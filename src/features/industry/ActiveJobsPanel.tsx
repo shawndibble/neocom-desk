@@ -560,12 +560,12 @@ export function ActiveJobsPanel({
           <span className="flex flex-wrap items-center gap-1.5">
             <span>{nameForBlueprint(job.blueprint_type_id)}</span>
             {soon(job) && (
-              <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-warning uppercase">
+              <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
                 {t('industry.jobsCompletingSoon')}
               </span>
             )}
             {done(job) && (
-              <span className="rounded-xs border border-success/50 bg-success/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-success uppercase">
+              <span className="rounded-xs border border-success/50 bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
                 {t('industry.jobsDone')}
               </span>
             )}

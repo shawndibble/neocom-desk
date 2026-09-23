@@ -451,7 +451,7 @@ export function NotificationsPanel() {
         {browserBlocked && (
           <p
             role="status"
-            className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-text"
+            className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning"
           >
             {t('settings.notifications.blockedNotice')}
           </p>

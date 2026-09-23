@@ -189,7 +189,7 @@ export function Alerts() {
           still stored, and a type muted individually is still listed behind the
           chip. Saying so beats a list that looks stale for no visible reason. */}
       {feedOff && (
-        <p className="rounded-xs border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
+        <p className="rounded-xs border border-warning/60 bg-warning/10 p-3 text-xs text-warning">
           {t('alerts.feedOff')}
         </p>
       )}

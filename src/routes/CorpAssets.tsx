@@ -596,7 +596,7 @@ function CorpAssetsView() {
               </div>
             )}
             {searchActive && (
-              <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-panel-2 px-3">
+              <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
                 <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                   {t('assets.search.resultCount', { count: searchMatches.length })}
                 </span>

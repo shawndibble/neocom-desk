@@ -105,7 +105,7 @@ export function EmploymentHistory() {
           return (
             <span className="inline-flex items-center gap-2">
               {name}
-              <span className="rounded-xs border border-success/50 bg-success/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-success uppercase">
+              <span className="rounded-xs border border-success/50 bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
                 {t('employmentHistory.current')}
               </span>
             </span>

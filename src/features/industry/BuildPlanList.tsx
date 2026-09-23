@@ -80,7 +80,7 @@ function VerdictTag({ verdict }: { verdict: PlanVerdictTag }) {
         : t('industry.verdictTagUnknown');
   return (
     <span
-      className={`rounded-xs border px-1.5 py-0.5 text-[0.625rem] font-semibold uppercase tracking-widest ${VERDICT_TAG_CLASS[verdict]}`}
+      className={`rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-widest ${VERDICT_TAG_CLASS[verdict]}`}
     >
       {label}
     </span>
