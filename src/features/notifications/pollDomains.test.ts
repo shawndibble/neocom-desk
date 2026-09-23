@@ -15,13 +15,13 @@ import {
   corpRosterDomain,
   corpWalletDomain,
   priceAlertDomain,
-  gatedOn,
   deriveMarketOrderEntries,
   domainForEvent,
   renderNotification,
   notificationSubjectId,
 } from './pollDomains';
 import { SUBJECT_ROUTED_EVENT_IDS } from './notificationOptions';
+import { eventEntry } from './eventEntries';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { resolveNames } from '@/features/character/names';
 import { getHubPrices } from '@/market/prices';
@@ -160,28 +160,51 @@ describe('POLL_DOMAINS', () => {
   });
 });
 
-describe('gatedOn', () => {
-  const snapshot = { entries: [], nowMs: 1 };
+describe('domain.diff: events derived from their entries (issue #1285)', () => {
+  const contract = { contractId: 7, issuerId: 1, acceptorId: 2 };
+  const prev = { entries: [{ ...contract, status: 'outstanding' as const }], nowMs: 1 };
+  const next = { entries: [{ ...contract, status: 'in_progress' as const }], nowMs: 2 };
 
-  it('runs the wrapped diff when its event is enabled', () => {
-    const diff = vi.fn(() => [{ eventId: 'newMail' as const, characterId: 1, mailId: 2 }]);
-    const gated = gatedOn('newMail', diff);
-    const fires = gated(1, undefined, snapshot, new Set<NotificationEventId>(['newMail']));
-    expect(diff).toHaveBeenCalledWith(1, undefined, snapshot);
-    expect(fires).toEqual([{ eventId: 'newMail', characterId: 1, mailId: 2 }]);
+  it("lists each domain's events in catalog order, from the entries naming its source", () => {
+    expect(Object.fromEntries(POLL_DOMAINS.map((domain) => [domain.id, domain.eventIds]))).toEqual({
+      skillQueue: ['skillLevelComplete', 'characterNotTraining'],
+      spExtraction: ['spExtractionReady'],
+      industryJobs: ['industryJobComplete'],
+      colonies: ['planetaryExtractionDone', 'planetaryExtractorExpiring'],
+      mail: ['newMail'],
+      calendar: ['newCalendarEvent', 'calendarEventStarting'],
+      contracts: ['contractAccepted', 'contractCompleted', 'contractFailed'],
+      wallet: ['walletBalanceChanged'],
+      marketOrders: ['marketOrderFilled'],
+      eveNotification: ['eveNotification'],
+      structureFuel: ['structureFuelLow'],
+      corpIndustryJobs: ['corpIndustryJobReady'],
+      corpRoster: ['corpMemberJoined', 'corpMemberLeft'],
+      corpWallet: ['corpWalletThreshold'],
+      priceAlert: ['priceAlertTriggered'],
+    });
   });
 
-  it('fires nothing and does not run the diff when its event is not enabled', () => {
-    const diff = vi.fn(() => [{ eventId: 'newMail' as const, characterId: 1, mailId: 2 }]);
-    const gated = gatedOn('newMail', diff);
-    const fires = gated(
-      1,
-      undefined,
-      snapshot,
-      new Set<NotificationEventId>(['calendarEventStarting'])
-    );
-    expect(diff).not.toHaveBeenCalled();
-    expect(fires).toEqual([]);
+  it("runs an event's diff when that event is enabled", () => {
+    expect(
+      contractDomain.diff(1, prev, next, new Set<NotificationEventId>(['contractAccepted']))
+    ).toEqual([{ eventId: 'contractAccepted', characterId: 1, contractId: 7 }]);
+  });
+
+  it("fires nothing for a shared snapshot's event that is not enabled", () => {
+    expect(
+      contractDomain.diff(1, prev, next, new Set<NotificationEventId>(['contractFailed']))
+    ).toEqual([]);
+  });
+
+  it('gives a domain a projection exactly when one of its entries declares one', () => {
+    for (const domain of POLL_DOMAINS) {
+      const projects = domain.eventIds.some((eventId) => eventEntry(eventId).projection !== null);
+      expect({ id: domain.id, projects: domain.projection !== undefined }).toEqual({
+        id: domain.id,
+        projects,
+      });
+    }
   });
 });
 

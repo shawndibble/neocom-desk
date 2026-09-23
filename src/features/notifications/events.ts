@@ -1,38 +1,27 @@
 /**
  * The fixed catalog of Notification Events (CONTEXT.md round 20): every
  * character-state change a user can be notified about, each independently
- * toggleable per Character. Scopes are derived from `ESI_REGISTRY`, never
+ * toggleable per Character. This is the service-worker-safe half of an event
+ * — id, label, gates, channel default — and the id union is derived from it.
+ * The other half (diff, copy, projectability, thresholds) is the event's
+ * Event Entry in `eventEntries.ts`, which the service worker never imports. Scopes are derived from `ESI_REGISTRY`, never
  * hand-copied, so an endpoint that changes scope upstream updates this table
  * for free (same rule `app/routeScopes.ts` follows).
  */
 import { ESI_REGISTRY, isScopeRequired, type EsiEndpointId, type Scope } from '@/esi/registry';
 import type { CorpCapability } from '@/engine/corpRoles';
 
-export type NotificationEventId =
-  | 'skillLevelComplete'
-  | 'characterNotTraining'
-  | 'spExtractionReady'
-  | 'industryJobComplete'
-  | 'newMail'
-  | 'planetaryExtractionDone'
-  | 'planetaryExtractorExpiring'
-  | 'marketOrderFilled'
-  | 'newCalendarEvent'
-  | 'calendarEventStarting'
-  | 'contractAccepted'
-  | 'contractCompleted'
-  | 'contractFailed'
-  | 'walletBalanceChanged'
-  | 'eveNotification'
-  | 'structureFuelLow'
-  | 'corpIndustryJobReady'
-  | 'corpMemberJoined'
-  | 'corpMemberLeft'
-  | 'corpWalletThreshold'
-  | 'priceAlertTriggered';
-
-export interface NotificationEventDef {
-  readonly id: NotificationEventId;
+/** Everything a catalog row says about its event besides its id. */
+interface NotificationEventTraits {
+  /**
+   * Which channels an untouched preference has on: `'both'` for nearly every
+   * event, `'feedOnly'` for the few worth a Feed row but not an interruption
+   * (CONTEXT.md round 45; `contractCompleted`/`contractFailed` by issue
+   * #1091's explicit decision — a forfeited courier is irreversible by the
+   * time you hear about it, so the value is the durable feed record, not a
+   * popup). Read by `eventSelection.ts`'s absence-means-default idiom.
+   */
+  readonly defaultChannels: 'both' | 'feedOnly';
   /** i18next key under the `settings.notifications.event.*` namespace. */
   readonly labelKey: string;
   /**
@@ -54,6 +43,10 @@ export interface NotificationEventDef {
   readonly corpCapability?: CorpCapability;
 }
 
+export interface NotificationEventDef extends NotificationEventTraits {
+  readonly id: NotificationEventId;
+}
+
 function requiredScope(endpoint: EsiEndpointId): Scope {
   const scope = ESI_REGISTRY[endpoint].scope;
   if (!isScopeRequired(scope)) {
@@ -62,15 +55,25 @@ function requiredScope(endpoint: EsiEndpointId): Scope {
   return scope;
 }
 
-export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
+/**
+ * A catalog row as written: `id` is any string here, because the id union is
+ * derived *from* this list (below) — so adding a Notification Event is one row
+ * in this array, and the compiler then demands its entry in
+ * `eventEntries.ts`.
+ */
+type CatalogRow = NotificationEventTraits & { readonly id: string };
+
+const CATALOG = [
   {
     id: 'skillLevelComplete',
     labelKey: 'settings.notifications.event.skillLevelComplete',
+    defaultChannels: 'both',
     scope: requiredScope('getCharacterSkillQueue'),
   },
   {
     id: 'characterNotTraining',
     labelKey: 'settings.notifications.event.characterNotTraining',
+    defaultChannels: 'both',
     scope: requiredScope('getCharacterSkillQueue'),
   },
   {
@@ -80,66 +83,79 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
     // setting itself before ever fetching skills for this reason.
     id: 'spExtractionReady',
     labelKey: 'settings.notifications.event.spExtractionReady',
+    defaultChannels: 'both',
     scope: requiredScope('getCharacterSkills'),
   },
   {
     id: 'industryJobComplete',
     labelKey: 'settings.notifications.event.industryJobComplete',
+    defaultChannels: 'both',
     scope: requiredScope('getCharacterIndustryJobs'),
   },
   {
     id: 'newMail',
     labelKey: 'settings.notifications.event.newMail',
+    defaultChannels: 'both',
     scope: requiredScope('getCharacterMailHeaders'),
   },
   {
     id: 'planetaryExtractionDone',
     labelKey: 'settings.notifications.event.planetaryExtractionDone',
+    defaultChannels: 'both',
     scope: requiredScope('getCharacterPlanets'),
   },
   {
     id: 'planetaryExtractorExpiring',
     labelKey: 'settings.notifications.event.planetaryExtractorExpiring',
+    defaultChannels: 'both',
     scope: requiredScope('getCharacterPlanets'),
   },
   {
     id: 'marketOrderFilled',
     labelKey: 'settings.notifications.event.marketOrderFilled',
+    defaultChannels: 'feedOnly',
     scope: requiredScope('getCharacterOrders'),
   },
   {
     id: 'newCalendarEvent',
     labelKey: 'settings.notifications.event.newCalendarEvent',
+    defaultChannels: 'both',
     scope: requiredScope('getCharacterCalendar'),
   },
   {
     id: 'calendarEventStarting',
     labelKey: 'settings.notifications.event.calendarEventStarting',
+    defaultChannels: 'both',
     scope: requiredScope('getCharacterCalendar'),
   },
   {
     id: 'contractAccepted',
     labelKey: 'settings.notifications.event.contractAccepted',
+    defaultChannels: 'both',
     scope: requiredScope('getCharacterContracts'),
   },
   {
     id: 'contractCompleted',
     labelKey: 'settings.notifications.event.contractCompleted',
+    defaultChannels: 'feedOnly',
     scope: requiredScope('getCharacterContracts'),
   },
   {
     id: 'contractFailed',
     labelKey: 'settings.notifications.event.contractFailed',
+    defaultChannels: 'feedOnly',
     scope: requiredScope('getCharacterContracts'),
   },
   {
     id: 'walletBalanceChanged',
     labelKey: 'settings.notifications.event.walletBalanceChanged',
+    defaultChannels: 'feedOnly',
     scope: requiredScope('getCharacterWallet'),
   },
   {
     id: 'eveNotification',
     labelKey: 'settings.notifications.event.eveNotification',
+    defaultChannels: 'both',
     scope: requiredScope('getCharacterNotifications'),
   },
   // The five corp events below (issue #299) deliberately take the ordinary
@@ -151,30 +167,35 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
   {
     id: 'structureFuelLow',
     labelKey: 'settings.notifications.event.structureFuelLow',
+    defaultChannels: 'both',
     scope: requiredScope('getCorporationStructures'),
     corpCapability: 'canReadStructures',
   },
   {
     id: 'corpIndustryJobReady',
     labelKey: 'settings.notifications.event.corpIndustryJobReady',
+    defaultChannels: 'both',
     scope: requiredScope('getCorporationIndustryJobs'),
     corpCapability: 'canReadIndustry',
   },
   {
     id: 'corpMemberJoined',
     labelKey: 'settings.notifications.event.corpMemberJoined',
+    defaultChannels: 'both',
     scope: requiredScope('getCorporationMembers'),
     corpCapability: 'canReadMembers',
   },
   {
     id: 'corpMemberLeft',
     labelKey: 'settings.notifications.event.corpMemberLeft',
+    defaultChannels: 'both',
     scope: requiredScope('getCorporationMembers'),
     corpCapability: 'canReadMembers',
   },
   {
     id: 'corpWalletThreshold',
     labelKey: 'settings.notifications.event.corpWalletThreshold',
+    defaultChannels: 'both',
     scope: requiredScope('getCorporationWallets'),
     corpCapability: 'canReadWallet',
   },
@@ -183,8 +204,13 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = [
   {
     id: 'priceAlertTriggered',
     labelKey: 'settings.notifications.event.priceAlertTriggered',
+    defaultChannels: 'both',
   },
-] as const;
+] as const satisfies readonly CatalogRow[];
+
+export type NotificationEventId = (typeof CATALOG)[number]['id'];
+
+export const NOTIFICATION_EVENTS: readonly NotificationEventDef[] = CATALOG;
 
 export const NOTIFICATION_EVENT_IDS: readonly NotificationEventId[] = NOTIFICATION_EVENTS.map(
   (event) => event.id

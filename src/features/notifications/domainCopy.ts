@@ -1,9 +1,10 @@
 /**
- * How each polled domain's Notification Events read (issue #1249): one entry
- * per `pollDomains.ts` domain, carrying its live (poll) wording, its hedged
- * Scheduled Push wording where it projects any, and the row a fire is about
- * for click routing. `pollDomains.ts` wires each entry onto its domain along
- * with the name lookups the copy needs; this module does no lookups, so every
+ * How each polled domain's Notification Events read (issue #1249): one copy
+ * table per `pollDomains.ts` domain, carrying its live (poll) wording, its
+ * hedged Scheduled Push wording where it projects any, and the row a fire is
+ * about for click routing. Each event's Event Entry (`eventEntries.ts`, issue
+ * #1285) names the table it reads and, if it projects, the push renderer; the
+ * domain supplies the name lookups the copy needs. This module does no lookups, so every
  * renderer here is a plain function of `(fire, characterName, names)` and
  * testable as a table.
  *

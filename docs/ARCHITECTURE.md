@@ -418,3 +418,26 @@ SDE rebuild: `npm run sde:build`.
 6. Build the route component in `src/routes/`, composing `components/ui` primitives (`Panel`, `DataAgeBadge` — required on every ESI-backed view, `EmptyState`, `Spinner`).
 7. Wire the route into `src/app/App.tsx` and give it a nav entry — the desktop rail plus the mobile More sheet (`Layout.tsx`), or a sub-nav tab if it belongs to an existing page (`features/skills/SkillsSubNav.tsx`, `features/character/OverviewSubNav.tsx`). A sub-nav tab still declares its own scopes in `routeScopes.ts`: tabs group views visually, they don't share a gate. If the route is gated, whichever nav renders it also renders the missing-scope marker.
 8. Add strings to `src/i18n/locales/en.json`; colocated unit tests; e2e mock additions in `e2e/support/mockEsi.ts` if the view needs e2e coverage.
+
+## 8. Adding a Notification Event
+
+Issue #1285. The work lands in two places, and the compiler holds you to the second.
+
+1. Add a row to the catalog in `src/features/notifications/events.ts`: id, label key, scope, corp capability and `defaultChannels`. Add the label string at `settings.notifications.event.<id>` in `en.json`. This half is service-worker-safe, and the `NotificationEventId` union is derived from it.
+2. Once the id exists, `NOTIFICATION_EVENT_ENTRIES` in `src/features/notifications/eventEntries.ts` fails to typecheck until the event has an **Event Entry**. The entry names every required field:
+   - `source`: the `SNAPSHOT_SOURCES` handle of the poll domain it reads.
+   - `diff`: an engine diff, written test-first in `src/engine/notificationDiffs.ts`.
+   - `copy`: its live wording in `domainCopy.ts` and `notifications.fired.*` strings.
+   - `projection`: either a push renderer or `null`. `engine/projection.ts`'s `PROJECTABLE_EVENT_IDS` decides which, per id.
+   - `thresholds`: fields from `eventThresholds.ts`, or `null`.
+   - `rowHintKey`: a row hint, or `null`.
+3. If the event needs data no domain fetches yet, add a domain to `pollDomains.ts` that names a new `SNAPSHOT_SOURCES` handle.
+4. A new fire type must join `AnyNotificationFire` (`eventEntries.ts`), or the entry's `diff` fails to typecheck. Joining it then makes `engine/occurrenceKey.ts`'s exhaustive `OccurrenceFire` switch demand a case.
+
+You don't touch the domain's event list, its per-event gating, its live renderer or Settings' row for the new event. The domain's event list, its per-event gating and its live renderer are derived from the entries. Settings' row gets its threshold controls, hint, height and Scheduled Push badge from the entry too.
+
+Some per-event sites stay by hand, because they are either service-worker-side or event-specific by nature:
+
+- `notificationOptions.ts`'s `SUBJECT_URLS` and routes
+- `eveNotification`'s per-type sub-list
+- the `projection.ts` `project*` runners, called from their domain

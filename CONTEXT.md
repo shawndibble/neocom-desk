@@ -272,6 +272,13 @@ here — they go one per file in `docs/context/decisions/`.
   the single event is fetched/toggled like every other, and each raw `type`
   string gets its own independent opt-out underneath, discovered as it fires
   rather than enumerated from a closed list.
+- **Event Entry**: The one declaration of a **Notification Event**'s
+  behaviour (`features/notifications/eventEntries.ts`, issue #1285): which
+  poll domain's snapshot it reads, its diff, its live copy, whether and how it
+  projects as a Scheduled Push, and the threshold fields it owns. Settings'
+  per-event controls are derived from it. Distinct from the event's catalog
+  row (`events.ts`: id, label, scope, default channels), which the service
+  worker reads and the Event Entry deliberately is not.
 - **Exportable Rate**: What one PI colony has going spare an hour, by product
   typeID — what its own factories make, less its **Local Draw**. This, never
   gross production, is what a **Colony Network** plan may spend: a colony
