@@ -63,6 +63,8 @@ import { formatIskAuto, formatIskCompact } from '@/lib/isk';
 import { formatMagnitude } from '@/lib/magnitude';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
+import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { boolParam, enumParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
 
 /** Rows shown before "show all" — the same cap the item results use. */
 const ROW_CAP = 50;
@@ -86,19 +88,6 @@ interface CourierUiFilter {
   maxVolume: string;
   minDays: string;
 }
-
-const EMPTY_UI_FILTER: CourierUiFilter = {
-  routeQuery: '',
-  originRegionId: null,
-  destinationRegionId: null,
-  destinationSpace: SPACE_KINDS,
-  hideUncompletable: false,
-  overRate: 'all',
-  minReward: '',
-  maxCollateral: '',
-  maxVolume: '',
-  minDays: '',
-};
 
 /**
  * Only the bands these hauls actually end in — the same rule `regionOptionsFor`
@@ -622,6 +611,23 @@ const ROUTE_PREFERENCES: readonly RoutePreferenceKind[] = [
  */
 const DEFAULT_ROUTE_PREFERENCE: RoutePreferenceKind = 'prefer-highsec';
 
+/** The Courier board's own filter, route preference and show-all, in the URL (ADR 0015) as one group. */
+const COURIER_FILTER_PARAMS = {
+  'courier.q': textParam(),
+  'courier.origin': optionalIdParam(),
+  'courier.dest': optionalIdParam(),
+  'courier.space': enumSetParam(SPACE_KINDS),
+  'courier.hideRisky': boolParam(),
+  'courier.overRate': enumParam(OVER_RATE_FILTERS, 'all'),
+  'courier.minReward': textParam(),
+  'courier.maxCollateral': textParam(),
+  'courier.maxVolume': textParam(),
+  'courier.minDays': textParam(),
+  'courier.pref': enumParam(ROUTE_PREFERENCES, DEFAULT_ROUTE_PREFERENCE),
+  'courier.all': boolParam(),
+};
+const COURIER_SORT = { columnId: 'iskPerJump', direction: 'desc' } as const;
+
 /**
  * Jumps for every filtered row, recomputed when the rows or the preference
  * change.
@@ -807,9 +813,28 @@ interface CourierResultsProps {
 export function CourierResults({ rows, regionNames, characterId }: CourierResultsProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  const [uiFilter, setUiFilter] = useState<CourierUiFilter>(EMPTY_UI_FILTER);
-  const [preference, setPreference] = useState<RoutePreferenceKind>(DEFAULT_ROUTE_PREFERENCE);
-  const [showAll, setShowAll] = useState(false);
+  const [params, setParams] = useUrlParams(COURIER_FILTER_PARAMS);
+  const uiFilter = useMemo<CourierUiFilter>(
+    () => ({
+      routeQuery: params['courier.q'],
+      originRegionId: params['courier.origin'],
+      destinationRegionId: params['courier.dest'],
+      destinationSpace: [...params['courier.space']],
+      hideUncompletable: params['courier.hideRisky'],
+      overRate: params['courier.overRate'],
+      minReward: params['courier.minReward'],
+      maxCollateral: params['courier.maxCollateral'],
+      maxVolume: params['courier.maxVolume'],
+      minDays: params['courier.minDays'],
+    }),
+    [params]
+  );
+  const preference = params['courier.pref'];
+  const showAll = params['courier.all'];
+  const setShowAll = useCallback(
+    (value: boolean) => setParams({ 'courier.all': value }),
+    [setParams]
+  );
   const [selectedRow, setSelectedRow] = useState<CourierRouteRow | null>(null);
 
   // Where the character is (issue #940), owned here rather than by the control
@@ -1022,8 +1047,19 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   }, [selectedRow, rows, filter, narrowToCompletable, narrowToOverRate]);
 
   function changeFilter(next: CourierUiFilter) {
-    setUiFilter(next);
-    setShowAll(false);
+    setParams({
+      'courier.q': next.routeQuery,
+      'courier.origin': next.originRegionId,
+      'courier.dest': next.destinationRegionId,
+      'courier.space': new Set(next.destinationSpace),
+      'courier.hideRisky': next.hideUncompletable,
+      'courier.overRate': next.overRate,
+      'courier.minReward': next.minReward,
+      'courier.maxCollateral': next.maxCollateral,
+      'courier.maxVolume': next.maxVolume,
+      'courier.minDays': next.minDays,
+      'courier.all': false,
+    });
   }
 
   /**
@@ -1041,8 +1077,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   }
 
   function changePreference(next: RoutePreferenceKind) {
-    setPreference(next);
-    setShowAll(false);
+    setParams({ 'courier.pref': next, 'courier.all': false });
   }
 
   const columns = useMemo<DataTableColumn<CourierRouteRow>[]>(() => {
@@ -1217,6 +1252,11 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
       },
     ];
   }, [t, regionNames, timeZone, jumps.kind, jumpsByContract, multipleFor]);
+  const courierSortProps = useUrlSort(
+    'courier.sort',
+    COURIER_SORT,
+    columns.map((column) => column.id)
+  );
 
   const visibleRows = showAll ? displayRows : displayRows.slice(0, ROW_CAP);
 
@@ -1321,7 +1361,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
             // contract lists an item line per stack — so `contractId` alone is
             // a unique key.
             rowKey={(row) => String(row.contractId)}
-            defaultSort={{ columnId: 'iskPerJump', direction: 'desc' }}
+            {...courierSortProps}
             onRowClick={setSelectedRow}
             // Hundreds of hauls are scanned, not read: the dense two-line card
             // fits three times the labelled one on a phone.
