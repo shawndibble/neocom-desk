@@ -46,6 +46,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
+  loadAttributeDictionary,
   loadMarketGroups,
   loadMarketTypes,
   loadNpcStations,
@@ -105,6 +106,12 @@ import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
+import { RequiredSkillsSection } from '@/features/market/RequiredSkillsSection';
+import { loadAttributeReferenceNames } from '@/features/market/attributeReferenceNames';
+import { extractRequiredSkills, type RequiredSkill } from '@/features/skills/dogma';
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { useTargetPlan } from '@/features/skills/useTargetPlan';
+import type { TrainedSkill } from '@/engine/types';
 import { CompareDrawer } from '@/features/market/CompareDrawer';
 import { useCompareSet } from '@/features/market/compareSet';
 import { QuickbarList } from '@/features/market/QuickbarList';
@@ -141,7 +148,7 @@ import {
   resolveMarketLocation,
   type MarketLocationParam,
 } from '@/engine/market/urlState';
-import type { RegionOrder } from '@/esi/endpoints';
+import { getUniverseType, type RegionOrder } from '@/esi/endpoints';
 import { formatIsk } from '@/lib/isk';
 import type { MarketFocusSearchState } from '@/lib/shortcuts';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
@@ -304,6 +311,96 @@ function SecurityCell({ order, npcStations, solarSystems, t }: LocationCellProps
     >
       {value}
     </span>
+  );
+}
+
+interface OrderDetailPanelProps {
+  order: RegionOrder;
+  npcStations: ReadonlyMap<number, NpcStationLookup>;
+  solarSystems: ReadonlyMap<number, SolarSystemLookup>;
+  /** This table's columns the pilot has hidden via the column picker — shown here instead. */
+  hiddenColumns: readonly MarketOrderColumnId[];
+  orderColumnsById: Record<MarketOrderColumnId, DataTableColumn<RegionOrder>>;
+  itemSkills: {
+    typeId: number;
+    requiredSkills: RequiredSkill[];
+    skillNames: Readonly<Record<number, string>>;
+  } | null;
+  trainedSkills: ReadonlyMap<number, TrainedSkill>;
+  targetPlan: ReturnType<typeof useTargetPlan>;
+  activeCharacterId: number | null;
+  itemName: string;
+  t: Translate;
+}
+
+/**
+ * An order row's expand (`DataTable`'s `expandableRow`): whatever this table
+ * isn't already showing as a column, plus two facts no column carries at
+ * all — a player structure's location isn't the game's own NPC-station
+ * network, and this item's skill requirements are the character's, not the
+ * order's, but a pilot scanning the book for a seller wants both in the same
+ * place rather than a second trip through "Show Info".
+ */
+function OrderDetailPanel({
+  order,
+  npcStations,
+  solarSystems,
+  hiddenColumns,
+  orderColumnsById,
+  itemSkills,
+  trainedSkills,
+  targetPlan,
+  activeCharacterId,
+  itemName,
+  t,
+}: OrderDetailPanelProps) {
+  const location = resolveOrderLocation(order, npcStations, solarSystems);
+  const isPlayerStructure = location.stationName === null;
+  const skillsLoaded = itemSkills !== null && itemSkills.typeId === order.type_id;
+  const hasSkills = skillsLoaded && itemSkills.requiredSkills.length > 0;
+  const hasFields = hiddenColumns.length > 0 || isPlayerStructure;
+
+  return (
+    <div className="space-y-3">
+      {hasFields && (
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-3">
+          {isPlayerStructure && (
+            <div>
+              <div className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('market.orderDetail.structureType')}
+              </div>
+              <div className="text-text">{t('market.orderDetail.playerStructure')}</div>
+            </div>
+          )}
+          {hiddenColumns.map((id) => {
+            const column = orderColumnsById[id];
+            return (
+              <div key={id}>
+                <div className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {column.header}
+                </div>
+                <div className="text-text">{column.render(order)}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {skillsLoaded && hasSkills && (
+        <RequiredSkillsSection
+          requiredSkills={itemSkills.requiredSkills}
+          skillNames={itemSkills.skillNames}
+          trainedSkills={trainedSkills}
+          target={targetPlan}
+          hasCharacter={activeCharacterId !== null}
+          itemName={itemName}
+        />
+      )}
+
+      {!hasFields && skillsLoaded && !hasSkills && (
+        <p className="text-xs text-text-dim">{t('market.orderDetail.empty')}</p>
+      )}
+    </div>
   );
 }
 
@@ -679,6 +776,74 @@ export function Market() {
     (ty, id) => ty.typeId === id
   );
   const selectedTypeId = parsedParams.typeId !== null && typeIsValid ? parsedParams.typeId : null;
+
+  // Required-skills-to-use, for the order row expand (`OrderDetailPanel`)
+  // below — the same section and the same fetch `ItemDetailModal` already
+  // does for "Show Info", read once per selected item here instead of once
+  // per opened row: every order in the book is the same item, so the answer
+  // is identical for all of them.
+  const [itemSkills, setItemSkills] = useState<{
+    typeId: number;
+    requiredSkills: RequiredSkill[];
+    skillNames: Readonly<Record<number, string>>;
+  } | null>(null);
+  useEffect(() => {
+    if (selectedTypeId === null) return;
+    let cancelled = false;
+    void (async () => {
+      // Never rejects: same as `ItemDetailModal`'s own `pi.catch(() => null)`
+      // — a nice-to-have fetch for a row-expand section that already renders
+      // nothing while `itemSkills` is null, so a failure just leaves it out
+      // rather than needing an error state of its own.
+      try {
+        const [{ data: type }, dictionary] = await Promise.all([
+          getUniverseType(selectedTypeId),
+          loadAttributeDictionary(),
+        ]);
+        if (cancelled || !type) return;
+        const names = await loadAttributeReferenceNames([type.dogma_attributes], dictionary);
+        if (cancelled) return;
+        setItemSkills({
+          typeId: selectedTypeId,
+          requiredSkills: extractRequiredSkills(type.dogma_attributes),
+          skillNames: names.types ?? {},
+        });
+      } catch {
+        // Left null — see comment above.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTypeId]);
+
+  const [trainedSkills, setTrainedSkills] = useState<ReadonlyMap<number, TrainedSkill>>(new Map());
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (activeCharacterId === null) {
+        if (!cancelled) setTrainedSkills(new Map());
+        return;
+      }
+      // Queue-corrected, like every other trained-level read (ItemDetailModal,
+      // usePlanEditorData) — a level the queue just finished but /skills
+      // hasn't caught up to would otherwise show wrong here while everywhere
+      // else shows it trained.
+      try {
+        const corrected = await loadCorrectedSkills(activeCharacterId, Date.now(), {
+          skipQueueWithoutScope: true,
+        });
+        if (!cancelled) setTrainedSkills(corrected.trained);
+      } catch {
+        // Left at whatever it was — a nice-to-have read for the row-expand
+        // skills section, not something worth an error state of its own.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCharacterId]);
+  const targetPlan = useTargetPlan(activeCharacterId);
 
   // One pass over `groups` builds both lookups this route needs — by id (this
   // param's validation and the ancestor walk below) and by parent
@@ -1337,6 +1502,17 @@ export function Market() {
       ),
     [visibleOrderColumns, orderColumnsById]
   );
+  // What each table's row expand (`OrderDetailPanel`) shows that the visible
+  // columns don't — the picker's hidden ids, per table, since Sell and Buy
+  // don't offer the same columns to begin with.
+  const sellHiddenColumns = useMemo(
+    () => SELL_ORDER_COLUMN_IDS.filter((id) => !visibleOrderColumns.includes(id)),
+    [visibleOrderColumns]
+  );
+  const buyHiddenColumns = useMemo(
+    () => BUY_ORDER_COLUMN_IDS.filter((id) => !visibleOrderColumns.includes(id)),
+    [visibleOrderColumns]
+  );
 
   function handleToggle(groupId: number) {
     const setter = filterResult !== null ? setSearchCollapsedIds : setExpandedIds;
@@ -1988,6 +2164,23 @@ export function Market() {
                               rowClassName={(o) =>
                                 myOrderIds.has(o.order_id) ? 'row-mine' : undefined
                               }
+                              expandableRow={{
+                                renderDetail: (o) => (
+                                  <OrderDetailPanel
+                                    order={o}
+                                    npcStations={npcStationMap}
+                                    solarSystems={solarSystemMap}
+                                    hiddenColumns={sellHiddenColumns}
+                                    orderColumnsById={orderColumnsById}
+                                    itemSkills={itemSkills}
+                                    trainedSkills={trainedSkills}
+                                    targetPlan={targetPlan}
+                                    activeCharacterId={activeCharacterId}
+                                    itemName={selectedItem?.name ?? ''}
+                                    t={t}
+                                  />
+                                ),
+                              }}
                             />
                             {!sellShowAll && sortedSell.length > ROW_CAP && (
                               <div className="px-3 py-2">
@@ -2059,6 +2252,23 @@ export function Market() {
                               rowClassName={(o) =>
                                 myOrderIds.has(o.order_id) ? 'row-mine' : undefined
                               }
+                              expandableRow={{
+                                renderDetail: (o) => (
+                                  <OrderDetailPanel
+                                    order={o}
+                                    npcStations={npcStationMap}
+                                    solarSystems={solarSystemMap}
+                                    hiddenColumns={buyHiddenColumns}
+                                    orderColumnsById={orderColumnsById}
+                                    itemSkills={itemSkills}
+                                    trainedSkills={trainedSkills}
+                                    targetPlan={targetPlan}
+                                    activeCharacterId={activeCharacterId}
+                                    itemName={selectedItem?.name ?? ''}
+                                    t={t}
+                                  />
+                                ),
+                              }}
                             />
                             {!buyShowAll && sortedBuy.length > ROW_CAP && (
                               <div className="px-3 py-2">
