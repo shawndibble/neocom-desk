@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -233,8 +234,7 @@ function Harness({
         catalog={catalog}
         pi={null}
         ownedBlueprints={[]}
-        skills={{}}
-        implantBonusPct={0}
+        modifiers={NO_CHARACTER_MODIFIERS}
         ownedStockSnapshot={EMPTY_OWNED_STOCK_SNAPSHOT}
         corpOwnedStock={{ ...CORP_OWNED_STOCK_UNAVAILABLE, ...corpOwnedStock }}
         corpOwnedBlueprints={{ ...CORP_OWNED_BLUEPRINTS_UNAVAILABLE, ...corpOwnedBlueprints }}

@@ -24,6 +24,7 @@ import type {
 } from '@/engine/industry/types';
 import { EMPTY_RIG_FIT, FACILITY_PRESETS } from '@/engine/industry/types';
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { sizeRuns } from '@/engine/industry/runSizing';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 
@@ -69,7 +70,8 @@ export interface MakeOrBuyContext {
    * the plan's own materials.
    */
   materialPrices: HubPrices;
-  skills: SkillLevels;
+  /** See `IndustryInputs.modifiers`. */
+  modifiers: CharacterModifiers;
   /**
    * The Reaction Location (issue #698), when Include Reactions is on for
    * this plan — quoted instead of the fixed unfitted-Athanor fallback below.
@@ -80,7 +82,7 @@ export interface MakeOrBuyContext {
   reactionFacility?: ReactionFacilityContext;
   /**
    * Account-wide trained skills (issue #1231), keyed by characterId — not
-   * `skills` above, which is one character's map used for job-cost math.
+   * `modifiers` above, which is one character's own, used for job-cost math.
    * When present, a manufacturing or reaction recipe nobody on the account
    * can install forces `verdict: 'buy'` regardless of cost, with `skillGate`
    * set to say why. Absent entirely, the verdict stays purely cost-based —
@@ -141,7 +143,7 @@ function jobUnitCost(
     systemCostIndex: ctx.systemCostIndex,
     adjustedPrices: ctx.adjustedPrices,
     hubPrices: ctx.materialPrices,
-    skills: ctx.skills,
+    modifiers: ctx.modifiers,
   });
   // Not `unpriceable`: that also trips when the *product* — the material we
   // are pricing — has no hub listing, which says nothing about build cost.

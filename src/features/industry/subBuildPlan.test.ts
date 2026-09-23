@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { IndustryBlueprint } from '@/engine/industry/types';
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
@@ -22,7 +23,7 @@ const CTX = {
   security: 'highsec' as const,
   systemCostIndex: 0.05,
   adjustedPrices: {},
-  skills: {},
+  modifiers: NO_CHARACTER_MODIFIERS,
 };
 
 const sealBlueprint: IndustryBlueprint = {

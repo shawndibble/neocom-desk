@@ -20,7 +20,7 @@ const typeVolumes = new Map([
 ]);
 
 function row(overrides: Partial<MiningYieldRow> = {}): MiningYieldRow {
-  return {
+  const base: Omit<MiningYieldRow, 'byBasis'> = {
     characterId: 1,
     characterName: 'Miner Alt',
     entry: {
@@ -60,7 +60,17 @@ function row(overrides: Partial<MiningYieldRow> = {}): MiningYieldRow {
       ],
     },
     materialUnitPrices: new Map([[TRITANIUM, 3]]),
+    priceSource: 'saved',
     ...overrides,
+  };
+  const valued = {
+    valuation: base.valuation,
+    materialUnitPrices: base.materialUnitPrices,
+    priceSource: base.priceSource,
+  };
+  return {
+    ...base,
+    byBasis: { buy: valued, sell: valued, 'now-buy': valued, 'now-sell': valued },
   };
 }
 

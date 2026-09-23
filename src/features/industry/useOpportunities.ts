@@ -22,7 +22,7 @@
  * codebase's `react-hooks/set-state-in-effect` rule.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { SkillLevels } from '@/engine/industry/types';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { PiData } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -53,9 +53,7 @@ export interface UseOpportunitiesArgs {
   pi: PiData | null;
   hub: TradeHub;
   facilityDefaults: ActivityFacilityDefaults;
-  skills: SkillLevels;
-  /** The active Character's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
-  implantBonusPct: number;
+  modifiers: CharacterModifiers;
   ownedStockSnapshot: OwnedStockSnapshot;
   /** Every owned blueprint by character, so a sub-build the recursive engine prices quotes at a researched copy's real ME where the pilot owns one. */
   ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>;
@@ -90,8 +88,7 @@ export function useOpportunities({
   pi,
   hub,
   facilityDefaults,
-  skills,
-  implantBonusPct,
+  modifiers,
   ownedStockSnapshot,
   ownedByCharacter,
   assumedMe,
@@ -157,8 +154,7 @@ export function useOpportunities({
             candidate,
             snapshot,
             facilityDefaults,
-            skills,
-            implantBonusPct,
+            modifiers,
             stock,
             {
               recipeFor,
@@ -200,8 +196,7 @@ export function useOpportunities({
     pi,
     hub,
     facilityDefaults,
-    skills,
-    implantBonusPct,
+    modifiers,
     ownedStockSnapshot,
     ownedByCharacter,
     assumedMe,

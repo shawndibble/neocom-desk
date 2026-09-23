@@ -12,6 +12,7 @@ import type {
 import { computeOrderFillQuantity } from '@/engine/industry/orderWatch';
 import { realizedProfit, type RealizedProfitResult } from '@/engine/industry/realizedProfit';
 import { SKILL_IDS, type SkillLevels } from '@/engine/industry/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
 
 export type ProductionRunStatus = 'new' | 'open' | 'closed';
 
@@ -39,7 +40,16 @@ export function summarizeProductionRun(
   run: ProductionRunRecord,
   saleLinks: readonly ProductionSaleLinkRecord[],
   orderWatches: readonly ProductionOrderWatchRecord[],
-  skills: SkillLevels
+  skills: SkillLevels,
+  /**
+   * The run owner's standing toward the watched order's station owner
+   * (issue #1238). `ProductionOrderWatchRecord` carries no `location_id` of
+   * its own — only `orderId` — so every caller resolves this against the
+   * run's own Build Plan's configured Trade Hub instead, the same reasonable
+   * fallback `realizedProfit`'s own doc comment anticipates. Absent/0 =
+   * standings assumed 0, today's behaviour.
+   */
+  standing?: ResolvedStandings
 ): ProductionRunSummary {
   const runSaleLinks = saleLinks.filter((l) => l.runId === run.id);
   const runOrderWatches = orderWatches
@@ -63,6 +73,7 @@ export function summarizeProductionRun(
     accountingLevel: skills[SKILL_IDS.accounting] ?? 0,
     brokerFeeableRevenue: watchRevenue,
     brokerRelationsLevel: skills[SKILL_IDS.brokerRelations] ?? 0,
+    standing,
   });
 
   const remaining = Math.max(0, run.quantity - quantitySold);

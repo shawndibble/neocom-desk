@@ -10,7 +10,7 @@
  * and the vocabulary note in the issue: this is deliberately not the Tax
  * tab's `MiningLedgerEntry`/`Assignment`/`Payee` model).
  */
-import { lazy, Suspense, useMemo, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -40,7 +40,21 @@ import {
   type MiningYieldSnapshot,
 } from './yieldSnapshot';
 import { iskPerCalendarHour } from '@/engine/miningTax/yieldRate';
+import { daysCovered, eveToday, rangeDates, rangeStartDate } from '@/engine/miningTax/yieldRange';
+import { useMiningYieldRange } from './yieldRangePref';
+import { useMiningPriceBasis } from './priceBasisPref';
+import { MobileSettings, PriceBasisOptions, RangeControl, ValueMenu } from './OverviewSettings';
+import { basisLabel } from './basisLabel';
+import {
+  basisSide,
+  countDaysBySource,
+  isNowBasis,
+  weakestSource,
+  type PriceSource,
+} from '@/engine/miningTax/priceBasis';
 import { YieldDetailModal } from './YieldDetailModal';
+import { sumVolume, volumeDisplayMode } from './volume';
+import { VolumeDisplay } from './volumeDisplay';
 import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
 
 const LazyMiningYieldCharts = lazy(() => import('./MiningYieldCharts'));
@@ -55,24 +69,14 @@ function loadSnapshot(): Promise<MiningYieldSnapshot> {
   return loadMiningYieldSnapshot();
 }
 
-/**
- * A row's mined m³ — units times the type's own unit volume, not the bare
- * unit count this column used to format through `formatVolume`. `complete`
- * is false when the SDE bake carries no volume for one of the types, so the
- * caller can render an em dash rather than a total that silently omits it.
- */
-function entryVolume(
-  row: MiningYieldRow,
-  typeVolumes: ReadonlyMap<number, number>
-): { m3: number; complete: boolean } {
-  let m3 = 0;
-  let complete = true;
-  for (const line of row.entry.oreLines) {
-    const unit = typeVolumes.get(line.typeId);
-    if (unit === undefined) complete = false;
-    else m3 += unit * line.quantity;
-  }
-  return { m3, complete };
+/** A row's mined m³ — units times the type's own unit volume for each ore line. */
+function entryVolume(row: MiningYieldRow, typeVolumes: ReadonlyMap<number, number>) {
+  return sumVolume(
+    row.entry.oreLines,
+    (line) => line.typeId,
+    (line) => line.quantity,
+    typeVolumes
+  );
 }
 
 function dateRangeLabel(dates: readonly string[]): string {
@@ -81,6 +85,25 @@ function dateRangeLabel(dates: readonly string[]): string {
   const first = sorted[0];
   const last = sorted[sorted.length - 1];
   return first === last ? first : `${first} – ${last}`;
+}
+
+const SOURCE_TAG_CLASS: Record<PriceSource, string> = {
+  saved: 'border-line-bright text-text-dim',
+  average: 'border-warning/50 text-warning',
+  live: 'border-accent-dim text-accent',
+  none: 'border-line text-text-dim',
+};
+
+/** Saved / Daily avg / Live / No price — where a row's ore prices came from on the chosen basis. */
+function PriceSourceTag({ source }: { source: PriceSource }) {
+  const { t } = useTranslation();
+  return (
+    <span
+      className={`rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${SOURCE_TAG_CLASS[source]}`}
+    >
+      {t(`miningTax.overview.priceSource.${source}`)}
+    </span>
+  );
 }
 
 interface OverviewTabProps {
@@ -99,38 +122,77 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
   const [characterFilter, setCharacterFilter] = useState<CharacterFilterValue>('all');
   const [detailRow, setDetailRow] = useState<MiningYieldRow | null>(null);
   const resolvedCharacterFilter = useResolvedCharacterFilter(characterFilter, activeCharacterId);
+  const range = useMiningYieldRange((state) => state.value);
+  const setRange = useMiningYieldRange((state) => state.setValue);
+  const hydrateRange = useMiningYieldRange((state) => state.hydrate);
+  const basis = useMiningPriceBasis((state) => state.value);
+  const setBasis = useMiningPriceBasis((state) => state.setValue);
+  const hydrateBasis = useMiningPriceBasis((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateRange();
+    void hydrateBasis();
+  }, [hydrateRange, hydrateBasis]);
+  // EVE/UTC, the ledger's own calendar. Recomputed each render so a tab left
+  // open past downtime moves its window with the day.
+  const today = eveToday();
 
   const characters = data?.characters ?? [];
   const showCharacterColumn = characters.length > 1;
 
-  const visibleRows = useMemo(
+  const characterRows = useMemo(
     () =>
       (data?.rows ?? []).filter(
         (row) => resolvedCharacterFilter === 'all' || resolvedCharacterFilter.has(row.characterId)
       ),
     [data, resolvedCharacterFilter]
   );
+  // In range, and re-valued on the chosen price basis — every basis is
+  // precomputed in the snapshot, so this is a swap, never a refetch.
+  const visibleRows = useMemo(() => {
+    const start = rangeStartDate(range, today);
+    return characterRows
+      .filter((row) => row.entry.date >= start && row.entry.date <= today)
+      .map((row) => ({ ...row, ...row.byBasis[basis] }));
+  }, [characterRows, range, today, basis]);
+  const daysBySource = useMemo(
+    () =>
+      countDaysBySource(
+        visibleRows.map((row) => ({ date: row.entry.date, source: row.priceSource }))
+      ),
+    [visibleRows]
+  );
+  const coverage = useMemo(() => {
+    let oldestSaved: string | null = null;
+    for (const row of characterRows) {
+      if (oldestSaved === null || row.entry.date < oldestSaved) oldestSaved = row.entry.date;
+    }
+    return daysCovered(
+      visibleRows.map((row) => row.entry.date),
+      range,
+      today,
+      oldestSaved
+    );
+  }, [characterRows, visibleRows, range, today]);
 
   const totals = useMemo(() => {
     const typeVolumes = data?.typeVolumes ?? new Map<number, number>();
     let rawValue = 0;
     let refineValue = 0;
-    let volume = 0;
-    let volumeComplete = true;
+    let volumeM3 = 0;
+    const missingVolumeTypeIds = new Set<number>();
     const dates: string[] = [];
     for (const row of visibleRows) {
       rawValue += row.valuation.rawValue;
       refineValue += row.valuation.refineValue;
       dates.push(row.entry.date);
       const rowVolume = entryVolume(row, typeVolumes);
-      volume += rowVolume.m3;
-      if (!rowVolume.complete) volumeComplete = false;
+      volumeM3 += rowVolume.m3;
+      for (const typeId of rowVolume.missingTypeIds) missingVolumeTypeIds.add(typeId);
     }
     return {
       rawValue,
       refineValue,
-      volume,
-      volumeComplete,
+      volume: { m3: volumeM3, missingTypeIds: [...missingVolumeTypeIds] },
       dates,
       iskPerHour: iskPerCalendarHour(rawValue, dates),
     };
@@ -138,13 +200,25 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
 
   const dailyRate: DailyRatePoint[] = useMemo(() => {
     const byDate = new Map<string, number>();
+    const sourcesByDate = new Map<string, PriceSource[]>();
     for (const row of visibleRows) {
       byDate.set(row.entry.date, (byDate.get(row.entry.date) ?? 0) + row.valuation.rawValue);
+      const list = sourcesByDate.get(row.entry.date) ?? [];
+      list.push(row.priceSource);
+      sourcesByDate.set(row.entry.date, list);
     }
-    return [...byDate.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, value]) => ({ date, iskPerHour: value / 24 }));
-  }, [visibleRows]);
+    // Every day of the range, mined or not, so the axis spans the whole window
+    // and a gap (or days before saved history began) reads as a gap. Each bar
+    // carries its day's weakest price source, so the chart can colour it.
+    return rangeDates(range, today).map((date) => {
+      const sources = sourcesByDate.get(date);
+      return {
+        date,
+        iskPerHour: (byDate.get(date) ?? 0) / 24,
+        source: sources ? weakestSource(sources) : null,
+      };
+    });
+  }, [visibleRows, range, today]);
 
   const typeComparison: TypeComparisonPoint[] = useMemo(() => {
     const byType = new Map<number, { rawValue: number; refineValue: number }>();
@@ -205,14 +279,14 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.overview.volumeColumn'),
       align: 'right',
       className: 'whitespace-nowrap tabular-nums',
-      render: (row) => {
-        const volume = entryVolume(row, data?.typeVolumes ?? new Map());
-        return volume.complete ? formatVolume(volume.m3) : '—';
-      },
-      sortValue: (row) => {
-        const volume = entryVolume(row, data?.typeVolumes ?? new Map());
-        return volume.complete ? volume.m3 : undefined;
-      },
+      render: (row) => (
+        <VolumeDisplay
+          volume={entryVolume(row, data?.typeVolumes ?? new Map())}
+          typeNames={data?.typeNames ?? new Map()}
+          t={t}
+        />
+      ),
+      sortValue: (row) => entryVolume(row, data?.typeVolumes ?? new Map()).m3,
     },
     {
       id: 'rawValue',
@@ -234,12 +308,17 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       id: 'pricing',
       header: t('miningTax.overview.pricingColumn'),
       className: 'whitespace-nowrap',
-      cellClassName: (row) => (row.valuation.pricedAll ? 'text-text-dim' : 'text-warning'),
-      render: (row) =>
-        row.valuation.pricedAll
-          ? t('miningTax.overview.pricingFull')
-          : t('miningTax.overview.pricingPartial'),
-      sortValue: (row) => (row.valuation.pricedAll ? 1 : 0),
+      render: (row) => (
+        <span className="flex items-center gap-1.5">
+          <PriceSourceTag source={row.priceSource} />
+          {!row.valuation.pricedAll && (
+            <span className="text-[0.6875rem] text-warning">
+              {t('miningTax.overview.pricingPartial')}
+            </span>
+          )}
+        </span>
+      ),
+      sortValue: (row) => `${row.priceSource}:${row.valuation.pricedAll ? 1 : 0}`,
     },
   ];
 
@@ -252,6 +331,18 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
         meta={data?.fetchedAt ? <DataAgeBadge date={data.fetchedAt} /> : undefined}
         actions={
           <>
+            <div className="hidden items-center gap-2 sm:flex">
+              <RangeControl value={range} onChange={(next) => void setRange(next)} />
+              <ValueMenu basis={basis}>
+                <PriceBasisOptions value={basis} onChange={(next) => void setBasis(next)} />
+              </ValueMenu>
+            </div>
+            <div className="sm:hidden">
+              <MobileSettings range={range} basis={basis}>
+                <RangeControl value={range} onChange={(next) => void setRange(next)} fill />
+                <PriceBasisOptions value={basis} onChange={(next) => void setBasis(next)} />
+              </MobileSettings>
+            </div>
             {characters.length > 0 && (
               <CharacterFilterControl
                 characters={characters.map((c) => ({
@@ -317,7 +408,14 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
             />
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <p className="text-xs text-text-dim">
+                {isNowBasis(basis)
+                  ? t('miningTax.overview.basis.summaryNow', {
+                      price: t(`miningTax.overview.basis.${basisSide(basis)}`),
+                    })
+                  : t('miningTax.overview.basis.summaryDay', { price: basisLabel(t, basis) })}
+              </p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 <Panel>
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('miningTax.overview.totalValueStat')}
@@ -346,14 +444,60 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                     {t('miningTax.overview.volumeStat')}
                   </p>
                   <p className="mt-1 text-lg font-semibold tabular-nums">
-                    {totals.volumeComplete ? `${formatVolume(totals.volume)} m³` : '—'}
+                    {volumeDisplayMode(totals.volume).kind === 'complete'
+                      ? `${formatVolume(totals.volume.m3)} m³`
+                      : volumeDisplayMode(totals.volume).kind === 'unknown'
+                        ? '—'
+                        : `≈ ${formatVolume(totals.volume.m3)} m³`}
                   </p>
+                  {volumeDisplayMode(totals.volume).kind === 'partial' && (
+                    <p className="text-[0.6875rem] text-warning">
+                      {t('miningTax.overview.volumeStatWarning', {
+                        count: totals.volume.missingTypeIds.length,
+                      })}
+                    </p>
+                  )}
                 </Panel>
                 <Panel>
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('miningTax.overview.dateRangeStat')}
+                    {t('miningTax.overview.daysCoveredStat')}
                   </p>
-                  <p className="mt-1 text-sm font-semibold">{dateRangeLabel(totals.dates)}</p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums">
+                    {t('miningTax.overview.daysCoveredValue', {
+                      count: coverage.daysWithData,
+                      total: coverage.rangeDays,
+                    })}
+                  </p>
+                  {coverage.historyStartsInRange ? (
+                    <p className="text-[0.6875rem] text-warning">
+                      {t('miningTax.overview.historyStartsHint', {
+                        date: coverage.historyStartsInRange,
+                      })}
+                    </p>
+                  ) : (
+                    <p className="text-[0.6875rem] text-text-dim">{dateRangeLabel(totals.dates)}</p>
+                  )}
+                </Panel>
+                <Panel>
+                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('miningTax.overview.priceSourceStat')}
+                  </p>
+                  <p className="mt-1 text-lg font-semibold tabular-nums">
+                    {isNowBasis(basis)
+                      ? t('miningTax.overview.priceSourceLive')
+                      : t('miningTax.overview.priceSourceValue', {
+                          count: daysBySource.saved,
+                          total: daysBySource.total,
+                        })}
+                  </p>
+                  {!isNowBasis(basis) && (daysBySource.average > 0 || daysBySource.live > 0) && (
+                    <p className="text-[0.6875rem] text-warning">
+                      {t('miningTax.overview.priceSourceMix', {
+                        average: daysBySource.average,
+                        live: daysBySource.live,
+                      })}
+                    </p>
+                  )}
                 </Panel>
               </div>
 

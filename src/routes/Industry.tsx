@@ -13,6 +13,7 @@ import {
 import { findOwnedBlueprint } from '@/features/industry/data';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
+import { useTradeHubStandings } from '@/features/market/useTradeHubStandings';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import type { PlanIndexStats, PlanRollupStats } from '@/features/industry/BuildPlanList';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
@@ -70,8 +71,7 @@ export function Industry() {
     ownedBlueprints,
     corpOwnedBlueprints,
     blueprintsNeedsReauth,
-    skills,
-    implantBonusPct,
+    modifiers,
     buildGroups,
     buildGroupsHydrated,
     setBuildGroups,
@@ -280,14 +280,15 @@ export function Industry() {
       ),
     [plans, knownGroupIds]
   );
+  const tradeHubStandings = useTradeHubStandings(activeCharacterId);
   const groupedRows = useComparedBuildResults({
     plans: groupedPlans,
     catalog,
     pi,
     ownedBlueprints,
     corpOwnedBlueprints,
-    skills,
-    implantBonusPct,
+    modifiers,
+    tradeHubStandings,
     computeGroupResult: true,
   });
   const ungroupedRows = useComparedBuildResults({
@@ -296,8 +297,8 @@ export function Industry() {
     pi,
     ownedBlueprints,
     corpOwnedBlueprints,
-    skills,
-    implantBonusPct,
+    modifiers,
+    tradeHubStandings,
   });
   const runCounts = useRunCountsByPlan(activeCharacterId);
 
@@ -496,8 +497,7 @@ export function Industry() {
               <OpportunitiesPanel
                 catalog={catalog}
                 pi={pi}
-                skills={skills}
-                implantBonusPct={implantBonusPct}
+                modifiers={modifiers}
                 facilityDefaults={facilityDefaults}
                 activeCharacterId={activeCharacterId}
                 ownedStockSnapshot={workspace.ownedStockSnapshot}
@@ -507,7 +507,8 @@ export function Industry() {
                 hub={DEFAULT_TRADE_HUB}
                 trees={marketWideTrees}
                 catalog={catalog}
-                skills={skills}
+                modifiers={modifiers}
+                activeCharacterId={activeCharacterId}
                 onStartPlan={(entry) => {
                   // Distinct from the plain search-box create: picking a
                   // scan result is an explicit "go build this" choice, same
@@ -524,7 +525,7 @@ export function Industry() {
             <ProductionLogPanel
               characterId={activeCharacterId}
               catalog={catalog}
-              skills={skills}
+              skills={modifiers.skills}
               plans={plans}
               onOpenRun={openRunFromRecords}
             />
@@ -536,8 +537,8 @@ export function Industry() {
                 pi={pi}
                 ownedBlueprints={ownedBlueprints}
                 corpOwnedBlueprints={corpOwnedBlueprints}
-                skills={skills}
-                implantBonusPct={implantBonusPct}
+                modifiers={modifiers}
+                tradeHubStandings={tradeHubStandings}
                 onDone={exitCompare}
               />
             ) : (

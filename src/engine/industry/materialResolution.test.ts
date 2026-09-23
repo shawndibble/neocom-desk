@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type {
   EffectiveMaterial,
@@ -20,7 +21,7 @@ const CTX = {
   security: 'highsec' as const,
   systemCostIndex: 0.05,
   adjustedPrices: {} as Record<number, number>,
-  skills: {} as Record<number, number>,
+  modifiers: NO_CHARACTER_MODIFIERS,
 };
 
 // A four-blueprint chain: PARENT (top-level material) is built from MID, MID
@@ -260,7 +261,7 @@ describe('resolveMaterial — reaction sub-builds (issue #698)', () => {
     security: 'highsec' as const,
     systemCostIndex: 0.2,
     adjustedPrices: { [LEAF_TYPE]: 10, [ROOT_TYPE]: 3 },
-    skills: {} as Record<number, number>,
+    modifiers: NO_CHARACTER_MODIFIERS,
   };
   const CTX_WITH_ROOT_PRICE = { ...CTX, adjustedPrices: { [ROOT_TYPE]: 3 } };
 

@@ -18,38 +18,66 @@ import type { MiningYieldEntry } from '@/engine/miningTax/yieldGrouping';
 import {
   valueMiningYield,
   type EntryValuation,
-  type GeneralReprocessingSkills,
   type YieldReprocessingEntry,
 } from '@/engine/miningTax/yieldValuation';
-import type { TrainedSkill } from '@/engine/types';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
+import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import { loadPriceHistory, type PriceHistoryResult } from '@/features/market/priceHistory';
 import { EsiError } from '@/esi/errors';
-import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import { loadCharacterImplants } from '@/features/skills/data';
-import { resolveImplantBonusPct } from '@/engine/industry/reprocessing';
-import { SKILL_IDS } from '@/engine/industry/types';
 import { loadCompressedOreTypeIds, loadReprocessing, loadTypes } from '@/sde/loadSde';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { getUniverseType } from '@/esi/endpoints';
+import {
+  GLOBAL_CACHE_CHARACTER_ID,
+  STALE_AFTER,
+  readCachedEntries,
+  writeCached,
+} from '@/esi/cache';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { getHubPrices } from '@/market/prices';
+import {
+  PRICE_BASES,
+  resolveUnitPrice,
+  weakestSource,
+  type PriceBasis,
+  type PriceSource,
+  type SidePrices,
+  type SnapshotDay,
+} from '@/engine/miningTax/priceBasis';
+import { eveToday } from '@/engine/miningTax/yieldRange';
+import { loadPriceSnapshots, saveTodayPriceSnapshot } from './priceSnapshots';
 
 export interface TrackedCharacter {
   characterId: number;
   characterName: string;
 }
 
-export interface MiningYieldRow {
+/** One row valued on one price basis (issue #1279). */
+export interface BasisValuation {
+  valuation: EntryValuation;
+  /**
+   * Price of each material the row's ore reprocesses into, for the detail
+   * modal's refined-output list. The same prices `valuation` was built from,
+   * kept rather than recomputed so the list and the total can never disagree;
+   * a material with no price on this basis is simply absent.
+   */
+  materialUnitPrices: ReadonlyMap<number, number>;
+  /** Where the row's ore prices came from — the weakest across its lines (`weakestSource`). */
+  priceSource: PriceSource;
+}
+
+export interface MiningYieldRow extends BasisValuation {
   characterId: number;
   characterName: string;
   entry: MiningYieldEntry;
-  valuation: EntryValuation;
   /**
-   * Mined-date price of each material the row's ore reprocesses into, for the
-   * detail modal's refined-output list. The same prices `valuation` was built
-   * from, kept rather than recomputed so the list and the total can never
-   * disagree; a material ESI had no history for on that date is simply absent.
+   * The row valued on every basis, so switching basis on the page never
+   * refetches. The row's own `valuation`/`materialUnitPrices`/`priceSource`
+   * are the default `buy` basis; the page swaps in the chosen one.
    */
-  materialUnitPrices: ReadonlyMap<number, number>;
+  byBasis: Record<PriceBasis, BasisValuation>;
 }
 
 export interface MiningYieldSnapshot {
@@ -60,41 +88,80 @@ export interface MiningYieldSnapshot {
   systemSecurity: Map<number, number>;
   /** Ore/ice/gas types AND the materials they reprocess into — the detail modal names both. */
   typeNames: Map<number, string>;
-  /** m³ of one unit, from the SDE bake. Missing for a type the bake doesn't carry. */
+  /**
+   * m³ of one unit, from the SDE bake, falling back to a live ESI lookup for
+   * a type the bake doesn't carry (issue #1283). Missing only for a type ESI
+   * itself has no volume for, or one a fetch failure left unresolved.
+   */
   typeVolumes: Map<number, number>;
   fetchedAt: Date | null;
   fromCache: boolean;
 }
 
-const NO_SKILLS: GeneralReprocessingSkills = {
-  reprocessingLevel: 0,
-  reprocessingEfficiencyLevel: 0,
-};
-const NO_TRAINED: ReadonlyMap<number, TrainedSkill> = new Map();
+function volumeCacheKey(typeId: number): string {
+  return `type-volume:${typeId}`;
+}
 
 /**
- * A character's general reprocessing skills, plus their full trained-skill
- * map so `valueMiningYield` can resolve each ore line's own specialisation
- * skill (issue #1058) — a mixed day's entry can refine ore and ice under two
- * different specialisations, so that resolution cannot happen here, ahead of
- * time, for the whole character.
+ * Volumes for types the SDE bake has no entry for (issue #1283) — mainly the
+ * hand-tagged overrides in `typeOverrides.ts`, which add ore/ice variants the
+ * bake never carried a row for. Cached under `STALE_AFTER.static`, same as
+ * `typeNames.ts`'s name cache: a type's volume is as immutable as its name.
+ * A cached `null` means ESI itself confirmed the type has no volume — cached
+ * rather than re-asked every load, the same way a real volume is. Only a
+ * type with NO cache entry at all blocks the caller; a merely stale one is
+ * served as-is with a background refresh fired, same tradeoff `typeNames.ts`
+ * makes for exactly the reason its header explains: a page holding one of
+ * these types must not block on live ESI on every render.
  */
-async function loadReprocessingSkills(
-  characterId: number
-): Promise<{ skills: GeneralReprocessingSkills; trained: ReadonlyMap<number, TrainedSkill> }> {
-  const [corrected, implants] = await Promise.all([
-    loadCorrectedSkills(characterId, Date.now()),
-    loadCharacterImplants(characterId),
-  ]);
-  return {
-    skills: {
-      reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
-      reprocessingEfficiencyLevel:
-        corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
-      implantBonusPct: resolveImplantBonusPct(implants?.data ?? []),
-    },
-    trained: corrected.trained,
-  };
+async function resolveMissingVolumes(typeIds: readonly number[]): Promise<Map<number, number>> {
+  const resolved = new Map<number, number>();
+  if (typeIds.length === 0) return resolved;
+
+  const cached = await readCachedEntries<number | null>(
+    GLOBAL_CACHE_CHARACTER_ID,
+    typeIds.map(volumeCacheKey)
+  );
+  const now = Date.now();
+  const unknown: number[] = [];
+  const lapsed: number[] = [];
+  for (const typeId of typeIds) {
+    const row = cached.get(volumeCacheKey(typeId));
+    if (row === undefined) {
+      unknown.push(typeId);
+      continue;
+    }
+    if (row.value !== null) resolved.set(typeId, row.value);
+    if (now - row.fetchedAt >= STALE_AFTER.static) lapsed.push(typeId);
+  }
+  if (unknown.length === 0) {
+    // Never awaited: the caller already has everything it needs from cache.
+    if (lapsed.length > 0) void fetchVolumesFromEsi(lapsed).catch(() => {});
+    return resolved;
+  }
+  for (const [typeId, volume] of await fetchVolumesFromEsi([...unknown, ...lapsed])) {
+    if (volume !== null) resolved.set(typeId, volume);
+  }
+  return resolved;
+}
+
+/** The network half: per-id GET, caching both a real volume and a confirmed "no volume" as `null`. Never rejects. */
+async function fetchVolumesFromEsi(typeIds: number[]): Promise<Map<number, number | null>> {
+  const map = new Map<number, number | null>();
+  const now = Date.now();
+  await mapWithConcurrencyLimit(typeIds, ESI_FANOUT_CONCURRENCY, async (typeId) => {
+    try {
+      const { data } = await getUniverseType(typeId);
+      if (!data) return; // 304 Not Modified: unreachable, no etag is ever sent here.
+      const volume = typeof data.volume === 'number' ? data.volume : null;
+      map.set(typeId, volume);
+      await writeCached(GLOBAL_CACHE_CHARACTER_ID, volumeCacheKey(typeId), volume, now);
+    } catch {
+      // Genuinely unresolvable, or offline mid-fallback: leave it uncached —
+      // the caller's own stale cached value (if any) already stands.
+    }
+  });
+  return map;
 }
 
 export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
@@ -194,6 +261,32 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
     if (attempt.reason instanceof EsiError && attempt.reason.status === 400) continue;
     throw attempt.reason;
   }
+  // Today's live Jita book for every priced type, saved as today's snapshot
+  // before anything reads the snapshots back — so today prices as "saved".
+  // `getHubPrices` never throws (a null price per type when Fuzzwork is down);
+  // a failed save only costs today's snapshot, never the page.
+  const today = eveToday();
+  const hubPrices = await getHubPrices(DEFAULT_TRADE_HUB, historyTypeIds);
+  const livePrices = new Map<number, SidePrices>();
+  const todaySnapshot: SnapshotDay = {};
+  for (const typeId of historyTypeIds) {
+    const aggregate = hubPrices.get(typeId);
+    const buy = aggregate?.buyMax ?? null;
+    const sell = aggregate?.sellMin ?? null;
+    const prices: SidePrices = {
+      buy: buy && buy > 0 ? buy : null,
+      sell: sell && sell > 0 ? sell : null,
+    };
+    livePrices.set(typeId, prices);
+    if (prices.buy !== null || prices.sell !== null) todaySnapshot[typeId] = prices;
+  }
+  try {
+    await saveTodayPriceSnapshot(today, todaySnapshot);
+  } catch {
+    // Storage full or blocked: the page still prices from what it has.
+  }
+  const savedByDate = await loadPriceSnapshots().catch(() => new Map<string, SnapshotDay>());
+
   const priceByTypeAndDate = new Map<number, Map<string, number>>();
   for (const [typeId, result] of histories) {
     const byDate = new Map<string, number>();
@@ -202,45 +295,58 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
   }
 
   const characterIds = [...new Set(allEntries.map(({ characterId }) => characterId))];
-  const skillsByCharacter = new Map(
+  const modifiersByCharacter = new Map(
     await Promise.all(
-      characterIds.map(async (id) => [id, await loadReprocessingSkills(id)] as const)
+      characterIds.map(async (id) => [id, await loadCharacterModifiers(id, Date.now())] as const)
     )
   );
 
-  const rows: MiningYieldRow[] = allEntries.map(({ characterId, characterName, entry }) => {
-    const rawUnitPrices = new Map<number, number>();
-    const materialPrices: Record<number, number> = {};
-    for (const line of entry.oreLines) {
-      const price = priceByTypeAndDate.get(pricingTypeId(line.typeId))?.get(entry.date);
-      if (price !== undefined) rawUnitPrices.set(line.typeId, price);
-      const reprocessing = reprocessingByTypeId.get(line.typeId);
-      for (const material of reprocessing?.materials ?? []) {
-        const materialPrice = priceByTypeAndDate.get(material.typeId)?.get(entry.date);
-        if (materialPrice !== undefined) materialPrices[material.typeId] = materialPrice;
-      }
-    }
-    const { skills, trained } = skillsByCharacter.get(characterId) ?? {
-      skills: NO_SKILLS,
-      trained: NO_TRAINED,
-    };
-    const valuation = valueMiningYield(
-      entry.oreLines,
-      rawUnitPrices,
-      reprocessingByTypeId,
-      skills,
-      trained,
-      materialPrices
+  const priceOn = (typeId: number, date: string, basis: PriceBasis) =>
+    resolveUnitPrice(
+      {
+        saved: savedByDate.get(date)?.[typeId],
+        average: priceByTypeAndDate.get(typeId)?.get(date),
+        live: livePrices.get(typeId),
+      },
+      basis,
+      date,
+      today
     );
-    return {
-      characterId,
-      characterName,
-      entry,
-      valuation,
-      materialUnitPrices: new Map(
-        Object.entries(materialPrices).map(([typeId, price]) => [Number(typeId), price])
-      ),
+
+  const rows: MiningYieldRow[] = allEntries.map(({ characterId, characterName, entry }) => {
+    const modifiers = modifiersByCharacter.get(characterId) ?? NO_CHARACTER_MODIFIERS;
+    const valueOn = (basis: PriceBasis): BasisValuation => {
+      const rawUnitPrices = new Map<number, number>();
+      const materialPrices: Record<number, number> = {};
+      const sources: PriceSource[] = [];
+      for (const line of entry.oreLines) {
+        const raw = priceOn(pricingTypeId(line.typeId), entry.date, basis);
+        sources.push(raw.source);
+        if (raw.price !== undefined) rawUnitPrices.set(line.typeId, raw.price);
+        const reprocessing = reprocessingByTypeId.get(line.typeId);
+        for (const material of reprocessing?.materials ?? []) {
+          const materialPrice = priceOn(material.typeId, entry.date, basis).price;
+          if (materialPrice !== undefined) materialPrices[material.typeId] = materialPrice;
+        }
+      }
+      return {
+        valuation: valueMiningYield(
+          entry.oreLines,
+          rawUnitPrices,
+          reprocessingByTypeId,
+          modifiers,
+          materialPrices
+        ),
+        materialUnitPrices: new Map(
+          Object.entries(materialPrices).map(([typeId, price]) => [Number(typeId), price])
+        ),
+        priceSource: weakestSource(sources),
+      };
     };
+    const byBasis = Object.fromEntries(
+      PRICE_BASES.map((basis) => [basis, valueOn(basis)])
+    ) as Record<PriceBasis, BasisValuation>;
+    return { characterId, characterName, entry, ...byBasis.buy, byBasis };
   });
 
   const [systemRows, typeNames, sdeTypes] = await Promise.all([
@@ -251,10 +357,14 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
     loadTypes(),
   ]);
   const typeVolumes = new Map<number, number>();
+  const typeIdsMissingVolume: number[] = [];
   for (const typeId of rawTypeIds) {
     const volume = sdeTypes[String(typeId)]?.volume;
     if (typeof volume === 'number') typeVolumes.set(typeId, volume);
+    else typeIdsMissingVolume.push(typeId);
   }
+  const esiVolumes = await resolveMissingVolumes(typeIdsMissingVolume);
+  for (const [typeId, volume] of esiVolumes) typeVolumes.set(typeId, volume);
   const systemNames = new Map<number, string>();
   const systemSecurity = new Map<number, number>();
   for (const { id, name, security } of systemRows) {

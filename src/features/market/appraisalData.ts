@@ -14,12 +14,12 @@
  * appraisal would be one paginated ESI order-book call per pasted item.
  *
  * Refine-then-sell (issue #672) is threaded in here, not the engine: only
- * this layer may reach Dexie (`loadCorrectedSkills`) or the SDE
+ * this layer may reach Dexie (`loadCharacterModifiers`) or the SDE
  * (`loadReprocessing`, 1.4 MB). `characterId` is null with no active
  * Character, in which case neither is fetched at all, and every row's
  * `refine` stays undefined — the page behaves exactly as it did before this
- * issue. Each row's specialisation skill is resolved per type via
- * `resolveSpecialisationLevel` (issue #1058): the SDE bake's attribute-790
+ * issue. Each row's specialisation skill is resolved per type by
+ * Character Modifiers' `refiningEfficiency` (issue #1058): the SDE bake's attribute-790
  * join names the matching ore/ice/moon-ore specialisation directly, falling
  * back to Scrapmetal Processing for a module or ship — the same resolver
  * `orderExits.ts` and Mining Yield use, so a mixed paste of ore and modules
@@ -47,16 +47,9 @@ import {
   type AppraisalUnmatched,
 } from '@/engine/market/appraisalMatch';
 import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
-import {
-  resolveReprocessingSkills,
-  resolveImplantBonusPct,
-  type GeneralReprocessingSkills,
-} from '@/engine/industry/reprocessing';
-import { SKILL_IDS } from '@/engine/industry/types';
-import type { TrainedSkill } from '@/engine/types';
+import { appliedRefiningImplantPct } from '@/engine/industry/characterModifiers';
+import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import { findLpOfferMatches, toLpOfferInputs } from '@/features/market/appraisalLpAcquisition';
-import { loadCharacterImplants } from '@/features/skills/data';
-import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { getHubPrices, invalidateHubPrices } from '@/market/prices';
 import { loadMarketTypes } from '@/sde/loadMarketSde';
@@ -118,31 +111,6 @@ export interface AppraiseOptions {
 }
 
 /**
- * The active Character's general reprocessing skills, plus their full
- * trained-skill map so each row can resolve its own specialisation via
- * `resolveReprocessingSkills` (issue #1058) — a paste mixing ore and
- * modules resolves a different skill per row, so this cannot be reduced to
- * one flat level here.
- */
-async function loadReprocessingSkills(
-  characterId: number
-): Promise<{ skills: GeneralReprocessingSkills; trained: ReadonlyMap<number, TrainedSkill> }> {
-  const [corrected, implants] = await Promise.all([
-    loadCorrectedSkills(characterId, Date.now()),
-    loadCharacterImplants(characterId),
-  ]);
-  return {
-    skills: {
-      reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
-      reprocessingEfficiencyLevel:
-        corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
-      implantBonusPct: resolveImplantBonusPct(implants?.data ?? []),
-    },
-    trained: corrected.trained,
-  };
-}
-
-/**
  * Parse, resolve and price a paste at `hub`. Throws only if the catalogue
  * itself cannot be loaded — an unreachable price source degrades to null
  * prices per type, which the table renders as a dash rather than as free.
@@ -162,12 +130,12 @@ export async function appraisePaste(
   const { matched, unmatched } = matchAppraisalEntries(entries, catalogue);
   const typeIds = matched.map((match) => match.typeId);
 
-  const [reprocessingMap, reprocessingSkills, lpMatches] =
+  const [reprocessingMap, modifiers, lpMatches] =
     characterId === null
       ? [null, null, null]
       : await Promise.all([
           loadReprocessing(),
-          loadReprocessingSkills(characterId),
+          loadCharacterModifiers(characterId, Date.now()),
           findLpOfferMatches(characterId, typeIds),
         ]);
 
@@ -197,16 +165,8 @@ export async function appraisePaste(
   const items: AppraisalItem[] = matched.map((match) => {
     const aggregate = prices.get(match.typeId);
     const reprocessing = reprocessingByTypeId.get(match.typeId);
-    const resolvedSkills =
-      reprocessing && reprocessingSkills
-        ? resolveReprocessingSkills(
-            reprocessingSkills.skills,
-            reprocessing.specialisationSkillID,
-            reprocessingSkills.trained
-          )
-        : undefined;
     const refine =
-      reprocessing && resolvedSkills
+      reprocessing && modifiers
         ? computeAppraisalRefine({
             quantity: match.quantity,
             reprocessing: {
@@ -215,8 +175,9 @@ export async function appraisePaste(
                 typeId: m.typeID,
                 quantity: m.quantity,
               })),
+              specialisationSkillId: reprocessing.specialisationSkillID,
             },
-            skills: resolvedSkills,
+            modifiers,
             materialPrices: Object.fromEntries(
               reprocessing.materials
                 .map((m): [number, number | undefined] => [
@@ -227,7 +188,12 @@ export async function appraisePaste(
             ),
           })
         : undefined;
-    if (refine && !resolvedSkills?.isScrap && resolvedSkills?.implantBonusPct) {
+    if (
+      refine &&
+      reprocessing &&
+      modifiers &&
+      appliedRefiningImplantPct(modifiers, reprocessing.specialisationSkillID) > 0
+    ) {
       implantApplied = true;
     }
     const lpForType = lpMatches?.matchesByTypeId.get(match.typeId);
@@ -248,7 +214,7 @@ export async function appraisePaste(
   return {
     appraisal: buildAppraisal(items, pricePercent),
     unmatched,
-    implantBonusPct: implantApplied ? (reprocessingSkills?.skills.implantBonusPct ?? 0) : 0,
+    implantBonusPct: implantApplied ? (modifiers?.refiningImplantPct ?? 0) : 0,
   };
 }
 

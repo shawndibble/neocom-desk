@@ -21,6 +21,7 @@ import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts'
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { OwnedStockScope } from '@/engine/industry/types';
 import { useQuickbar } from '@/features/market/useQuickbar';
+import { useTradeHubStandings } from '@/features/market/useTradeHubStandings';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 
 const NO_PLANS: BuildPlanRecord[] = [];
@@ -42,13 +43,13 @@ export function IndustryGroupPage() {
     pi,
     ownedBlueprints,
     corpOwnedBlueprints,
-    skills,
-    implantBonusPct,
+    modifiers,
     ownedStockSnapshot,
     blueprintsNeedsReauth,
   } = workspace;
 
   const quickbar = useQuickbar(activeCharacterId);
+  const tradeHubStandings = useTradeHubStandings(activeCharacterId);
   const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
     null
   );
@@ -95,7 +96,7 @@ export function IndustryGroupPage() {
       catalog,
       pi,
       ownedBlueprints,
-      skills,
+      modifiers,
       workspace.assumedMe,
       options,
       corpOwnedBlueprints,
@@ -166,8 +167,8 @@ export function IndustryGroupPage() {
           pi={pi}
           ownedBlueprints={ownedBlueprints}
           corpOwnedBlueprints={corpOwnedBlueprints}
-          skills={skills}
-          implantBonusPct={implantBonusPct}
+          modifiers={modifiers}
+          tradeHubStandings={tradeHubStandings}
           ownedStockSnapshot={ownedStockSnapshot}
           onOpenPlan={(planId) => navigate(`/industry/plans/${planId}`)}
           onRetarget={(target, planIds) => void handleRetargetGroup(target, planIds)}

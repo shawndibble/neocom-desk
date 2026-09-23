@@ -40,6 +40,7 @@
  * "checked, clean" for a scope this module could not actually resolve.
  */
 import type { OpenOrdersSnapshot, CharacterOpenOrders } from './openOrdersData';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { OrderCostBasis } from './orderCostBasis';
 import { stationPriceKey } from './stationPriceKey';
 import type { HubAggregate } from '@/market/fuzzwork';
@@ -52,6 +53,7 @@ import {
   type UndercutResult,
 } from '@/engine/market/undercut';
 import { orderFloor, type OrderFloor } from '@/engine/market/orderFloor';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import { orderExpiry, type OrderExpiry } from '@/engine/market/orderHealth';
 import {
   wasFrequentlyUndercut,
@@ -131,19 +133,12 @@ export interface CharacterSkills {
   brokerRelationsLevel: number;
   /** Advanced Broker Relations (typeID 16597): +6 points/level to the 50% base Relist Discount. */
   advancedBrokerRelationsLevel: number;
-  /** Reprocessing (3385), for the "refine and sell the materials" comparison. */
-  reprocessingLevel: number;
-  /** Reprocessing Efficiency (3389). */
-  reprocessingEfficiencyLevel: number;
-  /** The active clone's refining implant bonus, if any (issue #1227) — `resolveImplantBonusPct`'s result. */
-  implantBonusPct: number;
   /**
-   * Every trained skill, so the reprocess exit can resolve each order's own
-   * item to its specialisation via `resolveSpecialisationLevel` (issue
-   * #1058) — Scrapmetal Processing for a module/ship, or the matching ore
-   * specialisation, rather than one skill hardcoded for every order.
+   * The Character's skills + implants (issue #1284), for the "refine and
+   * sell the materials" exit — each order's own item picks its
+   * specialisation and whether the refining implant applies.
    */
-  trained: ReadonlyMap<number, { level: number }>;
+  modifiers: CharacterModifiers;
 }
 
 export interface BuildRowsInput {
@@ -177,6 +172,14 @@ export interface BuildRowsInput {
   stationNames?: ReadonlyMap<number, string>;
   /** Per character, since skills differ. Keyed characterId. */
   skillsByCharacter: ReadonlyMap<number, CharacterSkills>;
+  /**
+   * Each order's own standing toward its station's NPC owner (issue #1238),
+   * keyed orderId rather than locationId: two characters at the same station
+   * can hold different standings, and this is already per-order. Absent
+   * entry = standings assumed 0 (a player structure, an unresolved owner, or
+   * simply not yet resolved).
+   */
+  standingsByOrder?: ReadonlyMap<number, ResolvedStandings>;
   now: number;
   /** Days without a sale, keyed orderId, when known. */
   daysWithoutSale?: ReadonlyMap<number, number>;
@@ -260,6 +263,7 @@ function buildRow(
     skillsByCharacter,
     now,
     daysWithoutSale,
+    standingsByOrder,
   } = input;
 
   const isBuyOrder = order.is_buy_order ?? false;
@@ -297,6 +301,7 @@ function buildRow(
 
   const costBasis = costBases.get(order.order_id) ?? null;
   const skills = skillsByCharacter.get(entry.characterId);
+  const standing = standingsByOrder?.get(order.order_id);
   const floor =
     costBasis && skills
       ? orderFloor({
@@ -305,6 +310,8 @@ function buildRow(
           accountingLevel: skills.accountingLevel,
           brokerRelationsLevel: skills.brokerRelationsLevel,
           advancedBrokerRelationsLevel: skills.advancedBrokerRelationsLevel,
+          factionStanding: standing?.factionStanding,
+          corpStanding: standing?.corpStanding,
         })
       : null;
 

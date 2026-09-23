@@ -7,11 +7,11 @@
  * idiom: this is a state of the detail pane, not a separate route).
  */
 import type { ReactNode } from 'react';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { Button, DataTable, InfoTooltip, IskAmount, Panel } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import type { BuildPlanRecord } from '@/db';
-import type { SkillLevels } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
@@ -20,6 +20,7 @@ import type { BlueprintCatalog } from './blueprintCatalog';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { formatPercent } from './format';
 import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBuildResults';
+import type { TradeHubStandingsMap } from '@/features/market/useTradeHubStandings';
 
 interface BuildPlanCompareProps {
   plans: readonly BuildPlanRecord[];
@@ -28,9 +29,9 @@ interface BuildPlanCompareProps {
   ownedBlueprints: readonly CharacterBlueprint[];
   /** Folded into each plan on its own `includeCorpAssets` — see `resolveBuildPlan`. */
   corpOwnedBlueprints?: CorpOwnedBlueprintsState;
-  skills: SkillLevels;
-  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
-  implantBonusPct: number;
+  modifiers: CharacterModifiers;
+  /** The active Character's per-Trade-Hub standings (issue #1238) — see `useComparedBuildResults`. */
+  tradeHubStandings?: TradeHubStandingsMap;
   /** Exits compare mode, restoring the previously open single-plan detail. */
   onDone: () => void;
 }
@@ -81,8 +82,8 @@ export function BuildPlanCompare({
   pi,
   ownedBlueprints,
   corpOwnedBlueprints,
-  skills,
-  implantBonusPct,
+  modifiers,
+  tradeHubStandings,
   onDone,
 }: BuildPlanCompareProps) {
   const { t } = useTranslation();
@@ -92,8 +93,8 @@ export function BuildPlanCompare({
     pi,
     ownedBlueprints,
     corpOwnedBlueprints,
-    skills,
-    implantBonusPct,
+    modifiers,
+    tradeHubStandings,
   });
   const unknown = t('common.unknown');
 
