@@ -23,8 +23,25 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'across', labelKey: 'contacts.tabAcrossCharacters' },
 ]);
 
+/**
+ * Search has its own Items/Courier sub-tab, so each leaf's id is the full
+ * path suffix below `/contracts` rather than one segment (see `lib/pageTabs.ts`).
+ * `/contracts/search` alone names no tab and redirects like any unknown
+ * segment, landing on Items.
+ */
+export const CONTRACTS_TABS = definePageTabs(
+  '/contracts',
+  [
+    { id: 'search/items', labelKey: 'contractSearch.mode.items' },
+    { id: 'search/courier', labelKey: 'contractSearch.mode.courier' },
+    { id: 'history', labelKey: 'contracts.historyTab' },
+  ],
+  'search/items'
+);
+
 export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/contacts': CONTACTS_TABS,
+  '/contracts': CONTRACTS_TABS,
   '/industry': INDUSTRY_TABS,
 };
 

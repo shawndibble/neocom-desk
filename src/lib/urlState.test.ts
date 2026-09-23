@@ -6,6 +6,7 @@ import {
   idListParam,
   intParam,
   isoDateParam,
+  optionalEnumParam,
   optionalIdParam,
   optionalSortParam,
   resolveSort,
@@ -91,6 +92,24 @@ describe('enumParam', () => {
   it('omits the default', () => {
     expect(codec.serialize('hub')).toBeNull();
     expect(codec.serialize('region')).toBe('region');
+  });
+});
+
+describe('optionalEnumParam', () => {
+  const codec = optionalEnumParam(['outstanding', 'finished'] as const);
+
+  it('defaults to null and omits it from the URL', () => {
+    expect(codec.parse(null)).toBeNull();
+    expect(codec.serialize(null)).toBeNull();
+  });
+
+  it('accepts only declared members', () => {
+    expect(codec.parse('finished')).toBe('finished');
+    expect(codec.parse('bogus')).toBeNull();
+  });
+
+  it('round-trips a non-null member', () => {
+    expect(codec.serialize('outstanding')).toBe('outstanding');
   });
 });
 
@@ -186,6 +205,10 @@ describe('optionalIdParam', () => {
   it('omits null', () => {
     expect(codec.serialize(null)).toBeNull();
     expect(codec.serialize(638)).toBe('638');
+  });
+
+  it('round-trips a positive id', () => {
+    expect(codec.parse(codec.serialize(30000142))).toBe(30000142);
   });
 });
 
