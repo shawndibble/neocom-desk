@@ -57,7 +57,11 @@ describe('useOfferLocations', () => {
     const { result } = renderHook(() => useOfferLocations([offerRow()]));
 
     await waitFor(() =>
-      expect(result.current.get(JITA_STATION)).toEqual({ systemName: 'Jita', security: 0.9459 })
+      expect(result.current.get(JITA_STATION)).toEqual({
+        systemId: 30000142,
+        systemName: 'Jita',
+        security: 0.9459,
+      })
     );
   });
 
@@ -67,7 +71,11 @@ describe('useOfferLocations', () => {
     );
 
     await waitFor(() =>
-      expect(result.current.get(STRUCTURE)).toEqual({ systemName: null, security: null })
+      expect(result.current.get(STRUCTURE)).toEqual({
+        systemId: null,
+        systemName: null,
+        security: null,
+      })
     );
   });
 
@@ -77,7 +85,11 @@ describe('useOfferLocations', () => {
     );
 
     await waitFor(() =>
-      expect(result.current.get(UNREADABLE)).toEqual({ systemName: null, security: null })
+      expect(result.current.get(UNREADABLE)).toEqual({
+        systemId: null,
+        systemName: null,
+        security: null,
+      })
     );
   });
 
@@ -123,7 +135,11 @@ describe('useOfferLocations', () => {
     );
 
     await waitFor(() =>
-      expect(result.current.get(AMARR_STATION)).toEqual({ systemName: null, security: null })
+      expect(result.current.get(AMARR_STATION)).toEqual({
+        systemId: null,
+        systemName: null,
+        security: null,
+      })
     );
   });
 });

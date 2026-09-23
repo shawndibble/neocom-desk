@@ -155,14 +155,20 @@ describe('contractRowToSearchRow', () => {
       contract,
       locationName: null,
       space: null,
+      systemId: null,
     });
   });
 
   it('carries a resolved location when given one', () => {
     const contract = row({ contractId: 7 });
-    const result = contractRowToSearchRow(contract, { name: 'Jita IV - Moon 4', space: 'highsec' });
+    const result = contractRowToSearchRow(contract, {
+      name: 'Jita IV - Moon 4',
+      space: 'highsec',
+      systemId: 30000142,
+    });
     expect(result.locationName).toBe('Jita IV - Moon 4');
     expect(result.space).toBe('highsec');
+    expect(result.systemId).toBe(30000142);
   });
 });
 
@@ -180,6 +186,7 @@ describe('ownedBlueprintToSearchRow', () => {
       locationName: null,
       regionId: null,
       space: null,
+      systemId: null,
     });
   });
 
@@ -189,8 +196,10 @@ describe('ownedBlueprintToSearchRow', () => {
       locationName: 'J105443 - Some structure',
       regionId: 11000001,
       space: 'wormhole',
+      systemId: 31000001,
     });
     const result = ownedBlueprintToSearchRow(bp);
+    expect(result.systemId).toBe(31000001);
     expect(result.locationName).toBe('J105443 - Some structure');
     expect(result.source === 'owned' && result.regionId).toBe(11000001);
     expect(result.space).toBe('wormhole');
@@ -225,6 +234,7 @@ function marketInput(overrides: Partial<MarketBpoInput> = {}): MarketBpoInput {
     atHub: true,
     locationName: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
     space: 'highsec',
+    systemId: 30000142,
     ...overrides,
   };
 }
@@ -245,6 +255,7 @@ describe('marketBpoToSearchRow (issue #1241)', () => {
       atHub: true,
       locationName: 'Jita IV - Moon 4 - Caldari Navy Assembly Plant',
       space: 'highsec',
+      systemId: 30000142,
     });
   });
 });
@@ -362,6 +373,39 @@ describe('filterBpcSearchRows', () => {
       ownedBlueprintToSearchRow(ownedInput({ itemId: 1, space: 'nullsec' })),
     ];
     expect(filterBpcSearchRows(rows, EMPTY_BPC_SEARCH_FILTER)).toEqual(rows);
+  });
+
+  it('a jump range keeps only rows in an allowed system, across every source', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1 }), {
+        name: 'Jita',
+        space: 'highsec',
+        systemId: 30000142,
+      }),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1, systemId: 30002187 })),
+      marketBpoToSearchRow(marketInput({ orderId: 1, systemId: 30000144 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      allowedSystems: new Set([30000142, 30000144]),
+    });
+    expect(filtered.map((r) => r.source)).toEqual(['contract', 'market']);
+  });
+
+  it('a jump range excludes a row this app cannot place', () => {
+    const rows = [ownedBlueprintToSearchRow(ownedInput({ itemId: 1 }))];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      allowedSystems: new Set([30000142]),
+    });
+    expect(filtered).toEqual([]);
+  });
+
+  it('no jump range (null) passes an unplaced row', () => {
+    const rows = [ownedBlueprintToSearchRow(ownedInput({ itemId: 1 }))];
+    expect(filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, allowedSystems: null })).toEqual(
+      rows
+    );
   });
 
   it('a maxPrice filter never excludes an owned row — it has no price to judge', () => {

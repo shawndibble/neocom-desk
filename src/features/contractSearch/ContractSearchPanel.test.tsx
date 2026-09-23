@@ -61,6 +61,12 @@ vi.mock('@/features/character/typeNames', () => ({
   loadTypeNames: vi.fn(async () => new Map([[34, 'Tritanium']])),
 }));
 
+/** The Jump Range filter's origin (`features/route/currentSystem.ts`), mocked so a test can set it without ESI. */
+const loadCharacterSolarSystemId = vi.fn<(characterId: number) => Promise<number | null>>();
+vi.mock('@/features/character/location', () => ({
+  loadCharacterSolarSystemId: (characterId: number) => loadCharacterSolarSystemId(characterId),
+}));
+
 // The whole SDE for these tests: one blueprint (638) printing one product
 // (587), so the real `plannableProductTypeID` resolves both menu readings —
 // a blueprint row to what it makes, a 587 row to itself.
@@ -86,6 +92,8 @@ const CATALOG: MarketTypeEntry[] = [
 ];
 const JITA = 60003760;
 const AMARR = 60008494;
+/** Jita's own solar system, for the Jump Range filter's origin (system ids, not station ids). */
+const JITA_SYSTEM = 30000142;
 /** A player structure: `stations.json` does not hold it, so nothing local names it. */
 const UNKNOWN_STRUCTURE = 1035466617946;
 /** A 0.3 system joining the two hubs directly — two jumps instead of four. */
@@ -282,6 +290,8 @@ beforeEach(async () => {
   );
   loadContractLocationName.mockReset();
   loadContractLocationName.mockResolvedValue('Jita IV - Moon 4 - Caldari Navy Assembly Plant');
+  loadCharacterSolarSystemId.mockReset();
+  loadCharacterSolarSystemId.mockResolvedValue(JITA_SYSTEM);
   loadPublicContractItems.mockReset();
   loadPublicContractItems.mockResolvedValue({
     data: {
@@ -344,9 +354,9 @@ function SearchTabHarness() {
  * (#931), as is each detail-modal line, and both call `useNavigate`. Matches
  * production — the panel only ever renders under `/contracts`.
  */
-function renderWithRouter() {
+function renderWithRouter(initialEntries?: string[]) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <SearchTabHarness />
     </MemoryRouter>
   );
@@ -403,6 +413,41 @@ describe('ContractSearchPanel', () => {
       // A player structure is a finished answer, not a pending one.
       expect(within(rows[1]).getByText('—')).toBeInTheDocument();
     });
+  });
+
+  it('narrows to offers within the chosen jump range of the current system', async () => {
+    // Jita itself (0 jumps) and Amarr (4 jumps, per the `JUMPS` fixture) —
+    // "Current system" keeps the first and drops the second.
+    loadPublicContractOffers.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, price: 1, locationId: JITA }),
+        row({ contractId: 2, price: 2, locationId: AMARR }),
+      ])
+    );
+    const user = userEvent.setup();
+    renderWithRouter();
+    await bodyRows();
+
+    await user.click(screen.getByRole('button', { name: /filters/i }));
+    await user.click(screen.getByRole('combobox', { name: 'Distance' }));
+    await user.click(screen.getByRole('option', { name: 'Current system' }));
+
+    await waitFor(async () => expect(await bodyRows()).toHaveLength(1));
+    const rows = await bodyRows();
+    expect(within(rows[0]).getByText('Jita')).toBeInTheDocument();
+  });
+
+  it('explains an unfiltered range with no current system even with the filter funnel closed', async () => {
+    // A range set from a pasted link (or a prior session) must still explain
+    // itself with the sheet/row shut — `collapsible` unmounts the bar's own
+    // controls, so this note cannot live inside them.
+    loadCharacterSolarSystemId.mockResolvedValue(null);
+    renderWithRouter(['/?items.jumps=3']);
+
+    expect(
+      await screen.findByText('Set your current system to filter by distance.')
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Filters' })).not.toBeInTheDocument();
   });
 
   it('keeps the Items/Courier switch in the results panel header on desktop', async () => {

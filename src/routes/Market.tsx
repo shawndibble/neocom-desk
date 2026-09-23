@@ -47,6 +47,13 @@ import { buildVariationIndex } from '@/engine/market/variations';
 import { TRADE_HUBS, DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { useMarketHub } from '@/features/market/hub';
 import { useLocationMode, type LocationMode } from '@/features/market/locationMode';
+import { JUMP_RANGES, DEFAULT_JUMP_RANGE } from '@/engine/route/jumpRange';
+import { useCurrentSystem, useJumpRangeFilter } from '@/features/route/currentSystem';
+import {
+  JumpRangeSelect,
+  CurrentSystemPicker,
+  JumpRangeNote,
+} from '@/features/route/JumpRangeControls';
 import {
   filterMarketTree,
   addAncestors,
@@ -161,6 +168,9 @@ const STATION_FILTER_PARAM: UrlParamCodec<number | null> = {
 };
 
 const ITEM_TAB_PARAM = enumParam(['orders', 'history'] as const, 'orders');
+
+/** Jump Range's distance select, URL-backed like the rest of the Browser's filters. */
+const JUMP_RANGE_PARAM = enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE);
 /**
  * Deliberately not `textParam()`: its built-in debounce only smooths the
  * *write*, not the render (the tree already re-filters on every keystroke via
@@ -579,6 +589,12 @@ export function Market() {
   // round 10); undone via the banner rendered above the tables. URL-backed
   // (ADR 0015), scoped to the Browser tab.
   const [stationFilter, setStationFilter] = useUrlParam('browser.station', STATION_FILTER_PARAM);
+  // Jump Range (Region mode only — Hub mode is already one station):
+  // "how far from me" narrows the order book next to the station filter, see
+  // `orderBookView.ts`'s `allowedSystems`.
+  const [jumpRange, setJumpRange] = useUrlParam('browser.jumps', JUMP_RANGE_PARAM);
+  const currentSystem = useCurrentSystem();
+  const jumpRangeFilter = useJumpRangeFilter(currentSystem.systemId, jumpRange);
   // Market Data / Price History (issue #11), Market Data selected by default —
   // a scoped query param rather than a `/market/browser/<subtab>` path
   // segment (docs/ARCHITECTURE.md §9): it only ever matters with an item
@@ -833,18 +849,26 @@ export function Market() {
     [solarSystems]
   );
 
+  // Region mode only — Hub mode is already one station, so a jump range over
+  // it would just repeat the hub filter under a different name.
+  const allowedSystems =
+    effectiveLocation.mode === 'region' && jumpRangeFilter.status === 'ready'
+      ? jumpRangeFilter.allowed
+      : null;
+
   // Location Mode, Trade Hub station, the order-row "filter to this station"
-  // action (CONTEXT.md round 10), split and sort all happen in the view.
+  // action (CONTEXT.md round 10), Jump Range, split and sort all happen in
+  // the view.
   const orderBookView = useMemo(
     () =>
       orderBookFetch === null || selectedTypeId === null
         ? null
         : buildOrderBookView(
             selectedTypeId,
-            { ...orderBookLocation, stationFilter },
+            { ...orderBookLocation, stationFilter, allowedSystems },
             orderBookFetch
           ),
-    [orderBookFetch, selectedTypeId, orderBookLocation, stationFilter]
+    [orderBookFetch, selectedTypeId, orderBookLocation, stationFilter, allowedSystems]
   );
   const loadedView = orderBookView?.status === 'failed' ? null : orderBookView;
   const orderBookFailed = orderBookView?.status === 'failed';
@@ -1442,6 +1466,20 @@ export function Market() {
                       </p>
                     )}
                     <div className="divide-y divide-line">
+                      {effectiveLocation.mode === 'region' && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs text-text-dim">
+                          <div className="flex items-center gap-2">
+                            <JumpRangeSelect value={jumpRange} onChange={setJumpRange} />
+                            <CurrentSystemPicker current={currentSystem} />
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <JumpRangeNote status={jumpRangeFilter.status} />
+                            {jumpRangeFilter.status === 'ready' && (
+                              <span>{t('jumpRange.regionOnlyHint')}</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       {stationFilter !== null && (
                         <div className="flex items-center justify-between px-3 py-2 text-xs text-text-dim">
                           <span>

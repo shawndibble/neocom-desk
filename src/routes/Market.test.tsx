@@ -1367,6 +1367,22 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     expect(within(sellTable).queryByText('2,000,000.00')).not.toBeInTheDocument();
   });
 
+  it('shows the Jump Range control only in Region mode', async () => {
+    const hits = { count: 0 };
+    server.use(ordersHandler(hits));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(screen.queryByRole('combobox', { name: 'Distance' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Region' }));
+
+    expect(await screen.findByRole('combobox', { name: 'Distance' })).toBeInTheDocument();
+  });
+
   it('Region mode shows every station in the region, including ones Trade Hub mode hides', async () => {
     const hits = { count: 0 };
     server.use(ordersHandler(hits));

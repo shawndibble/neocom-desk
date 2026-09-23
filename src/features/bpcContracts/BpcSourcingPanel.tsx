@@ -91,15 +91,17 @@ import {
 } from '@/features/bpcContracts/useMarketBpoOrders';
 import { useMarketHub } from '@/features/market/hub';
 import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS } from '@/market/hubs';
+import { DEFAULT_JUMP_RANGE, withinJumpRange, type JumpRange } from '@/engine/route/jumpRange';
 import {
-  createWatch,
-  deleteWatch,
-  listWatches,
-  renameWatch,
-  updateWatchFilter,
-  type BpcWatchFilterInput,
-} from '@/features/bpcContracts/watches';
-import type { BpcSearchWatchRecord } from '@/db';
+  useCurrentSystem,
+  useJumpRangeFilter,
+  type CurrentSystemState,
+} from '@/features/route/currentSystem';
+import {
+  CurrentSystemPicker,
+  JumpRangeNote,
+  JumpRangeSelect,
+} from '@/features/route/JumpRangeControls';
 import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { loadBlueprints } from '@/sde/loadSde';
@@ -242,16 +244,18 @@ function parsePositiveNumber(value: string): number | null {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
-/** Space narrows contract rows up front — see `spaceFilteredRows`' comment. */
-function narrowBySpace(
+/** Space and Jump Range narrow contract rows up front — see `spaceFilteredRows`' comment. */
+function narrowByLocation(
   rows: BpcContractRow[],
   kinds: ReadonlySet<SpaceKind> | null,
+  allowedSystems: ReadonlySet<number> | null,
   locations: ReadonlyMap<number, ContractLocationInfo>
 ): BpcContractRow[] {
-  if (!kinds) return rows;
+  if (!kinds && !allowedSystems) return rows;
   return rows.filter((row) => {
-    const space = locations.get(row.locationId)?.space ?? null;
-    return space != null && kinds.has(space);
+    const location = locations.get(row.locationId);
+    if (kinds && (location?.space == null || !kinds.has(location.space))) return false;
+    return withinJumpRange(location?.systemId, allowedSystems);
   });
 }
 
@@ -294,19 +298,6 @@ const SOURCE_TOOLTIP_KEYS: Partial<Record<SourceToggle, string>> = {
   market: 'bpcContracts.sourceMarketBposTooltip',
 };
 
-/** `engineFilter`'s `Set`-shaped fields, flattened to the arrays a watch persists (`db.BpcSearchWatchRecord`). */
-function bpcWatchFilterInput(filter: BpcSearchFilter): BpcWatchFilterInput {
-  return {
-    typeIds: filter.typeIds ? [...filter.typeIds] : null,
-    regionId: filter.regionId ?? null,
-    minMe: filter.minMe ?? null,
-    minTe: filter.minTe ?? null,
-    minRuns: filter.minRuns ?? null,
-    maxPrice: filter.maxPrice ?? null,
-    spaceKinds: filter.spaceKinds ? [...filter.spaceKinds] : null,
-  };
-}
-
 interface BpcFilterBarProps {
   filter: UiFilter;
   onChange: (filter: UiFilter) => void;
@@ -315,6 +306,9 @@ interface BpcFilterBarProps {
   onSourcesChange: (next: ReadonlySet<SourceToggle>) => void;
   spaceKinds: readonly SpaceKind[];
   onSpaceKindsChange: (next: readonly SpaceKind[]) => void;
+  jumps: JumpRange;
+  onJumpsChange: (next: JumpRange) => void;
+  currentSystem: CurrentSystemState;
 }
 
 function BpcFilterBar({
@@ -325,6 +319,9 @@ function BpcFilterBar({
   onSourcesChange,
   spaceKinds,
   onSpaceKindsChange,
+  jumps,
+  onJumpsChange,
+  currentSystem,
 }: BpcFilterBarProps) {
   const { t } = useTranslation();
   const activeCount = [
@@ -336,16 +333,23 @@ function BpcFilterBar({
     filter.maxPrice,
     !isDefaultSources(sources),
     spaceKinds.length !== SPACE_KINDS.length,
+    jumps !== DEFAULT_JUMP_RANGE,
   ].filter(Boolean).length;
 
-  const compositeValue = { ...filter, sources, spaceKinds };
+  const compositeValue = { ...filter, sources, spaceKinds, jumps };
 
-  /** Widened past `UiFilter` so Source/Space buffer and commit through the same draft/Apply/Cancel as the other fields (matching Contracts.tsx and Market's FilterBar usage) instead of applying instantly. Space is a Dexie-backed preference, written here and nowhere else, so Cancel never leaves a store write to roll back. */
+  /** Widened past `UiFilter` so Source/Space/Distance buffer and commit through the same draft/Apply/Cancel as the other fields (matching Contracts.tsx and Market's FilterBar usage) instead of applying instantly. Space is a Dexie-backed preference, written here and nowhere else, so Cancel never leaves a store write to roll back. */
   function handleCompositeChange(next: typeof compositeValue) {
-    const { sources: nextSources, spaceKinds: nextSpaceKinds, ...restFilter } = next;
+    const {
+      sources: nextSources,
+      spaceKinds: nextSpaceKinds,
+      jumps: nextJumps,
+      ...restFilter
+    } = next;
     onChange(restFilter);
     if (nextSources !== sources) onSourcesChange(nextSources);
     if (nextSpaceKinds !== spaceKinds) onSpaceKindsChange(nextSpaceKinds);
+    if (nextJumps !== jumps) onJumpsChange(nextJumps);
   }
 
   return (
@@ -353,6 +357,9 @@ function BpcFilterBar({
       value={compositeValue}
       onChange={handleCompositeChange}
       activeCount={activeCount}
+      // Six fields plus two chip groups wrap to three rows inline, above
+      // the table they exist to narrow.
+      collapsible
       className="border-b border-line px-3 py-2"
       search={
         <SearchInput
@@ -384,6 +391,15 @@ function BpcFilterBar({
                 ))}
               </SelectContent>
             </Select>
+          </FilterField>
+          <FilterField label={t('jumpRange.label')}>
+            <div className="flex flex-wrap items-center gap-2">
+              <JumpRangeSelect
+                value={draft.jumps}
+                onChange={(next) => setDraft({ ...draft, jumps: next })}
+              />
+              <CurrentSystemPicker current={currentSystem} />
+            </div>
           </FilterField>
           <FilterField label={t('bpcContracts.minMeLabel')}>
             <TextInput
@@ -549,6 +565,9 @@ export function BpcSourcingPanel() {
   );
   const showAll = params['sourcing.all'];
   const sources = params['sourcing.src'];
+  const jumps = params['sourcing.jumps'];
+  const currentSystem = useCurrentSystem();
+  const jumpFilter = useJumpRangeFilter(currentSystem.systemId, jumps);
   /**
    * The one blueprint the search has been narrowed to, or `null` while the
    * query is still free text. Distinct from `uiFilter.typeQuery`: typing
@@ -593,13 +612,15 @@ export function BpcSourcingPanel() {
   // it here instead keeps the suggestion counts and the displayed table
   // agreeing on what "40 offers" means, the same property `nonTypeFilter`
   // below already protects for the other criteria.
+  // Jump Range rides the same pass, for the same reason. A row that cannot be
+  // placed drops out once a range is active (`withinJumpRange`).
   const spaceFilteredRows = useMemo(
-    () => narrowBySpace(rows, activeSpaceKinds, contractLocations),
-    [rows, activeSpaceKinds, contractLocations]
+    () => narrowByLocation(rows, activeSpaceKinds, jumpFilter.allowed, contractLocations),
+    [rows, activeSpaceKinds, jumpFilter.allowed, contractLocations]
   );
   const spaceFilteredOriginals = useMemo(
-    () => narrowBySpace(originals, activeSpaceKinds, contractLocations),
-    [originals, activeSpaceKinds, contractLocations]
+    () => narrowByLocation(originals, activeSpaceKinds, jumpFilter.allowed, contractLocations),
+    [originals, activeSpaceKinds, jumpFilter.allowed, contractLocations]
   );
 
   // Merges in owned typeIds, gated on the Owned toggle, so free-text search
@@ -647,6 +668,7 @@ export function BpcSourcingPanel() {
       minRuns: parsePositiveNumber(uiFilter.minRuns),
       maxPrice: parsePositiveNumber(uiFilter.maxPrice),
       spaceKinds: activeSpaceKinds,
+      allowedSystems: jumpFilter.allowed,
     }),
     [
       uiFilter.regionId,
@@ -655,6 +677,7 @@ export function BpcSourcingPanel() {
       uiFilter.minRuns,
       uiFilter.maxPrice,
       activeSpaceKinds,
+      jumpFilter.allowed,
     ]
   );
 
@@ -784,51 +807,6 @@ export function BpcSourcingPanel() {
   );
   const marketRegionLabel = marketRegionId === null ? null : regionLabel(marketRegionId);
 
-  // BPC Sourcing watches (issue #926): a pilot's saved searches, notified on
-  // a genuinely new or cheaper matching offer by the standalone
-  // `watchPoller.ts` loop. Loaded once on mount — device-local Dexie data,
-  // not part of `useRouteSnapshot`'s per-Character cache key.
-  const [watches, setWatches] = useState<BpcSearchWatchRecord[]>([]);
-  const [watchNameDraft, setWatchNameDraft] = useState<string | null>(null);
-  /** The watch currently being renamed, or `null` — at most one row edits at a time. */
-  const [renamingWatchId, setRenamingWatchId] = useState<string | null>(null);
-  const [renameDraft, setRenameDraft] = useState('');
-  useEffect(() => {
-    void listWatches().then(setWatches);
-  }, []);
-
-  async function saveCurrentSearchAsWatch() {
-    const name = watchNameDraft?.trim();
-    if (!name) return;
-    const watch = await createWatch(name, bpcWatchFilterInput(engineFilter));
-    setWatches((prev) => [...prev, watch]);
-    setWatchNameDraft(null);
-  }
-
-  async function removeWatch(watch: BpcSearchWatchRecord) {
-    await deleteWatch(watch.id);
-    setWatches((prev) => prev.filter((w) => w.id !== watch.id));
-  }
-
-  function startRenamingWatch(watch: BpcSearchWatchRecord) {
-    setRenamingWatchId(watch.id);
-    setRenameDraft(watch.name);
-  }
-
-  async function commitWatchRename(watch: BpcSearchWatchRecord) {
-    const name = renameDraft.trim();
-    setRenamingWatchId(null);
-    if (!name || name === watch.name) return;
-    const renamed = await renameWatch(watch, name);
-    setWatches((prev) => prev.map((w) => (w.id === renamed.id ? renamed : w)));
-  }
-
-  /** Replaces a watch's saved search with the tab's current filter, re-arming it (`updateWatchFilter`'s doc comment). */
-  async function updateWatchToCurrentSearch(watch: BpcSearchWatchRecord) {
-    const updated = await updateWatchFilter(watch, bpcWatchFilterInput(engineFilter));
-    setWatches((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
-  }
-
   // This filter path stays exactly as it was pre-multiselect (space already
   // narrowed via `spaceFilteredRows`) — the source toggle below only gates
   // what gets merged in alongside it.
@@ -856,6 +834,7 @@ export function BpcSourcingPanel() {
           locationName: location?.name ?? null,
           regionId: location?.regionId ?? null,
           space: location?.space ?? null,
+          systemId: location?.systemId ?? null,
         });
       }),
     [ownedBlueprints, ownedLocations]
@@ -892,6 +871,7 @@ export function BpcSourcingPanel() {
             atHub: offer.atHub,
             locationName: location?.name ?? null,
             space: location?.space ?? null,
+            systemId: location?.systemId ?? null,
           })
         );
       }
@@ -1324,87 +1304,15 @@ export function BpcSourcingPanel() {
             onSourcesChange={(next) => setParams({ 'sourcing.src': next })}
             spaceKinds={spaceFilter}
             onSpaceKindsChange={(next) => void setSpaceFilter(next)}
+            jumps={jumps}
+            onJumpsChange={(next) => setParams({ 'sourcing.jumps': next, 'sourcing.all': false })}
+            currentSystem={currentSystem}
           />
-
-          <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-            {watchNameDraft === null ? (
-              <Button variant="ghost" onClick={() => setWatchNameDraft('')}>
-                {t('bpcContracts.watchThisSearch')}
-              </Button>
-            ) : (
-              <>
-                <TextInput
-                  autoFocus
-                  value={watchNameDraft}
-                  onChange={(e) => setWatchNameDraft(e.target.value)}
-                  placeholder={t('bpcContracts.watchNamePlaceholder')}
-                  aria-label={t('bpcContracts.watchNamePlaceholder')}
-                />
-                <Button
-                  variant="primary"
-                  onClick={() => void saveCurrentSearchAsWatch()}
-                  disabled={watchNameDraft.trim() === ''}
-                >
-                  {t('common.save')}
-                </Button>
-                <Button variant="ghost" onClick={() => setWatchNameDraft(null)}>
-                  {t('common.cancel')}
-                </Button>
-              </>
-            )}
-          </div>
-
-          {watches.length > 0 && (
-            <div className="border-b border-line bg-panel-2 px-3 py-2">
-              <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
-                {t('bpcContracts.watchedSearchesHeading')}
-              </p>
-              <ul className="flex flex-col gap-1">
-                {watches.map((watch) =>
-                  renamingWatchId === watch.id ? (
-                    <li
-                      key={watch.id}
-                      className="flex items-center gap-2 rounded-xs border border-line bg-panel px-2 py-1"
-                    >
-                      <TextInput
-                        autoFocus
-                        value={renameDraft}
-                        onChange={(e) => setRenameDraft(e.target.value)}
-                        aria-label={t('bpcContracts.watchNamePlaceholder')}
-                        className="flex-1"
-                      />
-                      <Button variant="primary" onClick={() => void commitWatchRename(watch)}>
-                        {t('common.save')}
-                      </Button>
-                      <Button variant="ghost" onClick={() => setRenamingWatchId(null)}>
-                        {t('common.cancel')}
-                      </Button>
-                    </li>
-                  ) : (
-                    <li
-                      key={watch.id}
-                      className="flex items-center gap-2 rounded-xs border border-line bg-panel px-2 py-1"
-                    >
-                      <span className="min-w-0 flex-1 truncate text-sm">{watch.name}</span>
-                      <IconButton
-                        icon={<Icon.Refresh />}
-                        label={t('bpcContracts.updateWatchToCurrentSearch', { name: watch.name })}
-                        onClick={() => void updateWatchToCurrentSearch(watch)}
-                      />
-                      <IconButton
-                        icon={<Icon.Rename />}
-                        label={t('bpcContracts.renameWatch', { name: watch.name })}
-                        onClick={() => startRenamingWatch(watch)}
-                      />
-                      <IconButton
-                        icon={<Icon.Close />}
-                        label={t('bpcContracts.removeWatch', { name: watch.name })}
-                        onClick={() => void removeWatch(watch)}
-                      />
-                    </li>
-                  )
-                )}
-              </ul>
+          {/* Outside the bar: collapsed, its controls unmount, and this is
+              exactly when the pilot needs telling the range is not applied. */}
+          {(jumpFilter.status === 'no-origin' || jumpFilter.status === 'unknown') && (
+            <div className="border-b border-line px-3 py-2">
+              <JumpRangeNote status={jumpFilter.status} />
             </div>
           )}
 

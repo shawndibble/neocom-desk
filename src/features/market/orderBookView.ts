@@ -14,6 +14,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import type { RegionOrder } from '@/esi/endpoints';
+import { withinJumpRange } from '@/engine/route/jumpRange';
 import { loadGlobalMarkets } from '@/sde/loadMarketSde';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import {
@@ -40,6 +41,8 @@ export interface OrderBookLocation {
   globalMarkets: ReadonlyMap<number, GlobalMarketOverride>;
   /** The order-row "filter to this station" narrowing, applied on top of the mode. */
   stationFilter?: number | null;
+  /** Jump Range filter (Market Browser, Region mode): systems within range, or `null`/absent for no restriction. */
+  allowedSystems?: ReadonlySet<number> | null;
 }
 
 /** What `fetchOrderBook` settled to — kept apart from the view so a station filter change re-derives without refetching. */
@@ -102,7 +105,12 @@ export function buildOrderBookView(
     location.mode === 'hub'
       ? filterOrdersByLocation(fetched.result.orders, location.hubStationId)
       : fetched.result.orders;
-  const orders = filterOrdersByLocation(atLocation, location.stationFilter ?? null);
+  // Jump Range narrows by system_id next to the station filter, so the
+  // summary, best price, spread and row cap all read the same set the table
+  // shows — never applied after the fact (CONTEXT.md: Jump Range).
+  const orders = filterOrdersByLocation(atLocation, location.stationFilter ?? null).filter(
+    (order) => withinJumpRange(order.system_id, location.allowedSystems ?? null)
+  );
   const { sell, buy } = splitOrderBook(orders);
   sell.sort((a, b) => a.price - b.price);
   buy.sort((a, b) => b.price - a.price);

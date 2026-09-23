@@ -108,7 +108,11 @@ export function useMarketBpoOrders(
           const infos = await Promise.all(
             locationIds.map(async (id): Promise<[number, ContractLocationInfo]> => [
               id,
-              await loadContractLocationInfo(id).catch(() => ({ name: null, space: null })),
+              await loadContractLocationInfo(id).catch(() => ({
+                name: null,
+                space: null,
+                systemId: null,
+              })),
             ])
           );
           if (cancelled) return;

@@ -483,9 +483,8 @@ here — they go one per file in `docs/context/decisions/`.
   whole contract — EVE exposes no per-line price to split it by, and
   apportioning one would invent a number — so it is never attributed to any
   single line as that item's own price (issue #1076). BPC Sourcing's price
-  cell marks it rather than hiding it; the ISK/run figure, Blueprint
-  Acquisition's cheapest-tier selection, and a BPC Watch's all-time-cheapest
-  baseline all treat it as unknowable instead. Contract Search's item mode
+  cell marks it rather than hiding it; the ISK/run figure and Blueprint
+  Acquisition's cheapest-tier selection both treat it as unknowable instead. Contract Search's item mode
   and both boards' maximum-price filters are unaffected — a bundle's whole
   ask is exactly what those two ask about.
 - **Notification Allow-List**: The closed set of EVE Notification `type`

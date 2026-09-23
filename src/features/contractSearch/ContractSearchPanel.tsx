@@ -85,7 +85,29 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { cx } from '@/lib/cx';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
-import { boolParam, optionalEnumParam, optionalIdParam, textParam } from '@/lib/urlState';
+import {
+  boolParam,
+  enumParam,
+  optionalEnumParam,
+  optionalIdParam,
+  textParam,
+} from '@/lib/urlState';
+import {
+  DEFAULT_JUMP_RANGE,
+  JUMP_RANGES,
+  withinJumpRange,
+  type JumpRange,
+} from '@/engine/route/jumpRange';
+import {
+  useCurrentSystem,
+  useJumpRangeFilter,
+  type CurrentSystemState,
+} from '@/features/route/currentSystem';
+import {
+  CurrentSystemPicker,
+  JumpRangeNote,
+  JumpRangeSelect,
+} from '@/features/route/JumpRangeControls';
 
 /** Rows shown before "show all" — the same cap the character-contracts table and BPC Search use. */
 const ROW_CAP = 50;
@@ -135,6 +157,8 @@ interface UiFilter {
   maxPrice: string;
   minQuantity: string;
   saleKind: ContractSaleKind | null;
+  /** Distance from the Current System (`engine/route/jumpRange.ts`); `'any'` is no restriction. */
+  jumps: JumpRange;
 }
 
 /** The Items board's own filter, selection and show-all, in the URL (ADR 0015) as one group. */
@@ -144,6 +168,7 @@ const ITEMS_FILTER_PARAMS = {
   'items.maxPrice': textParam(),
   'items.minQty': textParam(),
   'items.kind': optionalEnumParam(SALE_KINDS),
+  'items.jumps': enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE),
   'items.type': optionalIdParam(),
   'items.all': boolParam(),
 };
@@ -191,12 +216,15 @@ interface ContractSearchFilterBarProps {
   filter: UiFilter;
   onChange: (filter: UiFilter) => void;
   regionOptions: RegionOption[];
+  /** The Jump Range filter's origin — computed above this bar since `FilterBar` unmounts its children. */
+  currentSystem: CurrentSystemState;
 }
 
 function ContractSearchFilterBar({
   filter,
   onChange,
   regionOptions,
+  currentSystem,
 }: ContractSearchFilterBarProps) {
   const { t } = useTranslation();
   // Counted off the controls, not off the parsed engine filter: a half-typed
@@ -208,6 +236,7 @@ function ContractSearchFilterBar({
     filter.maxPrice,
     filter.minQuantity,
     filter.saleKind !== null,
+    filter.jumps !== DEFAULT_JUMP_RANGE,
   ].filter(Boolean).length;
 
   return (
@@ -215,6 +244,10 @@ function ContractSearchFilterBar({
       value={filter}
       onChange={onChange}
       activeCount={activeCount}
+      // Region, max price, min quantity, sale kind, Jump Range and Current
+      // System: six controls beside the search box wrap to two rows above
+      // the table they exist to narrow — the same call the Courier bar makes.
+      collapsible
       className="border-b border-line px-3 py-2"
       search={
         <SearchInput
@@ -287,6 +320,14 @@ function ContractSearchFilterBar({
               />
             ))}
           </div>
+          <FilterField label={t('jumpRange.label')}>
+            <JumpRangeSelect
+              value={draft.jumps}
+              onChange={(jumps) => setDraft({ ...draft, jumps })}
+            />
+          </FilterField>
+          {/* Writes its own setting straight away — not part of this draft, see `currentSystem.ts`. */}
+          <CurrentSystemPicker current={currentSystem} />
         </>
       )}
     </FilterBar>
@@ -453,9 +494,16 @@ export function ContractSearchPanel({
       maxPrice: itemsParams['items.maxPrice'],
       minQuantity: itemsParams['items.minQty'],
       saleKind: itemsParams['items.kind'],
+      jumps: itemsParams['items.jumps'],
     }),
     [itemsParams]
   );
+  // Computed here rather than inside `ContractSearchFilterBar`: `FilterBar`
+  // unmounts its children whenever the funnel collapses, and both the origin
+  // and the distances behind it (`features/route/currentSystem.ts`) must
+  // survive that.
+  const currentSystem = useCurrentSystem();
+  const jumpRangeFilter = useJumpRangeFilter(currentSystem.systemId, uiFilter.jumps);
   /** The type the user picked out of the suggestion list, pinning the search to exactly one item. */
   const selectedTypeId = itemsParams['items.type'];
   const showAll = itemsParams['items.all'];
@@ -522,10 +570,31 @@ export function ContractSearchPanel({
     }),
     [uiFilter.regionId, uiFilter.maxPrice, uiFilter.minQuantity, uiFilter.saleKind]
   );
-  const nonTypeRows = useMemo(
-    () => filterContractOffers(rows, nonTypeFilter),
-    [rows, nonTypeFilter]
-  );
+  /**
+   * Jump Range folded in here rather than into `nonTypeFilter`/the engine:
+   * only this layer resolves an offer's system (`useOfferLocations`), so
+   * `filterContractOffers` cannot see it. A row this app has *placed* and
+   * cannot connect to the origin — a player structure, or a system the
+   * stargate graph does not reach — drops out the moment a range is active:
+   * "within 5 jumps" is a claim an unknown distance cannot back.
+   *
+   * A row still *resolving* (no entry in `offerLocations` yet) is a
+   * different case and stays. `useOfferLocations` can still be working
+   * through the snapshot's ids while the distances have already landed, and
+   * dropping an unresolved row here would read as "nothing in range" for an
+   * answer that has simply not arrived yet — the same "only a finished
+   * answer excludes" rule Courier's `narrowToOverRate` follows for its own
+   * mid-load rows.
+   */
+  const nonTypeRows = useMemo(() => {
+    const engineFiltered = filterContractOffers(rows, nonTypeFilter);
+    const allowed = jumpRangeFilter.allowed;
+    if (allowed === null) return engineFiltered;
+    return engineFiltered.filter((row) => {
+      const location = offerLocations.get(row.locationId);
+      return location === undefined || withinJumpRange(location.systemId, allowed);
+    });
+  }, [rows, nonTypeFilter, offerLocations, jumpRangeFilter.allowed]);
   const statsByType = useMemo(() => contractOfferStats(nonTypeRows), [nonTypeRows]);
 
   /**
@@ -599,6 +668,7 @@ export function ContractSearchPanel({
       'items.maxPrice': next.maxPrice,
       'items.minQty': next.minQuantity,
       'items.kind': next.saleKind,
+      'items.jumps': next.jumps,
       'items.type': unpin ? null : selectedTypeId,
       'items.all': false,
     });
@@ -888,7 +958,19 @@ export function ContractSearchPanel({
                   filter={uiFilter}
                   onChange={changeFilter}
                   regionOptions={regionOptions}
+                  currentSystem={currentSystem}
                 />
+
+                {/*
+                  Outside the bar, not inside its `children`: `collapsible`
+                  unmounts those the moment the funnel closes, and a range set
+                  from a pasted link must still explain itself with the
+                  sheet/row shut. `JumpRangeNote` itself renders nothing once
+                  it has an origin, so this costs no DOM the rest of the time.
+                */}
+                <div className="px-3 pt-2 text-[0.6875rem] text-text-dim empty:hidden">
+                  <JumpRangeNote status={jumpRangeFilter.status} />
+                </div>
 
                 {suggestions.length > 0 && (
                   <div className="border-b border-line bg-panel-2 px-3 py-2">

@@ -21,23 +21,27 @@ export interface ResolvedLocation {
   name: string | null;
   regionId: number | null;
   space: SpaceKind | null;
+  /** For the Jump Range filter. Kept even when the system snapshot cannot name it. */
+  systemId: number | null;
 }
 
-const UNRESOLVED: ResolvedLocation = { name: null, regionId: null, space: null };
+const UNRESOLVED: ResolvedLocation = { name: null, regionId: null, space: null, systemId: null };
 
 async function withSystem(systemId: number | null, name: string | null): Promise<ResolvedLocation> {
-  if (systemId == null) return { name, regionId: null, space: null };
+  if (systemId == null) return { name, regionId: null, space: null, systemId: null };
   const system = await lookupSolarSystem(systemId);
-  if (!system) return { name, regionId: null, space: null };
+  if (!system) return { name, regionId: null, space: null, systemId };
   return {
     name: name ?? system.name,
     regionId: system.regionId,
     space: classifySpace(system.name, system.security),
+    systemId,
   };
 }
 
+/** `v2` added `systemId`: an entry cached before it would leave every owned row unplaceable for a Jump Range until it went stale. */
 function cacheKey(locationId: number): string {
-  return `bpc-blueprint-location:${locationId}`;
+  return `bpc-blueprint-location:v2:${locationId}`;
 }
 
 /**
@@ -82,9 +86,15 @@ export async function loadBlueprintLocation(
 export interface ContractLocationInfo {
   name: string | null;
   space: SpaceKind | null;
+  /** For the Jump Range filter. */
+  systemId: number | null;
 }
 
-const UNRESOLVED_CONTRACT_LOCATION: ContractLocationInfo = { name: null, space: null };
+const UNRESOLVED_CONTRACT_LOCATION: ContractLocationInfo = {
+  name: null,
+  space: null,
+  systemId: null,
+};
 
 /**
  * A public BPC contract's location, name/space only — no region (the contract
@@ -101,6 +111,10 @@ export async function loadContractLocationInfo(locationId: number): Promise<Cont
   const snapshot = await lookupNpcStation(locationId);
   if (!snapshot) return UNRESOLVED_CONTRACT_LOCATION;
   const system = await lookupSolarSystem(snapshot.systemId);
-  if (!system) return { name: snapshot.name, space: null };
-  return { name: snapshot.name, space: classifySpace(system.name, system.security) };
+  if (!system) return { name: snapshot.name, space: null, systemId: snapshot.systemId };
+  return {
+    name: snapshot.name,
+    space: classifySpace(system.name, system.security),
+    systemId: snapshot.systemId,
+  };
 }

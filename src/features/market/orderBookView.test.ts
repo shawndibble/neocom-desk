@@ -28,6 +28,8 @@ const PERIMETER_STATION = 60000004;
 const PLEX = 44992;
 const PLEX_REGION = 19000001;
 const TRITANIUM = 34;
+const JITA_SYSTEM = 30000142;
+const OTHER_SYSTEM = 30000144;
 
 const regionLocation: OrderBookLocation = {
   mode: 'region',
@@ -167,6 +169,53 @@ describe('loadOrderBookView', () => {
     expect(view.sell.map((o) => o.order_id)).toEqual([2]);
     expect(view.buy.map((o) => o.order_id)).toEqual([5]);
     expect(view.summary.bestSell).toBe(4);
+  });
+
+  it('applies the Jump Range filter (allowedSystems) on top of the Location Mode', async () => {
+    mockedGetOrderBook.mockResolvedValue(
+      book([
+        order({
+          order_id: 1,
+          price: 6,
+          location_id: JITA_4_4,
+          system_id: JITA_SYSTEM,
+          volume_remain: 10,
+        }),
+        order({
+          order_id: 2,
+          price: 4,
+          location_id: PERIMETER_STATION,
+          system_id: OTHER_SYSTEM,
+          volume_remain: 5,
+        }),
+        order({
+          order_id: 3,
+          is_buy_order: true,
+          price: 3,
+          location_id: JITA_4_4,
+          system_id: JITA_SYSTEM,
+        }),
+      ])
+    );
+
+    const view = await loadOrderBookView(TRITANIUM, {
+      ...regionLocation,
+      allowedSystems: new Set([JITA_SYSTEM]),
+    });
+
+    if (view.status === 'failed') throw new Error('expected a loaded view');
+    expect(view.sell.map((o) => o.order_id)).toEqual([1]);
+    expect(view.buy.map((o) => o.order_id)).toEqual([3]);
+    expect(view.summary.bestSell).toBe(6);
+  });
+
+  it('null allowedSystems does not filter', async () => {
+    mockedGetOrderBook.mockResolvedValue(book(MIXED));
+
+    const view = await loadOrderBookView(TRITANIUM, { ...regionLocation, allowedSystems: null });
+
+    if (view.status === 'failed') throw new Error('expected a loaded view');
+    expect(view.sell).toHaveLength(3);
   });
 
   it('carries the truncated flag through', async () => {

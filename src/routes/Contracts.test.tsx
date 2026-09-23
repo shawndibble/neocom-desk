@@ -51,6 +51,13 @@ const loadPublicCourierContracts = vi.fn();
 vi.mock('@/features/contractSearch/publicCourierContracts', () => ({
   loadPublicCourierContracts: (...args: unknown[]) => loadPublicCourierContracts(...args),
 }));
+// The Search tab's Jump Range filter reads this (`features/route/currentSystem.ts`).
+// Mocked rather than given an msw handler: `onUnhandledRequest: 'error'` below
+// would otherwise fail every case that mounts the Search tab, not only the
+// ones this file is actually about.
+vi.mock('@/features/character/location', () => ({
+  loadCharacterSolarSystemId: vi.fn(async () => null),
+}));
 
 const CHAR_ID = 91;
 
