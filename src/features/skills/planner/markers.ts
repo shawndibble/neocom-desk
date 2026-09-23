@@ -12,26 +12,21 @@
  * so drag interactions are unit-testable without simulating drag events.
  */
 import { arrayMove } from '@dnd-kit/sortable';
-import { normalizePlan, normalizePlanWithBoundaries } from '@/engine/plan';
+import { normalizePlanWithBoundaries } from '@/engine/plan';
+import { hasKnownSkill, markerStepIndices, normalizeMarkers } from '@/engine/remapMarkers';
 import type { RemapSegment } from '@/engine/optimizer';
 import type { Attributes, EngineSkill, PlanEntry, TrainedSkill } from '@/engine/types';
 import { entryId } from './reorder';
+
+// Moved to the engine so the Skill Plan schedule (engine/skillPlanSchedule.ts)
+// can place markers without importing a UI module; re-exported for callers.
+export { markerStepIndices, normalizeMarkers };
 
 const MARKER_ID_PREFIX = 'marker-';
 
 /** Sortable id for the i-th marker (in normalized order). */
 export function markerRowId(index: number): string {
   return `${MARKER_ID_PREFIX}${index}`;
-}
-
-/** Clamp to [0, entryCount], sort ascending, dedupe. */
-export function normalizeMarkers(
-  markers: readonly number[] | undefined,
-  entryCount: number
-): number[] {
-  return [...new Set((markers ?? []).map((m) => Math.min(entryCount, Math.max(0, m))))].sort(
-    (a, b) => a - b
-  );
 }
 
 /**
@@ -229,33 +224,6 @@ export function markerAttributesAfterEntryRemoval(
   if (entryIndex < 0) return normalizeMarkerAttributes(markers, attributes, entryCountBefore);
   const shifted = (markers ?? []).map((m) => (m > entryIndex ? m - 1 : m));
   return normalizeMarkerAttributes(shifted, attributes, entryCountBefore - 1);
-}
-
-/** An entry whose skill is missing from the catalog contributes no step — the same filter `normalizePlan`/computeQueue apply. Shared so markerStepIndices and segmentsToMarkers can't drift on what "missing from the catalog" means. */
-function hasKnownSkill(entry: PlanEntry, skills: ReadonlyMap<number, EngineSkill>): boolean {
-  return skills.has(entry.skillTypeID);
-}
-
-/**
- * Marker <-> step mapping: a marker at entry-list position p means "remap
- * before entries[p]", which in the computed queue is the step right after
- * everything entries[0..p) expand to. normalizePlan builds steps entry by
- * entry (prereqs recursively, already-planned/trained levels skipped), so the
- * expansion of a strict entry prefix IS a strict step prefix of the full
- * queue — the marker's step index is simply that prefix's length. Entries
- * missing from the catalog are dropped first, mirroring the computed queue's
- * own filtering.
- */
-export function markerStepIndices(
-  entries: readonly PlanEntry[],
-  markers: readonly number[] | undefined,
-  skills: ReadonlyMap<number, EngineSkill>,
-  trainedSkills: ReadonlyMap<number, TrainedSkill>
-): number[] {
-  const valid = (list: readonly PlanEntry[]) => list.filter((e) => hasKnownSkill(e, skills));
-  return normalizeMarkers(markers, entries.length).map(
-    (position) => normalizePlan(valid(entries.slice(0, position)), skills, trainedSkills).length
-  );
 }
 
 /**
