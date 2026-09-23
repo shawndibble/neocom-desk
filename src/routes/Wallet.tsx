@@ -454,7 +454,7 @@ function CorpWalletView({
             <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {divisionLabel(division)}
             </p>
-            <p className={`text-lg font-medium tabular-nums ${iskToneClass(division.balance)}`}>
+            <p className={`text-xl font-medium tabular-nums ${iskToneClass(division.balance)}`}>
               {formatIsk(division.balance, 2)}
             </p>
             {walletsResult.fromCache && (
@@ -1205,7 +1205,7 @@ export function Wallet() {
                 </div>
               ) : (
                 <>
-                  <p className="px-3 pt-2 text-lg font-medium tabular-nums">
+                  <p className="px-3 pt-2 text-xl font-medium tabular-nums">
                     {t('wallet.totalBalance')}:{' '}
                     <span className={iskToneClass(walletBalancesTotal)}>
                       {formatIsk(walletBalancesTotal, 2)}
@@ -1285,7 +1285,7 @@ export function Wallet() {
                     />
                   ) : balanceResult ? (
                     <p
-                      className={`text-lg font-medium tabular-nums ${iskToneClass(balanceResult.data)}`}
+                      className={`text-xl font-medium tabular-nums ${iskToneClass(balanceResult.data)}`}
                     >
                       {formatIsk(balanceResult.data, 2)}
                     </p>
@@ -1301,7 +1301,7 @@ export function Wallet() {
                       content={t('wallet.everMarksTooltip')}
                     />
                   </p>
-                  <p className="text-lg font-medium tabular-nums">
+                  <p className="text-xl font-medium tabular-nums">
                     {loyaltyResult && !loyaltyNeedsReauth
                       ? everMarks.toLocaleString()
                       : t('common.unknown')}

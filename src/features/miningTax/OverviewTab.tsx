@@ -545,7 +545,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('miningTax.overview.totalValueStat')}
                   </p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums">
+                  <p className="mt-1 text-xl font-semibold tabular-nums">
                     <IskAmount value={totals.rawValue} revealOn="tap" decimals={0} />
                   </p>
                   {showRefining && (
@@ -559,7 +559,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('miningTax.overview.iskPerHourStat')}
                   </p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums">
+                  <p className="mt-1 text-xl font-semibold tabular-nums">
                     {totals.iskPerHour !== null ? (
                       <IskAmount value={totals.iskPerHour} revealOn="tap" decimals={0} />
                     ) : (
@@ -574,7 +574,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('miningTax.overview.volumeStat')}
                   </p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums">
+                  <p className="mt-1 text-xl font-semibold tabular-nums">
                     {volumeDisplayMode(totals.volume).kind === 'complete'
                       ? `${formatVolume(totals.volume.m3)} m³`
                       : volumeDisplayMode(totals.volume).kind === 'unknown'
@@ -593,7 +593,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('miningTax.overview.daysMinedStat')}
                   </p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums">
+                  <p className="mt-1 text-xl font-semibold tabular-nums">
                     {t('miningTax.overview.daysCoveredValue', {
                       count: coverage.daysWithData,
                       total: coverage.rangeDays,

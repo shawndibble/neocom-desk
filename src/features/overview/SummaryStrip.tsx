@@ -59,7 +59,7 @@ export function SummaryStrip({
             <Value muted>{t('overview.board.noDeadline')}</Value>
           ) : (
             <Link to={deadline.to} className="min-w-0 hover:underline">
-              <Value className={`text-2xl ${SEVERITY_TEXT[deadline.severity]}`}>
+              <Value className={`text-3xl ${SEVERITY_TEXT[deadline.severity]}`}>
                 {deadline.label}
               </Value>
               <Note>{deadline.note}</Note>
@@ -150,7 +150,7 @@ function Value({
   return (
     <span
       className={cx(
-        'block truncate text-lg font-medium tabular-nums',
+        'block truncate text-xl font-medium tabular-nums',
         muted && 'text-text-dim',
         className
       )}
