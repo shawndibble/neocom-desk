@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { CachedResult, StatusResult } from '@/esi/cache';
@@ -94,12 +94,23 @@ function labels(overrides: Partial<corpMembers.MemberLabels> = {}): corpMembers.
   };
 }
 
-function renderMembers() {
+/** Prints the router's current location, so a test can read what the page wrote. */
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
+}
+
+function renderMembers(initialEntry = '/corp/members') {
   return render(
-    <MemoryRouter initialEntries={['/corp/members']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <CorpMembers />
+      <LocationProbe />
     </MemoryRouter>
   );
+}
+
+function currentLocation(): string {
+  return screen.getByTestId('location').textContent ?? '';
 }
 
 /** Renders, then waits for the roster table to have replaced the loading spinner. */
@@ -489,5 +500,76 @@ describe('CSV export (issue #421, AC4)', () => {
     await screen.findByText('No member activity');
 
     expect(screen.getByRole('button', { name: 'Export CSV' })).toBeDisabled();
+  });
+});
+
+describe('filters and sort in the URL (issue #1306)', () => {
+  beforeEach(() => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([
+        tracking({ character_id: 1001, logon_date: ago(HOUR), logoff_date: ago(HOUR) }),
+        tracking({ character_id: 1002, logon_date: ago(90 * DAY), logoff_date: ago(90 * DAY) }),
+      ])
+    );
+  });
+
+  it('keeps an untouched view out of the URL', async () => {
+    await rosterTable();
+    expect(currentLocation()).toBe('/corp/members');
+  });
+
+  it('applies search, dark-only and sort from the URL on arrival', async () => {
+    renderMembers('/corp/members?q=ren&dark=1&sort=member:asc');
+    const table = await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
+    expect(screen.getByPlaceholderText('Search name, ship, location…')).toHaveValue('ren');
+    expect(screen.getByRole('button', { name: /Dark 30d\+/ })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(within(table).getByRole('columnheader', { name: 'Member' })).toHaveAttribute(
+      'aria-sort',
+      'ascending'
+    );
+    expect(within(table).getByText('Silent Ren')).toBeInTheDocument();
+    expect(within(table).queryByText('Jita Local')).not.toBeInTheDocument();
+  });
+
+  it('writes typed search text to the URL once typing pauses', async () => {
+    await rosterTable();
+    await userEvent
+      .setup()
+      .type(screen.getByPlaceholderText('Search name, ship, location…'), 'local');
+    await waitFor(() => expect(currentLocation()).toBe('/corp/members?q=local'));
+  });
+
+  it('writes the dark-only toggle, and removes it again when switched off', async () => {
+    const user = userEvent.setup();
+    await rosterTable();
+    const toggle = screen.getByRole('button', { name: /Dark 30d\+/ });
+    await user.click(toggle);
+    expect(currentLocation()).toBe('/corp/members?dark=1');
+    await user.click(toggle);
+    expect(currentLocation()).toBe('/corp/members');
+  });
+
+  it('writes a header sort to the URL', async () => {
+    const table = await rosterTable();
+    const header = within(table).getByRole('columnheader', { name: 'Member' });
+    await userEvent.setup().click(within(header).getByRole('button'));
+    expect(currentLocation()).toBe('/corp/members?sort=member%3Aasc');
+  });
+
+  it('falls back to the defaults on garbage values', async () => {
+    renderMembers('/corp/members?dark=maybe&sort=bogus:asc');
+    const table = await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
+    expect(screen.getByRole('button', { name: /Dark 30d\+/ })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(within(table).getByRole('columnheader', { name: 'Last seen' })).toHaveAttribute(
+      'aria-sort',
+      'descending'
+    );
+    expect(within(table).getByText('Jita Local')).toBeInTheDocument();
   });
 });
