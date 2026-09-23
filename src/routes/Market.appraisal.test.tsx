@@ -6,6 +6,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { useMarketHub } from '@/features/market/hub';
+import { useMarketBrowserHub } from '@/features/market/browserHub';
 import { useMarketPricePercent } from '@/features/market/pricePercent';
 import { appraisePaste } from '@/features/market/appraisalData';
 import { Market } from './Market';
@@ -75,13 +76,15 @@ async function pickHub(name: string) {
 beforeEach(async () => {
   probe.pathname = '';
   probe.search = '';
-  // The hub is a *synced* setting, so picking one writes it to Dexie as well
-  // as to the store. Resetting only the store leaves the row behind, and the
-  // next test's `hydrateHub()` reads it back asynchronously — landing on the
-  // hub the previous test picked, which makes picking that hub again a no-op
+  // The page reads its hub from `useMarketBrowserHub`, a Dexie-backed store
+  // like `useMarketHub`, so picking one writes it to Dexie as well as to the
+  // store. Resetting only the store leaves the row behind, and the next
+  // test's `hydrateHub()` reads it back asynchronously — landing on the hub
+  // the previous test picked, which makes picking that hub again a no-op
   // firing no `onValueChange` at all.
   await db.settings.clear();
   useMarketHub.setState({ value: 'jita', hydrated: false });
+  useMarketBrowserHub.setState({ value: 'jita', hydrated: false });
   useMarketPricePercent.setState({ value: 100, hydrated: false });
 });
 
