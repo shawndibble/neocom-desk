@@ -39,7 +39,7 @@ function renderPanel() {
   const onRequestBlueprintCatalog = vi.fn();
   const onViewChange = vi.fn();
   render(
-    <MemoryRouter initialEntries={['/market?section=transactions']}>
+    <MemoryRouter initialEntries={['/market/history/transactions']}>
       <TransactionsPanel
         onViewChange={onViewChange}
         blueprintCatalog={null}
@@ -152,7 +152,7 @@ describe('TransactionsPanel — phone', () => {
   it('pulses the fill a notification pointed at', async () => {
     load([transaction({ transaction_id: 7 })]);
     render(
-      <MemoryRouter initialEntries={['/market?section=transactions&highlight=2048']}>
+      <MemoryRouter initialEntries={['/market/history/transactions?highlight=2048']}>
         <TransactionsPanel
           onViewChange={vi.fn()}
           blueprintCatalog={null}

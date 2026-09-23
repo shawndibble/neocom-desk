@@ -1056,7 +1056,7 @@ describe('PlanEditor what-if implants', () => {
       screen.getByRole('button', { name: 'View attribute enhancer implants in Market' })
     );
 
-    expect(screen.getByTestId('location-probe')).toHaveTextContent('/market?group=532');
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/market/browser?group=532');
   });
 });
 
@@ -1068,7 +1068,7 @@ describe('PlanEditor booster market link (issue #407)', () => {
 
     await user.click(screen.getByRole('button', { name: 'View boosters in Market' }));
 
-    expect(screen.getByTestId('location-probe')).toHaveTextContent('/market?group=977');
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/market/browser?group=977');
   });
 });
 

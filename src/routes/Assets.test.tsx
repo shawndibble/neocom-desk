@@ -11,6 +11,7 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useCompareSet } from '@/features/market/compareSet';
 import { DEFAULT_ASSET_SORT, useAssetSort } from '@/features/character/assetSortPreference';
+import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { configureClipboard } from '@/lib/clipboard';
 import { App } from '@/app/App';
 import type { TypeMap } from '@/sde/types';
@@ -136,6 +137,7 @@ beforeEach(async () => {
   // Module-scope store, so a sort chosen by one test would otherwise be the
   // starting order of the next one.
   useAssetSort.setState({ value: DEFAULT_ASSET_SORT, hydrated: false });
+  useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -739,7 +741,7 @@ describe('item context menu (issue #83)', () => {
     await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
 
     await waitFor(() => {
-      expect(window.location.pathname).toBe('/market');
+      expect(window.location.pathname).toBe('/market/browser');
     });
     expect(window.location.search).toContain('type=34');
   });
@@ -866,6 +868,8 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     await user.click(screen.getByLabelText('Sort'));
     await user.click(await screen.findByRole('option', { name: 'Value' }));
     unmount();
+    // A fresh visit: All Items rides the URL, the sort does not.
+    window.history.replaceState({}, '', '/assets');
 
     render(<App />);
     await screen.findByText(JITA);
@@ -879,7 +883,7 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
     expect(names).toEqual(['Pyerite', 'Tritanium']);
   });
 
-  it('does not remember the minimum-value threshold across a remount', async () => {
+  it('keeps the minimum-value threshold in the URL only — a fresh visit starts without it', async () => {
     const user = userEvent.setup();
     const { unmount } = render(<App />);
     await screen.findByText(JITA);
@@ -888,7 +892,9 @@ describe('all items view, min-value filter, and sort (issue #414)', () => {
 
     await user.type(screen.getByLabelText('Minimum value'), '10000');
     await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
+    await waitFor(() => expect(window.location.search).toContain('min=10000'));
     unmount();
+    window.history.replaceState({}, '', '/assets');
 
     render(<App />);
     await screen.findByText(JITA);
@@ -1518,5 +1524,148 @@ describe('multi-select and bulk actions (issue #90)', () => {
     await user.click(screen.getByRole('button', { name: 'Select' }));
 
     expect(screen.getByRole('button', { name: 'Deselect all' })).toBeDisabled();
+  });
+});
+
+describe('view state in the URL (issue #1306)', () => {
+  const CHAR_ID_2 = 92;
+
+  async function seedSecondCharacter() {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID_2}/assets`, () =>
+        HttpResponse.json([], { headers: { 'X-Pages': '1' } })
+      )
+    );
+    await db.characters.put({
+      characterId: CHAR_ID_2,
+      name: 'Pilot Two',
+      ownerHash: 'oh2',
+      addedAt: 2,
+    });
+    await db.tokens.put({
+      characterId: CHAR_ID_2,
+      accessToken: 'access-token-2',
+      refreshToken: 'refresh-2',
+      expiresAt: Date.now() + 3_600_000,
+      scopes: ['esi-assets.read_assets.v1'],
+    });
+  }
+
+  it('applies search, All Items and min value from the URL on first render', async () => {
+    server.use(
+      http.get('https://esi.evetech.net/markets/prices', () =>
+        HttpResponse.json([
+          { type_id: 34, average_price: 5 },
+          { type_id: 35, average_price: 5000 },
+        ])
+      )
+    );
+    window.history.replaceState({}, '', '/assets?all=1&min=10000');
+    render(<App />);
+
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'All items' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.getByLabelText('Minimum value')).toHaveValue(10000);
+  });
+
+  it('reads the search text from the URL', async () => {
+    window.history.replaceState({}, '', '/assets?q=pyerite');
+    render(<App />);
+
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/search items/i)).toHaveValue('pyerite');
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+  });
+
+  it('writes changes to the URL and drops each key once back at its default', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText(JITA);
+    expect(window.location.search).toBe('');
+
+    await user.type(screen.getByPlaceholderText(/search items/i), 'trit');
+    await waitFor(() => expect(window.location.search).toBe('?q=trit'));
+
+    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('all')).toBe('1'));
+
+    await user.clear(screen.getByPlaceholderText(/search items/i));
+    await user.click(screen.getByRole('button', { name: 'All items' }));
+    await waitFor(() => expect(window.location.search).toBe(''));
+  });
+
+  it('falls back to defaults for garbage values', async () => {
+    window.history.replaceState({}, '', '/assets?all=yes&chars=bogus');
+    await seedSecondCharacter();
+    render(<App />);
+
+    expect(await screen.findByText(JITA)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'All items' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(screen.getByRole('button', { name: 'This character' })).toBeInTheDocument();
+  });
+
+  it('keeps the query string while drilling down, and the path still resolves', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState({}, '', '/assets?min=5');
+    render(<App />);
+
+    await openLocation(user, JITA);
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/assets/60003760');
+    expect(window.location.search).toBe('?min=5');
+
+    await goBack(user);
+    await screen.findByText(STRUCTURE);
+    expect(window.location.pathname).toBe('/assets');
+    expect(window.location.search).toBe('?min=5');
+  });
+
+  it('opens a drilled-in path with a query already on it', async () => {
+    window.history.replaceState({}, '', '/assets/60003760?q=pyerite');
+    render(<App />);
+
+    // Search wins over browsing, as it does when typed.
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+    expect(window.location.pathname).toBe('/assets/60003760');
+  });
+
+  it('uses the synced default character filter when the URL has none, without writing it to the URL', async () => {
+    await seedSecondCharacter();
+    await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
+    render(<App />);
+
+    expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
+    expect(window.location.search).toBe('');
+  });
+
+  it('lets the URL override the synced default, and never writes the URL value back to it', async () => {
+    await seedSecondCharacter();
+    await db.settings.put({ key: 'sync.defaultCharacterFilter', value: 'all' });
+    window.history.replaceState({}, '', '/assets?chars=current');
+    render(<App />);
+
+    expect(await screen.findByRole('button', { name: 'This character' })).toBeInTheDocument();
+    expect((await db.settings.get('sync.defaultCharacterFilter'))?.value).toBe('all');
+  });
+
+  it('writes a picked character filter to the URL', async () => {
+    const user = userEvent.setup();
+    await seedSecondCharacter();
+    render(<App />);
+    await screen.findByText(JITA);
+
+    await user.click(screen.getByRole('button', { name: 'This character' }));
+    await user.click(await screen.findByRole('button', { name: 'All characters' }));
+
+    await waitFor(() => expect(window.location.search).toBe('?chars=all'));
+    expect((await db.settings.get('sync.defaultCharacterFilter'))?.value).toBeUndefined();
   });
 });

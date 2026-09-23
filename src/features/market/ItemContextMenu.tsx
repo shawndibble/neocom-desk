@@ -125,7 +125,7 @@ export function ItemContextMenu({
         <ContextMenuItem
           onSelect={() => {
             const params = marketLinkParams(typeId, location.search);
-            navigate(`/market?${new URLSearchParams(params).toString()}`);
+            navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
           }}
         >
           {t('market.contextMenu.viewInMarket')}

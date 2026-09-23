@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -31,6 +31,7 @@ import { resolveCharacterFilter } from '@/features/character/characterFilterValu
 import { loadReprocessing } from '@/sde/loadSde';
 import type { ReprocessingType } from '@/sde/types';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
+import { useUrlParams } from '@/lib/useUrlState';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { cx } from '@/lib/cx';
 import { formatIskAuto, formatIskCompact } from '@/lib/isk';
@@ -66,7 +67,8 @@ import {
   EMPTY_OPEN_ORDERS_FILTER,
   FILTERABLE_PROBLEMS,
   filterOpenOrders,
-  openOrdersFilterFromParams,
+  OPEN_ORDERS_FILTER_PARAMS,
+  OPEN_ORDERS_SORTS,
   sortOpenOrders,
   activeFilterChips,
   type OpenOrdersFilter,
@@ -85,13 +87,7 @@ import type { ReprocessingInput } from './orderExits';
 /** Healthy orders start collapsed (CONTEXT.md redesign) — the `showHealthy` toggle is the way back, not the funnel filter. */
 const DEFAULT_FILTER: OpenOrdersFilter = { ...EMPTY_OPEN_ORDERS_FILTER, hideHealthy: true };
 
-const SORTS: readonly OpenOrdersSort[] = [
-  'worstFirst',
-  'expirySoonest',
-  'iskTiedUp',
-  'item',
-  'character',
-];
+const SORTS: readonly OpenOrdersSort[] = OPEN_ORDERS_SORTS;
 
 /**
  * Every problem worth a funnel chip. The same set a deep link may name, and
@@ -150,21 +146,42 @@ export function OpenOrdersPanel() {
   );
 
   /*
-   * A deep link narrows the opening filter — the Overview board's count tiles
-   * link here already filtered to what they counted, so a tile reading "21
-   * undercut" and a page listing thirty cannot both be on screen.
-   *
-   * Read once on mount and never synced afterwards, which is what Wallet's
-   * `?tab=` and Market's own `?section=` do. The URL states where the player
-   * arrived, not where they have got to since; keeping it in step would mean
-   * every chip removed rewrites history, and a stale param nobody reads again
-   * costs nothing. `activeFilterChips` is what shows them the filter is on and
-   * hands them the way out of it.
+   * The whole filter lives in the URL (ADR 0015), one `orders.*` key per
+   * field — a deep link (the Overview board's count tiles, `openOrdersHref`)
+   * narrows it on arrival, and every chip, select and search keystroke from
+   * here on writes straight back to it, so a reload or a shared link always
+   * reopens exactly what was on screen. The field names below are
+   * `OpenOrdersFilter`'s own, so `filter`/`setFilter` reads and writes exactly
+   * as they did with the old local `useState`.
    */
-  const [searchParams] = useSearchParams();
-  const [filter, setFilter] = useState<OpenOrdersFilter>(() =>
-    openOrdersFilterFromParams(searchParams, DEFAULT_FILTER)
+  const [urlFilter, setUrlFilter] = useUrlParams(OPEN_ORDERS_FILTER_PARAMS);
+  const filter = useMemo<OpenOrdersFilter>(
+    () => ({
+      text: urlFilter['orders.q'],
+      side: urlFilter['orders.side'],
+      characterIds: urlFilter['orders.characters'],
+      problems: urlFilter['orders.problems'],
+      expiringWithinDays: urlFilter['orders.expiring'],
+      costBasis: urlFilter['orders.costBasis'],
+      minIskTiedUp: urlFilter['orders.minIsk'],
+      hideHealthy: urlFilter['orders.hideHealthy'],
+      sort: urlFilter['orders.sort'],
+    }),
+    [urlFilter]
   );
+  function setFilter(next: OpenOrdersFilter) {
+    setUrlFilter({
+      'orders.q': next.text,
+      'orders.side': next.side,
+      'orders.characters': next.characterIds,
+      'orders.problems': next.problems,
+      'orders.expiring': next.expiringWithinDays,
+      'orders.costBasis': next.costBasis,
+      'orders.minIsk': next.minIskTiedUp,
+      'orders.hideHealthy': next.hideHealthy,
+      'orders.sort': next.sort,
+    });
+  }
   const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   /** Groups the player has folded away by hand. `healthy` is never in here — see the toggle below. */

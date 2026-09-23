@@ -1130,7 +1130,7 @@ describe('Market Browser item context menu (issue #6)', () => {
   });
 
   it('View in Market sets the type param, preserving an existing hub param (issue #83)', async () => {
-    window.history.pushState({}, '', '/market?hub=jita');
+    window.history.pushState({}, '', '/market/browser?hub=jita');
     server.use(
       http.get(`${ESI_BASE_URL}/markets/:regionId/orders`, () =>
         HttpResponse.json([], { headers: { 'X-Pages': '1' } })
@@ -1145,8 +1145,9 @@ describe('Market Browser item context menu (issue #6)', () => {
 
     await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
 
-    expect(window.location.pathname).toBe('/market');
-    expect(window.location.search).toBe('?type=587&hub=jita');
+    expect(window.location.pathname).toBe('/market/browser');
+    expect(new URLSearchParams(window.location.search).get('type')).toBe('587');
+    expect(new URLSearchParams(window.location.search).get('hub')).toBe('jita');
   });
 });
 
@@ -1431,10 +1432,14 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
-    expect(window.location.search).toBe('?type=587&hub=jita');
+    // The tree search box is URL-backed too (ADR 0015), written immediately —
+    // it rides along with every location change from here on.
+    expect(window.location.search).toBe('?browser.q=rift&type=587&hub=jita');
 
     await user.click(screen.getByRole('button', { name: 'Region' }));
-    expect(window.location.search).toBe('?type=587&region=10000002');
+    await waitFor(() =>
+      expect(window.location.search).toBe('?browser.q=rift&type=587&region=10000002')
+    );
   });
 
   it('opening a Market Browser URL with item and location parameters restores that exact view', async () => {

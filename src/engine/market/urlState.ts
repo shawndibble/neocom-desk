@@ -97,9 +97,9 @@ export function marketLinkParams(typeId: number, currentSearch: string): Record<
   return { type: String(typeId) };
 }
 
-/** `marketLinkParams`, serialised to the `/market?...` path a cross-link navigates to. */
+/** `marketLinkParams`, serialised to the `/market/browser?...` path a cross-link navigates to. */
 export function marketItemUrl(typeId: number, currentSearch: string): string {
-  return `/market?${new URLSearchParams(marketLinkParams(typeId, currentSearch)).toString()}`;
+  return `/market/browser?${new URLSearchParams(marketLinkParams(typeId, currentSearch)).toString()}`;
 }
 
 /**

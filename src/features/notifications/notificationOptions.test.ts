@@ -96,12 +96,14 @@ describe('NOTIFICATION_ROUTES against the real route table', () => {
   it('routes every event to a path the app actually serves', () => {
     const realRoutes = new Set<string>(Object.keys(ROUTE_REQUIREMENTS));
     for (const [eventId, route] of Object.entries(NOTIFICATION_ROUTES)) {
-      // A route may carry a query string (e.g. Market's own tab, `?section=`)
+      // A route may carry a query string (e.g. Wallet's own tab, `?tab=`)
       // that a route path never does — strip it before checking the path is
-      // real. A tab-as-path page (e.g. `/contracts/history`) collapses to its
-      // registered base the same way `TabRoute` treats it as the same page.
-      const [path] = route.split('?');
-      expect(realRoutes, `${eventId} -> ${route}`).toContain(pageKeyFor(path));
+      // real. A tab-as-path page's own tab segment (Market's
+      // `/history/transactions`, Contracts' `/search/items`, ADR 0015)
+      // collapses to the page's registered base via `pageKeyFor`.
+      const [rawPath] = route.split('?');
+      const path = pageKeyFor(rawPath);
+      expect(realRoutes, `${eventId} -> ${route}`).toContain(path);
     }
   });
 

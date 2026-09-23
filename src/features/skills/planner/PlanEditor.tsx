@@ -454,7 +454,7 @@ export function PlanEditor({
         label={label}
         onClick={() =>
           navigate(
-            `/market?${new URLSearchParams(buildMarketGroupParams(marketGroupId)).toString()}`
+            `/market/browser?${new URLSearchParams(buildMarketGroupParams(marketGroupId)).toString()}`
           )
         }
         size="sm"

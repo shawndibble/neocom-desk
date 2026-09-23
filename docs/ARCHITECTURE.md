@@ -452,6 +452,8 @@ ADR 0015. Contacts (`src/routes/Contacts.tsx`) is the reference conversion.
 2. Do **not** touch `ROUTE_ELEMENTS`, `ROUTE_REQUIREMENTS`, `pagePathFor` or `routeWarm`: `App.tsx` mounts a registered page at `<path>/*` and wraps it in `TabRoute` (bare path / unknown segment → default tab, replace), analytics reports each tab path, and `Layout` does not fade or remount between tabs.
 3. In the page, `const [tab, setTab] = usePageTab(MY_TABS)` replaces the `useState`, and the `Tabs` bar maps `MY_TABS.tabs` (`t(item.labelKey)`). A tab switch pushes history and keeps the query string.
 4. Any in-app link to a specific tab uses `tabPath(MY_TABS, id)`.
+5. A one-level subtab (`/<page>/<tab>/<subtab>`) needs no extra machinery: give it its own tab id containing a literal `/` (e.g. `'history/transactions'`) — `tabFromPathname` only ever compares one segment against a tab's `id` for equality, so a `/`-bearing id resolves the two-segment path directly. Leave it out of the `Tabs` bar's own `tabs` array if the UI that switches into it is not a second row of tabs (Market's `history`/`history/transactions`, switched from a select in History's own header) — `usePageTab`'s `selectTab` still works for it (`docs/ARCHITECTURE.md`, Market: `src/routes/Market.tsx`).
+6. A page-local, non-tab split that is still worth a distinct path in the same sense (Market Browser's per-item Market Data / Price History split, `itemTab`) does not have to become a path segment at all — a plain scoped query param (`useUrlParam`) is the other half of "sub-path of browser, or scoped param" and is the simpler of the two when the split is only ever relevant with something else already selected.
 
 **Filters, search, sort → query params.**
 

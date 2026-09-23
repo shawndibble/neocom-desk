@@ -119,7 +119,7 @@ function snapshot(
   return { entries, skipped };
 }
 
-function renderPanel(initialEntry = '/market?section=orders') {
+function renderPanel(initialEntry = '/market/orders') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <OpenOrdersPanel />
@@ -651,7 +651,7 @@ describe('OpenOrdersPanel', () => {
      * covers the parsing; these cover that the page actually opens on it.
      */
     it('opens narrowed to the problem the link names', async () => {
-      renderMixedFixture('/market?section=orders&problem=expiringOrStale');
+      renderMixedFixture('/market/orders?orders.problems=expiringOrStale');
       // One of the three, where the page's own default matches two.
       expect(await screen.findByText('1 of 3 orders match')).toBeInTheDocument();
     });
@@ -678,14 +678,14 @@ describe('OpenOrdersPanel', () => {
         ])
       );
       mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
-      renderPanel('/market?section=orders&character=1');
+      renderPanel('/market/orders?orders.characters=1');
 
       expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
     });
 
     it('keeps the filter it applied removable, rather than silently narrowing', async () => {
       const user = userEvent.setup();
-      renderMixedFixture('/market?section=orders&problem=expiringOrStale');
+      renderMixedFixture('/market/orders?orders.problems=expiringOrStale');
       await screen.findByText('1 of 3 orders match');
 
       // The chip row is the only thing telling the reader why they are seeing
@@ -697,7 +697,7 @@ describe('OpenOrdersPanel', () => {
     });
 
     it('ignores a param it cannot read instead of showing an empty page', async () => {
-      renderMixedFixture('/market?section=orders&problem=nonsense');
+      renderMixedFixture('/market/orders?orders.problems=nonsense');
       expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
     });
 
