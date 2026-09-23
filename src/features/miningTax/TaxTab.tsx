@@ -838,6 +838,9 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     characters[0]?.characterId ??
     null;
 
+  const duplicateRows =
+    data?.entries.filter((row) => (row.duplicateAssignmentIds?.length ?? 0) > 0) ?? [];
+
   return (
     <div className="space-y-4">
       {/*
@@ -942,7 +945,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             </div>
           )}
 
-          {data && data.entries.some((row) => (row.duplicateAssignmentIds?.length ?? 0) > 0) && (
+          {duplicateRows.length > 0 && (
             <div
               role="alert"
               className="space-y-1 rounded-xs border border-warning/60 bg-warning/10 p-2 text-xs"
@@ -952,15 +955,13 @@ export function TaxTab({ tabBar }: TaxTabProps) {
               </p>
               <p className="text-text-dim">{t('miningTax.duplicateHint')}</p>
               <ul className="space-y-1">
-                {data.entries
-                  .filter((row) => (row.duplicateAssignmentIds?.length ?? 0) > 0)
-                  .map((row) => (
-                    <li key={`${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`}>
-                      {row.characterName} — {row.entry.date} —{' '}
-                      {data.systemNames.get(row.entry.solarSystemId) ??
-                        `#${row.entry.solarSystemId}`}
-                    </li>
-                  ))}
+                {duplicateRows.map((row) => (
+                  <li key={`${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`}>
+                    {row.characterName} — {row.entry.date} —{' '}
+                    {data?.systemNames.get(row.entry.solarSystemId) ??
+                      `#${row.entry.solarSystemId}`}
+                  </li>
+                ))}
               </ul>
             </div>
           )}

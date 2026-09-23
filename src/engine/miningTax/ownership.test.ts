@@ -181,4 +181,19 @@ describe('findDuplicateAssignmentIds', () => {
     ]);
     expect(dupes).toEqual([]);
   });
+
+  it('does not let an over-claim on one type flag an identical pair on another', () => {
+    const dupes = findDuplicateAssignmentIds(
+      [
+        { typeId: A, quantity: 100 },
+        { typeId: B, quantity: 10 },
+      ],
+      [
+        candidate('x', [{ typeId: A, quantity: 50 }]),
+        candidate('y', [{ typeId: A, quantity: 50 }]),
+        candidate('z', [{ typeId: B, quantity: 30 }], { payeeId: 'p2' }),
+      ]
+    );
+    expect(dupes).toEqual([]);
+  });
 });

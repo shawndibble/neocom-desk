@@ -164,11 +164,10 @@ export function planEntryMerges(
     // A duplicate keeps the joined record when there is one — the corp's bill
     // is the group's — otherwise the lowest id, as ever.
     const ordered = [...members].sort(byId);
-    const keeper = duplicate
+    const keep = duplicate
       ? (ordered.find((m) => m.groupId !== undefined) ?? ordered[0])
       : ordered[0];
-    const keep = keeper;
-    const absorbed = ordered.filter((m) => m !== keeper);
+    const absorbed = ordered.filter((m) => m !== keep);
     const entry = entryKey(keep.characterId, keep.date, keep.solarSystemId);
     const soleAfterMerge = (coverageByEntry.get(entry) ?? 0) - absorbed.length === 1;
     const quantityByType = new Map<number, number>();

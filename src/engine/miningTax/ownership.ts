@@ -145,15 +145,24 @@ export function findDuplicateAssignmentIds(
       claimedByType.set(line.typeId, (claimedByType.get(line.typeId) ?? 0) + line.quantity);
     }
   }
-  const overClaimed = entryLines.some((l) => (claimedByType.get(l.typeId) ?? 0) > l.quantity);
-  if (!overClaimed) return [];
+  const entryByType = new Map(entryLines.map((l) => [l.typeId, l.quantity]));
 
-  const sets = new Map<string, string[]>();
+  const sets = new Map<string, DuplicateCandidate[]>();
   for (const c of live) {
     const key = `${c.payeeId ?? ''}:${c.taxPct}:${linesSignature(c.oreLines)}`;
-    const ids = sets.get(key);
-    if (ids) ids.push(c.id);
-    else sets.set(key, [c.id]);
+    const members = sets.get(key);
+    if (members) members.push(c);
+    else sets.set(key, [c]);
   }
-  return [...sets.values()].filter((ids) => ids.length > 1).flat();
+  // Over-claim is judged on each identical set's own ore types, so a pile-up on
+  // one type never taints an unrelated identical pair on another.
+  return [...sets.values()]
+    .filter(
+      (members) =>
+        members.length > 1 &&
+        members[0].oreLines.some(
+          (l) => (claimedByType.get(l.typeId) ?? 0) > (entryByType.get(l.typeId) ?? 0)
+        )
+    )
+    .flatMap((members) => members.map((m) => m.id));
 }

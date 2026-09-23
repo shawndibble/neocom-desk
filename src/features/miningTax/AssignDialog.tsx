@@ -274,6 +274,7 @@ export function AssignDialog({
           solarSystemId: row.entry.solarSystemId,
           payeeId,
           oreLines: selectedLines,
+          entryOreLines: row.entry.oreLines,
           taxPct: pctValue,
           estimatedValue,
           taxOwed,

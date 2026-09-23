@@ -989,4 +989,32 @@ describe('double-assignment guard', () => {
     ).rejects.toBeInstanceOf(AlreadyAssignedError);
     expect(await db.miningTaxAssignments.count()).toBe(1);
   });
+
+  it('refuses a twin when the entry holds no more than the first claim, even across a stale view', async () => {
+    const withEntry = { ...base, entryOreLines: [{ typeId: TYPE_A, quantity: 100 }] };
+    await createAssignment(withEntry);
+    await expect(createAssignment(withEntry)).rejects.toBeInstanceOf(AlreadyAssignedError);
+  });
+
+  it('still allows a claim on growth another Assignment on that type has not covered', async () => {
+    await createAssignment({
+      ...base,
+      oreLines: [{ typeId: TYPE_A, quantity: 60 }],
+      entryOreLines: [{ typeId: TYPE_A, quantity: 130 }],
+    });
+    await createAssignment({
+      ...base,
+      payeeId: 'payee-2',
+      oreLines: [{ typeId: TYPE_A, quantity: 40 }],
+      entryOreLines: [{ typeId: TYPE_A, quantity: 130 }],
+    });
+    // 60 + 40 claimed of 130: the 30 residual is still assignable.
+    await createAssignment({
+      ...base,
+      payeeId: 'payee-3',
+      oreLines: [{ typeId: TYPE_A, quantity: 30 }],
+      entryOreLines: [{ typeId: TYPE_A, quantity: 130 }],
+    });
+    expect(await db.miningTaxAssignments.count()).toBe(3);
+  });
 });

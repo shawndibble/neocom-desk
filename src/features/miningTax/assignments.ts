@@ -33,26 +33,38 @@ export class AlreadyAssignedError extends Error {
 }
 
 /**
- * Re-reads the database, not the caller's snapshot, and refuses when any
- * stored Assignment (a dismissal included) on this entry already names one of
- * `typeIds`. Ownership is presence-based per ore type (`rowStatus.ts`), so a
- * second claim on a type is never a legitimate split — those go through
- * `splitAssignment`, which moves units rather than creating a new claim.
+ * Re-reads the database, not the caller's snapshot, and refuses when what
+ * `oreLines` asks for, added to what stored Assignments (a dismissal included)
+ * on this entry already claim, exceeds what the entry holds — the twin case,
+ * two records each claiming all of it. `entryOreLines` is the ledger's ore for
+ * the entry; comparing quantities rather than ore types keeps a legitimate
+ * claim on growth ESI reported for a type another Assignment already holds
+ * (`computeOwnership`'s unassigned residual) from being refused. Without it
+ * there is nothing to measure against, so any second claim on a type refuses.
+ * Meant to run inside the same transaction as the write it guards.
  */
 async function assertUnclaimed(
   characterId: number,
   date: string,
   solarSystemId: number,
-  typeIds: readonly number[]
+  oreLines: readonly MiningTaxOreLine[],
+  entryOreLines?: readonly MiningTaxOreLine[]
 ): Promise<void> {
   const existing = await db.miningTaxAssignments.where('characterId').equals(characterId).toArray();
-  const wanted = new Set(typeIds);
-  const clash = existing.some(
-    (a) =>
-      a.date === date &&
-      a.solarSystemId === solarSystemId &&
-      a.oreLines.some((line) => wanted.has(line.typeId))
-  );
+  const claimed = new Map<number, number>();
+  for (const a of existing) {
+    if (a.date !== date || a.solarSystemId !== solarSystemId) continue;
+    for (const line of a.oreLines) {
+      claimed.set(line.typeId, (claimed.get(line.typeId) ?? 0) + line.quantity);
+    }
+  }
+  const entryByType = entryOreLines && new Map(entryOreLines.map((l) => [l.typeId, l.quantity]));
+  const clash = oreLines.some((line) => {
+    const already = claimed.get(line.typeId) ?? 0;
+    if (already === 0) return false;
+    const held = entryByType?.get(line.typeId);
+    return held === undefined ? true : already + line.quantity > held;
+  });
   if (clash) throw new AlreadyAssignedError();
 }
 
@@ -66,6 +78,8 @@ export interface AssignInput {
   solarSystemId: number;
   payeeId: string;
   oreLines: MiningTaxOreLine[];
+  /** The entry's full ore from the ledger the pilot is looking at — what the double-assignment guard measures claims against. */
+  entryOreLines?: readonly MiningTaxOreLine[];
   /** The Payee's default, or the user's override in the Assign dialog. */
   taxPct: number;
   /**
@@ -83,12 +97,6 @@ export interface AssignInput {
 
 /** Creates one Assignment, snapshotting the (possibly pilot-corrected) value and tax right now. */
 export async function createAssignment(input: AssignInput): Promise<MiningTaxAssignmentRecord> {
-  await assertUnclaimed(
-    input.characterId,
-    input.date,
-    input.solarSystemId,
-    input.oreLines.map((line) => line.typeId)
-  );
   const now = Date.now();
   const record: MiningTaxAssignmentRecord = {
     id: crypto.randomUUID(),
@@ -104,7 +112,17 @@ export async function createAssignment(input: AssignInput): Promise<MiningTaxAss
     ...(input.markPaid ? { paidAt: now } : {}),
     updatedAt: now,
   };
-  await db.miningTaxAssignments.put(record);
+  // Check and write in one transaction so two tabs cannot both pass the check.
+  await db.transaction('rw', db.miningTaxAssignments, async () => {
+    await assertUnclaimed(
+      input.characterId,
+      input.date,
+      input.solarSystemId,
+      input.oreLines,
+      input.entryOreLines
+    );
+    await db.miningTaxAssignments.put(record);
+  });
   scheduleSync(input.characterId);
   return record;
 }
@@ -212,6 +230,8 @@ export interface JoinMemberInput {
   assignment: MiningTaxAssignmentRecord | null;
   /** Required (and only meaningful) when `assignment` is `null`. */
   oreLines?: MiningTaxOreLine[];
+  /** The member entry's full ledger ore, for the double-assignment guard — see `AssignInput.entryOreLines`. */
+  entryOreLines?: readonly MiningTaxOreLine[];
 }
 
 /**
@@ -236,17 +256,6 @@ export async function joinAssignments(
   taxPct: number,
   unitPrices: ReadonlyMap<number, number>
 ): Promise<MiningTaxAssignmentRecord[]> {
-  // Only the members this call would *create* are checked — an already-assigned
-  // member is just re-tagged, and adds no claim.
-  for (const m of members) {
-    if (m.assignment) continue;
-    await assertUnclaimed(
-      m.characterId,
-      m.date,
-      m.solarSystemId,
-      (m.oreLines ?? []).map((line) => line.typeId)
-    );
-  }
   const groupId =
     members.map((m) => m.assignment?.groupId).find((id) => id !== undefined) ?? crypto.randomUUID();
   const now = Date.now();
@@ -269,7 +278,21 @@ export async function joinAssignments(
       updatedAt: now,
     };
   });
-  await db.miningTaxAssignments.bulkPut(records);
+  // Only the members this call would *create* are checked — an already-assigned
+  // member is just re-tagged, and adds no claim. Same transaction as the write.
+  await db.transaction('rw', db.miningTaxAssignments, async () => {
+    for (const m of members) {
+      if (m.assignment) continue;
+      await assertUnclaimed(
+        m.characterId,
+        m.date,
+        m.solarSystemId,
+        m.oreLines ?? [],
+        m.entryOreLines
+      );
+    }
+    await db.miningTaxAssignments.bulkPut(records);
+  });
   for (const characterId of new Set(members.map((m) => m.characterId))) scheduleSync(characterId);
   return records;
 }

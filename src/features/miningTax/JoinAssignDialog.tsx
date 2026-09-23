@@ -139,6 +139,7 @@ export function JoinAssignDialog({
       solarSystemId: candidate.row.entry.solarSystemId,
       assignment: candidate.assignment,
       oreLines: candidate.assignment ? undefined : candidate.row.unassignedOreLines,
+      entryOreLines: candidate.row.entry.oreLines,
     };
   }
 
