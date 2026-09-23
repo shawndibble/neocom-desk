@@ -498,6 +498,9 @@ export function Industry() {
                 catalog={catalog}
                 modifiers={modifiers}
                 activeCharacterId={activeCharacterId}
+                onAddToQuickbar={quickbar.add}
+                quickbarAvailable={quickbar.available}
+                onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
                 onStartPlan={(entry) => {
                   // Distinct from the plain search-box create: picking a
                   // scan result is an explicit "go build this" choice, same
