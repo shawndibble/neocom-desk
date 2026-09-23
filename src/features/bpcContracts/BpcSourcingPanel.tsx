@@ -12,11 +12,7 @@ import {
   IconButton,
   IskAmount,
   Panel,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  RegionSelect,
   SearchInput,
   Spinner,
   StatChip,
@@ -213,7 +209,6 @@ interface UiFilter {
   maxPrice: string;
 }
 
-const ALL_REGIONS = 'all';
 const TYPE_SEARCH_LIMIT = 50;
 
 /**
@@ -373,24 +368,16 @@ function BpcFilterBar({
       {(draft, setDraft) => (
         <>
           <FilterField label={t('bpcContracts.regionLabel')}>
-            <Select
-              value={draft.regionId === null ? ALL_REGIONS : String(draft.regionId)}
-              onValueChange={(value) =>
-                setDraft({ ...draft, regionId: value === ALL_REGIONS ? null : Number(value) })
-              }
-            >
-              <SelectTrigger aria-label={t('bpcContracts.regionLabel')} className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={ALL_REGIONS}>{t('bpcContracts.allRegions')}</SelectItem>
-                {regionOptions.map((region) => (
-                  <SelectItem key={region.id} value={String(region.id)}>
-                    {region.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <RegionSelect
+              options={regionOptions}
+              value={draft.regionId}
+              onChange={(regionId) => setDraft({ ...draft, regionId })}
+              allLabel={t('bpcContracts.allRegions')}
+              searchPlaceholder={t('common.searchRegions')}
+              noResultsLabel={t('common.noRegionMatches')}
+              aria-label={t('bpcContracts.regionLabel')}
+              className="w-48"
+            />
           </FilterField>
           <FilterField label={t('jumpRange.label')}>
             <div className="flex flex-wrap items-center gap-2">
@@ -736,9 +723,10 @@ export function BpcSourcingPanel() {
   }
   const regionOptions = useMemo(
     () =>
-      [...new Set([...rows, ...originals].map((r) => r.regionId))]
-        .map((id) => ({ id, name: regionNames.get(id) ?? `#${id}` }))
-        .sort((a, b) => a.name.localeCompare(b.name)),
+      [...new Set([...rows, ...originals].map((r) => r.regionId))].map((id) => ({
+        id,
+        name: regionNames.get(id) ?? `#${id}`,
+      })),
     [rows, originals, regionNames]
   );
 

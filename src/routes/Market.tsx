@@ -15,6 +15,7 @@ import {
   PageHeader,
   Panel,
   SearchInput,
+  RegionSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -1247,21 +1248,19 @@ export function Market() {
                   </SelectContent>
                 </Select>
               ) : (
-                <Select
-                  value={String(chosenRegionId)}
-                  onValueChange={(value) => handleRegionChange(Number(value))}
-                >
-                  <SelectTrigger size="sm" aria-label={t('market.region')} className="w-32 sm:w-44">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(marketRegions ?? []).map((r) => (
-                      <SelectItem key={r.id} value={String(r.id)}>
-                        {r.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                // No "All regions": the order book is fetched per region.
+                <RegionSelect
+                  size="sm"
+                  options={marketRegions ?? []}
+                  value={chosenRegionId}
+                  onChange={(regionId) => {
+                    if (regionId !== null) handleRegionChange(regionId);
+                  }}
+                  searchPlaceholder={t('common.searchRegions')}
+                  noResultsLabel={t('common.noRegionMatches')}
+                  aria-label={t('market.region')}
+                  className="w-32 sm:w-44"
+                />
               )}
               <IconButton
                 size="sm"

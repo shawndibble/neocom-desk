@@ -1425,11 +1425,12 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
 
     await user.click(await screen.findByRole('combobox', { name: 'Region' }));
     expect(
-      // The selected option's `SelectItem` renders a leading, aria-hidden "✓"
-      // indicator alongside the label — stripped here since `textContent`
-      // includes it even though it's invisible to the accessibility tree.
+      // The selected option renders a leading, aria-hidden "✓" indicator
+      // alongside the label — stripped here since `textContent` includes it
+      // even though it's invisible to the accessibility tree. Alphabetical:
+      // `RegionSelect` sorts by name.
       (await screen.findAllByRole('option')).map((o) => o.textContent?.replace(/^✓/, ''))
-    ).toEqual(['The Forge', 'Domain']);
+    ).toEqual(['Domain', 'The Forge']);
   });
 
   it('a globally-traded item reads its Global Market Region regardless of Location Mode, with an explanatory note', async () => {

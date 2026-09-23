@@ -23,7 +23,7 @@ import {
   quoteMailBody,
   type ComposeKind,
 } from '@/engine/mail';
-import { moveHighlight } from '@/features/industry/comboboxNav';
+import { moveHighlight } from '@/lib/comboboxNav';
 import { sendMail } from './mail';
 import { loadDraft, saveDraft, clearDraft, type MailDraftRecipient } from './mailDrafts';
 import { loadContacts } from './contacts';
