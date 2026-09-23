@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
-import { EmptyState, PageHeader, Spinner } from '@/components/ui';
+import { EmptyState, PageHeader, Spinner, Tabs, type TabItem } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
@@ -41,19 +41,22 @@ export function SkillShips() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
+  const modeTabs: TabItem[] = [
+    { id: 'fitCheck', label: t('skills.ships.fitCheckTab') },
+    { id: 'mastery', label: t('skills.ships.masteryTab') },
+  ];
+
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <PageHeader title={t('nav.skills')} />
       <SkillsSubNav />
 
-      <div className="flex gap-1 border-b border-line">
-        <SegmentButton active={mode === 'fitCheck'} onClick={() => setMode('fitCheck')}>
-          {t('skills.ships.fitCheckTab')}
-        </SegmentButton>
-        <SegmentButton active={mode === 'mastery'} onClick={() => setMode('mastery')}>
-          {t('skills.ships.masteryTab')}
-        </SegmentButton>
-      </div>
+      <Tabs
+        tabs={modeTabs}
+        value={mode}
+        onChange={(id) => setMode(id as ShipsMode)}
+        label={t('skills.ships.tabsLabel')}
+      />
 
       {!catalog ? (
         <div className="flex justify-center py-16">
@@ -75,30 +78,5 @@ export function SkillShips() {
         />
       )}
     </div>
-  );
-}
-
-function SegmentButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={
-        active
-          ? 'border-b-2 border-accent px-3 py-1.5 text-xs font-semibold tracking-widest text-text uppercase'
-          : 'border-b-2 border-transparent px-3 py-1.5 text-xs font-semibold tracking-widest text-text-dim uppercase'
-      }
-    >
-      {children}
-    </button>
   );
 }

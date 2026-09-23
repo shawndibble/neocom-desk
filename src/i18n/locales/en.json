@@ -61,6 +61,7 @@
       "missing": "Not trained"
     },
     "ships": {
+      "tabsLabel": "Fit Check or Mastery",
       "fitCheckTab": "Fit Check",
       "masteryTab": "Mastery",
       "masteryComingSoonTitle": "Ship Mastery is coming soon",

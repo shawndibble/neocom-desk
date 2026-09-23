@@ -79,18 +79,32 @@ export function useTargetPlan(characterId: number | null): TargetPlan {
     async (entries: readonly PlanEntry[], newPlanName: string) => {
       if (characterId === null || entries.length === 0) return;
 
-      let plan = (plans ?? []).find((p) => p.id === targetPlanId) ?? null;
-      if (!plan) {
-        plan = newPlan(characterId, newPlanName);
-        await db.skillPlans.add(plan);
-      }
+      // Read-modify-write inside one transaction, re-querying the
+      // Character's plans fresh rather than trusting `plans`/`targetPlanId`
+      // from render — those come from `useLiveQuery` and can still read
+      // zero plans for a moment after a concurrent Add already created one
+      // (two Add clicks in quick succession, before the first write round-
+      // trips back through the live query). Without the re-check, both
+      // calls see "no plan yet" and each creates its own.
+      const plan = await db.transaction('rw', db.skillPlans, async () => {
+        const existing = await db.skillPlans.where('characterId').equals(characterId).toArray();
+        const current =
+          existing.find((p) => p.id === targetPlanId) ??
+          existing[0] ??
+          newPlan(characterId, newPlanName);
+        const updated = {
+          ...current,
+          entries: entries.reduce((acc, entry) => upsertEntry(acc, entry), current.entries),
+          updatedAt: Date.now(),
+        };
+        await db.skillPlans.put(updated);
+        return updated;
+      });
 
-      const mergedEntries = entries.reduce((acc, entry) => upsertEntry(acc, entry), plan.entries);
-      await db.skillPlans.put({ ...plan, entries: mergedEntries, updatedAt: Date.now() });
       void setStored(withTargetPlanId(stored, characterId, plan.id));
       if (isSyncConfigured()) scheduleSync(characterId);
     },
-    [characterId, plans, targetPlanId, stored, setStored]
+    [characterId, targetPlanId, stored, setStored]
   );
 
   return { plans, targetPlanId, setTargetPlanId, addEntries };

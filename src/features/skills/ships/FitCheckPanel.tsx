@@ -127,7 +127,7 @@ export function FitCheckPanel({
             </Button>
             <Button
               size="sm"
-              variant="primary"
+              variant="ghost"
               onClick={() => void handleCheck()}
               disabled={checking || text.trim() === ''}
             >
@@ -146,7 +146,7 @@ export function FitCheckPanel({
               : t('skills.fitCheck.resultsTitle', { count: missingRows.length })
           }
           actions={
-            missingRows.length > 0 ? (
+            missingRows.length > 0 && target.plans !== undefined ? (
               <div className="flex items-center gap-2">
                 <TargetPlanPicker target={target} />
                 <Button
@@ -162,7 +162,7 @@ export function FitCheckPanel({
                     )
                   }
                 >
-                  {target.plans && target.plans.length === 0
+                  {target.plans.length === 0
                     ? t('skills.fitCheck.createPlanAndAdd')
                     : t('skills.fitCheck.addAllToPlan')}
                 </Button>
