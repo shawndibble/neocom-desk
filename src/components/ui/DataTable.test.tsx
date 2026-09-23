@@ -435,6 +435,56 @@ describe('DataTable', () => {
     });
   });
 
+  describe('expandableRow', () => {
+    const expandableRow = { renderDetail: (row: Row) => `Detail for ${row.item}` };
+
+    it('opens the detail row on click and closes it on a second click', async () => {
+      const user = userEvent.setup();
+      renderTable({ expandableRow });
+      expect(screen.queryByText('Detail for Tritanium')).not.toBeInTheDocument();
+
+      const cells = screen.getAllByRole('cell');
+      await user.click(cells[0]);
+      expect(screen.getByText('Detail for Tritanium')).toBeInTheDocument();
+
+      await user.click(cells[0]);
+      expect(screen.queryByText('Detail for Tritanium')).not.toBeInTheDocument();
+    });
+
+    it('keeps at most one row open — opening a second row closes the first', async () => {
+      const user = userEvent.setup();
+      renderTable({ expandableRow });
+      const [, firstRow, secondRow] = screen.getAllByRole('row');
+      await user.click(firstRow.querySelector('td')!);
+      expect(screen.getByText('Detail for Tritanium')).toBeInTheDocument();
+
+      await user.click(secondRow.querySelector('td')!);
+      expect(screen.queryByText('Detail for Tritanium')).not.toBeInTheDocument();
+      expect(screen.getByText('Detail for Pyerite')).toBeInTheDocument();
+    });
+
+    it('makes rows focusable and responds to Enter, same as onRowClick', async () => {
+      const user = userEvent.setup();
+      renderTable({ expandableRow });
+      const [, firstRow] = screen.getAllByRole('row');
+      expect(firstRow).toHaveClass('focus-visible:outline-accent');
+
+      firstRow.focus();
+      await user.keyboard('{Enter}');
+      expect(screen.getByText('Detail for Tritanium')).toBeInTheDocument();
+    });
+
+    it('fires onRowClick too, when both are given', async () => {
+      const user = userEvent.setup();
+      const onRowClick = vi.fn();
+      renderTable({ expandableRow, onRowClick });
+      const cells = screen.getAllByRole('cell');
+      await user.click(cells[0]);
+      expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+      expect(screen.getByText('Detail for Tritanium')).toBeInTheDocument();
+    });
+  });
+
   // The collapse itself is CSS (`.dt-stack`, src/styles/index.css) and jsdom
   // loads no stylesheet, so these cover the markup that CSS depends on: where
   // the labels come from, the opt-out hook, and the roles `display: block`

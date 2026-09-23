@@ -39,6 +39,7 @@ vi.mock('@/sde/loadSde', () => ({
 // character-scoped tabs, so an empty catalogue is enough to keep that effect
 // from making real requests msw would otherwise reject as unhandled.
 vi.mock('@/sde/loadMarketSde', () => ({
+  loadAttributeDictionary: vi.fn(async () => ({})),
   loadMarketGroups: vi.fn(async () => []),
   loadMarketTypes: vi.fn(async () => []),
   loadNpcStations: vi.fn(async () => []),

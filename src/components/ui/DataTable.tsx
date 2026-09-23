@@ -91,6 +91,19 @@ export function DataTableDenseCell({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Per-row disclosure (Market's order-book row expand): clicking a row opens
+ * one full-width detail row beneath it, rendered by the caller. At most one
+ * row open at a time — a second click opens the next row and closes the
+ * first, an accordion rather than independent toggles, so a long book never
+ * grows several detail blocks at once. State lives here, not with the
+ * caller: `renderDetail` only ever needs the row it was given.
+ */
+export interface DataTableExpandableRow<T> {
+  /** Content of the full-width row shown beneath an expanded row. */
+  renderDetail: (row: T) => ReactNode;
+}
+
+/**
  * Phone-only row grouping (`DataTable`'s `groupBy`): rows sharing a key fold
  * behind one toggle row, so a list with many near-duplicates (ten courier
  * offers on one route) reads as one line per distinct thing.
@@ -159,6 +172,13 @@ interface DataTableProps<T> {
    * `rowContextMenu`.
    */
   onRowClick?: (row: T) => void;
+  /**
+   * Adds a per-row disclosure: clicking a row opens `renderDetail`'s content
+   * in a full-width row beneath it. Independent of `onRowClick` — both fire
+   * on the same click when both are given, though no caller currently
+   * combines them. See `DataTableExpandableRow`.
+   */
+  expandableRow?: DataTableExpandableRow<T>;
   /**
    * How the table behaves below `sm`. `'stack'` (the default) collapses each
    * row into a labelled card — see `.dt-stack` in `src/styles/index.css`.
@@ -242,6 +262,7 @@ export function DataTable<T>({
   density = 'default',
   rowContextMenu,
   onRowClick,
+  expandableRow,
   responsive = 'stack',
   stackColumns = 1,
   stackLayout = 'labelled',
@@ -260,6 +281,9 @@ export function DataTable<T>({
   // `groupBy.defaultExpanded`, so a group that first appears on a later
   // refresh still gets its intended initial state.
   const [groupExpanded, setGroupExpanded] = useState<Record<string, boolean>>({});
+  // At most one row open at a time (see `DataTableExpandableRow`) — a single
+  // key, not a set.
+  const [expandedRowKey, setExpandedRowKey] = useState<string | number | null>(null);
   const isPhone = useIsPhone();
   const tableRef = useRef<HTMLTableElement>(null);
   const dense = responsive === 'stack' && stackLayout === 'dense';
@@ -342,7 +366,13 @@ export function DataTable<T>({
   }
 
   function renderRow(row: T, index: number, member = false) {
-    const focusable = Boolean(rowContextMenu) || Boolean(onRowClick);
+    const key = rowKey(row, index);
+    const expanded = expandableRow !== undefined && expandedRowKey === key;
+    const focusable = Boolean(rowContextMenu) || Boolean(onRowClick) || expandableRow !== undefined;
+    const activate = () => {
+      onRowClick?.(row);
+      if (expandableRow) setExpandedRowKey((current) => (current === key ? null : key));
+    };
     const tr = (
       <tr
         role="row"
@@ -350,24 +380,25 @@ export function DataTable<T>({
         // the only way a caller can find a specific row to scroll to
         // without this component growing a ref API — `TransactionsPanel`
         // uses it to land on the fill a notification pointed at.
-        data-row-key={rowKey(row, index)}
+        data-row-key={key}
+        aria-expanded={expandableRow ? expanded : undefined}
         className={cx(
           'hover:bg-panel-2',
           member && 'dt-group-member',
-          onRowClick && 'cursor-pointer',
+          (onRowClick || expandableRow) && 'cursor-pointer',
           focusable &&
             'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
-          rowKey(row, index) === highlightRowKey && 'row-pulse',
+          key === highlightRowKey && 'row-pulse',
           rowClassName?.(row)
         )}
         tabIndex={focusable ? 0 : undefined}
-        onClick={onRowClick ? () => onRowClick(row) : undefined}
+        onClick={onRowClick || expandableRow ? activate : undefined}
         onKeyDown={
-          onRowClick
+          onRowClick || expandableRow
             ? (event) => {
                 if (event.key !== 'Enter' && event.key !== ' ') return;
                 event.preventDefault();
-                onRowClick(row);
+                activate();
               }
             : undefined
         }
@@ -400,10 +431,30 @@ export function DataTable<T>({
             </td>
           );
         })}
+        {expandableRow &&
+          (() => {
+            const Chevron = expanded ? Icon.Expanded : Icon.Descend;
+            return (
+              <td role="cell" aria-hidden="true" className={cx(cellPadding, 'w-0')}>
+                <Chevron size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-dim" />
+              </td>
+            );
+          })()}
       </tr>
     );
+    const mainRow = rowContextMenu ? rowContextMenu(row, tr) : tr;
+    if (!expandableRow) return <Fragment key={key}>{mainRow}</Fragment>;
     return (
-      <Fragment key={rowKey(row, index)}>{rowContextMenu ? rowContextMenu(row, tr) : tr}</Fragment>
+      <Fragment key={key}>
+        {mainRow}
+        {expanded && (
+          <tr role="row" className="dt-row-detail">
+            <td role="cell" colSpan={columns.length + 1} className="bg-panel-2 px-3 py-3">
+              {expandableRow.renderDetail(row)}
+            </td>
+          </tr>
+        )}
+      </Fragment>
     );
   }
 
@@ -544,6 +595,9 @@ export function DataTable<T>({
               </th>
             );
           })}
+          {expandableRow && (
+            <th role="columnheader" scope="col" aria-hidden="true" className="w-0 p-0" />
+          )}
         </tr>
       </thead>
       <tbody role="rowgroup" className="divide-y divide-line">

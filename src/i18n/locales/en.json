@@ -3107,6 +3107,11 @@
     "expiry": "Expires",
     "range": "Range",
     "minVolume": "Min. Volume",
+    "orderDetail": {
+      "structureType": "Structure",
+      "playerStructure": "Player-owned",
+      "empty": "Nothing else to show for this order."
+    },
     "columnsButton": "Columns",
     "columnsMenuTitle": "Columns",
     "unknownStructure": "Unknown Structure",

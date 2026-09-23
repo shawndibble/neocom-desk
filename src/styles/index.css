@@ -421,6 +421,26 @@
       padding: 0;
     }
 
+    /*
+     * A row's expand detail (`DataTable`'s `expandableRow`): the same
+     * full-width, no-gutter, no-label cell as the group-header toggle above —
+     * it is prose/sub-fields of its own, not one more labelled field of the
+     * row it hangs off.
+     */
+    .dt-stack tr.dt-row-detail {
+      padding: 0;
+    }
+
+    .dt-stack tr.dt-row-detail > td {
+      flex: 1 1 100%;
+      padding: 0.75rem;
+      min-height: 0;
+    }
+
+    .dt-stack tr.dt-row-detail > td::before {
+      content: none;
+    }
+
     .dt-stack.dt-stack-dense tr.dt-group-header::before {
       content: none;
     }
