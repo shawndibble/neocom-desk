@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -119,10 +119,19 @@ function snapshot(
   return { entries, skipped };
 }
 
+const onRequestBlueprintCatalog = vi.fn();
+const onShowInfo = vi.fn();
+
 function renderPanel(initialEntry = '/market/orders') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
-      <OpenOrdersPanel />
+      <OpenOrdersPanel
+        blueprintCatalog={null}
+        onRequestBlueprintCatalog={onRequestBlueprintCatalog}
+        onAddToQuickbar={vi.fn()}
+        quickbarAvailable
+        onShowInfo={onShowInfo}
+      />
     </MemoryRouter>
   );
 }
@@ -151,6 +160,30 @@ beforeEach(() => {
 });
 
 describe('OpenOrdersPanel', () => {
+  it('carries the item context menu on order rows and asks for the blueprint catalog on open', async () => {
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [EXPIRING_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    renderPanel();
+
+    const group = await screen.findByTestId('order-group-expiringOrStale');
+    expect(onRequestBlueprintCatalog).not.toHaveBeenCalled();
+    fireEvent.contextMenu(within(group).getAllByRole('row')[1]);
+
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Show info' }));
+    expect(onShowInfo).toHaveBeenCalledWith(36, 'Mexallon');
+    expect(onRequestBlueprintCatalog).toHaveBeenCalled();
+  });
+
   it('renders groups worst-first, each with its row count', async () => {
     mockedLoadAll.mockResolvedValue(
       snapshot([

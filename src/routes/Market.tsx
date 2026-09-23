@@ -1662,7 +1662,15 @@ export function Market() {
         ]}
       />
 
-      {tab === 'orders' && <OpenOrdersPanel />}
+      {tab === 'orders' && (
+        <OpenOrdersPanel
+          blueprintCatalog={blueprintCatalog}
+          onRequestBlueprintCatalog={ensureBlueprintCatalog}
+          onAddToQuickbar={handleAddToQuickbar}
+          quickbarAvailable={activeCharacterId !== null}
+          onShowInfo={handleShowInfo}
+        />
+      )}
 
       {tab === 'history' && (
         <OrderHistoryPanel
