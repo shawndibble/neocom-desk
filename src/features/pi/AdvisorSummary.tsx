@@ -143,7 +143,7 @@ export function AdvisorSummary({ list, earnings, spots, controls }: AdvisorSumma
               <span className="text-3xl leading-none font-semibold text-warning tabular-nums">
                 {faultPlanets}
               </span>
-              <span className="text-[0.8125rem] leading-snug text-text-dim">
+              <span className="text-[0.6875rem] leading-snug text-text-dim">
                 {t('piAdvisor.summaryFaultsColonies', { count: faultPlanets })}
               </span>
             </div>
@@ -201,7 +201,7 @@ export function AdvisorSummary({ list, earnings, spots, controls }: AdvisorSumma
                   own legend below stays exact — it reads through i18next as a string. */}
               +<IskAmount value={tuningIsk} revealOn="tap" decimals={0} />
             </span>
-            <span className="text-[0.8125rem] leading-snug text-text-dim">
+            <span className="text-[0.6875rem] leading-snug text-text-dim">
               {t('piAdvisor.summaryEarnIskPerHour')}
             </span>
           </div>

@@ -65,7 +65,7 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
       aria-haspopup="dialog"
       className="group grid w-full grid-cols-[1fr_4.5rem_5rem] items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2 text-left last:border-b-0 hover:bg-panel-2 sm:grid-cols-[1fr_6.5rem_4.5rem_5rem_auto]"
     >
-      <span className="min-w-0 truncate text-[0.8125rem]">
+      <span className="min-w-0 truncate text-xs">
         {name}{' '}
         <span className="text-[0.6875rem] text-text-faint">
           {t(`pi.planetType.${row.planetType}`)}

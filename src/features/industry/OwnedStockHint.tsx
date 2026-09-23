@@ -78,7 +78,7 @@ export function OwnedStockHint({
           material: materialName,
           detected,
         })}
-        className="flex items-center justify-end rounded-xs text-[0.6875rem] font-semibold text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="flex min-h-11 items-center justify-end rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
       >
         {t('industry.useDetected', { quantity: suggestion.toLocaleString() })}
       </button>
