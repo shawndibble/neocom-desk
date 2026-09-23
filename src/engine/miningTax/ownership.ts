@@ -102,3 +102,67 @@ export function computeOwnership(
   }
   return { unassigned: sortedByType(unassigned), ownedLines };
 }
+
+/** The fields `findDuplicateAssignmentIds` reads off a stored Assignment — narrower than the Dexie record, so the engine stays Dexie-free. */
+export interface DuplicateCandidate {
+  id: string;
+  oreLines: readonly OreLine[];
+  payeeId?: string;
+  taxPct: number;
+  status: string;
+}
+
+function linesSignature(lines: readonly OreLine[]): string {
+  return sortedByType(lines)
+    .map((l) => `${l.typeId}:${l.quantity}`)
+    .join('|');
+}
+
+/**
+ * Ids of Assignments that look like the same obligation stored twice over one
+ * Mining Ledger Entry. Two things must both hold, because each alone has an
+ * innocent reading:
+ *
+ * - Identical Payee, tax % and ore lines — a split between two Payees, or two
+ *   halves of one day, differ in at least one of them.
+ * - The covering Assignments together claim more of some ore type than the
+ *   entry holds — identical halves that add up to the entry are a split moved
+ *   back, and a ledger that merely shrank under a lone record (ESI settling,
+ *   `computeOwnership`'s "a snapshot is never shrunk") has no twin to flag.
+ *
+ * Dismissals never count: they hold no Payee and owe nothing. Every member of
+ * a flagged set is returned, since nothing here can say which of two identical
+ * records the pilot meant to keep.
+ */
+export function findDuplicateAssignmentIds(
+  entryLines: readonly OreLine[],
+  covering: readonly DuplicateCandidate[]
+): string[] {
+  const live = covering.filter((c) => c.status !== 'dismissed');
+  const claimedByType = new Map<number, number>();
+  for (const c of live) {
+    for (const line of c.oreLines) {
+      claimedByType.set(line.typeId, (claimedByType.get(line.typeId) ?? 0) + line.quantity);
+    }
+  }
+  const entryByType = new Map(entryLines.map((l) => [l.typeId, l.quantity]));
+
+  const sets = new Map<string, DuplicateCandidate[]>();
+  for (const c of live) {
+    const key = `${c.payeeId ?? ''}:${c.taxPct}:${linesSignature(c.oreLines)}`;
+    const members = sets.get(key);
+    if (members) members.push(c);
+    else sets.set(key, [c]);
+  }
+  // Over-claim is judged on each identical set's own ore types, so a pile-up on
+  // one type never taints an unrelated identical pair on another.
+  return [...sets.values()]
+    .filter(
+      (members) =>
+        members.length > 1 &&
+        members[0].oreLines.some(
+          (l) => (claimedByType.get(l.typeId) ?? 0) > (entryByType.get(l.typeId) ?? 0)
+        )
+    )
+    .flatMap((members) => members.map((m) => m.id));
+}

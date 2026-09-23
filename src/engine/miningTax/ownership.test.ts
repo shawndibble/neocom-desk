@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { computeOwnership, type CoveringAssignment } from './ownership';
+import {
+  computeOwnership,
+  findDuplicateAssignmentIds,
+  type CoveringAssignment,
+  type DuplicateCandidate,
+} from './ownership';
 import type { OreLine } from './types';
 
 const A = 45490;
@@ -115,5 +120,80 @@ describe('computeOwnership — several Assignments and no collector (pre-flag sp
     expect(result.unassigned).toEqual([{ typeId: A, quantity: 30 }]);
     expect(result.ownedLines.get('a')).toEqual([{ typeId: A, quantity: 60 }]);
     expect(result.ownedLines.get('b')).toEqual([{ typeId: A, quantity: 40 }]);
+  });
+});
+
+function candidate(
+  id: string,
+  oreLines: OreLine[],
+  overrides: Partial<DuplicateCandidate> = {}
+): DuplicateCandidate {
+  return { id, oreLines, payeeId: 'p1', taxPct: 5, status: 'paid', ...overrides };
+}
+
+describe('findDuplicateAssignmentIds', () => {
+  const entry: OreLine[] = [{ typeId: A, quantity: 100 }];
+
+  it('flags two identical records that each hold the whole entry', () => {
+    const dupes = findDuplicateAssignmentIds(entry, [
+      candidate('x', [{ typeId: A, quantity: 100 }]),
+      candidate('y', [{ typeId: A, quantity: 100 }]),
+    ]);
+    expect([...dupes].sort()).toEqual(['x', 'y']);
+  });
+
+  it('does not flag identical halves that together equal the entry (a split moved back)', () => {
+    const dupes = findDuplicateAssignmentIds(entry, [
+      candidate('x', [{ typeId: A, quantity: 50 }]),
+      candidate('y', [{ typeId: A, quantity: 50 }]),
+    ]);
+    expect(dupes).toEqual([]);
+  });
+
+  it('does not flag a split between two payees', () => {
+    const dupes = findDuplicateAssignmentIds(entry, [
+      candidate('x', [{ typeId: A, quantity: 60 }]),
+      candidate('y', [{ typeId: A, quantity: 40 }], { payeeId: 'p2' }),
+    ]);
+    expect(dupes).toEqual([]);
+  });
+
+  it('does not flag a lone record even when the ledger shrank below it', () => {
+    const dupes = findDuplicateAssignmentIds(
+      [{ typeId: A, quantity: 80 }],
+      [candidate('x', [{ typeId: A, quantity: 100 }])]
+    );
+    expect(dupes).toEqual([]);
+  });
+
+  it('does not flag two records on different terms', () => {
+    const dupes = findDuplicateAssignmentIds(entry, [
+      candidate('x', [{ typeId: A, quantity: 100 }]),
+      candidate('y', [{ typeId: A, quantity: 100 }], { taxPct: 8 }),
+    ]);
+    expect(dupes).toEqual([]);
+  });
+
+  it('ignores dismissed records', () => {
+    const dupes = findDuplicateAssignmentIds(entry, [
+      candidate('x', [{ typeId: A, quantity: 100 }]),
+      candidate('y', [{ typeId: A, quantity: 100 }], { status: 'dismissed' }),
+    ]);
+    expect(dupes).toEqual([]);
+  });
+
+  it('does not let an over-claim on one type flag an identical pair on another', () => {
+    const dupes = findDuplicateAssignmentIds(
+      [
+        { typeId: A, quantity: 100 },
+        { typeId: B, quantity: 10 },
+      ],
+      [
+        candidate('x', [{ typeId: A, quantity: 50 }]),
+        candidate('y', [{ typeId: A, quantity: 50 }]),
+        candidate('z', [{ typeId: B, quantity: 30 }], { payeeId: 'p2' }),
+      ]
+    );
+    expect(dupes).toEqual([]);
   });
 });

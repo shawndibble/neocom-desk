@@ -204,3 +204,54 @@ describe('planGroupEjections', () => {
     ).toEqual(['c']);
   });
 });
+
+describe('planEntryMerges — exact duplicates', () => {
+  const entries = (qty: number) =>
+    new Map([['1:2026-09-12:30000001', [{ typeId: 100, quantity: qty }]]]);
+
+  it('drops the extra of two identical records that each equal the entry instead of summing', () => {
+    const plans = planEntryMerges(
+      [
+        make({ id: 'a', estimatedValue: 1000, taxOwed: 50 }),
+        make({ id: 'b', estimatedValue: 1180, taxOwed: 59 }),
+      ],
+      entries(10)
+    );
+    expect(plans).toEqual([
+      {
+        keepId: 'a',
+        absorbedIds: ['b'],
+        oreLines: [{ typeId: 100, quantity: 10 }],
+        estimatedValue: 1000,
+        taxOwed: 50,
+        collectsGrowth: false,
+      },
+    ]);
+  });
+
+  it('keeps the joined record when only one of the duplicates carries a group', () => {
+    const [plan] = planEntryMerges(
+      [make({ id: 'a' }), make({ id: 'b', groupId: 'g1' })],
+      entries(10)
+    );
+    expect(plan.keepId).toBe('b');
+    expect(plan.absorbedIds).toEqual(['a']);
+    expect(plan.groupId).toBe('g1');
+  });
+
+  it('still sums identical halves that together equal the entry', () => {
+    const [plan] = planEntryMerges(
+      [
+        make({ id: 'a', oreLines: [{ typeId: 100, quantity: 5 }] }),
+        make({ id: 'b', oreLines: [{ typeId: 100, quantity: 5 }] }),
+      ],
+      entries(10)
+    );
+    expect(plan.oreLines).toEqual([{ typeId: 100, quantity: 10 }]);
+    expect(plan.estimatedValue).toBe(2000);
+  });
+
+  it('leaves identical records alone when the entry is not in the ledger read', () => {
+    expect(planEntryMerges([make({ id: 'a' }), make({ id: 'b' })], new Map())).toEqual([]);
+  });
+});

@@ -67,6 +67,24 @@ function termsKey(a: CoalescableAssignment): string {
   return `${a.payeeId ?? ''}:${a.taxPct}`;
 }
 
+function sameLines(a: readonly OreLine[], b: readonly OreLine[]): boolean {
+  if (a.length !== b.length) return false;
+  const quantities = new Map(b.map((l) => [l.typeId, l.quantity]));
+  return a.every((l) => quantities.get(l.typeId) === l.quantity);
+}
+
+/** True when the members together hold more of some ore type than the entry does. */
+function claimsMoreThan(
+  members: readonly CoalescableAssignment[],
+  entryLines: readonly OreLine[]
+): boolean {
+  const claimed = new Map<number, number>();
+  for (const m of members) {
+    for (const l of m.oreLines) claimed.set(l.typeId, (claimed.get(l.typeId) ?? 0) + l.quantity);
+  }
+  return entryLines.some((l) => (claimed.get(l.typeId) ?? 0) > l.quantity);
+}
+
 function byId(a: CoalescableAssignment, b: CoalescableAssignment): number {
   return a.id.localeCompare(b.id);
 }
@@ -105,8 +123,19 @@ function bucket<T>(items: readonly T[], key: (item: T) => string): Map<string, T
  *
  * The surviving record is the lowest id in the set, so a repeated run over
  * unchanged data picks the same one however Dexie ordered the read.
+ *
+ * Given `entryLinesByKey` (the fresh ledger's ore per entry), records whose
+ * ore lines are all identical are told apart: halves that add up to the entry
+ * are summed as above, but records that together claim *more* than the entry
+ * holds are one obligation stored twice, so the extras are dropped and the
+ * kept record's figures stand — summing them doubled the bill. With the entry
+ * absent from the map nothing can say which it is, so such a bucket is left
+ * alone rather than guessed at.
  */
-export function planEntryMerges(assignments: readonly CoalescableAssignment[]): EntryMerge[] {
+export function planEntryMerges(
+  assignments: readonly CoalescableAssignment[],
+  entryLinesByKey?: ReadonlyMap<string, readonly OreLine[]>
+): EntryMerge[] {
   // Every Assignment on an entry, whatever its status — a fused record is the
   // entry's sole coverer only if nothing else, fusable or not, covers it too.
   const coverageByEntry = new Map<string, number>();
@@ -126,7 +155,19 @@ export function planEntryMerges(assignments: readonly CoalescableAssignment[]): 
     if (members.length < 2) continue;
     const groupIds = new Set(members.map((m) => m.groupId).filter((id) => id !== undefined));
     if (groupIds.size > 1) continue;
-    const [keep, ...absorbed] = [...members].sort(byId);
+    const identical = members.every((m) => sameLines(m.oreLines, members[0].oreLines));
+    const entryLines = entryLinesByKey?.get(
+      entryKey(members[0].characterId, members[0].date, members[0].solarSystemId)
+    );
+    if (entryLinesByKey && identical && !entryLines) continue;
+    const duplicate = identical && entryLines !== undefined && claimsMoreThan(members, entryLines);
+    // A duplicate keeps the joined record when there is one — the corp's bill
+    // is the group's — otherwise the lowest id, as ever.
+    const ordered = [...members].sort(byId);
+    const keep = duplicate
+      ? (ordered.find((m) => m.groupId !== undefined) ?? ordered[0])
+      : ordered[0];
+    const absorbed = ordered.filter((m) => m !== keep);
     const entry = entryKey(keep.characterId, keep.date, keep.solarSystemId);
     const soleAfterMerge = (coverageByEntry.get(entry) ?? 0) - absorbed.length === 1;
     const quantityByType = new Map<number, number>();
@@ -138,11 +179,15 @@ export function planEntryMerges(assignments: readonly CoalescableAssignment[]): 
     merges.push({
       keepId: keep.id,
       absorbedIds: absorbed.map((a) => a.id),
-      oreLines: [...quantityByType.entries()]
-        .map(([typeId, quantity]) => ({ typeId, quantity }))
-        .sort((a, b) => a.typeId - b.typeId),
-      estimatedValue: members.reduce((sum, m) => sum + m.estimatedValue, 0),
-      taxOwed: members.reduce((sum, m) => sum + m.taxOwed, 0),
+      oreLines: duplicate
+        ? [...keep.oreLines].sort((a, b) => a.typeId - b.typeId)
+        : [...quantityByType.entries()]
+            .map(([typeId, quantity]) => ({ typeId, quantity }))
+            .sort((a, b) => a.typeId - b.typeId),
+      estimatedValue: duplicate
+        ? keep.estimatedValue
+        : members.reduce((sum, m) => sum + m.estimatedValue, 0),
+      taxOwed: duplicate ? keep.taxOwed : members.reduce((sum, m) => sum + m.taxOwed, 0),
       collectsGrowth: !soleAfterMerge && members.some((m) => m.collectsGrowth === true),
       ...(groupIds.size === 1 ? { groupId: [...groupIds][0] } : {}),
     });

@@ -12,7 +12,7 @@ import {
   TypeIcon,
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
-import { joinAssignments, type JoinMemberInput } from './assignments';
+import { AlreadyAssignedError, joinAssignments, type JoinMemberInput } from './assignments';
 import { agreedTerms } from './selection';
 import type { MoonMiningTaxRow } from './snapshot';
 
@@ -139,6 +139,7 @@ export function JoinAssignDialog({
       solarSystemId: candidate.row.entry.solarSystemId,
       assignment: candidate.assignment,
       oreLines: candidate.assignment ? undefined : candidate.row.unassignedOreLines,
+      entryOreLines: candidate.row.entry.oreLines,
     };
   }
 
@@ -155,6 +156,11 @@ export function JoinAssignDialog({
         pricesFor(payees.find((p) => p.id === effectivePayeeId)?.hubId)
       );
       onJoined();
+    } catch (error) {
+      // A member's ore was claimed since this dialog's snapshot — refresh
+      // rather than create a second claim on it.
+      if (error instanceof AlreadyAssignedError) onJoined();
+      else throw error;
     } finally {
       setSaving(false);
     }

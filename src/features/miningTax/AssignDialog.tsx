@@ -16,7 +16,7 @@ import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { maskIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
-import { createAssignment, updateAssignment } from './assignments';
+import { AlreadyAssignedError, createAssignment, updateAssignment } from './assignments';
 import { updatePayee } from './payees';
 import { hubForPayee } from './pricing';
 import type { MoonMiningTaxRow } from './snapshot';
@@ -274,6 +274,7 @@ export function AssignDialog({
           solarSystemId: row.entry.solarSystemId,
           payeeId,
           oreLines: selectedLines,
+          entryOreLines: row.entry.oreLines,
           taxPct: pctValue,
           estimatedValue,
           taxOwed,
@@ -281,6 +282,11 @@ export function AssignDialog({
         });
       }
       onAssigned();
+    } catch (error) {
+      // The row was stale — something else already claimed this ore. Refresh
+      // so the pilot sees the Assignment that exists instead of saving a twin.
+      if (error instanceof AlreadyAssignedError) onAssigned();
+      else throw error;
     } finally {
       setSaving(false);
     }

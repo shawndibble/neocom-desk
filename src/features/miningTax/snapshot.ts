@@ -9,7 +9,7 @@ import { loadPayees } from './payees';
 import { loadAssignments } from './assignments';
 import { reconcileAssignments } from './reconcile';
 import { coalesceAssignments } from './coalesce';
-import { computeOwnership } from '@/engine/miningTax/ownership';
+import { computeOwnership, findDuplicateAssignmentIds } from '@/engine/miningTax/ownership';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 
 export interface MoonMiningTaxRow {
@@ -20,6 +20,8 @@ export interface MoonMiningTaxRow {
   assignments: MiningTaxAssignmentRecord[];
   /** Ore this entry's assignments don't yet cover. */
   unassignedOreLines: MiningLedgerEntry['oreLines'];
+  /** Assignments that look like one obligation stored twice over this entry — see `findDuplicateAssignmentIds`. Empty for a healthy row. */
+  duplicateAssignmentIds?: string[];
 }
 
 export interface UnclassifiedOre {
@@ -65,8 +67,11 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
   // Mining Ledger Entry over the Assignments covering it, so it has to see
   // one fused record rather than two halves of the same obligation. Needs no
   // ledger of its own — it only ever compares stored Assignments with each
-  // other.
-  await Promise.all(ledgers.map((ledger) => coalesceAssignments(ledger.characterId)));
+  // other. The fresh entries are passed only so it can tell a split day from
+  // an exact duplicate (and leave an unverifiable pair alone).
+  await Promise.all(
+    ledgers.map((ledger) => coalesceAssignments(ledger.characterId, ledger.entries))
+  );
 
   await Promise.all(
     ledgers
@@ -125,6 +130,7 @@ export async function loadMoonMiningTaxSnapshot(): Promise<MoonMiningTaxSnapshot
         entry,
         assignments: covering,
         unassignedOreLines: computeOwnership(entry.oreLines, covering).unassigned,
+        duplicateAssignmentIds: findDuplicateAssignmentIds(entry.oreLines, covering),
       });
     }
   });
