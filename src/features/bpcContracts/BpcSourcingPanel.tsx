@@ -1585,7 +1585,11 @@ export function BpcSourcingPanel() {
           {sources.size === 0 ? (
             <EmptyState title={t('bpcContracts.noSourceSelected')} className="py-8" />
           ) : displayRows.length === 0 ? (
-            <EmptyState title={t('bpcContracts.noFilterMatches')} className="py-8" />
+            <EmptyState
+              title={t('bpcContracts.noFilterMatches')}
+              hint={t('bpcContracts.noFilterMatchesHint')}
+              className="py-8"
+            />
           ) : (
             <>
               <DataTable

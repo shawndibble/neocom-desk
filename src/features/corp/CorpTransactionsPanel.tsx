@@ -303,7 +303,11 @@ export function CorpTransactionsPanel({
           )}
           <TransactionsFilterBar filter={filter} onChange={onFilterChange} />
           {filteredTransactions.length === 0 ? (
-            <EmptyState title={t('wallet.transactionsNoFilterMatches')} className="py-8" />
+            <EmptyState
+              title={t('wallet.transactionsNoFilterMatches')}
+              hint={t('wallet.transactionsNoFilterMatchesHint')}
+              className="py-8"
+            />
           ) : (
             <DataTable
               label={t('wallet.transactionsTab')}
