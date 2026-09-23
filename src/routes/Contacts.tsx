@@ -707,12 +707,12 @@ export function Contacts() {
         <ContactsFilterBar filter={filter} onChange={setFilter} counts={lastGoodCounts} />
       )}
 
-      {view === 'across' ? (
-        <AcrossCharactersPanel lists={acrossLists} names={contactNames} filter={filter} />
-      ) : loading && !data ? (
+      {loading && !data ? (
         <div className="flex justify-center py-16">
           <Spinner label={t('common.loading')} />
         </div>
+      ) : view === 'across' ? (
+        <AcrossCharactersPanel lists={acrossLists} names={contactNames} filter={filter} />
       ) : contactsNeedsReauth ? (
         <ReauthBanner
           title={t('contacts.reauthTitle')}

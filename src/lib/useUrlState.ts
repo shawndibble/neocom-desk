@@ -18,7 +18,15 @@
  *
  * Pass a schema that is stable across renders — module scope, or a `useMemo`.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useLocation, useNavigate, type Location, type NavigateFunction } from 'react-router-dom';
 import { resolveSort, sortParam, type UrlParamCodec, type UrlSort } from './urlState';
 
@@ -75,8 +83,14 @@ export function useUrlParams<S extends UrlParamSchema>(
   const flush = useCallback(
     (values: Record<string, unknown>) => {
       timer.current = null;
-      setPending({});
-      writeParams(latest.current.location, latest.current.navigate, codecs, values);
+      // One transition for both: `BrowserRouter` applies a navigation inside
+      // `startTransition`, so clearing `pending` urgently would commit a frame
+      // with the old URL's values — the text box would flicker back, and a
+      // write in that frame would start from the stale query string.
+      startTransition(() => {
+        setPending({});
+        writeParams(latest.current.location, latest.current.navigate, codecs, values);
+      });
     },
     [codecs]
   );
@@ -147,8 +161,8 @@ export function useUrlParam<T>(key: string, codec: UrlParamCodec<T>): [T, (value
 /**
  * A `DataTable`'s sort bound to one query key: spread the result onto the
  * table (`<DataTable {...sortProps} />`). A sort naming a column the table
- * does not have reads as `defaultSort`. `defaultSort` and `columnIds` should
- * be stable — a module constant and a memoised list.
+ * does not have reads as `defaultSort`. `defaultSort` should be
+ * a module constant; `columnIds` is only compared, so a fresh list is fine.
  */
 export function useUrlSort(
   key: string,

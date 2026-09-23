@@ -38,12 +38,23 @@ export function routePatternFor(path: AppRoutePath): string {
 }
 
 /**
- * `pathname` with a declared tab segment collapsed to its page — the identity
- * of "which page is this" once tabs are paths. Anything else passes through.
+ * `pathname` collapsed to its tabbed page, if in one — the identity of
+ * "which page is this" once tabs are paths. Includes the bare path and an
+ * unknown segment, so the redirect to the default tab does not fade twice.
+ * Anything else passes through.
  */
 export function pageKeyFor(pathname: string): string {
+  return tabbedPageFor(pathname)?.base ?? pathname;
+}
+
+/**
+ * A tabbed page's bare path or unknown segment — a URL `TabRoute` is about to
+ * replace with the default tab. Not a page view of its own: analytics skips
+ * it and records the tab path that follows.
+ */
+export function isTabRedirectPath(pathname: string): boolean {
   const page = tabbedPageFor(pathname);
-  return page !== null && tabFromPathname(page, pathname) !== null ? page.base : pathname;
+  return page !== null && tabFromPathname(page, pathname) === null;
 }
 
 /**
