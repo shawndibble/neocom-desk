@@ -39,7 +39,7 @@ export function VerdictPill({
   const Glyph = tone === 'warning' ? Icon.Warn : tone === 'success' ? Icon.Done : Icon.Info;
   return (
     <p
-      className={`inline-flex min-h-7 items-center gap-2 rounded-xs border px-2.5 py-1 text-[0.6875rem] font-semibold tracking-wide uppercase ${PILL_TONE[tone]}`}
+      className={`inline-flex min-h-7 items-center gap-2 rounded-xs border px-2.5 py-1 text-[0.6875rem] font-semibold tracking-widest uppercase ${PILL_TONE[tone]}`}
     >
       <Glyph size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
       <span className="sr-only">{label}</span>
