@@ -388,6 +388,15 @@ function BpcFilterBar({
               <CurrentSystemPicker current={currentSystem} />
             </div>
           </FilterField>
+          <FilterField label={t('jumpRange.label')}>
+            <div className="flex flex-wrap items-center gap-2">
+              <JumpRangeSelect
+                value={draft.jumps}
+                onChange={(next) => setDraft({ ...draft, jumps: next })}
+              />
+              <CurrentSystemPicker current={currentSystem} />
+            </div>
+          </FilterField>
           <FilterField label={t('bpcContracts.minMeLabel')}>
             <TextInput
               type="number"
