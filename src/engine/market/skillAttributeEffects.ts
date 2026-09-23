@@ -1,27 +1,21 @@
 /**
- * Which skill modifies a specific item attribute value, and by how much
- * (issue #1372's "click Falloff, see which skill changes it" popover).
+ * Which skill modifies a specific item attribute value, and by how much.
  * `SkillAttributeModifierMap` names only which skill *could* modify an
  * attribute (`scripts/build-sde.mjs`); this narrows that to the skills that
  * actually apply to one item (its own required skills gate applicability)
- * and computes the PostPercent magnitude at a trained level. Pure — callers
- * supply the item's required skills and the trained level.
+ * and computes the PostPercent magnitude at a trained level. Pure.
  */
 import type { SkillAttributeModifier, SkillAttributeModifierMap } from '@/sde/types';
 
 export interface ModifyingSkillEffect {
   ownerSkillTypeID: number;
-  /** Attribute on `ownerSkillTypeID`'s own dogma_attributes holding the per-level base value. */
-  sourceAttributeID: number;
+  perLevelValue: number;
 }
 
 /**
- * Skills that modify `attributeId` on an item requiring `itemRequiredSkillTypeIds`.
- * A candidate applies only when the item requires its `gatingSkillTypeID` —
- * Sharpshooter's bonus to Optimal Range, for instance, only applies to items
- * requiring Gunnery, even though Sharpshooter itself isn't required by them.
- * De-duplicates by owning skill: the same skill is never listed twice for one
- * attribute even if more than one gating row happens to name it.
+ * Skills that modify `attributeId` on an item requiring `itemRequiredSkillTypeIds`
+ * (a candidate applies only when the item requires its `gatingSkillTypeID` —
+ * see `SkillAttributeModifier`). De-duplicates by owning skill.
  */
 export function findModifyingSkills(
   attributeId: number,
@@ -37,17 +31,13 @@ export function findModifyingSkills(
     seen.add(candidate.ownerSkillTypeID);
     result.push({
       ownerSkillTypeID: candidate.ownerSkillTypeID,
-      sourceAttributeID: candidate.sourceAttributeID,
+      perLevelValue: candidate.perLevelValue,
     });
   }
   return result;
 }
 
-/**
- * A PostPercent bonus's total magnitude at a trained level: the flat
- * per-level design value (e.g. Sharpshooter's own attribute 294 = 5, "5% per
- * level") times the trained level. Zero at level 0 (untrained).
- */
+/** A PostPercent bonus's total magnitude at a trained level. Zero at level 0. */
 export function postPercentMagnitude(perLevelValue: number, trainedLevel: number): number {
   return perLevelValue * trainedLevel;
 }

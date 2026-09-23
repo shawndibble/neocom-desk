@@ -144,18 +144,12 @@ const SKILL_GATED_MODIFIER_FUNCS = new Set([
   'LocationRequiredSkillModifier',
   'OwnerRequiredSkillModifier',
 ]);
-// Dogma's ModifierOperation enum, verified against dgmEffects.csv effect
-// names that spell out their own operation (e.g. effect 290,
-// "sharpshooterRangeSkillBonusPostPercentMaxRange..."). Only PostPercent is
-// resolved here — it accounts for ~89% of skill-gated modifier rows in the
-// dump on 2026-09-23 (2332 of 2537), and is the shape every plain "+N% per
-// skill level" bonus takes. The rest (ModAdd, PreMul, PostDiv, ...) are the
-// small special-case list this feature's design doc explicitly allows for.
+// Dogma's ModifierOperation enum, verified against effect names that spell
+// out their own operation. Only PostPercent (a plain "+N% per level" bonus)
+// is resolved; the design doc's small special-case list covers the rest.
 const POST_PERCENT_OPERATION = 6;
-// Distinct modifiedAttributeIDs / total rows in `skillAttributeModifiers.json`,
-// as counted against the dump on 2026-09-23: 64 attributes, 261 rows (one row
-// per {modifiedAttributeID, ownerSkillTypeID} pair — an attribute a few skills
-// each independently modify emits a few rows). A broken join lands at 0.
+// Plausibility band for `skillAttributeModifiers.json`, counted against the
+// dump on 2026-09-23 (64 attributes, 261 rows). A broken join lands at 0.
 const SKILL_ATTRIBUTE_MODIFIERS_MIN = 30;
 const SKILL_ATTRIBUTE_MODIFIERS_MAX = 200;
 const SKILL_ATTRIBUTE_MODIFIER_ROWS_MIN = 100;
@@ -779,13 +773,16 @@ async function main() {
   }
 
   // --- skillAttributeModifiers.json: modifiedAttributeID -> skill bonuses affecting it ---
-  // (issue #1372) A LocationRequiredSkillModifier/OwnerRequiredSkillModifier
-  // row's own `skillTypeID` only *gates* the bonus (an item must require that
-  // skill for it to apply) — the bonus's actual source is whichever type the
-  // effect is attached to (dgmTypeEffects), which is usually NOT a skill at
-  // all: implants, ship set bonuses and subsystems reuse this exact mechanism.
-  // Filtering to effects owned by an actual skill type is what turns ~2300
-  // candidate rows into the couple hundred that are genuinely skill-driven.
+  // A skill-gated modifier row's own `skillTypeID` only *gates* the bonus (an
+  // item must require that skill for it to apply) — the bonus's actual
+  // source is whichever type the effect is attached to (dgmTypeEffects),
+  // which is usually NOT a skill at all: implants, ship set bonuses and
+  // subsystems reuse this exact mechanism. Filtering to effects owned by an
+  // actual skill type turns ~2300 candidate rows into the couple hundred
+  // genuinely skill-driven ones. `perLevelValue` is the owning skill's own
+  // static per-level design value (e.g. Sharpshooter's own attribute 294 =
+  // 5, "5% per level") — baked in here rather than fetched at runtime, since
+  // it's already static SDE data this build already has in hand.
   const effectModifierInfo = new Map(); // effectID -> parsed modifierInfo array
   {
     const rows = raw['dgmEffects.csv'];
@@ -819,6 +816,7 @@ async function main() {
     }
   }
   const skillAttributeModifiers = {};
+  let skillAttributeModifierUnresolved = 0;
   for (const [effectID, entries] of effectModifierInfo) {
     const ownerSkillTypeIDs = (effectOwnerTypes.get(effectID) ?? []).filter((t) =>
       skillTypeIds.has(t)
@@ -832,10 +830,15 @@ async function main() {
       const sourceAttributeID = entry.modifyingAttributeID;
       if (modifiedAttributeID == null || gatingSkillTypeID == null || sourceAttributeID == null)
         continue;
-      let list = skillAttributeModifiers[modifiedAttributeID];
-      if (!list) list = skillAttributeModifiers[modifiedAttributeID] = [];
       for (const ownerSkillTypeID of ownerSkillTypeIDs) {
-        list.push({ ownerSkillTypeID, gatingSkillTypeID, sourceAttributeID });
+        const perLevelValue = attrsByType.get(ownerSkillTypeID)?.get(sourceAttributeID);
+        if (!perLevelValue) {
+          skillAttributeModifierUnresolved++;
+          continue;
+        }
+        let list = skillAttributeModifiers[modifiedAttributeID];
+        if (!list) list = skillAttributeModifiers[modifiedAttributeID] = [];
+        list.push({ ownerSkillTypeID, gatingSkillTypeID, perLevelValue });
       }
     }
   }
@@ -2123,8 +2126,8 @@ async function main() {
       process.exitCode = 1;
     }
     // A known positive, verified against a live dump: Sharpshooter (3311)
-    // grants a PostPercent bonus to attribute 54 (Optimal Range) on items
-    // requiring Gunnery (3300), via its own attribute 294.
+    // grants a 5%-per-level PostPercent bonus to attribute 54 (Optimal Range)
+    // on items requiring Gunnery (3300).
     const OPTIMAL_RANGE_ATTR = 54;
     const SHARPSHOOTER_TYPE_ID = 3311;
     const GUNNERY_SKILL_TYPE_ID = 3300;
@@ -2132,29 +2135,22 @@ async function main() {
       (e) =>
         e.ownerSkillTypeID === SHARPSHOOTER_TYPE_ID &&
         e.gatingSkillTypeID === GUNNERY_SKILL_TYPE_ID &&
-        e.sourceAttributeID === 294
+        e.perLevelValue === 5
     );
     if (!found) {
       console.error('  FAIL: Sharpshooter should modify attribute 54 (Optimal Range)');
       process.exitCode = 1;
     }
-    // The resolver reads `sourceAttributeID`'s value directly off the owning
-    // skill's own static dogma_attributes (verified against a live dump: every
-    // skill-driven PostPercent bonus already carries its per-level design
-    // value there — no runtime effect chain needs simulating). A row whose
-    // owner skill has no such value, or a value of 0, would mean a future CCP
-    // data change introduced a case this flat lookup can't resolve.
-    let unresolvableRows = 0;
-    for (const list of Object.values(skillAttributeModifiers)) {
-      for (const { ownerSkillTypeID, sourceAttributeID } of list) {
-        const value = attrsByType.get(ownerSkillTypeID)?.get(sourceAttributeID);
-        if (!value) unresolvableRows++;
-      }
-    }
-    console.log(`  skill attribute modifiers unresolvable via flat lookup: ${unresolvableRows}`);
-    if (unresolvableRows) {
+    // Every skill-gated PostPercent bonus resolves to a static per-level value
+    // on its own type (verified against a live dump — no runtime effect chain
+    // ever needs simulating); rows that didn't were dropped above rather than
+    // emitted with a missing value. A future CCP data change introducing a
+    // genuinely unresolvable case fails the build here instead of shipping a
+    // popover with no number.
+    console.log(`  skill attribute modifiers unresolved: ${skillAttributeModifierUnresolved}`);
+    if (skillAttributeModifierUnresolved) {
       console.error(
-        `  FAIL: ${unresolvableRows} row(s) have no static per-level value on their owning skill`
+        `  FAIL: ${skillAttributeModifierUnresolved} row(s) have no static per-level value on their owning skill`
       );
       process.exitCode = 1;
     }

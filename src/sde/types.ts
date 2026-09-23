@@ -38,28 +38,25 @@ export type MasteryMap = Record<string, SkillPrereq[][]>;
 
 /**
  * One row of public/data/skillAttributeModifiers.json: a skill that grants a
- * PostPercent bonus to some item attribute. `gatingSkillTypeID` is the skill
- * an item must itself require for the bonus to apply (not necessarily
- * `ownerSkillTypeID` — see the worked example below); `sourceAttributeID` is
- * the attribute on `ownerSkillTypeID`'s own dogma_attributes holding the
- * per-level base value (e.g. "5" for a flat 5%/level bonus).
- *
- * Worked example: Sharpshooter (3311) boosts attribute 54 (Optimal Range) on
- * every item requiring Gunnery (3300, the `gatingSkillTypeID`), sourced from
- * Sharpshooter's own attribute 294 (the `sourceAttributeID`) — Sharpshooter
- * itself is `ownerSkillTypeID`, distinct from the skill that gates it.
+ * PostPercent (flat "+N% per level") bonus to some item attribute.
+ * `gatingSkillTypeID` is the skill an item must itself require for the bonus
+ * to apply — not necessarily `ownerSkillTypeID`, the skill actually granting
+ * it: Sharpshooter (`ownerSkillTypeID` 3311) boosts Optimal Range on every
+ * item requiring Gunnery (`gatingSkillTypeID` 3300), without Sharpshooter
+ * itself being required. `perLevelValue` is `ownerSkillTypeID`'s own
+ * per-level design value (5, for Sharpshooter's flat 5%/level) — the
+ * effective bonus at a trained level is `perLevelValue * level`.
  */
 export interface SkillAttributeModifier {
   ownerSkillTypeID: number;
   gatingSkillTypeID: number;
-  sourceAttributeID: number;
+  perLevelValue: number;
 }
 
 /**
  * public/data/skillAttributeModifiers.json: modifiedAttributeID (as a string
  * key) -> the skills that modify it. Only PostPercent-operation, skill-owned
- * modifiers are included — see `scripts/build-sde.mjs`'s
- * `skillAttributeModifiers` build for the full scope note (issue #1372).
+ * modifiers — see `scripts/build-sde.mjs`'s `skillAttributeModifiers` build.
  */
 export type SkillAttributeModifierMap = Record<string, SkillAttributeModifier[]>;
 

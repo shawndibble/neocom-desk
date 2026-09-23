@@ -78,12 +78,7 @@ interface DetailData {
   requiredSkills: RequiredSkill[];
   /** typeID -> name, reused from the same resolution the generic rows already paid for. */
   skillNames: Readonly<Record<number, string>>;
-  /**
-   * Every skill's name (skills.json, not just this item's required skills) —
-   * the attribute-modifier popover names skills the item doesn't itself
-   * require (Sharpshooter boosts Gunnery-gated items without being required
-   * by them), so `skillNames` above isn't enough.
-   */
+  /** Every skill's name — the popover surfaces skills the item doesn't require, so `skillNames` above isn't enough. */
   allSkillNames: Readonly<Record<number, string>>;
   skillAttributeModifiers: SkillAttributeModifierMap;
   /** Null when pi.json couldn't be read — the rest of the modal is unaffected. */
@@ -204,9 +199,8 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
     };
   }, [typeId]);
 
-  // Gates which attribute-modifier popovers can apply — Sharpshooter's bonus
-  // to Optimal Range, say, only applies to items requiring Gunnery. Fine to
-  // compute unconditionally (empty while `data` hasn't loaded yet).
+  // Gates which attribute-modifier popovers can apply (empty while `data`
+  // hasn't loaded yet).
   const requiredSkillTypeIds = new Set((data?.requiredSkills ?? []).map((r) => r.skillTypeID));
 
   return (
@@ -369,7 +363,7 @@ function RequiredSkillsSection({
       </div>
       <div className="mt-1 space-y-1">
         {requiredSkills.map((req) => {
-          const name = skillNames[req.skillTypeID] ?? `#${req.skillTypeID}`;
+          const name = skillNameOrFallback(req.skillTypeID, skillNames);
           if (!hasCharacter) {
             return <NameOnlySkillRow key={req.skillTypeID} name={name} level={req.level} />;
           }
@@ -412,12 +406,9 @@ function skillNameOrFallback(id: number, skillNames: Readonly<Record<number, str
 
 /**
  * "Which skill changes this?" — wraps an attribute's displayed value in a
- * click-to-reveal popover (issue #1372's feature 3b). `modifiers` is already
- * resolved (`findModifyingSkills`) to the skills that actually apply to this
- * item; the popover itself only needs to fetch each owning skill's own base
- * per-level value, which it does lazily on open (Radix `PopoverContent`
- * unmounts on close, so a fresh fetch on each open is the natural lazy
- * behavior, not a special case).
+ * click-to-reveal popover. `modifiers` is already resolved
+ * (`findModifyingSkills`) to the skills that actually apply to this item,
+ * each already carrying its own per-level value — no fetch needed to render.
  */
 function AttributeModifierTrigger({
   modifiers,
@@ -461,7 +452,7 @@ function AttributeModifierTrigger({
   );
 }
 
-/** One skill's effect inside `AttributeModifierTrigger`'s popover: fetches its own base per-level value on mount. */
+/** One skill's effect inside `AttributeModifierTrigger`'s popover — `modifier.perLevelValue` is already static SDE data, no fetch needed. */
 function AttributeModifierRow({
   modifier,
   skillName,
@@ -476,63 +467,25 @@ function AttributeModifierRow({
   itemName: string;
 }) {
   const { t } = useTranslation();
-  const [perLevelValue, setPerLevelValue] = useState<number | null>(null);
-  const [loadFailed, setLoadFailed] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const { data: ownerSkill } = await getUniverseType(modifier.ownerSkillTypeID);
-        if (cancelled) return;
-        if (!ownerSkill) {
-          setLoadFailed(true);
-          return;
-        }
-        const attr = ownerSkill.dogma_attributes?.find(
-          (a) => a.attribute_id === modifier.sourceAttributeID
-        );
-        setPerLevelValue(attr?.value ?? 0);
-      } catch {
-        // A live ESI fetch, unlike this modal's cached/precached data — an
-        // error here degrades to "couldn't load", not an unhandled rejection
-        // or a popover stuck on "Loading…" forever.
-        if (!cancelled) setLoadFailed(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [modifier.ownerSkillTypeID, modifier.sourceAttributeID]);
-
   return (
     <div className="space-y-1 text-xs">
-      {loadFailed ? (
-        <p className="text-danger">{t('skills.attributeModifier.loadError')}</p>
-      ) : perLevelValue === null ? (
-        <div className="flex items-center gap-2 text-text-dim">
-          <Spinner size="sm" label={t('common.loading')} />
-          {t('common.loading')}
-        </div>
-      ) : (
-        <>
-          <p className="text-text">
-            {t('skills.attributeModifier.perLevel', { skill: skillName, perLevel: perLevelValue })}
-          </p>
-          <p className="text-text-dim">
-            {trainedLevel > 0
-              ? t('skills.attributeModifier.current', {
-                  level: trainedLevel,
-                  total: postPercentMagnitude(perLevelValue, trainedLevel),
-                })
-              : t('skills.attributeModifier.untrained')}
-          </p>
-        </>
-      )}
+      <p className="text-text">
+        {t('skills.attributeModifier.perLevel', {
+          skill: skillName,
+          perLevel: modifier.perLevelValue,
+        })}
+      </p>
+      <p className="text-text-dim">
+        {trainedLevel > 0
+          ? t('skills.attributeModifier.current', {
+              level: trainedLevel,
+              total: postPercentMagnitude(modifier.perLevelValue, trainedLevel),
+            })
+          : t('skills.attributeModifier.untrained')}
+      </p>
       <Button
         size="sm"
         variant="ghost"
-        disabled={loadFailed}
         onClick={() =>
           void target.addEntries(
             [

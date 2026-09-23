@@ -87,8 +87,7 @@
     "attributeModifier": {
       "perLevel": "{{skill}}: +{{perLevel}}% per level",
       "current": "Trained to {{level}} — currently +{{total}}%",
-      "untrained": "Not trained",
-      "loadError": "Couldn't load this skill's effect"
+      "untrained": "Not trained"
     },
     "mastery": {
       "title": "Ship Mastery",
