@@ -84,6 +84,8 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { cx } from '@/lib/cx';
+import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { boolParam, optionalEnumParam, optionalIdParam, textParam } from '@/lib/urlState';
 
 /** Rows shown before "show all" — the same cap the character-contracts table and BPC Search use. */
 const ROW_CAP = 50;
@@ -106,7 +108,7 @@ const SALE_KINDS: ContractSaleKind[] = ['exchange', 'auction'];
 
 /** Which corpus the tab is showing. Items is the landing mode — it is what the tab was before #910. */
 const CONTRACT_MODES = ['items', 'courier'] as const;
-type ContractMode = (typeof CONTRACT_MODES)[number];
+export type ContractMode = (typeof CONTRACT_MODES)[number];
 
 /**
  * Guarded so a build with no sync backend reads nothing at all — not even the
@@ -135,13 +137,17 @@ interface UiFilter {
   saleKind: ContractSaleKind | null;
 }
 
-const EMPTY_UI_FILTER: UiFilter = {
-  typeQuery: '',
-  regionId: null,
-  maxPrice: '',
-  minQuantity: '',
-  saleKind: null,
+/** The Items board's own filter, selection and show-all, in the URL (ADR 0015) as one group. */
+const ITEMS_FILTER_PARAMS = {
+  'items.q': textParam(),
+  'items.region': optionalIdParam(),
+  'items.maxPrice': textParam(),
+  'items.minQty': textParam(),
+  'items.kind': optionalEnumParam(SALE_KINDS),
+  'items.type': optionalIdParam(),
+  'items.all': boolParam(),
 };
+const ITEMS_SORT = { columnId: 'price', direction: 'asc' } as const;
 
 /** A blank or unparseable field is "no restriction", never `NaN` — which would silently exclude every row. */
 function parseNumeric(value: string): number | null {
@@ -311,6 +317,9 @@ export interface ContractSearchStatus {
 }
 
 interface ContractSearchPanelProps {
+  /** Which corpus is showing — a path segment on the route (`CONTRACTS_TABS`), owned there. */
+  mode: ContractMode;
+  onModeChange: (mode: ContractMode) => void;
   /**
    * Called whenever the freshness/refresh state changes. The page header owns
    * the badge and the Refresh button; this panel owns the data behind them.
@@ -321,9 +330,8 @@ interface ContractSearchPanelProps {
    * portalled into, so the Search/History tabs and the corpus switch share
    * one line instead of stacking a tab bar over a panel header holding two
    * chips — two rows of chrome above a list that is the whole point of the
-   * page. Portalled rather than lifted because the mode is this panel's state
-   * and nothing on the route reads it. Ignored at `sm` and up, and when absent
-   * the switch falls back to the panel header, so the panel still works alone.
+   * page. Ignored at `sm` and up, and when absent the switch falls back to the
+   * panel header, so the panel still works alone.
    */
   modeSwitchSlot?: HTMLElement | null;
 }
@@ -371,7 +379,12 @@ function ContractModeSegments({ mode, onChange }: ContractModeSegmentsProps) {
 }
 
 /** Search every public item_exchange/auction contract line, any item type. Read-only, cached for offline. */
-export function ContractSearchPanel({ onStatusChange, modeSwitchSlot }: ContractSearchPanelProps) {
+export function ContractSearchPanel({
+  mode,
+  onModeChange,
+  onStatusChange,
+  modeSwitchSlot,
+}: ContractSearchPanelProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const isPhone = useIsPhone();
@@ -432,11 +445,24 @@ export function ContractSearchPanel({ onStatusChange, modeSwitchSlot }: Contract
   // flashes the newly shown rows back to "resolving".
   const offerLocations = useOfferLocations(rows);
 
-  const [uiFilter, setUiFilter] = useState<UiFilter>(EMPTY_UI_FILTER);
+  const [itemsParams, setItemsParams] = useUrlParams(ITEMS_FILTER_PARAMS);
+  const uiFilter = useMemo<UiFilter>(
+    () => ({
+      typeQuery: itemsParams['items.q'],
+      regionId: itemsParams['items.region'],
+      maxPrice: itemsParams['items.maxPrice'],
+      minQuantity: itemsParams['items.minQty'],
+      saleKind: itemsParams['items.kind'],
+    }),
+    [itemsParams]
+  );
   /** The type the user picked out of the suggestion list, pinning the search to exactly one item. */
-  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
-  const [showAll, setShowAll] = useState(false);
-  const [mode, setMode] = useState<ContractMode>('items');
+  const selectedTypeId = itemsParams['items.type'];
+  const showAll = itemsParams['items.all'];
+  const setShowAll = useCallback(
+    (value: boolean) => setItemsParams({ 'items.all': value }),
+    [setItemsParams]
+  );
   const [selectedRow, setSelectedRow] = useState<PublicContractOfferRow | null>(null);
 
   // Freshness and the offline banner both name the snapshot actually on
@@ -563,22 +589,31 @@ export function ContractSearchPanel({ onStatusChange, modeSwitchSlot }: Contract
   function changeFilter(next: UiFilter) {
     // Typing anything other than the pinned type's own name un-pins it —
     // otherwise editing the box would leave a search that no longer says what
-    // it is filtering on.
-    if (selectedTypeId !== null && next.typeQuery !== uiFilter.typeQuery) setSelectedTypeId(null);
-    setUiFilter(next);
-    setShowAll(false);
+    // it is filtering on. Grouped into one write with the filter fields
+    // themselves, since two `useUrlParams` writes in the same tick would drop
+    // one of them.
+    const unpin = selectedTypeId !== null && next.typeQuery !== uiFilter.typeQuery;
+    setItemsParams({
+      'items.q': next.typeQuery,
+      'items.region': next.regionId,
+      'items.maxPrice': next.maxPrice,
+      'items.minQty': next.minQuantity,
+      'items.kind': next.saleKind,
+      'items.type': unpin ? null : selectedTypeId,
+      'items.all': false,
+    });
   }
 
   function selectType(option: ContractTypeOption) {
-    setSelectedTypeId(option.typeId);
-    setUiFilter((previous) => ({ ...previous, typeQuery: option.name }));
-    setShowAll(false);
+    setItemsParams({
+      'items.type': option.typeId,
+      'items.q': option.name,
+      'items.all': false,
+    });
   }
 
   function clearType() {
-    setSelectedTypeId(null);
-    setUiFilter((previous) => ({ ...previous, typeQuery: '' }));
-    setShowAll(false);
+    setItemsParams({ 'items.type': null, 'items.q': '', 'items.all': false });
   }
 
   const columns = useMemo<DataTableColumn<PublicContractOfferRow>[]>(
@@ -681,6 +716,11 @@ export function ContractSearchPanel({ onStatusChange, modeSwitchSlot }: Contract
     ],
     [t, typeNames, regionNames, offerLocations, timeZone]
   );
+  const itemsSortProps = useUrlSort(
+    'items.sort',
+    ITEMS_SORT,
+    columns.map((column) => column.id)
+  );
 
   const visibleRows = showAll ? displayRows : displayRows.slice(0, ROW_CAP);
 
@@ -728,7 +768,7 @@ export function ContractSearchPanel({ onStatusChange, modeSwitchSlot }: Contract
   return (
     <>
       {portalSwitch &&
-        createPortal(<ContractModeSegments mode={mode} onChange={setMode} />, modeSwitchSlot)}
+        createPortal(<ContractModeSegments mode={mode} onChange={onModeChange} />, modeSwitchSlot)}
       <Panel
         padded={false}
         // Frameless on a phone, bleeding through `<main>`'s `px-2`: the dense
@@ -768,7 +808,7 @@ export function ContractSearchPanel({ onStatusChange, modeSwitchSlot }: Contract
                   key={candidate}
                   label={t(`contractSearch.mode.${candidate}`)}
                   selected={mode === candidate}
-                  onToggle={() => setMode(candidate)}
+                  onToggle={() => onModeChange(candidate)}
                 />
               ))}
             </div>
@@ -947,7 +987,7 @@ export function ContractSearchPanel({ onStatusChange, modeSwitchSlot }: Contract
                       // item once per stack, so contractId+typeId is not unique —
                       // the duplicate React keys left stale rows in the table.
                       rowKey={(row, index) => `${row.contractId}:${row.typeId}:${index}`}
-                      defaultSort={{ columnId: 'price', direction: 'asc' }}
+                      {...itemsSortProps}
                       // Two-line cards on a phone: a buyer scans hundreds of
                       // offers for a price and a place, not reads each one.
                       stackLayout="dense"

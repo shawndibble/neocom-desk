@@ -109,6 +109,7 @@ import { TransactionsPanel } from '@/features/market/TransactionsPanel';
 import { AppraisalPanel } from '@/features/market/AppraisalPanel';
 import { useAppraisal } from '@/features/market/useAppraisal';
 import { useMarketPricePercent } from '@/features/market/pricePercent';
+import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
 
 /** Debounce for the catalogue search, so a fast typist doesn't re-filter the tree on every keystroke. */
 const SEARCH_DEBOUNCE_MS = 250;
@@ -1505,7 +1506,7 @@ export function Market() {
                               stationFilter === null &&
                               selectedTypeId !== null ? (
                                 <Link
-                                  to={`/industry?tab=sourcing&bpcSearch=${selectedTypeId}`}
+                                  to={bpcSourcingHref(selectedTypeId)}
                                   className={buttonClassName({ size: 'sm' })}
                                 >
                                   {t('market.searchBpcContracts')}

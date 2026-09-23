@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
 import type { CourierEndpoint, CourierRouteRow } from '@/engine/contracts/courierSearch';
@@ -89,7 +90,9 @@ async function openFilters(user: ReturnType<typeof userEvent.setup>) {
 
 function renderBoard(characterId = CHARACTER_ID) {
   return render(
-    <CourierResults rows={ROWS} regionNames={REGION_NAMES} characterId={characterId} />
+    <MemoryRouter>
+      <CourierResults rows={ROWS} regionNames={REGION_NAMES} characterId={characterId} />
+    </MemoryRouter>
   );
 }
 
@@ -209,7 +212,9 @@ describe('CourierResults "From my region" shortcut', () => {
 
     loadCharacterRegionId.mockResolvedValue(THE_FORGE);
     rerender(
-      <CourierResults rows={ROWS} regionNames={REGION_NAMES} characterId={CHARACTER_ID + 1} />
+      <MemoryRouter>
+        <CourierResults rows={ROWS} regionNames={REGION_NAMES} characterId={CHARACTER_ID + 1} />
+      </MemoryRouter>
     );
 
     // The previous character's "no hauls start there" must not survive them.
@@ -313,18 +318,22 @@ function stubPhoneViewport() {
 
 function renderLanes() {
   return render(
-    <CourierResults rows={LANE_ROWS} regionNames={REGION_NAMES} characterId={CHARACTER_ID} />
+    <MemoryRouter>
+      <CourierResults rows={LANE_ROWS} regionNames={REGION_NAMES} characterId={CHARACTER_ID} />
+    </MemoryRouter>
   );
 }
 
 describe('CourierResults route cell', () => {
   it("prints each end's security right after its system name, not a space band", () => {
     render(
-      <CourierResults
-        rows={[laneRow(1, 5_000_000, 1_000)]}
-        regionNames={REGION_NAMES}
-        characterId={CHARACTER_ID}
-      />
+      <MemoryRouter>
+        <CourierResults
+          rows={[laneRow(1, 5_000_000, 1_000)]}
+          regionNames={REGION_NAMES}
+          characterId={CHARACTER_ID}
+        />
+      </MemoryRouter>
     );
     const route = within(screen.getAllByRole('row')[1]).getAllByRole('cell')[0];
 
@@ -349,7 +358,9 @@ describe('CourierResults route cell', () => {
       },
     };
     render(
-      <CourierResults rows={[unplaced]} regionNames={REGION_NAMES} characterId={CHARACTER_ID} />
+      <MemoryRouter>
+        <CourierResults rows={[unplaced]} regionNames={REGION_NAMES} characterId={CHARACTER_ID} />
+      </MemoryRouter>
     );
     const route = within(screen.getAllByRole('row')[1]).getAllByRole('cell')[0];
 
@@ -407,11 +418,13 @@ describe('CourierResults on a phone', () => {
       laneRow(1_000 + index, 10_000_000, 10_000)
     );
     render(
-      <CourierResults
-        rows={[...many, ...RETURN_LANE]}
-        regionNames={REGION_NAMES}
-        characterId={CHARACTER_ID}
-      />
+      <MemoryRouter>
+        <CourierResults
+          rows={[...many, ...RETURN_LANE]}
+          regionNames={REGION_NAMES}
+          characterId={CHARACTER_ID}
+        />
+      </MemoryRouter>
     );
 
     expect(await screen.findByText('62 hauls · 2 lanes')).toBeInTheDocument();
@@ -423,11 +436,13 @@ describe('CourierResults on a phone', () => {
       laneRow(1_000 + index, 10_000_000, 10_000)
     );
     render(
-      <CourierResults
-        rows={[...many, ...RETURN_LANE]}
-        regionNames={REGION_NAMES}
-        characterId={CHARACTER_ID}
-      />
+      <MemoryRouter>
+        <CourierResults
+          rows={[...many, ...RETURN_LANE]}
+          regionNames={REGION_NAMES}
+          characterId={CHARACTER_ID}
+        />
+      </MemoryRouter>
     );
 
     // Grouping runs over the capped page, so the lane first shows its first 50.

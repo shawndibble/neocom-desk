@@ -40,21 +40,21 @@ import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import {
-  useResolvedCharacterFilter,
-  type CharacterFilterValue,
-} from '@/features/character/characterFilterValue';
+import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { nameForType, type BlueprintCatalog } from './blueprintCatalog';
 import { loadCharacterBlueprints } from './data';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { formatPercent } from './format';
 import { MobileOpportunityList } from './MobileOpportunityList';
+import { OPPORTUNITIES_DEFAULT_SORT, OPPORTUNITIES_SORT_KEY } from './opportunitiesUrl';
 import { ORDER_DEPTH_TONE, unitMargin } from './opportunityMetrics';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { buildOpportunityCandidates, type OpportunityRow } from './opportunities';
 import { SkillGateMarker } from './SkillGateMarker';
 import { useOpportunities } from './useOpportunities';
+import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
+import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { useAssumedMe } from './assumedMe';
 
 interface OpportunitiesPanelProps {
@@ -74,6 +74,10 @@ function numericCell(
 ): ReactNode {
   return value === null ? unknown : format(value);
 }
+
+/** `'current'`, not the synced default: this panel has always opened on the active pilot. */
+const CHARACTER_FILTER = characterFilterParam('current');
+const OPPORTUNITIES_CHARACTERS_KEY = 'opps.chars';
 
 export function OpportunitiesPanel({
   catalog,
@@ -98,7 +102,10 @@ export function OpportunitiesPanel({
     [allCharacters]
   );
 
-  const [characterFilter, setCharacterFilter] = useState<CharacterFilterValue>('current');
+  const [characterFilter, setCharacterFilter] = useUrlParam(
+    OPPORTUNITIES_CHARACTERS_KEY,
+    CHARACTER_FILTER
+  );
   // `useResolvedCharacterFilter`, not the raw `resolveCharacterFilter`: this
   // panel's resolved filter feeds `characterIds` and through it the
   // blueprint-loading effect's dep array below, and the raw function
@@ -373,6 +380,11 @@ export function OpportunitiesPanel({
       ),
     },
   ];
+  const sortProps = useUrlSort(
+    OPPORTUNITIES_SORT_KEY,
+    OPPORTUNITIES_DEFAULT_SORT,
+    columns.map((column) => column.id)
+  );
 
   const meta = (
     <span className="flex flex-wrap items-center gap-2">
@@ -431,7 +443,7 @@ export function OpportunitiesPanel({
             rows={rows}
             rowKey={(row) => row.candidate.id}
             label={t('industry.opportunitiesTitle')}
-            defaultSort={{ columnId: 'iskPerHour', direction: 'desc' }}
+            {...sortProps}
           />
         </div>
       ) : (

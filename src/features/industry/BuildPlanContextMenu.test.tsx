@@ -66,7 +66,7 @@ describe('BuildPlanContextMenu', () => {
     // 587 (Rifter), not 638 (its blueprint) — `/industry?product=` looks the
     // typeID up in the catalog's `byProductTypeID`, so the blueprint's own ID
     // would silently resolve to nothing.
-    expect(await screen.findByTestId('location')).toHaveTextContent('/industry?product=587');
+    expect(await screen.findByTestId('location')).toHaveTextContent('/industry/plans?product=587');
   });
 
   it('plans a plain manufacturable item as itself', async () => {
@@ -75,7 +75,7 @@ describe('BuildPlanContextMenu', () => {
 
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
-    expect(await screen.findByTestId('location')).toHaveTextContent('/industry?product=587');
+    expect(await screen.findByTestId('location')).toHaveTextContent('/industry/plans?product=587');
   });
 
   it('disables the action, with a reason, for an item nothing builds', async () => {
@@ -93,7 +93,7 @@ describe('BuildPlanContextMenu', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
     expect(await screen.findByTestId('location')).toHaveTextContent(
-      '/industry?product=587&me=10&te=20&runs=5'
+      '/industry/plans?product=587&me=10&te=20&runs=5'
     );
   });
 
@@ -104,7 +104,7 @@ describe('BuildPlanContextMenu', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
     expect(await screen.findByTestId('location')).toHaveTextContent(
-      '/industry?product=587&me=0&te=0&runs=1'
+      '/industry/plans?product=587&me=0&te=0&runs=1'
     );
   });
 

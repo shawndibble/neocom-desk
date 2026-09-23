@@ -14,7 +14,9 @@ import {
   tabPath,
   type PageTabs,
 } from '@/lib/pageTabs';
-import type { AppRoutePath } from './routeScopes';
+import { matchPath } from 'react-router-dom';
+import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
+import { ROUTE_REQUIREMENTS, type AppRoutePath } from './routeScopes';
 
 export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'character', labelKey: 'contacts.tabThisCharacter' },
@@ -32,16 +34,44 @@ export const MINING_TABS = definePageTabs('/mining', [
   { id: 'overview', labelKey: 'miningTax.overviewTab' },
 ]);
 
+/**
+ * Search has its own Items/Courier sub-tab, so each leaf's id is the full
+ * path suffix below `/contracts` rather than one segment (see `lib/pageTabs.ts`).
+ * `/contracts/search` alone names no tab and redirects like any unknown
+ * segment, landing on Items.
+ */
+export const CONTRACTS_TABS = definePageTabs(
+  '/contracts',
+  [
+    { id: 'search/items', labelKey: 'contractSearch.mode.items' },
+    { id: 'search/courier', labelKey: 'contractSearch.mode.courier' },
+    { id: 'history', labelKey: 'contracts.historyTab' },
+  ],
+  'search/items'
+);
+
 export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/contacts': CONTACTS_TABS,
+  '/contracts': CONTRACTS_TABS,
+  '/industry': INDUSTRY_TABS,
   '/planetary-industry': PI_TABS,
   '/mining': MINING_TABS,
 };
 
 const TABBED_PAGES = Object.values(PAGE_TABS);
 
+/**
+ * Routes nested under a tabbed page's base (`/industry/plans/:planId`): React
+ * Router ranks them above the page's `<base>/*` splat, so a path they match
+ * is their page, not the tabbed one.
+ */
+const NESTED_ROUTE_PATTERNS = (Object.keys(ROUTE_REQUIREMENTS) as AppRoutePath[]).filter((path) =>
+  TABBED_PAGES.some((page) => path.startsWith(`${page.base}/`))
+);
+
 /** The tabbed page `pathname` sits in, if any. */
 export function tabbedPageFor(pathname: string): PageTabs | null {
+  if (NESTED_ROUTE_PATTERNS.some((pattern) => matchPath(pattern, pathname))) return null;
   return TABBED_PAGES.find((page) => isWithinPage(page, pathname)) ?? null;
 }
 
