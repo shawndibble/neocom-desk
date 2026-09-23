@@ -244,7 +244,11 @@ export function ProductionRunsPanel({
         }
       >
         {runs.length === 0 ? (
-          <EmptyState title={t('industry.productionRunsEmptyTitle')} className="py-4" />
+          <EmptyState
+            title={t('industry.productionRunsEmptyTitle')}
+            hint={t('industry.productionRunsEmptyHint')}
+            className="py-4"
+          />
         ) : (
           <DataTable
             columns={columns}

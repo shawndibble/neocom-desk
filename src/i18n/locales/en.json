@@ -573,6 +573,7 @@
     "currentMarketPrice": "Current market price",
     "productionRuns": "Production Runs",
     "productionRunsEmptyTitle": "No production runs logged yet",
+    "productionRunsEmptyHint": "Use Log production above to track realized profit and link the sales and orders that sold it.",
     "logProduction": "Log Production",
     "logProductionHint": "Snapshot this batch's cost so it can be compared against what {{name}} actually sells for. Editable now, not re-derived later.",
     "saveProductionRun": "Save run",

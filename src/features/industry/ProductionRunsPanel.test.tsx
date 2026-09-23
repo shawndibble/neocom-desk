@@ -104,6 +104,11 @@ describe('ProductionRunsPanel', () => {
   it('shows the empty state with no logged runs', () => {
     renderPanel(null);
     expect(screen.getByText('No production runs logged yet')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Use Log production above to track realized profit and link the sales and orders that sold it.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('logs a Production Run from the plan defaults', async () => {
