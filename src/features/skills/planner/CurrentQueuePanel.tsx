@@ -132,7 +132,7 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
                   </span>
                   {badgeKey && (
                     <span
-                      className={`rounded-xs border px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest uppercase ${BADGE_STYLE[status]}`}
+                      className={`rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${BADGE_STYLE[status]}`}
                     >
                       {t(badgeKey)}
                     </span>

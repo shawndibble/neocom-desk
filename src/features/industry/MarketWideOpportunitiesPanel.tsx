@@ -5,7 +5,8 @@
  * starting from nothing" answer. Opt-in: nothing runs until the pilot hits
  * "Scan".
  */
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -25,14 +26,16 @@ import { db } from '@/db';
 import { iskToneClass } from '@/features/character/format';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
-import type { SkillLevels } from '@/engine/industry/types';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
+import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
 import type { MarketWideResultRow } from './marketWideOpportunities';
 import { useMarketWideOpportunities } from './useMarketWideOpportunities';
 import { SkillGateMarker } from './SkillGateMarker';
+import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
+import { boolParam } from '@/lib/urlState';
 
 const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
   deep: 'success',
@@ -45,23 +48,32 @@ interface MarketWideOpportunitiesPanelProps {
   hub: TradeHub;
   trees: MarketWideTreeMap | null;
   catalog: BlueprintCatalog | null;
-  skills: SkillLevels;
+  modifiers: CharacterModifiers;
+  /** For the standing toward `hub`'s NPC owner (issue #1238). Null while no character is active. */
+  activeCharacterId: number | null;
   onStartPlan: (entry: BlueprintCatalogEntry) => void;
 }
+
+const HIDE_SKILL_GATED = boolParam();
+const MARKET_WIDE_DEFAULT_SORT = { columnId: 'iskPerHour', direction: 'desc' } as const;
 
 export function MarketWideOpportunitiesPanel({
   hub,
   trees,
   catalog,
-  skills,
+  modifiers,
+  activeCharacterId,
   onStartPlan,
 }: MarketWideOpportunitiesPanelProps) {
   const { t } = useTranslation();
+  const tradeHubStandings = useTradeHubStandings(activeCharacterId);
+  const standing = tradeHubStanding(tradeHubStandings, hub.id);
   const { rows, loading, hasRun, run } = useMarketWideOpportunities({
     hub,
     trees,
     catalog,
-    skills,
+    modifiers,
+    standing,
   });
 
   // Account-wide, not active-character: every character on the account, same
@@ -85,7 +97,7 @@ export function MarketWideOpportunitiesPanel({
     return verdicts;
   }, [rows, catalog, accountSkills]);
 
-  const [hideSkillGated, setHideSkillGated] = useState(false);
+  const [hideSkillGated, setHideSkillGated] = useUrlParam('marketWide.hideGated', HIDE_SKILL_GATED);
   const gatedCount = useMemo(
     () => rows.filter((row) => skillGateByProductTypeID.get(row.productTypeID)?.gated).length,
     [rows, skillGateByProductTypeID]
@@ -167,6 +179,11 @@ export function MarketWideOpportunitiesPanel({
       ),
     },
   ];
+  const sortProps = useUrlSort(
+    'marketWide.sort',
+    MARKET_WIDE_DEFAULT_SORT,
+    columns.map((column) => column.id)
+  );
 
   return (
     <Panel
@@ -208,7 +225,7 @@ export function MarketWideOpportunitiesPanel({
               <FilterChip
                 label={t('industry.skillGateFilterChip')}
                 selected={hideSkillGated}
-                onToggle={() => setHideSkillGated((v) => !v)}
+                onToggle={() => setHideSkillGated(!hideSkillGated)}
                 count={gatedCount}
                 countLabel={t('industry.skillGateFilterChipCount', { count: gatedCount })}
               />
@@ -220,7 +237,7 @@ export function MarketWideOpportunitiesPanel({
               rows={visibleRows}
               rowKey={(row) => row.productTypeID}
               label={t('industry.marketOpportunitiesTitle')}
-              defaultSort={{ columnId: 'iskPerHour', direction: 'desc' }}
+              {...sortProps}
             />
           </div>
           {gatedCount > 0 && (

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EsiError } from '@/esi/errors';
 
 const TRADABLE = 1230; // Veldspar
@@ -39,10 +39,22 @@ vi.mock('@/esi/cache', async (importOriginal) => {
   return { ...actual, ...cacheMock };
 });
 
+const hubPricesMock = vi.hoisted(() => ({ getHubPrices: vi.fn() }));
+vi.mock('@/market/prices', () => hubPricesMock);
+
+const snapshotsMock = vi.hoisted(() => ({
+  saveTodayPriceSnapshot: vi.fn(),
+  loadPriceSnapshots: vi.fn(),
+}));
+vi.mock('./priceSnapshots', () => snapshotsMock);
+
 import { loadMiningYieldSnapshot } from './yieldSnapshot';
 
 beforeEach(() => {
   vi.clearAllMocks();
+  hubPricesMock.getHubPrices.mockResolvedValue(new Map());
+  snapshotsMock.saveTodayPriceSnapshot.mockResolvedValue(undefined);
+  snapshotsMock.loadPriceSnapshots.mockResolvedValue(new Map());
   sdeMock.loadCompressedOreTypeIds.mockResolvedValue({});
   sdeMock.loadReprocessing.mockResolvedValue({});
   sdeMock.loadTypes.mockResolvedValue({});
@@ -234,5 +246,83 @@ describe('loadMiningYieldSnapshot', () => {
     // The stale value renders immediately, not the fresh one a background
     // refresh may still be fetching when this promise resolves.
     expect(snapshot.typeVolumes.get(NONTRADABLE)).toBe(0.07);
+  });
+
+  describe('showRefining off (issue #1281)', () => {
+    it('skips reprocessing recipes, material prices, and character skills/implants entirely', async () => {
+      sdeMock.loadReprocessing.mockResolvedValue({
+        [String(TRADABLE)]: { portionSize: 100, materials: [{ typeID: 34, quantity: 400 }] },
+      });
+      priceHistoryMock.loadPriceHistory.mockResolvedValue({
+        points: [{ date: '2026-09-01', average: 10, volume: 1 }],
+        fetchedAt: Date.now(),
+      });
+
+      const snapshot = await loadMiningYieldSnapshot(false);
+
+      expect(sdeMock.loadReprocessing).not.toHaveBeenCalled();
+      expect(skillsMock.loadCorrectedSkills).not.toHaveBeenCalled();
+      // Only the ore/ice types themselves are priced — never material 34,
+      // which only a refine valuation would ever need a price for.
+      const historyTypeIds = priceHistoryMock.loadPriceHistory.mock.calls.map(
+        (call: unknown[]) => call[1]
+      );
+      expect(historyTypeIds).not.toContain(34);
+
+      const [row] = snapshot.rows;
+      expect(row.valuation.refineValue).toBe(0);
+      // Raw pricing is still complete, so the row must not read as Partial
+      // for refine data that was never fetched on purpose.
+      expect(row.valuation.pricedAll).toBe(true);
+    });
+  });
+
+  describe('price basis (issue #1279)', () => {
+    const book = { buyMax: 8, sellMin: 12, buyVolume: 1, sellVolume: 1 };
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date('2026-09-01T12:00:00Z'));
+      priceHistoryMock.loadPriceHistory.mockResolvedValue({ points: [], fetchedAt: Date.now() });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("saves today's live Jita book and prices today from it as saved, per side", async () => {
+      hubPricesMock.getHubPrices.mockResolvedValue(new Map([[TRADABLE, book]]));
+      snapshotsMock.loadPriceSnapshots.mockResolvedValue(
+        new Map([['2026-09-01', { [TRADABLE]: { buy: 8, sell: 12 } }]])
+      );
+
+      const [row] = (await loadMiningYieldSnapshot()).rows;
+
+      expect(snapshotsMock.saveTodayPriceSnapshot).toHaveBeenCalledWith('2026-09-01', {
+        [TRADABLE]: { buy: 8, sell: 12 },
+      });
+      const line = (basis: 'buy' | 'sell') =>
+        row.byBasis[basis].valuation.lines.find((l) => l.typeId === TRADABLE)?.rawValue;
+      expect(line('buy')).toBe(800);
+      expect(line('sell')).toBe(1200);
+      expect(row.byBasis.buy.priceSource).toBe('saved');
+      expect(row.valuation).toBe(row.byBasis.buy.valuation);
+    });
+
+    it('falls back to the live price for today when nothing was saved and ESI has no history yet', async () => {
+      hubPricesMock.getHubPrices.mockResolvedValue(new Map([[TRADABLE, book]]));
+
+      const [row] = (await loadMiningYieldSnapshot()).rows;
+
+      expect(row.byBasis.buy.priceSource).toBe('live');
+      expect(
+        row.byBasis['now-sell'].valuation.lines.find((l) => l.typeId === TRADABLE)?.rawValue
+      ).toBe(1200);
+    });
+
+    it('still loads when saving the snapshot fails', async () => {
+      snapshotsMock.saveTodayPriceSnapshot.mockRejectedValue(new Error('QuotaExceeded'));
+
+      await expect(loadMiningYieldSnapshot()).resolves.toMatchObject({ rows: [expect.anything()] });
+    });
   });
 });

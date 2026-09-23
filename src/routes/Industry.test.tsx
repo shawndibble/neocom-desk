@@ -176,6 +176,28 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/industry');
 });
 
+describe('Industry: tabs are paths (issue #1300)', () => {
+  it('sends bare /industry to the Build Plans tab, and a tab click pushes its own path', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole('searchbox', { name: 'Add build plan' });
+    expect(window.location.pathname).toBe('/industry/plans');
+
+    await user.click(screen.getByRole('tab', { name: 'Records' }));
+    await waitFor(() => expect(window.location.pathname).toBe('/industry/records'));
+    expect(screen.getByRole('tab', { name: 'Records' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('opens the tab its path names', async () => {
+    window.history.pushState({}, '', '/industry/records');
+    render(<App />);
+
+    const tab = await screen.findByRole('tab', { name: 'Records' });
+    expect(tab).toHaveAttribute('aria-selected', 'true');
+  });
+});
+
 describe('Industry: Build Plan CRUD', () => {
   it('creates via blueprint search (by product name), renames, duplicates, and deletes, persisted in Dexie', async () => {
     const user = userEvent.setup();
@@ -199,7 +221,7 @@ describe('Industry: Build Plan CRUD', () => {
     // Creating stays on the index — a search-and-add is a list-management
     // action, not "go start editing this" (that's what clicking the row, or
     // a `?product=` deep link, is for).
-    expect(window.location.pathname).toBe('/industry');
+    expect(window.location.pathname).toBe('/industry/plans');
 
     // Rename/duplicate/move-to-group live behind the row's context menu now
     // (#767) — only Delete stays a visible button.
@@ -221,7 +243,7 @@ describe('Industry: Build Plan CRUD', () => {
     expect(await screen.findByRole('button', { name: 'Rifter run (copy)' })).toBeInTheDocument();
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(2);
     // Duplicate also stays on the index, same reasoning as create.
-    expect(window.location.pathname).toBe('/industry');
+    expect(window.location.pathname).toBe('/industry/plans');
 
     const originalRow = screen.getByRole('button', { name: 'Rifter run' }).closest('li')!;
     await user.click(within(originalRow).getByRole('button', { name: 'Delete Rifter run' }));
@@ -458,7 +480,7 @@ describe('Industry: "View in Industry as material" from Assets (issue #414)', ()
 
     await screen.findByRole('button', { name: 'Rifter run' });
     await waitFor(() => expect(window.location.search).toBe(''));
-    expect(window.location.pathname).toBe('/industry');
+    expect(window.location.pathname).toBe('/industry/plans');
     expect(await db.buildPlans.where('characterId').equals(CHAR_ID).count()).toBe(1);
   });
 });
@@ -550,7 +572,7 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
   });
 
   it('seeds both rows onto the active character and shows a real comparison, not the empty state', async () => {
-    window.history.pushState({}, '', '/industry?tab=opportunities');
+    window.history.pushState({}, '', '/industry/opportunities');
     render(<App />);
     const user = userEvent.setup();
 
@@ -563,6 +585,8 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
     ).closest('section')!;
     await user.click(await within(oppSection).findByRole('button', { name: 'This character' }));
     await user.click(await screen.findByRole('button', { name: 'All characters' }));
+    // The filter lives in the URL, so a reload keeps it.
+    expect(new URLSearchParams(window.location.search).get('opps.chars')).toBe('all');
 
     await user.click(
       await screen.findByRole('checkbox', { name: 'Select Rifter to add to Compare' })

@@ -125,7 +125,7 @@ test.describe('Open Orders — problem-group disclosure row and Healthy toggle t
     page,
   }) => {
     await page.setViewportSize(PHONE);
-    await page.goto('./market?section=orders');
+    await page.goto('./market/orders');
 
     const { disclosure, disclosureHeight, healthyToggleHeight } = await getHeights(page);
     await expect(disclosure).toHaveAttribute('aria-expanded', 'true');
@@ -136,7 +136,7 @@ test.describe('Open Orders — problem-group disclosure row and Healthy toggle t
 
   test('both revert to their compact height at and above md (1280px)', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
-    await page.goto('./market?section=orders');
+    await page.goto('./market/orders');
 
     const { disclosureHeight, healthyToggleHeight } = await getHeights(page);
 

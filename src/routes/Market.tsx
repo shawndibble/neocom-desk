@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { usePageTab } from '@/lib/usePageTab';
+import { useUrlParam } from '@/lib/useUrlState';
+import { enumParam, type UrlParamCodec } from '@/lib/urlState';
+import { MARKET_TABS } from '@/app/pageTabs';
 import {
   Button,
   Caret,
@@ -104,14 +108,11 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import { orderBookCsvColumns, rangeLabel } from '@/features/market/orderBookCsv';
 import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
 import { OrderHistoryPanel } from '@/features/market/OrderHistoryPanel';
-import type { HistoryView } from '@/features/market/HistoryViewSelect';
 import { TransactionsPanel } from '@/features/market/TransactionsPanel';
 import { AppraisalPanel } from '@/features/market/AppraisalPanel';
 import { useAppraisal } from '@/features/market/useAppraisal';
 import { useMarketPricePercent } from '@/features/market/pricePercent';
-
-/** Debounce for the catalogue search, so a fast typist doesn't re-filter the tree on every keystroke. */
-const SEARCH_DEBOUNCE_MS = 250;
+import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
 
 /** Rows shown per side before "show all" (CONTEXT.md). */
 const ROW_CAP = 15;
@@ -123,27 +124,20 @@ const ROW_CAP = 15;
  * which is the *selected item's* own Market Data / Price History split and
  * has nothing to do with this.
  *
- * `history` and `transactions` are one tab wearing two hats: both are the
- * character's past, they overlap on item and side, and they answer the same
- * question from either end — which orders ended, and which fills paid out.
- * So History is the tab, and the view is picked from a select in the table's
- * own header (`HistoryViewSelect`) rather than a second row of tabs. They
- * stay separate `section` values rather than a nested param because that
- * keeps every existing `?section=` link working and lets each view keep its
- * own `useRouteSnapshot`, so opening one never fetches the other.
+ * `history` and `history/transactions` are one tab wearing two hats: both are
+ * the character's past, they overlap on item and side, and they answer the
+ * same question from either end — which orders ended, and which fills paid
+ * out. So History is the tab, and the view is picked from a select in the
+ * table's own header (`HistoryViewSelect`) rather than a second row of tabs
+ * (round 54). `history/transactions` is still its own `MARKET_TABS` entry —
+ * a tab id containing a literal `/` (`docs/ARCHITECTURE.md` §9) — so it gets
+ * a real, distinct, bookmarkable path without either needing a second row of
+ * tabs or teaching the shared tab foundation about subtabs.
  */
-type MarketSection = 'browser' | 'orders' | 'history' | 'transactions' | 'appraisal';
-function parseMarketSection(value: string | null): MarketSection {
-  return value === 'orders' ||
-    value === 'history' ||
-    value === 'transactions' ||
-    value === 'appraisal'
-    ? value
-    : 'browser';
-}
+type MarketTab = (typeof MARKET_TABS.tabs)[number]['id'];
 
-function isHistoryView(section: MarketSection): section is HistoryView {
-  return section === 'history' || section === 'transactions';
+function isHistoryView(tab: MarketTab): tab is 'history' | 'history/transactions' {
+  return tab === 'history' || tab === 'history/transactions';
 }
 
 /**
@@ -156,9 +150,30 @@ function isHistoryView(section: MarketSection): section is HistoryView {
  * per pasted line. A control drawn on a tab where it cannot do anything is
  * worse than one that is not there, so the chips stay with the Browser.
  */
-function usesHubPicker(section: MarketSection): boolean {
-  return section === 'browser' || section === 'appraisal';
+function usesHubPicker(tab: MarketTab): boolean {
+  return tab === 'browser' || tab === 'appraisal';
 }
+
+/** `stationFilter` (:591 originally), URL-backed: a positive location id, or `null`. */
+const STATION_FILTER_PARAM: UrlParamCodec<number | null> = {
+  parse: (raw) => (raw !== null && /^\d+$/.test(raw) ? Number(raw) : null),
+  serialize: (value) => (value === null ? null : String(value)),
+};
+
+const ITEM_TAB_PARAM = enumParam(['orders', 'history'] as const, 'orders');
+/**
+ * Deliberately not `textParam()`: its built-in debounce only smooths the
+ * *write*, not the render (the tree already re-filters on every keystroke via
+ * the hook's own optimistic `pending` state) — and on this page, an
+ * item/hub/region change is a second, independent `useUrlParams` writer
+ * (`navigateTo`) that can land in the same window as a still-pending debounced
+ * write and silently drop it. Writing immediately removes that race; nothing
+ * here needed the debounce for its own sake.
+ */
+const BROWSER_SEARCH_PARAM: UrlParamCodec<string> = {
+  parse: (raw) => raw ?? '',
+  serialize: (value) => (value === '' ? null : value),
+};
 
 /**
  * Stands in for variationIndex before variations.json resolves (or if it
@@ -329,13 +344,7 @@ export function Market() {
   const { t } = useTranslation();
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
-  // Read once on mount, not kept in sync with back/forward — same as every
-  // other route's own tab state (Wallet, the old Orders route). Reading the
-  // URL here is what lets a notification deep link
-  // (features/notifications/notificationOptions.ts) land on the right tab.
-  const [section, setSection] = useState<MarketSection>(() =>
-    parseMarketSection(searchParams.get('section'))
-  );
+  const [tab, setTab] = usePageTab(MARKET_TABS);
   // Issue #726: true only immediately after the Quickbar's "View in
   // Appraisal" action, so the panel mounts with its Compare Hubs section
   // already open instead of collapsed.
@@ -343,18 +352,9 @@ export function Market() {
   // `expandCompare` defaults false so every ordinary tab switch clears it —
   // only `handleViewQuickbarInAppraisal` passes `true`, and only that call's
   // own value should reach the next `AppraisalPanel` mount.
-  function handleSectionChange(next: MarketSection, expandCompare = false) {
-    setSection(next);
+  function changeTab(next: MarketTab, expandCompare = false) {
+    setTab(next);
     setExpandCompareOnAppraisal(expandCompare);
-    setSearchParams(
-      (prev) => {
-        const params = new URLSearchParams(prev);
-        if (next === 'browser') params.delete('section');
-        else params.set('section', next);
-        return params;
-      },
-      { replace: true }
-    );
   }
   const searchInputRef = useRef<HTMLInputElement>(null);
   const hubId = useMarketHub((state) => state.value);
@@ -397,7 +397,7 @@ export function Market() {
   // directly on the multi-hub view (#689) rather than a collapsed one.
   function handleViewQuickbarInAppraisal() {
     appraisal.appraiseText(quickbarToPasteText(quickbarItems));
-    handleSectionChange('appraisal', true);
+    changeTab('appraisal', true);
   }
 
   // Item Detail (CONTEXT.md round 6): opened from the item context menu
@@ -425,6 +425,8 @@ export function Market() {
   const globalMarkets = useGlobalMarketOverrides();
   const [variationData, setVariationData] = useState<VariationData | null>(null);
   const [catalogueError, setCatalogueError] = useState(false);
+  // Bumped by Refresh after a failed catalogue load to re-run the load effect.
+  const [catalogueTick, setCatalogueTick] = useState(0);
 
   // Blueprint catalog for the item context menu's Build Plan action, loaded
   // lazily on the first menu open rather than on mount — it pulls the full
@@ -442,8 +444,9 @@ export function Market() {
       });
   }
 
-  const [rawQuery, setRawQuery] = useState('');
-  const [query, setQuery] = useState('');
+  // Tree search, in the URL (ADR 0015) scoped to the Browser tab — a reload
+  // or a shared link reopens the same search rather than an empty tree.
+  const [query, setQuery] = useUrlParam('browser.q', BROWSER_SEARCH_PARAM);
   const [expandedIds, setExpandedIds] = useState<ReadonlySet<number>>(new Set());
   // Groups the user has explicitly collapsed while a search is filtering the
   // tree (see MarketGroupTree's `expanded` calc) — kept apart from
@@ -469,22 +472,10 @@ export function Market() {
   );
 
   // Cross-page item links (MarketItemLink, ImplantChip, ItemContextMenu's
-  // "View in Market") land on `?type=...` without a `section`, since they
-  // mean "browse this item" regardless of which tab this page happened to be
-  // on. `section` state (above) only reads the URL on mount, so without this
-  // it silently stays on Orders/History and the click looks like a no-op.
-  // Every in-page tab switch (`handleSectionChange`) sets or deletes
-  // `section` explicitly, so `type` present with `section` absent
-  // unambiguously means "an external link just landed here" — adjusted
-  // during render (React's "adjusting state when a prop changes" pattern),
-  // not an effect, so it takes hold before the stale tab ever paints.
-  const crossLinkedToBrowser = searchParams.has('type') && !searchParams.has('section');
-  const [wasCrossLinkedToBrowser, setWasCrossLinkedToBrowser] = useState(crossLinkedToBrowser);
-  if (crossLinkedToBrowser !== wasCrossLinkedToBrowser) {
-    setWasCrossLinkedToBrowser(crossLinkedToBrowser);
-    if (crossLinkedToBrowser) setSection('browser');
-  }
-
+  // "View in Market") now land on `/market/browser?type=...` directly
+  // (`engine/market/urlState.ts`'s `marketItemUrl`) — tab is a path segment,
+  // so there is no longer a "which tab is this?" ambiguity for a click that
+  // means "browse this item" to paper over.
   const typeIsValid = resolveAgainstCatalogue(
     parsedParams.typeId,
     types,
@@ -587,10 +578,15 @@ export function Market() {
   const [sellShowAll, setSellShowAll] = useState(false);
   const [buyShowAll, setBuyShowAll] = useState(false);
   // The order row context menu's "filter to this station" action (CONTEXT.md
-  // round 10); undone via the banner rendered above the tables.
-  const [stationFilter, setStationFilter] = useState<number | null>(null);
-  // Market Data / Price History (issue #11). Market Data selected by default.
-  const [itemTab, setItemTab] = useState<'orders' | 'history'>('orders');
+  // round 10); undone via the banner rendered above the tables. URL-backed
+  // (ADR 0015), scoped to the Browser tab.
+  const [stationFilter, setStationFilter] = useUrlParam('browser.station', STATION_FILTER_PARAM);
+  // Market Data / Price History (issue #11), Market Data selected by default —
+  // a scoped query param rather than a `/market/browser/<subtab>` path
+  // segment (docs/ARCHITECTURE.md §9): it only ever matters with an item
+  // already selected, so it rides along with `type` rather than living a
+  // level of path beneath it.
+  const [itemTab, setItemTab] = useUrlParam('browser.itemTab', ITEM_TAB_PARAM);
   // "Adjusting state when a prop changes" (react.dev): resets the previous
   // item's row-cap, station filter and order book the instant selection or
   // the resolved region changes, in the same render — an Effect would let
@@ -615,7 +611,10 @@ export function Market() {
     setSellShowAll(false);
     setBuyShowAll(false);
     setOrderBookFetch(null);
-    setStationFilter(null);
+    // `browser.station` clears in `navigateTo` itself, not here — every path
+    // that changes `resetKey` goes through it, and clearing it here too was a
+    // second, independent `useUrlParams` writer landing in the same render as
+    // `navigateTo`'s own write, which silently dropped one of the two.
     // Set in the same render as the reset above, not left for the fetch
     // effect a tick later — otherwise the one commit in between paints
     // `orderBookLoading: false` alongside the just-cleared `orderBookFetch`,
@@ -694,7 +693,7 @@ export function Market() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [catalogueTick]);
 
   // Independent of the catalogue and order-book loads: a character with no
   // orders scope, or with no characters signed in at all, simply resolves to
@@ -740,11 +739,6 @@ export function Market() {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    const id = setTimeout(() => setQuery(rawQuery), SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(id);
-  }, [rawQuery]);
 
   const globalMarketsMap = globalMarkets ?? NO_GLOBAL_MARKETS;
 
@@ -968,23 +962,29 @@ export function Market() {
   // persisted device setting (unchanged) *and* pushes the new query string,
   // as its own history entry, so a URL grabbed right after matches what's on
   // screen and the browser's back/forward walks through prior selections.
+  //
+  // `buildMarketParams` returns the canonical type/hub/region set, and
+  // replacing those wholesale is the point — `group` goes with them (a
+  // one-shot cross-link param, never re-applied once acted on). `browser.station`
+  // goes too: every call here means a new item or location, which is exactly
+  // when the "filter to this station" banner should clear (previously done by
+  // `setStationFilter(null)` in the resetKey effect below — moved here because
+  // that call and this one are two independent `useUrlParams` writers landing
+  // in the very same render, and the second one silently dropped the first's
+  // write, per the "two writers, same tick" hazard `useUrlState.ts` documents).
+  // `browser.q`/`browser.itemTab` survive untouched: the tab lives in the path
+  // now, not here, so there is no longer a `?section=` this needs to carry along.
   function navigateTo(typeId: number | null, next: MarketLocationParam) {
     setSearchParams((prev) => {
-      // `buildMarketParams` returns the canonical type/hub/region set, and
-      // replacing those wholesale is the point — but the tab is not part of
-      // that state and has to survive a hub change, which is now reachable
-      // from two sections rather than one.
-      //
-      // Dropping it did two things, both bad. A `?section=` grabbed after
-      // changing hub no longer named the tab it was taken on, breaking the
-      // "a URL grabbed right after matches what's on screen" contract below.
-      // Worse, with a `type` still in the query — browse an item, switch to
-      // Appraisal, change hub — the result is `type` present and `section`
-      // absent, which `crossLinkedToBrowser` reads as an external item link
-      // and answers by throwing the pilot back to the Browser mid-appraisal.
-      const params = new URLSearchParams(buildMarketParams(typeId, next));
-      const section = prev.get('section');
-      if (section !== null) params.set('section', section);
+      const params = new URLSearchParams(prev);
+      params.delete('type');
+      params.delete('hub');
+      params.delete('region');
+      params.delete('group');
+      params.delete('browser.station');
+      for (const [key, value] of Object.entries(buildMarketParams(typeId, next))) {
+        params.set(key, value);
+      }
       return params;
     });
   }
@@ -1025,8 +1025,15 @@ export function Market() {
     // On Appraisal the button re-prices the pasted list instead, dropping the
     // Fuzzwork TTL for those types only (`invalidateHubPrices`). Nothing
     // below applies: there is no selected item and no order book on this tab.
-    if (section === 'appraisal') {
+    if (tab === 'appraisal') {
       appraisal.refresh();
+      return;
+    }
+    // A failed catalogue load leaves no item to select, so Refresh retries
+    // the catalogue itself, the one recovery this page has short of F5.
+    if (catalogueError) {
+      setCatalogueError(false);
+      setCatalogueTick((n) => n + 1);
       return;
     }
     // Manual refresh must bypass getOrderBook's 300s TTL cache (CONTEXT.md
@@ -1171,7 +1178,7 @@ export function Market() {
       <PageHeader
         title={t('market.title')}
         actions={
-          usesHubPicker(section) ? (
+          usesHubPicker(tab) ? (
             <>
               {/* The mode chip and the picker next to it printed the same words
                   twice — "TRADE HUB · REGION · TRADE HUB [Jita]". The selected chip
@@ -1181,7 +1188,7 @@ export function Market() {
 
                   Browser only: see `usesHubPicker`. Appraisal prices at a
                   station, so it has no Region mode to toggle into. */}
-              {section === 'browser' && (
+              {tab === 'browser' && (
                 <div role="group" aria-label={t('market.locationMode')} className="flex gap-2">
                   <FilterChip
                     label={t('market.modeHub')}
@@ -1195,7 +1202,7 @@ export function Market() {
                   />
                 </div>
               )}
-              {effectiveLocation.mode === 'hub' || section === 'appraisal' ? (
+              {effectiveLocation.mode === 'hub' || tab === 'appraisal' ? (
                 <Select
                   value={effectiveHub.id}
                   onValueChange={(value) => handleHubChange(value as TradeHub['id'])}
@@ -1242,9 +1249,9 @@ export function Market() {
                 // list. Both are "refresh what is on screen", and neither has
                 // anything to do until there *is* something on screen.
                 disabled={
-                  section === 'appraisal'
+                  tab === 'appraisal'
                     ? appraisal.result === null || appraisal.loading
-                    : selectedTypeId === null || orderBookLoading
+                    : !catalogueError && (selectedTypeId === null || orderBookLoading)
                 }
               />
             </>
@@ -1254,12 +1261,12 @@ export function Market() {
 
       <Tabs
         label={t('market.title')}
-        value={isHistoryView(section) ? 'history' : section}
+        value={isHistoryView(tab) ? 'history' : tab}
         // Clicking History while already inside it would otherwise throw away
         // the chosen view and snap back to the orders one.
         onChange={(id) => {
-          if (id === 'history' && isHistoryView(section)) return;
-          handleSectionChange(id as MarketSection);
+          if (id === 'history' && isHistoryView(tab)) return;
+          changeTab(id as MarketTab);
         }}
         tabs={[
           { id: 'browser', label: t('market.sections.browser') },
@@ -1269,11 +1276,13 @@ export function Market() {
         ]}
       />
 
-      {section === 'orders' && <OpenOrdersPanel />}
+      {tab === 'orders' && <OpenOrdersPanel />}
 
-      {section === 'history' && (
+      {tab === 'history' && (
         <OrderHistoryPanel
-          onViewChange={handleSectionChange}
+          onViewChange={(view) =>
+            changeTab(view === 'transactions' ? 'history/transactions' : 'history')
+          }
           blueprintCatalog={blueprintCatalog}
           onRequestBlueprintCatalog={ensureBlueprintCatalog}
           onAddToQuickbar={handleAddToQuickbar}
@@ -1281,9 +1290,11 @@ export function Market() {
           onShowInfo={handleShowInfo}
         />
       )}
-      {section === 'transactions' && (
+      {tab === 'history/transactions' && (
         <TransactionsPanel
-          onViewChange={handleSectionChange}
+          onViewChange={(view) =>
+            changeTab(view === 'transactions' ? 'history/transactions' : 'history')
+          }
           blueprintCatalog={blueprintCatalog}
           onRequestBlueprintCatalog={ensureBlueprintCatalog}
           onAddToQuickbar={handleAddToQuickbar}
@@ -1294,7 +1305,7 @@ export function Market() {
 
       {/* The list itself lives in `useAppraisal` at route level, so switching
           to the Browser and back does not throw away a forty-line paste. */}
-      {section === 'appraisal' && (
+      {tab === 'appraisal' && (
         <AppraisalPanel
           controller={appraisal}
           pricePercent={pricePercent}
@@ -1309,23 +1320,22 @@ export function Market() {
         />
       )}
 
-      {section === 'browser' && (
+      {tab === 'browser' && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
           <Panel className={isDesktop || selectedTypeId === null ? '' : 'hidden'}>
             <SearchInput
               ref={searchInputRef}
-              value={rawQuery}
-              onChange={(e) => setRawQuery(e.target.value)}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
               placeholder={t('market.searchPlaceholder')}
               aria-label={t('market.searchLabel')}
             />
 
-            {rawQuery.trim().length > 0 &&
-              rawQuery.trim().length < MARKET_TREE_MIN_QUERY_LENGTH && (
-                <p className="pt-2 text-[0.6875rem] text-text-dim uppercase">
-                  {t('market.searchTooShort', { min: MARKET_TREE_MIN_QUERY_LENGTH })}
-                </p>
-              )}
+            {query.trim().length > 0 && query.trim().length < MARKET_TREE_MIN_QUERY_LENGTH && (
+              <p className="pt-2 text-[0.6875rem] text-text-dim uppercase">
+                {t('market.searchTooShort', { min: MARKET_TREE_MIN_QUERY_LENGTH })}
+              </p>
+            )}
 
             {filterResult?.capped && (
               <p className="pt-2 text-[0.6875rem] text-warning uppercase">
@@ -1505,7 +1515,7 @@ export function Market() {
                               stationFilter === null &&
                               selectedTypeId !== null ? (
                                 <Link
-                                  to={`/industry?tab=sourcing&bpcSearch=${selectedTypeId}`}
+                                  to={bpcSourcingHref(selectedTypeId)}
                                   className={buttonClassName({ size: 'sm' })}
                                 >
                                   {t('market.searchBpcContracts')}

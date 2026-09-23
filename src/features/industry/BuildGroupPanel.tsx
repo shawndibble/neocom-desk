@@ -14,6 +14,7 @@
  * question this view cannot answer and must not appear to.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -31,7 +32,7 @@ import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import { rollUpBuildGroup, type BuildGroupMember } from '@/engine/industry/groupRollup';
 import { rowVolume, totalVolume } from '@/engine/industry/materialVolume';
 import { suggestedOwnedQuantity, type OwnedStockScope } from '@/engine/industry/ownedStock';
-import type { MaterialCostLine, SkillLevels } from '@/engine/industry/types';
+import type { MaterialCostLine } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { iskToneClass } from '@/features/character/format';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -40,6 +41,7 @@ import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 import { getTradeHub } from '@/market/hubs';
+import type { TradeHubStandingsMap } from '@/features/market/useTradeHubStandings';
 import type { PiData } from '@/sde/types';
 import { useAssumedMe } from './assumedMe';
 import { nameForType, volumeForType, type BlueprintCatalog } from './blueprintCatalog';
@@ -98,9 +100,9 @@ interface BuildGroupPanelProps {
   ownedBlueprints: readonly CharacterBlueprint[];
   /** Folded into each member on its own `includeCorpAssets` — see `resolveBuildPlan`. */
   corpOwnedBlueprints?: CorpOwnedBlueprintsState;
-  skills: SkillLevels;
-  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
-  implantBonusPct: number;
+  modifiers: CharacterModifiers;
+  /** The active Character's per-Trade-Hub standings (issue #1238) — see `useComparedBuildResults`. */
+  tradeHubStandings?: TradeHubStandingsMap;
   ownedStockSnapshot: OwnedStockSnapshot;
   /** Opens one member on its own, the way clicking it in the list would. */
   onOpenPlan: (planId: string) => void;
@@ -131,8 +133,8 @@ export function BuildGroupPanel({
   pi,
   ownedBlueprints,
   corpOwnedBlueprints,
-  skills,
-  implantBonusPct,
+  modifiers,
+  tradeHubStandings,
   ownedStockSnapshot,
   onOpenPlan,
   onRetarget,
@@ -157,8 +159,8 @@ export function BuildGroupPanel({
     pi,
     ownedBlueprints,
     corpOwnedBlueprints,
-    skills,
-    implantBonusPct,
+    modifiers,
+    tradeHubStandings,
     computeGroupResult: true,
   });
 
@@ -180,7 +182,7 @@ export function BuildGroupPanel({
       groupAutoBuildMaxDepth(
         plans,
         { catalog, pi, ownedBlueprints, corpOwnedBlueprints, assumedMe },
-        skills
+        modifiers
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- autoBuildBlueprintSignature is the stable proxy for `plans`' structural identity; see comment above.
     [
@@ -190,7 +192,7 @@ export function BuildGroupPanel({
       ownedBlueprints,
       corpOwnedBlueprints,
       assumedMe,
-      skills,
+      modifiers,
     ]
   );
   // Craft Scope's Reactions chip (issue #698): lit whenever any single member

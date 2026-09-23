@@ -78,6 +78,19 @@ export interface DataTableColumn<T> {
 }
 
 /**
+ * Wraps a dense-stack (`stackLayout="dense"`) column's `render` output when
+ * it's more than one inline piece (a value plus a badge, a name plus a
+ * security-status suffix). The dense meta line puts a `·` separator right
+ * before this cell's content via CSS `::before` — a plain `flex` span
+ * blockifies and breaks onto its own line whenever a separator precedes it;
+ * `inline-flex` doesn't. Column authors reach for this instead of writing
+ * the className themselves, so the constraint has one place to hold and fix.
+ */
+export function DataTableDenseCell({ children }: { children: ReactNode }) {
+  return <span className="inline-flex items-center gap-1.5">{children}</span>;
+}
+
+/**
  * Phone-only row grouping (`DataTable`'s `groupBy`): rows sharing a key fold
  * behind one toggle row, so a list with many near-duplicates (ten courier
  * offers on one route) reads as one line per distinct thing.
@@ -121,6 +134,15 @@ interface DataTableProps<T> {
   className?: string;
   /** Column and direction to sort by before any header click. Column must declare `sortValue`. */
   defaultSort?: DataTableSort;
+  /**
+   * Controlled sort, for a table whose sort lives somewhere else — typically
+   * the URL (`lib/useUrlState`'s `useUrlSort`). Passing it (even `null`)
+   * makes `defaultSort` inert; every header click and phone-picker change
+   * goes to `onSortChange` instead of internal state. Omitted, the table
+   * keeps its own sort as it always has.
+   */
+  sort?: DataTableSort | null;
+  onSortChange?: (sort: DataTableSort) => void;
   /** `'compact'` tightens header and cell padding on both axes. Table-level, not per-column — a table is compact as a whole. */
   density?: 'default' | 'compact';
   /**
@@ -215,6 +237,8 @@ export function DataTable<T>({
   label,
   className = '',
   defaultSort,
+  sort: controlledSort,
+  onSortChange,
   density = 'default',
   rowContextMenu,
   onRowClick,
@@ -226,7 +250,12 @@ export function DataTable<T>({
   groupBy,
 }: DataTableProps<T>) {
   const { t } = useTranslation();
-  const [sort, setSort] = useState<DataTableSort | null>(defaultSort ?? null);
+  const [internalSort, setInternalSort] = useState<DataTableSort | null>(defaultSort ?? null);
+  const sort = controlledSort !== undefined ? controlledSort : internalSort;
+  function setSort(next: DataTableSort) {
+    if (controlledSort === undefined) setInternalSort(next);
+    onSortChange?.(next);
+  }
   // Only what the reader has toggled; an untouched group falls back to
   // `groupBy.defaultExpanded`, so a group that first appears on a later
   // refresh still gets its intended initial state.
@@ -309,7 +338,7 @@ export function DataTable<T>({
   }, [grouping, groupBy, sortedRows]);
 
   function toggleSort(column: DataTableColumn<T>) {
-    setSort((previous) => nextDataTableSort(previous, column.id));
+    setSort(nextDataTableSort(sort, column.id));
   }
 
   function renderRow(row: T, index: number, member = false) {

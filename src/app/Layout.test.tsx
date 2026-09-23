@@ -74,7 +74,10 @@ function renderLayoutWithRoutes() {
           />
           <Route path="/market" element={<div>market page</div>} />
           <Route path="/characters" element={<div>characters page</div>} />
-          <Route path="/settings" element={<div>settings page</div>} />
+          {/* `/*`: Settings' tabs are real path segments now (ADR 0015), so the
+              `?` shortcut's `/settings/general#shortcuts` target has to match
+              this route too, not just the bare page path. */}
+          <Route path="/settings/*" element={<div>settings page</div>} />
         </Route>
       </Routes>
     </MemoryRouter>
@@ -699,6 +702,7 @@ describe('Layout route fade', () => {
           {name} page
           <Link to="/overview?tab=x">filter overview</Link>
           <Link to="/assets/60003760">drill down</Link>
+          <Link to="/contacts/across">across tab</Link>
         </div>
       );
     }
@@ -710,6 +714,7 @@ describe('Layout route fade', () => {
             <Route path="/wallet" element={<Page name="wallet" />} />
             <Route path="/assets" element={<Page name="assets" />} />
             <Route path="/assets/*" element={<Page name="assets" />} />
+            <Route path="/contacts/*" element={<Page name="contacts" />} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -790,6 +795,17 @@ describe('Layout route fade', () => {
     expect(mounts).toEqual(['assets']);
     // Still fades, though — it is a navigation, just not a new instance.
     expect(animate).toHaveBeenCalled();
+  });
+
+  it('neither remounts nor fades on a tab switch — a tab is not a new page', async () => {
+    const user = userEvent.setup();
+    const { mounts } = renderRoutes('/contacts/character');
+    await waitFor(() => expect(mounts).toEqual(['contacts']));
+    animate.mockClear();
+    await user.click(screen.getByRole('link', { name: 'across tab' }));
+    await waitFor(() => expect(screen.getByText('contacts page')).toBeInTheDocument());
+    expect(mounts).toEqual(['contacts']);
+    expect(animate).not.toHaveBeenCalled();
   });
 });
 

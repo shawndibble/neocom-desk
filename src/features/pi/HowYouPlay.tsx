@@ -264,7 +264,7 @@ export function HowYouPlay(props: HowYouPlayProps) {
             </span>
           ) : (
             <span className="flex items-center gap-1.5">
-              <span className="text-[0.8125rem] tabular-nums">
+              <span className="text-xs tabular-nums">
                 {t('piAdvisor.customsRatePercent', { percent: props.customsPercent })}
               </span>
               <button

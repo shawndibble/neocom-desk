@@ -15,6 +15,7 @@
 import { useMemo, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
+import { useUrlSort } from '@/lib/useUrlState';
 import {
   DataTable,
   EmptyState,
@@ -118,6 +119,9 @@ export function CorpRosterStats({
   );
 }
 
+/** Longest silence first — the view's whole point (see the module note). */
+const ROSTER_SORT = { columnId: 'lastSeen', direction: 'desc' } as const;
+
 export function CorpRosterTable({
   rows,
   rowContextMenu,
@@ -188,6 +192,12 @@ export function CorpRosterTable({
   // `corpMemberLeft` deliberately has no highlight — that member is gone from
   // this table, so there would be nothing to scroll to.
   const highlightedMemberId = useHighlightParam();
+  // In the URL (ADR 0015) as `?sort=`; the one table on `/corp/members`.
+  const sortProps = useUrlSort(
+    'sort',
+    ROSTER_SORT,
+    columns.map((column) => column.id)
+  );
 
   if (rows.length === 0) {
     return <EmptyState title={t('corp.members.empty')} hint={t('corp.members.emptyHint')} />;
@@ -202,7 +212,7 @@ export function CorpRosterTable({
       highlightRowKey={highlightedMemberId}
       label={t('corp.members.tableLabel')}
       density="compact"
-      defaultSort={{ columnId: 'lastSeen', direction: 'desc' }}
+      {...sortProps}
     />
   );
 }

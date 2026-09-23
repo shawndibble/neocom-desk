@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -617,6 +617,58 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
 
     expect(screen.getByText('Widget Alpha')).toBeInTheDocument();
     expect(screen.queryByText('Widget Gamma')).not.toBeInTheDocument();
+  });
+
+  it('keeps the Status filter in the URL, so a reload reopens it, and an untouched filter leaves the query empty', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    server.use(
+      http.get(jobsUrl(), () =>
+        HttpResponse.json([
+          manufacturingJob({
+            job_id: 1,
+            blueprint_type_id: 100,
+            product_type_id: 200,
+            end_date: new Date(NOW.getTime() + 30 * 60_000).toISOString(),
+          }),
+          manufacturingJob({
+            job_id: 2,
+            blueprint_type_id: 300,
+            product_type_id: undefined,
+            end_date: new Date(NOW.getTime() + 5 * 60 * 60_000).toISOString(),
+          }),
+        ])
+      )
+    );
+    const user = userEvent.setup();
+    let search = '';
+    function SearchProbe() {
+      search = useLocation().search;
+      return null;
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/industry/plans?jobs.status=completingSoon']}>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+        <SearchProbe />
+      </MemoryRouter>
+    );
+
+    await expandJobs(user);
+    expect(screen.getByText('Widget Alpha')).toBeInTheDocument();
+    expect(screen.queryByText('Widget Gamma')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^Status/ }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Completing soon' }));
+    await user.keyboard('{Escape}');
+
+    expect(await screen.findByText('Widget Gamma')).toBeInTheDocument();
+    expect(search).toBe('');
   });
 });
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { create } from 'zustand';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import '@/i18n';
@@ -117,8 +118,7 @@ const SNAPSHOT: MarketSnapshot = {
 const baseArgs: Omit<UseComparedBuildResultsArgs, 'plans' | 'catalog'> = {
   pi: null,
   ownedBlueprints: [],
-  skills: {},
-  implantBonusPct: 0,
+  modifiers: NO_CHARACTER_MODIFIERS,
 };
 
 beforeEach(() => {

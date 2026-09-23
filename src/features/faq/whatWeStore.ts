@@ -86,6 +86,7 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
       { id: 'esi', labelKey: 'settings.faq.store.local.esi' },
       { id: 'corp', labelKey: 'settings.faq.store.local.corp' },
       { id: 'market', labelKey: 'settings.faq.store.local.market' },
+      { id: 'miningHistory', labelKey: 'settings.faq.store.local.miningHistory' },
       {
         id: 'login',
         labelKey: 'settings.faq.store.local.login',

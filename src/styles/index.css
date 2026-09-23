@@ -326,6 +326,9 @@
       flex: 1 1 0;
       min-width: 0;
       padding: 0;
+      /* A size step above the meta line's 0.6875rem — this is the card's
+         title, not just another field. */
+      font-size: 0.8125rem;
     }
 
     /* Undoes the decorative corner's absolute pin: here it is content, and
@@ -339,6 +342,9 @@
       text-align: right;
       white-space: nowrap;
       font-weight: 700;
+      /* The card's headline figure — a size step above the title, two above
+         the meta line, so it reads as the number the whole card is for. */
+      font-size: 0.9375rem;
     }
 
     .dt-stack.dt-stack-dense td.dt-meta {
@@ -349,6 +355,21 @@
       font-size: 0.6875rem;
       line-height: 1rem;
       color: var(--color-text-dim);
+    }
+
+    /* A meta cell's own content can be a control (`PriceSourceTag`'s
+       tooltip button) rather than bare text — its border/padding/background
+       read fine as a standalone pill in the labelled card or the desktop
+       table, but stacked inline with three or four `·`-separated fields it
+       is both too wide (crowds the line into wrapping) and visually heavier
+       than its neighbours despite matching their font size. Strip the
+       button chrome down to plain colored text here; the per-source color
+       class it already carries still says which source it is. */
+    .dt-stack.dt-stack-dense td.dt-meta button {
+      border: none;
+      padding: 0;
+      background: none;
+      border-radius: 0;
     }
 
     /* The separator and the affix share the one pseudo-element a cell has

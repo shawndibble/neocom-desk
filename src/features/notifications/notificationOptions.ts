@@ -45,25 +45,26 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   newMail: '/mail',
   newCalendarEvent: '/calendar',
   calendarEventStarting: '/calendar',
-  // `?tab=` because Search, not History, is the page's default tab — and this
-  // alert is about a row in *History*. `notificationUrlForSubject` then adds
-  // `?highlight=`, which `useHighlightParam` spends on arrival whether or not
-  // a row matched; landing on the wrong tab would burn it for nothing.
-  contractAccepted: '/contracts?tab=history',
+  // The explicit History path because Search, not History, is the page's
+  // default tab — and this alert is about a row in *History*.
+  // `notificationUrlForSubject` then adds `?highlight=`, which
+  // `useHighlightParam` spends on arrival whether or not a row matched;
+  // landing on the wrong tab would burn it for nothing.
+  contractAccepted: '/contracts/history',
   // Same destination as acceptance (issue #1091) — both are about a row in
   // History, just a later transition of the same contract.
-  contractCompleted: '/contracts?tab=history',
-  contractFailed: '/contracts?tab=history',
-  // `?tab=` deep-links straight to the tab that actually shows the event,
-  // not just the page — `Wallet.tsx` reads it once on mount.
-  walletBalanceChanged: '/wallet?tab=journal',
+  contractCompleted: '/contracts/history',
+  contractFailed: '/contracts/history',
+  // The tab is a path segment (ADR 0015) — this lands straight on the tab
+  // that actually shows the event, not just the page.
+  walletBalanceChanged: '/wallet/journal',
   // The *history*, not Open Orders: a filled order has left the open list, so
   // the tab this used to land on is the one place the thing it is telling you
   // about is guaranteed not to be. Transactions is where the fill itself is
   // written down — what sold, how many, for how much, to whom.
   // `notificationUrlForSubject` adds `?highlight=` where the fire knows its
   // subject, which pulses that row on arrival.
-  marketOrderFilled: '/market?section=transactions',
+  marketOrderFilled: '/market/history/transactions',
   // ~100 EVE-native types (issue #274), most with no corresponding page in
   // the app. `/alerts` is a deliberate choice for this event rather than an
   // inherited default — and now a real destination rather than a shrug: the
@@ -82,7 +83,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // item-selection param (`engine/market/urlState.ts`'s `buildMarketParams`),
   // not `HIGHLIGHT_PARAM`: Market Browser selects an item by that param on
   // load rather than pulsing a table row.
-  priceAlertTriggered: '/market',
+  priceAlertTriggered: '/market/browser',
 };
 
 export const NOTIFICATION_FALLBACK_ROUTE = '/alerts';

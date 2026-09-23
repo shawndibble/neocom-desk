@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import {
   autoBuildHere,
   facilityContextForNode,
@@ -62,7 +63,7 @@ const ctx: MakeOrBuyContext = {
   systemCostIndex: 0.05,
   adjustedPrices: { 34: 1, 499: 1, 500: 1, 501: 1 },
   materialPrices: { 34: 1, 499: 500, 500: 1000, 501: 2000, 502: 5000 },
-  skills: {},
+  modifiers: NO_CHARACTER_MODIFIERS,
 };
 
 describe('autoBuildHere', () => {
@@ -345,7 +346,7 @@ describe('autoBuildHere', () => {
       systemCostIndex: 0.05,
       adjustedPrices: { 34: 4 },
       materialPrices: { 34: 5, 9840: 0 },
-      skills: {},
+      modifiers: NO_CHARACTER_MODIFIERS,
     };
 
     // Reference per-unit build costs at the two scales `autoBuildHere` could

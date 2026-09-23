@@ -274,6 +274,47 @@ describe('Mail', () => {
     expect(screen.queryByText('No mail cached')).not.toBeInTheDocument();
   });
 
+  it('keeps search and hide-read in the URL, and restores them on a fresh visit', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    await screen.findByText('Fleet up!');
+
+    await user.type(screen.getByRole('searchbox', { name: /search/i }), 'fleet');
+    await waitFor(() => expect(window.location.search).toContain('search=fleet'));
+    await user.click(screen.getByRole('button', { name: 'Hide read' }));
+    await waitFor(() => expect(window.location.search).toContain('hideRead=1'));
+    expect(screen.queryByText('Market report')).not.toBeInTheDocument();
+
+    unmount();
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    expect(screen.getByRole('searchbox', { name: /search/i })).toHaveValue('fleet');
+    expect(screen.getByRole('button', { name: 'Hide read' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.queryByText('Market report')).not.toBeInTheDocument();
+  });
+
+  it('applies a restored search filter as soon as data loads, without an unfiltered flash', async () => {
+    window.history.pushState({}, '', '/mail?search=market');
+    render(<App />);
+    await screen.findByText('Market report');
+    expect(screen.queryByText('Fleet up!')).not.toBeInTheDocument();
+  });
+
+  it('omits default search/hide-read from the URL and ignores a garbage hideRead value', async () => {
+    window.history.pushState({}, '', '/mail?hideRead=garbage');
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    expect(screen.getByRole('button', { name: 'Hide read' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(screen.getByText('Market report')).toBeInTheDocument();
+    expect(window.location.search).not.toContain('search=');
+  });
+
   it('gives a row its folder and unread state in words, not colour alone', async () => {
     render(<App />);
     await screen.findByText('Fleet up!');

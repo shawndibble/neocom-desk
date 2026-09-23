@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { IconButton } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { SKILL_IDS, type SkillLevels } from '@/engine/industry/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import { formatIsk } from '@/lib/isk';
 import type { ProductionRunSummary } from './productionRunSummary';
 import { RealizedProfitBreakdown } from './RealizedProfitBreakdown';
@@ -10,6 +11,8 @@ interface RealizedProfitCellProps {
   row: ProductionRunSummary;
   label: string;
   skills: SkillLevels;
+  /** The standing the row's own `profit` was already computed with (issue #1238) — for the breakdown's display only. */
+  standing?: ResolvedStandings;
 }
 
 /**
@@ -19,7 +22,7 @@ interface RealizedProfitCellProps {
  * null, so there is nothing realized yet to explain and the trigger is
  * withheld rather than shown disabled.
  */
-export function RealizedProfitCell({ row, label, skills }: RealizedProfitCellProps) {
+export function RealizedProfitCell({ row, label, skills, standing }: RealizedProfitCellProps) {
   const [open, setOpen] = useState(false);
   const value = formatIsk(row.profit.profit);
 
@@ -41,6 +44,7 @@ export function RealizedProfitCell({ row, label, skills }: RealizedProfitCellPro
         profit={row.profit}
         accountingLevel={skills[SKILL_IDS.accounting] ?? 0}
         brokerRelationsLevel={skills[SKILL_IDS.brokerRelations] ?? 0}
+        standing={standing}
       />
     </span>
   );

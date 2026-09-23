@@ -255,7 +255,7 @@ beforeEach(async () => {
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
-  window.history.pushState({}, '', '/industry?tab=sourcing');
+  window.history.pushState({}, '', '/industry/sourcing');
 });
 
 describe('BpcSourcingPanel', () => {
@@ -354,8 +354,46 @@ describe('BpcSourcingPanel', () => {
     render(<App />);
 
     const tab = await screen.findByRole('tab', { name: 'BPC Search' });
+    expect(window.location.pathname).toBe('/industry/sourcing');
     expect(tab).toHaveAttribute('aria-selected', 'true');
     expect(await screen.findByRole('table', { name: 'BPC Search' })).toBeInTheDocument();
+  });
+
+  it('keeps the search and the picked blueprint in the URL, so a reload reopens them', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, typeId: 638 }),
+        row({ contractId: 2, typeId: 638 }),
+        row({ contractId: 3, typeId: 870 }),
+      ])
+    );
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    await screen.findByRole('table', { name: 'BPC Search' });
+
+    await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+    const suggestions = screen.getByRole('list', { name: 'Matching blueprints' });
+    await user.click(within(suggestions).getByRole('button'));
+
+    const params = new URLSearchParams(window.location.search);
+    expect(window.location.pathname).toBe('/industry/sourcing');
+    expect(params.get('sourcing.type')).toBe('638');
+    expect(params.get('sourcing.q')).toBe('Rifter Blueprint');
+
+    unmount();
+    render(<App />);
+    expect(await screen.findByText('2 offers on contract')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search blueprint name…')).toHaveValue('Rifter Blueprint');
+  });
+
+  it('opens pinned to a blueprint from a "search BPC Sourcing" link', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 1, typeId: 638 }), row({ contractId: 2, typeId: 870 })])
+    );
+    window.history.pushState({}, '', '/industry/sourcing?sourcing.type=638');
+    render(<App />);
+
+    expect(await screen.findByText('1 offer on contract')).toBeInTheDocument();
   });
 
   it('suggests matching blueprints as you type, with how many offers each has', async () => {
@@ -671,6 +709,11 @@ describe('BpcSourcingPanel source multiselect', () => {
     await user.click(screen.getByRole('button', { name: 'Contracts' }));
 
     expect(screen.getByText('No BPC listings match your filters.')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Clear the item search or widen the region, ME/TE/runs, price, source and space filters.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('shows a dedicated empty state when every source is deselected', async () => {

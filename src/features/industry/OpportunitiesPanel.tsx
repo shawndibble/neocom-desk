@@ -11,6 +11,7 @@
  * account-level alt-linking, just this feature's own scoped selector.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -34,35 +35,32 @@ import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import type { SkillLevels } from '@/engine/industry/types';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import {
-  useResolvedCharacterFilter,
-  type CharacterFilterValue,
-} from '@/features/character/characterFilterValue';
+import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { nameForType, type BlueprintCatalog } from './blueprintCatalog';
 import { loadCharacterBlueprints } from './data';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { formatPercent } from './format';
 import { MobileOpportunityList } from './MobileOpportunityList';
+import { OPPORTUNITIES_DEFAULT_SORT, OPPORTUNITIES_SORT_KEY } from './opportunitiesUrl';
 import { ORDER_DEPTH_TONE, unitMargin } from './opportunityMetrics';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { buildOpportunityCandidates, type OpportunityRow } from './opportunities';
 import { SkillGateMarker } from './SkillGateMarker';
 import { useOpportunities } from './useOpportunities';
+import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
+import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { useAssumedMe } from './assumedMe';
 
 interface OpportunitiesPanelProps {
   catalog: BlueprintCatalog;
   pi: PiData | null;
-  skills: SkillLevels;
-  /** The active Character's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
-  implantBonusPct: number;
+  modifiers: CharacterModifiers;
   facilityDefaults: ActivityFacilityDefaults;
   activeCharacterId: number;
   ownedStockSnapshot: OwnedStockSnapshot;
@@ -77,11 +75,14 @@ function numericCell(
   return value === null ? unknown : format(value);
 }
 
+/** `'current'`, not the synced default: this panel has always opened on the active pilot. */
+const CHARACTER_FILTER = characterFilterParam('current');
+const OPPORTUNITIES_CHARACTERS_KEY = 'opps.chars';
+
 export function OpportunitiesPanel({
   catalog,
   pi,
-  skills,
-  implantBonusPct,
+  modifiers,
   facilityDefaults,
   activeCharacterId,
   ownedStockSnapshot,
@@ -101,7 +102,10 @@ export function OpportunitiesPanel({
     [allCharacters]
   );
 
-  const [characterFilter, setCharacterFilter] = useState<CharacterFilterValue>('current');
+  const [characterFilter, setCharacterFilter] = useUrlParam(
+    OPPORTUNITIES_CHARACTERS_KEY,
+    CHARACTER_FILTER
+  );
   // `useResolvedCharacterFilter`, not the raw `resolveCharacterFilter`: this
   // panel's resolved filter feeds `characterIds` and through it the
   // blueprint-loading effect's dep array below, and the raw function
@@ -176,8 +180,7 @@ export function OpportunitiesPanel({
     pi,
     hub: DEFAULT_TRADE_HUB,
     facilityDefaults,
-    skills,
-    implantBonusPct,
+    modifiers,
     ownedStockSnapshot,
     ownedByCharacter,
     assumedMe,
@@ -377,6 +380,11 @@ export function OpportunitiesPanel({
       ),
     },
   ];
+  const sortProps = useUrlSort(
+    OPPORTUNITIES_SORT_KEY,
+    OPPORTUNITIES_DEFAULT_SORT,
+    columns.map((column) => column.id)
+  );
 
   const meta = (
     <span className="flex flex-wrap items-center gap-2">
@@ -435,7 +443,7 @@ export function OpportunitiesPanel({
             rows={rows}
             rowKey={(row) => row.candidate.id}
             label={t('industry.opportunitiesTitle')}
-            defaultSort={{ columnId: 'iskPerHour', direction: 'desc' }}
+            {...sortProps}
           />
         </div>
       ) : (

@@ -60,6 +60,17 @@ export async function loadStationSystemId(stationId: number): Promise<number | n
 }
 
 /**
+ * Station's owning corporation id, for broker-fee standings resolution
+ * (issue #1238). Not in the SDE snapshot — `staStations.csv` has no
+ * corporation column — so this always reaches `GET /universe/stations/{id}`,
+ * cached the same as `loadStation`'s other fields. Null when unresolvable
+ * (offline + uncached, or ESI omits `owner`).
+ */
+export async function loadStationOwner(stationId: number): Promise<number | null> {
+  return (await loadStation(stationId))?.owner ?? null;
+}
+
+/**
  * The same three fields `loadStructureSummary` returns, for an NPC station.
  *
  * The only one of these that needs the snapshot's `typeId`, and so the only

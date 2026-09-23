@@ -611,13 +611,13 @@ describe('PlanetaryIndustry', () => {
     await user.click(screen.getByRole('tab', { name: 'Plan' }));
 
     await screen.findByRole('heading', { name: 'Verdict' });
-    expect(window.location.search).toContain('tab=plan');
+    expect(window.location.pathname).toBe('/planetary-industry/plan');
     // The colony surface is a peer view, not a section below the planner.
     expect(screen.queryByRole('heading', { name: /Jita IV/ })).not.toBeInTheDocument();
   });
 
   it('restores the tab and the planned commodity from the URL alone', async () => {
-    window.history.pushState({}, '', `/planetary-industry?tab=plan&type=${BROADCAST_NODE}`);
+    window.history.pushState({}, '', `/planetary-industry/plan?type=${BROADCAST_NODE}`);
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Verdict' });
@@ -629,8 +629,8 @@ describe('PlanetaryIndustry', () => {
     // Broadcast Node, in the test above, is also `PlanPanel`'s own fallback
     // for an unrecognised `type`, so only a commodity that isn't the default
     // proves the param is read at all. This is the far end of the item
-    // context menu's "PI Plan" link — the two must agree on `?tab=plan&type=`.
-    window.history.pushState({}, '', `/planetary-industry?tab=plan&type=${TRANSMITTER}`);
+    // context menu's "PI Plan" link — the two must agree on `/plan?type=`.
+    window.history.pushState({}, '', `/planetary-industry/plan?type=${TRANSMITTER}`);
     render(<App />);
 
     await screen.findByRole('heading', { name: 'Verdict' });
@@ -638,14 +638,14 @@ describe('PlanetaryIndustry', () => {
   });
 
   it('falls back to the colony view rather than crashing on a tab it does not know', async () => {
-    window.history.pushState({}, '', '/planetary-industry?tab=nonsense&type=not-a-number');
+    window.history.pushState({}, '', '/planetary-industry/nonsense?type=not-a-number');
     render(<App />);
     await colonyPanelFor(/Jita IV/);
     expect(screen.getByRole('tab', { name: 'Colonies' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('puts the verdict before the chain table, so the answer is not below the tree', async () => {
-    window.history.pushState({}, '', '/planetary-industry?tab=plan');
+    window.history.pushState({}, '', '/planetary-industry/plan');
     render(<App />);
 
     const verdict = await screen.findByRole('heading', { name: 'Verdict' });

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { CachedResult, StatusResult } from '@/esi/cache';
@@ -80,8 +80,19 @@ function renderAssets(initialEntry = '/corp/assets') {
         <Route path="/corp/assets" element={<CorpAssets />} />
         <Route path="/corp/assets/*" element={<CorpAssets />} />
       </Routes>
+      <LocationProbe />
     </MemoryRouter>
   );
+}
+
+/** Prints the router's current location, so a test can read what the page wrote. */
+function LocationProbe() {
+  const location = useLocation();
+  return <div data-testid="location">{`${location.pathname}${location.search}`}</div>;
+}
+
+function currentLocation(): string {
+  return screen.getByTestId('location').textContent ?? '';
 }
 
 /** Renders, then waits for the division list to have replaced the loading spinner. */
@@ -364,6 +375,65 @@ describe('search (issue #779)', () => {
 
     await waitFor(() => expect(screen.queryByText('Tritanium')).not.toBeInTheDocument());
     expect(screen.getByRole('link', { name: /Division 1/ })).toBeInTheDocument();
+  });
+});
+
+describe('search in the URL (issue #1306)', () => {
+  beforeEach(() => {
+    mocked.loadCorporationAssets.mockResolvedValue(
+      cached([
+        asset({ item_id: 1, type_id: 34, location_flag: 'CorpSAG1' }),
+        asset({ item_id: 2, type_id: 35, location_flag: 'CorpSAG7' }),
+      ])
+    );
+    mocked.loadCorpAssetLabels.mockResolvedValue({
+      types: new Map([
+        [34, 'Tritanium'],
+        [35, 'Pyerite'],
+      ]),
+      locations: new Map([[60003760, 'Jita IV - Moon 4']]),
+    });
+  });
+
+  it('keeps an untouched view out of the URL', async () => {
+    await divisionList();
+    expect(currentLocation()).toBe('/corp/assets');
+  });
+
+  it('applies ?q= on arrival', async () => {
+    renderAssets('/corp/assets?q=tri');
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search items…')).toHaveValue('tri');
+    expect(screen.queryByText('Pyerite')).not.toBeInTheDocument();
+  });
+
+  it('composes with a drill-down path: the path stays, the search reports across divisions', async () => {
+    renderAssets('/corp/assets/7?q=tri');
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(currentLocation()).toBe('/corp/assets/7?q=tri');
+  });
+
+  it('keeps the query on drill-down links', async () => {
+    renderAssets('/corp/assets?q=tri');
+    expect(await screen.findByRole('link', { name: /Tritanium/ })).toHaveAttribute(
+      'href',
+      expect.stringMatching(/\?q=tri$/)
+    );
+  });
+
+  it('writes typed text to the query without touching the drill-down path', async () => {
+    renderAssets('/corp/assets/7');
+    const search = await screen.findByPlaceholderText('Search items…');
+    await userEvent.setup().type(search, 'tri');
+    await waitFor(() => expect(currentLocation()).toBe('/corp/assets/7?q=tri'));
+  });
+
+  it('removes ?q= when the search is cleared', async () => {
+    renderAssets('/corp/assets/7?q=tri');
+    await screen.findByText('Tritanium');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Clear search' }));
+    await waitFor(() => expect(currentLocation()).toBe('/corp/assets/7'));
+    expect(await screen.findByText('Pyerite')).toBeInTheDocument();
   });
 });
 

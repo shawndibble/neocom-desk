@@ -195,6 +195,30 @@ describe('Calendar', () => {
     expect(screen.getByRole('list', { name: /coming up/i })).toBeInTheDocument();
   });
 
+  it('keeps the shown month in the URL, and restores it on a fresh visit', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    await screen.findByText('Fleet Op');
+
+    await user.click(screen.getByRole('button', { name: 'Next month' }));
+    await waitFor(() => expect(window.location.search).toMatch(/anchor=\d{4}-\d{2}-\d{2}/));
+    const monthLabel = screen.getByText(/\d{4}/, { selector: 'span.hidden' });
+    const shownMonth = monthLabel.textContent;
+
+    unmount();
+    render(<App />);
+    await screen.findByText('Fleet Op');
+    expect(screen.getByText(shownMonth as string)).toBeInTheDocument();
+  });
+
+  it('falls back to today rather than crashing on a garbage anchor value', async () => {
+    window.history.pushState({}, '', '/calendar?anchor=not-a-date');
+    render(<App />);
+    // Falls back to today's grid, where the fixture event actually lands —
+    // a garbage anchor parsed literally would show an empty, unrelated month.
+    expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
+  });
+
   /** The redesign's whole premise: the rail is not a calendar feed, it is every clock. */
   it('merges another clock source into the same list', async () => {
     server.use(http.get(`${ESI}/industry/jobs`, () => HttpResponse.json(jobs)));

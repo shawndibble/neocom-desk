@@ -406,12 +406,12 @@ describe('Overview board', () => {
     // own, read it as a reformatting, not as a routing bug.
     expect(await within(card).findByRole('link', { name: /undercut/i })).toHaveAttribute(
       'href',
-      `/market?section=orders&problem=undercutStation&problem=undercutSystem&problem=undercutRegion&character=${CHAR_ID}`
+      `/market/orders?orders.problems=undercutStation%2CundercutSystem%2CundercutRegion&orders.characters=${CHAR_ID}`
     );
     // The header's own link stays the whole page, the way every other card's does.
     expect(within(card).getByRole('link', { name: /open/i })).toHaveAttribute(
       'href',
-      '/market?section=orders'
+      '/market/orders'
     );
   });
 
@@ -561,8 +561,8 @@ describe('Overview board', () => {
     await screen.findByText(/1,234,567\.89/);
 
     const destinations: [RegExp, string][] = [
-      [/open orders/i, '/market?section=orders'],
-      [/mining tax/i, '/moon-mining'],
+      [/open orders/i, '/market/orders'],
+      [/mining tax/i, '/mining'],
       [/planetary industry/i, '/planetary-industry'],
       [/industry jobs/i, '/industry'],
     ];

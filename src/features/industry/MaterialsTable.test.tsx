@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -930,7 +931,7 @@ describe('MaterialsTable build-here control', () => {
     security: 'highsec' as const,
     systemCostIndex: 0.05,
     adjustedPrices: {},
-    skills: {},
+    modifiers: NO_CHARACTER_MODIFIERS,
   };
 
   /** A real resolved job, flattened the way `materialTableRows` hands rows to the table. */
@@ -1253,7 +1254,7 @@ describe('MaterialsTable skill-gate marker (issue #1015)', () => {
             security: 'highsec' as const,
             systemCostIndex: 0.05,
             adjustedPrices: {},
-            skills: {},
+            modifiers: NO_CHARACTER_MODIFIERS,
           },
         }
       );

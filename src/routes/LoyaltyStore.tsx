@@ -10,6 +10,7 @@
  */
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -36,6 +37,8 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { boolParam, textParam } from '@/lib/urlState';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import { useMarketHub } from '@/features/market/hub';
@@ -243,7 +246,7 @@ function OfferDetail({
       </dl>
 
       {!profit.affordableLp && (
-        <p className="text-xs text-text-faint">
+        <p className="text-xs text-text-dim">
           {t('loyaltyStore.needMoreLp', {
             amount: (row.offer.lp_cost - playerLp).toLocaleString(),
           })}
@@ -273,9 +276,7 @@ function OfferDetail({
             selected={useOwnMaterials}
             onToggle={onToggleUseOwnMaterials}
           />
-          <p className="text-[0.6875rem] text-text-faint">
-            {t('loyaltyStore.useOwnMaterialsHint')}
-          </p>
+          <p className="text-[0.6875rem] text-text-dim">{t('loyaltyStore.useOwnMaterialsHint')}</p>
           <div className="overflow-x-auto">
             <DataTable
               label={t('loyaltyStore.materials')}
@@ -291,6 +292,20 @@ function OfferDetail({
     </div>
   );
 }
+
+/**
+ * The filter row's three fields, in the URL (ADR 0015, issue #1302): all
+ * three as one `useUrlParams` group, so a click and a keystroke in the same
+ * update write together. `affordableOnly` defaults `true` — the offer list's
+ * own opening state — so it is the one omitted from the URL when left alone.
+ */
+const FILTER_PARAMS = {
+  search: textParam(),
+  affordableOnly: boolParam(true),
+  blueprintsOnly: boolParam(false),
+};
+
+const OFFERS_SORT = { columnId: 'iskPerLp', direction: 'desc' } as const;
 
 export function LoyaltyStore() {
   const { t } = useTranslation();
@@ -326,9 +341,8 @@ export function LoyaltyStore() {
     toggleUseOwnMaterials,
   } = useLoyaltyStoreOffers(corporationId);
 
-  const [search, setSearch] = useState('');
-  const [affordableOnly, setAffordableOnly] = useState(true);
-  const [blueprintsOnly, setBlueprintsOnly] = useState(false);
+  const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
+  const { search, affordableOnly, blueprintsOnly } = filterParams;
   const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
 
@@ -370,11 +384,11 @@ export function LoyaltyStore() {
 
   function viewInMarket(typeId: number) {
     const params = buildMarketParams(typeId, { mode: 'hub', hubId: hub.id });
-    navigate(`/market?${new URLSearchParams(params).toString()}`);
+    navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
   }
 
   function planInIndustry(productTypeId: number) {
-    navigate(`/industry?product=${productTypeId}`);
+    navigate(`${industryTabHref('plans')}?product=${productTypeId}`);
   }
 
   function rowContextMenu(row: LoyaltyOfferRow, tr: ReactElement) {
@@ -418,7 +432,7 @@ export function LoyaltyStore() {
               </span>
             )}
           </span>
-          <span className="text-[0.6875rem] text-text-faint">
+          <span className="text-[0.6875rem] text-text-dim">
             {row.offer.lp_cost.toLocaleString()} LP +{' '}
             <IskAmount value={row.offer.isk_cost} revealOn="longPress" decimals={0} />
           </span>
@@ -448,6 +462,11 @@ export function LoyaltyStore() {
       render: (row) => (row.profit.iskPerLp === null ? '—' : row.profit.iskPerLp.toFixed(1)),
     },
   ];
+  const offersSortProps = useUrlSort(
+    'sort',
+    OFFERS_SORT,
+    columns.map((column) => column.id)
+  );
 
   const list = (
     <Panel
@@ -471,7 +490,8 @@ export function LoyaltyStore() {
           rows={filteredRows}
           rowKey={(row) => row.offer.offer_id}
           density="compact"
-          defaultSort={{ columnId: 'iskPerLp', direction: 'desc' }}
+          sort={offersSortProps.sort}
+          onSortChange={offersSortProps.onSortChange}
           onRowClick={selectRow}
           rowContextMenu={rowContextMenu}
           rowClassName={(row) =>
@@ -495,7 +515,7 @@ export function LoyaltyStore() {
       onPlanInIndustry={planInIndustry}
     />
   ) : (
-    <p className="p-4 text-xs text-text-faint">{t('loyaltyStore.selectPrompt')}</p>
+    <p className="p-4 text-xs text-text-dim">{t('loyaltyStore.selectPrompt')}</p>
   );
 
   return (
@@ -505,7 +525,7 @@ export function LoyaltyStore() {
           `align-items: stretch` would blow the control's intrinsic width out
           to the full page — a full-width bordered bar above the header. */}
       <Link to="/wallet" className={buttonClassName({ size: 'sm', className: 'self-start' })}>
-        {'←'} {t('loyaltyStore.back')}
+        {t('loyaltyStore.back')}
       </Link>
 
       <PageHeader
@@ -534,15 +554,17 @@ export function LoyaltyStore() {
           // roll back — the draft was local until this point.
           if (next.hubId !== hubId) void setHubId(next.hubId);
           if (next.priceBasis !== priceBasis) void setPriceBasis(next.priceBasis);
-          setAffordableOnly(next.affordableOnly);
-          setBlueprintsOnly(next.blueprintsOnly);
+          setFilterParams({
+            affordableOnly: next.affordableOnly,
+            blueprintsOnly: next.blueprintsOnly,
+          });
         }}
         activeCount={(affordableOnly ? 1 : 0) + (blueprintsOnly ? 1 : 0)}
         search={
           <SearchInput
             placeholder={t('loyaltyStore.searchPlaceholder')}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => setFilterParams({ search: e.target.value })}
             className="min-w-40 flex-1"
           />
         }

@@ -184,10 +184,10 @@ describe('marketLinkParams', () => {
 
 describe('marketItemUrl', () => {
   it('serialises marketLinkParams to a /market path', () => {
-    expect(marketItemUrl(587, '?region=10000002')).toBe('/market?type=587&region=10000002');
+    expect(marketItemUrl(587, '?region=10000002')).toBe('/market/browser?type=587&region=10000002');
   });
 
   it('falls back to just the typeId when arriving with neither param', () => {
-    expect(marketItemUrl(587, '')).toBe('/market?type=587');
+    expect(marketItemUrl(587, '')).toBe('/market/browser?type=587');
   });
 });

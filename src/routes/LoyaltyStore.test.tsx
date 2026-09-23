@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useEffect } from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
@@ -233,6 +233,34 @@ describe('LoyaltyStore filters', () => {
       'false'
     );
   });
+
+  /**
+   * The three filters live in the URL now (issue #1302), so a reload or a
+   * pasted link reopens the same filtered view.
+   */
+  it('leaves the query string empty on a plain visit — every filter still on its default', () => {
+    renderStore();
+    expect(probe.search).toBe('');
+  });
+
+  it('writes the affordable-only toggle to the URL, omitted again once it is back on', async () => {
+    const user = userEvent.setup();
+    renderStore();
+
+    await user.click(screen.getByRole('button', { name: /Affordable/i }));
+    await waitFor(() => expect(probe.search).toContain('affordableOnly=0'));
+
+    await user.click(screen.getByRole('button', { name: /Affordable/i }));
+    await waitFor(() => expect(probe.search).toBe(''));
+  });
+
+  it('keeps the search box text in the URL, so a reload reopens the same filtered view', async () => {
+    const user = userEvent.setup();
+    renderStore();
+
+    await user.type(screen.getByPlaceholderText('Search offers'), 'plex');
+    await waitFor(() => expect(probe.search).toContain('search=plex'));
+  });
 });
 
 describe('LoyaltyStore item context menu (issue #716)', () => {
@@ -259,7 +287,7 @@ describe('LoyaltyStore item context menu (issue #716)', () => {
     fireEvent.contextMenu(row);
 
     await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
-    expect(probe.pathname).toBe('/market');
+    expect(probe.pathname).toBe('/market/browser');
     expect(probe.search).toContain('type=200');
   });
 
@@ -275,7 +303,7 @@ describe('LoyaltyStore item context menu (issue #716)', () => {
     expect(screen.getByRole('menuitem', { name: 'Build Plan' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
-    expect(probe.pathname).toBe('/market');
+    expect(probe.pathname).toBe('/market/browser');
     expect(probe.search).toContain('type=300');
     expect(probe.search).not.toContain('type=999');
   });

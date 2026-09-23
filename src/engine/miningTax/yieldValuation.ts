@@ -1,14 +1,14 @@
 import type { OreLine } from './types';
 import {
-  reprocessingEfficiency,
   reprocessingValue,
   reprocessingYield,
-  resolveReprocessingSkills,
-  type GeneralReprocessingSkills,
   type ReprocessingMaterial,
 } from '@/engine/industry/reprocessing';
-
-export type { GeneralReprocessingSkills };
+import {
+  baselineRefiningEfficiency,
+  refiningEfficiency,
+  type CharacterModifiers,
+} from '@/engine/industry/characterModifiers';
 
 /** One type's reprocessing yield, resolved from the SDE bake — same shape `appraisal.ts` uses. */
 export interface YieldReprocessingEntry {
@@ -84,22 +84,32 @@ export interface EntryValuation {
  * contributes zero to that side's value and flips `pricedAll` false, rather
  * than throwing or silently treating the ore as worthless in the total.
  *
- * `trained` resolves each line's own specialisation skill (issue #1058): an
- * entry mining both ore and ice in one day refines each under its own
- * skill, not one shared level, so this cannot be folded into `skills`.
+ * Each line refines under its own specialisation skill (issue #1058): an
+ * entry mining both ore and ice in one day resolves each separately from
+ * the same `modifiers`.
  */
+export interface ValueMiningYieldOptions {
+  /**
+   * False when the caller (issue #1281's "Show refining" switch) never
+   * loaded reprocessing recipes or material prices at all, so a line having
+   * neither must not read as unpriced the way a genuinely missing recipe
+   * does. Default true — every existing caller keeps today's behaviour.
+   */
+  includeRefining?: boolean;
+}
+
 export function valueMiningYield(
   oreLines: readonly OreLine[],
   rawUnitPrices: ReadonlyMap<number, number>,
   reprocessingByTypeId: ReadonlyMap<number, YieldReprocessingEntry | undefined>,
-  skills: GeneralReprocessingSkills,
-  trained: ReadonlyMap<number, { level: number }>,
-  materialPrices: Readonly<Record<number, number>>
+  modifiers: CharacterModifiers,
+  materialPrices: Readonly<Record<number, number>>,
+  { includeRefining = true }: ValueMiningYieldOptions = {}
 ): EntryValuation {
   // The baseline `refineBasisHint` states — general skills only, no
   // specialisation, since no single number can honestly speak for lines
   // resolved against different specialisation skills.
-  const efficiency = reprocessingEfficiency({ ...skills, specialisationLevel: 0 });
+  const efficiency = baselineRefiningEfficiency(modifiers);
   let rawValue = 0;
   let refineValue = 0;
   let pricedAll = true;
@@ -111,15 +121,13 @@ export function valueMiningYield(
     if (lineRawValue === 0) pricedAll = false;
     rawValue += lineRawValue;
 
-    const reprocessing = reprocessingByTypeId.get(line.typeId);
+    const reprocessing = includeRefining ? reprocessingByTypeId.get(line.typeId) : undefined;
     let lineRefineValue = 0;
     let refineOutputs: ReprocessingMaterial[] = [];
     let batches = 0;
     let unitsLeftOver = 0;
     if (reprocessing) {
-      const lineEfficiency = reprocessingEfficiency(
-        resolveReprocessingSkills(skills, reprocessing.specialisationSkillId, trained)
-      );
+      const lineEfficiency = refiningEfficiency(modifiers, reprocessing.specialisationSkillId);
       const yielded = reprocessingYield({
         portionSize: reprocessing.portionSize,
         materials: reprocessing.materials,
@@ -132,7 +140,7 @@ export function valueMiningYield(
       batches = yielded.batches;
       unitsLeftOver = yielded.unitsLeftOver;
       if (!value.pricedAll) pricedAll = false;
-    } else {
+    } else if (includeRefining) {
       pricedAll = false;
     }
     refineValue += lineRefineValue;
@@ -154,6 +162,6 @@ export function valueMiningYield(
     pricedAll,
     lines,
     efficiency,
-    implantBonusPct: skills.implantBonusPct ?? 0,
+    implantBonusPct: modifiers.refiningImplantPct,
   };
 }

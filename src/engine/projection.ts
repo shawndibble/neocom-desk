@@ -30,12 +30,13 @@
  *
  * The wording itself is not written here either: each `project*` takes the
  * owning domain's push renderer (`PushCopy`, declared beside that domain's
- * live wording in `features/notifications/domainCopy.ts`, issue #1249), so an
+ * live wording in `features/notifications/domainCopy.ts`, issue #1249, and
+ * named on each event's Event Entry, issue #1285), so an
  * event's poll and push copy sit side by side. Those renderers are plain
  * functions of their arguments — no i18next, no lookups — which keeps this
  * module as pure as before.
  *
- * 8 of the 17 Notification Events carry a timestamp fixed far enough in
+ * 8 of the 21 Notification Events carry a timestamp fixed far enough in
  * advance to be worth projecting; the rest are inherently "as it happens"
  * (new mail, a filled order, a wallet change) and have no seat here. EVE's
  * own notifications are mostly the same "as it happens" case — except a
@@ -72,10 +73,11 @@ export const romanLevel = (level: number): string => ROMAN[level - 1] ?? String(
  * push ahead of time and the alert arrives with the app closed. Everything
  * else is only observable by polling, which needs the app open.
  *
- * The union below is derived from this array rather than written twice: it is
- * the list Settings reads to mark which rows are genuinely push-delivered
- * (`NotificationsPanel.tsx`), and a second hand-maintained copy is exactly the
- * kind of drift that would put that badge on a row that cannot honour it.
+ * The union below is derived from this array rather than written twice. The
+ * feature layer's Event Entry catalog (`features/notifications/eventEntries.ts`,
+ * issue #1285) is typed against it per event: an id listed here must declare a
+ * push renderer there, and any other must declare none — so the two cannot
+ * drift, and Settings' Scheduled Push badge reads the entries.
  */
 export const PROJECTABLE_EVENT_IDS = [
   'skillLevelComplete',

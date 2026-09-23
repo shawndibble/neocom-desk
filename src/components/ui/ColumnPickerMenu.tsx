@@ -4,6 +4,8 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './DropdownMenu';
 import type { DataTableColumn } from './DataTable';
@@ -16,6 +18,13 @@ interface ColumnPickerMenuProps<Id extends string, Row> {
   /** Accessible name and tooltip text for the trigger — the picker itself is icon-only. */
   buttonLabel: string;
   menuTitle: string;
+  /**
+   * "Reset to default" action below a separator (issue #1282, Mining
+   * Overview's first consumer to need one — Characters' and BPC Search's
+   * pickers have no equivalent). Omitted entirely when `onReset` isn't given.
+   */
+  onReset?: () => void;
+  resetLabel?: string;
 }
 
 /**
@@ -35,6 +44,8 @@ export function ColumnPickerMenu<Id extends string, Row>({
   onToggle,
   buttonLabel,
   menuTitle,
+  onReset,
+  resetLabel,
 }: ColumnPickerMenuProps<Id, Row>) {
   const visibleSet = new Set(visible);
 
@@ -59,6 +70,12 @@ export function ColumnPickerMenu<Id extends string, Row>({
             {columnsById[id].header}
           </DropdownMenuCheckboxItem>
         ))}
+        {onReset && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onReset}>{resetLabel}</DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

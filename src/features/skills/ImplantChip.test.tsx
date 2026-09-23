@@ -20,7 +20,7 @@ describe('ImplantChip', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Ocular Filter - Basic/ }));
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/market?type=9899');
+    expect(screen.getByTestId('location')).toHaveTextContent('/market/browser?type=9899');
   });
 
   it('preserves an existing region param when clicked from inside /market', () => {
@@ -33,6 +33,8 @@ describe('ImplantChip', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Ocular Filter - Basic/ }));
 
-    expect(screen.getByTestId('location')).toHaveTextContent('/market?type=9899&region=10000002');
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/market/browser?type=9899&region=10000002'
+    );
   });
 });

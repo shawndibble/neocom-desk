@@ -13,6 +13,7 @@ import {
 import { findOwnedBlueprint } from '@/features/industry/data';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
+import { useTradeHubStandings } from '@/features/market/useTradeHubStandings';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import type { PlanIndexStats, PlanRollupStats } from '@/features/industry/BuildPlanList';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
@@ -47,10 +48,15 @@ import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import { useComparedBuildResults } from '@/features/industry/useComparedBuildResults';
 import { useRunCountsByPlan } from '@/features/industry/useRunCountsByPlan';
 import { computeGroupIndexStats } from '@/features/industry/groupIndexStats';
-import { readIndustryTab, type IndustryTab } from '@/features/industry/industryTabs';
+import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
+import { usePageTab } from '@/lib/usePageTab';
+import { useUrlParam } from '@/lib/useUrlState';
+import { boolParam } from '@/lib/urlState';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { loadMarketWideTrees } from '@/sde/loadSde';
 import type { MarketWideTreeMap } from '@/sde/types';
+
+const COMPARE_MODE = boolParam();
 
 /**
  * Build Plan manager index: create (via blueprint search)/duplicate/delete/
@@ -70,8 +76,7 @@ export function Industry() {
     ownedBlueprints,
     corpOwnedBlueprints,
     blueprintsNeedsReauth,
-    skills,
-    implantBonusPct,
+    modifiers,
     buildGroups,
     buildGroupsHydrated,
     setBuildGroups,
@@ -94,27 +99,7 @@ export function Industry() {
   }, []);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = readIndustryTab(searchParams.get('tab'));
-  // The picker/override modal's "search BPC Sourcing" action (issue #839)
-  // lands here via `/industry?tab=sourcing&bpcSearch=<typeID>`.
-  const bpcSearchParam = searchParams.get('bpcSearch');
-  const bpcSearchTypeId = bpcSearchParam === null ? null : Number(bpcSearchParam);
-  const setTab = useCallback(
-    (next: IndustryTab) => {
-      setSearchParams(
-        (previous) => {
-          const params = new URLSearchParams(previous);
-          // Plans is the default, so it stays out of the URL rather than
-          // leaving `?tab=plans` on every visit that never touched the strip.
-          if (next === 'plans') params.delete('tab');
-          else params.set('tab', next);
-          return params;
-        },
-        { replace: true }
-      );
-    },
-    [setSearchParams]
-  );
+  const [tab, setTab] = usePageTab(INDUSTRY_TABS);
 
   const plansQuery = useLiveQuery(async () => {
     if (activeCharacterId === null) return undefined;
@@ -141,8 +126,15 @@ export function Industry() {
   const [fitImportOpen, setFitImportOpen] = useState(false);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
 
-  const [compareMode, setCompareMode] = useState(false);
+  const [compareMode, setCompareMode] = useUrlParam('plans.compare', COMPARE_MODE);
   const [compareSelectedIds, setCompareSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  // Compare mode can also turn off from the URL (Back, a bare /industry
+  // link), not only the toggle — the ticked plans go with it either way.
+  const [prevCompareMode, setPrevCompareMode] = useState(compareMode);
+  if (compareMode !== prevCompareMode) {
+    setPrevCompareMode(compareMode);
+    if (!compareMode) setCompareSelectedIds(new Set());
+  }
   const [comparing, setComparing] = useState(false);
 
   const createPlan = useCallback(
@@ -280,14 +272,15 @@ export function Industry() {
       ),
     [plans, knownGroupIds]
   );
+  const tradeHubStandings = useTradeHubStandings(activeCharacterId);
   const groupedRows = useComparedBuildResults({
     plans: groupedPlans,
     catalog,
     pi,
     ownedBlueprints,
     corpOwnedBlueprints,
-    skills,
-    implantBonusPct,
+    modifiers,
+    tradeHubStandings,
     computeGroupResult: true,
   });
   const ungroupedRows = useComparedBuildResults({
@@ -296,8 +289,8 @@ export function Industry() {
     pi,
     ownedBlueprints,
     corpOwnedBlueprints,
-    skills,
-    implantBonusPct,
+    modifiers,
+    tradeHubStandings,
   });
   const runCounts = useRunCountsByPlan(activeCharacterId);
 
@@ -363,10 +356,7 @@ export function Industry() {
   }
 
   function toggleCompareMode() {
-    setCompareMode((wasOn) => {
-      if (wasOn) setCompareSelectedIds(new Set());
-      return !wasOn;
-    });
+    setCompareMode(!compareMode);
   }
 
   function toggleCompareSelected(id: string) {
@@ -490,14 +480,13 @@ export function Industry() {
       ) : (
         <>
           {tab === 'sourcing' ? (
-            <BpcSourcingPanel initialTypeId={bpcSearchTypeId} />
+            <BpcSourcingPanel />
           ) : tab === 'opportunities' ? (
             <div className="flex flex-col gap-4">
               <OpportunitiesPanel
                 catalog={catalog}
                 pi={pi}
-                skills={skills}
-                implantBonusPct={implantBonusPct}
+                modifiers={modifiers}
                 facilityDefaults={facilityDefaults}
                 activeCharacterId={activeCharacterId}
                 ownedStockSnapshot={workspace.ownedStockSnapshot}
@@ -507,7 +496,8 @@ export function Industry() {
                 hub={DEFAULT_TRADE_HUB}
                 trees={marketWideTrees}
                 catalog={catalog}
-                skills={skills}
+                modifiers={modifiers}
+                activeCharacterId={activeCharacterId}
                 onStartPlan={(entry) => {
                   // Distinct from the plain search-box create: picking a
                   // scan result is an explicit "go build this" choice, same
@@ -524,7 +514,7 @@ export function Industry() {
             <ProductionLogPanel
               characterId={activeCharacterId}
               catalog={catalog}
-              skills={skills}
+              skills={modifiers.skills}
               plans={plans}
               onOpenRun={openRunFromRecords}
             />
@@ -536,8 +526,8 @@ export function Industry() {
                 pi={pi}
                 ownedBlueprints={ownedBlueprints}
                 corpOwnedBlueprints={corpOwnedBlueprints}
-                skills={skills}
-                implantBonusPct={implantBonusPct}
+                modifiers={modifiers}
+                tradeHubStandings={tradeHubStandings}
                 onDone={exitCompare}
               />
             ) : (

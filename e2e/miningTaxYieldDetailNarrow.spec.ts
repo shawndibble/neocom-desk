@@ -131,7 +131,7 @@ async function seedMiningDay(page: Page): Promise<void> {
 
 /** Opens Mining Tax's Overview tab (the page defaults to Tax) and clicks the seeded day. */
 async function openYieldDetail(page: Page): Promise<void> {
-  await page.goto('./moon-mining');
+  await page.goto('./mining');
   await page.getByRole('tab', { name: 'Overview' }).click();
 
   const day = page.locator(

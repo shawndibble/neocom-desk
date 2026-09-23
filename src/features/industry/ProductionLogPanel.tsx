@@ -21,9 +21,11 @@ import {
 import type { DataTableColumn } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import type { SkillLevels } from '@/engine/industry/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
+import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import {
-  EMPTY_PRODUCTION_LOG_FILTER,
   activeProductionLogFilterCount,
   filterProductionRunsByDate,
   type ProductionLogFilter,
@@ -44,6 +46,8 @@ import { useSaleLinking } from './useSaleLinking';
 import { iskToneClass } from '@/features/character/format';
 import { formatIsk } from '@/lib/isk';
 import { formatPercent } from './format';
+import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
+import { isoDateParam, optionalSortParam, type UrlSort } from '@/lib/urlState';
 
 /**
  * Dynamic import, not a static one: `ProductionProfitChart.tsx` statically
@@ -80,6 +84,16 @@ interface ItemRow {
 // or two renders before the live query first resolves — these are read-only
 // and module-level, so they never change identity.
 const NO_RUNS: ProductionRunRecord[] = [];
+
+/** The date range in the URL (ADR 0015); both ends open by default. */
+const DATE_RANGE_PARAMS = { 'records.from': isoDateParam(), 'records.to': isoDateParam() };
+/** Both tables start unsorted, in the order the rollup builds them. */
+const TABLE_SORT = optionalSortParam();
+
+/** A URL sort naming a column this table does not have reads as unsorted. */
+function knownSort(sort: UrlSort | null, columns: readonly { id: string }[]): UrlSort | null {
+  return sort !== null && columns.some((column) => column.id === sort.columnId) ? sort : null;
+}
 const NO_SALE_LINKS: ProductionSaleLinkRecord[] = [];
 const NO_ORDER_WATCHES: ProductionOrderWatchRecord[] = [];
 
@@ -180,7 +194,9 @@ function buildRollup(
   filter: ProductionLogFilter,
   skills: SkillLevels,
   catalog: BlueprintCatalog,
-  planIds: ReadonlySet<string>
+  planIds: ReadonlySet<string>,
+  /** Each run's own Build Plan's Trade Hub standing (issue #1238), keyed by `run.buildPlanId` — see `standingByPlanId` below. */
+  standingByPlanId: ReadonlyMap<string, ResolvedStandings>
 ): Rollup {
   const filteredRuns = filterProductionRunsByDate(runs, filter);
   const saleLinksByRun = groupByRunId(saleLinks);
@@ -190,7 +206,8 @@ function buildRollup(
       run,
       saleLinksByRun.get(run.id) ?? [],
       orderWatchesByRun.get(run.id) ?? [],
-      skills
+      skills,
+      standingByPlanId.get(run.buildPlanId)
     )
   );
 
@@ -269,7 +286,15 @@ export function ProductionLogPanel({
   onOpenRun,
 }: ProductionLogPanelProps) {
   const { t } = useTranslation();
-  const [filter, setFilter] = useState<ProductionLogFilter>(EMPTY_PRODUCTION_LOG_FILTER);
+  const [dateRange, setDateRange] = useUrlParams(DATE_RANGE_PARAMS);
+  const filter: ProductionLogFilter = useMemo(
+    () => ({ startDate: dateRange['records.from'], endDate: dateRange['records.to'] }),
+    [dateRange]
+  );
+  const setFilter = (next: ProductionLogFilter) =>
+    setDateRange({ 'records.from': next.startDate, 'records.to': next.endDate });
+  const [itemSort, setItemSort] = useUrlParam('records.itemSort', TABLE_SORT);
+  const [runSort, setRunSort] = useUrlParam('records.runSort', TABLE_SORT);
   // The per-run ledger folds away by default: "By item" is the read that
   // says what is making money, the run list is the audit trail behind it.
   const [runsExpanded, setRunsExpanded] = useState(false);
@@ -294,13 +319,36 @@ export function ProductionLogPanel({
 
   const planIds = useMemo(() => new Set(plans.map((p) => p.id)), [plans]);
 
+  // Every Trade Hub's standing for this character (issue #1238), resolved
+  // once — each run below reads its own plan's hub out of this map rather
+  // than the panel fetching per-plan.
+  const tradeHubStandings = useTradeHubStandings(characterId);
+  const standingByPlanId = useMemo(() => {
+    const map = new Map<string, ResolvedStandings>();
+    for (const plan of plans) {
+      const hub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
+      map.set(plan.id, tradeHubStanding(tradeHubStandings, hub.id));
+    }
+    return map;
+  }, [plans, tradeHubStandings]);
+
   // The character's full history recomputes here, not on every keystroke in
   // the date filter or unrelated parent re-render — `filter` is the only
   // piece of this that changes often, and everything else it's paired with
   // (`runs`/`saleLinks`/`orderWatches`) only changes on an actual Dexie write.
   const rollup = useMemo(
-    () => buildRollup(runs, saleLinks, orderWatches, filter, skills, catalog, planIds),
-    [runs, saleLinks, orderWatches, filter, skills, catalog, planIds]
+    () =>
+      buildRollup(
+        runs,
+        saleLinks,
+        orderWatches,
+        filter,
+        skills,
+        catalog,
+        planIds,
+        standingByPlanId
+      ),
+    [runs, saleLinks, orderWatches, filter, skills, catalog, planIds, standingByPlanId]
   );
 
   const profitHistoryPoints = useMemo(
@@ -400,7 +448,7 @@ export function ProductionLogPanel({
     quantityColumn(t),
     totalCostColumn(t),
     quantitySoldColumn(t),
-    realizedProfitColumn(t, skills),
+    realizedProfitColumn(t, skills, (r) => standingByPlanId.get(r.run.buildPlanId)),
     statusColumn(t),
     soldActionsColumn(sale),
   ];
@@ -487,6 +535,8 @@ export function ProductionLogPanel({
                 rows={itemRows}
                 rowKey={(r) => r.productTypeID}
                 label={t('industry.byItem')}
+                sort={knownSort(itemSort, columns)}
+                onSortChange={setItemSort}
                 density="compact"
               />
             </div>
@@ -508,6 +558,8 @@ export function ProductionLogPanel({
                   rows={runRows}
                   rowKey={(r) => r.run.id}
                   label={t('industry.allProductionRuns')}
+                  sort={knownSort(runSort, runColumns)}
+                  onSortChange={setRunSort}
                   density="compact"
                   onRowClick={
                     onOpenRun ? (r) => r.planExists && onOpenRun(r.run.buildPlanId) : undefined

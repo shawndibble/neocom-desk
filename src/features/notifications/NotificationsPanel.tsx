@@ -55,7 +55,6 @@ import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { AllCharactersNotificationSection } from './AllCharactersNotificationSection';
 import { CHANNEL_COLUMNS, ChannelColumnHeadings } from './ChannelColumns';
 import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
-import { PROJECTABLE_EVENT_IDS } from '@/engine/projection';
 import { db } from '@/db';
 import {
   NOTIFICATION_EVENTS,
@@ -83,10 +82,10 @@ import {
   toggleAllEveTypesChannelPref,
   characterEventThresholds,
   withCharacterEventThreshold,
-  STRUCTURE_FUEL_LOW_DAY_OPTIONS,
-  EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS,
   type CharacterEventThresholds,
 } from './preferences';
+import { eventEntry, type EventThresholds } from './eventEntries';
+import type { ThresholdField, ThresholdKey } from './eventThresholds';
 import {
   isEventEnabledFor,
   isEveTypeEnabledFor,
@@ -115,8 +114,13 @@ import { enableWebPush } from './webPush';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
+import { useUrlParam } from '@/lib/useUrlState';
+import { textParam } from '@/lib/urlState';
 
 const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
+
+/** Module scope so `useUrlParam` sees a stable codec identity across renders. */
+const SEARCH_PARAM = textParam();
 
 /** Stable identity for a Character with no token row yet, so it doesn't itself break `CharacterNotificationSection`'s memo. */
 const EMPTY_SCOPES: ReadonlySet<string> = new Set();
@@ -148,17 +152,17 @@ function useIsDesktop(): boolean {
  * Events whose whole row is delivered by Scheduled Push — the ones that carry
  * the badge saying so.
  *
- * `PROJECTABLE_EVENT_IDS` is the projection engine's own list and the right
- * source of truth, but `eveNotification` is on it for one sub-case only: a
+ * Read from each Event Entry's `projection.everyOccurrence`, not merely
+ * "projects at all": `eveNotification` projects one sub-case only — a
  * structure's reinforcement *exit* has a knowable future instant, and the
  * other 25 types on that row do not. A badge there would tell someone who
  * enabled `WarDeclared` that it reaches them with the app closed, which is
- * false. So the row is excluded, and the reinforcement-timer fact stays where
- * it already lives — in prose, not on an icon that means something else
- * everywhere it appears.
+ * false. So its entry says `everyOccurrence: false`, and the
+ * reinforcement-timer fact stays where it already lives — in prose, not on an
+ * icon that means something else everywhere it appears.
  */
 const PUSH_BADGED_EVENT_IDS: ReadonlySet<NotificationEventId> = new Set(
-  PROJECTABLE_EVENT_IDS.filter((id) => id !== 'eveNotification')
+  NOTIFICATION_EVENT_IDS.filter((id) => eventEntry(id).projection?.everyOccurrence === true)
 );
 
 function eventDef(eventId: NotificationEventId): NotificationEventDef {
@@ -233,7 +237,7 @@ export function NotificationsPanel() {
   // never deliver anything, so this state shows why instead of the button.
   const installRequired = webPushSupport() === 'requires-install';
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useUrlParam('search', SEARCH_PARAM);
   const [expandedCharacterIds, setExpandedCharacterIds] = useState<ReadonlySet<number>>(new Set());
 
   /**
@@ -452,7 +456,7 @@ export function NotificationsPanel() {
         {browserBlocked && (
           <p
             role="status"
-            className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-text"
+            className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning"
           >
             {t('settings.notifications.blockedNotice')}
           </p>
@@ -735,6 +739,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                 characterCapabilities
               );
               const eventLabel = t(def.labelKey);
+              const entry = eventEntry(eventId);
               return (
                 <li key={eventId}>
                   <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs hover:bg-panel-2">
@@ -768,194 +773,40 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                     </div>
                   </div>
                   {/*
-                    Delivery disclosure for the lead-time
-                    warning (issue #310 AC5; wording updated for
-                    Scheduled Push, issue #358, CONTEXT.md round
-                    45). Not gated on `hasScope`: what bounds
-                    this one now is the 72-hour Projection
-                    Horizon, not the character's grants, so the
-                    caveat is true before authorization too.
+                    The event's own delivery caveat, shown whatever the
+                    Character's grants (extractor lead time, issues
+                    #310/#358: bounded by the 72-hour Projection Horizon,
+                    not by scopes, so it is true before authorization too).
                   */}
-                  {eventId === 'planetaryExtractorExpiring' && (
+                  {entry.rowHintKey !== null && (
                     <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
-                      {t('settings.notifications.extractorExpiringHint')}
+                      {t(entry.rowHintKey)}
                     </p>
                   )}
                   {/*
-                    Extractor lead time's inline threshold control (issue
-                    #750), same pattern as structure fuel's below — the
-                    fixed 24h/12h warning pair is gone, replaced by this one
-                    configured value both delivery channels read.
+                    The event's inline threshold controls (issue #299 and
+                    after), derived from its Event Entry. Persisted per
+                    Character (`preferences.ts`); the poller re-reads them
+                    each tick and a change rebuilds the Projection at once
+                    (issue #1259).
                   */}
-                  {eventId === 'planetaryExtractorExpiring' && rowEnabled && (
-                    <div className="border-t border-line bg-panel/60 px-6 py-1.5">
-                      <label className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
-                        {t('settings.notifications.extractorExpiringLeadTimeLabel')}
-                        <Select
-                          value={String(thresholds.extractorExpiringLeadHours)}
-                          onValueChange={(value) => {
-                            void updatePrefs(
-                              character.characterId,
-                              withCharacterEventThreshold(
-                                currentValue(),
-                                character.characterId,
-                                'extractorExpiringLeadHours',
-                                Number(value)
-                              )
-                            );
-                          }}
-                        >
-                          <SelectTrigger
-                            size="sm"
-                            aria-label={t('settings.notifications.extractorExpiringLeadTimeLabel')}
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS.map((hours) => (
-                              <SelectItem key={hours} value={String(hours)}>
-                                {t('settings.notifications.extractorExpiringLeadTimeOption', {
-                                  count: hours,
-                                })}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </label>
-                    </div>
-                  )}
-                  {/*
-                    Structure fuel's inline threshold control
-                    (issue #299, AC4) — the first Notification
-                    Event with a setting of its own rather than
-                    a plain on/off. Persisted per Character and
-                    per device (`preferences.ts`); the poller
-                    re-reads it each tick and a change rebuilds
-                    the Projection at once (issue #1259).
-                  */}
-                  {eventId === 'structureFuelLow' && rowEnabled && (
-                    <div className="border-t border-line bg-panel/60 px-6 py-1.5">
-                      <label className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
-                        {t('settings.notifications.structureFuelLowThresholdLabel')}
-                        <Select
-                          value={String(thresholds.structureFuelLowDays)}
-                          onValueChange={(value) =>
-                            void updatePrefs(
-                              character.characterId,
-                              withCharacterEventThreshold(
-                                currentValue(),
-                                character.characterId,
-                                'structureFuelLowDays',
-                                Number(value)
-                              )
-                            )
-                          }
-                        >
-                          <SelectTrigger
-                            size="sm"
-                            aria-label={t('settings.notifications.structureFuelLowThresholdLabel')}
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {STRUCTURE_FUEL_LOW_DAY_OPTIONS.map((days) => (
-                              <SelectItem key={days} value={String(days)}>
-                                {t('settings.notifications.structureFuelLowThresholdOption', {
-                                  count: days,
-                                })}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </label>
-                      {/*
-                        Issue #299's own words: "say so in the
-                        UI, so nobody reads it as a second copy
-                        of the EVE alert." CCP's own
-                        StructureFuelAlert fires later, at its
-                        own fixed point — this is additive
-                        early warning, not a duplicate.
-                      */}
-                      <p className="mt-1 text-[0.6875rem] text-text-faint">
-                        {t('settings.notifications.structureFuelLowNotDuplicateHint')}
-                      </p>
-                    </div>
-                  )}
-                  {/*
-                    walletBalanceChanged's inline threshold
-                    control — the minimum absolute ISK change a
-                    single wallet journal entry must reach to
-                    fire, same persistence and input widget as
-                    structure fuel's and corp wallet's controls
-                    above. Accepts shorthand ("10.5m",
-                    "10,500,000", "10500000") via
-                    `parseIskAmount`.
-                  */}
-                  {eventId === 'walletBalanceChanged' && rowEnabled && (
-                    <div className="border-t border-line bg-panel/60 px-6 py-1.5">
-                      <ThresholdAmountInput
-                        id={`wallet-balance-changed-threshold-${character.characterId}`}
-                        label={t('settings.notifications.walletBalanceChangedThresholdLabel')}
-                        value={thresholds.walletBalanceChangedThresholdIsk}
-                        onCommit={(amount) =>
-                          void updatePrefs(
+                  {entry.thresholds !== null && rowEnabled && (
+                    <ThresholdControls
+                      characterId={character.characterId}
+                      thresholds={entry.thresholds}
+                      values={thresholds}
+                      onChange={(key, amount) =>
+                        void updatePrefs(
+                          character.characterId,
+                          withCharacterEventThreshold(
+                            currentValue(),
                             character.characterId,
-                            withCharacterEventThreshold(
-                              currentValue(),
-                              character.characterId,
-                              'walletBalanceChangedThresholdIsk',
-                              amount
-                            )
+                            key,
+                            amount
                           )
-                        }
-                      />
-                      <p className="mt-1 text-[0.6875rem] text-text-faint">
-                        {t('settings.notifications.walletBalanceChangedThresholdHint')}
-                      </p>
-                    </div>
-                  )}
-                  {/*
-                    Corp wallet's two independent thresholds
-                    (issue #299, AC4) — a division balance floor
-                    and a single-transaction ceiling, either of
-                    which fires. Same persistence as the fuel
-                    control above.
-                  */}
-                  {eventId === 'corpWalletThreshold' && rowEnabled && (
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line bg-panel/60 px-6 py-1.5">
-                      <ThresholdAmountInput
-                        id={`corp-wallet-floor-${character.characterId}`}
-                        label={t('settings.notifications.corpWalletBalanceFloorLabel')}
-                        value={thresholds.corpWalletBalanceFloorIsk}
-                        onCommit={(amount) =>
-                          void updatePrefs(
-                            character.characterId,
-                            withCharacterEventThreshold(
-                              currentValue(),
-                              character.characterId,
-                              'corpWalletBalanceFloorIsk',
-                              amount
-                            )
-                          )
-                        }
-                      />
-                      <ThresholdAmountInput
-                        id={`corp-wallet-ceiling-${character.characterId}`}
-                        label={t('settings.notifications.corpWalletTransactionCeilingLabel')}
-                        value={thresholds.corpWalletTransactionCeilingIsk}
-                        onCommit={(amount) =>
-                          void updatePrefs(
-                            character.characterId,
-                            withCharacterEventThreshold(
-                              currentValue(),
-                              character.characterId,
-                              'corpWalletTransactionCeilingIsk',
-                              amount
-                            )
-                          )
-                        }
-                      />
-                    </div>
+                        )
+                      }
+                    />
                   )}
                   {/*
                     The honesty requirement (issue #299): these
@@ -1153,6 +1004,92 @@ function ChannelCheckbox({
     <Tooltip content={t(hintKey)} openOnTap>
       {checkbox}
     </Tooltip>
+  );
+}
+
+/**
+ * One event's threshold controls, rendered from its Event Entry's
+ * `thresholds` (issue #1285) rather than hand-written per event: a select per
+ * `choice` field, an ISK field per `iskAmount` field, then the group's hint.
+ * A single field sits in a plain block; several wrap side by side (corp
+ * wallet's floor and ceiling).
+ */
+function ThresholdControls({
+  characterId,
+  thresholds,
+  values,
+  onChange,
+}: {
+  characterId: number;
+  thresholds: EventThresholds;
+  values: Required<CharacterEventThresholds>;
+  onChange: (key: ThresholdKey, amount: number) => void;
+}) {
+  const { t } = useTranslation();
+  const wraps = thresholds.fields.length > 1;
+  return (
+    <div
+      className={
+        wraps
+          ? 'flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-line bg-panel/60 px-6 py-1.5'
+          : 'border-t border-line bg-panel/60 px-6 py-1.5'
+      }
+    >
+      {thresholds.fields.map((field) => (
+        <ThresholdFieldControl
+          key={field.key}
+          characterId={characterId}
+          field={field}
+          value={values[field.key]}
+          onChange={(amount) => onChange(field.key, amount)}
+        />
+      ))}
+      {thresholds.hintKey !== null && (
+        <p className="mt-1 text-[0.6875rem] text-text-faint">{t(thresholds.hintKey)}</p>
+      )}
+    </div>
+  );
+}
+
+function ThresholdFieldControl({
+  characterId,
+  field,
+  value,
+  onChange,
+}: {
+  characterId: number;
+  field: ThresholdField;
+  value: number;
+  onChange: (amount: number) => void;
+}) {
+  const { t } = useTranslation();
+  const { control } = field;
+  if (control.kind === 'iskAmount') {
+    return (
+      <ThresholdAmountInput
+        id={`${control.inputIdPrefix}-${characterId}`}
+        label={t(control.labelKey)}
+        value={value}
+        onCommit={onChange}
+      />
+    );
+  }
+  return (
+    <label className="flex items-center gap-2 text-[0.6875rem] text-text-dim">
+      {t(control.labelKey)}
+      <Select value={String(value)} onValueChange={(next) => onChange(Number(next))}>
+        <SelectTrigger size="sm" aria-label={t(control.labelKey)}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {control.options.map((option) => (
+            <SelectItem key={option} value={String(option)}>
+              {t(control.optionKey, { count: option })}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </label>
   );
 }
 

@@ -1,24 +1,25 @@
 /**
  * The polled-domain registry (issue #273): one entry per data domain the
- * Notification poller watches — what it fetches, how that becomes a snapshot,
- * which `engine/notificationDiffs.ts` diffs run against it, and where the last
- * snapshot is kept.
+ * Foreground Poller fetches — what it loads, how that becomes a snapshot, and
+ * where the last snapshot is kept. `foregroundPoller.ts` is one generic loop
+ * over `POLL_DOMAINS`.
  *
- * Before this, every domain was copy-pasted across five places (an event-id
- * const, a `load*` dependency, a `prev*`/`save*` dependency pair, a
- * `createLocalSetting` store plus merge helper, and a branch in the poller's
- * merge loop). Now `foregroundPoller.ts` is one generic loop over
- * `POLL_DOMAINS`, and **adding a domain is one entry in this file**.
+ * A domain is a *fetch*, not an event: several Notification Events can read
+ * one snapshot (calendar's two, contracts' three). What each event does with
+ * it — its diff, copy, projectability and thresholds — is declared once, on
+ * its Event Entry (`eventEntries.ts`, issue #1285). A domain names its
+ * snapshot through a `SnapshotSource` handle, and its event list, diffs and
+ * live renderer are derived from the entries naming the same handle. So a
+ * new event over an existing fetch is an entry there and nothing here; a new
+ * fetch is a domain here plus its entries.
  *
- * Each entry also says how its events read (issue #1249): its `copy` (live
- * and push wording, subject route — `domainCopy.ts`) and the `names` lookups
- * that copy needs. The poller renders every fire through
- * `renderNotification` without knowing which domain it came from.
- *
- * The engine's diffs stay pure and untouched; only their registration lives
- * here. `defineDomain` is where each entry's types are erased to `unknown`, so
- * the entry literal is fully type-checked while the loop that drives all of
- * them needs no per-domain branch.
+ * What stays per-domain is what needs the fetch's own context: the `names`
+ * lookups its copy needs, the Scheduled Push `projection` runner (which
+ * resolves names and current thresholds, then renders each row through its
+ * event's entry), and planetary's `disproven` retraction. `defineDomain` is
+ * where each domain's types are erased to `unknown`, so the entry literal is
+ * fully type-checked while the loop that drives all of them needs no
+ * per-domain branch.
  */
 import {
   loadCharacterSkillQueueWithStatus,
@@ -65,31 +66,10 @@ import type {
   CorporationIndustryJob,
 } from '@/esi/endpoints';
 import {
-  runSkillQueueNotificationDiffs,
-  SKILL_QUEUE_NOTIFICATION_DIFFS,
-  diffSpExtractionReady,
-  diffIndustryJobComplete,
-  diffPlanetaryExtractionDone,
-  diffPlanetaryExtractorExpiring,
   disprovenExtractorOccurrences,
-  diffNewMail,
-  diffNewCalendarEvent,
-  diffCalendarEventStarting,
-  diffContractAccepted,
-  diffContractCompleted,
-  diffContractFailed,
-  diffWalletBalanceChanged,
-  diffMarketOrderFilled,
-  diffEveNotification,
-  diffStructureFuelLow,
-  diffCorpIndustryJobReady,
-  diffCorpMemberJoined,
-  diffCorpMemberLeft,
-  diffCorpWalletThreshold,
   type NotificationFire,
   type SkillQueueEntrySnapshot,
   type SkillQueueSnapshot,
-  type SkillQueueNotificationEventId,
   type SpExtractionEntrySnapshot,
   type SpExtractionSnapshot,
   type SpExtractionFire,
@@ -136,7 +116,6 @@ import {
   type CorpWalletDivisionSnapshot,
   type CorpWalletSnapshot,
   type CorpWalletThresholdFire,
-  diffPriceAlertTriggered,
   type PriceAlertEntrySnapshot,
   type PriceAlertSnapshot,
   type PriceAlertTriggeredFire,
@@ -159,26 +138,10 @@ import type { NotificationCopy } from '@/engine/notificationWording';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import { formatCalendarTimestamp } from '@/lib/timestamp';
 import { timeZoneFor, useTimeFormat } from '@/lib/timeFormat';
-import type { NotificationEventId } from './events';
+import { NOTIFICATION_EVENT_IDS, type NotificationEventId } from './events';
 import { resolveEveNotificationNames } from './eveNotificationNames';
 import {
-  skillQueueCopy,
-  spExtractionCopy,
-  industryJobCopy,
   industryItemTypeId,
-  colonyCopy,
-  mailCopy,
-  calendarCopy,
-  contractCopy,
-  walletCopy,
-  marketOrderCopy,
-  eveNotificationCopy,
-  structureFuelCopy,
-  corpIndustryJobCopy,
-  corpRosterCopy,
-  corpWalletCopy,
-  priceAlertCopy,
-  type DomainCopy,
   type NoNames,
   type SkillNames,
   type ItemNames,
@@ -186,6 +149,13 @@ import {
   type CalendarNames,
   type MemberNames,
 } from './domainCopy';
+import {
+  NOTIFICATION_EVENT_ENTRIES,
+  SNAPSHOT_SOURCES,
+  eventEntry,
+  type AnyNotificationFire,
+  type SnapshotSource,
+} from './eventEntries';
 import type { EveNotificationNames } from './eveNotificationText';
 import {
   useNotificationPreferences,
@@ -244,59 +214,17 @@ function calendarStartLabel(startMs: number): string | undefined {
   return formatCalendarTimestamp(new Date(startMs), timeZoneFor(useTimeFormat.getState().value));
 }
 
-/** Every fire any registered diff can produce. */
-export type AnyNotificationFire =
-  | NotificationFire
-  | SpExtractionFire
-  | IndustryJobNotificationFire
-  | PlanetaryNotificationFire
-  | MailNotificationFire
-  | NewCalendarEventFire
-  | CalendarEventStartingFire
-  | ExtractorExpiringFire
-  | ContractNotificationFire
-  | WalletNotificationFire
-  | MarketOrderNotificationFire
-  | EveNotificationFire
-  | StructureFuelLowFire
-  | CorpIndustryJobNotificationFire
-  | CorpMemberJoinedFire
-  | CorpMemberLeftFire
-  | CorpWalletThresholdFire
-  | PriceAlertTriggeredFire;
-
-/**
- * The one diff signature every domain speaks. Most engine diffs don't take an
- * enabled set — `gatedOn` adapts those. Calendar is the domain that needs the
- * parameter: two diffs read one snapshot and each answers for its own event.
- */
-export type DomainDiff<TSnapshot, TFire> = (
-  characterId: number,
-  prev: TSnapshot | undefined,
-  next: TSnapshot,
-  enabledEvents: ReadonlySet<NotificationEventId>
-) => TFire[];
-
-/**
- * Adapts an engine diff that knows nothing about toggles to `DomainDiff`: it
- * runs only when its own event is enabled for this character. Redundant for a
- * single-event domain (the fetch is already skipped when its only event is
- * off) and load-bearing for calendar's two.
- */
-export function gatedOn<TSnapshot, TFire>(
-  eventId: NotificationEventId,
-  diff: (characterId: number, prev: TSnapshot | undefined, next: TSnapshot) => TFire[]
-): DomainDiff<TSnapshot, TFire> {
-  return (characterId, prev, next, enabledEvents) =>
-    enabledEvents.has(eventId) ? diff(characterId, prev, next) : [];
-}
+export type { AnyNotificationFire } from './eventEntries';
 
 /** One registry entry, as written. Fully typed; `defineDomain` erases it. */
 interface PollDomainSpec<TRaw, TSnapshot, TFire extends AnyNotificationFire, TNames> {
-  /** Stable identifier, used for the state key and by tests to address a domain. */
-  readonly id: string;
-  /** Every Notification Event this domain's snapshot can fire. */
-  readonly eventIds: readonly NotificationEventId[];
+  /**
+   * The snapshot this domain produces. Its id is the domain's id, and every
+   * Event Entry naming it (`eventEntries.ts`) is one of this domain's events:
+   * its diff runs against this snapshot and its copy renders this domain's
+   * fires with the names `names` looks up.
+   */
+  readonly source: SnapshotSource<TSnapshot, TNames>;
   /** Dexie `settings` key holding this domain's last snapshot per character. */
   readonly stateKey: string;
   /** Name of the snapshot's array field — `entries` for all but planetary. */
@@ -307,22 +235,21 @@ interface PollDomainSpec<TRaw, TSnapshot, TFire extends AnyNotificationFire, TNa
   readonly load: (characterId: number) => Promise<TRaw[] | null>;
   /** Turns what `load` returned into the snapshot the engine diffs compare. */
   readonly toSnapshot: (raw: readonly TRaw[], nowMs: number) => TSnapshot;
-  /** Run in order against the snapshot; a domain may register more than one. */
-  readonly diffs: readonly DomainDiff<TSnapshot, TFire>[];
   /**
-   * The inverse of `diffs`: occurrences this poll can prove never happened,
-   * so an alert already delivered for one can be retracted from the
+   * The inverse of the entries' diffs: occurrences this poll can prove never
+   * happened, so an alert already delivered for one can be retracted from the
    * Notification Feed. Only the planetary domain has any — see
    * `engine/notificationDiffs.disprovenExtractorOccurrences` — because only
    * there does a routine in-game action falsify a Scheduled Push that has
    * already fired, under a *different* Occurrence Key than the corrected
    * state will later produce, so nothing else revisits the row.
    *
-   * The poller runs this without the per-event filter it applies to `diffs`:
-   * the row being retracted may have been written by Web Push or another
-   * device, for either of this domain's two events, so one enabled event's
-   * fetch retracts both. It does still ride on the domain being fetched at
-   * all — see the call site for why that bound is right rather than a gap.
+   * The poller runs this without the per-event filter it applies to the
+   * diffs: the row being retracted may have been written by Web Push or
+   * another device, for either of this domain's two events, so one enabled
+   * event's fetch retracts both. It does still ride on the domain being
+   * fetched at all — see the call site for why that bound is right rather
+   * than a gap.
    */
   readonly disproven?: (
     characterId: number,
@@ -331,12 +258,10 @@ interface PollDomainSpec<TRaw, TSnapshot, TFire extends AnyNotificationFire, TNa
   ) => TFire[];
   /**
    * Turns this poll's snapshot into Scheduled Push Projection rows (issue
-   * #355, ADR 0010) — absent for a domain with nothing inside the 72-hour
-   * horizon worth projecting (mail, wallet, market orders, corp roster: all
-   * "as it happens", not fixed-timestamp-in-advance). EVE's own notifications
-   * are mostly the same "as it happens" case too, except the one shape below
-   * whose payload derives a future reinforcement-exit instant (issue #359).
-   * Resolves whatever display names the row text needs (Dexie-cached), which
+   * #355, ADR 0010), rendering each through its event's entry's
+   * `projection.push`. Present exactly when one of this domain's entries
+   * declares a projection (`pollDomains.test.ts` holds that). Resolves
+   * whatever display names the row text needs (Dexie-cached), which
    * `engine/projection.ts` deliberately cannot do itself.
    */
   readonly projection?: (
@@ -345,12 +270,11 @@ interface PollDomainSpec<TRaw, TSnapshot, TFire extends AnyNotificationFire, TNa
     snapshot: TSnapshot,
     nowMs: number
   ) => Promise<ProjectionRow[]>;
-  /** How this domain's fires read, and which row each is about (`domainCopy.ts`). */
-  readonly copy: DomainCopy<TFire, TNames>;
   /**
-   * The display names `copy.poll` needs, looked up per fire. Best-effort: a
-   * name it cannot resolve is left absent and the copy falls back to `#id`.
-   * Omitted by a domain whose copy names nothing it has to look up.
+   * The display names the entries' `copy.poll` needs, looked up per fire.
+   * Best-effort: a name it cannot resolve is left absent and the copy falls
+   * back to `#id`. Omitted by a domain whose copy names nothing it has to
+   * look up.
    */
   readonly names?: (fire: TFire) => Promise<TNames>;
 }
@@ -361,12 +285,13 @@ interface PollDomainSpec<TRaw, TSnapshot, TFire extends AnyNotificationFire, TNa
  */
 export interface PollDomain {
   readonly id: string;
+  /** This domain's events, in catalog order — derived from the Event Entries naming its source. */
   readonly eventIds: readonly NotificationEventId[];
   readonly stateKey: string;
   readonly store: LocalSettingStore<PollerState<unknown>>;
   readonly load: (characterId: number) => Promise<readonly unknown[] | null>;
   readonly toSnapshot: (raw: readonly unknown[], nowMs: number) => unknown;
-  /** Every registered diff, in order, each already gated on its own event. */
+  /** Every one of its events' diffs, in `eventIds` order, each run only when its own event is enabled. */
   readonly diff: (
     characterId: number,
     prev: unknown,
@@ -380,10 +305,8 @@ export interface PollDomain {
     snapshot: unknown,
     nowMs: number
   ) => Promise<ProjectionRow[]>;
-  /** Looks up this fire's names, then renders its live copy. */
+  /** Looks up this fire's names, then renders its live copy through its event's entry. */
   readonly render: (fire: AnyNotificationFire, characterName: string) => Promise<NotificationCopy>;
-  /** The row this fire was about, where its event routes to one. */
-  readonly subjectOf: (fire: AnyNotificationFire) => number | undefined;
 }
 
 /**
@@ -398,19 +321,24 @@ function defineDomain<TRaw, TSnapshot, TFire extends AnyNotificationFire, TNames
     spec.stateKey,
     isSnapshotWith<TSnapshot>(spec.entriesKey, spec.isEntry)
   );
+  const eventIds = NOTIFICATION_EVENT_IDS.filter(
+    (eventId) => eventEntry(eventId).source.id === spec.source.id
+  );
   return {
-    id: spec.id,
-    eventIds: spec.eventIds,
+    id: spec.source.id,
+    eventIds,
     stateKey: spec.stateKey,
     store: store as unknown as LocalSettingStore<PollerState<unknown>>,
     load: spec.load,
     toSnapshot: (raw, nowMs) => spec.toSnapshot(raw as readonly TRaw[], nowMs),
+    // One gate per event, not per domain: the fetch is skipped only when
+    // every event of the domain is off, so a domain answering for two events
+    // with one of them enabled must still not fire the other.
     diff: (characterId, prev, next, enabledEvents) => {
       const fires: AnyNotificationFire[] = [];
-      for (const diff of spec.diffs) {
-        fires.push(
-          ...diff(characterId, prev as TSnapshot | undefined, next as TSnapshot, enabledEvents)
-        );
+      for (const eventId of eventIds) {
+        if (!enabledEvents.has(eventId)) continue;
+        fires.push(...eventEntry(eventId).diff(characterId, prev, next));
       }
       return fires;
     },
@@ -422,25 +350,18 @@ function defineDomain<TRaw, TSnapshot, TFire extends AnyNotificationFire, TNames
       ? (characterId, characterName, snapshot, nowMs) =>
           spec.projection!(characterId, characterName, snapshot as TSnapshot, nowMs)
       : undefined,
-    // Only ever handed a fire whose eventId is in `spec.eventIds` —
+    // Only ever handed a fire whose eventId is in `eventIds` —
     // `domainForEvent` is the one caller that picks the domain.
     render: async (fire, characterName) => {
-      const typed = fire as TFire;
-      const names = spec.names ? await spec.names(typed) : ({} as TNames);
-      return spec.copy.poll(typed, characterName, names);
+      const names = spec.names ? await spec.names(fire as TFire) : ({} as TNames);
+      return eventEntry(fire.eventId).copy.poll(fire, characterName, names);
     },
-    subjectOf: (fire) => spec.copy.subjectOf?.(fire as TFire),
   };
 }
 
 /* -------------------------------------------------------------------------- */
 /* Skill queue                                                                 */
 /* -------------------------------------------------------------------------- */
-
-/** `SKILL_QUEUE_NOTIFICATION_DIFFS` is the one source of which skill-queue-driven events this poller runs; every other domain lists its events directly (engine/notificationDiffs.ts). */
-const SKILL_QUEUE_EVENT_IDS = Object.keys(
-  SKILL_QUEUE_NOTIFICATION_DIFFS
-) as SkillQueueNotificationEventId[];
 
 function isSkillQueueEntrySnapshot(raw: unknown): raw is SkillQueueEntrySnapshot {
   if (typeof raw !== 'object' || raw === null) return false;
@@ -469,8 +390,7 @@ export const skillQueueDomain = defineDomain<
   NotificationFire,
   SkillNames
 >({
-  id: 'skillQueue',
-  eventIds: SKILL_QUEUE_EVENT_IDS,
+  source: SNAPSHOT_SOURCES.skillQueue,
   stateKey: 'notifications.pollerState.skillQueue',
   entriesKey: 'entries',
   isEntry: isSkillQueueEntrySnapshot,
@@ -480,18 +400,6 @@ export const skillQueueDomain = defineDomain<
     return result.cached.data;
   },
   toSnapshot: (entries, nowMs) => ({ entries: entries.map(toSkillQueueEntrySnapshot), nowMs }),
-  // The engine already runs this domain's diffs off an enabled set, so it is
-  // the one that needs no `gatedOn` adapter — only the narrowing back to the
-  // ids it knows about.
-  diffs: [
-    (characterId, prev, next, enabledEvents) =>
-      runSkillQueueNotificationDiffs(
-        characterId,
-        prev,
-        next,
-        new Set(SKILL_QUEUE_EVENT_IDS.filter((eventId) => enabledEvents.has(eventId)))
-      ),
-  ],
   projection: async (characterId, characterName, snapshot, nowMs) => {
     const skillNames = await resolveProjectionNames(
       snapshot.entries.map((entry) => entry.skillId),
@@ -502,11 +410,11 @@ export const skillQueueDomain = defineDomain<
       characterName,
       snapshot.entries,
       skillNames,
-      skillQueueCopy.push,
+      (fire, character, names) =>
+        NOTIFICATION_EVENT_ENTRIES[fire.eventId].projection.push(fire, character, names),
       nowMs
     );
   },
-  copy: skillQueueCopy,
   names: async (fire) => ({
     skill: fire.skillId === null ? undefined : await typeNameOrAbsent(fire.skillId),
   }),
@@ -538,8 +446,7 @@ export const spExtractionDomain = defineDomain<
   SpExtractionSnapshot,
   SpExtractionFire
 >({
-  id: 'spExtraction',
-  eventIds: ['spExtractionReady'],
+  source: SNAPSHOT_SOURCES.spExtraction,
   stateKey: 'notifications.pollerState.spExtraction',
   entriesKey: 'entries',
   isEntry: isSpExtractionEntrySnapshot,
@@ -556,8 +463,6 @@ export const spExtractionDomain = defineDomain<
     return [{ totalSp: result.cached.data.total_sp, thresholdSp }];
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
-  diffs: [gatedOn('spExtractionReady', diffSpExtractionReady)],
-  copy: spExtractionCopy,
 });
 
 /* -------------------------------------------------------------------------- */
@@ -592,8 +497,7 @@ export const industryJobDomain = defineDomain<
   IndustryJobNotificationFire,
   ItemNames
 >({
-  id: 'industryJobs',
-  eventIds: ['industryJobComplete'],
+  source: SNAPSHOT_SOURCES.industryJobs,
   stateKey: 'notifications.pollerState.industryJobs',
   entriesKey: 'entries',
   isEntry: isIndustryJobEntrySnapshot,
@@ -603,7 +507,6 @@ export const industryJobDomain = defineDomain<
     return result.cached.data;
   },
   toSnapshot: (jobs, nowMs) => ({ entries: jobs.map(toIndustryJobEntrySnapshot), nowMs }),
-  diffs: [gatedOn('industryJobComplete', diffIndustryJobComplete)],
   projection: async (characterId, characterName, snapshot, nowMs) => {
     const itemNames = await resolveProjectionNames(
       snapshot.entries.map((entry) => entry.productTypeId ?? entry.blueprintTypeId),
@@ -614,11 +517,10 @@ export const industryJobDomain = defineDomain<
       characterName,
       snapshot.entries,
       itemNames,
-      industryJobCopy.push,
+      NOTIFICATION_EVENT_ENTRIES.industryJobComplete.projection.push,
       nowMs
     );
   },
-  copy: industryJobCopy,
   names: async (fire) => ({ item: await typeNameOrAbsent(industryItemTypeId(fire)) }),
 });
 
@@ -659,8 +561,7 @@ export const colonyDomain = defineDomain<
   PlanetaryNotificationFire | ExtractorExpiringFire,
   PlanetNames
 >({
-  id: 'colonies',
-  eventIds: ['planetaryExtractionDone', 'planetaryExtractorExpiring'],
+  source: SNAPSHOT_SOURCES.colonies,
   stateKey: 'notifications.pollerState.colonies',
   entriesKey: 'colonies',
   isEntry: isColonySnapshotEntry,
@@ -695,12 +596,6 @@ export const colonyDomain = defineDomain<
     return colonies;
   },
   toSnapshot: (colonies, nowMs) => ({ colonies: [...colonies], nowMs }),
-  // Both gates are load-bearing now that one snapshot answers for two events:
-  // the fetch is skipped only when every event of the domain is off.
-  diffs: [
-    gatedOn('planetaryExtractionDone', diffPlanetaryExtractionDone),
-    gatedOn('planetaryExtractorExpiring', diffPlanetaryExtractorExpiring),
-  ],
   disproven: disprovenExtractorOccurrences,
   // The baseline's baked-in `thresholdMs` stays as the diff needs it (the
   // setting in force at load time); the Projection instead uses the current
@@ -721,11 +616,21 @@ export const colonyDomain = defineDomain<
       characterName,
       colonies,
       planetNames,
-      colonyCopy.push,
+      (fire, character, names) =>
+        fire.eventId === 'planetaryExtractionDone'
+          ? NOTIFICATION_EVENT_ENTRIES.planetaryExtractionDone.projection.push(
+              fire,
+              character,
+              names
+            )
+          : NOTIFICATION_EVENT_ENTRIES.planetaryExtractorExpiring.projection.push(
+              fire,
+              character,
+              names
+            ),
       nowMs
     );
   },
-  copy: colonyCopy,
   names: async (fire) => ({ planet: (await loadPlanetName(fire.planetId)) ?? undefined }),
 });
 
@@ -740,8 +645,7 @@ function isMailHeaderSnapshot(raw: unknown): raw is MailHeaderSnapshot {
 }
 
 export const mailDomain = defineDomain<MailHeader, MailSnapshot, MailNotificationFire>({
-  id: 'mail',
-  eventIds: ['newMail'],
+  source: SNAPSHOT_SOURCES.mail,
   stateKey: 'notifications.pollerState.mail',
   entriesKey: 'entries',
   isEntry: isMailHeaderSnapshot,
@@ -754,8 +658,6 @@ export const mailDomain = defineDomain<MailHeader, MailSnapshot, MailNotificatio
     entries: headers.map((header) => ({ mailId: header.mail_id })),
     nowMs,
   }),
-  diffs: [gatedOn('newMail', diffNewMail)],
-  copy: mailCopy,
 });
 
 /* -------------------------------------------------------------------------- */
@@ -787,8 +689,7 @@ export const calendarDomain = defineDomain<
   NewCalendarEventFire | CalendarEventStartingFire,
   CalendarNames
 >({
-  id: 'calendar',
-  eventIds: ['newCalendarEvent', 'calendarEventStarting'],
+  source: SNAPSHOT_SOURCES.calendar,
   stateKey: 'notifications.pollerState.calendar',
   entriesKey: 'entries',
   isEntry: isCalendarEventEntrySnapshot,
@@ -808,16 +709,17 @@ export const calendarDomain = defineDomain<
   }),
   // The one domain running two diffs off a single snapshot and a single fetch:
   // each is gated on its own event so switching one off leaves the other alone.
-  diffs: [
-    gatedOn('newCalendarEvent', diffNewCalendarEvent),
-    gatedOn('calendarEventStarting', diffCalendarEventStarting),
-  ],
   // `newCalendarEvent` has no fixed future timestamp to project — only
   // `calendarEventStarting`'s `startMs` is; the pure `projectCalendar`
   // already emits `calendarEventStarting` rows exclusively.
   projection: async (characterId, characterName, snapshot, nowMs) =>
-    projectCalendar(characterId, characterName, snapshot.entries, calendarCopy.push, nowMs),
-  copy: calendarCopy,
+    projectCalendar(
+      characterId,
+      characterName,
+      snapshot.entries,
+      NOTIFICATION_EVENT_ENTRIES.calendarEventStarting.projection.push,
+      nowMs
+    ),
   names: async (fire) =>
     fire.eventId === 'newCalendarEvent' ? { when: calendarStartLabel(fire.startMs) } : {},
 });
@@ -870,8 +772,7 @@ function isContractEntrySnapshot(raw: unknown): raw is ContractEntrySnapshot {
 }
 
 export const contractDomain = defineDomain<Contract, ContractSnapshot, ContractNotificationFire>({
-  id: 'contracts',
-  eventIds: ['contractAccepted', 'contractCompleted', 'contractFailed'],
+  source: SNAPSHOT_SOURCES.contracts,
   stateKey: 'notifications.pollerState.contracts',
   entriesKey: 'entries',
   isEntry: isContractEntrySnapshot,
@@ -894,12 +795,6 @@ export const contractDomain = defineDomain<Contract, ContractSnapshot, ContractN
     })),
     nowMs,
   }),
-  diffs: [
-    gatedOn('contractAccepted', diffContractAccepted),
-    gatedOn('contractCompleted', diffContractCompleted),
-    gatedOn('contractFailed', diffContractFailed),
-  ],
-  copy: contractCopy,
 });
 
 /* -------------------------------------------------------------------------- */
@@ -938,8 +833,7 @@ export const walletDomain = defineDomain<
   WalletSnapshot,
   WalletNotificationFire
 >({
-  id: 'wallet',
-  eventIds: ['walletBalanceChanged'],
+  source: SNAPSHOT_SOURCES.wallet,
   stateKey: 'notifications.pollerState.wallet',
   entriesKey: 'entries',
   isEntry: isWalletJournalEntrySnapshot,
@@ -964,8 +858,6 @@ export const walletDomain = defineDomain<
     });
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
-  diffs: [gatedOn('walletBalanceChanged', diffWalletBalanceChanged)],
-  copy: walletCopy,
 });
 
 /* -------------------------------------------------------------------------- */
@@ -1032,8 +924,7 @@ export const marketOrderDomain = defineDomain<
   MarketOrderNotificationFire,
   ItemNames
 >({
-  id: 'marketOrders',
-  eventIds: ['marketOrderFilled'],
+  source: SNAPSHOT_SOURCES.marketOrders,
   stateKey: 'notifications.pollerState.marketOrders',
   entriesKey: 'entries',
   isEntry: isMarketOrderEntrySnapshot,
@@ -1051,8 +942,6 @@ export const marketOrderDomain = defineDomain<
     return deriveMarketOrderEntries(openResult.cached.data, historyResult.cached.data);
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
-  diffs: [gatedOn('marketOrderFilled', diffMarketOrderFilled)],
-  copy: marketOrderCopy,
   // Best-effort: `loadTypeNames` reads the local SDE snapshot first, falls
   // back to one batched ESI call, and yields "Type #id" rather than throwing.
   // A name we cannot resolve is no reason to hold the notification back.
@@ -1095,8 +984,7 @@ export const eveNotificationDomain = defineDomain<
   EveNotificationFire,
   EveNotificationNames
 >({
-  id: 'eveNotification',
-  eventIds: ['eveNotification'],
+  source: SNAPSHOT_SOURCES.eveNotification,
   stateKey: 'notifications.pollerState.eveNotification',
   entriesKey: 'entries',
   isEntry: isEveNotificationEntrySnapshot,
@@ -1116,7 +1004,6 @@ export const eveNotificationDomain = defineDomain<
     })),
     nowMs,
   }),
-  diffs: [gatedOn('eveNotification', diffEveNotification)],
   // Structure reinforcement exits (issue #359): the only EVE Notification
   // shape with a future, fixed-enough timestamp to project. Kept to the same
   // gates the live browser channel already applies to this domain
@@ -1145,11 +1032,10 @@ export const eveNotificationDomain = defineDomain<
       characterName,
       eligible,
       structureNames,
-      eveNotificationCopy.push,
+      NOTIFICATION_EVENT_ENTRIES.eveNotification.projection.push,
       nowMs
     );
   },
-  copy: eveNotificationCopy,
   // Best-effort, time-boxed and never rejects (issue #300): whatever it could
   // not look up in its budget renders as an id or a neutral phrase rather
   // than holding the notification back.
@@ -1216,8 +1102,7 @@ export const structureFuelDomain = defineDomain<
   StructureFuelSnapshot,
   StructureFuelLowFire
 >({
-  id: 'structureFuel',
-  eventIds: ['structureFuelLow'],
+  source: SNAPSHOT_SOURCES.structureFuel,
   stateKey: 'notifications.pollerState.structureFuel',
   entriesKey: 'entries',
   isEntry: isStructureFuelEntrySnapshot,
@@ -1239,7 +1124,6 @@ export const structureFuelDomain = defineDomain<
     }));
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
-  diffs: [gatedOn('structureFuelLow', diffStructureFuelLow)],
   // Same split as the colony domain: the baseline's baked-in `thresholdMs`
   // stays for the diff, while the Projection uses the current fuel threshold
   // so a Settings change rebuilt from that baseline (issue #1259) projects it.
@@ -1249,11 +1133,10 @@ export const structureFuelDomain = defineDomain<
       characterId,
       characterName,
       snapshot.entries.map((entry) => ({ ...entry, thresholdMs })),
-      structureFuelCopy.push,
+      NOTIFICATION_EVENT_ENTRIES.structureFuelLow.projection.push,
       nowMs
     );
   },
-  copy: structureFuelCopy,
 });
 
 /* Corp industry jobs --------------------------------------------------------- */
@@ -1286,8 +1169,7 @@ export const corpIndustryJobDomain = defineDomain<
   CorpIndustryJobNotificationFire,
   ItemNames
 >({
-  id: 'corpIndustryJobs',
-  eventIds: ['corpIndustryJobReady'],
+  source: SNAPSHOT_SOURCES.corpIndustryJobs,
   stateKey: 'notifications.pollerState.corpIndustryJobs',
   entriesKey: 'entries',
   isEntry: isCorpIndustryJobEntrySnapshot,
@@ -1299,8 +1181,6 @@ export const corpIndustryJobDomain = defineDomain<
     return result.cached.data;
   },
   toSnapshot: (jobs, nowMs) => ({ entries: jobs.map(toCorpIndustryJobEntrySnapshot), nowMs }),
-  diffs: [gatedOn('corpIndustryJobReady', diffCorpIndustryJobReady)],
-  copy: corpIndustryJobCopy,
   names: async (fire) => ({ item: await typeNameOrAbsent(industryItemTypeId(fire)) }),
 });
 
@@ -1324,8 +1204,7 @@ export const corpRosterDomain = defineDomain<
   CorpMemberJoinedFire | CorpMemberLeftFire,
   MemberNames
 >({
-  id: 'corpRoster',
-  eventIds: ['corpMemberJoined', 'corpMemberLeft'],
+  source: SNAPSHOT_SOURCES.corpRoster,
   stateKey: 'notifications.pollerState.corpRoster',
   entriesKey: 'entries',
   isEntry: isCorpRosterMemberSnapshot,
@@ -1340,13 +1219,6 @@ export const corpRosterDomain = defineDomain<
     entries: memberIds.map((characterId) => ({ characterId })),
     nowMs,
   }),
-  // Both gates are load-bearing (colonyDomain's precedent): the fetch is
-  // skipped only when both joined and left are off.
-  diffs: [
-    gatedOn('corpMemberJoined', diffCorpMemberJoined),
-    gatedOn('corpMemberLeft', diffCorpMemberLeft),
-  ],
-  copy: corpRosterCopy,
   names: async (fire) => ({
     member: (await resolveNames([fire.memberCharacterId])).get(fire.memberCharacterId),
   }),
@@ -1385,8 +1257,7 @@ export const corpWalletDomain = defineDomain<
   CorpWalletSnapshot,
   CorpWalletThresholdFire
 >({
-  id: 'corpWallet',
-  eventIds: ['corpWalletThreshold'],
+  source: SNAPSHOT_SOURCES.corpWallet,
   stateKey: 'notifications.pollerState.corpWallet',
   entriesKey: 'divisions',
   isEntry: isCorpWalletDivisionSnapshot,
@@ -1423,8 +1294,6 @@ export const corpWalletDomain = defineDomain<
     }));
   },
   toSnapshot: (divisions, nowMs) => ({ divisions: [...divisions], nowMs }),
-  diffs: [gatedOn('corpWalletThreshold', diffCorpWalletThreshold)],
-  copy: corpWalletCopy,
 });
 
 /* Quickbar: price alerts ----------------------------------------------------- */
@@ -1459,8 +1328,7 @@ export const priceAlertDomain = defineDomain<
   PriceAlertSnapshot,
   PriceAlertTriggeredFire
 >({
-  id: 'priceAlert',
-  eventIds: ['priceAlertTriggered'],
+  source: SNAPSHOT_SOURCES.priceAlert,
   stateKey: 'notifications.pollerState.priceAlert',
   entriesKey: 'entries',
   isEntry: isPriceAlertEntrySnapshot,
@@ -1485,8 +1353,6 @@ export const priceAlertDomain = defineDomain<
     }));
   },
   toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
-  diffs: [gatedOn('priceAlertTriggered', diffPriceAlertTriggered)],
-  copy: priceAlertCopy,
 });
 
 /**
@@ -1532,5 +1398,5 @@ export function renderNotification(
 
 /** The row a fire was about, where its event has a use for one — see `NotificationFeedRecord.subjectId`. */
 export function notificationSubjectId(fire: AnyNotificationFire): number | undefined {
-  return domainForEvent(fire.eventId).subjectOf(fire);
+  return eventEntry(fire.eventId).copy.subjectOf?.(fire);
 }

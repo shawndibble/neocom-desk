@@ -41,7 +41,7 @@ export function GroupTargetLink({ plan, snapshot, onApply }: GroupTargetLinkProp
         type="button"
         onClick={onApply}
         aria-label={t('industry.quickFillFromGroupAriaLabel', { target })}
-        className="flex items-center gap-1 rounded-xs text-[0.6875rem] font-semibold text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="flex min-h-11 items-center gap-1 rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
       >
         {t('industry.quickFillFromGroup')}
       </button>

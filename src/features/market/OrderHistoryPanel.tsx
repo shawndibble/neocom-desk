@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactElement } from 'react';
+import { useCallback, useMemo, type ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -26,16 +26,21 @@ import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { orderHistoryCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrderHistory } from '@/esi/endpoints';
 import { HistoryViewSelect, type HistoryView } from './HistoryViewSelect';
 import {
   activeHistoryFilterCount,
-  EMPTY_HISTORY_FILTER,
+  DEFAULT_HISTORY_FILTER_PARAMS,
   filterHistory,
+  HISTORY_FIELD_TO_PARAM,
+  HISTORY_FILTER_PARAMS,
   type HistoryFilter,
 } from './orderHistoryFilter';
+
+const HISTORY_SORT = { columnId: 'issued', direction: 'desc' } as const;
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
@@ -156,7 +161,14 @@ export function OrderHistoryPanel({
     (typeId: number) => typeNames.get(typeId) ?? `Type #${typeId}`,
     [typeNames]
   );
-  const [filter, setFilter] = useState<HistoryFilter>(EMPTY_HISTORY_FILTER);
+  // This tab has only the one filter bar, so it never needs `useUrlFilter`'s
+  // scope-reset — the scope key never changes.
+  const [filter, setFilter] = useUrlFilter<HistoryFilter>(
+    'history',
+    HISTORY_FILTER_PARAMS,
+    HISTORY_FIELD_TO_PARAM,
+    DEFAULT_HISTORY_FILTER_PARAMS
+  );
 
   const history = useMemo(
     () => [...(historyResult?.data ?? [])].sort((a, b) => b.issued.localeCompare(a.issued)),
@@ -219,6 +231,11 @@ export function OrderHistoryPanel({
       },
     ],
     [t, typeNames]
+  );
+  const sortProps = useUrlSort(
+    'history.sort',
+    HISTORY_SORT,
+    columns.map((column) => column.id)
   );
 
   /** Same menu the Appraisal ledger carries — an order-history row names an item like any other. */
@@ -332,7 +349,11 @@ export function OrderHistoryPanel({
           )}
           <HistoryFilterBar filter={filter} onChange={setFilter} />
           {filteredHistory.length === 0 ? (
-            <EmptyState title={t('orders.noResults')} className="py-8" />
+            <EmptyState
+              title={t('orders.noResults')}
+              hint={t('orders.noResultsHint')}
+              className="py-8"
+            />
           ) : isPhone ? (
             <OrderHistoryList
               orders={filteredHistory}
@@ -347,6 +368,7 @@ export function OrderHistoryPanel({
               rowKey={(order) => order.order_id}
               label={t('orders.historyTab')}
               rowContextMenu={rowContextMenu}
+              {...sortProps}
             />
           )}
         </>

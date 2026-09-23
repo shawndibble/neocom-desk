@@ -43,6 +43,8 @@ function renderPanel(overrides: Partial<Parameters<typeof CorpTransactionsPanel>
         loading={false}
         filter={EMPTY_WALLET_TRANSACTION_FILTER}
         onFilterChange={vi.fn()}
+        sort={{ columnId: 'date', direction: 'desc' }}
+        onSortChange={vi.fn()}
         nameFor={() => 'Damage Control II'}
         divisionQualifier={undefined}
         offlineTitleKey="common.offlineTitle"
@@ -67,5 +69,16 @@ describe('CorpTransactionsPanel — the row as an item', () => {
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Show info' }));
     expect(onShowInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
+  });
+});
+
+describe('CorpTransactionsPanel — filtered to zero', () => {
+  it('shows a hint naming which filters to clear', () => {
+    renderPanel({ filteredTransactions: [] });
+
+    expect(screen.getByText('No transactions match this filter.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Clear the search or widen the side and date filters.')
+    ).toBeInTheDocument();
   });
 });

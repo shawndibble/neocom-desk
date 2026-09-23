@@ -9,8 +9,7 @@ import {
   type AppraisalRow,
 } from '@/engine/market/appraisal';
 import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
-
-const NO_SKILLS = { reprocessingLevel: 0, reprocessingEfficiencyLevel: 0, specialisationLevel: 0 };
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 
 const damageControl: AppraisalItem = {
   typeId: 2048,
@@ -319,7 +318,7 @@ describe('computeAppraisalRefine', () => {
       computeAppraisalRefine({
         quantity: 1000,
         reprocessing: undefined,
-        skills: NO_SKILLS,
+        modifiers: NO_CHARACTER_MODIFIERS,
         materialPrices: {},
       })
     ).toBeUndefined();
@@ -329,7 +328,7 @@ describe('computeAppraisalRefine', () => {
     const refine = computeAppraisalRefine({
       quantity: 1000,
       reprocessing: veldspar,
-      skills: NO_SKILLS,
+      modifiers: NO_CHARACTER_MODIFIERS,
       materialPrices: { 34: 5 },
     });
     // 10 batches x floor(415 x 10 x 0.5) Tritanium x 5 ISK
@@ -344,7 +343,7 @@ describe('computeAppraisalRefine', () => {
     const refine = computeAppraisalRefine({
       quantity: 50,
       reprocessing: veldspar,
-      skills: NO_SKILLS,
+      modifiers: NO_CHARACTER_MODIFIERS,
       materialPrices: { 34: 5 },
     });
     expect(refine).toEqual({ valueAtFullPrice: 0, pricedAll: true, unitsLeftOver: 50 });
@@ -354,7 +353,7 @@ describe('computeAppraisalRefine', () => {
     const refine = computeAppraisalRefine({
       quantity: 1000,
       reprocessing: veldspar,
-      skills: NO_SKILLS,
+      modifiers: NO_CHARACTER_MODIFIERS,
       materialPrices: {},
     });
     expect(refine).toEqual({ valueAtFullPrice: 0, pricedAll: false, unitsLeftOver: 0 });

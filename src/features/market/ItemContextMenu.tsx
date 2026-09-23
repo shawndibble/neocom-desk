@@ -8,6 +8,7 @@
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { industryTabHref } from '@/features/industry/industryTabs';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -124,7 +125,7 @@ export function ItemContextMenu({
         <ContextMenuItem
           onSelect={() => {
             const params = marketLinkParams(typeId, location.search);
-            navigate(`/market?${new URLSearchParams(params).toString()}`);
+            navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
           }}
         >
           {t('market.contextMenu.viewInMarket')}
@@ -135,7 +136,7 @@ export function ItemContextMenu({
         <ContextMenuItem
           disabled={!blueprintTypeID}
           onSelect={() => {
-            if (blueprintTypeID) navigate(`/industry?product=${typeId}`);
+            if (blueprintTypeID) navigate(`${industryTabHref('plans')}?product=${typeId}`);
           }}
         >
           {buildPlanLabel}
@@ -155,7 +156,7 @@ export function ItemContextMenu({
           </ContextMenuItem>
         )}
         {piPlannable && (
-          <ContextMenuItem onSelect={() => navigate(`/planetary-industry?tab=plan&type=${typeId}`)}>
+          <ContextMenuItem onSelect={() => navigate(`/planetary-industry/plan?type=${typeId}`)}>
             {t('market.contextMenu.piPlan')}
           </ContextMenuItem>
         )}

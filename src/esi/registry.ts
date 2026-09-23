@@ -261,6 +261,10 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/loyalty/points',
     scope: 'esi-characters.read_loyalty.v1',
   },
+  getCharacterStandings: {
+    route: '/characters/{character_id}/standings/',
+    scope: 'esi-characters.read_standings.v1',
+  },
   getLoyaltyStoreOffers: {
     route: '/loyalty/stores/{corporation_id}/offers/',
     scope: PUBLIC,

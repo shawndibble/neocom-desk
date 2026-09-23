@@ -12,6 +12,8 @@ import type {
 } from '@/engine/industry/types';
 import type { TradeHub } from '@/market/hubs';
 import type { OrderProblemSample } from '@/engine/market/orderProblemHistory';
+import type { MiningLedgerRow } from '@/engine/miningTax/types';
+import type { SnapshotDay } from '@/engine/miningTax/priceBasis';
 
 export interface CharacterRecord {
   characterId: number;
@@ -844,6 +846,33 @@ export interface MailDraftRecord {
   updatedAt: number;
 }
 
+/**
+ * A Character's mining ledger kept past ESI's 30-day window (issue #1278),
+ * up to `LEDGER_HISTORY_DAYS` (`engine/miningTax/ledgerHistory.ts`). Its own
+ * table rather than an `esiCache` row: a cache row is thrown away by "clear
+ * cache" and replaced whole on every fetch, and days older than 30 can never
+ * be fetched again. Device-local, not synced. Read and written whole.
+ */
+export interface MiningLedgerHistoryRecord {
+  characterId: number;
+  /** Merged ledger rows, oldest first. */
+  rows: MiningLedgerRow[];
+  /** Epoch ms of the newest ESI fetch merged in — an older cached copy never overwrites it. */
+  fetchedAt: number;
+}
+
+/**
+ * One day's Jita buy/sell snapshot for every type the Mining Overview prices
+ * (issue #1279) — the ore's pricing type (its Compressed form where one
+ * exists) and each reprocessing material. ESI history only has a daily
+ * average; this is the app's own record of the book's two sides. Keyed by
+ * EVE/UTC date, 90 days kept. Character-independent and device-local.
+ */
+export interface JitaPriceSnapshotRecord {
+  date: string;
+  prices: SnapshotDay;
+}
+
 export const db = new Dexie('neocom') as Dexie & {
   characters: EntityTable<CharacterRecord, 'characterId'>;
   tokens: EntityTable<TokenRecord, 'characterId'>;
@@ -863,6 +892,8 @@ export const db = new Dexie('neocom') as Dexie & {
   bpcSearchWatches: EntityTable<BpcSearchWatchRecord, 'id'>;
   orderProblemSamples: EntityTable<OrderProblemSampleRecord, 'orderId'>;
   mailDrafts: EntityTable<MailDraftRecord, 'id'>;
+  miningLedgerHistory: EntityTable<MiningLedgerHistoryRecord, 'characterId'>;
+  jitaPriceSnapshots: EntityTable<JitaPriceSnapshotRecord, 'date'>;
 };
 
 /**
@@ -1097,4 +1128,55 @@ db.version(13).stores({
   bpcSearchWatches: 'id',
   orderProblemSamples: 'orderId, characterId',
   mailDrafts: 'id, characterId',
+});
+
+// Additive: v13 stores unchanged, plus the Mining Overview's 90-day ledger
+// history (issue #1278). One row per Character, keyed by it, so
+// `removeCharacter` drops it with a single delete.
+db.version(14).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: 'id',
+  orderProblemSamples: 'orderId, characterId',
+  mailDrafts: 'id, characterId',
+  miningLedgerHistory: 'characterId',
+});
+
+// Additive: v14 stores unchanged, plus the Mining Overview's saved daily Jita
+// buy/sell prices (issue #1279). Keyed by date, so the 90-day prune is a
+// primary-key range delete.
+db.version(15).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: 'id',
+  orderProblemSamples: 'orderId, characterId',
+  mailDrafts: 'id, characterId',
+  miningLedgerHistory: 'characterId',
+  jitaPriceSnapshots: 'date',
 });

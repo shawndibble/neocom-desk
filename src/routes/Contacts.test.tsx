@@ -253,6 +253,38 @@ describe('Contacts', () => {
       expect(screen.queryByRole('tab', { name: 'Across characters' })).not.toBeInTheDocument();
     });
 
+    it('gives each tab its own path, and restores the across tab and its toggle on reload', async () => {
+      await addSecondCharacter();
+      await cacheSecondCharacterContacts([contactsPayload[0]]);
+      render(<App />);
+      await screen.findByText('Good Friend');
+      // The bare page path settles on the default tab, with no defaults in the query.
+      expect(window.location.pathname).toBe('/contacts/character');
+      expect(window.location.search).toBe('');
+
+      fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+      await screen.findByRole('table', { name: /across/i });
+      expect(window.location.pathname).toBe('/contacts/across');
+
+      fireEvent.click(screen.getByRole('button', { name: /Only disagreements/ }));
+      expect(window.location.search).toBe('?across.disagree=1');
+    });
+
+    it('opens straight onto the across tab from its link', async () => {
+      await addSecondCharacter();
+      await cacheSecondCharacterContacts([contactsPayload[0]]);
+      window.history.replaceState({}, '', '/contacts/across?across.disagree=1');
+      render(<App />);
+
+      const table = within(await screen.findByRole('table', { name: /across/i }));
+      expect(screen.getByRole('tab', { name: 'Across characters' })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      );
+      expect(table.queryByText('2 of 2')).not.toBeInTheDocument();
+      expect(table.getAllByText('1 of 2').length).toBe(4);
+    });
+
     it('counts the characters holding each contact, and flags the ones that disagree', async () => {
       await addSecondCharacter();
       await cacheSecondCharacterContacts([contactsPayload[0]]);
@@ -525,5 +557,47 @@ describe('Contacts standing tag (issue #403)', () => {
 
     expect(screen.getAllByRole('img', { name: 'Neutral standing (0)' }).length).toBe(2);
     expect(screen.getByRole('img', { name: 'Terrible standing (-10)' })).toBeInTheDocument();
+  });
+});
+
+describe('Contacts URL state', () => {
+  it('restores the search text and sort from the URL', async () => {
+    window.history.replaceState({}, '', '/contacts/character?q=corp&sort=name:asc');
+    render(<App />);
+    const table = within(await screen.findByRole('table', { name: 'Contacts' }));
+    expect(screen.getByRole('searchbox', { name: 'Name' })).toHaveValue('corp');
+    expect(table.queryByText('Good Friend')).not.toBeInTheDocument();
+    expect(table.getByText('Neutral Corp')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toHaveAttribute(
+      'aria-sort',
+      'ascending'
+    );
+  });
+
+  it('writes typed search text to the URL once typing pauses', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Good Friend');
+    await user.type(screen.getByRole('searchbox', { name: 'Name' }), 'friend');
+    await waitFor(() => expect(window.location.search).toBe('?q=friend'));
+    expect(window.location.pathname).toBe('/contacts/character');
+  });
+
+  it('writes a header sort to the URL, and leaves the default sort out', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Good Friend');
+    await user.click(screen.getByRole('button', { name: 'Name' }));
+    expect(window.location.search).toBe('?sort=name%3Aasc');
+  });
+
+  it('ignores an unreadable sort and falls back to standing, best first', async () => {
+    window.history.replaceState({}, '', '/contacts/character?sort=bogus:asc');
+    render(<App />);
+    await screen.findByText('Good Friend');
+    expect(screen.getByRole('columnheader', { name: /Standing/ })).toHaveAttribute(
+      'aria-sort',
+      'descending'
+    );
   });
 });

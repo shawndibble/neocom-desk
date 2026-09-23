@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 import { piFixture } from '@/sde/__fixtures__/pi';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -295,7 +296,7 @@ describe('acquisitionForLookup', () => {
     security: 'highsec',
     systemCostIndex: 0.05,
     adjustedPrices: {},
-    skills: {},
+    modifiers: NO_CHARACTER_MODIFIERS,
   };
 
   it('is a no-op — always null — when the caller never configured Blueprint Acquisition', () => {

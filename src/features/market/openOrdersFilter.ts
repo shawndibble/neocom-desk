@@ -15,8 +15,26 @@
 import type { OpenOrderRow } from './openOrdersModel';
 import { compareOpenOrderRowsWorstFirst } from './openOrdersModel';
 import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
+import {
+  boolParam,
+  defineUrlFilter,
+  enumParam,
+  idListParam,
+  optionalEnumParam,
+  optionalIdParam,
+  textParam,
+  type UrlParamCodec,
+} from '@/lib/urlState';
 
 export type OpenOrdersSort = 'worstFirst' | 'expirySoonest' | 'iskTiedUp' | 'item' | 'character';
+
+export const OPEN_ORDERS_SORTS: readonly OpenOrdersSort[] = [
+  'worstFirst',
+  'expirySoonest',
+  'iskTiedUp',
+  'item',
+  'character',
+];
 
 export interface OpenOrdersFilter {
   text: string;
@@ -262,14 +280,47 @@ export function activeFilterCount(filter: OpenOrdersFilter): number {
   return activeFilterChips(filter).length;
 }
 
-// --- Deep links -----------------------------------------------------------
+// --- URL state --------------------------------------------------------------
+
+/** Where the Orders page lives. Written down once here so every link agrees. */
+const ORDERS_PATH = '/market/orders';
+
+/** A closed set of members, comma-joined — same shape as `idListParam`, but of enum values rather than ids. */
+function enumListParam<V extends string>(values: readonly V[]): UrlParamCodec<readonly V[]> {
+  return {
+    parse: (raw) => {
+      if (raw === null || raw === '') return [];
+      const matched = raw
+        .split(',')
+        .filter((value): value is V => (values as readonly string[]).includes(value));
+      return matched.length === 0 ? [] : [...new Set(matched)];
+    },
+    serialize: (value) => (value.length === 0 ? null : [...new Set(value)].join(',')),
+  };
+}
 
 /**
- * Where the Orders page lives. Written down once here rather than at each
- * caller, so a link built by the board and a link parsed by the page cannot
- * disagree about the route they are both describing.
+ * The whole filter, one `{ key, codec }` per field, scoped `orders.*` so it
+ * can never collide with another panel's params on the same page (ADR 0015).
  */
-const ORDERS_PATH = '/market?section=orders';
+export const {
+  schema: OPEN_ORDERS_FILTER_PARAMS,
+  fieldToParam: OPEN_ORDERS_FIELD_TO_PARAM,
+  emptyParams: DEFAULT_OPEN_ORDERS_FILTER_PARAMS,
+} = defineUrlFilter<OpenOrdersFilter>({
+  text: { key: 'orders.q', codec: textParam() },
+  side: { key: 'orders.side', codec: optionalEnumParam<'buy' | 'sell'>(['buy', 'sell']) },
+  characterIds: { key: 'orders.characters', codec: idListParam() },
+  problems: { key: 'orders.problems', codec: enumListParam(FILTERABLE_PROBLEMS) },
+  expiringWithinDays: { key: 'orders.expiring', codec: optionalIdParam() },
+  costBasis: {
+    key: 'orders.costBasis',
+    codec: optionalEnumParam<'linked' | 'missing'>(['linked', 'missing']),
+  },
+  minIskTiedUp: { key: 'orders.minIsk', codec: optionalIdParam() },
+  hideHealthy: { key: 'orders.hideHealthy', codec: boolParam(true) },
+  sort: { key: 'orders.sort', codec: enumParam(OPEN_ORDERS_SORTS, 'worstFirst') },
+});
 
 export interface OpenOrdersLinkTarget {
   /** OR'd, the way the filter's own `problems` are. */
@@ -287,46 +338,18 @@ export interface OpenOrdersLinkTarget {
  * every value it applied as its own removable chip — so widening back out is
  * one click, and visibly so.
  *
- * Repeated params rather than one comma-separated value: `URLSearchParams`
- * reads and writes that shape natively, which leaves no delimiter to escape.
+ * Built from the same `OPEN_ORDERS_FILTER_PARAMS` codecs the page itself
+ * reads live, so a link the board builds and a page that has since changed
+ * its own params can never silently disagree about the shape of the URL.
  */
 export function openOrdersHref({ problems, characterIds }: OpenOrdersLinkTarget): string {
   const params = new URLSearchParams();
-  for (const problem of problems ?? []) params.append('problem', problem);
-  for (const characterId of characterIds ?? []) params.append('character', String(characterId));
+  const problemsRaw = OPEN_ORDERS_FILTER_PARAMS['orders.problems'].serialize(problems ?? []);
+  if (problemsRaw !== null) params.set('orders.problems', problemsRaw);
+  const charactersRaw = OPEN_ORDERS_FILTER_PARAMS['orders.characters'].serialize(
+    characterIds ?? []
+  );
+  if (charactersRaw !== null) params.set('orders.characters', charactersRaw);
   const query = params.toString();
-  return query === '' ? ORDERS_PATH : `${ORDERS_PATH}&${query}`;
-}
-
-/**
- * The other direction: what a URL asks the Orders page to show.
- *
- * Layered onto the page's own default rather than onto `EMPTY_*` — arriving by
- * deep link narrows the page, it does not reset everything else about it.
- *
- * Nothing here throws or reports a failure. A URL is typed, shared, bookmarked
- * and edited by hand, so an unreadable value is an ordinary event rather than
- * an error, and the page it asked for is still the right thing to show. The
- * base is returned by identity when the URL says nothing, so a caller can tell
- * "no deep link" from "a deep link that narrowed nothing".
- */
-export function openOrdersFilterFromParams(
-  params: URLSearchParams,
-  base: OpenOrdersFilter
-): OpenOrdersFilter {
-  const problems = params
-    .getAll('problem')
-    .filter((value): value is OrderProblem =>
-      (FILTERABLE_PROBLEMS as readonly string[]).includes(value)
-    );
-  const characterIds = params
-    .getAll('character')
-    .map((value) => Number.parseInt(value, 10))
-    .filter((value) => Number.isFinite(value));
-  if (problems.length === 0 && characterIds.length === 0) return base;
-  return {
-    ...base,
-    ...(problems.length > 0 && { problems }),
-    ...(characterIds.length > 0 && { characterIds }),
-  };
+  return query === '' ? ORDERS_PATH : `${ORDERS_PATH}?${query}`;
 }

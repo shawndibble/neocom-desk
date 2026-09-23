@@ -63,8 +63,10 @@ import { CharacterBadge } from '@/features/character/assetBrowserRows';
 import {
   useResolvedCharacterFilter,
   fromStoredCharacterFilterValue,
-  type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
+import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
+import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { enumSetParam, idListParam } from '@/lib/urlState';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 
 /** A row on the table, tagged with its owning Character even in the single-character view — so `rowKey` and the optional character column need no branch. */
@@ -72,6 +74,16 @@ type JobRow = ActiveJob & { characterId: number; characterName: string };
 
 /** The two derived job states this panel's Status filter offers — not ESI's raw `status` enum, just what the list already highlights. */
 type JobStatusFilter = 'completingSoon' | 'done';
+
+/**
+ * The Activity and Status filters in the URL (ADR 0015). Both start empty —
+ * "no filter" — so the empty set is the default and never written.
+ */
+const JOB_FILTER_PARAMS = {
+  'jobs.activity': idListParam(),
+  'jobs.status': enumSetParam<JobStatusFilter>(['completingSoon', 'done'], []),
+};
+const JOBS_DEFAULT_SORT = { columnId: 'endsIn', direction: 'asc' } as const;
 
 /** Picks a job tone's class out of a per-site map, `undefined` for the neutral case — the one place every `cellClassName`/`rowClassName`/fill-color call site turns a tone into a string. */
 function toneClass(
@@ -198,8 +210,10 @@ export function ActiveJobsPanel({
   // This menu starts with nothing checked and narrows by *checking* the
   // activities/statuses to include, so the empty set has to mean "no
   // filter" from the very first click, not `'all'`.
-  const [activityFilter, setActivityFilter] = useState<ReadonlySet<number>>(new Set());
-  const [statusFilter, setStatusFilter] = useState<ReadonlySet<JobStatusFilter>>(new Set());
+  const [jobFilters, setJobFilters] = useUrlParams(JOB_FILTER_PARAMS);
+  const activityIds = jobFilters['jobs.activity'];
+  const activityFilter = useMemo<ReadonlySet<number>>(() => new Set(activityIds), [activityIds]);
+  const statusFilter = jobFilters['jobs.status'];
   // The list is folded away by default: the header's one-line read (how many
   // run, what finishes next) is what a pilot glancing at the page wants, and
   // the six-column table is one click away when they don't.
@@ -216,24 +230,24 @@ export function ActiveJobsPanel({
    * active Character across a switch with no resync logic of its own
    * (`useResolvedCharacterFilter` re-resolves it whenever the active
    * Character changes) — or All/a hand-picked subset once the pilot asks.
+   *
+   * Kept in the URL (`jobs.chars`); absent, it is the synced default
+   * (Settings' Defaults panel), which reads as `'current'` until it hydrates.
+   * The URL never writes back to that setting.
    */
-  const [jobsCharacterFilter, setJobsCharacterFilter] = useState<CharacterFilterValue>('current');
-  // Seeded once from the synced default (Settings' Defaults panel) the
-  // moment it hydrates — before that, `'current'` above is the safe seed,
-  // identical to what the default itself defaults to. A press before
-  // hydration lands is not overwritten: `seededFromDefault` only ever seeds
-  // the picker's very first value.
   const defaultCharacterFilter = useDefaultCharacterFilter((state) => state.value);
-  const defaultCharacterFilterHydrated = useDefaultCharacterFilter((state) => state.hydrated);
   const hydrateDefaultCharacterFilter = useDefaultCharacterFilter((state) => state.hydrate);
   useEffect(() => {
     void hydrateDefaultCharacterFilter();
   }, [hydrateDefaultCharacterFilter]);
-  const [seededFromDefault, setSeededFromDefault] = useState(false);
-  if (defaultCharacterFilterHydrated && !seededFromDefault) {
-    setSeededFromDefault(true);
-    setJobsCharacterFilter(fromStoredCharacterFilterValue(defaultCharacterFilter));
-  }
+  const jobsCharacterParams = useMemo(
+    () => ({
+      'jobs.chars': characterFilterParam(fromStoredCharacterFilterValue(defaultCharacterFilter)),
+    }),
+    [defaultCharacterFilter]
+  );
+  const [jobsCharacterValues, setJobsCharacterValues] = useUrlParams(jobsCharacterParams);
+  const jobsCharacterFilter = jobsCharacterValues['jobs.chars'];
 
   const resolvedJobsFilter = useResolvedCharacterFilter(jobsCharacterFilter, characterId);
   // Set once the filter names anyone but the current Character: gates the
@@ -501,21 +515,17 @@ export function ActiveJobsPanel({
   );
 
   function toggleActivity(activityId: number) {
-    setActivityFilter((current) => {
-      const next = new Set(current);
-      if (next.has(activityId)) next.delete(activityId);
-      else next.add(activityId);
-      return next;
-    });
+    const next = activityIds.includes(activityId)
+      ? activityIds.filter((id) => id !== activityId)
+      : [...activityIds, activityId];
+    setJobFilters({ 'jobs.activity': next });
   }
 
   function toggleStatus(status: JobStatusFilter) {
-    setStatusFilter((current) => {
-      const next = new Set(current);
-      if (next.has(status)) next.delete(status);
-      else next.add(status);
-      return next;
-    });
+    const next = new Set(statusFilter);
+    if (next.has(status)) next.delete(status);
+    else next.add(status);
+    setJobFilters({ 'jobs.status': next });
   }
 
   const nameForBlueprint = useCallback(
@@ -560,12 +570,12 @@ export function ActiveJobsPanel({
           <span className="flex flex-wrap items-center gap-1.5">
             <span>{nameForBlueprint(job.blueprint_type_id)}</span>
             {soon(job) && (
-              <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-warning uppercase">
+              <span className="rounded-xs border border-warning/50 bg-warning/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
                 {t('industry.jobsCompletingSoon')}
               </span>
             )}
             {done(job) && (
-              <span className="rounded-xs border border-success/50 bg-success/15 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-success uppercase">
+              <span className="rounded-xs border border-success/50 bg-success/15 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-success uppercase">
                 {t('industry.jobsDone')}
               </span>
             )}
@@ -653,6 +663,11 @@ export function ActiveJobsPanel({
       },
     ],
     [t, now, soon, done, jobTone, nameForBlueprint, showCharacterColumn]
+  );
+  const sortProps = useUrlSort(
+    'jobs.sort',
+    JOBS_DEFAULT_SORT,
+    columns.map((column) => column.id)
   );
 
   /** Right-click any row for the shared item menu. */
@@ -748,7 +763,7 @@ export function ActiveJobsPanel({
           characters={jobsFilterCandidates}
           activeCharacterId={characterId}
           value={jobsCharacterFilter}
-          onChange={setJobsCharacterFilter}
+          onChange={(next) => setJobsCharacterValues({ 'jobs.chars': next })}
         />
       )}
       {noneActive ? (
@@ -927,7 +942,7 @@ export function ActiveJobsPanel({
                 rowKey={(job) => job.job_id}
                 highlightRowKey={highlightedJobId}
                 label={t('industry.jobsTitle')}
-                defaultSort={{ columnId: 'endsIn', direction: 'asc' }}
+                {...sortProps}
                 density="compact"
                 rowClassName={(job) =>
                   toneClass(jobTone(job), { warning: 'bg-warning/10', success: 'bg-success/10' })

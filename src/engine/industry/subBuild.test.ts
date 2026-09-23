@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { characterModifiers, NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { IndustryBlueprint, MaterialCostLine } from '@/engine/industry/types';
 import { materialCostLines } from '@/engine/industry/sourcing';
@@ -10,7 +11,7 @@ const CTX = {
   security: 'highsec' as const,
   systemCostIndex: 0.05,
   adjustedPrices: {} as Record<number, number>,
-  skills: {} as Record<number, number>,
+  modifiers: NO_CHARACTER_MODIFIERS,
 };
 
 /**
@@ -97,7 +98,10 @@ describe('planSubBuild', () => {
   });
 
   it('applies the context manufacturing-time implant bonus to the sub-job seconds (issue #1229)', () => {
-    const sub = planSubBuild(parent(57478, 3), recipe(), 0, { ...CTX, implantBonusPct: 4 });
+    const sub = planSubBuild(parent(57478, 3), recipe(), 0, {
+      ...CTX,
+      modifiers: characterModifiers({ skills: {}, implantTypeIds: [27171] }), // BX-804
+    });
 
     // 1800 * 1 run * 0.96 (BX-804)
     expect(sub?.seconds).toBeCloseTo(1728, 6);

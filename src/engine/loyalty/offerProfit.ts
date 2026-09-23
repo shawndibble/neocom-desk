@@ -19,6 +19,7 @@ import { brokerFee, salesTax } from '@/engine/industry/fees';
 import { SKILL_IDS } from '@/engine/industry/types';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { LiquidationBasis } from '@/engine/industry/ownedStockSale';
+import type { ResolvedStandings } from '@/engine/market/standings';
 
 export interface LoyaltyOfferProfitInput {
   /** The store's ISK price for the offer. */
@@ -55,6 +56,8 @@ export interface LoyaltyOfferProfitInput {
   liquidationBasis: LiquidationBasis;
   /** Trained skills; Accounting and Broker Relations set the two fee rates. */
   skills: SkillLevels;
+  /** The character's standing toward the sale hub's NPC owner. Absent/0 = standings assumed 0. */
+  standing?: ResolvedStandings;
 }
 
 export interface LoyaltyOfferProfit {
@@ -84,6 +87,7 @@ export function loyaltyOfferProfit(input: LoyaltyOfferProfitInput): LoyaltyOffer
     playerLp,
     liquidationBasis,
     skills,
+    standing,
   } = input;
 
   const accounting = skills[SKILL_IDS.accounting] ?? 0;
@@ -101,7 +105,7 @@ export function loyaltyOfferProfit(input: LoyaltyOfferProfitInput): LoyaltyOffer
     revenue === null
       ? null
       : liquidationBasis === 'order'
-        ? brokerFee(revenue, brokerRelations)
+        ? brokerFee(revenue, brokerRelations, standing?.factionStanding, standing?.corpStanding)
         : 0;
   const netRevenue =
     revenue === null || tax === null || broker === null ? null : revenue - tax - broker;

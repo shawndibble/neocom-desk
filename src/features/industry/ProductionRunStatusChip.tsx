@@ -24,7 +24,7 @@ export function ProductionRunStatusChip({ status }: { status: ProductionRunStatu
   const { t } = useTranslation();
   return (
     <span
-      className={`inline-flex items-center rounded-xs border px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest uppercase ${TONE_CLASS[status]}`}
+      className={`inline-flex items-center rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${TONE_CLASS[status]}`}
     >
       {t(LABEL_KEY[status])}
     </span>

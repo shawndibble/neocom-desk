@@ -20,7 +20,7 @@ const typeVolumes = new Map([
 ]);
 
 function row(overrides: Partial<MiningYieldRow> = {}): MiningYieldRow {
-  return {
+  const base: Omit<MiningYieldRow, 'byBasis'> = {
     characterId: 1,
     characterName: 'Miner Alt',
     entry: {
@@ -60,11 +60,21 @@ function row(overrides: Partial<MiningYieldRow> = {}): MiningYieldRow {
       ],
     },
     materialUnitPrices: new Map([[TRITANIUM, 3]]),
+    priceSource: 'saved',
     ...overrides,
+  };
+  const valued = {
+    valuation: base.valuation,
+    materialUnitPrices: base.materialUnitPrices,
+    priceSource: base.priceSource,
+  };
+  return {
+    ...base,
+    byBasis: { buy: valued, sell: valued, 'now-buy': valued, 'now-sell': valued },
   };
 }
 
-function renderModal(value = row()) {
+function renderModal(value = row(), { showRefining = true }: { showRefining?: boolean } = {}) {
   render(
     <YieldDetailModal
       open
@@ -74,6 +84,7 @@ function renderModal(value = row()) {
       systemSecurity={0.9}
       typeNames={typeNames}
       typeVolumes={typeVolumes}
+      showRefining={showRefining}
     />
   );
 }
@@ -186,5 +197,19 @@ describe('YieldDetailModal', () => {
       )
     ).toBeInTheDocument();
     expect(screen.getByText(/no market history on this date/)).toBeInTheDocument();
+  });
+
+  describe('refining hidden (issue #1281)', () => {
+    it('hides the refined-output section entirely', () => {
+      renderModal(row(), { showRefining: false });
+      expect(screen.queryByRole('table', { name: 'Refines into' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Refine, then sell')).not.toBeInTheDocument();
+      expect(screen.queryByText(/over selling raw/)).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/Reprocessing and Reprocessing Efficiency skills/)
+      ).not.toBeInTheDocument();
+      const ore = screen.getByRole('table', { name: 'Ore mined' });
+      expect(within(ore).queryByText('Refined value')).not.toBeInTheDocument();
+    });
   });
 });

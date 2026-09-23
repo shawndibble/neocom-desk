@@ -74,7 +74,7 @@ export function OrderProblemBadge({
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1 rounded-xs border px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest uppercase',
+        'inline-flex items-center gap-1 rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase',
         TONE_CLASS[KIND_TONE[kind]],
         className
       )}

@@ -24,6 +24,14 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import {
+  BPC_SOURCING_PARAMS,
+  BPC_SOURCING_SORT_KEY,
+  DEFAULT_SOURCE_TOGGLES,
+  SOURCE_TOGGLES,
+  type SourceToggle,
+} from './bpcSourcingUrl';
 import {
   EMPTY_BPC_SEARCH_FILTER,
   asContract,
@@ -44,7 +52,6 @@ import {
   type BpcContractRow,
   type BpcSearchFilter,
   type BpcSearchRow,
-  type BpcSearchSource,
 } from '@/engine/contracts/bpcSearch';
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
 import {
@@ -204,15 +211,6 @@ interface UiFilter {
   maxPrice: string;
 }
 
-const EMPTY_UI_FILTER: UiFilter = {
-  typeQuery: '',
-  regionId: null,
-  minMe: '',
-  minTe: '',
-  minRuns: '',
-  maxPrice: '',
-};
-
 const ALL_REGIONS = 'all';
 const TYPE_SEARCH_LIMIT = 50;
 
@@ -272,22 +270,16 @@ function hubStationIn(regionId: number | null): number {
   return TRADE_HUBS.find((hub) => hub.regionId === regionId)?.stationId ?? 0;
 }
 
+const OFFERS_DEFAULT_SORT = { columnId: 'price', direction: 'asc' } as const;
+
 /** Rows shown before "show all" (same precedent as Contracts/the market order book). */
 const ROW_CAP = 50;
 
-/**
- * The Source toggles. `contract` is copies; `contractBpo` is contract
- * originals and `market` market BPO sell orders (issue #1241) — both off by
- * default, so the tab stays a copy search unless asked.
- */
-type SourceToggle = BpcSearchSource | 'contractBpo';
-const SOURCE_TOGGLES: readonly SourceToggle[] = ['contract', 'contractBpo', 'market', 'owned'];
-
-/** Both on by default: an existing user must keep seeing today's contract results, plus their owned blueprints, not a narrower default. */
-const DEFAULT_SOURCES: ReadonlySet<SourceToggle> = new Set(['contract', 'owned']);
-
 function isDefaultSources(sources: ReadonlySet<SourceToggle>): boolean {
-  return sources.size === DEFAULT_SOURCES.size && [...DEFAULT_SOURCES].every((s) => sources.has(s));
+  return (
+    sources.size === DEFAULT_SOURCE_TOGGLES.length &&
+    DEFAULT_SOURCE_TOGGLES.every((s) => sources.has(s))
+  );
 }
 
 const SOURCE_LABEL_KEYS: Record<SourceToggle, string> = {
@@ -502,17 +494,7 @@ function BpcFilterBar({
  * data — this one is global and Firestore-backed, Industry's is per-character
  * and ESI-backed.
  */
-export interface BpcSourcingPanelProps {
-  /**
-   * Pre-selects this blueprint on mount (issue #839's picker/override modal:
-   * "a search action pre-filtered to the item, opening BPC Sourcing").
-   * `Industry.tsx` reads it from the `bpcSearch` query param. `null`/absent
-   * leaves the search on whatever the pilot was last browsing.
-   */
-  initialTypeId?: number | null;
-}
-
-export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps = {}) {
+export function BpcSourcingPanel() {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -550,9 +532,23 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
     void setVisibleColumns(next);
   }
 
-  const [uiFilter, setUiFilter] = useState<UiFilter>(EMPTY_UI_FILTER);
-  const [showAll, setShowAll] = useState(false);
-  const [sources, setSources] = useState<ReadonlySet<SourceToggle>>(DEFAULT_SOURCES);
+  // Search, filters, sources, Show all and the pinned blueprint all live in
+  // the URL (`bpcSourcingUrl.ts`), one group so a handler that changes
+  // several at once writes them in one navigation.
+  const [params, setParams] = useUrlParams(BPC_SOURCING_PARAMS);
+  const uiFilter: UiFilter = useMemo(
+    () => ({
+      typeQuery: params['sourcing.q'],
+      regionId: params['sourcing.region'],
+      minMe: params['sourcing.minMe'],
+      minTe: params['sourcing.minTe'],
+      minRuns: params['sourcing.minRuns'],
+      maxPrice: params['sourcing.maxPrice'],
+    }),
+    [params]
+  );
+  const showAll = params['sourcing.all'];
+  const sources = params['sourcing.src'];
   /**
    * The one blueprint the search has been narrowed to, or `null` while the
    * query is still free text. Distinct from `uiFilter.typeQuery`: typing
@@ -560,20 +556,10 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
    * the browse path this page has always had; *choosing* one from the
    * autocomplete is what unlocks the per-blueprint summary and the
    * cheapest-by-region comparison, neither of which means anything averaged
-   * across several different blueprints.
+   * across several different blueprints. A "search BPC Sourcing" link
+   * (`bpcSourcingHref`, issue #839) arrives with only this set.
    */
-  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(initialTypeId);
-  // Adjusted during render, not an effect (React's own pattern for "store
-  // info from props" — an effect's setState would cost an extra render):
-  // re-applies whenever the caller passes a new id (e.g. the picker/override
-  // modal's search action fires again for a different blueprint while this
-  // panel stays mounted), which a `useState` initializer alone would miss
-  // past the first mount.
-  const [prevInitialTypeId, setPrevInitialTypeId] = useState(initialTypeId);
-  if (initialTypeId !== prevInitialTypeId) {
-    setPrevInitialTypeId(initialTypeId);
-    if (initialTypeId !== null) setSelectedTypeId(initialTypeId);
-  }
+  const selectedTypeId = params['sourcing.type'];
   /** The row whose contract detail is open, if any. */
   const [openRow, setOpenRow] = useState<BpcContractRow | null>(null);
 
@@ -698,25 +684,32 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
 
   /** Picking from the autocomplete puts the blueprint's full name in the box, the way a combobox does — the field keeps showing what is being filtered on. */
   function selectBlueprint(suggestion: BlueprintSuggestion) {
-    setSelectedTypeId(suggestion.typeId);
-    setUiFilter((filter) => ({ ...filter, typeQuery: suggestion.name }));
-    setShowAll(false);
+    setParams({
+      'sourcing.type': suggestion.typeId,
+      'sourcing.q': suggestion.name,
+      'sourcing.all': false,
+    });
   }
 
   function clearBlueprint() {
-    setSelectedTypeId(null);
-    setUiFilter((filter) => ({ ...filter, typeQuery: '' }));
-    setShowAll(false);
+    setParams({ 'sourcing.type': null, 'sourcing.q': '', 'sourcing.all': false });
   }
 
   /** Editing the text drops the pinned blueprint — otherwise the box would show one name while the table filtered on another. */
   function changeFilter(next: UiFilter) {
-    if (next.typeQuery !== uiFilter.typeQuery) setSelectedTypeId(null);
-    setUiFilter(next);
-    // Any filter edit gives a different row set, so an expansion asked for
-    // against the previous one no longer means anything — same reset the two
-    // blueprint handlers do.
-    setShowAll(false);
+    setParams({
+      ...(next.typeQuery !== uiFilter.typeQuery ? { 'sourcing.type': null } : {}),
+      'sourcing.q': next.typeQuery,
+      'sourcing.region': next.regionId,
+      'sourcing.minMe': next.minMe,
+      'sourcing.minTe': next.minTe,
+      'sourcing.minRuns': next.minRuns,
+      'sourcing.maxPrice': next.maxPrice,
+      // Any filter edit gives a different row set, so an expansion asked for
+      // against the previous one no longer means anything — same reset the
+      // two blueprint handlers do.
+      'sourcing.all': false,
+    });
   }
   const regionOptions = useMemo(
     () =>
@@ -1248,6 +1241,11 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
     bpoLocationName,
     regionLabel,
   ]);
+  const sortProps = useUrlSort(
+    BPC_SOURCING_SORT_KEY,
+    OFFERS_DEFAULT_SORT,
+    columns.map((column) => column.id)
+  );
 
   if (!hydrated || activeCharacterId === null) {
     // No redirect of its own: the Industry route this sits in already sends a
@@ -1323,7 +1321,7 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
             onChange={changeFilter}
             regionOptions={regionOptions}
             sources={sources}
-            onSourcesChange={setSources}
+            onSourcesChange={(next) => setParams({ 'sourcing.src': next })}
             spaceKinds={spaceFilter}
             onSpaceKindsChange={(next) => void setSpaceFilter(next)}
           />
@@ -1587,7 +1585,11 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
           {sources.size === 0 ? (
             <EmptyState title={t('bpcContracts.noSourceSelected')} className="py-8" />
           ) : displayRows.length === 0 ? (
-            <EmptyState title={t('bpcContracts.noFilterMatches')} className="py-8" />
+            <EmptyState
+              title={t('bpcContracts.noFilterMatches')}
+              hint={t('bpcContracts.noFilterMatchesHint')}
+              className="py-8"
+            />
           ) : (
             <>
               <DataTable
@@ -1607,7 +1609,7 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
                       ? `market:${row.orderId}`
                       : `owned:${row.itemId}`
                 }
-                defaultSort={{ columnId: 'price', direction: 'asc' }}
+                {...sortProps}
                 // No contract exists for an owned row — nothing to open.
                 onRowClick={(row) => setOpenRow(asContract(row))}
                 rowContextMenu={(row, tr) => (
@@ -1625,7 +1627,7 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
               />
               {!showAll && displayRows.length > ROW_CAP && (
                 <div className="px-3 py-2">
-                  <Button size="sm" onClick={() => setShowAll(true)}>
+                  <Button size="sm" onClick={() => setParams({ 'sourcing.all': true })}>
                     {t('bpcContracts.showAll', { count: displayRows.length })}
                   </Button>
                 </div>

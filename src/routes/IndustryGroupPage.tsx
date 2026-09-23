@@ -21,6 +21,7 @@ import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts'
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { OwnedStockScope } from '@/engine/industry/types';
 import { useQuickbar } from '@/features/market/useQuickbar';
+import { useTradeHubStandings } from '@/features/market/useTradeHubStandings';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 
 const NO_PLANS: BuildPlanRecord[] = [];
@@ -42,13 +43,13 @@ export function IndustryGroupPage() {
     pi,
     ownedBlueprints,
     corpOwnedBlueprints,
-    skills,
-    implantBonusPct,
+    modifiers,
     ownedStockSnapshot,
     blueprintsNeedsReauth,
   } = workspace;
 
   const quickbar = useQuickbar(activeCharacterId);
+  const tradeHubStandings = useTradeHubStandings(activeCharacterId);
   const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
     null
   );
@@ -95,7 +96,7 @@ export function IndustryGroupPage() {
       catalog,
       pi,
       ownedBlueprints,
-      skills,
+      modifiers,
       workspace.assumedMe,
       options,
       corpOwnedBlueprints,
@@ -130,14 +131,14 @@ export function IndustryGroupPage() {
     );
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
-  if (groupId === undefined) return <Navigate to="/industry" replace />;
+  if (groupId === undefined) return <Navigate to={industryTabHref('plans')} replace />;
 
   const group = buildGroupsFor(workspace.buildGroups, activeCharacterId).find(
     (g) => g.id === groupId
   );
   // Deleted elsewhere, or a stale URL — the index is the only page left to
   // send the pilot back to (same rule `IndustryPlanPage` follows).
-  if (!group) return <Navigate to="/industry" replace />;
+  if (!group) return <Navigate to={industryTabHref('plans')} replace />;
 
   return (
     <div className="mx-auto max-w-7xl space-y-4">
@@ -166,8 +167,8 @@ export function IndustryGroupPage() {
           pi={pi}
           ownedBlueprints={ownedBlueprints}
           corpOwnedBlueprints={corpOwnedBlueprints}
-          skills={skills}
-          implantBonusPct={implantBonusPct}
+          modifiers={modifiers}
+          tradeHubStandings={tradeHubStandings}
           ownedStockSnapshot={ownedStockSnapshot}
           onOpenPlan={(planId) => navigate(`/industry/plans/${planId}`)}
           onRetarget={(target, planIds) => void handleRetargetGroup(target, planIds)}

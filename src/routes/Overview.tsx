@@ -352,7 +352,7 @@ export function Overview() {
     {
       key: 'orders',
       domain: t('overview.board.orders'),
-      to: '/market?section=orders',
+      to: '/market/orders',
       severity: ordersSeverity(orderRows, ordersNeedReauth),
       summary: ordersSummary(t, orderRows, ordersNeedReauth),
       render: () => (
@@ -367,7 +367,7 @@ export function Overview() {
     {
       key: 'mining',
       domain: t('overview.board.miningTax'),
-      to: '/moon-mining',
+      to: '/mining',
       severity: miningTaxSeverity(miningSnapshot.data),
       summary: miningTaxSummary(t, miningSnapshot.data),
       render: () => <MiningTaxCard data={miningSnapshot.data} />,

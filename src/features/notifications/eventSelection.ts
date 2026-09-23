@@ -23,7 +23,7 @@
  * lose its settings.
  */
 import type { SelectionState } from '@/features/character/assetSelection';
-import type { NotificationEventId } from './events';
+import { NOTIFICATION_EVENTS, type NotificationEventId } from './events';
 
 export const NOTIFICATION_CHANNELS = ['browser', 'feed'] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
@@ -35,21 +35,15 @@ export type EventEnabledMap = Partial<Record<NotificationEventId, EventChannelSt
 
 /**
  * Events that default to feed-on/browser-off instead of on-for-both
- * (CONTEXT.md round 45) — worth a row, not worth an interruption.
- *
- * `contractCompleted`/`contractFailed` (issue #1091) join this set by an
- * explicit decision in that ticket, deliberately including failure: a
- * forfeited courier is irreversible by the time you hear about it, so the
- * value is the durable feed record, not a popup — a reviewer who wants
- * failure to interrupt should say so as a deliberate reversal, not inherit
- * one from an unattended default.
+ * (CONTEXT.md round 45) — worth a row, not worth an interruption. Declared per
+ * event in the catalog (`events.ts`'s `defaultChannels`, where the reasoning
+ * for each lives), read here.
  */
-const EVENTS_FEED_ONLY_BY_DEFAULT: ReadonlySet<NotificationEventId> = new Set([
-  'marketOrderFilled',
-  'walletBalanceChanged',
-  'contractCompleted',
-  'contractFailed',
-]);
+const EVENTS_FEED_ONLY_BY_DEFAULT: ReadonlySet<NotificationEventId> = new Set(
+  NOTIFICATION_EVENTS.filter((event) => event.defaultChannels === 'feedOnly').map(
+    (event) => event.id
+  )
+);
 
 function eventDefaultFor(eventId: NotificationEventId, channel: NotificationChannel): boolean {
   if (channel === 'browser' && EVENTS_FEED_ONLY_BY_DEFAULT.has(eventId)) return false;

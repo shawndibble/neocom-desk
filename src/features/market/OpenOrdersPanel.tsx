@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -31,6 +31,7 @@ import { resolveCharacterFilter } from '@/features/character/characterFilterValu
 import { loadReprocessing } from '@/sde/loadSde';
 import type { ReprocessingType } from '@/sde/types';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
+import { useUrlFilter } from '@/lib/useUrlState';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { cx } from '@/lib/cx';
 import { formatIskAuto, formatIskCompact } from '@/lib/isk';
@@ -66,9 +67,12 @@ import {
   EMPTY_OPEN_ORDERS_FILTER,
   FILTERABLE_PROBLEMS,
   filterOpenOrders,
-  openOrdersFilterFromParams,
+  OPEN_ORDERS_FIELD_TO_PARAM,
+  OPEN_ORDERS_FILTER_PARAMS,
+  OPEN_ORDERS_SORTS,
   sortOpenOrders,
   activeFilterChips,
+  DEFAULT_OPEN_ORDERS_FILTER_PARAMS,
   type OpenOrdersFilter,
   type OpenOrdersSort,
 } from './openOrdersFilter';
@@ -81,18 +85,11 @@ import { OrderBadgeLegend } from './OrderBadgeLegend';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { OrderDetailModal } from './OrderDetailModal';
 import type { ReprocessingInput } from './orderExits';
-import { resolveReprocessingSkills } from '@/engine/industry/reprocessing';
 
 /** Healthy orders start collapsed (CONTEXT.md redesign) — the `showHealthy` toggle is the way back, not the funnel filter. */
 const DEFAULT_FILTER: OpenOrdersFilter = { ...EMPTY_OPEN_ORDERS_FILTER, hideHealthy: true };
 
-const SORTS: readonly OpenOrdersSort[] = [
-  'worstFirst',
-  'expirySoonest',
-  'iskTiedUp',
-  'item',
-  'character',
-];
+const SORTS: readonly OpenOrdersSort[] = OPEN_ORDERS_SORTS;
 
 /**
  * Every problem worth a funnel chip. The same set a deep link may name, and
@@ -151,20 +148,19 @@ export function OpenOrdersPanel() {
   );
 
   /*
-   * A deep link narrows the opening filter — the Overview board's count tiles
-   * link here already filtered to what they counted, so a tile reading "21
-   * undercut" and a page listing thirty cannot both be on screen.
-   *
-   * Read once on mount and never synced afterwards, which is what Wallet's
-   * `?tab=` and Market's own `?section=` do. The URL states where the player
-   * arrived, not where they have got to since; keeping it in step would mean
-   * every chip removed rewrites history, and a stale param nobody reads again
-   * costs nothing. `activeFilterChips` is what shows them the filter is on and
-   * hands them the way out of it.
+   * The whole filter lives in the URL (ADR 0015), one `orders.*` key per
+   * field — a deep link (the Overview board's count tiles, `openOrdersHref`)
+   * narrows it on arrival, and every chip, select and search keystroke from
+   * here on writes straight back to it, so a reload or a shared link always
+   * reopens exactly what was on screen. This page has only the one filter
+   * bar, so it never needs `useUrlFilter`'s scope-reset — the scope key
+   * never changes.
    */
-  const [searchParams] = useSearchParams();
-  const [filter, setFilter] = useState<OpenOrdersFilter>(() =>
-    openOrdersFilterFromParams(searchParams, DEFAULT_FILTER)
+  const [filter, setFilter] = useUrlFilter<OpenOrdersFilter>(
+    'orders',
+    OPEN_ORDERS_FILTER_PARAMS,
+    OPEN_ORDERS_FIELD_TO_PARAM,
+    DEFAULT_OPEN_ORDERS_FILTER_PARAMS
   );
   const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
@@ -436,6 +432,7 @@ export function OpenOrdersPanel() {
       stationNames,
       problemSamples: snapshot.problemSamples,
       skillsByCharacter: snapshot.skillsByCharacter,
+      standingsByOrder: snapshot.standingsByOrder,
       now: snapshot.now,
     });
   }, [snapshot, deepCompetitionByOrderId, structureByKey, stationNames]);
@@ -1168,11 +1165,7 @@ export function OpenOrdersPanel() {
             return {
               entry: loaded.entry,
               materialPrices: loaded.materialPrices,
-              skills: resolveReprocessingSkills(
-                skills,
-                loaded.entry.specialisationSkillID,
-                skills.trained
-              ),
+              modifiers: skills.modifiers,
             };
           })()}
           hubs={((): readonly HubBuyPrice[] | undefined => {

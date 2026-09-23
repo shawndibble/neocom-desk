@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -23,6 +23,7 @@ import {
   Spinner,
   Tabs,
   type DataTableColumn,
+  type DataTableSort,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -36,10 +37,10 @@ import {
   type WalletBalancesSnapshot,
 } from '@/features/character/wallet';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import { CorpHistoryContextMenu } from '@/features/character/CorpHistoryContextMenu';
 import {
   useResolvedCharacterFilter,
   fromStoredCharacterFilterValue,
-  type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { loadCharacterLoyaltyPoints, splitEverMarks } from '@/features/character/loyalty';
@@ -47,10 +48,15 @@ import { resolveNames } from '@/features/character/names';
 import type { CachedResult, StatusResult } from '@/esi/cache';
 import { humanizeRefType, iskToneClass } from '@/features/character/format';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { useCorpOwner } from '@/features/corp/owner';
+import { useCorpOwner, type DataOwner } from '@/features/corp/owner';
 import { OwnerSwitch } from '@/features/corp/OwnerSwitch';
 import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
 import { walletDivisions, type WalletDivision } from '@/features/corp/divisions';
+import { usePageTab } from '@/lib/usePageTab';
+import { useUrlFilter, useUrlParam, useUrlSort } from '@/lib/useUrlState';
+import { enumParam, intParam } from '@/lib/urlState';
+import { WALLET_TABS } from '@/app/pageTabs';
+import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import {
   loadCorporationDivisions,
   loadCorporationWalletJournal,
@@ -63,8 +69,10 @@ import { useQuickbar } from '@/features/market/useQuickbar';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { loadTypeNames } from '@/features/character/typeNames';
 import {
-  EMPTY_WALLET_TRANSACTION_FILTER,
+  EMPTY_TRANSACTION_FILTER_PARAMS,
   filterWalletTransactions,
+  TRANSACTION_FIELD_TO_PARAM,
+  TRANSACTION_FILTER_PARAMS,
   type WalletTransactionFilter,
 } from '@/features/character/walletTransactionFilter';
 import { formatIsk } from '@/lib/isk';
@@ -73,9 +81,11 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import {
-  EMPTY_WALLET_JOURNAL_FILTER,
   activeWalletJournalFilterCount,
+  EMPTY_JOURNAL_FILTER_PARAMS,
   filterWalletJournal,
+  JOURNAL_FIELD_TO_PARAM,
+  JOURNAL_FILTER_PARAMS,
   journalRefTypes,
   type WalletJournalFilter,
 } from '@/features/character/walletJournalFilter';
@@ -182,6 +192,8 @@ interface JournalTableProps {
    * journal beside it has its own rows with their own ids.
    */
   highlightRowKey?: number | null;
+  sort: DataTableSort;
+  onSortChange: (sort: DataTableSort) => void;
 }
 
 /** The filter bar plus its result — either the table or a filtered-empty message. Shared by the personal and corp journal panels (issue #413). */
@@ -193,6 +205,8 @@ function JournalTable({
   journalColumns,
   label,
   highlightRowKey = null,
+  sort,
+  onSortChange,
 }: JournalTableProps) {
   const { t } = useTranslation();
   return (
@@ -211,7 +225,8 @@ function JournalTable({
           rows={filteredJournal}
           rowKey={(entry) => entry.id}
           highlightRowKey={highlightRowKey}
-          defaultSort={{ columnId: 'date', direction: 'desc' }}
+          sort={sort}
+          onSortChange={onSortChange}
         />
       )}
     </>
@@ -234,6 +249,15 @@ const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const EMPTY_JOURNAL: readonly WalletJournalEntry[] = [];
 /** Same, for the corp transactions tab. */
 const EMPTY_TRANSACTIONS: readonly CorporationWalletTransaction[] = [];
+
+/** `?owner=`/`?division=` params (issue #419, #1302). */
+const OWNER_PARAM = enumParam<DataOwner>(['personal', 'corporation'], 'personal');
+const DIVISION_PARAM = intParam(1, { min: 1, max: 7 });
+
+const BALANCE_SORT = { columnId: 'character', direction: 'asc' } as const;
+const LOYALTY_SORT = { columnId: 'points', direction: 'desc' } as const;
+const JOURNAL_SORT = { columnId: 'date', direction: 'desc' } as const;
+const TRANSACTIONS_SORT = { columnId: 'date', direction: 'desc' } as const;
 
 interface Snapshot {
   balanceResult: CachedResult<number> | null;
@@ -338,6 +362,8 @@ interface CorpWalletViewProps {
   journalColumns: DataTableColumn<WalletJournalEntry>[];
   journalFilter: WalletJournalFilter;
   onJournalFilterChange: (filter: WalletJournalFilter) => void;
+  journalSort: DataTableSort;
+  onJournalSortChange: (sort: DataTableSort) => void;
   division: WalletDivision | null;
   divisionLabel: (entry: WalletDivision) => string;
   offlineTitleKey: string;
@@ -361,6 +387,8 @@ function CorpWalletView({
   journalColumns,
   journalFilter,
   onJournalFilterChange,
+  journalSort,
+  onJournalSortChange,
   division,
   divisionLabel,
   offlineTitleKey,
@@ -388,7 +416,7 @@ function CorpWalletView({
             <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {divisionLabel(division)}
             </p>
-            <p className={`text-lg font-medium tabular-nums ${iskToneClass(division.balance)}`}>
+            <p className={`text-xl font-medium tabular-nums ${iskToneClass(division.balance)}`}>
               {formatIsk(division.balance, 2)}
             </p>
             {walletsResult.fromCache && (
@@ -467,49 +495,13 @@ function CorpWalletView({
             filteredJournal={filteredJournal}
             journalColumns={journalColumns}
             label={t('wallet.journalTab')}
+            sort={journalSort}
+            onSortChange={onJournalSortChange}
           />
         </>
       )}
     </Panel>
   );
-}
-
-/**
- * Parses the `?tab=` deep link; anything unrecognized lands on Balance rather
- * than erroring. `transactions` is corp-only, and the render below sends it
- * back to Balance for a personal wallet rather than rejecting it here — the
- * owner is not known at parse time, and a `?owner=corporation&tab=transactions`
- * link is exactly what the corp view wants to honour.
- */
-function walletTabFromParam(param: string | null): WalletTab {
-  if (param === 'journal') return 'journal';
-  if (param === 'transactions') return 'transactions';
-  return 'balance';
-}
-
-/**
- * Parses the `?owner=` deep link the vitals rail's division links use (issue
- * #419); anything else lands on Personal. `useCorpOwner`'s own `available`
- * check still forces Personal for a Character who never held the capability,
- * so a stale or forged link degrades to the page's normal default rather
- * than stranding the view on Corporation with no switch to get back.
- */
-function walletOwnerFromParam(param: string | null): 'personal' | 'corporation' {
-  return param === 'corporation' ? 'corporation' : 'personal';
-}
-
-/**
- * Parses the `?division=` deep link; anything outside ESI's own 1-7 division
- * range falls back to 1. Division is used to build the corp journal's cache
- * key (`corpJournalBaseKey`) before `divisions` has necessarily loaded, so an
- * out-of-range value can't be left for `effectiveDivision`'s own fallback to
- * catch later — that one only self-heals once the division list is populated,
- * and a bare `Number.isInteger` check would let `?division=0` (or a negative)
- * straight through to a `/wallets/0/journal` read in the meantime.
- */
-function walletDivisionFromParam(param: string | null): number {
-  const parsed = param === null ? NaN : Number(param);
-  return Number.isInteger(parsed) && parsed >= 1 && parsed <= 7 ? parsed : 1;
 }
 
 /**
@@ -544,11 +536,11 @@ export function Wallet() {
     setInfoModalItem({ typeId, itemName });
   }
 
-  // A notification's `?tab=` deep link (`notificationOptions.ts`) picks the
-  // opening tab; read once on mount, same as the `Tabs` control's own local
-  // state below — an invalid or missing value falls back to Balance.
-  const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState<WalletTab>(() => walletTabFromParam(searchParams.get('tab')));
+  // A notification's `walletBalanceChanged` deep link (`notificationOptions.ts`)
+  // names the tab as a path segment (`/wallet/journal`) — the `Tabs`
+  // control's own switch is a history push the same way any other tab
+  // switch is (ADR 0015, issue #1302).
+  const [tab, setTab] = usePageTab(WALLET_TABS);
   // The journal line a `walletBalanceChanged` alert pointed at, if any.
   const highlightedEntryId = useHighlightParam();
 
@@ -559,23 +551,27 @@ export function Wallet() {
    * (`useResolvedCharacterFilter` re-resolves it whenever the active
    * Character changes) — or All/a hand-picked subset once the pilot asks via
    * `CharacterFilterControl`.
+   *
+   * Lives in the `?char=` query param (issue #1302), so it survives a reload
+   * and a pasted link — the codec's own default is the synced setting below,
+   * rebuilt in a `useMemo` whenever that setting changes, so an absent param
+   * reads as whatever Settings' Defaults panel says until the URL overrides
+   * it for this view. Nothing read from the URL is ever written back to the
+   * setting.
    */
-  const [walletCharacterFilter, setWalletCharacterFilter] =
-    useState<CharacterFilterValue>('current');
-  // Seeded once from the synced default (Settings' Defaults panel) the
-  // moment it hydrates — see `ActiveJobsPanel.tsx`'s identical seeding for
-  // why `'current'` above is already the safe interim value.
   const defaultCharacterFilter = useDefaultCharacterFilter((state) => state.value);
-  const defaultCharacterFilterHydrated = useDefaultCharacterFilter((state) => state.hydrated);
   const hydrateDefaultCharacterFilter = useDefaultCharacterFilter((state) => state.hydrate);
   useEffect(() => {
     void hydrateDefaultCharacterFilter();
   }, [hydrateDefaultCharacterFilter]);
-  const [seededWalletFilterFromDefault, setSeededWalletFilterFromDefault] = useState(false);
-  if (defaultCharacterFilterHydrated && !seededWalletFilterFromDefault) {
-    setSeededWalletFilterFromDefault(true);
-    setWalletCharacterFilter(fromStoredCharacterFilterValue(defaultCharacterFilter));
-  }
+  const characterFilterCodec = useMemo(
+    () => characterFilterParam(fromStoredCharacterFilterValue(defaultCharacterFilter)),
+    [defaultCharacterFilter]
+  );
+  const [walletCharacterFilter, setWalletCharacterFilter] = useUrlParam(
+    'char',
+    characterFilterCodec
+  );
 
   const resolvedWalletFilter = useResolvedCharacterFilter(walletCharacterFilter, activeCharacterId);
   const showingAllWalletBalances =
@@ -636,12 +632,16 @@ export function Wallet() {
   );
   const walletBalancesLoading = walletBalancesSnapshot === null;
 
+  // `?owner=` backs `useCorpOwner` below (see its own doc for the rules) —
+  // `setUrlOwner` is the `setOwner` that hook writes both a toggle and its
+  // own resets through.
+  const [urlOwner, setUrlOwner] = useUrlParam('owner', OWNER_PARAM);
   const {
     owner,
     setOwner,
     available: corpAvailable,
     corporationId,
-  } = useCorpOwner('canReadWallet', walletOwnerFromParam(searchParams.get('owner')));
+  } = useCorpOwner('canReadWallet', urlOwner, setUrlOwner);
   const showingCorp =
     owner === 'corporation' && corporationId !== null && activeCharacterId !== null;
 
@@ -676,9 +676,7 @@ export function Wallet() {
   // corporation's list — which is exactly what a corp change looks like, and
   // also what a `?division=` deep link (issue #419) that named a division
   // this corporation doesn't have looks like.
-  const [division, setDivision] = useState(() =>
-    walletDivisionFromParam(searchParams.get('division'))
-  );
+  const [division, setDivision] = useUrlParam('division', DIVISION_PARAM);
   const effectiveDivision = divisions.some((entry) => entry.division === division)
     ? division
     : (divisions[0]?.division ?? division);
@@ -814,6 +812,11 @@ export function Wallet() {
     ],
     [t, corporationNames]
   );
+  const loyaltySortProps = useUrlSort(
+    'loyalty.sort',
+    LOYALTY_SORT,
+    loyaltyColumns.map((column) => column.id)
+  );
 
   const walletBalanceColumns = useMemo<DataTableColumn<CharacterWalletBalance>[]>(
     () => [
@@ -843,6 +846,11 @@ export function Wallet() {
       },
     ],
     [t]
+  );
+  const balanceSortProps = useUrlSort(
+    'balance.sort',
+    BALANCE_SORT,
+    walletBalanceColumns.map((column) => column.id)
   );
 
   const journalColumns = useMemo<DataTableColumn<WalletJournalEntry>[]>(
@@ -893,10 +901,10 @@ export function Wallet() {
     [t, timeZone]
   );
 
-  // Unsorted: `DataTable`'s own `defaultSort` below is the one place these
-  // rows get ordered — sorting here too was a redundant second pass over the
-  // same array on every render (issue #413). CSV export sorts its own copy at
-  // export time instead, since it bypasses `DataTable` entirely.
+  // Unsorted: `DataTable`'s own controlled `sort` below is the one place
+  // these rows get ordered — sorting here too was a redundant second pass
+  // over the same array on every render (issue #413). CSV export sorts its
+  // own copy at export time instead, since it bypasses `DataTable` entirely.
   const journal = journalResult?.data ?? EMPTY_JOURNAL;
   const walletBalancePoints = useMemo(() => walletBalanceHistory(journal), [journal]);
   const walletBalanceTrendDirection = useMemo(
@@ -906,21 +914,33 @@ export function Wallet() {
   const corpJournalResult = corpJournal.data?.cached ?? null;
   const corpJournalEntries = corpJournalResult?.data ?? EMPTY_JOURNAL;
 
-  // Local, per-visit filter state (not URL-synced), same shape as the tab
-  // control itself — see CONTEXT.md round 48 on Wallet's tabs. Reset on a
-  // switch of *which* journal is showing (owner, or corp division) — the
-  // ref-type dropdown is built from that journal's own values, so carrying a
-  // filter across the switch could pin a selection that journal never had.
-  const [journalFilter, setJournalFilter] = useState<WalletJournalFilter>(
-    EMPTY_WALLET_JOURNAL_FILTER
+  // Built from the raw `?owner=`/`?division=` params, not `showingCorp`/
+  // `effectiveDivision`: those settle a render or two after mount (corp
+  // access and the division list both resolve async), so a cold reload of
+  // `/wallet/transactions?owner=corporation&division=2&txn.q=foo` would
+  // otherwise see the scope go `personal` → `corp:2` as they resolve and
+  // wipe the very filter the URL just delivered. `urlOwner`/`division` are
+  // synchronous from the first render, so this only changes on a real
+  // owner or division change.
+  const journalFilterScope = urlOwner === 'corporation' ? `corp:${division}` : 'personal';
+  // In the URL (`journal.*`, issue #1302). Reset on a switch of *which*
+  // journal is showing (owner, or corp division) — the ref-type dropdown is
+  // built from that journal's own values, so carrying a filter across the
+  // switch could pin a selection that journal never had.
+  const [journalFilter, setJournalFilter] = useUrlFilter<WalletJournalFilter>(
+    journalFilterScope,
+    JOURNAL_FILTER_PARAMS,
+    JOURNAL_FIELD_TO_PARAM,
+    EMPTY_JOURNAL_FILTER_PARAMS
   );
-  const journalFilterScope = showingCorp ? `corp:${effectiveDivision}` : 'personal';
-  const [lastJournalFilterScope, setLastJournalFilterScope] = useState(journalFilterScope);
-  if (lastJournalFilterScope !== journalFilterScope) {
-    setLastJournalFilterScope(journalFilterScope);
-    setJournalFilter(EMPTY_WALLET_JOURNAL_FILTER);
-  }
   const { filteredJournal, refTypeOptions } = useJournalFilterResult(journal, journalFilter);
+  const journalSortProps = useUrlSort('journal.sort', JOURNAL_SORT, [
+    'date',
+    'refType',
+    'description',
+    'amount',
+    'balance',
+  ]);
 
   const corpTransactionsResult = corpTransactions.data?.transactionsResult.cached ?? null;
   const corpTransactionRows = corpTransactionsResult?.data ?? EMPTY_TRANSACTIONS;
@@ -932,25 +952,32 @@ export function Wallet() {
     [corpTypeNames]
   );
 
-  // Per-visit, and reset on a division switch for the same reason the
-  // journal's filter is: the rows change wholesale, and a date range left over
-  // from another division reads as "this division traded nothing".
-  const [transactionFilter, setTransactionFilter] = useState<WalletTransactionFilter>(
-    EMPTY_WALLET_TRANSACTION_FILTER
+  // In the URL (`txn.*`, issue #1302), and reset on a division switch for the
+  // same reason the journal's filter is: the rows change wholesale, and a
+  // date range left over from another division reads as "this division
+  // traded nothing". Keyed on the journal's own scope string, owner
+  // included — not on the division alone. The tab only exists for a
+  // corporation, so an owner flip hides it either way; but the flip *back*
+  // keeps the `/wallet/transactions` path, so it would arrive carrying the
+  // filter from before.
+  const [transactionFilter, setTransactionFilter] = useUrlFilter<WalletTransactionFilter>(
+    journalFilterScope,
+    TRANSACTION_FILTER_PARAMS,
+    TRANSACTION_FIELD_TO_PARAM,
+    EMPTY_TRANSACTION_FILTER_PARAMS
   );
-  // Keyed on the journal's own scope string, owner included — not on the
-  // division alone. The tab only exists for a corporation, so an owner flip
-  // hides it either way; but the flip *back* can land straight on Transactions
-  // through `?tab=`, and it would arrive carrying the filter from before.
-  const [lastTransactionScope, setLastTransactionScope] = useState(journalFilterScope);
-  if (lastTransactionScope !== journalFilterScope) {
-    setLastTransactionScope(journalFilterScope);
-    setTransactionFilter(EMPTY_WALLET_TRANSACTION_FILTER);
-  }
   const filteredTransactions = useMemo(
     () => filterWalletTransactions(corpTransactionRows, transactionFilter, nameForType),
     [corpTransactionRows, transactionFilter, nameForType]
   );
+  const transactionsSortProps = useUrlSort('txn.sort', TRANSACTIONS_SORT, [
+    'date',
+    'item',
+    'side',
+    'quantity',
+    'unitPrice',
+    'total',
+  ]);
 
   const visibleWalletBalances = useMemo(() => {
     const entries = walletBalancesSnapshot?.entries ?? [];
@@ -1068,6 +1095,8 @@ export function Wallet() {
             loading={corpTransactions.loading && corpTransactions.data === null}
             filter={transactionFilter}
             onFilterChange={setTransactionFilter}
+            sort={transactionsSortProps.sort}
+            onSortChange={transactionsSortProps.onSortChange}
             nameFor={nameForType}
             divisionQualifier={selectedDivision ? divisionLabel(selectedDivision) : undefined}
             offlineTitleKey={
@@ -1090,6 +1119,8 @@ export function Wallet() {
             journalColumns={journalColumns}
             journalFilter={journalFilter}
             onJournalFilterChange={setJournalFilter}
+            journalSort={journalSortProps.sort}
+            onJournalSortChange={journalSortProps.onSortChange}
             division={selectedDivision}
             divisionLabel={divisionLabel}
             offlineTitleKey={
@@ -1136,7 +1167,7 @@ export function Wallet() {
                 </div>
               ) : (
                 <>
-                  <p className="px-3 pt-2 text-lg font-medium tabular-nums">
+                  <p className="px-3 pt-2 text-xl font-medium tabular-nums">
                     {t('wallet.totalBalance')}:{' '}
                     <span className={iskToneClass(walletBalancesTotal)}>
                       {formatIsk(walletBalancesTotal, 2)}
@@ -1159,7 +1190,8 @@ export function Wallet() {
                       columns={walletBalanceColumns}
                       rows={visibleWalletBalances}
                       rowKey={(row) => row.characterId}
-                      defaultSort={{ columnId: 'character', direction: 'asc' }}
+                      sort={balanceSortProps.sort}
+                      onSortChange={balanceSortProps.onSortChange}
                     />
                   )}
                 </>
@@ -1215,7 +1247,7 @@ export function Wallet() {
                     />
                   ) : balanceResult ? (
                     <p
-                      className={`text-lg font-medium tabular-nums ${iskToneClass(balanceResult.data)}`}
+                      className={`text-xl font-medium tabular-nums ${iskToneClass(balanceResult.data)}`}
                     >
                       {formatIsk(balanceResult.data, 2)}
                     </p>
@@ -1231,7 +1263,7 @@ export function Wallet() {
                       content={t('wallet.everMarksTooltip')}
                     />
                   </p>
-                  <p className="text-lg font-medium tabular-nums">
+                  <p className="text-xl font-medium tabular-nums">
                     {loyaltyResult && !loyaltyNeedsReauth
                       ? everMarks.toLocaleString()
                       : t('common.unknown')}
@@ -1270,9 +1302,18 @@ export function Wallet() {
                 columns={loyaltyColumns}
                 rows={otherLoyalty}
                 rowKey={(entry) => entry.corporation_id}
-                defaultSort={{ columnId: 'points', direction: 'desc' }}
+                sort={loyaltySortProps.sort}
+                onSortChange={loyaltySortProps.onSortChange}
                 responsive="table"
                 onRowClick={(entry) => navigate(`/wallet/loyalty/${entry.corporation_id}`)}
+                rowContextMenu={(entry, tr) => (
+                  <CorpHistoryContextMenu
+                    corporationId={entry.corporation_id}
+                    name={corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
+                  >
+                    {tr}
+                  </CorpHistoryContextMenu>
+                )}
               />
             )}
           </Panel>
@@ -1329,6 +1370,8 @@ export function Wallet() {
                 filteredJournal={filteredJournal}
                 journalColumns={journalColumns}
                 label={t('wallet.journalTab')}
+                sort={journalSortProps.sort}
+                onSortChange={journalSortProps.onSortChange}
                 highlightRowKey={highlightedEntryId}
               />
             </>

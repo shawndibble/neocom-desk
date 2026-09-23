@@ -28,14 +28,19 @@
  * plan's own page. This hook only batches the fetches that feed it.
  */
 import { useEffect, useRef, useState } from 'react';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import i18n from '@/i18n';
 import type { BuildPlanRecord } from '@/db';
-import type { BuildResult, SkillLevels } from '@/engine/industry/types';
+import type { BuildResult } from '@/engine/industry/types';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
+import {
+  tradeHubStanding,
+  type TradeHubStandingsMap,
+} from '@/features/market/useTradeHubStandings';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { loadPlanSnapshots, type PlanSnapshots } from './planSnapshots';
 import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
@@ -74,9 +79,14 @@ export interface UseComparedBuildResultsArgs {
    * Omitted reads as unavailable.
    */
   corpOwnedBlueprints?: CorpOwnedBlueprintsState;
-  skills: SkillLevels;
-  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
-  implantBonusPct: number;
+  modifiers: CharacterModifiers;
+  /**
+   * The active Character's standing toward each Trade Hub's NPC owner
+   * (issue #1238), keyed by hub id — `useTradeHubStandings`'s result.
+   * Absent/no entry for a plan's hub = standings assumed 0, today's
+   * behaviour, same as `BuildPlanDetail.tsx`'s own page.
+   */
+  tradeHubStandings?: TradeHubStandingsMap;
   /** @see ComparedBuildRow.groupResult */
   computeGroupResult?: boolean;
 }
@@ -108,9 +118,10 @@ async function computeRow(
   plan: BuildPlanRecord,
   catalog: BlueprintCatalog,
   priced: PlanSnapshots | null,
-  sources: Omit<BuildPlanSources, 'catalog' | 'bpcOffersFor'>,
+  sources: Omit<BuildPlanSources, 'catalog' | 'bpcOffersFor' | 'standing'>,
   bpcRows: readonly BpcContractRow[],
-  computeGroupResult: boolean
+  computeGroupResult: boolean,
+  tradeHubStandings: TradeHubStandingsMap
 ): Promise<ComparedBuildRow> {
   const base = {
     planId: plan.id,
@@ -130,7 +141,12 @@ async function computeRow(
     const hub: TradeHub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
     const { result, error, groupResult, groupError } = resolveBuildPlan(
       plan,
-      { ...sources, catalog, bpcOffersFor: offersForRegion(bpcRows, hub.regionId) },
+      {
+        ...sources,
+        catalog,
+        bpcOffersFor: offersForRegion(bpcRows, hub.regionId),
+        standing: tradeHubStanding(tradeHubStandings, hub.id),
+      },
       { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex },
       { withGroupResult: computeGroupResult }
     );
@@ -155,8 +171,8 @@ export function useComparedBuildResults({
   pi,
   ownedBlueprints,
   corpOwnedBlueprints,
-  skills,
-  implantBonusPct,
+  modifiers,
+  tradeHubStandings,
   computeGroupResult = false,
 }: UseComparedBuildResultsArgs): ComparedBuildRow[] {
   const [rows, setRows] = useState<ComparedBuildRow[]>([]);
@@ -246,12 +262,12 @@ export function useComparedBuildResults({
           ownedBlueprints,
           corpBlueprints: corpForPlans,
           assumedMe,
-          skills,
-          implantBonusPct,
+          modifiers,
           includeBlueprintCost,
         },
         bpcRows,
-        computeGroupResult
+        computeGroupResult,
+        tradeHubStandings ?? new Map()
       ).then((row) => {
         if (cancelled) return;
         setRows((prev) => prev.map((r) => (r.planId === plan.id ? row : r)));
@@ -272,8 +288,8 @@ export function useComparedBuildResults({
     includeBlueprintCost,
     includeBlueprintCostHydrated,
     bpcRows,
-    skills,
-    implantBonusPct,
+    modifiers,
+    tradeHubStandings,
     computeGroupResult,
   ]);
 

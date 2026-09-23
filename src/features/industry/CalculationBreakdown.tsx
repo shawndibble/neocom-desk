@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
 import { brokerFeePct, salesTaxPct } from '@/engine/industry/fees';
 import type { BuildResult, MaterialPriceBasis } from '@/engine/industry/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { formatCostIndex, formatPercent } from './format';
@@ -23,6 +24,8 @@ export interface BreakdownContext {
   isReaction: boolean;
   accountingLevel: number;
   brokerRelationsLevel: number;
+  /** Standing toward the sale hub's NPC owner, for the broker fee shown here. Absent/0 = standings assumed 0. */
+  standing?: ResolvedStandings;
   systemCostIndex: number | null;
   /** Build System the cost index was read for. */
   costIndexSystemName: string;
@@ -79,7 +82,11 @@ export function CalculationBreakdown({
 }: CalculationBreakdownProps) {
   const { t } = useTranslation();
   const taxPct = salesTaxPct(context.accountingLevel);
-  const brokerPct = brokerFeePct(context.brokerRelationsLevel);
+  const brokerPct = brokerFeePct(
+    context.brokerRelationsLevel,
+    context.standing?.factionStanding,
+    context.standing?.corpStanding
+  );
   const feePct = formatPercent(taxPct + brokerPct);
 
   return (
@@ -166,6 +173,8 @@ export function CalculationBreakdown({
                 {t('industry.breakdown.fees', {
                   accounting: context.accountingLevel,
                   broker: context.brokerRelationsLevel,
+                  factionStanding: context.standing?.factionStanding ?? 0,
+                  corpStanding: context.standing?.corpStanding ?? 0,
                 })}
               </p>
               <Formula>

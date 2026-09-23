@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { industryTabHref } from '@/features/industry/industryTabs';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -39,6 +40,9 @@ import {
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
+import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
+import { useUrlParams } from '@/lib/useUrlState';
+import { boolParam, textParam } from '@/lib/urlState';
 import type { CachedResult } from '@/esi/cache';
 import { loadStationName, loadStationSystemId } from '@/features/character/stations';
 import { loadStructureName, loadStructureSystemId } from '@/features/character/structures';
@@ -105,6 +109,24 @@ import {
 // instantly responsive, only the potentially-thousands-of-assets recompute
 // below waits out the debounce.
 const SEARCH_DEBOUNCE_MS = 250;
+
+/**
+ * Query-string view state (ADR 0015), beside the drill-down path. The
+ * cross-character filter's codec joins these in the component, since its
+ * default is the synced Settings value.
+ */
+const SEARCH_PARAM = textParam();
+const ALL_ITEMS_PARAM = boolParam();
+const MIN_VALUE_PARAM = textParam();
+
+/**
+ * A drill-down href that keeps the page's whole query string: its filters
+ * describe the same view one level deeper, and the component instance (and
+ * its state) already survives drill-down.
+ */
+function assetHref(stationId: number | null, segments: readonly string[], query: string): string {
+  return assetPathHref(stationId, segments) + query;
+}
 
 /** Stable identity, so the fallback doesn't invalidate the grouping memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
@@ -584,12 +606,37 @@ export function Assets() {
     [wildcard]
   );
 
-  const [search, setSearch] = useState('');
+  // Query string carried onto every drill-down link (see `assetHref`).
+  const { search: query } = useLocation();
+
+  // Cross-character search (issue #746, replacing issue #85's binary toggle):
+  // `'current'` by default (today's old off-state, no extra fan-out), or
+  // All/a hand-picked subset once the pilot asks via `CharacterFilterControl`
+  // — same picker Wallet Balance and Industry Active Jobs already use. The
+  // URL wins; absent, the synced Settings default applies. Nothing here is
+  // written back to that setting.
+  const defaultCharacterFilter = useDefaultCharacterFilter((s) => s.value);
+  const hydrateDefaultCharacterFilter = useDefaultCharacterFilter((s) => s.hydrate);
+  useEffect(() => {
+    void hydrateDefaultCharacterFilter();
+  }, [hydrateDefaultCharacterFilter]);
+  const viewParams = useMemo(
+    () => ({
+      q: SEARCH_PARAM,
+      all: ALL_ITEMS_PARAM,
+      min: MIN_VALUE_PARAM,
+      chars: characterFilterParam(fromStoredCharacterFilterValue(defaultCharacterFilter)),
+    }),
+    [defaultCharacterFilter]
+  );
+  const [view, setView] = useUrlParams(viewParams);
+  const search = view.q;
+  const setSearch = (q: string) => setView({ q });
   const searchActive = search.trim().length > 0;
   // Debounced separately from `search` (issue #415): the input stays
   // instantly responsive, only the matching/grouping memos below — which
   // scan every asset — wait out the debounce.
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(id);
@@ -598,8 +645,8 @@ export function Assets() {
   // Permanent "all items across all locations" flat view (issue #414): off by
   // default (unpruned tree browsing, as before), and — like search — flattens
   // every location into one sortable list rather than replacing the tree.
-  const [allItemsView, setAllItemsView] = useState(false);
-  const [minValueInput, setMinValueInput] = useState('');
+  const allItemsView = view.all;
+  const minValueInput = view.min;
   const flatModeActive = searchActive || allItemsView;
   const minValueThreshold = Number(minValueInput) > 0 ? Number(minValueInput) : 0;
 
@@ -618,24 +665,7 @@ export function Assets() {
     setSelectedIds((prev) => toggleSelection(prev, ids));
   }
 
-  // Cross-character search (issue #746, replacing issue #85's binary toggle):
-  // `'current'` by default (today's old off-state, no extra fan-out), or
-  // All/a hand-picked subset once the pilot asks via `CharacterFilterControl`
-  // — same picker Wallet Balance and Industry Active Jobs already use, seeded
-  // from the synced Settings default the same way (`Wallet.tsx`'s identical
-  // seeding).
-  const [crossCharacterFilter, setCrossCharacterFilter] = useState<CharacterFilterValue>('current');
-  const defaultCharacterFilter = useDefaultCharacterFilter((s) => s.value);
-  const defaultCharacterFilterHydrated = useDefaultCharacterFilter((s) => s.hydrated);
-  const hydrateDefaultCharacterFilter = useDefaultCharacterFilter((s) => s.hydrate);
-  useEffect(() => {
-    void hydrateDefaultCharacterFilter();
-  }, [hydrateDefaultCharacterFilter]);
-  const [seededCrossCharacterFilter, setSeededCrossCharacterFilter] = useState(false);
-  if (defaultCharacterFilterHydrated && !seededCrossCharacterFilter) {
-    setSeededCrossCharacterFilter(true);
-    setCrossCharacterFilter(fromStoredCharacterFilterValue(defaultCharacterFilter));
-  }
+  const crossCharacterFilter = view.chars;
   const resolvedCrossCharacterFilter = useResolvedCharacterFilter(
     crossCharacterFilter,
     activeCharacterId
@@ -659,7 +689,7 @@ export function Assets() {
         characters={crossCharacterCandidates}
         activeCharacterId={activeCharacterId}
         value={crossCharacterFilter}
-        onChange={setCrossCharacterFilter}
+        onChange={(chars: CharacterFilterValue) => setView({ chars })}
       />
     ) : undefined;
 
@@ -772,7 +802,7 @@ export function Assets() {
     [blueprintCatalog, buildPlans]
   );
   function handleViewInIndustryAsMaterial(typeId: number) {
-    navigate(`/industry?material=${typeId}`);
+    navigate(`${industryTabHref('plans')}?material=${typeId}`);
   }
 
   const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
@@ -1446,16 +1476,18 @@ export function Assets() {
     resolved.station === null
       ? []
       : [
-          { label: stationLabelFor(resolved.station), href: assetPathHref(pathStationId, []) },
+          { label: stationLabelFor(resolved.station), href: assetHref(pathStationId, [], query) },
           ...resolved.trail.map((node, index) => ({
             label: nodeLabel(node),
-            href: assetPathHref(
+            href: assetHref(
               pathStationId,
-              resolved.trail.slice(0, index + 1).map(assetNodeSegment)
+              resolved.trail.slice(0, index + 1).map(assetNodeSegment),
+              query
             ),
           })),
         ];
-  const parentHref = crumbs.length > 1 ? crumbs[crumbs.length - 2].href : assetPathHref(null, []);
+  const parentHref =
+    crumbs.length > 1 ? crumbs[crumbs.length - 2].href : assetHref(null, [], query);
   // A leaf item carries no aggregate of its own — there is nothing below it to
   // total — so the header simply drops the counts at that depth.
   const deepest = resolved.trail[resolved.trail.length - 1] ?? resolved.station;
@@ -1500,7 +1532,7 @@ export function Assets() {
                 icon={<Icon.FlatList />}
                 label={t('assets.allItemsToggle')}
                 pressed={allItemsView}
-                onClick={() => setAllItemsView((v) => !v)}
+                onClick={() => setView({ all: !allItemsView })}
               />
               <IconButton
                 icon={<Icon.Select />}
@@ -1611,7 +1643,7 @@ export function Assets() {
                       that explains why (issue #415), shown exactly when cross-
                       character results are actually on screen to be confused by. */}
                   {activeCrossCharacterData && (
-                    <span className="text-[0.6875rem] text-text-faint">
+                    <span className="text-[0.6875rem] text-text-dim">
                       {t('assets.crossCharacterCsvNote')}
                     </span>
                   )}
@@ -1622,7 +1654,7 @@ export function Assets() {
                       min={0}
                       inputMode="decimal"
                       value={minValueInput}
-                      onChange={(e) => setMinValueInput(e.target.value)}
+                      onChange={(e) => setView({ min: e.target.value })}
                       placeholder={t('assets.minValue.placeholder')}
                       aria-label={t('assets.minValue.label')}
                       className="w-24 tabular-nums"
@@ -1631,7 +1663,7 @@ export function Assets() {
                       value={sortField}
                       onValueChange={(value) => void setSortField(value as AssetSortField)}
                     >
-                      <SelectTrigger aria-label={t('assets.sort.label')} className="w-28">
+                      <SelectTrigger size="sm" aria-label={t('assets.sort.label')} className="w-28">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1678,7 +1710,7 @@ export function Assets() {
                   </div>
                   {resolved.station &&
                     !isUnresolvedParent(resolved.station, mergedLocationNames) && (
-                      <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-faint sm:flex">
+                      <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-dim sm:flex">
                         <SecurityValue
                           security={securityForStation(resolved.station.locationId)}
                           t={t}
@@ -1692,7 +1724,7 @@ export function Assets() {
                       </span>
                     )}
                   {currentTotals && (
-                    <span className="shrink-0 text-[0.6875rem] text-text-faint tabular-nums">
+                    <span className="shrink-0 text-[0.6875rem] text-text-dim tabular-nums">
                       <span className="hidden sm:inline">
                         {t('assets.itemCount', { count: currentTotals.itemCount })} ·{' '}
                       </span>
@@ -1767,7 +1799,7 @@ export function Assets() {
                   hint={t('assets.staleLink.hint')}
                   className="py-8"
                   action={
-                    <Button size="sm" onClick={() => void navigate(assetPathHref(null, []))}>
+                    <Button size="sm" onClick={() => void navigate(assetHref(null, [], query))}>
                       {t('assets.staleLink.action')}
                     </Button>
                   }
@@ -1823,6 +1855,7 @@ export function Assets() {
                             pathSegments={pathSegments}
                             trailFor={trailFor}
                             rootStationIdFor={rootStationIdFor}
+                            query={query}
                           />
                         </div>
                       );
@@ -1865,6 +1898,8 @@ interface BrowseRowViewProps {
   pathSegments: readonly string[];
   trailFor: (asset: CharacterAsset) => string[];
   rootStationIdFor: (asset: CharacterAsset) => number | null;
+  /** The page's query string, carried onto every drill-down link. */
+  query: string;
 }
 
 /** Dispatches one virtualized row to the right presentation component. */
@@ -1880,7 +1915,7 @@ function BrowseRowView(props: BrowseRowViewProps) {
     const orphan = isUnresolvedParent(station, props.locationNames);
     return (
       <LocationRow
-        href={assetPathHref(station.locationId, [])}
+        href={assetHref(station.locationId, [], props.query)}
         label={props.stationLabelFor(station)}
         security={orphan ? undefined : props.securityForStation(station.locationId)}
         jumpsAway={orphan ? undefined : props.jumpsAwayFor(station.locationId)}
@@ -1912,6 +1947,7 @@ function SearchMatchRow({
   securityForStation,
   trailFor,
   rootStationIdFor,
+  query,
 }: BrowseRowViewProps & { match: AssetMatch }) {
   const actions = useAssetItemActions();
   const { asset, name } = match;
@@ -1923,7 +1959,7 @@ function SearchMatchRow({
       estimatedValue={estimatedValueFor(asset, actions.priceByTypeId)}
       trail={trailFor(asset)}
       security={rootStationId === null ? undefined : securityForStation(rootStationId)}
-      href={assetPathHref(rootStationId, [])}
+      href={assetHref(rootStationId, [], query)}
       characterBadge={characterBadgeFor(asset.item_id, characterBadges)}
       t={t}
     />
@@ -1941,6 +1977,7 @@ function NodeRowView({
   characterBadges,
   pathStationId,
   pathSegments,
+  query,
 }: BrowseRowViewProps & { node: AssetTreeNode }) {
   const actions = useAssetItemActions();
   const label = nodeLabel(node);
@@ -1949,7 +1986,7 @@ function NodeRowView({
   if (node.kind !== 'item') {
     return (
       <ContainerRow
-        href={assetPathHref(pathStationId, [...pathSegments, assetNodeSegment(node)])}
+        href={assetHref(pathStationId, [...pathSegments, assetNodeSegment(node)], query)}
         label={label}
         itemCount={node.itemCount}
         estimatedValue={node.estimatedValue}

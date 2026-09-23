@@ -41,6 +41,8 @@ interface YieldDetailModalProps {
   typeNames: ReadonlyMap<number, string>;
   /** m³ per unit, by type. A type with no known volume (issue #1283) is simply absent. */
   typeVolumes: ReadonlyMap<number, number>;
+  /** Issue #1281's page switch — hides the refined-output section entirely. */
+  showRefining: boolean;
 }
 
 interface RefinedRow {
@@ -76,6 +78,7 @@ export function YieldDetailModal({
   systemSecurity,
   typeNames,
   typeVolumes,
+  showRefining,
 }: YieldDetailModalProps) {
   const { t } = useTranslation();
   const { valuation, entry } = row;
@@ -181,24 +184,28 @@ export function YieldDetailModal({
         ),
       sortValue: (line) => line.rawValue,
     },
-    {
-      id: 'refined',
-      header: t('miningTax.overview.refineValue'),
-      align: 'right',
-      className: 'whitespace-nowrap',
-      render: (line) =>
-        line.refineValue > 0 ? (
-          <IskAmount
-            value={line.refineValue}
-            revealOn="tap"
-            decimals={0}
-            className={lineWinner(line) === 'refined' ? 'text-isk-pos' : undefined}
-          />
-        ) : (
-          '—'
-        ),
-      sortValue: (line) => line.refineValue,
-    },
+    ...(showRefining
+      ? [
+          {
+            id: 'refined',
+            header: t('miningTax.overview.refineValue'),
+            align: 'right',
+            className: 'whitespace-nowrap',
+            render: (line) =>
+              line.refineValue > 0 ? (
+                <IskAmount
+                  value={line.refineValue}
+                  revealOn="tap"
+                  decimals={0}
+                  className={lineWinner(line) === 'refined' ? 'text-isk-pos' : undefined}
+                />
+              ) : (
+                '—'
+              ),
+            sortValue: (line) => line.refineValue,
+          } satisfies DataTableColumn<OreLineValuation>,
+        ]
+      : []),
   ];
 
   const refinedColumns: DataTableColumn<RefinedRow>[] = [
@@ -293,65 +300,83 @@ export function YieldDetailModal({
 
         {/* The whole point of the row: which exit was worth more, and by how
             much. Raw and refined sit side by side so neither reads as the
-            headline number on its own. */}
-        <div className="grid gap-3 sm:grid-cols-3">
-          <div className={cx(CARD, suggested === 'raw' ? CARD_SUGGESTED : 'border-line')}>
-            <p className={cx(CARD_LABEL, suggested === 'raw' ? 'text-accent' : 'text-text-dim')}>
+            headline number on its own — with refining hidden there is
+            nothing to compare, so just the raw figure stands alone. */}
+        <div className={cx('grid gap-3', showRefining && 'sm:grid-cols-3')}>
+          <div
+            className={cx(
+              CARD,
+              showRefining && suggested === 'raw' ? CARD_SUGGESTED : 'border-line'
+            )}
+          >
+            <p
+              className={cx(
+                CARD_LABEL,
+                showRefining && suggested === 'raw' ? 'text-accent' : 'text-text-dim'
+              )}
+            >
               {t('miningTax.overview.detail.sellRawCard')}
             </p>
-            <p className="mt-1 text-lg font-semibold tabular-nums">
+            <p className="mt-1 text-xl font-semibold tabular-nums">
               <IskAmount value={valuation.rawValue} revealOn="tap" decimals={0} />
             </p>
             <p className={CARD_HINT}>{t('miningTax.overview.detail.sellRawCardHint')}</p>
           </div>
-          <div className={cx(CARD, suggested === 'refined' ? CARD_SUGGESTED : 'border-line')}>
-            <p
-              className={cx(CARD_LABEL, suggested === 'refined' ? 'text-accent' : 'text-text-dim')}
-            >
-              {t('miningTax.overview.detail.refineCard')}
-            </p>
-            <p className="mt-1 text-lg font-semibold tabular-nums">
-              <IskAmount value={valuation.refineValue} revealOn="tap" decimals={0} />
-            </p>
-            <p className={CARD_HINT}>
-              {t('miningTax.overview.detail.refineCardHint', {
-                efficiency: (valuation.efficiency * 100).toFixed(1),
-              })}
-            </p>
-          </div>
-          <div className={cx(CARD, 'border-line')}>
-            <p className={cx(CARD_LABEL, 'text-text-dim')}>
-              {!anyValue
-                ? t('miningTax.overview.detail.refineUnknownCard')
-                : totals.delta > 0
-                  ? t('miningTax.overview.detail.refineGainCard')
-                  : totals.delta < 0
-                    ? t('miningTax.overview.detail.refineLossCard')
-                    : t('miningTax.overview.detail.refineEvenCard')}
-            </p>
-            <p className={cx('mt-1 text-lg font-semibold tabular-nums', deltaTone)}>
-              {/* Nothing priced is unknown, not break-even: an em dash says so,
-                  "0 ISK" would claim the two exits were measured and tied. */}
-              {!anyValue ? (
-                '—'
-              ) : (
-                <>
-                  {totals.delta !== 0 && (totals.delta > 0 ? '+' : '-')}
-                  <IskAmount value={Math.abs(totals.delta)} revealOn="tap" decimals={0} />
-                </>
-              )}
-            </p>
-            {totals.deltaPercent !== null && totals.deltaPercent !== 0 && (
-              <p className={cx(CARD_HINT, 'tabular-nums')}>
-                {t(
-                  totals.deltaPercent > 0
-                    ? 'miningTax.overview.detail.deltaPercentGain'
-                    : 'miningTax.overview.detail.deltaPercentLoss',
-                  { percent: Math.abs(totals.deltaPercent).toFixed(1) }
+          {showRefining && (
+            <>
+              <div className={cx(CARD, suggested === 'refined' ? CARD_SUGGESTED : 'border-line')}>
+                <p
+                  className={cx(
+                    CARD_LABEL,
+                    suggested === 'refined' ? 'text-accent' : 'text-text-dim'
+                  )}
+                >
+                  {t('miningTax.overview.detail.refineCard')}
+                </p>
+                <p className="mt-1 text-xl font-semibold tabular-nums">
+                  <IskAmount value={valuation.refineValue} revealOn="tap" decimals={0} />
+                </p>
+                <p className={CARD_HINT}>
+                  {t('miningTax.overview.detail.refineCardHint', {
+                    efficiency: (valuation.efficiency * 100).toFixed(1),
+                  })}
+                </p>
+              </div>
+              <div className={cx(CARD, 'border-line')}>
+                <p className={cx(CARD_LABEL, 'text-text-dim')}>
+                  {!anyValue
+                    ? t('miningTax.overview.detail.refineUnknownCard')
+                    : totals.delta > 0
+                      ? t('miningTax.overview.detail.refineGainCard')
+                      : totals.delta < 0
+                        ? t('miningTax.overview.detail.refineLossCard')
+                        : t('miningTax.overview.detail.refineEvenCard')}
+                </p>
+                <p className={cx('mt-1 text-xl font-semibold tabular-nums', deltaTone)}>
+                  {/* Nothing priced is unknown, not break-even: an em dash says so,
+                      "0 ISK" would claim the two exits were measured and tied. */}
+                  {!anyValue ? (
+                    '—'
+                  ) : (
+                    <>
+                      {totals.delta !== 0 && (totals.delta > 0 ? '+' : '-')}
+                      <IskAmount value={Math.abs(totals.delta)} revealOn="tap" decimals={0} />
+                    </>
+                  )}
+                </p>
+                {totals.deltaPercent !== null && totals.deltaPercent !== 0 && (
+                  <p className={cx(CARD_HINT, 'tabular-nums')}>
+                    {t(
+                      totals.deltaPercent > 0
+                        ? 'miningTax.overview.detail.deltaPercentGain'
+                        : 'miningTax.overview.detail.deltaPercentLoss',
+                      { percent: Math.abs(totals.deltaPercent).toFixed(1) }
+                    )}
+                  </p>
                 )}
-              </p>
-            )}
-          </div>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr]">
@@ -380,34 +405,36 @@ export function YieldDetailModal({
           </div>
 
           <div className="space-y-3">
-            <div className="overflow-hidden rounded-xs border border-line">
-              <p className="border-b border-line bg-panel-2 px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('miningTax.overview.detail.refinesIntoTitle')}
-              </p>
-              {refinedRows.length === 0 ? (
-                <p className="px-2.5 py-2 text-xs text-text-dim">
-                  {t('miningTax.overview.detail.refinesIntoNone')}
+            {showRefining && (
+              <div className="overflow-hidden rounded-xs border border-line">
+                <p className="border-b border-line bg-panel-2 px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('miningTax.overview.detail.refinesIntoTitle')}
                 </p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <DataTable
-                    columns={refinedColumns}
-                    rows={refinedRows}
-                    rowKey={(material) => material.typeId}
-                    label={t('miningTax.overview.detail.refinesIntoTitle')}
-                  />
-                </div>
-              )}
-              {/* The portion trap, stated rather than rounded away:
-                  `reprocessing.ts` returns nothing at all for a part batch. */}
-              {totals.unitsLeftOver > 0 && (
-                <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-warning">
-                  {t('miningTax.overview.detail.leftOverHint', {
-                    units: totals.unitsLeftOver.toLocaleString(),
-                  })}
-                </p>
-              )}
-            </div>
+                {refinedRows.length === 0 ? (
+                  <p className="px-2.5 py-2 text-xs text-text-dim">
+                    {t('miningTax.overview.detail.refinesIntoNone')}
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <DataTable
+                      columns={refinedColumns}
+                      rows={refinedRows}
+                      rowKey={(material) => material.typeId}
+                      label={t('miningTax.overview.detail.refinesIntoTitle')}
+                    />
+                  </div>
+                )}
+                {/* The portion trap, stated rather than rounded away:
+                    `reprocessing.ts` returns nothing at all for a part batch. */}
+                {totals.unitsLeftOver > 0 && (
+                  <p className="border-t border-line px-2.5 py-1.5 text-[0.6875rem] text-warning">
+                    {t('miningTax.overview.detail.leftOverHint', {
+                      units: totals.unitsLeftOver.toLocaleString(),
+                    })}
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="overflow-hidden rounded-xs border border-line">
               <p className="border-b border-line bg-panel-2 px-2.5 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -415,13 +442,15 @@ export function YieldDetailModal({
               </p>
               <div className="space-y-1.5 px-2.5 py-2 text-[0.6875rem] leading-relaxed text-text-dim">
                 <p>{t('miningTax.overview.detail.priceBasisHint', { date: entry.date })}</p>
-                <p>
-                  {t('miningTax.overview.detail.refineBasisHint', {
-                    character: row.characterName,
-                    efficiency: (valuation.efficiency * 100).toFixed(1),
-                  })}
-                </p>
-                {valuation.implantBonusPct > 0 && (
+                {showRefining && (
+                  <p>
+                    {t('miningTax.overview.detail.refineBasisHint', {
+                      character: row.characterName,
+                      efficiency: (valuation.efficiency * 100).toFixed(1),
+                    })}
+                  </p>
+                )}
+                {showRefining && valuation.implantBonusPct > 0 && (
                   <p>
                     {t('miningTax.overview.detail.refineImplantHint', {
                       pct: valuation.implantBonusPct,

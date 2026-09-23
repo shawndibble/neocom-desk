@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { makeOrBuy } from '@/engine/industry/makeOrBuy';
 import type { MakeOrBuyContext, MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
@@ -20,7 +21,7 @@ const ctx: MakeOrBuyContext = {
   systemCostIndex: 0.05,
   adjustedPrices: { 34: 4 },
   materialPrices: { 34: 5 },
-  skills: {},
+  modifiers: NO_CHARACTER_MODIFIERS,
 };
 
 function line(overrides: Partial<MaterialCostLine> = {}): MaterialCostLine {
