@@ -389,6 +389,15 @@ describe('Tooltip multi-touch', () => {
 });
 
 describe('InfoTooltip', () => {
+  it('tints the trigger accent when asked, and stays dim otherwise', () => {
+    const { rerender } = render(<InfoTooltip label="About X" content="X." />);
+    expect(screen.getByRole('button', { name: 'About X' })).toHaveClass('text-text-dim');
+    rerender(<InfoTooltip label="About X" content="X." tone="accent" />);
+    const trigger = screen.getByRole('button', { name: 'About X' });
+    expect(trigger).toHaveClass('text-accent');
+    expect(trigger).not.toHaveClass('text-text-dim');
+  });
+
   it('renders a labeled "?" button describing the tooltip content once revealed', () => {
     render(<InfoTooltip label="About Material Efficiency" content="Reduces material use." />);
     const trigger = screen.getByRole('button', { name: 'About Material Efficiency' });

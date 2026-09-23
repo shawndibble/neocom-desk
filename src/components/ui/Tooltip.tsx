@@ -226,6 +226,8 @@ interface InfoTooltipProps {
   onClick?: () => void;
   /** Set when the click opens a dialog, so the trigger announces what it opens. */
   'aria-haspopup'?: 'dialog';
+  /** `accent` tints the trigger like the value it annotates; default is the dim glyph. */
+  tone?: 'dim' | 'accent';
   className?: string;
 }
 
@@ -234,6 +236,7 @@ export function InfoTooltip({
   label,
   content,
   onClick,
+  tone = 'dim',
   className = '',
   'aria-haspopup': ariaHasPopup,
 }: InfoTooltipProps) {
@@ -244,7 +247,7 @@ export function InfoTooltip({
         aria-label={label}
         onClick={onClick}
         aria-haspopup={ariaHasPopup}
-        className={`relative inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-line before:absolute before:-inset-1 before:content-[''] text-[0.625rem] leading-none text-text-dim hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${className}`}
+        className={`relative inline-flex size-4 shrink-0 items-center justify-center rounded-full border border-line before:absolute before:-inset-1 before:content-[''] text-[0.625rem] leading-none hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-accent ${tone === 'accent' ? 'text-accent' : 'text-text-dim'} ${className}`}
       >
         ?
       </button>
