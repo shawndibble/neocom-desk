@@ -1313,6 +1313,61 @@ describe('BpcSourcingPanel Jump Range', () => {
     expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
   });
 
+  it("shows each row's own distance from the current system, even with no range filter applied", async () => {
+    loadCharacterSolarSystemId.mockResolvedValue(JITA);
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    await screen.findByText('Jita IV - Moon 4');
+    const rows = within(table).getAllByRole('row');
+    const jitaRow = rows.find((r) => within(r).queryByText('Jita IV - Moon 4'));
+    const amarrRow = rows.find((r) => within(r).queryByText('Amarr VIII'));
+    expect(jitaRow).toBeDefined();
+    expect(amarrRow).toBeDefined();
+    const jumpsCell = (row: HTMLElement) => row.querySelector('[data-label="Jumps"]');
+    await waitFor(() => {
+      expect(
+        within(jumpsCell(jitaRow as HTMLElement) as HTMLElement).getByText('0')
+      ).toBeInTheDocument();
+    });
+    // Amarr has no entry in the mocked `localJumpDistances` map above — a
+    // settled but unreachable row, not a pending one.
+    expect(
+      within(jumpsCell(amarrRow as HTMLElement) as HTMLElement).getByText('—')
+    ).toBeInTheDocument();
+  });
+
+  it('shows the Jumps cell as pending, not unavailable, while the distance snapshot is still resolving', async () => {
+    loadCharacterSolarSystemId.mockResolvedValue(JITA);
+    // Never resolves — the same "still loading" state a fresh page load or a
+    // slow Dexie read leaves the cell in, regardless of the filter's range.
+    localJumpDistances.mockReturnValue(new Promise(() => {}));
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    await screen.findByText('Jita IV - Moon 4');
+    const rows = within(table).getAllByRole('row');
+    const jitaRow = rows.find((r) => within(r).queryByText('Jita IV - Moon 4'));
+    expect(jitaRow).toBeDefined();
+    const jumpsCell = (jitaRow as HTMLElement).querySelector('[data-label="Jumps"]');
+    expect(within(jumpsCell as HTMLElement).getByText('…')).toBeInTheDocument();
+  });
+
+  it('explains a missing Jumps cell as no current system, not an unreachable stargate route', async () => {
+    // Jita is a *resolved* location (`loadContractLocationInfo` places it) —
+    // unlike the Rifter row's unresolved one, this row's own systemId is
+    // known, so the missing cell can only be the filter's no-origin state.
+    loadCharacterSolarSystemId.mockResolvedValue(null);
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    await screen.findByText('Jita IV - Moon 4');
+    const rows = within(table).getAllByRole('row');
+    const jitaRow = rows.find((r) => within(r).queryByText('Jita IV - Moon 4'));
+    expect(jitaRow).toBeDefined();
+    const jumpsCell = (jitaRow as HTMLElement).querySelector('[data-label="Jumps"]');
+    expect(
+      within(jumpsCell as HTMLElement).getByTitle('Set your current system to filter by distance.')
+    ).toBeInTheDocument();
+  });
+
   it('says so and filters nothing when there is no current system to measure from', async () => {
     window.history.pushState({}, '', '/industry/sourcing?sourcing.jumps=3');
     render(<App />);

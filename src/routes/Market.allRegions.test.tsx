@@ -230,6 +230,12 @@ describe('Market Browser: All regions', () => {
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(await within(sellTable).findByText('1,100,000.00')).toBeInTheDocument();
     expect(within(sellTable).getByText('1,000,000.00')).toBeInTheDocument();
+    // Each row's own distance from Jita, not only the "within 5" filter that
+    // let both of these through — default sort is price ascending.
+    const sellRows = within(sellTable).getAllByRole('row');
+    const jumpsCell = (row: HTMLElement) => row.querySelector('[data-label="Jumps"]');
+    expect(within(jumpsCell(sellRows[1]) as HTMLElement).getByText('0')).toBeInTheDocument();
+    expect(within(jumpsCell(sellRows[2]) as HTMLElement).getByText('4')).toBeInTheDocument();
     // Never fired while the range was still resolving, and never since.
     expect(hits.get(HEIMATAR)).toBeUndefined();
     expect(hits.get(THE_FORGE)).toBe(1);

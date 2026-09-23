@@ -410,8 +410,11 @@ describe('ContractSearchPanel', () => {
       const rows = await bodyRows();
       expect(within(rows[0]).getByText('Jita')).toBeInTheDocument();
       expect(within(rows[0]).getByText('0.9')).toBeInTheDocument();
-      // A player structure is a finished answer, not a pending one.
-      expect(within(rows[1]).getByText('—')).toBeInTheDocument();
+      // A player structure is a finished answer, not a pending one — for the
+      // System cell and (no resolvable system) the Jumps cell beside it.
+      const systemCell = rows[1].querySelector('[data-label="System"]');
+      expect(systemCell).not.toBeNull();
+      expect(within(systemCell as HTMLElement).getByText('—')).toBeInTheDocument();
     });
   });
 
@@ -435,6 +438,25 @@ describe('ContractSearchPanel', () => {
     await waitFor(async () => expect(await bodyRows()).toHaveLength(1));
     const rows = await bodyRows();
     expect(within(rows[0]).getByText('Jita')).toBeInTheDocument();
+  });
+
+  it("shows each offer's own distance from the current system, even with no range filter applied", async () => {
+    loadPublicContractOffers.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, price: 1, locationId: JITA }),
+        row({ contractId: 2, price: 2, locationId: AMARR }),
+      ])
+    );
+    renderWithRouter();
+
+    await waitFor(async () => {
+      const rows = await bodyRows();
+      const jumpsCell = (index: number) => rows[index].querySelector('[data-label="Jumps"]');
+      expect(within(jumpsCell(0) as HTMLElement).getByText('0')).toBeInTheDocument();
+      // 2 via the lowsec shortcut (`JUMPS`'s shortest path), not the 4-jump
+      // highsec-only route the Courier board's own routing preference takes.
+      expect(within(jumpsCell(1) as HTMLElement).getByText('2')).toBeInTheDocument();
+    });
   });
 
   it('explains an unfiltered range with no current system even with the filter funnel closed', async () => {

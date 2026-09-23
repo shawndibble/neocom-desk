@@ -106,9 +106,39 @@ export function useCurrentSystem(): CurrentSystemState {
  */
 export type JumpRangeStatus = 'off' | 'no-origin' | 'loading' | 'unknown' | 'ready';
 
+/**
+ * `jumps` itself resolves the same way regardless of `range` — `status` alone
+ * can't tell a caller why a row's own distance isn't showing yet, since `off`
+ * (range is Any) says nothing about whether the origin or the graph are
+ * ready. Mirrors `JumpRangeStatus` minus `off`.
+ */
+export type JumpDistanceStatus = 'no-origin' | 'loading' | 'unknown' | 'ready';
+
+/**
+ * A row's own Jumps cell, as every table built off `jumps`/`jumpsStatus`
+ * renders it: the three unready `JumpDistanceStatus` values verbatim, or a
+ * settled `value` — `count: null` for a row this app cannot place on the
+ * stargate graph, distinct from still loading.
+ */
+export type JumpsCellValue =
+  | { kind: 'loading' }
+  | { kind: 'no-origin' }
+  | { kind: 'unknown' }
+  | { kind: 'value'; count: number | null };
+
 export interface JumpRangeFilter {
   status: JumpRangeStatus;
   allowed: ReadonlySet<number> | null;
+  /**
+   * Every reachable system's distance from the Current System, regardless of
+   * `range` or `status` — a row's own jump count (a table column) needs this
+   * even at `'any'`, where `allowed` is `null` and says nothing about it.
+   * `null` while unresolved (loading, no origin, or an unreachable graph) —
+   * `jumpsStatus` says which.
+   */
+  jumps: ReadonlyMap<number, number> | null;
+  /** Why `jumps` is `null`, or `'ready'` once it holds a real map. */
+  jumpsStatus: JumpDistanceStatus;
 }
 
 export function useJumpRangeFilter(
@@ -121,10 +151,8 @@ export function useJumpRangeFilter(
     jumps: ReadonlyMap<number, number> | null;
   } | null>(null);
 
-  const needed = range !== 'any' && originSystemId !== null;
-
   useEffect(() => {
-    if (!needed || originSystemId === null) return;
+    if (originSystemId === null) return;
     let cancelled = false;
     void localJumpDistances(originSystemId).then((result) => {
       if (cancelled) return;
@@ -136,15 +164,29 @@ export function useJumpRangeFilter(
     return () => {
       cancelled = true;
     };
-  }, [needed, originSystemId]);
+  }, [originSystemId]);
+
+  const jumps = distances?.origin === originSystemId ? distances.jumps : null;
+
+  const jumpsStatus = useMemo((): JumpDistanceStatus => {
+    // Still reading ESI: "no system" now would flash the set-your-system note.
+    if (!current.loaded) return 'loading';
+    if (originSystemId === null) return 'no-origin';
+    if (distances?.origin !== originSystemId) return 'loading';
+    if (distances.jumps === null) return 'unknown';
+    return 'ready';
+  }, [current.loaded, originSystemId, distances]);
 
   return useMemo((): JumpRangeFilter => {
-    if (range === 'any') return { status: 'off', allowed: null };
-    // Still reading ESI: "no system" now would flash the set-your-system note.
-    if (!current.loaded) return { status: 'loading', allowed: null };
-    if (originSystemId === null) return { status: 'no-origin', allowed: null };
-    if (distances?.origin !== originSystemId) return { status: 'loading', allowed: null };
-    if (distances.jumps === null) return { status: 'unknown', allowed: null };
-    return { status: 'ready', allowed: jumpRangeSystems(distances.jumps, range) };
-  }, [range, current.loaded, originSystemId, distances]);
+    if (range === 'any') return { status: 'off', allowed: null, jumps, jumpsStatus };
+    if (jumpsStatus !== 'ready') {
+      return { status: jumpsStatus, allowed: null, jumps, jumpsStatus };
+    }
+    return {
+      status: 'ready',
+      allowed: jumpRangeSystems(distances?.jumps ?? new Map(), range),
+      jumps,
+      jumpsStatus,
+    };
+  }, [range, jumps, jumpsStatus, distances]);
 }

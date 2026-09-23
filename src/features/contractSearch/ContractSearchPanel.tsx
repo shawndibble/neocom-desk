@@ -25,6 +25,7 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  ColumnPickerMenu,
   DataTable,
   EmptyState,
   FilterBar,
@@ -39,6 +40,11 @@ import {
   IskAmount,
   type DataTableColumn,
 } from '@/components/ui';
+import {
+  CONTRACT_SEARCH_ITEMS_COLUMN_IDS,
+  useVisibleContractSearchItemsColumns,
+  type ContractSearchItemsColumnId,
+} from '@/features/contractSearch/contractSearchItemsColumns';
 import {
   contractOfferPriceSummary,
   contractOfferStats,
@@ -98,12 +104,14 @@ import {
   useCurrentSystem,
   useJumpRangeFilter,
   type CurrentSystemState,
+  type JumpsCellValue,
 } from '@/features/route/currentSystem';
 import {
   CurrentSystemPicker,
   JumpRangeNote,
   JumpRangeSelect,
 } from '@/features/route/JumpRangeControls';
+import { renderJumpsCell } from '@/features/route/jumpsCell';
 
 /** Rows shown before "show all" — the same cap the character-contracts table and BPC Search use. */
 const ROW_CAP = 50;
@@ -489,6 +497,18 @@ export function ContractSearchPanel({
   // survive that.
   const currentSystem = useCurrentSystem();
   const jumpRangeFilter = useJumpRangeFilter(currentSystem, uiFilter.jumps);
+  const visibleItemsColumns = useVisibleContractSearchItemsColumns((state) => state.value);
+  const setVisibleItemsColumns = useVisibleContractSearchItemsColumns((state) => state.setValue);
+  const hydrateVisibleItemsColumns = useVisibleContractSearchItemsColumns((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateVisibleItemsColumns();
+  }, [hydrateVisibleItemsColumns]);
+  function toggleItemsColumn(id: ContractSearchItemsColumnId) {
+    const next = visibleItemsColumns.includes(id)
+      ? visibleItemsColumns.filter((existing) => existing !== id)
+      : [...visibleItemsColumns, id];
+    void setVisibleItemsColumns(next);
+  }
   /** The type the user picked out of the suggestion list, pinning the search to exactly one item. */
   const selectedTypeId = itemsParams['items.type'];
   const showAll = itemsParams['items.all'];
@@ -669,16 +689,30 @@ export function ContractSearchPanel({
     setItemsParams({ 'items.type': null, 'items.q': '', 'items.all': false });
   }
 
-  const columns = useMemo<DataTableColumn<PublicContractOfferRow>[]>(
-    () => [
-      {
-        id: 'item',
-        header: t('contractSearch.itemColumn'),
-        primary: true,
-        sortValue: (row) => typeNames.get(row.typeId) ?? `#${row.typeId}`,
-        render: (row) => typeNames.get(row.typeId) ?? `#${row.typeId}`,
-      },
-      {
+  /**
+   * A row's own distance from the Current System, independent of whether a
+   * Jump Range filter is even active (`jumpRangeFilter.jumps`/`jumpsStatus`
+   * are populated at every range). Pending while *either* the offer's own
+   * location (`offerLocations`) or the distance map is still resolving; a
+   * settled but unplaced offer (a player structure, or nothing this app
+   * could place) is a `value` of `null`, same as an unreachable system.
+   */
+  const offerJumps = useCallback(
+    (row: PublicContractOfferRow): JumpsCellValue => {
+      const location = offerLocations.get(row.locationId);
+      if (location === undefined) return { kind: 'loading' };
+      if (location.systemId === null) return { kind: 'value', count: null };
+      if (jumpRangeFilter.jumpsStatus !== 'ready') return { kind: jumpRangeFilter.jumpsStatus };
+      return { kind: 'value', count: jumpRangeFilter.jumps?.get(location.systemId) ?? null };
+    },
+    [offerLocations, jumpRangeFilter]
+  );
+
+  const itemsColumnsById = useMemo<
+    Record<ContractSearchItemsColumnId, DataTableColumn<PublicContractOfferRow>>
+  >(
+    () => ({
+      qty: {
         id: 'qty',
         header: t('contractSearch.qtyColumn'),
         align: 'right',
@@ -689,7 +723,7 @@ export function ContractSearchPanel({
         // system name says nothing about what it counts.
         stackAffix: { before: t('contractSearch.mobile.qtyAffix') },
       },
-      {
+      price: {
         id: 'price',
         header: t('contractSearch.priceColumn'),
         align: 'right',
@@ -721,7 +755,7 @@ export function ContractSearchPanel({
           </>
         ),
       },
-      {
+      system: {
         // The system, with its security, is what a buyer actually weighs —
         // whether the pickup is a hop from home or a trip into lowsec — and a
         // region alone cannot say either. After Price so the phone card's
@@ -752,13 +786,25 @@ export function ContractSearchPanel({
           );
         },
       },
-      {
+      jumps: {
+        id: 'jumps',
+        header: t('contractSearch.itemsJumpsColumn'),
+        align: 'right',
+        className: 'tabular-nums',
+        sortValue: (row) => {
+          const cell = offerJumps(row);
+          return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;
+        },
+        stackAffix: { before: t('contractSearch.mobile.jumpsAffix') },
+        render: (row) => renderJumpsCell(offerJumps(row), t, 'contractSearch.jumpsUnavailableHint'),
+      },
+      region: {
         id: 'region',
         header: t('contractSearch.regionColumn'),
         sortValue: (row) => regionNames.get(row.regionId) ?? `#${row.regionId}`,
         render: (row) => regionNames.get(row.regionId) ?? `#${row.regionId}`,
       },
-      {
+      expires: {
         id: 'expires',
         header: t('contractSearch.expiresColumn'),
         className: 'whitespace-nowrap text-text-dim',
@@ -766,9 +812,25 @@ export function ContractSearchPanel({
         render: (row) => formatTimestamp(new Date(row.dateExpired), timeZone),
         stackAffix: { before: t('contractSearch.mobile.expiresAffix') },
       },
-    ],
-    [t, typeNames, regionNames, offerLocations, timeZone]
+    }),
+    [t, regionNames, offerLocations, timeZone, offerJumps]
   );
+
+  const columns = useMemo<DataTableColumn<PublicContractOfferRow>[]>(() => {
+    const cols: DataTableColumn<PublicContractOfferRow>[] = [
+      {
+        id: 'item',
+        header: t('contractSearch.itemColumn'),
+        primary: true,
+        sortValue: (row) => typeNames.get(row.typeId) ?? `#${row.typeId}`,
+        render: (row) => typeNames.get(row.typeId) ?? `#${row.typeId}`,
+      },
+    ];
+    for (const id of CONTRACT_SEARCH_ITEMS_COLUMN_IDS) {
+      if (visibleItemsColumns.includes(id)) cols.push(itemsColumnsById[id]);
+    }
+    return cols;
+  }, [t, typeNames, visibleItemsColumns, itemsColumnsById]);
   const itemsSortProps = useUrlSort(
     'items.sort',
     ITEMS_SORT,
@@ -1044,6 +1106,16 @@ export function ContractSearchPanel({
                   )
                 ) : (
                   <>
+                    <div className="flex justify-end px-3 pb-2">
+                      <ColumnPickerMenu
+                        available={CONTRACT_SEARCH_ITEMS_COLUMN_IDS}
+                        visible={visibleItemsColumns}
+                        columnsById={itemsColumnsById}
+                        onToggle={toggleItemsColumn}
+                        buttonLabel={t('contractSearch.columnsButton')}
+                        menuTitle={t('contractSearch.columnsMenuTitle')}
+                      />
+                    </div>
                     <DataTable
                       label={t('contractSearch.title')}
                       columns={columns}

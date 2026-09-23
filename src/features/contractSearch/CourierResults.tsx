@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  ColumnPickerMenu,
   DataTable,
   EmptyState,
   FilterBar,
@@ -29,6 +30,11 @@ import {
   type DataTableColumn,
   type DataTableGroupBy,
 } from '@/components/ui';
+import {
+  COURIER_COLUMN_IDS,
+  useVisibleCourierColumns,
+  type CourierColumnId,
+} from '@/features/contractSearch/courierColumns';
 import {
   courierCollateral,
   filterCourierContracts,
@@ -918,6 +924,18 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
    * are then looked up by contract id instead of by position.
    */
   const jumps = useJumpCounts(rows, preference);
+  const visibleColumns = useVisibleCourierColumns((state) => state.value);
+  const setVisibleColumns = useVisibleCourierColumns((state) => state.setValue);
+  const hydrateVisibleColumns = useVisibleCourierColumns((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateVisibleColumns();
+  }, [hydrateVisibleColumns]);
+  function toggleColumn(id: CourierColumnId) {
+    const next = visibleColumns.includes(id)
+      ? visibleColumns.filter((existing) => existing !== id)
+      : [...visibleColumns, id];
+    void setVisibleColumns(next);
+  }
 
   /** A row's own count, found by its id — see `jumps` for why not by position. */
   const jumpsByContract = useMemo(() => {
@@ -1070,40 +1088,9 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
     setParams({ 'courier.pref': next, 'courier.all': false });
   }
 
-  const columns = useMemo<DataTableColumn<CourierRouteRow>[]>(() => {
-    const originRegion = (row: CourierRouteRow) => regionLabel(row.origin.regionId, regionNames);
-    const destinationRegion = (row: CourierRouteRow) =>
-      regionLabel(row.destination.regionId, regionNames);
-    return [
-      {
-        id: 'route',
-        header: t('contractSearch.routeColumn'),
-        primary: true,
-        sortValue: (row) =>
-          `${endpointSystemName(row.origin)} ${endpointSystemName(row.destination)}`,
-        render: (row) => (
-          <div className="flex flex-col gap-0.5">
-            <span>
-              {endpointSystemName(row.origin)}
-              <EndpointSecurity security={row.origin.security} />
-              {originRegion(row) && (
-                <span className="ml-1.5 text-[0.6875rem] text-text-dim">{originRegion(row)}</span>
-              )}
-              <EndpointRiskMarkers endpoint={row.origin} end="origin" />
-            </span>
-            <span className="text-text-dim">
-              {'→ '}
-              {endpointSystemName(row.destination)}
-              <EndpointSecurity security={row.destination.security} />
-              {destinationRegion(row) && (
-                <span className="ml-1.5 text-[0.6875rem]">{destinationRegion(row)}</span>
-              )}
-              <EndpointRiskMarkers endpoint={row.destination} end="destination" />
-            </span>
-          </div>
-        ),
-      },
-      {
+  const courierColumnsById = useMemo<Record<CourierColumnId, DataTableColumn<CourierRouteRow>>>(
+    () => ({
+      reward: {
         id: 'reward',
         header: t('contractSearch.rewardColumn'),
         align: 'right',
@@ -1113,7 +1100,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         // Long press, not tap: the row's own tap opens the haul's detail modal.
         render: (row) => <IskAmount value={row.reward} revealOn="longPress" />,
       },
-      {
+      collateral: {
         id: 'collateral',
         header: t('contractSearch.collateralColumn'),
         align: 'right',
@@ -1132,7 +1119,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
             <IskAmount value={courierCollateral(row)} revealOn="longPress" />
           ),
       },
-      {
+      jumps: {
         id: 'jumps',
         header: t('contractSearch.jumpsColumn'),
         align: 'right',
@@ -1155,7 +1142,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           return String(count);
         },
       },
-      {
+      iskPerJump: {
         id: 'iskPerJump',
         header: t('contractSearch.iskPerJumpColumn'),
         align: 'right',
@@ -1216,7 +1203,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           );
         },
       },
-      {
+      iskPerVolume: {
         id: 'iskPerVolume',
         header: t('contractSearch.iskPerVolumeColumn'),
         align: 'right',
@@ -1232,7 +1219,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           return rate === null ? <span className="text-text-dim">—</span> : formatIskAuto(rate);
         },
       },
-      {
+      expires: {
         id: 'expires',
         header: t('contractSearch.expiresColumn'),
         className: 'whitespace-nowrap text-text-dim',
@@ -1240,8 +1227,49 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         stackAffix: { before: t('contractSearch.courierMobile.expiresAffix') },
         render: (row) => formatTimestamp(new Date(row.dateExpired), timeZone),
       },
+    }),
+    [t, timeZone, jumps.kind, jumpsByContract, multipleFor]
+  );
+
+  const columns = useMemo<DataTableColumn<CourierRouteRow>[]>(() => {
+    const originRegion = (row: CourierRouteRow) => regionLabel(row.origin.regionId, regionNames);
+    const destinationRegion = (row: CourierRouteRow) =>
+      regionLabel(row.destination.regionId, regionNames);
+    const cols: DataTableColumn<CourierRouteRow>[] = [
+      {
+        id: 'route',
+        header: t('contractSearch.routeColumn'),
+        primary: true,
+        sortValue: (row) =>
+          `${endpointSystemName(row.origin)} ${endpointSystemName(row.destination)}`,
+        render: (row) => (
+          <div className="flex flex-col gap-0.5">
+            <span>
+              {endpointSystemName(row.origin)}
+              <EndpointSecurity security={row.origin.security} />
+              {originRegion(row) && (
+                <span className="ml-1.5 text-[0.6875rem] text-text-dim">{originRegion(row)}</span>
+              )}
+              <EndpointRiskMarkers endpoint={row.origin} end="origin" />
+            </span>
+            <span className="text-text-dim">
+              {'→ '}
+              {endpointSystemName(row.destination)}
+              <EndpointSecurity security={row.destination.security} />
+              {destinationRegion(row) && (
+                <span className="ml-1.5 text-[0.6875rem]">{destinationRegion(row)}</span>
+              )}
+              <EndpointRiskMarkers endpoint={row.destination} end="destination" />
+            </span>
+          </div>
+        ),
+      },
     ];
-  }, [t, regionNames, timeZone, jumps.kind, jumpsByContract, multipleFor]);
+    for (const id of COURIER_COLUMN_IDS) {
+      if (visibleColumns.includes(id)) cols.push(courierColumnsById[id]);
+    }
+    return cols;
+  }, [t, regionNames, visibleColumns, courierColumnsById]);
   const courierSortProps = useUrlSort(
     'courier.sort',
     COURIER_SORT,
@@ -1343,6 +1371,16 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
               {t('contractSearch.jumpsSnapshotUnavailable')}
             </p>
           )}
+          <div className="flex justify-end px-3 pb-2">
+            <ColumnPickerMenu
+              available={COURIER_COLUMN_IDS}
+              visible={visibleColumns}
+              columnsById={courierColumnsById}
+              onToggle={toggleColumn}
+              buttonLabel={t('contractSearch.columnsButton')}
+              menuTitle={t('contractSearch.columnsMenuTitle')}
+            />
+          </div>
           <DataTable
             label={t('contractSearch.courierTitle')}
             columns={columns}
