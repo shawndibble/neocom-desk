@@ -138,6 +138,7 @@ here — they go one per file in `docs/context/decisions/`.
   list out, severity from time remaining alone. A source that could not be read
   contributes nothing _and says so_; a source that read fine with nothing due
   shows a zero — the two must never look alike.
+- **Character Modifiers**: One value built from a Character's snapshot — skill levels plus active-clone implants — that every pricing path (job time, job cost, refining yield) takes as a required input instead of loose bonus percentages (issue #1284). It owns which bonus applies to which activity: manufacturing time (Industry, Advanced Industry, the blueprint's own science skills, BX-80x implant), reaction time (Reactions only), refining yield for ore/ice/moon ore (Reprocessing, Reprocessing Efficiency, the type's specialisation, RX-80x implant) versus scrap (Scrapmetal Processing only). Built pure in `src/engine/industry/characterModifiers.ts`; loaded once per Character by `src/features/character/characterModifiers.ts`, which picks the level rule: Industry uses effective levels (issue #1236's min of trained and active), market/refining/mining surfaces use queue-corrected trained levels. Does not cover Clone State or training speed.
 - **Character Not Training**: Fires when a Character's skill queue shows no
   active training (the head entry has no live `finish_date`) — whether from
   an empty queue or a stalled/alpha-incapable queue head. ESI exposes no
@@ -756,6 +757,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   `1,254,000,000` both render `1.25B`-ish) safe to accept. See
   `docs/context/decisions/` for the rule the rollout follows.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
+- **Skill Plan schedule**: A **Skill Plan** costed in time — its per-level steps with training seconds, plan total, projected finish, skill count, **Remap Marker** segments, **Booster**-boosted and Alpha-capped steps and effective **Priority (Skill Plan)** — computed in one pass from the plan, the Character's trained skills and attributes, **Clone State**, implants (or **What-If Implants**) and Booster (`engine/skillPlanSchedule.ts`). Every number the plan editor shows about when the plan trains reads from one schedule, so none can disagree. A step is identified by skill and level, not by position.
 - **Stale-Serve**: showing a cached row whose **Freshness Window** has lapsed while the replacement is fetched behind it, rather than spinning until it lands. Only for a **Published Snapshot**, where a long window encodes a publish cadence; a game constant's long window asserts the value cannot change, so a lapsed one is fetched outright instead. A stale-serve that fails to revalidate must say so on the next read — it is never left standing as a loading state.
 - **Standing (corp)**: The `/corp` overview's top panel: the figures a corp
   manager acts on — clocks due inside a day, Runway, 30-day net — beside the

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import {
   facilityContextFor,
@@ -62,21 +63,21 @@ describe('autoBuildDepthContext', () => {
   });
 
   it('zeroes every pricing field, since depth discovery never prices anything', () => {
-    const ctx = autoBuildDepthContext(facilityContext, null, {});
+    const ctx = autoBuildDepthContext(facilityContext, null, NO_CHARACTER_MODIFIERS);
     expect(ctx.systemCostIndex).toBe(0);
     expect(ctx.adjustedPrices).toEqual({});
     expect(ctx.materialPrices).toEqual({});
   });
 
   it('carries the plan facility context through unchanged', () => {
-    const ctx = autoBuildDepthContext(facilityContext, null, {});
+    const ctx = autoBuildDepthContext(facilityContext, null, NO_CHARACTER_MODIFIERS);
     expect(ctx.facility).toBe(facilityContext.facility);
     expect(ctx.rigFit).toBe(facilityContext.rigFit);
     expect(ctx.security).toBe(facilityContext.security);
   });
 
   it('omits reactionFacility when no Reaction Location is configured', () => {
-    const ctx = autoBuildDepthContext(facilityContext, null, {});
+    const ctx = autoBuildDepthContext(facilityContext, null, NO_CHARACTER_MODIFIERS);
     expect(ctx.reactionFacility).toBeUndefined();
   });
 
@@ -86,7 +87,11 @@ describe('autoBuildDepthContext', () => {
       reactionRigFit: ['meT2', 'teT2', 'none'],
       reactionFacilityTaxPct: 2,
     });
-    const ctx = autoBuildDepthContext(facilityContext, reactionPlanFacilityContext, {});
+    const ctx = autoBuildDepthContext(
+      facilityContext,
+      reactionPlanFacilityContext,
+      NO_CHARACTER_MODIFIERS
+    );
     // Ready the instant a Reaction Location is configured — never waiting on
     // a live systemCostIndex the way the price-resolved reactionFacilityContext
     // does, which is the bug this seam exists to not repeat.

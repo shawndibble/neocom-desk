@@ -28,9 +28,10 @@
  * plan's own page. This hook only batches the fetches that feed it.
  */
 import { useEffect, useRef, useState } from 'react';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import i18n from '@/i18n';
 import type { BuildPlanRecord } from '@/db';
-import type { BuildResult, SkillLevels } from '@/engine/industry/types';
+import type { BuildResult } from '@/engine/industry/types';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
@@ -78,9 +79,7 @@ export interface UseComparedBuildResultsArgs {
    * Omitted reads as unavailable.
    */
   corpOwnedBlueprints?: CorpOwnedBlueprintsState;
-  skills: SkillLevels;
-  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
-  implantBonusPct: number;
+  modifiers: CharacterModifiers;
   /**
    * The active Character's standing toward each Trade Hub's NPC owner
    * (issue #1238), keyed by hub id — `useTradeHubStandings`'s result.
@@ -172,8 +171,7 @@ export function useComparedBuildResults({
   pi,
   ownedBlueprints,
   corpOwnedBlueprints,
-  skills,
-  implantBonusPct,
+  modifiers,
   tradeHubStandings,
   computeGroupResult = false,
 }: UseComparedBuildResultsArgs): ComparedBuildRow[] {
@@ -264,8 +262,7 @@ export function useComparedBuildResults({
           ownedBlueprints,
           corpBlueprints: corpForPlans,
           assumedMe,
-          skills,
-          implantBonusPct,
+          modifiers,
           includeBlueprintCost,
         },
         bpcRows,
@@ -291,8 +288,7 @@ export function useComparedBuildResults({
     includeBlueprintCost,
     includeBlueprintCostHydrated,
     bpcRows,
-    skills,
-    implantBonusPct,
+    modifiers,
     tradeHubStandings,
     computeGroupResult,
   ]);

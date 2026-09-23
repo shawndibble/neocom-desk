@@ -11,6 +11,7 @@
  * account-level alt-linking, just this feature's own scoped selector.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -34,7 +35,6 @@ import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import type { SkillLevels } from '@/engine/industry/types';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
@@ -60,9 +60,7 @@ import { useAssumedMe } from './assumedMe';
 interface OpportunitiesPanelProps {
   catalog: BlueprintCatalog;
   pi: PiData | null;
-  skills: SkillLevels;
-  /** The active Character's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
-  implantBonusPct: number;
+  modifiers: CharacterModifiers;
   facilityDefaults: ActivityFacilityDefaults;
   activeCharacterId: number;
   ownedStockSnapshot: OwnedStockSnapshot;
@@ -80,8 +78,7 @@ function numericCell(
 export function OpportunitiesPanel({
   catalog,
   pi,
-  skills,
-  implantBonusPct,
+  modifiers,
   facilityDefaults,
   activeCharacterId,
   ownedStockSnapshot,
@@ -176,8 +173,7 @@ export function OpportunitiesPanel({
     pi,
     hub: DEFAULT_TRADE_HUB,
     facilityDefaults,
-    skills,
-    implantBonusPct,
+    modifiers,
     ownedStockSnapshot,
     ownedByCharacter,
     assumedMe,

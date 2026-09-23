@@ -22,8 +22,8 @@ import type {
   IndustryBlueprint,
   JobFeeBreakdown,
   MaterialCostLine,
-  SkillLevels,
 } from '@/engine/industry/types';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { effectiveMaterials } from '@/engine/industry/materials';
 import { jobDurationSeconds } from '@/engine/industry/time';
 import { estimatedItemValue, jobFee } from '@/engine/industry/jobCost';
@@ -62,9 +62,8 @@ export interface SubBuildContext extends FacilityContext {
   facilityTaxPct?: number;
   systemCostIndex: number;
   adjustedPrices: AdjustedPrices;
-  skills: SkillLevels;
-  /** The active clone's manufacturing-time implant bonus (issue #1229); see `IndustryInputs.implantBonusPct`. */
-  implantBonusPct?: number;
+  /** See `IndustryInputs.modifiers`. */
+  modifiers: CharacterModifiers;
 }
 
 /**
@@ -98,15 +97,7 @@ export function planSubBuild(
       needed,
       spare,
       me,
-      seconds: jobDurationSeconds(
-        blueprint.time,
-        runs,
-        0,
-        ctx.skills,
-        ctx,
-        blueprint.skills,
-        ctx.implantBonusPct
-      ),
+      seconds: jobDurationSeconds(blueprint.time, runs, 0, ctx.modifiers, ctx, blueprint.skills),
       inputs,
       jobFee: jobFee(
         estimatedItemValue(blueprint, runs, ctx.adjustedPrices),

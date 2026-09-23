@@ -3,6 +3,11 @@ import { buildVsBuy } from './buildVsBuy';
 import { EMPTY_RIG_FIT, FACILITY_PRESETS, SKILL_IDS } from './types';
 import type { IndustryBlueprint, IndustryInputs } from './types';
 import { computeMarketWideRows, selectLiquidCandidates } from './marketWideOpportunities';
+import { characterModifiers, NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
+
+function mods(skills: Record<number, number>) {
+  return characterModifiers({ skills, implantTypeIds: [] });
+}
 
 describe('selectLiquidCandidates', () => {
   const candidates = [
@@ -55,7 +60,7 @@ describe('computeMarketWideRows', () => {
     ],
   };
 
-  const noFee = { adjustedPrices: {}, systemCostIndex: 0, skills: {} };
+  const noFee = { adjustedPrices: {}, systemCostIndex: 0, modifiers: NO_CHARACTER_MODIFIERS };
 
   it('computes ISK/hour from flattened materials, sell price, and time — net of sales tax and broker fee even at untrained skills', () => {
     const rows = computeMarketWideRows(
@@ -85,7 +90,7 @@ describe('computeMarketWideRows', () => {
     const rows = computeMarketWideRows(
       [{ productTypeID: 2, tree: feeTree, sellPrice: 2000, sellDepthIsk: 5_000_000 }],
       new Map([[60, 50]]), // materialCost = 10 * 50 = 500
-      { adjustedPrices: { 60: 10_000 }, systemCostIndex: 0.05, skills: {} } // EIV 100,000 at a 5% index
+      { adjustedPrices: { 60: 10_000 }, systemCostIndex: 0.05, modifiers: NO_CHARACTER_MODIFIERS } // EIV 100,000 at a 5% index
     );
     // jobFee(100_000, 0.05, npcStation): grossCost 5000, SCC 4000, tax 250 -> 9250.
     // buildCost = 500 + 9250 = 9750. revenue 2000, untrained tax 150, broker
@@ -102,7 +107,7 @@ describe('computeMarketWideRows', () => {
         [50, 10],
         [51, 20],
       ]),
-      { ...noFee, skills: { [SKILL_IDS.accounting]: 5, [SKILL_IDS.brokerRelations]: 5 } }
+      { ...noFee, modifiers: mods({ [SKILL_IDS.accounting]: 5, [SKILL_IDS.brokerRelations]: 5 }) }
     );
     // buildCost = 200 (no job fee). revenue = 10_000. Accounting V:
     // 7.5%*(1-0.11*5) = 3.375% -> tax 337.5. Broker Relations V:
@@ -130,7 +135,7 @@ describe('computeMarketWideRows', () => {
       ]),
       {
         ...noFee,
-        skills: { [SKILL_IDS.industry]: 5, [SKILL_IDS.advancedIndustry]: 5 },
+        modifiers: mods({ [SKILL_IDS.industry]: 5, [SKILL_IDS.advancedIndustry]: 5 }),
       }
     );
     // Same profit (625) either way — skills here don't touch tax/broker —
@@ -156,7 +161,7 @@ describe('computeMarketWideRows', () => {
         [50, 10],
         [51, 20],
       ]),
-      { ...noFee, skills: { 3395: 3 } } // character trained ASSC III
+      { ...noFee, modifiers: mods({ 3395: 3 }) } // character trained ASSC III
     );
     // Same profit (625) as the untrained baseline — only time changes.
     // 3600s * (1 - 0.01*3) = 3492s.
@@ -227,7 +232,7 @@ describe('computeMarketWideRows', () => {
       systemCostIndex,
       adjustedPrices,
       hubPrices: { [materialTypeID]: materialHubPrice, [productTypeID]: productHubPrice },
-      skills,
+      modifiers: mods(skills),
     };
     const ownedResult = buildVsBuy(ownedInputs);
 
@@ -249,7 +254,7 @@ describe('computeMarketWideRows', () => {
         },
       ],
       new Map([[materialTypeID, materialHubPrice]]),
-      { adjustedPrices, systemCostIndex, skills }
+      { adjustedPrices, systemCostIndex, modifiers: mods(skills) }
     );
 
     expect(ownedResult.iskPerHour).not.toBeNull();

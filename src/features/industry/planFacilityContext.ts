@@ -6,13 +6,13 @@
  * once both needed the exact same four-field shape.
  */
 import type { BuildPlanRecord } from '@/db';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import {
   FACILITY_PRESETS,
   resolveRigFit,
   type FacilityPreset,
   type RigFit,
   type SecurityBand,
-  type SkillLevels,
 } from '@/engine/industry/types';
 import type { MakeOrBuyContext } from '@/engine/industry/makeOrBuy';
 
@@ -73,14 +73,14 @@ export function reactionPlanFacilityContextFor(
 export function autoBuildDepthContext(
   facilityContext: PlanFacilityContext,
   reactionPlanFacilityContext: PlanFacilityContext | null,
-  skills: SkillLevels
+  modifiers: CharacterModifiers
 ): MakeOrBuyContext {
   return {
     ...facilityContext,
     systemCostIndex: 0,
     adjustedPrices: {},
     materialPrices: {},
-    skills,
+    modifiers,
     reactionFacility: reactionPlanFacilityContext
       ? { ...reactionPlanFacilityContext, systemCostIndex: 0 }
       : undefined,

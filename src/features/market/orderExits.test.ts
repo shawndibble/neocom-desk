@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { orderExits, hubHaulGaps, type HubBuyPrice } from './orderExits';
 import type { OpenOrderRow } from './openOrdersModel';
 import type { CompetingOrder } from '@/engine/market/undercut';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 
 const BASE_ROW: OpenOrderRow = {
   orderId: 101,
@@ -91,11 +92,7 @@ describe('orderExits', () => {
   });
 
   describe('reprocess and sell the materials', () => {
-    const SKILLS = {
-      reprocessingLevel: 0,
-      reprocessingEfficiencyLevel: 0,
-      specialisationLevel: 0,
-    };
+    const SKILLS = NO_CHARACTER_MODIFIERS;
     /** 10 units refine into 1,000 Tritanium at 100%; at the assumed 50% station that is 500. */
     const ENTRY = { portionSize: 10, materials: [{ typeID: 34, quantity: 1000 }] };
 
@@ -104,7 +101,7 @@ describe('orderExits', () => {
       // ISK over 10 units = 100 a unit, against a fill floor of 380.
       const exits = orderExits({
         row: BASE_ROW,
-        reprocessing: { entry: ENTRY, skills: SKILLS, materialPrices: { 34: 2 } },
+        reprocessing: { entry: ENTRY, modifiers: SKILLS, materialPrices: { 34: 2 } },
       });
       expect(exits).toContainEqual({
         kind: 'reprocess',
@@ -118,7 +115,7 @@ describe('orderExits', () => {
     it('reports the stock that cannot make up a whole portion', () => {
       const exits = orderExits({
         row: { ...BASE_ROW, volumeRemain: 23 },
-        reprocessing: { entry: ENTRY, skills: SKILLS, materialPrices: { 34: 2 } },
+        reprocessing: { entry: ENTRY, modifiers: SKILLS, materialPrices: { 34: 2 } },
       });
       const refine = exits.find((e) => e.kind === 'reprocess');
       expect(refine?.unitsLeftOver).toBe(3);
@@ -127,7 +124,7 @@ describe('orderExits', () => {
     it('offers a worthless refine, rather than hiding it, when nothing makes up a portion', () => {
       const exits = orderExits({
         row: { ...BASE_ROW, volumeRemain: 3 },
-        reprocessing: { entry: ENTRY, skills: SKILLS, materialPrices: { 34: 2 } },
+        reprocessing: { entry: ENTRY, modifiers: SKILLS, materialPrices: { 34: 2 } },
       });
       expect(exits).toContainEqual({
         kind: 'reprocess',
@@ -147,7 +144,7 @@ describe('orderExits', () => {
       };
       const exits = orderExits({
         row: BASE_ROW,
-        reprocessing: { entry: twoMaterials, skills: SKILLS, materialPrices: { 34: 2 } },
+        reprocessing: { entry: twoMaterials, modifiers: SKILLS, materialPrices: { 34: 2 } },
       });
       expect(exits.find((e) => e.kind === 'reprocess')?.partial).toBe(true);
     });

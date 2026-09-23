@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import '@/i18n';
 import type { BuildPlanRecord } from '@/db';
 import {
@@ -84,8 +85,7 @@ function tableFor(p: BuildPlanRecord) {
       pi: null,
       ownedBlueprints: [],
       assumedMe: 0,
-      skills: {},
-      implantBonusPct: 0,
+      modifiers: NO_CHARACTER_MODIFIERS,
       bpcOffersFor: () => [],
       includeBlueprintCost: false,
     },

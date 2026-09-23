@@ -8,6 +8,7 @@
  * see FACILITY_PRESETS.npcStation.defaultTaxPct), and never throws.
  */
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { withoutOwnedQuantities } from '@/engine/industry/materialResolution';
 import { FACILITY_PRESETS, MAX_JOB_RUNS, resolveRigFit } from '@/engine/industry/types';
 import type {
@@ -17,7 +18,6 @@ import type {
   HubPrices,
   IndustryBlueprint,
   ReactionFacilityContext,
-  SkillLevels,
 } from '@/engine/industry/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import type { SubBuildContext } from '@/engine/industry/subBuild';
@@ -46,15 +46,13 @@ export interface ComputeBuildPlanInput {
   hubPrices: HubPrices;
   /** The plan's material price basis, already resolved by `priceBasis.ts`. */
   materialPrices?: HubPrices;
-  skills: SkillLevels;
+  modifiers: CharacterModifiers;
   /**
    * The plan owner's standing toward the plan's Trade Hub NPC owner, for the
    * broker fee and break-even price (issue #1238). Absent/0 = standings
    * assumed 0, today's behaviour.
    */
   standing?: ResolvedStandings;
-  /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
-  implantBonusPct?: number;
   /** What produces a material, for anything `plan.buildHere` might name at any depth. */
   recipeFor?: (typeID: number) => MaterialRecipe | null;
   /** Blueprint Acquisition (issue #838) for any buildable node reached during recursion. */
@@ -92,9 +90,8 @@ export function computeBuildPlan({
   adjustedPrices,
   hubPrices,
   materialPrices,
-  skills,
+  modifiers,
   standing,
-  implantBonusPct,
   recipeFor,
   acquisitionFor,
   blueprintAcquisition,
@@ -130,9 +127,8 @@ export function computeBuildPlan({
       materialSourcing: ignoreOwnedStock
         ? withoutOwnedQuantities(plan.materialSourcing)
         : plan.materialSourcing,
-      skills,
+      modifiers,
       standing,
-      implantBonusPct,
       buildHere: plan.buildHere,
       recipeFor,
       acquisitionFor,

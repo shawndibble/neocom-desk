@@ -11,6 +11,7 @@
  * sits here instead of the engine.
  */
 import type { BuildPlanRecord } from '@/db';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
@@ -21,7 +22,7 @@ import {
 } from '@/engine/industry/autoMakeOrBuy';
 import { craftScope, reactionCraftEligible } from '@/engine/industry/craftScope';
 import type { MakeMethod, MakeOrBuyContext, MaterialRecipe } from '@/engine/industry/makeOrBuy';
-import type { IndustryBlueprint, SkillLevels } from '@/engine/industry/types';
+import type { IndustryBlueprint } from '@/engine/industry/types';
 import { industryActivityOf } from '@/engine/industry/types';
 import type { PiData } from '@/sde/types';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
@@ -130,7 +131,7 @@ export function memberRecipeFor(
 export function groupAutoBuildMaxDepth(
   plans: readonly BuildPlanRecord[],
   sources: GroupRecipeSources,
-  skills: SkillLevels
+  modifiers: CharacterModifiers
 ): number {
   let deepest = 0;
   for (const plan of plans) {
@@ -140,7 +141,7 @@ export function groupAutoBuildMaxDepth(
     const ctx = autoBuildDepthContext(
       member.facilityContext,
       member.reactionPlanFacilityContext,
-      skills
+      modifiers
     );
     deepest = Math.max(
       deepest,
@@ -172,7 +173,7 @@ export async function applyGroupAutoBuild(
   catalog: BlueprintCatalog,
   pi: PiData | null,
   ownedBlueprints: readonly CharacterBlueprint[],
-  skills: SkillLevels,
+  modifiers: CharacterModifiers,
   assumedMe: number,
   options: { strategy: BuildStrategy; depth: number },
   corpOwnedBlueprints?: CorpOwnedBlueprintsState,
@@ -210,7 +211,7 @@ export async function applyGroupAutoBuild(
         systemCostIndex: snapshot.systemCostIndex,
         adjustedPrices: snapshot.adjustedPrices,
         materialPrices,
-        skills,
+        modifiers,
         reactionFacility,
       };
       // The ME the member's own page walks at: its top-level Blueprint

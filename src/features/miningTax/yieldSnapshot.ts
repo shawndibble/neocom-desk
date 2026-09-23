@@ -18,16 +18,12 @@ import type { MiningYieldEntry } from '@/engine/miningTax/yieldGrouping';
 import {
   valueMiningYield,
   type EntryValuation,
-  type GeneralReprocessingSkills,
   type YieldReprocessingEntry,
 } from '@/engine/miningTax/yieldValuation';
-import type { TrainedSkill } from '@/engine/types';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
+import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import { loadPriceHistory, type PriceHistoryResult } from '@/features/market/priceHistory';
 import { EsiError } from '@/esi/errors';
-import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import { loadCharacterImplants } from '@/features/skills/data';
-import { resolveImplantBonusPct } from '@/engine/industry/reprocessing';
-import { SKILL_IDS } from '@/engine/industry/types';
 import { loadCompressedOreTypeIds, loadReprocessing, loadTypes } from '@/sde/loadSde';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadSystemNameAndSecurity } from '@/features/character/systemSecurity';
@@ -100,37 +96,6 @@ export interface MiningYieldSnapshot {
   typeVolumes: Map<number, number>;
   fetchedAt: Date | null;
   fromCache: boolean;
-}
-
-const NO_SKILLS: GeneralReprocessingSkills = {
-  reprocessingLevel: 0,
-  reprocessingEfficiencyLevel: 0,
-};
-const NO_TRAINED: ReadonlyMap<number, TrainedSkill> = new Map();
-
-/**
- * A character's general reprocessing skills, plus their full trained-skill
- * map so `valueMiningYield` can resolve each ore line's own specialisation
- * skill (issue #1058) — a mixed day's entry can refine ore and ice under two
- * different specialisations, so that resolution cannot happen here, ahead of
- * time, for the whole character.
- */
-async function loadReprocessingSkills(
-  characterId: number
-): Promise<{ skills: GeneralReprocessingSkills; trained: ReadonlyMap<number, TrainedSkill> }> {
-  const [corrected, implants] = await Promise.all([
-    loadCorrectedSkills(characterId, Date.now()),
-    loadCharacterImplants(characterId),
-  ]);
-  return {
-    skills: {
-      reprocessingLevel: corrected.trained.get(SKILL_IDS.reprocessing)?.level ?? 0,
-      reprocessingEfficiencyLevel:
-        corrected.trained.get(SKILL_IDS.reprocessingEfficiency)?.level ?? 0,
-      implantBonusPct: resolveImplantBonusPct(implants?.data ?? []),
-    },
-    trained: corrected.trained,
-  };
 }
 
 function volumeCacheKey(typeId: number): string {
@@ -330,9 +295,9 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
   }
 
   const characterIds = [...new Set(allEntries.map(({ characterId }) => characterId))];
-  const skillsByCharacter = new Map(
+  const modifiersByCharacter = new Map(
     await Promise.all(
-      characterIds.map(async (id) => [id, await loadReprocessingSkills(id)] as const)
+      characterIds.map(async (id) => [id, await loadCharacterModifiers(id, Date.now())] as const)
     )
   );
 
@@ -349,10 +314,7 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
     );
 
   const rows: MiningYieldRow[] = allEntries.map(({ characterId, characterName, entry }) => {
-    const { skills, trained } = skillsByCharacter.get(characterId) ?? {
-      skills: NO_SKILLS,
-      trained: NO_TRAINED,
-    };
+    const modifiers = modifiersByCharacter.get(characterId) ?? NO_CHARACTER_MODIFIERS;
     const valueOn = (basis: PriceBasis): BasisValuation => {
       const rawUnitPrices = new Map<number, number>();
       const materialPrices: Record<number, number> = {};
@@ -372,8 +334,7 @@ export async function loadMiningYieldSnapshot(): Promise<MiningYieldSnapshot> {
           entry.oreLines,
           rawUnitPrices,
           reprocessingByTypeId,
-          skills,
-          trained,
+          modifiers,
           materialPrices
         ),
         materialUnitPrices: new Map(

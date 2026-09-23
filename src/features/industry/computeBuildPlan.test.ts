@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
 import { FACILITY_PRESETS } from '@/engine/industry/types';
 import type { IndustryBlueprint } from '@/engine/industry/types';
@@ -36,7 +37,7 @@ const MARKET = {
   systemCostIndex: 0.05,
   adjustedPrices: { 34: 4.2 },
   hubPrices: { 34: 5.5, 587: 2_000_000 },
-  skills: {},
+  modifiers: NO_CHARACTER_MODIFIERS,
 };
 
 describe('computeBuildPlan', () => {

@@ -9,6 +9,10 @@ import type { RegionCompetition } from './orderCompetition';
 import type { PriceHistoryResult } from './priceHistory';
 import { orderFloor } from '@/engine/market/orderFloor';
 import { historyPoint as buildHistoryPoint } from '@/engine/market/__fixtures__/priceHistory';
+import { characterModifiers, NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
+
+const SIMPLE_ORE_PROCESSING = 60377;
+const WITH_RX_804 = characterModifiers({ skills: {}, implantTypeIds: [27174] });
 
 /** Daily point `daysAgo` days before now, so it always lands inside a `30d` filter regardless of when the suite runs. */
 /** A day of history `daysAgo` days back — these tests only ever vary the volume. */
@@ -24,10 +28,7 @@ const SKILLS: CharacterSkills = {
   accountingLevel: 5,
   brokerRelationsLevel: 5,
   advancedBrokerRelationsLevel: 5,
-  reprocessingLevel: 0,
-  reprocessingEfficiencyLevel: 0,
-  implantBonusPct: 0,
-  trained: new Map(),
+  modifiers: NO_CHARACTER_MODIFIERS,
 };
 
 const BASE_ROW: OpenOrderRow = {
@@ -822,12 +823,12 @@ describe('OrderDetailModal', () => {
   describe('reprocess and sell the materials', () => {
     /** 10 units refine into 1,000 Tritanium at 100%; the assumed 50% station halves it. */
     const REPROCESSING = {
-      entry: { portionSize: 10, materials: [{ typeID: 34, quantity: 1000 }] },
-      skills: {
-        reprocessingLevel: 0,
-        reprocessingEfficiencyLevel: 0,
-        specialisationLevel: 0,
+      entry: {
+        portionSize: 10,
+        materials: [{ typeID: 34, quantity: 1000 }],
+        specialisationSkillID: SIMPLE_ORE_PROCESSING,
       },
+      modifiers: NO_CHARACTER_MODIFIERS,
       materialPrices: { 34: 2 },
     };
     const FLOORED_ROW: OpenOrderRow = { ...BASE_ROW, floor: { relist: 400, fill: 380 } };
@@ -862,7 +863,7 @@ describe('OrderDetailModal', () => {
     it("names the fitted refining implant's bonus (issue #1227)", () => {
       renderModal({
         row: FLOORED_ROW,
-        reprocessing: { ...REPROCESSING, skills: { ...REPROCESSING.skills, implantBonusPct: 4 } },
+        reprocessing: { ...REPROCESSING, modifiers: WITH_RX_804 },
       });
       expect(
         screen.getByText(
@@ -876,7 +877,9 @@ describe('OrderDetailModal', () => {
         row: FLOORED_ROW,
         reprocessing: {
           ...REPROCESSING,
-          skills: { ...REPROCESSING.skills, implantBonusPct: 4, isScrap: true },
+          // No specialisation attribute = scrap.
+          entry: { portionSize: 10, materials: [{ typeID: 34, quantity: 1000 }] },
+          modifiers: WITH_RX_804,
         },
       });
       expect(screen.queryByText(/fitted refining implant/)).not.toBeInTheDocument();

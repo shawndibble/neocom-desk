@@ -41,6 +41,7 @@ import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { orderVerdict, type OrderVerdictKind } from './orderVerdict';
 import { orderExits, hubHaulGaps, type HubBuyPrice, type ReprocessingInput } from './orderExits';
 import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
+import { appliedRefiningImplantPct } from '@/engine/industry/characterModifiers';
 
 export interface OrderDetailModalProps {
   open: boolean;
@@ -412,6 +413,10 @@ export function OrderDetailModal({
     region.kind === 'clear';
   const verdict = orderVerdict(row);
   const exits = orderExits({ row, competitors: deep?.competitors, reprocessing });
+  // Named only when it moved the number: never on scrap (f4b5a3f5).
+  const refineImplantPct = reprocessing
+    ? appliedRefiningImplantPct(reprocessing.modifiers, reprocessing.entry.specialisationSkillID)
+    : 0;
   const haulGaps = hubHaulGaps({ row, hubs: hubs ?? [], competitors: deep?.competitors });
   const refine = exits.find((exit) => exit.kind === 'reprocess');
   const rank = stationRank(row, deep);
@@ -883,10 +888,10 @@ export function OrderDetailModal({
                       rate: Math.round(BASE_STATION_REPROCESSING_RATE * 100),
                     })}
                   </p>
-                  {!reprocessing?.skills.isScrap && !!reprocessing?.skills.implantBonusPct && (
+                  {refineImplantPct > 0 && (
                     <p className="text-text-dim">
                       {t('market.orders.exitReprocessImplant', {
-                        pct: reprocessing.skills.implantBonusPct,
+                        pct: refineImplantPct,
                       })}
                     </p>
                   )}
