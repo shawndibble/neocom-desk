@@ -1,17 +1,7 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactElement,
-  type ReactNode,
-} from 'react';
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { usePageTab } from '@/lib/usePageTab';
-import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
-import { boolParam, enumParam, enumSetParam, intParam, type UrlParamCodec } from '@/lib/urlState';
 import { MARKET_TABS } from '@/app/pageTabs';
 import {
   Button,
@@ -38,85 +28,35 @@ import {
   TypeIcon,
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
-import {
-  MARKET_ORDER_COLUMN_IDS,
-  useVisibleMarketOrderColumns,
-  type MarketOrderColumnId,
-} from '@/features/market/marketOrderColumns';
+import type { MarketOrderColumnId } from '@/features/market/marketOrderColumns';
 import * as Icon from '@/components/ui/icons';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import {
-  loadAttributeDictionary,
-  loadMarketGroups,
-  loadMarketTypes,
-  loadNpcStations,
-  loadSolarSystems,
-  loadMarketRegions,
-  loadVariations,
-} from '@/sde/loadMarketSde';
-import type {
-  MarketGroupNode,
-  MarketTypeEntry,
-  NpcStationEntry,
-  SolarSystemEntry,
-  MarketRegionEntry,
-  VariationData,
-} from '@/sde/marketTypes';
-import { buildVariationIndex } from '@/engine/market/variations';
-import { TRADE_HUBS, DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
-import { useMarketHub } from '@/features/market/hub';
-import { useLocationMode, type LocationMode } from '@/features/market/locationMode';
-import { JUMP_RANGES, DEFAULT_JUMP_RANGE, type JumpRange } from '@/engine/route/jumpRange';
-import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
-import { intersectSystemSets, systemsInSpace } from '@/engine/market/orderBookFilters';
-import {
-  useCurrentSystem,
-  useJumpRangeFilter,
-  type CurrentSystemState,
-  type JumpsCellValue,
-} from '@/features/route/currentSystem';
+import type { MarketGroupNode, MarketTypeEntry } from '@/sde/marketTypes';
+import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
+import { SPACE_KINDS } from '@/engine/space';
+import type { CurrentSystemState } from '@/features/route/currentSystem';
 import {
   JumpRangeSelect,
   CurrentSystemPicker,
   JumpRangeNote,
 } from '@/features/route/JumpRangeControls';
-import { renderJumpsCell } from '@/features/route/jumpsCell';
 import {
-  filterMarketTree,
-  addAncestors,
   MARKET_TREE_MATCH_LIMIT,
   MARKET_TREE_MIN_QUERY_LENGTH,
+  type MarketTreeFilterResult,
 } from '@/features/market/marketTree';
-import { ORDER_BOOK_FANOUT_CONCURRENCY } from '@/features/market/orderBook';
-import {
-  buildOrderBookView,
-  clearOrderBookViewCache,
-  clearOrderBookViewCacheAcross,
-  fetchOrderBook,
-  fetchOrderBookAcross,
-  loadOrderBookView,
-  orderBookLocationFor,
-  useGlobalMarketOverrides,
-  type OrderBookFetch,
-  type OrderBookLocation,
-} from '@/features/market/orderBookView';
-import { mapWithConcurrencyLimit } from '@/lib/concurrency';
-import { formatVolume } from '@/features/market/format';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { RequiredSkillsSection } from '@/features/market/RequiredSkillsSection';
-import { loadAttributeReferenceNames } from '@/features/market/attributeReferenceNames';
-import { extractRequiredSkills, type RequiredSkill } from '@/features/skills/dogma';
-import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
-import { useTargetPlan } from '@/features/skills/useTargetPlan';
+import type { RequiredSkill } from '@/features/skills/dogma';
+import type { TargetPlan } from '@/features/skills/useTargetPlan';
 import type { TrainedSkill } from '@/engine/types';
 import { CompareDrawer } from '@/features/market/CompareDrawer';
 import { useCompareSet } from '@/features/market/compareSet';
 import { QuickbarList } from '@/features/market/QuickbarList';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
-import { getVariationRows } from '@/features/market/variations';
 import { VariationsTable } from '@/features/market/VariationsTable';
 import { VariationsCompareModal } from '@/features/market/VariationsCompareModal';
 import {
@@ -127,34 +67,16 @@ import {
 import { useQuickbar } from '@/features/market/useQuickbar';
 import {
   resolveOrderLocation,
-  orderExpiry,
   type NpcStationLookup,
   type SolarSystemLookup,
-  type OrderBookSummary,
 } from '@/engine/market/orderBook';
-import { securityStatusColor } from '@/engine/securityStatus';
-import {
-  ALL_REGIONS,
-  regionsForSystems,
-  resolveOrderBookRegion,
-  type GlobalMarketOverride,
-  type RegionChoice,
-} from '@/engine/market/locationMode';
-import { loadAllCharactersOpenOrders } from '@/features/market/openOrdersData';
-import {
-  parseMarketParams,
-  buildMarketParams,
-  resolveAgainstCatalogue,
-  resolveMarketLocation,
-  type MarketLocationParam,
-} from '@/engine/market/urlState';
-import { getUniverseType, type RegionOrder } from '@/esi/endpoints';
-import { formatIsk } from '@/lib/isk';
+import { ALL_REGIONS } from '@/engine/market/locationMode';
+import type { RegionOrder } from '@/esi/endpoints';
 import type { MarketFocusSearchState } from '@/lib/shortcuts';
-import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { downloadCsv } from '@/lib/downloadCsv';
-import { orderBookCsvColumns, rangeLabel } from '@/features/market/orderBookCsv';
+import { orderBookCsvColumns } from '@/features/market/orderBookCsv';
 import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
 import { OrderHistoryPanel } from '@/features/market/OrderHistoryPanel';
 import { TransactionsPanel } from '@/features/market/TransactionsPanel';
@@ -162,6 +84,19 @@ import { AppraisalPanel } from '@/features/market/AppraisalPanel';
 import { useAppraisal } from '@/features/market/useAppraisal';
 import { useMarketPricePercent } from '@/features/market/pricePercent';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
+import { useBlueprintCatalog } from '@/features/market/useBlueprintCatalog';
+import { useMarketCatalogue } from '@/features/market/useMarketCatalogue';
+import { useMarketBrowser } from '@/features/market/useMarketBrowser';
+import {
+  useOrderBookOrchestration,
+  type BrowserFilterValue,
+} from '@/features/market/useOrderBookOrchestration';
+import { useOrderRowSkills } from '@/features/market/useOrderRowSkills';
+import {
+  useMarketOrderColumns,
+  SELL_ORDER_COLUMN_IDS,
+  BUY_ORDER_COLUMN_IDS,
+} from '@/features/market/useMarketOrderColumns';
 
 /** Rows shown per side before "show all" (CONTEXT.md). */
 const ROW_CAP = 15;
@@ -203,116 +138,8 @@ function usesHubPicker(tab: MarketTab): boolean {
   return tab === 'browser' || tab === 'appraisal';
 }
 
-/** `stationFilter` (:591 originally), URL-backed: a positive location id, or `null`. */
-const STATION_FILTER_PARAM: UrlParamCodec<number | null> = {
-  parse: (raw) => (raw !== null && /^\d+$/.test(raw) ? Number(raw) : null),
-  serialize: (value) => (value === null ? null : String(value)),
-};
-
-const ITEM_TAB_PARAM = enumParam(['orders', 'history'] as const, 'orders');
-
-/**
- * The order book's filter bar — Jump Range, Security, Min quantity, NPC
- * stations only — as one `useUrlParams` group, so the narrow sheet's Apply
- * lands every changed field in one write rather than four writers racing in
- * one tick (see `navigateTo`).
- */
-const BROWSER_FILTER_PARAMS = {
-  'browser.jumps': enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE),
-  'browser.sec': enumSetParam(SPACE_KINDS),
-  'browser.minQty': intParam(0, { min: 0 }),
-  'browser.npcOnly': boolParam(),
-};
-
-interface BrowserFilterValue {
-  jumps: JumpRange;
-  sec: ReadonlySet<SpaceKind>;
-  minQty: number;
-  npcOnly: boolean;
-}
-
-/** A Min quantity box's text as a count; blank or junk is no minimum. */
-function parseMinQuantity(raw: string): number {
-  const n = Number.parseInt(raw, 10);
-  return Number.isSafeInteger(n) && n > 0 ? n : 0;
-}
-/**
- * Deliberately not `textParam()`: its built-in debounce only smooths the
- * *write*, not the render (the tree already re-filters on every keystroke via
- * the hook's own optimistic `pending` state) — and on this page, an
- * item/hub/region change is a second, independent `useUrlParams` writer
- * (`navigateTo`) that can land in the same window as a still-pending debounced
- * write and silently drop it. Writing immediately removes that race; nothing
- * here needed the debounce for its own sake.
- */
-const BROWSER_SEARCH_PARAM: UrlParamCodec<string> = {
-  parse: (raw) => raw ?? '',
-  serialize: (value) => (value === '' ? null : value),
-};
-
-/**
- * Stands in for variationIndex before variations.json resolves (or if it
- * fails to load) — every lookup against it comes back empty, which
- * getVariationRows already treats the same as "this item has no variation
- * data" and degrades to the Market Group sibling fallback. Keeps the
- * Variations panel's own data source independent of the page's primary
- * catalogue load.
- */
-const EMPTY_VARIATION_INDEX = buildVariationIndex({}, {});
-
-/** Stand-in until globalMarkets.json settles; the order book waits for the real one. */
-const NO_GLOBAL_MARKETS: ReadonlyMap<number, GlobalMarketOverride> = new Map();
-
-/** Sell has no `range`/`minVolume` — buy-order-only fields (ESI's `RegionOrder`). */
-const SELL_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = [
-  'price',
-  'quantity',
-  'location',
-  'security',
-  'jumps',
-  'expiry',
-];
-const BUY_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = MARKET_ORDER_COLUMN_IDS;
-
-const REGIONS_UNAVAILABLE_FETCH: OrderBookFetch = {
-  status: 'failed',
-  error: new Error('Market Region catalogue unavailable'),
-};
-
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
-
-interface LocationCellProps {
-  order: RegionOrder;
-  npcStations: ReadonlyMap<number, NpcStationLookup>;
-  solarSystems: ReadonlyMap<number, SolarSystemLookup>;
-  t: Translate;
-}
-
-function LocationCell({ order, npcStations, solarSystems, t }: LocationCellProps) {
-  const location = resolveOrderLocation(order, npcStations, solarSystems);
-  // Station name alone. The system and its security used to trail it, but an
-  // EVE station name already carries its system ("Jita IV - Moon 4 - ..."),
-  // so the suffix repeated a word the eye had just read on every row of the
-  // book. The full form survives where it is pasted or exported rather than
-  // scanned — `OrderRowContextMenu`'s copy action and `orderBookCsv`.
-  return <span>{location.stationName ?? t('market.unknownStructure')}</span>;
-}
-
-/** Security dropped from `LocationCell` (see above) lives here instead, as its own optional column. */
-function SecurityCell({ order, npcStations, solarSystems, t }: LocationCellProps) {
-  const { security } = resolveOrderLocation(order, npcStations, solarSystems);
-  const value = security.toFixed(1);
-  return (
-    <span
-      className="tabular-nums font-semibold"
-      style={{ color: securityStatusColor(security) }}
-      title={t('market.securityAriaLabel', { value })}
-    >
-      {value}
-    </span>
-  );
-}
 
 interface OrderDetailPanelProps {
   order: RegionOrder;
@@ -327,7 +154,7 @@ interface OrderDetailPanelProps {
     skillNames: Readonly<Record<number, string>>;
   } | null;
   trainedSkills: ReadonlyMap<number, TrainedSkill>;
-  targetPlan: ReturnType<typeof useTargetPlan>;
+  targetPlan: TargetPlan;
   activeCharacterId: number | null;
   itemName: string;
   t: Translate;
@@ -402,6 +229,12 @@ function OrderDetailPanel({
       )}
     </div>
   );
+}
+
+/** A Min quantity box's text as a count; blank or junk is no minimum. */
+function parseMinQuantity(raw: string): number {
+  const n = Number.parseInt(raw, 10);
+  return Number.isSafeInteger(n) && n > 0 ? n : 0;
 }
 
 interface BrowserFilterBarProps {
@@ -506,7 +339,7 @@ interface MarketGroupTreeProps {
   groups: readonly MarketGroupNode[];
   childrenByParent: ReadonlyMap<number | null, MarketGroupNode[]>;
   typesByGroup: ReadonlyMap<number, MarketTypeEntry[]>;
-  filterResult: ReturnType<typeof filterMarketTree>;
+  filterResult: MarketTreeFilterResult | null;
   expandedIds: ReadonlySet<number>;
   searchCollapsedIds: ReadonlySet<number>;
   onToggle: (id: number) => void;
@@ -637,7 +470,6 @@ function MarketGroupTree({
 export function Market() {
   const { t } = useTranslation();
   const location = useLocation();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = usePageTab(MARKET_TABS);
   // Issue #726: true only immediately after the Quickbar's "View in
   // Appraisal" action, so the panel mounts with its Compare Hubs section
@@ -651,23 +483,16 @@ export function Market() {
     setExpandCompareOnAppraisal(expandCompare);
   }
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const hubId = useMarketHub((state) => state.value);
-  const hubHydrated = useMarketHub((state) => state.hydrated);
-  const hydrateHub = useMarketHub((state) => state.hydrate);
-  const setHubId = useMarketHub((state) => state.setValue);
-  const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
 
-  // The Appraisal tab's other half of the same control pair as the hub above.
+  // The Appraisal tab's other half of the same control pair as the header's hub picker.
   const pricePercent = useMarketPricePercent((state) => state.value);
   const hydratePricePercent = useMarketPricePercent((state) => state.hydrate);
   const setPricePercent = useMarketPricePercent((state) => state.setValue);
+  useEffect(() => {
+    void hydratePricePercent();
+  }, [hydratePricePercent]);
 
   const compareCount = useCompareSet((state) => state.items.length);
-
-  const locationModeValue = useLocationMode((state) => state.value);
-  const locationModeHydrated = useLocationMode((state) => state.hydrated);
-  const hydrateLocationMode = useLocationMode((state) => state.hydrate);
-  const setLocationModeValue = useLocationMode((state) => state.setValue);
 
   // The Quickbar (CONTEXT.md): Editable Data, one record per character. Reads
   // as [] rather than requiring an active character — Market Browser itself
@@ -708,290 +533,125 @@ export function Market() {
   // Variations table, side by side — see VariationsCompareModal.
   const [compareModalOpen, setCompareModalOpen] = useState(false);
 
-  const [groups, setGroups] = useState<MarketGroupNode[] | null>(null);
-  const [types, setTypes] = useState<MarketTypeEntry[] | null>(null);
-  const [npcStations, setNpcStations] = useState<NpcStationEntry[] | null>(null);
-  const [solarSystems, setSolarSystems] = useState<SolarSystemEntry[] | null>(null);
-  const [marketRegions, setMarketRegions] = useState<MarketRegionEntry[] | null>(null);
-  // Loaded on its own, not with the catalogue below: the order book waits
-  // only on this (never on the whole SDE catalogue), and a failed read
-  // settles to no overrides rather than leaving the book waiting forever.
-  const globalMarkets = useGlobalMarketOverrides();
-  const [variationData, setVariationData] = useState<VariationData | null>(null);
-  const [catalogueError, setCatalogueError] = useState(false);
-  // Bumped by Refresh after a failed catalogue load to re-run the load effect.
-  const [catalogueTick, setCatalogueTick] = useState(0);
-
-  // Blueprint catalog for the item context menu's Build Plan action, loaded
-  // lazily on the first menu open rather than on mount — it pulls the full
-  // SDE types.json, and CONTEXT.md keeps /market's own payloads out of the
-  // install precache because most installs never open this page at all.
-  const [blueprintCatalog, setBlueprintCatalog] = useState<BlueprintCatalog | null>(null);
-  const blueprintCatalogRequested = useRef(false);
-  function ensureBlueprintCatalog() {
-    if (blueprintCatalogRequested.current) return;
-    blueprintCatalogRequested.current = true;
-    void loadBlueprintCatalog()
-      .then(setBlueprintCatalog)
-      .catch(() => {
-        // Build Plan action degrades to "No blueprint options" on failure — not core functionality.
-      });
-  }
-
-  // Tree search, in the URL (ADR 0015) scoped to the Browser tab — a reload
-  // or a shared link reopens the same search rather than an empty tree.
-  const [query, setQuery] = useUrlParam('browser.q', BROWSER_SEARCH_PARAM);
-  const [expandedIds, setExpandedIds] = useState<ReadonlySet<number>>(new Set());
-  // Groups the user has explicitly collapsed while a search is filtering the
-  // tree (see MarketGroupTree's `expanded` calc) — kept apart from
-  // `expandedIds` (the plain-browsing expand state) so clearing the search
-  // returns to whatever the tree looked like before it started.
-  const [searchCollapsedIds, setSearchCollapsedIds] = useState<ReadonlySet<number>>(new Set());
+  const { blueprintCatalog, ensureBlueprintCatalog } = useBlueprintCatalog();
 
   // Narrow screens show one column at a time (CONTEXT.md round 8); matches
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
   // layout switch at the same width.
   const isDesktop = useIsDesktop();
 
-  // The selected item and the current location are read from the URL
-  // (CONTEXT.md round 7, issue #4), not held in component state: the query
-  // string is the single source of truth, so a shared link and the browser's
-  // own back/forward both just work. A parsed id that doesn't (yet, or ever)
-  // resolve against the loaded catalogue falls back to the default view
-  // rather than erroring — `types`/`marketRegions` still being null (first
-  // load) is treated as "not yet known to be invalid", not "invalid".
-  const parsedParams = useMemo(
-    () => parseMarketParams((key) => searchParams.get(key)),
-    [searchParams]
-  );
-
-  // Cross-page item links (MarketItemLink, ImplantChip, ItemContextMenu's
-  // "View in Market") now land on `/market/browser?type=...` directly
-  // (`engine/market/urlState.ts`'s `marketItemUrl`) — tab is a path segment,
-  // so there is no longer a "which tab is this?" ambiguity for a click that
-  // means "browse this item" to paper over.
-  const typeIsValid = resolveAgainstCatalogue(
-    parsedParams.typeId,
+  const {
+    groups,
     types,
-    (ty, id) => ty.typeId === id
-  );
-  const selectedTypeId = parsedParams.typeId !== null && typeIsValid ? parsedParams.typeId : null;
+    npcStations,
+    solarSystems,
+    marketRegions,
+    catalogueError,
+    catalogueLoading,
+    retry: retryCatalogue,
+    groupsById,
+    childrenByParent,
+    typesByGroup,
+    typesById,
+    npcStationMap,
+    solarSystemMap,
+    allMarketRegionIds,
+    systemRegions,
+    variationIndex,
+  } = useMarketCatalogue();
 
-  // Required-skills-to-use, for the order row expand (`OrderDetailPanel`)
-  // below — the same section and the same fetch `ItemDetailModal` already
-  // does for "Show Info", read once per selected item here instead of once
-  // per opened row: every order in the book is the same item, so the answer
-  // is identical for all of them.
-  const [itemSkills, setItemSkills] = useState<{
-    typeId: number;
-    requiredSkills: RequiredSkill[];
-    skillNames: Readonly<Record<number, string>>;
-  } | null>(null);
+  const {
+    selectedTypeId,
+    selectedItem,
+    effectiveLocation,
+    effectiveHub,
+    allRegions,
+    chosenRegionId,
+    hubHydrated,
+    locationModeHydrated,
+    handleModeChange,
+    handleHubChange,
+    handleRegionChange,
+    handleSelectItem,
+    handleBackToFinder,
+    query,
+    setQuery,
+    expandedIds,
+    searchCollapsedIds,
+    filterResult,
+    handleToggle,
+    itemTab,
+    setItemTab,
+  } = useMarketBrowser({ groups, types, marketRegions, groupsById });
+
+  // The "jump to search" shortcut (`lib/shortcuts.ts`) navigates here with
+  // this state to focus the box in one step, from anywhere in the app.
   useEffect(() => {
-    if (selectedTypeId === null) return;
-    let cancelled = false;
-    void (async () => {
-      // Never rejects: same as `ItemDetailModal`'s own `pi.catch(() => null)`
-      // — a nice-to-have fetch for a row-expand section that already renders
-      // nothing while `itemSkills` is null, so a failure just leaves it out
-      // rather than needing an error state of its own.
-      try {
-        const [{ data: type }, dictionary] = await Promise.all([
-          getUniverseType(selectedTypeId),
-          loadAttributeDictionary(),
-        ]);
-        if (cancelled || !type) return;
-        const names = await loadAttributeReferenceNames([type.dogma_attributes], dictionary);
-        if (cancelled) return;
-        setItemSkills({
-          typeId: selectedTypeId,
-          requiredSkills: extractRequiredSkills(type.dogma_attributes),
-          skillNames: names.types ?? {},
-        });
-      } catch {
-        // Left null — see comment above.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedTypeId]);
-
-  const [trainedSkills, setTrainedSkills] = useState<ReadonlyMap<number, TrainedSkill>>(new Map());
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      if (activeCharacterId === null) {
-        if (!cancelled) setTrainedSkills(new Map());
-        return;
-      }
-      // Queue-corrected, like every other trained-level read (ItemDetailModal,
-      // usePlanEditorData) — a level the queue just finished but /skills
-      // hasn't caught up to would otherwise show wrong here while everywhere
-      // else shows it trained.
-      try {
-        const corrected = await loadCorrectedSkills(activeCharacterId, Date.now(), {
-          skipQueueWithoutScope: true,
-        });
-        if (!cancelled) setTrainedSkills(corrected.trained);
-      } catch {
-        // Left at whatever it was — a nice-to-have read for the row-expand
-        // skills section, not something worth an error state of its own.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCharacterId]);
-  const targetPlan = useTargetPlan(activeCharacterId);
-
-  // One pass over `groups` builds both lookups this route needs — by id (this
-  // param's validation and the ancestor walk below) and by parent
-  // (`childrenByParent`, the tree's own render shape, further down).
-  const groupCatalogue = useMemo(() => {
-    const byId = new Map<number, MarketGroupNode>();
-    const byParent = new Map<number | null, MarketGroupNode[]>();
-    for (const group of groups ?? []) {
-      byId.set(group.id, group);
-      const list = byParent.get(group.parentId) ?? [];
-      list.push(group);
-      byParent.set(group.parentId, list);
+    if ((location.state as Partial<MarketFocusSearchState> | null)?.focusSearch) {
+      searchInputRef.current?.focus();
     }
-    for (const list of byParent.values()) list.sort((a, b) => a.name.localeCompare(b.name));
-    return { byId, byParent };
-  }, [groups]);
-  const groupsById = groupCatalogue.byId;
-
-  const groupIdIsValid =
-    parsedParams.groupId === null
-      ? false
-      : groups === null
-        ? true
-        : groupsById.has(parsedParams.groupId);
-  const linkedGroupId = groupIdIsValid ? parsedParams.groupId : null;
-
-  // A `?group=` cross-link lands the tree pre-expanded to that category,
-  // additive to whatever's already open, once per incoming id — a ref, not
-  // state, since a manual re-collapse afterwards must not be fought back open.
-  const expandedForGroupId = useRef<number | null>(null);
-  useEffect(() => {
-    if (groups === null || linkedGroupId === null || linkedGroupId === expandedForGroupId.current) {
-      return;
-    }
-    const ancestry = new Set<number>();
-    addAncestors(linkedGroupId, groupsById, ancestry);
-    setExpandedIds((prev) => new Set([...prev, ...ancestry]));
-    expandedForGroupId.current = linkedGroupId;
-  }, [groups, linkedGroupId, groupsById]);
-
-  // All regions needs no catalogue check — it names every region there is.
-  const regionIsValid =
-    parsedParams.regionId === ALL_REGIONS
-      ? true
-      : resolveAgainstCatalogue(parsedParams.regionId, marketRegions, (r, id) => r.id === id);
-  // A hub id is a small static set (`TRADE_HUBS`), so unlike the region
-  // catalogue there's no loading window to be optimistic about.
-  const hubIsValid =
-    parsedParams.hubId !== null && getTradeHub(parsedParams.hubId as TradeHub['id']) !== undefined;
-
-  // Whichever of region/hub the URL names wins, falling back to the
-  // device-local Location Mode preference when neither param resolves.
-  const fallbackLocation: MarketLocationParam = useMemo(
-    () =>
-      locationModeValue.mode === 'region'
-        ? { mode: 'region', regionId: locationModeValue.regionId ?? hub.regionId }
-        : { mode: 'hub', hubId: hub.id },
-    [locationModeValue, hub]
-  );
-  const effectiveLocation: MarketLocationParam = useMemo(
-    () =>
-      resolveMarketLocation(
-        parsedParams,
-        { region: regionIsValid, hub: hubIsValid },
-        fallbackLocation
-      ),
-    [parsedParams, regionIsValid, hubIsValid, fallbackLocation]
-  );
-  const effectiveHub =
-    effectiveLocation.mode === 'hub'
-      ? (getTradeHub(effectiveLocation.hubId as TradeHub['id']) ?? hub)
-      : hub;
-
-  // All regions (Region mode over every Market Region) fans out only for the
-  // selected item's own book. Everything else that reads one region —
-  // Variations, Compare, Item Detail, Price History — reads the Trade Hub's
-  // region instead, so `chosenRegionId` is always one real region.
-  const allRegions =
-    effectiveLocation.mode === 'region' && effectiveLocation.regionId === ALL_REGIONS;
-  const chosenRegionId =
-    effectiveLocation.mode === 'region' && effectiveLocation.regionId !== ALL_REGIONS
-      ? effectiveLocation.regionId
-      : effectiveHub.regionId;
+  }, [location.state]);
 
   // Held here rather than inside `AppraisalPanel` so a pasted list survives a
   // trip to the Browser tab, and so the header's refresh button can drive it.
   const appraisal = useAppraisal(effectiveHub, pricePercent, activeCharacterId);
 
-  // The selected item's settled fetch, null until it lands. The view itself is
-  // derived below, so the "filter to this station" action narrows it in place
-  // without another request.
-  const [orderBookFetch, setOrderBookFetch] = useState<OrderBookFetch | null>(null);
-  const [orderBookLoading, setOrderBookLoading] = useState(false);
-  const [refreshTick, setRefreshTick] = useState(0);
-  // Every authenticated character's own open order ids, across every item —
-  // not scoped to the selected type, since matching is by order_id against
-  // whatever's on screen. Membership is the whole question here: a row that
-  // is mine gets a tinted background, and nothing else. How badly a rival
-  // beats it is the Open Orders page's job, which has the cost basis and the
-  // exits to say something useful about it.
-  const [myOrderIds, setMyOrderIds] = useState<ReadonlySet<number>>(new Set());
-  const [sellShowAll, setSellShowAll] = useState(false);
-  const [buyShowAll, setBuyShowAll] = useState(false);
-  // The order row context menu's "filter to this station" action (CONTEXT.md
-  // round 10); undone via the banner rendered above the tables. URL-backed
-  // (ADR 0015), scoped to the Browser tab.
-  const [stationFilter, setStationFilter] = useUrlParam('browser.station', STATION_FILTER_PARAM);
-  // The order book's filter bar. Jump Range, Security and NPC stations only
-  // are Region mode only — Hub mode is already one NPC station — so they're
-  // neither shown nor applied there, whatever the URL says; Min quantity
-  // applies in both. All narrow the book next to the station filter, see
-  // `orderBookView.ts`'s `allowedSystems`/`minQuantity`/`npcStationIds`.
-  const [browserFilters, setBrowserFilters] = useUrlParams(BROWSER_FILTER_PARAMS);
-  const regionMode = effectiveLocation.mode === 'region';
-  const jumpRange = browserFilters['browser.jumps'];
-  const spaceKinds = browserFilters['browser.sec'];
-  const minQuantity = browserFilters['browser.minQty'];
-  const npcOnly = regionMode && browserFilters['browser.npcOnly'];
-  const currentSystem = useCurrentSystem();
-  const jumpRangeFilter = useJumpRangeFilter(
+  const {
+    orderBookLoading,
+    refreshTick,
+    myOrderIds,
+    orderBookLocation,
+    resolvedRegion,
+    hubRegionName,
     currentSystem,
-    regionMode ? jumpRange : DEFAULT_JUMP_RANGE
-  );
-  const visibleOrderColumns = useVisibleMarketOrderColumns((state) => state.value);
-  const setVisibleOrderColumns = useVisibleMarketOrderColumns((state) => state.setValue);
-  const hydrateVisibleOrderColumns = useVisibleMarketOrderColumns((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateVisibleOrderColumns();
-  }, [hydrateVisibleOrderColumns]);
-  function toggleOrderColumn(id: MarketOrderColumnId) {
-    const next = visibleOrderColumns.includes(id)
-      ? visibleOrderColumns.filter((existing) => existing !== id)
-      : [...visibleOrderColumns, id];
-    void setVisibleOrderColumns(next);
-  }
-  // Market Data / Price History (issue #11), Market Data selected by default —
-  // a scoped query param rather than a `/market/browser/<subtab>` path
-  // segment (docs/ARCHITECTURE.md §9): it only ever matters with an item
-  // already selected, so it rides along with `type` rather than living a
-  // level of path beneath it.
-  const [itemTab, setItemTab] = useUrlParam('browser.itemTab', ITEM_TAB_PARAM);
-  // "Adjusting state when a prop changes" (react.dev): resets the previous
-  // item's row-cap, station filter and order book the instant selection or
-  // the resolved region changes, in the same render — an Effect would let
-  // the old item's (or old region's) rows flash under the new title. Keyed
-  // on `chosenRegionId` rather than the persisted `hubId` store: the two can
-  // diverge when a shared link or browser back/forward drives a different
-  // effective hub without writing the device's persisted default.
+    jumpRangeFilter,
+    regionMode,
+    stationFilter,
+    setStationFilter,
+    stationFilterLabel,
+    browserFilterValue,
+    handleBrowserFiltersChange,
+    activeFilterCount,
+    filtersNarrowBook,
+    orderBookFailed,
+    regionsUnavailable,
+    orderBookView,
+    loadedView,
+    sortedSell,
+    sortedBuy,
+    sellShowAll,
+    setSellShowAll,
+    buyShowAll,
+    setBuyShowAll,
+    failedRegionCount,
+    jumpNoteShown,
+    variationsResult,
+    variationPrices,
+    refresh: refreshOrderBook,
+  } = useOrderBookOrchestration({
+    selectedTypeId,
+    selectedItem,
+    effectiveLocation,
+    effectiveHub,
+    allRegions,
+    chosenRegionId,
+    hubHydrated,
+    locationModeHydrated,
+    catalogueError,
+    ensureBlueprintCatalog,
+    npcStations,
+    solarSystems,
+    marketRegions,
+    allMarketRegionIds,
+    systemRegions,
+    typesByGroup,
+    typesById,
+    variationIndex,
+    npcStationMap,
+    solarSystemMap,
+    t,
+  });
+
   /**
    * A blueprint *original* can be sold on the market; a **copy** cannot — BPCs
    * are contract-only. So an empty order book on a blueprint is the one case
@@ -1002,590 +662,23 @@ export function Market() {
   const selectedIsBlueprint =
     selectedTypeId !== null && (blueprintCatalog?.byBlueprintTypeID.has(selectedTypeId) ?? false);
 
-  // `allRegions` apart from `chosenRegionId`: The Forge → All regions with
-  // Jita as hub is the same region id, yet a different book.
-  const resetKey = `${selectedTypeId ?? 'none'}:${chosenRegionId}:${allRegions ? 'all' : 'one'}`;
-  const [resetForKey, setResetForKey] = useState<string | null>(null);
-  if (resetKey !== resetForKey) {
-    setResetForKey(resetKey);
-    setSellShowAll(false);
-    setBuyShowAll(false);
-    setOrderBookFetch(null);
-    // `browser.station` clears in `navigateTo` itself, not here — every path
-    // that changes `resetKey` goes through it, and clearing it here too was a
-    // second, independent `useUrlParams` writer landing in the same render as
-    // `navigateTo`'s own write, which silently dropped one of the two.
-    // Set in the same render as the reset above, not left for the fetch
-    // effect a tick later — otherwise the one commit in between paints
-    // `orderBookLoading: false` alongside the just-cleared `orderBookFetch`,
-    // which the table below reads as "loaded, and empty" and flashes the
-    // empty state before the spinner.
-    if (selectedTypeId !== null) setOrderBookLoading(true);
-  }
-
-  useEffect(() => {
-    void hydrateHub();
-    void hydrateLocationMode();
-    void hydratePricePercent();
-  }, [hydrateHub, hydrateLocationMode, hydratePricePercent]);
-
-  // Catches the device's persisted Location Mode up to a valid URL override.
-  // `buildMarketParams` only ever writes one of `hub`/`region` at a time, so
-  // a URL-supplied hub is dropped from the query string the moment the mode
-  // toggles to Region — without this, toggling back to Trade Hub would have
-  // nothing left to read and would fall back to whatever hub was persisted
-  // before the link was opened, silently abandoning what the link pointed
-  // at. `effectiveLocation`/`effectiveHub` still read the URL directly for
-  // the render that shows the link's own view, so this is purely about what
-  // survives a later, unrelated interaction.
-  useEffect(() => {
-    if (!hubHydrated || !locationModeHydrated) return;
-    if (hubIsValid && parsedParams.hubId !== null && parsedParams.hubId !== hubId) {
-      void setHubId(parsedParams.hubId as TradeHub['id']);
-    }
-    if (
-      regionIsValid &&
-      parsedParams.regionId !== null &&
-      (locationModeValue.mode !== 'region' || locationModeValue.regionId !== parsedParams.regionId)
-    ) {
-      void setLocationModeValue({ mode: 'region', regionId: parsedParams.regionId });
-    }
-  }, [
-    parsedParams,
-    hubIsValid,
-    regionIsValid,
-    hubId,
-    locationModeValue,
-    hubHydrated,
-    locationModeHydrated,
-    setHubId,
-    setLocationModeValue,
-  ]);
-
-  // The "jump to search" shortcut (`lib/shortcuts.ts`) navigates here with
-  // this state to focus the box in one step, from anywhere in the app.
-  useEffect(() => {
-    if ((location.state as Partial<MarketFocusSearchState> | null)?.focusSearch) {
-      searchInputRef.current?.focus();
-    }
-  }, [location.state]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.all([
-      loadMarketGroups(),
-      loadMarketTypes(),
-      loadNpcStations(),
-      loadSolarSystems(),
-      loadMarketRegions(),
-    ])
-      .then(([g, ty, stations, systems, regions]) => {
-        if (cancelled) return;
-        setGroups(g);
-        setTypes(ty);
-        setNpcStations(stations);
-        setSolarSystems(systems);
-        setMarketRegions(regions);
-      })
-      .catch(() => {
-        if (!cancelled) setCatalogueError(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [catalogueTick]);
-
-  // Independent of the catalogue and order-book loads: a character with no
-  // orders scope, or with no characters signed in at all, simply resolves to
-  // an empty set — the highlight below then degrades to "nothing here is
-  // mine" rather than erroring. Refetches on a manual Refresh (refreshTick)
-  // the same way the order book itself does, so placing or cancelling an
-  // order and hitting Refresh updates the highlight in place.
-  useEffect(() => {
-    let cancelled = false;
-    void loadAllCharactersOpenOrders()
-      .then((snapshot) => {
-        if (cancelled) return;
-        const ids = new Set<number>();
-        for (const entry of snapshot.entries) {
-          for (const order of entry.orders) ids.add(order.order_id);
-        }
-        setMyOrderIds(ids);
-      })
-      .catch(() => {
-        // Leaves myOrderIds at whatever it was — a failed fetch must not
-        // erase an already-known highlight.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [refreshTick]);
-
-  // Fetched independently of the catalogue load above: variations.json is
-  // Variations-panel-only data, so a slow or failed fetch degrades that one
-  // panel to its Market-Group-sibling fallback (see variationsResult below)
-  // rather than blocking or erroring the whole Market route.
-  useEffect(() => {
-    let cancelled = false;
-    void loadVariations()
-      .then((variations) => {
-        if (!cancelled) setVariationData(variations);
-      })
-      .catch(() => {
-        // Leaves variationData null — variationsResult below already treats
-        // that the same as "no variation data for this item".
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const globalMarketsMap = globalMarkets ?? NO_GLOBAL_MARKETS;
-
-  // The one location every order book on this page reads through — the
-  // tables, the Variations rows, the Compare Drawer and Item Detail — so they
-  // can't disagree about the same item (`orderBookView.ts`). Built from the
-  // effective (URL-aware) location, not the persisted preference.
-  const orderBookLocation = useMemo<OrderBookLocation>(
-    () =>
-      orderBookLocationFor(effectiveLocation.mode, chosenRegionId, effectiveHub, globalMarketsMap),
-    [effectiveLocation.mode, chosenRegionId, effectiveHub, globalMarketsMap]
-  );
-
-  const resolvedRegion = useMemo(
-    () =>
-      selectedTypeId === null
-        ? null
-        : resolveOrderBookRegion(selectedTypeId, chosenRegionId, globalMarketsMap),
-    [selectedTypeId, chosenRegionId, globalMarketsMap]
-  );
-
-  const hubRegionName =
-    marketRegions?.find((r) => r.id === effectiveHub.regionId)?.name ?? effectiveHub.systemName;
-  const allMarketRegionIds = useMemo(
-    () => (marketRegions ?? []).map((r) => r.id).sort((a, b) => a - b),
-    [marketRegions]
-  );
-  const systemRegions = useMemo(
-    () => new Map((solarSystems ?? []).map((s) => [s.id, { regionId: s.regionId }])),
-    [solarSystems]
-  );
-  // All regions' fan-out: every Market Region the picker lists, or — once a
-  // Jump Range is measurable — only those holding an in-range system, so
-  // "within 5 jumps" costs a few regions, not every one. Waits (null) while
-  // the range is still resolving rather than firing every region and then a
-  // few. Keyed by a joined string so an unchanged set never refetches.
-  const allRegionsFetchKey = useMemo((): string | null => {
-    if (!allRegions || marketRegions === null || jumpRangeFilter.status === 'loading') return null;
-    if (jumpRangeFilter.status === 'ready' && jumpRangeFilter.allowed !== null) {
-      const inReach = regionsForSystems(jumpRangeFilter.allowed, systemRegions);
-      return allMarketRegionIds.filter((id) => inReach.has(id)).join(',');
-    }
-    return allMarketRegionIds.join(',');
-  }, [allRegions, marketRegions, jumpRangeFilter, systemRegions, allMarketRegionIds]);
-  const allRegionsFetchIds = useMemo(
-    () =>
-      allRegionsFetchKey === null
-        ? null
-        : allRegionsFetchKey === ''
-          ? []
-          : allRegionsFetchKey.split(',').map(Number),
-    [allRegionsFetchKey]
-  );
-
-  // Refetches on selection, location, or a manual Refresh click. Gated on both
-  // *Hydrated flags so this doesn't fire once for the defaults and again once
-  // the persisted settings resolve. `fetchOrderBook` never rejects: a 420 or
-  // an Error Budget refusal settles as `'failed'`, which renders its own
-  // state rather than an empty book or a spinner that never clears.
-  useEffect(() => {
-    // Also waits for globalMarkets.json to settle (success or failure):
-    // before it does, a Global Market Region item (a PLEX deep link) would be
-    // read from the wrong region.
-    if (selectedTypeId === null || !hubHydrated || !locationModeHydrated || globalMarkets === null)
-      return;
-    // Waits for the region list and the range (see `allRegionsFetchKey`).
-    if (allRegions && allRegionsFetchIds === null) return;
-    let cancelled = false;
-    void (async () => {
-      setOrderBookLoading(true);
-      const fetched =
-        allRegionsFetchIds !== null
-          ? await fetchOrderBookAcross(
-              selectedTypeId,
-              allRegionsFetchIds,
-              orderBookLocation,
-              () => cancelled
-            )
-          : await fetchOrderBook(selectedTypeId, orderBookLocation);
-      if (cancelled) return;
-      setOrderBookFetch(fetched);
-      setOrderBookLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    selectedTypeId,
-    orderBookLocation,
-    allRegions,
-    allRegionsFetchIds,
-    hubHydrated,
-    locationModeHydrated,
-    globalMarkets,
-    refreshTick,
-  ]);
-
-  const childrenByParent = groupCatalogue.byParent;
-
-  const typesByGroup = useMemo(() => {
-    const map = new Map<number, MarketTypeEntry[]>();
-    for (const type of types ?? []) {
-      const list = map.get(type.marketGroupId) ?? [];
-      list.push(type);
-      map.set(type.marketGroupId, list);
-    }
-    for (const list of map.values()) list.sort((a, b) => a.name.localeCompare(b.name));
-    return map;
-  }, [types]);
-
-  const typesById = useMemo(
-    () => new Map((types ?? []).map((type) => [type.typeId, type])),
-    [types]
-  );
-
-  // Built once per SDE load, not per selection — getVariations is then
-  // O(group size) per call instead of re-scanning the whole types map.
-  // Defaults to EMPTY_VARIATION_INDEX before variations.json resolves, so
-  // the Variations panel falls back to siblings rather than going blank.
-  const variationIndex = useMemo(
-    () =>
-      variationData
-        ? buildVariationIndex(variationData.types, variationData.metaGroups)
-        : EMPTY_VARIATION_INDEX,
-    [variationData]
-  );
-
-  const filterResult = useMemo(
-    () => (groups && types ? filterMarketTree(groups, types, query) : null),
-    [groups, types, query]
-  );
-
-  const npcStationMap = useMemo(
-    () => new Map((npcStations ?? []).map((s) => [s.id, { name: s.name, systemId: s.systemId }])),
-    [npcStations]
-  );
-  const solarSystemMap = useMemo(
-    () => new Map((solarSystems ?? []).map((s) => [s.id, { name: s.name, security: s.security }])),
-    [solarSystems]
-  );
-
-  // Region mode only — Hub mode is already one station, so a jump range or
-  // security band over it would just repeat the hub filter under a different
-  // name. Security folds into the same allowed-system set as Jump Range.
-  const spaceSystems = useMemo(
-    () => (regionMode && solarSystems ? systemsInSpace(solarSystems, spaceKinds) : null),
-    [regionMode, solarSystems, spaceKinds]
-  );
-  const allowedSystems = useMemo(
-    () =>
-      regionMode
-        ? intersectSystemSets(
-            jumpRangeFilter.status === 'ready' ? jumpRangeFilter.allowed : null,
-            spaceSystems
-          )
-        : null,
-    [regionMode, jumpRangeFilter, spaceSystems]
-  );
-  // Not applied until the station list has loaded — before then every order
-  // would read as a player structure and the book would flash empty.
-  const npcStationIds = useMemo(
-    () => (npcOnly && npcStations ? new Set(npcStations.map((s) => s.id)) : null),
-    [npcOnly, npcStations]
-  );
-  const browserFilterValue = useMemo<BrowserFilterValue>(
-    () => ({
-      jumps: jumpRange,
-      sec: spaceKinds,
-      minQty: minQuantity,
-      npcOnly: browserFilters['browser.npcOnly'],
-    }),
-    [jumpRange, spaceKinds, minQuantity, browserFilters]
-  );
-  // Only what this mode shows counts: a Region-only filter left in the URL
-  // does nothing in Hub mode, so badging it would claim a filter that isn't on.
-  const activeFilterCount = [
-    regionMode && jumpRange !== DEFAULT_JUMP_RANGE,
-    regionMode && spaceKinds.size !== SPACE_KINDS.length,
-    minQuantity > 0,
-    npcOnly,
-  ].filter(Boolean).length;
-  const filtersNarrowBook = activeFilterCount > 0 || stationFilter !== null;
-  function handleBrowserFiltersChange(next: BrowserFilterValue) {
-    setBrowserFilters({
-      'browser.jumps': next.jumps,
-      'browser.sec': next.sec,
-      'browser.minQty': next.minQty,
-      'browser.npcOnly': next.npcOnly,
-    });
-  }
-
-  // Location Mode, Trade Hub station, the order-row "filter to this station"
-  // action (CONTEXT.md round 10), the filter bar, split and sort all happen
-  // in the view.
-  // All regions with no region catalogue has no "every region" to read: a
-  // failed book (with its retry), not a spinner waiting on a list that
-  // isn't coming.
-  const regionsUnavailable = allRegions && catalogueError;
-  const settledFetch = regionsUnavailable ? REGIONS_UNAVAILABLE_FETCH : orderBookFetch;
-  const orderBookView = useMemo(
-    () =>
-      settledFetch === null || selectedTypeId === null
-        ? null
-        : buildOrderBookView(
-            selectedTypeId,
-            { ...orderBookLocation, stationFilter, allowedSystems, minQuantity, npcStationIds },
-            settledFetch
-          ),
-    [
-      settledFetch,
-      selectedTypeId,
-      orderBookLocation,
-      stationFilter,
-      allowedSystems,
-      minQuantity,
-      npcStationIds,
-    ]
-  );
-  const loadedView = orderBookView?.status === 'failed' ? null : orderBookView;
-  const orderBookFailed = orderBookView?.status === 'failed';
-  const sortedSell = useMemo(() => loadedView?.sell ?? [], [loadedView]);
-  const sortedBuy = useMemo(() => loadedView?.buy ?? [], [loadedView]);
-  /**
-   * The catalogue is otherwise loaded lazily on the first context-menu open,
-   * so reading it here without asking for it meant `selectedIsBlueprint` was
-   * always false on a fresh page and the hint below never appeared at all.
-   * Requested only once the book is actually empty, which keeps the laziness
-   * this was built for: the payload is fetched in the one case its answer can
-   * change what is rendered, not on every item you click.
-   */
-  useEffect(() => {
-    // `ensureBlueprintCatalog` is ref-guarded, so re-running this costs nothing.
-    // A failed book says nothing about who sells the item, so it asks nothing.
-    if (selectedTypeId !== null && loadedView && sortedSell.length === 0) ensureBlueprintCatalog();
-  }, [selectedTypeId, loadedView, sortedSell.length]);
-
   const sellRows = sellShowAll ? sortedSell : sortedSell.slice(0, ROW_CAP);
   const buyRows = buyShowAll ? sortedBuy : sortedBuy.slice(0, ROW_CAP);
 
-  const stationFilterLabel = useMemo(() => {
-    if (stationFilter === null || orderBookFetch?.status !== 'fetched') return null;
-    const order = orderBookFetch.result.orders.find((o) => o.location_id === stationFilter);
-    if (!order) return null;
-    const location = resolveOrderLocation(order, npcStationMap, solarSystemMap);
-    // Names the same station the Location column does, so the banner and the
-    // rows below it read alike.
-    return location.stationName ?? t('market.unknownStructure');
-  }, [stationFilter, orderBookFetch, npcStationMap, solarSystemMap, t]);
-
-  /**
-   * A row's own distance from the Current System — independent of whether a
-   * Jump Range filter is even active (`jumpRangeFilter.jumps`/`jumpsStatus`
-   * are populated at every range, `useJumpRangeFilter`). `count: null` is a
-   * settled row this app cannot place on the stargate graph — not the same
-   * as still loading, same "unknowable, not pending" rule the Courier
-   * board's own Jumps column follows.
-   */
-  const orderJumps = useCallback(
-    (systemId: number): JumpsCellValue => {
-      if (jumpRangeFilter.jumpsStatus !== 'ready') return { kind: jumpRangeFilter.jumpsStatus };
-      return { kind: 'value', count: jumpRangeFilter.jumps?.get(systemId) ?? null };
-    },
-    [jumpRangeFilter]
+  const { itemSkills, trainedSkills, targetPlan } = useOrderRowSkills(
+    selectedTypeId,
+    activeCharacterId
   );
 
-  const orderColumnsById = useMemo<Record<MarketOrderColumnId, DataTableColumn<RegionOrder>>>(
-    () => ({
-      price: {
-        id: 'price',
-        header: t('market.price'),
-        align: 'right',
-        className: 'tabular-nums',
-        render: (o) => (
-          <>
-            {formatIsk(o.price, 2)}
-            {/*
-              The tinted row (`row-mine`, styles/index.css) is the visible
-              marker for "this one is mine" — no badge, no gap figure,
-              nothing that adds a line to every row of a book you scan by
-              price. Colour is never the sole signal though (docs/DESIGN.md
-              §7), so the word rides along unseen, the way `CorpBoardRow`'s
-              severity label does.
-            */}
-            {myOrderIds.has(o.order_id) && <span className="sr-only">{t('market.myOrder')}</span>}
-          </>
-        ),
-        sortValue: (o) => o.price,
-      },
-      quantity: {
-        id: 'quantity',
-        header: t('market.quantity'),
-        align: 'right',
-        className: 'tabular-nums',
-        render: (o) => formatVolume(o.volume_remain),
-        sortValue: (o) => o.volume_remain,
-      },
-      location: {
-        id: 'location',
-        header: t('market.location'),
-        render: (o) => (
-          <LocationCell order={o} npcStations={npcStationMap} solarSystems={solarSystemMap} t={t} />
-        ),
-      },
-      security: {
-        id: 'security',
-        header: t('market.securityColumn'),
-        align: 'right',
-        className: 'tabular-nums',
-        sortValue: (o) => resolveOrderLocation(o, npcStationMap, solarSystemMap).security,
-        render: (o) => (
-          <SecurityCell order={o} npcStations={npcStationMap} solarSystems={solarSystemMap} t={t} />
-        ),
-      },
-      jumps: {
-        id: 'jumps',
-        header: t('market.jumpsColumn'),
-        align: 'right',
-        className: 'tabular-nums',
-        sortValue: (o) => {
-          const cell = orderJumps(o.system_id);
-          return cell.kind === 'value' ? (cell.count ?? undefined) : undefined;
-        },
-        render: (o) => renderJumpsCell(orderJumps(o.system_id), t, 'market.jumpsUnavailableHint'),
-      },
-      expiry: {
-        id: 'expiry',
-        header: t('market.expiry'),
-        className: 'whitespace-nowrap text-text-dim',
-        render: (o) => orderExpiry(o).toLocaleDateString(),
-        sortValue: (o) => orderExpiry(o).getTime(),
-      },
-      range: {
-        id: 'range',
-        header: t('market.range'),
-        className: 'text-text-dim',
-        render: (o) => rangeLabel(o.range, t),
-      },
-      minVolume: {
-        id: 'minVolume',
-        header: t('market.minVolume'),
-        align: 'right',
-        className: 'tabular-nums',
-        render: (o) => formatVolume(o.min_volume),
-        sortValue: (o) => o.min_volume,
-      },
-    }),
-    [t, npcStationMap, solarSystemMap, myOrderIds, orderJumps]
-  );
-
-  const baseColumns = useMemo<DataTableColumn<RegionOrder>[]>(
-    () =>
-      SELL_ORDER_COLUMN_IDS.filter((id) => visibleOrderColumns.includes(id)).map(
-        (id) => orderColumnsById[id]
-      ),
-    [visibleOrderColumns, orderColumnsById]
-  );
-  const buyColumns = useMemo<DataTableColumn<RegionOrder>[]>(
-    () =>
-      BUY_ORDER_COLUMN_IDS.filter((id) => visibleOrderColumns.includes(id)).map(
-        (id) => orderColumnsById[id]
-      ),
-    [visibleOrderColumns, orderColumnsById]
-  );
-  // What each table's row expand (`OrderDetailPanel`) shows that the visible
-  // columns don't — the picker's hidden ids, per table, since Sell and Buy
-  // don't offer the same columns to begin with.
-  const sellHiddenColumns = useMemo(
-    () => SELL_ORDER_COLUMN_IDS.filter((id) => !visibleOrderColumns.includes(id)),
-    [visibleOrderColumns]
-  );
-  const buyHiddenColumns = useMemo(
-    () => BUY_ORDER_COLUMN_IDS.filter((id) => !visibleOrderColumns.includes(id)),
-    [visibleOrderColumns]
-  );
-
-  function handleToggle(groupId: number) {
-    const setter = filterResult !== null ? setSearchCollapsedIds : setExpandedIds;
-    setter((current) => {
-      const next = new Set(current);
-      if (next.has(groupId)) next.delete(groupId);
-      else next.add(groupId);
-      return next;
-    });
-  }
-
-  // Every handler that changes the selected item or the location writes the
-  // persisted device setting (unchanged) *and* pushes the new query string,
-  // as its own history entry, so a URL grabbed right after matches what's on
-  // screen and the browser's back/forward walks through prior selections.
-  //
-  // `buildMarketParams` returns the canonical type/hub/region set, and
-  // replacing those wholesale is the point — `group` goes with them (a
-  // one-shot cross-link param, never re-applied once acted on). `browser.station`
-  // goes too: every call here means a new item or location, which is exactly
-  // when the "filter to this station" banner should clear (previously done by
-  // `setStationFilter(null)` in the resetKey effect below — moved here because
-  // that call and this one are two independent `useUrlParams` writers landing
-  // in the very same render, and the second one silently dropped the first's
-  // write, per the "two writers, same tick" hazard `useUrlState.ts` documents).
-  // `browser.q`/`browser.itemTab` survive untouched: the tab lives in the path
-  // now, not here, so there is no longer a `?section=` this needs to carry along.
-  function navigateTo(typeId: number | null, next: MarketLocationParam) {
-    setSearchParams((prev) => {
-      const params = new URLSearchParams(prev);
-      params.delete('type');
-      params.delete('hub');
-      params.delete('region');
-      params.delete('group');
-      params.delete('browser.station');
-      for (const [key, value] of Object.entries(buildMarketParams(typeId, next))) {
-        params.set(key, value);
-      }
-      return params;
-    });
-  }
-
-  function handleModeChange(mode: LocationMode) {
-    if (mode === effectiveLocation.mode) return;
-    // Toggling off a URL-supplied location keeps *that* hub/region, not the
-    // device's persisted default — otherwise a shared `?hub=amarr` link
-    // reverts to the visitor's own Jita default the instant they touch the
-    // toggle, which isn't "restores exactly what the sender saw" anymore.
-    const regionId = locationModeValue.regionId ?? effectiveHub.regionId;
-    void setLocationModeValue({ mode, regionId });
-    navigateTo(
-      selectedTypeId,
-      mode === 'region' ? { mode: 'region', regionId } : { mode: 'hub', hubId: effectiveHub.id }
-    );
-  }
-
-  function handleHubChange(id: TradeHub['id']) {
-    void setHubId(id);
-    navigateTo(selectedTypeId, { mode: 'hub', hubId: id });
-  }
-
-  function handleRegionChange(regionId: RegionChoice) {
-    void setLocationModeValue({ mode: 'region', regionId });
-    navigateTo(selectedTypeId, { mode: 'region', regionId });
-  }
-
-  function handleSelectItem(typeId: number) {
-    navigateTo(typeId, effectiveLocation);
-  }
-
-  function handleBackToFinder() {
-    navigateTo(null, effectiveLocation);
-  }
+  const {
+    visibleOrderColumns,
+    toggleOrderColumn,
+    orderColumnsById,
+    baseColumns,
+    buyColumns,
+    sellHiddenColumns,
+    buyHiddenColumns,
+  } = useMarketOrderColumns({ t, npcStationMap, solarSystemMap, myOrderIds, jumpRangeFilter });
 
   function handleRefresh() {
     // On Appraisal the button re-prices the pasted list instead, dropping the
@@ -1598,32 +691,10 @@ export function Market() {
     // A failed catalogue load leaves no item to select, so Refresh retries
     // the catalogue itself, the one recovery this page has short of F5.
     if (catalogueError) {
-      setCatalogueError(false);
-      setCatalogueTick((n) => n + 1);
+      retryCatalogue();
       return;
     }
-    // Manual refresh must bypass getOrderBook's 300s TTL cache (CONTEXT.md
-    // "Data Age": refresh happens on app open + manual button only) — scoped
-    // to what's actually on screen (the selected item, plus the Variations
-    // table rows beneath it, which reuse this same tick to refetch their own
-    // prices in place), not a global wipe. That's the difference from the
-    // Compare Drawer: its rows aren't part of this page's own render, so
-    // they keep whatever's still within TTL instead of being forced to
-    // refetch just because something else on the page was refreshed. Also
-    // the failed order book's "Try again".
-    // All regions clears the type in every region, not just the ones last
-    // fetched: a range change since would otherwise leave some stale.
-    if (selectedTypeId !== null) {
-      if (allRegions) {
-        clearOrderBookViewCacheAcross(selectedTypeId, allMarketRegionIds, orderBookLocation);
-      } else {
-        clearOrderBookViewCache(selectedTypeId, orderBookLocation);
-      }
-    }
-    for (const row of variationsResultRef.current?.rows ?? []) {
-      clearOrderBookViewCache(row.typeId, orderBookLocation);
-    }
-    setRefreshTick((n) => n + 1);
+    refreshOrderBook();
   }
 
   function orderRowContextMenu(order: RegionOrder, tr: ReactElement) {
@@ -1641,12 +712,6 @@ export function Market() {
     );
   }
 
-  // variationData isn't included here — it's fetched by its own effect,
-  // independent of the primary catalogue load, so a slow or failed
-  // variations.json never blocks or errors the rest of the page.
-  const catalogueLoading =
-    !catalogueError && (!groups || !types || !npcStations || !solarSystems || !marketRegions);
-  const selectedItem = types?.find((ty) => ty.typeId === selectedTypeId) ?? null;
   // Narrow screens only: on desktop the item finder is already on screen
   // beside the item, so there is nothing to go back to. It sits in the
   // Panel's `leading` slot, immediately left of the item name — it means
@@ -1662,91 +727,6 @@ export function Market() {
     />
   ) : undefined;
 
-  // Variations (CONTEXT.md round 6): the selected item's Tech/Meta/Faction
-  // variation group, falling back to Market Group siblings, re-anchored
-  // whenever selectedItem changes — including a click on a row itself, which
-  // just becomes the new selectedItem.
-  const variationsResult = useMemo(
-    () =>
-      selectedItem ? getVariationRows(variationIndex, typesByGroup, typesById, selectedItem) : null,
-    [variationIndex, typesByGroup, typesById, selectedItem]
-  );
-  // Latest-ref pattern (useCompareRows.ts): handleRefresh is declared above
-  // this memo (it needs to be in scope for the header's onClick) and reads
-  // this value only on click, well after it settles — a ref sidesteps that
-  // ordering entirely instead of asking the render function to read ahead.
-  const variationsResultRef = useRef(variationsResult);
-  useEffect(() => {
-    variationsResultRef.current = variationsResult;
-  });
-
-  const [variationPrices, setVariationPrices] = useState<
-    ReadonlyMap<number, OrderBookSummary | undefined>
-  >(new Map());
-  // Same "adjusting state when a prop changes" pattern as resetKey above:
-  // clears stale row prices the instant the row set or the location changes,
-  // in the same render — an Effect would let the old item's prices flash
-  // under the new table. stationFilter is included so the table stays in
-  // step with the order-row "filter to this station" action (CONTEXT.md
-  // round 10) the same way the on-screen tables do; refreshTick deliberately
-  // isn't, so a manual refresh updates prices in place instead of blanking
-  // the table back to a loading state.
-  const variationResetKey = variationsResult
-    ? `${variationsResult.rows.map((row) => row.typeId).join(',')}:${chosenRegionId}:${orderBookLocation.mode}:${orderBookLocation.hubStationId}:${stationFilter ?? 'none'}`
-    : 'none';
-  const [variationResetForKey, setVariationResetForKey] = useState<string | null>(null);
-  if (variationResetKey !== variationResetForKey) {
-    setVariationResetForKey(variationResetKey);
-    setVariationPrices(new Map());
-  }
-
-  // Fetched independently of the main order book, so a slow row's price
-  // never delays the order book's own render (acceptance criteria). Also
-  // reruns on refreshTick so a manual Refresh — which clears getOrderBook's
-  // cache — refetches row prices too, not just the on-screen tables.
-  useEffect(() => {
-    if (
-      !variationsResult ||
-      variationsResult.rows.length === 0 ||
-      !hubHydrated ||
-      !locationModeHydrated ||
-      globalMarkets === null
-    ) {
-      return;
-    }
-    let cancelled = false;
-    // Capped, not one Promise.all: ~20 rows fired at once tripped Sentry's
-    // N+1 API Call detector (ORDER_BOOK_FANOUT_CONCURRENCY).
-    void mapWithConcurrencyLimit(
-      variationsResult.rows,
-      ORDER_BOOK_FANOUT_CONCURRENCY,
-      async (row) => {
-        if (cancelled) return;
-        const view = await loadOrderBookView(row.typeId, { ...orderBookLocation, stationFilter });
-        if (cancelled) return;
-        // A row's own price is a nice-to-have next to the order book that did
-        // load; a failed fetch reads as "no orders" (the empty summary) rather
-        // than stalling the table on a spinner forever.
-        const summary: OrderBookSummary =
-          view.status === 'failed'
-            ? { bestSell: null, bestBuy: null, spread: null, availableVolume: 0 }
-            : view.summary;
-        setVariationPrices((prev) => new Map(prev).set(row.typeId, summary));
-      }
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    variationsResult,
-    orderBookLocation,
-    stationFilter,
-    hubHydrated,
-    locationModeHydrated,
-    globalMarkets,
-    refreshTick,
-  ]);
-
   const itemTabs = (
     <Tabs
       tabs={[
@@ -1759,10 +739,6 @@ export function Market() {
       className="min-w-0 flex-1"
     />
   );
-  // Only "can't measure" earns a line: a range that applies needs no caption.
-  const jumpNoteShown =
-    regionMode && (jumpRangeFilter.status === 'no-origin' || jumpRangeFilter.status === 'unknown');
-  const failedRegionCount = loadedView?.failedRegionIds.length ?? 0;
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">

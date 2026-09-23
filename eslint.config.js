@@ -73,5 +73,17 @@ export default tseslint.config(
     rules: {
       'react-refresh/only-export-components': 'off',
     },
+  },
+  {
+    // A hook file, not a component file: `useMarketOrderColumns` builds the
+    // Market Browser order book's `DataTableColumn` definitions, and two of
+    // those columns' `render` functions return JSX cells — so the file
+    // carries JSX without exporting a single component for fast-refresh to
+    // find. Scoped narrowly to this one file, the same shape as the
+    // radix-ui wrapper exemption above.
+    files: ['src/features/market/useMarketOrderColumns.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
   }
 );
