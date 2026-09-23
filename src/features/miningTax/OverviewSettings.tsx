@@ -7,15 +7,7 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  Modal,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  TextInput,
-  type DataTableColumn,
-} from '@/components/ui';
+import { Modal, Popover, PopoverContent, PopoverTrigger, TextInput } from '@/components/ui';
 import { MINING_YIELD_RANGES, type MiningYieldRange } from '@/engine/miningTax/yieldRange';
 import { basisSide, isNowBasis, type PriceBasis } from '@/engine/miningTax/priceBasis';
 import {
@@ -24,8 +16,6 @@ import {
   MIN_BUYBACK_RATE,
 } from '@/engine/miningTax/buybackRate';
 import { valueButtonLabel } from './basisLabel';
-import type { OverviewColumnId } from './overviewColumns';
-import type { MiningYieldRow } from './yieldSnapshot';
 
 interface RangeControlProps {
   value: MiningYieldRange;
@@ -142,56 +132,6 @@ export function ShowRefiningToggle({ value, onChange }: ShowRefiningToggleProps)
       </label>
       <p className="text-xs text-text-dim">{t('miningTax.overview.showRefiningHint')}</p>
     </div>
-  );
-}
-
-interface CardDetailsOptionsProps {
-  available: readonly OverviewColumnId[];
-  visible: readonly OverviewColumnId[];
-  columnsById: Record<OverviewColumnId, DataTableColumn<MiningYieldRow>>;
-  onToggle: (id: OverviewColumnId) => void;
-  onReset: () => void;
-}
-
-/**
- * Phone equivalent of the desktop `ColumnPickerMenu` dropdown (issue #1282):
- * the same column choice, but as a checkbox group inside the settings sheet
- * rather than a second header control — a phone's "day card" (the table's
- * own responsive stack, `DataTable.tsx`) already renders from the same
- * `columns` array, so toggling here changes both at once.
- */
-export function CardDetailsOptions({
-  available,
-  visible,
-  columnsById,
-  onToggle,
-  onReset,
-}: CardDetailsOptionsProps) {
-  const { t } = useTranslation();
-  const visibleSet = new Set(visible);
-  return (
-    <fieldset className="space-y-1">
-      <legend className="mb-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {t('miningTax.overview.cardDetailsTitle')}
-      </legend>
-      {available.map((id) => (
-        <label
-          key={id}
-          className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-xs px-2.5 py-2 hover:bg-panel-2"
-        >
-          <input
-            type="checkbox"
-            className="size-4 accent-accent"
-            checked={visibleSet.has(id)}
-            onChange={() => onToggle(id)}
-          />
-          <span className="text-sm">{columnsById[id].header}</span>
-        </label>
-      ))}
-      <Button variant="ghost" size="sm" onClick={onReset}>
-        {t('miningTax.overview.resetColumnsAction')}
-      </Button>
-    </fieldset>
   );
 }
 
