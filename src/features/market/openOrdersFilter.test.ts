@@ -11,6 +11,7 @@ import {
 } from './openOrdersFilter';
 import type { OpenOrderRow } from './openOrdersModel';
 import { UNDERCUT_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
+import type { UrlParamCodec } from '@/lib/urlState';
 
 function makeRow(overrides: Partial<OpenOrderRow> = {}): OpenOrderRow {
   return {
@@ -358,8 +359,12 @@ describe('activeFilterChips / activeFilterCount', () => {
  * it, and the round-trip below is what stops them drifting apart.
  */
 describe('the deep-link vocabulary', () => {
-  const problemsCodec = OPEN_ORDERS_FILTER_PARAMS['orders.problems'];
-  const charactersCodec = OPEN_ORDERS_FILTER_PARAMS['orders.characters'];
+  const problemsCodec = OPEN_ORDERS_FILTER_PARAMS['orders.problems'] as UrlParamCodec<
+    readonly string[]
+  >;
+  const charactersCodec = OPEN_ORDERS_FILTER_PARAMS['orders.characters'] as UrlParamCodec<
+    readonly number[]
+  >;
 
   function parseHref(href: string): {
     problems: readonly string[];

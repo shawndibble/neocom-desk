@@ -31,7 +31,7 @@ import { resolveCharacterFilter } from '@/features/character/characterFilterValu
 import { loadReprocessing } from '@/sde/loadSde';
 import type { ReprocessingType } from '@/sde/types';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
-import { useUrlParams } from '@/lib/useUrlState';
+import { useUrlFilter } from '@/lib/useUrlState';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { cx } from '@/lib/cx';
 import { formatIskAuto, formatIskCompact } from '@/lib/isk';
@@ -67,10 +67,12 @@ import {
   EMPTY_OPEN_ORDERS_FILTER,
   FILTERABLE_PROBLEMS,
   filterOpenOrders,
+  OPEN_ORDERS_FIELD_TO_PARAM,
   OPEN_ORDERS_FILTER_PARAMS,
   OPEN_ORDERS_SORTS,
   sortOpenOrders,
   activeFilterChips,
+  DEFAULT_OPEN_ORDERS_FILTER_PARAMS,
   type OpenOrdersFilter,
   type OpenOrdersSort,
 } from './openOrdersFilter';
@@ -150,38 +152,16 @@ export function OpenOrdersPanel() {
    * field — a deep link (the Overview board's count tiles, `openOrdersHref`)
    * narrows it on arrival, and every chip, select and search keystroke from
    * here on writes straight back to it, so a reload or a shared link always
-   * reopens exactly what was on screen. The field names below are
-   * `OpenOrdersFilter`'s own, so `filter`/`setFilter` reads and writes exactly
-   * as they did with the old local `useState`.
+   * reopens exactly what was on screen. This page has only the one filter
+   * bar, so it never needs `useUrlFilter`'s scope-reset — the scope key
+   * never changes.
    */
-  const [urlFilter, setUrlFilter] = useUrlParams(OPEN_ORDERS_FILTER_PARAMS);
-  const filter = useMemo<OpenOrdersFilter>(
-    () => ({
-      text: urlFilter['orders.q'],
-      side: urlFilter['orders.side'],
-      characterIds: urlFilter['orders.characters'],
-      problems: urlFilter['orders.problems'],
-      expiringWithinDays: urlFilter['orders.expiring'],
-      costBasis: urlFilter['orders.costBasis'],
-      minIskTiedUp: urlFilter['orders.minIsk'],
-      hideHealthy: urlFilter['orders.hideHealthy'],
-      sort: urlFilter['orders.sort'],
-    }),
-    [urlFilter]
+  const [filter, setFilter] = useUrlFilter<OpenOrdersFilter>(
+    'orders',
+    OPEN_ORDERS_FILTER_PARAMS,
+    OPEN_ORDERS_FIELD_TO_PARAM,
+    DEFAULT_OPEN_ORDERS_FILTER_PARAMS
   );
-  function setFilter(next: OpenOrdersFilter) {
-    setUrlFilter({
-      'orders.q': next.text,
-      'orders.side': next.side,
-      'orders.characters': next.characterIds,
-      'orders.problems': next.problems,
-      'orders.expiring': next.expiringWithinDays,
-      'orders.costBasis': next.costBasis,
-      'orders.minIsk': next.minIskTiedUp,
-      'orders.hideHealthy': next.hideHealthy,
-      'orders.sort': next.sort,
-    });
-  }
   const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   /** Groups the player has folded away by hand. `healthy` is never in here — see the toggle below. */
