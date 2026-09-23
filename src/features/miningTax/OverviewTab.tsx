@@ -322,7 +322,12 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       id: 'system',
       header: t('miningTax.systemColumn'),
       render: (row) => (
-        <span className="flex items-center gap-1.5">
+        // `inline-flex`, not `flex`: the dense phone card's meta line puts a
+        // `·` separator right before this cell's content (`::before` in
+        // index.css) — a block-level `flex` span can't sit on that same
+        // inline line, so it broke the whole cell onto its own line inside
+        // the meta line whenever a separator preceded it.
+        <span className="inline-flex items-center gap-1.5">
           {systemName(row)}
           <SecurityValue security={data?.systemSecurity.get(row.entry.solarSystemId)} t={t} />
         </span>
@@ -396,7 +401,8 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.overview.pricingColumn'),
       className: 'whitespace-nowrap',
       render: (row) => (
-        <span className="flex items-center gap-1.5">
+        // `inline-flex`, not `flex` — see the `system` column's render.
+        <span className="inline-flex items-center gap-1.5">
           <PriceSourceTag source={row.priceSource} />
           {!row.valuation.pricedAll && (
             <span className="text-[0.6875rem] text-warning">
