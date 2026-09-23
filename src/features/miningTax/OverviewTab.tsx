@@ -57,16 +57,13 @@ import {
 import { oreBreakdownSummary, sumUnits } from './oreBreakdown';
 import {
   BuybackRateInput,
-  CardDetailsOptions,
   MobileSettings,
   PriceBasisOptions,
   RangeControl,
   ShowRefiningToggle,
   ValueMenu,
 } from './OverviewSettings';
-import { formatIsk } from '@/lib/isk';
 import { basisSummary } from './basisLabel';
-import { rawValueFormula } from './priceFormula';
 import { weakestSource, type PriceSource } from '@/engine/miningTax/priceBasis';
 import { YieldDetailModal } from './YieldDetailModal';
 import { sumVolume, volumeDisplayMode } from './volume';
@@ -353,34 +350,19 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       className: 'whitespace-nowrap',
       render: (row) => <IskAmount value={row.valuation.rawValue} revealOn="tap" decimals={0} />,
       sortValue: (row) => row.valuation.rawValue,
+      // Dense phone card's headline figure (`stackLayout="dense"` below) —
+      // this is the column that's on by default, so it's the number a
+      // reader's eye should land on first.
+      cardCorner: true,
     },
-    priceFormula: {
-      id: 'priceFormula',
-      header: t('miningTax.overview.priceFormulaColumn'),
-      className: 'whitespace-nowrap text-[0.6875rem] tabular-nums',
-      // The full-price lines on the chosen basis, so the unit price shown is
-      // the market price the rate then discounts, not an already-scaled one.
-      render: (row) => {
-        const formula = rawValueFormula(row.byBasis[basis].valuation.lines, buybackRate);
-        return (
-          <ul>
-            {formula.terms.map((term) => (
-              <li key={term.typeId}>
-                <span className="text-text-dim">
-                  {data?.typeNames.get(term.typeId) ?? `#${term.typeId}`}
-                </span>{' '}
-                {term.quantity.toLocaleString()} ×{' '}
-                {term.unitPrice === null
-                  ? t('miningTax.overview.priceFormulaNoPrice')
-                  : formatIsk(term.unitPrice, 2)}
-              </li>
-            ))}
-            {formula.ratePct !== 100 && <li className="text-text-dim">× {formula.ratePct}%</li>}
-            <li className="font-semibold">= {formatIsk(formula.total, 0)}</li>
-          </ul>
-        );
-      },
+    total: {
+      id: 'total',
+      header: t('miningTax.overview.totalColumn'),
+      align: 'right',
+      className: 'whitespace-nowrap',
+      render: (row) => <IskAmount value={row.valuation.rawValue} revealOn="tap" decimals={0} />,
       sortValue: (row) => row.valuation.rawValue,
+      stackAffix: { before: t('miningTax.overview.totalColumn') },
     },
     refineValue: {
       id: 'refineValue',
@@ -389,6 +371,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       className: 'whitespace-nowrap',
       render: (row) => <IskAmount value={row.valuation.refineValue} revealOn="tap" decimals={0} />,
       sortValue: (row) => row.valuation.refineValue,
+      stackAffix: { before: t('miningTax.overview.refineValue') },
     },
     oreBreakdown: {
       id: 'oreBreakdown',
@@ -403,6 +386,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       className: 'whitespace-nowrap tabular-nums',
       render: (row) => sumUnits(row.entry.oreLines).toLocaleString(),
       sortValue: (row) => sumUnits(row.entry.oreLines),
+      stackAffix: { after: ` ${t('miningTax.overview.unitsColumn').toLowerCase()}` },
     },
     pricing: {
       id: 'pricing',
@@ -490,13 +474,6 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                   onChange={(next) => void setBuybackRate(next)}
                 />
                 <ShowRefiningToggle value={showRefining} onChange={handleShowRefiningChange} />
-                <CardDetailsOptions
-                  available={availableColumnIds}
-                  visible={activeColumnIds}
-                  columnsById={columnsById}
-                  onToggle={handleToggleColumn}
-                  onReset={handleResetColumns}
-                />
               </MobileSettings>
             </div>
             <IconButton
@@ -645,22 +622,16 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
               <Panel
                 padded={false}
                 actions={
-                  // Desktop only — a phone toggles the same columns as
-                  // "Card details" inside the settings sheet instead
-                  // (`CardDetailsOptions` above), so this dropdown would be
-                  // a redundant second control there.
-                  <div className="hidden sm:block">
-                    <ColumnPickerMenu
-                      available={availableColumnIds}
-                      visible={activeColumnIds}
-                      columnsById={columnsById}
-                      onToggle={handleToggleColumn}
-                      onReset={handleResetColumns}
-                      buttonLabel={t('miningTax.overview.columnsButton')}
-                      menuTitle={t('miningTax.overview.columnsMenuTitle')}
-                      resetLabel={t('miningTax.overview.resetColumnsAction')}
-                    />
-                  </div>
+                  <ColumnPickerMenu
+                    available={availableColumnIds}
+                    visible={activeColumnIds}
+                    columnsById={columnsById}
+                    onToggle={handleToggleColumn}
+                    onReset={handleResetColumns}
+                    buttonLabel={t('miningTax.overview.columnsButton')}
+                    menuTitle={t('miningTax.overview.columnsMenuTitle')}
+                    resetLabel={t('miningTax.overview.resetColumnsAction')}
+                  />
                 }
               >
                 <div className="overflow-x-auto">
@@ -671,6 +642,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                       `${row.characterId}:${row.entry.date}:${row.entry.solarSystemId}`
                     }
                     label={t('miningTax.overviewTab')}
+                    stackLayout="dense"
                     {...overviewSort}
                     onRowClick={(row) => setDetailRow(row)}
                   />

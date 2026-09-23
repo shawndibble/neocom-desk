@@ -16,7 +16,7 @@ export const OVERVIEW_COLUMN_IDS = [
   'system',
   'volume',
   'rawValue',
-  'priceFormula',
+  'total',
   'refineValue',
   'oreBreakdown',
   'units',
@@ -25,7 +25,7 @@ export const OVERVIEW_COLUMN_IDS = [
 
 export type OverviewColumnId = (typeof OVERVIEW_COLUMN_IDS)[number];
 
-/** Everything the table already showed before this picker existed — the columns added since (Ore breakdown, Units, Price calculation) start off. */
+/** Everything the table already showed before this picker existed — the columns added since (Ore breakdown, Units, Total) start off. */
 export const DEFAULT_VISIBLE_OVERVIEW_COLUMNS: readonly OverviewColumnId[] = [
   'character',
   'system',
