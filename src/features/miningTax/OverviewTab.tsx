@@ -23,6 +23,7 @@ import {
   PageHeader,
   Panel,
   Spinner,
+  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -65,12 +66,7 @@ import {
   ValueMenu,
 } from './OverviewSettings';
 import { basisSummary } from './basisLabel';
-import {
-  countDaysBySource,
-  isNowBasis,
-  weakestSource,
-  type PriceSource,
-} from '@/engine/miningTax/priceBasis';
+import { weakestSource, type PriceSource } from '@/engine/miningTax/priceBasis';
 import { YieldDetailModal } from './YieldDetailModal';
 import { sumVolume, volumeDisplayMode } from './volume';
 import { VolumeDisplay } from './volumeDisplay';
@@ -103,15 +99,24 @@ const SOURCE_TAG_CLASS: Record<PriceSource, string> = {
   none: 'border-line text-text-dim',
 };
 
-/** Saved / Daily avg / Live / No price — where a row's ore prices came from on the chosen basis. */
+/**
+ * Saved / Daily avg / Live / No price — where a row's ore prices came from on
+ * the chosen basis, with a tooltip saying what that means. A button so the
+ * tooltip is reachable by keyboard and a tap; the click stops at the tag so it
+ * doesn't also open the row's detail modal.
+ */
 function PriceSourceTag({ source }: { source: PriceSource }) {
   const { t } = useTranslation();
   return (
-    <span
-      className={`rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${SOURCE_TAG_CLASS[source]}`}
-    >
-      {t(`miningTax.overview.priceSource.${source}`)}
-    </span>
+    <Tooltip content={t(`miningTax.overview.priceSourceHint.${source}`)} openOnTap>
+      <button
+        type="button"
+        onClick={(event) => event.stopPropagation()}
+        className={`cursor-help rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase focus-visible:outline-2 focus-visible:outline-accent ${SOURCE_TAG_CLASS[source]}`}
+      >
+        {t(`miningTax.overview.priceSource.${source}`)}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -222,13 +227,6 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
         };
       });
   }, [characterRows, range, today, basis, buybackRate]);
-  const daysBySource = useMemo(
-    () =>
-      countDaysBySource(
-        visibleRows.map((row) => ({ date: row.entry.date, source: row.priceSource }))
-      ),
-    [visibleRows]
-  );
   const coverage = useMemo(() => {
     let oldestSaved: string | null = null;
     for (const row of characterRows) {
@@ -518,7 +516,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
           ) : (
             <>
               <p className="text-xs text-text-dim">{basisSummary(t, basis, buybackRate)}</p>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Panel>
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('miningTax.overview.totalValueStat')}
@@ -569,7 +567,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                 </Panel>
                 <Panel>
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('miningTax.overview.daysCoveredStat')}
+                    {t('miningTax.overview.daysMinedStat')}
                   </p>
                   <p className="mt-1 text-lg font-semibold tabular-nums">
                     {t('miningTax.overview.daysCoveredValue', {
@@ -585,27 +583,6 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                     </p>
                   ) : (
                     <p className="text-[0.6875rem] text-text-dim">{dateRangeLabel(totals.dates)}</p>
-                  )}
-                </Panel>
-                <Panel>
-                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('miningTax.overview.priceSourceStat')}
-                  </p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums">
-                    {isNowBasis(basis)
-                      ? t('miningTax.overview.priceSourceLive')
-                      : t('miningTax.overview.priceSourceValue', {
-                          count: daysBySource.saved,
-                          total: daysBySource.total,
-                        })}
-                  </p>
-                  {!isNowBasis(basis) && (daysBySource.average > 0 || daysBySource.live > 0) && (
-                    <p className="text-[0.6875rem] text-warning">
-                      {t('miningTax.overview.priceSourceMix', {
-                        average: daysBySource.average,
-                        live: daysBySource.live,
-                      })}
-                    </p>
                   )}
                 </Panel>
               </div>

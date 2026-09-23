@@ -1594,11 +1594,13 @@
       "iskPerHourBasisHint": "Averaged over the date range, not active mining time — ESI's ledger has no time of day.",
       "volumeStat": "Volume mined",
       "dateRangeStat": "Date range",
-      "daysCoveredStat": "Days covered",
-      "priceSourceStat": "Price source",
-      "priceSourceValue": "{{count}} of {{total}} days saved",
-      "priceSourceMix": "{{average}} day(s) use daily avg · {{live}} live",
-      "priceSourceLive": "Live, every day",
+      "daysMinedStat": "Days mined",
+      "priceSourceHint": {
+        "saved": "Jita price this app saved on the day mined, for the side you picked (buy or sell).",
+        "average": "No price was saved that day, so this uses EVE's daily average: a mix of buy and sell trades.",
+        "live": "Today's live Jita price. Used for Now, and for today or yesterday until EVE publishes that day.",
+        "none": "No price found for this ore."
+      },
       "priceSource": {
         "saved": "Saved",
         "average": "Daily avg",
