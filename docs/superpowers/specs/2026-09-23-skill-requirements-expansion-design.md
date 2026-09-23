@@ -81,14 +81,16 @@ Net-new concept; nothing like it exists in the codebase or docs today.
   bundles include marginal skills (EVE Uni + forum feedback surfaced in
   research); this must not read as a hard gate to fly the ship.
 
-**Open risk — research spike required before implementation:** mastery
-tier→skill bundles are not present in any of the flat CSV tables
-`scripts/build-sde.mjs` already pulls from Fuzzwork's SDE mirror (that
-mirror is flattened SQL tables; masteries are nested FSD/YAML data in
-CCP's raw SDE export, not one Fuzzwork table). A public flattened source,
-or a path to parse CCP's own SDE export, must be confirmed before this
-feature is buildable. This is the first task of the implementation plan for
-this feature, not an assumption baked into the rest of the design.
+**Data source spike — resolved.** Fuzzwork's SDE mirror already flattens
+this: `certMasteries.csv` (`typeID, masteryLevel, certID` — ship hull, tier
+0–4, one or more certs per tier) joined with `certSkills.csv` (`certID,
+skillID, certLevelInt, skillLevel` — `certLevelInt` = `masteryLevel + 1`)
+gives the exact ship→tier→skill/level bundle needed, no CCP raw-SDE parsing
+or manual data entry required. Add `certMasteries.csv`, `certSkills.csv`
+and `certCerts.csv` (`certID, name` — for display) to the `FILES` array in
+`scripts/build-sde.mjs` alongside the files it already downloads; combined
+size (~500KB) is in line with existing downloads. Mastery is no longer
+blocked and is in scope alongside the other two features.
 
 ## Feature 3 — Module/Ship → affecting skill (inline)
 
@@ -153,9 +155,11 @@ No "active plan" flag added to the Plan model itself. Instead:
 
 ## Suggested implementation order
 
-Three fairly independent pieces of work, likely three separate tickets:
+All 4 pieces are in scope now that the Mastery data source is confirmed
+(above). Sequenced so each builds on a shared dependency:
 
-1. Fit Check panel (lowest risk — engine already exists).
-2. Target Plan mechanism (shared dependency for 1 and the other two).
+1. Target Plan mechanism (shared dependency for everything below).
+2. Fit Check panel (lowest risk — engine already exists).
 3. Module→skill inline chip (contextual, reuses existing dogma parsing).
-4. Ship Mastery (highest risk — blocked on the data-source spike above).
+4. Ship Mastery (new `certMasteries.csv`/`certSkills.csv` build-time data,
+   new `Mastery`/`MasteryTier` types, new tier UI).
