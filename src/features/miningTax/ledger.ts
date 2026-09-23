@@ -10,10 +10,11 @@
  */
 import { db, type CharacterRecord } from '@/db';
 import { getCharacterMining } from '@/esi/endpoints';
-import { loadPaginatedWithCacheStatus, type StatusResult } from '@/esi/cache';
+import { loadPaginatedWithCacheStatus, type CachedResult, type StatusResult } from '@/esi/cache';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { groupMiningLedger } from '@/engine/miningTax/groupLedger';
 import { groupMiningYield, type MiningYieldEntry } from '@/engine/miningTax/yieldGrouping';
+import { mergeLedgerHistory } from '@/engine/miningTax/ledgerHistory';
 import type { MiningLedgerEntry, MiningLedgerRow } from '@/engine/miningTax/types';
 import { loadGasCloudTypeIds, loadMoonOreTypeIds, loadOreAndIceTypeIds } from '@/sde/loadSde';
 import { loadManualIgnoredTypeIds, loadManualMoonOreTypeIds } from './typeOverrides';
@@ -25,6 +26,26 @@ export function loadMiningLedger(characterId: number): Promise<StatusResult<Mini
   return loadPaginatedWithCacheStatus(characterId, KEYS.ledger, () =>
     getCharacterMining(characterId)
   );
+}
+
+/**
+ * A character's ledger rows with the device-kept history folded in (issue
+ * #1278): ESI only returns 30 days, so each fetch is merged into the saved
+ * rows and written back. A cached copy older than the last merge is ignored —
+ * it would roll today's growing quantity back. With no cached ledger at all
+ * (a failed first load, a lost token) the saved history still shows.
+ */
+async function withLedgerHistory(
+  characterId: number,
+  cached: CachedResult<MiningLedgerRow[]> | null
+): Promise<MiningLedgerRow[]> {
+  const stored = await db.miningLedgerHistory.get(characterId);
+  if (!cached) return stored?.rows ?? [];
+  const fetchedAt = cached.fetchedAt.getTime();
+  if (stored && fetchedAt <= stored.fetchedAt) return stored.rows;
+  const rows = mergeLedgerHistory(stored?.rows ?? [], cached.data);
+  await db.miningLedgerHistory.put({ characterId, rows, fetchedAt });
+  return rows;
 }
 
 export interface CharacterMiningLedger {
@@ -151,10 +172,12 @@ export async function loadAllCharacterYields(): Promise<CharacterMiningYield[]> 
   await mapWithConcurrencyLimit(results, ESI_FANOUT_CONCURRENCY, async (result) => {
     const { cached, needsReauth } = await loadMiningLedger(result.characterId);
     result.needsReauth = needsReauth;
-    if (!cached) return;
-    result.fetchedAt = cached.fetchedAt;
-    result.fromCache = cached.fromCache;
-    result.entries = groupMiningYield(cached.data, result.characterId, harvestedSet);
+    if (cached) {
+      result.fetchedAt = cached.fetchedAt;
+      result.fromCache = cached.fromCache;
+    }
+    const rows = await withLedgerHistory(result.characterId, cached);
+    result.entries = groupMiningYield(rows, result.characterId, harvestedSet);
   });
 
   return results;

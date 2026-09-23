@@ -27,6 +27,7 @@ beforeEach(async () => {
   await db.characters.clear();
   await db.esiCache.clear();
   await db.settings.clear();
+  await db.miningLedgerHistory.clear();
 });
 
 async function seedCharacter(characterId: number, name: string): Promise<void> {
@@ -156,6 +157,64 @@ describe('loadAllCharacterLedgers', () => {
     expect(ledger.entries[0].oreLines).toEqual([{ typeId: MOON_ORE, quantity: 100 }]);
     expect(ledger.unclassifiedTypeIds).toEqual([GAS]);
     expect(sdeMock.loadGasCloudTypeIds).not.toHaveBeenCalled();
+  });
+});
+
+describe('loadAllCharacterYields — saved history (issue #1278)', () => {
+  async function seedLedgerAt(characterId: number, rows: unknown[], fetchedAt: number) {
+    await db.esiCache.put({ characterId, key: LEDGER_KEY, value: rows, fetchedAt });
+  }
+
+  it('keeps days the ESI copy no longer reports and saves the merge', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await db.miningLedgerHistory.put({
+      characterId: CHAR_A,
+      rows: [{ date: '2026-07-15', quantity: 40, solar_system_id: 1, type_id: ORDINARY_ORE }],
+      fetchedAt: 1,
+    });
+    await seedLedgerAt(
+      CHAR_A,
+      [{ date: '2026-09-04', quantity: 500, solar_system_id: 1, type_id: ORDINARY_ORE }],
+      2
+    );
+
+    const [yield_] = await loadAllCharacterYields();
+
+    expect(yield_.entries.map((e) => e.date)).toEqual(['2026-07-15', '2026-09-04']);
+    const saved = await db.miningLedgerHistory.get(CHAR_A);
+    expect(saved?.rows.map((r) => r.date)).toEqual(['2026-07-15', '2026-09-04']);
+    expect(saved?.fetchedAt).toBe(2);
+  });
+
+  it('never lets an older cached copy overwrite a newer saved quantity', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await db.miningLedgerHistory.put({
+      characterId: CHAR_A,
+      rows: [{ date: '2026-09-04', quantity: 450, solar_system_id: 1, type_id: ORDINARY_ORE }],
+      fetchedAt: 5,
+    });
+    await seedLedgerAt(
+      CHAR_A,
+      [{ date: '2026-09-04', quantity: 100, solar_system_id: 1, type_id: ORDINARY_ORE }],
+      1
+    );
+
+    const [yield_] = await loadAllCharacterYields();
+
+    expect(yield_.entries[0].oreLines).toEqual([{ typeId: ORDINARY_ORE, quantity: 450 }]);
+  });
+
+  it('shows saved history when no cached ledger exists at all', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await db.miningLedgerHistory.put({
+      characterId: CHAR_A,
+      rows: [{ date: '2026-07-15', quantity: 40, solar_system_id: 1, type_id: ORDINARY_ORE }],
+      fetchedAt: 1,
+    });
+
+    const [yield_] = await loadAllCharacterYields();
+
+    expect(yield_.entries.map((e) => e.date)).toEqual(['2026-07-15']);
   });
 });
 
