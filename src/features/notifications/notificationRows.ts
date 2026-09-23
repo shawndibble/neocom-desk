@@ -21,6 +21,7 @@
  */
 import { NOTIFICATION_FAMILIES, eveTypesByFamily } from './eventSelection';
 import { isCorpEventId, type NotificationEventId } from './events';
+import { eventEntry } from './eventEntries';
 
 export interface CharacterSectionHeightInput {
   expanded: boolean;
@@ -44,11 +45,9 @@ type InternalRowKind =
   | 'character-header-touch'
   | 'column-captions'
   | 'event'
-  | 'extractor-hint'
-  | 'extractor-lead-time'
-  | 'fuel-threshold'
-  | 'wallet-threshold'
-  | 'corp-wallet-threshold'
+  | 'row-hint'
+  | 'threshold-controls'
+  | 'threshold-controls-with-hint'
   | 'corp-best-effort-hint'
   | 'eve-types-hint'
   | 'eve-family-header'
@@ -69,11 +68,12 @@ const ROW_HEIGHT: Record<InternalRowKind, number> = {
   'character-header-touch': 44,
   'column-captions': 26,
   event: 33,
-  'extractor-hint': 48,
-  'extractor-lead-time': 44,
-  'fuel-threshold': 52,
-  'wallet-threshold': 52,
-  'corp-wallet-threshold': 44,
+  // An Event Entry's `rowHintKey` paragraph (today only the extractor's).
+  'row-hint': 48,
+  // An Event Entry's inline threshold block — one select or ISK field, or
+  // corp wallet's two side by side — without and with its hint line.
+  'threshold-controls': 44,
+  'threshold-controls-with-hint': 52,
   'corp-best-effort-hint': 42,
   'eve-types-hint': 42,
   'eve-family-header': 30,
@@ -97,14 +97,14 @@ export function estimateCharacterSectionHeight(input: CharacterSectionHeightInpu
     height += ROW_HEIGHT.event;
     const rowEnabled = input.rowEnabledFor(eventId);
 
-    if (eventId === 'planetaryExtractorExpiring') height += ROW_HEIGHT['extractor-hint'];
-    if (eventId === 'planetaryExtractorExpiring' && rowEnabled) {
-      height += ROW_HEIGHT['extractor-lead-time'];
-    }
-    if (eventId === 'structureFuelLow' && rowEnabled) height += ROW_HEIGHT['fuel-threshold'];
-    if (eventId === 'walletBalanceChanged' && rowEnabled) height += ROW_HEIGHT['wallet-threshold'];
-    if (eventId === 'corpWalletThreshold' && rowEnabled) {
-      height += ROW_HEIGHT['corp-wallet-threshold'];
+    // Mirrors `NotificationsPanel.tsx`'s row: both read the Event Entry.
+    const { rowHintKey, thresholds } = eventEntry(eventId);
+    if (rowHintKey !== null) height += ROW_HEIGHT['row-hint'];
+    if (thresholds !== null && rowEnabled) {
+      height +=
+        ROW_HEIGHT[
+          thresholds.hintKey === null ? 'threshold-controls' : 'threshold-controls-with-hint'
+        ];
     }
     if (isCorpEventId(eventId)) height += ROW_HEIGHT['corp-best-effort-hint'];
 
