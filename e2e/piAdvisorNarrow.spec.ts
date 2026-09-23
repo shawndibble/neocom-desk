@@ -217,7 +217,7 @@ async function chipHeight(page: Page, name: string) {
 
 async function openAdvisor(page: Page, viewport: { width: number; height: number }) {
   await page.setViewportSize(viewport);
-  await page.goto('/planetary-industry?tab=advisor');
+  await page.goto('/planetary-industry/advisor');
   await page.getByText('Do this, best first').waitFor();
   // The toggle renders only against a rebuild candidate, so gate on it here
   // rather than inside each measurement: a timeout on this line means the

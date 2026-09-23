@@ -198,7 +198,7 @@ test.describe('Balances strip Payee filter button — touch target', () => {
 
   test('grows to 44px on phone without growing the row it sits in', async ({ page }) => {
     await page.setViewportSize(PHONE);
-    await page.goto('./moon-mining');
+    await page.goto('./mining');
 
     const button = page.getByRole('button', { name: `Show only ${PAYEE_NAME}'s entries` });
     await expect(button).toBeVisible();
@@ -218,7 +218,7 @@ test.describe('Balances strip Payee filter button — touch target', () => {
 
   test('stays small above md — desktop is unchanged', async ({ page }) => {
     await page.setViewportSize(DESKTOP);
-    await page.goto('./moon-mining');
+    await page.goto('./mining');
 
     const button = page.getByRole('button', { name: `Show only ${PAYEE_NAME}'s entries` });
     await expect(button).toBeVisible();
@@ -308,7 +308,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
     await page.setViewportSize(PHONE);
     await signInAndGoto(page);
     await seedPayeeBalance(page);
-    await page.goto('./moon-mining');
+    await page.goto('./mining');
 
     const dialog = await openSettleUp(page);
     expect(await rowHeight(dialog, ENTRY_DATE)).toBeGreaterThanOrEqual(44);
@@ -318,7 +318,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
     await page.setViewportSize(PHONE);
     await signInAndGoto(page);
     await seedPayeeBalance(page, { withMadePayment: true });
-    await page.goto('./moon-mining');
+    await page.goto('./mining');
 
     const dialog = await openLinkPayment(page);
     expect(await rowHeight(dialog, ENTRY_DATE)).toBeGreaterThanOrEqual(44);
@@ -328,7 +328,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
     await page.setViewportSize(PHONE);
     await signInAndGoto(page);
     await seedPayeeBalance(page, { withUnassignedEntry: true });
-    await page.goto('./moon-mining');
+    await page.goto('./mining');
 
     const dialog = await openBulkDismiss(page);
     expect(await rowHeight(dialog, UNASSIGNED_DATE)).toBeGreaterThanOrEqual(44);
@@ -338,7 +338,7 @@ test.describe('Mining Tax dialog entry rows — touch target', () => {
     await page.setViewportSize(DESKTOP);
     await signInAndGoto(page);
     await seedPayeeBalance(page, { withUnassignedEntry: true, withMadePayment: true });
-    await page.goto('./moon-mining');
+    await page.goto('./mining');
 
     // One line of `text-xs` (16px) inside `py-1.5` (2 x 6px) is 28px — what
     // `md:min-h-7` reverts to exactly. Pinned as a range rather than asserted
@@ -389,7 +389,7 @@ test.describe('Mining Tax bulk Settle Up — touch target', () => {
     await page.setViewportSize(viewport);
     await signInAndGoto(page);
     await seedPayeeBalance(page);
-    await page.goto('./moon-mining');
+    await page.goto('./mining');
 
     const boxes = page.getByLabel('Select this row');
     await expect(boxes).toHaveCount(1);

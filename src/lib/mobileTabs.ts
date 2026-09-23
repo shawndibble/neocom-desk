@@ -40,7 +40,7 @@ export const MOBILE_TAB_CHOICES = [
   '/alerts',
   '/skills',
   '/industry',
-  '/moon-mining',
+  '/mining',
   '/planetary-industry',
   '/market',
   '/wallet',
@@ -70,7 +70,7 @@ export const NAV_LABEL_KEYS: Record<MobileTabPath, string> = {
   '/alerts': 'nav.alerts',
   '/skills': 'nav.skills',
   '/industry': 'nav.industry',
-  '/moon-mining': 'nav.miningTax',
+  '/mining': 'nav.miningTax',
   '/planetary-industry': 'nav.pi',
   '/market': 'nav.market',
   '/wallet': 'nav.wallet',
@@ -83,6 +83,15 @@ export const NAV_LABEL_KEYS: Record<MobileTabPath, string> = {
 
 function isMobileTabPath(value: unknown): value is MobileTabPath {
   return (MOBILE_TAB_CHOICES as readonly string[]).includes(value as string);
+}
+
+/** A path this settings value may still hold from before #1304 renamed the route. */
+const LEGACY_PATH_REMAP: Record<string, MobileTabPath> = {
+  '/moon-mining': '/mining',
+};
+
+function remapLegacyPath(value: unknown): unknown {
+  return typeof value === 'string' && value in LEGACY_PATH_REMAP ? LEGACY_PATH_REMAP[value] : value;
 }
 
 /** Canonical order, and known paths only — it filters the choices, not the input. */
@@ -115,9 +124,10 @@ export function mobileSheetPaths(tabs: readonly MobileTabPath[]): MobileTabPath[
  */
 export function parseMobileTabs(raw: unknown): MobileTabPath[] | null {
   if (!Array.isArray(raw) || raw.length !== MOBILE_TAB_COUNT) return null;
-  if (!raw.every(isMobileTabPath)) return null;
-  if (new Set(raw).size !== raw.length) return null;
-  return sortMobileTabs(raw);
+  const remapped = raw.map(remapLegacyPath);
+  if (!remapped.every(isMobileTabPath)) return null;
+  if (new Set(remapped).size !== remapped.length) return null;
+  return sortMobileTabs(remapped);
 }
 
 export const useMobileTabs = createLocalSetting<readonly MobileTabPath[]>({
