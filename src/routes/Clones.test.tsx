@@ -150,7 +150,7 @@ describe('Clones', () => {
     render(<App />);
     expect(
       await screen.findByRole('link', { name: 'High-grade Ascendancy Alpha' })
-    ).toHaveAttribute('href', '/market?type=19540');
+    ).toHaveAttribute('href', '/market/browser?type=19540');
     expect(screen.getByText('No implants')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'No implants' })).not.toBeInTheDocument();
   });

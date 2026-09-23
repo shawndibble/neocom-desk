@@ -105,7 +105,7 @@ export function OrdersCard({
           </span>
         )
       }
-      to="/market?section=orders"
+      to="/market/orders"
       openLabel={t('overview.board.open')}
       footer={
         needsReauth ? (

@@ -352,7 +352,7 @@ export function Overview() {
     {
       key: 'orders',
       domain: t('overview.board.orders'),
-      to: '/market?section=orders',
+      to: '/market/orders',
       severity: ordersSeverity(orderRows, ordersNeedReauth),
       summary: ordersSummary(t, orderRows, ordersNeedReauth),
       render: () => (

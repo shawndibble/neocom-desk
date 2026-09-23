@@ -7,14 +7,14 @@ describe('notificationUrlForSubject', () => {
     expect(notificationUrlForSubject('walletBalanceChanged', 77)).toEqual(
       '/wallet/journal?highlight=77'
     );
-    expect(notificationUrlForSubject('marketOrderFilled', 34)).toEqual(
-      '/market?section=transactions&highlight=34'
-    );
   });
 
   it('appends it to a route that carries none, without inventing a second `?`', () => {
     expect(notificationUrlForSubject('industryJobComplete', 9)).toEqual('/industry?highlight=9');
     expect(notificationUrlForSubject('corpMemberJoined', 12)).toEqual('/corp/members?highlight=12');
+    expect(notificationUrlForSubject('marketOrderFilled', 34)).toEqual(
+      '/market/history/transactions?highlight=34'
+    );
     // A path, not a `?tab=` query, is what picks History now (ADR 0015).
     expect(notificationUrlForSubject('contractAccepted', 5)).toEqual(
       '/contracts/history?highlight=5'

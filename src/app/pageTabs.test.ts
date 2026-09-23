@@ -6,7 +6,7 @@ describe('routePatternFor', () => {
     expect(routePatternFor('/contacts')).toBe('/contacts/*');
     expect(routePatternFor('/wallet')).toBe('/wallet/*');
     expect(routePatternFor('/industry')).toBe('/industry/*');
-    expect(routePatternFor('/market')).toBe('/market');
+    expect(routePatternFor('/skills')).toBe('/skills');
   });
 });
 
@@ -56,7 +56,7 @@ describe('tabbedPagePathFor', () => {
     expect(tabbedPagePathFor('/contacts/nope')).toBe('/contacts');
     expect(tabbedPagePathFor('/wallet/journal')).toBe('/wallet/journal');
     expect(tabbedPagePathFor('/wallet')).toBe('/wallet');
-    expect(tabbedPagePathFor('/market')).toBeNull();
+    expect(tabbedPagePathFor('/skills')).toBeNull();
   });
 });
 
@@ -67,7 +67,7 @@ describe('isTabRedirectPath', () => {
     expect(isTabRedirectPath('/contacts/across')).toBe(false);
     expect(isTabRedirectPath('/wallet')).toBe(true);
     expect(isTabRedirectPath('/wallet/journal')).toBe(false);
-    expect(isTabRedirectPath('/market')).toBe(false);
+    expect(isTabRedirectPath('/skills')).toBe(false);
   });
 });
 

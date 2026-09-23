@@ -386,7 +386,7 @@ export function LoyaltyStore() {
 
   function viewInMarket(typeId: number) {
     const params = buildMarketParams(typeId, { mode: 'hub', hubId: hub.id });
-    navigate(`/market?${new URLSearchParams(params).toString()}`);
+    navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
   }
 
   function planInIndustry(productTypeId: number) {

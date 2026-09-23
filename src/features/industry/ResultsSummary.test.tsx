@@ -75,7 +75,7 @@ function renderSummary(overrides: Partial<Parameters<typeof ResultsSummary>[0]> 
             />
           }
         />
-        <Route path="/market" element={<p>Market Browser</p>} />
+        <Route path="/market/browser" element={<p>Market Browser</p>} />
       </Routes>
     </MemoryRouter>
   );

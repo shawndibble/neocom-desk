@@ -28,7 +28,7 @@ export function ImplantChip({ typeId, name, description }: ImplantChipProps) {
       type="button"
       onClick={() => {
         const params = marketLinkParams(typeId, location.search);
-        navigate(`/market?${new URLSearchParams(params).toString()}`);
+        navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
       }}
       className="flex items-center gap-1.5 rounded-xs border border-line bg-panel-2 px-2 py-0.5 text-xs hover:border-line-bright focus-visible:outline-2 focus-visible:outline-accent"
     >

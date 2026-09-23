@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactElement } from 'react';
+import { useCallback, useMemo, type ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -26,16 +26,19 @@ import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { orderHistoryCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrderHistory } from '@/esi/endpoints';
 import { HistoryViewSelect, type HistoryView } from './HistoryViewSelect';
 import {
   activeHistoryFilterCount,
-  EMPTY_HISTORY_FILTER,
   filterHistory,
+  HISTORY_FILTER_PARAMS,
   type HistoryFilter,
 } from './orderHistoryFilter';
+
+const HISTORY_SORT = { columnId: 'issued', direction: 'desc' } as const;
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
@@ -156,7 +159,22 @@ export function OrderHistoryPanel({
     (typeId: number) => typeNames.get(typeId) ?? `Type #${typeId}`,
     [typeNames]
   );
-  const [filter, setFilter] = useState<HistoryFilter>(EMPTY_HISTORY_FILTER);
+  const [urlFilter, setUrlFilter] = useUrlParams(HISTORY_FILTER_PARAMS);
+  const filter = useMemo<HistoryFilter>(
+    () => ({
+      text: urlFilter['history.q'],
+      side: urlFilter['history.side'],
+      state: urlFilter['history.state'],
+    }),
+    [urlFilter]
+  );
+  function setFilter(next: HistoryFilter) {
+    setUrlFilter({
+      'history.q': next.text,
+      'history.side': next.side,
+      'history.state': next.state,
+    });
+  }
 
   const history = useMemo(
     () => [...(historyResult?.data ?? [])].sort((a, b) => b.issued.localeCompare(a.issued)),
@@ -219,6 +237,11 @@ export function OrderHistoryPanel({
       },
     ],
     [t, typeNames]
+  );
+  const sortProps = useUrlSort(
+    'history.sort',
+    HISTORY_SORT,
+    columns.map((column) => column.id)
   );
 
   /** Same menu the Appraisal ledger carries — an order-history row names an item like any other. */
@@ -347,6 +370,7 @@ export function OrderHistoryPanel({
               rowKey={(order) => order.order_id}
               label={t('orders.historyTab')}
               rowContextMenu={rowContextMenu}
+              {...sortProps}
             />
           )}
         </>

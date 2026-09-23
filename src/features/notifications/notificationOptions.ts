@@ -64,7 +64,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // written down — what sold, how many, for how much, to whom.
   // `notificationUrlForSubject` adds `?highlight=` where the fire knows its
   // subject, which pulses that row on arrival.
-  marketOrderFilled: '/market?section=transactions',
+  marketOrderFilled: '/market/history/transactions',
   // ~100 EVE-native types (issue #274), most with no corresponding page in
   // the app. `/alerts` is a deliberate choice for this event rather than an
   // inherited default — and now a real destination rather than a shrug: the
@@ -83,7 +83,7 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // item-selection param (`engine/market/urlState.ts`'s `buildMarketParams`),
   // not `HIGHLIGHT_PARAM`: Market Browser selects an item by that param on
   // load rather than pulsing a table row.
-  priceAlertTriggered: '/market',
+  priceAlertTriggered: '/market/browser',
 };
 
 export const NOTIFICATION_FALLBACK_ROUTE = '/alerts';

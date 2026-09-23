@@ -191,7 +191,7 @@ describe('Market top-level tabs', () => {
   });
 
   it('clicking a linked item name from Open Orders lands on the Market Browser tab', async () => {
-    window.history.pushState({}, '', '/market?section=orders');
+    window.history.pushState({}, '', '/market/orders');
     const user = userEvent.setup();
     render(<App />);
 
@@ -208,7 +208,7 @@ describe('Market top-level tabs', () => {
   });
 
   it('opens the Transactions view from a deep link, with History still the selected tab', async () => {
-    window.history.pushState({}, '', '/market?section=transactions');
+    window.history.pushState({}, '', '/market/history/transactions');
     const user = userEvent.setup();
     render(<App />);
 
@@ -231,8 +231,8 @@ describe('Market top-level tabs', () => {
 });
 
 describe('Market Open Orders tab', () => {
-  it('shows open orders directly via a ?section= deep link, with resolved item name', async () => {
-    window.history.pushState({}, '', '/market?section=orders');
+  it('shows open orders directly via a /market/orders deep link, with resolved item name', async () => {
+    window.history.pushState({}, '', '/market/orders');
     const user = userEvent.setup();
     render(<App />);
     // The fixture order has no problems, so it lands in the Healthy group,
@@ -256,7 +256,7 @@ describe('Market Open Orders tab', () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders`, () => HttpResponse.error())
     );
-    window.history.pushState({}, '', '/market?section=orders');
+    window.history.pushState({}, '', '/market/orders');
     const user = userEvent.setup();
     render(<App />);
     await user.click(await screen.findByRole('button', { name: 'Show healthy orders' }));
@@ -270,7 +270,7 @@ describe('Market Open Orders tab', () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/orders`, () => HttpResponse.error())
     );
-    window.history.pushState({}, '', '/market?section=orders');
+    window.history.pushState({}, '', '/market/orders');
     render(<App />);
     expect(await screen.findByText(/no open orders cached/i)).toBeInTheDocument();
   });
@@ -281,7 +281,7 @@ describe('Market Open Orders tab', () => {
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })
       )
     );
-    window.history.pushState({}, '', '/market?section=orders');
+    window.history.pushState({}, '', '/market/orders');
     render(<App />);
     // The banner is now per character, since this page covers every selling
     // character at once — title is prefixed with the character's name.
@@ -298,8 +298,8 @@ describe('Market Open Orders tab', () => {
 });
 
 describe('Market History tab', () => {
-  it('shows order history directly via a ?section= deep link', async () => {
-    window.history.pushState({}, '', '/market?section=history');
+  it('shows order history directly via a /market/history deep link', async () => {
+    window.history.pushState({}, '', '/market/history');
     render(<App />);
     expect(await screen.findByText('expired')).toBeInTheDocument();
   });
@@ -316,7 +316,7 @@ describe('Market History tab', () => {
         HttpResponse.error()
       )
     );
-    window.history.pushState({}, '', '/market?section=history');
+    window.history.pushState({}, '', '/market/history');
     render(<App />);
     expect(await screen.findByText('expired')).toBeInTheDocument();
     expect(screen.getByText(/showing cached data/i)).toBeInTheDocument();
@@ -328,7 +328,7 @@ describe('Market History tab', () => {
         HttpResponse.json({ error: 'missing scope' }, { status: 403 })
       )
     );
-    window.history.pushState({}, '', '/market?section=history');
+    window.history.pushState({}, '', '/market/history');
     render(<App />);
     expect(await screen.findByText('Log in again to see your orders')).toBeInTheDocument();
     expect(screen.queryByText(/no order history cached/i)).not.toBeInTheDocument();
@@ -336,8 +336,8 @@ describe('Market History tab', () => {
 });
 
 describe('Market Transactions tab', () => {
-  it('shows transactions with SDE item names resolved, directly via a ?section= deep link', async () => {
-    window.history.pushState({}, '', '/market?section=transactions');
+  it('shows transactions with SDE item names resolved, directly via a /market/history/transactions deep link', async () => {
+    window.history.pushState({}, '', '/market/history/transactions');
     render(<App />);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
     expect(screen.getByText('Sell')).toBeInTheDocument();
@@ -347,7 +347,7 @@ describe('Market Transactions tab', () => {
     const scrollIntoView = vi
       .spyOn(Element.prototype, 'scrollIntoView')
       .mockImplementation(() => {});
-    window.history.pushState({}, '', '/market?section=transactions&highlight=34');
+    window.history.pushState({}, '', '/market/history/transactions?highlight=34');
     render(<App />);
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
@@ -372,7 +372,7 @@ describe('Market Transactions tab', () => {
   it('pulses nothing when the item has no sell of its own to point at', async () => {
     // Type 35 is in the list, but only as a buy — and the alert only ever
     // fires for a filled *sell* order.
-    window.history.pushState({}, '', '/market?section=transactions&highlight=35');
+    window.history.pushState({}, '', '/market/history/transactions?highlight=35');
     render(<App />);
 
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
@@ -385,7 +385,7 @@ describe('Market Transactions tab', () => {
   });
 
   it('signs and colors transaction totals: buy negative red, sell positive green', async () => {
-    window.history.pushState({}, '', '/market?section=transactions');
+    window.history.pushState({}, '', '/market/history/transactions');
     render(<App />);
 
     const sellTotal = await screen.findByText('500.00');
@@ -403,7 +403,7 @@ describe('Market Transactions tab', () => {
         return HttpResponse.json([{ ...transactions[0], transaction_id: 1000 - calls }]);
       })
     );
-    window.history.pushState({}, '', '/market?section=transactions');
+    window.history.pushState({}, '', '/market/history/transactions');
     render(<App />);
 
     // Five identical Tritanium fills come back, one per page.
@@ -420,7 +420,7 @@ describe('Market Transactions tab', () => {
       value: transactions,
       fetchedAt: STALE_FETCHED_AT,
     });
-    window.history.pushState({}, '', '/market?section=transactions');
+    window.history.pushState({}, '', '/market/history/transactions');
     const user = userEvent.setup();
     render(<App />);
 
@@ -444,7 +444,7 @@ describe('Market Transactions tab', () => {
         HttpResponse.error()
       )
     );
-    window.history.pushState({}, '', '/market?section=transactions');
+    window.history.pushState({}, '', '/market/history/transactions');
     render(<App />);
     expect(await screen.findByText(/no transactions cached/i)).toBeInTheDocument();
   });

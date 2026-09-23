@@ -1,4 +1,5 @@
 import type { MarketOrderHistory } from '@/esi/endpoints';
+import { optionalEnumParam, textParam } from '@/lib/urlState';
 
 export interface HistoryFilter {
   text: string;
@@ -7,6 +8,16 @@ export interface HistoryFilter {
 }
 
 export const EMPTY_HISTORY_FILTER: HistoryFilter = { text: '', side: null, state: null };
+
+/**
+ * The History tab's filter bar, in the URL (ADR 0015), scoped `history.*` so
+ * it can never collide with another panel's params on `/market/history`.
+ */
+export const HISTORY_FILTER_PARAMS = {
+  'history.q': textParam(),
+  'history.side': optionalEnumParam<'buy' | 'sell'>(['buy', 'sell']),
+  'history.state': optionalEnumParam<MarketOrderHistory['state']>(['cancelled', 'expired']),
+};
 
 export function filterHistory(
   history: readonly MarketOrderHistory[],
