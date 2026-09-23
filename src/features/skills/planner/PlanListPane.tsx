@@ -10,6 +10,7 @@ import {
   VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
 } from '@/lib/useViewportBoundedHeight';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import { newPlan } from './newPlan';
 import { PlanList } from './PlanList';
 import type { RemapAvailability } from './remapAvailability';
 
@@ -28,17 +29,6 @@ interface PlanListPaneProps {
    */
   height?: 'viewport' | 'sidebar';
   className?: string;
-}
-
-function newPlan(characterId: number, name: string, remapCount = 0): SkillPlanRecord {
-  return {
-    id: crypto.randomUUID(),
-    characterId,
-    name,
-    entries: [],
-    remapCount,
-    updatedAt: Date.now(),
-  };
 }
 
 /**
