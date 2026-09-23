@@ -122,6 +122,12 @@
 // another value, never unset" shape as the Defaults-panel preferences above
 // (0 is a value, not an absence), so the tombstone-expiry edge does not bite
 // it. No `legacyKey`: new, with no device-local life to seed from.
+//
+// sync.skillCloneStates (issue #1233): each Character's Clone State, Alpha or
+// Omega — ESI does not report it. A `Record<characterId, 'alpha'>` blob like
+// sync.industryBuildGroups, for the same exact-match reason; Omega is the
+// absent entry, and the key is never deleted, so the tombstone-expiry edge
+// does not bite it. See features/skills/cloneState.ts.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpDarkAfterDays',
   'sync.defaultCharacterFilter',
@@ -137,6 +143,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.notificationFeedPrefs',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
+  'sync.skillCloneStates',
   'sync.spExtractionMonitoringEnabled',
   'sync.spExtractionThresholdSp',
 ];

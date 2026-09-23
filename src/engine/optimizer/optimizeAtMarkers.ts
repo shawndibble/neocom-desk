@@ -18,7 +18,7 @@ import {
 import type { PlaceRemapsResult, RemapSegment } from '@/engine/optimizer/placeRemaps';
 import { computeSchedule } from '@/engine/schedule';
 import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
-import type { Attributes, EngineSkill, Implants, PlanStep } from '@/engine/types';
+import type { Attributes, CloneState, EngineSkill, Implants, PlanStep } from '@/engine/types';
 
 export interface OptimizeAtMarkersOptions {
   /** Step indices where the user will remap ("remap before step i"). */
@@ -38,6 +38,11 @@ export interface OptimizeAtMarkersOptions {
    * collapse onto the same cut, the first one's override wins.
    */
   manualAttributes?: readonly (Attributes | null)[];
+  /**
+   * Omit for Omega. Only the costing changes: halving every rate leaves the
+   * best spread for a segment the same, so the allocation search ignores it.
+   */
+  cloneState?: CloneState;
 }
 
 export function optimizeAtMarkers(
@@ -45,7 +50,14 @@ export function optimizeAtMarkers(
   skills: ReadonlyMap<number, EngineSkill>,
   options: OptimizeAtMarkersOptions
 ): PlaceRemapsResult {
-  const { markers, currentAttributes, implants = {}, booster, manualAttributes } = options;
+  const {
+    markers,
+    currentAttributes,
+    implants = {},
+    booster,
+    manualAttributes,
+    cloneState,
+  } = options;
 
   if (steps.length === 0) {
     return { segments: [], totalSeconds: 0, currentSeconds: 0, savingsSeconds: 0 };
@@ -65,7 +77,7 @@ export function optimizeAtMarkers(
       const startDate = new Date(booster!.startDate.getTime() + elapsedSeconds * 1000);
       return computeSchedule(
         steps.slice(start, end),
-        { attributes: attrs, implants, boosters: liveBoosters, startDate },
+        { attributes: attrs, implants, boosters: liveBoosters, startDate, cloneState },
         skills
       ).reduce((acc, s) => acc + s.seconds, 0);
     }
@@ -75,7 +87,8 @@ export function optimizeAtMarkers(
       const sp = spBetween(skill.rank, step.level - 1, step.level);
       const rate = trainingRate(
         attrs[skill.primary] + (implants[skill.primary] ?? 0),
-        attrs[skill.secondary] + (implants[skill.secondary] ?? 0)
+        attrs[skill.secondary] + (implants[skill.secondary] ?? 0),
+        cloneState
       );
       return acc + timeToTrain(sp, rate);
     }, 0);

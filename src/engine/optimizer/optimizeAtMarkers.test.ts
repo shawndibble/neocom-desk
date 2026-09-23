@@ -284,3 +284,45 @@ describe('optimizeAtMarkers', () => {
     });
   });
 });
+
+describe('optimizeAtMarkers clone state', () => {
+  it('doubles every Alpha segment when no Booster is live', () => {
+    const omega = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
+      markers: [3],
+      currentAttributes: CURRENT,
+    });
+    const alpha = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
+      markers: [3],
+      currentAttributes: CURRENT,
+      cloneState: 'alpha',
+    });
+    expect(alpha.currentSeconds).toBeCloseTo(2 * omega.currentSeconds, 6);
+    expect(alpha.totalSeconds).toBeCloseTo(2 * omega.totalSeconds, 6);
+    expect(alpha.segments.map((s) => s.attributes)).toEqual(
+      omega.segments.map((s) => s.attributes)
+    );
+  });
+
+  it('matches computeSchedule for an Alpha baseline with a Booster live', async () => {
+    const { computeSchedule } = await import('@/engine/schedule');
+    const START = new Date('2026-08-30T00:00:00Z');
+    const boosters = [
+      {
+        bonus: { intelligence: 10, memory: 10 },
+        expiresAt: new Date(START.getTime() + 20_000_000),
+      },
+    ];
+    const alpha = optimizeAtMarkers(TWO_PHASE_STEPS, TWO_PHASE_SKILLS, {
+      markers: [3],
+      currentAttributes: CURRENT,
+      booster: { boosters, startDate: START },
+      cloneState: 'alpha',
+    });
+    const baseline = computeSchedule(
+      TWO_PHASE_STEPS,
+      { attributes: CURRENT, boosters, startDate: START, cloneState: 'alpha' },
+      TWO_PHASE_SKILLS
+    );
+    expect(alpha.currentSeconds).toBeCloseTo(baseline[baseline.length - 1].cumulativeSeconds, 4);
+  });
+});

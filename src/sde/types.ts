@@ -22,6 +22,8 @@ export interface SkillType {
   primaryAttr: CharacterAttribute;
   secondaryAttr: CharacterAttribute;
   prereqs: SkillPrereq[];
+  /** Highest level an Alpha clone can train; absent when Alphas cannot train it. */
+  alphaMaxLevel?: number;
 }
 
 export interface BlueprintQuantity {

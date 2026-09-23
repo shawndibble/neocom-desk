@@ -153,6 +153,10 @@ here — they go one per file in `docs/context/decisions/`.
   rail's countdown and glyph, one dot per kind in the **Calendar Map**, a
   segment in the **Day Ticker**, and a swatch in the filter menu, which is the
   legend for the set. Never the only signal: the kind is always also named.
+- **Clone State**: Whether a Character is **Alpha** or **Omega**. ESI does
+  not expose it (see **Character Not Training**), so the pilot sets it per
+  Character. Alpha trains at half the Omega SP rate and cannot train past
+  each skill's **Alpha cap** (the SDE's clone-grade skill levels).
 - **Coming Up Rail**: The `/calendar` list beside the **Calendar Map**: every
   **Character Board Item** the pilot can read, deadline-ordered under relative
   day headings, each row carrying a countdown. The half of the page that

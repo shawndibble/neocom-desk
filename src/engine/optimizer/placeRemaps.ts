@@ -45,7 +45,7 @@ import {
 } from '@/engine/optimizer/bestAttributes';
 import { computeSchedule } from '@/engine/schedule';
 import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
-import type { Attributes, EngineSkill, Implants, PlanStep } from '@/engine/types';
+import type { Attributes, CloneState, EngineSkill, Implants, PlanStep } from '@/engine/types';
 
 export interface RemapSegment {
   /** First step of the segment (inclusive). */
@@ -76,6 +76,12 @@ export interface PlaceRemapsOptions {
    * costing — every existing caller and test does, and that path is untouched.
    */
   booster?: BoosterContext;
+  /**
+   * Omit for Omega. Applied to the no-remap baseline and to every remapped
+   * branch alike — pricing only one side at the Alpha rate reports savings
+   * that do not exist.
+   */
+  cloneState?: CloneState;
 }
 
 /**
@@ -114,7 +120,7 @@ export function placeRemaps(
   skills: ReadonlyMap<number, EngineSkill>,
   options: PlaceRemapsOptions
 ): PlaceRemapsResult {
-  const { remapCount, currentAttributes, implants = {}, booster } = options;
+  const { remapCount, currentAttributes, implants = {}, booster, cloneState } = options;
 
   const liveBoosters =
     booster?.boosters.filter((b) => b.expiresAt.getTime() > booster.startDate.getTime()) ?? [];
@@ -143,6 +149,7 @@ export function placeRemaps(
             implants,
             boosters: [...liveBoosters],
             startDate: booster!.startDate,
+            cloneState,
           },
           skills
         ).map((s) => s.seconds)
@@ -157,7 +164,8 @@ export function placeRemaps(
     const sp = spBetween(skill.rank, step.level - 1, step.level);
     const rate = trainingRate(
       currentAttributes[skill.primary] + (implants[skill.primary] ?? 0),
-      currentAttributes[skill.secondary] + (implants[skill.secondary] ?? 0)
+      currentAttributes[skill.secondary] + (implants[skill.secondary] ?? 0),
+      cloneState
     );
     const seconds = boostedStepSeconds ? boostedStepSeconds[index] : timeToTrain(sp, rate);
     currentSeconds += seconds;
@@ -261,7 +269,8 @@ export function placeRemaps(
         {
           boosters: liveBoosters,
           startDate: new Date(booster!.startDate.getTime() + startSeconds * 1000),
-        }
+        },
+        cloneState
       );
       boostedCost.set(key, result);
     }
@@ -297,7 +306,7 @@ export function placeRemaps(
         i,
         runCount,
         currentPrefix[i],
-        bestAttributesForPairs(spByPair, implants)
+        bestAttributesForPairs(spByPair, implants, cloneState)
       );
       const total = currentPrefix[i] + best.seconds;
       if (total <= bestSeconds) {
@@ -341,7 +350,7 @@ export function placeRemaps(
   const runPair = runs.map((run) => pairIndex.get(run.pair)!);
   /** Exclusive end step of every run — the boosted pass always wants a suffix of this. */
   const runEnds = runs.map((run) => run.endStep + 1);
-  const table = allocationCostTable(pairKeys, implants);
+  const table = allocationCostTable(pairKeys, implants, cloneState);
   const { secondsPerSp, width } = table;
 
   /**
@@ -354,7 +363,7 @@ export function placeRemaps(
     for (let r = i; r < j; r++) {
       spByPair.set(runs[r].pair, (spByPair.get(runs[r].pair) ?? 0) + runs[r].sp);
     }
-    return bestAttributesForPairs(spByPair, implants);
+    return bestAttributesForPairs(spByPair, implants, cloneState);
   };
 
   // dp[k][j]: min seconds for runs [0, j) using exactly k allocations after
@@ -425,7 +434,8 @@ export function placeRemaps(
             startDate: new Date(booster!.startDate.getTime() + start * 1000),
           },
           runs[i].startStep,
-          runEnds.slice(i)
+          runEnds.slice(i),
+          cloneState
         );
         for (let j = Math.max(k, i + 1); j <= runCount; j++) {
           const seg = batch[j - i - 1];
