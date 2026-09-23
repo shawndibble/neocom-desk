@@ -15,8 +15,15 @@
 import type { OpenOrderRow } from './openOrdersModel';
 import { compareOpenOrderRowsWorstFirst } from './openOrdersModel';
 import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
-import { parsePositiveInt } from '@/engine/market/urlState';
-import { boolParam, enumParam, idListParam, textParam, type UrlParamCodec } from '@/lib/urlState';
+import {
+  boolParam,
+  enumParam,
+  idListParam,
+  optionalEnumParam,
+  optionalIdParam,
+  textParam,
+  type UrlParamCodec,
+} from '@/lib/urlState';
 
 export type OpenOrdersSort = 'worstFirst' | 'expirySoonest' | 'iskTiedUp' | 'item' | 'character';
 
@@ -291,23 +298,6 @@ function enumListParam<V extends string>(values: readonly V[]): UrlParamCodec<re
   };
 }
 
-/** `V | null`, `null` being the codec's own default — there is no other default to compare against. */
-function nullableEnumParam<V extends string>(values: readonly V[]): UrlParamCodec<V | null> {
-  return {
-    parse: (raw) =>
-      raw !== null && (values as readonly string[]).includes(raw) ? (raw as V) : null,
-    serialize: (value) => value,
-  };
-}
-
-/** A positive integer, or `null` — `parsePositiveInt`'s reading, as a codec. */
-function nullablePositiveIntParam(): UrlParamCodec<number | null> {
-  return {
-    parse: (raw) => parsePositiveInt(raw),
-    serialize: (value) => (value === null ? null : String(value)),
-  };
-}
-
 /**
  * The whole filter, one key per field, scoped `orders.*` so it can never
  * collide with another panel's params on the same page (ADR 0015). Field
@@ -316,12 +306,12 @@ function nullablePositiveIntParam(): UrlParamCodec<number | null> {
  */
 export const OPEN_ORDERS_FILTER_PARAMS = {
   'orders.q': textParam(),
-  'orders.side': nullableEnumParam<'buy' | 'sell'>(['buy', 'sell']),
+  'orders.side': optionalEnumParam<'buy' | 'sell'>(['buy', 'sell']),
   'orders.characters': idListParam(),
   'orders.problems': enumListParam(FILTERABLE_PROBLEMS),
-  'orders.expiring': nullablePositiveIntParam(),
-  'orders.costBasis': nullableEnumParam<'linked' | 'missing'>(['linked', 'missing']),
-  'orders.minIsk': nullablePositiveIntParam(),
+  'orders.expiring': optionalIdParam(),
+  'orders.costBasis': optionalEnumParam<'linked' | 'missing'>(['linked', 'missing']),
+  'orders.minIsk': optionalIdParam(),
   'orders.hideHealthy': boolParam(true),
   'orders.sort': enumParam(OPEN_ORDERS_SORTS, 'worstFirst'),
 };

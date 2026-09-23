@@ -231,7 +231,7 @@ describe('Market top-level tabs', () => {
 });
 
 describe('Market Open Orders tab', () => {
-  it('shows open orders directly via a ?section= deep link, with resolved item name', async () => {
+  it('shows open orders directly via a /market/orders deep link, with resolved item name', async () => {
     window.history.pushState({}, '', '/market/orders');
     const user = userEvent.setup();
     render(<App />);
@@ -298,7 +298,7 @@ describe('Market Open Orders tab', () => {
 });
 
 describe('Market History tab', () => {
-  it('shows order history directly via a ?section= deep link', async () => {
+  it('shows order history directly via a /market/history deep link', async () => {
     window.history.pushState({}, '', '/market/history');
     render(<App />);
     expect(await screen.findByText('expired')).toBeInTheDocument();
@@ -336,7 +336,7 @@ describe('Market History tab', () => {
 });
 
 describe('Market Transactions tab', () => {
-  it('shows transactions with SDE item names resolved, directly via a ?section= deep link', async () => {
+  it('shows transactions with SDE item names resolved, directly via a /market/history/transactions deep link', async () => {
     window.history.pushState({}, '', '/market/history/transactions');
     render(<App />);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
