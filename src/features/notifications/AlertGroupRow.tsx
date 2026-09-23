@@ -186,7 +186,7 @@ function AlertFireRow({
     */
     <li className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line px-3 py-1.5 last:border-b-0 sm:flex-nowrap">
       {name !== null && (
-        <span className="order-1 max-w-24 shrink-0 truncate rounded-full bg-panel px-2 py-0.5 text-[0.625rem] font-medium text-text-dim sm:order-2 sm:max-w-none">
+        <span className="order-1 max-w-24 shrink-0 truncate rounded-xs border border-line bg-panel-2 px-1 py-0.5 text-[0.625rem] font-medium text-text-dim sm:order-2 sm:max-w-none">
           {name}
         </span>
       )}

@@ -51,7 +51,7 @@ export function RangeControl({ value, onChange, fill = false }: RangeControlProp
             type="button"
             aria-pressed={active}
             onClick={() => onChange(range)}
-            className={`border-r border-line px-3 text-xs last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${fill ? 'h-11 flex-1' : 'h-8'} ${active ? 'bg-panel-2 text-accent shadow-[inset_0_-2px_0_var(--color-accent)]' : 'text-text-dim hover:text-text'}`}
+            className={`border-r border-line px-3 text-xs last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${fill ? 'h-11 flex-1' : 'h-9'} ${active ? 'bg-panel-2 text-accent shadow-[inset_0_-2px_0_var(--color-accent)]' : 'text-text-dim hover:text-text'}`}
           >
             {t(`miningTax.overview.range.${range}`)}
           </button>
@@ -212,7 +212,7 @@ export function ValueMenu({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button type="button" className={`${triggerClassName} h-8`}>
+        <button type="button" className={`${triggerClassName} h-9`}>
           <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
             {t('miningTax.overview.valueMenu')}
           </span>
