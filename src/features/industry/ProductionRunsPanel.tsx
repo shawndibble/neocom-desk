@@ -19,6 +19,7 @@ import {
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { SkillLevels } from '@/engine/industry/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import { SourcingInput } from './MaterialsTable';
 import {
   rollupProductionRuns,
@@ -47,6 +48,8 @@ interface ProductionRunsPanelProps {
   productTypeID: number | null;
   productName: string;
   skills: SkillLevels;
+  /** The plan owner's standing toward the plan's Trade Hub NPC owner (issue #1238), for each run's realized-profit broker fee. Absent/0 = standings assumed 0. */
+  standing?: ResolvedStandings;
   /**
    * Bumped by the parent each time something outside this panel asks to log
    * a run — the hero's own "Log Production" button. A counter rather than a
@@ -87,6 +90,7 @@ export function ProductionRunsPanel({
   productTypeID,
   productName,
   skills,
+  standing,
   logRequest = 0,
 }: ProductionRunsPanelProps) {
   const { t } = useTranslation();
@@ -125,7 +129,7 @@ export function ProductionRunsPanel({
   const sale = useSaleLinking(characterId, saleLinks, orderWatches);
 
   const rows: ProductionRunSummary[] = runs.map((run) =>
-    summarizeProductionRun(run, saleLinks, orderWatches, skills)
+    summarizeProductionRun(run, saleLinks, orderWatches, skills, standing)
   );
 
   const editingRow = editingRunId ? rows.find((r) => r.run.id === editingRunId) : undefined;
@@ -214,7 +218,7 @@ export function ProductionRunsPanel({
       sortValue: (r) => r.profit.grossRevenue,
       render: (r) => formatIsk(r.profit.grossRevenue),
     },
-    realizedProfitColumn(t, skills),
+    realizedProfitColumn(t, skills, () => standing),
     quantitySoldColumn(t),
     statusColumn(t),
     soldActionsColumn(sale),

@@ -23,6 +23,7 @@
 import { getHubPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
 import type { SkillLevels } from '@/engine/industry/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import { loadMarketSnapshot } from './marketData';
@@ -73,7 +74,9 @@ export async function runMarketWideScan(
   trees: MarketWideTreeMap,
   catalog: BlueprintCatalog,
   skills: SkillLevels,
-  options: MarketWideScanOptions = {}
+  options: MarketWideScanOptions = {},
+  /** The character's standing toward `hub`'s NPC owner (issue #1238). Absent/0 = standings assumed 0. */
+  standing?: ResolvedStandings
 ): Promise<MarketWideResultRow[]> {
   const floorIsk = options.liquidityFloorIsk ?? DEFAULT_LIQUIDITY_FLOOR_ISK;
   const topN = options.topNPerMarketGroup ?? DEFAULT_TOP_N_PER_MARKET_GROUP;
@@ -133,6 +136,7 @@ export async function runMarketWideScan(
     adjustedPrices: snapshot.adjustedPrices ?? {},
     systemCostIndex: snapshot.systemCostIndex ?? 0,
     skills,
+    standing,
   };
 
   const rows = computeMarketWideRows(marketWideCandidates, materialPrices, feeContext);

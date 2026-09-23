@@ -508,6 +508,7 @@ export function Industry() {
                 trees={marketWideTrees}
                 catalog={catalog}
                 skills={skills}
+                activeCharacterId={activeCharacterId}
                 onStartPlan={(entry) => {
                   // Distinct from the plain search-box create: picking a
                   // scan result is an explicit "go build this" choice, same

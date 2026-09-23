@@ -19,6 +19,7 @@ import type {
   ReactionFacilityContext,
   SkillLevels,
 } from '@/engine/industry/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import type { SubBuildContext } from '@/engine/industry/subBuild';
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type { BuildPlanRecord } from '@/db';
@@ -46,6 +47,12 @@ export interface ComputeBuildPlanInput {
   /** The plan's material price basis, already resolved by `priceBasis.ts`. */
   materialPrices?: HubPrices;
   skills: SkillLevels;
+  /**
+   * The plan owner's standing toward the plan's Trade Hub NPC owner, for the
+   * broker fee and break-even price (issue #1238). Absent/0 = standings
+   * assumed 0, today's behaviour.
+   */
+  standing?: ResolvedStandings;
   /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
   implantBonusPct?: number;
   /** What produces a material, for anything `plan.buildHere` might name at any depth. */
@@ -86,6 +93,7 @@ export function computeBuildPlan({
   hubPrices,
   materialPrices,
   skills,
+  standing,
   implantBonusPct,
   recipeFor,
   acquisitionFor,
@@ -123,6 +131,7 @@ export function computeBuildPlan({
         ? withoutOwnedQuantities(plan.materialSourcing)
         : plan.materialSourcing,
       skills,
+      standing,
       implantBonusPct,
       buildHere: plan.buildHere,
       recipeFor,

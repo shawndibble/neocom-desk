@@ -27,6 +27,7 @@ import type {
   MaterialSourcingMap,
   SkillLevels,
 } from '@/engine/industry/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import {
   loyaltyOfferProfit,
   rankByIskPerLp,
@@ -109,6 +110,14 @@ export interface LoyaltyOfferComputeInputs {
    */
   liquidationBasis: LiquidationBasis;
   /**
+   * The character's standing toward the configured Trade Hub's NPC owner
+   * (issue #1238). LP store offers carry no issuing-corp home station in this
+   * app's data, so every offer here prices against the same configured hub
+   * `hubPrices`/`revenueHubPrices` already use, rather than the corp's own
+   * station. Absent/0 = standings assumed 0.
+   */
+  standing?: ResolvedStandings;
+  /**
    * Which blueprint offers (by `offer_id`) should price their build against
    * `materialSourcing` rather than buying every material at the hub — the "use
    * my own materials" toggle is per-offer, not global, since the sourcing map
@@ -185,6 +194,7 @@ function computeBlueprintRow(
     hubPrices: inputs.hubPrices,
     materialSourcing: useOwnMaterials ? inputs.materialSourcing : undefined,
     skills: inputs.skills,
+    standing: inputs.standing,
   });
 
   // Priced separately from `build.revenue` (which is always `hubPrices`,
@@ -218,6 +228,7 @@ function computeBlueprintRow(
     playerLp: inputs.playerLp,
     liquidationBasis: inputs.liquidationBasis,
     skills: inputs.skills,
+    standing: inputs.standing,
   });
 
   return {
@@ -251,6 +262,7 @@ function computeItemRow(
     playerLp: inputs.playerLp,
     liquidationBasis: inputs.liquidationBasis,
     skills: inputs.skills,
+    standing: inputs.standing,
   });
   return {
     offer,
