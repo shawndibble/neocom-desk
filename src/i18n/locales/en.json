@@ -1591,7 +1591,7 @@
       "totalValueStat": "Total value",
       "totalValueRefinedSubtitle": "Refined:",
       "iskPerHourStat": "ISK/hr",
-      "iskPerHourBasisHint": "Averaged over the date range, not active mining time — ESI's ledger has no time of day.",
+      "iskPerHourBasisHint": "Averaged over the date range",
       "volumeStat": "Volume mined",
       "dateRangeStat": "Date range",
       "daysMinedStat": "Days mined",
