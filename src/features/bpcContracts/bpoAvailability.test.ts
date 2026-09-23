@@ -11,6 +11,7 @@ import {
   cheapestBpoByType,
   cheapestBpoSourcesByType,
   cheapestComparableCopy,
+  cheapestSourcingCard,
   marketBpoOffers,
   type BpoAvailabilityInput,
 } from './bpoAvailability';
@@ -318,5 +319,41 @@ describe('bpoBadgeRows', () => {
     });
     const bpo = contractRowToSearchRow(original({ typeId: CARACAL_BP }));
     expect([...bpoBadgeRows([bpo, owned])]).toEqual([owned]);
+  });
+});
+
+describe('cheapestSourcingCard', () => {
+  it('keeps the region highlight when no BPO is strictly cheaper', () => {
+    expect(cheapestSourcingCard(100_000, [{ kind: 'market', price: 1_700_000 }])).toBe('region');
+    expect(cheapestSourcingCard(100_000, [{ kind: 'contract', price: 100_000 }])).toBe('region');
+  });
+
+  it('moves the highlight to a BPO only when it is the cheapest box in the row', () => {
+    expect(
+      cheapestSourcingCard(2_000_000, [
+        { kind: 'market', price: 1_700_000 },
+        { kind: 'contract', price: 11_900_000 },
+      ])
+    ).toBe('market');
+    expect(
+      cheapestSourcingCard(2_000_000, [
+        { kind: 'market', price: 1_900_000 },
+        { kind: 'contract', price: 1_500_000 },
+      ])
+    ).toBe('contract');
+  });
+
+  it('compares the BPO cards between themselves when no region cells show', () => {
+    expect(
+      cheapestSourcingCard(null, [
+        { kind: 'market', price: 3 },
+        { kind: 'contract', price: 2 },
+      ])
+    ).toBe('contract');
+  });
+
+  it('highlights nothing when the row holds a single box', () => {
+    expect(cheapestSourcingCard(null, [{ kind: 'market', price: 1 }])).toBeNull();
+    expect(cheapestSourcingCard(null, [])).toBeNull();
   });
 });

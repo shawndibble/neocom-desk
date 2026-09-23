@@ -1029,10 +1029,22 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       await waitFor(() => expect(marketCard).toHaveTextContent('Jita 0.9'));
       expect(marketCard).not.toHaveTextContent('Jita IV - Moon 4');
       expect(marketCard).not.toHaveTextContent('The Forge');
-      // 2M is at or below the cheapest copy (3M); 40M is not.
-      expect(marketCard).toHaveTextContent('BPO may be cheaper');
+      // 2M is at or below the cheapest copy (3M); 40M is not. Said on the
+      // price itself (accent + hint), not as an extra line.
+      expect(
+        within(marketCard).getByRole('button', { name: 'BPO may be cheaper' })
+      ).toBeInTheDocument();
       expect(within(contractCard).getByLabelText('40,000,000.00 ISK')).toBeInTheDocument();
-      expect(contractCard).toHaveTextContent('BPO');
+      // The group header names the source: no per-card "BPO" cue line, so
+      // the card is as tall as a region card (three lines).
+      expect(within(contractCard).queryByText('BPO')).not.toBeInTheDocument();
+      expect(contractCard.children).toHaveLength(3);
+      // Accent only on the cheapest box in the row: the 2M market BPO beats
+      // every copy (3M+) and the 40M contract BPO, so it alone is lit.
+      expect(marketCard).toHaveClass('border-accent-dim');
+      expect(contractCard).not.toHaveClass('border-accent-dim');
+      expect(contractCard).not.toHaveClass('bg-accent/10');
+      expect(marketCard.children).toHaveLength(3);
       expect(contractCard).toHaveTextContent('ME 8 / TE 16');
       await waitFor(() => expect(contractCard).toHaveTextContent('Jita 0.9'));
       expect(contractCard).not.toHaveTextContent('Jita IV - Moon 4');

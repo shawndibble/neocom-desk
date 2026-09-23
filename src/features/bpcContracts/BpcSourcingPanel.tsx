@@ -74,6 +74,7 @@ import {
   cheaperBpo,
   cheapestBpoSourcesByType,
   cheapestComparableCopy,
+  cheapestSourcingCard,
   type BpoOffer,
   marketBpoOffers,
 } from '@/features/bpcContracts/bpoAvailability';
@@ -998,6 +999,13 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
     () => (selectedTypeId === null ? [] : cheapestByRegion(filteredRows)),
     [selectedTypeId, filteredRows]
   );
+  // One accent for the whole row: the leading region cell, or a BPO card
+  // only when it is strictly the cheapest box shown (region cells render
+  // only when there are two or more regions).
+  const cheapestCard = cheapestSourcingCard(
+    regionPrices.length > 1 ? regionPrices[0].cheapest : null,
+    selectedBpoCards
+  );
 
   const bpcColumnsById = useMemo<Record<BpcSearchColumnId, DataTableColumn<BpcSearchRow>>>(
     () => ({
@@ -1506,13 +1514,20 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
                         className={cx(
                           'flex flex-col gap-0.5 rounded-xs border bg-panel-2 px-2.5 py-2',
                           SOURCING_CARD_WIDTH,
-                          index === 0 ? 'border-accent-dim' : 'border-line'
+                          index === 0 && cheapestCard === 'region'
+                            ? 'border-accent-dim'
+                            : 'border-line'
                         )}
                       >
                         <span className="truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                           {regionNames.get(region.regionId) ?? `#${region.regionId}`}
                         </span>
-                        <span className={cx('text-sm tabular-nums', index === 0 && 'text-accent')}>
+                        <span
+                          className={cx(
+                            'text-sm tabular-nums',
+                            index === 0 && cheapestCard === 'region' && 'text-accent'
+                          )}
+                        >
                           <IskAmount value={region.cheapest} revealOn="tap" />
                         </span>
                         <span className="text-[0.6875rem] tabular-nums text-text-dim">
@@ -1536,6 +1551,7 @@ export function BpcSourcingPanel({ initialTypeId = null }: BpcSourcingPanelProps
                       <BpoCard
                         bpo={bpo}
                         mayBeCheaper={cheapestCopy !== null && bpoMayBeCheaper(bpo, cheapestCopy)}
+                        cheapest={cheapestCard === bpo.kind}
                         location={bpoCardLocations.get(bpo.locationId)}
                         className={SOURCING_CARD_WIDTH}
                       />

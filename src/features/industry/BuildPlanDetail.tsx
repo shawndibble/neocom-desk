@@ -645,6 +645,13 @@ export function BuildPlanDetail({
   // `MarketWideOpportunitiesPanel` both follow.
   const skillGateCharacterIds = [...characterNames.keys()];
   const accountSkills = useAccountSkillLevels(skillGateCharacterIds);
+  // Materials the most recent Auto Build pass routed to buy specifically for
+  // a skill gate (issue #1231's "and says why") — those rows leave
+  // `visibleMaterials`'s sub-build set, so the marker below must be told
+  // about them separately rather than losing the reason a pilot just saw.
+  const [autoBuildSkillGated, setAutoBuildSkillGated] = useState<
+    ReadonlyMap<number, Extract<SkillGateVerdict, { gated: true }>>
+  >(new Map());
   const skillGates = useMemo(() => {
     const gates = new Map<number, SkillGateVerdict>();
     for (const material of visibleMaterials) {
@@ -652,8 +659,19 @@ export function BuildPlanDetail({
       const requirements = catalog.byProductTypeID.get(material.typeID)?.blueprint.skills ?? [];
       gates.set(material.typeID, evaluateSkillGate(requirements, accountSkills));
     }
+    for (const [typeID, verdict] of autoBuildSkillGated) {
+      if (!gates.has(typeID)) gates.set(typeID, verdict);
+    }
     return gates;
-  }, [visibleMaterials, catalog, accountSkills]);
+  }, [visibleMaterials, catalog, accountSkills, autoBuildSkillGated]);
+
+  // The plan's own top-level product (issue #1231) — the header this same
+  // account-wide check used to explicitly skip (see the 2026-09-14 decision
+  // this reverses for the top-level case).
+  const topLevelSkillGate = useMemo(
+    () => evaluateSkillGate(entry?.blueprint.skills ?? [], accountSkills),
+    [entry, accountSkills]
+  );
 
   // `scopedStock` is narrowed to the plan's owned-stock scope (issue #454);
   // `detectedStock` stays the galaxy-wide picture the breakdown popover shows.
@@ -907,15 +925,21 @@ export function BuildPlanDetail({
    */
   function applyAutoBuild(options: { strategy: BuildStrategy }) {
     if (!blueprint || !makeOrBuyContext) return;
+    const gated = new Map<number, Extract<SkillGateVerdict, { gated: true }>>();
     const picked = autoBuildHere(blueprint, resolvedMe, {
       recipeFor,
-      ctx: makeOrBuyContext,
+      // Account-wide (issue #1231): a material nobody on the account can
+      // build is forced to buy regardless of cost — same `accountSkills` the
+      // sub-build marker above uses.
+      ctx: { ...makeOrBuyContext, accountSkills },
       depth: autoBuildMaxDepth,
       runs: plan.runs,
       scope: craftScopeList,
       strategy: options.strategy,
+      onSkillGated: (typeID, verdict) => gated.set(typeID, verdict),
     });
     update({ buildHere: [...picked] });
+    setAutoBuildSkillGated(gated);
   }
 
   /**
@@ -1048,6 +1072,9 @@ export function BuildPlanDetail({
           onBreakdownOpenChange={setBreakdownOpen}
           onLogProduction={() => setLogRequest((n) => n + 1)}
           logProductionDisabled={entry.productTypeID === null}
+          skillGate={topLevelSkillGate}
+          nameForSkill={(typeID) => nameForType(catalog, typeID)}
+          nameForCharacter={(characterId) => characterNames.get(characterId) ?? t('common.unknown')}
         />
       )}
 

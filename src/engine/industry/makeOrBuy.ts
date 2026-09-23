@@ -25,6 +25,7 @@ import type {
 import { EMPTY_RIG_FIT, FACILITY_PRESETS } from '@/engine/industry/types';
 import { buildVsBuy } from '@/engine/industry/buildVsBuy';
 import { sizeRuns } from '@/engine/industry/runSizing';
+import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 
 export type MakeMethod = 'manufacturing' | 'planetary' | 'reaction';
 
@@ -77,6 +78,17 @@ export interface MakeOrBuyContext {
    * `security`/`facilityTaxPct`/`systemCostIndex` above instead.
    */
   reactionFacility?: ReactionFacilityContext;
+  /**
+   * Account-wide trained skills (issue #1231), keyed by characterId — not
+   * `skills` above, which is one character's map used for job-cost math.
+   * When present, a manufacturing or reaction recipe nobody on the account
+   * can install forces `verdict: 'buy'` regardless of cost, with `skillGate`
+   * set to say why. Absent entirely, the verdict stays purely cost-based —
+   * every existing caller that doesn't yet fan out account skills keeps its
+   * old behavior. Planetary schematics carry no skill requirement, so this
+   * never affects them.
+   */
+  accountSkills?: ReadonlyMap<number, SkillLevels>;
 }
 
 export interface MakeOrBuy {
@@ -90,6 +102,8 @@ export interface MakeOrBuy {
   savings: number;
   /** ME the manufacturing quote assumes; null for a planetary one, which has no equivalent. */
   me: number | null;
+  /** Set only when `ctx.accountSkills` forced this verdict to 'buy' — why. */
+  skillGate?: Extract<SkillGateVerdict, { gated: true }>;
 }
 
 /**
@@ -231,12 +245,20 @@ export function makeOrBuy(
   }
   if (makeUnitPrice === null || !Number.isFinite(makeUnitPrice)) return null;
 
+  const blueprintSkills = recipe.method !== 'planetary' ? recipe.blueprint.skills : undefined;
+  const skillGateVerdict =
+    blueprintSkills && ctx.accountSkills
+      ? evaluateSkillGate(blueprintSkills, ctx.accountSkills)
+      : null;
+  const skillGate = skillGateVerdict?.gated ? skillGateVerdict : undefined;
+
   return {
     method: recipe.method,
-    verdict: makeUnitPrice < buyUnitPrice ? 'build' : 'buy',
+    verdict: skillGate ? 'buy' : makeUnitPrice < buyUnitPrice ? 'build' : 'buy',
     makeUnitPrice,
     buyUnitPrice,
     savings: Math.abs(buyUnitPrice - makeUnitPrice) * material.remainingQuantity,
     me: recipe.method === 'manufacturing' ? recipe.me : null,
+    ...(skillGate ? { skillGate } : {}),
   };
 }
