@@ -26,7 +26,6 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { loadContacts } from '@/features/character/contacts';
 import {
   ALL_CONTACT_TYPES,
-  EMPTY_CONTACTS_FILTER,
   STANDING_CATEGORIES,
   activeContactsFilterCount,
   contactCountsByStanding,
@@ -57,6 +56,10 @@ import {
   type OwnAffiliation,
 } from '@/features/character/contactAffiliation';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { usePageTab } from '@/lib/usePageTab';
+import { useUrlParam, useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { boolParam, enumSetParam, textParam } from '@/lib/urlState';
+import { CONTACTS_TABS } from '@/app/pageTabs';
 
 interface Snapshot {
   contactsResult: CachedResult<CharacterContact[]> | null;
@@ -289,6 +292,19 @@ function AffiliationLine({
   );
 }
 
+/**
+ * The filter bar, in the URL (ADR 0015) as one group: the bar hands back the
+ * whole filter on every change, so its three keys are written together.
+ */
+const FILTER_PARAMS = {
+  q: textParam(),
+  types: enumSetParam(ALL_CONTACT_TYPES),
+  standing: enumSetParam(STANDING_CATEGORIES),
+};
+const CHARACTER_SORT = { columnId: 'standing', direction: 'desc' } as const;
+const ACROSS_SORT = { columnId: 'held', direction: 'asc' } as const;
+const DISAGREEMENTS_ONLY = boolParam();
+
 interface AcrossCharactersPanelProps {
   lists: readonly CharacterContactList[];
   names: ReadonlyMap<number, string>;
@@ -308,7 +324,10 @@ function AcrossCharactersPanel({ lists, names, filter }: AcrossCharactersPanelPr
   const { t } = useTranslation();
   const [fetched, setFetched] = useState<readonly CharacterContactList[] | null>(null);
   const [fetching, setFetching] = useState(false);
-  const [disagreementsOnly, setDisagreementsOnly] = useState(false);
+  const [disagreementsOnly, setDisagreementsOnly] = useUrlParam(
+    'across.disagree',
+    DISAGREEMENTS_ONLY
+  );
 
   const effectiveLists = fetched ?? lists;
   const rows = useMemo(() => mergeContactsAcrossCharacters(effectiveLists), [effectiveLists]);
@@ -397,6 +416,11 @@ function AcrossCharactersPanel({ lists, names, filter }: AcrossCharactersPanelPr
       sortValue: (row) => row.standings[0],
     },
   ];
+  const sortProps = useUrlSort(
+    'across.sort',
+    ACROSS_SORT,
+    columns.map((column) => column.id)
+  );
 
   if (rows.length === 0) {
     return (
@@ -410,7 +434,7 @@ function AcrossCharactersPanel({ lists, names, filter }: AcrossCharactersPanelPr
         <FilterChip
           label={t('contacts.acrossDisagreementsOnly')}
           selected={disagreementsOnly}
-          onToggle={() => setDisagreementsOnly((previous) => !previous)}
+          onToggle={() => setDisagreementsOnly(!disagreementsOnly)}
           count={disagreementCount}
         />
         <Button
@@ -437,7 +461,7 @@ function AcrossCharactersPanel({ lists, names, filter }: AcrossCharactersPanelPr
           columns={columns}
           rows={visibleRows}
           rowKey={(row) => `${row.contactType}:${row.contactId}`}
-          defaultSort={{ columnId: 'held', direction: 'asc' }}
+          {...sortProps}
           rowContextMenu={(row, tr) => (
             <ContactContextMenu
               contact={{ contact_id: row.contactId, contact_type: row.contactType }}
@@ -461,8 +485,14 @@ export function Contacts() {
     { cacheKey: 'contacts' }
   );
 
-  const [filter, setFilter] = useState<ContactsFilter>(EMPTY_CONTACTS_FILTER);
-  const [tab, setTab] = useState<'character' | 'across'>('character');
+  const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
+  const filter = useMemo<ContactsFilter>(
+    () => ({ text: filterParams.q, types: filterParams.types, standings: filterParams.standing }),
+    [filterParams]
+  );
+  const setFilter = (next: ContactsFilter) =>
+    setFilterParams({ q: next.text, types: next.types, standing: next.standings });
+  const [tab, setTab] = usePageTab(CONTACTS_TABS);
 
   const contactsResult = data?.contactsResult ?? null;
   const contactsNeedsReauth = data?.contactsNeedsReauth ?? false;
@@ -622,6 +652,17 @@ export function Contacts() {
     ],
     [t, contactNames, affiliationRows]
   );
+  const characterSortProps = useUrlSort(
+    'sort',
+    CHARACTER_SORT,
+    columns.map((column) => column.id)
+  );
+
+  // `/contacts/across` with a single Character falls back to this Character's
+  // view — but only once the snapshot says so: before it loads the list is
+  // empty for everyone, and a reload of the across tab must not bounce.
+  const view =
+    tab === 'across' && (data === undefined || acrossLists.length > 1) ? 'across' : 'character';
 
   if (!hydrated) {
     return (
@@ -653,11 +694,8 @@ export function Contacts() {
         <Tabs
           label={t('contacts.title')}
           value={tab}
-          onChange={(id) => setTab(id as 'character' | 'across')}
-          tabs={[
-            { id: 'character', label: t('contacts.tabThisCharacter') },
-            { id: 'across', label: t('contacts.tabAcrossCharacters') },
-          ]}
+          onChange={(id) => setTab(id as typeof tab)}
+          tabs={CONTACTS_TABS.tabs.map((item) => ({ id: item.id, label: t(item.labelKey) }))}
         />
       )}
 
@@ -669,7 +707,7 @@ export function Contacts() {
         <ContactsFilterBar filter={filter} onChange={setFilter} counts={lastGoodCounts} />
       )}
 
-      {tab === 'across' ? (
+      {view === 'across' ? (
         <AcrossCharactersPanel lists={acrossLists} names={contactNames} filter={filter} />
       ) : loading && !data ? (
         <div className="flex justify-center py-16">
@@ -710,7 +748,7 @@ export function Contacts() {
               columns={columns}
               rows={filteredContacts}
               rowKey={(contact) => contact.contact_id}
-              defaultSort={{ columnId: 'standing', direction: 'desc' }}
+              {...characterSortProps}
               rowContextMenu={contactRowContextMenu}
             />
           )}

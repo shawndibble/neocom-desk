@@ -51,6 +51,8 @@ import { InstallPrompt } from './InstallPrompt';
 import { BootScreen } from './BootScreen';
 import { RequireCharacter } from './RequireCharacter';
 import { ScopeGate } from './ScopeGate';
+import { TabRoute } from './TabRoute';
+import { PAGE_TABS, routePatternFor } from './pageTabs';
 import { AuthFailureRedirect } from './AuthFailureNotice';
 import { PublicInfoModal } from '@/components/PublicInfoModal';
 import { SkillDetailModal } from '@/components/SkillDetailModal';
@@ -232,13 +234,20 @@ export function App() {
           {/* Below: a logged-in Character, then the route's own scopes. */}
           <Route element={<RequireCharacter />}>
             <Route element={<Layout />}>
-              {FEATURE_ROUTES.map(([path, element]) => (
-                <Route
-                  key={path}
-                  path={path}
-                  element={<ScopeGate path={path}>{element}</ScopeGate>}
-                />
-              ))}
+              {/* A tabbed page (`pageTabs.ts`) mounts once at `<path>/*`, so
+                  its tabs are one route instance: switching tab keeps the
+                  page mounted, and none of the tables above gain an entry. */}
+              {FEATURE_ROUTES.map(([path, element]) => {
+                const tabs = PAGE_TABS[path];
+                const gated = <ScopeGate path={path}>{element}</ScopeGate>;
+                return (
+                  <Route
+                    key={path}
+                    path={routePatternFor(path)}
+                    element={tabs ? <TabRoute page={tabs}>{gated}</TabRoute> : gated}
+                  />
+                );
+              })}
             </Route>
           </Route>
           <Route path="/styleguide" element={<Styleguide />} />

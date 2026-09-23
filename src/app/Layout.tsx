@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { pageKeyFor } from './pageTabs';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -426,7 +427,9 @@ function MobileMoreSheet({
 }
 
 /**
- * Fades the route outlet in whenever the pathname changes.
+ * Fades the route outlet in whenever the page changes — `pageKeyFor`'s
+ * pathname, in which a tab segment (`/contacts/across`) collapses to its page:
+ * a tab switch is not a page change and does not fade (ADR 0015).
  *
  * Runs the animation on the live element rather than replaying a CSS one,
  * because the only way to restart a CSS animation is to remount — and the
@@ -438,7 +441,7 @@ function MobileMoreSheet({
  * implements no Web Animations API, so this must degrade to an instant swap
  * exactly as it does in a browser that lacks it.
  */
-function useRouteFade(pathname: string) {
+function useRouteFade(pageKey: string) {
   const ref = useRef<HTMLDivElement>(null);
   const running = useRef<Animation | null>(null);
 
@@ -453,7 +456,7 @@ function useRouteFade(pathname: string) {
       duration: 140,
       easing: 'ease-out',
     });
-  }, [pathname]);
+  }, [pageKey]);
 
   return ref;
 }
@@ -463,7 +466,7 @@ export function Layout() {
   const { t } = useTranslation();
   useKeyboardShortcuts();
   const location = useLocation();
-  const outletRef = useRouteFade(location.pathname);
+  const outletRef = useRouteFade(pageKeyFor(location.pathname));
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const activeCharacter = useLiveQuery(
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
