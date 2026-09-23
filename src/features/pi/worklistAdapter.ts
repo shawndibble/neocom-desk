@@ -33,6 +33,8 @@ export interface WorklistAdapterInput {
   prices: Readonly<Record<number, number>>;
   revenuePrices: Readonly<Record<number, number>>;
   taxRate: number;
+  /** Sales tax rate, percent, from the character's own Accounting level. */
+  salesTaxPct: number;
   /** The pilot's own haul window, in hours — see `cadencePref.ts`. */
   haulHours: number;
   opportunitiesByHost: ReadonlyMap<number, readonly NetworkOpportunity[]>;
@@ -117,7 +119,17 @@ function throughputOf(
 }
 
 export function worklistColonies(input: WorklistAdapterInput): WorklistColony[] {
-  const { advice, pinsByPlanet, pi, prices, revenuePrices, taxRate, haulHours, typeNames } = input;
+  const {
+    advice,
+    pinsByPlanet,
+    pi,
+    prices,
+    revenuePrices,
+    taxRate,
+    salesTaxPct,
+    haulHours,
+    typeNames,
+  } = input;
 
   return advice
     .filter((entry): entry is Extract<PlanetAdvice, { kind: 'built' }> => entry.kind === 'built')
@@ -133,6 +145,7 @@ export function worklistColonies(input: WorklistAdapterInput): WorklistColony[] 
         prices,
         revenuePrices,
         taxRate,
+        salesTaxPct,
         bufferHours: haulHours,
       });
       // Only a recommendation the colony is not already running is a step. A

@@ -76,6 +76,7 @@ const options = {
   prices: PRICES,
   // Their system's own rate. Nothing here derives one.
   taxRate: 0,
+  salesTaxPct: 0,
 };
 
 describe('planNetwork', () => {
@@ -225,6 +226,14 @@ describe('planNetwork', () => {
   it('drops a candidate the tax turns unprofitable rather than recommending a loss', () => {
     const plan = planNetwork({ ...options, taxRate: 0.9 }, pi);
     for (const line of plan.opportunities) expect(line.marginPerHour).toBeGreaterThan(0);
+  });
+
+  it('nets sales tax off a candidate’s revenue, lowering its margin', () => {
+    const untaxed = planNetwork(options, pi);
+    const taxed = planNetwork({ ...options, salesTaxPct: 7.5 }, pi);
+    const best = (plan: typeof untaxed) =>
+      plan.opportunities.find((line) => line.name === 'Superconductors');
+    expect(best(taxed)?.marginPerUnit).toBeLessThan(best(untaxed)?.marginPerUnit ?? 0);
   });
 
   it('reports the P1 still worth selling raw, so the panel can say what is left over', () => {
@@ -584,6 +593,7 @@ describe('planNetwork — sourced material pricing', () => {
         prices,
         revenuePrices,
         taxRate: 0,
+        salesTaxPct: 0,
       },
       pi
     );

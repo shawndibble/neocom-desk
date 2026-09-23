@@ -147,6 +147,7 @@ describe('builtColonyEarnings', () => {
     const result = builtColonyEarnings(colony(), pi, {
       prices: { [BACTERIA]: 1_000 },
       taxRate: 0.1,
+      salesTaxPct: 0,
     });
     // 1,000 - 0.1*400 = 960/unit, times the fed rate, not eight pins' worth.
     expect(result.iskPerHour).toBeCloseTo((21_201 / 6_000) * 40 * 960, 2);
@@ -162,7 +163,7 @@ describe('builtColonyEarnings', () => {
         extractedPerHour: [],
       }),
       pi,
-      { prices: { [BACTERIA]: 1_000 }, taxRate: 0.1 }
+      { prices: { [BACTERIA]: 1_000 }, taxRate: 0.1, salesTaxPct: 0 }
     );
     expect(result.iskPerHour).toBeNull();
   });

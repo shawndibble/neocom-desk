@@ -2106,8 +2106,8 @@
     "networkOpportunity": "{{name}} — {{factories}}× {{facility}} on {{host}}",
     "networkLeftover": "Still sold raw: {{list}}",
     "networkLeftoverItem": "{{units}}/hr of {{name}}",
-    "networkTotal": "+{{isk}} an hour over selling every P1 raw, at {{hub}} prices and this system’s {{percent}}% customs rate.",
-    "networkTotalMixedRates": "+{{isk}} an hour over selling every P1 raw, at {{hub}} prices — each priced at its own host's customs rate.",
+    "networkTotal": "+{{isk}} an hour over selling every P1 raw, at {{hub}} prices and this system’s {{percent}}% customs rate, net of sales tax.",
+    "networkTotalMixedRates": "+{{isk}} an hour over selling every P1 raw, at {{hub}} prices — each priced at its own host's customs rate, net of sales tax.",
     "networkGreedy": "Allocated best-paying first — not provably optimal.",
     "networkAssumesRemoval": "Assumes the unfed factories below come out first; this spends the budget they free up.",
     "networkNothing": "Nothing yet: no two of these colonies make a pair of inputs that combine.",
@@ -2117,7 +2117,7 @@
     "networkBlockedReason": {
       "no-host-budget": "no colony here has the CPU/Powergrid for a factory",
       "needs-price": "the hub quotes no price for it",
-      "unprofitable": "the customs office takes more than it earns",
+      "unprofitable": "customs and sales tax take more than it earns",
       "inputs-spoken-for": "its inputs went to a better-paying product",
       "needs-buying": "one of its inputs would have to be bought at the hub"
     },
@@ -2152,8 +2152,8 @@
     "actionAssumesRemoval": "This assumes the idle facilities above come out first — the budget they are holding is where these go.",
     "actionConvertWhy": "Nothing in your colonies uses that {{from}}, so those {{count}} are worth {{lost}} an hour selling it. The replacement clears {{gained}}.",
     "actionConvertHaul": "You would be hauling {{in}} units an hour in and {{out}} units an hour out.",
-    "actionAddEcon": "Sells {{units}}/hr for {{revenue}}. Nothing to buy — you already make the inputs, and giving up their sale is what the margin is net of: +{{margin}} an hour after customs.",
-    "actionAddEconBuy": "Sells {{units}}/hr for {{revenue}}, against {{spend}} an hour of inputs you have to buy. +{{margin}} an hour after customs and the material you already make.",
+    "actionAddEcon": "Sells {{units}}/hr for {{revenue}}. Nothing to buy — you already make the inputs, and giving up their sale is what the margin is net of: +{{margin}} an hour after customs and sales tax.",
+    "actionAddEconBuy": "Sells {{units}}/hr for {{revenue}}, against {{spend}} an hour of inputs you have to buy. +{{margin}} an hour after customs, sales tax and the material you already make.",
     "actionNothing": "Nothing to change here: every facility is fed, and no product your other colonies could feed was placed on this planet.",
     "capacityFootnote": "{{cpu}} tf and {{powergrid}} MW free as it stands. A new pin also pays for its link here: {{linkCpu}} tf / {{linkPowergrid}} MW.",
     "capacityFootnoteNoLink": "{{cpu}} tf and {{powergrid}} MW free as it stands.",
@@ -2203,8 +2203,8 @@
       "does-not-fit": "No build advice: this colony’s Command Center hosts no whole chain of anything this planet yields. A higher upgrade level is what changes that.",
       "needs-prices": "No build advice: the reference hub quotes no price for anything this planet can extract or make from it.",
       "throughput": "No build advice: everything that fits here would fill its launchpad and storage faster than a day, so nothing it could run would keep running.",
-      "unprofitable": "No build advice: nothing this planet can extract covers its own customs tax at current hub prices.",
-      "mixed": "No build advice: of everything this planet yields, nothing at once fits here, is priced at the hub and earns more than its customs tax."
+      "unprofitable": "No build advice: nothing this planet can extract covers its own customs and sales tax at current hub prices.",
+      "mixed": "No build advice: of everything this planet yields, nothing at once fits here, is priced at the hub and earns more than its customs and sales tax."
     },
     "verb": {
       "add": "Add",
@@ -2285,6 +2285,7 @@
     "summaryPlanets_one": "{{count}} colony",
     "summaryPlanets_other": "{{count}} colonies",
     "summaryEarnTitle": "What more you could earn",
+    "summaryEarnHint": "Every ISK/hr figure here is net of export customs and sales tax, at your own Accounting level.",
     "summaryEarnNow": "Earning now",
     "summaryEarnNowUnknown": "No colony here reports both a measured rate and a hub price, so there is no figure to compare against.",
     "summaryEarnTuning": "{{isk}} ISK/hr more by tuning, over {{steps}} — nothing torn down.",
