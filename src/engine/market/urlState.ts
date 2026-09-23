@@ -5,17 +5,19 @@
  * route) is responsible for validating a parsed id against the loaded
  * catalogue and falling back to the default view when it doesn't resolve.
  */
+import { ALL_REGIONS, type RegionChoice } from './locationMode';
 
 export interface ParsedMarketParams {
   typeId: number | null;
   hubId: string | null;
-  regionId: number | null;
+  /** `'all'` for `?region=all` (All regions), which needs no catalogue check. */
+  regionId: RegionChoice | null;
   /** A Market Group to land expanded-open on — independent of typeId/location. */
   groupId: number | null;
 }
 
 export type MarketLocationParam =
-  { mode: 'hub'; hubId: string } | { mode: 'region'; regionId: number };
+  { mode: 'hub'; hubId: string } | { mode: 'region'; regionId: RegionChoice };
 
 /**
  * A positive integer query parameter, or null.
@@ -40,7 +42,7 @@ export function parseMarketParams(get: (key: string) => string | null): ParsedMa
   return {
     typeId: parsePositiveInt(get('type')),
     hubId: nonEmpty(get('hub')),
-    regionId: parsePositiveInt(get('region')),
+    regionId: get('region') === ALL_REGIONS ? ALL_REGIONS : parsePositiveInt(get('region')),
     groupId: parsePositiveInt(get('group')),
   };
 }
@@ -107,13 +109,15 @@ export function marketItemUrl(typeId: number, currentSearch: string): string {
  * issue #4): a valid region param wins, then a valid hub param, then the
  * device-local Location Mode preference. `valid` is supplied by the caller —
  * region validity depends on the (possibly still-loading) Market Region
- * catalogue, which this pure function has no way to reach itself.
+ * catalogue, which this pure function has no way to reach itself. All
+ * regions (`region=all`) is valid without one.
  */
 export function resolveMarketLocation(
-  parsed: { regionId: number | null; hubId: string | null },
+  parsed: { regionId: RegionChoice | null; hubId: string | null },
   valid: { region: boolean; hub: boolean },
   fallback: MarketLocationParam
 ): MarketLocationParam {
+  if (parsed.regionId === ALL_REGIONS) return { mode: 'region', regionId: ALL_REGIONS };
   if (parsed.regionId !== null && valid.region)
     return { mode: 'region', regionId: parsed.regionId };
   if (parsed.hubId !== null && valid.hub) return { mode: 'hub', hubId: parsed.hubId };

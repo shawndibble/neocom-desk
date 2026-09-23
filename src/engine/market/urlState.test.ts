@@ -47,6 +47,10 @@ describe('parseMarketParams', () => {
     expect(parseMarketParams(paramsOf({ type: '0' })).typeId).toBeNull();
   });
 
+  it('parses region=all as All regions, not as a malformed id', () => {
+    expect(parseMarketParams(paramsOf({ region: 'all' })).regionId).toBe('all');
+  });
+
   it('treats an empty hub param as absent', () => {
     expect(parseMarketParams(paramsOf({ hub: '' })).hubId).toBeNull();
   });
@@ -87,6 +91,15 @@ describe('buildMarketParams', () => {
   });
 });
 
+describe('buildMarketParams with All regions', () => {
+  it('writes region=all', () => {
+    expect(buildMarketParams(587, { mode: 'region', regionId: 'all' })).toEqual({
+      type: '587',
+      region: 'all',
+    });
+  });
+});
+
 describe('resolveAgainstCatalogue', () => {
   interface Item {
     id: number;
@@ -121,6 +134,16 @@ describe('resolveMarketLocation', () => {
         fallback
       )
     ).toEqual({ mode: 'region', regionId: 10000043 });
+  });
+
+  it('resolves region=all to All regions without a catalogue check', () => {
+    expect(
+      resolveMarketLocation(
+        { regionId: 'all', hubId: 'amarr' },
+        { region: false, hub: true },
+        fallback
+      )
+    ).toEqual({ mode: 'region', regionId: 'all' });
   });
 
   it('falls back to a valid hub param when the region is absent or invalid', () => {
@@ -164,6 +187,10 @@ describe('marketLinkParams', () => {
       type: '587',
       region: '10000002',
     });
+  });
+
+  it('preserves an All regions scope', () => {
+    expect(marketLinkParams(587, '?region=all')).toEqual({ type: '587', region: 'all' });
   });
 
   it('preserves an existing hub param when there is no region', () => {

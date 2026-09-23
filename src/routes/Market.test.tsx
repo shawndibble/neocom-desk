@@ -1382,7 +1382,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     expect(within(sellTable).queryByText('2,000,000.00')).not.toBeInTheDocument();
   });
 
-  it('shows the Jump Range control only in Region mode', async () => {
+  it('shows Distance, Security and NPC-only filters only in Region mode; Min quantity in both', async () => {
     const hits = { count: 0 };
     server.use(ordersHandler(hits));
     const user = userEvent.setup();
@@ -1391,11 +1391,47 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
     await screen.findByRole('table', { name: 'Sell Orders' });
+    // Behind the funnel, like the other search pages.
+    expect(screen.queryByRole('spinbutton', { name: 'Min quantity' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    expect(screen.getByRole('spinbutton', { name: 'Min quantity' })).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: 'Distance' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Security' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'NPC stations only' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Region' }));
 
     expect(await screen.findByRole('combobox', { name: 'Distance' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Security' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'NPC stations only' })).toBeInTheDocument();
+  });
+
+  it('Min quantity and NPC stations only narrow the book, counted on the funnel', async () => {
+    server.use(ordersHandler({ count: 0 }));
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/market/browser?type=587&region=10000002');
+    render(<App />);
+
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    expect(within(sellTable).getByText('2,000,000.00')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    await user.click(screen.getByRole('button', { name: 'NPC stations only' }));
+
+    // The player-structure sell order drops out; the Jita 4-4 one stays.
+    await waitFor(() =>
+      expect(
+        within(screen.getByRole('table', { name: 'Sell Orders' })).queryByText('2,000,000.00')
+      ).not.toBeInTheDocument()
+    );
+    expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
+
+    await user.type(screen.getByRole('spinbutton', { name: 'Min quantity' }), '6');
+    // Jita's orders have 5 (sell) and 3 (buy) left, so both sides empty — and the hint says why.
+    expect(
+      await screen.findAllByText('No orders match the filters. Loosen them to see more.')
+    ).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Filters (2 active)' })).toBeInTheDocument();
   });
 
   it('Region mode shows every station in the region, including ones Trade Hub mode hides', async () => {
@@ -1417,7 +1453,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
     expect(hits.count).toBe(1);
   });
 
-  it('the Region select offers only Market Regions', async () => {
+  it('the Region select offers All regions plus only Market Regions', async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -1430,7 +1466,7 @@ describe('Location Mode and the Global Market Region (issue #3)', () => {
       // even though it's invisible to the accessibility tree. Alphabetical:
       // `RegionSelect` sorts by name.
       (await screen.findAllByRole('option')).map((o) => o.textContent?.replace(/^✓/, ''))
-    ).toEqual(['Domain', 'The Forge']);
+    ).toEqual(['All regions', 'Domain', 'The Forge']);
   });
 
   it('a globally-traded item reads its Global Market Region regardless of Location Mode, with an explanatory note', async () => {

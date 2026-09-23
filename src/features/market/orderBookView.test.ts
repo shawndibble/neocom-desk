@@ -3,7 +3,9 @@ import { getOrderBook, type OrderBookResult } from './orderBook';
 import {
   buildOrderBookView,
   clearOrderBookViewCache,
+  clearOrderBookViewCacheAcross,
   fetchOrderBook,
+  fetchOrderBookAcross,
   loadGlobalMarketOverrides,
   loadOrderBookView,
   orderBookLocationFor,
@@ -255,6 +257,114 @@ describe('fetchOrderBook + buildOrderBookView', () => {
   });
 });
 
+describe('fetchOrderBookAcross (All regions)', () => {
+  const DOMAIN = 10000043;
+  const HEIMATAR = 10000030;
+
+  it('merges every region into one fetched book, oldest fetchedAt, truncated if any was', async () => {
+    mockedGetOrderBook.mockImplementation(async (regionId) =>
+      regionId === THE_FORGE
+        ? book([order({ order_id: 1, price: 5 })], { fetchedAt: 2000 })
+        : book([order({ order_id: 2, price: 4 })], { fetchedAt: 1000, truncated: true })
+    );
+
+    const fetched = await fetchOrderBookAcross(TRITANIUM, [THE_FORGE, DOMAIN], regionLocation);
+
+    if (fetched.status !== 'fetched') throw new Error('expected fetched');
+    expect(fetched.result.orders.map((o) => o.order_id).sort()).toEqual([1, 2]);
+    expect(fetched.result.fetchedAt).toBe(1000);
+    expect(fetched.result.truncated).toBe(true);
+    expect(fetched.failedRegionIds).toEqual([]);
+    const view = buildOrderBookView(TRITANIUM, regionLocation, fetched);
+    if (view.status === 'failed') throw new Error('expected a loaded view');
+    expect(view.sell.map((o) => o.order_id)).toEqual([2, 1]);
+  });
+
+  it('names the regions that failed rather than silently dropping them', async () => {
+    mockedGetOrderBook.mockImplementation(async (regionId) => {
+      if (regionId === DOMAIN) throw new Error('420');
+      return book([order({ order_id: regionId })]);
+    });
+
+    const fetched = await fetchOrderBookAcross(
+      TRITANIUM,
+      [THE_FORGE, DOMAIN, HEIMATAR],
+      regionLocation
+    );
+
+    if (fetched.status !== 'fetched') throw new Error('expected fetched');
+    expect(fetched.failedRegionIds).toEqual([DOMAIN]);
+    const view = buildOrderBookView(TRITANIUM, regionLocation, fetched);
+    if (view.status === 'failed') throw new Error('expected a loaded view');
+    expect(view.failedRegionIds).toEqual([DOMAIN]);
+  });
+
+  it('is failed when every region failed', async () => {
+    mockedGetOrderBook.mockRejectedValue(new Error('420'));
+
+    const fetched = await fetchOrderBookAcross(TRITANIUM, [THE_FORGE, DOMAIN], regionLocation);
+
+    expect(fetched.status).toBe('failed');
+  });
+
+  it('an empty region list is an empty book, not a failure', async () => {
+    const fetched = await fetchOrderBookAcross(TRITANIUM, [], regionLocation);
+
+    expect(mockedGetOrderBook).not.toHaveBeenCalled();
+    expect(fetched).toMatchObject({ status: 'fetched', result: { orders: [] } });
+  });
+
+  it('reads only the Global Market Region for an item that trades in one', async () => {
+    mockedGetOrderBook.mockResolvedValue(book([order({ type_id: PLEX })]));
+
+    await fetchOrderBookAcross(PLEX, [THE_FORGE, DOMAIN], {
+      ...regionLocation,
+      globalMarkets: new Map([[PLEX, { regionId: PLEX_REGION, regionName: 'PLEX Market' }]]),
+    });
+
+    expect(mockedGetOrderBook).toHaveBeenCalledTimes(1);
+    expect(mockedGetOrderBook).toHaveBeenCalledWith(PLEX_REGION, PLEX);
+  });
+
+  it('starts no further region once cancelled', async () => {
+    mockedGetOrderBook.mockResolvedValue(book([]));
+    let cancelled = false;
+    const regions = Array.from({ length: 20 }, (_, i) => 10000001 + i);
+    const pending = fetchOrderBookAcross(TRITANIUM, regions, regionLocation, () => cancelled);
+    cancelled = true;
+    await pending;
+
+    expect(mockedGetOrderBook.mock.calls.length).toBeLessThan(regions.length);
+  });
+});
+
+describe('order book filters in buildOrderBookView', () => {
+  it('applies Min quantity and NPC stations only before the summary', async () => {
+    mockedGetOrderBook.mockResolvedValue(book(MIXED));
+
+    const view = await loadOrderBookView(TRITANIUM, {
+      ...regionLocation,
+      minQuantity: 10,
+      npcStationIds: new Set([JITA_4_4]),
+    });
+
+    if (view.status === 'failed') throw new Error('expected a loaded view');
+    expect(view.sell.map((o) => o.order_id)).toEqual([3, 1]);
+    expect(view.summary.bestSell).toBe(5);
+    expect(view.buy).toEqual([]);
+  });
+});
+
+describe('clearOrderBookViewCacheAcross', () => {
+  it('clears the type in every region given', async () => {
+    const { clearOrderBookCache } = await import('./orderBook');
+    vi.mocked(clearOrderBookCache).mockClear();
+    clearOrderBookViewCacheAcross(TRITANIUM, [THE_FORGE, 10000043], regionLocation);
+    expect(vi.mocked(clearOrderBookCache)).toHaveBeenCalledWith(THE_FORGE, TRITANIUM);
+    expect(vi.mocked(clearOrderBookCache)).toHaveBeenCalledWith(10000043, TRITANIUM);
+  });
+});
+
 describe('clearOrderBookViewCache', () => {
   it('clears the cache entry for the region the location actually resolves to', async () => {
     const { clearOrderBookCache } = await import('./orderBook');
@@ -282,6 +392,10 @@ describe('orderBookLocationFor', () => {
   it("Region mode reads the picked region, falling back to the hub's until one is picked", () => {
     expect(orderBookLocationFor('region', 10000043, jita, globalMarkets).regionId).toBe(10000043);
     expect(orderBookLocationFor('region', null, jita, globalMarkets).regionId).toBe(THE_FORGE);
+  });
+
+  it("All regions reads the hub's region, so a single-region reader never receives 'all'", () => {
+    expect(orderBookLocationFor('region', 'all', jita, globalMarkets).regionId).toBe(THE_FORGE);
   });
 });
 
