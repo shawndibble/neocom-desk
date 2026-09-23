@@ -100,7 +100,9 @@
       "tierComplete": "{{count}}/{{count}} complete",
       "tierProgress": "{{done}}/{{total}} · {{time}} left",
       "addLevelToPlan": "Add Level to Plan",
-      "newPlanName": "{{ship}} Mastery"
+      "newPlanName": "{{ship}} Mastery",
+      "hideCompleted": "Hide completed",
+      "tierAllHidden": "All skills in this tier are already trained."
     },
     "totalSp": "Total SP",
     "unallocatedSp": "Unallocated SP",

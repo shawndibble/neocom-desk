@@ -5,7 +5,7 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Disclosure, Panel, SearchInput, Spinner } from '@/components/ui';
+import { Button, Disclosure, FilterChip, Panel, SearchInput, Spinner } from '@/components/ui';
 import { formatDuration } from '@/lib/duration';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { romanLevel } from '@/engine/projection';
@@ -50,6 +50,7 @@ export function MasteryPanel({
   // primary "Add Level to Plan" button, and DESIGN.md §6 allows only one
   // primary button per view.
   const [expandedTier, setExpandedTier] = useState<number | null>(null);
+  const [hideCompleted, setHideCompleted] = useState(false);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
@@ -154,57 +155,74 @@ export function MasteryPanel({
       </Panel>
 
       {selected && tiers && (
-        <Panel title={t('skills.mastery.tiersTitle', { ship: selected.name })}>
+        <Panel
+          title={t('skills.mastery.tiersTitle', { ship: selected.name })}
+          actions={
+            <FilterChip
+              label={t('skills.mastery.hideCompleted')}
+              selected={hideCompleted}
+              onToggle={() => setHideCompleted((prev) => !prev)}
+            />
+          }
+        >
           <div className="divide-y divide-line">
-            {tiers.map((tierRow) => (
-              <Disclosure
-                key={tierRow.tier}
-                expanded={expandedTier === tierRow.tier}
-                onToggle={() => toggle(tierRow.tier)}
-                label={t('skills.mastery.tierLabel', { roman: romanLevel(tierRow.tier + 1) })}
-                trailing={tierTrailing(tierRow)}
-              >
-                <div className="space-y-1 p-3">
-                  {tierRow.rows.map((row) => (
-                    <SkillRow
-                      key={row.skillTypeID}
-                      name={row.name}
-                      status={row.status}
-                      currentLevel={row.currentLevel}
-                      timeLabel={
-                        row.status === 'trained'
-                          ? t('skills.fitCheck.trained')
-                          : formatDuration(row.seconds)
-                      }
-                    />
-                  ))}
-                  {!tierRow.complete && tierRow.rows.length > 0 && target.plans !== undefined && (
-                    <div className="flex items-center justify-end gap-2 pt-2">
-                      <TargetPlanPicker target={target} />
-                      <Button
-                        size="sm"
-                        variant="primary"
-                        onClick={() =>
-                          void target.addEntries(
-                            tierRow.rows
-                              .filter((r) => r.status !== 'trained')
-                              .map((r) => ({
-                                skillTypeID: r.skillTypeID,
-                                targetLevel: r.targetLevel,
-                              })),
-                            t('skills.mastery.newPlanName', { ship: selected.name })
-                          )
+            {tiers.map((tierRow) => {
+              const visibleRows = hideCompleted
+                ? tierRow.rows.filter((row) => row.status !== 'trained')
+                : tierRow.rows;
+              return (
+                <Disclosure
+                  key={tierRow.tier}
+                  expanded={expandedTier === tierRow.tier}
+                  onToggle={() => toggle(tierRow.tier)}
+                  label={t('skills.mastery.tierLabel', { roman: romanLevel(tierRow.tier + 1) })}
+                  trailing={tierTrailing(tierRow)}
+                >
+                  <div className="space-y-1 p-3">
+                    {visibleRows.length === 0 && tierRow.rows.length > 0 && (
+                      <p className="text-xs text-text-dim">{t('skills.mastery.tierAllHidden')}</p>
+                    )}
+                    {visibleRows.map((row) => (
+                      <SkillRow
+                        key={row.skillTypeID}
+                        name={row.name}
+                        status={row.status}
+                        currentLevel={row.currentLevel}
+                        timeLabel={
+                          row.status === 'trained'
+                            ? t('skills.fitCheck.trained')
+                            : formatDuration(row.seconds)
                         }
-                      >
-                        {target.plans.length === 0
-                          ? t('skills.fitCheck.createPlanAndAdd')
-                          : t('skills.mastery.addLevelToPlan')}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </Disclosure>
-            ))}
+                      />
+                    ))}
+                    {!tierRow.complete && tierRow.rows.length > 0 && target.plans !== undefined && (
+                      <div className="flex items-center justify-end gap-2 pt-2">
+                        <TargetPlanPicker target={target} />
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={() =>
+                            void target.addEntries(
+                              tierRow.rows
+                                .filter((r) => r.status !== 'trained')
+                                .map((r) => ({
+                                  skillTypeID: r.skillTypeID,
+                                  targetLevel: r.targetLevel,
+                                })),
+                              t('skills.mastery.newPlanName', { ship: selected.name })
+                            )
+                          }
+                        >
+                          {target.plans.length === 0
+                            ? t('skills.fitCheck.createPlanAndAdd')
+                            : t('skills.mastery.addLevelToPlan')}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </Disclosure>
+              );
+            })}
           </div>
         </Panel>
       )}
