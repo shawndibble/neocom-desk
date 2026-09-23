@@ -1,6 +1,6 @@
-import { useState, type ComponentProps } from 'react';
+import { useEffect, useState, type ComponentProps } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
@@ -103,9 +103,16 @@ function renderEditor(
   overrides: Partial<ComponentProps<typeof PlanEditor>> = {}
 ) {
   const { plan: initialPlan = PLAN, ...rest } = overrides;
+  // Stands in for a write landing from elsewhere (another device's sync),
+  // which can change the plan while one of this editor's Modals is open.
+  const control: { replacePlan?: (next: (current: SkillPlanRecord) => SkillPlanRecord) => void } =
+    {};
 
   function Harness() {
     const [plan, setPlan] = useState(initialPlan);
+    useEffect(() => {
+      control.replacePlan = setPlan;
+    }, []);
     // Stands in for the route's PageHeader actions slot: PlanEditor portals
     // Import/Export into it, so a test needs a mounted node to portal into
     // (queries still find the portaled content — Testing Library's `screen`
@@ -146,7 +153,11 @@ function renderEditor(
       <LocationProbe />
     </MemoryRouter>
   );
-  return { onUpdate };
+  return {
+    onUpdate,
+    replacePlan: (next: (current: SkillPlanRecord) => SkillPlanRecord) =>
+      act(() => control.replacePlan?.(next)),
+  };
 }
 
 /** Exposes wherever `navigate()` lands, for the Market cross-link tests below. */
@@ -394,6 +405,33 @@ describe('PlanEditor tools pane', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
 
     expect(onUpdate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('drops an open Optimize remaps result once the plan it was costed against changes (BUG #1)', async () => {
+    const user = userEvent.setup();
+    const { replacePlan } = renderEditor();
+    await openTools(user);
+
+    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+    expect(screen.getByRole('dialog', { name: 'Optimize remaps' })).toBeInTheDocument();
+
+    replacePlan((current) => ({ ...current, entries: [...current.entries].reverse() }));
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(within(sectionFor('Actions')).queryByRole('status')).toBeNull();
+  });
+
+  it('drops an open Suggest reorder preview when a different plan is swapped in (BUG #1)', async () => {
+    const user = userEvent.setup();
+    const { replacePlan } = renderEditor();
+    await openTools(user);
+
+    await user.click(screen.getByRole('button', { name: 'Suggest reorder' }));
+    expect(screen.getByRole('dialog', { name: 'Suggested reorder' })).toBeInTheDocument();
+
+    replacePlan((current) => ({ ...current, id: 'plan-2' }));
+
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
