@@ -28,10 +28,11 @@ import {
   useViewportBoundedHeight,
   VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
 } from '@/lib/useViewportBoundedHeight';
-import { normalizePlanWithBoundaries } from '@/engine/plan';
-import { effectivePriority } from '@/engine/planPriority';
-import { computeSchedule } from '@/engine/schedule';
-import type { AttributeSegment } from '@/engine/schedule';
+import {
+  computeSkillPlanSchedule,
+  type SkillPlanScheduleInput,
+  type StepKey,
+} from '@/engine/skillPlanSchedule';
 import { parseSkillQueue } from '@/engine/queueImport';
 import { exportPlanToClipboard } from '@/engine/clipboardExport';
 import {
@@ -51,7 +52,6 @@ import type {
   PlanEntry,
   PlanPriority,
   PlanStep,
-  ScheduledStep,
   TrainedSkill,
 } from '@/engine/types';
 import type {
@@ -76,8 +76,6 @@ import { PlanEditorLayout } from './PlanEditorLayout';
 import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import { evaluateOptimizationBadge, toOptimizationBadge } from './planHeaderStats';
 import { markerVerdict, remapVerdict, type OptimizeVerdict } from './optimizeVerdict';
-import { boostedStepIndices } from '@/engine/boosterImpact';
-import { alphaCappedStepIndices } from '@/engine/alphaCap';
 import { cloneStateFor, useCloneStates, withCloneState } from '../cloneState';
 import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
 import { queueCsvColumns } from './queueCsv';
@@ -97,7 +95,6 @@ import {
   addMarkerAttributes,
   buildRows,
   markerAttributesAfterEntryRemoval,
-  markerStepIndices,
   markersAfterEntryRemoval,
   normalizeMarkerAttributes,
   removeMarker,
@@ -128,6 +125,7 @@ import {
   MAX_BOOSTER_BONUS,
 } from './planBooster';
 import { ImportClipboardDialog } from './ImportClipboardDialog';
+import { useScopedState } from './useScopedState';
 import { attributeShort, remapInstruction } from './remapInstruction';
 import {
   ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID,
@@ -195,85 +193,17 @@ interface PlanEditorProps {
   onUpdate: (patch: PlanPatch) => void;
 }
 
-interface ComputeResult {
-  scheduled: ScheduledStep[];
-  /** entryBoundaries[i] = scheduled.length after processing validEntries[0..i] (see normalizePlanWithBoundaries). */
-  entryBoundaries: number[];
-  error: string | null;
-  /**
-   * "Now" at compute time — the single wall-clock origin fed to
-   * computeSchedule's booster-expiry math AND used to derive the plan
-   * timeline (#20), so the two can never disagree.
-   */
-  startDate: Date;
-  /**
-   * What "Optimize at my markers" resolves to for this plan's current
-   * markers, `null` when there are none. The queue's own segment-aware
-   * `scheduled` above is built from these same segments (`s.attributes` from
-   * `s.startIndex` onward), so the plan total/finish date and the savings
-   * badge can never disagree about what each marker segment trains on (#1232).
-   */
-  markersResult: PlaceRemapsResult | null;
+/**
+ * The Skill Plan schedule (engine/skillPlanSchedule.ts), started "now". The
+ * wall-clock read sits out here, not in the component body, where it would be
+ * an impure call during render.
+ */
+function scheduleFromNow(input: Omit<SkillPlanScheduleInput, 'startDate'>) {
+  return computeSkillPlanSchedule({ ...input, startDate: new Date() });
 }
 
-function computeQueue(
-  entries: readonly PlanEntry[],
-  catalog: SkillCatalog,
-  trainedSkills: ReadonlyMap<number, TrainedSkill>,
-  attributes: Attributes,
-  implants: Implants,
-  boosters: Booster[],
-  markers: readonly number[] | undefined,
-  markerAttributes: readonly (Attributes | null)[],
-  cloneState: CloneState
-): ComputeResult {
-  // Guard against unknown typeIDs (stale plan, imported skill not in the current SDE snapshot).
-  const validEntries = entries.filter((e) => catalog.engineSkills.has(e.skillTypeID));
-  const startDate = new Date();
-  try {
-    const { steps, entryBoundaries } = normalizePlanWithBoundaries(
-      validEntries,
-      catalog.engineSkills,
-      trainedSkills
-    );
-    const markerStepIdx = markerStepIndices(entries, markers, catalog.engineSkills, trainedSkills);
-    const markersResult =
-      markerStepIdx.length > 0
-        ? optimizeAtMarkers(steps, catalog.engineSkills, {
-            markers: markerStepIdx,
-            currentAttributes: attributes,
-            implants,
-            booster: boosters.length > 0 ? { boosters, startDate } : undefined,
-            manualAttributes: markerAttributes,
-            cloneState,
-          })
-        : null;
-    const segments: AttributeSegment[] | undefined = markersResult?.segments.map((s) => ({
-      startIndex: s.startIndex,
-      attributes: s.attributes,
-    }));
-    const scheduled = computeSchedule(
-      steps,
-      // `trainedSkills` is read twice, for two different things:
-      // normalizePlanWithBoundaries takes the levels (which steps to emit),
-      // computeSchedule takes the SP (how much of the first such step is
-      // already paid for). Without the second, a plan that opens on the skill
-      // the character is currently training re-charges the whole level and
-      // reads hours longer than the in-game queue for it.
-      { attributes, implants, boosters, startDate, trainedSkills, segments, cloneState },
-      catalog.engineSkills
-    );
-    return { scheduled, entryBoundaries, error: null, startDate, markersResult };
-  } catch (err) {
-    return {
-      scheduled: [],
-      entryBoundaries: [],
-      error: err instanceof Error ? err.message : String(err),
-      startDate,
-      markersResult: null,
-    };
-  }
-}
+/** An Optimize Remaps result, with each segment's first step held by key rather than index. */
+type OptimizeRun = PlaceRemapsResult & { anchorKeys: (StepKey | undefined)[] };
 
 export function PlanEditor({
   characterId,
@@ -298,20 +228,6 @@ export function PlanEditor({
   const isDesktop = useIsDesktop();
   const [copyConfirm, setCopyConfirm] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
-  const [optimizeResult, setOptimizeResult] = useState<PlaceRemapsResult | null>(null);
-  // Whether the "Optimize at my markers" savings/segments panel is showing.
-  // The computation itself is no longer state — `markersAtCurrentPositions`
-  // below derives it live from `plan.markers` so marker rows always have
-  // their target attributes on hand — this flag exists purely to keep that
-  // panel an explicit, click-revealed finding rather than something that
-  // pops up unasked the moment a plan happens to carry any markers.
-  const [markersPanelOpen, setMarkersPanelOpen] = useState(false);
-  // Why each result came out the way it did (optimizeVerdict.ts). Held
-  // beside the result rather than derived at render: the verdict depends on
-  // the Remaps Available the run actually used, and the user can edit that
-  // input afterwards without invalidating the result itself.
-  const [optimizeVerdict, setOptimizeVerdict] = useState<OptimizeVerdict | null>(null);
-  const [reorderPreview, setReorderPreview] = useState<PlanStep[] | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importConfirm, setImportConfirm] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -319,15 +235,11 @@ export function PlanEditor({
   // copyConfirm/importConfirm above: small text next to the triggering
   // button, cleared after a couple of seconds. Additive to the full
   // Panel/Modal results those same actions already produce below.
-  const [optimizeConfirm, setOptimizeConfirm] = useState<string | null>(null);
   const [markerConfirm, setMarkerConfirm] = useState(false);
   const [reorderConfirm, setReorderConfirm] = useState(false);
-  // Outcome of the last drag on the entry list. A drop that would land a
-  // skill after something requiring it is refused rather than silently
-  // re-normalized back (planDrop.ts), so the refusal has to say why; a
-  // promoted prereq row is a quieter change than it looks (a dimmed row turns
-  // into user data), so it says so too.
-  const [dropError, setDropError] = useState<string | null>(null);
+  // A promoted prereq row is a quieter change than it looks (a dimmed row
+  // turns into user data), so it says so. A "that worked" note about the
+  // change that just landed, so it clears on its own timer, not with the plan.
   const [promoteConfirm, setPromoteConfirm] = useState<string | null>(null);
   // Which marker's manual attribute editor (RemapMarkerModal) is open, by
   // ordinal — the same addressing `onRemoveMarker`/`markerAttributesFor` use.
@@ -382,6 +294,37 @@ export function PlanEditor({
   const cloneState = cloneStateFor(cloneStates, characterId);
   const setCloneState = (next: CloneState): void =>
     void setCloneStates(withCloneState(cloneStates, characterId, next));
+
+  // Results about the plan as it stood when they were produced (BUG #1).
+  // Scoped, not cleared: each reads as null once the plan is swapped or its
+  // entries/markers change, and the Optimize ones also once the Clone State
+  // flips — a savings figure costed at one training rate describes nothing
+  // after the plan trains at another.
+  const planScope = [plan.id, plan.entries, plan.markers];
+  const costingScope = [...planScope, cloneState];
+  const [optimizeResult, setOptimizeResult] = useScopedState<OptimizeRun>(costingScope);
+  // Why each result came out the way it did (optimizeVerdict.ts). Held
+  // beside the result rather than derived at render: the verdict depends on
+  // the Remaps Available the run actually used, and the user can edit that
+  // input afterwards without invalidating the result itself.
+  const [optimizeVerdict, setOptimizeVerdict] = useScopedState<OptimizeVerdict>(costingScope);
+  // Beside-the-button confirmation (#222) for Optimize Remaps.
+  const [optimizeConfirm, setOptimizeConfirm] = useScopedState<string>(costingScope);
+  // Whether the "Optimize at my markers" savings/segments panel is showing.
+  // The computation itself is not state — the schedule below derives it live
+  // from `plan.markers` so marker rows always have their target attributes on
+  // hand — this flag exists purely to keep that panel an explicit,
+  // click-revealed finding rather than something that pops up unasked the
+  // moment a plan happens to carry any markers.
+  const [markersPanelOpenHeld, setMarkersPanelOpen] = useScopedState<boolean>(planScope);
+  const markersPanelOpen = markersPanelOpenHeld ?? false;
+  const [reorderPreview, setReorderPreview] = useScopedState<PlanStep[]>(planScope);
+  // Outcome of the last drag on the entry list. A drop that would land a
+  // skill after something requiring it is refused rather than silently
+  // re-normalized back (planDrop.ts), so the refusal has to say why. It
+  // describes one drag against one entry order — once the order moves on it
+  // describes nothing.
+  const [dropError, setDropError] = useScopedState<string>(planScope);
 
   // What-If Implants (CONTEXT.md): swap the clone's real implants for a
   // hypothetical set — a uniform preset, or five per-slot bonuses, since EVE's
@@ -537,25 +480,19 @@ export function PlanEditor({
     [plan.markers, plan.markerAttributes, plan.entries.length]
   );
 
-  const {
-    scheduled,
-    entryBoundaries,
-    error,
-    startDate,
-    markersResult: markersAtCurrentPositions,
-  } = useMemo(
+  const schedule = useMemo(
     () =>
-      computeQueue(
-        plan.entries,
-        catalog,
+      scheduleFromNow({
+        entries: plan.entries,
+        skills: catalog.engineSkills,
         trainedSkills,
         attributes,
-        effectiveImplants,
-        activeBoosters,
-        plan.markers,
-        normalizedMarkerAttributes,
-        cloneState
-      ),
+        implants: effectiveImplants,
+        boosters: activeBoosters,
+        markers: plan.markers,
+        markerAttributes: normalizedMarkerAttributes,
+        cloneState,
+      }),
     [
       plan.entries,
       catalog,
@@ -568,6 +505,19 @@ export function PlanEditor({
       cloneState,
     ]
   );
+  const {
+    scheduled,
+    entryBoundaries,
+    error,
+    startDate,
+    markersResult: markersAtCurrentPositions,
+    priorityMap,
+    boostedSteps,
+    alphaCappedSteps,
+    totalSeconds,
+    finish: planFinish,
+    skillCount: scheduledSkillCount,
+  } = schedule;
 
   // One row per skill level (reorder.ts). Plans written before that rule —
   // and any entry added at a level several above the character's trained one
@@ -602,57 +552,9 @@ export function PlanEditor({
     onUpdate,
   ]);
 
-  // BUG #1: optimizeResult/reorderPreview index into `scheduled` by position.
-  // Once entries change (add/remove/reorder) or the plan itself is swapped,
-  // those positions are stale and can point past the end of the new
-  // `scheduled` array — clear both rather than render or crash against
-  // outdated data. Derived-and-cleared during render (React's sanctioned
-  // "adjusting state when a prop changes" pattern) instead of an effect, so
-  // the clear lands in the same commit as the prop change rather than one
-  // tick later.
-  const [prevPlanId, setPrevPlanId] = useState(plan.id);
-  const [prevEntries, setPrevEntries] = useState(plan.entries);
-  const [prevMarkers, setPrevMarkers] = useState(plan.markers);
-  if (prevPlanId !== plan.id || prevEntries !== plan.entries || prevMarkers !== plan.markers) {
-    setPrevPlanId(plan.id);
-    setPrevEntries(plan.entries);
-    setPrevMarkers(plan.markers);
-    setOptimizeResult(null);
-    setMarkersPanelOpen(false);
-    setOptimizeVerdict(null);
-    setReorderPreview(null);
-    setOptimizeConfirm(null);
-    // A refusal describes one drag against one entry order — once the order
-    // moves on it describes nothing. (promoteConfirm is the opposite: a
-    // "that worked" note about the change that just landed, so it clears on
-    // its own timer like markerAdded, not here.)
-    setDropError(null);
-  }
-  // An Optimize result was costed at one training rate; after a Clone State
-  // flip its savings figure describes a rate the plan no longer trains at.
-  const [prevCloneState, setPrevCloneState] = useState(cloneState);
-  if (prevCloneState !== cloneState) {
-    setPrevCloneState(cloneState);
-    setOptimizeResult(null);
-    setOptimizeVerdict(null);
-    setOptimizeConfirm(null);
-  }
-
   const userSkillTypeIDs = useMemo(
     () => new Set(plan.entries.map((e) => e.skillTypeID)),
     [plan.entries]
-  );
-
-  // Effective priority per skill (#27): each entry's own band, inherited by
-  // its prerequisites so one never reads as less urgent than what needs it.
-  // Guard against unknown typeIDs the same way computeQueue does.
-  const priorityMap = useMemo(
-    () =>
-      effectivePriority(
-        plan.entries.filter((e) => catalog.engineSkills.has(e.skillTypeID)),
-        catalog.engineSkills
-      ),
-    [plan.entries, catalog]
   );
 
   // The plan keeps whatever count the user set (ESI prefills bonus remaps).
@@ -660,35 +562,12 @@ export function PlanEditor({
   // quietly answering a different question than the one on screen.
   const remapCount = Math.min(plan.remapCount, MAX_SUPPORTED_REMAPS);
 
-  // Which queue rows the Booster actually speeds up: trained inside its window
-  // AND on an attribute it raises. Both, or the mark is a lie.
-  const boostedSteps = useMemo(
-    () =>
-      activeBoosters.length > 0
-        ? boostedStepIndices(scheduled, catalog.engineSkills, activeBoosters, startDate)
-        : new Set<number>(),
-    [scheduled, catalog, activeBoosters, startDate]
-  );
-
-  // Queue rows an Alpha clone cannot train at all — flagged, not dropped: the
-  // plan is still the pilot's, and it is right the moment they go Omega.
-  const alphaCappedSteps = useMemo(
-    () =>
-      cloneState === 'alpha'
-        ? alphaCappedStepIndices(scheduled, catalog.engineSkills)
-        : new Set<number>(),
-    [cloneState, scheduled, catalog]
-  );
-
   // #112: merge "Your entries" and the computed queue into one row list —
   // one row per entry (own aggregated per-level/cumulative time) plus dimmed
   // prereq rows positioned just ahead of the entry that needed them.
   const entryQueue = useMemo(
-    () =>
-      summarizeEntryQueue(plan.entries, entryBoundaries, scheduled, (skillTypeID) =>
-        catalog.engineSkills.has(skillTypeID)
-      ),
-    [plan.entries, entryBoundaries, scheduled, catalog]
+    () => summarizeEntryQueue(plan.entries, entryBoundaries, scheduled, schedule.isKnownSkill),
+    [plan.entries, entryBoundaries, scheduled, schedule.isKnownSkill]
   );
   // Built once and reused by both mergedRows and bandsAt below (#408: the
   // two used to each call buildRows independently over the same
@@ -714,21 +593,7 @@ export function PlanEditor({
     );
   }, [groupingMode, mergedRows, rows, priorityMap, catalog.engineSkills]);
 
-  const totalSeconds = scheduled.length > 0 ? scheduled[scheduled.length - 1].cumulativeSeconds : 0;
-  // No steps means no plan finish to project — never invent one for an
-  // empty (or all-trained) queue (#20).
-  const planFinish =
-    scheduled.length > 0 ? new Date(startDate.getTime() + totalSeconds * 1000) : null;
-  // Distinct skills in `scheduled`, not just plan.entries.length — scheduled
-  // also carries prerequisite steps normalizePlan injected, and totalSeconds
-  // already reflects their training time, so the header's skill count must
-  // count the same set it's timing.
-  const scheduledSkillCount = useMemo(
-    () => new Set(scheduled.map((s) => s.skillTypeID)).size,
-    [scheduled]
-  );
-
-  // `markersAtCurrentPositions` (from computeQueue, above) already carries a
+  // `markersAtCurrentPositions` (from the schedule, above) already carries a
   // manual override's real attributes when one is set — exactly what the
   // savings badge and Accept must cost against (#1232). But RemapMarkerModal
   // needs the OTHER half for a marker that already has an override: what the
@@ -739,17 +604,16 @@ export function PlanEditor({
   const markersOptimizerSpread = useMemo(() => {
     if (!plan.markers || plan.markers.length === 0) return null;
     return optimizeAtMarkers(scheduled, catalog.engineSkills, {
-      markers: markerStepIndices(plan.entries, plan.markers, catalog.engineSkills, trainedSkills),
+      markers: schedule.markerStepIndices,
       currentAttributes: attributes,
       implants: effectiveImplants,
       cloneState,
     });
   }, [
     plan.markers,
-    plan.entries,
     scheduled,
+    schedule.markerStepIndices,
     catalog.engineSkills,
-    trainedSkills,
     attributes,
     effectiveImplants,
     cloneState,
@@ -883,7 +747,7 @@ export function PlanEditor({
         activeBoosters.length > 0 ? { boosters: activeBoosters, startDate: new Date() } : undefined,
     });
     const verdict = remapVerdict(result, remapCount);
-    setOptimizeResult(result);
+    setOptimizeResult({ ...result, anchorKeys: anchorKeysOf(result.segments) });
     setOptimizeVerdict(verdict);
     setOptimizeConfirm(confirmRemapOutcome(verdict));
     setTimeout(() => setOptimizeConfirm(null), 2000);
@@ -960,13 +824,7 @@ export function PlanEditor({
         .map((s) => [s.startIndex, s.attributes])
     );
   }, [markersOptimizerSpread]);
-  const markerStepIndicesForResult = useMemo(
-    () =>
-      markersOptimizerSpread
-        ? markerStepIndices(plan.entries, plan.markers, catalog.engineSkills, trainedSkills)
-        : null,
-    [markersOptimizerSpread, plan.entries, plan.markers, catalog.engineSkills, trainedSkills]
-  );
+  const markerStepIndicesForResult = markersOptimizerSpread ? schedule.markerStepIndices : null;
   /** What "Optimize at my markers" computes for this marker, ignoring any manual override — RemapMarkerModal needs this half on its own so it can seed a fresh edit from the optimizer's spread without that spread being mistaken for an existing override. */
   function computedMarkerAttributesFor(markerIndex: number): Attributes | undefined {
     const stepIndex = markerStepIndicesForResult?.[markerIndex];
@@ -1067,6 +925,7 @@ export function PlanEditor({
       reorderedMarkerAttributes,
       confirmPromotion,
       onUpdate,
+      setDropError,
     ]
   );
 
@@ -1089,7 +948,15 @@ export function PlanEditor({
       const row = mergedRows.find((r) => r.id === rowId);
       if (row?.kind === 'prereq') confirmPromotion(row.step.skillTypeID, row.step.level);
     },
-    [plan.entries, plan.markers, mergedRows, onUpdate, reorderedMarkerAttributes, confirmPromotion]
+    [
+      plan.entries,
+      plan.markers,
+      mergedRows,
+      onUpdate,
+      reorderedMarkerAttributes,
+      confirmPromotion,
+      setDropError,
+    ]
   );
 
   /** EntryList's `onRemove`: opens the confirm Modal rather than removing immediately (#408). */
@@ -1158,14 +1025,23 @@ export function PlanEditor({
   // Shared per-segment rendering for both optimize modes: a remapped segment
   // gets the remap instruction; the leading current-attributes segment
   // (remap: false) is labeled as "keep current attributes" instead.
-  function renderSegments(segments: readonly RemapSegment[]) {
+  /** Each segment's first step, by key — see `stepKey`. */
+  function anchorKeysOf(segments: readonly RemapSegment[]): (StepKey | undefined)[] {
+    return segments.map((segment) => schedule.stepKeys[segment.startIndex]);
+  }
+
+  function renderSegments(
+    segments: readonly RemapSegment[],
+    anchorKeys: readonly (StepKey | undefined)[]
+  ) {
     return (
       <ul className="space-y-1">
         {segments.map((segment, index) => {
-          // Defensive: results are cleared whenever plan.entries/markers
-          // change (see the derive-and-clear block above), but guard the
-          // index anyway so a stale result can never crash the route.
-          const anchor = scheduled[segment.startIndex];
+          // Resolved by key against the live schedule: a step the plan no
+          // longer trains misses and its row is skipped, rather than an index
+          // naming whatever step now sits there (or nothing at all).
+          const key = anchorKeys[index];
+          const anchor = key === undefined ? undefined : schedule.stepByKey.get(key);
           if (!anchor) return null;
           return (
             <li key={index} className="space-y-0.5 border-b border-line pb-1 last:border-b-0">
@@ -1214,7 +1090,10 @@ export function PlanEditor({
     title: string;
     open: boolean;
     verdict: OptimizeVerdict | null;
-    segments: readonly RemapSegment[] | null;
+    segments: {
+      segments: readonly RemapSegment[];
+      anchorKeys: readonly (StepKey | undefined)[];
+    } | null;
     message: string;
     onAccept: () => void;
     onClose: () => void;
@@ -1230,7 +1109,11 @@ export function PlanEditor({
             ) : (
               <p className="text-text-dim">{message}</p>
             )}
-            {segments && <div className="max-h-56 overflow-y-auto">{renderSegments(segments)}</div>}
+            {segments && (
+              <div className="max-h-56 overflow-y-auto">
+                {renderSegments(segments.segments, segments.anchorKeys)}
+              </div>
+            )}
             <div className="flex gap-2">
               {verdict.kind === 'saves' && (
                 <Button variant="primary" size="sm" onClick={onAccept}>
@@ -1908,7 +1791,7 @@ export function PlanEditor({
         // never when there was none to spend. No segments on this branch:
         // a search that found nothing to remap has no plan-as-trained to
         // show, unlike the markers Modal below, which already has one.
-        segments: optimizeVerdict?.kind === 'saves' ? (optimizeResult?.segments ?? null) : null,
+        segments: optimizeVerdict?.kind === 'saves' && optimizeResult ? optimizeResult : null,
         message:
           optimizeVerdict?.kind === 'noRemapsAvailable'
             ? t('plans.remapNoneAvailable')
@@ -1927,7 +1810,10 @@ export function PlanEditor({
         // as a contradiction of the message above it.
         segments:
           markersAtCurrentPositions && markersVerdict?.kind !== 'markersAtEnd'
-            ? markersAtCurrentPositions.segments
+            ? {
+                segments: markersAtCurrentPositions.segments,
+                anchorKeys: anchorKeysOf(markersAtCurrentPositions.segments),
+              }
             : null,
         message:
           markersVerdict?.kind === 'markersAtEnd'
