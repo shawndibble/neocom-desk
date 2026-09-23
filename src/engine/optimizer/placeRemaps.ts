@@ -120,7 +120,7 @@ export function placeRemaps(
   skills: ReadonlyMap<number, EngineSkill>,
   options: PlaceRemapsOptions
 ): PlaceRemapsResult {
-  const { remapCount, currentAttributes, implants = {}, booster, cloneState = 'omega' } = options;
+  const { remapCount, currentAttributes, implants = {}, booster, cloneState } = options;
 
   const liveBoosters =
     booster?.boosters.filter((b) => b.expiresAt.getTime() > booster.startDate.getTime()) ?? [];

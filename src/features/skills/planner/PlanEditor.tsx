@@ -367,9 +367,11 @@ export function PlanEditor({
     void hydrateGroupingMode();
   }, [hydrateGroupingMode]);
 
-  // Clone State (CONTEXT.md): per Character, not per plan — an Alpha is Alpha
-  // in every plan it opens. ESI cannot tell us, so the pilot says.
+  // Clone State (CONTEXT.md): per Character, not per plan. The control waits
+  // for hydration — a write from the empty default would replace the whole
+  // blob and drop every other Character's answer.
   const cloneStates = useCloneStates((state) => state.value);
+  const cloneStatesHydrated = useCloneStates((state) => state.hydrated);
   const hydrateCloneStates = useCloneStates((state) => state.hydrate);
   const setCloneStates = useCloneStates((state) => state.setValue);
   useEffect(() => {
@@ -624,6 +626,7 @@ export function PlanEditor({
     setPrevCloneState(cloneState);
     setOptimizeResult(null);
     setOptimizeVerdict(null);
+    setOptimizeConfirm(null);
   }
 
   const userSkillTypeIDs = useMemo(
@@ -1449,6 +1452,7 @@ export function PlanEditor({
             <input
               type="checkbox"
               checked={cloneState === 'alpha'}
+              disabled={!cloneStatesHydrated}
               onChange={(e) => setCloneState(e.target.checked ? 'alpha' : 'omega')}
             />
             {t('plans.alphaClone')}

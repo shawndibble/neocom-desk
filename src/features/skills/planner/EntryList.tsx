@@ -258,33 +258,40 @@ function useRowSortable(id: string): SortableRowChrome {
   };
 }
 
-/** A row's booster mark: shared by entry and prereq rows. */
-function BoosterMark() {
-  const { t } = useTranslation();
+/** An inline row glyph: shared by entry and prereq rows. */
+function RowMark({ label, tone, path }: { label: string; tone: string; path: string }) {
   return (
     <svg
       viewBox="0 0 24 24"
-      aria-label={t('plans.boosterAffects')}
+      aria-label={label}
       role="img"
-      className="ml-1 inline-block size-3 align-[-0.125em] text-accent"
+      className={`ml-1 inline-block size-3 align-[-0.125em] ${tone}`}
     >
-      <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z" fill="currentColor" />
+      <path d={path} fill="currentColor" />
     </svg>
   );
 }
 
-/** A row an Alpha clone cannot train: shared by entry and prereq rows. */
+function BoosterMark() {
+  const { t } = useTranslation();
+  return (
+    <RowMark
+      label={t('plans.boosterAffects')}
+      tone="text-accent"
+      path="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"
+    />
+  );
+}
+
+/** A level an Alpha clone cannot train. */
 function AlphaCapMark() {
   const { t } = useTranslation();
   return (
-    <svg
-      viewBox="0 0 24 24"
-      aria-label={t('plans.alphaCapped')}
-      role="img"
-      className="ml-1 inline-block size-3 align-[-0.125em] text-warning"
-    >
-      <path d="M12 2 1 21h22L12 2Zm-1 7h2v6h-2V9Zm0 8h2v2h-2v-2Z" fill="currentColor" />
-    </svg>
+    <RowMark
+      label={t('plans.alphaCapped')}
+      tone="text-warning"
+      path="M12 2 1 21h22L12 2Zm-1 7h2v6h-2V9Zm0 8h2v2h-2v-2Z"
+    />
   );
 }
 

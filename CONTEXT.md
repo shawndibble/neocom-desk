@@ -146,13 +146,6 @@ here — they go one per file in `docs/context/decisions/`.
   the _cause_ can never be distinguished; only this one unified symptom is
   detectable. Distinct from **Skill Level Complete**, which fires per
   finished queue entry while training continues.
-- **Clone State**: Whether a Character is **Alpha** or **Omega**. ESI does
-  not expose it (see **Character Not Training**), so the pilot sets it per
-  Character, default Omega, synced across devices. Alpha trains at half the
-  Omega SP rate — halved inside the rate, so a Booster window covers half the
-  SP rather than the plan simply doubling — and cannot train past each
-  skill's Alpha cap (the SDE's clone-grade skill levels); plan rows above the
-  cap are flagged, not removed.
 - **Clock Kind**: Which of the six sources a **Character Board Item** came
   from. The `/calendar` page's one colour scale names this and nothing else —
   a **nominal** palette (`--color-kind-*`, DESIGN.md §1), unlike every other
@@ -160,6 +153,10 @@ here — they go one per file in `docs/context/decisions/`.
   rail's countdown and glyph, one dot per kind in the **Calendar Map**, a
   segment in the **Day Ticker**, and a swatch in the filter menu, which is the
   legend for the set. Never the only signal: the kind is always also named.
+- **Clone State**: Whether a Character is **Alpha** or **Omega**. ESI does
+  not expose it (see **Character Not Training**), so the pilot sets it per
+  Character. Alpha trains at half the Omega SP rate and cannot train past
+  each skill's **Alpha cap** (the SDE's clone-grade skill levels).
 - **Coming Up Rail**: The `/calendar` list beside the **Calendar Map**: every
   **Character Board Item** the pilot can read, deadline-ordered under relative
   day headings, each row carrying a countdown. The half of the page that

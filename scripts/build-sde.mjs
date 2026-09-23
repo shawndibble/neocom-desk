@@ -73,12 +73,12 @@ const MARKET_REGIONS_MAX = 116;
 // off, so a generous band around the known count still catches that while
 // tolerating CCP adding a handful more ore variants later (issue #1058).
 const REPROCESSING_SPECIALISATION_MIN = 300;
+const REPROCESSING_SPECIALISATION_MAX = 500;
 // Skills an Alpha clone can train at all, as counted against the dump on
 // 2026-09-22: 175, identical across all four clone grades. Same idea as the
 // band above — a broken join lands at 0, not slightly off (issue #1233).
 const ALPHA_SKILLS_MIN = 150;
 const ALPHA_SKILLS_MAX = 250;
-const REPROCESSING_SPECIALISATION_MAX = 500;
 // A region whose every solar system sits within this many meters of the
 // coordinate origin is not a place in the game universe — the nearest real
 // system (Zarzakh) sits ~5.66e15 m out, ~5.7 billion times farther than this
