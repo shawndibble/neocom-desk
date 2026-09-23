@@ -74,7 +74,14 @@
  *   costs a planet slot and forgoes a sale, and pricing it at zero would make
  *   the P0 floor win at every rate — which the tax tables show it does not.
  *
- * Pure: prices, tax rate, layout and extraction rate are all parameters. No
+ * `salesTaxPct` defaults to 0, unlike `taxRate`: this module's own callers
+ * disagree on whether the target is actually sold. `stopTier.ts` and
+ * `network.ts` score a sale and pass the pilot's real rate; `planModel.ts`
+ * asks a make-or-buy question with no sale in it and leaves it unset, same
+ * as before this parameter existed.
+ *
+ * Pure: prices, tax rate, sales tax rate, layout and extraction rate are all
+ * parameters. No
  * fetch, no market imports, no clock, no skill lookups.
  */
 
@@ -279,6 +286,7 @@ export function chainCost(chain: PiChain, opts: ChainCostOptions): ChainCostResu
     ownSourcedIds,
     layout,
     taxRate = DEFAULT_CUSTOMS_TAX_RATE,
+    salesTaxPct = 0,
     extractionRate = null,
   } = opts;
 
@@ -415,6 +423,7 @@ export function chainCost(chain: PiChain, opts: ChainCostOptions): ChainCostResu
   }
 
   const totalCost = sourcedCost + taxCost;
+  const salesTax = (revenue * salesTaxPct) / 100;
   const breakdown: ChainCostBreakdown = {
     status: 'costed',
     sourcingFloor,
@@ -427,7 +436,9 @@ export function chainCost(chain: PiChain, opts: ChainCostOptions): ChainCostResu
     taxCost,
     totalCost,
     revenue,
-    margin: revenue - totalCost,
+    salesTax,
+    salesTaxPct,
+    margin: revenue - totalCost - salesTax,
     extraction,
   };
   return breakdown;

@@ -155,6 +155,12 @@ export interface StopTierOptions {
    */
   revenuePrices?: Readonly<Record<number, number>>;
   taxRate: number;
+  /**
+   * Sales tax rate, percent, netted off a candidate's own revenue before
+   * customs — the raw floor's export price, or a made tier's `chainCost`
+   * revenue. Never derived here; see `engine/industry/fees.ts#salesTaxPct`.
+   */
+  salesTaxPct: number;
   linkCapacityPerHour: ThroughputOptions['linkCapacityPerHour'];
   bufferHours: ThroughputOptions['bufferHours'];
   /**
@@ -470,7 +476,8 @@ function scoreRawResource(
   // Its export is the only customs boundary extracted-and-sold ore crosses.
   // A made chain's P0 is billed differently, and CONTEXT.md round 56 records
   // why that asymmetry is inherited rather than fixed here.
-  const marginPerUnit = price - opts.taxRate * CUSTOMS_TAXABLE_VALUE[0];
+  const netPrice = price * (1 - opts.salesTaxPct / 100);
+  const marginPerUnit = netPrice - opts.taxRate * CUSTOMS_TAXABLE_VALUE[0];
   const factor = opts.extraExtractorYieldFactor ?? DEFAULT_EXTRA_EXTRACTOR_YIELD_FACTOR;
   const unitsPerHour =
     fit.blocks * opts.extractionRatePerHour * extractionFalloffRatio(fit.blocks, factor);
@@ -516,6 +523,7 @@ function scoreProduct(typeId: number, pi: PiData, opts: StopTierOptions): StopTi
     sourcingFloor: 'P0',
     layout: LAYOUT,
     taxRate: opts.taxRate,
+    salesTaxPct: opts.salesTaxPct,
     extractionRate: opts.extractionRatePerHour,
   });
   // Both refusals were answered above; this is a guard against the engine

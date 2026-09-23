@@ -64,6 +64,7 @@ function costed(opts: {
   layout?: 'single-planet' | 'planet-per-tier';
   taxRate?: number;
   extractionRate?: number | null;
+  salesTaxPct?: number;
 }) {
   const result = chainCost(chain, {
     prices,
@@ -272,6 +273,30 @@ describe('chainCost', () => {
     expect(p1.sourcedCost).toBeCloseTo(1_459_200, 3);
     expect(p1.sourced.some((line) => line.tier === 0)).toBe(false);
     expect(p1.sourced.every((line) => line.tier === 1)).toBe(true);
+  });
+});
+
+describe('chainCost sales tax', () => {
+  it('defaults to no sales tax, leaving margin unchanged', () => {
+    const untaxed = costed({ sourcingFloor: 'P1', taxRate: 0.1 });
+    const explicitZero = costed({ sourcingFloor: 'P1', taxRate: 0.1, salesTaxPct: 0 });
+    expect(untaxed.salesTax).toBe(0);
+    expect(untaxed.margin).toBeCloseTo(explicitZero.margin, 6);
+  });
+
+  it('charges sales tax only on the target’s own revenue, not on sourced or customs cost', () => {
+    const result = costed({ sourcingFloor: 'P1', taxRate: 0.1, salesTaxPct: 7.5 });
+    const target = nodeFor(BROADCAST_NODE);
+    const grossRevenue = FIXTURE_UNIT_PRICE[target.tier];
+    expect(result.salesTax).toBeCloseTo(grossRevenue * 0.075, 6);
+    expect(result.revenue).toBeCloseTo(grossRevenue, 6);
+    expect(result.margin).toBeCloseTo(result.revenue - result.totalCost - result.salesTax, 6);
+  });
+
+  it('reduces margin as the rate rises, all else equal', () => {
+    const untaxed = costed({ sourcingFloor: 'P1', taxRate: 0.1, salesTaxPct: 0 });
+    const taxed = costed({ sourcingFloor: 'P1', taxRate: 0.1, salesTaxPct: 7.5 });
+    expect(taxed.margin).toBeLessThan(untaxed.margin);
   });
 });
 

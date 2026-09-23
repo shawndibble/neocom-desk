@@ -33,7 +33,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
-import { IskAmount } from '@/components/ui';
+import { InfoTooltip, IskAmount } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import type { BlindSpot } from './blindSpotModel';
 import type { TotalColonyEarnings } from './colonyEarningsModel';
@@ -179,7 +179,15 @@ export function AdvisorSummary({ list, earnings, spots, controls }: AdvisorSumma
         )}
       </Card>
 
-      <Card title={t('piAdvisor.summaryEarnTitle')}>
+      <Card
+        title={t('piAdvisor.summaryEarnTitle')}
+        meta={
+          <InfoTooltip
+            label={t('common.aboutLabel', { label: t('piAdvisor.summaryEarnTitle') })}
+            content={t('piAdvisor.summaryEarnHint')}
+          />
+        }
+      >
         {/*
           The unit sits on the figure, not in the header. It used to be a
           header label with a sentence under the number explaining where the

@@ -72,6 +72,8 @@ export interface ColonyEarningsPrices {
   /** What the hub actually pays — its highest buy. Defaults to `prices`, whole-book. */
   revenuePrices?: Readonly<Record<number, number>>;
   taxRate: number;
+  /** Sales tax rate, percent, from the character's own Accounting level. */
+  salesTaxPct: number;
 }
 
 /**

@@ -25,6 +25,7 @@ function options(overrides: Partial<ColonyEarningsOptions> = {}): ColonyEarnings
     saleableOutputPerHour: new Map(),
     prices: {},
     taxRate: 0.1,
+    salesTaxPct: 0,
     ...overrides,
   };
 }
@@ -155,5 +156,18 @@ describe('colonyEarnings', () => {
       pi
     );
     expect(result.iskPerHour).toBeCloseTo(-400);
+  });
+
+  it('nets sales tax off the price before charging customs', () => {
+    // 1,000 * (1 - 0.075) = 925 net; 925 - 0.1*400 = 885 margin/unit.
+    const result = colonyEarnings(
+      options({
+        saleableOutputPerHour: new Map([[BACTERIA, 40]]),
+        prices: { [BACTERIA]: 1_000 },
+        salesTaxPct: 7.5,
+      }),
+      pi
+    );
+    expect(result.iskPerHour).toBeCloseTo(40 * 885);
   });
 });
