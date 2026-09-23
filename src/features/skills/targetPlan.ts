@@ -1,15 +1,7 @@
 /**
- * Which Skill Plan an "Add to Plan" action (Fit Check, the Market item-detail
- * skill chip) lands on, per Character.
- *
- * Synced, one blob keyed by Character id, for the same reason as
- * `sync.skillCloneStates`: the allow-list matches exact keys only, and this
- * is one key carrying every Character's choice rather than one key per
- * Character. Never deleted: a stale entry (its plan removed on another
- * device) is not an error — `selectTargetPlanId` below just falls back to
- * picking for itself.
- *
- * Pure here; the Dexie read of the Character's actual plans lives in
+ * Which Skill Plan an Add-to-Plan action lands on, per Character. One
+ * synced blob keyed by Character id, same reason as `sync.skillCloneStates`
+ * (exact-match allow-list). Pure here; the Dexie plan read lives in
  * `useTargetPlan.ts`.
  */
 import { parseCharacterKeyedRecord } from '@/lib/characterKeyedRecord';
@@ -43,14 +35,9 @@ export function withTargetPlanId(
 }
 
 /**
- * Resolves which plan an Add action should land on, given the Character's
- * current plans and whatever this preference last stored for them.
- *
- * - No plans at all: `null` — the caller offers "Create Plan & Add" instead.
- * - Exactly one plan: always that one, whatever is stored — nothing to pick.
- * - Several plans: the stored id, if it still names one of them; otherwise
- *   the first (a stored id can go stale when its plan was deleted on another
- *   device, or nothing has ever been stored for this Character yet).
+ * Which plan an Add lands on: `null` with none (caller offers "Create Plan &
+ * Add"), the only one with exactly one, else the stored id if it still names
+ * one of them — otherwise the first (stale/never-set stored id).
  */
 export function selectTargetPlanId(
   plans: readonly { id: string }[],

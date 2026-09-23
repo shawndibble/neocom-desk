@@ -276,7 +276,7 @@ describe('ItemDetailModal', () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/<font/)).not.toBeInTheDocument();
     // The generic "Primary Skill required" row is folded into the dedicated
-    // Required Skills section (issue #1366) instead of also rendering here.
+    // Required Skills section instead of also rendering here.
     expect(screen.queryByText('Primary Skill required')).not.toBeInTheDocument();
     expect(screen.getByText('Required Skills')).toBeInTheDocument();
     expect(screen.getByText('Caldari Frigate')).toBeInTheDocument();

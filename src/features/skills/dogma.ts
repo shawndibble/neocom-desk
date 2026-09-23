@@ -73,19 +73,6 @@ export interface RequiredSkill {
 }
 
 /**
- * The `requiredSkillN` attribute ids (not their `Level` counterparts —
- * `itemAttributes.ts`'s `groupItemAttributes` already keys its one merged
- * row per requirement on these, never the level half). `ItemDetailModal`
- * uses this to drop the generic "<Skill name> <roman level>" row it would
- * otherwise render for a requirement its own dedicated Required Skills
- * section (with trained-level status and Add to Plan) already covers, so
- * the same requirement is never shown twice.
- */
-export const REQUIRED_SKILL_DISPLAY_ATTRIBUTE_IDS: ReadonlySet<number> = new Set(
-  REQUIRED_SKILL_ATTRIBUTE_PAIRS.map(([skillAttrId]) => skillAttrId)
-);
-
-/**
  * Extract "this item requires skill X at level Y" pairs from a type's dogma
  * attributes. ESI values are floats (e.g. `3329.0`) — rounded to ints. A
  * requiredSkillN of 0/absent (most items only use the first 1-3 of 6 slots)

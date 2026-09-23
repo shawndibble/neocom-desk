@@ -1,9 +1,4 @@
-/**
- * The 3-state read shared by Fit Check's rows (`ships/fitCheckRows.ts`) and
- * Market's item-detail Required Skills section: trained to the requested
- * level already, partially trained (some levels in, more still needed), or
- * never started at all.
- */
+/** Trained to the requested level, partially trained, or never started — shared by Fit Check and Market's Required Skills. */
 export type SkillTrainingStatus = 'trained' | 'partial' | 'missing';
 
 export function skillTrainingStatus(

@@ -28,15 +28,10 @@ import { loadPi } from '@/sde/loadSde';
 import type { PiData } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { loadCharacterSkills } from '@/features/skills/data';
-import {
-  extractRequiredSkills,
-  REQUIRED_SKILL_DISPLAY_ATTRIBUTE_IDS,
-  type RequiredSkill,
-} from '@/features/skills/dogma';
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { extractRequiredSkills, type RequiredSkill } from '@/features/skills/dogma';
 import { SkillStatusIcon } from '@/features/skills/SkillStatusIcon';
 import { skillTrainingStatus } from '@/features/skills/skillStatus';
-import { toTrainedSkillsMap } from '@/features/skills/skillMap';
 import { TargetPlanPicker } from '@/features/skills/TargetPlanPicker';
 import { useTargetPlan, type TargetPlan } from '@/features/skills/useTargetPlan';
 import { loadAttributeReferenceNames } from './attributeReferenceNames';
@@ -63,7 +58,7 @@ export interface ItemDetailModalProps {
 
 interface DetailData {
   type: UniverseType;
-  /** `REQUIRED_SKILL_DISPLAY_ATTRIBUTE_IDS` rows already pulled out — the Required Skills section below owns those instead. */
+  /** Skill-requirement rows already excluded — the Required Skills section below owns those instead. */
   groups: AttributeGroup[];
   requiredSkills: RequiredSkill[];
   /** typeID -> name, reused from the same resolution the generic rows already paid for. */
@@ -103,8 +98,13 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
         if (!cancelled) setTrainedSkills(new Map());
         return;
       }
-      const result = await loadCharacterSkills(activeCharacterId);
-      if (!cancelled) setTrainedSkills(toTrainedSkillsMap(result?.data.skills ?? []));
+      // Queue-corrected, like every other trained-level read (usePlanEditorData) —
+      // a level the queue just finished but /skills hasn't caught up to would
+      // otherwise show wrong here while everywhere else shows it trained.
+      const corrected = await loadCorrectedSkills(activeCharacterId, Date.now(), {
+        skipQueueWithoutScope: true,
+      });
+      if (!cancelled) setTrainedSkills(corrected.trained);
     })();
     return () => {
       cancelled = true;
@@ -150,17 +150,11 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
         // the fetch above; it never rejects, so it can't blank the modal.
         const names = await loadAttributeReferenceNames([type.dogma_attributes], dictionary);
         if (cancelled) return;
-        const groups = groupItemAttributes(type.dogma_attributes, dictionary, names)
-          .map((group) => ({
-            ...group,
-            attributes: group.attributes.filter(
-              (attribute) => !REQUIRED_SKILL_DISPLAY_ATTRIBUTE_IDS.has(attribute.attributeId)
-            ),
-          }))
-          .filter((group) => group.attributes.length > 0);
         setData({
           type,
-          groups,
+          groups: groupItemAttributes(type.dogma_attributes, dictionary, names, {
+            omitSkillRequirementRows: true,
+          }),
           requiredSkills: extractRequiredSkills(type.dogma_attributes),
           skillNames: names.types ?? {},
           pi,
@@ -282,15 +276,13 @@ function priceCell(price: number | null): ReactNode {
 }
 
 /**
- * "What skill affects this?" (issue #1366) — inline, not a destination: the
- * skills this item's own dogma attributes already named as required, each
- * with the Character's status and a one-click Add to Skill Plan through the
- * same Target Plan mechanism Fit Check uses. Renders nothing when the item
- * requires no skill (most items). Without an active Character
- * (`hasCharacter` false — nobody to hold a trained level or a plan for), it
- * degrades to name + required level only: no status icon, no picker, no Add
- * button, rather than a status that's always "missing" and an Add that's a
- * no-op.
+ * "What skill affects this?" — inline, not a destination: each skill the
+ * item's own dogma attributes name as required, with the Character's status
+ * and a one-click Add to Skill Plan (same Target Plan mechanism Fit Check
+ * uses). Renders nothing when the item requires no skill (most items).
+ * `hasCharacter` false (nobody to hold a trained level or a plan for)
+ * branches to name + required level only, once, rather than a status
+ * that's always "missing" and an Add that's a no-op.
  */
 function RequiredSkillsSection({
   requiredSkills,
@@ -320,36 +312,62 @@ function RequiredSkillsSection({
       </div>
       <div className="mt-1 space-y-1">
         {requiredSkills.map((req) => {
-          const currentLevel = trainedSkills.get(req.skillTypeID)?.level ?? 0;
-          const status = skillTrainingStatus(currentLevel, req.level);
           const name = skillNames[req.skillTypeID] ?? `#${req.skillTypeID}`;
-          return (
-            <div key={req.skillTypeID} className="flex items-center gap-3 text-xs">
-              {hasCharacter && <SkillStatusIcon status={status} />}
-              <span className="flex-1 text-text">{name}</span>
-              {hasCharacter ? (
-                <SkillBar level={currentLevel} />
-              ) : (
-                <span className="text-text-dim">{t('plans.level', { level: req.level })}</span>
-              )}
-              {hasCharacter && status !== 'trained' && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() =>
-                    void target.addEntries(
-                      [{ skillTypeID: req.skillTypeID, targetLevel: req.level }],
-                      itemName
-                    )
-                  }
-                >
-                  {t('skills.requiredSkills.addToPlan')}
-                </Button>
-              )}
-            </div>
+          return hasCharacter ? (
+            <TrackedSkillRow
+              key={req.skillTypeID}
+              name={name}
+              level={req.level}
+              currentLevel={trainedSkills.get(req.skillTypeID)?.level ?? 0}
+              onAdd={() =>
+                void target.addEntries(
+                  [{ skillTypeID: req.skillTypeID, targetLevel: req.level }],
+                  itemName
+                )
+              }
+            />
+          ) : (
+            <NameOnlySkillRow key={req.skillTypeID} name={name} level={req.level} />
           );
         })}
       </div>
+    </div>
+  );
+}
+
+function TrackedSkillRow({
+  name,
+  level,
+  currentLevel,
+  onAdd,
+}: {
+  name: string;
+  level: number;
+  currentLevel: number;
+  onAdd: () => void;
+}) {
+  const { t } = useTranslation();
+  const status = skillTrainingStatus(currentLevel, level);
+  return (
+    <div className="flex items-center gap-3 text-xs">
+      <SkillStatusIcon status={status} />
+      <span className="flex-1 text-text">{name}</span>
+      <SkillBar level={currentLevel} />
+      {status !== 'trained' && (
+        <Button size="sm" variant="ghost" onClick={onAdd}>
+          {t('skills.requiredSkills.addToPlan')}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function NameOnlySkillRow({ name, level }: { name: string; level: number }) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-center gap-3 text-xs">
+      <span className="flex-1 text-text">{name}</span>
+      <span className="text-text-dim">{t('plans.level', { level })}</span>
     </div>
   );
 }

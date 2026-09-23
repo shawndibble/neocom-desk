@@ -6,12 +6,7 @@ export interface TargetPlanPickerProps {
   target: TargetPlan;
 }
 
-/**
- * "Adding to: <plan>" — shown beside every Add-to-Plan action that shares
- * `useTargetPlan`. Renders nothing while there is exactly zero or one plan:
- * zero has no plan to name (the Add button itself reads "Create Plan &
- * Add"), and one is picked automatically with nothing to choose.
- */
+/** Renders nothing under 2 plans — nothing to choose (0: the Add button itself offers to create one; 1: auto-picked). */
 export function TargetPlanPicker({ target }: TargetPlanPickerProps) {
   const { t } = useTranslation();
   const { plans, targetPlanId, setTargetPlanId } = target;

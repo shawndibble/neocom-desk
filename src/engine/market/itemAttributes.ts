@@ -135,11 +135,22 @@ function idReferenceName(
   return map?.[value] ?? null;
 }
 
+export interface GroupItemAttributesOptions {
+  /**
+   * Skip building the curated "<Skill name> <roman level>" rows — for a
+   * caller (Market's item-detail Required Skills section) already rendering
+   * those requirements itself, with trained-level status and an Add to Plan
+   * action the plain dictionary row can't carry.
+   */
+  omitSkillRequirementRows?: boolean;
+}
+
 /** Groups by category, sorted alphabetically; attributes within a group sorted by display name. */
 export function groupItemAttributes(
   dogmaAttributes: readonly RawDogmaAttribute[] | undefined,
   dictionary: AttributeDictionary,
-  names: AttributeReferenceNames = {}
+  names: AttributeReferenceNames = {},
+  options: GroupItemAttributesOptions = {}
 ): AttributeGroup[] {
   if (!dogmaAttributes || dogmaAttributes.length === 0) return [];
 
@@ -156,7 +167,9 @@ export function groupItemAttributes(
     list.push(attribute);
   };
 
-  for (const [skillAttrId, levelAttrId] of SKILL_REQUIREMENT_PAIRS) {
+  for (const [skillAttrId, levelAttrId] of options.omitSkillRequirementRows
+    ? []
+    : SKILL_REQUIREMENT_PAIRS) {
     const skillTypeId = byId.get(skillAttrId);
     if (skillTypeId === undefined) continue;
     const entry = dictionary[skillAttrId];

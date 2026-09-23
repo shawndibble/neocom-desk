@@ -1,24 +1,9 @@
 /**
- * The "Add to Plan" target for one Character: which of their Skill Plans an
- * action from Fit Check or the Market item-detail skill chip lands on.
- *
- * Wires `targetPlan.ts`'s pure selection rule to the Character's actual
- * plans (Dexie, live) and the synced preference that remembers the last
- * choice. `db.skillPlans.put`/`scheduleSync` here mirrors
- * `SkillPlanEditor.tsx`'s own patch pattern exactly, and `upsertEntry`
- * (`planner/reorder.ts`) is the same merge the plan editor's own Skill
- * Picker uses — a skill already covered at an equal or higher level is left
- * alone rather than duplicated or downgraded.
- *
- * Deliberately different from `SkillRowContextMenu.tsx`'s "Add to Skill
- * Plan," which asks which plan on every click via a submenu, on the stated
- * reasoning that Skill Plans has no notion of a current plan. That reasoning
- * held for a single one-off right-click; it stops holding once "Add" is the
- * whole point of a panel someone returns to repeatedly (Fit Check, Ship
- * Mastery, a Market item's skill chip) — asking every time there turns one
- * click into two, every time. This preference is the new state that trade
- * accepts; the context menu's own submenu is untouched and still correct for
- * what it does.
+ * Which Skill Plan Fit Check / the Market skill chip Add into. Wires
+ * `targetPlan.ts`'s pure selection rule to the Character's live plans plus
+ * the synced remembered choice. Deliberately different from
+ * `SkillRowContextMenu.tsx`'s per-click plan submenu — that's right for a
+ * one-off right-click, not for a panel where "Add" repeats.
  */
 import { useCallback, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -79,19 +64,15 @@ export function useTargetPlan(characterId: number | null): TargetPlan {
     async (entries: readonly PlanEntry[], newPlanName: string) => {
       if (characterId === null || entries.length === 0) return;
 
-      // Read-modify-write inside one transaction, re-querying the
-      // Character's plans fresh rather than trusting `plans`/`targetPlanId`
-      // from render — those come from `useLiveQuery` and can still read
-      // zero plans for a moment after a concurrent Add already created one
-      // (two Add clicks in quick succession, before the first write round-
-      // trips back through the live query). Without the re-check, both
-      // calls see "no plan yet" and each creates its own.
+      // Re-queries plans fresh inside the transaction rather than trusting
+      // `plans`/`targetPlanId` from render (`useLiveQuery`, can still read
+      // zero plans for a moment after a concurrent Add just created one) —
+      // otherwise two rapid Add clicks each see "no plan yet" and both create one.
       const plan = await db.transaction('rw', db.skillPlans, async () => {
         const existing = await db.skillPlans.where('characterId').equals(characterId).toArray();
+        const selected = selectTargetPlanId(existing, targetPlanIdFor(stored, characterId));
         const current =
-          existing.find((p) => p.id === targetPlanId) ??
-          existing[0] ??
-          newPlan(characterId, newPlanName);
+          existing.find((p) => p.id === selected) ?? newPlan(characterId, newPlanName);
         const updated = {
           ...current,
           entries: entries.reduce((acc, entry) => upsertEntry(acc, entry), current.entries),
@@ -104,7 +85,7 @@ export function useTargetPlan(characterId: number | null): TargetPlan {
       void setStored(withTargetPlanId(stored, characterId, plan.id));
       if (isSyncConfigured()) scheduleSync(characterId);
     },
-    [characterId, targetPlanId, stored, setStored]
+    [characterId, stored, setStored]
   );
 
   return { plans, targetPlanId, setTargetPlanId, addEntries };

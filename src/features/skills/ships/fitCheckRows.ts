@@ -1,10 +1,4 @@
-/**
- * Fit Check's own display shape: one row per skill a pasted fit needs,
- * independent of any Skill Plan. Pure — the caller supplies `entries` (from
- * `fitToSkills`), the Character's trained skills, and the scheduled steps
- * `computeSkillPlanSchedule` produced for those same entries (reused rather
- * than re-deriving training time here).
- */
+/** One display row per skill a pasted fit needs. Pure — seconds come from `computeSkillPlanSchedule`'s own steps, not re-derived here. */
 import type { EngineSkill, PlanEntry, ScheduledStep, TrainedSkill } from '@/engine/types';
 import { skillTrainingStatus, type SkillTrainingStatus } from '../skillStatus';
 

@@ -1,12 +1,9 @@
 /**
- * "What skills do I need to fly this fit?" — paste an EFT fit, see the
- * skills it still needs, add them to a plan. Reuses the same parse/resolve
- * path as the Skill Plan editor's own "Import from clipboard" (eftFit mode
- * of `previewClipboardImport`) and Industry's Fit Import — this panel is a
- * new, narrower presentation of that shared engine, not a new parser: unlike
- * `ImportClipboardDialog`, it only ever reads an EFT fit (no skill-plan-paste
- * or file tabs) and shows the result as a first-class panel instead of a
- * modal preview.
+ * Paste an EFT fit, see the skills it still needs, add them to a plan.
+ * Reuses `previewClipboardImport`'s eftFit path (same as the Skill Plan
+ * editor's clipboard import and Industry's Fit Import) — narrower than
+ * `ImportClipboardDialog` (EFT only, no skill-plan-paste/file tabs) and a
+ * panel rather than a modal preview.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -39,6 +36,8 @@ interface CheckedFit {
   warnings: string[];
 }
 
+type CheckState = { kind: 'idle' } | { kind: 'notEftFit' } | ({ kind: 'result' } & CheckedFit);
+
 export function FitCheckPanel({
   target,
   skills,
@@ -50,13 +49,10 @@ export function FitCheckPanel({
   const { t } = useTranslation();
   const [text, setText] = useState('');
   const [checking, setChecking] = useState(false);
-  const [result, setResult] = useState<CheckedFit | null>(null);
-  const [notEftFit, setNotEftFit] = useState(false);
+  const [check, setCheck] = useState<CheckState>({ kind: 'idle' });
 
   async function handleCheck() {
     setChecking(true);
-    setNotEftFit(false);
-    setResult(null);
     try {
       const [skillByName, typeByName] = await Promise.all([loadSkillNameMap(), loadItemNameMap()]);
       const preview = await previewClipboardImport(text, {
@@ -65,7 +61,7 @@ export function FitCheckPanel({
         loadType: loadUniverseType,
       });
       if (preview.mode !== 'eftFit') {
-        setNotEftFit(true);
+        setCheck({ kind: 'notEftFit' });
         return;
       }
       const schedule = computeSkillPlanSchedule({
@@ -80,7 +76,8 @@ export function FitCheckPanel({
         cloneState,
         startDate: new Date(),
       });
-      setResult({
+      setCheck({
+        kind: 'result',
         shipName: preview.shipName,
         rows: buildFitCheckRows(preview.entries, skills, trainedSkills, schedule.scheduled),
         warnings: preview.warnings,
@@ -94,12 +91,13 @@ export function FitCheckPanel({
     try {
       const clip = await readFromClipboard();
       setText(clip);
-      setResult(null);
+      setCheck({ kind: 'idle' });
     } catch {
       // Clipboard permission denied — the paste box is still there to type into.
     }
   }
 
+  const result = check.kind === 'result' ? check : null;
   const missingRows = result?.rows.filter((r) => r.status !== 'trained') ?? [];
 
   return (
@@ -114,8 +112,7 @@ export function FitCheckPanel({
             value={text}
             onChange={(e) => {
               setText(e.target.value);
-              setResult(null);
-              setNotEftFit(false);
+              setCheck({ kind: 'idle' });
             }}
             rows={8}
             className="w-full rounded-xs border border-line bg-panel-2 p-2 text-xs text-text"
@@ -134,7 +131,9 @@ export function FitCheckPanel({
               {checking ? <Spinner size="sm" /> : t('skills.fitCheck.checkButton')}
             </Button>
           </div>
-          {notEftFit && <p className="text-xs text-danger">{t('skills.fitCheck.notEftFit')}</p>}
+          {check.kind === 'notEftFit' && (
+            <p className="text-xs text-danger">{t('skills.fitCheck.notEftFit')}</p>
+          )}
         </div>
       </Panel>
 

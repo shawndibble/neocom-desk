@@ -12,12 +12,10 @@ import { FitCheckPanel } from '@/features/skills/ships/FitCheckPanel';
 type ShipsMode = 'fitCheck' | 'mastery';
 
 /**
- * Ships tab (issue #1366): "what skills do I need to fly this fit / hit this
- * ship's mastery level" — the two "I have a ship/fit in mind" planning
- * activities, as a segmented sub-view of Skills alongside Plans/Trained/
- * Compare. "What skill affects this module" (the third original question)
- * is deliberately not here — it's an inline chip on the item itself
- * (Market's item detail), not a destination.
+ * "What skills for this fit / this ship's mastery" — the two "I have a
+ * ship/fit in mind" planning activities, segmented alongside Skills'
+ * Plans/Trained/Compare. "What skill affects this module" lives inline on
+ * Market's item detail instead — a lookup, not a destination.
  */
 export function SkillShips() {
   const { t } = useTranslation();
