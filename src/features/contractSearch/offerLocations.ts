@@ -19,6 +19,8 @@ import type { PublicContractOfferRow } from '@/engine/contracts/contractOffers';
 
 /** One item-offer location, as far as the local snapshots place it. */
 export interface OfferLocation {
+  /** For the Jump Range filter (`engine/route/jumpRange.ts`). */
+  systemId: number | null;
   systemName: string | null;
   /** Raw ESI security status of the system — unrounded, the same float `CourierEndpoint.security` carries. */
   security: number | null;
@@ -27,7 +29,7 @@ export interface OfferLocation {
 const EMPTY_LOCATIONS: ReadonlyMap<number, OfferLocation> = new Map();
 
 /** Nothing local places this id — a player structure or an unreadable table alike. */
-const UNPLACED: OfferLocation = { systemName: null, security: null };
+const UNPLACED: OfferLocation = { systemId: null, systemName: null, security: null };
 
 async function resolveOne(locationId: number): Promise<OfferLocation> {
   const station = await lookupNpcStation(locationId);
@@ -38,7 +40,7 @@ async function resolveOne(locationId: number): Promise<OfferLocation> {
 
   const system = await lookupSolarSystem(station.systemId);
   if (!system) return UNPLACED;
-  return { systemName: system.name, security: system.security };
+  return { systemId: system.id, systemName: system.name, security: system.security };
 }
 
 async function resolveLocations(
