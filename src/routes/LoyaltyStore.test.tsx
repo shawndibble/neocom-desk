@@ -259,7 +259,7 @@ describe('LoyaltyStore item context menu (issue #716)', () => {
     fireEvent.contextMenu(row);
 
     await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
-    expect(probe.pathname).toBe('/market');
+    expect(probe.pathname).toBe('/market/browser');
     expect(probe.search).toContain('type=200');
   });
 
@@ -275,7 +275,7 @@ describe('LoyaltyStore item context menu (issue #716)', () => {
     expect(screen.getByRole('menuitem', { name: 'Build Plan' })).toBeInTheDocument();
 
     await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
-    expect(probe.pathname).toBe('/market');
+    expect(probe.pathname).toBe('/market/browser');
     expect(probe.search).toContain('type=300');
     expect(probe.search).not.toContain('type=999');
   });

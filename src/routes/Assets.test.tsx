@@ -739,7 +739,7 @@ describe('item context menu (issue #83)', () => {
     await user.click(screen.getByRole('menuitem', { name: 'View in Market' }));
 
     await waitFor(() => {
-      expect(window.location.pathname).toBe('/market');
+      expect(window.location.pathname).toBe('/market/browser');
     });
     expect(window.location.search).toContain('type=34');
   });

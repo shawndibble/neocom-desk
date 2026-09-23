@@ -237,7 +237,7 @@ describe('ContractDetailModal', () => {
       onClose: () => {},
     });
     const link = await screen.findByRole('link', { name: /Tritanium/ });
-    expect(link).toHaveAttribute('href', expect.stringContaining('/market?'));
+    expect(link).toHaveAttribute('href', expect.stringContaining('/market/browser?'));
   });
 
   it('right-clicking a blueprint line item starts a Build Plan for what it builds', async () => {

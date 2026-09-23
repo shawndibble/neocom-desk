@@ -13,7 +13,7 @@ describe('MarketItemLink', () => {
 
     expect(screen.getByRole('link', { name: 'Ocular Filter - Basic' })).toHaveAttribute(
       'href',
-      '/market?type=9899'
+      '/market/browser?type=9899'
     );
   });
 
@@ -26,7 +26,7 @@ describe('MarketItemLink', () => {
 
     expect(screen.getByRole('link', { name: 'Ocular Filter - Basic' })).toHaveAttribute(
       'href',
-      '/market?type=9899&region=10000002'
+      '/market/browser?type=9899&region=10000002'
     );
   });
 

@@ -71,7 +71,7 @@ function outcome(overrides: Partial<AppraisalOutcome> = {}): AppraisalOutcome {
  */
 function renderPanel(
   props: Partial<Parameters<typeof AppraisalPanel>[0]> = {},
-  { route = '/market?section=appraisal&hub=jita' }: { route?: string } = {}
+  { route = '/market/appraisal?hub=jita' }: { route?: string } = {}
 ) {
   const onPricePercentChange = vi.fn();
   const onAddToQuickbar = vi.fn();
@@ -502,22 +502,21 @@ describe('AppraisalPanel', () => {
 
 describe('AppraisalPanel — the row as an item', () => {
   /**
-   * The link deliberately carries no `section`: that absence is what
-   * `Market.tsx` reads as an incoming item link and answers by switching to
-   * the Browser. Carrying `section=appraisal` through would land the pilot
-   * back on the tab they clicked from, which looks like a dead link.
+   * The link points at `/market/browser` directly (ADR 0015) — the tab is
+   * part of the path now, so there is no `section` left to carry through
+   * that would otherwise land the pilot back on the tab they clicked from.
    */
   it('links an item name into the Market Browser, keeping the hub it was priced at', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     const link = screen.getByRole('link', { name: 'Damage Control II' });
-    expect(link).toHaveAttribute('href', '/market?type=2048&hub=jita');
+    expect(link).toHaveAttribute('href', '/market/browser?type=2048&hub=jita');
   });
 
   it('falls back to a bare item link when the URL names no location', () => {
     renderPanel({ controller: controller({ result: outcome() }) }, { route: '/market' });
     expect(screen.getByRole('link', { name: 'Damage Control II' })).toHaveAttribute(
       'href',
-      '/market?type=2048'
+      '/market/browser?type=2048'
     );
   });
 

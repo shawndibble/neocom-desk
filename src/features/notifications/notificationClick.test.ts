@@ -58,8 +58,8 @@ describe('handleNotificationClick', () => {
   });
 
   it('focuses without navigating when already on that route, query string included', async () => {
-    const open = client(`${ORIGIN}/market?section=orders`);
-    await handleNotificationClick(env([open]), '/market?section=orders');
+    const open = client(`${ORIGIN}/market/orders`);
+    await handleNotificationClick(env([open]), '/market/orders');
     expect(open.focus).toHaveBeenCalled();
     expect(open.navigate).not.toHaveBeenCalled();
   });

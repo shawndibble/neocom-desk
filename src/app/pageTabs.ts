@@ -21,8 +21,28 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'across', labelKey: 'contacts.tabAcrossCharacters' },
 ]);
 
+/**
+ * `history/transactions` is a tab id containing a literal `/`, not a nested
+ * subtab of `history` — `tabFromPathname` only ever compares one segment
+ * against a tab's `id` for equality, so a `/`-bearing id is how a two-segment
+ * path (`/market/history/transactions`) resolves without either this
+ * registry or `usePageTab` needing to understand subtabs at all. It is not
+ * one of the four tabs the `Tabs` bar renders — `HistoryViewSelect`, inside
+ * History's own header, is what switches into and out of it (round 54); this
+ * entry exists only so that path resolves to a real tab instead of bouncing
+ * to the default (docs/ARCHITECTURE.md §9).
+ */
+export const MARKET_TABS = definePageTabs('/market', [
+  { id: 'browser', labelKey: 'market.sections.browser' },
+  { id: 'orders', labelKey: 'market.sections.openOrders' },
+  { id: 'history', labelKey: 'market.sections.history' },
+  { id: 'history/transactions', labelKey: 'market.sections.transactions' },
+  { id: 'appraisal', labelKey: 'market.sections.appraisal' },
+]);
+
 export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/contacts': CONTACTS_TABS,
+  '/market': MARKET_TABS,
 };
 
 const TABBED_PAGES = Object.values(PAGE_TABS);

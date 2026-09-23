@@ -4,8 +4,8 @@ import {
   activeFilterCount,
   EMPTY_OPEN_ORDERS_FILTER,
   filterOpenOrders,
-  openOrdersFilterFromParams,
   openOrdersHref,
+  OPEN_ORDERS_FILTER_PARAMS,
   sortOpenOrders,
   type OpenOrdersFilter,
 } from './openOrdersFilter';
@@ -358,23 +358,29 @@ describe('activeFilterChips / activeFilterCount', () => {
  * it, and the round-trip below is what stops them drifting apart.
  */
 describe('the deep-link vocabulary', () => {
-  const base: OpenOrdersFilter = { ...EMPTY_OPEN_ORDERS_FILTER, hideHealthy: true };
+  const problemsCodec = OPEN_ORDERS_FILTER_PARAMS['orders.problems'];
+  const charactersCodec = OPEN_ORDERS_FILTER_PARAMS['orders.characters'];
 
-  function parse(query: string): OpenOrdersFilter {
-    return openOrdersFilterFromParams(new URLSearchParams(query), base);
+  function parseHref(href: string): {
+    problems: readonly string[];
+    characterIds: readonly number[];
+  } {
+    const params = new URLSearchParams(href.slice(href.indexOf('?') + 1));
+    return {
+      problems: problemsCodec.parse(params.get('orders.problems')),
+      characterIds: charactersCodec.parse(params.get('orders.characters')),
+    };
   }
 
-  it('reads a repeated problem param as the OR the filter already means', () => {
-    // Repeated rather than comma-separated: `getAll` is the standard reading
-    // of it, so there is no delimiter to escape and no parser to get wrong.
-    expect(parse('problem=undercutStation&problem=undercutRegion').problems).toEqual([
+  it('reads a comma-separated problems param as the OR the filter already means', () => {
+    expect(problemsCodec.parse('undercutStation,undercutRegion')).toEqual([
       'undercutStation',
       'undercutRegion',
     ]);
   });
 
-  it('reads a repeated character param', () => {
-    expect(parse('character=91&character=42').characterIds).toEqual([91, 42]);
+  it('reads a comma-separated characters param, sorted', () => {
+    expect(charactersCodec.parse('91,42')).toEqual([42, 91]);
   });
 
   /*
@@ -383,9 +389,8 @@ describe('the deep-link vocabulary', () => {
    * asked for — orders — is still the right answer.
    */
   it('drops what it does not recognise instead of throwing', () => {
-    const filter = parse('problem=undercutStation&problem=nonsense&character=91&character=abc');
-    expect(filter.problems).toEqual(['undercutStation']);
-    expect(filter.characterIds).toEqual([91]);
+    expect(problemsCodec.parse('undercutStation,nonsense')).toEqual(['undercutStation']);
+    expect(charactersCodec.parse('91,abc')).toEqual([]);
   });
 
   /*
@@ -397,32 +402,23 @@ describe('the deep-link vocabulary', () => {
    * `healthy` out); only a URL can.
    */
   it('refuses `healthy`, which would filter to a guaranteed empty page', () => {
-    expect(parse('problem=healthy')).toBe(base);
-    expect(parse('problem=healthy&problem=outbid').problems).toEqual(['outbid']);
+    expect(problemsCodec.parse('healthy')).toEqual([]);
+    expect(problemsCodec.parse('healthy,outbid')).toEqual(['outbid']);
   });
 
-  it('leaves the rest of the filter exactly as it found it', () => {
-    // Layered onto the page's own default, not onto an empty filter: arriving
-    // by deep link must not quietly unfold every healthy order.
-    const filter = parse('problem=outbid');
-    expect(filter.hideHealthy).toBe(true);
-    expect(filter.sort).toBe(base.sort);
-    expect(filter.text).toBe('');
-  });
-
-  it('hands back the base untouched when the URL says nothing', () => {
-    expect(parse('')).toBe(base);
-    expect(parse('section=orders')).toBe(base);
+  it('hands back the empty list when the URL says nothing', () => {
+    expect(problemsCodec.parse(null)).toEqual([]);
+    expect(charactersCodec.parse(null)).toEqual([]);
   });
 
   it('round-trips what the board links to', () => {
     const href = openOrdersHref({ problems: UNDERCUT_PROBLEMS, characterIds: [91] });
-    const filter = parse(href.slice(href.indexOf('?') + 1));
-    expect(filter.problems).toEqual([...UNDERCUT_PROBLEMS]);
-    expect(filter.characterIds).toEqual([91]);
+    const parsed = parseHref(href);
+    expect(parsed.problems).toEqual([...UNDERCUT_PROBLEMS]);
+    expect(parsed.characterIds).toEqual([91]);
   });
 
   it('is the plain Orders page when there is nothing to narrow by', () => {
-    expect(openOrdersHref({})).toBe('/market?section=orders');
+    expect(openOrdersHref({})).toBe('/market/orders');
   });
 });

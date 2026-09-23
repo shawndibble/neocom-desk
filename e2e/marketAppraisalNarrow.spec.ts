@@ -89,7 +89,7 @@ async function mockHubPrices(page: Page): Promise<void> {
 
 /** Pastes a haul into the Appraisal tab and prices it. `hub` is pinned rather than left to `DEFAULT_TRADE_HUB`, so a change to which hub ships as the default cannot quietly re-point this. */
 async function appraise(page: Page, paste: string): Promise<void> {
-  await page.goto('./market?section=appraisal&hub=jita');
+  await page.goto('./market/appraisal?hub=jita');
   await page.getByLabel(/items from inventory/i).fill(paste);
   await page.getByRole('button', { name: 'Appraise', exact: true }).click();
   // Well past the 5s default: one click here awaits the market type index and

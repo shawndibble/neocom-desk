@@ -43,7 +43,7 @@ function renderPanel() {
   const onRequestBlueprintCatalog = vi.fn();
   const onViewChange = vi.fn();
   render(
-    <MemoryRouter initialEntries={['/market?section=history']}>
+    <MemoryRouter initialEntries={['/market/history']}>
       <OrderHistoryPanel
         onViewChange={onViewChange}
         blueprintCatalog={null}

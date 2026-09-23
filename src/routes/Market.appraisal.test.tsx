@@ -47,12 +47,13 @@ vi.mock('@/features/market/appraisalData', () => ({
 // Recording the URL is exactly what an effect is for — writing the latest
 // React state out to something outside React. Doing it during render trips
 // `react-hooks/globals` / `react-hooks/immutability`, and rightly so.
-const probe = { search: '' };
+const probe = { pathname: '', search: '' };
 function LocationProbe() {
-  const { search } = useLocation();
+  const { pathname, search } = useLocation();
   useEffect(() => {
+    probe.pathname = pathname;
     probe.search = search;
-  }, [search]);
+  }, [pathname, search]);
   return null;
 }
 
@@ -72,6 +73,7 @@ async function pickHub(name: string) {
 }
 
 beforeEach(async () => {
+  probe.pathname = '';
   probe.search = '';
   // The hub is a *synced* setting, so picking one writes it to Dexie as well
   // as to the store. Resetting only the store leaves the row behind, and the
@@ -85,7 +87,7 @@ beforeEach(async () => {
 
 describe('Market Appraisal tab navigation', () => {
   it('offers the trade hub picker but not the Location Mode chips', async () => {
-    renderAt('/market?section=appraisal');
+    renderAt('/market/appraisal');
 
     expect(await screen.findByRole('combobox', { name: /Trade Hub/i })).toBeInTheDocument();
     // Region has no meaning here: prices come from one station's aggregates.
@@ -93,43 +95,37 @@ describe('Market Appraisal tab navigation', () => {
   });
 
   /**
-   * `navigateTo` replaces the whole query with `buildMarketParams`' canonical
-   * set. Without carrying `section` across, a URL grabbed after changing hub
-   * named the wrong tab.
+   * `navigateTo` replaces only `type`/`hub`/`region`/`group` — the tab is a
+   * path segment now (ADR 0015), not a query param riding along, so there is
+   * nothing left for it to carry across a hub change.
    */
-  it('keeps section=appraisal in the URL when the hub changes', async () => {
-    renderAt('/market?section=appraisal');
+  it('stays on the appraisal path when the hub changes', async () => {
+    renderAt('/market/appraisal');
     await screen.findByRole('combobox', { name: /Trade Hub/i });
 
     await pickHub('Amarr');
 
     await waitFor(() => expect(probe.search).toContain('hub=amarr'));
-    expect(new URLSearchParams(probe.search).get('section')).toBe('appraisal');
+    expect(probe.pathname).toBe('/market/appraisal');
   });
 
-  /**
-   * The sharp edge: with a `type` left in the query from the Browser tab,
-   * dropping `section` makes the URL look like an external item cross-link
-   * (`crossLinkedToBrowser`), which answers by yanking the pilot back to the
-   * Browser mid-appraisal.
-   */
   it('stays on the tab when the hub changes with an item still in the URL', async () => {
-    renderAt('/market?type=34&section=appraisal');
+    renderAt('/market/appraisal?type=34');
     await screen.findByRole('combobox', { name: /Trade Hub/i });
     expect(screen.getByText('Nothing appraised yet')).toBeInTheDocument();
 
     await pickHub('Amarr');
 
     await waitFor(() => expect(probe.search).toContain('hub=amarr'));
-    expect(new URLSearchParams(probe.search).get('section')).toBe('appraisal');
+    expect(probe.pathname).toBe('/market/appraisal');
     expect(screen.getByText('Nothing appraised yet')).toBeInTheDocument();
   });
 
   /**
-   * The other half of that same rule, read the other way round: an appraised
-   * row's item link deliberately carries no `section`, so `crossLinkedToBrowser`
-   * treats it as an incoming item link and hands the pilot the order book. A
-   * link that stayed on this tab would look broken.
+   * An appraised row's item link points at `/market/browser?type=…`
+   * (`engine/market/urlState.ts`'s `marketItemUrl`) — a real path change, not
+   * a query-only cross-link heuristic — so Market's own tab resolution just
+   * follows the new pathname to the Browser like any other navigation.
    */
   it('opens an appraised item in the Browser when its name is clicked', async () => {
     const user = userEvent.setup();
@@ -160,15 +156,15 @@ describe('Market Appraisal tab navigation', () => {
       unmatched: [],
       implantBonusPct: 0,
     });
-    renderAt('/market?section=appraisal');
+    renderAt('/market/appraisal');
 
     await user.type(await screen.findByLabelText(/Items from inventory/), 'Tritanium 5');
     await user.click(screen.getByRole('button', { name: 'Appraise' }));
 
     await user.click(await screen.findByRole('link', { name: 'Tritanium' }));
 
-    await waitFor(() => expect(probe.search).toContain('type=34'));
-    expect(new URLSearchParams(probe.search).has('section')).toBe(false);
+    await waitFor(() => expect(probe.pathname).toBe('/market/browser'));
+    expect(probe.search).toContain('type=34');
     // The Browser's own item view, not the paste box it was clicked from.
     expect(await screen.findByRole('tab', { name: 'Market Data' })).toBeInTheDocument();
     expect(screen.queryByLabelText(/Items from inventory/)).not.toBeInTheDocument();
