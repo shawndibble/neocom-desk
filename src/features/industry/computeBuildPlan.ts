@@ -19,6 +19,7 @@ import type {
   IndustryBlueprint,
   ReactionFacilityContext,
 } from '@/engine/industry/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import type { SubBuildContext } from '@/engine/industry/subBuild';
 import type { MaterialRecipe } from '@/engine/industry/makeOrBuy';
 import type { BuildPlanRecord } from '@/db';
@@ -46,6 +47,12 @@ export interface ComputeBuildPlanInput {
   /** The plan's material price basis, already resolved by `priceBasis.ts`. */
   materialPrices?: HubPrices;
   modifiers: CharacterModifiers;
+  /**
+   * The plan owner's standing toward the plan's Trade Hub NPC owner, for the
+   * broker fee and break-even price (issue #1238). Absent/0 = standings
+   * assumed 0, today's behaviour.
+   */
+  standing?: ResolvedStandings;
   /** What produces a material, for anything `plan.buildHere` might name at any depth. */
   recipeFor?: (typeID: number) => MaterialRecipe | null;
   /** Blueprint Acquisition (issue #838) for any buildable node reached during recursion. */
@@ -84,6 +91,7 @@ export function computeBuildPlan({
   hubPrices,
   materialPrices,
   modifiers,
+  standing,
   recipeFor,
   acquisitionFor,
   blueprintAcquisition,
@@ -120,6 +128,7 @@ export function computeBuildPlan({
         ? withoutOwnedQuantities(plan.materialSourcing)
         : plan.materialSourcing,
       modifiers,
+      standing,
       buildHere: plan.buildHere,
       recipeFor,
       acquisitionFor,

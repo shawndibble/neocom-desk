@@ -57,6 +57,7 @@ import type { EngineAsset } from '../assetTree';
 import type { MaterialRecipe } from './makeOrBuy';
 import type { ResolvedMaterial } from './materialResolution';
 import type { CharacterModifiers } from './characterModifiers';
+import type { ResolvedStandings } from '@/engine/market/standings';
 
 export interface QuantityEntry {
   typeID: number;
@@ -514,6 +515,13 @@ export interface IndustryInputs {
    * path that forgets it must fail to compile, not quote without bonuses.
    */
   modifiers: CharacterModifiers;
+  /**
+   * The character's standing toward the product's sale hub's NPC owner, for
+   * the broker fee and break-even price. Absent/0 = today's behaviour
+   * (standings assumed 0) — the caller resolves this once for the plan's
+   * fixed Trade Hub, not per material.
+   */
+  standing?: ResolvedStandings;
   /**
    * Material typeIDs the player chose to build rather than buy, at any depth
    * — not only the blueprint's own materials. Absent = build nothing, the

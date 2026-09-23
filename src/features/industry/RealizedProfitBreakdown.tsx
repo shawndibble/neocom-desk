@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
 import { brokerFeePct, salesTaxPct } from '@/engine/industry/fees';
 import type { RealizedProfitResult } from '@/engine/industry/realizedProfit';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import { formatIsk } from '@/lib/isk';
 import { Formula, Section } from './CalculationBreakdown';
 import { formatPercent } from './format';
@@ -12,6 +13,8 @@ interface RealizedProfitBreakdownProps {
   profit: RealizedProfitResult;
   accountingLevel: number;
   brokerRelationsLevel: number;
+  /** Standing toward the watched order's station owner. Absent/0 = standings assumed 0. */
+  standing?: ResolvedStandings;
 }
 
 /**
@@ -29,10 +32,15 @@ export function RealizedProfitBreakdown({
   profit,
   accountingLevel,
   brokerRelationsLevel,
+  standing,
 }: RealizedProfitBreakdownProps) {
   const { t } = useTranslation();
   const taxPct = salesTaxPct(accountingLevel);
-  const brokerPct = brokerFeePct(brokerRelationsLevel);
+  const brokerPct = brokerFeePct(
+    brokerRelationsLevel,
+    standing?.factionStanding,
+    standing?.corpStanding
+  );
 
   return (
     <Modal open={open} onClose={onClose} title={t('industry.realizedBreakdown.title')}>
@@ -66,6 +74,8 @@ export function RealizedProfitBreakdown({
             {t('industry.realizedBreakdown.brokerFee', {
               broker: brokerRelationsLevel,
               pct: formatPercent(brokerPct),
+              factionStanding: standing?.factionStanding ?? 0,
+              corpStanding: standing?.corpStanding ?? 0,
             })}
           </p>
           <Formula>

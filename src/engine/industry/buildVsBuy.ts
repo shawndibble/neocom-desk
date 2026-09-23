@@ -27,7 +27,17 @@ import { estimatedItemValue, jobFee } from '@/engine/industry/jobCost';
 import { brokerFee, breakEvenPrice, salesTax } from '@/engine/industry/fees';
 
 export function buildVsBuy(inputs: IndustryInputs): BuildResult {
-  const { blueprint, runs, me, te, systemCostIndex, adjustedPrices, hubPrices, modifiers } = inputs;
+  const {
+    blueprint,
+    runs,
+    me,
+    te,
+    systemCostIndex,
+    adjustedPrices,
+    hubPrices,
+    modifiers,
+    standing,
+  } = inputs;
   const { skills } = modifiers;
   const ctx: SubBuildContext = {
     facility: inputs.facility,
@@ -102,7 +112,14 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
   const revenue = productPriced ? product.quantity * runs * productPrice : null;
   const tax = revenue === null ? null : salesTax(revenue, skills[SKILL_IDS.accounting] ?? 0);
   const broker =
-    revenue === null ? null : brokerFee(revenue, skills[SKILL_IDS.brokerRelations] ?? 0);
+    revenue === null
+      ? null
+      : brokerFee(
+          revenue,
+          skills[SKILL_IDS.brokerRelations] ?? 0,
+          standing?.factionStanding,
+          standing?.corpStanding
+        );
   const netRevenue =
     revenue === null || tax === null || broker === null ? null : revenue - tax - broker;
 
@@ -128,7 +145,9 @@ export function buildVsBuy(inputs: IndustryInputs): BuildResult {
     totalCost,
     productQuantity,
     skills[SKILL_IDS.accounting] ?? 0,
-    skills[SKILL_IDS.brokerRelations] ?? 0
+    skills[SKILL_IDS.brokerRelations] ?? 0,
+    standing?.factionStanding,
+    standing?.corpStanding
   );
 
   return {

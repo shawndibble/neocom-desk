@@ -35,6 +35,7 @@ import type {
   IndustryBlueprint,
   ReactionFacilityContext,
 } from '@/engine/industry/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import type { MakeOrBuyContext } from '@/engine/industry/makeOrBuy';
 import type { BpcOffer } from '@/engine/industry/blueprintAcquisition';
 import type { CharacterBlueprint } from '@/esi/endpoints';
@@ -70,6 +71,13 @@ export interface BuildPlanSources {
   /** ME to quote an unowned sub-build at (`useAssumedMe`). */
   assumedMe: number;
   modifiers: CharacterModifiers;
+  /**
+   * The plan owner's standing toward the plan's own Trade Hub NPC owner
+   * (issue #1238). Absent/0 = standings assumed 0, today's behaviour. The
+   * caller resolves this against `getTradeHub(plan.hubId)`'s station, same
+   * as every other per-plan hub read.
+   */
+  standing?: ResolvedStandings;
   /** BPC Sourcing offers already narrowed to the plan's own Trade Hub region. */
   bpcOffersFor: (blueprintTypeID: number) => readonly BpcOffer[];
   /** `useIncludeBlueprintCost`: off still resolves each tier, but prices no acquisition line. */
@@ -253,6 +261,7 @@ export function resolveBuildPlan(
     hubPrices: snapshot?.hubPrices ?? {},
     materialPrices,
     modifiers: sources.modifiers,
+    standing: sources.standing,
     recipeFor,
     blueprintAcquisition,
     reactionFacility,

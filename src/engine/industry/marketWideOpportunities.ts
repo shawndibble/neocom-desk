@@ -21,6 +21,7 @@
  * Pure: no fetch/DOM/Dexie. The caller supplies prices already fetched.
  */
 import type { MarketWideTreeEntry } from '@/sde/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import { brokerFee, salesTax } from './fees';
 import { jobFee } from './jobCost';
 import {
@@ -55,8 +56,9 @@ const NPC_STATION_CONTEXT = {
 export interface MarketWideFeeInputs {
   adjustedPrices: AdjustedPrices;
   systemCostIndex: number;
-  /** See `IndustryInputs.modifiers`. */
   modifiers: CharacterModifiers;
+  /** The character's standing toward the sale hub's NPC owner. Absent/0 = standings assumed 0. */
+  standing?: ResolvedStandings;
 }
 
 /** One product's liquidity signal — the cheap, product-only price fetch that runs before any material pricing. */
@@ -154,7 +156,7 @@ export function computeMarketWideRows(
   feeInputs: MarketWideFeeInputs,
   thresholds?: OrderDepthThresholds
 ): MarketWideRow[] {
-  const { adjustedPrices, systemCostIndex, modifiers } = feeInputs;
+  const { adjustedPrices, systemCostIndex, modifiers, standing } = feeInputs;
   const { skills } = modifiers;
   const priced: {
     id: string;
@@ -184,7 +186,12 @@ export function computeMarketWideRows(
 
     const revenue = candidate.sellPrice * tree.outputQuantity;
     const tax = salesTax(revenue, skills[SKILL_IDS.accounting] ?? 0);
-    const broker = brokerFee(revenue, skills[SKILL_IDS.brokerRelations] ?? 0);
+    const broker = brokerFee(
+      revenue,
+      skills[SKILL_IDS.brokerRelations] ?? 0,
+      standing?.factionStanding,
+      standing?.corpStanding
+    );
     const profit = revenue - tax - broker - buildCost;
     // TE0, 1 run: tree.time is already the per-candidate total (not per-run),
     // and this scan has no owned plan to seed a non-zero TE assumption from

@@ -37,6 +37,7 @@ const READ_ONLY_PHRASES: Record<string, string> = {
   'esi-planets.manage_planets.v1': 'planetary colonies',
   'esi-characters.read_contacts.v1': 'contacts',
   'esi-characters.read_loyalty.v1': 'loyalty points',
+  'esi-characters.read_standings.v1': 'standings',
   'esi-location.read_location.v1': 'current location',
 };
 

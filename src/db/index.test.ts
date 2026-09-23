@@ -226,7 +226,7 @@ describe('schema upgrade v6 -> v7', () => {
   });
 
   it('the shipped database is at its current version with v7’s index live', () => {
-    expect(db.verno).toBe(13);
+    expect(db.verno).toBe(14);
     expect(db.characters.schema.indexes.map((i) => i.name)).toContain('corporationId');
   });
 });
@@ -268,6 +268,7 @@ describe('schema upgrade v8 -> v9 (Production Log, issue #525)', () => {
         'characters',
         'esiCache',
         'mailDrafts',
+        'miningLedgerHistory',
         'miningTaxAssignments',
         'notificationFeed',
         'orderProblemSamples',
@@ -347,5 +348,12 @@ describe('a blocked upgrade', () => {
       unsubscribe();
       close.mockRestore();
     }
+  });
+});
+
+describe('schema upgrade v13 -> v14 (mining ledger history, issue #1278)', () => {
+  it('adds miningLedgerHistory keyed by characterId, with no other index', () => {
+    expect(db.miningLedgerHistory.schema.primKey.name).toBe('characterId');
+    expect(db.miningLedgerHistory.schema.indexes.map((i) => i.name)).toEqual([]);
   });
 });

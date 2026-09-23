@@ -37,6 +37,10 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
+import {
+  tradeHubStanding,
+  type TradeHubStandingsMap,
+} from '@/features/market/useTradeHubStandings';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { loadPlanSnapshots, type PlanSnapshots } from './planSnapshots';
 import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
@@ -76,6 +80,13 @@ export interface UseComparedBuildResultsArgs {
    */
   corpOwnedBlueprints?: CorpOwnedBlueprintsState;
   modifiers: CharacterModifiers;
+  /**
+   * The active Character's standing toward each Trade Hub's NPC owner
+   * (issue #1238), keyed by hub id — `useTradeHubStandings`'s result.
+   * Absent/no entry for a plan's hub = standings assumed 0, today's
+   * behaviour, same as `BuildPlanDetail.tsx`'s own page.
+   */
+  tradeHubStandings?: TradeHubStandingsMap;
   /** @see ComparedBuildRow.groupResult */
   computeGroupResult?: boolean;
 }
@@ -107,9 +118,10 @@ async function computeRow(
   plan: BuildPlanRecord,
   catalog: BlueprintCatalog,
   priced: PlanSnapshots | null,
-  sources: Omit<BuildPlanSources, 'catalog' | 'bpcOffersFor'>,
+  sources: Omit<BuildPlanSources, 'catalog' | 'bpcOffersFor' | 'standing'>,
   bpcRows: readonly BpcContractRow[],
-  computeGroupResult: boolean
+  computeGroupResult: boolean,
+  tradeHubStandings: TradeHubStandingsMap
 ): Promise<ComparedBuildRow> {
   const base = {
     planId: plan.id,
@@ -129,7 +141,12 @@ async function computeRow(
     const hub: TradeHub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
     const { result, error, groupResult, groupError } = resolveBuildPlan(
       plan,
-      { ...sources, catalog, bpcOffersFor: offersForRegion(bpcRows, hub.regionId) },
+      {
+        ...sources,
+        catalog,
+        bpcOffersFor: offersForRegion(bpcRows, hub.regionId),
+        standing: tradeHubStanding(tradeHubStandings, hub.id),
+      },
       { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex },
       { withGroupResult: computeGroupResult }
     );
@@ -155,6 +172,7 @@ export function useComparedBuildResults({
   ownedBlueprints,
   corpOwnedBlueprints,
   modifiers,
+  tradeHubStandings,
   computeGroupResult = false,
 }: UseComparedBuildResultsArgs): ComparedBuildRow[] {
   const [rows, setRows] = useState<ComparedBuildRow[]>([]);
@@ -248,7 +266,8 @@ export function useComparedBuildResults({
           includeBlueprintCost,
         },
         bpcRows,
-        computeGroupResult
+        computeGroupResult,
+        tradeHubStandings ?? new Map()
       ).then((row) => {
         if (cancelled) return;
         setRows((prev) => prev.map((r) => (r.planId === plan.id ? row : r)));
@@ -270,6 +289,7 @@ export function useComparedBuildResults({
     includeBlueprintCostHydrated,
     bpcRows,
     modifiers,
+    tradeHubStandings,
     computeGroupResult,
   ]);
 

@@ -20,6 +20,7 @@ import type { BlueprintCatalog } from './blueprintCatalog';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { formatPercent } from './format';
 import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBuildResults';
+import type { TradeHubStandingsMap } from '@/features/market/useTradeHubStandings';
 
 interface BuildPlanCompareProps {
   plans: readonly BuildPlanRecord[];
@@ -29,6 +30,8 @@ interface BuildPlanCompareProps {
   /** Folded into each plan on its own `includeCorpAssets` — see `resolveBuildPlan`. */
   corpOwnedBlueprints?: CorpOwnedBlueprintsState;
   modifiers: CharacterModifiers;
+  /** The active Character's per-Trade-Hub standings (issue #1238) — see `useComparedBuildResults`. */
+  tradeHubStandings?: TradeHubStandingsMap;
   /** Exits compare mode, restoring the previously open single-plan detail. */
   onDone: () => void;
 }
@@ -80,6 +83,7 @@ export function BuildPlanCompare({
   ownedBlueprints,
   corpOwnedBlueprints,
   modifiers,
+  tradeHubStandings,
   onDone,
 }: BuildPlanCompareProps) {
   const { t } = useTranslation();
@@ -90,6 +94,7 @@ export function BuildPlanCompare({
     ownedBlueprints,
     corpOwnedBlueprints,
     modifiers,
+    tradeHubStandings,
   });
   const unknown = t('common.unknown');
 

@@ -41,6 +41,7 @@ import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 import { getTradeHub } from '@/market/hubs';
+import type { TradeHubStandingsMap } from '@/features/market/useTradeHubStandings';
 import type { PiData } from '@/sde/types';
 import { useAssumedMe } from './assumedMe';
 import { nameForType, volumeForType, type BlueprintCatalog } from './blueprintCatalog';
@@ -100,6 +101,8 @@ interface BuildGroupPanelProps {
   /** Folded into each member on its own `includeCorpAssets` — see `resolveBuildPlan`. */
   corpOwnedBlueprints?: CorpOwnedBlueprintsState;
   modifiers: CharacterModifiers;
+  /** The active Character's per-Trade-Hub standings (issue #1238) — see `useComparedBuildResults`. */
+  tradeHubStandings?: TradeHubStandingsMap;
   ownedStockSnapshot: OwnedStockSnapshot;
   /** Opens one member on its own, the way clicking it in the list would. */
   onOpenPlan: (planId: string) => void;
@@ -131,6 +134,7 @@ export function BuildGroupPanel({
   ownedBlueprints,
   corpOwnedBlueprints,
   modifiers,
+  tradeHubStandings,
   ownedStockSnapshot,
   onOpenPlan,
   onRetarget,
@@ -156,6 +160,7 @@ export function BuildGroupPanel({
     ownedBlueprints,
     corpOwnedBlueprints,
     modifiers,
+    tradeHubStandings,
     computeGroupResult: true,
   });
 

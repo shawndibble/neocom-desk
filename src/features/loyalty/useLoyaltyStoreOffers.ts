@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub, DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
+import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { loadLoyaltyStoreOffers, loadCorporationName } from './store';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { useMarketSnapshot } from '@/features/industry/useMarketSnapshot';
@@ -49,6 +50,11 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
   const hubHydrated = useMarketHub((s) => s.hydrated);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const priceBasis = usePriceBasis((s) => s.value);
+  // Issue #1238: LP store offers carry no issuing-corp home station in this
+  // app's data, so every offer prices standing against the configured Trade
+  // Hub, same as the prices it already reads.
+  const tradeHubStandings = useTradeHubStandings(activeCharacterId);
+  const standing = tradeHubStanding(tradeHubStandings, hub.id);
 
   const [corpName, setCorpName] = useState<string | null>(null);
   const [offers, setOffers] = useState<LoyaltyStoreOffer[] | null>(null);
@@ -193,6 +199,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
       adjustedPrices: snapshot.adjustedPrices,
       systemCostIndex: snapshot.systemCostIndex,
       skills,
+      standing,
       materialSourcing,
       itemNames,
       useOwnMaterialsFor,
@@ -204,6 +211,7 @@ export function useLoyaltyStoreOffers(corporationId: number): LoyaltyStoreResult
     snapshot,
     priceBasis,
     skills,
+    standing,
     materialSourcing,
     itemNames,
     useOwnMaterialsFor,

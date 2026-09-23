@@ -492,6 +492,8 @@ export interface UniverseStation {
   name: string;
   type_id: number;
   system_id: number;
+  /** Owning corporation id — used to resolve the character's broker-fee standings. */
+  owner?: number;
 }
 
 export function getUniverseStation(
@@ -1578,6 +1580,25 @@ export function getCharacterLoyaltyPoints(
     ...options,
     characterId,
     endpointId: 'getCharacterLoyaltyPoints',
+  });
+}
+
+// --- GET /characters/{character_id}/standings/ (esi-characters.read_standings.v1) ---
+
+export interface CharacterStanding {
+  from_id: number;
+  from_type: 'agent' | 'npc_corp' | 'faction';
+  standing: number;
+}
+
+export function getCharacterStandings(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CharacterStanding[]>> {
+  return esiFetch<CharacterStanding[]>(`/characters/${characterId}/standings/`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterStandings',
   });
 }
 

@@ -435,6 +435,7 @@ export function OpenOrdersPanel() {
       stationNames,
       problemSamples: snapshot.problemSamples,
       skillsByCharacter: snapshot.skillsByCharacter,
+      standingsByOrder: snapshot.standingsByOrder,
       now: snapshot.now,
     });
   }, [snapshot, deepCompetitionByOrderId, structureByKey, stationNames]);

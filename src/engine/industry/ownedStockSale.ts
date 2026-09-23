@@ -21,6 +21,7 @@
 import { brokerFee, salesTax } from '@/engine/industry/fees';
 import { SKILL_IDS } from '@/engine/industry/types';
 import type { HubPrices, MaterialCostLine, SkillLevels } from '@/engine/industry/types';
+import type { ResolvedStandings } from '@/engine/market/standings';
 
 /** How the owned stock would be turned into ISK. */
 export type LiquidationBasis = 'instant' | 'order';
@@ -77,7 +78,9 @@ export function ownedStockSale(
   materials: readonly MaterialCostLine[],
   prices: HubPrices,
   basis: LiquidationBasis,
-  skills: SkillLevels
+  skills: SkillLevels,
+  /** The character's standing toward the sale hub's NPC owner. Absent/0 = standings assumed 0. */
+  standing?: ResolvedStandings
 ): OwnedStockSale {
   const accounting = skills[SKILL_IDS.accounting] ?? 0;
   const brokerRelations = skills[SKILL_IDS.brokerRelations] ?? 0;
@@ -101,7 +104,10 @@ export function ownedStockSale(
     // One order per material, so the 100 ISK minimum bites per stack listed —
     // which is exactly why listing a small stack can net less than filling a
     // buy order does.
-    const broker = basis === 'order' ? brokerFee(gross, brokerRelations) : 0;
+    const broker =
+      basis === 'order'
+        ? brokerFee(gross, brokerRelations, standing?.factionStanding, standing?.corpStanding)
+        : 0;
     lines.push({
       typeID: material.typeID,
       quantity: material.ownedQuantity,

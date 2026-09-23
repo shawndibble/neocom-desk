@@ -56,6 +56,7 @@ import { useReactionFacilityDefaults, REACTION_FACILITY_PRESETS } from './reacti
 import { hydrateActivityFacilityDefaults } from './facilityDefaults';
 import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
+import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
@@ -257,6 +258,10 @@ export function BuildPlanDetail({
   const blueprint = useMemo(() => (entry ? toIndustryBlueprint(entry.blueprint) : null), [entry]);
   const activity = blueprint ? industryActivityOf(blueprint) : 'manufacturing';
   const hub = useMemo(() => getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB, [plan.hubId]);
+  // The plan owner's standing toward this hub's NPC owner (issue #1238), for
+  // the broker fee/break-even price every result below prices with.
+  const tradeHubStandings = useTradeHubStandings(plan.characterId);
+  const standing = tradeHubStanding(tradeHubStandings, hub.id);
   const facilityPreset = FACILITY_PRESETS[plan.facility];
   // Include Reactions (issue #698): meaningless for a reaction-activity plan,
   // which is always eligible via its own top-level facility regardless of
@@ -517,6 +522,7 @@ export function BuildPlanDetail({
           corpBlueprints: corpOwnedBlueprints,
           assumedMe,
           modifiers,
+          standing,
           bpcOffersFor,
           includeBlueprintCost,
         },
@@ -530,6 +536,7 @@ export function BuildPlanDetail({
       corpOwnedBlueprints,
       assumedMe,
       modifiers,
+      standing,
       bpcOffersFor,
       includeBlueprintCost,
       snapshot,
@@ -549,10 +556,16 @@ export function BuildPlanDetail({
     if (!result || !snapshot) return null;
     const materials = sellableMaterials(result.materials);
     return {
-      instant: ownedStockSale(materials, snapshot.hubBuyPrices, 'instant', modifiers.skills),
-      order: ownedStockSale(materials, snapshot.hubPrices, 'order', modifiers.skills),
+      instant: ownedStockSale(
+        materials,
+        snapshot.hubBuyPrices,
+        'instant',
+        modifiers.skills,
+        standing
+      ),
+      order: ownedStockSale(materials, snapshot.hubPrices, 'order', modifiers.skills, standing),
     };
-  }, [result, snapshot, modifiers]);
+  }, [result, snapshot, modifiers, standing]);
 
   const pricesReady =
     snapshot !== null && snapshot.adjustedPrices !== null && snapshot.systemCostIndex !== null;
@@ -1035,6 +1048,7 @@ export function BuildPlanDetail({
     productQuantity: blueprint.products[0] ? blueprint.products[0].quantity * plan.runs : null,
     productUnitPrice:
       entry.productTypeID !== null ? (snapshot?.hubPrices[entry.productTypeID] ?? null) : null,
+    standing,
   };
 
   const chip = (label: string, value: string) => (
@@ -1788,6 +1802,7 @@ export function BuildPlanDetail({
         productTypeID={entry.productTypeID}
         productName={entry.productName}
         skills={modifiers.skills}
+        standing={standing}
         logRequest={logRequest}
       />
     </div>
