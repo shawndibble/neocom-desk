@@ -115,4 +115,24 @@ describe('MasteryPanel', () => {
     expect(screen.getAllByText('1/1 complete').length).toBeGreaterThan(0);
     expect(screen.queryByRole('button', { name: /add/i })).not.toBeInTheDocument();
   });
+
+  it('Hide completed toggle hides trained skill rows and shows a note when a tier empties out', async () => {
+    const user = userEvent.setup();
+    renderPanel(fakeTarget(), new Map([[3300, { level: 5, sp: 1_000_000 }]]));
+
+    await waitFor(() => expect(screen.getByLabelText(/search for a ship/i)).toBeInTheDocument());
+    await user.type(screen.getByLabelText(/search for a ship/i), 'Vexor');
+    await user.click(await screen.findByRole('button', { name: 'Vexor' }));
+    await waitFor(() => expect(screen.getByText('Gunnery')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Hide completed' }));
+
+    expect(screen.queryByText('Gunnery')).not.toBeInTheDocument();
+    expect(
+      screen.getAllByText('All skills in this tier are already trained.').length
+    ).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole('button', { name: 'Hide completed' }));
+    expect(screen.getByText('Gunnery')).toBeInTheDocument();
+  });
 });
