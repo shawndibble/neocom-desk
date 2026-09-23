@@ -587,21 +587,22 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                 </Panel>
               </div>
 
-              <Panel padded>
-                <Suspense
-                  fallback={
+              {/* The charts draw their own two cards. */}
+              <Suspense
+                fallback={
+                  <Panel padded>
                     <div className="flex justify-center py-8">
                       <Spinner label={t('common.loading')} />
                     </div>
-                  }
-                >
-                  <LazyMiningYieldCharts
-                    dailyRate={dailyRate}
-                    typeComparison={typeComparison}
-                    showRefining={showRefining}
-                  />
-                </Suspense>
-              </Panel>
+                  </Panel>
+                }
+              >
+                <LazyMiningYieldCharts
+                  dailyRate={dailyRate}
+                  typeComparison={typeComparison}
+                  showRefining={showRefining}
+                />
+              </Suspense>
 
               <Panel
                 padded={false}

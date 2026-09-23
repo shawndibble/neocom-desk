@@ -19,6 +19,7 @@ import {
 } from 'recharts';
 import type { PriceSource } from '@/engine/miningTax/priceBasis';
 import { useTranslation } from 'react-i18next';
+import { Panel } from '@/components/ui';
 import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 
@@ -120,9 +121,17 @@ export default function MiningYieldCharts({
       : 'miningTax.overview.compareChartTitleRawOnly'
   );
 
+  // Horizontal bars: ore names read left of the bar instead of slanted under
+  // it, so the chart grows with the number of types rather than squeezing them.
+  const compareHeight = Math.max(
+    256,
+    typeComparison.length * (showRefining ? 36 : 24) + (showRefining ? 64 : 32)
+  );
+
+  // Two cards, same gap as the stat cards above them.
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <div>
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <Panel padded>
         <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('miningTax.overview.rateChartTitle')}
         </p>
@@ -166,33 +175,38 @@ export default function MiningYieldCharts({
             </li>
           ))}
         </ul>
-      </div>
+      </Panel>
 
-      <div>
+      <Panel padded>
         <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {compareChartTitle}
         </p>
-        <div role="img" aria-label={compareChartTitle} className="h-64 w-full">
+        <div
+          role="img"
+          aria-label={compareChartTitle}
+          className="w-full"
+          style={{ height: compareHeight }}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={typeComparison}
-              margin={{ top: 8, right: 8, left: COMPACT_ISK_Y_AXIS_MARGIN_LEFT, bottom: 0 }}
+              layout="vertical"
+              margin={{ top: 8, right: showRefining ? 16 : 56, left: 0, bottom: 0 }}
             >
               <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
               <XAxis
-                dataKey="typeName"
-                stroke="var(--color-text-dim)"
-                tick={{ fontSize: 10, fill: 'var(--color-text-dim)' }}
-                interval={0}
-                angle={-30}
-                textAnchor="end"
-                height={50}
-              />
-              <YAxis
+                type="number"
                 stroke="var(--color-text-dim)"
                 tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
-                width={COMPACT_ISK_Y_AXIS_WIDTH}
                 tickFormatter={(value: number) => formatIskCompact(value)}
+              />
+              <YAxis
+                type="category"
+                dataKey="typeName"
+                stroke="var(--color-text-dim)"
+                tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
+                interval={0}
+                width={120}
               />
               <Tooltip
                 content={(props) => <CompareTooltip {...props} showRefining={showRefining} />}
@@ -206,7 +220,7 @@ export default function MiningYieldCharts({
                 {!showRefining && (
                   <LabelList
                     dataKey="rawValue"
-                    position="top"
+                    position="right"
                     formatter={(value: unknown) => formatIskCompact(Number(value))}
                     style={{ fontSize: 10, fill: 'var(--color-text-dim)' }}
                   />
@@ -227,7 +241,7 @@ export default function MiningYieldCharts({
             {t('miningTax.overview.refiningHiddenNote')}
           </p>
         )}
-      </div>
+      </Panel>
     </div>
   );
 }

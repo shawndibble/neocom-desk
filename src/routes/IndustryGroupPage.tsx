@@ -131,14 +131,14 @@ export function IndustryGroupPage() {
     );
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
-  if (groupId === undefined) return <Navigate to="/industry" replace />;
+  if (groupId === undefined) return <Navigate to={industryTabHref('plans')} replace />;
 
   const group = buildGroupsFor(workspace.buildGroups, activeCharacterId).find(
     (g) => g.id === groupId
   );
   // Deleted elsewhere, or a stale URL — the index is the only page left to
   // send the pilot back to (same rule `IndustryPlanPage` follows).
-  if (!group) return <Navigate to="/industry" replace />;
+  if (!group) return <Navigate to={industryTabHref('plans')} replace />;
 
   return (
     <div className="mx-auto max-w-7xl space-y-4">

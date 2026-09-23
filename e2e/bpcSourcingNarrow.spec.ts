@@ -145,7 +145,7 @@ test.describe('BPC Sourcing — multi-type price cell alignment', () => {
     await signInAndGoto(page);
     await seedBpcSnapshot(page, [multiTypeContractRow()]);
 
-    await page.goto('./industry?tab=sourcing');
+    await page.goto('./industry/sourcing');
 
     expect(await priceWrapperAlignItems(page)).toBe('flex-start');
   });
@@ -158,7 +158,7 @@ test.describe('BPC Sourcing — multi-type price cell alignment', () => {
     await signInAndGoto(page);
     await seedBpcSnapshot(page, [multiTypeContractRow()]);
 
-    await page.goto('./industry?tab=sourcing');
+    await page.goto('./industry/sourcing');
 
     expect(await priceWrapperAlignItems(page)).toBe('flex-end');
   });
@@ -171,7 +171,7 @@ test.describe('BPC Sourcing — multi-type price cell alignment', () => {
     await signInAndGoto(page);
     await seedBpcSnapshot(page, [singleTypeContractRow()]);
 
-    await page.goto('./industry?tab=sourcing');
+    await page.goto('./industry/sourcing');
 
     const table = page.getByRole('table', { name: 'BPC Search' });
     const priceCell = table.locator('tbody tr').first().locator('td[data-label="Price"]');

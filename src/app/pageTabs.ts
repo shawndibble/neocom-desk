@@ -14,7 +14,9 @@ import {
   tabPath,
   type PageTabs,
 } from '@/lib/pageTabs';
-import type { AppRoutePath } from './routeScopes';
+import { matchPath } from 'react-router-dom';
+import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
+import { ROUTE_REQUIREMENTS, type AppRoutePath } from './routeScopes';
 
 export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'character', labelKey: 'contacts.tabThisCharacter' },
@@ -40,12 +42,23 @@ export const CONTRACTS_TABS = definePageTabs(
 export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/contacts': CONTACTS_TABS,
   '/contracts': CONTRACTS_TABS,
+  '/industry': INDUSTRY_TABS,
 };
 
 const TABBED_PAGES = Object.values(PAGE_TABS);
 
+/**
+ * Routes nested under a tabbed page's base (`/industry/plans/:planId`): React
+ * Router ranks them above the page's `<base>/*` splat, so a path they match
+ * is their page, not the tabbed one.
+ */
+const NESTED_ROUTE_PATTERNS = (Object.keys(ROUTE_REQUIREMENTS) as AppRoutePath[]).filter((path) =>
+  TABBED_PAGES.some((page) => path.startsWith(`${page.base}/`))
+);
+
 /** The tabbed page `pathname` sits in, if any. */
 export function tabbedPageFor(pathname: string): PageTabs | null {
+  if (NESTED_ROUTE_PATTERNS.some((pattern) => matchPath(pattern, pathname))) return null;
   return TABBED_PAGES.find((page) => isWithinPage(page, pathname)) ?? null;
 }
 
