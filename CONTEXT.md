@@ -169,7 +169,7 @@ here — they go one per file in `docs/context/decisions/`.
   the rail declines to list.
 - **Compare**: A tab that puts the Quickbar's items side by side on best sell,
   best buy, spread and volume, under the same **Location Mode** as the order
-  book beside it.
+  book beside it — the Trade Hub's region when that book is All regions.
 - **Compare Set**: The short-lived selection of items being priced against each
   other right now — usually variants of one thing. Distinct from the
   **Quickbar**, which is the durable list of items the user returns to across
