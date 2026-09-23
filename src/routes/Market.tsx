@@ -1030,7 +1030,7 @@ export function Market() {
       return;
     }
     // A failed catalogue load leaves no item to select, so Refresh retries
-    // the catalogue itself — the one recovery this page has short of F5.
+    // the catalogue itself, the one recovery this page has short of F5.
     if (catalogueError) {
       setCatalogueError(false);
       setCatalogueTick((n) => n + 1);
