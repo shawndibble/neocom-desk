@@ -6,6 +6,7 @@ import {
   idListParam,
   intParam,
   isoDateParam,
+  nullableTextParam,
   optionalEnumParam,
   optionalIdParam,
   optionalSortParam,
@@ -30,6 +31,23 @@ describe('textParam', () => {
 
   it('debounces by default, so typing replaces the URL once per pause', () => {
     expect(codec.debounceMs).toBeGreaterThan(0);
+  });
+});
+
+describe('nullableTextParam', () => {
+  const codec = nullableTextParam();
+
+  it('omits the default (absent) value', () => {
+    expect(codec.serialize(null)).toBeNull();
+    expect(codec.parse(null)).toBeNull();
+  });
+
+  it('round-trips any other text verbatim', () => {
+    expect(codec.parse(codec.serialize('bounty_prize'))).toBe('bounty_prize');
+  });
+
+  it('does not debounce — a click, not typing, sets this kind of value', () => {
+    expect(codec.debounceMs).toBeUndefined();
   });
 });
 

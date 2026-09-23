@@ -45,6 +45,16 @@ export function textParam(options: { defaultValue?: string } = {}): UrlParamCode
   };
 }
 
+/**
+ * A nullable string passed through verbatim: `null` reads and writes as
+ * absent, anything else round-trips as-is. For a field whose valid values
+ * are data-dependent (a journal's own `ref_type`s, say) rather than a closed
+ * set `enumParam` could declare.
+ */
+export function nullableTextParam(): UrlParamCodec<string | null> {
+  return { parse: (raw) => raw, serialize: (value) => value };
+}
+
 export function intParam(
   defaultValue: number,
   bounds: { min?: number; max?: number } = {}

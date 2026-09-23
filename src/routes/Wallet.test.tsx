@@ -171,7 +171,7 @@ describe('Wallet', () => {
   });
 
   it('opens straight to the journal tab when a walletBalanceChanged notification deep-links here', async () => {
-    window.history.pushState({}, '', '/wallet?tab=journal');
+    window.history.pushState({}, '', '/wallet/journal');
     render(<App />);
     expect(await screen.findByText('Bounty')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: 'Journal' })).toHaveAttribute('aria-selected', 'true');
@@ -181,7 +181,7 @@ describe('Wallet', () => {
     const scrollIntoView = vi
       .spyOn(Element.prototype, 'scrollIntoView')
       .mockImplementation(() => {});
-    window.history.pushState({}, '', '/wallet?tab=journal&highlight=2');
+    window.history.pushState({}, '', '/wallet/journal?highlight=2');
     render(<App />);
 
     expect(await screen.findByText('Donation')).toBeInTheDocument();
@@ -580,7 +580,7 @@ describe('Wallet', () => {
       const user = userEvent.setup();
       await seedCorpCharacter();
 
-      window.history.pushState({}, '', '/wallet?owner=corporation&tab=transactions');
+      window.history.pushState({}, '', '/wallet/transactions?owner=corporation');
       render(<App />);
 
       const table = await screen.findByRole('table', { name: 'Transactions' });
@@ -595,14 +595,34 @@ describe('Wallet', () => {
     });
 
     /**
-     * The filter is per-visit view state, and "this division traded nothing"
-     * is what a filter left over from another owner or division looks like.
+     * The filter lives in the URL now (issue #1302). Corp access resolves a
+     * render or two after mount, and the reset-on-scope-change effect must
+     * not mistake that settling for a real owner/division change — or a
+     * reload of a link carrying a transaction filter would wipe it the
+     * instant corp access finished loading.
+     */
+    it('keeps a transaction filter carried in the URL, even while corp access is still resolving', async () => {
+      await seedCorpCharacter();
+
+      window.history.pushState({}, '', '/wallet/transactions?owner=corporation&txn.q=Pyerite');
+      render(<App />);
+
+      const table = await screen.findByRole('table', { name: 'Transactions' });
+      expect(await within(table).findByText('Pyerite')).toBeInTheDocument();
+      expect(within(table).queryByText('Tritanium')).not.toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Search item…')).toHaveValue('Pyerite');
+    });
+
+    /**
+     * The filter lives in the URL but still resets on scope change, and
+     * "this division traded nothing" is what a filter left over from
+     * another owner or division looks like.
      */
     it('drops the filter when the owner switches away and back', async () => {
       const user = userEvent.setup();
       await seedCorpCharacter();
 
-      window.history.pushState({}, '', '/wallet?owner=corporation&tab=transactions');
+      window.history.pushState({}, '', '/wallet/transactions?owner=corporation');
       render(<App />);
 
       const search = await screen.findByPlaceholderText('Search item…');
@@ -627,7 +647,7 @@ describe('Wallet', () => {
       const user = userEvent.setup();
       await seedCorpCharacter();
 
-      window.history.pushState({}, '', '/wallet?owner=corporation&tab=transactions');
+      window.history.pushState({}, '', '/wallet/transactions?owner=corporation');
       render(<App />);
 
       const search = await screen.findByPlaceholderText('Search item…');
