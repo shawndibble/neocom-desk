@@ -248,6 +248,35 @@ describe('loadMiningYieldSnapshot', () => {
     expect(snapshot.typeVolumes.get(NONTRADABLE)).toBe(0.07);
   });
 
+  describe('showRefining off (issue #1281)', () => {
+    it('skips reprocessing recipes, material prices, and character skills/implants entirely', async () => {
+      sdeMock.loadReprocessing.mockResolvedValue({
+        [String(TRADABLE)]: { portionSize: 100, materials: [{ typeID: 34, quantity: 400 }] },
+      });
+      priceHistoryMock.loadPriceHistory.mockResolvedValue({
+        points: [{ date: '2026-09-01', average: 10, volume: 1 }],
+        fetchedAt: Date.now(),
+      });
+
+      const snapshot = await loadMiningYieldSnapshot(false);
+
+      expect(sdeMock.loadReprocessing).not.toHaveBeenCalled();
+      expect(skillsMock.loadCorrectedSkills).not.toHaveBeenCalled();
+      // Only the ore/ice types themselves are priced — never material 34,
+      // which only a refine valuation would ever need a price for.
+      const historyTypeIds = priceHistoryMock.loadPriceHistory.mock.calls.map(
+        (call: unknown[]) => call[1]
+      );
+      expect(historyTypeIds).not.toContain(34);
+
+      const [row] = snapshot.rows;
+      expect(row.valuation.refineValue).toBe(0);
+      // Raw pricing is still complete, so the row must not read as Partial
+      // for refine data that was never fetched on purpose.
+      expect(row.valuation.pricedAll).toBe(true);
+    });
+  });
+
   describe('price basis (issue #1279)', () => {
     const book = { buyMax: 8, sellMin: 12, buyVolume: 1, sellVolume: 1 };
 

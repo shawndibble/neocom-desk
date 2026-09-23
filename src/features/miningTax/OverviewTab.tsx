@@ -10,7 +10,7 @@
  * and the vocabulary note in the issue: this is deliberately not the Tax
  * tab's `MiningLedgerEntry`/`Assignment`/`Payee` model).
  */
-import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -45,11 +45,13 @@ import { scaleUnitPrices, scaleValuation } from '@/engine/miningTax/buybackRate'
 import { useMiningYieldRange } from './yieldRangePref';
 import { useMiningPriceBasis } from './priceBasisPref';
 import { useMiningBuybackRate } from './buybackRatePref';
+import { useMiningShowRefining } from './showRefiningPref';
 import {
   BuybackRateInput,
   MobileSettings,
   PriceBasisOptions,
   RangeControl,
+  ShowRefiningToggle,
   ValueMenu,
 } from './OverviewSettings';
 import { basisSummary } from './basisLabel';
@@ -65,16 +67,6 @@ import { VolumeDisplay } from './volumeDisplay';
 import type { DailyRatePoint, TypeComparisonPoint } from './MiningYieldCharts';
 
 const LazyMiningYieldCharts = lazy(() => import('./MiningYieldCharts'));
-
-/**
- * Ignores both arguments `useRouteSnapshot` passes — this view isn't scoped
- * to the active Character (every tracked Character, same as the Tax tab) and
- * `loadMiningYieldSnapshot` has no mid-flight cancellation checkpoint to gate
- * on `signal`.
- */
-function loadSnapshot(): Promise<MiningYieldSnapshot> {
-  return loadMiningYieldSnapshot();
-}
 
 /** A row's mined m³ — units times the type's own unit volume for each ore line. */
 function entryVolume(row: MiningYieldRow, typeVolumes: ReadonlyMap<number, number>) {
@@ -120,6 +112,17 @@ interface OverviewTabProps {
 
 export function OverviewTab({ tabBar }: OverviewTabProps) {
   const { t } = useTranslation();
+  const showRefining = useMiningShowRefining((state) => state.value);
+  const setShowRefining = useMiningShowRefining((state) => state.setValue);
+  const hydrateShowRefining = useMiningShowRefining((state) => state.hydrate);
+  // `showRefining` decides what the loader itself fetches (issue #1281), so
+  // unlike basis/buyback-rate — which only rescale already-loaded rows — it
+  // must be part of the load closure. `useRouteSnapshot` only re-runs it on
+  // an epoch bump, so toggling the switch also calls `refresh()` below.
+  const loadSnapshot = useCallback(
+    (): Promise<MiningYieldSnapshot> => loadMiningYieldSnapshot(showRefining),
+    [showRefining]
+  );
   const { data, error, loading, activeCharacterId, refresh } = useRouteSnapshot(
     loadSnapshot,
     undefined,
@@ -142,7 +145,15 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
     void hydrateRange();
     void hydrateBasis();
     void hydrateBuybackRate();
-  }, [hydrateRange, hydrateBasis, hydrateBuybackRate]);
+    void hydrateShowRefining();
+  }, [hydrateRange, hydrateBasis, hydrateBuybackRate, hydrateShowRefining]);
+  const handleShowRefiningChange = useCallback(
+    (next: boolean) => {
+      void setShowRefining(next);
+      refresh();
+    },
+    [setShowRefining, refresh]
+  );
   // EVE/UTC, the ledger's own calendar. Recomputed each render so a tab left
   // open past downtime moves its window with the day.
   const today = eveToday();
@@ -317,14 +328,20 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       render: (row) => <IskAmount value={row.valuation.rawValue} revealOn="tap" decimals={0} />,
       sortValue: (row) => row.valuation.rawValue,
     },
-    {
-      id: 'refineValue',
-      header: t('miningTax.overview.refineValue'),
-      align: 'right',
-      className: 'whitespace-nowrap',
-      render: (row) => <IskAmount value={row.valuation.refineValue} revealOn="tap" decimals={0} />,
-      sortValue: (row) => row.valuation.refineValue,
-    },
+    ...(showRefining
+      ? [
+          {
+            id: 'refineValue',
+            header: t('miningTax.overview.refineValue'),
+            align: 'right',
+            className: 'whitespace-nowrap',
+            render: (row: MiningYieldRow) => (
+              <IskAmount value={row.valuation.refineValue} revealOn="tap" decimals={0} />
+            ),
+            sortValue: (row: MiningYieldRow) => row.valuation.refineValue,
+          } satisfies DataTableColumn<MiningYieldRow>,
+        ]
+      : []),
     {
       id: 'pricing',
       header: t('miningTax.overview.pricingColumn'),
@@ -360,6 +377,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                   value={buybackRate}
                   onChange={(next) => void setBuybackRate(next)}
                 />
+                <ShowRefiningToggle value={showRefining} onChange={handleShowRefiningChange} />
               </ValueMenu>
             </div>
             <div className="sm:hidden">
@@ -370,6 +388,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                   value={buybackRate}
                   onChange={(next) => void setBuybackRate(next)}
                 />
+                <ShowRefiningToggle value={showRefining} onChange={handleShowRefiningChange} />
               </MobileSettings>
             </div>
             {characters.length > 0 && (
@@ -446,6 +465,12 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                   <p className="mt-1 text-lg font-semibold tabular-nums">
                     <IskAmount value={totals.rawValue} revealOn="tap" decimals={0} />
                   </p>
+                  {showRefining && (
+                    <p className="text-[0.6875rem] text-text-dim">
+                      {t('miningTax.overview.totalValueRefinedSubtitle')}{' '}
+                      <IskAmount value={totals.refineValue} revealOn="tap" decimals={0} />
+                    </p>
+                  )}
                 </Panel>
                 <Panel>
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -532,7 +557,11 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                     </div>
                   }
                 >
-                  <LazyMiningYieldCharts dailyRate={dailyRate} typeComparison={typeComparison} />
+                  <LazyMiningYieldCharts
+                    dailyRate={dailyRate}
+                    typeComparison={typeComparison}
+                    showRefining={showRefining}
+                  />
                 </Suspense>
               </Panel>
 
@@ -564,6 +593,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
           systemSecurity={data?.systemSecurity.get(detailRow.entry.solarSystemId) ?? null}
           typeNames={data?.typeNames ?? new Map()}
           typeVolumes={data?.typeVolumes ?? new Map()}
+          showRefining={showRefining}
         />
       )}
     </div>
