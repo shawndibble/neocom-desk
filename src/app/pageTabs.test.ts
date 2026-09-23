@@ -5,6 +5,7 @@ describe('routePatternFor', () => {
   it('mounts a tabbed page with a splat and leaves the rest alone', () => {
     expect(routePatternFor('/contacts')).toBe('/contacts/*');
     expect(routePatternFor('/wallet')).toBe('/wallet');
+    expect(routePatternFor('/industry')).toBe('/industry/*');
   });
 });
 
@@ -39,5 +40,22 @@ describe('isTabRedirectPath', () => {
     expect(isTabRedirectPath('/contacts/nope')).toBe(true);
     expect(isTabRedirectPath('/contacts/across')).toBe(false);
     expect(isTabRedirectPath('/wallet')).toBe(false);
+  });
+});
+
+describe('a tabbed page with its own nested detail routes (Industry)', () => {
+  it('treats a declared tab as the tabbed page', () => {
+    expect(pageKeyFor('/industry/sourcing')).toBe('/industry');
+    expect(tabbedPagePathFor('/industry/records')).toBe('/industry/records');
+    expect(isTabRedirectPath('/industry')).toBe(true);
+    expect(isTabRedirectPath('/industry/plans')).toBe(false);
+  });
+
+  it('leaves a path owned by a more specific route out of the tabbed page', () => {
+    expect(pageKeyFor('/industry/plans/abc')).toBe('/industry/plans/abc');
+    expect(pageKeyFor('/industry/groups/g1')).toBe('/industry/groups/g1');
+    expect(isTabRedirectPath('/industry/plans/abc')).toBe(false);
+    expect(isTabRedirectPath('/industry/groups/g1')).toBe(false);
+    expect(tabbedPagePathFor('/industry/plans/abc')).toBeNull();
   });
 });

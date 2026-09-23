@@ -135,7 +135,7 @@ export function ItemContextMenu({
         <ContextMenuItem
           disabled={!blueprintTypeID}
           onSelect={() => {
-            if (blueprintTypeID) navigate(`/industry?product=${typeId}`);
+            if (blueprintTypeID) navigate(`/industry/plans?product=${typeId}`);
           }}
         >
           {buildPlanLabel}

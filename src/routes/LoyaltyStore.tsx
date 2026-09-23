@@ -374,7 +374,7 @@ export function LoyaltyStore() {
   }
 
   function planInIndustry(productTypeId: number) {
-    navigate(`/industry?product=${productTypeId}`);
+    navigate(`/industry/plans?product=${productTypeId}`);
   }
 
   function rowContextMenu(row: LoyaltyOfferRow, tr: ReactElement) {

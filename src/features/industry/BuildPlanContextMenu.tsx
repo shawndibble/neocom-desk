@@ -128,7 +128,7 @@ export function BuildPlanContextMenu({
             if (productTypeId == null) return;
             const params = new URLSearchParams({ product: String(productTypeId) });
             applyPlanSeed(params, seed ?? null);
-            navigate(`/industry?${params.toString()}`);
+            navigate(`/industry/plans?${params.toString()}`);
           }}
         >
           {productTypeId === undefined

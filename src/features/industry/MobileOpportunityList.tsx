@@ -14,7 +14,7 @@
  * `sortRows`/`nextDataTableSort` so both this list and the desktop table sort
  * and toggle direction by the identical rule.
  */
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -28,7 +28,6 @@ import {
   StatChip,
   nextDataTableSort,
   sortRows,
-  type DataTableSort,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
@@ -39,6 +38,8 @@ import { ORDER_DEPTH_TONE, unitMargin } from './opportunityMetrics';
 import { formatPercent } from './format';
 import type { OpportunityRow } from './opportunities';
 import { SkillGateMarker } from './SkillGateMarker';
+import { useUrlSort } from '@/lib/useUrlState';
+import { OPPORTUNITIES_DEFAULT_SORT, OPPORTUNITIES_SORT_KEY } from './opportunitiesUrl';
 
 interface MobileOpportunityListProps {
   rows: readonly OpportunityRow[];
@@ -145,8 +146,12 @@ export function MobileOpportunityList({
   const unknown = t('common.unknown');
   const fields = sortFields(t);
 
-  const [sort, setSort] = useState<DataTableSort>({ columnId: 'iskPerHour', direction: 'desc' });
-  const activeFieldId = (sort.columnId in fields ? sort.columnId : 'iskPerHour') as SortFieldId;
+  const { sort, onSortChange: setSort } = useUrlSort(
+    OPPORTUNITIES_SORT_KEY,
+    OPPORTUNITIES_DEFAULT_SORT,
+    SORT_FIELD_ORDER
+  );
+  const activeFieldId = sort.columnId as SortFieldId;
 
   const sortedRows = sortRows(rows, { sortValue: fields[activeFieldId].sortValue }, sort.direction);
 
@@ -173,10 +178,7 @@ export function MobileOpportunityList({
             {t('industry.opportunitiesSortBy')}
           </p>
           {SORT_FIELD_ORDER.map((id) => (
-            <DropdownMenuItem
-              key={id}
-              onSelect={() => setSort((prev) => nextDataTableSort(prev, id))}
-            >
+            <DropdownMenuItem key={id} onSelect={() => setSort(nextDataTableSort(sort, id))}>
               {fields[id].label}
             </DropdownMenuItem>
           ))}

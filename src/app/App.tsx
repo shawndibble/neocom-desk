@@ -119,7 +119,7 @@ const ROUTE_ELEMENTS = {
   '/contracts': <Contracts />,
   // The BPC search moved into Industry's tab strip; the old path stays as a
   // redirect so bookmarks and any link already in the wild still land on it.
-  '/bpc-contracts': <Navigate to="/industry?tab=sourcing" replace />,
+  '/bpc-contracts': <Navigate to="/industry/sourcing" replace />,
   '/contacts': <Contacts />,
   '/settings': <Settings />,
 } satisfies Record<AppRoutePath, ReactElement>;

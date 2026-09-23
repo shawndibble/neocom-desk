@@ -1085,7 +1085,7 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
     // product, so handing it the blueprint's own typeID creates nothing.
     await waitFor(() => {
       expect(screen.getByTestId('location')).toHaveTextContent(
-        '/industry?product=587&me=10&te=20&runs=5'
+        '/industry/plans?product=587&me=10&te=20&runs=5'
       );
     });
   });
@@ -1104,7 +1104,7 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
 
     await waitFor(() => {
-      expect(screen.getByTestId('location')).toHaveTextContent(/^\/industry\?product=587$/);
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/industry\/plans\?product=587$/);
     });
   });
 

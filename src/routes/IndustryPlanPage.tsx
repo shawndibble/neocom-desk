@@ -8,6 +8,7 @@ import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { IndustryHeader } from '@/features/industry/IndustryHeader';
 import { buildGroupsFor } from '@/features/industry/buildGroups';
 import { industryTabHref, type IndustryTab } from '@/features/industry/industryTabs';
+import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { BuildPlanDetail } from '@/features/industry/BuildPlanDetail';
 import { applyBuildPlanChange } from '@/features/industry/buildPlanStore';
 import { useQuickbar } from '@/features/market/useQuickbar';
@@ -66,7 +67,7 @@ export function IndustryPlanPage() {
   // Deleted elsewhere, a stale URL, or another character's plan — the index
   // is the only page left to send the pilot back to.
   if (!plan || plan.characterId !== activeCharacterId) {
-    return <Navigate to="/industry" replace />;
+    return <Navigate to="/industry/plans" replace />;
   }
 
   const groups = buildGroupsFor(workspace.buildGroups, activeCharacterId);
@@ -111,7 +112,7 @@ export function IndustryPlanPage() {
           quickbarAvailable={quickbar.available}
           onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
           groupSnapshot={groupSnapshot}
-          onSearchBpcSourcing={(typeId) => navigate(`/industry?tab=sourcing&bpcSearch=${typeId}`)}
+          onSearchBpcSourcing={(typeId) => navigate(bpcSourcingHref(typeId))}
         />
       )}
 

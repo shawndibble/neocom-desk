@@ -772,7 +772,7 @@ export function Assets() {
     [blueprintCatalog, buildPlans]
   );
   function handleViewInIndustryAsMaterial(typeId: number) {
-    navigate(`/industry?material=${typeId}`);
+    navigate(`/industry/plans?material=${typeId}`);
   }
 
   const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(

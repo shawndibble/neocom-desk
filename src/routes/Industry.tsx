@@ -48,10 +48,15 @@ import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import { useComparedBuildResults } from '@/features/industry/useComparedBuildResults';
 import { useRunCountsByPlan } from '@/features/industry/useRunCountsByPlan';
 import { computeGroupIndexStats } from '@/features/industry/groupIndexStats';
-import { readIndustryTab, type IndustryTab } from '@/features/industry/industryTabs';
+import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
+import { usePageTab } from '@/lib/usePageTab';
+import { useUrlParam } from '@/lib/useUrlState';
+import { boolParam } from '@/lib/urlState';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { loadMarketWideTrees } from '@/sde/loadSde';
 import type { MarketWideTreeMap } from '@/sde/types';
+
+const COMPARE_MODE = boolParam();
 
 /**
  * Build Plan manager index: create (via blueprint search)/duplicate/delete/
@@ -94,27 +99,7 @@ export function Industry() {
   }, []);
 
   const [searchParams, setSearchParams] = useSearchParams();
-  const tab = readIndustryTab(searchParams.get('tab'));
-  // The picker/override modal's "search BPC Sourcing" action (issue #839)
-  // lands here via `/industry?tab=sourcing&bpcSearch=<typeID>`.
-  const bpcSearchParam = searchParams.get('bpcSearch');
-  const bpcSearchTypeId = bpcSearchParam === null ? null : Number(bpcSearchParam);
-  const setTab = useCallback(
-    (next: IndustryTab) => {
-      setSearchParams(
-        (previous) => {
-          const params = new URLSearchParams(previous);
-          // Plans is the default, so it stays out of the URL rather than
-          // leaving `?tab=plans` on every visit that never touched the strip.
-          if (next === 'plans') params.delete('tab');
-          else params.set('tab', next);
-          return params;
-        },
-        { replace: true }
-      );
-    },
-    [setSearchParams]
-  );
+  const [tab, setTab] = usePageTab(INDUSTRY_TABS);
 
   const plansQuery = useLiveQuery(async () => {
     if (activeCharacterId === null) return undefined;
@@ -141,7 +126,7 @@ export function Industry() {
   const [fitImportOpen, setFitImportOpen] = useState(false);
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
 
-  const [compareMode, setCompareMode] = useState(false);
+  const [compareMode, setCompareMode] = useUrlParam('plans.compare', COMPARE_MODE);
   const [compareSelectedIds, setCompareSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [comparing, setComparing] = useState(false);
 
@@ -364,10 +349,8 @@ export function Industry() {
   }
 
   function toggleCompareMode() {
-    setCompareMode((wasOn) => {
-      if (wasOn) setCompareSelectedIds(new Set());
-      return !wasOn;
-    });
+    if (compareMode) setCompareSelectedIds(new Set());
+    setCompareMode(!compareMode);
   }
 
   function toggleCompareSelected(id: string) {
@@ -491,7 +474,7 @@ export function Industry() {
       ) : (
         <>
           {tab === 'sourcing' ? (
-            <BpcSourcingPanel initialTypeId={bpcSearchTypeId} />
+            <BpcSourcingPanel />
           ) : tab === 'opportunities' ? (
             <div className="flex flex-col gap-4">
               <OpportunitiesPanel
