@@ -231,7 +231,7 @@ function CharacterCard({
             <span className="block truncate text-xs text-text-dim">
               {info?.corporationName ?? t('common.unknown')}
             </span>
-            <span className="block truncate text-xs text-text-faint">
+            <span className="block truncate text-xs text-text-dim">
               {info?.allianceName ?? t('common.unknown')}
             </span>
           </span>
