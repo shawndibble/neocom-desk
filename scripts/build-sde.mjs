@@ -46,6 +46,9 @@ const FILES = [
   // are kept; see `piPlanetRadius` below.
   'mapDenormalize.csv',
   'staStations.csv',
+  // Alpha clone skill caps, per clone grade (issue #1233); see `alphaMaxLevel`
+  // on skills.json below.
+  'chrCloneGradeSkills.csv',
 ];
 
 const MARKET_OUT_DIR = join(OUT_DIR, 'market');
@@ -71,6 +74,11 @@ const MARKET_REGIONS_MAX = 116;
 // tolerating CCP adding a handful more ore variants later (issue #1058).
 const REPROCESSING_SPECIALISATION_MIN = 300;
 const REPROCESSING_SPECIALISATION_MAX = 500;
+// Skills an Alpha clone can train at all, as counted against the dump on
+// 2026-09-22: 175, identical across all four clone grades. Same idea as the
+// band above — a broken join lands at 0, not slightly off (issue #1233).
+const ALPHA_SKILLS_MIN = 150;
+const ALPHA_SKILLS_MAX = 250;
 // A region whose every solar system sits within this many meters of the
 // coordinate origin is not a place in the game universe — the nearest real
 // system (Zarzakh) sits ~5.66e15 m out, ~5.7 billion times farther than this
@@ -649,6 +657,33 @@ async function main() {
     }
   }
 
+  // --- Alpha skill caps: typeID -> highest level an Alpha clone can train ---
+  // One clone grade per starter race; they have matched since CCP let Alphas
+  // train every race's skills, so any disagreement is surfaced, not guessed at.
+  const alphaMaxLevel = new Map();
+  let alphaGradesDisagree = false;
+  {
+    const rows = raw['chrCloneGradeSkills.csv'];
+    const h = indexHeader(rows);
+    const byGrade = new Map();
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (r.length < 3) continue;
+      const grade = Number(r[h.cloneGradeID]);
+      const typeID = Number(r[h.typeID]);
+      const level = Number(r[h.level]);
+      let m = byGrade.get(grade);
+      if (!m) byGrade.set(grade, (m = new Map()));
+      m.set(typeID, level);
+      alphaMaxLevel.set(typeID, Math.max(alphaMaxLevel.get(typeID) ?? 0, level));
+    }
+    for (const m of byGrade.values()) {
+      if (m.size !== alphaMaxLevel.size) alphaGradesDisagree = true;
+      for (const [typeID, level] of m)
+        if (alphaMaxLevel.get(typeID) !== level) alphaGradesDisagree = true;
+    }
+  }
+
   // --- skills.json ---
   const skills = [];
   for (const typeID of [...skillTypeIds].sort((a, b) => a - b)) {
@@ -674,6 +709,8 @@ async function main() {
       primaryAttr: CHAR_ATTR_NAMES[attrs.get(PRIMARY_ATTR)] ?? null,
       secondaryAttr: CHAR_ATTR_NAMES[attrs.get(SECONDARY_ATTR)] ?? null,
       prereqs,
+      // Omitted for Omega-only skills (most of them), which the app reads as 0.
+      ...(alphaMaxLevel.get(typeID) > 0 ? { alphaMaxLevel: alphaMaxLevel.get(typeID) } : {}),
     });
   }
 
@@ -1853,6 +1890,35 @@ async function main() {
   console.log(`  skills with rank outside 1-16: ${badRank}`);
   console.log(`  skills missing primary/secondary attr: ${badAttrs}`);
   if (badPrereq || badRank || badAttrs) process.exitCode = 1;
+  {
+    const alphaSkills = skills.filter((s) => s.alphaMaxLevel > 0);
+    console.log(`  skills an Alpha clone can train: ${alphaSkills.length}`);
+    if (alphaSkills.length < ALPHA_SKILLS_MIN || alphaSkills.length > ALPHA_SKILLS_MAX) {
+      console.error(
+        `  FAIL: ${alphaSkills.length} Alpha-trainable skills, outside the plausible ${ALPHA_SKILLS_MIN}-${ALPHA_SKILLS_MAX} range`
+      );
+      process.exitCode = 1;
+    }
+    if (alphaGradesDisagree) {
+      console.error(
+        '  FAIL: Alpha clone grades disagree on skill caps; alphaMaxLevel took the highest'
+      );
+      process.exitCode = 1;
+    }
+    // A known positive and a known negative (verified against the dump):
+    // Gunnery trains to V on Alpha, Capital Ships not at all.
+    const GUNNERY_TYPE_ID = 3300;
+    const CAPITAL_SHIPS_TYPE_ID = 20533;
+    const bySkill = new Map(skills.map((s) => [s.typeID, s]));
+    if (bySkill.get(GUNNERY_TYPE_ID)?.alphaMaxLevel !== 5) {
+      console.error('  FAIL: Gunnery should carry alphaMaxLevel 5');
+      process.exitCode = 1;
+    }
+    if (bySkill.get(CAPITAL_SHIPS_TYPE_ID)?.alphaMaxLevel !== undefined) {
+      console.error('  FAIL: Capital Ships should carry no alphaMaxLevel');
+      process.exitCode = 1;
+    }
+  }
 
   console.log(`  market groups: ${marketGroups.length}`);
   console.log(`  market types: ${marketTypes.length}`);

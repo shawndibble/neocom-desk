@@ -30,7 +30,18 @@ export interface EngineSkill {
   primary: AttributeName;
   secondary: AttributeName;
   prereqs: SkillPrereq[];
+  /**
+   * Highest level an Alpha clone can train (SDE clone grades). Absent or 0:
+   * Alphas cannot train this skill at all.
+   */
+  alphaMaxLevel?: number;
 }
+
+/**
+ * Alpha or Omega. ESI does not expose it, so the player sets it per character;
+ * Alpha trains at half the Omega rate and only up to each skill's Alpha cap.
+ */
+export type CloneState = 'alpha' | 'omega';
 
 /** Implant bonuses, +0..+5 per attribute. Missing key = +0. */
 export type Implants = Partial<Attributes>;

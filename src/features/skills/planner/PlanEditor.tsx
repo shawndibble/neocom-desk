@@ -46,6 +46,7 @@ import type {
   AttributeName,
   Attributes,
   Booster,
+  CloneState,
   Implants,
   PlanEntry,
   PlanPriority,
@@ -76,6 +77,8 @@ import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import { evaluateOptimizationBadge, toOptimizationBadge } from './planHeaderStats';
 import { markerVerdict, remapVerdict, type OptimizeVerdict } from './optimizeVerdict';
 import { boostedStepIndices } from '@/engine/boosterImpact';
+import { alphaCappedStepIndices } from '@/engine/alphaCap';
+import { cloneStateFor, useCloneStates, withCloneState } from '../cloneState';
 import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
 import { queueCsvColumns } from './queueCsv';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -115,7 +118,9 @@ import {
   WHAT_IF_IMPLANT_PRESETS,
 } from './whatIfImplants';
 import {
+  BOOSTER_QUICK_PICKS,
   boosterExpiryFromInput,
+  boosterExpiryFromNow,
   boosterExpiryToInput,
   clampBoosterBonus,
   resolvePlanBooster,
@@ -219,7 +224,8 @@ function computeQueue(
   implants: Implants,
   boosters: Booster[],
   markers: readonly number[] | undefined,
-  markerAttributes: readonly (Attributes | null)[]
+  markerAttributes: readonly (Attributes | null)[],
+  cloneState: CloneState
 ): ComputeResult {
   // Guard against unknown typeIDs (stale plan, imported skill not in the current SDE snapshot).
   const validEntries = entries.filter((e) => catalog.engineSkills.has(e.skillTypeID));
@@ -239,6 +245,7 @@ function computeQueue(
             implants,
             booster: boosters.length > 0 ? { boosters, startDate } : undefined,
             manualAttributes: markerAttributes,
+            cloneState,
           })
         : null;
     const segments: AttributeSegment[] | undefined = markersResult?.segments.map((s) => ({
@@ -253,7 +260,7 @@ function computeQueue(
       // already paid for). Without the second, a plan that opens on the skill
       // the character is currently training re-charges the whole level and
       // reads hours longer than the in-game queue for it.
-      { attributes, implants, boosters, startDate, trainedSkills, segments },
+      { attributes, implants, boosters, startDate, trainedSkills, segments, cloneState },
       catalog.engineSkills
     );
     return { scheduled, entryBoundaries, error: null, startDate, markersResult };
@@ -362,6 +369,20 @@ export function PlanEditor({
     void hydrateGroupingMode();
   }, [hydrateGroupingMode]);
 
+  // Clone State (CONTEXT.md): per Character, not per plan. The control waits
+  // for hydration — a write from the empty default would replace the whole
+  // blob and drop every other Character's answer.
+  const cloneStates = useCloneStates((state) => state.value);
+  const cloneStatesHydrated = useCloneStates((state) => state.hydrated);
+  const hydrateCloneStates = useCloneStates((state) => state.hydrate);
+  const setCloneStates = useCloneStates((state) => state.setValue);
+  useEffect(() => {
+    void hydrateCloneStates();
+  }, [hydrateCloneStates]);
+  const cloneState = cloneStateFor(cloneStates, characterId);
+  const setCloneState = (next: CloneState): void =>
+    void setCloneStates(withCloneState(cloneStates, characterId, next));
+
   // What-If Implants (CONTEXT.md): swap the clone's real implants for a
   // hypothetical set — a uniform preset, or five per-slot bonuses, since EVE's
   // hardwirings are per attribute. Saved on the plan and synced with it, not
@@ -448,6 +469,13 @@ export function PlanEditor({
       patchBooster({ expiresAt: null });
     }
   };
+  // Bypasses the datetime-local round trip entirely: a quick pick is a
+  // direct answer, not text to parse, so any half-typed draft it supersedes
+  // is dropped along with it.
+  const handleBoosterQuickPick = (hours: number): void => {
+    setExpiryDraft(null);
+    patchBooster({ expiresAt: boosterExpiryFromNow(hours) });
+  };
 
   // Display-only "expired" hint: reads the wall clock, which is unavoidably
   // impure (there's no ticking-clock store in this codebase to subscribe to
@@ -525,7 +553,8 @@ export function PlanEditor({
         effectiveImplants,
         activeBoosters,
         plan.markers,
-        normalizedMarkerAttributes
+        normalizedMarkerAttributes,
+        cloneState
       ),
     [
       plan.entries,
@@ -536,6 +565,7 @@ export function PlanEditor({
       activeBoosters,
       plan.markers,
       normalizedMarkerAttributes,
+      cloneState,
     ]
   );
 
@@ -598,6 +628,15 @@ export function PlanEditor({
     // its own timer like markerAdded, not here.)
     setDropError(null);
   }
+  // An Optimize result was costed at one training rate; after a Clone State
+  // flip its savings figure describes a rate the plan no longer trains at.
+  const [prevCloneState, setPrevCloneState] = useState(cloneState);
+  if (prevCloneState !== cloneState) {
+    setPrevCloneState(cloneState);
+    setOptimizeResult(null);
+    setOptimizeVerdict(null);
+    setOptimizeConfirm(null);
+  }
 
   const userSkillTypeIDs = useMemo(
     () => new Set(plan.entries.map((e) => e.skillTypeID)),
@@ -629,6 +668,16 @@ export function PlanEditor({
         ? boostedStepIndices(scheduled, catalog.engineSkills, activeBoosters, startDate)
         : new Set<number>(),
     [scheduled, catalog, activeBoosters, startDate]
+  );
+
+  // Queue rows an Alpha clone cannot train at all — flagged, not dropped: the
+  // plan is still the pilot's, and it is right the moment they go Omega.
+  const alphaCappedSteps = useMemo(
+    () =>
+      cloneState === 'alpha'
+        ? alphaCappedStepIndices(scheduled, catalog.engineSkills)
+        : new Set<number>(),
+    [cloneState, scheduled, catalog]
   );
 
   // #112: merge "Your entries" and the computed queue into one row list —
@@ -693,6 +742,7 @@ export function PlanEditor({
       markers: markerStepIndices(plan.entries, plan.markers, catalog.engineSkills, trainedSkills),
       currentAttributes: attributes,
       implants: effectiveImplants,
+      cloneState,
     });
   }, [
     plan.markers,
@@ -702,6 +752,7 @@ export function PlanEditor({
     trainedSkills,
     attributes,
     effectiveImplants,
+    cloneState,
   ]);
   const markersVerdict = useMemo(
     () => (markersAtCurrentPositions ? markerVerdict(markersAtCurrentPositions) : null),
@@ -747,6 +798,7 @@ export function PlanEditor({
       remapCount: plan.remapCount,
       currentAttributes: attributes,
       implants: effectiveImplants,
+      cloneState,
     });
   }, [
     markersAtCurrentPositions,
@@ -759,6 +811,7 @@ export function PlanEditor({
     catalog,
     attributes,
     effectiveImplants,
+    cloneState,
   ]);
 
   const update = useCallback((entries: PlanEntry[]) => onUpdate({ entries }), [onUpdate]);
@@ -823,6 +876,7 @@ export function PlanEditor({
       remapCount,
       currentAttributes: attributes,
       implants: effectiveImplants,
+      cloneState,
       // The same Boosters the computed queue schedules with, so the savings
       // figure and the queue total cannot disagree.
       booster:
@@ -1403,6 +1457,22 @@ export function PlanEditor({
             </p>
           )}
 
+          <label className="flex items-center gap-1.5">
+            <input
+              type="checkbox"
+              checked={cloneState === 'alpha'}
+              disabled={!cloneStatesHydrated}
+              onChange={(e) => setCloneState(e.target.checked ? 'alpha' : 'omega')}
+            />
+            {t('plans.alphaClone')}
+          </label>
+          <p className="text-[0.6875rem] text-text-dim">{t('plans.alphaCloneNote')}</p>
+          {alphaCappedSteps.size > 0 && (
+            <p className="text-warning">
+              {t('plans.alphaCappedCount', { count: alphaCappedSteps.size })}
+            </p>
+          )}
+
           <div className="flex items-center gap-1">
             <label className="flex flex-1 items-center justify-between gap-2">
               {t('plans.whatIfImplants')}
@@ -1546,6 +1616,27 @@ export function PlanEditor({
                   className="min-w-0 flex-1"
                 />
               </label>
+              {/* One click each, so the notice below has something to act
+                  on immediately instead of sending the user to a native
+                  date picker. */}
+              <div
+                role="group"
+                aria-label={t('plans.boosterQuickPicks')}
+                className="flex flex-wrap gap-1"
+              >
+                {BOOSTER_QUICK_PICKS.map(({ hours }) => (
+                  <button
+                    key={hours}
+                    type="button"
+                    onClick={() => handleBoosterQuickPick(hours)}
+                    className="min-h-7 rounded-xs border border-line px-1.5 text-[0.6875rem] text-text-dim hover:border-line-bright hover:text-text"
+                  >
+                    {hours % 24 === 0
+                      ? t('plans.boosterQuickPickDays', { days: hours / 24 })
+                      : t('plans.boosterQuickPickHours', { hours })}
+                  </button>
+                ))}
+              </div>
               {/* A blank expiry means no Booster is applied at all, so a
                   prefilled bonus would otherwise sit there looking active
                   while every number on the page ignored it. */}
@@ -1688,6 +1779,7 @@ export function PlanEditor({
                   attributesFor={attributesFor}
                   columns={columnVisibility}
                   boostedSteps={boostedSteps}
+                  alphaCappedSteps={alphaCappedSteps}
                   startDate={startDate}
                   onReorder={handleDrop}
                   onPromotePrereq={handlePromotePrereq}

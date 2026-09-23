@@ -1098,6 +1098,17 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
 
     expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
   });
+
+  it('sets the expiry in one click from a quick pick, clearing the warning', async () => {
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
+    await openTools(user);
+
+    await user.click(screen.getByRole('button', { name: '+12h' }));
+
+    expect(screen.getByLabelText<HTMLInputElement>('Expires').value).not.toBe('');
+    expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
+  });
 });
 
 /**
@@ -1382,5 +1393,28 @@ describe('removing an entry requires confirmation (#408)', () => {
 
     expect(onUpdate).not.toHaveBeenCalled();
     expect(screen.queryByText(/remove "skill a i+v?" from this plan/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('Clone State (#1233)', () => {
+  it('flags every level above the Alpha skill cap once the Character is set to Alpha', async () => {
+    const user = userEvent.setup();
+    // Own Character id: the store is module-global, so this keeps the Alpha
+    // answer from leaking into any other test's Character.
+    renderEditor(vi.fn(), { characterId: 1233 });
+    await openTools(user);
+
+    // Omega by default: nothing is flagged.
+    const toggle = screen.getByLabelText<HTMLInputElement>('Alpha clone');
+    expect(toggle.checked).toBe(false);
+    expect(screen.queryAllByRole('img', { name: 'Above the Alpha skill cap' })).toHaveLength(0);
+
+    // Neither fixture skill carries an Alpha cap, so both levels are flagged.
+    await user.click(toggle);
+    expect(toggle.checked).toBe(true);
+    expect(screen.getAllByRole('img', { name: 'Above the Alpha skill cap' })).toHaveLength(2);
+    expect(
+      screen.getByText('2 levels in this plan are above the Alpha skill cap.')
+    ).toBeInTheDocument();
   });
 });

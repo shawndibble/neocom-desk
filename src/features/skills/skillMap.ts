@@ -28,6 +28,7 @@ function toEngineSkill(skill: SkillType): EngineSkill {
     primary: skill.primaryAttr,
     secondary: skill.secondaryAttr,
     prereqs: skill.prereqs.map((p) => ({ typeID: p.skillTypeID, level: p.level })),
+    alphaMaxLevel: skill.alphaMaxLevel,
   };
 }
 

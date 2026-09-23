@@ -180,3 +180,15 @@ describe('timeToTrain', () => {
     expect(() => timeToTrain(-1, 30)).toThrow(RangeError);
   });
 });
+
+describe('trainingRate clone state', () => {
+  it('halves the rate for an Alpha clone', () => {
+    // Omega 20 + 20/2 = 30 SP/min; Alpha trains at half that.
+    expect(trainingRate(20, 20, 'omega')).toBe(30);
+    expect(trainingRate(20, 20, 'alpha')).toBe(15);
+  });
+
+  it('defaults to Omega', () => {
+    expect(trainingRate(20, 20)).toBe(trainingRate(20, 20, 'omega'));
+  });
+});

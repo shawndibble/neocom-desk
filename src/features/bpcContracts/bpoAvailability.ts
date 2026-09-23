@@ -180,3 +180,27 @@ export function bpoMayBeCheaper(
   const offerPrice = effectivePrice(offer);
   return offerPrice > 0 && bpo.price <= offerPrice;
 }
+
+/**
+ * Which box in the Cheapest by region / Market BPOs / Contract BPOs row gets
+ * the "cheapest" accent — at most one, and only when the row holds more than
+ * one box. `regionCheapest` is the leading region cell's price, or `null`
+ * when no region cells show. A BPO takes the accent only when strictly
+ * cheaper than every other box; a tie leaves it on the region cell.
+ */
+export function cheapestSourcingCard(
+  regionCheapest: number | null,
+  bpos: readonly Pick<BpoOffer, 'kind' | 'price'>[]
+): 'region' | BpoOffer['kind'] | null {
+  const boxes = (regionCheapest === null ? 0 : 1) + bpos.length;
+  if (boxes < 2) return null;
+  let winner: 'region' | BpoOffer['kind'] | null = regionCheapest === null ? null : 'region';
+  let best = regionCheapest ?? Infinity;
+  for (const bpo of bpos) {
+    if (bpo.price < best) {
+      best = bpo.price;
+      winner = bpo.kind;
+    }
+  }
+  return winner;
+}

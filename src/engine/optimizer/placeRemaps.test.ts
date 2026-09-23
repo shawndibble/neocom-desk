@@ -1163,3 +1163,72 @@ describe('a baseline outside EVE’s legal attribute space', () => {
     expect(last.cumulativeSeconds).toBeGreaterThan(lastUnboosted.cumulativeSeconds * 0.9);
   });
 });
+
+describe('placeRemaps clone state', () => {
+  it('doubles the Alpha baseline and savings but picks the same spread', () => {
+    const skills = skillMap(skill(1, 'perception', 'willpower'));
+    const omega = placeRemaps(levels(1, 1), skills, { remapCount: 1, currentAttributes: CURRENT });
+    const alpha = placeRemaps(levels(1, 1), skills, {
+      remapCount: 1,
+      currentAttributes: CURRENT,
+      cloneState: 'alpha',
+    });
+    expect(alpha.segments[0].attributes).toEqual(omega.segments[0].attributes);
+    expect(alpha.totalSeconds).toBeCloseTo(800, 9);
+    expect(alpha.currentSeconds).toBeCloseTo(1000, 9);
+    expect(alpha.savingsSeconds).toBeCloseTo(200, 9);
+  });
+
+  it('costs every Alpha segment the way computeSchedule does, with a Booster live', async () => {
+    // Baseline and remapped branches must both see the Alpha rate — one side
+    // at Omega would report savings that do not exist.
+    const { computeSchedule } = await import('@/engine/schedule');
+    const START = new Date('2026-08-30T00:00:00Z');
+    const after = (seconds: number) => new Date(START.getTime() + seconds * 1000);
+    const skills = skillMap(
+      skill(1, 'perception', 'willpower', 5),
+      skill(2, 'intelligence', 'memory', 5),
+      skill(3, 'charisma', 'willpower', 5)
+    );
+    const steps: PlanStep[] = [...levels(1, 4), ...levels(2, 4), ...levels(3, 3)];
+    const bonus = { intelligence: 12, memory: 12, perception: 12, willpower: 12, charisma: 12 };
+    const planSeconds = placeRemaps(steps, skills, {
+      remapCount: 1,
+      currentAttributes: CURRENT,
+      cloneState: 'alpha',
+    }).currentSeconds;
+    const boosters = [{ bonus, expiresAt: after(planSeconds * 0.5) }];
+
+    for (const remapCount of [1, 2]) {
+      const result = placeRemaps(steps, skills, {
+        remapCount,
+        currentAttributes: CURRENT,
+        booster: { boosters, startDate: START },
+        cloneState: 'alpha',
+      });
+      const baseline = computeSchedule(
+        steps,
+        { attributes: CURRENT, boosters, startDate: START, cloneState: 'alpha' },
+        skills
+      );
+      expect(result.currentSeconds).toBeCloseTo(baseline[baseline.length - 1].cumulativeSeconds, 4);
+
+      let offset = 0;
+      for (const segment of result.segments) {
+        const scheduled = computeSchedule(
+          steps.slice(segment.startIndex, segment.endIndex + 1),
+          {
+            attributes: segment.attributes,
+            boosters,
+            startDate: after(offset),
+            cloneState: 'alpha',
+          },
+          skills
+        );
+        expect(segment.seconds).toBeCloseTo(scheduled[scheduled.length - 1].cumulativeSeconds, 4);
+        offset += segment.seconds;
+      }
+      expect(result.totalSeconds).toBeCloseTo(offset, 4);
+    }
+  });
+});

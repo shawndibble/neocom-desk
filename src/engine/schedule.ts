@@ -3,6 +3,7 @@ import type {
   AttributeName,
   Attributes,
   Booster,
+  CloneState,
   EngineSkill,
   Implants,
   PlanStep,
@@ -47,6 +48,8 @@ export interface ScheduleOptions {
    * does not pass it.
    */
   trainedSkills?: ReadonlyMap<number, TrainedSkill>;
+  /** Omit for Omega. Alpha halves the rate, so a Booster covers half the SP. */
+  cloneState?: CloneState;
 }
 
 const EPSILON_SP = 1e-9;
@@ -67,6 +70,7 @@ export function computeSchedule(
     boosters = [],
     startDate,
     trainedSkills,
+    cloneState,
   } = options;
   if (boosters.length > 0 && !startDate) {
     throw new Error('startDate is required when boosters are provided');
@@ -133,7 +137,8 @@ export function computeSchedule(
       const now = elapsed + seconds;
       const rate = trainingRate(
         attributeAt(baseAttributes, skill.primary, now),
-        attributeAt(baseAttributes, skill.secondary, now)
+        attributeAt(baseAttributes, skill.secondary, now),
+        cloneState
       );
       const spPerSecond = rate / 60;
       const segmentEnd = nextBreakpointAfter(now);

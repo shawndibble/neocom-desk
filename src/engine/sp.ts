@@ -4,6 +4,7 @@
  * cumulative totals for rank 1: 250 / 1,415 / 8,000 / 45,255 / 256,000).
  * Source: EVE University wiki, "Skills and learning".
  */
+import type { CloneState } from '@/engine/types';
 
 const SQRT_32_EXP = 2.5; // sqrt(32) = 2^2.5
 
@@ -78,12 +79,23 @@ export function progressToNextLevel(rank: number, level: number, currentSp: numb
   return Math.min(1, Math.max(0, fraction));
 }
 
-/** Training speed in SP per minute (Omega): primary + secondary/2. */
-export function trainingRate(primaryVal: number, secondaryVal: number): number {
+/** An Alpha clone trains at half the Omega rate. */
+const ALPHA_RATE_FACTOR = 0.5;
+
+/**
+ * Training speed in SP per minute: primary + secondary/2 for an Omega clone,
+ * half that for an Alpha.
+ */
+export function trainingRate(
+  primaryVal: number,
+  secondaryVal: number,
+  cloneState: CloneState = 'omega'
+): number {
   if (!(primaryVal > 0) || !(secondaryVal > 0)) {
     throw new RangeError('attribute values must be > 0');
   }
-  return primaryVal + secondaryVal / 2;
+  const omega = primaryVal + secondaryVal / 2;
+  return cloneState === 'alpha' ? omega * ALPHA_RATE_FACTOR : omega;
 }
 
 /** Seconds to train `sp` skill points at `rate` SP/minute. */

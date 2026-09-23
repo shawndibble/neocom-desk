@@ -43,7 +43,7 @@ export function toOptimizationBadge(
 export function evaluateOptimizationBadge(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
-  options: Pick<PlaceRemapsOptions, 'remapCount' | 'currentAttributes' | 'implants'>
+  options: Pick<PlaceRemapsOptions, 'remapCount' | 'currentAttributes' | 'implants' | 'cloneState'>
 ): OptimizationBadge | null {
   if (steps.length === 0) return null;
   // No remaps to spend means none to place, so there is no savings figure to

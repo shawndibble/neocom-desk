@@ -343,3 +343,41 @@ describe('computeSchedule with attribute segments (Remap Markers)', () => {
     expect(result[1].seconds).toBeCloseTo((1165 / 47.5) * 60, 6);
   });
 });
+
+describe('computeSchedule clone state', () => {
+  it('doubles every step for an Alpha clone when nothing is time-bound', () => {
+    const steps: PlanStep[] = [
+      { skillTypeID: 100, level: 1 },
+      { skillTypeID: 100, level: 2 },
+    ];
+    const omega = computeSchedule(steps, { attributes: attrs(20, 20) }, skills);
+    const alpha = computeSchedule(
+      steps,
+      { attributes: attrs(20, 20), cloneState: 'alpha' },
+      skills
+    );
+    // Omega L1 500 s, L2 2330 s -> Alpha 1000 s, 4660 s.
+    expect(alpha[0].seconds).toBe(1000);
+    expect(alpha[1].seconds).toBe(4660);
+    expect(alpha[1].cumulativeSeconds).toBe(2 * omega[1].cumulativeSeconds);
+    // SP owed does not change, only how fast it trains.
+    expect(alpha.map((s) => s.sp)).toEqual(omega.map((s) => s.sp));
+  });
+
+  it('halves the rate inside a Booster window, so the Booster covers half the SP', () => {
+    // Alpha base 25/2 = 12.5 SP/min; boosted 35/2 = 17.5 SP/min for 300 s.
+    // 300 s * 17.5/60 = 87.5 SP; 162.5 SP left at 12.5/min -> 780 s; total 1080 s.
+    // Doubling the Omega answer (2 * 480 = 960 s) would be wrong.
+    const [step] = computeSchedule(
+      L1,
+      {
+        attributes: attrs(20, 10),
+        boosters: [{ bonus: { intelligence: 10 }, expiresAt: new Date(300_000) }],
+        startDate: new Date(0),
+        cloneState: 'alpha',
+      },
+      skills
+    );
+    expect(step.seconds).toBeCloseTo(1080, 6);
+  });
+});
