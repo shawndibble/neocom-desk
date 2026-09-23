@@ -120,9 +120,9 @@ const ALL_ITEMS_PARAM = boolParam();
 const MIN_VALUE_PARAM = textParam();
 
 /**
- * A drill-down href that keeps the page's query string: search, All Items,
- * min value and the character filter are the same view one level deeper, and
- * the component instance (and its state) already survives drill-down.
+ * A drill-down href that keeps the page's whole query string: its filters
+ * describe the same view one level deeper, and the component instance (and
+ * its state) already survives drill-down.
  */
 function assetHref(stationId: number | null, segments: readonly string[], query: string): string {
   return assetPathHref(stationId, segments) + query;
@@ -636,7 +636,7 @@ export function Assets() {
   // Debounced separately from `search` (issue #415): the input stays
   // instantly responsive, only the matching/grouping memos below — which
   // scan every asset — wait out the debounce.
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(id);

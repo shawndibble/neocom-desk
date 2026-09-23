@@ -295,6 +295,15 @@ type BrowseRow =
   | { kind: 'node'; key: string; node: AssetTreeNode }
   | { kind: 'match'; key: string; match: CorpAssetMatch };
 
+/** A drill-down href that keeps the page's query string, as on the Assets page. */
+function corpAssetHref(
+  groupId: CorpAssetGroupId | null,
+  segments: readonly string[],
+  query: string
+): string {
+  return corpAssetPathHref(groupId, segments) + query;
+}
+
 function estimateRowHeight(row: BrowseRow): number {
   switch (row.kind) {
     case 'group':
@@ -490,8 +499,8 @@ function CorpAssetsView() {
 
   const parentHref =
     resolved.trail.length > 0
-      ? corpAssetPathHref(pathGroupId, resolved.trail.slice(0, -1).map(assetNodeSegment)) + query
-      : corpAssetPathHref(null, []) + query;
+      ? corpAssetHref(pathGroupId, resolved.trail.slice(0, -1).map(assetNodeSegment), query)
+      : corpAssetHref(null, [], query);
   const currentLabel =
     resolved.trail.length > 0
       ? nodeLabel(resolved.trail[resolved.trail.length - 1], typeNames, t)
@@ -625,10 +634,7 @@ function CorpAssetsView() {
                 hint={t('assets.staleLink.hint')}
                 className="py-8"
                 action={
-                  <Button
-                    size="sm"
-                    onClick={() => void navigate(corpAssetPathHref(null, []) + query)}
-                  >
+                  <Button size="sm" onClick={() => void navigate(corpAssetHref(null, [], query))}>
                     {t('assets.staleLink.action')}
                   </Button>
                 }
@@ -722,7 +728,7 @@ function BrowseRowView(props: BrowseRowViewProps) {
     const { group } = row;
     return (
       <LocationRow
-        href={corpAssetPathHref(group.id, []) + props.query}
+        href={corpAssetHref(group.id, [], props.query)}
         label={groupLabel(t, group.id, props.divisionNames)}
         security={undefined}
         jumpsAway={undefined}
@@ -751,7 +757,7 @@ function BrowseRowView(props: BrowseRowViewProps) {
       estimatedValue={estimatedValueFor(match.node.asset, props.priceByTypeId)}
       trail={match.trail}
       security={undefined}
-      href={corpAssetPathHref(match.groupId, match.segments) + props.query}
+      href={corpAssetHref(match.groupId, match.segments, props.query)}
       characterBadge={null}
       t={t}
     />
@@ -778,7 +784,7 @@ function NodeRowView({
   if (node.kind !== 'item') {
     return (
       <ContainerRow
-        href={corpAssetPathHref(pathGroupId, [...pathSegments, assetNodeSegment(node)]) + query}
+        href={corpAssetHref(pathGroupId, [...pathSegments, assetNodeSegment(node)], query)}
         label={label}
         itemCount={node.itemCount}
         estimatedValue={node.estimatedValue}

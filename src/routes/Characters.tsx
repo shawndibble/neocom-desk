@@ -765,7 +765,7 @@ export function Characters() {
 
   const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
   const { q: search, sort: sortKey, dir: sortDirection } = filterParams;
-  const [tableSortParam, setTableSort] = useUrlParam('tsort', TABLE_SORT);
+  const [tableSortParam, setTableSort] = useUrlParam('table.sort', TABLE_SORT);
   const [stats, setStats] = useState<Map<number, CharacterSortStats>>(new Map());
   const [queueById, setQueueById] = useState<Map<number, QueueInfo>>(new Map());
   const [attentionById, setAttentionById] = useState<Map<number, AttentionEntry>>(new Map());

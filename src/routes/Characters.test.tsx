@@ -667,7 +667,7 @@ describe('Characters table view', () => {
     const table = await screen.findByRole('table');
     const header = within(table).getByRole('columnheader', { name: /name/i });
     await user.click(within(header).getByRole('button'));
-    await waitFor(() => expect(locationSearch()).toMatch(/^\?tsort=name%3A(asc|desc)$/));
+    await waitFor(() => expect(locationSearch()).toMatch(/^\?table\.sort=name%3A(asc|desc)$/));
     const written = locationSearch();
     unmount();
 
