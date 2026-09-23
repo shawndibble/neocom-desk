@@ -17,6 +17,7 @@ import {
   ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
+  DataTableDenseCell,
   EmptyState,
   IconButton,
   IskAmount,
@@ -322,15 +323,10 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       id: 'system',
       header: t('miningTax.systemColumn'),
       render: (row) => (
-        // `inline-flex`, not `flex`: the dense phone card's meta line puts a
-        // `·` separator right before this cell's content (`::before` in
-        // index.css) — a block-level `flex` span can't sit on that same
-        // inline line, so it broke the whole cell onto its own line inside
-        // the meta line whenever a separator preceded it.
-        <span className="inline-flex items-center gap-1.5">
+        <DataTableDenseCell>
           {systemName(row)}
           <SecurityValue security={data?.systemSecurity.get(row.entry.solarSystemId)} t={t} />
-        </span>
+        </DataTableDenseCell>
       ),
       sortValue: (row) => systemName(row),
     },
@@ -401,15 +397,14 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       header: t('miningTax.overview.pricingColumn'),
       className: 'whitespace-nowrap',
       render: (row) => (
-        // `inline-flex`, not `flex` — see the `system` column's render.
-        <span className="inline-flex items-center gap-1.5">
+        <DataTableDenseCell>
           <PriceSourceTag source={row.priceSource} />
           {!row.valuation.pricedAll && (
             <span className="text-[0.6875rem] text-warning">
               {t('miningTax.overview.pricingPartial')}
             </span>
           )}
-        </span>
+        </DataTableDenseCell>
       ),
       sortValue: (row) => `${row.priceSource}:${row.valuation.pricedAll ? 1 : 0}`,
     },
