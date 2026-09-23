@@ -1,12 +1,12 @@
 /**
  * Merges a ship's Mastery tiers with an optional attached fit into one row
- * per skill, each tagged by which source(s) named it. Built on
- * `buildFitCheckRows` for the actual status/time math — this only merges
- * entries and re-attaches provenance.
+ * per skill, each tagged by which source(s) named it. Status/time math is
+ * `buildFitCheckRows`'s, unchanged — this only merges entries and
+ * re-attaches provenance.
  */
-import type { EngineSkill, PlanEntry, ScheduledStep, TrainedSkill } from '@/engine/types';
+import type { PlanEntry } from '@/engine/types';
 import type { SkillPrereq } from '@/sde/types';
-import { buildFitCheckRows, type FitCheckRow } from './fitCheckRows';
+import type { FitCheckRow } from './fitCheckRows';
 
 export interface UnifiedShipRow extends FitCheckRow {
   /** Highest Mastery tier (0-4) that requires this skill, or null if none does. */
@@ -21,17 +21,11 @@ export interface MergedShipEntries {
 }
 
 /**
- * `masteryTiers` is a ship's 5 tier bundles (index 0-4, `masteries.json`'s
- * own shape) — all-empty for a hull with no mastery data, or when the ship
- * search hasn't resolved one yet. `fitEntries` is `null` when no fit is
- * attached.
- *
- * Same skill in more than one tier, or in both a tier and the fit: takes the
- * max target level across every source that names it. A skill's own level is
- * assumed non-decreasing tier to tier, per CCP's own Mastery design (not
- * enforced here) — so the highest tier requiring a skill is also its
- * binding tag, even though the max-level computation itself doesn't rely on
- * that assumption.
+ * `masteryTiers`: a ship's 5 tier bundles (`masteries.json`'s own shape),
+ * all-empty when there's none. `fitEntries`: `null` when no fit is attached.
+ * A skill named by more than one source takes the max target level across
+ * them; its tag is the highest tier naming it, assuming (not enforcing)
+ * CCP's own Mastery levels are non-decreasing tier to tier.
  */
 export function mergeShipEntries(
   masteryTiers: readonly (readonly SkillPrereq[])[],
@@ -72,17 +66,4 @@ export function tagUnifiedRows(
     highestMasteryTier: highestMasteryTier.get(row.skillTypeID) ?? null,
     fromFit: fromFit.has(row.skillTypeID),
   }));
-}
-
-/** Convenience wrapper for callers that already have a computed schedule. */
-export function buildUnifiedShipRows(
-  masteryTiers: readonly (readonly SkillPrereq[])[],
-  fitEntries: readonly PlanEntry[] | null,
-  skills: ReadonlyMap<number, EngineSkill>,
-  trainedSkills: ReadonlyMap<number, TrainedSkill>,
-  scheduled: readonly ScheduledStep[]
-): UnifiedShipRow[] {
-  const { entries, highestMasteryTier, fromFit } = mergeShipEntries(masteryTiers, fitEntries);
-  const rows = buildFitCheckRows(entries, skills, trainedSkills, scheduled);
-  return tagUnifiedRows(rows, highestMasteryTier, fromFit);
 }

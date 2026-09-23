@@ -1,9 +1,7 @@
 /**
- * One ship, one flat list: merges Mastery tiers with an optional attached
- * fit into a single set of skill rows tagged by source, replacing the old
- * Fit Check / Mastery tab switch. Search picks the ship; a fit is optional
- * context, not a separate mode — pasting one auto-switches the ship search
- * to match its hull when it names a different one.
+ * One ship, one flat list of skill rows tagged by source: Mastery tiers,
+ * an optionally attached fit, or both. Search picks the ship; pasting a fit
+ * auto-switches it to match the fit's own hull when they differ.
  */
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +11,7 @@ import {
   FilterChip,
   Panel,
   SearchInput,
+  sortRows,
   Spinner,
   StatChip,
 } from '@/components/ui';
@@ -87,10 +86,7 @@ export function ShipsPanel({
   const [showMastery, setShowMastery] = useState(true);
   const [showFit, setShowFit] = useState(true);
 
-  // Read inside `handleCheckFit`'s async closure to detect a manual
-  // reselect that happened while a check was in flight -- `selected`
-  // itself would stay frozen at the value from when that closure was
-  // created.
+  // True-current value for `handleCheckFit`'s async closure, where `selected` is frozen.
   const selectedRef = useRef(selected);
   useEffect(() => {
     selectedRef.current = selected;
@@ -160,14 +156,10 @@ export function ShipsPanel({
         entries: preview.entries,
         warnings: preview.warnings,
       });
-      // Auto-switch the ship search to match the fit's own hull — via
-      // `selectShip`, not `pickShip`: the latter would immediately clear
-      // the fit we just attached, reading `fit` from this render's stale
-      // closure before the `setFit` above has committed. Skipped entirely
-      // if the user manually picked a different ship while this check was
-      // in flight (`selectedRef` tracks the true current value; `selected`
-      // itself is frozen at whatever it was when this closure was made) —
-      // otherwise a slow parse racing a reselect would silently clobber it.
+      // Auto-switch via `selectShip`, not `pickShip` (which would read this
+      // closure's stale `fit` and immediately clear the result just set).
+      // Skipped if the selection changed mid-flight, so a slow parse can't
+      // clobber a reselect the user made while it was pending.
       if (preview.shipName && ships && selectedRef.current?.typeID === startedWith?.typeID) {
         const matched = ships.find((s) => s.name.toLowerCase() === preview.shipName?.toLowerCase());
         if (matched && matched.typeID !== selectedRef.current?.typeID) selectShip(matched);
@@ -215,11 +207,12 @@ export function ShipsPanel({
       if (hideCompleted && row.status === 'trained') return false;
       return true;
     });
-    return [...filtered].sort((a, b) => {
-      const secondsA = a.status === 'trained' ? Infinity : a.seconds;
-      const secondsB = b.status === 'trained' ? Infinity : b.seconds;
-      return secondsA - secondsB;
-    });
+    // Trained rows have no orderable time left, so `sortRows` sinks them last.
+    return sortRows(
+      filtered,
+      { sortValue: (r) => (r.status === 'trained' ? undefined : r.seconds) },
+      'asc'
+    );
   }, [rows, showMastery, showFit, hideCompleted]);
 
   const untrained = visibleRows.filter((row) => row.status !== 'trained');
@@ -362,16 +355,16 @@ export function ShipsPanel({
             )}
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setAttaching(true)}
-            className="text-xs text-text-dim underline"
-          >
-            {t('skills.ships.attachFit')}
-          </button>
-        )}
-        {!fitResult && !attaching && (
-          <p className="text-xs text-text-faint">{t('skills.ships.attachFitHint')}</p>
+          <>
+            <button
+              type="button"
+              onClick={() => setAttaching(true)}
+              className="text-xs text-text-dim underline"
+            >
+              {t('skills.ships.attachFit')}
+            </button>
+            <p className="text-xs text-text-faint">{t('skills.ships.attachFitHint')}</p>
+          </>
         )}
         {fitResult?.warnings.map((warning, i) => (
           <p key={`${i}:${warning}`} className="text-xs text-warning">
