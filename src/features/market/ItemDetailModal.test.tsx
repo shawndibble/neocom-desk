@@ -439,9 +439,10 @@ describe('ItemDetailModal', () => {
     const popoverContent = skillLine.closest('div') as HTMLElement;
     expect(within(popoverContent).getByText('Not trained')).toBeInTheDocument();
 
-    // The item's own Required Skills section also has an "Add to Skill Plan"
-    // button (for Gunnery) — scope to this popover's own button.
-    await user.click(within(popoverContent).getByRole('button', { name: 'Add to Skill Plan' }));
+    // Zero plans yet -> "Create Plan & Add", matching FitCheckPanel/MasteryPanel's
+    // convention. The item's own Required Skills section also has a button
+    // here (for Gunnery) — scope to this popover's own button.
+    await user.click(within(popoverContent).getByRole('button', { name: 'Create Plan & Add' }));
 
     await waitFor(async () => {
       const plans = await db.skillPlans.where('characterId').equals(CHARACTER_ID).toArray();
@@ -450,6 +451,71 @@ describe('ItemDetailModal', () => {
       // SkillRowContextMenu's `Math.min(currentLevel + 1, 5)`.
       expect(plans[0].entries).toEqual([{ skillTypeID: SHARPSHOOTER_TYPE_ID, targetLevel: 1 }]);
     });
+  });
+
+  it('attribute modifier chip: a failed live fetch of the owning skill degrades to an error row, not a stuck spinner', async () => {
+    const GUNNERY_TYPE_ID = 3300;
+    const SHARPSHOOTER_TYPE_ID = 3311;
+    const OPTIMAL_RANGE_ATTR = 54;
+    useActiveCharacter.setState({ activeCharacterId: 888, hydrated: true });
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: '1400mm Autocannon II',
+          description: '',
+          group_id: 55,
+          published: true,
+          volume: 5,
+          dogma_attributes: [
+            { attribute_id: 182, value: GUNNERY_TYPE_ID },
+            { attribute_id: 277, value: 1 },
+            { attribute_id: OPTIMAL_RANGE_ATTR, value: 12000 },
+          ],
+        })
+      ),
+      // The owning skill's own type fetch fails — the chip must not be left
+      // showing "Loading…" forever, nor throw an unhandled rejection.
+      http.get(
+        `${ESI_BASE_URL}/universe/types/${SHARPSHOOTER_TYPE_ID}`,
+        () => new HttpResponse(null, { status: 500 })
+      )
+    );
+    mockedLoadDictionary.mockResolvedValue({
+      182: { name: 'Primary Skill required', unit: 'typeID', category: 'Required Skills' },
+      [OPTIMAL_RANGE_ATTR]: { name: 'Optimal Range', unit: 'm', category: 'Targeting' },
+    });
+    mockedLoadSkills.mockResolvedValue([
+      {
+        typeID: GUNNERY_TYPE_ID,
+        name: 'Gunnery',
+        description: '',
+        groupID: 0,
+        groupName: '',
+        rank: 1,
+        primaryAttr: 'perception',
+        secondaryAttr: 'willpower',
+        prereqs: [],
+      },
+    ]);
+    mockedLoadSkillAttributeModifiers.mockResolvedValue({
+      [OPTIMAL_RANGE_ATTR]: [
+        {
+          ownerSkillTypeID: SHARPSHOOTER_TYPE_ID,
+          gatingSkillTypeID: GUNNERY_TYPE_ID,
+          sourceAttributeID: 294,
+        },
+      ],
+    });
+    const user = userEvent.setup();
+
+    render(<ItemDetailModal typeId={TYPE_ID} itemName="1400mm Autocannon II" onClose={() => {}} />);
+
+    const chip = await screen.findByRole('button', { name: '12,000 m' });
+    await user.click(chip);
+
+    expect(await screen.findByText("Couldn't load this skill's effect")).toBeInTheDocument();
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
   });
 
   it('closes on Escape and returns focus to the trigger', async () => {

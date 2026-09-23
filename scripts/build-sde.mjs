@@ -2138,6 +2138,26 @@ async function main() {
       console.error('  FAIL: Sharpshooter should modify attribute 54 (Optimal Range)');
       process.exitCode = 1;
     }
+    // The resolver reads `sourceAttributeID`'s value directly off the owning
+    // skill's own static dogma_attributes (verified against a live dump: every
+    // skill-driven PostPercent bonus already carries its per-level design
+    // value there — no runtime effect chain needs simulating). A row whose
+    // owner skill has no such value, or a value of 0, would mean a future CCP
+    // data change introduced a case this flat lookup can't resolve.
+    let unresolvableRows = 0;
+    for (const list of Object.values(skillAttributeModifiers)) {
+      for (const { ownerSkillTypeID, sourceAttributeID } of list) {
+        const value = attrsByType.get(ownerSkillTypeID)?.get(sourceAttributeID);
+        if (!value) unresolvableRows++;
+      }
+    }
+    console.log(`  skill attribute modifiers unresolvable via flat lookup: ${unresolvableRows}`);
+    if (unresolvableRows) {
+      console.error(
+        `  FAIL: ${unresolvableRows} row(s) have no static per-level value on their owning skill`
+      );
+      process.exitCode = 1;
+    }
   }
 
   console.log(`  market groups: ${marketGroups.length}`);

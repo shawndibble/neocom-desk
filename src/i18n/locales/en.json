@@ -88,8 +88,7 @@
       "perLevel": "{{skill}}: +{{perLevel}}% per level",
       "current": "Trained to {{level}} — currently +{{total}}%",
       "untrained": "Not trained",
-      "addToPlan": "Add to Skill Plan",
-      "loading": "Loading…"
+      "loadError": "Couldn't load this skill's effect"
     },
     "mastery": {
       "title": "Ship Mastery",

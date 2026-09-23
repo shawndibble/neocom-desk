@@ -301,7 +301,7 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
                         <dt className="text-text-dim">{attribute.name}</dt>
                         <dd className="text-right text-text">
                           {modifiers.length > 0 ? (
-                            <AttributeModifierChip
+                            <AttributeModifierTrigger
                               modifiers={modifiers}
                               skillNames={data.allSkillNames}
                               trainedSkills={trainedSkills}
@@ -309,7 +309,7 @@ export function ItemDetailModal({ typeId, itemName, onClose, location }: ItemDet
                               itemName={itemName}
                             >
                               {valueText}
-                            </AttributeModifierChip>
+                            </AttributeModifierTrigger>
                           ) : (
                             valueText
                           )}
@@ -405,6 +405,11 @@ function NameOnlySkillRow({ name, level }: { name: string; level: number }) {
   );
 }
 
+/** `skillNames[id]`, falling back to `#id` when a skill's name hasn't resolved — shared by the trigger and each popover row. */
+function skillNameOrFallback(id: number, skillNames: Readonly<Record<number, string>>): string {
+  return skillNames[id] ?? `#${id}`;
+}
+
 /**
  * "Which skill changes this?" — wraps an attribute's displayed value in a
  * click-to-reveal popover (issue #1372's feature 3b). `modifiers` is already
@@ -414,7 +419,7 @@ function NameOnlySkillRow({ name, level }: { name: string; level: number }) {
  * unmounts on close, so a fresh fetch on each open is the natural lazy
  * behavior, not a special case).
  */
-function AttributeModifierChip({
+function AttributeModifierTrigger({
   modifiers,
   skillNames,
   trainedSkills,
@@ -433,7 +438,10 @@ function AttributeModifierChip({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button type="button" className="underline decoration-dotted underline-offset-2">
+        <button
+          type="button"
+          className="underline decoration-dotted underline-offset-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+        >
           {children}
         </button>
       </PopoverTrigger>
@@ -442,7 +450,7 @@ function AttributeModifierChip({
           <AttributeModifierRow
             key={modifier.ownerSkillTypeID}
             modifier={modifier}
-            skillName={skillNames[modifier.ownerSkillTypeID] ?? `#${modifier.ownerSkillTypeID}`}
+            skillName={skillNameOrFallback(modifier.ownerSkillTypeID, skillNames)}
             trainedLevel={trainedSkills.get(modifier.ownerSkillTypeID)?.level ?? 0}
             target={target}
             itemName={itemName}
@@ -453,7 +461,7 @@ function AttributeModifierChip({
   );
 }
 
-/** One skill's effect inside `AttributeModifierChip`'s popover: fetches its own base per-level value on mount. */
+/** One skill's effect inside `AttributeModifierTrigger`'s popover: fetches its own base per-level value on mount. */
 function AttributeModifierRow({
   modifier,
   skillName,
@@ -469,16 +477,28 @@ function AttributeModifierRow({
 }) {
   const { t } = useTranslation();
   const [perLevelValue, setPerLevelValue] = useState<number | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const { data: ownerSkill } = await getUniverseType(modifier.ownerSkillTypeID);
-      if (cancelled || !ownerSkill) return;
-      const attr = ownerSkill.dogma_attributes?.find(
-        (a) => a.attribute_id === modifier.sourceAttributeID
-      );
-      setPerLevelValue(attr?.value ?? 0);
+      try {
+        const { data: ownerSkill } = await getUniverseType(modifier.ownerSkillTypeID);
+        if (cancelled) return;
+        if (!ownerSkill) {
+          setLoadFailed(true);
+          return;
+        }
+        const attr = ownerSkill.dogma_attributes?.find(
+          (a) => a.attribute_id === modifier.sourceAttributeID
+        );
+        setPerLevelValue(attr?.value ?? 0);
+      } catch {
+        // A live ESI fetch, unlike this modal's cached/precached data — an
+        // error here degrades to "couldn't load", not an unhandled rejection
+        // or a popover stuck on "Loading…" forever.
+        if (!cancelled) setLoadFailed(true);
+      }
     })();
     return () => {
       cancelled = true;
@@ -487,8 +507,13 @@ function AttributeModifierRow({
 
   return (
     <div className="space-y-1 text-xs">
-      {perLevelValue === null ? (
-        <p className="text-text-dim">{t('skills.attributeModifier.loading')}</p>
+      {loadFailed ? (
+        <p className="text-danger">{t('skills.attributeModifier.loadError')}</p>
+      ) : perLevelValue === null ? (
+        <div className="flex items-center gap-2 text-text-dim">
+          <Spinner size="sm" label={t('common.loading')} />
+          {t('common.loading')}
+        </div>
       ) : (
         <>
           <p className="text-text">
@@ -507,6 +532,7 @@ function AttributeModifierRow({
       <Button
         size="sm"
         variant="ghost"
+        disabled={loadFailed}
         onClick={() =>
           void target.addEntries(
             [
@@ -519,7 +545,9 @@ function AttributeModifierRow({
           )
         }
       >
-        {t('skills.attributeModifier.addToPlan')}
+        {target.plans?.length === 0
+          ? t('skills.fitCheck.createPlanAndAdd')
+          : t('skills.requiredSkills.addToPlan')}
       </Button>
     </div>
   );
