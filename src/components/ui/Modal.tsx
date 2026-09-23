@@ -96,39 +96,45 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
       className={`fixed inset-0 h-fit overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${placementClass}`}
     >
       {open && (
-        <div className="flex max-h-[85vh] flex-col">
-          <header className="flex min-h-8 items-center justify-between gap-2 border-b border-line px-3 py-1">
-            <h2
-              id={titleId}
-              className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
-            >
-              {title}
-            </h2>
-            {/* `Icon.Close` via `IconButton`, not the hand-rolled "×" glyph
+        // The provider spans the header too, not just the body: a title can
+        // carry its own overlay (e.g. an item name's right-click menu), and
+        // one portaled to `document.body` would
+        // land behind the top layer — see `portalContainer.ts`.
+        <PortalContainerProvider value={portalContainer}>
+          <div className="flex max-h-[85vh] flex-col">
+            <header className="flex min-h-8 items-center justify-between gap-2 border-b border-line px-3 py-1">
+              <h2
+                id={titleId}
+                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+              >
+                {title}
+              </h2>
+              {/* `Icon.Close` via `IconButton`, not the hand-rolled "×" glyph
                 this replaced: DESIGN.md's icon rules require an icon-only
                 control to be an `IconButton` and forbid a dingbat character
                 standing in for one, and the mobile "More" sheet's close
                 control was flagged at 23×28px — under the documented 44px
                 touch tier every other icon action in the header now gets. */}
-            <IconButton
-              variant="plain"
-              icon={<Icon.Close />}
-              label={t('common.close')}
-              onClick={onClose}
-            />
-          </header>
-          {/* `overscroll-contain` plus the `body:has(dialog[open])` rule in
+              <IconButton
+                variant="plain"
+                icon={<Icon.Close />}
+                label={t('common.close')}
+                onClick={onClose}
+              />
+            </header>
+            {/* `overscroll-contain` plus the `body:has(dialog[open])` rule in
               index.css: a native dialog does not lock the page behind it, so
               on a phone a scroll that starts over the sheet would otherwise
               chain straight into the page underneath. */}
-          <div
-            ref={bodyRef}
-            tabIndex={-1}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none"
-          >
-            <PortalContainerProvider value={portalContainer}>{children}</PortalContainerProvider>
+            <div
+              ref={bodyRef}
+              tabIndex={-1}
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none"
+            >
+              {children}
+            </div>
           </div>
-        </div>
+        </PortalContainerProvider>
       )}
     </dialog>
   );

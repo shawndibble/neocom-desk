@@ -63,7 +63,7 @@ export function SkillRequirementsList({
                 trailing={
                   <span
                     data-trained={req.trained}
-                    className={`shrink-0 rounded-xs px-1.5 py-0.5 text-[0.6875rem] uppercase tracking-wide ${
+                    className={`shrink-0 rounded-xs px-1.5 py-0.5 text-[0.6875rem] uppercase tracking-widest ${
                       req.trained ? 'bg-accent/20 text-accent' : 'border border-line text-text-dim'
                     }`}
                   >

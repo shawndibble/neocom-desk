@@ -506,7 +506,7 @@ function PlanetCard({
           {name ?? t('pi.planetLabel', { id: planetId })}
         </span>
         {planetType && (
-          <span className="text-[0.625rem] tracking-wide text-text-dim uppercase">
+          <span className="text-[0.625rem] tracking-widest text-text-dim uppercase">
             {t(`pi.planetType.${planetType}`)}
           </span>
         )}

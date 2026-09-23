@@ -1,7 +1,9 @@
+import { Fragment, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
+import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
 import type { BuildRecipe } from './subBuildPlan';
 
 interface BuildRecipeModalProps {
@@ -11,6 +13,8 @@ interface BuildRecipeModalProps {
   nameFor: (typeID: number) => string;
   /** Swaps the modal to an input's own recipe — how the tree is walked now the table is flat. */
   onOpenRecipe: (typeID: number) => void;
+  /** Wraps the title and each input row in the item context menu; omitted where the caller has none to offer. */
+  itemMenuFor?: ItemMenuFor;
 }
 
 /**
@@ -38,15 +42,19 @@ export function BuildRecipeModal({
   onClose,
   nameFor,
   onOpenRecipe,
+  itemMenuFor,
 }: BuildRecipeModalProps) {
   const { t } = useTranslation();
   const name = recipe ? nameFor(recipe.typeID) : '';
+  const title = t('industry.buildRecipe.title', { material: name });
+  const withMenu = (typeID: number, trigger: ReactElement) =>
+    itemMenuFor ? itemMenuFor(typeID, trigger) : trigger;
 
   return (
     <Modal
       open={recipe !== null}
       onClose={onClose}
-      title={t('industry.buildRecipe.title', { material: name })}
+      title={recipe ? withMenu(recipe.typeID, <span>{title}</span>) : title}
     >
       {recipe && (
         <div className="space-y-4">
@@ -72,20 +80,22 @@ export function BuildRecipeModal({
             */}
             <ul className="divide-y divide-line border-y border-line">
               {recipe.inputs.map((input) => (
-                <li
-                  key={input.typeID}
-                  className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1.5 text-xs"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    {nameFor(input.typeID)}
-                    {input.built && (
-                      <Button size="sm" onClick={() => onOpenRecipe(input.typeID)}>
-                        {t('industry.buildRecipe.action')}
-                      </Button>
-                    )}
-                  </span>
-                  <span className="tabular-nums">{input.quantity.toLocaleString()}</span>
-                </li>
+                <Fragment key={input.typeID}>
+                  {withMenu(
+                    input.typeID,
+                    <li className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-1.5 text-xs">
+                      <span className="inline-flex items-center gap-2">
+                        {nameFor(input.typeID)}
+                        {input.built && (
+                          <Button size="sm" onClick={() => onOpenRecipe(input.typeID)}>
+                            {t('industry.buildRecipe.action')}
+                          </Button>
+                        )}
+                      </span>
+                      <span className="tabular-nums">{input.quantity.toLocaleString()}</span>
+                    </li>
+                  )}
+                </Fragment>
               ))}
             </ul>
           </section>

@@ -99,7 +99,7 @@ function AttributePairBadge({ primary, secondary }: AttributePairBadgeProps) {
   return (
     <span
       aria-label={t('plans.attributePairLabel', { pair: label })}
-      className="rounded-xs border border-line px-1 text-[0.6875rem] tracking-wide text-text-dim uppercase"
+      className="rounded-xs border border-line px-1 text-[0.6875rem] tracking-widest text-text-dim uppercase"
     >
       {label}
     </span>
@@ -201,7 +201,7 @@ function PriorityPill({
           className={`group inline-flex items-center ${touchTarget ? controlHeightClassName.sm : ''}`}
         >
           <span
-            className={`rounded-xs border px-1 text-[0.6875rem] tracking-wide uppercase group-hover:border-line-bright group-focus-visible:outline-2 group-focus-visible:outline-offset-1 group-focus-visible:outline-accent ${PRIORITY_TONE[priority]}`}
+            className={`rounded-xs border px-1 text-[0.6875rem] tracking-widest uppercase group-hover:border-line-bright group-focus-visible:outline-2 group-focus-visible:outline-offset-1 group-focus-visible:outline-accent ${PRIORITY_TONE[priority]}`}
           >
             {t(priorityLabelKey(priority))}
           </span>
@@ -232,7 +232,7 @@ function BandHeader({ band }: BandHeaderProps) {
           pair: attributePairLabel(band.primary, band.secondary),
         });
   return (
-    <li className="border-b border-line bg-panel-2 px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide text-text-dim">
+    <li className="border-b border-line bg-panel-2 px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-widest text-text-dim">
       {text}
     </li>
   );
@@ -652,7 +652,7 @@ const MarkerRow = memo(function MarkerRow({
           <button
             type="button"
             onClick={() => onEdit(markerIndex)}
-            className="font-semibold tracking-wide uppercase hover:underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+            className="font-semibold tracking-widest uppercase hover:underline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
           >
             {t('plans.markerRow')}
           </button>

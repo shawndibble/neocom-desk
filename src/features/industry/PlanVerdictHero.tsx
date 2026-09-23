@@ -10,6 +10,7 @@ import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
 import { formatPercent } from './format';
 import { CalculationBreakdown, type BreakdownContext } from './CalculationBreakdown';
+import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
 import { SkillGateMarker } from './SkillGateMarker';
 
 type PillTone = 'success' | 'warning' | 'muted';
@@ -38,7 +39,7 @@ export function VerdictPill({
   const Glyph = tone === 'warning' ? Icon.Warn : tone === 'success' ? Icon.Done : Icon.Info;
   return (
     <p
-      className={`inline-flex min-h-7 items-center gap-2 rounded-xs border px-2.5 py-1 text-[0.6875rem] font-semibold tracking-wide uppercase ${PILL_TONE[tone]}`}
+      className={`inline-flex min-h-7 items-center gap-2 rounded-xs border px-2.5 py-1 text-[0.6875rem] font-semibold tracking-widest uppercase ${PILL_TONE[tone]}`}
     >
       <Glyph size={Icon.ICON_SIZE.sm} aria-hidden="true" className="shrink-0" />
       <span className="sr-only">{label}</span>
@@ -52,6 +53,10 @@ interface PlanVerdictHeroProps {
   pricesReady: boolean;
   pricesLoading: boolean;
   productName: string;
+  /** The product's typeID, for the heading's item context menu; null when the blueprint has no product. */
+  productTypeID?: number | null;
+  /** Wraps the product heading in the item context menu; omitted where the caller has none to offer. */
+  itemMenuFor?: ItemMenuFor;
   runs: number;
   /** Both liquidation bases; the hero states the sell-now one. Null with no owned stock priced. */
   ownedSale: { instant: OwnedStockSale; order: OwnedStockSale } | null;
@@ -78,6 +83,8 @@ export function PlanVerdictHero({
   pricesReady,
   pricesLoading,
   productName,
+  productTypeID,
+  itemMenuFor,
   runs,
   ownedSale,
   breakdown,
@@ -122,7 +129,14 @@ export function PlanVerdictHero({
           <div className="min-w-0 space-y-1 md:flex-1">
             <p className="flex flex-wrap items-baseline gap-x-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {/* A real heading, not decoration: it is what names the open plan to a screen reader. */}
-              <h2 className="text-text">{productName}</h2>
+              {/* The heading alone, not the line: the breakdown modal below is
+                  this component's React child, and a right-click inside it
+                  would bubble up to any wider trigger. */}
+              {itemMenuFor && productTypeID != null ? (
+                itemMenuFor(productTypeID, <h2 className="text-text">{productName}</h2>)
+              ) : (
+                <h2 className="text-text">{productName}</h2>
+              )}
               {skillGate?.gated && nameForSkill && nameForCharacter && (
                 <SkillGateMarker
                   verdict={skillGate}
