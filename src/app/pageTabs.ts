@@ -23,6 +23,17 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'across', labelKey: 'contacts.tabAcrossCharacters' },
 ]);
 
+export const PI_TABS = definePageTabs('/planetary-industry', [
+  { id: 'colonies', labelKey: 'piPlan.coloniesTab' },
+  { id: 'plan', labelKey: 'piPlan.planTab' },
+  { id: 'advisor', labelKey: 'piPlan.advisorTab' },
+]);
+
+export const MINING_TABS = definePageTabs('/mining', [
+  { id: 'tax', labelKey: 'miningTax.taxTab' },
+  { id: 'overview', labelKey: 'miningTax.overviewTab' },
+]);
+
 export const WALLET_TABS = definePageTabs('/wallet', [
   { id: 'balance', labelKey: 'wallet.balanceTab' },
   { id: 'journal', labelKey: 'wallet.journalTab' },
@@ -49,6 +60,8 @@ export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/contacts': CONTACTS_TABS,
   '/contracts': CONTRACTS_TABS,
   '/industry': INDUSTRY_TABS,
+  '/planetary-industry': PI_TABS,
+  '/mining': MINING_TABS,
   '/wallet': WALLET_TABS,
 };
 
