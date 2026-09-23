@@ -134,6 +134,12 @@ describe('NOTIFICATION_EVENTS', () => {
     expect(event?.scope).toBeUndefined();
     expect(event?.corpCapability).toBeUndefined();
   });
+
+  it('defaults exactly the four worth-a-row events to feed-only (round 45, issue #1091)', () => {
+    expect(
+      NOTIFICATION_EVENTS.filter((e) => e.defaultChannels === 'feedOnly').map((e) => e.id)
+    ).toEqual(['marketOrderFilled', 'contractCompleted', 'contractFailed', 'walletBalanceChanged']);
+  });
 });
 
 describe('isCorpEventId', () => {

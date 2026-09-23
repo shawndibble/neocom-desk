@@ -27,7 +27,8 @@ import {
   type EveTypeEnabledMap,
 } from './eventSelection';
 import type { NotificationEventId } from './events';
-import type { CharacterEventThresholds, NotificationPreferencesValue } from './preferences';
+import type { NotificationPreferencesValue } from './preferences';
+import { setThresholds, type CharacterEventThresholds } from './eventThresholds';
 import { recordByCharacterId } from './recordByCharacterId';
 
 export const SYNCED_NOTIFICATION_FEED_PREFS_KEY = 'sync.notificationFeedPrefs';
@@ -74,26 +75,6 @@ function extractFeedFromEveTypeMap(map: EveTypeEnabledMap): Record<string, boole
   return result;
 }
 
-/** Only the fields actually set for this Character — never an `undefined` value (Firestore rejects those). */
-function extractThresholds(raw: CharacterEventThresholds | undefined): CharacterEventThresholds {
-  const result: CharacterEventThresholds = {};
-  if (raw?.structureFuelLowDays !== undefined)
-    result.structureFuelLowDays = raw.structureFuelLowDays;
-  if (raw?.extractorExpiringLeadHours !== undefined) {
-    result.extractorExpiringLeadHours = raw.extractorExpiringLeadHours;
-  }
-  if (raw?.corpWalletBalanceFloorIsk !== undefined) {
-    result.corpWalletBalanceFloorIsk = raw.corpWalletBalanceFloorIsk;
-  }
-  if (raw?.corpWalletTransactionCeilingIsk !== undefined) {
-    result.corpWalletTransactionCeilingIsk = raw.corpWalletTransactionCeilingIsk;
-  }
-  if (raw?.walletBalanceChangedThresholdIsk !== undefined) {
-    result.walletBalanceChangedThresholdIsk = raw.walletBalanceChangedThresholdIsk;
-  }
-  return result;
-}
-
 /** The full local preferences value, reduced to the slice `SYNCED_NOTIFICATION_FEED_PREFS_KEY` carries. */
 export function toSyncedFeedPrefs(value: NotificationPreferencesValue): SyncedFeedPrefs {
   const perCharacter: Record<number, Partial<Record<NotificationEventId, boolean>>> = {};
@@ -111,7 +92,7 @@ export function toSyncedFeedPrefs(value: NotificationPreferencesValue): SyncedFe
 
   const thresholdsByCharacter: Record<number, CharacterEventThresholds> = {};
   for (const [characterIdRaw, raw] of Object.entries(value.thresholdsByCharacter ?? {})) {
-    const thresholds = extractThresholds(raw);
+    const thresholds = setThresholds(raw);
     if (Object.keys(thresholds).length > 0)
       thresholdsByCharacter[Number(characterIdRaw)] = thresholds;
   }

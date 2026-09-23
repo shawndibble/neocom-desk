@@ -35,6 +35,13 @@ import {
   type NotificationChannel,
 } from './eventSelection';
 import type { NotificationEventId } from './events';
+import {
+  DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
+  DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+  defaultedThresholds,
+  isCharacterEventThresholds,
+  type CharacterEventThresholds,
+} from './eventThresholds';
 import type { EntryChannelTarget } from './feedSelection';
 import {
   SYNCED_NOTIFICATION_FEED_PREFS_KEY,
@@ -83,32 +90,17 @@ export interface NotificationPreferencesValue {
   thresholdsByCharacter?: Record<number, CharacterEventThresholds>;
 }
 
-/** One Character's threshold settings. Absent fields read as their default (below). */
-export interface CharacterEventThresholds {
-  /** Days of fuel remaining that trigger `structureFuelLow` — one of `STRUCTURE_FUEL_LOW_DAY_OPTIONS`. */
-  structureFuelLowDays?: number;
-  /** Hours before an extractor's `expiry_time` that trigger `planetaryExtractorExpiring` (issue #750) — one of `EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS`. */
-  extractorExpiringLeadHours?: number;
-  /** ISK balance at or under which `corpWalletThreshold` fires its `balanceBelow` half. */
-  corpWalletBalanceFloorIsk?: number;
-  /** ISK amount a single journal entry must exceed to fire `corpWalletThreshold`'s `transactionAbove` half. */
-  corpWalletTransactionCeilingIsk?: number;
-  /** Absolute ISK amount a single wallet journal entry must reach to fire `walletBalanceChanged`. */
-  walletBalanceChangedThresholdIsk?: number;
-}
-
-/** The three lead times `structureFuelLow`'s inline control offers (issue #299) — CCP's own alert fires separately and later. */
-export const STRUCTURE_FUEL_LOW_DAY_OPTIONS: readonly number[] = [7, 3, 1];
-
-/** The lead times `planetaryExtractorExpiring`'s inline control offers (issue #750), replacing the old fixed 24h/12h pair. */
-export const EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS: readonly number[] = [24, 12, 6, 1];
-
-/** A week's warning is the issue's own justification: "a director planning a fuel run wants a week's warning." */
-export const DEFAULT_STRUCTURE_FUEL_LOW_DAYS = 7;
-export const DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS = 6;
-export const DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK = 50_000_000;
-export const DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK = 100_000_000;
-export const DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK = 1_000_000;
+export type { CharacterEventThresholds } from './eventThresholds';
+/** Re-exported: the threshold field specs live in `eventThresholds.ts`, so callers that already import preferences need not reach there. */
+export {
+  STRUCTURE_FUEL_LOW_DAY_OPTIONS,
+  EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS,
+  DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
+  DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
+  DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
+  DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
+  DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
+} from './eventThresholds';
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferencesValue = {
   masterEnabled: true,
@@ -157,22 +149,6 @@ const isEveNotificationTypesByCharacter = recordByCharacterId(isEveTypeEnabledMa
 
 function isOptionalBoolean(raw: unknown): boolean {
   return raw === undefined || typeof raw === 'boolean';
-}
-
-function isOptionalFiniteNumber(raw: unknown): boolean {
-  return raw === undefined || (typeof raw === 'number' && Number.isFinite(raw));
-}
-
-function isCharacterEventThresholds(raw: unknown): raw is CharacterEventThresholds {
-  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return false;
-  const r = raw as Record<string, unknown>;
-  return (
-    isOptionalFiniteNumber(r.structureFuelLowDays) &&
-    isOptionalFiniteNumber(r.extractorExpiringLeadHours) &&
-    isOptionalFiniteNumber(r.corpWalletBalanceFloorIsk) &&
-    isOptionalFiniteNumber(r.corpWalletTransactionCeilingIsk) &&
-    isOptionalFiniteNumber(r.walletBalanceChangedThresholdIsk)
-  );
 }
 
 const isThresholdsByCharacter = recordByCharacterId(isCharacterEventThresholds);
@@ -558,18 +534,7 @@ export function characterEventThresholds(
   value: NotificationPreferencesValue,
   characterId: number
 ): Required<CharacterEventThresholds> {
-  const raw = value.thresholdsByCharacter?.[characterId] ?? {};
-  return {
-    structureFuelLowDays: raw.structureFuelLowDays ?? DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
-    extractorExpiringLeadHours:
-      raw.extractorExpiringLeadHours ?? DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
-    corpWalletBalanceFloorIsk:
-      raw.corpWalletBalanceFloorIsk ?? DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
-    corpWalletTransactionCeilingIsk:
-      raw.corpWalletTransactionCeilingIsk ?? DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
-    walletBalanceChangedThresholdIsk:
-      raw.walletBalanceChangedThresholdIsk ?? DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
-  };
+  return defaultedThresholds(value.thresholdsByCharacter?.[characterId] ?? {});
 }
 
 /** Sets one threshold field for one Character, preserving the others (issue #299). */
