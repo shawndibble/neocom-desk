@@ -1,15 +1,21 @@
 /**
- * The Mining Yield Overview's page settings (issues #1278, #1279): the date
- * range, and the price basis inside a "Value" menu. On desktop the range sits
- * in the header and the basis in a popover; on a phone both live in one
- * bottom sheet behind a single header button.
+ * The Mining Yield Overview's page settings (issues #1278, #1279, #1280):
+ * the date range, and the price basis and buyback rate inside a "Value"
+ * menu. On desktop the range sits in the header and the rest in a popover;
+ * on a phone all three live in one bottom sheet behind a single header
+ * button.
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
+import { Modal, Popover, PopoverContent, PopoverTrigger, TextInput } from '@/components/ui';
 import { MINING_YIELD_RANGES, type MiningYieldRange } from '@/engine/miningTax/yieldRange';
 import { basisSide, isNowBasis, type PriceBasis } from '@/engine/miningTax/priceBasis';
-import { basisLabel } from './basisLabel';
+import {
+  MAX_BUYBACK_RATE,
+  isValidBuybackRate,
+  MIN_BUYBACK_RATE,
+} from '@/engine/miningTax/buybackRate';
+import { valueButtonLabel } from './basisLabel';
 
 interface RangeControlProps {
   value: MiningYieldRange;
@@ -102,7 +108,15 @@ const triggerClassName =
   'flex items-center gap-2 rounded-xs border border-accent-dim bg-panel-2 px-2.5 text-xs text-text hover:border-line-bright focus-visible:outline-2 focus-visible:outline-accent';
 
 /** Desktop: the header's "VALUE  Jita buy" button and its popover. */
-export function ValueMenu({ children, basis }: { children: ReactNode; basis: PriceBasis }) {
+export function ValueMenu({
+  children,
+  basis,
+  buybackRate,
+}: {
+  children: ReactNode;
+  basis: PriceBasis;
+  buybackRate: number;
+}) {
   const { t } = useTranslation();
   return (
     <Popover>
@@ -111,7 +125,7 @@ export function ValueMenu({ children, basis }: { children: ReactNode; basis: Pri
           <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
             {t('miningTax.overview.valueMenu')}
           </span>
-          <span>{basisLabel(t, basis)}</span>
+          <span>{valueButtonLabel(t, basis, buybackRate)}</span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 space-y-4 p-3.5">
@@ -121,14 +135,16 @@ export function ValueMenu({ children, basis }: { children: ReactNode; basis: Pri
   );
 }
 
-/** Phone: one header button ("30d · Jita buy") opening every page setting in a bottom sheet. */
+/** Phone: one header button ("30d · 90% · Jita buy") opening every page setting in a bottom sheet. */
 export function MobileSettings({
   range,
   basis,
+  buybackRate,
   children,
 }: {
   range: MiningYieldRange;
   basis: PriceBasis;
+  buybackRate: number;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -141,7 +157,7 @@ export function MobileSettings({
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
       >
-        {t(`miningTax.overview.range.${range}`)} · {basisLabel(t, basis)}
+        {t(`miningTax.overview.range.${range}`)} · {valueButtonLabel(t, basis, buybackRate)}
       </button>
       <Modal
         open={open}
@@ -152,5 +168,56 @@ export function MobileSettings({
         <div className="space-y-4">{children}</div>
       </Modal>
     </>
+  );
+}
+
+interface BuybackRateInputProps {
+  value: number;
+  onChange: (rate: number) => void;
+}
+
+/**
+ * The buyback rate percent field (issue #1280): same string-buffer idiom as
+ * the Appraisal tab's price-percent field (`AppraisalPanel.tsx`) — the box
+ * holds whatever is typed, and the setting only writes once what's typed
+ * parses to a valid rate, so clearing the field to retype a number doesn't
+ * get clobbered mid-edit.
+ */
+export function BuybackRateInput({ value, onChange }: BuybackRateInputProps) {
+  const { t } = useTranslation();
+  const [text, setText] = useState(String(value));
+  const [lastValue, setLastValue] = useState(value);
+  if (value !== lastValue) {
+    setLastValue(value);
+    if (Number(text) !== value) setText(String(value));
+  }
+
+  function handleChange(next: string) {
+    setText(next);
+    const parsed = Number(next);
+    if (next.trim() !== '' && isValidBuybackRate(parsed)) onChange(parsed);
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <label
+        className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+        htmlFor="mining-overview-buyback-rate"
+      >
+        {t('miningTax.overview.buybackRateLabel')}
+      </label>
+      <TextInput
+        id="mining-overview-buyback-rate"
+        size="sm"
+        type="number"
+        inputMode="decimal"
+        min={MIN_BUYBACK_RATE}
+        max={MAX_BUYBACK_RATE}
+        value={text}
+        onChange={(event) => handleChange(event.target.value)}
+        className="field-no-spinner w-16 text-right"
+      />
+      <span className="text-xs text-text-faint">{t('miningTax.overview.buybackRateHint')}</span>
+    </div>
   );
 }

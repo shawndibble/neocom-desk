@@ -41,12 +41,19 @@ import {
 } from './yieldSnapshot';
 import { iskPerCalendarHour } from '@/engine/miningTax/yieldRate';
 import { daysCovered, eveToday, rangeDates, rangeStartDate } from '@/engine/miningTax/yieldRange';
+import { scaleUnitPrices, scaleValuation } from '@/engine/miningTax/buybackRate';
 import { useMiningYieldRange } from './yieldRangePref';
 import { useMiningPriceBasis } from './priceBasisPref';
-import { MobileSettings, PriceBasisOptions, RangeControl, ValueMenu } from './OverviewSettings';
-import { basisLabel } from './basisLabel';
+import { useMiningBuybackRate } from './buybackRatePref';
 import {
-  basisSide,
+  BuybackRateInput,
+  MobileSettings,
+  PriceBasisOptions,
+  RangeControl,
+  ValueMenu,
+} from './OverviewSettings';
+import { basisSummary } from './basisLabel';
+import {
   countDaysBySource,
   isNowBasis,
   weakestSource,
@@ -128,10 +135,14 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
   const basis = useMiningPriceBasis((state) => state.value);
   const setBasis = useMiningPriceBasis((state) => state.setValue);
   const hydrateBasis = useMiningPriceBasis((state) => state.hydrate);
+  const buybackRate = useMiningBuybackRate((state) => state.value);
+  const setBuybackRate = useMiningBuybackRate((state) => state.setValue);
+  const hydrateBuybackRate = useMiningBuybackRate((state) => state.hydrate);
   useEffect(() => {
     void hydrateRange();
     void hydrateBasis();
-  }, [hydrateRange, hydrateBasis]);
+    void hydrateBuybackRate();
+  }, [hydrateRange, hydrateBasis, hydrateBuybackRate]);
   // EVE/UTC, the ledger's own calendar. Recomputed each render so a tab left
   // open past downtime moves its window with the day.
   const today = eveToday();
@@ -146,14 +157,24 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       ),
     [data, resolvedCharacterFilter]
   );
-  // In range, and re-valued on the chosen price basis — every basis is
-  // precomputed in the snapshot, so this is a swap, never a refetch.
+  // In range, re-valued on the chosen price basis (every basis is
+  // precomputed in the snapshot, so this is a swap, never a refetch), and
+  // scaled by the buyback rate (issue #1280) — done here, once, so every
+  // downstream consumer (stat cards, charts, table, detail modal) sees
+  // already-scaled values without needing to know about the rate itself.
   const visibleRows = useMemo(() => {
     const start = rangeStartDate(range, today);
     return characterRows
       .filter((row) => row.entry.date >= start && row.entry.date <= today)
-      .map((row) => ({ ...row, ...row.byBasis[basis] }));
-  }, [characterRows, range, today, basis]);
+      .map((row) => {
+        const basisRow = { ...row, ...row.byBasis[basis] };
+        return {
+          ...basisRow,
+          valuation: scaleValuation(basisRow.valuation, buybackRate),
+          materialUnitPrices: scaleUnitPrices(basisRow.materialUnitPrices, buybackRate),
+        };
+      });
+  }, [characterRows, range, today, basis, buybackRate]);
   const daysBySource = useMemo(
     () =>
       countDaysBySource(
@@ -333,14 +354,22 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
           <>
             <div className="hidden items-center gap-2 sm:flex">
               <RangeControl value={range} onChange={(next) => void setRange(next)} />
-              <ValueMenu basis={basis}>
+              <ValueMenu basis={basis} buybackRate={buybackRate}>
                 <PriceBasisOptions value={basis} onChange={(next) => void setBasis(next)} />
+                <BuybackRateInput
+                  value={buybackRate}
+                  onChange={(next) => void setBuybackRate(next)}
+                />
               </ValueMenu>
             </div>
             <div className="sm:hidden">
-              <MobileSettings range={range} basis={basis}>
+              <MobileSettings range={range} basis={basis} buybackRate={buybackRate}>
                 <RangeControl value={range} onChange={(next) => void setRange(next)} fill />
                 <PriceBasisOptions value={basis} onChange={(next) => void setBasis(next)} />
+                <BuybackRateInput
+                  value={buybackRate}
+                  onChange={(next) => void setBuybackRate(next)}
+                />
               </MobileSettings>
             </div>
             {characters.length > 0 && (
@@ -408,13 +437,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
             />
           ) : (
             <>
-              <p className="text-xs text-text-dim">
-                {isNowBasis(basis)
-                  ? t('miningTax.overview.basis.summaryNow', {
-                      price: t(`miningTax.overview.basis.${basisSide(basis)}`),
-                    })
-                  : t('miningTax.overview.basis.summaryDay', { price: basisLabel(t, basis) })}
-              </p>
+              <p className="text-xs text-text-dim">{basisSummary(t, basis, buybackRate)}</p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 <Panel>
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
