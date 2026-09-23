@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { SecurityStatus } from '@/components/SecurityStatus';
-import { IskAmount, Tooltip } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
+import { InfoTooltip, IskAmount } from '@/components/ui';
 import type { OfferLocation } from '@/features/contractSearch/offerLocations';
 import { cx } from '@/lib/cx';
 import type { BpoOffer } from './bpoAvailability';
@@ -51,15 +50,11 @@ export function BpoCard({ bpo, mayBeCheaper, cheapest, location, className }: Bp
           className={cx('text-sm tabular-nums', cheapest && 'text-accent')}
         />
         {mayBeCheaper && (
-          <Tooltip content={t('bpcContracts.bpoCardMayBeCheaperHint')} openOnTap>
-            <button
-              type="button"
-              aria-label={t('bpcContracts.bpoMayBeCheaper')}
-              className="rounded-xs text-accent focus-visible:outline-2 focus-visible:outline-accent"
-            >
-              <Icon.Info aria-hidden />
-            </button>
-          </Tooltip>
+          <InfoTooltip
+            label={t('bpcContracts.bpoMayBeCheaper')}
+            content={t('bpcContracts.bpoCardMayBeCheaperHint')}
+            tone="accent"
+          />
         )}
       </span>
       {/* Missing entry: still resolving. Null system: a player structure. */}
