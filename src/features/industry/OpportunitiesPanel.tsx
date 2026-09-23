@@ -10,7 +10,7 @@
  * "this character / all characters / pick some" — this ticket adds no new
  * account-level alt-linking, just this feature's own scoped selector.
  */
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -38,6 +38,7 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
@@ -65,6 +66,10 @@ interface OpportunitiesPanelProps {
   activeCharacterId: number;
   ownedStockSnapshot: OwnedStockSnapshot;
   onAddToCompare: (rows: readonly OpportunityRow[]) => void;
+  onAddToQuickbar: (typeId: number, itemName: string) => void;
+  /** False with no active character — the Quickbar has nobody to save the item under. */
+  quickbarAvailable: boolean;
+  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 function numericCell(
@@ -87,6 +92,9 @@ export function OpportunitiesPanel({
   activeCharacterId,
   ownedStockSnapshot,
   onAddToCompare,
+  onAddToQuickbar,
+  quickbarAvailable,
+  onShowInfo,
 }: OpportunitiesPanelProps) {
   const { t } = useTranslation();
   const unknown = t('common.unknown');
@@ -380,6 +388,24 @@ export function OpportunitiesPanel({
       ),
     },
   ];
+  // A row whose product type is unknown has no item to open a menu for, so it
+  // renders bare (the price-history button is withheld for the same reason).
+  const rowContextMenu = (row: OpportunityRow, tr: ReactElement): ReactElement => {
+    const { productTypeID, productName, blueprintTypeID } = row.candidate.catalogEntry;
+    if (productTypeID === null) return tr;
+    return (
+      <ItemContextMenu
+        typeId={productTypeID}
+        itemName={productName}
+        blueprintTypeID={blueprintTypeID}
+        onAddToQuickbar={onAddToQuickbar}
+        quickbarAvailable={quickbarAvailable}
+        onShowInfo={onShowInfo}
+      >
+        {tr}
+      </ItemContextMenu>
+    );
+  };
   const sortProps = useUrlSort(
     OPPORTUNITIES_SORT_KEY,
     OPPORTUNITIES_DEFAULT_SORT,
@@ -443,6 +469,7 @@ export function OpportunitiesPanel({
             rows={rows}
             rowKey={(row) => row.candidate.id}
             label={t('industry.opportunitiesTitle')}
+            rowContextMenu={rowContextMenu}
             {...sortProps}
           />
         </div>

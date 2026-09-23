@@ -491,6 +491,9 @@ export function Industry() {
                 activeCharacterId={activeCharacterId}
                 ownedStockSnapshot={workspace.ownedStockSnapshot}
                 onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
+                onAddToQuickbar={quickbar.add}
+                quickbarAvailable={quickbar.available}
+                onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
               />
               <MarketWideOpportunitiesPanel
                 hub={DEFAULT_TRADE_HUB}
