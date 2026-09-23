@@ -47,7 +47,6 @@ import { alertGroupLabel, groupAlertsByType } from '@/features/notifications/ale
 import {
   activeAlertsFilterCount,
   filterAlertGroups,
-  type AlertsFilter,
   type DisplayAlertGroup,
 } from '@/features/notifications/alertsFilter';
 import { readFeed } from '@/features/notifications/feed';
@@ -103,9 +102,7 @@ export function Alerts() {
   const { t } = useTranslation();
   const prefsValue = useNotificationPreferences((state) => state.value);
   const prefsHydrated = useNotificationPreferences((state) => state.hydrated);
-  const [filter, setFilterParams] = useUrlParams(ALERTS_FILTER_PARAMS);
-  const setFilter = (next: AlertsFilter | ((prev: AlertsFilter) => AlertsFilter)): void =>
-    setFilterParams(typeof next === 'function' ? next(filter) : next);
+  const [filter, setFilter] = useUrlParams(ALERTS_FILTER_PARAMS);
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(() => new Set());
 
   useEffect(() => {
@@ -221,7 +218,7 @@ export function Alerts() {
         search={
           <SearchInput
             value={filter.query}
-            onChange={(event) => setFilter((prev) => ({ ...prev, query: event.target.value }))}
+            onChange={(event) => setFilter({ query: event.target.value })}
             aria-label={t('alerts.searchLabel')}
             placeholder={t('alerts.searchPlaceholder')}
             /*

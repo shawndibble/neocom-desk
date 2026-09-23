@@ -1051,13 +1051,7 @@ export function Settings() {
         label={t('settings.title')}
         value={tab}
         onChange={(id) => setTab(id as typeof tab)}
-        tabs={[
-          { id: 'general', label: t('settings.tabs.general') },
-          { id: 'notifications', label: t('settings.tabs.notifications') },
-          { id: 'dataAge', label: t('settings.tabs.data') },
-          { id: 'activity', label: t('settings.tabs.activity') },
-          { id: 'faq', label: t('settings.tabs.faq') },
-        ]}
+        tabs={SETTINGS_TABS.tabs.map((item) => ({ id: item.id, label: t(item.labelKey) }))}
       />
       {tab === 'general' && (
         <div className="space-y-4">

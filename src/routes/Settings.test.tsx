@@ -643,6 +643,34 @@ describe('Settings — Notifications (issue #170)', () => {
     ).toBeInTheDocument();
   });
 
+  it('restores the search text from the URL on reload', async () => {
+    window.history.pushState({}, '', '/settings/notifications?search=mail');
+    render(<App />);
+    await notificationsPanel();
+
+    const pilotOneSection = within(await notificationsPanel())
+      .getByRole('button', { name: /pilot one/i })
+      .closest('div')!.parentElement!;
+    expect(
+      within(pilotOneSection).getByRole('checkbox', { name: 'New Mail, browser notifications' })
+    ).toBeInTheDocument();
+    expect(
+      within(pilotOneSection).queryByRole('checkbox', {
+        name: 'Skill Level Complete, browser notifications',
+      })
+    ).not.toBeInTheDocument();
+  });
+
+  it('writes typed search text to the URL once typing pauses, and leaves the default out', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await notificationsPanel();
+
+    await user.type(await screen.findByRole('searchbox'), 'mail');
+
+    await waitFor(() => expect(window.location.search).toBe('?search=mail'));
+  });
+
   it("lands on the Notifications tab when the Overview feed's link names it", async () => {
     // The feed links to /settings/notifications directly (ADR 0015: tab is a path segment).
     window.history.pushState({}, '', '/settings/notifications');

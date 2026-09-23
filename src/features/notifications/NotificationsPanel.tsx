@@ -100,11 +100,6 @@ import {
 } from './eventSelection';
 import { eveTypeLabel } from './eveTypeLabel';
 import { filterNotificationSections } from './notificationSearch';
-import { useUrlParam } from '@/lib/useUrlState';
-import { textParam } from '@/lib/urlState';
-
-/** Module scope so `useUrlParam` sees a stable codec identity across renders. */
-const SEARCH_PARAM = textParam();
 import { estimateCharacterSectionHeight } from './notificationRows';
 import { parseIskAmount, formatIsk } from '@/lib/isk';
 import { refreshAppBadge } from './appBadge';
@@ -119,8 +114,13 @@ import { enableWebPush } from './webPush';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
+import { useUrlParam } from '@/lib/useUrlState';
+import { textParam } from '@/lib/urlState';
 
 const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
+
+/** Module scope so `useUrlParam` sees a stable codec identity across renders. */
+const SEARCH_PARAM = textParam();
 
 /** Stable identity for a Character with no token row yet, so it doesn't itself break `CharacterNotificationSection`'s memo. */
 const EMPTY_SCOPES: ReadonlySet<string> = new Set();

@@ -501,4 +501,28 @@ describe('Alerts URL state', () => {
       expect(screen.getByTestId('location-search')).toHaveTextContent('?query=ahbazon')
     );
   });
+
+  it('restores showMuted from the URL, and writes a toggled chip back to it', async () => {
+    useNotificationPreferences.setState({
+      value: {
+        ...DEFAULT_NOTIFICATION_PREFERENCES,
+        perCharacter: { [KAELEN]: { newMail: { feed: false, browser: true } } },
+      },
+      hydrated: true,
+    });
+    await db.notificationFeed.put(entry({ id: 'a' }));
+
+    renderPage('/alerts?showMuted=1');
+
+    // Muted by default in `EMPTY_ALERTS_FILTER`; `showMuted=1` in the URL
+    // reveals it without touching the chip.
+    expect(await screen.findByText('New Mail')).toBeInTheDocument();
+    expect(screen.getByText('Muted')).toBeInTheDocument();
+
+    // Toggling the chip back off returns to `showMuted`'s default (`false`),
+    // which a URL-state codec never writes — the key drops out entirely.
+    await openFilters();
+    await userEvent.click(await screen.findByRole('button', { name: /muted types/i }));
+    await waitFor(() => expect(screen.getByTestId('location-search')).toHaveTextContent(''));
+  });
 });
