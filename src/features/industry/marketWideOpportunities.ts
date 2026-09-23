@@ -132,8 +132,7 @@ export async function runMarketWideScan(
   const feeContext: MarketWideFeeInputs = {
     adjustedPrices: snapshot.adjustedPrices ?? {},
     systemCostIndex: snapshot.systemCostIndex ?? 0,
-    // Pre-#1284 behaviour: this scan never applied the BX-80x implant.
-    modifiers: { ...modifiers, manufacturingTimeImplantPct: 0 },
+    modifiers,
   };
 
   const rows = computeMarketWideRows(marketWideCandidates, materialPrices, feeContext);
