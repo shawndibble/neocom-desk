@@ -567,7 +567,7 @@ export function BpcSourcingPanel() {
   const sources = params['sourcing.src'];
   const jumps = params['sourcing.jumps'];
   const currentSystem = useCurrentSystem();
-  const jumpFilter = useJumpRangeFilter(currentSystem.systemId, jumps);
+  const jumpFilter = useJumpRangeFilter(currentSystem, jumps);
   /**
    * The one blueprint the search has been narrowed to, or `null` while the
    * query is still free text. Distinct from `uiFilter.typeQuery`: typing

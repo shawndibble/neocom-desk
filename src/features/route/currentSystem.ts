@@ -112,9 +112,10 @@ export interface JumpRangeFilter {
 }
 
 export function useJumpRangeFilter(
-  originSystemId: number | null,
+  current: Pick<CurrentSystemState, 'systemId' | 'loaded'>,
   range: JumpRange
 ): JumpRangeFilter {
+  const originSystemId = current.systemId;
   const [distances, setDistances] = useState<{
     origin: number;
     jumps: ReadonlyMap<number, number> | null;
@@ -139,9 +140,11 @@ export function useJumpRangeFilter(
 
   return useMemo((): JumpRangeFilter => {
     if (range === 'any') return { status: 'off', allowed: null };
+    // Still reading ESI: "no system" now would flash the set-your-system note.
+    if (!current.loaded) return { status: 'loading', allowed: null };
     if (originSystemId === null) return { status: 'no-origin', allowed: null };
     if (distances?.origin !== originSystemId) return { status: 'loading', allowed: null };
     if (distances.jumps === null) return { status: 'unknown', allowed: null };
     return { status: 'ready', allowed: jumpRangeSystems(distances.jumps, range) };
-  }, [range, originSystemId, distances]);
+  }, [range, current.loaded, originSystemId, distances]);
 }

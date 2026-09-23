@@ -503,7 +503,7 @@ export function ContractSearchPanel({
   // and the distances behind it (`features/route/currentSystem.ts`) must
   // survive that.
   const currentSystem = useCurrentSystem();
-  const jumpRangeFilter = useJumpRangeFilter(currentSystem.systemId, uiFilter.jumps);
+  const jumpRangeFilter = useJumpRangeFilter(currentSystem, uiFilter.jumps);
   /** The type the user picked out of the suggestion list, pinning the search to exactly one item. */
   const selectedTypeId = itemsParams['items.type'];
   const showAll = itemsParams['items.all'];

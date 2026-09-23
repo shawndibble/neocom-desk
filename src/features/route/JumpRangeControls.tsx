@@ -141,6 +141,9 @@ export function CurrentSystemPicker({ current }: CurrentSystemPickerProps) {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          // A pick made before ESI answers would record no game location, and
+          // the answer arriving a moment later would then clear it.
+          disabled={!current.loaded}
           aria-label={t('jumpRange.changeSystem', { current: label })}
           className="whitespace-nowrap"
         >

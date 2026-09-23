@@ -127,6 +127,8 @@ export async function installEsiMock(page: Page): Promise<void> {
     if (path === `/characters/${CHARACTER_ID}/attributes`) return json(CHARACTER_ATTRIBUTES);
     if (path === `/characters/${CHARACTER_ID}/implants`) return json(IMPLANT_IDS);
     if (path === `/characters/${CHARACTER_ID}/wallet`) return json(WALLET_BALANCE);
+    // Jump Range's Current System (Market, Item Offers, BPC Sourcing): Jita.
+    if (path === `/characters/${CHARACTER_ID}/location`) return json({ solar_system_id: 30000142 });
     if (path === `/corporations/${CORPORATION_ID}`) return json(CORPORATION_INFO);
     if (path === `/alliances/${ALLIANCE_ID}`) return json(ALLIANCE_INFO);
     if (path === '/markets/prices') return json(MARKET_PRICES);

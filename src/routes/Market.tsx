@@ -594,7 +594,7 @@ export function Market() {
   // `orderBookView.ts`'s `allowedSystems`.
   const [jumpRange, setJumpRange] = useUrlParam('browser.jumps', JUMP_RANGE_PARAM);
   const currentSystem = useCurrentSystem();
-  const jumpRangeFilter = useJumpRangeFilter(currentSystem.systemId, jumpRange);
+  const jumpRangeFilter = useJumpRangeFilter(currentSystem, jumpRange);
   // Market Data / Price History (issue #11), Market Data selected by default —
   // a scoped query param rather than a `/market/browser/<subtab>` path
   // segment (docs/ARCHITECTURE.md §9): it only ever matters with an item
