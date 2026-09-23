@@ -40,6 +40,7 @@ import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 import { getTradeHub } from '@/market/hubs';
+import type { TradeHubStandingsMap } from '@/features/market/useTradeHubStandings';
 import type { PiData } from '@/sde/types';
 import { useAssumedMe } from './assumedMe';
 import { nameForType, volumeForType, type BlueprintCatalog } from './blueprintCatalog';
@@ -101,6 +102,8 @@ interface BuildGroupPanelProps {
   skills: SkillLevels;
   /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
   implantBonusPct: number;
+  /** The active Character's per-Trade-Hub standings (issue #1238) — see `useComparedBuildResults`. */
+  tradeHubStandings?: TradeHubStandingsMap;
   ownedStockSnapshot: OwnedStockSnapshot;
   /** Opens one member on its own, the way clicking it in the list would. */
   onOpenPlan: (planId: string) => void;
@@ -133,6 +136,7 @@ export function BuildGroupPanel({
   corpOwnedBlueprints,
   skills,
   implantBonusPct,
+  tradeHubStandings,
   ownedStockSnapshot,
   onOpenPlan,
   onRetarget,
@@ -159,6 +163,7 @@ export function BuildGroupPanel({
     corpOwnedBlueprints,
     skills,
     implantBonusPct,
+    tradeHubStandings,
     computeGroupResult: true,
   });
 

@@ -7,14 +7,17 @@
  */
 
 /**
- * One row of `GET /characters/{character_id}/standings/`. `from_type`'s
- * exact spelling for an NPC corporation row is unconfirmed against a live
- * fetch, so `resolveOwnerStandings` matches on `from_id` alone rather than
- * filtering by it first — see that function's doc.
+ * One row of `GET /characters/{character_id}/standings/` — structurally the
+ * same as `@/esi/endpoints`'s `CharacterStanding`, but declared separately
+ * rather than imported so this pure engine module carries no dependency
+ * (even a type-only one) on the ESI layer. `from_type`'s exact spelling for
+ * an NPC corporation row is unconfirmed against a live fetch, so
+ * `resolveOwnerStandings` matches on `from_id` alone rather than filtering
+ * by it first — see that function's doc.
  */
 export interface CharacterStandingEntry {
   from_id: number;
-  from_type: 'agent' | 'npc_corp' | 'corporation' | 'faction';
+  from_type: 'agent' | 'npc_corp' | 'faction';
   standing: number;
 }
 

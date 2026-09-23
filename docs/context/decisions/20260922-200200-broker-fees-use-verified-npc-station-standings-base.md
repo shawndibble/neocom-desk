@@ -56,6 +56,29 @@ _Recorded 2026-09-22 · issue #1238._
   `stations.ts`). `loadPublicCorporationInfo` (already used for
   `PublicInfoModal`) supplies the corporation's `faction_id`, so no new ESI
   endpoint was needed for that half.
+- **`GET /characters/{character_id}/standings/` is assumed to return base
+  (unmodified) standing, not effective standing.** ESI's own documentation
+  does not say this explicitly either way; the assumption rests on this
+  being the same value EVE's character sheet and the in-game standings list
+  show, which every other consumer of this endpoint (third-party trading
+  tools, the wiki source above) treats as base standing. If this ever proves
+  wrong, `resolveLocationStandings`/`resolveOwnerStandings` are the only two
+  functions that would need to change — everything else here is indifferent
+  to which kind of standing the numbers represent.
+- **Known gap: a Production Run's realized profit uses the plan's Trade Hub
+  standing, not the watched sell order's actual station.**
+  `ProductionOrderWatchRecord` (`src/db`) carries only an `orderId`, no
+  `location_id`, so `productionRunSummary.ts`'s `summarizeProductionRun` has
+  no way to resolve the order's real location and falls back to the plan's
+  configured Trade Hub. This is a knowing departure from "player-structure
+  orders are unchanged": a watched order actually sitting in a player
+  structure would get non-zero NPC standings applied here. Fixing it
+  properly needs `location_id` added to the watch record (a schema change
+  out of scope for this ticket) or a live per-order ESI lookup keyed by
+  `orderId` alone; either is follow-up work, not blocking, since realized
+  profit already only ever _estimates_ — the "confirmed sale" framing in
+  `realizedProfit.ts`'s own module doc already accepts this class of
+  approximation for `brokerFeeableRevenue`.
 - **`resolveOwnerStandings` (`src/engine/market/standings.ts`) matches a
   standings row by `from_id` alone, ignoring `from_type`.** ESI's exact enum
   spelling for an NPC-corporation standings row was not confirmed against a
