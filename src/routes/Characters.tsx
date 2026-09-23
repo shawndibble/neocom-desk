@@ -90,6 +90,8 @@ import {
   type SortDirection,
 } from '@/features/character/groups';
 import { formatCompactNumber } from '@/lib/compactNumber';
+import { enumParam, optionalSortParam, textParam } from '@/lib/urlState';
+import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
 
 const UNGROUPED_VALUE = '__ungrouped__';
 
@@ -121,6 +123,24 @@ const DENSITY_LABEL_KEYS = {
 } as const satisfies Record<FontScale, string>;
 
 const SORT_KEYS: readonly CharacterSortKey[] = ['name', 'skillPoints', 'wallet'];
+const SORT_DIRECTIONS: readonly SortDirection[] = ['asc', 'desc'];
+
+/**
+ * The filter bar, in the URL (ADR 0015) as one group: the bar hands back sort
+ * key and direction together, and the search box shares the group so a
+ * pending keystroke flushes with a sort change instead of being dropped.
+ */
+const FILTER_PARAMS = {
+  q: textParam(),
+  sort: enumParam(SORT_KEYS, 'name'),
+  dir: enumParam(SORT_DIRECTIONS, 'asc'),
+};
+/**
+ * Table view's header-click sort — one key for every group section's table,
+ * so a column sort reads the same across the whole roster. Unsorted (the
+ * filter bar's order) by default.
+ */
+const TABLE_SORT = optionalSortParam();
 
 interface QueueInfo {
   state: QueueState;
@@ -743,8 +763,9 @@ export function Characters() {
   const alertCounts = useAlertCountsByCharacter();
   const timeZone = useTimeZone();
 
-  const [sortKey, setSortKey] = useState<CharacterSortKey>('name');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
+  const { q: search, sort: sortKey, dir: sortDirection } = filterParams;
+  const [tableSortParam, setTableSort] = useUrlParam('tsort', TABLE_SORT);
   const [stats, setStats] = useState<Map<number, CharacterSortStats>>(new Map());
   const [queueById, setQueueById] = useState<Map<number, QueueInfo>>(new Map());
   const [attentionById, setAttentionById] = useState<Map<number, AttentionEntry>>(new Map());
@@ -762,7 +783,6 @@ export function Characters() {
   const [addingGroup, setAddingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
   const [removingCharacter, setRemovingCharacter] = useState<{
     id: number;
     name: string;
@@ -791,6 +811,13 @@ export function Characters() {
   // guard) is for narrowing the *raw stored* list, which can hold ids that
   // aren't available right now; this list already excludes those.
   const activeColumnIds = availableColumnIds.filter((id) => visibleColumns.includes(id));
+
+  // A sort on a column that isn't on screen (hand-edited link, or since
+  // hidden in the Columns picker) reads as unsorted.
+  const tableSort =
+    tableSortParam && (activeColumnIds as readonly string[]).includes(tableSortParam.columnId)
+      ? tableSortParam
+      : null;
 
   const query = search.trim().toLowerCase();
   function matchesSearch(characterId: number): boolean {
@@ -1054,6 +1081,8 @@ export function Characters() {
             rowKey={(row) => row.character.characterId}
             label={t('characters.title')}
             responsive="table"
+            sort={tableSort}
+            onSortChange={setTableSort}
             onRowClick={(row) => void select(row.character.characterId)}
             rowContextMenu={(row, tr) => (
               <CharacterRowContextMenu characterId={row.character.characterId}>
@@ -1150,14 +1179,11 @@ export function Characters() {
         <>
           <FilterBar
             value={{ sortKey, sortDirection }}
-            onChange={(next) => {
-              setSortKey(next.sortKey);
-              setSortDirection(next.sortDirection);
-            }}
+            onChange={(next) => setFilterParams({ sort: next.sortKey, dir: next.sortDirection })}
             search={
               <SearchInput
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => setFilterParams({ q: e.target.value })}
                 placeholder={t('characters.searchPlaceholder')}
                 className="min-w-40 flex-1"
               />

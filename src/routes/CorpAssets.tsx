@@ -32,6 +32,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useUrlParam } from '@/lib/useUrlState';
+import { textParam } from '@/lib/urlState';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -96,6 +98,7 @@ import { getAdjustedPrices } from '@/market/prices';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 
 const SEARCH_DEBOUNCE_MS = 250;
+const SEARCH_PARAM = textParam();
 const EMPTY_PRICES: ReadonlyMap<number, number> = new Map();
 const EMPTY_DIVISION_NAMES: ReadonlyMap<number, string | null> = new Map();
 
@@ -328,8 +331,11 @@ function CorpAssetsView() {
     [groups, pathGroupId, pathSegments]
   );
 
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  // In the query string (ADR 0015), beside the drill-down in the path: a
+  // search reports across every division, so the two compose rather than
+  // one replacing the other.
+  const [search, setSearch] = useUrlParam('q', SEARCH_PARAM);
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(id);

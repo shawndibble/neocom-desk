@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -96,9 +96,20 @@ beforeEach(async () => {
   ]);
 });
 
-function renderCharacters() {
+/** Mirrors the router's query string into the DOM so a test can assert what the page wrote. */
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location-search">{location.search}</output>;
+}
+
+function locationSearch(): string {
+  return screen.getByTestId('location-search').textContent ?? '';
+}
+
+function renderCharacters(initialEntry = '/characters') {
   return render(
-    <MemoryRouter initialEntries={['/characters']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <LocationProbe />
       <Routes>
         <Route path="/characters" element={<Characters />} />
         <Route path="/overview" element={<div>overview page</div>} />
@@ -597,7 +608,76 @@ async function waitForSettingsValue(
   );
 }
 
+describe('Characters URL state', () => {
+  function firstCardName() {
+    return screen.getAllByRole('button', { name: /^Select /i })[0]?.textContent ?? '';
+  }
+
+  it('applies search text and sort from the URL on first render', async () => {
+    renderCharacters('/characters?q=pilot&dir=desc');
+    await screen.findByText('Pilot One');
+    expect(screen.getByPlaceholderText('Search by name or corporation')).toHaveValue('pilot');
+    await waitFor(() => expect(firstCardName()).toContain('Pilot Two'));
+  });
+
+  it('filters by a search carried in the URL', async () => {
+    renderCharacters('/characters?q=Pilot%20Two');
+    await screen.findByText('Pilot Two');
+    expect(screen.queryByText('Pilot One')).not.toBeInTheDocument();
+  });
+
+  it('writes typed search text to the URL once typing pauses, and clears it back out', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+    expect(locationSearch()).toBe('');
+
+    const search = screen.getByPlaceholderText('Search by name or corporation');
+    await user.type(search, 'One');
+    await waitFor(() => expect(locationSearch()).toBe('?q=One'));
+
+    await user.clear(search);
+    await waitFor(() => expect(locationSearch()).toBe(''));
+  });
+
+  it('writes a sort direction change to the URL and omits the default', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: 'Reverse sort direction' }));
+    await waitFor(() => expect(locationSearch()).toBe('?dir=desc'));
+
+    await user.click(screen.getByRole('button', { name: 'Reverse sort direction' }));
+    await waitFor(() => expect(locationSearch()).toBe(''));
+  });
+
+  it('falls back to the default sort for unreadable values', async () => {
+    renderCharacters('/characters?sort=bogus&dir=sideways');
+    await screen.findByText('Pilot One');
+    expect(firstCardName()).toContain('Pilot One');
+  });
+});
+
 describe('Characters table view', () => {
+  it('writes a header-click sort to the URL and restores it', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+    const table = await screen.findByRole('table');
+    const header = within(table).getByRole('columnheader', { name: /name/i });
+    await user.click(within(header).getByRole('button'));
+    await waitFor(() => expect(locationSearch()).toMatch(/^\?tsort=name%3A(asc|desc)$/));
+    const written = locationSearch();
+    unmount();
+
+    renderCharacters(`/characters${written}`);
+    const restored = await screen.findByRole('table');
+    expect(within(restored).getByRole('columnheader', { name: /name/i })).toHaveAttribute(
+      'aria-sort'
+    );
+  });
+
   it('defaults to card view', async () => {
     renderCharacters();
     expect(await screen.findByRole('button', { name: 'Cards' })).toHaveAttribute(

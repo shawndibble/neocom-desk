@@ -61,9 +61,14 @@ import {
 } from '@/engine/corp/members';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { useUrlParams } from '@/lib/useUrlState';
+import { boolParam, textParam } from '@/lib/urlState';
 
 /** Same debounce shape as `CorpAssets.tsx`/`Assets.tsx`: the input stays responsive, only the filter waits. */
 const SEARCH_DEBOUNCE_MS = 250;
+
+/** The roster's filters, in the URL (ADR 0015); the table's sort is `CorpRosterTable`'s `?sort=`. */
+const FILTER_PARAMS = { q: textParam(), dark: boolParam() };
 
 interface MembersSnapshot {
   corporationId: number | null;
@@ -173,13 +178,16 @@ function CorpMembersView() {
   // stacking rule as Mail's search-and-label filters (CONTEXT.md round 55).
   // The stat strip's dark count stays computed from the full roster — only
   // the table narrows.
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  // Both in the URL (ADR 0015); the dark *threshold* is a synced setting and
+  // stays out of it.
+  const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
+  const search = filterParams.q;
+  const darkOnly = filterParams.dark;
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(id);
   }, [search]);
-  const [darkOnly, setDarkOnly] = useState(false);
   const visibleRows = useMemo(() => {
     const searched = filterRosterRows(rows, debouncedSearch);
     return darkOnly ? searched.filter((row) => row.standing.isDark) : searched;
@@ -223,7 +231,7 @@ function CorpMembersView() {
         <div className="space-y-2">
           <SearchInput
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => setFilterParams({ q: e.target.value })}
             placeholder={t('corp.members.searchPlaceholder')}
           />
           <Panel padded={false}>
@@ -232,7 +240,7 @@ function CorpMembersView() {
                 <CorpRosterStats
                   rows={rows}
                   darkOnly={darkOnly}
-                  onToggleDarkOnly={() => setDarkOnly((value) => !value)}
+                  onToggleDarkOnly={() => setFilterParams({ dark: !darkOnly })}
                 />
                 <IconButton
                   size="sm"
