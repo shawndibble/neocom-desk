@@ -36,6 +36,8 @@ import {
   loadUniverseType,
 } from '@/features/skills/data';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { useUrlParam } from '@/lib/useUrlState';
+import { textParam } from '@/lib/urlState';
 import { filterSkillGroups } from '@/features/skills/skillGroupFilter';
 import type { CompletedLevel } from '@/features/skills/queueStatus';
 import type { CachedResult } from '@/features/skills/data';
@@ -133,6 +135,8 @@ async function loadSkillsSnapshot(
   };
 }
 
+const GROUP_SEARCH_PARAM = textParam();
+
 /** Trained skills for the active character: grouped by SDE group, with SP + attributes/implants. */
 export function Skills() {
   const { t } = useTranslation();
@@ -216,7 +220,7 @@ export function Skills() {
   // All groups start collapsed on every load (CONTEXT.md round 17); nothing
   // seeds this set from a previous visit.
   const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(() => new Set());
-  const [groupSearch, setGroupSearch] = useState('');
+  const [groupSearch, setGroupSearch] = useUrlParam('groupSearch', GROUP_SEARCH_PARAM);
   const filterResult = useMemo(() => filterSkillGroups(groups, groupSearch), [groups, groupSearch]);
   // While searching, a surviving group is by construction a match — force it
   // open so the result is visible without the user pre-expanding it. Toggling

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -540,6 +540,22 @@ describe('Skills', () => {
     expect(await screen.findByText('Gunnery')).toBeInTheDocument();
     expect(screen.getByText('Small Hybrid Turret')).toBeInTheDocument();
     expect(screen.queryByText('Frigate')).not.toBeInTheDocument();
+  });
+
+  it('keeps the group search in the URL, and restores it on a fresh visit', async () => {
+    const { unmount } = render(<App />);
+    await screen.findByText('Gunnery');
+
+    const search = screen.getByPlaceholderText('Search skills…');
+    fireEvent.change(search, { target: { value: 'frigate' } });
+    await screen.findByText('Frigate');
+    await waitFor(() => expect(window.location.search).toContain('groupSearch=frigate'));
+
+    unmount();
+    render(<App />);
+    expect(await screen.findByText('Frigate')).toBeInTheDocument();
+    expect(screen.queryByText('Gunnery')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search skills…')).toHaveValue('frigate');
   });
 
   it('shows an empty state when the search matches no skill', async () => {

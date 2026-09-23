@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -38,14 +38,42 @@ import {
   buildDaysFrom,
   buildFortnightDays,
   buildMonthGrid,
+  dayKey,
   formatFortnightLabel,
   formatMonthLabel,
 } from '@/lib/calendarGrid';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
+import { useUrlParam } from '@/lib/useUrlState';
+import type { UrlParamCodec } from '@/lib/urlState';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { calendarCsvColumns } from '@/features/character/calendarCsv';
 import type { CalendarRsvpResponse } from '@/esi/endpoints';
+
+/**
+ * The shown month/fortnight (ADR 0015), as a local `YYYY-MM-DD` day key —
+ * `calendarGrid.ts`'s own `dayKey`, so parsing agrees with how the grid
+ * builders already read a `Date`. `defaultKey` is "today" at codec-creation
+ * time, not a fixed constant: it must come from a `useMemo` computed once per
+ * mount (see `urlState.ts`'s codec-identity note), never recomputed inline.
+ */
+function anchorParam(defaultKey: string): UrlParamCodec<string> {
+  return {
+    // A day that does not exist (2026-02-30) is garbage, not a rollover into
+    // March — round-tripped through `dayKey` the same way `isoDateParam` does.
+    parse: (raw) => {
+      if (raw === null || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return defaultKey;
+      return dayKey(parseAnchorKey(raw)) === raw ? raw : defaultKey;
+    },
+    serialize: (value) => (value === defaultKey ? null : value),
+  };
+}
+
+/** `anchorParam`'s day key back to a local `Date` — local midnight, matching `calendarGrid.ts`. */
+function parseAnchorKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
 
 /**
  * Calendar: the Calendar Map and the Coming Up Rail, side by side.
@@ -102,7 +130,25 @@ export function Calendar() {
     void hydrateHiddenKinds();
   }, [hydrateDensity, hydrateHiddenKinds]);
 
-  const [anchor, setAnchor] = useState(() => new Date());
+  // "Today" at mount, stable for this visit's codec identity (see `anchorParam`).
+  const [defaultAnchorKey] = useState(() => dayKey(new Date()));
+  const anchorCodec = useMemo(() => anchorParam(defaultAnchorKey), [defaultAnchorKey]);
+  const [anchorKey, setAnchorKey] = useUrlParam('anchor', anchorCodec);
+  const anchor = useMemo(() => parseAnchorKey(anchorKey), [anchorKey]);
+  // The URL write goes through a router transition that may not have landed
+  // by the next click (matches Mail.tsx's `dataRef`): `step()` reads this
+  // instead of the render-scope `anchor` so two clicks before that transition
+  // commits still advance from each other rather than both stepping off the
+  // same stale month.
+  const anchorKeyRef = useRef(anchorKey);
+  useEffect(() => {
+    anchorKeyRef.current = anchorKey;
+  }, [anchorKey]);
+  function setAnchor(next: Date) {
+    const key = dayKey(next);
+    anchorKeyRef.current = key;
+    setAnchorKey(key);
+  }
   const [selectedDayMs, setSelectedDayMs] = useState<number | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
 
@@ -229,10 +275,12 @@ export function Calendar() {
   }
 
   function step(delta: number) {
-    setAnchor((current) => {
-      if (isNarrow) return addDays(current, delta * TICKER_DAYS);
-      return density === 'month' ? addMonths(current, delta) : addWeeks(current, delta);
-    });
+    const current = parseAnchorKey(anchorKeyRef.current);
+    if (isNarrow) {
+      setAnchor(addDays(current, delta * TICKER_DAYS));
+      return;
+    }
+    setAnchor(density === 'month' ? addMonths(current, delta) : addWeeks(current, delta));
   }
 
   if (!hydrated) {

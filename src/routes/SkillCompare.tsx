@@ -37,9 +37,19 @@ import {
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { invalidateFreshness } from '@/esi/cache';
 import type { TrainedSkill } from '@/engine/types';
+import { useUrlParams } from '@/lib/useUrlState';
+import { boolParam, idListParam, nullableTextParam } from '@/lib/urlState';
 
 const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent';
+
+/** Short-lived view state (ADR 0015): the selection, its saved-comparison link, and the two display toggles. One group — several of these change together in a single click (see `toggleCharacter`, `handleLoad`). */
+const SKILL_COMPARE_PARAMS = {
+  ids: idListParam(),
+  comparisonId: nullableTextParam(),
+  differingOnly: boolParam(),
+  groupColumn: boolParam(true),
+};
 
 interface SkillsSnapshot {
   skillsByCharacter: Map<number, ReadonlyMap<number, TrainedSkill>>;
@@ -153,7 +163,23 @@ export function SkillCompare() {
     void comparisonsHydrate();
   }, [comparisonsHydrate]);
 
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [compareParams, setCompareParams] = useUrlParams(SKILL_COMPARE_PARAMS);
+  const selectedIds = compareParams.ids;
+  const activeComparisonId = compareParams.comparisonId;
+  const differingOnly = compareParams.differingOnly;
+  const groupColumnVisible = compareParams.groupColumn;
+  // A hand-edited or stale `?ids=` can name a character this device has never
+  // heard of — no roster button to toggle it off, no name to show in its
+  // column. Prune once the roster is known, the same "resolve against a known
+  // set" a saved comparison already gets (`resolveComparisonCharacterIds`).
+  // Gated on `characters !== undefined`: pruning against the still-empty
+  // first render would evict every id before the roster has even loaded.
+  useEffect(() => {
+    if (characters === undefined) return;
+    const known = new Set(characters.map((c) => c.characterId));
+    const pruned = selectedIds.filter((id) => known.has(id));
+    if (pruned.length !== selectedIds.length) setCompareParams({ ids: pruned });
+  }, [characters, selectedIds, setCompareParams]);
   const [catalog, setCatalog] = useState<SkillCatalog | null>(null);
   const [skillsByCharacter, setSkillsByCharacter] = useState<
     Map<number, ReadonlyMap<number, TrainedSkill>>
@@ -172,11 +198,6 @@ export function SkillCompare() {
   const [refreshNonce, setRefreshNonce] = useState(0);
   const lastRefreshNonceRef = useRef(refreshNonce);
   const [degradedNotice, setDegradedNotice] = useState(false);
-  // The saved comparison Save should overwrite, if any — set on load, cleared
-  // once the selection empties. Without it, repeated Saves pile up duplicates.
-  const [activeComparisonId, setActiveComparisonId] = useState<string | null>(null);
-  const [differingOnly, setDifferingOnly] = useState(false);
-  const [groupColumnVisible, setGroupColumnVisible] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -239,22 +260,21 @@ export function SkillCompare() {
     const next = selectedIds.includes(characterId)
       ? selectedIds.filter((id) => id !== characterId)
       : [...selectedIds, characterId];
-    setSelectedIds(next);
-    if (next.length === 0) setActiveComparisonId(null);
+    setCompareParams(next.length === 0 ? { ids: next, comparisonId: null } : { ids: next });
   }
 
   function handleSave() {
     if (selectedIds.length === 0) return;
     const existing = comparisonsValue.items.find((item) => item.id === activeComparisonId);
     const comparison: SavedComparison = existing
-      ? { ...existing, characterIds: selectedIds }
+      ? { ...existing, characterIds: [...selectedIds] }
       : {
           id: crypto.randomUUID(),
           name: t('skillCompare.untitledName'),
-          characterIds: selectedIds,
+          characterIds: [...selectedIds],
         };
     void comparisonsSetValue(upsertComparison(comparisonsValue, comparison, Date.now()));
-    setActiveComparisonId(comparison.id);
+    setCompareParams({ comparisonId: comparison.id });
   }
 
   /**
@@ -274,14 +294,13 @@ export function SkillCompare() {
     const known = new Set(roster.map((c) => c.characterId));
     const resolved = resolveComparisonCharacterIds(comparison, known);
     setDegradedNotice(resolved.length < comparison.characterIds.length);
-    setSelectedIds(resolved);
-    setActiveComparisonId(comparison.id);
+    setCompareParams({ ids: resolved, comparisonId: comparison.id });
   }
 
   function handleConfirmDelete() {
     if (!deletingId) return;
     void comparisonsSetValue(removeComparison(comparisonsValue, deletingId, Date.now()));
-    if (activeComparisonId === deletingId) setActiveComparisonId(null);
+    if (activeComparisonId === deletingId) setCompareParams({ comparisonId: null });
     setDeletingId(null);
   }
 
@@ -409,13 +428,13 @@ export function SkillCompare() {
                 <FilterChip
                   label={t('skillCompare.differingOnly')}
                   selected={differingOnly}
-                  onToggle={() => setDifferingOnly((value) => !value)}
+                  onToggle={() => setCompareParams({ differingOnly: !differingOnly })}
                 />
               )}
               <FilterChip
                 label={t('skillCompare.groupColumnToggle')}
                 selected={groupColumnVisible}
-                onToggle={() => setGroupColumnVisible((value) => !value)}
+                onToggle={() => setCompareParams({ groupColumn: !groupColumnVisible })}
               />
             </div>
             <div className="flex items-center gap-2">
