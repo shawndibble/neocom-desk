@@ -137,7 +137,7 @@ function TimeCell({ value, dim = false, fixedWidth = true }: TimeCellProps) {
 function MetaValue({ label, value }: { label: string; value: string }) {
   return (
     <span className="whitespace-nowrap tabular-nums">
-      <span className="text-text-faint">{label}</span> {value}
+      <span className="text-text-dim">{label}</span> {value}
     </span>
   );
 }

@@ -480,7 +480,7 @@ export function ProductionLogPanel({
             <span className="text-[0.6875rem] text-text-dim">
               {t('industry.productionLogSubtitle')}
             </span>
-            <span className="text-[0.6875rem] text-text-faint">
+            <span className="text-[0.6875rem] text-text-dim">
               {t('industry.productionLogCaveat', {
                 runs: filteredRunCount,
                 items: itemRows.length,
