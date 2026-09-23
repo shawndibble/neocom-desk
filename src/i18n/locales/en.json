@@ -149,7 +149,8 @@
       "masteryTag": "Mastery {{roman}}",
       "fitTag": "This Fit",
       "emptyTitle": "Nothing to show",
-      "emptyHint": "Every skill here is already trained or filtered out — or this ship has no Mastery data and no fit attached."
+      "emptyHint": "Every skill here is already trained or filtered out — or this ship has no Mastery data and no fit attached.",
+      "fitAttachedFallback": "this fit"
     }
   },
   "plans": {

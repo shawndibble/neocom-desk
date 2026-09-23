@@ -5,7 +5,7 @@
  * context, not a separate mode — pasting one auto-switches the ship search
  * to match its hull when it names a different one.
  */
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -44,6 +44,9 @@ import { mergeShipEntries, tagUnifiedRows, type UnifiedShipRow } from './unified
 const SEARCH_DEBOUNCE_MS = 250;
 const SEARCH_LIMIT = 20;
 const EMPTY_TIERS: readonly (readonly SkillPrereq[])[] = [[], [], [], [], []];
+/** Static provenance badge — matches the size DESIGN.md's type scale names for chips/badges. Neither tag is interactive/selected, so neither takes accent (DESIGN.md §6). */
+const SOURCE_TAG_CLASS =
+  'rounded-xs border border-line px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
 export interface ShipsPanelProps {
   target: TargetPlan;
@@ -83,6 +86,15 @@ export function ShipsPanel({
   const [hideCompleted, setHideCompleted] = useState(false);
   const [showMastery, setShowMastery] = useState(true);
   const [showFit, setShowFit] = useState(true);
+
+  // Read inside `handleCheckFit`'s async closure to detect a manual
+  // reselect that happened while a check was in flight -- `selected`
+  // itself would stay frozen at the value from when that closure was
+  // created.
+  const selectedRef = useRef(selected);
+  useEffect(() => {
+    selectedRef.current = selected;
+  }, [selected]);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
@@ -129,6 +141,7 @@ export function ShipsPanel({
   }
 
   async function handleCheckFit() {
+    const startedWith = selectedRef.current;
     setCheckingFit(true);
     try {
       const [skillByName, typeByName] = await Promise.all([loadSkillNameMap(), loadItemNameMap()]);
@@ -150,10 +163,14 @@ export function ShipsPanel({
       // Auto-switch the ship search to match the fit's own hull — via
       // `selectShip`, not `pickShip`: the latter would immediately clear
       // the fit we just attached, reading `fit` from this render's stale
-      // closure before the `setFit` above has committed.
-      if (preview.shipName && ships) {
+      // closure before the `setFit` above has committed. Skipped entirely
+      // if the user manually picked a different ship while this check was
+      // in flight (`selectedRef` tracks the true current value; `selected`
+      // itself is frozen at whatever it was when this closure was made) —
+      // otherwise a slow parse racing a reselect would silently clobber it.
+      if (preview.shipName && ships && selectedRef.current?.typeID === startedWith?.typeID) {
         const matched = ships.find((s) => s.name.toLowerCase() === preview.shipName?.toLowerCase());
-        if (matched && matched.typeID !== selected?.typeID) selectShip(matched);
+        if (matched && matched.typeID !== selectedRef.current?.typeID) selectShip(matched);
       }
     } finally {
       setCheckingFit(false);
@@ -213,20 +230,14 @@ export function ShipsPanel({
     const chips: ReactNode[] = [];
     if (row.highestMasteryTier !== null) {
       chips.push(
-        <span
-          key="mastery"
-          className="rounded-xs border border-line px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase"
-        >
+        <span key="mastery" className={SOURCE_TAG_CLASS}>
           {t('skills.ships.masteryTag', { roman: romanLevel(row.highestMasteryTier + 1) })}
         </span>
       );
     }
     if (row.fromFit) {
       chips.push(
-        <span
-          key="fit"
-          className="rounded-xs border border-accent-dim px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-accent uppercase"
-        >
+        <span key="fit" className={SOURCE_TAG_CLASS}>
           {t('skills.ships.fitTag')}
         </span>
       );
@@ -242,135 +253,137 @@ export function ShipsPanel({
     );
   }
 
+  const hasContext = selected !== null || fitResult !== null;
+
   return (
-    <div className="space-y-4">
-      <Panel title={t('skills.ships.title')}>
-        <div className="space-y-2 p-3">
-          <SearchInput
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setSelected(null);
-            }}
-            placeholder={t('skills.ships.searchPlaceholder')}
-            aria-label={t('skills.ships.searchPlaceholder')}
-          />
-          {!selected && results.length > 0 && (
-            <ul className="max-h-56 overflow-y-auto rounded-xs border border-line bg-panel">
-              {results.map((ship) => (
-                <li key={ship.typeID} className="border-b border-line last:border-b-0">
-                  <button
-                    type="button"
-                    onClick={() => pickShip(ship)}
-                    className="w-full px-2 py-1.5 text-left text-xs hover:bg-panel-2"
-                  >
-                    {ship.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {!selected && debouncedQuery.trim() !== '' && results.length === 0 && (
-            <p className="text-xs text-text-dim">
-              {t('skills.ships.noShipsMatch', { query: debouncedQuery })}
-            </p>
-          )}
-
-          {fitResult ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-text-dim">
-                {t('skills.ships.fitAttached', { name: fitResult.shipName ?? '' })}
-              </span>
-              <button type="button" onClick={clearFit} className="text-xs text-text-dim underline">
-                {t('skills.ships.removeFit')}
-              </button>
-            </div>
-          ) : attaching ? (
-            <div className="space-y-2">
-              <label className="block text-xs text-text-dim" htmlFor="ships-fit-text">
-                {t('skills.fitCheck.pasteLabel')}
-              </label>
-              <textarea
-                id="ships-fit-text"
-                value={fitText}
-                onChange={(e) => {
-                  setFitText(e.target.value);
-                  setFit({ kind: 'idle' });
-                }}
-                rows={6}
-                className="w-full rounded-xs border border-line bg-panel-2 p-2 text-xs text-text"
-                placeholder={t('skills.fitCheck.pastePlaceholder')}
-              />
-              <div className="flex flex-wrap items-center gap-2">
-                <Button size="sm" variant="ghost" onClick={() => void handlePasteFromClipboard()}>
-                  {t('plans.pasteFromClipboard')}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => void handleCheckFit()}
-                  disabled={checkingFit || fitText.trim() === ''}
+    <Panel
+      title={t('skills.ships.title')}
+      meta={hasContext && <span className="text-text-dim">{planNameFallback}</span>}
+      actions={
+        hasContext && (
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterChip
+              label={t('skills.ships.filterMastery')}
+              selected={showMastery}
+              onToggle={() => setShowMastery((v) => !v)}
+            />
+            <FilterChip
+              label={t('skills.ships.filterFit')}
+              selected={showFit}
+              onToggle={() => setShowFit((v) => !v)}
+              disabled={!fitResult}
+              tooltip={!fitResult ? t('skills.ships.filterFitDisabledTooltip') : undefined}
+            />
+            <FilterChip
+              label={t('skills.ships.hideCompleted')}
+              selected={hideCompleted}
+              onToggle={() => setHideCompleted((v) => !v)}
+            />
+            {untrained.length > 0 && (
+              <StatChip label={t('skills.ships.totalTime')} value={formatDuration(totalSeconds)} />
+            )}
+          </div>
+        )
+      }
+    >
+      <div className="space-y-2 p-3">
+        <SearchInput
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setSelected(null);
+          }}
+          placeholder={t('skills.ships.searchPlaceholder')}
+          aria-label={t('skills.ships.searchPlaceholder')}
+        />
+        {!selected && results.length > 0 && (
+          <ul className="max-h-56 overflow-y-auto rounded-xs border border-line bg-panel">
+            {results.map((ship) => (
+              <li key={ship.typeID} className="border-b border-line last:border-b-0">
+                <button
+                  type="button"
+                  onClick={() => pickShip(ship)}
+                  className="w-full px-2 py-1.5 text-left text-xs hover:bg-panel-2"
                 >
-                  {checkingFit ? <Spinner size="sm" /> : t('skills.fitCheck.checkButton')}
-                </Button>
-              </div>
-              {fit.kind === 'notEftFit' && (
-                <p className="text-xs text-danger">{t('skills.fitCheck.notEftFit')}</p>
-              )}
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setAttaching(true)}
-              className="text-xs text-text-dim underline"
-            >
-              {t('skills.ships.attachFit')}
-            </button>
-          )}
-          {!fitResult && !attaching && (
-            <p className="text-xs text-text-faint">{t('skills.ships.attachFitHint')}</p>
-          )}
-          {fitResult?.warnings.map((warning, i) => (
-            <p key={`${i}:${warning}`} className="text-xs text-warning">
-              {warning}
-            </p>
-          ))}
-          <p className="text-xs text-text-dim">{t('skills.ships.suggestedNote')}</p>
-        </div>
-      </Panel>
+                  {ship.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {!selected && debouncedQuery.trim() !== '' && results.length === 0 && (
+          <p className="text-xs text-text-dim">
+            {t('skills.ships.noShipsMatch', { query: debouncedQuery })}
+          </p>
+        )}
 
-      {(selected || fitResult) && (
-        <Panel
-          title={planNameFallback}
-          actions={
+        {fitResult ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-text-dim">
+              {t('skills.ships.fitAttached', {
+                name: fitResult.shipName ?? t('skills.ships.fitAttachedFallback'),
+              })}
+            </span>
+            <button type="button" onClick={clearFit} className="text-xs text-text-dim underline">
+              {t('skills.ships.removeFit')}
+            </button>
+          </div>
+        ) : attaching ? (
+          <div className="space-y-2">
+            <label className="block text-xs text-text-dim" htmlFor="ships-fit-text">
+              {t('skills.fitCheck.pasteLabel')}
+            </label>
+            <textarea
+              id="ships-fit-text"
+              value={fitText}
+              onChange={(e) => {
+                setFitText(e.target.value);
+                setFit({ kind: 'idle' });
+              }}
+              rows={6}
+              className="w-full rounded-xs border border-line bg-panel-2 p-2 text-xs text-text"
+              placeholder={t('skills.fitCheck.pastePlaceholder')}
+            />
             <div className="flex flex-wrap items-center gap-2">
-              <FilterChip
-                label={t('skills.ships.filterMastery')}
-                selected={showMastery}
-                onToggle={() => setShowMastery((v) => !v)}
-              />
-              <FilterChip
-                label={t('skills.ships.filterFit')}
-                selected={showFit}
-                onToggle={() => setShowFit((v) => !v)}
-                disabled={!fitResult}
-                tooltip={!fitResult ? t('skills.ships.filterFitDisabledTooltip') : undefined}
-              />
-              <FilterChip
-                label={t('skills.ships.hideCompleted')}
-                selected={hideCompleted}
-                onToggle={() => setHideCompleted((v) => !v)}
-              />
-              {untrained.length > 0 && (
-                <StatChip
-                  label={t('skills.ships.totalTime')}
-                  value={formatDuration(totalSeconds)}
-                />
-              )}
+              <Button size="sm" variant="ghost" onClick={() => void handlePasteFromClipboard()}>
+                {t('plans.pasteFromClipboard')}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => void handleCheckFit()}
+                disabled={checkingFit || fitText.trim() === ''}
+              >
+                {checkingFit ? <Spinner size="sm" /> : t('skills.fitCheck.checkButton')}
+              </Button>
             </div>
-          }
-        >
-          <div className="space-y-1 p-3">
+            {fit.kind === 'notEftFit' && (
+              <p className="text-xs text-danger">{t('skills.fitCheck.notEftFit')}</p>
+            )}
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAttaching(true)}
+            className="text-xs text-text-dim underline"
+          >
+            {t('skills.ships.attachFit')}
+          </button>
+        )}
+        {!fitResult && !attaching && (
+          <p className="text-xs text-text-faint">{t('skills.ships.attachFitHint')}</p>
+        )}
+        {fitResult?.warnings.map((warning, i) => (
+          <p key={`${i}:${warning}`} className="text-xs text-warning">
+            {warning}
+          </p>
+        ))}
+        <p className="text-xs text-text-dim">{t('skills.ships.suggestedNote')}</p>
+      </div>
+
+      {hasContext && (
+        <>
+          <div className="space-y-1 border-t border-line p-3">
             {visibleRows.length === 0 ? (
               <EmptyState title={t('skills.ships.emptyTitle')} hint={t('skills.ships.emptyHint')} />
             ) : (
@@ -420,8 +433,8 @@ export function ShipsPanel({
               </Button>
             </div>
           )}
-        </Panel>
+        </>
       )}
-    </div>
+    </Panel>
   );
 }

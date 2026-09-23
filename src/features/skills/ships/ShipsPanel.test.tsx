@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { EngineSkill } from '@/engine/types';
 import type { TargetPlan } from '../useTargetPlan';
+import { loadUniverseType } from '../data';
 import { ShipsPanel } from './ShipsPanel';
 
 vi.mock('@/sde/loadSde', () => ({
@@ -15,8 +16,12 @@ vi.mock('@/sde/loadSde', () => ({
       [], // IV
       [], // V
     ],
+    '587': [[], [], [], [], []], // Rifter -- no mastery data, just a second ship to reselect to
   })),
-  loadTypes: vi.fn(async () => ({ '626': { name: 'Vexor', groupID: 26, volume: 100000 } })),
+  loadTypes: vi.fn(async () => ({
+    '626': { name: 'Vexor', groupID: 26, volume: 100000 },
+    '587': { name: 'Rifter', groupID: 25, volume: 27289 },
+  })),
 }));
 
 vi.mock('../typeCatalog', () => ({
@@ -178,5 +183,51 @@ describe('ShipsPanel', () => {
     await waitFor(() =>
       expect(screen.getByText(/doesn't look like an eft fit/i)).toBeInTheDocument()
     );
+  });
+
+  it('a manual reselect while a fit check is in flight is not clobbered by the auto-switch', async () => {
+    const user = userEvent.setup();
+    renderPanel(fakeTarget());
+    await pickVexor(user);
+    await waitFor(() => expect(screen.getByText('Gunnery')).toBeInTheDocument());
+
+    // Hold the fit-check's own type lookup pending so a reselect can happen mid-flight.
+    let resolveLookup!: (value: Awaited<ReturnType<typeof loadUniverseType>>) => void;
+    vi.mocked(loadUniverseType).mockImplementationOnce(
+      () => new Promise((resolve) => (resolveLookup = resolve))
+    );
+
+    await user.click(screen.getByRole('button', { name: '+ Attach a fit (optional)' }));
+    fireEvent.change(screen.getByLabelText(/paste an eft fit/i), {
+      target: { value: '[Vexor, PvE Ratting]' },
+    });
+    await user.click(screen.getByRole('button', { name: 'Check Fit' }));
+
+    // Reselect to a different ship while the check is still pending.
+    await user.clear(screen.getByLabelText(/search for a ship/i));
+    await user.type(screen.getByLabelText(/search for a ship/i), 'Rifter');
+    await user.click(await screen.findByRole('button', { name: 'Rifter' }));
+
+    resolveLookup({
+      data: {
+        type_id: 626,
+        name: 'Vexor',
+        description: '',
+        group_id: 26,
+        published: true,
+        dogma_attributes: [
+          { attribute_id: 182, value: 3300 },
+          { attribute_id: 277, value: 4 },
+        ],
+      },
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated: false,
+    });
+
+    // The fit result still lands (it isn't discarded)...
+    await waitFor(() => expect(screen.getByText(/fit attached: vexor/i)).toBeInTheDocument());
+    // ...but the manual reselect to Rifter is not clobbered by the auto-switch back to Vexor.
+    expect(screen.getByLabelText(/search for a ship/i)).toHaveValue('Rifter');
   });
 });
