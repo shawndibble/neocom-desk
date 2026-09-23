@@ -29,6 +29,21 @@ test('Attach a fit toggle and Remove link meet the 44px touch floor at 390px', a
 
   await attach.click();
   await page.getByLabel(/paste an eft fit/i).fill('[Vexor, PvE Ratting]');
+  await page.route(/\/universe\/types\/\d+$/, async (route) => {
+    const typeId = Number(/\/universe\/types\/(\d+)$/.exec(route.request().url())![1]);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        type_id: typeId,
+        name: 'Vexor',
+        description: '',
+        group_id: 26,
+        published: true,
+        dogma_attributes: [],
+      }),
+    });
+  });
   await page.getByRole('button', { name: 'Check Fit' }).click();
 
   const remove = page.getByRole('button', { name: 'Remove' });
