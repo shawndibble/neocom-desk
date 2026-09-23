@@ -14,6 +14,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNo
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -47,7 +48,16 @@ import { useMiningPriceBasis } from './priceBasisPref';
 import { useMiningBuybackRate } from './buybackRatePref';
 import { useMiningShowRefining } from './showRefiningPref';
 import {
+  availableOverviewColumns,
+  DEFAULT_VISIBLE_OVERVIEW_COLUMNS,
+  useVisibleOverviewColumns,
+  visibleAvailableColumns,
+  type OverviewColumnId,
+} from './overviewColumns';
+import { oreBreakdownSummary, sumUnits } from './oreBreakdown';
+import {
   BuybackRateInput,
+  CardDetailsOptions,
   MobileSettings,
   PriceBasisOptions,
   RangeControl,
@@ -141,12 +151,16 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
   const buybackRate = useMiningBuybackRate((state) => state.value);
   const setBuybackRate = useMiningBuybackRate((state) => state.setValue);
   const hydrateBuybackRate = useMiningBuybackRate((state) => state.hydrate);
+  const visibleColumns = useVisibleOverviewColumns((state) => state.value);
+  const setVisibleColumns = useVisibleOverviewColumns((state) => state.setValue);
+  const hydrateVisibleColumns = useVisibleOverviewColumns((state) => state.hydrate);
   useEffect(() => {
     void hydrateRange();
     void hydrateBasis();
     void hydrateBuybackRate();
     void hydrateShowRefining();
-  }, [hydrateRange, hydrateBasis, hydrateBuybackRate, hydrateShowRefining]);
+    void hydrateVisibleColumns();
+  }, [hydrateRange, hydrateBasis, hydrateBuybackRate, hydrateShowRefining, hydrateVisibleColumns]);
   const handleShowRefiningChange = useCallback(
     (next: boolean) => {
       void setShowRefining(next);
@@ -160,6 +174,28 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
 
   const characters = data?.characters ?? [];
   const showCharacterColumn = characters.length > 1;
+  const availableColumnIds = availableOverviewColumns(showRefining, showCharacterColumn);
+  // `id` is already known available here, so this is just "is it checked" —
+  // `visibleAvailableColumns` (below, `handleToggleColumn`'s own
+  // zero-columns guard) is for narrowing the *raw stored* list, which can
+  // hold ids that aren't available right now; this list already excludes
+  // those.
+  const activeColumnIds = availableColumnIds.filter((id) => visibleColumns.includes(id));
+
+  function handleToggleColumn(id: OverviewColumnId) {
+    const next = visibleColumns.includes(id)
+      ? visibleColumns.filter((existing) => existing !== id)
+      : [...visibleColumns, id];
+    // A table with zero *rendered* columns (besides the locked Date one) is
+    // as good as no picker at all — guard against the filtered/available
+    // count, same as Characters' table-view picker.
+    if (visibleAvailableColumns(next, showRefining, showCharacterColumn).length === 0) return;
+    void setVisibleColumns(next);
+  }
+
+  function handleResetColumns() {
+    void setVisibleColumns(DEFAULT_VISIBLE_OVERVIEW_COLUMNS);
+  }
 
   const characterRows = useMemo(
     () =>
@@ -276,26 +312,14 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
     return data?.systemNames.get(row.entry.solarSystemId) ?? `#${row.entry.solarSystemId}`;
   }
 
-  const columns: DataTableColumn<MiningYieldRow>[] = [
-    ...(showCharacterColumn
-      ? [
-          {
-            id: 'character',
-            header: t('miningTax.characterColumn'),
-            render: (row: MiningYieldRow) => row.characterName,
-            sortValue: (row: MiningYieldRow) => row.characterName,
-          } satisfies DataTableColumn<MiningYieldRow>,
-        ]
-      : []),
-    {
-      id: 'date',
-      header: t('miningTax.dateColumn'),
-      headerTooltip: t('miningTax.dateEveHint'),
-      render: (row) => row.entry.date,
-      sortValue: (row) => row.entry.date,
-      primary: true,
+  const columnsById: Record<OverviewColumnId, DataTableColumn<MiningYieldRow>> = {
+    character: {
+      id: 'character',
+      header: t('miningTax.characterColumn'),
+      render: (row) => row.characterName,
+      sortValue: (row) => row.characterName,
     },
-    {
+    system: {
       id: 'system',
       header: t('miningTax.systemColumn'),
       render: (row) => (
@@ -306,7 +330,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       ),
       sortValue: (row) => systemName(row),
     },
-    {
+    volume: {
       id: 'volume',
       header: t('miningTax.overview.volumeColumn'),
       align: 'right',
@@ -320,7 +344,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       ),
       sortValue: (row) => entryVolume(row, data?.typeVolumes ?? new Map()).m3,
     },
-    {
+    rawValue: {
       id: 'rawValue',
       header: t('miningTax.overview.rawSellValue'),
       align: 'right',
@@ -328,21 +352,29 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       render: (row) => <IskAmount value={row.valuation.rawValue} revealOn="tap" decimals={0} />,
       sortValue: (row) => row.valuation.rawValue,
     },
-    ...(showRefining
-      ? [
-          {
-            id: 'refineValue',
-            header: t('miningTax.overview.refineValue'),
-            align: 'right',
-            className: 'whitespace-nowrap',
-            render: (row: MiningYieldRow) => (
-              <IskAmount value={row.valuation.refineValue} revealOn="tap" decimals={0} />
-            ),
-            sortValue: (row: MiningYieldRow) => row.valuation.refineValue,
-          } satisfies DataTableColumn<MiningYieldRow>,
-        ]
-      : []),
-    {
+    refineValue: {
+      id: 'refineValue',
+      header: t('miningTax.overview.refineValue'),
+      align: 'right',
+      className: 'whitespace-nowrap',
+      render: (row) => <IskAmount value={row.valuation.refineValue} revealOn="tap" decimals={0} />,
+      sortValue: (row) => row.valuation.refineValue,
+    },
+    oreBreakdown: {
+      id: 'oreBreakdown',
+      header: t('miningTax.overview.oreBreakdownColumn'),
+      render: (row) => oreBreakdownSummary(row.entry.oreLines, data?.typeNames ?? new Map()),
+      sortValue: (row) => oreBreakdownSummary(row.entry.oreLines, data?.typeNames ?? new Map()),
+    },
+    units: {
+      id: 'units',
+      header: t('miningTax.overview.unitsColumn'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums',
+      render: (row) => sumUnits(row.entry.oreLines).toLocaleString(),
+      sortValue: (row) => sumUnits(row.entry.oreLines),
+    },
+    pricing: {
       id: 'pricing',
       header: t('miningTax.overview.pricingColumn'),
       className: 'whitespace-nowrap',
@@ -358,6 +390,18 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       ),
       sortValue: (row) => `${row.priceSource}:${row.valuation.pricedAll ? 1 : 0}`,
     },
+  };
+
+  const columns: DataTableColumn<MiningYieldRow>[] = [
+    {
+      id: 'date',
+      header: t('miningTax.dateColumn'),
+      headerTooltip: t('miningTax.dateEveHint'),
+      render: (row) => row.entry.date,
+      sortValue: (row) => row.entry.date,
+      primary: true,
+    },
+    ...activeColumnIds.map((id) => columnsById[id]),
   ];
 
   return (
@@ -410,6 +454,13 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                   onChange={(next) => void setBuybackRate(next)}
                 />
                 <ShowRefiningToggle value={showRefining} onChange={handleShowRefiningChange} />
+                <CardDetailsOptions
+                  available={availableColumnIds}
+                  visible={activeColumnIds}
+                  columnsById={columnsById}
+                  onToggle={handleToggleColumn}
+                  onReset={handleResetColumns}
+                />
               </MobileSettings>
             </div>
             <IconButton
@@ -575,7 +626,27 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                 </Suspense>
               </Panel>
 
-              <Panel padded={false}>
+              <Panel
+                padded={false}
+                actions={
+                  // Desktop only — a phone toggles the same columns as
+                  // "Card details" inside the settings sheet instead
+                  // (`CardDetailsOptions` above), so this dropdown would be
+                  // a redundant second control there.
+                  <div className="hidden sm:block">
+                    <ColumnPickerMenu
+                      available={availableColumnIds}
+                      visible={activeColumnIds}
+                      columnsById={columnsById}
+                      onToggle={handleToggleColumn}
+                      onReset={handleResetColumns}
+                      buttonLabel={t('miningTax.overview.columnsButton')}
+                      menuTitle={t('miningTax.overview.columnsMenuTitle')}
+                      resetLabel={t('miningTax.overview.resetColumnsAction')}
+                    />
+                  </div>
+                }
+              >
                 <div className="overflow-x-auto">
                   <DataTable
                     columns={columns}
