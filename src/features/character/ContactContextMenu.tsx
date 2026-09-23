@@ -15,14 +15,17 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { usePublicInfoModal, type PublicInfoKind } from '@/stores/publicInfoModal';
 import type { CharacterContact } from '@/esi/endpoints';
 
+/** Only the identity is read, so a merged Across-Characters row can supply one too. */
+export type ContactIdentity = Pick<CharacterContact, 'contact_id' | 'contact_type'>;
+
 export interface ContactContextMenuProps {
-  contact: CharacterContact;
+  contact: ContactIdentity;
   name: string;
   children: ReactElement;
 }
 
 /** No public faction-info endpoint is wired into the modal, so faction contacts get no Show Info. */
-function publicInfoKind(contact: CharacterContact): PublicInfoKind | null {
+function publicInfoKind(contact: ContactIdentity): PublicInfoKind | null {
   return contact.contact_type === 'faction' ? null : contact.contact_type;
 }
 

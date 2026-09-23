@@ -438,6 +438,14 @@ function AcrossCharactersPanel({ lists, names, filter }: AcrossCharactersPanelPr
           rows={visibleRows}
           rowKey={(row) => `${row.contactType}:${row.contactId}`}
           defaultSort={{ columnId: 'held', direction: 'asc' }}
+          rowContextMenu={(row, tr) => (
+            <ContactContextMenu
+              contact={{ contact_id: row.contactId, contact_type: row.contactType }}
+              name={entityName(names, row.contactId)}
+            >
+              {tr}
+            </ContactContextMenu>
+          )}
         />
       )}
     </Panel>
