@@ -61,7 +61,7 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { ItemContextMenu, type ItemMenuFor } from '@/features/market/ItemContextMenu';
 import {
   nameForType,
   toIndustryBlueprint,
@@ -950,22 +950,40 @@ export function BuildPlanDetail({
    * the action lands back here with `?product=`, creating or selecting that
    * material's own plan so its build-vs-buy read can be compared with this one.
    */
-  function materialContextMenu(material: MaterialTableRow, tr: ReactElement) {
-    const name = nameForType(catalog, material.typeID);
-    const buildable = canBuildHere(material.typeID);
+  function itemContextMenu(
+    typeId: number,
+    trigger: ReactElement,
+    buildHere?: { onToggle: () => void; building: boolean }
+  ) {
     return (
       <ItemContextMenu
-        typeId={material.typeID}
-        itemName={name}
-        blueprintTypeID={catalog.byProductTypeID.get(material.typeID)?.blueprintTypeID ?? null}
+        typeId={typeId}
+        itemName={nameForType(catalog, typeId)}
+        blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}
         onAddToQuickbar={onAddToQuickbar}
         quickbarAvailable={quickbarAvailable}
         onShowInfo={onShowInfo}
-        onToggleBuildHere={buildable ? () => toggleBuildHere(material.typeID) : undefined}
-        buildingHere={material.subBuilds.length > 0}
+        onToggleBuildHere={buildHere?.onToggle}
+        buildingHere={buildHere?.building}
       >
-        {tr}
+        {trigger}
       </ItemContextMenu>
+    );
+  }
+
+  /** The same menu on every other item name the page shows — product heading, revenue and owned-sale rows, the recipe and acquisition modals. */
+  const itemMenuFor: ItemMenuFor = (typeId, trigger) => itemContextMenu(typeId, trigger);
+
+  function materialContextMenu(material: MaterialTableRow, tr: ReactElement) {
+    return itemContextMenu(
+      material.typeID,
+      tr,
+      canBuildHere(material.typeID)
+        ? {
+            onToggle: () => toggleBuildHere(material.typeID),
+            building: material.subBuilds.length > 0,
+          }
+        : undefined
     );
   }
 
@@ -1065,6 +1083,8 @@ export function BuildPlanDetail({
           pricesReady={pricesReady}
           pricesLoading={pricesLoading}
           productName={entry.productName}
+          productTypeID={entry.productTypeID}
+          itemMenuFor={itemMenuFor}
           runs={plan.runs}
           ownedSale={ownedSale}
           breakdown={breakdownContext}
@@ -1614,6 +1634,7 @@ export function BuildPlanDetail({
                 onClose={() => setRecipeTypeId(null)}
                 nameFor={(typeID) => nameForType(catalog, typeID)}
                 onOpenRecipe={setRecipeTypeId}
+                itemMenuFor={itemMenuFor}
               />
               {acquisitionPickerTypeId !== null && (
                 <BlueprintAcquisitionModal
@@ -1621,6 +1642,7 @@ export function BuildPlanDetail({
                   characterId={plan.characterId}
                   blueprintTypeID={acquisitionPickerTypeId}
                   blueprintName={nameForType(catalog, acquisitionPickerTypeId)}
+                  itemMenuFor={itemMenuFor}
                   ownedCopies={acquisitionPickerOwnedCopies}
                   sourcing={plan.materialSourcing?.[acquisitionPickerTypeId]}
                   onSourcingChange={changeOneSourcing}
@@ -1749,6 +1771,7 @@ export function BuildPlanDetail({
               ownedSale={ownedSale}
               nameFor={(typeID) => nameForType(catalog, typeID)}
               totalVolume={materialVolume}
+              itemMenuFor={itemMenuFor}
               onOpenBreakdown={() => setBreakdownOpen(true)}
             />
           </CollapsiblePanel>

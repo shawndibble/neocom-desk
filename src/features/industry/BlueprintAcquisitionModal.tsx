@@ -46,6 +46,7 @@ import { loadContractLocationInfo } from '@/features/bpcContracts/blueprintLocat
 import { loadRegionName } from '@/features/bpcContracts/regionNames';
 import { useLpValue } from '@/features/loyalty/lpValue';
 import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
+import type { ItemMenuFor } from '@/features/market/ItemContextMenu';
 import { findLpOfferMatches, type LpOfferMatch } from '@/features/market/appraisalLpAcquisition';
 import {
   loadGlobalMarketOverrides,
@@ -101,6 +102,8 @@ interface BlueprintAcquisitionModalProps {
   onSearchBpcSourcing: (blueprintTypeID: number) => void;
   /** The Build Plan's own Trade Hub — the modal's starting hub. */
   planHubId: TradeHub['id'];
+  /** Wraps the title (the blueprint's own name) in the item context menu; omitted where the caller has none to offer. */
+  itemMenuFor?: ItemMenuFor;
 }
 
 /** Names for `ids`, resolved one by one as they land; a missing entry means not resolved yet. */
@@ -176,6 +179,7 @@ export function BlueprintAcquisitionModal({
   onSourcingChange,
   onSearchBpcSourcing,
   planHubId,
+  itemMenuFor,
 }: BlueprintAcquisitionModalProps) {
   const { t } = useTranslation();
   const override = sourcing?.acquisitionTierOverride;
@@ -429,7 +433,14 @@ export function BlueprintAcquisitionModal({
     <Modal
       open
       onClose={onClose}
-      title={t('industry.blueprintAcquisitionModalTitle', { name: blueprintName })}
+      title={
+        itemMenuFor
+          ? itemMenuFor(
+              blueprintTypeID,
+              <span>{t('industry.blueprintAcquisitionModalTitle', { name: blueprintName })}</span>
+            )
+          : t('industry.blueprintAcquisitionModalTitle', { name: blueprintName })
+      }
     >
       <div className="flex flex-col gap-4 text-xs">
         <div className="flex flex-col gap-1">
