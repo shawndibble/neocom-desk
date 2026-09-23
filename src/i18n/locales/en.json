@@ -173,6 +173,10 @@
     "prereq": "Prereq",
     "importClipboard": "Import from clipboard",
     "whatIfImplants": "What-if implants",
+    "alphaClone": "Alpha clone",
+    "alphaCloneNote": "EVE does not report clone state, so set it here. Alpha trains at half speed and only up to the Alpha skill caps. Applies to every plan for this character.",
+    "alphaCappedCount_one": "{{count}} level in this plan is above the Alpha skill cap.",
+    "alphaCappedCount_other": "{{count}} levels in this plan are above the Alpha skill cap.",
     "whatIfNone": "None",
     "whatIfCurrent": "Current",
     "whatIfCustom": "Custom",
@@ -271,6 +275,7 @@
     "queuePausedNote": "Training is paused, so EVE reports no completion times.",
     "queueFinishes": "Finishes {{date}}",
     "boosterAffects": "Booster speeds this skill up",
+    "alphaCapped": "Above the Alpha skill cap",
     "remapCapNote_one": "Evaluated with {{count}} remap. This plan allows more; placement beyond that is not available yet.",
     "remapCapNote_other": "Evaluated with {{count}} remaps. This plan allows more; placement beyond that is not available yet.",
     "headerTitle": "Plan summary",
@@ -3403,7 +3408,7 @@
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, and the ISK-per-LP value you set for LP Store blueprints. Nothing else on this page leaves your device."
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, and whether each character is Alpha or Omega. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",

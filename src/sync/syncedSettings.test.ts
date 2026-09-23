@@ -20,6 +20,7 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.notificationFeedPrefs',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',
+  'sync.skillCloneStates',
   'sync.spExtractionMonitoringEnabled',
   'sync.spExtractionThresholdSp',
 ];

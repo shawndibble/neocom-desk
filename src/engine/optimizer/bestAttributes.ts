@@ -4,6 +4,8 @@
  * EVE remap rules (EVE University wiki, "Skills and learning" / Neural Remap):
  * 99 base points across 5 attributes, min 17 / max 27 each, i.e. 14 freely
  * allocatable points. Implants add on top and are unaffected by a remap.
+ * An Alpha `cloneState` halves every rate, which never changes which spread
+ * wins on its own but does change how much SP a Booster's window covers.
  * Boosters are accounted for when a `BoosterContext` is supplied, matching
  * `computeSchedule` — a long accelerator runs to weeks, so ignoring one gives
  * the wrong optimum for weeks of training (plan §5.5). `placeRemaps` passes a
@@ -14,6 +16,7 @@ import type {
   AttributeName,
   Attributes,
   Booster,
+  CloneState,
   EngineSkill,
   Implants,
   PlanStep,
@@ -115,18 +118,21 @@ function rateFor(
   extras: readonly number[],
   implantByIndex: readonly number[],
   primary: number,
-  secondary: number
+  secondary: number,
+  cloneState: CloneState
 ): number {
   return trainingRate(
     BASE_MIN + extras[primary] + implantByIndex[primary],
-    BASE_MIN + extras[secondary] + implantByIndex[secondary]
+    BASE_MIN + extras[secondary] + implantByIndex[secondary],
+    cloneState
   );
 }
 
 /** Brute-force the best allocation for pre-aggregated segment SP. */
 export function bestAttributesForPairs(
   spByPair: SpByPair,
-  implants: Implants = {}
+  implants: Implants = {},
+  cloneState: CloneState = 'omega'
 ): BestAttributesResult {
   const pairs: { primary: number; secondary: number; sp: number }[] = [];
   for (const [key, sp] of spByPair) {
@@ -141,7 +147,7 @@ export function bestAttributesForPairs(
   for (const extras of allAllocations()) {
     let seconds = 0;
     for (const { primary, secondary, sp } of pairs) {
-      seconds += timeToTrain(sp, rateFor(extras, implantByIndex, primary, secondary));
+      seconds += timeToTrain(sp, rateFor(extras, implantByIndex, primary, secondary, cloneState));
     }
     if (seconds < bestSeconds) {
       bestSeconds = seconds;
@@ -179,7 +185,8 @@ export interface AllocationCostTable {
 
 export function allocationCostTable(
   pairKeys: readonly string[],
-  implants: Implants = {}
+  implants: Implants = {},
+  cloneState: CloneState = 'omega'
 ): AllocationCostTable {
   const allocations = allAllocations();
   const implantByIndex = ATTRIBUTE_NAMES.map((name) => implants[name] ?? 0);
@@ -190,7 +197,7 @@ export function allocationCostTable(
     pairs.forEach(({ primary, secondary }, p) => {
       secondsPerSp[a * width + p] = timeToTrain(
         1,
-        rateFor(extras, implantByIndex, primary, secondary)
+        rateFor(extras, implantByIndex, primary, secondary, cloneState)
       );
     });
   });
@@ -272,7 +279,11 @@ function bonusSegments(live: readonly Booster[], startMs: number): BonusSegment[
  * this it outlives the segment for *every* candidate allocation — which is
  * what makes the uniform shortcut safe rather than merely usual.
  */
-function maxBoostedSeconds(spByPair: SpByPair, boostedImplants: Implants): number {
+function maxBoostedSeconds(
+  spByPair: SpByPair,
+  boostedImplants: Implants,
+  cloneState: CloneState
+): number {
   let seconds = 0;
   for (const [key, sp] of spByPair) {
     if (sp <= 0) continue;
@@ -281,7 +292,8 @@ function maxBoostedSeconds(spByPair: SpByPair, boostedImplants: Implants): numbe
       sp,
       trainingRate(
         BASE_MIN + (boostedImplants[primary] ?? 0),
-        BASE_MIN + (boostedImplants[secondary] ?? 0)
+        BASE_MIN + (boostedImplants[secondary] ?? 0),
+        cloneState
       )
     );
   }
@@ -307,7 +319,8 @@ function bestAttributesWalking(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
   implants: Implants,
-  segments: readonly BonusSegment[]
+  segments: readonly BonusSegment[],
+  cloneState: CloneState
 ): BestAttributesResult {
   const stepSp: number[] = [];
   const stepPrimary: AttributeName[] = [];
@@ -350,7 +363,11 @@ function bestAttributesWalking(
     for (; i < steps.length && seg < lastSeg; i++) {
       let spLeft = stepSp[i];
       while (spLeft > 0 && seg < lastSeg) {
-        const rate = trainingRate(valueAt(stepPrimary[i], seg), valueAt(stepSecondary[i], seg));
+        const rate = trainingRate(
+          valueAt(stepPrimary[i], seg),
+          valueAt(stepSecondary[i], seg),
+          cloneState
+        );
         const needed = timeToTrain(spLeft, rate);
         const room = segments[seg].endSeconds - elapsed;
         if (needed <= room) {
@@ -367,7 +384,11 @@ function bestAttributesWalking(
         // (zero-bonus) segment, then the rest of the plan is constant-rate.
         elapsed += timeToTrain(
           spLeft,
-          trainingRate(valueAt(stepPrimary[i], lastSeg), valueAt(stepSecondary[i], lastSeg))
+          trainingRate(
+            valueAt(stepPrimary[i], lastSeg),
+            valueAt(stepSecondary[i], lastSeg),
+            cloneState
+          )
         );
         i++;
         break;
@@ -384,7 +405,7 @@ function bestAttributesWalking(
       const [primary, secondary] = keyPairs[k];
       elapsed += timeToTrain(
         sp,
-        trainingRate(valueAt(primary, lastSeg), valueAt(secondary, lastSeg))
+        trainingRate(valueAt(primary, lastSeg), valueAt(secondary, lastSeg), cloneState)
       );
     }
 
@@ -409,16 +430,17 @@ export function bestAttributes(
   steps: readonly PlanStep[],
   skills: ReadonlyMap<number, EngineSkill>,
   implants: Implants = {},
-  booster?: BoosterContext
+  booster?: BoosterContext,
+  cloneState: CloneState = 'omega'
 ): BestAttributesResult {
   const spByPair = aggregateSpByPair(steps, skills);
   if (!booster || booster.boosters.length === 0) {
-    return bestAttributesForPairs(spByPair, implants);
+    return bestAttributesForPairs(spByPair, implants, cloneState);
   }
 
   const startMs = booster.startDate.getTime();
   const live = booster.boosters.filter((b) => b.expiresAt.getTime() > startMs);
-  if (live.length === 0) return bestAttributesForPairs(spByPair, implants);
+  if (live.length === 0) return bestAttributesForPairs(spByPair, implants, cloneState);
 
   // Piecewise: the full stacked bonus holds until the earliest live Booster's
   // own expiry, then drops segment by segment as each one lapses in turn.
@@ -426,11 +448,11 @@ export function bestAttributes(
   const earliestExpiry = segments[0].endSeconds;
 
   const boostedImplants = withBonus(implants, segments[0].bonus);
-  if (earliestExpiry >= maxBoostedSeconds(spByPair, boostedImplants)) {
-    return bestAttributesForPairs(spByPair, boostedImplants);
+  if (earliestExpiry >= maxBoostedSeconds(spByPair, boostedImplants, cloneState)) {
+    return bestAttributesForPairs(spByPair, boostedImplants, cloneState);
   }
 
-  return bestAttributesWalking(steps, skills, implants, segments);
+  return bestAttributesWalking(steps, skills, implants, segments, cloneState);
 }
 
 /**
@@ -452,7 +474,8 @@ export function bestAttributesAtBoundaries(
   implants: Implants,
   booster: BoosterContext,
   startStep: number,
-  boundaries: readonly number[]
+  boundaries: readonly number[],
+  cloneState: CloneState = 'omega'
 ): BestAttributesResult[] {
   const startMs = booster.startDate.getTime();
   const live = booster.boosters.filter((b) => b.expiresAt.getTime() > startMs);
@@ -496,7 +519,7 @@ export function bestAttributesAtBoundaries(
       }
       let spLeft = sp[i];
       while (spLeft > 0) {
-        const rate = trainingRate(valueAt(primary[i], seg), valueAt(secondary[i], seg));
+        const rate = trainingRate(valueAt(primary[i], seg), valueAt(secondary[i], seg), cloneState);
         const needed = timeToTrain(spLeft, rate);
         const room = seg < lastSeg ? segments[seg].endSeconds - elapsed : Infinity;
         if (needed <= room) {

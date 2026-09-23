@@ -273,12 +273,29 @@ function BoosterMark() {
   );
 }
 
+/** A row an Alpha clone cannot train: shared by entry and prereq rows. */
+function AlphaCapMark() {
+  const { t } = useTranslation();
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      aria-label={t('plans.alphaCapped')}
+      role="img"
+      className="ml-1 inline-block size-3 align-[-0.125em] text-warning"
+    >
+      <path d="M12 2 1 21h22L12 2Zm-1 7h2v6h-2V9Zm0 8h2v2h-2v-2Z" fill="currentColor" />
+    </svg>
+  );
+}
+
 interface EntryRowProps {
   row: Extract<MergedRow, { kind: 'entry' }>;
   name: string;
   attributes: AttributePair | undefined;
   /** Step indices a live Booster speeds up — the row's own mark and its per-level marks both read this. */
   boostedSteps: ReadonlySet<number> | undefined;
+  /** Step indices above the Alpha skill cap; empty unless the Character is Alpha. */
+  alphaCappedSteps: ReadonlySet<number> | undefined;
   /** When training begins, for this row's finish date. Undefined when there's no wall-clock basis to offer. */
   startDate: Date | undefined;
   columns: ColumnVisibility;
@@ -301,6 +318,7 @@ const EntryRow = memo(function EntryRow({
   name,
   attributes,
   boostedSteps,
+  alphaCappedSteps,
   startDate,
   columns,
   isDesktop,
@@ -311,6 +329,7 @@ const EntryRow = memo(function EntryRow({
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
   const { entry, stepIndices } = row;
   const boosted = stepIndices.some((i) => boostedSteps?.has(i) ?? false);
+  const alphaCapped = stepIndices.some((i) => alphaCappedSteps?.has(i) ?? false);
   // Names the level, not just the skill: a plan holds one row per level, so
   // two rows of the same skill would otherwise offer two buttons with the
   // identical accessible name "Remove Gunnery".
@@ -337,6 +356,7 @@ const EntryRow = memo(function EntryRow({
       <span className="truncate">
         {name} {ROMAN[entry.targetLevel - 1]}
         {boosted && <BoosterMark />}
+        {alphaCapped && <AlphaCapMark />}
       </span>
     </span>
   );
@@ -431,6 +451,7 @@ interface PrereqRowProps {
   name: string;
   attributes: AttributePair | undefined;
   boosted: boolean;
+  alphaCapped: boolean;
   /** When training begins, for this row's finish date. Undefined when there's no wall-clock basis to offer. */
   startDate: Date | undefined;
   columns: ColumnVisibility;
@@ -452,6 +473,7 @@ const PrereqRow = memo(function PrereqRow({
   name,
   attributes,
   boosted,
+  alphaCapped,
   startDate,
   columns,
   isDesktop,
@@ -496,6 +518,7 @@ const PrereqRow = memo(function PrereqRow({
         {name} {ROMAN[row.step.level - 1]}
         <span className="ml-2 text-[0.625rem] uppercase">{t('plans.prereq')}</span>
         {boosted && <BoosterMark />}
+        {alphaCapped && <AlphaCapMark />}
       </span>
     </span>
   );
@@ -657,6 +680,8 @@ interface EntryListProps {
   columns: ColumnVisibility;
   /** Step indices (into the underlying scheduled queue) a live Booster speeds up. */
   boostedSteps?: ReadonlySet<number>;
+  /** Step indices (into the underlying scheduled queue) above the Alpha skill cap. */
+  alphaCappedSteps?: ReadonlySet<number>;
   /** When training begins, for each row's finish date (#20). Omitted when there's no wall-clock basis to offer — rows then fall back to a running total. */
   startDate?: Date;
   onReorder: (activeId: string, overId: string) => void;
@@ -695,6 +720,7 @@ export function EntryList({
   attributesFor,
   columns,
   boostedSteps,
+  alphaCappedSteps,
   startDate,
   onReorder,
   onRemove,
@@ -764,6 +790,7 @@ export function EntryList({
                       name={nameFor(row.entry.skillTypeID)}
                       attributes={attributesFor(row.entry.skillTypeID)}
                       boostedSteps={boostedSteps}
+                      alphaCappedSteps={alphaCappedSteps}
                       startDate={startDate}
                       columns={columns}
                       isDesktop={isDesktop}
@@ -777,6 +804,7 @@ export function EntryList({
                       name={nameFor(row.step.skillTypeID)}
                       attributes={attributesFor(row.step.skillTypeID)}
                       boosted={boostedSteps?.has(row.stepIndex) ?? false}
+                      alphaCapped={alphaCappedSteps?.has(row.stepIndex) ?? false}
                       startDate={startDate}
                       columns={columns}
                       isDesktop={isDesktop}
