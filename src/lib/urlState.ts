@@ -78,6 +78,22 @@ export function enumParam<V extends string>(
   };
 }
 
+/** An enum whose "no selection" state is `null` rather than a declared member. */
+export function optionalEnumParam<V extends string>(values: readonly V[]): UrlParamCodec<V | null> {
+  return {
+    parse: (raw) => ((values as readonly string[]).includes(raw ?? '') ? (raw as V) : null),
+    serialize: (value) => value,
+  };
+}
+
+/** A single positive id (region, location…) whose "no selection" state is `null`. */
+export function optionalIdParam(): UrlParamCodec<number | null> {
+  return {
+    parse: (raw) => parsePositiveInt(raw),
+    serialize: (value) => (value === null ? null : String(value)),
+  };
+}
+
 /**
  * A comma-separated list of positive ids (character, type, location…),
  * sorted and de-duplicated so the same selection always writes the same URL.

@@ -5,6 +5,8 @@ import {
   enumSetParam,
   idListParam,
   intParam,
+  optionalEnumParam,
+  optionalIdParam,
   resolveSort,
   sortParam,
   textParam,
@@ -88,6 +90,43 @@ describe('enumParam', () => {
   it('omits the default', () => {
     expect(codec.serialize('hub')).toBeNull();
     expect(codec.serialize('region')).toBe('region');
+  });
+});
+
+describe('optionalEnumParam', () => {
+  const codec = optionalEnumParam(['outstanding', 'finished'] as const);
+
+  it('defaults to null and omits it from the URL', () => {
+    expect(codec.parse(null)).toBeNull();
+    expect(codec.serialize(null)).toBeNull();
+  });
+
+  it('accepts only declared members', () => {
+    expect(codec.parse('finished')).toBe('finished');
+    expect(codec.parse('bogus')).toBeNull();
+  });
+
+  it('round-trips a non-null member', () => {
+    expect(codec.serialize('outstanding')).toBe('outstanding');
+  });
+});
+
+describe('optionalIdParam', () => {
+  const codec = optionalIdParam();
+
+  it('defaults to null and omits it from the URL', () => {
+    expect(codec.parse(null)).toBeNull();
+    expect(codec.serialize(null)).toBeNull();
+  });
+
+  it('falls back to null for garbage or non-positive ids', () => {
+    expect(codec.parse('abc')).toBeNull();
+    expect(codec.parse('0')).toBeNull();
+    expect(codec.parse('-3')).toBeNull();
+  });
+
+  it('round-trips a positive id', () => {
+    expect(codec.parse(codec.serialize(30000142))).toBe(30000142);
   });
 });
 

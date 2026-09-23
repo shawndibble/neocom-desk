@@ -8,6 +8,29 @@ describe('routePatternFor', () => {
   });
 });
 
+describe('a page with a sub-tab nested under one of its tabs (Contracts)', () => {
+  it('resolves a two-segment tab id from the full path suffix', () => {
+    expect(tabbedPagePathFor('/contracts/search/items')).toBe('/contracts/search/items');
+    expect(tabbedPagePathFor('/contracts/search/courier')).toBe('/contracts/search/courier');
+    expect(tabbedPagePathFor('/contracts/history')).toBe('/contracts/history');
+  });
+
+  it('tolerates a trailing slash on the deeper segment', () => {
+    expect(tabbedPagePathFor('/contracts/search/items/')).toBe('/contracts/search/items');
+  });
+
+  it('redirects the bare page and the tab-less "search" segment to the default', () => {
+    expect(isTabRedirectPath('/contracts')).toBe(true);
+    expect(isTabRedirectPath('/contracts/search')).toBe(true);
+    expect(tabbedPagePathFor('/contracts')).toBe('/contracts');
+    expect(tabbedPagePathFor('/contracts/search')).toBe('/contracts');
+  });
+
+  it('mounts with a splat like any other tabbed page', () => {
+    expect(routePatternFor('/contracts')).toBe('/contracts/*');
+  });
+});
+
 describe('pageKeyFor', () => {
   it('collapses a declared tab to its page', () => {
     expect(pageKeyFor('/contacts/character')).toBe('/contacts');
