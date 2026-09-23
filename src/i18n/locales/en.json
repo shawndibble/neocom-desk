@@ -1580,6 +1580,7 @@
       "volumeStatWarning": "{{count}} ore type(s) have no known volume. Total is partial.",
       "rawSellValue": "Raw sell value",
       "refineValue": "Refined value",
+      "refineValueShort": "Refined",
       "oreBreakdownColumn": "Ore breakdown",
       "unitsColumn": "Units",
       "pricingColumn": "Pricing",

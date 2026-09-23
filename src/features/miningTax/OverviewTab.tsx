@@ -362,7 +362,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       className: 'whitespace-nowrap',
       render: (row) => <IskAmount value={row.valuation.rawValue} revealOn="tap" decimals={0} />,
       sortValue: (row) => row.valuation.rawValue,
-      stackAffix: { before: t('miningTax.overview.totalColumn') },
+      stackAffix: { before: `${t('miningTax.overview.totalColumn')} ` },
     },
     refineValue: {
       id: 'refineValue',
@@ -371,7 +371,10 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
       className: 'whitespace-nowrap',
       render: (row) => <IskAmount value={row.valuation.refineValue} revealOn="tap" decimals={0} />,
       sortValue: (row) => row.valuation.refineValue,
-      stackAffix: { before: t('miningTax.overview.refineValue') },
+      // Short, dense-meta-line label ("Refined 91.6M"): the full column
+      // header ("Refined value") is right for a desktop table but repeats
+      // the word "value" the phone card has no room for.
+      stackAffix: { before: `${t('miningTax.overview.refineValueShort')} ` },
     },
     oreBreakdown: {
       id: 'oreBreakdown',
