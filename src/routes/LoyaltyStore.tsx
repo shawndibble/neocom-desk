@@ -525,7 +525,7 @@ export function LoyaltyStore() {
           `align-items: stretch` would blow the control's intrinsic width out
           to the full page — a full-width bordered bar above the header. */}
       <Link to="/wallet" className={buttonClassName({ size: 'sm', className: 'self-start' })}>
-        {'←'} {t('loyaltyStore.back')}
+        {t('loyaltyStore.back')}
       </Link>
 
       <PageHeader
