@@ -104,6 +104,44 @@ export function PriceBasisOptions({ value, onChange }: PriceBasisOptionsProps) {
   );
 }
 
+interface ShowRefiningToggleProps {
+  value: boolean;
+  onChange: (value: boolean) => void;
+}
+
+/**
+ * "Show refining" switch (issue #1281): off for a pilot who never refines —
+ * hides refined value everywhere on the page and in the detail modal, and
+ * skips the ESI calls only refining needs (reprocessing material prices,
+ * skills, implants).
+ */
+export function ShowRefiningToggle({ value, onChange }: ShowRefiningToggleProps) {
+  const { t } = useTranslation();
+  return (
+    <div className="flex items-center justify-between gap-2.5 px-2.5 py-2">
+      <span className="text-sm">
+        {t('miningTax.overview.showRefiningLabel')}
+        <span className="block text-[0.6875rem] text-text-dim">
+          {t('miningTax.overview.showRefiningHint')}
+        </span>
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={value}
+        aria-label={t('miningTax.overview.showRefiningLabel')}
+        onClick={() => onChange(!value)}
+        className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${value ? 'border-accent-dim bg-accent' : 'border-line bg-panel-2'}`}
+      >
+        <span
+          aria-hidden="true"
+          className={`absolute top-0.5 size-5 rounded-full bg-bg transition-transform ${value ? 'translate-x-5' : 'translate-x-0.5'}`}
+        />
+      </button>
+    </div>
+  );
+}
+
 const triggerClassName =
   'flex items-center gap-2 rounded-xs border border-accent-dim bg-panel-2 px-2.5 text-xs text-text hover:border-line-bright focus-visible:outline-2 focus-visible:outline-accent';
 

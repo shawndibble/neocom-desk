@@ -88,12 +88,23 @@ export interface EntryValuation {
  * entry mining both ore and ice in one day resolves each separately from
  * the same `modifiers`.
  */
+export interface ValueMiningYieldOptions {
+  /**
+   * False when the caller (issue #1281's "Show refining" switch) never
+   * loaded reprocessing recipes or material prices at all, so a line having
+   * neither must not read as unpriced the way a genuinely missing recipe
+   * does. Default true — every existing caller keeps today's behaviour.
+   */
+  includeRefining?: boolean;
+}
+
 export function valueMiningYield(
   oreLines: readonly OreLine[],
   rawUnitPrices: ReadonlyMap<number, number>,
   reprocessingByTypeId: ReadonlyMap<number, YieldReprocessingEntry | undefined>,
   modifiers: CharacterModifiers,
-  materialPrices: Readonly<Record<number, number>>
+  materialPrices: Readonly<Record<number, number>>,
+  { includeRefining = true }: ValueMiningYieldOptions = {}
 ): EntryValuation {
   // The baseline `refineBasisHint` states — general skills only, no
   // specialisation, since no single number can honestly speak for lines
@@ -110,7 +121,7 @@ export function valueMiningYield(
     if (lineRawValue === 0) pricedAll = false;
     rawValue += lineRawValue;
 
-    const reprocessing = reprocessingByTypeId.get(line.typeId);
+    const reprocessing = includeRefining ? reprocessingByTypeId.get(line.typeId) : undefined;
     let lineRefineValue = 0;
     let refineOutputs: ReprocessingMaterial[] = [];
     let batches = 0;
@@ -129,7 +140,7 @@ export function valueMiningYield(
       batches = yielded.batches;
       unitsLeftOver = yielded.unitsLeftOver;
       if (!value.pricedAll) pricedAll = false;
-    } else {
+    } else if (includeRefining) {
       pricedAll = false;
     }
     refineValue += lineRefineValue;
