@@ -107,8 +107,9 @@ export function hostRateFor(
 }
 
 /**
- * The character's trained Customs Code Expertise, or `null` when the app has
- * no skill data for them at all.
+ * The character's effective (issue #1236: min of queue-corrected trained and
+ * active) Customs Code Expertise, or `null` when the app has no skill data
+ * for them at all.
  *
  * `null` and `0` are deliberately different answers and both are real: a
  * character who has never trained it is a confident 0, while a character whose
@@ -128,5 +129,5 @@ export async function loadCustomsCodeExpertise(
     skipQueueWithoutScope: true,
   });
   if (!corrected.skillsResult) return null;
-  return corrected.trained.get(CUSTOMS_CODE_EXPERTISE_SKILL_ID)?.level ?? 0;
+  return corrected.effective.get(CUSTOMS_CODE_EXPERTISE_SKILL_ID) ?? 0;
 }

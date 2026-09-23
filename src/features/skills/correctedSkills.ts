@@ -19,6 +19,7 @@ import {
   type CachedResult,
 } from './data';
 import { toTrainedSkillsMap } from './skillMap';
+import { effectiveSkillLevelsFromTrained } from './effectiveSkillLevels';
 import {
   applyCompletedQueueEntries,
   applyTrainingProgress,
@@ -58,6 +59,17 @@ export interface CorrectedSkills {
    * only as current as the load that produced it.
    */
   trained: Map<number, TrainedSkill>;
+  /**
+   * The lower of the queue-corrected trained level and the queue-corrected
+   * active level (issue #1236) — "the level this character can use right
+   * now". Active is corrected the same way trained is: `/skills`'
+   * `active_skill_level` is exactly as stale as `trained_skill_level` when a
+   * queue entry has finished but the character hasn't logged in, so without
+   * this correction a just-finished level would read as capped instead of as
+   * complete. A persistent gap (alpha clone, lapsed omega) has no queue entry
+   * to raise it, so it survives the correction and still wins the min().
+   */
+  effective: Map<number, number>;
   /** SP the completed levels add on top of ESI's stale total_sp. */
   completedSp: number;
   /** total_sp corrected for the completed queue; null until /skills has loaded. */
@@ -113,6 +125,7 @@ export async function loadCorrectedSkills(
     queueEntries,
     nowMs
   );
+  const effective = effectiveSkillLevelsFromTrained(trained, rawSkills, queueEntries, nowMs);
   const completedSp = completedSpGain(rawSkills, completedLevels);
   const totalSp = skillsResult?.data ? skillsResult.data.total_sp + completedSp : null;
 
@@ -123,6 +136,7 @@ export async function loadCorrectedSkills(
     queueNeedsReauth,
     completedLevels,
     trained,
+    effective,
     completedSp,
     totalSp,
     fetchedAt: olderOf(skillsResult?.fetchedAt, queueResult?.fetchedAt),

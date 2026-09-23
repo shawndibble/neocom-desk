@@ -46,7 +46,7 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import { jobsCsvColumns } from './jobsCsv';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { mapWithConcurrencyLimit, ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
-import { loadCharacterSkills } from '@/features/skills/data';
+import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import {
   jobSlotSkillsFromCharacterSkills,
   toJobSlotJobs,
@@ -145,15 +145,22 @@ const TICK_MS = 30_000;
 
 async function loadActiveJobsSnapshot(characterId: number): Promise<Snapshot> {
   try {
-    const [result, types, skillsResult] = await Promise.all([
+    const nowMs = Date.now();
+    const [result, types, corrected] = await Promise.all([
       loadCharacterIndustryJobs(characterId),
       loadTypes(),
-      loadCharacterSkills(characterId),
+      loadCorrectedSkills(characterId, nowMs, { skipQueueWithoutScope: true }),
     ]);
     return {
       result,
       types,
-      skills: skillsResult ? jobSlotSkillsFromCharacterSkills(skillsResult.data.skills) : undefined,
+      skills: corrected.skillsResult
+        ? jobSlotSkillsFromCharacterSkills(
+            corrected.skillsResult.data.skills,
+            corrected.queueResult?.data ?? [],
+            nowMs
+          )
+        : undefined,
     };
   } catch {
     // `loadTypes()` throws when the SDE fetch fails. Resolving with an empty
@@ -302,14 +309,25 @@ export function ActiveJobsPanel({
     let cancelled = false;
     const skillsById = new Map<number, JobSlotSkills>();
     // No per-character try/catch here (unlike `rosterAttention.ts`'s fan-out,
-    // which wraps each request explicitly): `loadCharacterSkills` ->
+    // which wraps each request explicitly): `loadCorrectedSkills` ->
     // `loadWithCache` already swallows a failed fetch internally and
-    // resolves `null` rather than rejecting, so one character's failure
-    // can't sink the others or this `Promise.all` — it just leaves that
-    // character out of `skillsById`, read as "unknown" below.
+    // resolves `null`/no cached result rather than rejecting, so one
+    // character's failure can't sink the others or this `Promise.all` — it
+    // just leaves that character out of `skillsById`, read as "unknown"
+    // below.
     void mapWithConcurrencyLimit(ids, ESI_FANOUT_CONCURRENCY, async (id) => {
-      const result = await loadCharacterSkills(id);
-      if (result) skillsById.set(id, jobSlotSkillsFromCharacterSkills(result.data.skills));
+      const nowMs = Date.now();
+      const corrected = await loadCorrectedSkills(id, nowMs, { skipQueueWithoutScope: true });
+      if (corrected.skillsResult) {
+        skillsById.set(
+          id,
+          jobSlotSkillsFromCharacterSkills(
+            corrected.skillsResult.data.skills,
+            corrected.queueResult?.data ?? [],
+            nowMs
+          )
+        );
+      }
     })
       .then(() => {
         if (!cancelled) setJobsFanOutSkills(skillsById);

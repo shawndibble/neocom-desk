@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { CharacterSkill } from '@/esi/endpoints';
+import type { CharacterSkill, SkillQueueEntry } from '@/esi/endpoints';
 import { jobSlotSkillsFromCharacterSkills } from './jobSlotSkills';
 
 function skill(skillId: number, activeLevel: number): CharacterSkill {
@@ -48,5 +48,21 @@ describe('jobSlotSkillsFromCharacterSkills', () => {
       { skill_id: 3387, trained_skill_level: 5, active_skill_level: 3, skillpoints_in_skill: 0 },
     ];
     expect(jobSlotSkillsFromCharacterSkills(skills).massProduction).toBe(3);
+  });
+
+  it('counts a queue entry finished in the past even though /skills has not caught up yet (issue #1236)', () => {
+    const skills = [
+      { skill_id: 3387, trained_skill_level: 4, active_skill_level: 4, skillpoints_in_skill: 0 },
+    ];
+    const queue: SkillQueueEntry[] = [
+      {
+        skill_id: 3387,
+        queue_position: 0,
+        finished_level: 5,
+        finish_date: '2026-08-29T12:00:00Z',
+      } as SkillQueueEntry,
+    ];
+    const nowMs = Date.parse('2026-08-30T12:00:00Z');
+    expect(jobSlotSkillsFromCharacterSkills(skills, queue, nowMs).massProduction).toBe(5);
   });
 });
