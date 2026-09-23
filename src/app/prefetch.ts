@@ -43,6 +43,7 @@ import { loadContracts } from '@/features/character/contracts';
 import { loadMailHeaders, loadMailLabels } from '@/features/character/mail';
 import { loadCalendarEvents } from '@/features/character/calendar';
 import { loadContacts } from '@/features/character/contacts';
+import { loadCharacterStandings } from '@/features/character/standings';
 import { loadCharacterClones } from '@/features/character/clones';
 import { loadEmploymentHistory } from '@/features/character/employmentHistory';
 import { loadCharacterBlueprints } from '@/features/industry/data';
@@ -138,6 +139,13 @@ export const PREFETCH_TASKS: readonly PrefetchTask[] = [
     id: 'contacts',
     endpoints: ['getCharacterContacts'],
     run: loadContacts,
+  },
+  {
+    // Broker-fee standings (issue #1238); warmed so a Build Plan/Open
+    // Orders open with real values on first render rather than a cold fetch.
+    id: 'standings',
+    endpoints: ['getCharacterStandings'],
+    run: loadCharacterStandings,
   },
   {
     id: 'contracts',

@@ -56,6 +56,7 @@
 import type { EngineAsset } from '../assetTree';
 import type { MaterialRecipe } from './makeOrBuy';
 import type { ResolvedMaterial } from './materialResolution';
+import type { ResolvedStandings } from '@/engine/market/standings';
 
 export interface QuantityEntry {
   typeID: number;
@@ -509,6 +510,13 @@ export interface IndustryInputs {
   /** Per-material owned quantity / price override; absent = buy it all at the hub. */
   materialSourcing?: MaterialSourcingMap;
   skills: SkillLevels;
+  /**
+   * The character's standing toward the product's sale hub's NPC owner, for
+   * the broker fee and break-even price. Absent/0 = today's behaviour
+   * (standings assumed 0) — the caller resolves this once for the plan's
+   * fixed Trade Hub, not per material.
+   */
+  standing?: ResolvedStandings;
   /**
    * The active clone's BX-80x manufacturing-time implant bonus, if any
    * (issue #1229) — `resolveManufacturingTimeImplantBonusPct`'s result.

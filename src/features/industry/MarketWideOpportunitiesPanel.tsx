@@ -29,6 +29,7 @@ import type { SkillLevels } from '@/engine/industry/types';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
+import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
 import type { MarketWideResultRow } from './marketWideOpportunities';
 import { useMarketWideOpportunities } from './useMarketWideOpportunities';
@@ -46,6 +47,8 @@ interface MarketWideOpportunitiesPanelProps {
   trees: MarketWideTreeMap | null;
   catalog: BlueprintCatalog | null;
   skills: SkillLevels;
+  /** For the standing toward `hub`'s NPC owner (issue #1238). Null while no character is active. */
+  activeCharacterId: number | null;
   onStartPlan: (entry: BlueprintCatalogEntry) => void;
 }
 
@@ -54,14 +57,18 @@ export function MarketWideOpportunitiesPanel({
   trees,
   catalog,
   skills,
+  activeCharacterId,
   onStartPlan,
 }: MarketWideOpportunitiesPanelProps) {
   const { t } = useTranslation();
+  const tradeHubStandings = useTradeHubStandings(activeCharacterId);
+  const standing = tradeHubStanding(tradeHubStandings, hub.id);
   const { rows, loading, hasRun, run } = useMarketWideOpportunities({
     hub,
     trees,
     catalog,
     skills,
+    standing,
   });
 
   // Account-wide, not active-character: every character on the account, same

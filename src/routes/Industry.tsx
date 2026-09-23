@@ -13,6 +13,7 @@ import {
 import { findOwnedBlueprint } from '@/features/industry/data';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
+import { useTradeHubStandings } from '@/features/market/useTradeHubStandings';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import type { PlanIndexStats, PlanRollupStats } from '@/features/industry/BuildPlanList';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
@@ -280,6 +281,7 @@ export function Industry() {
       ),
     [plans, knownGroupIds]
   );
+  const tradeHubStandings = useTradeHubStandings(activeCharacterId);
   const groupedRows = useComparedBuildResults({
     plans: groupedPlans,
     catalog,
@@ -288,6 +290,7 @@ export function Industry() {
     corpOwnedBlueprints,
     skills,
     implantBonusPct,
+    tradeHubStandings,
     computeGroupResult: true,
   });
   const ungroupedRows = useComparedBuildResults({
@@ -298,6 +301,7 @@ export function Industry() {
     corpOwnedBlueprints,
     skills,
     implantBonusPct,
+    tradeHubStandings,
   });
   const runCounts = useRunCountsByPlan(activeCharacterId);
 
@@ -508,6 +512,7 @@ export function Industry() {
                 trees={marketWideTrees}
                 catalog={catalog}
                 skills={skills}
+                activeCharacterId={activeCharacterId}
                 onStartPlan={(entry) => {
                   // Distinct from the plain search-box create: picking a
                   // scan result is an explicit "go build this" choice, same
@@ -538,6 +543,7 @@ export function Industry() {
                 corpOwnedBlueprints={corpOwnedBlueprints}
                 skills={skills}
                 implantBonusPct={implantBonusPct}
+                tradeHubStandings={tradeHubStandings}
                 onDone={exitCompare}
               />
             ) : (

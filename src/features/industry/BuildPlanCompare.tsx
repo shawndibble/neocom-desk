@@ -20,6 +20,7 @@ import type { BlueprintCatalog } from './blueprintCatalog';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { formatPercent } from './format';
 import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBuildResults';
+import type { TradeHubStandingsMap } from '@/features/market/useTradeHubStandings';
 
 interface BuildPlanCompareProps {
   plans: readonly BuildPlanRecord[];
@@ -31,6 +32,8 @@ interface BuildPlanCompareProps {
   skills: SkillLevels;
   /** The plan owner's active-clone BX-80x manufacturing-time implant bonus, if any (issue #1229). */
   implantBonusPct: number;
+  /** The active Character's per-Trade-Hub standings (issue #1238) — see `useComparedBuildResults`. */
+  tradeHubStandings?: TradeHubStandingsMap;
   /** Exits compare mode, restoring the previously open single-plan detail. */
   onDone: () => void;
 }
@@ -83,6 +86,7 @@ export function BuildPlanCompare({
   corpOwnedBlueprints,
   skills,
   implantBonusPct,
+  tradeHubStandings,
   onDone,
 }: BuildPlanCompareProps) {
   const { t } = useTranslation();
@@ -94,6 +98,7 @@ export function BuildPlanCompare({
     corpOwnedBlueprints,
     skills,
     implantBonusPct,
+    tradeHubStandings,
   });
   const unknown = t('common.unknown');
 

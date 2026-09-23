@@ -52,6 +52,7 @@ import {
   type UndercutResult,
 } from '@/engine/market/undercut';
 import { orderFloor, type OrderFloor } from '@/engine/market/orderFloor';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import { orderExpiry, type OrderExpiry } from '@/engine/market/orderHealth';
 import {
   wasFrequentlyUndercut,
@@ -177,6 +178,14 @@ export interface BuildRowsInput {
   stationNames?: ReadonlyMap<number, string>;
   /** Per character, since skills differ. Keyed characterId. */
   skillsByCharacter: ReadonlyMap<number, CharacterSkills>;
+  /**
+   * Each order's own standing toward its station's NPC owner (issue #1238),
+   * keyed orderId rather than locationId: two characters at the same station
+   * can hold different standings, and this is already per-order. Absent
+   * entry = standings assumed 0 (a player structure, an unresolved owner, or
+   * simply not yet resolved).
+   */
+  standingsByOrder?: ReadonlyMap<number, ResolvedStandings>;
   now: number;
   /** Days without a sale, keyed orderId, when known. */
   daysWithoutSale?: ReadonlyMap<number, number>;
@@ -260,6 +269,7 @@ function buildRow(
     skillsByCharacter,
     now,
     daysWithoutSale,
+    standingsByOrder,
   } = input;
 
   const isBuyOrder = order.is_buy_order ?? false;
@@ -297,6 +307,7 @@ function buildRow(
 
   const costBasis = costBases.get(order.order_id) ?? null;
   const skills = skillsByCharacter.get(entry.characterId);
+  const standing = standingsByOrder?.get(order.order_id);
   const floor =
     costBasis && skills
       ? orderFloor({
@@ -305,6 +316,8 @@ function buildRow(
           accountingLevel: skills.accountingLevel,
           brokerRelationsLevel: skills.brokerRelationsLevel,
           advancedBrokerRelationsLevel: skills.advancedBrokerRelationsLevel,
+          factionStanding: standing?.factionStanding,
+          corpStanding: standing?.corpStanding,
         })
       : null;
 

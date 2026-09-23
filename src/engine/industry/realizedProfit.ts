@@ -20,6 +20,7 @@
  */
 
 import { brokerFee, salesTax } from '@/engine/industry/fees';
+import type { ResolvedStandings } from '@/engine/market/standings';
 
 export interface RealizedProfitInputs {
   /** Snapshotted from the Build Plan at logging time, user-overridable. */
@@ -33,6 +34,8 @@ export interface RealizedProfitInputs {
   /** Portion of `grossRevenue` confirmed via a watched sell order — see module doc. */
   brokerFeeableRevenue: number;
   brokerRelationsLevel: number;
+  /** The character's standing toward the watched order's station owner. Absent/0 = standings assumed 0. */
+  standing?: ResolvedStandings;
 }
 
 export interface RealizedProfitResult {
@@ -50,7 +53,12 @@ export interface RealizedProfitResult {
 export function realizedProfit(inputs: RealizedProfitInputs): RealizedProfitResult {
   const totalCost = inputs.materialCost + inputs.jobFee;
   const salesTaxAmount = salesTax(inputs.grossRevenue, inputs.accountingLevel);
-  const brokerFeeAmount = brokerFee(inputs.brokerFeeableRevenue, inputs.brokerRelationsLevel);
+  const brokerFeeAmount = brokerFee(
+    inputs.brokerFeeableRevenue,
+    inputs.brokerRelationsLevel,
+    inputs.standing?.factionStanding,
+    inputs.standing?.corpStanding
+  );
   const netRevenue = inputs.grossRevenue - salesTaxAmount - brokerFeeAmount;
   const profit = netRevenue - totalCost;
 
