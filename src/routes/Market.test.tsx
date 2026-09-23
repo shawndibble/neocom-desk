@@ -9,6 +9,7 @@ import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { usePublicInfo } from '@/stores/publicInfo';
 import { useMarketHub } from '@/features/market/hub';
+import { useMarketBrowserHub } from '@/features/market/browserHub';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import { clearOrderBookCache, ORDER_BOOK_FANOUT_CONCURRENCY } from '@/features/market/orderBook';
 import { resetEsiBudget } from '@/esi/budget';
@@ -339,6 +340,7 @@ beforeEach(async () => {
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   usePublicInfo.setState({ byCharacterId: {} });
   useMarketHub.setState({ value: 'jita', hydrated: false });
+  useMarketBrowserHub.setState({ value: 'jita', hydrated: false });
   useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
   useCompareSet.setState({ items: [] });
   clearOrderBookCache();
@@ -1614,6 +1616,43 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Trade Hub' }));
     expect(window.location.search).toBe('?type=587&hub=amarr');
+  });
+
+  it('remembers the last picked Trade Hub across a remount, per device, without touching the synced default', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    await screen.findByText('Ships');
+
+    await user.click(screen.getByRole('combobox', { name: 'Trade Hub' }));
+    await user.click(screen.getByRole('option', { name: 'Amarr' }));
+    expect(screen.getByRole('combobox', { name: 'Trade Hub' })).toHaveTextContent('Amarr');
+
+    // The device-local pick must not touch the cross-device default other
+    // features (Settings, Contracts, LP Store) read — no row for it at all.
+    expect(await db.settings.get('sync.marketHub')).toBeUndefined();
+
+    unmount();
+    window.history.pushState({}, '', '/market');
+    render(<App />);
+    await screen.findByText('Ships');
+
+    expect(await screen.findByRole('combobox', { name: 'Trade Hub' })).toHaveTextContent('Amarr');
+  });
+
+  it('keeps its own Trade Hub when the synced Settings default changes underneath it', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Ships');
+
+    await user.click(screen.getByRole('combobox', { name: 'Trade Hub' }));
+    await user.click(screen.getByRole('option', { name: 'Amarr' }));
+    expect(screen.getByRole('combobox', { name: 'Trade Hub' })).toHaveTextContent('Amarr');
+
+    // Another device (or Settings' own "Default trade hub" control) changes
+    // the synced default to Dodixie — must not reach back into this page.
+    await useMarketHub.getState().setValue('dodixie');
+
+    expect(screen.getByRole('combobox', { name: 'Trade Hub' })).toHaveTextContent('Amarr');
   });
 
   it('browser back and forward move through previous selections', async () => {
