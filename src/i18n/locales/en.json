@@ -51,6 +51,34 @@
     "trainedTab": "Trained",
     "plansTab": "Plans",
     "compareTab": "Compare",
+    "shipsTab": "Ships",
+    "targetPlan": {
+      "label": "Adding to"
+    },
+    "ships": {
+      "fitCheckTab": "Fit Check",
+      "masteryTab": "Mastery",
+      "masteryComingSoonTitle": "Ship Mastery is coming soon",
+      "masteryComingSoonHint": "Fit Check is ready below in the meantime."
+    },
+    "fitCheck": {
+      "title": "Check a fit",
+      "pasteLabel": "Paste an EFT fit",
+      "pastePlaceholder": "[Vexor, PvE Ratting]\nDrone Damage Amplifier II\n...",
+      "checkButton": "Check Fit",
+      "notEftFit": "That doesn't look like an EFT fit — paste one starting with [Ship Name, Fit Name].",
+      "resultsTitle": "Missing skills ({{count}})",
+      "resultsTitleEmpty": "Missing skills",
+      "emptyTitle": "You already have every skill this fit needs",
+      "emptyHint": "Nothing to add.",
+      "addAllToPlan": "Add All to Plan",
+      "createPlanAndAdd": "Create Plan & Add",
+      "add": "Add",
+      "trained": "Trained",
+      "statusTrained": "Trained",
+      "statusPartial": "Partially trained",
+      "statusMissing": "Not trained"
+    },
     "totalSp": "Total SP",
     "unallocatedSp": "Unallocated SP",
     "refresh": "Refresh",
