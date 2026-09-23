@@ -3,7 +3,12 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
-import { DataTable, type DataTableColumn, type DataTableGroupBy } from './DataTable';
+import {
+  DataTable,
+  DataTableDenseCell,
+  type DataTableColumn,
+  type DataTableGroupBy,
+} from './DataTable';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -625,6 +630,13 @@ describe('DataTable opt-in phone features', () => {
       renderTable({ columns: denseColumns, stackLayout: 'dense', responsive: 'table' });
       expect(screen.getByRole('table')).not.toHaveClass('dt-stack-dense');
       expect(document.querySelector('.dt-meta')).toBeNull();
+    });
+
+    it('DataTableDenseCell stays inline-flex, never flex, so it can sit on the meta line', () => {
+      render(<DataTableDenseCell>content</DataTableDenseCell>);
+      const cell = screen.getByText('content');
+      expect(cell).toHaveClass('inline-flex');
+      expect(cell).not.toHaveClass('flex');
     });
   });
 

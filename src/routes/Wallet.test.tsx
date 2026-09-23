@@ -120,6 +120,15 @@ describe('Wallet', () => {
     expect(screen.queryByText('#1000419')).not.toBeInTheDocument();
   });
 
+  it('opens a Copy Name / Show Info menu on a loyalty row right-click', async () => {
+    render(<App />);
+    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    const row = screen.getByText('Caldari Navy').closest('tr') as HTMLElement;
+    fireEvent.contextMenu(row);
+    expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+  });
+
   it('explains EverMarks with an info tooltip beside the label', async () => {
     render(<App />);
     const label = await screen.findByText('EverMarks');

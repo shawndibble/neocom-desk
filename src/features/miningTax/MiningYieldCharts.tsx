@@ -253,7 +253,7 @@ export default function MiningYieldCharts({
                     dataKey="rawValue"
                     position="right"
                     formatter={(value: unknown) => formatIskCompact(Number(value))}
-                    style={{ fontSize: 10, fill: 'var(--color-text-dim)' }}
+                    style={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
                   />
                 )}
               </Bar>

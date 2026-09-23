@@ -12,6 +12,7 @@
  * It stays pure regardless, and its tests are the specification.
  */
 import type { WalletTransactionCommon } from '@/esi/endpoints';
+import { defineUrlFilter, enumParam, nullableTextParam, textParam } from '@/lib/urlState';
 
 /** Buy, sell, or don't care. */
 export type TransactionSide = 'all' | 'buy' | 'sell';
@@ -31,6 +32,18 @@ export const EMPTY_WALLET_TRANSACTION_FILTER: WalletTransactionFilter = {
   endDate: null,
   text: '',
 };
+
+/** The corp Transactions filter bar's fields in the URL (issue #570, #1302), scoped `txn.`. */
+export const {
+  schema: TRANSACTION_FILTER_PARAMS,
+  fieldToParam: TRANSACTION_FIELD_TO_PARAM,
+  emptyParams: EMPTY_TRANSACTION_FILTER_PARAMS,
+} = defineUrlFilter<WalletTransactionFilter>({
+  side: { key: 'txn.side', codec: enumParam<TransactionSide>(['all', 'buy', 'sell'], 'all') },
+  startDate: { key: 'txn.start', codec: nullableTextParam() },
+  endDate: { key: 'txn.end', codec: nullableTextParam() },
+  text: { key: 'txn.q', codec: textParam() },
+});
 
 /**
  * The rows this filter keeps, in the order they arrived.

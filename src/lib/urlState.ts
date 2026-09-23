@@ -213,3 +213,36 @@ export function resolveSort(
 ): UrlSort {
   return columnIds.includes(sort.columnId) ? sort : defaultSort;
 }
+
+/**
+ * A filter bar's schema, field-to-param map and empty/default params (the
+ * three arguments `useUrlFilter` — `./useUrlState.ts` — needs), derived from
+ * one `{ key, codec }` per field instead of hand-written three times over.
+ * `key` is the literal URL param name (`'orders.q'`, `'journal.refType'`) —
+ * given explicitly, not derived from the field name, since the two often
+ * differ on purpose (a `text` field reading as `?…q=`) and existing links
+ * already carry today's key spelling.
+ *
+ * The empty params come from parsing `null` through each field's own codec,
+ * never hand-typed: "absence parses to the default" is a rule every codec in
+ * this module already follows (see the file header), so restating a codec's
+ * default by hand here is exactly the kind of copy that drifts.
+ */
+export function defineUrlFilter<F extends object>(fields: {
+  [K in keyof F]: { key: string; codec: UrlParamCodec<F[K]> };
+}): {
+  schema: Record<string, UrlParamCodec<unknown>>;
+  fieldToParam: Record<keyof F & string, string>;
+  emptyParams: Record<string, unknown>;
+} {
+  const schema: Record<string, UrlParamCodec<unknown>> = {};
+  const fieldToParam = {} as Record<keyof F & string, string>;
+  const emptyParams: Record<string, unknown> = {};
+  for (const field in fields) {
+    const { key, codec } = fields[field] as { key: string; codec: UrlParamCodec<unknown> };
+    schema[key] = codec;
+    fieldToParam[field as keyof F & string] = key;
+    emptyParams[key] = codec.parse(null);
+  }
+  return { schema, fieldToParam, emptyParams };
+}

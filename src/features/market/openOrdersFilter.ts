@@ -17,6 +17,7 @@ import { compareOpenOrderRowsWorstFirst } from './openOrdersModel';
 import { ORDER_PROBLEMS, type OrderProblem } from '@/engine/market/orderProblems';
 import {
   boolParam,
+  defineUrlFilter,
   enumParam,
   idListParam,
   optionalEnumParam,
@@ -299,22 +300,27 @@ function enumListParam<V extends string>(values: readonly V[]): UrlParamCodec<re
 }
 
 /**
- * The whole filter, one key per field, scoped `orders.*` so it can never
- * collide with another panel's params on the same page (ADR 0015). Field
- * names match `OpenOrdersFilter`'s own, less the `orders.` prefix, so the
- * mapping between the two is entirely mechanical.
+ * The whole filter, one `{ key, codec }` per field, scoped `orders.*` so it
+ * can never collide with another panel's params on the same page (ADR 0015).
  */
-export const OPEN_ORDERS_FILTER_PARAMS = {
-  'orders.q': textParam(),
-  'orders.side': optionalEnumParam<'buy' | 'sell'>(['buy', 'sell']),
-  'orders.characters': idListParam(),
-  'orders.problems': enumListParam(FILTERABLE_PROBLEMS),
-  'orders.expiring': optionalIdParam(),
-  'orders.costBasis': optionalEnumParam<'linked' | 'missing'>(['linked', 'missing']),
-  'orders.minIsk': optionalIdParam(),
-  'orders.hideHealthy': boolParam(true),
-  'orders.sort': enumParam(OPEN_ORDERS_SORTS, 'worstFirst'),
-};
+export const {
+  schema: OPEN_ORDERS_FILTER_PARAMS,
+  fieldToParam: OPEN_ORDERS_FIELD_TO_PARAM,
+  emptyParams: DEFAULT_OPEN_ORDERS_FILTER_PARAMS,
+} = defineUrlFilter<OpenOrdersFilter>({
+  text: { key: 'orders.q', codec: textParam() },
+  side: { key: 'orders.side', codec: optionalEnumParam<'buy' | 'sell'>(['buy', 'sell']) },
+  characterIds: { key: 'orders.characters', codec: idListParam() },
+  problems: { key: 'orders.problems', codec: enumListParam(FILTERABLE_PROBLEMS) },
+  expiringWithinDays: { key: 'orders.expiring', codec: optionalIdParam() },
+  costBasis: {
+    key: 'orders.costBasis',
+    codec: optionalEnumParam<'linked' | 'missing'>(['linked', 'missing']),
+  },
+  minIskTiedUp: { key: 'orders.minIsk', codec: optionalIdParam() },
+  hideHealthy: { key: 'orders.hideHealthy', codec: boolParam(true) },
+  sort: { key: 'orders.sort', codec: enumParam(OPEN_ORDERS_SORTS, 'worstFirst') },
+});
 
 export interface OpenOrdersLinkTarget {
   /** OR'd, the way the filter's own `problems` are. */

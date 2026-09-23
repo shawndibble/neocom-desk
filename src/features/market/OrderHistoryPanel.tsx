@@ -26,14 +26,16 @@ import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
-import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { orderHistoryCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrderHistory } from '@/esi/endpoints';
 import { HistoryViewSelect, type HistoryView } from './HistoryViewSelect';
 import {
   activeHistoryFilterCount,
+  DEFAULT_HISTORY_FILTER_PARAMS,
   filterHistory,
+  HISTORY_FIELD_TO_PARAM,
   HISTORY_FILTER_PARAMS,
   type HistoryFilter,
 } from './orderHistoryFilter';
@@ -159,22 +161,14 @@ export function OrderHistoryPanel({
     (typeId: number) => typeNames.get(typeId) ?? `Type #${typeId}`,
     [typeNames]
   );
-  const [urlFilter, setUrlFilter] = useUrlParams(HISTORY_FILTER_PARAMS);
-  const filter = useMemo<HistoryFilter>(
-    () => ({
-      text: urlFilter['history.q'],
-      side: urlFilter['history.side'],
-      state: urlFilter['history.state'],
-    }),
-    [urlFilter]
+  // This tab has only the one filter bar, so it never needs `useUrlFilter`'s
+  // scope-reset — the scope key never changes.
+  const [filter, setFilter] = useUrlFilter<HistoryFilter>(
+    'history',
+    HISTORY_FILTER_PARAMS,
+    HISTORY_FIELD_TO_PARAM,
+    DEFAULT_HISTORY_FILTER_PARAMS
   );
-  function setFilter(next: HistoryFilter) {
-    setUrlFilter({
-      'history.q': next.text,
-      'history.side': next.side,
-      'history.state': next.state,
-    });
-  }
 
   const history = useMemo(
     () => [...(historyResult?.data ?? [])].sort((a, b) => b.issued.localeCompare(a.issued)),
@@ -355,7 +349,11 @@ export function OrderHistoryPanel({
           )}
           <HistoryFilterBar filter={filter} onChange={setFilter} />
           {filteredHistory.length === 0 ? (
-            <EmptyState title={t('orders.noResults')} className="py-8" />
+            <EmptyState
+              title={t('orders.noResults')}
+              hint={t('orders.noResultsHint')}
+              className="py-8"
+            />
           ) : isPhone ? (
             <OrderHistoryList
               orders={filteredHistory}

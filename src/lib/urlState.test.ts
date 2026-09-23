@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   boolParam,
+  defineUrlFilter,
   enumParam,
   enumSetParam,
   idListParam,
@@ -260,5 +261,53 @@ describe('optionalSortParam', () => {
     const sort = { columnId: 'realizedProfit', direction: 'desc' } as const;
     expect(codec.parse(codec.serialize(sort))).toEqual(sort);
     expect(codec.serialize(null)).toBeNull();
+  });
+});
+
+interface TestFilter {
+  side: 'buy' | 'sell' | null;
+  q: string;
+  hideHealthy: boolean;
+}
+
+describe('defineUrlFilter', () => {
+  const { schema, fieldToParam, emptyParams } = defineUrlFilter<TestFilter>({
+    side: { key: 'orders.side', codec: optionalEnumParam<'buy' | 'sell'>(['buy', 'sell']) },
+    q: { key: 'orders.q', codec: textParam() },
+    hideHealthy: { key: 'orders.hideHealthy', codec: boolParam(true) },
+  });
+
+  it('keys the schema by each field’s given key', () => {
+    expect(Object.keys(schema).sort()).toEqual(['orders.hideHealthy', 'orders.q', 'orders.side']);
+  });
+
+  it('maps each field to its given key', () => {
+    expect(fieldToParam).toEqual({
+      side: 'orders.side',
+      q: 'orders.q',
+      hideHealthy: 'orders.hideHealthy',
+    });
+  });
+
+  it('derives empty params from each codec parsing absence, not a hand-typed guess', () => {
+    expect(emptyParams).toEqual({
+      'orders.side': null,
+      'orders.q': '',
+      // boolParam(true)'s own default, not `false` — the point of deriving
+      // this instead of writing it by hand.
+      'orders.hideHealthy': true,
+    });
+  });
+
+  it('keeps a key that deliberately differs from its field name', () => {
+    interface AbbreviatedFilter {
+      text: string;
+    }
+    const abbreviated = defineUrlFilter<AbbreviatedFilter>({
+      text: { key: 'journal.q', codec: textParam() },
+    });
+    expect(abbreviated.schema).toHaveProperty('journal.q');
+    expect(abbreviated.schema).not.toHaveProperty('journal.text');
+    expect(abbreviated.fieldToParam).toEqual({ text: 'journal.q' });
   });
 });
