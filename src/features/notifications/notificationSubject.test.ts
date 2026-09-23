@@ -10,20 +10,21 @@ describe('notificationUrlForSubject', () => {
     expect(notificationUrlForSubject('marketOrderFilled', 34)).toEqual(
       '/market?section=transactions&highlight=34'
     );
-    expect(notificationUrlForSubject('contractAccepted', 5)).toEqual(
-      '/contracts?tab=history&highlight=5'
-    );
-    expect(notificationUrlForSubject('contractCompleted', 6)).toEqual(
-      '/contracts?tab=history&highlight=6'
-    );
-    expect(notificationUrlForSubject('contractFailed', 7)).toEqual(
-      '/contracts?tab=history&highlight=7'
-    );
   });
 
   it('appends it to a route that carries none, without inventing a second `?`', () => {
     expect(notificationUrlForSubject('industryJobComplete', 9)).toEqual('/industry?highlight=9');
     expect(notificationUrlForSubject('corpMemberJoined', 12)).toEqual('/corp/members?highlight=12');
+    // A path, not a `?tab=` query, is what picks History now (ADR 0015).
+    expect(notificationUrlForSubject('contractAccepted', 5)).toEqual(
+      '/contracts/history?highlight=5'
+    );
+    expect(notificationUrlForSubject('contractCompleted', 6)).toEqual(
+      '/contracts/history?highlight=6'
+    );
+    expect(notificationUrlForSubject('contractFailed', 7)).toEqual(
+      '/contracts/history?highlight=7'
+    );
   });
 
   it('falls back to the plain route when the row carries no subject', () => {
