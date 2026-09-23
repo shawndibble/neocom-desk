@@ -1,7 +1,9 @@
 /**
  * Right-click menu for an item — the tree, search results (same tree,
  * CONTEXT.md round 8), the Quickbar, the Assets tree (issue #83), the
- * Variations table (issue #147) and a Build Plan's materials (round 27).
+ * Variations table (issue #147) and every item name on a Build Plan page —
+ * materials (round 27), product heading, revenue and owned-sale rows, and the
+ * recipe and Blueprint Acquisition modals.
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -45,6 +47,14 @@ export interface ItemContextMenuProps {
   onOpenChange?: (open: boolean) => void;
   children: ReactElement;
 }
+
+/**
+ * Wraps `trigger` in this menu for `typeId`, the caller having already bound
+ * the rest of the props. How a page that owns the Quickbar/show-info wiring
+ * hands the menu down to children that only know a type ID — same shape as
+ * `DataTable`'s `rowContextMenu`.
+ */
+export type ItemMenuFor = (typeId: number, trigger: ReactElement) => ReactElement;
 
 /**
  * Item context menu: add to Quickbar, show info, add to Compare, view in

@@ -31,8 +31,9 @@ export interface PlanetSlots {
 }
 
 /**
- * @param skillLevel Trained Interplanetary Consolidation, or `null` when the
- *   app has no skill data for this character at all.
+ * @param skillLevel Effective (issue #1236: min of queue-corrected trained
+ *   and active) Interplanetary Consolidation, or `null` when the app has no
+ *   skill data for this character at all.
  *
  * `assumed` keeps a pilot who has never trained the skill distinct from one
  * whose `/skills` has never loaded — the same distinction `customsRateSource`
@@ -45,8 +46,9 @@ export function planetSlots(skillLevel: number | null): PlanetSlots {
 }
 
 /**
- * The character's trained Interplanetary Consolidation, or `null` when the app
- * has no skill data for them at all.
+ * The character's effective Interplanetary Consolidation (issue #1236: min
+ * of queue-corrected trained and active), or `null` when the app has no
+ * skill data for them at all.
  *
  * Read through `loadCorrectedSkills` for the same reason
  * `loadCommandCenterUpgrades` and `loadCustomsCodeExpertise` are: `/skills`
@@ -62,5 +64,5 @@ export async function loadInterplanetaryConsolidation(
     skipQueueWithoutScope: true,
   });
   if (!corrected.skillsResult) return null;
-  return corrected.trained.get(INTERPLANETARY_CONSOLIDATION_SKILL_ID)?.level ?? 0;
+  return corrected.effective.get(INTERPLANETARY_CONSOLIDATION_SKILL_ID) ?? 0;
 }

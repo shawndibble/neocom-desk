@@ -100,7 +100,12 @@ export function useIndustryWorkspace(): IndustryWorkspace {
         // handful of verdicts rather than the whole page.
         loadPi().catch(() => null),
         loadCharacterBlueprints(activeCharacterId),
-        loadCharacterModifiers(activeCharacterId, Date.now(), { skipQueueWithoutScope: true }),
+        // Effective levels (issue #1236): an alpha or lapsed-omega clone can't
+        // use a level industry math would otherwise credit in full.
+        loadCharacterModifiers(activeCharacterId, Date.now(), {
+          skipQueueWithoutScope: true,
+          levels: 'effective',
+        }),
       ]);
       if (cancelled) return;
       setCatalog(cat);

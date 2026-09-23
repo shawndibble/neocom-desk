@@ -431,11 +431,17 @@ function queueInfoMap(roster: readonly RosterEntry[], nowMs: number): Map<number
  * `jobSlotSkillsFromCharacterSkills([])` would otherwise misreport "no
  * capacity" for a character whose skills just haven't loaded yet.
  */
-function jobSlotSkillsMap(roster: readonly RosterEntry[]): Map<number, JobSlotSkills> {
+function jobSlotSkillsMap(
+  roster: readonly RosterEntry[],
+  nowMs: number
+): Map<number, JobSlotSkills> {
   const map = new Map<number, JobSlotSkills>();
   for (const entry of roster) {
     if (entry.skills?.data) {
-      map.set(entry.characterId, jobSlotSkillsFromCharacterSkills(entry.skills.data.skills));
+      map.set(
+        entry.characterId,
+        jobSlotSkillsFromCharacterSkills(entry.skills.data.skills, entry.queue?.data ?? [], nowMs)
+      );
     }
   }
   return map;
@@ -749,7 +755,7 @@ export function Characters() {
   function applyRoster(roster: readonly RosterEntry[], now: number) {
     setStats(rosterSortStats(roster));
     setQueueById(queueInfoMap(roster, now));
-    setJobSlotSkillsById(jobSlotSkillsMap(roster));
+    setJobSlotSkillsById(jobSlotSkillsMap(roster, now));
     setTotalSpById(totalSpMap(roster));
   }
 
