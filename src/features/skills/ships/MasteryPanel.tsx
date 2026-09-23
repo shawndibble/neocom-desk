@@ -49,7 +49,10 @@ export function MasteryPanel({
   const [masteries, setMasteries] = useState<MasteryMap | null>(null);
   const [ships, setShips] = useState<ShipOption[] | null>(null);
   const [selected, setSelected] = useState<ShipOption | null>(null);
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  // One tier open at a time: each open, incomplete tier renders its own
+  // primary "Add Level to Plan" button, and DESIGN.md §6 allows only one
+  // primary button per view.
+  const [expandedTier, setExpandedTier] = useState<number | null>(null);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
@@ -94,12 +97,7 @@ export function MasteryPanel({
   }, [selected, masteries, skills, trainedSkills, attributes, implants, cloneState]);
 
   function toggle(tier: number) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(tier)) next.delete(tier);
-      else next.add(tier);
-      return next;
-    });
+    setExpandedTier((prev) => (prev === tier ? null : tier));
   }
 
   function tierTrailing(tierRow: MasteryTierRow) {
@@ -129,7 +127,7 @@ export function MasteryPanel({
             onChange={(e) => {
               setQuery(e.target.value);
               setSelected(null);
-              setExpanded(new Set());
+              setExpandedTier(null);
             }}
             placeholder={t('skills.mastery.searchPlaceholder')}
             aria-label={t('skills.mastery.searchPlaceholder')}
@@ -144,7 +142,7 @@ export function MasteryPanel({
                       setSelected(ship);
                       setQuery(ship.name);
                       setDebouncedQuery('');
-                      setExpanded(new Set([0]));
+                      setExpandedTier(0);
                     }}
                     className="w-full px-2 py-1.5 text-left text-xs hover:bg-panel-2"
                   >
@@ -169,7 +167,7 @@ export function MasteryPanel({
             {tiers.map((tierRow) => (
               <Disclosure
                 key={tierRow.tier}
-                expanded={expanded.has(tierRow.tier)}
+                expanded={expandedTier === tierRow.tier}
                 onToggle={() => toggle(tierRow.tier)}
                 label={t('skills.mastery.tierLabel', { roman: ROMAN[tierRow.tier] })}
                 trailing={tierTrailing(tierRow)}

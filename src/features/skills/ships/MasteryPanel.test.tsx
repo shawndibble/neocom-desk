@@ -82,6 +82,27 @@ describe('MasteryPanel', () => {
     );
   });
 
+  it('only one tier is expanded at a time — DESIGN.md allows one primary button per view', async () => {
+    const user = userEvent.setup();
+    renderPanel(fakeTarget());
+
+    await waitFor(() => expect(screen.getByLabelText(/search for a ship/i)).toBeInTheDocument());
+    await user.type(screen.getByLabelText(/search for a ship/i), 'Vexor');
+    await user.click(await screen.findByRole('button', { name: 'Vexor' }));
+    await waitFor(() => expect(screen.getByText('Gunnery')).toBeInTheDocument());
+    expect(screen.getAllByRole('button', { name: /add level to plan|create plan/i })).toHaveLength(
+      1
+    );
+
+    await user.click(screen.getByText('Mastery II'));
+
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole('button', { name: /add level to plan|create plan/i })
+      ).toHaveLength(1)
+    );
+  });
+
   it('a tier whose whole bundle is already trained has no Add button', async () => {
     const user = userEvent.setup();
     renderPanel(fakeTarget(), new Map([[3300, { level: 5, sp: 1_000_000 }]]));

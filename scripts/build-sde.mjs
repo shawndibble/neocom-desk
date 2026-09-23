@@ -713,6 +713,7 @@ async function main() {
     const h = indexHeader(rows);
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
+      if (r.length < 5) continue;
       const certID = Number(r[h.certID]);
       const certLevelInt = Number(r[h.certLevelInt]);
       const skillTypeID = Number(r[h.skillID]);
@@ -730,9 +731,11 @@ async function main() {
     const h = indexHeader(rows);
     for (let i = 1; i < rows.length; i++) {
       const r = rows[i];
+      if (r.length < 3) continue;
       const typeID = Number(r[h.typeID]);
       if (!shipTypeIds.has(typeID)) continue;
       const masteryLevel = Number(r[h.masteryLevel]);
+      if (!(masteryLevel >= 0 && masteryLevel < MASTERY_TIER_COUNT)) continue;
       const certID = Number(r[h.certID]);
       const certLevelInt = masteryLevel + 1;
       const bundle = certSkillsByCert.get(`${certID}:${certLevelInt}`) ?? [];

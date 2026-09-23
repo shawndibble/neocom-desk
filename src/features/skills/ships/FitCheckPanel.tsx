@@ -170,8 +170,8 @@ export function FitCheckPanel({
           }
         >
           <div className="space-y-1 p-3">
-            {result.warnings.map((warning) => (
-              <p key={warning} className="text-xs text-warning">
+            {result.warnings.map((warning, i) => (
+              <p key={`${i}:${warning}`} className="text-xs text-warning">
                 {warning}
               </p>
             ))}
