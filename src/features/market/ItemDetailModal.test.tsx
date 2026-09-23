@@ -347,6 +347,62 @@ describe('ItemDetailModal', () => {
     expect(plans[0].entries).toEqual([{ skillTypeID: 24241, targetLevel: 3 }]);
   });
 
+  it('shows Added for a required skill already in the target plan, with no click (issue: silent duplicate add)', async () => {
+    const CHARACTER_ID = 555;
+    useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
+    await db.skillPlans.put({
+      id: 'plan-1',
+      characterId: CHARACTER_ID,
+      name: 'Existing plan',
+      entries: [{ skillTypeID: 24241, targetLevel: 3 }],
+      remapCount: 0,
+      updatedAt: 1,
+    });
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/${TYPE_ID}`, () =>
+        HttpResponse.json({
+          type_id: TYPE_ID,
+          name: 'Brand Manager Expert System',
+          description: 'Grants access.',
+          group_id: 25,
+          published: true,
+          volume: 0.1,
+          dogma_attributes: [
+            { attribute_id: 182, value: 24241 },
+            { attribute_id: 277, value: 3 },
+          ],
+        })
+      ),
+      http.get(`${ESI_BASE_URL}/characters/${CHARACTER_ID}/skills`, () =>
+        HttpResponse.json({ skills: [], total_sp: 0, unallocated_sp: 0 })
+      )
+    );
+    mockedLoadDictionary.mockResolvedValue({
+      182: { name: 'Primary Skill required', unit: 'typeID', category: 'Required Skills' },
+    });
+    mockedLoadSkills.mockResolvedValue([
+      {
+        typeID: 24241,
+        name: 'Caldari Frigate',
+        description: '',
+        groupID: 0,
+        groupName: '',
+        rank: 1,
+        primaryAttr: 'perception',
+        secondaryAttr: 'willpower',
+        prereqs: [],
+      },
+    ]);
+
+    render(
+      <ItemDetailModal typeId={TYPE_ID} itemName="Brand Manager Expert System" onClose={() => {}} />
+    );
+
+    expect(await screen.findByText('Caldari Frigate')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Added' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add to Skill Plan' })).not.toBeInTheDocument();
+  });
+
   it('attribute modifier chip: shows which skill affects it and adds it to a plan (issue #1372)', async () => {
     const CHARACTER_ID = 777;
     const GUNNERY_TYPE_ID = 3300;

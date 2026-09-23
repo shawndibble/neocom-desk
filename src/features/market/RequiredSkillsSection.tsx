@@ -6,7 +6,6 @@
  * row expand (the same section, so a pilot who never opens Show Info still
  * sees it from the order book directly).
  */
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { TrainedSkill } from '@/engine/types';
 import type { RequiredSkill } from '@/features/skills/dogma';
@@ -32,18 +31,22 @@ export function RequiredSkillsSection({
   itemName: string;
 }) {
   const { t } = useTranslation();
-  // Which skills this session's clicks have confirmed added — `SkillRow`'s
-  // own status only ever reflects *trained* level, never *planned*, so
-  // without this a successful add looks identical to before the click (issue
-  // report: "clicked Add to Skill Plan and nothing happened"). Awaited, not
-  // optimistic — a rejected `addEntries` must not claim success.
-  const [addedSkillIds, setAddedSkillIds] = useState<ReadonlySet<number>>(new Set());
   if (requiredSkills.length === 0) return null;
 
   const addLabel =
     target.plans?.length === 0
       ? t('skills.fitCheck.createPlanAndAdd')
       : t('skills.requiredSkills.addToPlan');
+
+  // The target plan itself, live off Dexie — reflects both entries the plan
+  // already had (e.g. added from a different item earlier) and ones just
+  // added this session, once the write resolves. `SkillRow`'s own status
+  // only ever reflects *trained* level, never *planned*, so without this a
+  // skill already in the plan looks identical to one that isn't — a click on
+  // "Add" then does nothing visible, which reads as broken (issue report:
+  // "clicked Add to Skill Plan and nothing happened" — the skill was already
+  // there from before).
+  const selectedPlan = target.plans?.find((p) => p.id === target.targetPlanId);
 
   return (
     <div>
@@ -60,18 +63,23 @@ export function RequiredSkillsSection({
             return <NameOnlySkillRow key={req.skillTypeID} name={name} level={req.level} />;
           }
           const currentLevel = trainedSkills.get(req.skillTypeID)?.level ?? 0;
-          const added = addedSkillIds.has(req.skillTypeID);
+          // Mirrors `upsertEntry`'s own "already covered" check, since that's
+          // exactly the condition under which clicking Add would no-op.
+          const planned = (selectedPlan?.entries ?? []).some(
+            (e) => e.skillTypeID === req.skillTypeID && e.targetLevel >= req.level
+          );
           return (
             <SkillRow
               key={req.skillTypeID}
               name={name}
               status={skillTrainingStatus(currentLevel, req.level)}
               currentLevel={currentLevel}
-              addLabel={added ? t('skills.requiredSkills.added') : addLabel}
+              addLabel={planned ? t('skills.requiredSkills.added') : addLabel}
               onAdd={() =>
-                void target
-                  .addEntries([{ skillTypeID: req.skillTypeID, targetLevel: req.level }], itemName)
-                  .then(() => setAddedSkillIds((current) => new Set(current).add(req.skillTypeID)))
+                void target.addEntries(
+                  [{ skillTypeID: req.skillTypeID, targetLevel: req.level }],
+                  itemName
+                )
               }
             />
           );
