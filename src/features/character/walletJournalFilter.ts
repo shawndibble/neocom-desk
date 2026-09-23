@@ -1,4 +1,5 @@
 import type { WalletJournalEntry } from '@/esi/endpoints';
+import { defineUrlFilter, nullableTextParam, textParam } from '@/lib/urlState';
 
 /**
  * The journal filter bar's state (issue #413): a raw ESI `ref_type`, an
@@ -19,6 +20,23 @@ export const EMPTY_WALLET_JOURNAL_FILTER: WalletJournalFilter = {
   endDate: null,
   text: '',
 };
+
+/**
+ * The journal filter bar's three fields in the URL (issue #413, #1302),
+ * scoped `journal.` so they cannot collide with the corp Transactions
+ * filter's own keys — both panels' `useUrlFilter` calls run unconditionally,
+ * whichever tab is on screen.
+ */
+export const {
+  schema: JOURNAL_FILTER_PARAMS,
+  fieldToParam: JOURNAL_FIELD_TO_PARAM,
+  emptyParams: EMPTY_JOURNAL_FILTER_PARAMS,
+} = defineUrlFilter<WalletJournalFilter>({
+  refType: { key: 'journal.refType', codec: nullableTextParam() },
+  startDate: { key: 'journal.start', codec: nullableTextParam() },
+  endDate: { key: 'journal.end', codec: nullableTextParam() },
+  text: { key: 'journal.q', codec: textParam() },
+});
 
 /**
  * Every active criterion is ANDed. String comparison on the `YYYY-MM-DD`

@@ -22,7 +22,7 @@ export { StandingIcon } from './StandingIcon';
 export { standingTier, type StandingTier } from './standingTier';
 export { Modal } from './Modal';
 export type { ModalPlacement } from './Modal';
-export { DataTable } from './DataTable';
+export { DataTable, DataTableDenseCell } from './DataTable';
 export type { DataTableColumn, DataTableGroupBy, DataTableSort } from './DataTable';
 export { sortRows, nextDataTableSort } from './dataTableSort';
 export { CharacterAvatar } from './CharacterAvatar';

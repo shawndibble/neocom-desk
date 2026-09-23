@@ -78,6 +78,19 @@ export interface DataTableColumn<T> {
 }
 
 /**
+ * Wraps a dense-stack (`stackLayout="dense"`) column's `render` output when
+ * it's more than one inline piece (a value plus a badge, a name plus a
+ * security-status suffix). The dense meta line puts a `·` separator right
+ * before this cell's content via CSS `::before` — a plain `flex` span
+ * blockifies and breaks onto its own line whenever a separator precedes it;
+ * `inline-flex` doesn't. Column authors reach for this instead of writing
+ * the className themselves, so the constraint has one place to hold and fix.
+ */
+export function DataTableDenseCell({ children }: { children: ReactNode }) {
+  return <span className="inline-flex items-center gap-1.5">{children}</span>;
+}
+
+/**
  * Phone-only row grouping (`DataTable`'s `groupBy`): rows sharing a key fold
  * behind one toggle row, so a list with many near-duplicates (ten courier
  * offers on one route) reads as one line per distinct thing.

@@ -54,7 +54,7 @@ import { useCorpSnapshot } from '@/features/corp/useCorpSnapshot';
 import { walletDivisions, type WalletDivision } from '@/features/corp/divisions';
 import { usePageTab } from '@/lib/usePageTab';
 import { useUrlFilter, useUrlParam, useUrlSort } from '@/lib/useUrlState';
-import { enumParam, intParam, nullableTextParam, textParam } from '@/lib/urlState';
+import { enumParam, intParam } from '@/lib/urlState';
 import { WALLET_TABS } from '@/app/pageTabs';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import {
@@ -69,8 +69,10 @@ import { useQuickbar } from '@/features/market/useQuickbar';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { loadTypeNames } from '@/features/character/typeNames';
 import {
+  EMPTY_TRANSACTION_FILTER_PARAMS,
   filterWalletTransactions,
-  type TransactionSide,
+  TRANSACTION_FIELD_TO_PARAM,
+  TRANSACTION_FILTER_PARAMS,
   type WalletTransactionFilter,
 } from '@/features/character/walletTransactionFilter';
 import { formatIsk } from '@/lib/isk';
@@ -80,7 +82,10 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import {
   activeWalletJournalFilterCount,
+  EMPTY_JOURNAL_FILTER_PARAMS,
   filterWalletJournal,
+  JOURNAL_FIELD_TO_PARAM,
+  JOURNAL_FILTER_PARAMS,
   journalRefTypes,
   type WalletJournalFilter,
 } from '@/features/character/walletJournalFilter';
@@ -248,50 +253,6 @@ const EMPTY_TRANSACTIONS: readonly CorporationWalletTransaction[] = [];
 /** `?owner=`/`?division=` params (issue #419, #1302). */
 const OWNER_PARAM = enumParam<DataOwner>(['personal', 'corporation'], 'personal');
 const DIVISION_PARAM = intParam(1, { min: 1, max: 7 });
-
-/**
- * The journal filter bar's three fields (issue #413, #1302), scoped `journal.`
- * so they cannot collide with the corp Transactions filter below — both
- * `useUrlParams` calls run unconditionally, whichever tab is on screen.
- */
-const JOURNAL_FILTER_PARAMS = {
-  'journal.refType': nullableTextParam(),
-  'journal.start': nullableTextParam(),
-  'journal.end': nullableTextParam(),
-  'journal.q': textParam(),
-};
-const EMPTY_JOURNAL_FILTER_PARAMS = {
-  'journal.refType': null,
-  'journal.start': null,
-  'journal.end': null,
-  'journal.q': '',
-} as const;
-const JOURNAL_FIELD_TO_PARAM: Record<keyof WalletJournalFilter, string> = {
-  refType: 'journal.refType',
-  startDate: 'journal.start',
-  endDate: 'journal.end',
-  text: 'journal.q',
-};
-
-/** The corp Transactions filter bar's fields (issue #570, #1302), scoped `txn.`. */
-const TRANSACTION_FILTER_PARAMS = {
-  'txn.side': enumParam<TransactionSide>(['all', 'buy', 'sell'], 'all'),
-  'txn.start': nullableTextParam(),
-  'txn.end': nullableTextParam(),
-  'txn.q': textParam(),
-};
-const EMPTY_TRANSACTION_FILTER_PARAMS = {
-  'txn.side': 'all',
-  'txn.start': null,
-  'txn.end': null,
-  'txn.q': '',
-} as const;
-const TRANSACTION_FIELD_TO_PARAM: Record<keyof WalletTransactionFilter, string> = {
-  side: 'txn.side',
-  startDate: 'txn.start',
-  endDate: 'txn.end',
-  text: 'txn.q',
-};
 
 const BALANCE_SORT = { columnId: 'character', direction: 'asc' } as const;
 const LOYALTY_SORT = { columnId: 'points', direction: 'desc' } as const;
