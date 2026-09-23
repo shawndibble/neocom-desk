@@ -1,16 +1,18 @@
 /**
  * BPC Sourcing's view state in the URL (ADR 0015): the search box, filters,
- * source toggles, Show all, and the blueprint the search is pinned to — so a
- * reload of `/industry/sourcing` reopens the same search. Keys are prefixed
- * `sourcing.` so they never collide with another Industry tab's.
+ * source toggles, Jump Range, Show all, and the blueprint the search is
+ * pinned to — so a reload of `/industry/sourcing` reopens the same search.
+ * Keys are prefixed `sourcing.` so they never collide with another Industry
+ * tab's.
  *
  * The Space filter and visible columns are *not* here: both are persisted
  * local settings already (`bpcSpaceFilterPref.ts`, `bpcSearchColumns.ts`).
  */
 import { tabPath } from '@/lib/pageTabs';
-import { boolParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
+import { boolParam, enumParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
 import type { BpcSearchSource } from '@/engine/contracts/bpcSearch';
+import { DEFAULT_JUMP_RANGE, JUMP_RANGES } from '@/engine/route/jumpRange';
 
 /**
  * Which listings the search covers: `contract` BPCs, `contractBpo` contract
@@ -35,6 +37,8 @@ export const BPC_SOURCING_PARAMS = {
   'sourcing.maxPrice': textParam(),
   'sourcing.all': boolParam(),
   'sourcing.src': enumSetParam(SOURCE_TOGGLES, DEFAULT_SOURCE_TOGGLES),
+  /** Jump Range from the Current System (`engine/route/jumpRange.ts`). */
+  'sourcing.jumps': enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE),
   'sourcing.type': optionalIdParam(),
 };
 

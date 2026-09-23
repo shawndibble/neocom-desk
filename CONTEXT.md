@@ -194,6 +194,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Cost Index**: A solar system's current manufacturing activity level
   (read live from ESI). Higher activity in a system drives its Job Fee up;
   distinct from EIV, which prices the materials rather than the system.
+- **Current System**: The solar system a **Jump Range** measures from. The active Character's ESI location by default; the pilot can pick another system when ESI is stale or silent. A pick is device-local, per Character, and clears itself once ESI reports a different system than it did when the pick was made — the pilot has really moved, so the fresh location wins.
 - **Daily Range**: One day's lowest and highest _executed_ price for an item in
   a Region, from ESI's market history (`lowest`/`highest`). Drawn on **Price
   History** as a shaded band behind the average line. Distinct from the
@@ -404,6 +405,7 @@ here — they go one per file in `docs/context/decisions/`.
 - **Job Fee**: The ISK ESI charges to install a manufacturing job, separate
   from material cost. Sized from EIV, the system's **Cost Index**, a fixed
   SCC surcharge, and the facility's tax.
+- **Jump Range**: The distance filter on Market Browser (Region mode only), Contract Search's Items and **BPC Sourcing**: Any, the **Current System** only, or within 3, 5 or 10 stargate jumps of it. Counted on the local stargate graph, never ESI. A row the app cannot place (a player structure) drops out once a range is set. It narrows what was already fetched, so it never reaches past a region-scoped order book.
 - **Kind Card**: One `/corp` overview panel per kind of Corp Board Item — Fuel,
   Structure timers, Moon chunks, Industry jobs — showing that kind's most urgent
   few and counting the rest. Fed by the one engine ranking, never a second one,
@@ -483,9 +485,8 @@ here — they go one per file in `docs/context/decisions/`.
   whole contract — EVE exposes no per-line price to split it by, and
   apportioning one would invent a number — so it is never attributed to any
   single line as that item's own price (issue #1076). BPC Sourcing's price
-  cell marks it rather than hiding it; the ISK/run figure, Blueprint
-  Acquisition's cheapest-tier selection, and a BPC Watch's all-time-cheapest
-  baseline all treat it as unknowable instead. Contract Search's item mode
+  cell marks it rather than hiding it; the ISK/run figure and Blueprint
+  Acquisition's cheapest-tier selection both treat it as unknowable instead. Contract Search's item mode
   and both boards' maximum-price filters are unaffected — a bundle's whole
   ask is exactly what those two ask about.
 - **Notification Allow-List**: The closed set of EVE Notification `type`

@@ -27,7 +27,7 @@ export interface BpcContractRow {
    * *whole contract*, not this one blueprint. A single-copy or
    * same-type-repeated listing is `false`. Consumers that attribute a price
    * to this one blueprint (Blueprint Acquisition's cheapest-tier selection,
-   * the ISK/run figure, a watch's all-time-cheapest baseline) must treat a
+   * the ISK/run figure) must treat a
    * `true` row's price as unknowable rather than as this blueprint's price.
    */
   isMultiType: boolean;
@@ -53,6 +53,12 @@ export interface BpcSearchFilter {
    * stance `regionId` already takes on a row with no known region.
    */
   spaceKinds?: ReadonlySet<SpaceKind> | null;
+  /**
+   * The solar systems a Jump Range admits (`engine/route/jumpRange.ts`'s
+   * `jumpRangeSystems`), or `null`/`undefined` for no range. A row with no
+   * known system fails any real range, same stance as `spaceKinds`.
+   */
+  allowedSystems?: ReadonlySet<number> | null;
 }
 
 export const EMPTY_BPC_SEARCH_FILTER: BpcSearchFilter = {
@@ -63,6 +69,7 @@ export const EMPTY_BPC_SEARCH_FILTER: BpcSearchFilter = {
   minRuns: null,
   maxPrice: null,
   spaceKinds: null,
+  allowedSystems: null,
 };
 
 /**
@@ -97,6 +104,8 @@ export interface OwnedBlueprintInput {
   regionId?: number | null;
   /** The resolved location's four-way space classification, or `null` while unresolved. */
   space?: SpaceKind | null;
+  /** The resolved location's solar system, for the Jump Range filter; `null` while unresolved. */
+  systemId?: number | null;
 }
 
 /**
@@ -111,7 +120,8 @@ export interface OwnedBlueprintInput {
  * filtering purposes lives at `contract.regionId` still (it was always known,
  * synced with every row), but `locationName`/`space` need per-row resolution
  * work neither branch had before this ticket, so both start `null` until a
- * caller resolves them.
+ * caller resolves them. `systemId` (the Jump Range filter's key) rides the
+ * same resolution.
  */
 export type BpcSearchRow =
   | {
@@ -124,6 +134,7 @@ export type BpcSearchRow =
       contract: BpcContractRow;
       locationName: string | null;
       space: SpaceKind | null;
+      systemId: number | null;
     }
   | {
       source: 'owned';
@@ -136,6 +147,7 @@ export type BpcSearchRow =
       locationName: string | null;
       regionId: number | null;
       space: SpaceKind | null;
+      systemId: number | null;
     }
   | {
       /** A market sell order for the blueprint original (issue #1241). */
@@ -153,6 +165,7 @@ export type BpcSearchRow =
       atHub: boolean;
       locationName: string | null;
       space: SpaceKind | null;
+      systemId: number | null;
     };
 
 /**
@@ -170,6 +183,7 @@ export interface MarketBpoInput {
   atHub: boolean;
   locationName?: string | null;
   space?: SpaceKind | null;
+  systemId?: number | null;
 }
 
 /** Only an original is ever a market item, and it always sells unresearched: ME0/TE0, unlimited runs. */
@@ -188,6 +202,7 @@ export function marketBpoToSearchRow(order: MarketBpoInput): BpcSearchRow {
     atHub: order.atHub,
     locationName: order.locationName ?? null,
     space: order.space ?? null,
+    systemId: order.systemId ?? null,
   };
 }
 
@@ -200,7 +215,7 @@ export function marketBpoToSearchRow(order: MarketBpoInput): BpcSearchRow {
  */
 export function contractRowToSearchRow(
   row: BpcContractRow,
-  location?: { name: string | null; space: SpaceKind | null }
+  location?: { name: string | null; space: SpaceKind | null; systemId?: number | null }
 ): BpcSearchRow {
   return {
     source: 'contract',
@@ -212,6 +227,7 @@ export function contractRowToSearchRow(
     contract: row,
     locationName: location?.name ?? null,
     space: location?.space ?? null,
+    systemId: location?.systemId ?? null,
   };
 }
 
@@ -235,6 +251,7 @@ export function ownedBlueprintToSearchRow(bp: OwnedBlueprintInput): BpcSearchRow
     locationName: bp.locationName ?? null,
     regionId: bp.regionId ?? null,
     space: bp.space ?? null,
+    systemId: bp.systemId ?? null,
   };
 }
 
@@ -266,6 +283,12 @@ export function filterBpcSearchRows(
     if (filter.spaceKinds && (row.space == null || !filter.spaceKinds.has(row.space))) {
       return false;
     }
+    if (
+      filter.allowedSystems &&
+      (row.systemId == null || !filter.allowedSystems.has(row.systemId))
+    ) {
+      return false;
+    }
     if (row.source === 'contract' && filter.maxPrice != null) {
       const price = priceForMaxFilter(row.contract);
       if (price != null && price > filter.maxPrice) return false;
@@ -278,14 +301,14 @@ export function filterBpcSearchRows(
 }
 
 /**
- * Silently ignores `filter.spaceKinds`: a raw `BpcContractRow` carries no
- * `space` of its own (that classification is resolved separately, keyed by
- * `locationId`, since ADR 0013 already deferred exact location resolution for
- * these rows) and this function stays untouched for that reason. Applying a
- * Space filter to contract rows is `BpcSourcingPanel`'s job, narrowing
- * *before* calling this — a caller that expects `spaceKinds` honored here
- * instead should use `filterBpcSearchRows`, which works over the unified row
- * shape that does carry `space`.
+ * Silently ignores `filter.spaceKinds` and `filter.allowedSystems`: a raw
+ * `BpcContractRow` carries no `space` or system of its own (both resolved
+ * separately, keyed by `locationId`, since ADR 0013 already deferred exact
+ * location resolution for these rows) and this function stays untouched for
+ * that reason. Applying a Space or Jump Range filter to contract rows is
+ * `BpcSourcingPanel`'s job, narrowing *before* calling this — a caller that
+ * expects either honored here instead should use `filterBpcSearchRows`, which
+ * works over the unified row shape that does carry `space` and `systemId`.
  */
 export function filterBpcContracts(
   rows: readonly BpcContractRow[],

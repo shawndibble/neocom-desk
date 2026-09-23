@@ -22,6 +22,8 @@ import type { CachedResult, StatusResult } from '@/esi/cache';
 import type { CharacterBlueprint, RegionOrder } from '@/esi/endpoints';
 import type { BlueprintMap } from '@/sde/types';
 import type { GlobalMarketEntry } from '@/sde/marketTypes';
+import type { LocalJumpDistances } from '@/features/route/localRoute';
+import { usePickedSystems } from '@/features/route/currentSystem';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -73,16 +75,40 @@ const loadBlueprintLocation = vi
     (
       characterId: number,
       locationId: number
-    ) => Promise<{ name: string | null; regionId: number | null; space: SpaceKind | null }>
+    ) => Promise<{
+      name: string | null;
+      regionId: number | null;
+      space: SpaceKind | null;
+      systemId?: number | null;
+    }>
   >()
   .mockResolvedValue({ name: null, regionId: null, space: null });
 const loadContractLocationInfo = vi
-  .fn<(locationId: number) => Promise<{ name: string | null; space: SpaceKind | null }>>()
+  .fn<
+    (
+      locationId: number
+    ) => Promise<{ name: string | null; space: SpaceKind | null; systemId?: number | null }>
+  >()
   .mockResolvedValue({ name: null, space: null });
 vi.mock('@/features/bpcContracts/blueprintLocation', () => ({
   loadBlueprintLocation: (...args: [number, number]) => loadBlueprintLocation(...args),
   loadContractLocationInfo: (...args: [number]) => loadContractLocationInfo(...args),
 }));
+
+// The Jump Range's origin and distances. No game location unless a test says
+// otherwise, so the range filter reads "set your system" and filters nothing.
+const loadCharacterSolarSystemId = vi.fn<(characterId: number) => Promise<number | null>>();
+vi.mock('@/features/character/location', () => ({
+  loadCharacterSolarSystemId: (characterId: number) => loadCharacterSolarSystemId(characterId),
+}));
+const localJumpDistances = vi.fn<(originSystemId: number) => Promise<LocalJumpDistances>>();
+vi.mock('@/features/route/localRoute', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/route/localRoute')>();
+  return {
+    ...actual,
+    localJumpDistances: (originSystemId: number) => localJumpDistances(originSystemId),
+  };
+});
 
 // BPO cards place a station by its system (issue #1241), through the same
 // local SDE lookups Item Offers uses. Only the Jita hub station is known.
@@ -252,11 +278,21 @@ beforeEach(async () => {
   getOrderBook.mockResolvedValue({ orders: [], truncated: false, fetchedAt: 0 });
   loadGlobalMarkets.mockReset();
   loadGlobalMarkets.mockResolvedValue([]);
+  loadCharacterSolarSystemId.mockReset();
+  loadCharacterSolarSystemId.mockResolvedValue(null);
+  localJumpDistances.mockReset();
+  localJumpDistances.mockResolvedValue({ kind: 'unknown' });
+  usePickedSystems.setState({ value: {}, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   window.history.pushState({}, '', '/industry/sourcing');
 });
+
+/** The bar is `collapsible`, so its controls live behind the funnel at pointer width. */
+async function openFilters(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: /^Filters/ }));
+}
 
 describe('BpcSourcingPanel', () => {
   it('renders synced BPC rows with item name, ME/TE and price', async () => {
@@ -613,6 +649,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
+    await openFilters(userEvent.setup());
     expect(screen.getByRole('button', { name: 'Contracts' })).toHaveAttribute(
       'aria-pressed',
       'true'
@@ -630,6 +667,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     const table = await screen.findByRole('table', { name: 'BPC Search' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
+    await openFilters(user);
     await user.click(screen.getByRole('button', { name: 'Owned' }));
 
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
@@ -646,6 +684,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     const table = await screen.findByRole('table', { name: 'BPC Search' });
     expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
 
+    await openFilters(user);
     await user.click(screen.getByRole('button', { name: 'Contracts' }));
 
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
@@ -706,6 +745,7 @@ describe('BpcSourcingPanel source multiselect', () => {
 
     expect(screen.getByText('Log in again to see owned blueprints')).toBeInTheDocument();
 
+    await openFilters(user);
     await user.click(screen.getByRole('button', { name: 'Contracts' }));
 
     expect(screen.getByText('No BPC listings match your filters.')).toBeInTheDocument();
@@ -722,6 +762,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     render(<App />);
     await screen.findByRole('table', { name: 'BPC Search' });
 
+    await openFilters(user);
     await user.click(screen.getByRole('button', { name: 'Contracts' }));
     await user.click(screen.getByRole('button', { name: 'Owned' }));
 
@@ -740,6 +781,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     const table = await screen.findByRole('table', { name: 'BPC Search' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
+    await openFilters(user);
     await user.click(screen.getByRole('combobox', { name: 'Region' }));
     await user.click(await screen.findByRole('option', { name: 'The Forge' }));
 
@@ -768,6 +810,7 @@ describe('BpcSourcingPanel source multiselect', () => {
     const table = await screen.findByRole('table', { name: 'BPC Search' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
 
+    await openFilters(user);
     await user.click(screen.getByRole('combobox', { name: 'Region' }));
     await user.click(await screen.findByRole('option', { name: 'The Forge' }));
 
@@ -821,6 +864,7 @@ describe('BpcSourcingPanel Location/Space', () => {
     expect(within(table).getByText('Wormhole')).toBeInTheDocument();
     expect(within(table).getByText('Highsec')).toBeInTheDocument();
 
+    await openFilters(user);
     await user.click(screen.getByRole('button', { name: 'Wormhole' }));
 
     expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
@@ -940,6 +984,36 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
 
       expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
       expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it('applies a Distance and a Source changed together in the sheet, both at once', async () => {
+    const restore = useNarrowViewport();
+    try {
+      loadPublicBpcContracts.mockResolvedValue(
+        cachedSnapshot([row({ contractId: 1, typeId: 638 })])
+      );
+      loadCharacterBlueprints.mockResolvedValue(
+        ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
+      );
+      const user = userEvent.setup();
+      render(<App />);
+      const table = await screen.findByRole('table', { name: 'BPC Search' });
+
+      await user.click(screen.getByRole('button', { name: /^Filters/ }));
+      const dialog = screen.getByRole('dialog', { name: 'Filters' });
+      await user.click(within(dialog).getByRole('combobox', { name: 'Distance' }));
+      await user.click(await screen.findByRole('option', { name: 'Within 3 jumps' }));
+      await user.click(within(dialog).getByRole('button', { name: 'Owned' }));
+      expect(window.location.search).not.toContain('sourcing.jumps');
+
+      await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+
+      expect(new URLSearchParams(window.location.search).get('sourcing.jumps')).toBe('3');
+      expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Filters (2 active)' })).toBeInTheDocument();
     } finally {
       restore();
     }
@@ -1136,6 +1210,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       expect(screen.getByText(/Market BPOs checked in the Jita region/)).toBeInTheDocument();
 
       expect(within(table).queryByLabelText('2,000,000.00 ISK')).not.toBeInTheDocument();
+      await openFilters(user);
       await user.click(screen.getByRole('button', { name: 'Market BPOs' }));
       // The market row itself: its order price, and its station.
       expect(await within(table).findByLabelText('2,000,000.00 ISK')).toBeInTheDocument();
@@ -1188,9 +1263,65 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       const table = await screen.findByRole('table', { name: 'BPC Search' });
       expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
 
+      await openFilters(user);
       await user.click(screen.getByRole('button', { name: 'Contract BPOs' }));
 
       expect(await within(table).findByText('Caracal Blueprint')).toBeInTheDocument();
     });
+  });
+});
+
+describe('BpcSourcingPanel Jump Range', () => {
+  const JITA = 30000142;
+  const AMARR = 30002187;
+
+  beforeEach(() => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, typeId: 638, locationId: 60003760 }),
+        row({ contractId: 2, typeId: 870, locationId: 60008494 }),
+      ])
+    );
+    // Unplaced: a range it cannot back drops it.
+    loadCharacterBlueprints.mockResolvedValue(
+      ownedResult([ownedBlueprint({ item_id: 1, type_id: 870, location_id: 1_000_000_000_001 })])
+    );
+    loadContractLocationInfo.mockImplementation(async (locationId: number) =>
+      locationId === 60003760
+        ? { name: 'Jita IV - Moon 4', space: 'highsec' as const, systemId: JITA }
+        : { name: 'Amarr VIII', space: 'highsec' as const, systemId: AMARR }
+    );
+    localJumpDistances.mockResolvedValue({ kind: 'known', jumps: new Map([[JITA, 0]]) });
+  });
+
+  it('keeps only rows within range of the game location, counting the range as active', async () => {
+    loadCharacterSolarSystemId.mockResolvedValue(JITA);
+    const user = userEvent.setup();
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    expect(within(table).getAllByText('Caracal Blueprint')).toHaveLength(2);
+
+    await openFilters(user);
+    await user.click(screen.getByRole('combobox', { name: 'Distance' }));
+    await user.click(await screen.findByRole('option', { name: 'Within 3 jumps' }));
+
+    await waitFor(() =>
+      expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument()
+    );
+    expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+    expect(localJumpDistances).toHaveBeenCalledWith(JITA);
+    expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
+  });
+
+  it('says so and filters nothing when there is no current system to measure from', async () => {
+    window.history.pushState({}, '', '/industry/sourcing?sourcing.jumps=3');
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+
+    expect(
+      await screen.findByText('Set your current system to filter by distance.')
+    ).toBeInTheDocument();
+    expect(within(table).getAllByText('Caracal Blueprint')).toHaveLength(2);
+    expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
   });
 });

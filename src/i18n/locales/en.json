@@ -2587,13 +2587,7 @@
     "spaceColumn": "Space",
     "spaceLabel": "Space",
     "columnsButton": "Columns",
-    "columnsMenuTitle": "Columns",
-    "watchThisSearch": "Watch this search",
-    "watchNamePlaceholder": "Name this watch…",
-    "watchedSearchesHeading": "Watched searches",
-    "removeWatch": "Remove watch: {{name}}",
-    "renameWatch": "Rename watch: {{name}}",
-    "updateWatchToCurrentSearch": "Update \"{{name}}\" to the current search"
+    "columnsMenuTitle": "Columns"
   },
   "contacts": {
     "title": "Contacts",
@@ -2853,12 +2847,6 @@
         "title": "Price alert",
         "aboveBody": "{{item}} reached {{price}} ISK, at or above your {{target}} ISK target.",
         "belowBody": "{{item}} reached {{price}} ISK, at or below your {{target}} ISK target."
-      },
-      "bpcSearchWatchMatch": {
-        "title": "BPC Sourcing watch",
-        "bodyNew": "\"{{watch}}\": new matching offer — {{item}} at {{price}} ISK.",
-        "bodyNewMultiType": "\"{{watch}}\": new matching offer — {{item}}, part of a multi-item contract asking {{price}} ISK.",
-        "bodyCheaper": "\"{{watch}}\": cheaper matching offer — {{item}} now at {{price}} ISK."
       },
       "corpIndustryJobReady": {
         "title": "Corp industry job ready for delivery",
@@ -4085,5 +4073,27 @@
     "routeExposureNoRoute": "No stargate route between these ends, so none was measured.",
     "routeExposureUnknown": "Route not worked out — one end is unplaced, or the map could not be read.",
     "routeExposureChokepoints": "Route runs through {{systems}}, where haulers are most often killed."
+  },
+  "jumpRange": {
+    "label": "Distance",
+    "option": {
+      "3": "Within 3 jumps",
+      "5": "Within 5 jumps",
+      "10": "Within 10 jumps",
+      "any": "Any distance",
+      "system": "Current system"
+    },
+    "from": "From: {{system}}",
+    "fromUnknown": "From: set your system",
+    "pickedSuffix": "(set by you)",
+    "changeSystem": "Change current system — {{current}}",
+    "gameHint": "From the game. Pick another system if this is out of date.",
+    "pickedHint": "Set by you. It resets when the game reports that you moved.",
+    "noGameHint": "The game did not report where you are. Pick your system.",
+    "searchPlaceholder": "Search solar systems…",
+    "useGameLocation": "Use game location",
+    "noOrigin": "Set your current system to filter by distance.",
+    "graphUnavailable": "Distances are unavailable offline. Showing every distance.",
+    "regionOnlyHint": "Only orders in this region are checked."
   }
 }

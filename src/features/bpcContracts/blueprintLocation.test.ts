@@ -50,6 +50,7 @@ describe('loadBlueprintLocation', () => {
       name: 'Jita IV - Moon 4',
       regionId: 10000002,
       space: 'highsec',
+      systemId: 30000142,
     });
   });
 
@@ -64,6 +65,7 @@ describe('loadBlueprintLocation', () => {
       name: 'A Citadel',
       regionId: 11000001,
       space: 'wormhole',
+      systemId: 31000007,
     });
   });
 
@@ -78,6 +80,7 @@ describe('loadBlueprintLocation', () => {
       name: null,
       regionId: null,
       space: null,
+      systemId: null,
     });
   });
 });
@@ -87,6 +90,16 @@ describe('loadContractLocationInfo', () => {
     expect(await loadContractLocationInfo(60003760)).toEqual({
       name: 'Jita IV - Moon 4',
       space: 'highsec',
+      systemId: 30000142,
+    });
+  });
+
+  it('keeps the station system id when the system snapshot cannot place it', async () => {
+    loadSolarSystems.mockResolvedValue([]);
+    expect(await loadContractLocationInfo(60003760)).toEqual({
+      name: 'Jita IV - Moon 4',
+      space: null,
+      systemId: 30000142,
     });
   });
 
@@ -94,6 +107,10 @@ describe('loadContractLocationInfo', () => {
     // No handler registered for `/universe/structures/1000000000001` on
     // purpose — `onUnhandledRequest: 'error'` would fail the test if this
     // function ever tried, which is exactly the property under test.
-    expect(await loadContractLocationInfo(1000000000001)).toEqual({ name: null, space: null });
+    expect(await loadContractLocationInfo(1000000000001)).toEqual({
+      name: null,
+      space: null,
+      systemId: null,
+    });
   });
 });
