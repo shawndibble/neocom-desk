@@ -811,7 +811,7 @@ export function OrderDetailModal({
                     <span
                       className={cx(
                         'shrink-0 tabular-nums',
-                        exit.netPerUnit >= 0 ? 'text-success' : 'text-danger'
+                        exit.netPerUnit >= 0 ? 'text-isk-pos' : 'text-isk-neg'
                       )}
                     >
                       {t('market.orders.exitPerUnit', {

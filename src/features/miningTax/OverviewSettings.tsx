@@ -248,7 +248,7 @@ export function BuybackRateInput({ value, onChange }: BuybackRateInputProps) {
         onChange={(event) => handleChange(event.target.value)}
         className="field-no-spinner w-16 text-right"
       />
-      <span className="text-xs text-text-faint">{t('miningTax.overview.buybackRateHint')}</span>
+      <span className="text-xs text-text-dim">{t('miningTax.overview.buybackRateHint')}</span>
     </div>
   );
 }
