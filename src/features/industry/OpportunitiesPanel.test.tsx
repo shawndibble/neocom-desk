@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { MemoryRouter } from 'react-router-dom';
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@/i18n';
 import { db } from '@/db';
 import type { BlueprintCatalog } from './blueprintCatalog';
@@ -19,6 +19,9 @@ vi.mock('./data', async () => {
 // mock factory below — which vitest hoists above every other statement — and
 // the assertion read the same number.
 const loop = vi.hoisted(() => ({ count: 0, limit: 40 }));
+const stub = vi.hoisted(() => ({ rows: [] as unknown[] }));
+
+vi.mock('@/lib/useIsDesktop', () => ({ useIsDesktop: () => true }));
 
 // Stubbed out so this test isolates the panel's own blueprint-loading effect
 // — the real hook does a market fetch and holds state of its own, neither of
@@ -33,7 +36,7 @@ vi.mock('./useOpportunities', () => ({
       throw new Error(`OpportunitiesPanel re-rendered more than ${loop.limit} times — render loop`);
     }
     return {
-      rows: [],
+      rows: stub.rows,
       loading: false,
       progress: { done: 0, total: 0 },
       manualRefreshOnly: false,
@@ -59,6 +62,7 @@ const SNAPSHOT: OwnedStockSnapshot = {
 
 beforeEach(async () => {
   loop.count = 0;
+  stub.rows = [];
   loadCharacterBlueprints.mockReset();
   loadCharacterBlueprints.mockResolvedValue({ cached: { data: [], fetchedAt: new Date() } });
   await db.characters.clear();
@@ -92,6 +96,9 @@ describe('OpportunitiesPanel', () => {
         activeCharacterId={CHARACTER_ID}
         ownedStockSnapshot={SNAPSHOT}
         onAddToCompare={() => {}}
+        onAddToQuickbar={() => {}}
+        quickbarAvailable
+        onShowInfo={() => {}}
       />,
       { wrapper: MemoryRouter }
     );
@@ -103,5 +110,90 @@ describe('OpportunitiesPanel', () => {
     const settled = loadCharacterBlueprints.mock.calls.length;
     await new Promise((resolve) => setTimeout(resolve, 100));
     expect(loadCharacterBlueprints.mock.calls.length).toBe(settled);
+  });
+
+  describe('item context menu', () => {
+    function entry(productTypeID: number | null, name: string) {
+      return {
+        blueprintTypeID: 900,
+        blueprint: { activity: 'manufacturing', skills: [] },
+        productTypeID,
+        productName: name,
+        productNameLower: name.toLowerCase(),
+      };
+    }
+
+    async function renderWithRow(productTypeID: number | null, handlers = {}) {
+      const e = entry(productTypeID, 'Widget Alpha');
+      const catalog = {
+        ...CATALOG,
+        byBlueprintTypeID: new Map([[900, e]]),
+      } as unknown as BlueprintCatalog;
+      loadCharacterBlueprints.mockResolvedValue({
+        cached: {
+          data: [
+            { item_id: 1, type_id: 900, runs: -1, material_efficiency: 0, time_efficiency: 0 },
+          ],
+          fetchedAt: new Date(),
+        },
+      });
+      stub.rows = [
+        {
+          candidate: {
+            id: `${CHARACTER_ID}:1`,
+            characterId: CHARACTER_ID,
+            characterName: 'Pilot One',
+            blueprint: { item_id: 1, type_id: 900, runs: -1 },
+            catalogEntry: e,
+          },
+          result: {
+            seconds: 60,
+            iskPerHour: null,
+            marginPct: null,
+            profit: null,
+            totalCost: 0,
+            revenue: null,
+          },
+          orderDepth: 'deep',
+        },
+      ];
+      const onAddToQuickbar = vi.fn();
+      const onShowInfo = vi.fn();
+      render(
+        <OpportunitiesPanel
+          catalog={catalog}
+          pi={null}
+          modifiers={NO_CHARACTER_MODIFIERS}
+          facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
+          activeCharacterId={CHARACTER_ID}
+          ownedStockSnapshot={SNAPSHOT}
+          onAddToCompare={() => {}}
+          onAddToQuickbar={onAddToQuickbar}
+          quickbarAvailable
+          onShowInfo={onShowInfo}
+          {...handlers}
+        />,
+        { wrapper: MemoryRouter }
+      );
+      const name = await screen.findByText('Widget Alpha');
+      return { row: name.closest('tr')!, onAddToQuickbar, onShowInfo };
+    }
+
+    it('opens the shared item menu from a row and wires its actions', async () => {
+      const { row, onAddToQuickbar, onShowInfo } = await renderWithRow(1000);
+      fireEvent.contextMenu(row);
+      fireEvent.click(await screen.findByText('Add to Quickbar'));
+      expect(onAddToQuickbar).toHaveBeenCalledWith(1000, 'Widget Alpha');
+
+      fireEvent.contextMenu(row);
+      fireEvent.click(await screen.findByText('Show info'));
+      expect(onShowInfo).toHaveBeenCalledWith(1000, 'Widget Alpha');
+    });
+
+    it('renders a row with an unknown product type without a menu', async () => {
+      const { row } = await renderWithRow(null);
+      fireEvent.contextMenu(row);
+      expect(screen.queryByText('Add to Quickbar')).toBeNull();
+    });
   });
 });
