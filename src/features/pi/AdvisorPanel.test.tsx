@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { useState } from 'react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fireEvent, render, screen, within } from '@testing-library/react';
@@ -199,9 +200,35 @@ const PLANET_INFO: Record<number, { name: string; typeId: number }> = {
   40_000_002: { name: 'Ashab II', typeId: 2016 },
 };
 
+/** `systemId`/`includeRebuilds` are both URL-held by the real route — this stands in for that, so a click is visible in the next render the way it would be in the app. */
+function TestHarness({
+  characterId,
+  systemId: initialSystemId,
+  onSystemIdChange,
+}: {
+  characterId: number;
+  systemId: number | null;
+  onSystemIdChange: (systemId: number) => void;
+}) {
+  const [systemId, setSystemId] = useState(initialSystemId);
+  const [includeRebuilds, setIncludeRebuilds] = useState(false);
+  return (
+    <AdvisorPanel
+      characterId={characterId}
+      systemId={systemId}
+      onSystemIdChange={(next) => {
+        setSystemId(next);
+        onSystemIdChange(next);
+      }}
+      includeRebuilds={includeRebuilds}
+      onIncludeRebuildsChange={setIncludeRebuilds}
+    />
+  );
+}
+
 function renderPanel(onSystemIdChange = vi.fn()) {
   return render(
-    <AdvisorPanel characterId={1} systemId={null} onSystemIdChange={onSystemIdChange} />
+    <TestHarness characterId={1} systemId={null} onSystemIdChange={onSystemIdChange} />
   );
 }
 
@@ -362,7 +389,7 @@ describe('AdvisorPanel', () => {
     const { rerender } = renderPanel();
     expect(await screen.findByText('Could not load')).toBeInTheDocument();
 
-    rerender(<AdvisorPanel characterId={2} systemId={null} onSystemIdChange={vi.fn()} />);
+    rerender(<TestHarness characterId={2} systemId={null} onSystemIdChange={vi.fn()} />);
     expect((await screen.findAllByText('Ashab III')).length).toBeGreaterThan(0);
     expect(screen.queryByText('Could not load')).not.toBeInTheDocument();
   });
@@ -412,7 +439,7 @@ describe('AdvisorPanel', () => {
     const dialog = await openDetails();
     expect(within(dialog).getByText('Running now')).toBeInTheDocument();
 
-    rerender(<AdvisorPanel characterId={1} systemId={null} onSystemIdChange={vi.fn()} />);
+    rerender(<TestHarness characterId={1} systemId={null} onSystemIdChange={vi.fn()} />);
     expect(screen.getByRole('dialog')).toHaveAttribute('open');
     expect(within(screen.getByRole('dialog')).getByText('Running now')).toBeInTheDocument();
   });

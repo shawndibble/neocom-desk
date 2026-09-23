@@ -845,9 +845,22 @@ export interface AdvisorPanelProps {
   /** Which system's cards to show, from the URL; falls back to the first the character has a colony in. */
   systemId: number | null;
   onSystemIdChange: (systemId: number) => void;
+  /**
+   * Also URL-held, same reason. Hidden (false) by default: rebuilds are an
+   * alternative plan, not more of the list above them, and a worklist that
+   * opens with both reads as one longer list whose figures sum. They do not.
+   */
+  includeRebuilds: boolean;
+  onIncludeRebuildsChange: (value: boolean) => void;
 }
 
-export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: AdvisorPanelProps) {
+export function AdvisorPanel({
+  characterId,
+  systemId,
+  onSystemIdChange,
+  includeRebuilds,
+  onIncludeRebuildsChange,
+}: AdvisorPanelProps) {
   const { t } = useTranslation();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   // Off by default: buying planetary inputs assumes a hub within reach, which
@@ -934,10 +947,6 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
   // control silently refused. Held per system, so switching systems shows that
   // system's own figure rather than the last one typed. `PlanPanel` holds its
   // rate the same way.
-  // Rebuilds are hidden until asked for. They are an alternative plan, not
-  // more of the list above them, and a page that opens with both reads as one
-  // longer worklist whose figures sum. They do not.
-  const [includeRebuilds, setIncludeRebuilds] = useState(false);
   const customsOverrides = customsEdits ?? snapshot?.customsOverrides ?? EMPTY_CUSTOMS;
 
   const writeCustoms = useCallback(
@@ -1311,7 +1320,7 @@ export function AdvisorPanel({ characterId, systemId, onSystemIdChange }: Adviso
         actions={
           <WorklistToggle
             includeRebuilds={includeRebuilds}
-            onChange={setIncludeRebuilds}
+            onChange={onIncludeRebuildsChange}
             rebuildCount={worklist.rebuilds.length}
           />
         }

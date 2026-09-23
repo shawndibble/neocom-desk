@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { useState } from 'react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -7,6 +8,7 @@ import '@/i18n';
 import type { PiData } from '@/sde/types';
 import { db } from '@/db';
 import { expandChain, type PiTier } from '@/engine/pi/chain';
+import type { ColonySpace } from './customsRate';
 
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
@@ -74,11 +76,42 @@ beforeEach(async () => {
   loadInterplanetaryConsolidation.mockResolvedValue(4);
 });
 
+/** `PlanPanel`'s fields are all URL-held by the real route — this stands in for that, so typing into a field is visible in the next render the way it would be in the app. */
+function TestHarness({
+  typeId: initialTypeId,
+  onTypeIdChange,
+}: {
+  typeId: number | null;
+  onTypeIdChange: (typeId: number) => void;
+}) {
+  const [typeId, setTypeId] = useState(initialTypeId);
+  const [perDayText, setPerDayText] = useState('10');
+  const [space, setSpace] = useState<ColonySpace>('highsec');
+  const [ratePercentText, setRatePercentText] = useState<string | null>(null);
+  const [extractionRateText, setExtractionRateText] = useState('');
+  return (
+    <PlanPanel
+      characterId={91}
+      typeId={typeId}
+      onTypeIdChange={(next) => {
+        setTypeId(next);
+        onTypeIdChange(next);
+      }}
+      perDayText={perDayText}
+      onPerDayTextChange={setPerDayText}
+      space={space}
+      onSpaceChange={setSpace}
+      ratePercentText={ratePercentText}
+      onRatePercentTextChange={setRatePercentText}
+      extractionRateText={extractionRateText}
+      onExtractionRateTextChange={setExtractionRateText}
+    />
+  );
+}
+
 function renderPanel(typeId: number | null = BROADCAST_NODE) {
   const onTypeIdChange = vi.fn();
-  const { unmount } = render(
-    <PlanPanel characterId={91} typeId={typeId} onTypeIdChange={onTypeIdChange} />
-  );
+  const { unmount } = render(<TestHarness typeId={typeId} onTypeIdChange={onTypeIdChange} />);
   return { onTypeIdChange, unmount };
 }
 

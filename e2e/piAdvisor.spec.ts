@@ -233,7 +233,7 @@ test.beforeEach(async ({ page }) => {
       })
   );
 
-  await page.goto('/planetary-industry?tab=advisor');
+  await page.goto('/planetary-industry/advisor');
 });
 
 test('leads with one ranked list of what to do, across planets', async ({ page }) => {

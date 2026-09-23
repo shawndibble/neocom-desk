@@ -1,17 +1,19 @@
-import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Spinner, Tabs } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { usePageTab } from '@/lib/usePageTab';
+import { MINING_TABS } from '@/app/pageTabs';
 import { TaxTab } from '@/features/miningTax/TaxTab';
 import { OverviewTab } from '@/features/miningTax/OverviewTab';
 
-type MiningTab = 'tax' | 'overview';
-
 /**
- * Mining (issue #671): renamed from "Moon Mining" — the route path and every
- * internal module/component name stay `MoonMiningTax`/`miningTax`
- * (decision doc `20260905-215631`), this is a label/structure change only.
+ * Mining (issue #671): renamed from "Moon Mining" — every internal
+ * module/component name stays `MoonMiningTax`/`miningTax` (decision doc
+ * `20260905-215631`), a label/structure change only. The route *path* that
+ * doc kept at `/moon-mining` moved again under #1304, to `/mining` with its
+ * tabs as path segments (`/mining/tax`, `/mining/overview`) — #1304's own
+ * decision doc supersedes only that path call, not the module-naming one.
  * `Tax` (default) is the unchanged rent/tax ledger; `Overview` is the new
  * personal-output stats tab. The two tabs load independent data, so each
  * owns its own fetch/refresh lifecycle rather than sharing one snapshot —
@@ -38,7 +40,7 @@ export function MoonMiningTax() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
-  const [tab, setTab] = useState<MiningTab>('tax');
+  const [tab, setTab] = usePageTab(MINING_TABS);
 
   if (!hydrated) {
     return (
@@ -53,7 +55,7 @@ export function MoonMiningTax() {
     <Tabs
       label={t('miningTax.title')}
       value={tab}
-      onChange={(id) => setTab(id as MiningTab)}
+      onChange={(id) => setTab(id as typeof tab)}
       tabs={[
         { id: 'tax', label: t('miningTax.taxTab') },
         { id: 'overview', label: t('miningTax.overviewTab') },

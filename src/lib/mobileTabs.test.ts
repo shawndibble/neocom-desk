@@ -46,6 +46,19 @@ describe('parseMobileTabs', () => {
   ])('rejects %s', (_case, raw) => {
     expect(parseMobileTabs(raw)).toBeNull();
   });
+
+  it('migrates a stored /moon-mining choice to /mining (#1304 rename)', () => {
+    expect(parseMobileTabs(['/overview', '/skills', '/mail', '/moon-mining'])).toEqual([
+      '/overview',
+      '/skills',
+      '/mining',
+      '/mail',
+    ]);
+  });
+
+  it('still rejects a stored /moon-mining choice alongside its own replacement, as a duplicate', () => {
+    expect(parseMobileTabs(['/overview', '/skills', '/mining', '/moon-mining'])).toBeNull();
+  });
 });
 
 describe('the bar and the sheet split the choices between them', () => {

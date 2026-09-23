@@ -562,7 +562,7 @@ describe('Overview board', () => {
 
     const destinations: [RegExp, string][] = [
       [/open orders/i, '/market?section=orders'],
-      [/mining tax/i, '/moon-mining'],
+      [/mining tax/i, '/mining'],
       [/planetary industry/i, '/planetary-industry'],
       [/industry jobs/i, '/industry'],
     ];
