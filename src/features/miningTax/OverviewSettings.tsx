@@ -128,26 +128,19 @@ interface ShowRefiningToggleProps {
 export function ShowRefiningToggle({ value, onChange }: ShowRefiningToggleProps) {
   const { t } = useTranslation();
   return (
-    <div className="flex items-center justify-between gap-2.5 px-2.5 py-2">
-      <span className="text-sm">
-        {t('miningTax.overview.showRefiningLabel')}
-        <span className="block text-[0.6875rem] text-text-dim">
-          {t('miningTax.overview.showRefiningHint')}
-        </span>
-      </span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={value}
-        aria-label={t('miningTax.overview.showRefiningLabel')}
-        onClick={() => onChange(!value)}
-        className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${value ? 'border-accent-dim bg-accent' : 'border-line bg-panel-2'}`}
-      >
-        <span
-          aria-hidden="true"
-          className={`absolute top-0.5 size-5 rounded-full bg-bg transition-transform ${value ? 'translate-x-5' : 'translate-x-0.5'}`}
+    // A plain labelled checkbox, the app's one on/off control (Settings uses
+    // the same markup) — not a custom switch.
+    <div className="space-y-1.5">
+      <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
+        <input
+          type="checkbox"
+          checked={value}
+          onChange={() => onChange(!value)}
+          className="size-4 shrink-0 cursor-pointer accent-accent"
         />
-      </button>
+        {t('miningTax.overview.showRefiningLabel')}
+      </label>
+      <p className="text-xs text-text-dim">{t('miningTax.overview.showRefiningHint')}</p>
     </div>
   );
 }

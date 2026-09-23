@@ -60,8 +60,8 @@ describe('ShowRefiningToggle (issue #1281)', () => {
     const onChange = vi.fn();
     render(<ShowRefiningToggle value={true} onChange={onChange} />);
 
-    const toggle = screen.getByRole('switch', { name: 'Show refining' });
-    expect(toggle).toHaveAttribute('aria-checked', 'true');
+    const toggle = screen.getByRole('checkbox', { name: 'Show refining' });
+    expect(toggle).toBeChecked();
 
     await userEvent.click(toggle);
 
