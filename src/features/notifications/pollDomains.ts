@@ -39,6 +39,8 @@ import { loadCalendarEvents as loadCharacterCalendarEvents } from '@/features/ch
 import { loadContracts as loadCharacterContracts } from '@/features/character/contracts';
 import { loadWalletJournalWithStatus } from '@/features/character/wallet';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
+import { UPWELL_STRUCTURE_ID_FLOOR } from '@/esi/locationIds';
+import { classifyStationUndercut } from '@/engine/market/stationUndercutState';
 import {
   loadCorporationId,
   loadCorporationStructures,
@@ -51,7 +53,7 @@ import { loadCorporationWallets, loadCorporationWalletJournal } from '@/features
 import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapability } from '@/engine/corpRoles';
 import { db, type QuickbarItem } from '@/db';
-import { getHubPrices } from '@/market/prices';
+import { getHubPrices, getStationPrices, type HubAggregate } from '@/market/prices';
 import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { useMarketHub } from '@/features/market/hub';
 import type {
@@ -99,6 +101,10 @@ import {
   type MarketOrderEntrySnapshot,
   type MarketOrderSnapshot,
   type MarketOrderNotificationFire,
+  buildOrderUndercutEntry,
+  type OrderUndercutEntrySnapshot,
+  type OrderUndercutSnapshot,
+  type MarketOrderUndercutFire,
   type EveNotificationEntrySnapshot,
   type EveNotificationSnapshot,
   type EveNotificationFire,
@@ -982,6 +988,124 @@ export const marketOrderDomain = defineDomain<
 });
 
 /* -------------------------------------------------------------------------- */
+/* Market orders: station undercut/outbid (issue #1423)                      */
+/* -------------------------------------------------------------------------- */
+
+/** What `load()` produces per order, before `toSnapshot` folds in the `armed` anti-flap latch (`buildOrderUndercutEntry`). */
+type OrderUndercutRawEntry = Omit<OrderUndercutEntrySnapshot, 'armed'>;
+
+const ORDER_UNDERCUT_STATES = ['beaten', 'clear', 'unknown'] as const;
+
+/**
+ * Strict about every field, `isMarketOrderEntrySnapshot`'s reason: a stored
+ * baseline this domain does not fully recognise is discarded (read as no
+ * baseline at all) rather than read partially, which would corrupt the
+ * `armed` latch's own carry-forward logic on the very poll meant to rebuild
+ * it.
+ */
+function isOrderUndercutEntrySnapshot(raw: unknown): raw is OrderUndercutEntrySnapshot {
+  if (typeof raw !== 'object' || raw === null) return false;
+  const r = raw as Record<string, unknown>;
+  return (
+    typeof r.orderId === 'number' &&
+    typeof r.typeId === 'number' &&
+    typeof r.isBuyOrder === 'boolean' &&
+    typeof r.locationId === 'number' &&
+    typeof r.price === 'number' &&
+    (ORDER_UNDERCUT_STATES as readonly unknown[]).includes(r.state) &&
+    (r.rivalPrice === null || typeof r.rivalPrice === 'number') &&
+    typeof r.armed === 'boolean'
+  );
+}
+
+/**
+ * A new poll domain rather than widening `marketOrderDomain` (issue #1423,
+ * per the ticket brief): `isMarketOrderEntrySnapshot` validates a closed shape,
+ * and widening it would discard every device's stored `marketOrderFilled`
+ * baseline on upgrade, risking a missed fill being reported as newly filled
+ * against a rebuilt, empty baseline. A separate domain also means this fetch
+ * — and the Fuzzwork calls inside it — is skipped entirely (AC5, same gate
+ * `spExtractionDomain` uses) when `marketOrderUndercut` is off for every
+ * Character, independent of whether `marketOrderFilled` is on.
+ */
+export const marketOrderUndercutDomain = defineDomain<
+  OrderUndercutRawEntry,
+  OrderUndercutSnapshot,
+  MarketOrderUndercutFire,
+  ItemNames
+>({
+  source: SNAPSHOT_SOURCES.marketOrderUndercut,
+  stateKey: 'notifications.pollerState.marketOrderUndercut',
+  entriesKey: 'entries',
+  isEntry: isOrderUndercutEntrySnapshot,
+  load: async (characterId) => {
+    const result = await loadOrders(characterId);
+    if (result.needsReauth || result.cached === null) return null;
+    // Structure-parked orders never reach Fuzzwork: it aggregates public
+    // NPC-station data only, and the page's own `orderCompetition.ts` already
+    // routes those through `loadStructureCompetition` instead — asking
+    // Fuzzwork about a structure id would spend a call for an answer it can
+    // never have. Station-only detection ships first (owner decision #2);
+    // these orders are simply absent from the snapshot.
+    const npcOrders = result.cached.data.filter(
+      (order) => order.location_id < UPWELL_STRUCTURE_ID_FLOOR
+    );
+    if (npcOrders.length === 0) return [];
+
+    const typeIdsByStation = new Map<number, number[]>();
+    for (const order of npcOrders) {
+      const existing = typeIdsByStation.get(order.location_id);
+      if (existing) existing.push(order.type_id);
+      else typeIdsByStation.set(order.location_id, [order.type_id]);
+    }
+
+    // Fanned out at most ESI_FANOUT_CONCURRENCY stations at a time
+    // (`loadStationBestPrices`'s own precedent) — a character with orders
+    // scattered across many stations must not fire them all at once.
+    // `getStationPrices` shares the same 15-minute cache the Open Orders page
+    // reads through (issue #1423's decision file), so two polls inside that
+    // window cost one Fuzzwork request per station, not two.
+    const pricesByStation = new Map<number, Map<number, HubAggregate>>();
+    await mapWithConcurrencyLimit(
+      [...typeIdsByStation.entries()],
+      ESI_FANOUT_CONCURRENCY,
+      async ([stationId, typeIds]) => {
+        pricesByStation.set(stationId, await getStationPrices(stationId, [...new Set(typeIds)]));
+      }
+    );
+
+    return npcOrders.map((order): OrderUndercutRawEntry => {
+      const isBuyOrder = order.is_buy_order === true;
+      const aggregate = pricesByStation.get(order.location_id)?.get(order.type_id) ?? null;
+      const { state, rivalPrice } = classifyStationUndercut(order.price, isBuyOrder, aggregate);
+      return {
+        orderId: order.order_id,
+        typeId: order.type_id,
+        isBuyOrder,
+        locationId: order.location_id,
+        price: order.price,
+        state,
+        rivalPrice,
+      };
+    });
+  },
+  // The one domain whose snapshot needs the character's own previous
+  // baseline to build itself (issue #1423) — `buildOrderUndercutEntry` folds
+  // in the `armed` anti-flap latch, which is what lets `diffMarketOrderUndercut`
+  // tell `clear -> unknown -> beaten` apart from `beaten -> unknown -> beaten`.
+  toSnapshot: (entries, nowMs, prevSnapshot) => ({
+    entries: entries.map((entry) => buildOrderUndercutEntry(entry, prevSnapshot)),
+    nowMs,
+  }),
+  // Best-effort, `marketOrderDomain`'s own precedent: an unresolved item name
+  // is no reason to hold the notification back.
+  names: async (fire) => {
+    const names = await loadTypeNames([fire.typeId]).catch(() => new Map<number, string>());
+    return { item: names.get(fire.typeId) };
+  },
+});
+
+/* -------------------------------------------------------------------------- */
 /* EVE's own notifications                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -1399,6 +1523,7 @@ export const POLL_DOMAINS: readonly PollDomain[] = [
   contractDomain,
   walletDomain,
   marketOrderDomain,
+  marketOrderUndercutDomain,
   eveNotificationDomain,
   structureFuelDomain,
   corpIndustryJobDomain,

@@ -127,6 +127,16 @@ const CATALOG = [
     scope: requiredScope('getCharacterOrders'),
   },
   {
+    // Undercut for a sell order, outbid for a buy order, at the order's own
+    // NPC station only (issue #1423, owner decisions #2/#3). 'both' — unlike
+    // its marketOrderFilled sibling above — because the point of this one is
+    // to be told promptly, not merely logged (owner decision #3).
+    id: 'marketOrderUndercut',
+    labelKey: 'settings.notifications.event.marketOrderUndercut',
+    defaultChannels: 'both',
+    scope: requiredScope('getCharacterOrders'),
+  },
+  {
     id: 'newCalendarEvent',
     labelKey: 'settings.notifications.event.newCalendarEvent',
     defaultChannels: 'both',

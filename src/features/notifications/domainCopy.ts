@@ -36,6 +36,7 @@ import type {
   ContractNotificationFire,
   WalletNotificationFire,
   MarketOrderNotificationFire,
+  MarketOrderUndercutFire,
   EveNotificationFire,
   StructureReinforcementExitFire,
   StructureFuelLowFire,
@@ -331,6 +332,27 @@ export const marketOrderCopy: DomainCopy<MarketOrderNotificationFire, ItemNames>
   // no order id, so the panel resolves the item to its newest sell; every
   // other subject is an exact row id.
   subjectOf: (fire) => fire.typeId,
+};
+
+/* Market order undercut (issue #1423) -------------------------------------- */
+
+export const marketOrderUndercutCopy: DomainCopy<MarketOrderUndercutFire, ItemNames> = {
+  poll: (fire, character, names) => {
+    const item = names.item ?? `#${fire.typeId}`;
+    const vars = {
+      character,
+      item,
+      price: formatIsk(fire.price, 2),
+      rival: formatIsk(fire.rivalPrice, 2),
+    };
+    return {
+      title: fired('marketOrderUndercut', 'title'),
+      body: fired('marketOrderUndercut', fire.isBuyOrder ? 'buyBody' : 'sellBody', vars),
+    };
+  },
+  // The beaten order's own row on Market Orders (`notificationOptions.ts`'s
+  // `highlightRow`).
+  subjectOf: (fire) => fire.orderId,
 };
 
 /* EVE notifications ------------------------------------------------------- */
