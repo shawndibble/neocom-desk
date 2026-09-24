@@ -152,9 +152,32 @@ test.describe('Open Orders — problem-group disclosure row and Healthy toggle t
   });
 });
 
+/**
+ * `openDetails` (`OpenOrdersPanel.tsx`) fires four on-open ESI fetches the
+ * instant a row is tapped — region competition, price history, reprocessing
+ * material prices, and route distance to every trade hub — regardless of
+ * whether the modal ends up showing any of that data. None of them are in
+ * `mockEsi.ts`'s default `PREFETCHED_EMPTY` set (they're not boot-prefetched,
+ * only fetched on demand), so a spec that opens the detail modal has to mock
+ * them itself or trip `support/testBase.ts`'s real-network guard.
+ */
+async function mockOrderDetailDependencies(page: Page): Promise<void> {
+  await page.route('https://esi.evetech.net/markets/*/orders*', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+  );
+  await page.route('https://esi.evetech.net/markets/*/history*', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+  );
+  // `/route/` always includes at least the origin system (`engine/jumpsAway.ts`).
+  await page.route('https://esi.evetech.net/latest/route/*/*', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: '[30000142]' })
+  );
+}
+
 test.describe('Open Orders — compact phone list (#1429)', () => {
   test.beforeEach(async ({ page }) => {
     await seedOpenOrders(page);
+    await mockOrderDetailDependencies(page);
     await signInAndGoto(page);
   });
 
