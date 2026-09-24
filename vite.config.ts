@@ -4,9 +4,11 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
-import { copyFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { join } from 'node:path';
 
 const { version } = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf-8')
@@ -97,6 +99,52 @@ const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
  * Last in `plugins` so `closeBundle` runs after VitePWA has taken its manifest
  * — otherwise the copy is precached as a second, identical `index.html`.
  */
+/**
+ * `@eveshipfit/dogma-engine`'s WASM binary and `@eveshipfit/sde`'s `sde.dat`
+ * (ADR 0016) load lazily at runtime instead of bundling with the app shell —
+ * `src/features/fittings/dogmaFittingEngine.ts` fetches them from
+ * `/vendor/dogma/*` on first use. Vite serves `public/` as-is, so getting
+ * them there just means copying out of `node_modules` once per dev/build
+ * (mirrors `public/data/*.json`, which `scripts/build-sde.mjs` populates the
+ * same way from an external source, committed instead of gitignored only
+ * because that source is Fuzzwork's live CSVs rather than an installed
+ * package already pinned in `package.json`). Not committed: `.gitignore`
+ * excludes `public/vendor/dogma/`, since re-copying is one `npm ci` away and
+ * the point of pinning in `package.json` is to have exactly one place the
+ * version lives.
+ *
+ * The copy is a no-op once the destination already has a same-size file:
+ * `buildStart` fires for `vite dev` as well as `vite build`, and e2e boots
+ * both a `vite build` preview *and* a `vite dev` server against the same
+ * checkout (`playwright.config.ts`'s `built`/`dev` projects) — an
+ * unconditional copy on the second `buildStart` would touch these files'
+ * mtimes after `npm run build` already ran, and `scripts/e2e-preview.mjs`
+ * treats all of `public/` as a build input, so it would then see `public` as
+ * newer than `dist` and refuse to start, thinking the bundle was stale.
+ */
+const require = createRequire(import.meta.url);
+function copyDogmaEngineAssets() {
+  const copies: ReadonlyArray<readonly [string, string]> = [
+    ['@eveshipfit/dogma-engine/esf_dogma_engine_bg.wasm', 'esf_dogma_engine_bg.wasm'],
+    ['@eveshipfit/sde/dist/sde.dat', 'sde.dat'],
+    ['@eveshipfit/sde/LICENSE.EVE', 'LICENSE.EVE'],
+  ];
+  return {
+    name: 'neocom-dogma-engine-assets',
+    buildStart() {
+      const destDir = join(process.cwd(), 'public', 'vendor', 'dogma');
+      mkdirSync(destDir, { recursive: true });
+      for (const [pkgPath, destName] of copies) {
+        const src = require.resolve(pkgPath);
+        const dest = join(destDir, destName);
+        const alreadyCopied =
+          statSync(dest, { throwIfNoEntry: false })?.size === statSync(src).size;
+        if (!alreadyCopied) copyFileSync(src, dest);
+      }
+    },
+  };
+}
+
 function spaFallbackHtml() {
   return {
     name: 'neocom-spa-fallback-html',
@@ -122,6 +170,7 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    copyDogmaEngineAssets(),
     VitePWA({
       // Hand-written src/sw.ts (originally ADR 0007, issue #176; now ADR 0009)
       // — only strategy that will support a custom `push` handler (future
@@ -158,7 +207,10 @@ export default defineConfig({
         // types, solar systems, NPC stations, market regions) is fetched
         // lazily on first visit to /market instead — most installs never
         // open it, so an install should not pay for it up front (CONTEXT.md).
-        globIgnores: ['**/data/market/**'],
+        // The dogma engine's WASM binary and its SDE data file (ADR 0016,
+        // ~10 MB together) are fetched lazily on first Fitting open instead —
+        // same reasoning as the market catalogue above.
+        globIgnores: ['**/data/market/**', '**/vendor/dogma/**'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),
