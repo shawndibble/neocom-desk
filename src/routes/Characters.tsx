@@ -667,6 +667,10 @@ function buildColumns(
               onClick={(event) => event.stopPropagation()}
               className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
             >
+              {/* The countdown alone is a colour-only tell of the underlying
+                  attention state (DESIGN.md §7) — this restores the word for
+                  screen readers without changing what a sighted reader sees. */}
+              <span className="sr-only">{t(`pi.attention.${attention}`)} </span>
               {label}
             </span>
           </Tooltip>

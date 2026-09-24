@@ -138,6 +138,19 @@ describe('DataTable highlightRowKey', () => {
   });
 });
 
+describe('DataTable selectedRowKey', () => {
+  it('marks the selected row aria-current="true", distinct from a highlight', () => {
+    renderTable({ selectedRowKey: 2 });
+    expect(document.querySelector('[data-row-key="2"]')).toHaveAttribute('aria-current', 'true');
+    expect(document.querySelector('[data-row-key="1"]')).not.toHaveAttribute('aria-current');
+  });
+
+  it('marks nothing when no row is selected', () => {
+    renderTable();
+    expect(document.querySelector('[aria-current]')).toBeNull();
+  });
+});
+
 describe('DataTable', () => {
   it('exposes an accessible name and column headers', () => {
     renderTable();

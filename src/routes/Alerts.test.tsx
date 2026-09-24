@@ -164,6 +164,17 @@ describe('Alerts', () => {
     expect(within(rows[0]).getByText('Structure Under Attack')).toBeInTheDocument();
   });
 
+  it('states each type row severity in text, not only by icon colour', async () => {
+    await db.notificationFeed.bulkPut([entry({ id: 'mail-1' })]);
+    renderPage();
+
+    const row = (await screen.findByText('New Mail')).closest('li') as HTMLElement;
+    const icon = within(row).getByRole('img');
+    expect(['Critical', 'Due soon', 'Worth watching', 'Not urgent']).toContain(
+      icon.getAttribute('aria-label')
+    );
+  });
+
   it('expands a type to the individual fires, each naming its character', async () => {
     await db.notificationFeed.bulkPut([
       entry({ id: 'a', characterId: KAELEN, firedAt: 2000 }),
@@ -373,9 +384,13 @@ describe('Alerts', () => {
       await expandNewMail();
 
       // Both fires, so the assertion below is about an expanded list rather
-      // than an empty one that trivially has no portraits in it.
-      expect(await screen.findAllByText(/New Mail — body/)).toHaveLength(2);
-      expect(screen.queryAllByRole('img')).toHaveLength(0);
+      // than an empty one that trivially has no portraits in it. Scoped to
+      // the expanded fire rows themselves — the collapsed type row above them
+      // now carries its own (non-portrait) severity `img`, added by #1490.
+      const bodies = await screen.findAllByText(/New Mail — body/);
+      expect(bodies).toHaveLength(2);
+      const fires = bodies[0].closest('ul') as HTMLElement;
+      expect(within(fires).queryAllByRole('img')).toHaveLength(0);
     });
 
     /*
