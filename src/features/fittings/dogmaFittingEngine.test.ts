@@ -163,4 +163,32 @@ describe('computeFittingStats', () => {
     expect(stats.cpuTotal).toBe(400);
     expect(stats.cpuUsed).toBe(300);
   });
+
+  it('sums calibration cost across fitted rigs and bandwidth across active drones only', async () => {
+    stubNetwork();
+    const fittingWithRigAndDrones: Fitting = {
+      name: 'Test Fit',
+      shipTypeId: 17843,
+      modules: [{ slot: 'rig', slotIndex: 0, typeId: 31105, state: 'online' }],
+      drones: [
+        { typeId: 2454, quantity: 3, state: 'active' },
+        { typeId: 2454, quantity: 2, state: 'online' }, // in the bay, not deployed — draws no bandwidth
+      ],
+      cargo: [],
+    };
+    calculateMock.mockReturnValue({
+      ship: { attributes: new Map() },
+      items: [
+        { attributes: new Map([[1153, { value: 100 }]]) }, // the rig
+        { attributes: new Map([[1272, { value: 5 }]]) }, // active drone stack
+        { attributes: new Map([[1272, { value: 5 }]]) }, // bay drone stack
+      ],
+    });
+    const { computeFittingStats } = await freshModule();
+
+    const stats = await computeFittingStats(fittingWithRigAndDrones, profile);
+
+    expect(stats.calibrationUsed).toBe(100);
+    expect(stats.droneBandwidthUsed).toBe(15); // 5 Mbit x 3 active, bay stack excluded
+  });
 });

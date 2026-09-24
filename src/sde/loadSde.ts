@@ -1,5 +1,6 @@
 import type {
   BlueprintMap,
+  FittingSlotMap,
   MarketWideTreeMap,
   MasteryMap,
   PiData,
@@ -96,3 +97,5 @@ export const loadCompressedOreTypeIds = cached<Record<string, number>>('compress
  * so ranking the whole SDE never resolves a sub-build tree live per candidate.
  */
 export const loadMarketWideTrees = cached<MarketWideTreeMap>('marketWideTrees.json');
+/** See `FittingSlotMap` — which rack an EFT-loaded item goes in. */
+export const loadFittingSlots = cached<FittingSlotMap>('fittingSlots.json');
