@@ -52,7 +52,7 @@ describe('loadPriceHistory', () => {
 
   // Sentry flagged the Mining Overview's per-type fan-out as an N+1: every
   // visit re-fetched every ore's history although ESI only publishes it once
-  // a day. A repeat call inside the window must not touch the network � with
+  // a day. A repeat call inside the window must not touch the network — with
   // no handler registered, `onUnhandledRequest: 'error'` proves it.
   it('serves a repeat call from the cache without a second request', async () => {
     server.use(
@@ -80,16 +80,26 @@ describe('loadPriceHistory', () => {
 
   // The Mining Overview tolerates exactly this rejection per type (a
   // non-tradable ore) and fails on anything else, so the cache must not turn
-  // it into a silent empty result.
-  it('still rejects with the ESI error when nothing is cached', async () => {
+  // it into a silent empty result — not for a caller whose concurrent load
+  // was deduplicated onto another's request, and not on a later visit that
+  // is answered from the cache.
+  it('rejects every caller with a 400 for a non-tradable type, and caches that answer', async () => {
     server.use(
-      http.get(`${ESI_BASE_URL}/markets/${REGION_ID}/history`, () =>
-        HttpResponse.json({ error: 'Type not found' }, { status: 400 })
+      http.get(
+        `${ESI_BASE_URL}/markets/${REGION_ID}/history`,
+        () => HttpResponse.json({ error: 'Type not found' }, { status: 400 }),
+        { once: true }
       )
     );
 
-    const err = await loadPriceHistory(REGION_ID, TYPE_ID).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(EsiError);
-    expect((err as EsiError).status).toBe(400);
+    const errors = await Promise.all([
+      loadPriceHistory(REGION_ID, TYPE_ID).catch((e: unknown) => e),
+      loadPriceHistory(REGION_ID, TYPE_ID).catch((e: unknown) => e),
+    ]);
+    const later = await loadPriceHistory(REGION_ID, TYPE_ID).catch((e: unknown) => e);
+    for (const err of [...errors, later]) {
+      expect(err).toBeInstanceOf(EsiError);
+      expect((err as EsiError).status).toBe(400);
+    }
   });
 });
