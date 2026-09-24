@@ -26,6 +26,7 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import type { OreLineValuation } from '@/engine/miningTax/yieldValuation';
 import type { MiningYieldRow } from './yieldSnapshot';
 import { sumVolume } from './volume';
@@ -85,6 +86,15 @@ export function YieldDetailModal({
 
   const typeName = (typeId: number) => typeNames.get(typeId) ?? `#${typeId}`;
 
+  const typeNameCell = (typeId: number) => (
+    <span className="flex items-center gap-1.5">
+      <TypeIcon typeId={typeId} size={32} className="h-5 w-5 shrink-0" />
+      <span className="truncate">
+        <MarketItemLink typeId={typeId}>{typeName(typeId)}</MarketItemLink>
+      </span>
+    </span>
+  );
+
   const totals = useMemo(() => {
     let units = 0;
     let unitsLeftOver = 0;
@@ -129,12 +139,7 @@ export function YieldDetailModal({
       id: 'type',
       header: t('miningTax.oreColumn'),
       primary: true,
-      render: (line) => (
-        <span className="flex items-center gap-1.5">
-          <TypeIcon typeId={line.typeId} size={32} className="h-5 w-5 shrink-0" />
-          <span className="truncate">{typeName(line.typeId)}</span>
-        </span>
-      ),
+      render: (line) => typeNameCell(line.typeId),
       sortValue: (line) => typeName(line.typeId),
     },
     {
@@ -213,12 +218,7 @@ export function YieldDetailModal({
       id: 'material',
       header: t('miningTax.overview.detail.materialColumn'),
       primary: true,
-      render: (material) => (
-        <span className="flex items-center gap-1.5">
-          <TypeIcon typeId={material.typeId} size={32} className="h-5 w-5 shrink-0" />
-          <span className="truncate">{typeName(material.typeId)}</span>
-        </span>
-      ),
+      render: (material) => typeNameCell(material.typeId),
       sortValue: (material) => typeName(material.typeId),
     },
     {
