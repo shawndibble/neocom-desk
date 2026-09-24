@@ -36,7 +36,13 @@ import {
   useViewportBoundedHeight,
   VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
 } from '@/lib/useViewportBoundedHeight';
-import type { StepKey } from '@/engine/skillPlanSchedule';
+import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
+import {
+  milestoneKey,
+  milestoneStates,
+  nextMilestone,
+  type MilestoneStatus,
+} from '@/engine/skillPlanMilestones';
 import { schedulePlan } from './planSchedule';
 import { parseSkillQueue } from '@/engine/queueImport';
 import { exportPlanToClipboard } from '@/engine/clipboardExport';
@@ -58,6 +64,8 @@ import type {
   PlanStep,
   TrainedSkill,
 } from '@/engine/types';
+import { addMilestone, removeMilestone, renameMilestone } from './milestones';
+import { MilestoneModal } from './MilestoneModal';
 import type {
   PlanBooster,
   SkillPlanRecord,
@@ -70,7 +78,7 @@ import { loadCharacterSkillQueue, type CachedResult } from '../data';
 import { writeToClipboard } from '@/lib/clipboard';
 import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
-import { EntryList } from './EntryList';
+import { EntryList, ICON_BUTTON } from './EntryList';
 import type { BandInfo } from './EntryList';
 import { useColumnVisibility } from './columnPreference';
 import { useGroupingMode, GROUPING_MODES, type GroupingMode } from './groupingMode';
@@ -135,7 +143,13 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 export type PlanPatch = Partial<
   Pick<
     SkillPlanRecord,
-    'entries' | 'remapCount' | 'markers' | 'markerAttributes' | 'whatIfImplants' | 'boosters'
+    | 'entries'
+    | 'remapCount'
+    | 'markers'
+    | 'markerAttributes'
+    | 'whatIfImplants'
+    | 'boosters'
+    | 'milestones'
   >
 >;
 
@@ -268,6 +282,15 @@ export function PlanEditor({
   // Which marker's manual attribute editor (RemapMarkerModal) is open, by
   // ordinal — the same addressing `onRemoveMarker`/`markerAttributesFor` use.
   const [editingMarkerIndex, setEditingMarkerIndex] = useState<number | null>(null);
+  // The Plan Milestone naming modal (MilestoneModal): 'add' opens it blank,
+  // anchored to a row's skill/level; 'rename' seeds it with the milestone's
+  // current name. One instance shared by every row, like editingMarkerIndex
+  // above.
+  const [milestoneModal, setMilestoneModal] = useState<
+    | { mode: 'add'; skillTypeID: number; level: number }
+    | { mode: 'rename'; id: string; currentName: string }
+    | null
+  >(null);
   // The entry pending a remove confirmation (#408) — an in-app Modal rather
   // than removing on click, matching the pattern PlanList already uses for
   // deleting a whole plan (CONTEXT.md's "an in-app Modal replacing
@@ -509,7 +532,39 @@ export function PlanEditor({
     totalSeconds,
     finish: planFinish,
     skillCount: scheduledSkillCount,
+    stepByKey,
   } = schedule;
+
+  // Plan Milestone (CONTEXT.md) statuses against the current schedule —
+  // recomputed whenever the schedule or the milestones themselves change, the
+  // same dependency shape as every other schedule-derived value above.
+  const milestoneStatuses = useMemo(
+    () => milestoneStates(stepByKey, startDate, plan.milestones ?? [], trainedSkills),
+    [stepByKey, startDate, plan.milestones, trainedSkills]
+  );
+  const milestoneStatusByKey = useMemo(() => {
+    const map = new Map<StepKey, MilestoneStatus>();
+    for (const status of milestoneStatuses) {
+      map.set(milestoneKey(status.milestone), status);
+    }
+    return map;
+  }, [milestoneStatuses]);
+  const milestoneStatusFor = useCallback(
+    (skillTypeID: number, level: number) =>
+      milestoneStatusByKey.get(stepKey({ skillTypeID, level })),
+    [milestoneStatusByKey]
+  );
+  // Gone from the plan entirely (never trained, never scheduled) — the only
+  // milestones with no row of their own to show on, so the header lists them
+  // separately with a remove action rather than dropping them silently.
+  const orphanedMilestones = useMemo(
+    () => milestoneStatuses.filter((s) => s.state === 'orphaned'),
+    [milestoneStatuses]
+  );
+  const headerNextMilestone = useMemo(() => {
+    const next = nextMilestone(milestoneStatuses);
+    return next && next.finish ? { name: next.milestone.name, finish: next.finish } : null;
+  }, [milestoneStatuses]);
 
   // One row per skill level (reorder.ts). Plans written before that rule —
   // and any entry added at a level several above the character's trained one
@@ -1122,6 +1177,44 @@ export function PlanEditor({
     [plan.entries, update]
   );
 
+  /** EntryList's row menu "Add milestone…": opens the naming modal anchored to that row. */
+  const handleAddMilestone = useCallback((skillTypeID: number, level: number) => {
+    setMilestoneModal({ mode: 'add', skillTypeID, level });
+  }, []);
+
+  /** The row menu's "Rename": opens the same modal, seeded with the existing name. */
+  const handleRenameMilestone = useCallback(
+    (milestoneId: string) => {
+      const current = (plan.milestones ?? []).find((m) => m.id === milestoneId);
+      if (!current) return;
+      setMilestoneModal({ mode: 'rename', id: milestoneId, currentName: current.name });
+    },
+    [plan.milestones]
+  );
+
+  const handleRemoveMilestone = useCallback(
+    (milestoneId: string) => {
+      onUpdate({ milestones: removeMilestone(plan.milestones, milestoneId) });
+    },
+    [plan.milestones, onUpdate]
+  );
+
+  /** MilestoneModal's Save, for both 'add' and 'rename'. */
+  function submitMilestoneModal(name: string) {
+    if (!milestoneModal) return;
+    if (milestoneModal.mode === 'add') {
+      onUpdate({
+        milestones: addMilestone(
+          plan.milestones,
+          { skillTypeID: milestoneModal.skillTypeID, level: milestoneModal.level },
+          name
+        ),
+      });
+    } else {
+      onUpdate({ milestones: renameMilestone(plan.milestones, milestoneModal.id, name) });
+    }
+  }
+
   function handleAddMarker() {
     onUpdate({
       markers: addMarker(plan.markers, plan.entries.length),
@@ -1594,7 +1687,33 @@ export function PlanEditor({
           skillCount={scheduledSkillCount}
           projectedFinish={planFinish}
           badge={headerBadge}
+          nextMilestone={headerNextMilestone}
         />
+
+        {/* Plan Milestones (CONTEXT.md) whose entry was removed from the plan
+            entirely — no row exists to flag any more, so they surface here
+            instead of vanishing silently. */}
+        {orphanedMilestones.length > 0 && (
+          <div className="flex flex-wrap gap-2 text-xs">
+            {orphanedMilestones.map((status) => (
+              <span
+                key={status.milestone.id}
+                className="inline-flex items-center gap-1.5 rounded-xs border border-warning/60 px-1.5 py-0.5 text-warning"
+              >
+                {t('plans.milestone.orphanedNotice', { name: status.milestone.name })}
+                <Button
+                  variant="danger"
+                  size="sm"
+                  className={ICON_BUTTON}
+                  onClick={() => handleRemoveMilestone(status.milestone.id)}
+                  aria-label={t('plans.milestone.removeLabel', { name: status.milestone.name })}
+                >
+                  <Icon.Close size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+                </Button>
+              </span>
+            ))}
+          </div>
+        )}
 
         {!isDesktop && toolsPane}
 
@@ -1714,6 +1833,10 @@ export function PlanEditor({
                   markerImplants={effectiveImplants}
                   onEditMarker={setEditingMarkerIndex}
                   onSetPriority={handleSetPriority}
+                  milestoneStatusFor={milestoneStatusFor}
+                  onAddMilestone={handleAddMilestone}
+                  onRenameMilestone={handleRenameMilestone}
+                  onRemoveMilestone={handleRemoveMilestone}
                 />
               )}
             </div>
@@ -1908,6 +2031,13 @@ export function PlanEditor({
         onSave={(next) => {
           if (editingMarkerIndex !== null) handleSaveMarkerAttributes(editingMarkerIndex, next);
         }}
+      />
+
+      <MilestoneModal
+        open={milestoneModal !== null}
+        initialName={milestoneModal?.mode === 'rename' ? milestoneModal.currentName : undefined}
+        onClose={() => setMilestoneModal(null)}
+        onSave={submitMilestoneModal}
       />
 
       <Modal

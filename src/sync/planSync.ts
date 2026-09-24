@@ -773,6 +773,7 @@ const skillPlanSpec: CollectionSpec<SkillPlanRecord, RemotePlanDoc> = {
       : p.booster !== undefined
         ? { booster: p.booster }
         : {}),
+    ...(p.milestones !== undefined ? { milestones: p.milestones } : {}),
     updatedAt: p.updatedAt,
     ownerHash,
     deleted: false,
@@ -788,6 +789,7 @@ const skillPlanSpec: CollectionSpec<SkillPlanRecord, RemotePlanDoc> = {
     ...(r.whatIfImplants !== undefined ? { whatIfImplants: r.whatIfImplants } : {}),
     ...(r.booster !== undefined ? { booster: r.booster } : {}),
     ...(r.boosters !== undefined ? { boosters: r.boosters } : {}),
+    ...(r.milestones !== undefined ? { milestones: r.milestones } : {}),
     updatedAt: r.updatedAt,
   }),
   bulkPutLocal: (records) => db.skillPlans.bulkPut(records),

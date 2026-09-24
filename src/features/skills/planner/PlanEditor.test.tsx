@@ -1716,3 +1716,83 @@ describe('Clone State (#1233)', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('Plan Milestones (CONTEXT.md)', () => {
+  it("names a goal from a row, and shows it as the header's next milestone", async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+
+    await user.click(screen.getByRole('button', { name: /add milestone to skill a i/i }));
+    const dialog = screen.getByRole('dialog', { name: 'Name this milestone' });
+    await user.type(within(dialog).getByRole('textbox'), 'Fly Loki');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      milestones: [expect.objectContaining({ name: 'Fly Loki', skillTypeID: 10, level: 1 })],
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // The row itself shows the badge, and the header promotes it to "next".
+    expect(screen.getAllByText('Fly Loki').length).toBeGreaterThan(0);
+  });
+
+  it('renames an existing milestone from the row menu', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor(vi.fn(), {
+      plan: {
+        ...PLAN,
+        milestones: [{ id: 'm1', name: 'Fly Loki', skillTypeID: 10, level: 1 }],
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: /milestone actions for skill a i/i }));
+    await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    const dialog = screen.getByRole('dialog', { name: 'Rename milestone' });
+    const input = within(dialog).getByRole('textbox');
+    expect(input).toHaveValue('Fly Loki');
+    await user.clear(input);
+    await user.type(input, 'Command Ships');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      milestones: [{ id: 'm1', name: 'Command Ships', skillTypeID: 10, level: 1 }],
+    });
+  });
+
+  it('removes a milestone from the row menu', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor(vi.fn(), {
+      plan: {
+        ...PLAN,
+        milestones: [{ id: 'm1', name: 'Fly Loki', skillTypeID: 10, level: 1 }],
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: /milestone actions for skill a i/i }));
+    await user.click(screen.getByRole('menuitem', { name: 'Remove' }));
+
+    expect(onUpdate).toHaveBeenCalledWith({ milestones: [] });
+  });
+
+  it('surfaces an orphaned milestone under the header once its entry is removed, with a remove action', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor(vi.fn(), {
+      plan: {
+        ...PLAN,
+        milestones: [{ id: 'm1', name: 'Fly Loki', skillTypeID: 10, level: 1 }],
+      },
+    });
+
+    await user.click(screen.getByRole('button', { name: /remove skill a i/i }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' }));
+
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entries: [{ skillTypeID: 20, targetLevel: 1, priority: 'high' }],
+      })
+    );
+    expect(screen.getByText(/Fly Loki.*entry removed/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /remove milestone fly loki/i }));
+    expect(onUpdate).toHaveBeenLastCalledWith({ milestones: [] });
+  });
+});

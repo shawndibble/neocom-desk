@@ -20,6 +20,12 @@
  * column is off by default (`columnPreference.ts`), so the run seeds both the
  * plan entry and that preference — same raw-`indexedDB` route as the plan
  * itself, into the `settings` store `useLocalSetting` reads.
+ *
+ * Plan Milestone (CONTEXT.md, issue #1406): "Add milestone" is a per-row
+ * control reachable at the same narrow viewport as the priority pill above,
+ * and naming one there is what makes it show up as the plan header's "Next
+ * milestone" chip — the one thing this file's other tests don't cover
+ * (control sizing, not the milestone feature's own round trip).
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
@@ -191,4 +197,22 @@ test('adds a second accelerator on a phone, with a full sm-tier remove control (
 
   const height = await removeButtons.first().evaluate((el) => el.getBoundingClientRect().height);
   expect(height).toBeGreaterThanOrEqual(36);
+});
+
+test("naming a milestone from an entry row shows it as the header's next milestone", async ({
+  page,
+}) => {
+  await signInAndGoto(page);
+  await seedPlan(page, [PLAN_ENTRY]);
+  await page.setViewportSize(PHONE);
+  await page.goto(`./skills/plans/${PLAN_ID}`);
+
+  await page.getByRole('button', { name: 'Add milestone to Spaceship Command I' }).click();
+  const nameDialog = page.getByRole('dialog', { name: 'Name this milestone' });
+  await nameDialog.getByRole('textbox').fill('Fly Loki');
+  await nameDialog.getByRole('button', { name: 'Save' }).click();
+  await expect(nameDialog).toBeHidden();
+
+  await expect(page.getByText('Next milestone')).toBeVisible();
+  await expect(page.getByText('Fly Loki').first()).toBeVisible();
 });

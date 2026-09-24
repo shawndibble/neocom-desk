@@ -364,6 +364,30 @@ describe('markers field mapping', () => {
   });
 });
 
+describe('milestones field mapping', () => {
+  const milestones = [{ id: 'm1', name: 'Fly Loki', skillTypeID: 3327, level: 4 }];
+
+  it('round-trips plan milestones through push and pull', async () => {
+    await db.skillPlans.add(plan({ milestones }));
+    await triggerSync(1);
+    const remote = remoteStore.get(PLANS_PATH)?.get('p1');
+    expect(remote?.milestones).toEqual(milestones);
+
+    await db.skillPlans.delete('p1');
+    seedRemote(PLANS_PATH, [remoteDoc({ milestones, updatedAt: Date.now() + 1000 })]);
+    await triggerSync(1);
+    const local = await db.skillPlans.get('p1');
+    expect(local?.milestones).toEqual(milestones);
+  });
+
+  it('omits milestones key entirely when undefined (Firestore rejects undefined)', async () => {
+    await db.skillPlans.add(plan());
+    await triggerSync(1);
+    const remote = remoteStore.get(PLANS_PATH)?.get('p1');
+    expect(remote && 'milestones' in remote).toBe(false);
+  });
+});
+
 describe('plan lens field mapping (What-If Implants + Booster)', () => {
   // The two lenses a plan is costed under are Editable Data like the entries
   // themselves — a plan that synced without them would quote different
@@ -704,6 +728,7 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
     // would.
     booster: { enabled: true, bonus: 6, startsAt: null, expiresAt: 4_102_444_800_000 },
     boosters: [{ enabled: true, bonus: 6, startsAt: null, expiresAt: 4_102_444_800_000 }],
+    milestones: [{ id: 'm1', name: 'Fly Loki', skillTypeID: 3327, level: 5 }],
     updatedAt: Date.now() - 1000,
   };
 
@@ -758,6 +783,7 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
       'id',
       'markerAttributes',
       'markers',
+      'milestones',
       'name',
       'remapCount',
       'updatedAt',

@@ -10,13 +10,25 @@ interface PlanHeaderProps {
   projectedFinish: Date | null;
   /** null when the plan has no valid entries to optimize. */
   badge: OptimizationBadge | null;
+  /**
+   * The soonest not-yet-reached Plan Milestone (CONTEXT.md), or null when the
+   * plan has none still ahead — a reached or orphaned one never shows here
+   * (`engine/skillPlanMilestones.ts`'s `nextMilestone`).
+   */
+  nextMilestone: { name: string; finish: Date } | null;
 }
 
 /**
- * Plan-at-a-glance header: total time, skill count, projected finish, and a
- * live remap-savings badge.
+ * Plan-at-a-glance header: total time, skill count, projected finish, a live
+ * remap-savings badge, and the next Plan Milestone still ahead.
  */
-export function PlanHeader({ totalSeconds, skillCount, projectedFinish, badge }: PlanHeaderProps) {
+export function PlanHeader({
+  totalSeconds,
+  skillCount,
+  projectedFinish,
+  badge,
+  nextMilestone,
+}: PlanHeaderProps) {
   const { t } = useTranslation();
   const savingsSeconds = badge?.savingsSeconds ?? 0;
   const showsSavings = badge !== null && savingsSeconds >= MIN_MEANINGFUL_SAVINGS_SECONDS;
@@ -39,6 +51,17 @@ export function PlanHeader({ totalSeconds, skillCount, projectedFinish, badge }:
           label={t('plans.headerProjectedFinish')}
           value={projectedFinish ? formatLocalDate(projectedFinish) : t('plans.headerNoFinish')}
         />
+        {nextMilestone && (
+          <StatChip
+            label={t('plans.milestone.next')}
+            value={
+              <>
+                {nextMilestone.name}{' '}
+                <span className="text-text-dim">{formatLocalDate(nextMilestone.finish)}</span>
+              </>
+            }
+          />
+        )}
         {badge && (
           <StatChip
             label={t('plans.headerSavingsLabel')}

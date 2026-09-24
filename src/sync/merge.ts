@@ -25,7 +25,7 @@ import type {
   MiningTaxAssignmentRecord,
   WhatIfImplantSelection,
 } from '@/db';
-import type { Attributes } from '@/engine/types';
+import type { Attributes, PlanMilestone } from '@/engine/types';
 
 export const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -55,6 +55,7 @@ export interface RemotePlanDoc extends RemoteDoc {
   /** Legacy single Booster; superseded by `boosters` but still written (#1407). */
   booster?: PlanBooster;
   boosters?: PlanBooster[];
+  milestones?: PlanMilestone[];
 }
 
 /** Remote Firestore doc at /characters/{uid}/buildPlans/{planId}. */

@@ -80,6 +80,20 @@ export interface PlanEntry {
   priority?: PlanPriority;
 }
 
+/**
+ * A named goal ("Fly Loki") pinned to a plan entry's skill level (CONTEXT.md
+ * "Plan Milestone"). Anchored to (skillTypeID, level) rather than a position,
+ * so it survives reorder and removal by construction — looked up by
+ * `skillPlanSchedule.ts`'s `StepKey`, which simply misses when the anchor is
+ * gone, where a stored index would silently point at some other step.
+ */
+export interface PlanMilestone {
+  id: string;
+  name: string;
+  skillTypeID: number;
+  level: number;
+}
+
 /** Normalized single-level training step. */
 export interface PlanStep {
   skillTypeID: number;
