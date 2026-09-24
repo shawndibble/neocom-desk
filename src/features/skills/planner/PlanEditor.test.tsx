@@ -475,6 +475,22 @@ describe('PlanEditor tools pane', () => {
     ).toBeInTheDocument();
   });
 
+  it('starts the plan when the live queue ends and shows the queue as a collapsed lead line (#1403)', () => {
+    renderEditor(vi.fn(), {
+      queueEntries: [
+        {
+          skill_id: 999999,
+          queue_position: 0,
+          finished_level: 3,
+          start_date: '2098-12-01T00:00:00Z',
+          finish_date: '2099-01-01T12:00:00Z',
+        },
+      ],
+    });
+    expect(screen.getByText(/Finishes 2099-01-0/)).toBeInTheDocument();
+    expect(screen.getByText(/In-game queue: 1 skill, finishes 2099-01-0/)).toBeInTheDocument();
+  });
+
   it("costs the plan's total training time and finish date per marker segment, not just the savings badge (#1232)", async () => {
     // Skill A (intelligence/memory) trains on the flat attributes either way.
     // Skill B (perception/willpower) sits after a marker with a manual
