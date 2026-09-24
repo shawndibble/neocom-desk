@@ -5,7 +5,7 @@
  * price (hub order book) are two independent loads off the same `fitting`,
  * which is why price can resolve well before stats do.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useUrlParam } from '@/lib/useUrlState';
 import { nullableTextParam } from '@/lib/urlState';
@@ -63,15 +63,28 @@ export function useFittingWorkspace(): FittingWorkspace {
 
   const [price, setPrice] = useState<Appraisal | null>(null);
 
+  // Set by `loadFromEftText` right before its own `setShareCode` write, so
+  // the decode effect below can tell "the URL changed because we just wrote
+  // it" (keep the unresolved list that write's own paste just reported) apart
+  // from every other way `shareCode` changes — a pasted link, Back/Forward —
+  // where a *previous* paste's stale unresolved list must not linger next to
+  // the unrelated fitting that URL change just loaded.
+  const ownWriteRef = useRef(false);
+
   // Decode whenever the URL's `f` changes — a fresh load's own write below, a
   // pasted link, or Back/Forward. A stale decode from a param that changed
   // again before this one resolved is dropped rather than clobbering a newer
   // result.
   useEffect(() => {
     let cancelled = false;
+    if (ownWriteRef.current) {
+      ownWriteRef.current = false;
+    } else {
+      setUnresolved([]);
+      setTooLargeToShare(false);
+    }
     if (shareCode === null) {
-      // A synchronous reset when the URL drops `f=` entirely (Back past the
-      // last load) — not a subscription, so the rule's usual "derive during
+      // Synchronous, not a subscription, so the rule's usual "derive during
       // render instead" advice doesn't apply; matches the house pattern in
       // features/industry/useOpportunities.ts.
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -111,6 +124,11 @@ export function useFittingWorkspace(): FittingWorkspace {
       if (encoded.ok) {
         // The decode effect above picks this up and sets `fitting` — one path
         // for "a Fitting is now open", whether it arrived by paste or by URL.
+        // Only actually flags "mine" when the code is really changing: an
+        // identical re-paste writes the same URL, which `useUrlParam` no-ops
+        // and the effect below then never re-runs to consume the flag,
+        // wrongly suppressing the *next* external change's reset.
+        if (encoded.payload !== shareCode) ownWriteRef.current = true;
         setShareCode(encoded.payload);
       } else {
         // Still shown — a Fitting this large just can't round-trip through a
@@ -119,7 +137,7 @@ export function useFittingWorkspace(): FittingWorkspace {
         setFitting(loaded);
       }
     },
-    [setShareCode]
+    [shareCode, setShareCode]
   );
 
   // Stats: the active Character's own profile, or All V with no Character at
@@ -127,13 +145,15 @@ export function useFittingWorkspace(): FittingWorkspace {
   // fallback for the ordinary route rendering before hydration resolves).
   useEffect(() => {
     let cancelled = false;
+    // Cleared unconditionally, not only when `fitting` becomes null — a
+    // swap from one open Fitting straight to another (a new paste, a pasted
+    // link, Back/Forward) must not keep showing the *previous* fitting's
+    // numbers under the new one's header until the new computation resolves.
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new fitting, not a render-time derivation
     setStatsError(false);
     setStatsProgress(null);
-    if (fitting === null) {
-      setStats(null);
-      return;
-    }
+    setStats(null);
+    if (fitting === null) return;
     void (async () => {
       try {
         const profile =
@@ -158,11 +178,12 @@ export function useFittingWorkspace(): FittingWorkspace {
   // well before stats do.
   useEffect(() => {
     let cancelled = false;
-    if (fitting === null) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new fitting, not a render-time derivation
-      setPrice(null);
-      return;
-    }
+    // Same reasoning as the stats effect above: cleared on every `fitting`
+    // change, not only a transition to null, so a swap never shows the
+    // previous fitting's price under the new one's header.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new fitting, not a render-time derivation
+    setPrice(null);
+    if (fitting === null) return;
     void (async () => {
       const result = await loadFittingPrice(fitting, DEFAULT_TRADE_HUB);
       if (!cancelled) setPrice(result);

@@ -46,7 +46,7 @@ export function FittingLoadCard({
           className={`${fieldBaseClassName} w-full p-2 font-mono text-xs`}
         />
         <Button
-          size="sm"
+          size="md"
           variant="primary"
           onClick={() => void handleLoad()}
           disabled={loading || text.trim() === ''}

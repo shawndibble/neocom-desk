@@ -8,6 +8,15 @@
 
 export type FittingSlotKind = 'high' | 'medium' | 'low' | 'rig' | 'subsystem';
 
+/** Canonical rack order — the List view's own display order, and the one source `eftLoader.ts` and `shareMapper.ts` sort/iterate by. */
+export const FITTING_SLOT_KINDS: readonly FittingSlotKind[] = [
+  'high',
+  'medium',
+  'low',
+  'rig',
+  'subsystem',
+];
+
 export type FittingItemState = 'offline' | 'online' | 'active' | 'overload';
 
 export interface FittingModule {

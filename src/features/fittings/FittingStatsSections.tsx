@@ -19,10 +19,11 @@ function resistPct(resonance: number): number {
 }
 
 function ResistBar({ type, resonance }: { type: DamageType; resonance: number }) {
+  const { t } = useTranslation();
   const pct = resistPct(resonance);
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span className="w-20 shrink-0 text-text-dim capitalize">{type}</span>
+      <span className="w-20 shrink-0 text-text-dim">{t(`fittings.stats.damageType.${type}`)}</span>
       <div className="h-2 flex-1 overflow-hidden rounded-full bg-panel-2">
         <div
           className={`h-full rounded-full ${DMG_RESIST_CLASS[type]}`}

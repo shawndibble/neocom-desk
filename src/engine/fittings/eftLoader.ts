@@ -24,12 +24,13 @@
 import { parseEftFit, type EftItem } from '@/engine/import/eftFit';
 import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
 import type { FittingSlotAssignment } from '@/sde/types';
-import type {
-  Fitting,
-  FittingCargoItem,
-  FittingDrone,
-  FittingModule,
-  FittingSlotKind,
+import {
+  FITTING_SLOT_KINDS,
+  type Fitting,
+  type FittingCargoItem,
+  type FittingDrone,
+  type FittingModule,
+  type FittingSlotKind,
 } from './types';
 
 export interface EftUnresolvedItem {
@@ -54,8 +55,6 @@ export type EftLoadResult =
       unresolved: EftUnresolvedItem[];
     }
   | { hullTypeId: null; unresolved: EftUnresolvedItem[] };
-
-const RACK_SLOTS: readonly FittingSlotKind[] = ['high', 'medium', 'low', 'rig', 'subsystem'];
 
 /**
  * Same shape as `eftFit.ts`'s own `QUANTITY_SUFFIX` — duplicated rather than
@@ -151,11 +150,13 @@ export function loadEftFitting(
     }
   }
 
-  // Deterministic order: RACK_SLOTS' canonical order, slot index ascending
-  // within each — the same order the List view's racks render in, regardless
-  // of the order sections happened to appear in the pasted text.
+  // Deterministic order: FITTING_SLOT_KINDS' canonical order, slot index
+  // ascending within each — the same order the List view's racks render in,
+  // regardless of the order sections happened to appear in the pasted text.
   modules.sort(
-    (a, b) => RACK_SLOTS.indexOf(a.slot) - RACK_SLOTS.indexOf(b.slot) || a.slotIndex - b.slotIndex
+    (a, b) =>
+      FITTING_SLOT_KINDS.indexOf(a.slot) - FITTING_SLOT_KINDS.indexOf(b.slot) ||
+      a.slotIndex - b.slotIndex
   );
 
   return { hullTypeId, modules, drones, cargo, unresolved };

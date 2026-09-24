@@ -1,9 +1,12 @@
 import { useTranslation } from 'react-i18next';
 import { Panel, TypeIcon } from '@/components/ui';
-import type { Fitting, FittingModule, FittingSlotKind } from '@/engine/fittings/types';
-import type { FittingStats } from '@/engine/fittings/types';
-
-const RACKS: readonly FittingSlotKind[] = ['high', 'medium', 'low', 'rig', 'subsystem'];
+import {
+  FITTING_SLOT_KINDS,
+  type Fitting,
+  type FittingModule,
+  type FittingSlotKind,
+  type FittingStats,
+} from '@/engine/fittings/types';
 
 interface ResourceBarProps {
   label: string;
@@ -41,13 +44,16 @@ function ResourceBar({ label, used, total }: ResourceBarProps) {
 }
 
 function RackRow({ module }: { module: FittingModule }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center gap-2 rounded-xs bg-panel-2 p-1.5">
       <TypeIcon typeId={module.typeId} size={32} width={24} height={24} />
       {module.chargeTypeId !== undefined && (
         <TypeIcon typeId={module.chargeTypeId} size={32} width={16} height={16} />
       )}
-      <span className="truncate text-xs text-text-dim capitalize">{module.state}</span>
+      <span className="truncate text-xs text-text-dim">
+        {t(`fittings.list.moduleState.${module.state}`)}
+      </span>
     </div>
   );
 }
@@ -60,7 +66,7 @@ interface FittingRackListProps {
 export function FittingRackList({ fitting, stats }: FittingRackListProps) {
   const { t } = useTranslation();
   const modulesByRack = new Map<FittingSlotKind, FittingModule[]>();
-  for (const rack of RACKS) modulesByRack.set(rack, []);
+  for (const rack of FITTING_SLOT_KINDS) modulesByRack.set(rack, []);
   for (const module of fitting.modules) modulesByRack.get(module.slot)?.push(module);
 
   return (
@@ -89,7 +95,7 @@ export function FittingRackList({ fitting, stats }: FittingRackListProps) {
           />
         </div>
 
-        {RACKS.map((rack) => {
+        {FITTING_SLOT_KINDS.map((rack) => {
           const modules = modulesByRack.get(rack) ?? [];
           if (modules.length === 0) return null;
           return (

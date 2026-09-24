@@ -80,6 +80,12 @@
       "droneState": {
         "online": "in bay",
         "active": "active"
+      },
+      "moduleState": {
+        "offline": "offline",
+        "online": "online",
+        "active": "active",
+        "overload": "overloaded"
       }
     },
     "stats": {
@@ -88,6 +94,12 @@
       "error": "Couldn't load ship data for this fit.",
       "loadingIndeterminate": "Downloading ship data…",
       "loading": "Downloading ship data… {{pct}}%",
+      "damageType": {
+        "em": "EM",
+        "thermal": "Thermal",
+        "kinetic": "Kinetic",
+        "explosive": "Explosive"
+      },
       "section": {
         "capacitor": "Capacitor",
         "offense": "Offense",

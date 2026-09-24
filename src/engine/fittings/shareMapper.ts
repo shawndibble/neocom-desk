@@ -32,7 +32,12 @@ import type {
   FittingShareInput,
   SlotCategory,
 } from '@/engine/fitting/fittingShare';
-import type { Fitting, FittingModule, FittingSlotKind } from './types';
+import {
+  FITTING_SLOT_KINDS,
+  type Fitting,
+  type FittingModule,
+  type FittingSlotKind,
+} from './types';
 
 const SLOT_TO_SHARE: Record<FittingSlotKind, SlotCategory> = {
   high: 'high',
@@ -41,8 +46,6 @@ const SLOT_TO_SHARE: Record<FittingSlotKind, SlotCategory> = {
   rig: 'rig',
   subsystem: 'subsystem',
 };
-
-const SLOT_CATEGORIES: readonly FittingSlotKind[] = ['high', 'medium', 'low', 'rig', 'subsystem'];
 
 export function fittingToShareInput(fitting: Fitting): FittingShareInput {
   const modules: Record<SlotCategory, FittingModuleEntry[]> = {
@@ -75,7 +78,7 @@ export function fittingToShareInput(fitting: Fitting): FittingShareInput {
 }
 
 export function shareToFitting(decoded: FittingShareInput, name: string): Fitting {
-  const modules: FittingModule[] = SLOT_CATEGORIES.flatMap((slot) =>
+  const modules: FittingModule[] = FITTING_SLOT_KINDS.flatMap((slot) =>
     decoded.modules[SLOT_TO_SHARE[slot]].map((entry): FittingModule => ({
       slot,
       slotIndex: entry.slotIndex,
