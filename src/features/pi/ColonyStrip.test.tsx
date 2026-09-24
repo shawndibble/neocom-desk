@@ -19,11 +19,24 @@ function row(overrides: Partial<ColonyStripRow> = {}): ColonyStripRow {
 }
 
 describe('ColonyStrip', () => {
+  it('reads a clear colony as clear, without the overflow warning', () => {
+    render(
+      <ColonyStrip
+        rows={[row({ faults: 0, overflowing: false, hoursToFull: 72 })]}
+        onOpenPlanet={() => {}}
+        locked={null}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Details for Efa II' })).toHaveAccessibleDescription(
+      '82% of budget in use. Nothing to change. Full in 3 d.'
+    );
+  });
+
   it('names the row by what it opens and describes the state it shows', () => {
     render(<ColonyStrip rows={[row()]} onOpenPlanet={() => {}} locked={null} />);
     const button = screen.getByRole('button', { name: 'Details for Efa II' });
     expect(button).toHaveAccessibleDescription(
-      '82% of budget in use. 2 faults Full in 30 h. Fills before the next haul.'
+      '82% of budget in use. 2 faults. Full in 30 h, before the next haul.'
     );
   });
 
@@ -36,7 +49,7 @@ describe('ColonyStrip', () => {
       />
     );
     expect(screen.getByRole('button', { name: 'Details for Efa II' })).toHaveAccessibleDescription(
-      'Load unknown. unknown Time to full unknown.'
+      'Load unknown. Time to full unknown.'
     );
   });
 });
