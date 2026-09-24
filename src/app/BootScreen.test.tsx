@@ -45,6 +45,20 @@ describe('BootScreen', () => {
     expect(recoverFromStalledBoot).toHaveBeenCalledOnce();
   });
 
+  it('announces the stall hint through a live region that was already mounted (issue #1494)', () => {
+    render(<BootScreen />);
+    // Present, and empty, before the stall: a live region inserted together
+    // with its text is not reliably announced.
+    const region = screen.getByTestId('boot-stall-status');
+    expect(region).toHaveAttribute('role', 'status');
+    expect(region).toBeEmptyDOMElement();
+    act(() => {
+      vi.advanceTimersByTime(BOOT_STALL_MS);
+    });
+    expect(region).toHaveTextContent(/another copy of the app/i);
+    expect(screen.getByTestId('boot-stall-status')).toBe(region);
+  });
+
   it('disables the button once tapped, so the silent wait cannot start a second flow', () => {
     render(<BootScreen />);
     act(() => {
