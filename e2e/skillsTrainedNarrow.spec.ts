@@ -66,3 +66,41 @@ test('skill-group disclosure header drops the touch-tier floor at and above md (
   expect(height).toBeGreaterThanOrEqual(24);
   expect(height).toBeLessThanOrEqual(36);
 });
+
+/**
+ * The trained-skill rows under each header (#1468): a single `py-1.5 text-xs`
+ * line landed at 28px on a phone while the header above it reached 44px.
+ * `tappableRowClassName` pins the touch tier below `md` and falls back to
+ * that same 28px above it.
+ */
+async function caldariFrigateRow(page: Page) {
+  await page.getByRole('button', { name: /Spaceship Command/ }).click();
+  const row = page.getByRole('button', { name: /^Caldari Frigate/ });
+  await expect(row).toBeVisible();
+  return row;
+}
+
+test('trained-skill row meets the 44px touch floor at 390px, and still selects', async ({
+  page,
+}) => {
+  await gotoTrainedSkills(page);
+  await page.setViewportSize(PHONE);
+
+  const row = await caldariFrigateRow(page);
+  const height = await row.evaluate((el) => el.getBoundingClientRect().height);
+  expect(height).toBeGreaterThanOrEqual(44);
+
+  await row.click();
+  await expect(row).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('trained-skill row keeps its 28px pointer height at and above md (1280px)', async ({
+  page,
+}) => {
+  await gotoTrainedSkills(page);
+  await page.setViewportSize(DESKTOP);
+
+  const row = await caldariFrigateRow(page);
+  const height = await row.evaluate((el) => el.getBoundingClientRect().height);
+  expect(height).toBeCloseTo(28, 0);
+});

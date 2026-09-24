@@ -13,8 +13,9 @@ interface LiveQueueLeadProps {
 }
 
 /**
- * The in-game queue, read-only, above the plan rows: it trains before the
- * plan does, so the plan's dates start where it ends. Collapsed by default.
+ * The in-game queue's lead, read-only, above the plan rows: the levels that
+ * train before the first one this plan lists, so the plan's dates start where
+ * they end. Collapsed by default.
  */
 export function LiveQueueLead({ projection, fetchedAt, nameFor }: LiveQueueLeadProps) {
   const { t } = useTranslation();

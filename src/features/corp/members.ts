@@ -34,6 +34,7 @@ import { loadStructureName } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { MemberActivity } from '@/engine/corp/members';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { UPWELL_STRUCTURE_ID_FLOOR } from '@/esi/locationIds';
 import { loadCorpPaginatedWithCacheStatus, loadCorpWithCacheStatus } from './corpRead';
 
 export const KEYS = {
@@ -86,23 +87,6 @@ export function toMemberActivity(rows: readonly CorporationMemberTracking[]): Me
     locationId: row.location_id ?? null,
   }));
 }
-
-/**
- * The lowest id CCP issues to an Upwell structure.
- *
- * `membertracking`'s `location_id` carries no `location_type`, the same gap
- * `contractLocationName.ts` works around — but that module has one id to
- * resolve and can afford to try both endpoints in turn, while this one has as
- * many distinct locations as the corp is spread across. So the id space is
- * split up front instead: everything below this floor is an NPC station or a
- * solar system, which `/universe/names` resolves in a single batch, and
- * everything at or above it is a structure, which has no bulk endpoint at all.
- *
- * Splitting the other way round is not an option: `/universe/names` answers 404
- * for the *whole* batch if any one id is unresolvable, so a single structure id
- * mixed in would cost every location name on the page.
- */
-const UPWELL_STRUCTURE_ID_FLOOR = 1_000_000_000_000;
 
 /** `/universe/names` takes at most this many ids per call. */
 const UNIVERSE_NAMES_BATCH = 1000;

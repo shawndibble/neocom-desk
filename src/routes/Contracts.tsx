@@ -38,6 +38,8 @@ import { characterStanding } from '@/features/character/entityStanding';
 import { CONTRACT_STATUS_KEY, CONTRACT_TYPE_KEY } from '@/features/character/contractLabels';
 import {
   activeContractsFilterCount,
+  EMPTY_CONTRACTS_FILTER,
+  isContractsFilterActive,
   contractStatusOptions,
   contractTypeOptions,
   filterContracts,
@@ -541,11 +543,26 @@ export function Contracts() {
             typeOptions={typeOptions}
           />
           {filteredContracts.length === 0 ? (
-            <EmptyState
-              title={t('contracts.noFilterMatches')}
-              hint={t('contracts.noFilterMatchesHint')}
-              className="py-8"
-            />
+            // Zero matches with no active filter can't happen today (an empty
+            // list is caught above), but the reset only belongs where a filter is on.
+            isContractsFilterActive(filter) ? (
+              <EmptyState
+                title={t('contracts.noFilterMatches')}
+                hint={t('contracts.noFilterMatchesResetHint')}
+                className="py-8"
+                action={
+                  <Button size="sm" onClick={() => setFilter(EMPTY_CONTRACTS_FILTER)}>
+                    {t('contracts.resetFilters')}
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                title={t('contracts.noFilterMatches')}
+                hint={t('contracts.noFilterMatchesHint')}
+                className="py-8"
+              />
+            )
           ) : (
             <>
               <DataTable

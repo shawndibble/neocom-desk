@@ -18,6 +18,7 @@ import {
   contractCopy,
   walletCopy,
   marketOrderCopy,
+  marketOrderUndercutCopy,
   eveNotificationCopy,
   structureFuelCopy,
   corpIndustryJobCopy,
@@ -318,6 +319,69 @@ describe('poll copy', () => {
       expected: { title: 'Sell order filled', body: 'Someone bought 2 x #35 from Kestrel.' },
     },
     {
+      name: 'marketOrderUndercut, sell order',
+      render: () =>
+        marketOrderUndercutCopy.poll(
+          {
+            eventId: 'marketOrderUndercut',
+            characterId: C,
+            orderId: 1,
+            typeId: 34,
+            isBuyOrder: false,
+            price: 100,
+            rivalPrice: 95,
+          },
+          PILOT,
+          { item: 'Tritanium' }
+        ),
+      expected: {
+        title: 'Order undercut',
+        body: "Kestrel's Tritanium sell order at 100.00 ISK was undercut at its station (95.00 ISK).",
+      },
+    },
+    {
+      name: 'marketOrderUndercut, buy order reads as outbid',
+      render: () =>
+        marketOrderUndercutCopy.poll(
+          {
+            eventId: 'marketOrderUndercut',
+            characterId: C,
+            orderId: 2,
+            typeId: 34,
+            isBuyOrder: true,
+            price: 50,
+            rivalPrice: 55,
+          },
+          PILOT,
+          { item: 'Tritanium' }
+        ),
+      expected: {
+        title: 'Order undercut',
+        body: "Kestrel's Tritanium buy order at 50.00 ISK was outbid at its station (55.00 ISK).",
+      },
+    },
+    {
+      name: 'marketOrderUndercut, unresolved item name',
+      render: () =>
+        marketOrderUndercutCopy.poll(
+          {
+            eventId: 'marketOrderUndercut',
+            characterId: C,
+            orderId: 3,
+            typeId: 99,
+            isBuyOrder: false,
+            price: 10,
+            rivalPrice: 9,
+          },
+          PILOT,
+          {}
+        ),
+      expected: {
+        title: 'Order undercut',
+        body: "Kestrel's #99 sell order at 10.00 ISK was undercut at its station (9.00 ISK).",
+      },
+    },
+    {
       name: 'eveNotification (delegates to eveNotificationText)',
       render: () =>
         eveNotificationCopy.poll(
@@ -610,6 +674,17 @@ describe('subject routes', () => {
         direction: 'above',
       })
     ).toEqual(34);
+    expect(
+      marketOrderUndercutCopy.subjectOf!({
+        eventId: 'marketOrderUndercut',
+        characterId: C,
+        orderId: 456,
+        typeId: 34,
+        isBuyOrder: false,
+        price: 100,
+        rivalPrice: 95,
+      })
+    ).toEqual(456);
   });
 
   it('reads nothing for a member who left: that roster row is gone', () => {

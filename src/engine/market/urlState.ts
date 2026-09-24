@@ -90,8 +90,18 @@ export function resolveAgainstCatalogue<T>(
  * than resetting to the device's Location Mode default. A caller arriving
  * with neither (e.g. Skills' implant chips, #405) gets just the typeId, same
  * as opening `/market?type=…` fresh.
+ *
+ * `forcedHubId`, when given, wins over the URL entirely — the caller's own
+ * resolved hub must not be silently swapped for the browser's current
+ * location, which can price differently than what's already on screen.
  */
-export function marketLinkParams(typeId: number, currentSearch: string): Record<string, string> {
+export function marketLinkParams(
+  typeId: number,
+  currentSearch: string,
+  forcedHubId?: string
+): Record<string, string> {
+  if (forcedHubId !== undefined)
+    return buildMarketParams(typeId, { mode: 'hub', hubId: forcedHubId });
   const parsed = parseMarketParams((key) => new URLSearchParams(currentSearch).get(key));
   if (parsed.regionId !== null)
     return buildMarketParams(typeId, { mode: 'region', regionId: parsed.regionId });

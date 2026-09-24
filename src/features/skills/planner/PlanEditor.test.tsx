@@ -641,7 +641,7 @@ describe('PlanEditor tools pane', () => {
       ],
     });
     expect(screen.getAllByText(/^2099-01-0/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/In-game queue: 1 skill, finishes 2099-01-0/)).toBeInTheDocument();
+    expect(screen.getByText(/Trains first in game: 1 skill, until 2099-01-0/)).toBeInTheDocument();
   });
 
   it("costs the plan's total training time and finish date per marker segment, not just the savings badge (#1232)", async () => {
@@ -975,7 +975,7 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
     await openTools(user);
 
     const section = sectionFor('Attributes');
-    expect(within(section).getByLabelText('22 base + 3 implant = 25')).toBeInTheDocument();
+    expect(within(section).getByText('22 base + 3 implant = 25')).toBeInTheDocument();
 
     await user.click(within(section).getByRole('combobox', { name: 'What-if implants' }));
     await user.click(await screen.findByRole('option', { name: '+5' }));
@@ -983,7 +983,7 @@ describe('PlanEditor: the attributes every estimate is costed against', () => {
     // The lens re-costs the plan; it does not rewrite the character. "Current
     // attributes" has to keep meaning current, or the page has no honest
     // reading of the pilot left on it.
-    expect(within(section).getByLabelText('22 base + 3 implant = 25')).toBeInTheDocument();
+    expect(within(section).getByText('22 base + 3 implant = 25')).toBeInTheDocument();
   });
 
   it('says the attributes are unknown when ESI could not be read, rather than inventing a sheet', async () => {

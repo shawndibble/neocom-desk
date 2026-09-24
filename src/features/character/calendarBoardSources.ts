@@ -93,8 +93,8 @@ export function toSkillTrainingSources(
  * surfaces to say so.
  *
  * A step the live queue already carries is dropped: the queue row is the
- * real clock and wins. `projectQueueEnd` already counts queued levels as
- * trained, so this only bites for a schedule built without it.
+ * real clock and wins. `projectQueueEnd` leaves every queued level from the
+ * first one the plan lists onward to the plan, so shared levels land here.
  */
 export function toSkillPlanSources(
   schedule: Pick<SkillPlanSchedule, 'scheduled' | 'startDate'>,

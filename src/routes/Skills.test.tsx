@@ -148,7 +148,9 @@ describe('Skills', () => {
     // ESI perception 22 already includes the +3 implant: base 19 + 3 = 22.
     // The chip shows the total; the terms are what its hover reveals.
     expect(await screen.findByText('22')).toBeInTheDocument();
-    expect(screen.getByLabelText('19 base + 3 implant = 22')).toBeInTheDocument();
+    expect(
+      screen.getByText('19 base + 3 implant = 22', { selector: '.sr-only' })
+    ).toBeInTheDocument();
     // Unbonused attributes show the base value plainly.
     expect(screen.getByText('20')).toBeInTheDocument(); // intelligence, no bonus
   });
@@ -179,7 +181,9 @@ describe('Skills', () => {
 
     expect(await screen.findByText('Ocular Filter - Basic')).toBeInTheDocument();
     expect(screen.queryByText('#9899')).not.toBeInTheDocument();
-    expect(await screen.findByLabelText('19 base + 3 implant = 22')).toBeInTheDocument();
+    expect(
+      await screen.findByText('19 base + 3 implant = 22', { selector: '.sr-only' })
+    ).toBeInTheDocument();
   });
 
   it('counts only attribute-enhancer implants toward "N of 5 slots empty", not skill hardwirings (#405)', async () => {
@@ -236,11 +240,13 @@ describe('Skills', () => {
     // Perception: base 20 + implant 3 + booster 4 = effective 27. The chip
     // shows the total; the terms are the label the hover reveals.
     expect(
-      await screen.findByLabelText('20 base + 3 implant + 4 booster = 27')
+      await screen.findByText('20 base + 3 implant + 4 booster = 27', { selector: '.sr-only' })
     ).toBeInTheDocument();
     // Intelligence, memory, willpower: no implant, so the booster is named on
     // its own — applied uniformly.
-    expect(screen.getAllByLabelText('20 base + 4 booster = 24')).toHaveLength(3);
+    expect(screen.getAllByText('20 base + 4 booster = 24', { selector: '.sr-only' })).toHaveLength(
+      3
+    );
   });
 
   it('shows the level from a finished queue entry that /skills has not caught up to', async () => {

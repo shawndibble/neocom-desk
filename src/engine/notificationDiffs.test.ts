@@ -47,6 +47,10 @@ import {
   type WalletSnapshot,
   type MarketOrderEntrySnapshot,
   type MarketOrderSnapshot,
+  diffMarketOrderUndercut,
+  buildOrderUndercutEntry,
+  type OrderUndercutEntrySnapshot,
+  type OrderUndercutSnapshot,
   type EveNotificationEntrySnapshot,
   type EveNotificationSnapshot,
   type StructureFuelEntrySnapshot,
@@ -1716,6 +1720,238 @@ describe('diffMarketOrderFilled', () => {
     const prev = orderSnapshot([orderEntry(2, false)], T0);
     const next = orderSnapshot([orderEntry(1, true), orderEntry(2, false)], T0 + 2000);
     expect(diffMarketOrderFilled(7, prev, next).map((f) => f.orderId)).toEqual([1]);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* diffMarketOrderUndercut / buildOrderUndercutEntry (issue #1423)            */
+/* -------------------------------------------------------------------------- */
+
+function undercutEntry(
+  orderId: number,
+  price: number,
+  state: OrderUndercutEntrySnapshot['state'],
+  rivalPrice: number | null,
+  overrides: Partial<Pick<OrderUndercutEntrySnapshot, 'typeId' | 'isBuyOrder' | 'locationId'>> = {}
+): Omit<OrderUndercutEntrySnapshot, 'armed'> {
+  return {
+    orderId,
+    typeId: 34,
+    isBuyOrder: false,
+    locationId: 60003760,
+    price,
+    state,
+    rivalPrice,
+    ...overrides,
+  };
+}
+
+/**
+ * One poll's stored snapshot, built the same way `pollDomains.ts`'s
+ * `marketOrderUndercutDomain.toSnapshot` builds it — every entry threaded
+ * through `buildOrderUndercutEntry` against the PREVIOUS poll's own stored
+ * snapshot. Chaining this across several calls (poll1 -> poll2, then poll2's
+ * own output as the input to poll3) is what proves the sequential shape:
+ * feeding hand-authored `armed` values in would prove nothing about whether
+ * the domain's own persistence actually carries them forward correctly.
+ */
+function undercutPoll(
+  raws: readonly Omit<OrderUndercutEntrySnapshot, 'armed'>[],
+  prev: OrderUndercutSnapshot | undefined,
+  nowMs: number
+): OrderUndercutSnapshot {
+  return { entries: raws.map((raw) => buildOrderUndercutEntry(raw, prev)), nowMs };
+}
+
+describe('buildOrderUndercutEntry', () => {
+  it('stores armed: true for a clear reading, so a later beaten fires', () => {
+    expect(buildOrderUndercutEntry(undercutEntry(1, 100, 'clear', 105), undefined).armed).toBe(
+      true
+    );
+  });
+
+  it('stores armed: false for a beaten reading, so a later beaten alone does not re-fire', () => {
+    expect(buildOrderUndercutEntry(undercutEntry(1, 100, 'beaten', 95), undefined).armed).toBe(
+      false
+    );
+  });
+
+  it('freezes armed at whatever it was before, for an unknown reading', () => {
+    const wasClear: OrderUndercutSnapshot = {
+      entries: [{ ...undercutEntry(1, 100, 'clear', 105), armed: true }],
+      nowMs: T0,
+    };
+    expect(buildOrderUndercutEntry(undercutEntry(1, 100, 'unknown', null), wasClear).armed).toBe(
+      true
+    );
+
+    const wasBeaten: OrderUndercutSnapshot = {
+      entries: [{ ...undercutEntry(1, 100, 'beaten', 95), armed: false }],
+      nowMs: T0,
+    };
+    expect(buildOrderUndercutEntry(undercutEntry(1, 100, 'unknown', null), wasBeaten).armed).toBe(
+      false
+    );
+  });
+
+  it('treats a brand-new order (missing from the baseline) as armed, even from an unknown first reading', () => {
+    const prev: OrderUndercutSnapshot = { entries: [], nowMs: T0 };
+    expect(buildOrderUndercutEntry(undercutEntry(1, 100, 'unknown', null), prev).armed).toBe(true);
+  });
+
+  it('never arms on the very first poll for a character, even from an unknown reading', () => {
+    expect(buildOrderUndercutEntry(undercutEntry(1, 100, 'unknown', null), undefined).armed).toBe(
+      false
+    );
+  });
+
+  it('re-arms on a relist (own price changed), regardless of the previous armed value', () => {
+    const wasBeatenAndDisarmed: OrderUndercutSnapshot = {
+      entries: [{ ...undercutEntry(1, 100, 'beaten', 95), armed: false }],
+      nowMs: T0,
+    };
+    // Relisted at a new price (90), and still unknown this poll — the price
+    // change alone re-arms it, independent of the frozen-armed rule above.
+    expect(
+      buildOrderUndercutEntry(undercutEntry(1, 90, 'unknown', null), wasBeatenAndDisarmed).armed
+    ).toBe(true);
+  });
+});
+
+describe('diffMarketOrderUndercut', () => {
+  it('fires nothing on the first-ever poll, whatever state it observes', () => {
+    const next = undercutPoll([undercutEntry(1, 100, 'beaten', 99)], undefined, T0);
+    expect(diffMarketOrderUndercut(7, undefined, next)).toEqual([]);
+  });
+
+  it('fires once when an order goes from clear to beaten (undercut)', () => {
+    const prev = undercutPoll([undercutEntry(1, 100, 'clear', 105)], undefined, T0);
+    const next = undercutPoll([undercutEntry(1, 100, 'beaten', 95)], prev, T0 + FIVE_MIN);
+    expect(diffMarketOrderUndercut(7, prev, next)).toEqual([
+      {
+        eventId: 'marketOrderUndercut',
+        characterId: 7,
+        orderId: 1,
+        typeId: 34,
+        isBuyOrder: false,
+        price: 100,
+        rivalPrice: 95,
+      },
+    ]);
+  });
+
+  it('stays silent while an order remains beaten across polls', () => {
+    const poll1 = undercutPoll([undercutEntry(1, 100, 'clear', 105)], undefined, T0);
+    const poll2 = undercutPoll([undercutEntry(1, 100, 'beaten', 95)], poll1, T0 + FIVE_MIN);
+    expect(diffMarketOrderUndercut(7, poll1, poll2)).toHaveLength(1);
+    const poll3 = undercutPoll([undercutEntry(1, 100, 'beaten', 90)], poll2, T0 + 2 * FIVE_MIN);
+    expect(diffMarketOrderUndercut(7, poll2, poll3)).toEqual([]);
+  });
+
+  it('fires twice in total across beaten -> clear -> beaten', () => {
+    const poll1 = undercutPoll([undercutEntry(1, 100, 'clear', 105)], undefined, T0);
+    const poll2 = undercutPoll([undercutEntry(1, 100, 'beaten', 95)], poll1, T0 + FIVE_MIN);
+    const poll3 = undercutPoll([undercutEntry(1, 100, 'clear', 105)], poll2, T0 + 2 * FIVE_MIN);
+    const poll4 = undercutPoll([undercutEntry(1, 100, 'beaten', 95)], poll3, T0 + 3 * FIVE_MIN);
+    expect(diffMarketOrderUndercut(7, poll1, poll2)).toHaveLength(1);
+    expect(diffMarketOrderUndercut(7, poll2, poll3)).toEqual([]); // going clear is not itself a fire
+    expect(diffMarketOrderUndercut(7, poll3, poll4)).toHaveLength(1);
+  });
+
+  // The correctness trap (issue #1423): a diff comparing only two adjacent
+  // snapshots cannot tell `clear -> unknown -> beaten` apart from
+  // `beaten -> unknown -> beaten` — both look like `prev.state === 'unknown'`
+  // pairwise. These two sequential tests feed THREE real polls through
+  // `undercutPoll`'s own chaining (poll2's OWN built output becomes the input
+  // to poll3), which is what actually exercises the stored `armed` latch
+  // rather than a hand-authored one.
+  it('sequential: clear -> unknown -> beaten fires — an outage never swallows a real undercut', () => {
+    const poll1 = undercutPoll([undercutEntry(1, 100, 'clear', 105)], undefined, T0);
+    const poll2 = undercutPoll([undercutEntry(1, 100, 'unknown', null)], poll1, T0 + FIVE_MIN);
+    expect(diffMarketOrderUndercut(7, poll1, poll2)).toEqual([]);
+    const poll3 = undercutPoll([undercutEntry(1, 100, 'beaten', 95)], poll2, T0 + 2 * FIVE_MIN);
+    expect(diffMarketOrderUndercut(7, poll2, poll3)).toEqual([
+      {
+        eventId: 'marketOrderUndercut',
+        characterId: 7,
+        orderId: 1,
+        typeId: 34,
+        isBuyOrder: false,
+        price: 100,
+        rivalPrice: 95,
+      },
+    ]);
+  });
+
+  it('sequential: beaten -> unknown -> beaten stays silent — an outage never resets the latch', () => {
+    const poll1 = undercutPoll([undercutEntry(1, 100, 'clear', 105)], undefined, T0);
+    const poll2 = undercutPoll([undercutEntry(1, 100, 'beaten', 95)], poll1, T0 + FIVE_MIN);
+    expect(diffMarketOrderUndercut(7, poll1, poll2)).toHaveLength(1);
+    const poll3 = undercutPoll([undercutEntry(1, 100, 'unknown', null)], poll2, T0 + 2 * FIVE_MIN);
+    expect(diffMarketOrderUndercut(7, poll2, poll3)).toEqual([]);
+    const poll4 = undercutPoll([undercutEntry(1, 100, 'beaten', 90)], poll3, T0 + 3 * FIVE_MIN);
+    expect(diffMarketOrderUndercut(7, poll3, poll4)).toEqual([]);
+  });
+
+  it('a brand-new order already beaten on its first sighting fires, even though a baseline exists for the character (owner decision 5)', () => {
+    const prev = undercutPoll([undercutEntry(2, 50, 'clear', 55)], undefined, T0);
+    const next = undercutPoll(
+      [undercutEntry(2, 50, 'clear', 55), undercutEntry(1, 100, 'beaten', 95)],
+      prev,
+      T0 + FIVE_MIN
+    );
+    expect(diffMarketOrderUndercut(7, prev, next).map((f) => f.orderId)).toEqual([1]);
+  });
+
+  it('a closed order simply drops out of the snapshot — no fire, no crash', () => {
+    const prev = undercutPoll([undercutEntry(1, 100, 'beaten', 95)], undefined, T0);
+    const next = undercutPoll([], prev, T0 + FIVE_MIN);
+    expect(diffMarketOrderUndercut(7, prev, next)).toEqual([]);
+  });
+
+  it('fires for a beaten buy order (outbid) alongside a beaten sell order (undercut) in the same poll', () => {
+    const prev = undercutPoll(
+      [
+        undercutEntry(1, 100, 'clear', 105),
+        undercutEntry(2, 50, 'clear', 45, { isBuyOrder: true }),
+      ],
+      undefined,
+      T0
+    );
+    const next = undercutPoll(
+      [
+        undercutEntry(1, 100, 'beaten', 95),
+        undercutEntry(2, 50, 'beaten', 55, { isBuyOrder: true }),
+      ],
+      prev,
+      T0 + FIVE_MIN
+    );
+    expect(diffMarketOrderUndercut(7, prev, next).map((f) => [f.orderId, f.isBuyOrder])).toEqual([
+      [1, false],
+      [2, true],
+    ]);
+  });
+
+  // Not in the brief's own case list, but required by the acceptance
+  // criteria ("after a relist at a new price, a new beating alerts again") —
+  // `state` never leaves 'beaten' here, so a diff that only watched `state`
+  // transitions would wrongly stay silent.
+  it('a relist at a new price re-arms and fires again, even though it never left beaten', () => {
+    const poll1 = undercutPoll([undercutEntry(1, 100, 'clear', 105)], undefined, T0);
+    const poll2 = undercutPoll([undercutEntry(1, 100, 'beaten', 95)], poll1, T0 + FIVE_MIN);
+    expect(diffMarketOrderUndercut(7, poll1, poll2)).toHaveLength(1);
+    const poll3 = undercutPoll([undercutEntry(1, 90, 'beaten', 85)], poll2, T0 + 2 * FIVE_MIN);
+    expect(diffMarketOrderUndercut(7, poll2, poll3)).toEqual([
+      {
+        eventId: 'marketOrderUndercut',
+        characterId: 7,
+        orderId: 1,
+        typeId: 34,
+        isBuyOrder: false,
+        price: 90,
+        rivalPrice: 85,
+      },
+    ]);
   });
 });
 

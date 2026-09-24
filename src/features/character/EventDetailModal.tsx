@@ -4,10 +4,22 @@
  * long description. Mounted only while an event is selected (mounting is the
  * open signal, `ItemDetailModal`'s pattern). `event` seeds the title/date
  * immediately so there's no flash while the full detail fetches.
+ *
+ * A failed load with nothing cached is a real failure state, not an empty
+ * one: the page's Refresh and the app-wide re-login notice both sit behind
+ * this modal's backdrop, so recovery (Try again, or Log in again for an auth
+ * failure) has to live in the body — `SkillDetailModal`'s pattern.
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, Modal, Spinner, type ButtonVariant } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  Modal,
+  ReauthBanner,
+  Spinner,
+  type ButtonVariant,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { KIND_FILL, KIND_TEXT } from '@/components/ui/kindTone';
 import { loadCalendarEvent, respondToCalendarEvent } from '@/features/character/calendar';
@@ -15,6 +27,7 @@ import { RESPONSE_BADGE_TONE, RESPONSE_ICON, RESPONSE_KEY } from './calendarResp
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { buildIcsFile, googleCalendarUrl, type CalendarExportEvent } from '@/lib/calendarExport';
 import { downloadTextFile } from '@/lib/download';
+import { beginEveLogin } from '@/app/loginFlow';
 import { formatCalendarTimestamp } from '@/lib/timestamp';
 import type { CachedResult } from '@/esi/cache';
 import type {
@@ -47,6 +60,17 @@ function exportEventOf(detail: CalendarEventDetail): CalendarExportEvent {
   };
 }
 
+/**
+ * `needs-reauth` only when the live call failed on auth *and* nothing is
+ * cached — a stale copy still renders as `ready`, and the app-wide notice
+ * covers the auth failure there.
+ */
+type DetailState =
+  | { status: 'loading' }
+  | { status: 'failed' }
+  | { status: 'needs-reauth' }
+  | { status: 'ready'; detail: CachedResult<CalendarEventDetail> };
+
 export interface EventDetailModalProps {
   characterId: number;
   event: CalendarEventSummary;
@@ -69,9 +93,10 @@ export function EventDetailModal({
   onResponded,
 }: EventDetailModalProps) {
   const { t } = useTranslation();
-  const [detail, setDetail] = useState<CachedResult<CalendarEventDetail> | null | undefined>(
-    undefined
-  );
+  const [state, setState] = useState<DetailState>({ status: 'loading' });
+  // Bumped by Try again to re-run the load in place — closing and reopening
+  // was otherwise the only way back to the network.
+  const [attempt, setAttempt] = useState(0);
   const [saving, setSaving] = useState(false);
   const [rsvpFailed, setRsvpFailed] = useState(false);
 
@@ -84,7 +109,11 @@ export function EventDetailModal({
         setRsvpFailed(true);
         return;
       }
-      setDetail((prev) => (prev ? { ...prev, data: { ...prev.data, response } } : prev));
+      setState((prev) =>
+        prev.status === 'ready'
+          ? { ...prev, detail: { ...prev.detail, data: { ...prev.detail.data, response } } }
+          : prev
+      );
       onResponded?.(event.event_id, response);
     } finally {
       setSaving(false);
@@ -94,23 +123,49 @@ export function EventDetailModal({
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      setDetail(undefined);
-      const result = await loadCalendarEvent(characterId, event.event_id);
-      if (!cancelled) setDetail(result);
+      setState({ status: 'loading' });
+      try {
+        const { cached, needsReauth } = await loadCalendarEvent(characterId, event.event_id);
+        if (cancelled) return;
+        setState(
+          cached
+            ? { status: 'ready', detail: cached }
+            : { status: needsReauth ? 'needs-reauth' : 'failed' }
+        );
+      } catch {
+        if (!cancelled) setState({ status: 'failed' });
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [characterId, event.event_id]);
+  }, [characterId, event.event_id, attempt]);
 
   return (
     <Modal open onClose={onClose} title={event.title}>
-      {detail === undefined ? (
+      {state.status === 'loading' ? (
         <div className="flex justify-center py-8">
           <Spinner label={t('common.loading')} />
         </div>
-      ) : detail === null ? (
-        <EmptyState title={t('calendar.emptyTitle')} className="py-8" />
+      ) : state.status === 'needs-reauth' ? (
+        // No Try again: retrying can't fix an expired or revoked grant.
+        <ReauthBanner
+          title={t('calendar.detailReauthTitle')}
+          hint={t('calendar.detailReauthHint')}
+          actionLabel={t('calendar.reauthAction')}
+          onLogin={() => void beginEveLogin()}
+        />
+      ) : state.status === 'failed' ? (
+        <EmptyState
+          title={t('common.loadFailedTitle')}
+          hint={t('calendar.detailLoadFailedHint')}
+          action={
+            <Button size="sm" onClick={() => setAttempt((n) => n + 1)}>
+              {t('common.retry')}
+            </Button>
+          }
+          className="py-8"
+        />
       ) : (
         <div className="space-y-3 text-xs">
           {/* Kind-colour bar, bled to the modal's edges: the same hue the Coming Up Rail and Calendar Map use for `calendarEvent`, so the popup carries the identity a plain dialog otherwise loses. */}
@@ -120,11 +175,11 @@ export function EventDetailModal({
               className={`size-4 shrink-0 ${KIND_TEXT.calendarEvent}`}
               aria-hidden="true"
             />
-            {formatCalendarTimestamp(new Date(detail.data.date))} ·{' '}
-            {t('calendar.importance', { value: detail.data.importance })}
+            {formatCalendarTimestamp(new Date(state.detail.data.date))} ·{' '}
+            {t('calendar.importance', { value: state.detail.data.importance })}
           </p>
           <p className="rounded-xs border border-line bg-panel-2 p-2 whitespace-pre-wrap text-text-dim">
-            {stripEveMarkup(detail.data.text)}
+            {stripEveMarkup(state.detail.data.text)}
           </p>
           <div className="space-y-2 border-t border-line pt-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -138,15 +193,15 @@ export function EventDetailModal({
                 label), so a second badge repeating the same word/color here
                 would just double it.
               */}
-              {detail.data.response === 'not_responded' &&
+              {state.detail.data.response === 'not_responded' &&
                 (() => {
-                  const ResponseIcon = RESPONSE_ICON[detail.data.response];
+                  const ResponseIcon = RESPONSE_ICON[state.detail.data.response];
                   return (
                     <p
-                      className={`inline-flex items-center gap-1 rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${RESPONSE_BADGE_TONE[detail.data.response]}`}
+                      className={`inline-flex items-center gap-1 rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${RESPONSE_BADGE_TONE[state.detail.data.response]}`}
                     >
                       <ResponseIcon size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-                      {t(RESPONSE_KEY[detail.data.response])}
+                      {t(RESPONSE_KEY[state.detail.data.response])}
                     </p>
                   );
                 })()}
@@ -154,7 +209,7 @@ export function EventDetailModal({
             <div className="flex flex-wrap gap-2">
               {RSVP_OPTIONS.map(({ response, labelKey }) => {
                 const OptionIcon = RESPONSE_ICON[response];
-                const active = detail.data.response === response;
+                const active = state.detail.data.response === response;
                 return (
                   <Button
                     key={response}
@@ -182,7 +237,7 @@ export function EventDetailModal({
               <Button
                 size="sm"
                 onClick={() => {
-                  const exportEvent = exportEventOf(detail.data);
+                  const exportEvent = exportEventOf(state.detail.data);
                   downloadTextFile(
                     `${exportEvent.eventId}.ics`,
                     buildIcsFile(exportEvent),
@@ -196,7 +251,11 @@ export function EventDetailModal({
               <Button
                 size="sm"
                 onClick={() =>
-                  window.open(googleCalendarUrl(exportEventOf(detail.data)), '_blank', 'noopener')
+                  window.open(
+                    googleCalendarUrl(exportEventOf(state.detail.data)),
+                    '_blank',
+                    'noopener'
+                  )
                 }
               >
                 <Icon.CalendarEvent size={Icon.ICON_SIZE.sm} aria-hidden="true" />

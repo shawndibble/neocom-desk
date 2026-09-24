@@ -25,13 +25,13 @@ here — they go one per file in `docs/context/decisions/`.
   and loaded charges it prices alongside the modules — at a **Trade Hub**, on
   both sides of the book at once: what it fetches sold into buy orders, and what it costs bought off
   sell orders. Scaled by a **Price Percent**. Distinct from **Compare**, which
-  puts a handful of Quickbar items side by side on their own prices: an
+  puts the items in the **Compare Set** side by side on their own prices: an
   Appraisal answers "what is this pile worth", Compare answers "which of these
   is cheaper". Its collapsible "Compare hubs" section (issue #689) prices the
   same pasted pile at all 5 Trade Hubs side by side — a different question
   again ("where is this pile worth the most") from either of the above, and
-  not the **Compare** tab under another name: it shares no state, code path,
-  or Quickbar dependency with it.
+  not the **Compare** drawer under another name: it shares no state or code
+  path with it and never touches the **Compare Set**.
 - **Price Percent**: The fraction of market an **Appraisal** is quoted at —
   100 is the order book untouched, and a buyer quoting loot pays some fraction
   of it.
@@ -720,7 +720,8 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   day (ESI's `volume`). Not the item's cargo volume in m³ — the collision is
   EVE's, and this glossary keeps both words only because ESI does.
 - **Quickbar**: The user's saved item shortcuts in the Market Browser's left
-  column. Replaces the pin-to-compare grid; the comparison itself becomes a tab.
+  column. Replaces the pin-to-compare grid; comparing lives in the **Compare**
+  drawer over the separate **Compare Set**.
 - **Ratio Block**: The smallest whole-pin set that runs a chain once — one
   Advanced Industry Facility making a P2 fed by exactly two Basic Industry
   Facilities, because one P1 factory's 40/hr is precisely what one P2 factory

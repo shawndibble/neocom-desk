@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Neocom Desk",
-    "tagline": "Skill plans, build margins, market orders, colonies and moon tax — every character you fly, in one browser tab."
+    "tagline": "Skill plans, build margins, market orders, colonies and mining tax — every character you fly, in one browser tab."
   },
   "boot": {
     "stalledHint": "Still loading. Another copy of the app may be holding your local data open.",
@@ -125,7 +125,10 @@
       "close": "Close"
     },
     "detail": {
-      "title": "Skill Detail"
+      "title": "Skill Detail",
+      "loadFailedHint": "Something went wrong loading this skill. Try again.",
+      "notFoundTitle": "Skill not found",
+      "notFoundHint": "This skill isn't in the skill catalog."
     },
     "contextMenu": {
       "addToSkillPlan": "Add to Skill Plan",
@@ -183,8 +186,8 @@
     "attributePairBand": "{{pair}} attributes",
     "listRowStats": "{{duration}} · finishes {{date}}",
     "listRowNothingToTrain": "Nothing to train",
-    "liveQueueLead_one": "In-game queue: {{count}} skill, finishes {{date}}",
-    "liveQueueLead_other": "In-game queue: {{count}} skills, finishes {{date}}",
+    "liveQueueLead_one": "Trains first in game: {{count}} skill, until {{date}}",
+    "liveQueueLead_other": "Trains first in game: {{count}} skills, until {{date}}",
     "liveQueuePaused": "Your in-game queue is paused, so this plan is dated from now.",
     "currentQueueTitle": "Current skill queue",
     "currentQueueEmpty": "No active in-game training queue cached.",
@@ -200,6 +203,7 @@
     "searchPlaceholder": "Search skills…",
     "filterByGroup": "Filter by skill group",
     "level": "Level {{level}}",
+    "addedAnnouncement": "Added {{skill}} {{level}}",
     "remapBudget": "Remaps: {{bonus}} bonus now",
     "remapBudgetYearlyReady": "· yearly ready",
     "remapBudgetYearlyFrom": "· yearly from {{date}}",
@@ -785,6 +789,7 @@
     "jobsFilterStatus": "Status",
     "jobsFilterWithCount": "{{label}} ({{count}})",
     "jobsFilteredEmptyTitle": "No jobs match these filters",
+    "jobsResetFilters": "Reset filters",
     "jobsColBlueprint": "Blueprint",
     "jobsColActivity": "Activity",
     "jobsColRuns": "Runs",
@@ -1090,7 +1095,7 @@
     "features": {
       "skills": {
         "name": "Skills",
-        "desc": "Drag-and-drop skill plans, a remap-, implant- and accelerator-aware optimizer, live queue import, and a side-by-side character comparison.",
+        "desc": "Drag-and-drop skill plans, a remap-, implant- and accelerator-aware optimizer, live queue import, ship mastery and fit checks, and a side-by-side character comparison.",
         "tag": "Planning"
       },
       "clones": {
@@ -1100,12 +1105,12 @@
       },
       "industry": {
         "name": "Industry",
-        "desc": "Build plans for manufacturing and reactions: materials, job fees, facility rigs and taxes at live hub prices, with a production log that tracks what each run really made.",
+        "desc": "Build plans for manufacturing and reactions: materials, job fees, facility rigs and taxes at live hub prices, with a production log that tracks what each run really made, and a search across every public BPC contract by ME/TE, runs, price and jumps.",
         "tag": "Manufacturing"
       },
       "market": {
         "name": "Market",
-        "desc": "Order books, spreads and variation comparison across Jita, Amarr, Dodixie, Rens and Hek. Built on public price data, so it works whatever you did or didn't grant.",
+        "desc": "Order books for any region or all of them, filtered by jump range and security, with price history, side-by-side compare, price alerts, and an appraisal of pasted items or EFT fits net of fees. Built on public price data, so it works whatever you did or didn't grant.",
         "tag": "No scope needed"
       },
       "orders": {
@@ -1129,8 +1134,8 @@
         "tag": "Planning"
       },
       "miningTax": {
-        "name": "Moon Mining",
-        "desc": "The rental ledger: per-day, per-system ore assigned to payees, tax and ISK snapshotted at assignment, splits, settle-up and payment matching.",
+        "name": "Mining",
+        "desc": "Your output, ISK/hr and raw-vs-refined value over time, plus the moon rental ledger: per-day, per-system ore assigned to payees, tax and ISK snapshotted at assignment, splits, settle-up and payment matching.",
         "tag": "Ledger"
       },
       "corp": {
@@ -1150,8 +1155,8 @@
       },
       "social": {
         "name": "Mail, Calendar & Contracts",
-        "desc": "In-game mail, upcoming events, contracts and standings, read without launching the client.",
-        "tag": "Read-only"
+        "desc": "In-game mail with reply and forward, a calendar you can RSVP from, contracts and standings, all without launching the client.",
+        "tag": "Out of game"
       }
     },
     "trustHeading": "Read-only, and it stays that way",
@@ -1416,6 +1421,7 @@
     },
     "loadFailedTitle": "Could not load",
     "loadFailedHint": "Something went wrong fetching this. Try Refresh.",
+    "retry": "Try again",
     "spaceOption": {
       "highsec": "Highsec",
       "lowsec": "Lowsec",
@@ -1884,6 +1890,9 @@
     },
     "itemCount_one": "{{count}} item",
     "itemCount_other": "{{count}} items",
+    "levelHeading": {
+      "itemsSuffix": ", {{items}}"
+    },
     "emptyLocation": "Nothing stored here.",
     "section": {
       "pinned": "Pinned",
@@ -2090,7 +2099,10 @@
       "noKindsHint": "Pick at least one type from the filter to see what is coming up."
     },
     "sourcesNeedLogin": "Some sources need a new login: {{sources}}.",
-    "emptyTitle": "No event detail cached"
+    "detailLoadFailedHint": "Couldn't fetch this event's details. You may be offline or ESI may be busy — try again in a moment. If it keeps failing, the event may have been deleted or your invitation withdrawn.",
+    "detailReauthTitle": "Log in again to see this event",
+    "detailReauthHint": "EVE rejected this character's login when fetching the event's details. Log this character in again to restore calendar access.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "clones": {
     "title": "Clones",
@@ -2535,6 +2547,16 @@
     "colonyStateSteps_other": "{{count}} steps",
     "colonyStateClear": "as is",
     "colonyUnknown": "unknown",
+    "colonyLoadSr": "{{percent}}% of budget in use.",
+    "colonyLoadUnknownSr": "Load unknown.",
+    "colonyFaultsSr_one": "{{count}} fault.",
+    "colonyFaultsSr_other": "{{count}} faults.",
+    "colonyStepsSr_one": "{{count}} step to take.",
+    "colonyStepsSr_other": "{{count}} steps to take.",
+    "colonyClearSr": "Nothing to change.",
+    "colonyFullInSr": "Full in {{span}}.",
+    "colonyFullInOverflowSr": "Full in {{span}}, before the next haul.",
+    "colonyFullInUnknownSr": "Time to full unknown.",
     "worklistStalled": "stalls {{percent}}% of the time",
     "colonySlotLockedTag": "Locked",
     "colonySlotLocked": "Train Interplanetary Consolidation to level {{level}} to unlock another colony.",
@@ -2571,6 +2593,8 @@
     "searchPlaceholder": "Search issuer or title…",
     "noFilterMatches": "No contracts match your filters.",
     "noFilterMatchesHint": "Clear the search or reset the status/type filters to see every contract.",
+    "noFilterMatchesResetHint": "No contract matches the current search and filters.",
+    "resetFilters": "Reset filters",
     "showAll": "Show all ({{count}} total)",
     "staleTooltip": "Outstanding and past its deadline — lapsed and unclaimed.",
     "fetchTruncatedRetry": "Retry",
@@ -2979,6 +3003,11 @@
         "body": "Someone bought {{item}} from {{character}}.",
         "bodyWithQuantity": "Someone bought {{quantity}} x {{item}} from {{character}}."
       },
+      "marketOrderUndercut": {
+        "title": "Order undercut",
+        "sellBody": "{{character}}'s {{item}} sell order at {{price}} ISK was undercut at its station ({{rival}} ISK).",
+        "buyBody": "{{character}}'s {{item}} buy order at {{price}} ISK was outbid at its station ({{rival}} ISK)."
+      },
       "structureFuelLow": {
         "title": "Structure fuel low",
         "body": "{{character}}: {{structure}} has less than {{days}} days of fuel remaining."
@@ -3264,10 +3293,19 @@
       "columnSellTotal": "Sell total",
       "columnRefineTotal": "Refine total",
       "columnLpTotal": "LP store",
+      "columnUndercut": "List at",
+      "undercut": "Undercut",
+      "undercutHelp": "Show a sell price for every item, one price step under the cheapest seller at this hub, ready to copy into EVE.",
+      "undercutNote": "List at is one price step under the cheapest seller at {{hub}}, at 100% of market, as of the last price fetch, which can lag the live order book. Refresh before listing. EVE doesn't let apps place orders, so copy each price into the in-game sell window.",
+      "undercutAtOrBelowBuy": "Listing at {{price}} pays no more than selling into the best buy order — sell it now instead.",
       "sellTotal": "Sell total",
       "sellTotalHelp": "What the list costs to buy outright, from sell orders at this hub.",
       "buyTotal": "Buy total",
       "buyTotalHelp": "What the list fetches if you sell into buy orders at this hub right now.",
+      "instantNet": "You receive, selling now",
+      "instantNetHelp": "Selling into buy orders here, after {{tax}}% sales tax. No broker fee: filling an order lists nothing. Always at 100% of market.",
+      "listNet": "You receive, listing",
+      "listNetHelp": "Listing one price step under the cheapest seller here, after {{tax}}% sales tax and a {{broker}}% broker fee, 100 ISK minimum per row. Always at 100% of market.",
       "refineTotal": "Refine total",
       "refineTotalHelp": "What refining the list with the active Character's own reprocessing skills would fetch, sold into buy orders at this hub. Assumes an NPC station's 50% base rate and no ore-specialisation skill — neither is modelled — so a trained miner's real yield runs higher than shown.",
       "refineImplantHint": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
@@ -3471,6 +3509,15 @@
       "noCostBasisTitle": "We don't know what this cost you",
       "noCostBasisHint": "Without it we can't work out your lowest safe price. We know the cost of stock you built (make a build plan on the Industry page, log the run that made these, then link it to this order) or bought with this character, when your wallet history covers every unit.",
       "linkBuild": "Link a build",
+      "nextStep": "Next step",
+      "nextSetPrice": "Set your price to {{price}}",
+      "nextKeepAt": "Keep it at {{price}}",
+      "nextCheapestRival": "Cheapest seller: {{price}}",
+      "sectionNumbers": "The numbers",
+      "trailingClear": "Clear",
+      "trailingNotChecked": "Not checked",
+      "trailingCostPerUnit": "{{amount}} ISK/unit",
+      "trailingNoExit": "No priced exit yet",
       "sellsOutIn": "Sells out in",
       "sellsOutHelp": "Units left divided by the item's average daily volume in the region, shared by your place in the queue.",
       "sellsOutUnknown": "Can't tell yet",
@@ -3528,6 +3575,10 @@
       "statIfSellsAsListed": "If it sells as listed",
       "statPerUnitAfterFees": "a unit, after fees",
       "exitsTitle": "Is there a better exit?",
+      "exitShortHold": "Hold",
+      "exitShortUndercutStation": "Undercut",
+      "exitShortDumpToBuyOrder": "Dump",
+      "exitShortReprocess": "Reprocess",
       "exitHold": "Hold at {{price}}",
       "exitHoldSellsIn": "Hold at {{price}}, sells in {{days}}d",
       "exitUndercutStation": "Undercut the station at {{price}}",
@@ -3703,6 +3754,7 @@
         "planetaryExtractionDone": "Planetary Extraction Done",
         "planetaryExtractorExpiring": "Planetary Extractor Expiring",
         "marketOrderFilled": "Sell Order Filled",
+        "marketOrderUndercut": "Market Order Undercut",
         "newCalendarEvent": "New Calendar Event",
         "calendarEventStarting": "Calendar Event Starting",
         "contractAccepted": "Contract Accepted",
@@ -3718,6 +3770,7 @@
         "priceAlertTriggered": "Quickbar Price Alert"
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled for notifications — open the app at least that often to keep it current. The Planetary Industry page always shows the real expiry.",
+      "marketOrderUndercutStationOnlyHint": "Only checks your order's own station, and only while the app is open — it does not compare prices across the wider system or region.",
       "corpEventBestEffortHint": "Best-effort: fires only while the app is open. Not a substitute for in-game alerts.",
       "scheduledPushBadge": "Arrives even with the app closed — the backend schedules this one up to 72 hours ahead. Needs notification permission, and on iPhone and iPad the app installed to the home screen. Every other event needs the app open.",
       "extractorExpiringLeadTimeLabel": "Warn this far before an extractor expires:",
@@ -3921,6 +3974,7 @@
         "showInfo": "Show info",
         "viewInMarket": "View in Market"
       },
+      "moreActionsLabel": "More actions for {{name}}",
       "severity": {
         "critical": "Critical",
         "warning": "Due soon",
@@ -3991,6 +4045,11 @@
       "columnLocation": "Location",
       "itemCount_one": "{{count}} item",
       "itemCount_other": "{{count}} items",
+      "levelHeading": {
+        "itemsSuffix": ", {{items}}"
+      },
+      "groupCount_one": "{{count}} group",
+      "groupCount_other": "{{count}} groups",
       "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this corporation has more.",
       "noAccessTitle": "Corp assets need Director",
       "noAccessHint": "EVE only opens the corporation asset list to a Director. No other corporation role can see it, and granting access here will not change that.",

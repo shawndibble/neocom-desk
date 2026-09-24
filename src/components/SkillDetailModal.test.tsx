@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { act, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -8,6 +9,7 @@ import { db } from '@/db';
 import { SkillDetailModal } from './SkillDetailModal';
 import { useSkillDetailModalStore } from '@/stores/skillDetailModal';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { loadSkills } from '@/sde/loadSde';
 import type { SkillType } from '@/sde/types';
 
 const CHAR_ID = 91;
@@ -129,12 +131,55 @@ describe('SkillDetailModal', () => {
     expect(await within(dialog).findByText('Level 3')).toBeInTheDocument();
   });
 
-  it('shows an empty state for an unknown skill type id', async () => {
+  it('shows a neutral not-found state with no retry for an unknown skill type id', async () => {
     render(<SkillDetailModal />);
     act(() => useSkillDetailModalStore.getState().open(99999));
 
     const dialog = await screen.findByRole('dialog');
+    expect(await within(dialog).findByText('Skill not found')).toBeInTheDocument();
+    expect(within(dialog).getByText("This skill isn't in the skill catalog.")).toBeInTheDocument();
+    expect(within(dialog).queryByText('Could not load')).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+  });
+
+  it('shows a load failure with an in-place Try again that never mentions Refresh', async () => {
+    vi.mocked(loadSkills).mockRejectedValueOnce(new Error('boom'));
+
+    render(<SkillDetailModal />);
+    act(() => useSkillDetailModalStore.getState().open(3));
+
+    const dialog = await screen.findByRole('dialog');
     expect(await within(dialog).findByText('Could not load')).toBeInTheDocument();
+    expect(
+      within(dialog).getByText('Something went wrong loading this skill. Try again.')
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Refresh/)).not.toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
+  it('Try again re-runs the load, showing the spinner and then the skill', async () => {
+    let resolveRetry: (skills: SkillType[]) => void = () => {};
+    vi.mocked(loadSkills)
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockImplementationOnce(
+        () =>
+          new Promise<SkillType[]>((resolve) => {
+            resolveRetry = resolve;
+          })
+      );
+    const user = userEvent.setup();
+
+    render(<SkillDetailModal />);
+    act(() => useSkillDetailModalStore.getState().open(3));
+
+    const dialog = await screen.findByRole('dialog');
+    await user.click(await within(dialog).findByRole('button', { name: 'Try again' }));
+
+    expect(within(dialog).getByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    expect(within(dialog).queryByText('Could not load')).not.toBeInTheDocument();
+
+    await act(async () => resolveRetry(FIXTURE_SKILLS));
+    expect(await within(dialog).findByText('No prerequisites')).toBeInTheDocument();
   });
 
   it('close() from the store hides the dialog', async () => {

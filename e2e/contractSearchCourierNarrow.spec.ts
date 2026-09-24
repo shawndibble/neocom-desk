@@ -281,15 +281,23 @@ test.describe('courier board — 390px width', () => {
       if (!badge) throw new Error('ISK/jump cell shows no going-rate badge');
       // Where the glyphs end, not the cell's box: a stray padding utility
       // would leave the box at the edge and the figure well short of it. A
-      // `Range` over the figure's text reports what a reader sees.
+      // `Range` over the figure's text reports what a reader sees — the
+      // visible text only: `IskAmount`'s screen-reader copy of the exact
+      // figure is clipped away but still reports its full-width box.
       const figure = stack.firstChild;
       if (!figure) throw new Error('ISK/jump cell rendered no figure');
-      const range = document.createRange();
-      range.selectNodeContents(figure);
+      let glyphsRight = -Infinity;
+      const walker = document.createTreeWalker(figure, NodeFilter.SHOW_TEXT);
+      for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+        if (!text.textContent?.trim() || text.parentElement?.closest('.sr-only')) continue;
+        const range = document.createRange();
+        range.selectNodeContents(text);
+        glyphsRight = Math.max(glyphsRight, range.getBoundingClientRect().right);
+      }
       const rowBox = row.getBoundingClientRect();
       const cornerBox = cornerCell.getBoundingClientRect();
       return {
-        cornerRight: range.getBoundingClientRect().right,
+        cornerRight: glyphsRight,
         badgeRight: badge.getBoundingClientRect().right,
         // The card's content edge, read from its own style rather than a
         // hardcoded inset, so a padding change moves the target with it.

@@ -188,6 +188,8 @@ interface DomainOverrides {
   loadEveNotifications?: (characterId: number) => Promise<CharacterNotification[] | null>;
   prevEveNotificationState?: () => Promise<EveNotificationPollerState>;
   saveEveNotificationState?: (state: EveNotificationPollerState) => Promise<void>;
+  /** issue #1423 — a distinct domain from `loadMarketOrders`, so gating one off must leave the other running. */
+  loadMarketOrderUndercut?: (characterId: number) => Promise<readonly unknown[] | null>;
 }
 
 /**
@@ -239,6 +241,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     loadEveNotifications = async () => [],
     prevEveNotificationState,
     saveEveNotificationState,
+    loadMarketOrderUndercut = async () => [],
     ...rest
   } = overrides;
 
@@ -257,13 +260,16 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     // covered in pollDomains.test.ts and notificationDiffs.test.ts, so a bare
     // "nothing to fetch" default is enough to keep the generic delivery-loop
     // cases above from tripping over a later registry entry they know
-    // nothing about.
+    // nothing about. marketOrderUndercut (issue #1423) gets its own
+    // `loadMarketOrderUndercut` override below, since a domain-off test needs
+    // to tell its stub apart from `marketOrders`' own.
     structureFuel: async () => [],
     corpIndustryJobs: async () => [],
     corpRoster: async () => [],
     corpWallet: async () => [],
     spExtraction: async () => [],
     priceAlert: async () => [],
+    marketOrderUndercut: loadMarketOrderUndercut,
   };
   const states: Record<string, DomainPollState> = {
     skillQueue: domainState(prevState, saveState),
@@ -281,6 +287,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     corpWallet: domainState(undefined, undefined),
     spExtraction: domainState(undefined, undefined),
     priceAlert: domainState(undefined, undefined),
+    marketOrderUndercut: domainState(undefined, undefined),
   };
 
   return {
@@ -1225,6 +1232,29 @@ describe('runForegroundPoll', () => {
     const deps = baseDeps({ loadMarketOrders });
     await runForegroundPoll(deps);
     expect(loadMarketOrders).not.toHaveBeenCalled();
+  });
+
+  // issue #1423: marketOrderFilled and marketOrderUndercut are two distinct
+  // domains sharing nothing but the scope and the underlying ESI endpoint
+  // (`loadOrders`, coalesced by `esi/cache.ts`'s `inFlightLoads`, not by this
+  // registry) — the realistic default (a character with orders scope granted,
+  // marketOrderFilled left on, marketOrderUndercut never turned on) must fetch
+  // one and not the other, never both or neither.
+  it('makes no Fuzzwork-backed call for marketOrderUndercut while marketOrderFilled stays on for the same character', async () => {
+    const loadMarketOrders = vi.fn(async () => []);
+    const loadMarketOrderUndercut = vi.fn(async () => []);
+    const deps = baseDeps({
+      grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, MARKET_ORDERS_SCOPE]),
+      eventPrefsFor: async () => ({
+        marketOrderFilled: { browser: true },
+        marketOrderUndercut: false,
+      }),
+      loadMarketOrders,
+      loadMarketOrderUndercut,
+    });
+    await runForegroundPoll(deps);
+    expect(loadMarketOrders).toHaveBeenCalledTimes(1);
+    expect(loadMarketOrderUndercut).not.toHaveBeenCalled();
   });
 
   it('skips market orders for a character who toggled the event off despite having the scope', async () => {

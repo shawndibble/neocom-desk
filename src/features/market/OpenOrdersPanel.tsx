@@ -31,6 +31,8 @@ import { resolveCharacterFilter } from '@/features/character/characterFilterValu
 import { loadReprocessing } from '@/sde/loadSde';
 import type { ReprocessingType } from '@/sde/types';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
+import { useHighlightParam } from '@/lib/useHighlightParam';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { useUrlFilter } from '@/lib/useUrlState';
 import { useLazyRowCache } from '@/lib/useLazyRowCache';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -44,6 +46,9 @@ import type { CompetingOrder } from '@/engine/market/undercut';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { ItemContextMenu } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
+import { OpenOrdersList } from './OpenOrdersList';
+import { isOffHubStation } from './hubStation';
+import { formatOrderFloorPrice, formatOrderRemaining } from './orderRowFormat';
 import { loadOpenOrdersSnapshot } from './openOrdersPageSnapshot';
 import {
   loadStationBestPrices,
@@ -83,7 +88,6 @@ import type { OrderProblem } from '@/engine/market/orderProblems';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
 import { stationPriceKey } from './stationPriceKey';
-import { roundPriceUp } from '@/engine/market/priceTick';
 import type { HubBuyPrice } from './orderExits';
 import { OrderBadgeLegend } from './OrderBadgeLegend';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
@@ -102,9 +106,6 @@ const SORTS: readonly OpenOrdersSort[] = OPEN_ORDERS_SORTS;
  * `FILTERABLE_PROBLEMS` gives.
  */
 const PROBLEM_FILTER_OPTIONS = FILTERABLE_PROBLEMS;
-
-/** The five NPC trade hub stations — an order anywhere else sees far fewer buyers, which the row says out loud. */
-const HUB_STATION_IDS = new Set(TRADE_HUBS.map((hub) => hub.stationId));
 
 /**
  * The left edge stripe on a group header, by how bad the group is. Same
@@ -134,6 +135,18 @@ function itemKey(regionId: number, typeId: number): string {
 function stationShortName(name: string): string {
   const dashIndex = name.indexOf(' - ');
   return dashIndex === -1 ? name : name.slice(0, dashIndex);
+}
+
+/** The highlighted row's own group always wins over either fold mechanism (decision `20260924-...`, step 9). */
+function isGroupFolded(
+  problem: OrderProblem,
+  highlightedRow: OpenOrderRow | null,
+  filter: OpenOrdersFilter,
+  collapsedGroups: ReadonlySet<OrderProblem>
+): boolean {
+  if (problem === highlightedRow?.problem) return false;
+  if (problem === 'healthy') return filter.hideHealthy;
+  return collapsedGroups.has(problem);
 }
 
 interface ActiveChipDisplay {
@@ -181,6 +194,13 @@ export function OpenOrdersPanel({
     OPEN_ORDERS_FIELD_TO_PARAM,
     DEFAULT_OPEN_ORDERS_FILTER_PARAMS
   );
+  /**
+   * The order a Notification Event (an undercut, or a fill) sent the reader
+   * to, spent once on arrival (`useHighlightParam`'s own doc). Landing on the
+   * row that prompted the click, decision `20260908-123516`.
+   */
+  const highlightId = useHighlightParam();
+  const isPhone = useIsPhone();
   const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   /** Groups the player has folded away by hand. `healthy` is never in here — see the toggle below. */
@@ -373,6 +393,19 @@ export function OpenOrdersPanel({
       now: snapshot.now,
     });
   }, [snapshot, deepCompetitionByOrderId, structureCache.byKey, stationNames]);
+
+  /**
+   * The highlighted row, found across every group before any fold/filter
+   * narrows the screen — null when nothing matches is harmless (decision
+   * `20260908-123516`). Read off `allRows`, not `groupingRows`: this only
+   * forces open the row's own fold state, never an active content filter
+   * (search/problem/character) — narrowing that too is an open judgment call
+   * (see the scope decision file).
+   */
+  const highlightedRow = useMemo(
+    () => (highlightId === null ? null : (allRows.find((r) => r.orderId === highlightId) ?? null)),
+    [allRows, highlightId]
+  );
 
   /**
    * Takes this load's `OrderProblem` reading for every open order and drops
@@ -585,6 +618,19 @@ export function OpenOrdersPanel({
     );
   }
 
+  /** `CharacterFilterControl`'s `value` prop, derived the same way from either `filter.characterIds` (desktop strip) or `draft.characterIds` (phone funnel sheet). */
+  function characterFilterValueOf(characterIds: readonly number[]) {
+    return characterIds.length === 0 ? 'all' : new Set(characterIds);
+  }
+
+  /** `CharacterFilterControl`'s `onChange`, resolving its selection back to `characterIds` and handing it to whichever setter owns them — `setFilter` (commits immediately) or `setDraft` (committed on the funnel's Apply). */
+  function characterFilterOnChange(setCharacterIds: (ids: readonly number[]) => void) {
+    return (next: Parameters<typeof resolveCharacterFilter>[0]) => {
+      const resolved = resolveCharacterFilter(next, activeCharacterId);
+      setCharacterIds(resolved === 'all' ? [] : [...resolved]);
+    };
+  }
+
   /** Same menu Transactions carries — an order row names an item like any other. */
   function rowContextMenu(row: OpenOrderRow, tr: ReactElement) {
     const blueprintTypeID =
@@ -608,116 +654,115 @@ export function OpenOrdersPanel({
     );
   }
 
-  const columns: DataTableColumn<OpenOrderRow>[] = [
-    {
-      id: 'item',
-      header: t('orders.item'),
-      primary: true,
-      sortValue: (row) => row.typeName,
-      render: (row) => (
-        <span className="flex flex-wrap items-center gap-1">
-          <MarketItemLink typeId={row.typeId}>{row.typeName}</MarketItemLink>
-          {showCharacterStrip && <CharacterBadge characterName={row.characterName} t={t} />}
-        </span>
-      ),
-    },
-    {
-      id: 'where',
-      header: t('market.location'),
-      className: 'text-text-dim',
-      render: (row) => (
-        <span className="flex flex-col gap-0.5">
-          <span>
-            {row.stationName === null ? (
-              t('market.unknownStructure')
-            ) : (
-              <Tooltip content={row.stationName} openOnTap>
-                <span
-                  tabIndex={0}
-                  className="cursor-help underline decoration-dotted decoration-text-dim/50 underline-offset-2"
-                >
-                  {stationShortName(row.stationName)}
-                </span>
-              </Tooltip>
-            )}
-          </span>
-          {/*
-            Only ever claimed for a location this app actually resolved: an
-            unresolved player structure is "not checked", not "off hub".
-          */}
-          {row.stationName !== null && !HUB_STATION_IDS.has(row.locationId) && (
-            <span className="flex items-center gap-1 text-[0.6875rem] text-warning">
-              {t('market.orders.offHub')}
-              <InfoTooltip
-                label={t('common.aboutLabel', { label: t('market.orders.offHub') })}
-                content={t('market.orders.offHubHelp')}
-              />
+  // On a phone `OpenOrdersList` renders instead of `DataTable` and none of
+  // this is used — the ternary short-circuits so the array (8 columns'
+  // worth of render closures, rebuilt every render otherwise) is never
+  // actually constructed there.
+  const columns: DataTableColumn<OpenOrderRow>[] = isPhone
+    ? []
+    : [
+        {
+          id: 'item',
+          header: t('orders.item'),
+          primary: true,
+          sortValue: (row) => row.typeName,
+          render: (row) => (
+            <span className="flex flex-wrap items-center gap-1">
+              <MarketItemLink typeId={row.typeId}>{row.typeName}</MarketItemLink>
+              {showCharacterStrip && <CharacterBadge characterName={row.characterName} t={t} />}
             </span>
-          )}
-        </span>
-      ),
-    },
-    {
-      id: 'price',
-      header: t('orders.price'),
-      align: 'right',
-      className: 'tabular-nums',
-      sortValue: (row) => row.price,
-      render: (row) => formatIskAuto(row.price),
-    },
-    {
-      id: 'problem',
-      header: t('market.orders.filter.problem'),
-      render: (row) => {
-        const badge = orderBadgeFor(row);
-        return (
-          <span className="flex flex-col items-start gap-1">
-            {badge && <OrderProblemBadge kind={badge.kind} detail={badge.detail} />}
-            <OrderRowSummaryText row={row} />
-          </span>
-        );
-      },
-    },
-    {
-      id: 'floor',
-      header: t('market.orders.floorLabel'),
-      align: 'right',
-      className: 'tabular-nums',
-      // Sorted by the EXACT break-even, unaffected by the rounded-up figure
-      // the cell itself renders (issue #1421) — no copy button here, no room
-      // in the row (see `OrderDetailModal.tsx` for the copyable version).
-      sortValue: (row) => row.floor?.relist,
-      render: (row) =>
-        row.floor
-          ? formatIskAuto(roundPriceUp(row.floor.relist) ?? row.floor.relist)
-          : t('common.unknown'),
-    },
-    {
-      id: 'remaining',
-      header: t('orders.remaining'),
-      align: 'right',
-      className: 'tabular-nums',
-      sortValue: (row) => row.volumeRemain,
-      render: (row) => `${row.volumeRemain.toLocaleString()} / ${row.volumeTotal.toLocaleString()}`,
-    },
-    {
-      id: 'expires',
-      header: t('orders.expires'),
-      className: 'whitespace-nowrap text-text-dim',
-      sortValue: (row) => row.expiry?.expiresAt,
-      render: (row) =>
-        row.expiry ? new Date(row.expiry.expiresAt).toLocaleDateString() : t('common.unknown'),
-    },
-    {
-      id: 'details',
-      header: t('market.orders.details'),
-      render: (row) => (
-        <Button size="sm" onClick={() => openDetails(row)}>
-          {t('market.orders.details')}
-        </Button>
-      ),
-    },
-  ];
+          ),
+        },
+        {
+          id: 'where',
+          header: t('market.location'),
+          className: 'text-text-dim',
+          render: (row) => (
+            <span className="flex flex-col gap-0.5">
+              <span>
+                {row.stationName === null ? (
+                  t('market.unknownStructure')
+                ) : (
+                  <Tooltip content={row.stationName} openOnTap>
+                    <span
+                      tabIndex={0}
+                      className="cursor-help underline decoration-dotted decoration-text-dim/50 underline-offset-2"
+                    >
+                      {stationShortName(row.stationName)}
+                    </span>
+                  </Tooltip>
+                )}
+              </span>
+              {isOffHubStation(row.stationName, row.locationId) && (
+                <span className="flex items-center gap-1 text-[0.6875rem] text-warning">
+                  {t('market.orders.offHub')}
+                  <InfoTooltip
+                    label={t('common.aboutLabel', { label: t('market.orders.offHub') })}
+                    content={t('market.orders.offHubHelp')}
+                  />
+                </span>
+              )}
+            </span>
+          ),
+        },
+        {
+          id: 'price',
+          header: t('orders.price'),
+          align: 'right',
+          className: 'tabular-nums',
+          sortValue: (row) => row.price,
+          render: (row) => formatIskAuto(row.price),
+        },
+        {
+          id: 'problem',
+          header: t('market.orders.filter.problem'),
+          render: (row) => {
+            const badge = orderBadgeFor(row);
+            return (
+              <span className="flex flex-col items-start gap-1">
+                {badge && <OrderProblemBadge kind={badge.kind} detail={badge.detail} />}
+                <OrderRowSummaryText row={row} />
+              </span>
+            );
+          },
+        },
+        {
+          id: 'floor',
+          header: t('market.orders.floorLabel'),
+          align: 'right',
+          className: 'tabular-nums',
+          // Sorted by the EXACT break-even, unaffected by the rounded-up figure
+          // the cell itself renders (issue #1421) — no copy button here, no room
+          // in the row (see `OrderDetailModal.tsx` for the copyable version).
+          sortValue: (row) => row.floor?.relist,
+          render: (row) => (row.floor ? formatOrderFloorPrice(row.floor) : t('common.unknown')),
+        },
+        {
+          id: 'remaining',
+          header: t('orders.remaining'),
+          align: 'right',
+          className: 'tabular-nums',
+          sortValue: (row) => row.volumeRemain,
+          render: (row) => formatOrderRemaining(row.volumeRemain, row.volumeTotal),
+        },
+        {
+          id: 'expires',
+          header: t('orders.expires'),
+          className: 'whitespace-nowrap text-text-dim',
+          sortValue: (row) => row.expiry?.expiresAt,
+          render: (row) =>
+            row.expiry ? new Date(row.expiry.expiresAt).toLocaleDateString() : t('common.unknown'),
+        },
+        {
+          id: 'details',
+          header: t('market.orders.details'),
+          render: (row) => (
+            <Button size="sm" onClick={() => openDetails(row)}>
+              {t('market.orders.details')}
+            </Button>
+          ),
+        },
+      ];
 
   // No VISIBLE order carries a floor (nothing has a linked build), so the
   // whole column would be a wall of dashes — dropped rather than shown
@@ -938,6 +983,25 @@ export function OpenOrdersPanel({
                       ))}
                     </SelectContent>
                   </Select>
+                  {/*
+                    On a phone the character strip below (outside the funnel)
+                    is hidden, so its picker lives here instead — the active
+                    selection still surfaces as chips in the row below this
+                    sheet, same as every other filter field (decision
+                    20260924-020211 "Open Orders gets a compact phone list").
+                  */}
+                  {isPhone && showCharacterStrip && (
+                    <div className="w-full border-t border-line pt-2">
+                      <CharacterFilterControl
+                        characters={entriesWithOrders}
+                        activeCharacterId={activeCharacterId}
+                        value={characterFilterValueOf(draft.characterIds)}
+                        onChange={characterFilterOnChange((characterIds) =>
+                          setDraft({ ...draft, characterIds })
+                        )}
+                      />
+                    </div>
+                  )}
                 </>
               )}
             </FilterBar>
@@ -950,7 +1014,7 @@ export function OpenOrdersPanel({
               ))}
               <button
                 type="button"
-                className="rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                className="flex min-h-11 items-center rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
                 onClick={() => setFilter(DEFAULT_FILTER)}
               >
                 {t('market.orders.filter.clearAll')}
@@ -958,19 +1022,15 @@ export function OpenOrdersPanel({
             </div>
           )}
 
-          {showCharacterStrip && (
+          {showCharacterStrip && !isPhone && (
             <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
               <CharacterFilterControl
                 characters={entriesWithOrders}
                 activeCharacterId={activeCharacterId}
-                value={filter.characterIds.length === 0 ? 'all' : new Set(filter.characterIds)}
-                onChange={(next) => {
-                  const resolved = resolveCharacterFilter(next, activeCharacterId);
-                  setFilter({
-                    ...filter,
-                    characterIds: resolved === 'all' ? [] : [...resolved],
-                  });
-                }}
+                value={characterFilterValueOf(filter.characterIds)}
+                onChange={characterFilterOnChange((characterIds) =>
+                  setFilter({ ...filter, characterIds })
+                )}
               />
             </div>
           )}
@@ -990,10 +1050,10 @@ export function OpenOrdersPanel({
               // `collapsedGroups`: that flag is also what the "N of M orders
               // match" count reads, so two mechanisms would let the caret and
               // the count disagree about whether healthy orders are showing.
-              const folded =
-                group.problem === 'healthy'
-                  ? filter.hideHealthy
-                  : collapsedGroups.has(group.problem);
+              // `isGroupFolded` reads `highlightedRow` live rather than a
+              // `setFilter`/`setCollapsedGroups` write, so it never races
+              // `useHighlightParam`'s own URL write on first render.
+              const folded = isGroupFolded(group.problem, highlightedRow, filter, collapsedGroups);
               const toggle = () => {
                 if (group.problem === 'healthy') {
                   setFilter({ ...filter, hideHealthy: !filter.hideHealthy });
@@ -1077,6 +1137,16 @@ export function OpenOrdersPanel({
                         {t('market.orders.group.healthyHint')}
                       </p>
                     )
+                  ) : isPhone ? (
+                    <OpenOrdersList
+                      rows={group.rows}
+                      label={`${groupTitle} · ${group.rows.length}`}
+                      showCharacter={showCharacterStrip}
+                      showFloor={hasFloorData}
+                      highlightId={highlightId}
+                      onOpen={openDetails}
+                      rowContextMenu={rowContextMenu}
+                    />
                   ) : (
                     <DataTable
                       columns={visibleColumns}
@@ -1084,6 +1154,7 @@ export function OpenOrdersPanel({
                       rowKey={(row) => row.orderId}
                       rowContextMenu={rowContextMenu}
                       label={`${groupTitle} · ${group.rows.length}`}
+                      highlightRowKey={highlightId}
                     />
                   )}
                 </div>
@@ -1094,7 +1165,7 @@ export function OpenOrdersPanel({
           <div className="flex flex-wrap items-center gap-3 px-3 py-2">
             <button
               type="button"
-              className="rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+              className="flex min-h-11 items-center rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
               onClick={() => setLegendOpen(true)}
             >
               {t('market.orders.legendOpen')}
@@ -1105,6 +1176,10 @@ export function OpenOrdersPanel({
 
       {detailRow && (
         <OrderDetailModal
+          // Keyed by orderId so the modal remounts (and its folded-section
+          // state resets) between orders, rather than reusing one instance
+          // across every row (issue #1428).
+          key={detailRow.orderId}
           open={detailOrderId !== null}
           row={detailRow}
           skills={snapshot.skillsByCharacter.get(detailRow.characterId)}

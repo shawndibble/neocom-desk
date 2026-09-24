@@ -1,13 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { OpenOrdersPanel } from './OpenOrdersPanel';
 import { loadAllCharactersOpenOrders, type OpenOrdersSnapshot } from './openOrdersData';
 import { loadOrderCostBases, type ProductionRunBasis } from './orderCostBasis';
 import { loadStationBestPrices, loadRegionCompetition, loadJumpsBetween } from './orderCompetition';
+import { stationPriceKey } from './stationPriceKey';
 import { loadPriceHistory } from './priceHistory';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadNpcStations } from '@/sde/loadMarketSde';
@@ -131,6 +132,27 @@ const onShowInfo = vi.fn();
 function renderPanel(initialEntry = '/market/orders') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
+      <OpenOrdersPanel
+        blueprintCatalog={null}
+        onRequestBlueprintCatalog={onRequestBlueprintCatalog}
+        onAddToQuickbar={vi.fn()}
+        quickbarAvailable
+        onShowInfo={onShowInfo}
+      />
+    </MemoryRouter>
+  );
+}
+
+/** Renders the current URL's search string alongside the panel, for asserting `?highlight=` is spent on arrival (issue #1423). */
+function CurrentSearch() {
+  const location = useLocation();
+  return <p data-testid="location-search">{location.search}</p>;
+}
+
+function renderPanelWithLocation(initialEntry: string) {
+  return render(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <CurrentSearch />
       <OpenOrdersPanel
         blueprintCatalog={null}
         onRequestBlueprintCatalog={onRequestBlueprintCatalog}
@@ -422,6 +444,88 @@ describe('OpenOrdersPanel', () => {
     ).toBeInTheDocument();
   });
 
+  // issue #1423: a marketOrderUndercut (or marketOrderFilled) notification
+  // deep-links here with `?highlight=<orderId>`, per decision
+  // `20260908-123516` — the row must land expanded and pulsed even when its
+  // group is the healthy one, folded by default.
+  describe('?highlight= deep link (issue #1423)', () => {
+    it('expands the healthy group and pulses the highlighted row, without touching Show healthy orders', async () => {
+      const scrollIntoView = vi
+        .spyOn(Element.prototype, 'scrollIntoView')
+        .mockImplementation(() => {});
+      mockedLoadAll.mockResolvedValue(
+        snapshot([
+          {
+            characterId: 1,
+            characterName: 'Alpha',
+            orders: [NO_COST_BASIS_ORDER],
+            fetchedAt: Date.now(),
+            fromCache: false,
+            needsReauth: false,
+          },
+        ])
+      );
+
+      renderPanel('/market/orders?highlight=103');
+
+      const group = await screen.findByTestId('order-group-healthy');
+      // Expanded on arrival, with no click on "Show healthy orders" — the
+      // toggle still reads "Show healthy orders" (untouched: the URL's
+      // `hideHealthy` default was never flipped), but the table is visible
+      // anyway.
+      expect(screen.getByRole('button', { name: 'Show healthy orders' })).toBeInTheDocument();
+      expect(within(group).getByRole('table')).toBeInTheDocument();
+      const pulsed = within(group).getByText('Pyerite').closest('[data-row-key]');
+      expect(pulsed).toHaveAttribute('data-row-key', '103');
+      expect(pulsed?.className).toContain('row-pulse');
+      expect(scrollIntoView.mock.instances).toContain(pulsed);
+      scrollIntoView.mockRestore();
+    });
+
+    it('is harmless when the highlighted id matches no order — a stale link, or an order since closed', async () => {
+      mockedLoadAll.mockResolvedValue(
+        snapshot([
+          {
+            characterId: 1,
+            characterName: 'Alpha',
+            orders: [NO_COST_BASIS_ORDER],
+            fetchedAt: Date.now(),
+            fromCache: false,
+            needsReauth: false,
+          },
+        ])
+      );
+
+      renderPanel('/market/orders?highlight=999999');
+
+      // The healthy group stays folded, same as with no highlight at all —
+      // nothing forces it open for an id that matches nothing on screen.
+      const group = await screen.findByTestId('order-group-healthy');
+      expect(within(group).queryByRole('table')).not.toBeInTheDocument();
+    });
+
+    it('spends the highlight param on arrival, matched or not', async () => {
+      vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+      mockedLoadAll.mockResolvedValue(
+        snapshot([
+          {
+            characterId: 1,
+            characterName: 'Alpha',
+            orders: [NO_COST_BASIS_ORDER],
+            fetchedAt: Date.now(),
+            fromCache: false,
+            needsReauth: false,
+          },
+        ])
+      );
+
+      renderPanelWithLocation('/market/orders?highlight=103');
+
+      await screen.findByText('Pyerite');
+      await waitFor(() => expect(screen.getByTestId('location-search').textContent).toBe(''));
+    });
+  });
+
   it('shows the noCostBasis badge and drops the floor column when nothing has one', async () => {
     const user = userEvent.setup();
     mockedLoadAll.mockResolvedValue(
@@ -643,6 +747,8 @@ describe('OpenOrdersPanel', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
     await waitFor(() => expect(within(dialog).queryByText('Checking...')).not.toBeInTheDocument());
+    // "Who is cheaper" starts folded (issue #1428).
+    fireEvent.click(within(dialog).getByRole('button', { name: /Who is cheaper/ }));
 
     const systemRow = within(dialog).getByText('System').closest('div');
     const regionRow = within(dialog).getByText('Region').closest('div');
@@ -906,5 +1012,157 @@ describe('OpenOrdersPanel', () => {
       // check must not fire a second request for the same item.
       expect(mockedRegionCompetition).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe('OpenOrdersPanel — phone', () => {
+  const original = window.matchMedia;
+  beforeEach(() => {
+    // `useIsPhone` reads a max-width query; answering yes is how a phone looks under test.
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: true,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+  });
+  afterEach(() => {
+    window.matchMedia = original;
+  });
+
+  it('renders an expanded group as a compact tap-to-open list, not a table', async () => {
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [BELOW_FLOOR_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanel();
+    await screen.findByTestId('order-group-belowFloor');
+
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    const row = screen.getByRole('button', { name: /Tritanium/ });
+    expect(row).toBeInTheDocument();
+    // The row's own sentence — the plain-English half of the badge (decision
+    // 20260906-170442) — stays even in the compact list.
+    expect(row).toHaveTextContent('Selling at this price loses');
+  });
+
+  it("opens the detail modal by tapping the row, same order as the desktop table's Details button", async () => {
+    const user = userEvent.setup();
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [BELOW_FLOOR_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanel();
+    const row = await screen.findByRole('button', { name: /Tritanium/ });
+    await user.click(row);
+
+    expect(await screen.findByRole('dialog', { name: 'Alpha · Tritanium' })).toBeInTheDocument();
+  });
+
+  it('drops the floor line when no visible row carries one', async () => {
+    // `EXPIRING_ORDER` has no cost basis linked, so no row has a floor — and
+    // `expiringOrStale` (unlike `healthy`) starts expanded, so the row is on
+    // screen without an extra toggle click.
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [EXPIRING_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+
+    renderPanel();
+    await screen.findByRole('button', { name: /Mexallon/ });
+
+    expect(screen.queryByText(/Never sell below/)).not.toBeInTheDocument();
+  });
+
+  it('folding a group still hides its compact rows', async () => {
+    const user = userEvent.setup();
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [EXPIRING_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+
+    renderPanel();
+    const row = await screen.findByRole('button', { name: /Mexallon/ });
+    expect(row).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Expiring or stale · 1' }));
+
+    expect(screen.queryByRole('button', { name: /Mexallon/ })).not.toBeInTheDocument();
+  });
+
+  it("renders the undercut row's match clause as plain text, not a nested focusable tooltip trigger", async () => {
+    // A cheap station rival beating my price, plus a cost basis, is what
+    // makes `orderRowSummary` return a `match` — the one clause that,
+    // on desktop, renders as its own `Tooltip` trigger (`tabIndex={0}`
+    // nested in the row). Nested inside this row's own `<button>` that
+    // would be invalid HTML and a focus/tap trap (issue #1429 code review).
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [{ ...BELOW_FLOOR_ORDER, price: 1000 }],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(100)]]));
+    mockedStationPrices.mockResolvedValue(
+      new Map([
+        [
+          stationPriceKey(STATION_A, 34),
+          { buyMax: null, sellMin: 900, sellVolume: 0, buyVolume: 0 },
+        ],
+      ])
+    );
+
+    renderPanel();
+    const row = await screen.findByRole('button', { name: /Tritanium/ });
+    expect(row).toHaveTextContent('still clears');
+    expect(within(row).queryByRole('button')).not.toBeInTheDocument();
+    expect(row.querySelector('[tabindex]')).toBeNull();
   });
 });

@@ -6,6 +6,7 @@ import { FUZZWORK_AGGREGATES_URL } from './fuzzwork';
 import { DEFAULT_TRADE_HUB } from './hubs';
 import {
   getHubPrices,
+  getStationPrices,
   getAdjustedPrices,
   clearMarketPriceCache,
   invalidateHubPrices,
@@ -158,6 +159,53 @@ describe('getHubPrices', () => {
     await getHubPrices(DEFAULT_TRADE_HUB, [34, 35], clock);
 
     expect(requestedTypes).toEqual(['34', '35']);
+  });
+});
+
+describe('getStationPrices', () => {
+  // issue #1423: `marketOrderUndercutDomain` calls this directly with a bare
+  // station (order location) id, sharing `getHubPrices`' cache rather than
+  // paying an uncached Fuzzwork request per station per poll.
+  it('shares the cache with getHubPrices — a second call inside the TTL makes no fetch', async () => {
+    const hits = { count: 0 };
+    server.use(fuzzworkHandler(hits));
+    let now = 1_000_000;
+    const clock = () => now;
+
+    const first = await getStationPrices(DEFAULT_TRADE_HUB.stationId, [34], clock);
+    expect(first.get(34)).toEqual({ sellMin: 3.8, buyMax: 3.71, sellVolume: 200, buyVolume: 100 });
+    expect(hits.count).toBe(1);
+
+    now += 1000; // well within TTL
+    const second = await getStationPrices(DEFAULT_TRADE_HUB.stationId, [34], clock);
+    expect(second.get(34)).toEqual(first.get(34));
+    expect(hits.count).toBe(1); // served from cache, no second request
+
+    // getHubPrices for the same station/type reads the very same cache entry.
+    const viaHub = await getHubPrices(DEFAULT_TRADE_HUB, [34], clock);
+    expect(viaHub.get(34)).toEqual(first.get(34));
+    expect(hits.count).toBe(1);
+  });
+
+  it('a Fuzzwork failure returns null prices and caches nothing', async () => {
+    let attempt = 0;
+    server.use(
+      http.get(FUZZWORK_AGGREGATES_URL, () => {
+        attempt += 1;
+        return HttpResponse.error();
+      })
+    );
+    let now = 1_000_000;
+    const clock = () => now;
+
+    const first = await getStationPrices(DEFAULT_TRADE_HUB.stationId, [34], clock);
+    expect(first.get(34)).toEqual({ sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 });
+    expect(attempt).toBe(1);
+
+    now += 1000; // well within TTL — nothing was cached, so this retries
+    const second = await getStationPrices(DEFAULT_TRADE_HUB.stationId, [34], clock);
+    expect(second.get(34)).toEqual({ sellMin: null, buyMax: null, sellVolume: 0, buyVolume: 0 });
+    expect(attempt).toBe(2);
   });
 });
 

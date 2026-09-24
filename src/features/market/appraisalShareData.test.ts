@@ -58,9 +58,12 @@ function outcome(): AppraisalOutcome {
         cheapestBuy: 0,
         cheapestBuyViaLp: 0,
       },
+      items: [],
     },
     unmatched: [],
     implantBonusPct: 0,
+    accountingLevel: null,
+    brokerRelationsLevel: null,
   };
 }
 

@@ -20,7 +20,15 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, DataTable, EmptyState, IconButton, IskAmount, Spinner } from '@/components/ui';
+import {
+  Button,
+  DataTable,
+  EmptyState,
+  IconButton,
+  IskAmount,
+  Spinner,
+  TypeIcon,
+} from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { controlHeightClassName } from '@/components/ui/controlStyles';
@@ -34,6 +42,9 @@ import type { OrderBookLocation } from './orderBookView';
 import { compareCsvColumns } from './compareCsv';
 import { formatVolume } from './format';
 import { downloadCsv } from '@/lib/downloadCsv';
+import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import { ItemContextMenu } from './ItemContextMenu';
+import { blueprintTypeIdFor } from './useBlueprintCatalog';
 
 const DRAWER_ID = 'compare-drawer';
 const MIN_HEIGHT = 160;
@@ -62,41 +73,55 @@ const VIEW_LABEL_KEYS = { prices: 'viewPrices', attributes: 'viewAttributes' } a
 export interface CompareDrawerProps {
   location: OrderBookLocation;
   refreshTick: number;
+  blueprintCatalog: BlueprintCatalog | null;
+  onRequestBlueprintCatalog: () => void;
+  onAddToQuickbar: (typeId: number, itemName: string) => void;
+  quickbarAvailable: boolean;
+  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 /** Mounted only while the Compare Set is non-empty — see Market.tsx. Unmounting on empty resets the drawer's own open/height state for free. */
-export function CompareDrawer({ location, refreshTick }: CompareDrawerProps) {
+export function CompareDrawer({
+  location,
+  refreshTick,
+  blueprintCatalog,
+  onRequestBlueprintCatalog,
+  onAddToQuickbar,
+  quickbarAvailable,
+  onShowInfo,
+}: CompareDrawerProps) {
   const { t } = useTranslation();
   const items = useCompareSet((state) => state.items);
   const removeItem = useCompareSet((state) => state.remove);
   const clearSet = useCompareSet((state) => state.clear);
   const view = useCompareSet((state) => state.view);
   const setView = useCompareSet((state) => state.setView);
-  const openRequest = useCompareSet((state) => state.openRequest);
-
-  // `openRequest > 0` at the very first render means `addMany` + `openIn`
-  // already ran in the same synchronous batch that mounted this drawer (a
-  // fresh Variations "Compare" click going from an empty Compare Set) — the
-  // effect below can't tell that case apart from "nothing happened" by
-  // diffing against a ref seeded on this same render, so the initial mode has
-  // to be decided here instead.
+  // A pending `openRequest` at the very first render means `addMany` +
+  // `openIn` already ran in the same synchronous batch that mounted this
+  // drawer (a fresh Variations "Compare" click going from an empty Compare
+  // Set), so the initial mode is decided here.
   const [mode, setMode] = useState<'closed' | 'open' | 'full'>(() =>
-    openRequest > 0 ? (isDesktopWidth() ? 'open' : 'full') : 'closed'
+    useCompareSet.getState().openRequest > 0 ? (isDesktopWidth() ? 'open' : 'full') : 'closed'
   );
   const [heightPx, setHeightPx] = useState(DEFAULT_HEIGHT);
   const handleRef = useRef<HTMLButtonElement>(null);
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
-  const lastHandledRequestRef = useRef(openRequest);
 
-  // A later `openIn` while already mounted (drawer closed, or open on the
-  // other view) — e.g. a second Variations "Compare" click. Only opens a
+  // Every `openIn` is consumed once acted on — the one that mounted this
+  // drawer here, later ones in the listener — so a remount after leaving
+  // Market doesn't reopen the drawer on a request it already honoured. A
+  // later `openIn` (e.g. a second Variations "Compare" click) only opens a
   // *closed* drawer; an already-open one just gets the view switch below, so
   // this never downgrades a manually expanded `full` back to `open`.
   useEffect(() => {
-    if (openRequest === lastHandledRequestRef.current) return;
-    lastHandledRequestRef.current = openRequest;
-    setMode((current) => (current === 'closed' ? (isDesktopWidth() ? 'open' : 'full') : current));
-  }, [openRequest]);
+    const store = useCompareSet.getState();
+    if (store.openRequest > 0) store.consumeOpenRequest();
+    return useCompareSet.subscribe((state, previous) => {
+      if (state.openRequest <= previous.openRequest) return;
+      state.consumeOpenRequest();
+      setMode((current) => (current === 'closed' ? (isDesktopWidth() ? 'open' : 'full') : current));
+    });
+  }, []);
 
   const rows = useCompareRows({
     items,
@@ -144,7 +169,26 @@ export function CompareDrawer({ location, refreshTick }: CompareDrawerProps) {
       {
         id: 'item',
         header: t('market.compare.columnItem'),
-        render: (row) => row.itemName,
+        // The menu wraps only this cell, not the row (unlike sibling surfaces):
+        // the row also holds a Remove button, which must not open it.
+        render: (row) => (
+          <ItemContextMenu
+            typeId={row.typeId}
+            itemName={row.itemName}
+            blueprintTypeID={blueprintTypeIdFor(blueprintCatalog, row.typeId)}
+            onAddToQuickbar={onAddToQuickbar}
+            quickbarAvailable={quickbarAvailable}
+            onShowInfo={onShowInfo}
+            onOpenChange={(open) => {
+              if (open) onRequestBlueprintCatalog();
+            }}
+          >
+            <span className="flex items-center gap-1.5">
+              <TypeIcon typeId={row.typeId} size={32} className="h-4 w-4 shrink-0" />
+              <span>{row.itemName}</span>
+            </span>
+          </ItemContextMenu>
+        ),
       },
       {
         id: 'bestSell',
@@ -210,7 +254,15 @@ export function CompareDrawer({ location, refreshTick }: CompareDrawerProps) {
         ),
       },
     ],
-    [t, removeItem]
+    [
+      t,
+      removeItem,
+      blueprintCatalog,
+      onRequestBlueprintCatalog,
+      onAddToQuickbar,
+      quickbarAvailable,
+      onShowInfo,
+    ]
   );
 
   return (

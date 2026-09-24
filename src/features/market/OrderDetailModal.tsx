@@ -19,9 +19,9 @@
  *   `deriveSystemId`) — which must render as "not checked" too, never as
  *   "checked, clean".
  */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Button, InfoTooltip } from '@/components/ui';
+import { Modal, Button, InfoTooltip, Disclosure } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { Link } from 'react-router-dom';
@@ -32,6 +32,7 @@ import { JumpsAwayText } from '@/features/character/assetBrowserRows';
 import type { UndercutRival, UndercutScope } from '@/engine/market/undercut';
 import { sellThrough, type SellThrough } from '@/engine/market/orderHealth';
 import { filterPriceHistoryRange } from '@/engine/market/priceHistory';
+import { useIsPhone } from '@/lib/useIsPhone';
 import type { CharacterSkills, OpenOrderRow } from './openOrdersModel';
 import type { RegionCompetition, StructureCompetition } from './orderCompetition';
 import type { PriceHistoryResult } from './priceHistory';
@@ -40,11 +41,19 @@ import { orderBadgeFor } from './orderBadgeKind';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { orderVerdict, type OrderVerdictKind } from './orderVerdict';
 import { orderRowSummary } from './orderRowSummary';
-import { orderExits, hubHaulGaps, type HubBuyPrice, type ReprocessingInput } from './orderExits';
+import { orderNextAction } from './orderNextAction';
+import {
+  orderExits,
+  hubHaulGaps,
+  type HubBuyPrice,
+  type OrderExitKind,
+  type ReprocessingInput,
+} from './orderExits';
 import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
 import { appliedRefiningImplantPct } from '@/engine/industry/characterModifiers';
 import { roundPriceUp } from '@/engine/market/priceTick';
 import { CopyablePrice } from './CopyablePrice';
+import { MarketItemLink } from './MarketItemLink';
 
 export interface OrderDetailModalProps {
   open: boolean;
@@ -100,6 +109,42 @@ type ScopeState =
   | { kind: 'notChecked' }
   | { kind: 'clear' }
   | { kind: 'rival'; rival: UndercutRival };
+
+/** The four folding sections of the detail modal (issue #1428). `numbers` only ever folds on a phone; the rest fold at every width. */
+type SectionId = 'numbers' | 'whoCheaper' | 'costBasis' | 'exits';
+
+/** The tightest scope carrying a rival, for the "Who is cheaper" disclosure's trailing read — or `'clear'`/`'notChecked'` when none of the three do. */
+function tightestRivalScope(
+  station: ScopeState,
+  system: ScopeState,
+  region: ScopeState
+): { scope: UndercutScope; price: number } | 'clear' | 'notChecked' {
+  for (const [scope, state] of [
+    ['station', station],
+    ['system', system],
+    ['region', region],
+  ] as const) {
+    if (state.kind === 'rival') return { scope, price: state.rival.price };
+  }
+  // `unavailable` (a player structure's market that can't be read at all)
+  // is not proof of "clear" either — only a real `clear` read earns that.
+  return [station, system, region].some((s) => s.kind === 'notChecked' || s.kind === 'unavailable')
+    ? 'notChecked'
+    : 'clear';
+}
+
+/** An ISK figure that can go either way, with its own sign — `+30.00`, `-30.10`. */
+function signedIsk(amount: number): string {
+  return `${amount >= 0 ? '+' : ''}${formatIsk(amount, 2)}`;
+}
+
+/** Short label for an exit's kind in the "Is there a better exit?" disclosure's trailing read — distinct from the exit's own full sentence, which states the price rather than the net. */
+const EXIT_SHORT_KEY: Record<OrderExitKind, string> = {
+  hold: 'exitShortHold',
+  undercutStation: 'exitShortUndercutStation',
+  dumpToBuyOrder: 'exitShortDumpToBuyOrder',
+  reprocess: 'exitShortReprocess',
+};
 
 /**
  * `'known'` — the NPC-station lookup loaded and resolved this location.
@@ -394,6 +439,20 @@ export function OrderDetailModal({
   onClose,
 }: OrderDetailModalProps) {
   const { t } = useTranslation();
+  const isPhone = useIsPhone();
+  // Everything folds by default; the modal remounts per row (`OpenOrdersPanel`
+  // keys it by `orderId`), so this never carries state from one order to the
+  // next. `numbers` only ever folds on a phone (owner decision, issue #1428)
+  // but stays in the same set for uniform toggling.
+  const [expandedSections, setExpandedSections] = useState<Set<SectionId>>(() => new Set());
+  const toggleSection = (id: SectionId) =>
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
   const location: LocationState = !stationsLoaded
     ? 'unknown'
     : row.stationName === null
@@ -427,6 +486,20 @@ export function OrderDetailModal({
     (system.kind === 'clear' || system.kind === 'unavailable' || system.kind === 'notChecked') &&
     region.kind === 'clear';
   const verdict = orderVerdict(row);
+  const nextAction = orderNextAction(row, verdict);
+  const nextActionText = (() => {
+    switch (nextAction.kind) {
+      case 'cheapestRival':
+        return t('market.orders.nextCheapestRival', { price: formatIsk(nextAction.price, 2) });
+      case 'keepAt':
+        return t('market.orders.nextKeepAt', { price: formatIsk(nextAction.price, 2) });
+      case 'raisePrice':
+      case 'matchThem':
+        return t('market.orders.nextSetPrice', { price: formatIsk(nextAction.price, 2) });
+      case 'badgeAdvice':
+        return null;
+    }
+  })();
   const outbidSuggestedPrice = row.isBuyOrder ? outbidSuggestion(row) : null;
   const exits = orderExits({ row, competitors: deep?.competitors, reprocessing });
   // Named only when it moved the number: never on scrap (f4b5a3f5).
@@ -437,6 +510,97 @@ export function OrderDetailModal({
   const refine = exits.find((exit) => exit.kind === 'reprocess');
   const rank = stationRank(row, deep);
   const netIfSellsAsListed = row.floor ? row.price - row.floor.fill : null;
+
+  const whoTrailing = (() => {
+    const tightest = tightestRivalScope(station, system, region);
+    if (tightest === 'clear') return t('market.orders.trailingClear');
+    if (tightest === 'notChecked') return t('market.orders.trailingNotChecked');
+    const scopeLabel = t(
+      `market.orders.badge.undercut${tightest.scope[0].toUpperCase()}${tightest.scope.slice(1)}`
+    );
+    return `${scopeLabel} · ${formatIsk(tightest.price, 2)}`;
+  })();
+
+  const costBasisTrailing = row.costBasis
+    ? t('market.orders.trailingCostPerUnit', { amount: formatIsk(row.costBasis.unitCost, 2) })
+    : null;
+
+  const bestExit = exits.length
+    ? exits.reduce((best, exit) => (exit.netPerUnit > best.netPerUnit ? exit : best))
+    : null;
+  const exitsTrailing = bestExit
+    ? `${t(`market.orders.${EXIT_SHORT_KEY[bestExit.kind]}`)} · ${signedIsk(bestExit.netPerUnit)}`
+    : haulGaps.length
+      ? `${haulGaps[0].systemName} · +${formatIsk(haulGaps[0].overLocal, 2)}`
+      : t('market.orders.trailingNoExit');
+
+  // "The numbers" (issue #1428): the stat grid plus the past-expiry line,
+  // shared between the always-open desktop layout and the phone Disclosure.
+  const numbersContent = (
+    <>
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+        <StatCard
+          label={t('market.orders.statMyPrice')}
+          value={formatIsk(row.price, 2)}
+          caption={
+            rank ? t('market.orders.statRank', { rank: rank.rank, total: rank.total }) : null
+          }
+        />
+        <StatCard
+          label={t('market.orders.sellsOutIn')}
+          tooltip={t('market.orders.sellsOutHelp')}
+          value={sellValue}
+          tone={sellPastExpiry ? 'danger' : 'default'}
+          caption={
+            sell.kind === 'known'
+              ? t('market.orders.statSellsOutCaption', {
+                  count: Math.round(sell.unitsPerDay),
+                })
+              : null
+          }
+        />
+        <StatCard
+          label={t('market.orders.statVolumeLeft')}
+          value={`${row.volumeRemain.toLocaleString()} / ${row.volumeTotal.toLocaleString()}`}
+        >
+          {row.volumeTotal > 0 && (
+            <span className="mt-1.5 block h-1 w-full overflow-hidden rounded-xs bg-line">
+              <span
+                className="block h-full bg-accent"
+                style={{
+                  width: `${Math.min(100, (row.volumeRemain / row.volumeTotal) * 100)}%`,
+                }}
+              />
+            </span>
+          )}
+        </StatCard>
+        <StatCard
+          label={t('market.orders.statOrderExpires')}
+          value={row.expiry ? `${row.expiry.daysLeft}d` : t('common.unknown')}
+          tone={row.expiry && row.expiry.daysLeft <= 7 ? 'warning' : 'default'}
+          caption={
+            row.expiry
+              ? t('market.orders.statExpiresCaption', {
+                  date: new Date(row.expiry.expiresAt).toLocaleDateString(),
+                  listed: new Date(row.issued).toLocaleDateString(),
+                })
+              : null
+          }
+        />
+        <StatCard
+          label={t('market.orders.statIfSellsAsListed')}
+          value={netIfSellsAsListed === null ? t('common.unknown') : signedIsk(netIfSellsAsListed)}
+          tone={
+            netIfSellsAsListed === null ? 'default' : netIfSellsAsListed >= 0 ? 'success' : 'danger'
+          }
+          caption={netIfSellsAsListed === null ? null : t('market.orders.statPerUnitAfterFees')}
+        />
+      </div>
+      {sellPastExpiry && (
+        <p className="mt-2 text-xs text-danger">{t('market.orders.sellsOutPastExpiry')}</p>
+      )}
+    </>
+  );
 
   return (
     <Modal
@@ -477,19 +641,6 @@ export function OrderDetailModal({
                     price: verdict.price === null ? '' : formatIsk(verdict.price, 2),
                   })}
                 </p>
-                {/*
-                  The one number this call rests on, ready to paste straight
-                  into EVE's own price field. Icon-only: the detail sentence
-                  right above already states this exact figure for every
-                  kind that reaches here (letGoDetail, matchThemDetail,
-                  raisePriceDetail all carry {{price}}) — showing it again as
-                  visible text here would read as "520.10 520.10 [copy]".
-                */}
-                {verdict.price !== null && (
-                  <p className="mt-1.5 text-sm">
-                    <CopyablePrice price={verdict.price} showValue={false} />
-                  </p>
-                )}
               </>
             ) : badge ? (
               // The badge's own "?" tooltip already carries the fuller
@@ -501,8 +652,80 @@ export function OrderDetailModal({
             ) : (
               <p className="mt-1.5 text-sm text-text-dim">{t('market.orders.scopeNotChecked')}</p>
             )}
+            {/*
+              The one thing to actually type into the order, directly under
+              the call (issue #1428). Absent only for `badgeAdvice` — there
+              the badge's own action text just above already says this, and
+              repeating it here would be the same sentence twice on one screen.
+            */}
+            {nextActionText !== null && (
+              <div className="mt-2">
+                <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('market.orders.nextStep')}
+                </p>
+                <p className="mt-0.5 flex items-center gap-1.5 text-sm font-semibold text-text">
+                  <span>{nextActionText}</span>
+                  {(nextAction.kind === 'raisePrice' || nextAction.kind === 'matchThem') && (
+                    <CopyablePrice price={nextAction.price} showValue={false} />
+                  )}
+                </p>
+              </div>
+            )}
+            {/*
+              The one floor this app ever shows as a figure (20260906-155913),
+              kept beside the call rather than buried in the folded stat grid
+              below — it is the number that decides whether the call above is
+              even reachable. Rounded UP to the nearest legal price (issue
+              #1421): safe to type into an order, never below the exact
+              break-even — `belowFloor` detection elsewhere still compares
+              against the exact `row.floor.relist`, never this.
+            */}
+            {row.floor && (
+              <div className="mt-1.5">
+                <p className="flex items-center gap-1.5 text-xs text-text-dim">
+                  <span className="font-semibold tracking-widest uppercase">
+                    {t('market.orders.floorLabel')}
+                  </span>
+                  <InfoTooltip
+                    label={t('common.aboutLabel', { label: t('market.orders.floorLabel') })}
+                    content={t('market.orders.floorHelp')}
+                  />
+                  <span
+                    className={cx(
+                      'font-semibold tabular-nums',
+                      row.price < row.floor.relist ? 'text-danger' : 'text-text'
+                    )}
+                  >
+                    {formatIsk(roundPriceUp(row.floor.relist) ?? row.floor.relist, 2)}
+                  </span>
+                </p>
+                <p className="text-[0.6875rem] text-text-dim">
+                  {t(
+                    row.costBasis
+                      ? row.costBasis.source === 'wallet'
+                        ? 'market.orders.statFloorCaptionWallet'
+                        : 'market.orders.statFloorCaption'
+                      : 'market.orders.statFloorNoBasis'
+                  )}
+                </p>
+              </div>
+            )}
             <p className="mt-2">
               <OrderRowSummaryText row={row} />
+            </p>
+            {/*
+              The phone list's row is plain text, not `MarketItemLink` (a
+              link nested in the row's own tap target would be nested
+              interactive content) — this is where a phone reader reaches
+              the item's Market listing instead.
+            */}
+            <p className="mt-1.5">
+              <MarketItemLink
+                typeId={row.typeId}
+                className={buttonClassName({ variant: 'ghost', size: 'sm' })}
+              >
+                {t('orders.viewInMarket')}
+              </MarketItemLink>
             </p>
             {/* Outbid buy orders get their own suggested bid — `orderVerdict` is a sell-side idea only, so this is the one place a buy order sees a suggested price. */}
             {outbidSuggestedPrice !== null && (
@@ -516,209 +739,132 @@ export function OrderDetailModal({
             )}
           </section>
 
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
-            <StatCard
-              label={t('market.orders.statMyPrice')}
-              value={formatIsk(row.price, 2)}
-              caption={
-                rank ? t('market.orders.statRank', { rank: rank.rank, total: rank.total }) : null
-              }
-            />
-            <StatCard
-              label={t('market.orders.floorLabel')}
-              tooltip={t('market.orders.floorHelp')}
-              // Rounded UP to the nearest legal price (issue #1421): the
-              // number shown is safe to type into an order, never below the
-              // exact break-even. `belowFloor` detection elsewhere still
-              // compares against the EXACT `row.floor.relist`, never this.
-              value={
-                row.floor ? (
-                  <CopyablePrice price={roundPriceUp(row.floor.relist) ?? row.floor.relist} />
-                ) : (
-                  t('common.unknown')
-                )
-              }
-              tone={row.floor && row.price < row.floor.relist ? 'danger' : 'default'}
-              caption={t(
-                row.costBasis
-                  ? row.costBasis.source === 'wallet'
-                    ? 'market.orders.statFloorCaptionWallet'
-                    : 'market.orders.statFloorCaption'
-                  : 'market.orders.statFloorNoBasis'
-              )}
-            />
-            <StatCard
-              label={t('market.orders.sellsOutIn')}
-              tooltip={t('market.orders.sellsOutHelp')}
-              value={sellValue}
-              tone={sellPastExpiry ? 'danger' : 'default'}
-              caption={
-                sell.kind === 'known'
-                  ? t('market.orders.statSellsOutCaption', {
-                      count: Math.round(sell.unitsPerDay),
-                    })
-                  : null
-              }
-            />
-            <StatCard
-              label={t('market.orders.statVolumeLeft')}
-              value={`${row.volumeRemain.toLocaleString()} / ${row.volumeTotal.toLocaleString()}`}
-            >
-              {row.volumeTotal > 0 && (
-                <span className="mt-1.5 block h-1 w-full overflow-hidden rounded-xs bg-line">
-                  <span
-                    className="block h-full bg-accent"
-                    style={{
-                      width: `${Math.min(100, (row.volumeRemain / row.volumeTotal) * 100)}%`,
-                    }}
-                  />
-                </span>
-              )}
-            </StatCard>
-            <StatCard
-              label={t('market.orders.statOrderExpires')}
-              value={row.expiry ? `${row.expiry.daysLeft}d` : t('common.unknown')}
-              tone={row.expiry && row.expiry.daysLeft <= 7 ? 'warning' : 'default'}
-              caption={
-                row.expiry
-                  ? t('market.orders.statExpiresCaption', {
-                      date: new Date(row.expiry.expiresAt).toLocaleDateString(),
-                      listed: new Date(row.issued).toLocaleDateString(),
-                    })
-                  : null
-              }
-            />
-            <StatCard
-              label={t('market.orders.statIfSellsAsListed')}
-              value={
-                netIfSellsAsListed === null
-                  ? t('common.unknown')
-                  : `${netIfSellsAsListed >= 0 ? '+' : ''}${formatIsk(netIfSellsAsListed, 2)}`
-              }
-              tone={
-                netIfSellsAsListed === null
-                  ? 'default'
-                  : netIfSellsAsListed >= 0
-                    ? 'success'
-                    : 'danger'
-              }
-              caption={netIfSellsAsListed === null ? null : t('market.orders.statPerUnitAfterFees')}
-            />
-          </div>
+          {isPhone ? (
+            <section className="rounded-xs border border-line">
+              <Disclosure
+                label={t('market.orders.sectionNumbers')}
+                trailing={sellValue}
+                expanded={expandedSections.has('numbers')}
+                onToggle={() => toggleSection('numbers')}
+              >
+                <div className="p-2">{numbersContent}</div>
+              </Disclosure>
+            </section>
+          ) : (
+            numbersContent
+          )}
         </div>
 
-        {sellPastExpiry && (
-          <p className="text-xs text-danger">{t('market.orders.sellsOutPastExpiry')}</p>
-        )}
-
         <section className="rounded-xs border border-line">
-          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line bg-panel-2 px-3 py-2">
-            <h3 className="text-xs font-semibold tracking-widest text-text-dim uppercase">
-              {t('market.orders.whoIsCheaper')}
-            </h3>
-            <p className="text-[0.6875rem] text-text-dim">
+          <Disclosure
+            label={t('market.orders.whoIsCheaper')}
+            trailing={whoTrailing}
+            expanded={expandedSections.has('whoCheaper')}
+            onToggle={() => toggleSection('whoCheaper')}
+          >
+            <p className="px-2.5 pt-1.5 text-[0.6875rem] text-text-dim">
               {t('market.orders.scopeTightestBites')}
             </p>
-          </div>
-          {/*
+            {/*
             ONE grid for the whole table: header, every scope row and the
             player's own order all contribute cells to these tracks, so the
             price, gap and distance columns line up down the table. Rows
             cannot own a background or a border here, so the rule between
             rows and the "my order" tint are painted per cell.
           */}
-          <div className="grid grid-cols-[auto_1fr_auto] text-xs md:grid-cols-[auto_1fr_auto_auto_auto]">
-            <span className="px-2 pt-2 pl-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('market.orders.scopeColumn')}
-            </span>
-            <span className="px-2 pt-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('market.orders.scopeCheapestSeller')}
-            </span>
-            <span className="px-2 pt-2 pr-3 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:pr-2">
-              {t('market.orders.scopeTheirPrice')}
-            </span>
-            <span className="hidden px-2 pt-2 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:block">
-              {t('market.orders.scopeOverBy')}
-            </span>
-            <span className="hidden px-2 pt-2 pr-3 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:block">
-              {t('market.orders.scopeDistance')}
-            </span>
-            <ScopeRow
-              scope="station"
-              state={station}
-              stationName={row.stationName}
-              distance={t('market.orders.scopeSameStation')}
-            />
-            <ScopeRow
-              scope="system"
-              state={system}
-              stationName={
-                system.kind === 'rival' ? stationNameFor(system.rival.locationId) : undefined
-              }
-              distance={t('market.orders.scopeSameSystem')}
-            />
-            <ScopeRow
-              scope="region"
-              state={region}
-              stationName={
-                region.kind === 'rival' ? stationNameFor(region.rival.locationId) : undefined
-              }
-              jumps={regionJumps}
-            />
-            {/* My own order last, as the line every row above is measured against. */}
-            <span
-              className={cx(
-                CELL,
-                'bg-panel-2 pl-3 font-semibold tracking-widest text-accent uppercase'
+            <div className="grid grid-cols-[auto_1fr_auto] text-xs md:grid-cols-[auto_1fr_auto_auto_auto]">
+              <span className="px-2 pt-2 pl-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('market.orders.scopeColumn')}
+              </span>
+              <span className="px-2 pt-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('market.orders.scopeCheapestSeller')}
+              </span>
+              <span className="px-2 pt-2 pr-3 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:pr-2">
+                {t('market.orders.scopeTheirPrice')}
+              </span>
+              <span className="hidden px-2 pt-2 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:block">
+                {t('market.orders.scopeOverBy')}
+              </span>
+              <span className="hidden px-2 pt-2 pr-3 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:block">
+                {t('market.orders.scopeDistance')}
+              </span>
+              <ScopeRow
+                scope="station"
+                state={station}
+                stationName={row.stationName}
+                distance={t('market.orders.scopeSameStation')}
+              />
+              <ScopeRow
+                scope="system"
+                state={system}
+                stationName={
+                  system.kind === 'rival' ? stationNameFor(system.rival.locationId) : undefined
+                }
+                distance={t('market.orders.scopeSameSystem')}
+              />
+              <ScopeRow
+                scope="region"
+                state={region}
+                stationName={
+                  region.kind === 'rival' ? stationNameFor(region.rival.locationId) : undefined
+                }
+                jumps={regionJumps}
+              />
+              {/* My own order last, as the line every row above is measured against. */}
+              <span
+                className={cx(
+                  CELL,
+                  'bg-panel-2 pl-3 font-semibold tracking-widest text-accent uppercase'
+                )}
+              >
+                {t('market.orders.scopeMyOrder')}
+              </span>
+              <span className={cx(CELL, 'bg-panel-2')}>
+                {row.stationName ?? t('market.unknownStructure')}
+              </span>
+              <span className={cx(CELL, 'bg-panel-2 pr-3 text-right tabular-nums md:pr-2')}>
+                {formatIsk(row.price, 2)}
+              </span>
+              <span className={cx(CELL, 'hidden bg-panel-2 md:block')} />
+              <span className={cx(CELL, 'hidden bg-panel-2 md:block')} />
+            </div>
+            <div className="px-3 pb-2">
+              {allClean && (
+                <p className="pt-1.5 text-xs text-success">{t('market.orders.onlySeller')}</p>
               )}
-            >
-              {t('market.orders.scopeMyOrder')}
-            </span>
-            <span className={cx(CELL, 'bg-panel-2')}>
-              {row.stationName ?? t('market.unknownStructure')}
-            </span>
-            <span className={cx(CELL, 'bg-panel-2 pr-3 text-right tabular-nums md:pr-2')}>
-              {formatIsk(row.price, 2)}
-            </span>
-            <span className={cx(CELL, 'hidden bg-panel-2 md:block')} />
-            <span className={cx(CELL, 'hidden bg-panel-2 md:block')} />
-          </div>
-          <div className="px-3 pb-2">
-            {allClean && (
-              <p className="pt-1.5 text-xs text-success">{t('market.orders.onlySeller')}</p>
-            )}
-            {deep?.truncated && (
-              // A truncated fetch isn't the pre-fetch state (the button below
-              // stays hidden, same as any other resolved `deep`) — say why
-              // system/region above read "not checked" instead of leaving the
-              // user to wonder where the "check deeper" button went. Same
-              // key/shape `OrderHistoryPanel.tsx` and `VariationsTable.tsx` use
-              // for their own truncated fetches.
-              <p className="pt-1.5 text-[0.6875rem] text-warning uppercase">
-                {t('common.incompleteTitle')}
-              </p>
-            )}
-            {showCheckDeeper && (
-              <p className="pt-2">
-                <Button size="sm" onClick={onCheckDeeper}>
-                  {t('market.orders.checkDeeper')}
-                </Button>
-              </p>
-            )}
-            {loadingDeep && (
-              <p className="pt-1.5 text-xs text-text-dim">{t('market.orders.checkingDeeper')}</p>
-            )}
-          </div>
+              {deep?.truncated && (
+                // A truncated fetch isn't the pre-fetch state (the button below
+                // stays hidden, same as any other resolved `deep`) — say why
+                // system/region above read "not checked" instead of leaving the
+                // user to wonder where the "check deeper" button went. Same
+                // key/shape `OrderHistoryPanel.tsx` and `VariationsTable.tsx` use
+                // for their own truncated fetches.
+                <p className="pt-1.5 text-[0.6875rem] text-warning uppercase">
+                  {t('common.incompleteTitle')}
+                </p>
+              )}
+              {showCheckDeeper && (
+                <p className="pt-2">
+                  <Button size="sm" onClick={onCheckDeeper}>
+                    {t('market.orders.checkDeeper')}
+                  </Button>
+                </p>
+              )}
+              {loadingDeep && (
+                <p className="pt-1.5 text-xs text-text-dim">{t('market.orders.checkingDeeper')}</p>
+              )}
+            </div>
+          </Disclosure>
         </section>
 
         <div className="grid gap-3 md:grid-cols-2">
           <section className="rounded-xs border border-line">
-            <h3 className="border-b border-line bg-panel-2 px-3 py-2 text-xs font-semibold tracking-widest text-text-dim uppercase">
-              {t('market.orders.floorWorking')}
-            </h3>
-            <div className="space-y-1.5 px-3 py-2">
-              {row.costBasis === null ? (
-                <>
+            {row.costBasis === null ? (
+              <>
+                <h3 className="border-b border-line bg-panel-2 px-3 py-2 text-xs font-semibold tracking-widest text-text-dim uppercase">
+                  {t('market.orders.floorWorking')}
+                </h3>
+                <div className="space-y-1.5 px-3 py-2">
                   <p className="text-sm text-text">{t('market.orders.noCostBasisTitle')}</p>
                   <p className="text-xs text-text-dim">{t('market.orders.noCostBasisHint')}</p>
                   {row.walletGap && (
@@ -740,9 +886,16 @@ export function OrderDetailModal({
                   >
                     {t('market.orders.linkBuild')}
                   </Link>
-                </>
-              ) : (
-                <>
+                </div>
+              </>
+            ) : (
+              <Disclosure
+                label={t('market.orders.floorWorking')}
+                trailing={costBasisTrailing ?? undefined}
+                expanded={expandedSections.has('costBasis')}
+                onToggle={() => toggleSection('costBasis')}
+              >
+                <div className="space-y-1.5 px-3 py-2">
                   <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                     {row.costBasis.source === 'wallet' ? (
                       <>
@@ -897,146 +1050,150 @@ export function OrderDetailModal({
                   >
                     {t('market.orders.linkBuild')}
                   </Link>
-                </>
-              )}
-            </div>
+                </div>
+              </Disclosure>
+            )}
           </section>
 
           <section className="rounded-xs border border-line">
-            <h3 className="border-b border-line bg-panel-2 px-3 py-2 text-xs font-semibold tracking-widest text-text-dim uppercase">
-              {t('market.orders.exitsTitle')}
-            </h3>
-            <div className="space-y-1.5 px-3 py-2 text-xs">
-              {exits.length === 0 ? (
-                <p className="text-text-dim">{t('market.orders.exitsNoFloor')}</p>
-              ) : (
-                exits.map((exit) => (
-                  <p key={exit.kind} className="flex items-baseline justify-between gap-3">
-                    <span className="text-text-dim">
-                      {exit.kind === 'hold' && sell.kind === 'known'
-                        ? t('market.orders.exitHoldSellsIn', {
-                            price: formatIsk(exit.price, 2),
-                            days: sell.daysToClear,
-                          })
-                        : t(
-                            `market.orders.exit${exit.kind[0].toUpperCase()}${exit.kind.slice(1)}`,
-                            {
+            <Disclosure
+              label={t('market.orders.exitsTitle')}
+              trailing={exitsTrailing}
+              expanded={expandedSections.has('exits')}
+              onToggle={() => toggleSection('exits')}
+            >
+              <div className="space-y-1.5 px-3 py-2 text-xs">
+                {exits.length === 0 ? (
+                  <p className="text-text-dim">{t('market.orders.exitsNoFloor')}</p>
+                ) : (
+                  exits.map((exit) => (
+                    <p key={exit.kind} className="flex items-baseline justify-between gap-3">
+                      <span className="text-text-dim">
+                        {exit.kind === 'hold' && sell.kind === 'known'
+                          ? t('market.orders.exitHoldSellsIn', {
                               price: formatIsk(exit.price, 2),
-                            }
-                          )}
-                    </span>
-                    <span className="flex shrink-0 items-center gap-1.5">
-                      {/*
+                              days: sell.daysToClear,
+                            })
+                          : t(
+                              `market.orders.exit${exit.kind[0].toUpperCase()}${exit.kind.slice(1)}`,
+                              {
+                                price: formatIsk(exit.price, 2),
+                              }
+                            )}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-1.5">
+                        {/*
                         Only the undercut exit is a price to TYPE somewhere —
                         hold, dump and reprocess are all facts already true,
                         not suggestions. Icon-only: the sentence to the left
                         (`exitUndercutStation`) already states this price.
                       */}
-                      {exit.kind === 'undercutStation' && (
-                        <CopyablePrice price={exit.price} showValue={false} />
-                      )}
-                      <span
-                        className={cx(
-                          'tabular-nums',
-                          exit.netPerUnit >= 0 ? 'text-isk-pos' : 'text-isk-neg'
+                        {exit.kind === 'undercutStation' && (
+                          <CopyablePrice price={exit.price} showValue={false} />
                         )}
-                      >
-                        {t('market.orders.exitPerUnit', {
-                          amount: `${exit.netPerUnit >= 0 ? '+' : ''}${formatIsk(exit.netPerUnit, 2)}`,
-                        })}
+                        <span
+                          className={cx(
+                            'tabular-nums',
+                            exit.netPerUnit >= 0 ? 'text-isk-pos' : 'text-isk-neg'
+                          )}
+                        >
+                          {t('market.orders.exitPerUnit', {
+                            amount: signedIsk(exit.netPerUnit),
+                          })}
+                        </span>
                       </span>
-                    </span>
-                  </p>
-                ))
-              )}
-              {/*
+                    </p>
+                  ))
+                )}
+                {/*
                 Hauling is a gap and a distance, never a net: what a hub pays
                 is knowable, what a courier charges is not. The rows survive a
                 missing Order Floor for the same reason — "Amarr bids more
                 than anyone here" needs no cost basis behind it.
               */}
-              {!row.isBuyOrder && (
-                <div className="border-t border-line pt-1.5">
-                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('market.orders.exitHaulTitle')}
-                  </p>
-                  {hubs === undefined ? (
-                    <p className="mt-1 text-text-dim">
-                      {t(
-                        hubsFailed
-                          ? 'market.orders.exitHaulUnavailable'
-                          : 'market.orders.exitHaulLoading'
-                      )}
+                {!row.isBuyOrder && (
+                  <div className="border-t border-line pt-1.5">
+                    <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {t('market.orders.exitHaulTitle')}
                     </p>
-                  ) : haulGaps.length === 0 ? (
-                    <p className="mt-1 text-text-dim">{t('market.orders.exitHaulNone')}</p>
-                  ) : (
-                    <>
-                      {haulGaps.map((gap) => (
-                        <p
-                          key={gap.hubId}
-                          className="mt-1 flex items-baseline justify-between gap-3"
-                        >
-                          <span className="text-text-dim">
-                            {t('market.orders.exitHaulHub', {
-                              hub: gap.systemName,
-                              price: formatIsk(gap.price, 2),
-                            })}{' '}
-                            <JumpsAwayText result={gap.jumps} t={t} />
-                          </span>
-                          <span className="shrink-0 tabular-nums text-success">
-                            {t('market.orders.exitHaulGap', {
-                              amount: formatIsk(gap.overLocal, 2),
-                              total: formatIsk(gap.totalIsk, 2),
-                            })}
-                          </span>
-                        </p>
-                      ))}
-                      <p className="mt-1 text-text-dim">{t('market.orders.exitHaulNote')}</p>
-                    </>
-                  )}
-                </div>
-              )}
-              {!reprocessing && (
-                <p className="flex items-baseline justify-between gap-3 text-text-faint">
-                  <span>{t('market.orders.exitReprocessNotBuilt')}</span>
-                  <span className="shrink-0">{t('market.orders.exitNotBuilt')}</span>
-                </p>
-              )}
-              {refine && (
-                <>
-                  {/*
+                    {hubs === undefined ? (
+                      <p className="mt-1 text-text-dim">
+                        {t(
+                          hubsFailed
+                            ? 'market.orders.exitHaulUnavailable'
+                            : 'market.orders.exitHaulLoading'
+                        )}
+                      </p>
+                    ) : haulGaps.length === 0 ? (
+                      <p className="mt-1 text-text-dim">{t('market.orders.exitHaulNone')}</p>
+                    ) : (
+                      <>
+                        {haulGaps.map((gap) => (
+                          <p
+                            key={gap.hubId}
+                            className="mt-1 flex items-baseline justify-between gap-3"
+                          >
+                            <span className="text-text-dim">
+                              {t('market.orders.exitHaulHub', {
+                                hub: gap.systemName,
+                                price: formatIsk(gap.price, 2),
+                              })}{' '}
+                              <JumpsAwayText result={gap.jumps} t={t} />
+                            </span>
+                            <span className="shrink-0 tabular-nums text-success">
+                              {t('market.orders.exitHaulGap', {
+                                amount: formatIsk(gap.overLocal, 2),
+                                total: formatIsk(gap.totalIsk, 2),
+                              })}
+                            </span>
+                          </p>
+                        ))}
+                        <p className="mt-1 text-text-dim">{t('market.orders.exitHaulNote')}</p>
+                      </>
+                    )}
+                  </div>
+                )}
+                {!reprocessing && (
+                  <p className="flex items-baseline justify-between gap-3 text-text-faint">
+                    <span>{t('market.orders.exitReprocessNotBuilt')}</span>
+                    <span className="shrink-0">{t('market.orders.exitNotBuilt')}</span>
+                  </p>
+                )}
+                {refine && (
+                  <>
+                    {/*
                     The assumption, stated rather than folded into the number:
                     a structure's own reprocessing rate, its rigs and the
                     standings-based station tax are not readable from ESI, so
                     this prices a plain NPC station with no tax deducted.
                   */}
-                  <p className="text-text-dim">
-                    {t('market.orders.exitReprocessAssumption', {
-                      rate: Math.round(BASE_STATION_REPROCESSING_RATE * 100),
-                    })}
-                  </p>
-                  {refineImplantPct > 0 && (
                     <p className="text-text-dim">
-                      {t('market.orders.exitReprocessImplant', {
-                        pct: refineImplantPct,
+                      {t('market.orders.exitReprocessAssumption', {
+                        rate: Math.round(BASE_STATION_REPROCESSING_RATE * 100),
                       })}
                     </p>
-                  )}
-                  {refine.partial && (
-                    <p className="text-warning">{t('market.orders.exitReprocessPartial')}</p>
-                  )}
-                  {refine.unitsLeftOver !== undefined && refine.unitsLeftOver > 0 && (
-                    <p className="text-text-dim">
-                      {t('market.orders.exitReprocessLeftOver', {
-                        count: refine.unitsLeftOver,
-                      })}
-                    </p>
-                  )}
-                </>
-              )}
-              <p className="text-text-faint">{t('market.orders.orderSoFarNotBuilt')}</p>
-            </div>
+                    {refineImplantPct > 0 && (
+                      <p className="text-text-dim">
+                        {t('market.orders.exitReprocessImplant', {
+                          pct: refineImplantPct,
+                        })}
+                      </p>
+                    )}
+                    {refine.partial && (
+                      <p className="text-warning">{t('market.orders.exitReprocessPartial')}</p>
+                    )}
+                    {refine.unitsLeftOver !== undefined && refine.unitsLeftOver > 0 && (
+                      <p className="text-text-dim">
+                        {t('market.orders.exitReprocessLeftOver', {
+                          count: refine.unitsLeftOver,
+                        })}
+                      </p>
+                    )}
+                  </>
+                )}
+                <p className="text-text-faint">{t('market.orders.orderSoFarNotBuilt')}</p>
+              </div>
+            </Disclosure>
           </section>
         </div>
       </div>

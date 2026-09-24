@@ -18,6 +18,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, TextInput } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { PlanBooster } from '@/db';
 import { buildMarketGroupParams } from '@/engine/market/urlState';
@@ -90,6 +91,8 @@ interface BoosterRowProps {
   row: PlanBooster;
   rowKey: string;
   detectedAccelerator: number | null;
+  /** Whether this row shows its Starts field. */
+  showStart: boolean;
   overlaps: boolean;
   onPatch: (patch: Partial<PlanBooster>) => boolean;
   onRemove: () => void;
@@ -99,6 +102,7 @@ function BoosterRow({
   row,
   rowKey,
   detectedAccelerator,
+  showStart,
   overlaps,
   onPatch,
   onRemove,
@@ -162,18 +166,20 @@ function BoosterRow({
               className="field-no-spinner w-16 text-center"
             />
           </label>
-          <label className="flex items-center justify-between gap-2">
-            {t('plans.boosterStartsAt')}
-            <TextInput
-              size="md"
-              type="datetime-local"
-              placeholder={t('plans.boosterStartsNow')}
-              value={startsAtField.inputValue}
-              onChange={(e) => startsAtField.onChange(e.target.value)}
-              onBlur={startsAtField.onBlur}
-              className="min-w-0 flex-1"
-            />
-          </label>
+          {showStart && (
+            <label className="flex items-center justify-between gap-2">
+              {t('plans.boosterStartsAt')}
+              <TextInput
+                size="md"
+                type="datetime-local"
+                placeholder={t('plans.boosterStartsNow')}
+                value={startsAtField.inputValue}
+                onChange={(e) => startsAtField.onChange(e.target.value)}
+                onBlur={startsAtField.onBlur}
+                className="min-w-0 flex-1"
+              />
+            </label>
+          )}
           <label className="flex items-center justify-between gap-2">
             {t('plans.boosterExpiresAt')}
             <TextInput
@@ -197,7 +203,7 @@ function BoosterRow({
                 onClick={() =>
                   patch({ expiresAt: boosterExpiryFromNow(hours, row.startsAt ?? Date.now()) })
                 }
-                className="min-h-7 rounded-xs border border-line px-1.5 text-[0.6875rem] text-text-dim hover:border-line-bright hover:text-text"
+                className={`${tappableRowClassName} rounded-xs border border-line px-1.5 text-[0.6875rem] text-text-dim hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
               >
                 {hours % 24 === 0
                   ? t('plans.boosterQuickPickDays', { days: hours / 24 })
@@ -268,6 +274,8 @@ export function BoosterList({ boosters, detectedAccelerator, onChange }: Booster
             rowKey={`booster-${index}`}
             row={row}
             detectedAccelerator={detectedAccelerator}
+            // A start only matters for an accelerator queued behind another.
+            showStart={index > 0 || row.startsAt !== null}
             overlaps={overlaps}
             onPatch={(patch) => patchRow(index, patch)}
             onRemove={() => removeRow(index)}

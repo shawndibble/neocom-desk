@@ -14,12 +14,13 @@
  * `Panel` above an optional, foldable Compare Hubs section once something
  * has been appraised.
  */
-import { useState, type ReactElement, type ReactNode } from 'react';
+import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
   DataTable,
   EmptyState,
+  FilterChip,
   IconButton,
   IskAmount,
   Panel,
@@ -32,8 +33,16 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { Caret } from '@/components/ui/Disclosure';
 import { fieldBaseClassName } from '@/components/ui/controlStyles';
-import { lpBeatsMarket, refineBeatsSellAsIs, type AppraisalRow } from '@/engine/market/appraisal';
+import {
+  appraisalNet,
+  appraisalUndercut,
+  lpBeatsMarket,
+  refineBeatsSellAsIs,
+  type AppraisalRow,
+  type AppraisalUndercut,
+} from '@/engine/market/appraisal';
 import { countPasteLines } from '@/engine/market/appraisalPaste';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import { iskToneClass } from '@/features/character/format';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
@@ -43,6 +52,7 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import type { TradeHub } from '@/market/hubs';
 import { appraisalCsvColumns } from './appraisalCsv';
 import { buildAppraisalShareLink, MAX_SHARE_ITEMS } from './appraisalShareData';
+import { CopyablePrice } from './CopyablePrice';
 import { formatVolume } from './format';
 import { HubCompareCards } from './HubCompareCards';
 import { ItemContextMenu } from './ItemContextMenu';
@@ -56,6 +66,8 @@ interface AppraisalPanelProps {
   onPricePercentChange: (value: number) => void;
   /** The hub the figures are quoted at — the panel's own provenance chip, and what a Share link (#831) is generated against. */
   hub: TradeHub;
+  /** The active Character's standing toward this hub's NPC station owner, for the net-of-fees chips' broker fee. */
+  standing: ResolvedStandings;
   /** Same per-item context menu as the tree and the Variations table: null until requested, then per-typeId lookups. */
   blueprintCatalog: BlueprintCatalog | null;
   onRequestBlueprintCatalog: () => void;
@@ -98,6 +110,7 @@ export function AppraisalPanel({
   pricePercent,
   onPricePercentChange,
   hub,
+  standing,
   blueprintCatalog,
   onRequestBlueprintCatalog,
   onAddToQuickbar,
@@ -109,6 +122,9 @@ export function AppraisalPanel({
   const { text, setText, result, compare, loading, failed } = controller;
   const [compareExpanded, setCompareExpanded] = useState(defaultCompareExpanded);
   const [shareCopied, setShareCopied] = useState(false);
+  // Off by default so the ledger reads as it always has; the pilot turns it on
+  // once they have decided to list rather than sell into buy orders.
+  const [undercutShown, setUndercutShown] = useState(false);
   const hubName = hub.systemName;
 
   async function handleShare() {
@@ -213,6 +229,19 @@ export function AppraisalPanel({
   const totals = result?.appraisal.totals;
   const unmatched = result?.unmatched ?? [];
   const implantBonusPct = result?.implantBonusPct ?? 0;
+  const accountingLevel = result?.accountingLevel ?? null;
+  const brokerRelationsLevel = result?.brokerRelationsLevel ?? null;
+  // Null while skills are loading, or with no active Character — falls back
+  // to the result panel's own loading/empty states rather than ever showing
+  // a base-rate (untrained) figure.
+  const net = useMemo(() => {
+    if (result === null || accountingLevel === null || brokerRelationsLevel === null) return null;
+    return appraisalNet(result.appraisal.items, {
+      accountingLevel,
+      brokerRelationsLevel,
+      standing,
+    });
+  }, [result, accountingLevel, brokerRelationsLevel, standing]);
   // Undefined per row when the type has no reprocessing data at all — the
   // column only earns its place on screen when at least one row has
   // something to show, which is also exactly when there is nothing to show
@@ -240,6 +269,43 @@ export function AppraisalPanel({
               )
             ),
       sortValue: (row) => row.refineTotal ?? undefined,
+    });
+  }
+
+  // The Undercut view, read from the unscaled items rather than the rows —
+  // see `20260924-124701-appraisal-undercut-lists-one-tick-under-the-hubs.md`.
+  const undercuts = useMemo(() => {
+    const byType = new Map<number, AppraisalUndercut | null>();
+    for (const item of result?.appraisal.items ?? [])
+      byType.set(item.typeId, appraisalUndercut(item));
+    return byType;
+  }, [result]);
+  if (undercutShown) {
+    columns.push({
+      id: 'undercut',
+      header: t('market.appraisal.columnUndercut'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums',
+      render: (row) => {
+        const undercut = undercuts.get(row.typeId);
+        if (!undercut) return '—';
+        return (
+          <span>
+            <CopyablePrice price={undercut.price} />
+            {undercut.atOrBelowBuy && (
+              <span
+                className="ml-0.5 text-warning"
+                title={t('market.appraisal.undercutAtOrBelowBuy', {
+                  price: formatIskAuto(undercut.price),
+                })}
+              >
+                *
+              </span>
+            )}
+          </span>
+        );
+      },
+      sortValue: (row) => undercuts.get(row.typeId)?.price,
     });
   }
 
@@ -473,6 +539,33 @@ export function AppraisalPanel({
                   value={<IskAmount value={totals.buy} revealOn="tap" decimals={0} />}
                   tooltip={t('market.appraisal.buyTotalHelp')}
                 />
+                {net && (
+                  <StatChip
+                    label={t('market.appraisal.instantNet')}
+                    value={
+                      <span className={iskToneClass(net.instantNet)}>
+                        <IskAmount value={net.instantNet} revealOn="tap" decimals={0} />
+                      </span>
+                    }
+                    tooltip={t('market.appraisal.instantNetHelp', {
+                      tax: net.salesTaxPct.toFixed(2),
+                    })}
+                  />
+                )}
+                {net && (
+                  <StatChip
+                    label={t('market.appraisal.listNet')}
+                    value={
+                      <span className={iskToneClass(net.listNet)}>
+                        <IskAmount value={net.listNet} revealOn="tap" decimals={0} />
+                      </span>
+                    }
+                    tooltip={t('market.appraisal.listNetHelp', {
+                      tax: net.salesTaxPct.toFixed(2),
+                      broker: net.brokerFeePct.toFixed(2),
+                    })}
+                  />
+                )}
                 <StatChip
                   label={t('market.appraisal.spread')}
                   value={
@@ -502,6 +595,17 @@ export function AppraisalPanel({
                 )}
                 <StatChip label={t('market.appraisal.items')} value={rows.length} />
                 {loading && <Spinner label={t('common.loading')} size="sm" />}
+                {/* In the chip row rather than the Panel header: this row
+                    wraps, the header does not, and a text button there
+                    overflowed the page at phone width. */}
+                <FilterChip
+                  size="sm"
+                  label={t('market.appraisal.undercut')}
+                  selected={undercutShown}
+                  onToggle={() => setUndercutShown((shown) => !shown)}
+                  tooltip={t('market.appraisal.undercutHelp')}
+                  className="ml-auto"
+                />
               </div>
 
               {totals.unpricedRows > 0 && (
@@ -512,6 +616,11 @@ export function AppraisalPanel({
               {totals.refineUnpricedRows > 0 && (
                 <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-warning">
                   {t('market.appraisal.refineUnpriced', { count: totals.refineUnpricedRows })}
+                </p>
+              )}
+              {undercutShown && (
+                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                  {t('market.appraisal.undercutNote', { hub: hubName })}
                 </p>
               )}
               {totals.cheapestBuyViaLp > 0 && (

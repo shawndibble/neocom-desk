@@ -12,6 +12,7 @@ import type {
   ContractNotificationFire,
   WalletNotificationFire,
   MarketOrderNotificationFire,
+  MarketOrderUndercutFire,
   EveNotificationFire,
   StructureFuelLowFire,
   CorpIndustryJobNotificationFire,
@@ -414,6 +415,28 @@ describe('occurrenceKey', () => {
     // A different direction is a genuinely different occurrence.
     expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey({ ...fire, direction: 'below' }, T0));
   });
+
+  it('keys marketOrderUndercut on orderId and the order’s own price, so a relist is a distinct occurrence', () => {
+    const fire: MarketOrderUndercutFire = {
+      eventId: 'marketOrderUndercut',
+      characterId: 7,
+      orderId: 456,
+      typeId: 34,
+      isBuyOrder: false,
+      price: 100,
+      rivalPrice: 95,
+    };
+    // Same real occurrence, different poll time and a different rival price
+    // (both are only copy — the identity is the order and its own price).
+    expect(occurrenceKey(fire, T0)).toEqual(
+      occurrenceKey({ ...fire, rivalPrice: 90 }, T0 + 60_000)
+    );
+    // A relist at a new price is a genuinely different occurrence — the
+    // anti-flap key, not a bucket (owner decision #4, issue #1423).
+    expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey({ ...fire, price: 105 }, T0));
+    // A different order is obviously a different occurrence.
+    expect(occurrenceKey(fire, T0)).not.toEqual(occurrenceKey({ ...fire, orderId: 457 }, T0));
+  });
 });
 
 describe('occurrenceFiredAt', () => {
@@ -491,6 +514,19 @@ describe('occurrenceFiredAt', () => {
       price: 6,
       targetPrice: 5,
       direction: 'above',
+    };
+    expect(occurrenceFiredAt(fire, T0)).toBe(T0);
+  });
+
+  it('dates marketOrderUndercut by the poll that noticed it — Fuzzwork carries no "as of" time', () => {
+    const fire: MarketOrderUndercutFire = {
+      eventId: 'marketOrderUndercut',
+      characterId: 7,
+      orderId: 456,
+      typeId: 34,
+      isBuyOrder: false,
+      price: 100,
+      rivalPrice: 95,
     };
     expect(occurrenceFiredAt(fire, T0)).toBe(T0);
   });

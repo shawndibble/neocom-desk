@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { YieldDetailModal } from './YieldDetailModal';
 import type { MiningYieldRow } from './yieldSnapshot';
@@ -76,16 +77,18 @@ function row(overrides: Partial<MiningYieldRow> = {}): MiningYieldRow {
 
 function renderModal(value = row(), { showRefining = true }: { showRefining?: boolean } = {}) {
   render(
-    <YieldDetailModal
-      open
-      onClose={() => {}}
-      row={value}
-      systemName="Jita"
-      systemSecurity={0.9}
-      typeNames={typeNames}
-      typeVolumes={typeVolumes}
-      showRefining={showRefining}
-    />
+    <MemoryRouter>
+      <YieldDetailModal
+        open
+        onClose={() => {}}
+        row={value}
+        systemName="Jita"
+        systemSecurity={0.9}
+        typeNames={typeNames}
+        typeVolumes={typeVolumes}
+        showRefining={showRefining}
+      />
+    </MemoryRouter>
   );
 }
 
@@ -121,6 +124,20 @@ describe('YieldDetailModal', () => {
     // Two non-primary columns is already a short card — pairing it buys
     // nothing, so this table deliberately stays at the default.
     expect(screen.getByRole('table', { name: 'Refines into' })).not.toHaveClass('dt-stack-2col');
+  });
+
+  it('links each ore and refined-material name to its Market listing (#1462)', () => {
+    renderModal();
+    const ore = screen.getByRole('table', { name: 'Ore mined' });
+    expect(within(ore).getByRole('link', { name: 'Veldspar' })).toHaveAttribute(
+      'href',
+      expect.stringContaining(`type=${VELDSPAR}`)
+    );
+    const refined = screen.getByRole('table', { name: 'Refines into' });
+    expect(within(refined).getByRole('link', { name: 'Tritanium' })).toHaveAttribute(
+      'href',
+      expect.stringContaining(`type=${TRITANIUM}`)
+    );
   });
 
   it('folds every line into what the whole day refines into', () => {
@@ -169,8 +186,12 @@ describe('YieldDetailModal', () => {
     renderModal();
     const ore = screen.getByRole('table', { name: 'Ore mined' });
     const veldspar = within(ore).getByRole('row', { name: /Veldspar/ });
-    expect(within(veldspar).getByLabelText('1,200 ISK')).toHaveClass('text-isk-pos');
-    expect(within(veldspar).getByLabelText('1,000 ISK')).not.toHaveClass('text-isk-pos');
+    expect(
+      within(veldspar).getByText('1,200 ISK', { selector: '.sr-only' }).parentElement
+    ).toHaveClass('text-isk-pos');
+    expect(
+      within(veldspar).getByText('1,000 ISK', { selector: '.sr-only' }).parentElement
+    ).not.toHaveClass('text-isk-pos');
   });
 
   it('suggests nothing on a day where nothing priced', () => {

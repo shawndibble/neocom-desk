@@ -8,6 +8,7 @@
  * reachable has stopped being reachable — it is one click away instead of
  * six cards down.
  */
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ColonyStripRow } from './colonyStripModel';
 
@@ -16,6 +17,35 @@ function span(hours: number, t: ReturnType<typeof useTranslation>['t']): string 
   return hours < 48
     ? t('piAdvisor.hoursShort', { count: Math.round(hours) })
     : t('piAdvisor.daysShort', { count: Math.round(hours / 24) });
+}
+
+/**
+ * What the row shows, as sentences for a screen reader: the row's name is the
+ * control it opens, so everything it displays rides on its description.
+ * Sentences, not the visible cells, because the cells are fragments ("2
+ * faults", "62 h", "unknown") that run together when read in a line.
+ */
+function describe(
+  row: ColonyStripRow,
+  percent: number | null,
+  t: ReturnType<typeof useTranslation>['t']
+): string {
+  const sentences = [
+    percent === null
+      ? t('piAdvisor.colonyLoadUnknownSr')
+      : t('piAdvisor.colonyLoadSr', { percent }),
+  ];
+  if (row.faults > 0) sentences.push(t('piAdvisor.colonyFaultsSr', { count: row.faults }));
+  else if (row.steps > 0) sentences.push(t('piAdvisor.colonyStepsSr', { count: row.steps }));
+  else if (row.load !== null || row.hoursToFull !== null) {
+    sentences.push(t('piAdvisor.colonyClearSr'));
+  }
+  if (row.hoursToFull === null) sentences.push(t('piAdvisor.colonyFullInUnknownSr'));
+  else {
+    const key = row.overflowing ? 'piAdvisor.colonyFullInOverflowSr' : 'piAdvisor.colonyFullInSr';
+    sentences.push(t(key, { span: span(row.hoursToFull, t) }));
+  }
+  return sentences.join(' ');
 }
 
 function State({ row }: { row: ColonyStripRow }) {
@@ -52,6 +82,7 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
   const percent = row.load === null ? null : Math.min(100, Math.round(row.load * 100));
 
   const name = row.name ?? t('pi.planetLabel', { id: row.planetId });
+  const id = useId();
 
   return (
     <button
@@ -62,6 +93,9 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
       // Temperate 82% 2 faults 62 h" to a screen reader says everything except
       // what pressing it does.
       aria-label={t('piAdvisor.detailsLabel', { name })}
+      // The label replaces the row's text, so what it shows comes back as
+      // the description — see `describe`.
+      aria-describedby={id}
       aria-haspopup="dialog"
       className="group grid w-full grid-cols-[1fr_4.5rem_5rem] items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2 text-left last:border-b-0 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:grid-cols-[1fr_6.5rem_4.5rem_5rem_auto]"
     >
@@ -100,6 +134,9 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
         }`}
       >
         {row.hoursToFull === null ? t('piAdvisor.colonyUnknown') : span(row.hoursToFull, t)}
+      </span>
+      <span id={id} className="sr-only">
+        {describe(row, percent, t)}
       </span>
 
       {/*

@@ -14,7 +14,11 @@
  * that point (`compareCount > 0` in Market.tsx) and discards its own
  * open/height state for free, so a stale `openRequest` surviving in the
  * store would otherwise wrongly force the *next* mount open even when it
- * was reached via a plain "Add to Compare", not a fresh `openIn`.
+ * was reached via a plain "Add to Compare", not a fresh `openIn`. For the
+ * same reason the drawer calls `consumeOpenRequest` once it has acted on a
+ * request: the store outlives the Market route, so an already-honoured
+ * request left in place would reopen the drawer every time the route
+ * remounts it.
  */
 import { create } from 'zustand';
 
@@ -35,6 +39,7 @@ interface CompareSetState {
   clear: () => void;
   setView: (view: CompareView) => void;
   openIn: (view: CompareView) => void;
+  consumeOpenRequest: () => void;
 }
 
 const EMPTY_SET_DEFAULTS = { view: 'prices' as const, openRequest: 0 };
@@ -67,4 +72,5 @@ export const useCompareSet = create<CompareSetState>((set) => ({
   clear: () => set({ items: [], ...EMPTY_SET_DEFAULTS }),
   setView: (view) => set({ view }),
   openIn: (view) => set((state) => ({ view, openRequest: state.openRequest + 1 })),
+  consumeOpenRequest: () => set({ openRequest: 0 }),
 }));

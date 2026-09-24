@@ -71,6 +71,8 @@ export function useCompareAttributes(
             currentItems.map((item, index) => ({ item, index })),
             ESI_FANOUT_CONCURRENCY,
             async ({ item, index }) => {
+              // A superseded run stops spending ESI budget on columns nobody will see.
+              if (cancelled) return;
               types[index] = await getUniverseType(item.typeId);
             }
           ),

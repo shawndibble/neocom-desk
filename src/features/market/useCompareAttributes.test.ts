@@ -7,6 +7,7 @@ import { useCompareAttributes } from './useCompareAttributes';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadSkills } from '@/sde/loadSde';
 import { db } from '@/db';
+import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 
 vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: vi.fn(),
@@ -123,5 +124,48 @@ describe('useCompareAttributes', () => {
     rerender({ items: [ITEMS[0]] });
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(calls).toBeGreaterThan(callsAfterFirstFetch);
+  });
+
+  it('stops queuing type fetches once a run is cancelled mid-fan-out', async () => {
+    // More items than the fan-out's concurrency, so some are still queued
+    // behind the first wave when the drawer closes.
+    const many = Array.from({ length: ESI_FANOUT_CONCURRENCY + 5 }, (_, index) => ({
+      typeId: 1000 + index,
+      itemName: `Item ${index}`,
+    }));
+    let calls = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/:typeId`, async ({ params }) => {
+        calls += 1;
+        await gate;
+        return HttpResponse.json({
+          type_id: Number(params.typeId),
+          name: 'Item',
+          description: '',
+          group_id: 25,
+          published: true,
+          dogma_attributes: [],
+        });
+      })
+    );
+    mockedLoadDictionary.mockResolvedValue({});
+    mockedLoadSkills.mockResolvedValue([]);
+
+    const { rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) => useCompareAttributes(many, enabled),
+      { initialProps: { enabled: true } }
+    );
+    await waitFor(() => expect(calls).toBe(ESI_FANOUT_CONCURRENCY));
+
+    rerender({ enabled: false });
+    release();
+    // Let the first wave settle and any queued workers get their turn.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(calls).toBe(ESI_FANOUT_CONCURRENCY);
   });
 });

@@ -446,6 +446,22 @@ describe('Market Browser', () => {
     expect(within(buyTable).getByText('500,000.00')).toBeInTheDocument();
   });
 
+  it('focuses the item panel heading on selection, and the tree row on Back (issue #1485)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    const treeRow = (await screen.findByText('Rifter')).closest('button');
+    expect(treeRow).not.toBeNull();
+    await user.click(treeRow as HTMLButtonElement);
+
+    const heading = await screen.findByRole('heading', { name: 'Rifter' });
+    expect(heading).toHaveFocus();
+
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(treeRow).toHaveFocus());
+  });
+
   it('an ESI failure shows a failed state, not an empty book and not a spinner', async () => {
     // `getOrderBook` throws on any ESI failure. The fetch effect once let
     // that reject into nothing and spun forever; the fix after that read the
@@ -675,7 +691,9 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
 
     const table = await screen.findByRole('table', { name: 'Variations' });
     expect(await within(table).findByText('Kestrel')).toBeInTheDocument();
-    expect(within(table).getByLabelText('1,500,000.00 ISK')).toBeInTheDocument();
+    expect(
+      within(table).getByText('1,500,000.00 ISK', { selector: '.sr-only' })
+    ).toBeInTheDocument();
 
     // Corax has a buy order but no sell order — the Sell cell says so
     // plainly rather than showing a fabricated zero, and the Buy cell still
@@ -683,7 +701,9 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     const coraxRow = within(table).getByText('Corax').closest('tr');
     if (!coraxRow) throw new Error('expected a Corax row');
     expect(within(coraxRow).getByText('No sell orders')).toBeInTheDocument();
-    expect(within(coraxRow).getByLabelText('700,000.00 ISK')).toBeInTheDocument();
+    expect(
+      within(coraxRow).getByText('700,000.00 ISK', { selector: '.sr-only' })
+    ).toBeInTheDocument();
 
     // Cormorant has no orders on either side — each cell independently says
     // so, never conflated with Corax's buy-only state.
@@ -929,7 +949,9 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(within(sellTable).getByText('850,000.00')).toBeInTheDocument();
     const table = await screen.findByRole('table', { name: 'Variations' });
-    expect(within(table).getByLabelText('1,500,000.00 ISK')).toBeInTheDocument(); // Kestrel, unfiltered
+    expect(
+      within(table).getByText('1,500,000.00 ISK', { selector: '.sr-only' })
+    ).toBeInTheDocument(); // Kestrel, unfiltered
 
     const rows = within(sellTable).getAllByRole('row');
     const targetRow = rows.find((row) => within(row).queryByText('850,000.00'));
@@ -941,7 +963,9 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     // Kestrel and Corax have no orders at all at that location — the table
     // degrades exactly as the on-screen tables do under the same filter.
     await waitFor(() => {
-      expect(within(table).queryByLabelText('1,500,000.00 ISK')).not.toBeInTheDocument();
+      expect(
+        within(table).queryByText('1,500,000.00 ISK', { selector: '.sr-only' })
+      ).not.toBeInTheDocument();
     });
     expect(within(table).getAllByText('No orders').length).toBeGreaterThanOrEqual(2);
   });

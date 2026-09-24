@@ -14,6 +14,7 @@ import {
   StatChip,
   IconButton,
 } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
@@ -442,7 +443,7 @@ export function Skills() {
                                   current === skill.skillTypeID ? null : skill.skillTypeID
                                 )
                               }
-                              className={`flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
+                              className={`${tappableRowClassName} flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
                                 selected ? 'bg-panel-2' : ''
                               }`}
                             >

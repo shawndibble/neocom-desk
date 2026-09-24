@@ -58,7 +58,7 @@ export interface PlanScheduleInputs {
   cloneState: CloneState;
 }
 
-/** The plan's schedule, started when the live queue runs dry (`nowMs` if it is empty). */
+/** The plan's schedule, started when the live queue's lead ends (`nowMs` if there is none). */
 export function schedulePlan(
   plan: SchedulablePlan,
   inputs: PlanScheduleInputs,
@@ -72,7 +72,7 @@ export function schedulePlan(
   const boosters = toBoosters(
     resolvePlanBoosters(plan.boosters, plan.booster, detectedAccelerator)
   );
-  const queue = projectQueueEnd(inputs.trained, inputs.queueEntries, nowMs);
+  const queue = projectQueueEnd(inputs.trained, inputs.queueEntries, nowMs, plan.entries);
   return computeSkillPlanSchedule({
     entries: plan.entries,
     skills: inputs.catalog.engineSkills,

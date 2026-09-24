@@ -5,11 +5,27 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
+import { resetRevalidationState } from '@/esi/cache';
 import { db } from '@/db';
+import { beginEveLogin } from '@/app/loginFlow';
 import { EventDetailModal } from './EventDetailModal';
 import type { CalendarEventSummary } from '@/esi/endpoints';
 
+vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
+
 const CHAR_ID = 91;
+const DETAIL = {
+  event_id: 1,
+  title: 'Fleet Op',
+  date: '2026-09-01T18:00:00Z',
+  duration: 60,
+  importance: 1,
+  owner_id: 1,
+  owner_name: 'FC',
+  owner_type: 'character',
+  response: 'accepted',
+  text: 'Bring your ship',
+};
 const EVENT: CalendarEventSummary = {
   event_id: 1,
   event_date: '2026-09-01T18:00:00Z',
@@ -23,8 +39,11 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
+  resetRevalidationState();
+  vi.mocked(beginEveLogin).mockClear();
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   server.resetHandlers();
   configureEsi({ getToken: null });
 });
@@ -62,12 +81,92 @@ describe('EventDetailModal', () => {
     expect(screen.getByText(/Importance 1/)).toBeInTheDocument();
   });
 
-  it('shows an empty state when the event has no cached/fetchable detail', async () => {
-    server.use(
-      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () => HttpResponse.error())
-    );
-    render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
-    expect(await screen.findByText('No event detail cached')).toBeInTheDocument();
+  describe('load failure', () => {
+    it('shows a load failure with a Try again button when nothing is cached', async () => {
+      server.use(
+        http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () => HttpResponse.error())
+      );
+      render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+      expect(await screen.findByText('Could not load')).toBeInTheDocument();
+      expect(screen.getByText(/You may be offline or ESI may be busy/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+    });
+
+    it('Try again re-runs the load in place and renders the detail on success', async () => {
+      let fail = true;
+      server.use(
+        http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () =>
+          fail ? HttpResponse.error() : HttpResponse.json(DETAIL)
+        )
+      );
+      render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+      const retry = await screen.findByRole('button', { name: 'Try again' });
+      fail = false;
+      await userEvent.setup().click(retry);
+
+      expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
+      expect(screen.getByText(/Importance 1/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Download \.ics/i })).toBeInTheDocument();
+    });
+
+    it('a repeat failure returns to the failure state', async () => {
+      let calls = 0;
+      server.use(
+        http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () => {
+          calls += 1;
+          return HttpResponse.error();
+        })
+      );
+      render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+      await userEvent.setup().click(await screen.findByRole('button', { name: 'Try again' }));
+
+      await vi.waitFor(() => expect(calls).toBeGreaterThanOrEqual(2));
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
+      expect(screen.getByText('Could not load')).toBeInTheDocument();
+    });
+
+    it('a load that throws ends in the failure state, not an endless spinner', async () => {
+      vi.spyOn(db.esiCache, 'get').mockRejectedValue(new Error('IDB closed'));
+      server.use(
+        http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () => HttpResponse.error())
+      );
+      render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
+      expect(screen.queryByRole('status', { name: 'Loading' })).not.toBeInTheDocument();
+    });
+
+    it('an auth failure with nothing cached shows the re-login banner, not Try again', async () => {
+      server.use(
+        http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () =>
+          HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+        )
+      );
+      render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+      const login = await screen.findByRole('button', { name: 'Log in again with EVE Online' });
+      expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+      await userEvent.setup().click(login);
+      expect(beginEveLogin).toHaveBeenCalledTimes(1);
+    });
+
+    it('an auth failure with stale cached detail renders that detail normally', async () => {
+      await db.esiCache.put({
+        characterId: CHAR_ID,
+        key: 'calendar:1',
+        value: DETAIL,
+        fetchedAt: 3,
+      });
+      server.use(
+        http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () =>
+          HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+        )
+      );
+      render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+      expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Log in again with EVE Online' })
+      ).not.toBeInTheDocument();
+    });
   });
 
   describe('RSVP', () => {

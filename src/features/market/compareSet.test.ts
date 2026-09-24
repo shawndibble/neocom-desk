@@ -67,6 +67,15 @@ describe('useCompareSet', () => {
     expect(useCompareSet.getState().openRequest).toBe(before + 1);
   });
 
+  it('consumeOpenRequest clears the pending open without touching the view or items', () => {
+    useCompareSet.getState().add({ typeId: 34, itemName: 'Tritanium' });
+    useCompareSet.getState().openIn('attributes');
+    useCompareSet.getState().consumeOpenRequest();
+    expect(useCompareSet.getState().openRequest).toBe(0);
+    expect(useCompareSet.getState().view).toBe('attributes');
+    expect(useCompareSet.getState().items).toHaveLength(1);
+  });
+
   it('setView changes the view without touching openRequest', () => {
     const before = useCompareSet.getState().openRequest;
     useCompareSet.getState().setView('attributes');

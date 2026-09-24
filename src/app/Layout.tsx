@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { pageKeyFor } from './pageTabs';
+import { useRouteFocus } from './routeFocus';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -467,6 +468,7 @@ export function Layout() {
   useKeyboardShortcuts();
   const location = useLocation();
   const outletRef = useRouteFade(pageKeyFor(location.pathname));
+  useRouteFocus(outletRef, location.pathname, location.hash);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const activeCharacter = useLiveQuery(
     () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
@@ -636,8 +638,10 @@ export function Layout() {
           across those — so re-keying would throw away Assets' search, filters
           and selection on every drill-down and re-run its loader. Animating
           the element in place keeps the instance and still replays.
+          `tabIndex={-1}`: where a page never renders an `<h1>`, route focus
+          (`routeFocus.ts`) lands here instead.
         */}
-        <div ref={outletRef}>
+        <div ref={outletRef} tabIndex={-1} className="focus:outline-none">
           <Outlet />
         </div>
       </main>

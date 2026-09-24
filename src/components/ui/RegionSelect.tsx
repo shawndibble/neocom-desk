@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useState, type KeyboardEvent } from 'react';
 import { cx } from '@/lib/cx';
-import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
+import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { Popover, PopoverContent, PopoverTrigger } from './Popover';
 import { SearchInput } from './SearchInput';
 import * as Icon from './icons';
@@ -29,8 +29,6 @@ interface Row {
   id: number | null;
   name: string;
 }
-
-const NAV_KEYS: readonly string[] = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
 
 /**
  * The one region picker. EVE has 60-odd k-space regions, too many to scan in
@@ -101,7 +99,7 @@ export function RegionSelect({
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (NAV_KEYS.includes(event.key)) {
+    if (COMBOBOX_NAV_KEYS.includes(event.key)) {
       event.preventDefault();
       setHighlight(moveHighlight(event.key as ComboboxNavKey, highlight, rows.length));
     } else if (event.key === 'Enter' && highlight !== null && rows[highlight]) {

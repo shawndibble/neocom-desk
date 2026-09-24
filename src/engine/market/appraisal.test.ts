@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
+  appraisalNet,
+  appraisalUndercut,
   buildAppraisal,
   buildHubComparison,
   computeAppraisalRefine,
@@ -10,6 +12,7 @@ import {
 } from '@/engine/market/appraisal';
 import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
+import { ZERO_STANDINGS } from '@/engine/market/standings';
 
 const damageControl: AppraisalItem = {
   typeId: 2048,
@@ -40,6 +43,13 @@ describe('buildAppraisal', () => {
     const { rows } = buildAppraisal([damageControl], 100);
     expect(rows[0].buyEach).toBe(498_500);
     expect(rows[0].sellTotal).toBe(1_536_000);
+  });
+
+  it('returns the un-scaled items alongside the percent-scaled rows, for net-of-fees math that must ignore Price Percent', () => {
+    const { rows, items } = buildAppraisal([damageControl], 50);
+    expect(rows[0].buyEach).toBe(249_250);
+    expect(rows[0].sellEach).toBe(256_000);
+    expect(items).toEqual([damageControl]);
   });
 
   it('carries identity and quantity through unchanged', () => {
@@ -468,5 +478,119 @@ describe('refineBeatsSellAsIs (issue #1048)', () => {
       refineUnitsLeftOver: 99,
     });
     expect(refineBeatsSellAsIs(unpriced)).toBe(false);
+  });
+});
+
+describe('appraisalNet (issue #1426)', () => {
+  /** A priced item; overrides say what the case is. `appraisalNet` reads `AppraisalItem` — always the 100%-market price, never a Price-Percent-scaled `AppraisalRow` figure. */
+  function item(overrides: Partial<AppraisalItem> = {}): AppraisalItem {
+    return { typeId: 1, name: 'Item', quantity: 10, buy: 1_000, sell: 1_050, ...overrides };
+  }
+
+  const fees = { accountingLevel: 5, brokerRelationsLevel: 0, standing: ZERO_STANDINGS };
+
+  it('instant net is the raw buy total minus sales tax, with no broker fee', () => {
+    const { instantNet } = appraisalNet([item()], fees);
+    // salesTaxPct(5) = 7.5 * (1 - 0.11 * 5) = 3.375%; 10,000 * 0.03375 = 337.5
+    expect(instantNet).toBeCloseTo(10_000 - 337.5, 6);
+  });
+
+  it('list net undercuts the best sell by one legal tick, then charges tax and broker fee', () => {
+    const priced = item({ quantity: 100, sell: 1_000 });
+    const { listNet } = appraisalNet([priced], fees);
+    // undercutPrice(1,000) = 999.9 (an exact power of ten, so the band below
+    // uses the smaller tick) -> listValue = 99,990.
+    // tax = 99,990 * 0.03375 = 3,374.6625; broker (BrokerRelations 0,
+    // no standings) = 99,990 * 0.03 = 2,999.7.
+    expect(listNet).toBeCloseTo(99_990 - 3_374.6625 - 2_999.7, 4);
+  });
+
+  it('floors the broker fee at 100 ISK per item, not per unit, for a small listing', () => {
+    const tiny = item({ quantity: 1, sell: 10 });
+    const { listNet } = appraisalNet([tiny], { ...fees, accountingLevel: 0 });
+    // undercutPrice(10) = 9.99 -> listValue = 9.99; the 3% rate fee (30c)
+    // would be far under the 100 ISK minimum, so the minimum applies once.
+    expect(listNet).toBeCloseTo(9.99 - 9.99 * 0.075 - 100, 6);
+  });
+
+  it('excludes an unpriced side from its own net only', () => {
+    const noBuy = item({ typeId: 2, buy: null, sell: 1_050 });
+    const noSell = item({ typeId: 3, buy: 1_000, sell: null });
+    const { instantNet, listNet } = appraisalNet([noBuy, noSell], fees);
+    // noBuy contributes nothing to instantNet; noSell contributes nothing to
+    // listNet — each item's priced side still counts on the other total.
+    const soloBuy = appraisalNet([noSell], fees).instantNet;
+    const soloList = appraisalNet([noBuy], fees).listNet;
+    expect(instantNet).toBeCloseTo(soloBuy, 6);
+    expect(listNet).toBeCloseTo(soloList, 6);
+  });
+
+  it('lowers the broker fee, and so raises the net, with favourable standings', () => {
+    const base = appraisalNet([item()], fees).listNet;
+    const favoured = appraisalNet([item()], {
+      ...fees,
+      standing: { factionStanding: 10, corpStanding: 10 },
+    }).listNet;
+    expect(favoured).toBeGreaterThan(base);
+  });
+
+  it('never nets above the matching raw gross', () => {
+    const { instantNet, listNet } = appraisalNet([item({ quantity: 100 })], fees);
+    const rawBuyGross = 100 * 1_000;
+    const rawListGross = 100 * 999.9; // undercutPrice(1,000)
+    expect(instantNet).toBeLessThan(rawBuyGross);
+    expect(listNet).toBeLessThan(rawListGross);
+  });
+
+  it('reports the rates applied, for the chip tooltip copy', () => {
+    const { salesTaxPct, brokerFeePct } = appraisalNet([item()], fees);
+    expect(salesTaxPct).toBeCloseTo(3.375, 6);
+    expect(brokerFeePct).toBeCloseTo(3, 6);
+  });
+});
+
+describe('appraisalUndercut', () => {
+  function item(overrides: Partial<AppraisalItem> = {}): AppraisalItem {
+    return { typeId: 1, name: 'Item', quantity: 10, buy: 1_000, sell: 1_234_000, ...overrides };
+  }
+
+  it('prices one legal tick under the cheapest seller at the hub', () => {
+    expect(appraisalUndercut(item())).toEqual({ price: 1_233_000, atOrBelowBuy: false });
+  });
+
+  it('drops to the smaller tick at an exact power of ten', () => {
+    expect(appraisalUndercut(item({ sell: 1_000 }))?.price).toBe(999.9);
+  });
+
+  it('is null when nobody is selling, never a zero price', () => {
+    expect(appraisalUndercut(item({ sell: null }))).toBeNull();
+  });
+
+  it('is null when the best sell already sits at the 0.01 ISK floor', () => {
+    expect(appraisalUndercut(item({ sell: 0.01, buy: null }))).toBeNull();
+  });
+
+  it('flags an undercut that lands at or under the best buy — selling instantly pays the same or more', () => {
+    expect(appraisalUndercut(item({ sell: 1_001, buy: 1_000 }))).toEqual({
+      price: 1_000,
+      atOrBelowBuy: true,
+    });
+    expect(appraisalUndercut(item({ sell: 1_001, buy: 1_000.5 }))?.atOrBelowBuy).toBe(true);
+  });
+
+  it('never flags a row nobody is buying', () => {
+    expect(appraisalUndercut(item({ buy: null }))?.atOrBelowBuy).toBe(false);
+  });
+
+  it('ignores Price Percent — it reads the unscaled item, so the column agrees with List Net', () => {
+    const priced = item({ quantity: 100, sell: 1_000, buy: null });
+    const undercut = appraisalUndercut(priced);
+    const { listNet } = appraisalNet([priced], {
+      accountingLevel: 0,
+      brokerRelationsLevel: 0,
+      standing: ZERO_STANDINGS,
+    });
+    const listValue = (undercut?.price ?? 0) * priced.quantity;
+    expect(listNet).toBeCloseTo(listValue - listValue * 0.075 - listValue * 0.03, 4);
   });
 });

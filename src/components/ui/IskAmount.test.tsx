@@ -6,9 +6,9 @@ import { IskAmount } from './IskAmount';
 
 const EXACT = '1,284,500,000.00 ISK';
 
-/** The focusable trigger — named by the exact figure, showing the shorthand. */
+/** The focusable trigger — the shorthand on screen, the exact figure in hidden text inside it. */
 function trigger(exact = EXACT) {
-  return screen.getByLabelText(exact);
+  return screen.getByText(exact, { selector: '.sr-only' }).parentElement as HTMLElement;
 }
 
 describe('IskAmount', () => {
@@ -17,14 +17,21 @@ describe('IskAmount', () => {
     expect(screen.getByText('1.3B')).toBeInTheDocument();
   });
 
-  it('keeps the exact value in the accessible name, with no gesture', () => {
+  it('reads the shorthand and then the exact value as text, with no gesture', () => {
     render(<IskAmount value={1_284_500_000} revealOn="longPress" />);
-    expect(trigger()).toHaveAccessibleName(EXACT);
+    expect(trigger()).toHaveTextContent(`1.3B ${EXACT}`);
+    expect(trigger()).not.toHaveAttribute('aria-hidden');
+    expect(screen.getByText(EXACT)).toHaveClass('sr-only');
   });
 
-  it('hides the shorthand from screen readers, so the value is announced once', () => {
+  it('carries no aria-label, which a role-less span may not have', () => {
     render(<IskAmount value={1_284_500_000} revealOn="longPress" />);
-    expect(screen.getByText('1.3B')).toHaveAttribute('aria-hidden', 'true');
+    expect(trigger()).not.toHaveAttribute('aria-label');
+  });
+
+  it('stays a tab stop, so the tooltip is reachable from the keyboard', () => {
+    render(<IskAmount value={1_284_500_000} revealOn="longPress" />);
+    expect(trigger()).toHaveAttribute('tabindex', '0');
   });
 
   it('reveals the exact value on hover', async () => {
@@ -72,6 +79,6 @@ describe('IskAmount', () => {
 
   it('honours the caller precision for the exact value', () => {
     render(<IskAmount value={1_284_500_000} decimals={0} revealOn="longPress" />);
-    expect(trigger('1,284,500,000 ISK')).toHaveAccessibleName('1,284,500,000 ISK');
+    expect(trigger('1,284,500,000 ISK')).toHaveTextContent('1.3B 1,284,500,000 ISK');
   });
 });

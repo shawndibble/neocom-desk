@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, SearchInput } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { SkillType } from '@/sde/types';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import { rankedSearch } from '@/lib/rankedSearch';
@@ -51,6 +52,8 @@ export function SkillPicker({
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
   const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set());
+  const [announcement, setAnnouncement] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
@@ -96,18 +99,27 @@ export function SkillPicker({
     [selected, catalog, trainedSkills]
   );
 
-  function pick(skillTypeID: number, targetLevel: number) {
+  function pick(skillTypeID: number, targetLevel: number, skillName: string, levelLabel: string) {
     onAdd({ skillTypeID, targetLevel });
     setQuery('');
     setDebouncedQuery('');
     setSelected(null);
     setActiveGroups(new Set());
+    // The results list just collapsed, unmounting the clicked button
+    // (WCAG 2.4.3) — refocus the search box and announce the add. Cleared
+    // first: an `aria-live` region only speaks on an actual DOM mutation.
+    setAnnouncement('');
+    window.setTimeout(() => {
+      setAnnouncement(t('plans.addedAnnouncement', { skill: skillName, level: levelLabel }));
+    }, 0);
+    searchRef.current?.focus();
   }
 
   return (
     <div className={className}>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <SearchInput
+          ref={searchRef}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -118,6 +130,9 @@ export function SkillPicker({
           aria-label={t('plans.addSkill')}
           className="flex-1"
         />
+        <span role="status" aria-live="polite" className="sr-only">
+          {announcement}
+        </span>
         {controls && (
           <div className="flex flex-wrap items-center gap-2 text-xs whitespace-nowrap text-text-dim">
             {controls}
@@ -147,7 +162,7 @@ export function SkillPicker({
               <button
                 type="button"
                 onClick={() => setSelected(selected === skill.typeID ? null : skill.typeID)}
-                className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+                className={`${tappableRowClassName} flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
               >
                 <span className="truncate">{skill.name}</span>
                 <span className="shrink-0 text-text-dim">{skill.groupName}</span>
@@ -182,7 +197,14 @@ export function SkillPicker({
                           key={roman}
                           size="sm"
                           className={flagKey ? 'text-text-dim' : undefined}
-                          onClick={() => pick(skill.typeID, level)}
+                          onClick={() =>
+                            pick(
+                              skill.typeID,
+                              level,
+                              skill.name,
+                              t('plans.level', { level: roman })
+                            )
+                          }
                         >
                           {t('plans.level', { level: roman })}
                           {flagKey && (

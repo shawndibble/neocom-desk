@@ -207,6 +207,25 @@ describe('marketLinkParams', () => {
   it('falls back to just the typeId when arriving with neither param (e.g. from Skills)', () => {
     expect(marketLinkParams(587, '')).toEqual({ type: '587' });
   });
+
+  // The forced hub wins over both region and hub params — see marketLinkParams' own doc.
+  it('prefers a forced hub over an existing region param', () => {
+    expect(marketLinkParams(587, '?region=10000002', 'amarr')).toEqual({
+      type: '587',
+      hub: 'amarr',
+    });
+  });
+
+  it('prefers a forced hub over an existing hub param', () => {
+    expect(marketLinkParams(587, '?hub=jita', 'amarr')).toEqual({
+      type: '587',
+      hub: 'amarr',
+    });
+  });
+
+  it('uses a forced hub even with no URL params at all', () => {
+    expect(marketLinkParams(587, '', 'amarr')).toEqual({ type: '587', hub: 'amarr' });
+  });
 });
 
 describe('marketItemUrl', () => {

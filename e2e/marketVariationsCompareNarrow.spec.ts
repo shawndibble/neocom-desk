@@ -89,8 +89,11 @@ test('Variations compare stacks into labelled cards at 390px', async ({ page }) 
   const drawer = await openCompareDrawer(page);
 
   // Non-modal (round 8): the order book beside it stays interactive rather
-  // than being inerted, which is exactly what the old modal did wrong.
-  await expect(page.getByRole('table', { name: 'Sell Orders' })).toBeVisible();
+  // than being inerted, which is exactly what the old modal did wrong. The
+  // heading, not a table: `stubEveryType` serves empty books, so the section
+  // renders its empty state. Inert content drops out of the accessibility
+  // tree, so a role query still fails if the drawer blocks the book.
+  await expect(page.getByRole('heading', { name: 'Sell Orders' })).toBeVisible();
 
   // A phone can't hold a stacked matrix at the 280px default drawer height,
   // so opening on Attributes goes straight to `full` (80vh).

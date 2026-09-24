@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
@@ -86,6 +87,7 @@ afterEach(async () => {
 });
 
 beforeEach(() => {
+  vi.clearAllMocks();
   useCompareSet.setState({ items: [], view: 'prices', openRequest: 0 });
   mockedLoadDictionary.mockResolvedValue({
     9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
@@ -93,17 +95,29 @@ beforeEach(() => {
   mockedLoadSkills.mockResolvedValue([]);
 });
 
+const drawerHandlers = {
+  onRequestBlueprintCatalog: vi.fn(),
+  onShowInfo: vi.fn(),
+};
+
 function renderDrawer() {
   return render(
-    <CompareDrawer
-      location={{
-        mode: 'region',
-        regionId: REGION_ID,
-        hubStationId: 60003760,
-        globalMarkets: new Map(),
-      }}
-      refreshTick={0}
-    />
+    <MemoryRouter>
+      <CompareDrawer
+        location={{
+          mode: 'region',
+          regionId: REGION_ID,
+          hubStationId: 60003760,
+          globalMarkets: new Map(),
+        }}
+        refreshTick={0}
+        blueprintCatalog={null}
+        onRequestBlueprintCatalog={drawerHandlers.onRequestBlueprintCatalog}
+        onAddToQuickbar={vi.fn()}
+        quickbarAvailable
+        onShowInfo={drawerHandlers.onShowInfo}
+      />
+    </MemoryRouter>
   );
 }
 
@@ -135,9 +149,11 @@ describe('CompareDrawer', () => {
 
     const region = await screen.findByRole('region', { name: 'Compare' });
     // Prices render as shorthand (#947); the exact figure is the accessible name.
-    await waitFor(() => expect(within(region).getByLabelText('100.00 ISK')).toBeInTheDocument());
-    expect(within(region).getByLabelText('80.00 ISK')).toBeInTheDocument();
-    expect(within(region).getByLabelText('20.00 ISK')).toBeInTheDocument(); // spread
+    await waitFor(() =>
+      expect(within(region).getByText('100.00 ISK', { selector: '.sr-only' })).toBeInTheDocument()
+    );
+    expect(within(region).getByText('80.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
+    expect(within(region).getByText('20.00 ISK', { selector: '.sr-only' })).toBeInTheDocument(); // spread
     expect(within(region).getByText('10')).toBeInTheDocument(); // volume
     // Pyerite has no orders in the fixture, so its priced cells read the empty dash.
     const pyeriteRow = within(region).getByText('Pyerite').closest('tr');
@@ -155,6 +171,24 @@ describe('CompareDrawer', () => {
     await user.click(screen.getByRole('button', { name: 'Remove Tritanium' }));
 
     expect(useCompareSet.getState().items).toEqual([]);
+  });
+
+  it('opens the item context menu from the item cell only, requesting the blueprint catalog', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Remove Tritanium' }));
+    expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
+    expect(drawerHandlers.onRequestBlueprintCatalog).not.toHaveBeenCalled();
+
+    fireEvent.contextMenu(within(region).getByText('Tritanium'));
+    await user.click(await screen.findByRole('menuitem', { name: 'Show info' }));
+
+    expect(drawerHandlers.onRequestBlueprintCatalog).toHaveBeenCalled();
+    expect(drawerHandlers.onShowInfo).toHaveBeenCalledWith(ITEM_A.typeId, ITEM_A.itemName);
   });
 
   it('clears the whole set from the drawer header', async () => {
@@ -270,5 +304,36 @@ describe('CompareDrawer', () => {
     act(() => useCompareSet.getState().openIn('attributes'));
 
     expect(region.style.height).toBe('80vh');
+  });
+
+  it('a handled open request does not reopen the drawer on a later remount (leaving Market and coming back)', async () => {
+    const user = userEvent.setup();
+    act(() => {
+      useCompareSet.setState({ items: [ITEM_A] });
+      useCompareSet.getState().openIn('attributes');
+    });
+    const first = renderDrawer();
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    await user.click(within(region).getByRole('button', { name: 'Close' }));
+    first.unmount();
+
+    renderDrawer();
+
+    expect(screen.getByRole('button', { name: 'Compare (1)' })).toBeInTheDocument();
+    expect(screen.queryByRole('region')).not.toBeInTheDocument();
+  });
+
+  it('each of two consecutive openIn calls reopens a drawer closed in between', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+
+    act(() => useCompareSet.getState().openIn('attributes'));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    await user.click(within(region).getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('region')).not.toBeInTheDocument();
+
+    act(() => useCompareSet.getState().openIn('attributes'));
+    expect(await screen.findByRole('region', { name: 'Compare' })).toBeInTheDocument();
   });
 });
