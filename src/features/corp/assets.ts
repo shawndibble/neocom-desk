@@ -24,6 +24,7 @@ import { loadStructureName } from '@/features/character/structures';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { CorpAssetInput } from '@/engine/corp/assetDivisions';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
+import { UPWELL_STRUCTURE_ID_FLOOR } from '@/esi/locationIds';
 import { loadCorpPaginatedWithCacheStatus } from './corpRead';
 
 /**
@@ -72,9 +73,6 @@ export function toCorpAssetInputs(assets: readonly CorporationAsset[]): CorpAsse
     locationFlag: asset.location_flag,
   }));
 }
-
-/** The lowest id CCP issues to an Upwell structure — see the note below. */
-const UPWELL_STRUCTURE_ID_FLOOR = 1_000_000_000_000;
 
 /**
  * Location names for the distinct places this corporation's assets sit.

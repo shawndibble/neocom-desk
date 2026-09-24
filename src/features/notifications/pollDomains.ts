@@ -233,8 +233,17 @@ interface PollDomainSpec<TRaw, TSnapshot, TFire extends AnyNotificationFire, TNa
   readonly isEntry: (raw: unknown) => boolean;
   /** Fetches this domain for one character, or null to skip it this poll. */
   readonly load: (characterId: number) => Promise<TRaw[] | null>;
-  /** Turns what `load` returned into the snapshot the engine diffs compare. */
-  readonly toSnapshot: (raw: readonly TRaw[], nowMs: number) => TSnapshot;
+  /**
+   * Turns what `load` returned into the snapshot the engine diffs compare.
+   * `prevSnapshot` — the character's persisted baseline from *before* this
+   * poll, the same value passed to `diff` as `prev` — is offered so a domain
+   * whose own snapshot needs to carry state forward across a poll that
+   * observed nothing new can do so (issue #1423's `marketOrderUndercutDomain`:
+   * an `armed` anti-flap latch that must survive an `unknown` poll in
+   * between). Every other domain ignores the third parameter; it costs them
+   * nothing since it's optional.
+   */
+  readonly toSnapshot: (raw: readonly TRaw[], nowMs: number, prevSnapshot?: TSnapshot) => TSnapshot;
   /**
    * The inverse of the entries' diffs: occurrences this poll can prove never
    * happened, so an alert already delivered for one can be retracted from the
@@ -290,7 +299,7 @@ export interface PollDomain {
   readonly stateKey: string;
   readonly store: LocalSettingStore<PollerState<unknown>>;
   readonly load: (characterId: number) => Promise<readonly unknown[] | null>;
-  readonly toSnapshot: (raw: readonly unknown[], nowMs: number) => unknown;
+  readonly toSnapshot: (raw: readonly unknown[], nowMs: number, prevSnapshot?: unknown) => unknown;
   /** Every one of its events' diffs, in `eventIds` order, each run only when its own event is enabled. */
   readonly diff: (
     characterId: number,
@@ -330,7 +339,8 @@ function defineDomain<TRaw, TSnapshot, TFire extends AnyNotificationFire, TNames
     stateKey: spec.stateKey,
     store: store as unknown as LocalSettingStore<PollerState<unknown>>,
     load: spec.load,
-    toSnapshot: (raw, nowMs) => spec.toSnapshot(raw as readonly TRaw[], nowMs),
+    toSnapshot: (raw, nowMs, prevSnapshot) =>
+      spec.toSnapshot(raw as readonly TRaw[], nowMs, prevSnapshot as TSnapshot | undefined),
     // One gate per event, not per domain: the fetch is skipped only when
     // every event of the domain is off, so a domain answering for two events
     // with one of them enabled must still not fire the other.
