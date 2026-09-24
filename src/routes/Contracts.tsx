@@ -23,6 +23,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { loadContracts } from '@/features/character/contracts';
 import { ContractContextMenu } from '@/features/character/ContractContextMenu';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
@@ -518,7 +519,9 @@ export function Contracts() {
           title={t('contracts.reauthTitle')}
           hint={t('contracts.reauthHint')}
           actionLabel={t('contracts.reauthAction')}
-          onLogin={() => void beginEveLogin()}
+          onLogin={() =>
+            void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterContracts']) })
+          }
         />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />

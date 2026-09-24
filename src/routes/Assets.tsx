@@ -24,6 +24,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { clearStationPin, setAccountStationPin, setCharacterStationPin } from '@/sync';
 import { db, type BuildPlanRecord } from '@/db';
 import { cx } from '@/lib/cx';
@@ -1620,7 +1621,9 @@ export function Assets() {
           title={t('assets.reauthTitle')}
           hint={t('assets.reauthHint')}
           actionLabel={t('assets.reauthAction')}
-          onLogin={() => void beginEveLogin()}
+          onLogin={() =>
+            void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterAssets']) })
+          }
         />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />

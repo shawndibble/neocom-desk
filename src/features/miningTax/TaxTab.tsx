@@ -23,6 +23,7 @@ import {
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
@@ -902,7 +903,12 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                     </span>
                     <Button
                       size="sm"
-                      onClick={() => void beginEveLogin({ characterId: c.characterId })}
+                      onClick={() =>
+                        void beginEveLogin({
+                          characterId: c.characterId,
+                          groups: permissionsForEndpoints(['getCharacterMining']),
+                        })
+                      }
                     >
                       {t('miningTax.reauthAction')}
                     </Button>

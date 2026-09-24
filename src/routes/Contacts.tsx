@@ -23,6 +23,7 @@ import * as Icon from '@/components/ui/icons';
 import { ICON_SIZE } from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { beginEveLogin } from '@/app/loginFlow';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { loadContacts } from '@/features/character/contacts';
 import {
   ALL_CONTACT_TYPES,
@@ -724,7 +725,9 @@ export function Contacts() {
           title={t('contacts.reauthTitle')}
           hint={t('contacts.reauthHint')}
           actionLabel={t('contacts.reauthAction')}
-          onLogin={() => void beginEveLogin()}
+          onLogin={() =>
+            void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterContacts']) })
+          }
         />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />

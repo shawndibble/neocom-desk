@@ -16,6 +16,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { loadCharacterClones, loadImplantDescriptions } from '@/features/character/clones';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
@@ -271,7 +272,9 @@ export function Clones() {
               title={t('clones.reauthTitle')}
               hint={t('clones.reauthHint')}
               actionLabel={t('clones.reauthAction')}
-              onLogin={() => void beginEveLogin()}
+              onLogin={() =>
+                void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterClones']) })
+              }
             />
           </div>
         ) : error ? (

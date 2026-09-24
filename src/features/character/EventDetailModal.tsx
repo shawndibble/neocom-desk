@@ -28,6 +28,7 @@ import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { buildIcsFile, googleCalendarUrl, type CalendarExportEvent } from '@/lib/calendarExport';
 import { downloadTextFile } from '@/lib/download';
 import { beginEveLogin } from '@/app/loginFlow';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { formatCalendarTimestamp } from '@/lib/timestamp';
 import type { CachedResult } from '@/esi/cache';
 import type {
@@ -153,7 +154,9 @@ export function EventDetailModal({
           title={t('calendar.detailReauthTitle')}
           hint={t('calendar.detailReauthHint')}
           actionLabel={t('calendar.reauthAction')}
-          onLogin={() => void beginEveLogin()}
+          onLogin={() =>
+            void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterCalendarEvent']) })
+          }
         />
       ) : state.status === 'failed' ? (
         <EmptyState

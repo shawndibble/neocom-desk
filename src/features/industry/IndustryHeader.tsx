@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { PageHeader, Panel, ReauthBanner, Tabs } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
 import { industryTabs, type IndustryTab } from './industryTabs';
 
@@ -57,7 +58,9 @@ export function IndustryHeader({
             title={t('industry.blueprintsReauthTitle')}
             hint={t('industry.blueprintsReauthHint')}
             actionLabel={t('industry.blueprintsReauthAction')}
-            onLogin={() => void beginEveLogin()}
+            onLogin={() =>
+              void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterBlueprints']) })
+            }
           />
         </Panel>
       )}

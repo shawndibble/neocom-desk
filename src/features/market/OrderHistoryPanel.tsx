@@ -17,6 +17,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { loadOrderHistory } from '@/features/character/orders';
 import { ItemContextMenu } from './ItemContextMenu';
 import { OrderHistoryList } from './OrderHistoryList';
@@ -326,7 +327,9 @@ export function OrderHistoryPanel({
             title={t('orders.reauthTitle')}
             hint={t('orders.reauthHint')}
             actionLabel={t('orders.reauthAction')}
-            onLogin={() => void beginEveLogin()}
+            onLogin={() =>
+              void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterOrderHistory']) })
+            }
           />
         </div>
       ) : !historyResult || history.length === 0 ? (
