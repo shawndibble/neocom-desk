@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
@@ -9,6 +10,8 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ScopeGate } from './ScopeGate';
 import { useGrantedScopes } from './useGrantedScopes';
 import type { AppRoutePath } from './routeScopes';
+
+vi.mock('./loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
 const CHARACTER_ID = 42;
 
@@ -108,6 +111,17 @@ describe('ScopeGate', () => {
       expect(screen.queryByRole('button', { name: /log in again/i }), path).not.toBeInTheDocument();
       unmount();
     }
+  });
+
+  it('presses the banner asking for exactly the route’s own Permission, not the whole Base Grant (AC 1)', async () => {
+    const { beginEveLogin } = await import('./loginFlow');
+    await seedGrant(['esi-wallet.read_character_wallet.v1']);
+    const user = userEvent.setup();
+    renderGate('/mail');
+
+    await user.click(await screen.findByRole('button', { name: /log in again with eve online/i }));
+
+    expect(beginEveLogin).toHaveBeenCalledWith({ groups: ['mail'] });
   });
 
   it('never gates an ungated route, even on an empty grant', async () => {

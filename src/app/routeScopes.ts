@@ -11,8 +11,10 @@
 import {
   ESI_REGISTRY,
   isScopeRequired,
+  permissionsForEndpoints,
   type EsiEndpointId,
   type Scope,
+  type ScopeGroup,
   type ScopeRequirement,
 } from '@/esi/registry';
 
@@ -285,4 +287,17 @@ export function missingScopesForRoute(
 ): readonly Scope[] {
   const held = new Set(granted);
   return requiredScopesForRoute(path).filter((scope) => !held.has(scope));
+}
+
+/**
+ * The Permission(s) a gated route's re-login banner should ask for, derived
+ * from the same `endpoints` list the route declares — so pressing the Mail
+ * banner asks for exactly Mail, never every Permission (issue #1520).
+ * `[]` for an ungated route, which `beginEveLogin` treats as "no identifiable
+ * Permission" and asks for the Core Grant plus the stored grant only.
+ */
+export function permissionsForRoute(path: AppRoutePath): readonly ScopeGroup[] {
+  const requirement = ROUTE_REQUIREMENTS[path];
+  if (requirement === UNGATED) return [];
+  return permissionsForEndpoints(requirement.endpoints);
 }

@@ -15,6 +15,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { IssuerLink } from '@/features/character/IssuerLink';
 import { StandingTag } from '@/features/character/StandingTag';
 import { MailRowContextMenu } from '@/features/character/MailRowContextMenu';
@@ -562,7 +563,9 @@ export function Mail() {
           title={t('mail.reauthTitle')}
           hint={t('mail.reauthHint')}
           actionLabel={t('mail.reauthAction')}
-          onLogin={() => void beginEveLogin()}
+          onLogin={() =>
+            void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterMailHeaders']) })
+          }
         />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
