@@ -3978,6 +3978,9 @@
       "noResults": "No matching events or characters",
       "emptyTitle": "Add a character to configure notifications",
       "reauthHint": "This character hasn't granted the permission this notification needs. Re-authorize the character to enable it.",
+      "needsPermission": "Needs the {{permission}} permission",
+      "grantPermission": "Grant",
+      "grantPermissionLabel": "Grant the {{permission}} permission for {{event}}",
       "corpCapabilityHint": "This character doesn't hold the in-game corporation role this notification needs. Re-authorizing won't fix it — a corp Director has to grant the role.",
       "event": {
         "skillLevelComplete": "Skill Level Complete",

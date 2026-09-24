@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { CORE_GRANT, SCOPES, SCOPES_STRING, revokedScopes, scopesForGroup } from './scopes';
+import {
+  CORE_GRANT,
+  SCOPES,
+  SCOPES_STRING,
+  permissionForScope,
+  revokedScopes,
+  scopesForGroup,
+} from './scopes';
 import {
   ESI_REGISTRY,
   PERMISSIONS,
@@ -207,6 +214,24 @@ describe('scopesForGroup', () => {
   it('leaves every declared group non-empty — an empty group is a dead declaration', () => {
     for (const group of SCOPE_GROUPS) {
       expect(scopesForGroup(group).length, group).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('permissionForScope', () => {
+  it('names the Permission a grouped scope belongs to (issue #1525)', () => {
+    expect(permissionForScope('esi-industry.read_character_jobs.v1')).toBe('industry');
+    expect(permissionForScope('esi-wallet.read_character_wallet.v1')).toBe('wallet');
+    expect(permissionForScope('esi-characters.read_notifications.v1')).toBe('notifications');
+  });
+
+  it('is undefined for a Core Grant scope, which belongs to no Permission', () => {
+    for (const scope of CORE_GRANT) expect(permissionForScope(scope)).toBeUndefined();
+  });
+
+  it('inverts scopesForGroup for every Permission', () => {
+    for (const group of SCOPE_GROUPS) {
+      for (const scope of scopesForGroup(group)) expect(permissionForScope(scope)).toBe(group);
     }
   });
 });
