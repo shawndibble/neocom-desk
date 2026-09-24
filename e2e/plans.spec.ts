@@ -57,7 +57,9 @@ test('exports the computed queue to the clipboard', async ({ page, context }) =>
 test('optimize remaps shows attribute segments and savings', async ({ page }) => {
   await addCaldariCruiserToNewPlan(page);
 
-  await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
+  // No manual remap count any more — CHARACTER_ATTRIBUTES has no bonus
+  // remaps and no cooldown, so the live budget already reads 1 (the yearly
+  // remap, ready).
   await page.getByRole('button', { name: 'Optimize remaps' }).click();
 
   // The verdict opens its own Accept/Reject Modal, mirroring "Suggest
@@ -170,8 +172,8 @@ test('the plan summary and tools stay in view while the entries queue scrolls (#
   // What-If Implants, Booster) — the real case the sticky exists for. Firing
   // Optimize remaps is incidental setup at this point (its result now opens
   // its own Modal rather than growing the sidebar), kept only so the guard
-  // below isn't the only thing exercising the click.
-  await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
+  // below isn't the only thing exercising the click. No manual remap count
+  // any more — the fixture's live budget already reads 1.
   await page.getByRole('button', { name: 'Optimize remaps' }).click();
   await expect(page.getByText(/^Remapping saves|^No remap improves/)).toBeVisible();
 
