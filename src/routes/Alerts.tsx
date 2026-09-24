@@ -79,10 +79,8 @@ const FILTERABLE_SEVERITIES: readonly DeadlineSeverity[] = DEADLINE_SEVERITIES.f
 const ALL_CHARACTERS = 'all';
 
 /**
- * Sentinel for `focusAfterRemoval`'s candidate list — the panel heading, made
- * a one-off focus target (`tabIndex={-1}`) once nothing else is left to land
- * on. Never collides with a real group/entry key, which are all Dexie ids or
- * `alertGroupLabel` output.
+ * Sentinel in `focusAfterRemoval`'s candidate list for the panel heading —
+ * never collides with a real group/entry key (Dexie ids, `alertGroupLabel` output).
  */
 const PANEL_HEADING_FOCUS = '__panel-heading__';
 
@@ -113,25 +111,16 @@ export function Alerts() {
   const [filter, setFilter] = useUrlParams(ALERTS_FILTER_PARAMS);
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(() => new Set());
 
-  // Focus anchors for `focusAfterRemoval` below. Dismiss/mute/dismiss-all all
-  // unmount the row the click came from (WCAG 2.4.3) — these track the still
-  // -mounted rows a click can land focus on instead of letting it fall to
-  // `document.body`. Plain mutable maps, not state: they never drive a
-  // render, only get read inside a click handler for the elements already on
-  // screen at that moment.
+  // Focus anchors for `focusAfterRemoval` below, tracking rows still mounted
+  // after a dismiss/mute unmounts the clicked one (WCAG 2.4.3). Plain
+  // mutable maps, not state: only read inside a click handler, never render.
   const panelRef = useRef<HTMLElement>(null);
   const groupRefs = useRef(new Map<string, HTMLButtonElement>());
   const entryRefs = useRef(new Map<string, HTMLButtonElement>());
 
-  /**
-   * Focuses the first candidate that is still mounted, in order — the caller
-   * lists "next row", "previous row", then `PANEL_HEADING_FOCUS` as the last
-   * resort. Safe to call synchronously from a dismiss/mute handler: the
-   * candidates named here are rows other than the one just acted on, so they
-   * are still in the DOM even though the click's own row hasn't unmounted
-   * yet (that happens once Dexie's write round-trips back through
-   * `useLiveQuery`).
-   */
+  // Focuses the first candidate still mounted — caller lists next row,
+  // previous row, then `PANEL_HEADING_FOCUS`. Safe to call before the click's
+  // own row unmounts: candidates are always other rows, already in the DOM.
   function focusAfterRemoval(candidates: readonly string[]) {
     for (const key of candidates) {
       if (key === PANEL_HEADING_FOCUS) {
@@ -350,10 +339,8 @@ export function Alerts() {
         ) : (
           <ul className="-mx-3 divide-y divide-line">
             {visible.map((group, groupIndex) => {
-              // Group-level "next row, else previous row, else panel
-              // heading": shared by dismiss-group, mute-group (when muting
-              // hides it), and by dismiss-entry once an entry was the last
-              // one in its group.
+              // Next row, else previous, else panel heading — shared by
+              // dismiss-group, hide-on-mute, and dismiss-entry's last-in-group fallback.
               const groupCandidates = [
                 visible[groupIndex + 1]?.key,
                 visible[groupIndex - 1]?.key,
@@ -371,10 +358,8 @@ export function Alerts() {
                     void dismissFeedEntriesAndSync(group.entries);
                   }}
                   onToggleMute={() => {
-                    // Only about to disappear when muting turns it on and the
-                    // "muted types" chip isn't showing it — unmuting, or
-                    // muting while the chip is selected, leaves this same row
-                    // (and its focused button) mounted right where it is.
+                    // Only disappears when muting it while the "muted types"
+                    // chip is off — otherwise this same row stays mounted.
                     if (!group.muted && !filter.showMuted) focusAfterRemoval(groupCandidates);
                     void setFeedMutedForCharacters(group.characterIds, group.target, !group.muted);
                   }}
@@ -389,9 +374,8 @@ export function Alerts() {
                       group.entries[entryIndex + 1]?.id,
                       group.entries[entryIndex - 1]?.id,
                     ].filter((id): id is string => id !== undefined);
-                    // No sibling entry survives: this was the group's last
-                    // one, so the group itself is about to go too — fall
-                    // through to the group-level candidates.
+                    // No sibling entry: this was the group's last one, so
+                    // fall through to the group-level candidates.
                     focusAfterRemoval(
                       entryCandidates.length > 0 ? entryCandidates : groupCandidates
                     );

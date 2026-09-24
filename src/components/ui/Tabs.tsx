@@ -21,18 +21,9 @@ interface TabsProps {
   label?: string;
   className?: string;
   /**
-   * `'automatic'` (default): an arrow key both moves focus and selects,
-   * calling `onChange` immediately — the ARIA "automatic activation" tabs
-   * pattern, right whenever `onChange` just swaps content this component
-   * itself keeps mounted.
-   *
-   * `'manual'`: an arrow key only moves focus among the tab buttons; Enter or
-   * Space (a `<button>`'s own native keydown behavior, needing no extra
-   * handling here) is what calls `onChange`. Needed wherever `onChange`
-   * actually navigates to another route — the arrow key would otherwise
-   * unmount this whole tablist mid-keypress and strand focus on
-   * `document.body`, since there is no longer a next tab of *this* mounted
-   * instance to hand focus to.
+   * `'manual'`: arrow keys only move focus, Enter/Space selects (native
+   * button behavior). Use wherever `onChange` navigates to another route —
+   * `'automatic'` (default) would unmount this tablist mid-keypress.
    */
   activation?: 'automatic' | 'manual';
 }

@@ -105,11 +105,13 @@ export function SkillPicker({
     setDebouncedQuery('');
     setSelected(null);
     setActiveGroups(new Set());
-    // The level button just picked unmounts with the rest of the results
-    // list once the query above clears — land focus back on the search box
-    // rather than `document.body` (WCAG 2.4.3), and say what just happened
-    // since the list collapse itself is silent to a screen reader.
-    setAnnouncement(t('plans.addedAnnouncement', { skill: skillName, level: levelLabel }));
+    // The results list just collapsed, unmounting the clicked button
+    // (WCAG 2.4.3) — refocus the search box and announce the add. Cleared
+    // first: an `aria-live` region only speaks on an actual DOM mutation.
+    setAnnouncement('');
+    window.setTimeout(() => {
+      setAnnouncement(t('plans.addedAnnouncement', { skill: skillName, level: levelLabel }));
+    }, 0);
     searchRef.current?.focus();
   }
 

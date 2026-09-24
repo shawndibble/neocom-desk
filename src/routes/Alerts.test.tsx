@@ -482,7 +482,73 @@ describe('Alerts', () => {
 
       await userEvent.click(within(firstRow).getByRole('button', { name: /^Dismiss every/ }));
 
+      await waitFor(() => expect(firstRow).not.toBeInTheDocument());
       expect(document.activeElement).toBe(nextToggle);
+    });
+
+    it('falls back to the previous row once the last group is dismissed', async () => {
+      await db.notificationFeed.bulkPut([
+        entry({ id: 'a', eventId: 'newMail', title: 'New Mail' }),
+        entry({ id: 'b', eventId: 'skillComplete', title: 'Skill' }),
+      ]);
+      renderPage();
+
+      const rows = await screen.findAllByRole('listitem');
+      const [firstRow, secondRow] = rows;
+      const prevToggle = within(firstRow).getByRole('button', { expanded: false });
+
+      await userEvent.click(within(secondRow).getByRole('button', { name: /^Dismiss every/ }));
+
+      await waitFor(() => expect(secondRow).not.toBeInTheDocument());
+      expect(document.activeElement).toBe(prevToggle);
+    });
+
+    it('moves focus to the next entry when a single alert is dismissed', async () => {
+      const now = Date.now();
+      await db.notificationFeed.bulkPut([
+        entry({ id: 'newer', eventId: 'newMail', title: 'New Mail A', firedAt: now }),
+        entry({ id: 'older', eventId: 'newMail', title: 'New Mail B', firedAt: now - 1000 }),
+      ]);
+      renderPage();
+      await userEvent.click(
+        await screen.findByRole('button', { name: /New Mail/i, expanded: false })
+      );
+
+      const olderDismiss = await screen.findByRole('button', { name: 'Dismiss New Mail B' });
+      const newerRow = screen.getByRole('button', { name: 'Dismiss New Mail A' }).closest('li');
+      await userEvent.click(screen.getByRole('button', { name: 'Dismiss New Mail A' }));
+
+      await waitFor(() => expect(newerRow).not.toBeInTheDocument());
+      expect(document.activeElement).toBe(olderDismiss);
+    });
+
+    it('moves focus to the next row when muting hides a group', async () => {
+      await db.notificationFeed.bulkPut([
+        entry({ id: 'a', eventId: 'newMail', title: 'New Mail' }),
+        entry({ id: 'b', eventId: 'skillComplete', title: 'Skill' }),
+      ]);
+      renderPage();
+
+      const rows = await screen.findAllByRole('listitem');
+      const [firstRow, secondRow] = rows;
+      const nextToggle = within(secondRow).getByRole('button', { expanded: false });
+
+      await userEvent.click(within(firstRow).getByRole('button', { name: /^Stop showing/ }));
+
+      await waitFor(() => expect(firstRow).not.toBeInTheDocument());
+      expect(document.activeElement).toBe(nextToggle);
+    });
+
+    it('leaves focus on the mute button when the row stays visible (muted-types chip on)', async () => {
+      await db.notificationFeed.put(entry({ id: 'a' }));
+      renderPage();
+      await openFilters();
+      await userEvent.click(await screen.findByRole('button', { name: /muted types/i }));
+
+      const muteButton = await screen.findByRole('button', { name: /^Stop showing/ });
+      await userEvent.click(muteButton);
+
+      expect(document.activeElement).toBe(muteButton);
     });
 
     it('falls back to the panel heading once the last group is dismissed', async () => {
@@ -492,6 +558,7 @@ describe('Alerts', () => {
       const row = (await screen.findByText('New Mail')).closest('li') as HTMLElement;
       await userEvent.click(within(row).getByRole('button', { name: /^Dismiss every/ }));
 
+      await screen.findByText('No alerts yet');
       expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'By type' }));
     });
 
@@ -501,6 +568,7 @@ describe('Alerts', () => {
 
       await userEvent.click(await screen.findByRole('button', { name: 'Dismiss all' }));
 
+      await screen.findByText('No alerts yet');
       expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'By type' }));
     });
   });

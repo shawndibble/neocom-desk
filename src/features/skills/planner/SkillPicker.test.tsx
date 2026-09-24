@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { SkillType } from '@/sde/types';
@@ -157,7 +157,9 @@ describe('SkillPicker', () => {
     await user.click(screen.getByRole('button', { name: 'Level III' }));
 
     expect(input).toHaveFocus();
-    expect(screen.getByRole('status')).toHaveTextContent('Added Frigate Level III');
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Added Frigate Level III')
+    );
   });
 
   it('matches description text, not just name', async () => {
