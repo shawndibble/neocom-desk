@@ -120,7 +120,7 @@ import {
 } from './markers';
 import { planDrop, promotePrereq } from './planDrop';
 import { RemapMarkerModal } from './RemapMarkerModal';
-import { bandStarts } from './bands';
+import { bandStarts, meaningfulBandStarts } from './bands';
 import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueRows';
 import { timedRemapFrom, type RemapAvailability } from './remapAvailability';
 import {
@@ -676,7 +676,10 @@ export function PlanEditor({
         [...placed].map(([id, pair]) => [id, { kind: 'attributePair', ...pair } as const])
       );
     }
-    const placed = placeBandHeaders(mergedRows, bandStarts(rows, priorityMap));
+    const placed = placeBandHeaders(
+      mergedRows,
+      meaningfulBandStarts(bandStarts(rows, priorityMap))
+    );
     return new Map(
       [...placed].map(([id, priority]) => [id, { kind: 'priority', priority } as const])
     );

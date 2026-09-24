@@ -598,11 +598,8 @@ describe('SkillPlans editor: add-skill picker', () => {
 
       const panel = screen.getByText('Your entries').closest('section')!;
       const items = await within(panel).findAllByRole('listitem');
-      // A priority-band divider ("Normal priority") precedes the whole entry
-      // block (#27) — including its leading dimmed prereq rows, not just the
-      // entry row itself, so the group reads as one visual unit.
+      // No priority-band divider: every entry is Normal, a single band (#1415).
       expect(items.map((li) => li.textContent)).toEqual([
-        expect.stringContaining('Normal priority'),
         expect.stringContaining('Gunnery I'),
         expect.stringContaining('Gunnery II'),
         expect.stringContaining('Gunnery III'),
@@ -612,10 +609,10 @@ describe('SkillPlans editor: add-skill picker', () => {
       // dimmed and tagged, positioned ahead of the one row for the entry
       // they were needed by (#112: entry rows are one-per-entry, not
       // one-per-level, so Small Hybrid Turret I is a single row here).
+      expect(items[0].textContent).toMatch(/prereq/i);
       expect(items[1].textContent).toMatch(/prereq/i);
       expect(items[2].textContent).toMatch(/prereq/i);
-      expect(items[3].textContent).toMatch(/prereq/i);
-      expect(items[4].textContent).not.toMatch(/prereq/i);
+      expect(items[3].textContent).not.toMatch(/prereq/i);
 
       // Column headers label the two time columns (UX-REVIEW #9), by what
       // each one means rather than by the jargon they used to carry.
@@ -687,18 +684,17 @@ describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {
 
     const panel = (await screen.findByText('Your entries')).closest('section')!;
     expect(within(panel).queryByText('No entries yet. Add a skill below.')).not.toBeInTheDocument();
-    // A priority-band divider ("Normal priority") precedes the entry row
-    // (#27). Waits for the row's own duration to actually settle at zero
+    // No priority-band divider (single band, #1415). Waits for the row's own duration to actually settle at zero
     // (post the async ESI "already trained" skills fetch) rather than just
     // for some listitem to exist, which could be a transient pre-recompute state.
     await waitFor(() => {
       const items = within(panel).getAllByRole('listitem');
-      expect(items).toHaveLength(2);
-      expect(items[1].textContent).toContain('Gunnery III');
+      expect(items).toHaveLength(1);
+      expect(items[0].textContent).toContain('Gunnery III');
       // Exact-match: a span reading precisely "0m" only happens at zero
       // duration (any real duration formats to something like "2h 5m"). One
       // cell, not two: the running-total column now reads as a finish date.
-      expect(within(items[1]).getAllByText('0m')).toHaveLength(1);
+      expect(within(items[0]).getAllByText('0m')).toHaveLength(1);
     });
   });
 });
@@ -725,14 +721,13 @@ describe('SkillPlans: /skills is stale until the character logs in', () => {
     render(<App />);
 
     const panel = (await screen.findByText('Your entries')).closest('section')!;
-    // A priority-band divider ("Normal priority") precedes the entry row
-    // (#27). Waits for the row's own duration to actually settle at zero
-    // (post the async ESI skillqueue fetch) rather than just for some
+    // No priority-band divider (single band, #1415). Waits for the row's own
+    // duration to actually settle at zero (post the async ESI skillqueue fetch) rather than just for some
     // listitem to exist, which could be a transient pre-recompute state.
     await waitFor(() => {
       const items = within(panel).getAllByRole('listitem');
-      expect(items).toHaveLength(2);
-      expect(within(items[1]).getAllByText('0m')).toHaveLength(1);
+      expect(items).toHaveLength(1);
+      expect(within(items[0]).getAllByText('0m')).toHaveLength(1);
     });
   });
 
@@ -744,21 +739,20 @@ describe('SkillPlans: /skills is stale until the character logs in', () => {
     render(<App />);
 
     const panel = (await screen.findByText('Your entries')).closest('section')!;
-    // A priority-band divider ("Normal priority") precedes the entry row
-    // (#27) — wait for the row itself before checking its duration, so a
+    // No priority-band divider (single band, #1415) — wait for the row itself before checking its duration, so a
     // pre-recompute transient (with no rows/no "0m" either way) can't pass
     // this negative assertion for the wrong reason.
     // One row per level (reorder.ts): "Gunnery III" on an untrained character
-    // is three rows, under one priority-band divider. The seeded plan is
+    // is three rows, no band divider. The seeded plan is
     // stored unsplit, so wait for the split write rather than catching the
     // single row it renders first.
     await waitFor(async () =>
-      expect(await within(panel).findAllByRole('listitem')).toHaveLength(4)
+      expect(await within(panel).findAllByRole('listitem')).toHaveLength(3)
     );
     const items = await within(panel).findAllByRole('listitem');
     // Not credited as trained: the entry rows must show real, nonzero
     // duration rather than the "0m" they would show if wrongly treated as done.
-    expect(within(items[1]).queryByText('0m')).not.toBeInTheDocument();
+    expect(within(items[0]).queryByText('0m')).not.toBeInTheDocument();
   });
 });
 
@@ -1703,9 +1697,8 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
     render(<App />);
 
     const panel = (await screen.findByText('Your entries')).closest('section')!;
-    // A priority-band divider ("Normal priority") precedes the entry row (#27).
     const items = await within(panel).findAllByRole('listitem');
-    expect(items).toHaveLength(2);
+    expect(items).toHaveLength(1);
 
     const summary = screen.getByText('Plan summary').closest('section')!;
     const planFinishDate = within(summary)
@@ -1718,7 +1711,7 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
     // one number, computed one way (#20 acceptance criterion). The separate
     // start→finish line is gone: it restated the running total a third way
     // and cost every row a line it couldn't spare on a phone.
-    expect(items[1].textContent).toContain(planFinishDate);
+    expect(items[0].textContent).toContain(planFinishDate);
   });
 
   it('shows no projected finish date, and no invented start time, for an empty plan (#20)', async () => {
