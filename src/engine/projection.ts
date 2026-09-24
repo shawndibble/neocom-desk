@@ -36,7 +36,7 @@
  * functions of their arguments — no i18next, no lookups — which keeps this
  * module as pure as before.
  *
- * 8 of the 21 Notification Events carry a timestamp fixed far enough in
+ * 9 of the 22 Notification Events carry a timestamp fixed far enough in
  * advance to be worth projecting; the rest are inherently "as it happens"
  * (new mail, a filled order, a wallet change) and have no seat here. EVE's
  * own notifications are mostly the same "as it happens" case — except a
@@ -82,6 +82,7 @@ export const romanLevel = (level: number): string => ROMAN[level - 1] ?? String(
 export const PROJECTABLE_EVENT_IDS = [
   'skillLevelComplete',
   'characterNotTraining',
+  'skillQueueEnding',
   'industryJobComplete',
   'planetaryExtractionDone',
   'planetaryExtractorExpiring',
@@ -100,15 +101,19 @@ export type ProjectionWording = 'assert' | 'hedge';
  * hedges when an ordinary in-game action, taken while the app is closed,
  * routinely falsifies that prediction before it lands.
  *
- * Three do. `structureFuelLow` is falsified by a refuel. Both planetary
+ * Four do. `structureFuelLow` is falsified by a refuel. Both planetary
  * events are falsified by the move a pilot makes on every reset run —
- * stopping an extractor program and installing a new one. That is not an
- * edge case; it is the whole activity these two events exist to prompt, so
- * a pilot who acts on the warning with the app closed is precisely the one
- * who then gets told their programs expired.
+ * stopping an extractor program and installing a new one. `skillQueueEnding`
+ * (issue #1410) is falsified the same way by topping up the skill queue in
+ * the EVE client — the app itself cannot write to the queue, but the game
+ * client always can, with the app closed or open. That is not an edge case
+ * for any of the four; it is the whole activity each event exists to prompt,
+ * so a pilot who acts on the warning with the app closed is precisely the
+ * one who then gets told their queue was about to run dry.
  *
  * Everything else rarely changes once its timestamp is fixed — a queued
- * skill, a started job, a scheduled calendar event — so it asserts.
+ * skill about to *complete* (as opposed to the queue running dry behind it),
+ * a started job, a scheduled calendar event — so it asserts.
  *
  * This governs the **push** path only. The Foreground Poller has genuinely
  * observed what it reports, so its copy stays assertive
@@ -122,6 +127,7 @@ export function projectionWording(eventId: ProjectableEventId): ProjectionWordin
     case 'structureFuelLow':
     case 'planetaryExtractionDone':
     case 'planetaryExtractorExpiring':
+    case 'skillQueueEnding':
       return 'hedge';
     case 'skillLevelComplete':
     case 'characterNotTraining':
@@ -228,7 +234,10 @@ function sortedByQueuePosition(
  * only the *last* entry's finish is the point training actually stops
  * (`characterNotTraining`), matching `notificationDiffs.ts`'s live
  * `hasMoreBehind` distinction without needing a previous poll to compare
- * against.
+ * against. That same last entry also projects `skillQueueEnding` (issue
+ * #1410) at its own, earlier `finishMs - endingLeadMs` instant — a distinct
+ * warning ahead of the queue actually running dry, not a duplicate of
+ * `characterNotTraining`.
  */
 export function projectSkillQueue(
   characterId: number,
@@ -262,23 +271,49 @@ export function projectSkillQueue(
     );
   }
   const last = ordered[ordered.length - 1];
-  if (last !== undefined && last.finishMs !== null && inHorizon(last.finishMs, nowMs, horizonMs)) {
-    const fire: NotificationFire = {
-      eventId: 'characterNotTraining',
-      characterId,
-      skillId: null,
-      level: null,
-      finishMs: null,
-    };
-    rows.push(
-      buildRow(
+  if (last !== undefined && last.finishMs !== null) {
+    const finishMs = last.finishMs;
+    if (inHorizon(finishMs, nowMs, horizonMs)) {
+      const fire: NotificationFire = {
+        eventId: 'characterNotTraining',
         characterId,
-        'characterNotTraining',
-        fire,
-        last.finishMs,
-        copy(fire, characterName, {})
-      )
-    );
+        skillId: null,
+        level: null,
+        finishMs: null,
+      };
+      rows.push(
+        buildRow(characterId, 'characterNotTraining', fire, finishMs, copy(fire, characterName, {}))
+      );
+    }
+    // The tail's own warning (issue #1410) — a distinct fire from
+    // `characterNotTraining` above: this one still has queue behind it to
+    // point to (`skillId`/`level`), and fires at `finishMs - endingLeadMs`
+    // rather than at `finishMs` itself. `endingLeadMs` is absent when the
+    // Character has none baked onto this entry (`pollDomains.ts`'s
+    // `skillQueueDomain.projection` always bakes the current one in before
+    // calling this, so absence here only ever means "not yet observed").
+    if (last.endingLeadMs !== undefined) {
+      const fireAt = finishMs - last.endingLeadMs;
+      if (inHorizon(fireAt, nowMs, horizonMs)) {
+        const fire: NotificationFire = {
+          eventId: 'skillQueueEnding',
+          characterId,
+          skillId: last.skillId,
+          level: last.finishedLevel,
+          finishMs,
+          thresholdMs: last.endingLeadMs,
+        };
+        rows.push(
+          buildRow(
+            characterId,
+            'skillQueueEnding',
+            fire,
+            fireAt,
+            copy(fire, characterName, { skill: skillNames.get(last.skillId) })
+          )
+        );
+      }
+    }
   }
   return rows;
 }

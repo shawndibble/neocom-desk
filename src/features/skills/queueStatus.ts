@@ -215,8 +215,15 @@ export function applyTrainingProgress(
 
 export type QueueState = 'training' | 'idle' | 'paused' | 'endingSoon' | 'unknown';
 
-/** How close the last queued entry's finish must be to count as "about to run dry". */
-const ENDING_SOON_MS = 24 * 60 * 60 * 1000;
+/**
+ * How close the last queued entry's finish must be to count as "about to run
+ * dry". Exported so a test can pin `skillQueueEndingLeadHours`'s default
+ * (`features/notifications/eventThresholds.ts`) to this figure rather than
+ * risk the two silently drifting apart — `eventThresholds.ts` deliberately
+ * imports nothing at runtime (it is reachable from the service worker), so
+ * that default stays its own literal `24` and a test is what keeps it honest.
+ */
+export const ENDING_SOON_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Cache-only queue-state classification for one character, for roster-wide

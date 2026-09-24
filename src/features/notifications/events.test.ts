@@ -4,10 +4,11 @@ import { NOTIFICATION_EVENTS, NOTIFICATION_EVENT_IDS, isCorpEventId } from './ev
 import { isEventEnabledFor, isEveTypeEnabledFor } from './eventSelection';
 
 describe('NOTIFICATION_EVENTS', () => {
-  it('lists exactly the 10 synthesized events from CONTEXT.md round 20, plus eveNotification (issue #274), planetaryExtractorExpiring (issue #310), spExtractionReady (grilling session, 2026-09-09), the five corp events (issue #299), and contractCompleted/contractFailed (issue #1091), in order', () => {
+  it('lists exactly the 10 synthesized events from CONTEXT.md round 20, plus eveNotification (issue #274), planetaryExtractorExpiring (issue #310), spExtractionReady (grilling session, 2026-09-09), the five corp events (issue #299), contractCompleted/contractFailed (issue #1091), and skillQueueEnding (issue #1410), in order', () => {
     expect(NOTIFICATION_EVENT_IDS).toEqual([
       'skillLevelComplete',
       'characterNotTraining',
+      'skillQueueEnding',
       'spExtractionReady',
       'industryJobComplete',
       'newMail',
@@ -37,9 +38,12 @@ describe('NOTIFICATION_EVENTS', () => {
   it("derives each event's scope from ESI_REGISTRY rather than a hand-copied string", () => {
     const skillQueueScope = ESI_REGISTRY.getCharacterSkillQueue.scope;
     const skillEvents = NOTIFICATION_EVENTS.filter(
-      (e) => e.id === 'skillLevelComplete' || e.id === 'characterNotTraining'
+      (e) =>
+        e.id === 'skillLevelComplete' ||
+        e.id === 'characterNotTraining' ||
+        e.id === 'skillQueueEnding'
     );
-    expect(skillEvents).toHaveLength(2);
+    expect(skillEvents).toHaveLength(3);
     for (const event of skillEvents) expect(event.scope).toBe(skillQueueScope);
 
     const walletEvent = NOTIFICATION_EVENTS.find((e) => e.id === 'walletBalanceChanged');

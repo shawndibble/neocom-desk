@@ -283,6 +283,14 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     thresholds: null,
     rowHintKey: null,
   }),
+  skillQueueEnding: defineEvent({
+    source: SNAPSHOT_SOURCES.skillQueue,
+    diff: SKILL_QUEUE_NOTIFICATION_DIFFS.skillQueueEnding,
+    copy: skillQueueCopy,
+    projection: { push: skillQueueCopy.push, everyOccurrence: true },
+    thresholds: { fields: [THRESHOLD_FIELDS.skillQueueEndingLeadHours], hintKey: null },
+    rowHintKey: null,
+  }),
   // Opt-in behind sync.spExtractionMonitoringEnabled, with its threshold a
   // single account-wide setting (`Settings.tsx`), not a per-Character field.
   spExtractionReady: defineEvent({
