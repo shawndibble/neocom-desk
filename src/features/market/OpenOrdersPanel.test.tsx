@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -1009,5 +1009,122 @@ describe('OpenOrdersPanel', () => {
       // check must not fire a second request for the same item.
       expect(mockedRegionCompetition).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe('OpenOrdersPanel — phone', () => {
+  const original = window.matchMedia;
+  beforeEach(() => {
+    // `useIsPhone` reads a max-width query; answering yes is how a phone looks under test.
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: true,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+  });
+  afterEach(() => {
+    window.matchMedia = original;
+  });
+
+  it('renders an expanded group as a compact tap-to-open list, not a table', async () => {
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [BELOW_FLOOR_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanel();
+    await screen.findByTestId('order-group-belowFloor');
+
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    const row = screen.getByRole('button', { name: /Tritanium/ });
+    expect(row).toBeInTheDocument();
+    // The row's own sentence — the plain-English half of the badge (decision
+    // 20260906-170442) — stays even in the compact list.
+    expect(row).toHaveTextContent('Selling at this price loses');
+  });
+
+  it("opens the detail modal by tapping the row, same order as the desktop table's Details button", async () => {
+    const user = userEvent.setup();
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [BELOW_FLOOR_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+
+    renderPanel();
+    const row = await screen.findByRole('button', { name: /Tritanium/ });
+    await user.click(row);
+
+    expect(await screen.findByRole('dialog', { name: 'Alpha · Tritanium' })).toBeInTheDocument();
+  });
+
+  it('drops the floor line when no visible row carries one', async () => {
+    // `EXPIRING_ORDER` has no cost basis linked, so no row has a floor — and
+    // `expiringOrStale` (unlike `healthy`) starts expanded, so the row is on
+    // screen without an extra toggle click.
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [EXPIRING_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+
+    renderPanel();
+    await screen.findByRole('button', { name: /Mexallon/ });
+
+    expect(screen.queryByText(/Never sell below/)).not.toBeInTheDocument();
+  });
+
+  it('folding a group still hides its compact rows', async () => {
+    const user = userEvent.setup();
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [EXPIRING_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+
+    renderPanel();
+    const row = await screen.findByRole('button', { name: /Mexallon/ });
+    expect(row).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Expiring or stale · 1' }));
+
+    expect(screen.queryByRole('button', { name: /Mexallon/ })).not.toBeInTheDocument();
   });
 });

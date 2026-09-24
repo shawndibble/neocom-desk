@@ -151,3 +151,26 @@ test.describe('Open Orders — problem-group disclosure row and Healthy toggle t
     expect(healthyToggleHeight).toBeLessThanOrEqual(21);
   });
 });
+
+test.describe('Open Orders — compact phone list (#1429)', () => {
+  test.beforeEach(async ({ page }) => {
+    await seedOpenOrders(page);
+    await signInAndGoto(page);
+  });
+
+  test('the expiring order renders as a 44px+ tap row that opens its detail modal', async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto('./market/orders');
+
+    const row = page.getByRole('button', { name: /Mexallon/ });
+    await expect(row).toBeVisible();
+    expect(await row.evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(
+      44
+    );
+
+    await row.click();
+    await expect(page.getByRole('dialog', { name: /Mexallon/ })).toBeVisible();
+  });
+});

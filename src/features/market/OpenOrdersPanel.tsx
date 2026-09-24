@@ -32,6 +32,7 @@ import { loadReprocessing } from '@/sde/loadSde';
 import type { ReprocessingType } from '@/sde/types';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useHighlightParam } from '@/lib/useHighlightParam';
+import { useIsPhone } from '@/lib/useIsPhone';
 import { useUrlFilter } from '@/lib/useUrlState';
 import { useLazyRowCache } from '@/lib/useLazyRowCache';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -45,6 +46,8 @@ import type { CompetingOrder } from '@/engine/market/undercut';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { ItemContextMenu } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
+import { OpenOrdersList } from './OpenOrdersList';
+import { isOffHubStation } from './hubStation';
 import { loadOpenOrdersSnapshot } from './openOrdersPageSnapshot';
 import {
   loadStationBestPrices,
@@ -103,9 +106,6 @@ const SORTS: readonly OpenOrdersSort[] = OPEN_ORDERS_SORTS;
  * `FILTERABLE_PROBLEMS` gives.
  */
 const PROBLEM_FILTER_OPTIONS = FILTERABLE_PROBLEMS;
-
-/** The five NPC trade hub stations — an order anywhere else sees far fewer buyers, which the row says out loud. */
-const HUB_STATION_IDS = new Set(TRADE_HUBS.map((hub) => hub.stationId));
 
 /**
  * The left edge stripe on a group header, by how bad the group is. Same
@@ -200,6 +200,7 @@ export function OpenOrdersPanel({
    * row that prompted the click, decision `20260908-123516`.
    */
   const highlightId = useHighlightParam();
+  const isPhone = useIsPhone();
   const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   /** Groups the player has folded away by hand. `healthy` is never in here — see the toggle below. */
@@ -677,7 +678,7 @@ export function OpenOrdersPanel({
             Only ever claimed for a location this app actually resolved: an
             unresolved player structure is "not checked", not "off hub".
           */}
-          {row.stationName !== null && !HUB_STATION_IDS.has(row.locationId) && (
+          {row.stationName !== null && isOffHubStation(row.locationId) && (
             <span className="flex items-center gap-1 text-[0.6875rem] text-warning">
               {t('market.orders.offHub')}
               <InfoTooltip
@@ -970,6 +971,31 @@ export function OpenOrdersPanel({
                       ))}
                     </SelectContent>
                   </Select>
+                  {/*
+                    On a phone the character strip below (outside the funnel)
+                    is hidden, so its picker lives here instead — the active
+                    selection still surfaces as chips in the row below this
+                    sheet, same as every other filter field (decision
+                    20260924-... "Open Orders gets a compact phone list").
+                  */}
+                  {isPhone && showCharacterStrip && (
+                    <div className="w-full border-t border-line pt-2">
+                      <CharacterFilterControl
+                        characters={entriesWithOrders}
+                        activeCharacterId={activeCharacterId}
+                        value={
+                          draft.characterIds.length === 0 ? 'all' : new Set(draft.characterIds)
+                        }
+                        onChange={(next) => {
+                          const resolved = resolveCharacterFilter(next, activeCharacterId);
+                          setDraft({
+                            ...draft,
+                            characterIds: resolved === 'all' ? [] : [...resolved],
+                          });
+                        }}
+                      />
+                    </div>
+                  )}
                 </>
               )}
             </FilterBar>
@@ -990,7 +1016,7 @@ export function OpenOrdersPanel({
             </div>
           )}
 
-          {showCharacterStrip && (
+          {showCharacterStrip && !isPhone && (
             <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
               <CharacterFilterControl
                 characters={entriesWithOrders}
@@ -1109,6 +1135,16 @@ export function OpenOrdersPanel({
                         {t('market.orders.group.healthyHint')}
                       </p>
                     )
+                  ) : isPhone ? (
+                    <OpenOrdersList
+                      rows={group.rows}
+                      label={`${groupTitle} · ${group.rows.length}`}
+                      showCharacter={showCharacterStrip}
+                      showFloor={hasFloorData}
+                      highlightId={highlightId}
+                      onOpen={openDetails}
+                      rowContextMenu={rowContextMenu}
+                    />
                   ) : (
                     <DataTable
                       columns={visibleColumns}
