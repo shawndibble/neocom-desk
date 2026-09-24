@@ -19,7 +19,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import type { CharacterBoardItem, CharacterBoardItemKind } from '@/engine/character/board';
-import { runsPastItsDeadline } from '@/engine/character/board';
+import { isProjectedKind, runsPastItsDeadline } from '@/engine/character/board';
 import { formatDuration } from '@/lib/duration';
 import { formatTimeOfDay } from '@/lib/timestamp';
 import * as Icon from '@/components/ui/icons';
@@ -36,6 +36,7 @@ const KIND_ICON: Record<CharacterBoardItemKind, typeof Icon.Skills> = {
   planetExtraction: Icon.Planetary,
   contractExpiry: Icon.Contracts,
   orderExpiry: Icon.Orders,
+  skillPlan: Icon.FlatList,
 };
 
 export interface CharacterBoardRowProps {
@@ -79,6 +80,11 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
           <span className={`text-xs font-semibold tabular-nums ${KIND_TEXT[item.kind]}`}>
             {countdown}
           </span>
+          {isProjectedKind(item.kind) && (
+            <span className="text-[0.6875rem] font-semibold tracking-widest text-text uppercase">
+              {t('calendar.projected')}
+            </span>
+          )}
           {item.important && (
             <span className="text-[0.6875rem] font-semibold tracking-widest text-text uppercase">
               {t('calendar.important')}

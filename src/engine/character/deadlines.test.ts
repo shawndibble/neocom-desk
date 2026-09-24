@@ -111,10 +111,11 @@ describe('countsByDay', () => {
       planetExtractions: [clock('planet', day)],
       contractExpiries: [clock('contract', day)],
       orderExpiries: [clock('order', day)],
+      skillPlan: [clock('plan', day)],
     });
 
     expect(countsByDay(board).get(local(2026, 9, 11, 0, 0))).toEqual({
-      count: 6,
+      count: 7,
       kinds: [...CHARACTER_BOARD_ITEM_KINDS],
     });
   });

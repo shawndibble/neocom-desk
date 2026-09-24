@@ -1,6 +1,6 @@
 /**
  * The Calendar page's event-type filter: an icon in the page toolbar that
- * opens a multi-select list of the six clocks.
+ * opens a multi-select list of the seven clocks.
  *
  * **In `PageHeader` `actions`, not in a `FilterBar` row.** The mobile-filter
  * decision puts a page's filters behind a funnel *beside its search box* below
@@ -26,14 +26,20 @@
  * is the place to learn them.
  */
 import { useTranslation } from 'react-i18next';
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent } from '@/components/ui';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuSeparator,
+} from '@/components/ui';
 import { DropdownMenuTrigger } from '@/components/ui';
 import { IconButton } from '@/components/ui';
 import { controlHeightClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { CHARACTER_BOARD_ITEM_KINDS, type CharacterBoardItemKind } from '@/engine/character/board';
 import { KIND_LABEL } from './calendarKindLabels';
-import { KIND_FILL } from '@/components/ui/kindTone';
+import { kindDotClassName } from '@/components/ui/kindTone';
+import type { SkillPlanChoice } from './calendarSkillPlan';
 
 export interface CalendarKindFilterMenuProps {
   hidden: readonly CharacterBoardItemKind[];
@@ -49,6 +55,13 @@ export interface CalendarKindFilterMenuProps {
   readableKinds: readonly CharacterBoardItemKind[];
   /** Kinds whose read came back 401/403 — named as such rather than shown as a zero. */
   reauthKinds: readonly CharacterBoardItemKind[];
+  /** The Character's Skill Plans — one may be projected onto the board at a time. */
+  skillPlanChoices: readonly SkillPlanChoice[];
+  chosenSkillPlanId: string | null;
+  /** Why the chosen plan could not be scheduled, or null. */
+  skillPlanError: string | null;
+  /** Picks a plan, or null to stop projecting one. */
+  onChooseSkillPlan: (planId: string | null) => void;
 }
 
 export function CalendarKindFilterMenu({
@@ -58,6 +71,10 @@ export function CalendarKindFilterMenu({
   counts,
   readableKinds,
   reauthKinds,
+  skillPlanChoices,
+  chosenSkillPlanId,
+  skillPlanError,
+  onChooseSkillPlan,
 }: CalendarKindFilterMenuProps) {
   const { t } = useTranslation();
   const hiddenSet = new Set(hidden);
@@ -72,6 +89,11 @@ export function CalendarKindFilterMenu({
    */
   function countLabel(kind: CharacterBoardItemKind) {
     if (needsReauth.has(kind)) return t('calendar.filter.notGranted');
+    if (kind === 'skillPlan' && !readable.has(kind)) {
+      // Not an ESI read, so "unavailable" would blame the network. Say what is
+      // actually missing: a choice, or a plan the scheduler could not cost.
+      return t(skillPlanError === null ? 'calendar.skillPlan.choose' : 'calendar.skillPlan.error');
+    }
     if (!readable.has(kind)) return t('calendar.filter.unavailable');
     return counts.get(kind) ?? 0;
   }
@@ -108,16 +130,40 @@ export function CalendarKindFilterMenu({
               that mint means Planets. Decorative only: the label it sits
               beside already says the same thing (DESIGN.md §5, §7).
             */}
-            <span
-              aria-hidden="true"
-              className={`size-2 shrink-0 rounded-full ${KIND_FILL[kind]}`}
-            />
+            <span aria-hidden="true" className={`shrink-0 ${kindDotClassName(kind)}`} />
             <span className="flex-1">{t(KIND_LABEL[kind])}</span>
             <span className="ml-2 text-[0.6875rem] text-text-dim tabular-nums">
               {countLabel(kind)}
             </span>
           </DropdownMenuCheckboxItem>
         ))}
+        <DropdownMenuSeparator />
+        <p className="px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {t('calendar.skillPlan.title')}
+        </p>
+        {skillPlanChoices.length === 0 ? (
+          <p className="px-2 py-1.5 text-xs text-text-dim">{t('calendar.skillPlan.none')}</p>
+        ) : (
+          skillPlanChoices.map((plan) => (
+            <DropdownMenuCheckboxItem
+              key={plan.id}
+              checked={plan.id === chosenSkillPlanId}
+              onSelect={(event) => event.preventDefault()}
+              // Picking the chosen plan again stops projecting it; picking any
+              // other replaces it — one plan per Character.
+              onCheckedChange={() =>
+                onChooseSkillPlan(plan.id === chosenSkillPlanId ? null : plan.id)
+              }
+            >
+              <span className="flex-1 truncate">{plan.name}</span>
+            </DropdownMenuCheckboxItem>
+          ))
+        )}
+        {skillPlanError !== null && (
+          <p className="px-2 py-1.5 text-xs text-text-dim">
+            {t('calendar.skillPlan.errorReason', { reason: skillPlanError })}
+          </p>
+        )}
         {/* `controlHeightClassName.md` rather than ad-hoc padding: a touch
             viewport gets 44px here like every other control (DESIGN.md §3). */}
         <button

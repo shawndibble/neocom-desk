@@ -378,6 +378,7 @@ describe('Calendar', () => {
         'planetExtraction',
         'contractExpiry',
         'orderExpiry',
+        'skillPlan',
       ],
     });
     render(<App />);

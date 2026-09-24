@@ -17,6 +17,10 @@ import { CalendarMap, CalendarPastHint } from '@/features/character/CalendarMap'
 import { CalendarDayTicker } from '@/features/character/CalendarDayTicker';
 import { ComingUpRail } from '@/features/character/ComingUpRail';
 import { CalendarKindFilterMenu } from '@/features/character/CalendarKindFilterMenu';
+import {
+  useCalendarSkillPlans,
+  withCalendarSkillPlan,
+} from '@/features/character/calendarSkillPlan';
 import { KIND_LABEL } from '@/features/character/calendarKindLabels';
 import { useCalendarDensity } from '@/features/character/calendarViewPref';
 import {
@@ -124,11 +128,23 @@ export function Calendar() {
   const hiddenKinds = useCalendarHiddenKinds((state) => state.value);
   const setHiddenKinds = useCalendarHiddenKinds((state) => state.setValue);
   const hydrateHiddenKinds = useCalendarHiddenKinds((state) => state.hydrate);
+  const skillPlanChoices = useCalendarSkillPlans((state) => state.value);
+  const setSkillPlanChoices = useCalendarSkillPlans((state) => state.setValue);
+  const hydrateSkillPlanChoices = useCalendarSkillPlans((state) => state.hydrate);
 
   useEffect(() => {
     void hydrateDensity();
     void hydrateHiddenKinds();
-  }, [hydrateDensity, hydrateHiddenKinds]);
+    void hydrateSkillPlanChoices();
+  }, [hydrateDensity, hydrateHiddenKinds, hydrateSkillPlanChoices]);
+
+  // The loader reads the choice from Dexie itself, so the write must land
+  // before the reload that reads it.
+  async function chooseSkillPlan(planId: string | null) {
+    if (activeCharacterId === null) return;
+    await setSkillPlanChoices(withCalendarSkillPlan(skillPlanChoices, activeCharacterId, planId));
+    refresh();
+  }
 
   // "Today" at mount, stable for this visit's codec identity (see `anchorParam`).
   const [defaultAnchorKey] = useState(() => dayKey(new Date()));
@@ -343,6 +359,10 @@ export function Calendar() {
               counts={counts}
               readableKinds={data?.readableKinds ?? []}
               reauthKinds={data?.reauthKinds ?? []}
+              skillPlanChoices={data?.skillPlanChoices ?? []}
+              chosenSkillPlanId={data?.chosenSkillPlanId ?? null}
+              skillPlanError={data?.skillPlanError ?? null}
+              onChooseSkillPlan={(planId) => void chooseSkillPlan(planId)}
             />
             <IconButton
               icon={<Icon.Download />}
