@@ -589,7 +589,7 @@ describe('ContractSearchPanel — zero-price (barter) offers (issue #1080)', () 
     const rows = await bodyRows();
     expect(within(rows[0]).getByText('Asking for goods')).toBeInTheDocument();
     // The real (0) figure is still shown, not hidden.
-    expect(within(rows[0]).getByLabelText('0.00 ISK')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('0.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
   it('does not mark an ordinary positive-price row', async () => {

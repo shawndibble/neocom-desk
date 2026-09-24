@@ -194,6 +194,22 @@ describe('Assets', () => {
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
   });
 
+  it('moves focus to the level heading on drill-in, and back to the root heading on Back (issue #1485)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await openLocation(user, JITA);
+
+    const levelHeading = await screen.findByRole('heading', {
+      name: new RegExp(escapeRegExp(JITA)),
+    });
+    expect(levelHeading).toHaveFocus();
+
+    await goBack(user);
+
+    const rootHeading = await screen.findByRole('heading', { name: /location/i });
+    expect(rootHeading).toHaveFocus();
+  });
+
   it('resolves a solar-system location to its name instead of a raw system id', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, ({ request }) => {

@@ -75,6 +75,20 @@ function renderBox(kind: 'reply' | 'forward', onSent = vi.fn(), onClose = vi.fn(
   );
 }
 
+describe('focus (issue #1485)', () => {
+  it('focuses the Subject field on mount for Reply', async () => {
+    renderBox('reply');
+    await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveFocus());
+  });
+
+  it('focuses the recipient search box on mount for Forward, without popping its picker open', async () => {
+    renderBox('forward');
+    const recipientSearch = screen.getByLabelText('Add recipient');
+    await waitFor(() => expect(recipientSearch).toHaveFocus());
+    expect(recipientSearch).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
 describe('Reply defaults', () => {
   it('reply-all: sender chip plus every other original recipient, sender not removable', async () => {
     renderBox('reply');

@@ -16,9 +16,9 @@ const ATTRIBUTES: CharacterAttributes = {
   charisma: 24,
 };
 
-/** The hoverable total of one chip, found by the breakdown it announces. */
+/** The hoverable total of one chip, found by the breakdown it carries as hidden text. */
 function total(breakdown: string) {
-  return screen.getByLabelText(breakdown);
+  return screen.getByText(breakdown, { selector: '.sr-only' }).parentElement as HTMLElement;
 }
 
 describe('AttributeChips', () => {
@@ -31,7 +31,14 @@ describe('AttributeChips', () => {
     const implants: Implants = { perception: 4 };
     render(<AttributeChips attributes={ATTRIBUTES} implantBonuses={implants} boosterBonus={4} />);
     expect(screen.getByText('29')).toBeInTheDocument();
-    expect(screen.queryByText(/\+/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\+/, { ignore: '.sr-only' })).not.toBeInTheDocument();
+  });
+
+  it('reads the total with its breakdown as text, not as a label on a role-less span', () => {
+    render(<AttributeChips attributes={ATTRIBUTES} implantBonuses={{ perception: 4 }} />);
+    const trigger = total('25 base + 4 implant = 29');
+    expect(trigger).toHaveTextContent('29 25 base + 4 implant = 29');
+    expect(trigger).not.toHaveAttribute('aria-label');
   });
 
   it('reveals base + implant on hovering the total when only implants apply', async () => {

@@ -682,8 +682,8 @@ describe('ItemDetailModal best sell/buy price', () => {
     render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
 
     // Shorthand on screen (#947); the exact figure is the accessible name.
-    expect(await screen.findByLabelText('450,000.00 ISK')).toBeInTheDocument();
-    expect(screen.getByLabelText('420,000.00 ISK')).toBeInTheDocument();
+    expect(await screen.findByText('450,000.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
+    expect(screen.getByText('420,000.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
   it('shows a dash for a side with no orders', async () => {
@@ -696,7 +696,7 @@ describe('ItemDetailModal best sell/buy price', () => {
 
     render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
 
-    expect(await screen.findByLabelText('500,000.00 ISK')).toBeInTheDocument();
+    expect(await screen.findByText('500,000.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
     expect(screen.getByText('—')).toBeInTheDocument();
   });
 
@@ -714,8 +714,8 @@ describe('ItemDetailModal best sell/buy price', () => {
 
     render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
 
-    expect(await screen.findByLabelText('500,000.00 ISK')).toBeInTheDocument();
-    expect(screen.queryByLabelText('300,000.00 ISK')).not.toBeInTheDocument();
+    expect(await screen.findByText('500,000.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
+    expect(screen.queryByText('300,000.00 ISK', { selector: '.sr-only' })).not.toBeInTheDocument();
   });
 
   it('reads every station in the region when handed a Region-mode location', async () => {
@@ -743,7 +743,7 @@ describe('ItemDetailModal best sell/buy price', () => {
       />
     );
 
-    expect(await screen.findByLabelText('300,000.00 ISK')).toBeInTheDocument();
+    expect(await screen.findByText('300,000.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
   it('reads a Global Market Region item from its own region', async () => {
@@ -759,7 +759,9 @@ describe('ItemDetailModal best sell/buy price', () => {
 
     render(<ItemDetailModal typeId={TYPE_ID} itemName="Rifter" onClose={() => {}} />);
 
-    expect(await screen.findByLabelText('4,000,000.00 ISK')).toBeInTheDocument();
+    expect(
+      await screen.findByText('4,000,000.00 ISK', { selector: '.sr-only' })
+    ).toBeInTheDocument();
   });
 
   it('hides the price row rather than blanking the modal when the order book fetch fails', async () => {

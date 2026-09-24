@@ -283,6 +283,10 @@ describe('per-panel capability gating (AC3)', () => {
       'href',
       '/wallet?owner=corporation&division=3'
     );
+    // The label replaces the row's text, so the balance rides on the description.
+    expect(screen.getByRole('link', { name: 'View SRP in Wallet' })).toHaveAccessibleDescription(
+      '250.00'
+    );
     expect(screen.getByRole('link', { name: 'View Division 1 in Wallet' })).toHaveAttribute(
       'href',
       '/wallet?owner=corporation&division=1'

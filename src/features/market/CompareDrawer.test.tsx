@@ -116,9 +116,11 @@ describe('CompareDrawer', () => {
 
     const region = await screen.findByRole('region', { name: 'Compare' });
     // Prices render as shorthand (#947); the exact figure is the accessible name.
-    await waitFor(() => expect(within(region).getByLabelText('100.00 ISK')).toBeInTheDocument());
-    expect(within(region).getByLabelText('80.00 ISK')).toBeInTheDocument();
-    expect(within(region).getByLabelText('20.00 ISK')).toBeInTheDocument(); // spread
+    await waitFor(() =>
+      expect(within(region).getByText('100.00 ISK', { selector: '.sr-only' })).toBeInTheDocument()
+    );
+    expect(within(region).getByText('80.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
+    expect(within(region).getByText('20.00 ISK', { selector: '.sr-only' })).toBeInTheDocument(); // spread
     expect(within(region).getByText('10')).toBeInTheDocument(); // volume
     // Pyerite has no orders in the fixture, so its priced cells read the empty dash.
     const pyeriteRow = within(region).getByText('Pyerite').closest('tr');

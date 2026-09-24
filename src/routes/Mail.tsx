@@ -38,6 +38,7 @@ import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useFocusHeading } from '@/lib/useFocusHeading';
 import {
   useViewportBoundedHeight,
   VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
@@ -223,6 +224,75 @@ export function Mail() {
     setSelectedId(mailId);
     setComposeKind(null);
   }
+
+  // Focus management below the `lg:` breakpoint (issue #1485), where opening
+  // a mail hides the list Panel and Back hides the reader Panel again — both
+  // CSS `hidden`, not an unmount, so nothing here needs a mount effect, only
+  // a place to land focus once the swap has happened.
+  const isDesktop = useIsDesktop();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  // The exact row button last clicked to open a mail — a DOM node, not a
+  // mail id + `querySelector`, so a row the "Hide read" filter has since
+  // removed from the list is simply not `.isConnected` rather than matching
+  // some other row that happens to share an id after a re-render.
+  const openedRowRef = useRef<HTMLButtonElement | null>(null);
+  // Reader heading focus: fires once `body` has actually resolved for the
+  // newly selected mail, not the instant `selectedId` changes — focusing a
+  // still-loading pane would land on a spinner, not the subject the pilot
+  // asked to read. `null` on desktop (both panes stay on screen; the clicked
+  // row already keeps its own focus there) and while nothing is selected.
+  const readerHeadingRef = useRef<HTMLElement>(null);
+  function selectMailFromRow(mailId: number, row: HTMLButtonElement) {
+    openedRowRef.current = row;
+    selectMail(mailId);
+  }
+  // Back-to-list focus restore: only when the pilot actually pressed Back
+  // (captured below), never for an unrelated `selectedId` reset — e.g.
+  // switching characters, which also lands on `selectedId === null`.
+  const backToListRef = useRef(false);
+  function handleBackToList() {
+    backToListRef.current = true;
+    selectMail(null);
+  }
+  useEffect(() => {
+    if (selectedId !== null) return;
+    // Cleared unconditionally the moment `selectedId` goes null, before the
+    // `isDesktop` check below — otherwise a resize straight after the Back
+    // click (landing between the click and this effect's commit) could skip
+    // the reset entirely, leaving a stale flag that a later, unrelated
+    // `selectedId` reset (a character switch) would misread as "Back was
+    // pressed" and wrongly steal focus for.
+    const wasBackPressed = backToListRef.current;
+    backToListRef.current = false;
+    if (!wasBackPressed || isDesktop) return;
+    const row = openedRowRef.current;
+    if (row && row.isConnected) row.focus();
+    else searchInputRef.current?.focus();
+  }, [selectedId, isDesktop]);
+
+  // Reply/Forward focus restore (issue #1485): both buttons unmount the
+  // instant `composeKind` is set (replaced by the compose box in the same
+  // spot), so Cancel/Send — which unmount the compose box in turn — have
+  // nothing to hand focus back to unless it's remembered up front. Records
+  // which button opened it and which mail it opened it for; a mail switch
+  // clears `composeKind` too (see `selectMail`), and that must NOT steal
+  // focus back to a Reply/Forward button on a mail the pilot has since left.
+  const replyButtonRef = useRef<HTMLButtonElement>(null);
+  const forwardButtonRef = useRef<HTMLButtonElement>(null);
+  const composeOpenedFromRef = useRef<{ kind: ComposeKind; mailId: number } | null>(null);
+  function openCompose(kind: ComposeKind, mailId: number) {
+    composeOpenedFromRef.current = { kind, mailId };
+    setComposeKind(kind);
+  }
+  useEffect(() => {
+    if (composeKind !== null) return;
+    const opened = composeOpenedFromRef.current;
+    if (opened === null) return;
+    composeOpenedFromRef.current = null;
+    if (selectedId !== opened.mailId) return;
+    const button = opened.kind === 'reply' ? replyButtonRef.current : forwardButtonRef.current;
+    button?.focus();
+  }, [composeKind, selectedId]);
   // Local "mark read" state, applied instantly on selection so the dim never
   // waits on the network — independent of `markMailReadOnEsi`'s own write
   // below. Set on selection, not toggled — no manual mark-unread control.
@@ -291,10 +361,6 @@ export function Mail() {
     dataRef.current = data;
   });
 
-  // Narrow screens show one column at a time (CONTEXT.md round 18); matches
-  // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
-  // layout switch at the same width.
-  const isDesktop = useIsDesktop();
   // The pilot's Local/EVE-time preference, the same way Contracts,
   // Notifications and Clones thread it into their own timestamps.
   const timeZone = useTimeZone();
@@ -443,6 +509,10 @@ export function Mail() {
   // compose box's auto-quote — both must quote exactly what the pilot reads.
   const bodyText = body?.data.body ? stripEveMarkup(body.data.body) : '';
 
+  // `enabled: !isDesktop` — narrow-only; see `useFocusHeading`'s own doc
+  // comment for why that's a separate param rather than folded into the key.
+  useFocusHeading(readerHeadingRef, body === undefined ? null : selectedId, !isDesktop);
+
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -539,6 +609,7 @@ export function Mail() {
           {(isDesktop || selectedId === null) && (
             <div className="flex flex-wrap items-center gap-2">
               <SearchInput
+                ref={searchInputRef}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={t('mail.searchPlaceholder')}
@@ -609,8 +680,8 @@ export function Mail() {
                         <MailRowContextMenu mailId={header.mail_id} senderId={header.from}>
                           <button
                             type="button"
-                            onClick={() => {
-                              selectMail(header.mail_id);
+                            onClick={(e) => {
+                              selectMailFromRow(header.mail_id, e.currentTarget);
                               markLocalRead(header.mail_id);
                               // Gated on ESI's flag, not `isRead` (which also covers
                               // local state) — a failed write must get another
@@ -742,21 +813,23 @@ export function Mail() {
                   {selectedHeader !== null && composeKind === null && (
                     <>
                       <IconButton
+                        ref={replyButtonRef}
                         icon={<Icon.MailReply size={Icon.ICON_SIZE.sm} />}
                         label={t('mail.reply')}
                         size="sm"
-                        onClick={() => setComposeKind('reply')}
+                        onClick={() => openCompose('reply', selectedHeader.mail_id)}
                       />
                       <IconButton
+                        ref={forwardButtonRef}
                         icon={<Icon.MailForward size={Icon.ICON_SIZE.sm} />}
                         label={t('mail.forward')}
                         size="sm"
-                        onClick={() => setComposeKind('forward')}
+                        onClick={() => openCompose('forward', selectedHeader.mail_id)}
                       />
                     </>
                   )}
                   {showBackControl && (
-                    <Button size="sm" onClick={() => selectMail(null)}>
+                    <Button size="sm" onClick={handleBackToList}>
                       {t('mail.backToList')}
                     </Button>
                   )}
@@ -774,7 +847,19 @@ export function Mail() {
                   <Spinner size="sm" label={t('common.loading')} />
                 </div>
               ) : body === null ? (
-                <EmptyState title={t('mail.emptyTitle')} className="py-4" />
+                // Still gets the reader-heading focus target (issue #1485):
+                // a failed/uncached body is the same "opening this mail
+                // just changed the pane" transition as the success path
+                // below, just with nothing to read yet.
+                <div
+                  ref={(el) => {
+                    readerHeadingRef.current = el;
+                  }}
+                  tabIndex={-1}
+                  className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  <EmptyState title={t('mail.emptyTitle')} className="py-4" />
+                </div>
               ) : (
                 <div
                   ref={bodyScrollerRef}
@@ -783,9 +868,15 @@ export function Mail() {
                     isDesktop && bodyMaxHeight !== null ? { maxHeight: bodyMaxHeight } : undefined
                   }
                 >
-                  <p className="text-base font-semibold text-text">
+                  <h3
+                    ref={(el) => {
+                      readerHeadingRef.current = el;
+                    }}
+                    tabIndex={-1}
+                    className="text-base font-semibold text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
                     {body.data.subject || t('mail.noSubject')}
-                  </p>
+                  </h3>
                   <div className="space-y-0.5 border-b border-line pb-2 text-text-dim">
                     <p className="flex flex-wrap items-center gap-1.5">
                       {t('mail.from')}

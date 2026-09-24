@@ -147,7 +147,7 @@ describe('MaterialsTable sourcing', () => {
     expect(valueOf(priceInput('Tritanium'))).toBe('5');
     // The line total renders as shorthand (`5K`); the exact figure is its
     // accessible name, which is what these assertions read.
-    expect(tritanium.getByLabelText('5,000 ISK')).toBeTruthy();
+    expect(tritanium.getByText('5,000 ISK', { selector: '.sr-only' })).toBeTruthy();
     // No tag at all: a hub price is what every row is unless something says
     // otherwise, so the word was a per-row repeat that ruled nothing out.
     expect(tritanium.queryByText('Hub')).toBeNull();
@@ -172,7 +172,7 @@ describe('MaterialsTable sourcing', () => {
     const tritanium = within(row('Tritanium'));
     expect(valueOf(priceInput('Tritanium'))).toBe('7');
     expect(tritanium.getByText('Override')).toBeTruthy();
-    expect(tritanium.getByLabelText('7,000 ISK')).toBeTruthy();
+    expect(tritanium.getByText('7,000 ISK', { selector: '.sr-only' })).toBeTruthy();
     expect(tritanium.queryByText('No price')).toBeNull();
   });
 
@@ -187,11 +187,11 @@ describe('MaterialsTable sourcing', () => {
     // 600 still to buy at 5 ISK, the 400 owned are free. The split itself is
     // no longer restated under the total — "Need" beside the quantity is the
     // only part of it not already on the row.
-    expect(tritanium.getByLabelText('3,000 ISK')).toBeTruthy();
+    expect(tritanium.getByText('3,000 ISK', { selector: '.sr-only' })).toBeTruthy();
     expect(tritanium.getByText('Need: 600')).toBeTruthy();
     expect(tritanium.queryByText(/owned \+/)).toBeNull();
     // Untouched rows keep their hub pricing.
-    expect(within(row('Pyerite')).getByLabelText('2,000 ISK')).toBeTruthy();
+    expect(within(row('Pyerite')).getByText('2,000 ISK', { selector: '.sr-only' })).toBeTruthy();
   });
 
   it('accepts an owned quantity above the required amount and shows no error, the engine clamps it', async () => {
@@ -202,7 +202,7 @@ describe('MaterialsTable sourcing', () => {
     const tritanium = within(row('Tritanium'));
     // Clamped to the requirement, so there is nothing left to need.
     expect(tritanium.getByText('Need: 0')).toBeTruthy();
-    expect(tritanium.getByLabelText('0 ISK')).toBeTruthy();
+    expect(tritanium.getByText('0 ISK', { selector: '.sr-only' })).toBeTruthy();
     // The number the player typed is kept — it is not an error to fix — and
     // comes back masked, since 5000 is what they typed but 5,000 is what the
     // field shows once they leave it.
@@ -220,20 +220,20 @@ describe('MaterialsTable sourcing', () => {
     expect(onChange).toHaveBeenCalledWith(34, { overridePrice: 7 });
     const tritanium = within(row('Tritanium'));
     expect(valueOf(priceInput('Tritanium'))).toBe('7');
-    expect(tritanium.getByLabelText('7,000 ISK')).toBeTruthy();
+    expect(tritanium.getByText('7,000 ISK', { selector: '.sr-only' })).toBeTruthy();
     expect(tritanium.getByText('Override')).toBeTruthy();
   });
 
   it('clearing an override price reverts the row to the market price', async () => {
     const onChange = vi.fn();
     render(<Harness initial={{ 34: { overridePrice: 7 } }} onChange={onChange} />);
-    expect(within(row('Tritanium')).getByLabelText('7,000 ISK')).toBeTruthy();
+    expect(within(row('Tritanium')).getByText('7,000 ISK', { selector: '.sr-only' })).toBeTruthy();
 
     await setField(priceInput('Tritanium'), '');
 
     expect(onChange).toHaveBeenCalledWith(34, { overridePrice: undefined });
     const tritanium = within(row('Tritanium'));
-    expect(tritanium.getByLabelText('5,000 ISK')).toBeTruthy();
+    expect(tritanium.getByText('5,000 ISK', { selector: '.sr-only' })).toBeTruthy();
     expect(tritanium.queryByText('Hub')).toBeNull();
   });
 
@@ -250,7 +250,7 @@ describe('MaterialsTable sourcing', () => {
     expect(within(row('Tritanium')).getByText('Override')).toBeTruthy();
     // Fully owned — nothing left to buy, so the row needs none and costs none.
     expect(within(row('Pyerite')).getByText('Need: 0')).toBeTruthy();
-    expect(within(row('Pyerite')).getByLabelText('0 ISK')).toBeTruthy();
+    expect(within(row('Pyerite')).getByText('0 ISK', { selector: '.sr-only' })).toBeTruthy();
   });
 
   it('labels a partly-owned unpriced remainder without inventing a total', () => {
@@ -467,7 +467,7 @@ describe('MaterialsTable price field', () => {
     const tritanium = within(row('Tritanium'));
     expect(valueOf(priceInput('Tritanium'))).toBe('5');
     expect(tritanium.queryByText('Hub')).toBeNull();
-    expect(tritanium.getByLabelText('5,000 ISK')).toBeTruthy();
+    expect(tritanium.getByText('5,000 ISK', { selector: '.sr-only' })).toBeTruthy();
     // Back to tracking the market, so there is nothing left to revert.
     expect(queryRevertButton('Tritanium')).toBeNull();
   });
