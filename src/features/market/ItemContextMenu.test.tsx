@@ -146,3 +146,12 @@ describe('ItemContextMenu — PI Plan', () => {
     expect(screen.queryByRole('menuitem', { name: 'PI Plan' })).not.toBeInTheDocument();
   });
 });
+
+describe('ItemContextMenu — price alert', () => {
+  it('opens the alert dialog from the menu item', async () => {
+    renderMenu(TRITANIUM, 'Tritanium');
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Set price alert…' }));
+    expect(await screen.findByRole('dialog', { name: 'Price alert: Tritanium' })).toBeTruthy();
+  });
+});

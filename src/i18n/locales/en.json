@@ -3209,6 +3209,8 @@
     "rangeJumps_other": "{{count}} jumps",
     "contextMenu": {
       "addToQuickbar": "Add to Quickbar",
+      "setPriceAlert": "Set price alert…",
+      "editPriceAlert": "Edit price alert…",
       "showInfo": "Show info",
       "addToCompare": "Add to Compare",
       "compareVariations": "Compare Variations",
@@ -3340,16 +3342,19 @@
       "empty": "No items yet — right-click an item and choose Add to Quickbar.",
       "viewInAppraisal": "View in Appraisal",
       "removeItem": "Remove {{name}} from Quickbar",
-      "reorderItem": "Reorder {{name}}",
-      "priceAlert": {
-        "button": "Set price alert for {{name}}",
-        "priceLabel": "Target price (ISK)",
-        "directionLabel": "Direction",
-        "directionAbove": "At or above",
-        "directionBelow": "At or below",
-        "save": "Save",
-        "clear": "Clear alert"
-      }
+      "reorderItem": "Reorder {{name}}"
+    },
+    "priceAlert": {
+      "button": "Set price alert for {{name}}",
+      "priceLabel": "Target price (ISK)",
+      "directionLabel": "Direction",
+      "directionAbove": "At or above",
+      "directionBelow": "At or below",
+      "save": "Save",
+      "clear": "Clear alert",
+      "hubLine": "Compares against lowest sell at {{hub}}.",
+      "currentPrice": "Now {{price}} ISK",
+      "dialogTitle": "Price alert: {{name}}"
     },
     "variations": {
       "title": "Variations",
