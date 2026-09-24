@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadCharacterClones } from './clones';
+import { loadCharacterClones, loadImplantDescriptions } from './clones';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -66,5 +66,28 @@ describe('loadCharacterClones', () => {
     const result = await loadCharacterClones(CHAR_ID);
     expect(result.needsReauth).toBe(true);
     expect(result.cached).toBeNull();
+  });
+});
+
+describe('loadImplantDescriptions', () => {
+  const type = (id: number, description: string) => ({
+    type_id: id,
+    name: `Implant ${id}`,
+    description,
+    group_id: 300,
+    published: true,
+  });
+
+  it('strips markup, and omits failed lookups and empty descriptions', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/universe/types/1`, () =>
+        HttpResponse.json(type(1, '+3 <b>Charisma</b><br>bonus'))
+      ),
+      http.get(`${ESI_BASE_URL}/universe/types/2`, () => HttpResponse.json(type(2, ''))),
+      http.get(`${ESI_BASE_URL}/universe/types/3`, () => HttpResponse.error())
+    );
+    const result = await loadImplantDescriptions([1, 2, 3, 1]);
+    expect(result.get(1)).toBe('+3 Charisma\nbonus');
+    expect(result.size).toBe(1);
   });
 });

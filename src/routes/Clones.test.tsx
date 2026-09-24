@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
@@ -105,6 +105,15 @@ const server = setupServer(
       date_founded: '2016-01-01T00:00:00Z',
     })
   ),
+  http.get(`${ESI}/universe/types/19540`, () =>
+    HttpResponse.json({
+      type_id: 19540,
+      name: 'High-grade Ascendancy Alpha',
+      description: '+4 <b>Willpower</b> bonus',
+      group_id: 300,
+      published: true,
+    })
+  ),
   http.post(`${ESI}/universe/names`, () =>
     HttpResponse.json([
       { id: 19540, name: 'High-grade Ascendancy Alpha', category: 'inventory_type' },
@@ -155,6 +164,14 @@ describe('Clones', () => {
     expect(screen.queryByRole('link', { name: 'No implants' })).not.toBeInTheDocument();
   });
 
+  it('shows an implant description tooltip on hover, still linking to Market', async () => {
+    render(<App />);
+    const link = await screen.findByRole('link', { name: 'High-grade Ascendancy Alpha' });
+    fireEvent.pointerMove(link);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('+4 Willpower bonus');
+    expect(link).toHaveAttribute('href', '/market/browser?type=19540');
+  });
+
   it('surfaces the home station and last jump-clone-change date', async () => {
     render(<App />);
     await screen.findByText('High-grade Ascendancy Alpha');
@@ -177,6 +194,9 @@ describe('Clones', () => {
     // answering one throttled batch with one GET /universe/types/{id} per
     // implant would deepen the outage for every other panel in the app.
     // Degrading to the placeholder until something asks again is the trade.
+    // The one type request below is the tooltip description lookup (#1379), one
+    // per distinct implant — it is not a name fallback, and the name stays a
+    // placeholder even though that response carries one.
     let typeRequests = 0;
     server.use(
       http.post(
@@ -200,7 +220,7 @@ describe('Clones', () => {
 
     expect(await screen.findByText('Type #19540')).toBeInTheDocument();
     expect(screen.queryByText('High-grade Ascendancy Alpha')).not.toBeInTheDocument();
-    expect(typeRequests).toBe(0);
+    expect(typeRequests).toBe(1);
   });
 
   it('renders a clone in an inaccessible structure as an id fallback, without a re-auth banner', async () => {

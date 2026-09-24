@@ -22,3 +22,8 @@ export function stripEveMarkup(description: string): string {
     .replace(/&amp;/g, '&')
     .trim();
 }
+
+/** A type's display description: markup-stripped, or null when it has none. */
+export function typeDescription(description: string | null | undefined): string | null {
+  return description ? stripEveMarkup(description) : null;
+}
