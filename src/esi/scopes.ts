@@ -12,12 +12,15 @@
 import {
   ESI_REGISTRY,
   isScopeRequired,
+  PERMISSIONS,
+  SCOPE_GROUPS,
   type EsiEndpointSpec,
   type Scope,
   type ScopeGroup,
 } from './registry';
 
-export type { Scope };
+export type { Scope, ScopeGroup };
+export { PERMISSIONS, SCOPE_GROUPS };
 
 /**
  * Widened to the interface so the optional `group` reads uniformly. Straight
@@ -32,24 +35,40 @@ function derive(belongs: (spec: EsiEndpointSpec) => boolean): readonly Scope[] {
 }
 
 /**
- * What **every** character is asked for at sign-in: the scopes of every
- * endpoint that declares no opt-in group.
+ * The Core Grant: scopes of the endpoints that declare no Permission at all
+ * (skills, skill queue, structure lookup). These belong to no Permission and
+ * are never a choice — `Customize permissions` shows them checked and locked.
+ */
+export const CORE_GRANT: readonly Scope[] = derive((spec) => spec.group === undefined);
+
+/** The Scope Groups (Permissions) that are part of the Base Grant. */
+const DEFAULT_ON_GROUPS: readonly ScopeGroup[] = SCOPE_GROUPS.filter(
+  (group) => PERMISSIONS[group].defaultOn
+);
+
+/**
+ * What **every** character is asked for at sign-in: the Core Grant plus every
+ * default-on Permission. The plain login and Add Character request exactly
+ * this set.
  *
- * Grouped scopes are excluded by design (issue #295). Registering a corp
- * endpoint the ordinary way would put "read your corporation's wallets,
- * assets and members" on the consent screen of the ~95% of users who hold no
- * corp role and can never exercise it — a conversion cost paid by everyone
- * for a feature almost nobody uses. `scopesForGroup` supplies the rest, per
- * character, when they ask for it.
+ * Opt-in Permissions (`corp`, `structureMarkets`) are excluded by design
+ * (issue #295, issue #538). Registering a corp endpoint the ordinary way
+ * would put "read your corporation's wallets, assets and members" on the
+ * consent screen of the ~95% of users who hold no corp role and can never
+ * exercise it — a conversion cost paid by everyone for a feature almost
+ * nobody uses. `scopesForGroup` supplies the rest, per character, when they
+ * ask for it.
  *
  * Order is cosmetic — the SSO authorize URL's `scope` parameter is
  * order-insensitive.
  */
-export const SCOPES: readonly Scope[] = derive((spec) => spec.group === undefined);
+export const SCOPES: readonly Scope[] = [
+  ...new Set([...CORE_GRANT, ...DEFAULT_ON_GROUPS.flatMap((group) => scopesForGroup(group))]),
+];
 
 /**
- * The scopes one opt-in group asks for, derived from the registry exactly as
- * `SCOPES` is — this file stays hand-edit-free (CLAUDE.md).
+ * The scopes one Scope Group (Permission) asks for, derived from the registry
+ * exactly as `SCOPES` is — this file stays hand-edit-free (CLAUDE.md).
  *
  * Whole groups are requested rather than individual scopes: a character
  * granting corp access once should not be sent back to SSO the day they gain

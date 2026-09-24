@@ -31,39 +31,145 @@ export type EsiScopeName = `esi-${string}.v${number}`;
 export type ScopeRequirement = EsiScopeName | PublicAccess;
 
 /**
- * Named, opt-in scope groups: scopes a Character is asked for only when they
- * ask for the feature, rather than at sign-in with everyone else.
+ * Every named Scope Group (user-facing: **Permission**) a scope outside the
+ * **Core Grant** can belong to. Eleven are default-on — granted at sign-in
+ * along with the Core Grant, together forming the **Base Grant** — and two
+ * (`corp`, `structureMarkets`) are opt-in: a Character is asked for them only
+ * when they ask for the feature, never at sign-in with everyone else.
  *
- * `corp` exists because the corp section needs seven scopes that ~95% of users
+ * `corp` exists because the corp section needs ten scopes that ~95% of users
  * can never use — CCP role-gates the endpoints server-side, so a line member
  * granting them gains nothing but a longer consent screen (CONTEXT.md round
- * 35). Adding a group here is a product decision, not a mechanical one: the
- * default is the base grant, and a scope leaves it only when most users would
- * be consenting to something they will never exercise.
- *
- * `structureMarkets` (issue #538) exists because most Characters never list
- * an order inside a player structure, so `esi-markets.structure_markets.v1`
+ * 35). `structureMarkets` (issue #538) exists because most Characters never
+ * list an order inside a player structure, so `esi-markets.structure_markets.v1`
  * would cost everyone a consent-screen line for a check almost nobody's
- * orders need. No settings surface requests this group yet — until one does,
+ * orders need. No settings surface requests that group yet — until one does,
  * it stays grantable in principle but ungranted in practice, which degrades
  * to the same "unavailable" row every ungranted Character already sees.
+ *
+ * See `docs/context/decisions/20260924-143410-customize-permissions-at-sign-in-core-grant-plus.md`
+ * for why the split lands exactly here.
  */
-export const SCOPE_GROUPS = ['corp', 'structureMarkets'] as const;
+export const SCOPE_GROUPS = [
+  'wallet',
+  'marketOrders',
+  'contracts',
+  'assets',
+  'industry',
+  'mining',
+  'planets',
+  'mail',
+  'calendar',
+  'notifications',
+  'characterDetails',
+  'corp',
+  'structureMarkets',
+] as const;
 export type ScopeGroup = (typeof SCOPE_GROUPS)[number];
+
+/** A Permission's i18n keys and whether it's part of the Base Grant. */
+export interface PermissionMeta {
+  /** i18n key for the user-facing checkbox label (`en.json`). */
+  readonly labelKey: string;
+  /** i18n key for the one-line "unlocks" caption under the label (`en.json`). */
+  readonly captionKey: string;
+  /** Whether this Permission is part of the Base Grant (on by default). */
+  readonly defaultOn: boolean;
+}
+
+/**
+ * Every Permission's metadata, readable from one place — the source the
+ * Customize permissions dialog and re-login banners (#1520+) read from,
+ * rather than each hand-listing labels and captions of their own.
+ */
+export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
+  wallet: {
+    labelKey: 'permissions.wallet.label',
+    captionKey: 'permissions.wallet.caption',
+    defaultOn: true,
+  },
+  marketOrders: {
+    labelKey: 'permissions.marketOrders.label',
+    captionKey: 'permissions.marketOrders.caption',
+    defaultOn: true,
+  },
+  contracts: {
+    labelKey: 'permissions.contracts.label',
+    captionKey: 'permissions.contracts.caption',
+    defaultOn: true,
+  },
+  assets: {
+    labelKey: 'permissions.assets.label',
+    captionKey: 'permissions.assets.caption',
+    defaultOn: true,
+  },
+  industry: {
+    labelKey: 'permissions.industry.label',
+    captionKey: 'permissions.industry.caption',
+    defaultOn: true,
+  },
+  mining: {
+    labelKey: 'permissions.mining.label',
+    captionKey: 'permissions.mining.caption',
+    defaultOn: true,
+  },
+  planets: {
+    labelKey: 'permissions.planets.label',
+    captionKey: 'permissions.planets.caption',
+    defaultOn: true,
+  },
+  mail: {
+    labelKey: 'permissions.mail.label',
+    captionKey: 'permissions.mail.caption',
+    defaultOn: true,
+  },
+  calendar: {
+    labelKey: 'permissions.calendar.label',
+    captionKey: 'permissions.calendar.caption',
+    defaultOn: true,
+  },
+  notifications: {
+    labelKey: 'permissions.notifications.label',
+    captionKey: 'permissions.notifications.caption',
+    defaultOn: true,
+  },
+  characterDetails: {
+    labelKey: 'permissions.characterDetails.label',
+    captionKey: 'permissions.characterDetails.caption',
+    defaultOn: true,
+  },
+  corp: {
+    labelKey: 'permissions.corp.label',
+    captionKey: 'permissions.corp.caption',
+    defaultOn: false,
+  },
+  structureMarkets: {
+    labelKey: 'permissions.structureMarkets.label',
+    captionKey: 'permissions.structureMarkets.caption',
+    defaultOn: false,
+  },
+};
 
 export interface EsiEndpointSpec {
   /** ESI route with `{snake_case}` placeholders — never an interpolated URL. */
   readonly route: string;
   readonly scope: ScopeRequirement;
   /**
-   * The opt-in group this endpoint's scope belongs to. **Absent means the base
-   * grant** — the set every Character is asked for at sign-in — so leaving it
-   * off is the ordinary case and grouping is the deliberate one.
+   * The Permission (Scope Group) this endpoint's scope belongs to. **Absent
+   * means the Core Grant** — the handful of scopes every Character is asked
+   * for at sign-in and which belong to no Permission (skills, skill queue,
+   * structure lookup) — so leaving it off is the rare case, reserved for
+   * those.
+   *
+   * Every other endpoint declares one of the 13 `SCOPE_GROUPS`: the eleven
+   * default-on ones together with the Core Grant make up the **Base Grant**
+   * (`SCOPES` in `scopes.ts`), and `corp`/`structureMarkets` stay opt-in.
    *
    * Declared per endpoint rather than per scope, which is why
-   * `scopes.test.ts` asserts the base and grouped sets never overlap: one
-   * ungrouped endpoint declaring a grouped scope would quietly put it back on
-   * everyone's consent screen.
+   * `scopes.test.ts` asserts a scope repeated across endpoints always
+   * resolves to the same group: one endpoint declaring a scope inconsistently
+   * would quietly split it across two Permissions (or into and out of the
+   * Core Grant).
    */
   readonly group?: ScopeGroup;
 }
@@ -100,46 +206,57 @@ export const ESI_REGISTRY = {
   getCharacterImplants: {
     route: '/characters/{character_id}/implants',
     scope: 'esi-clones.read_implants.v1',
+    group: 'characterDetails',
   },
   getCharacterBlueprints: {
     route: '/characters/{character_id}/blueprints',
     scope: 'esi-characters.read_blueprints.v1',
+    group: 'industry',
   },
   getCharacterWallet: {
     route: '/characters/{character_id}/wallet',
     scope: 'esi-wallet.read_character_wallet.v1',
+    group: 'wallet',
   },
   getCharacterWalletJournal: {
     route: '/characters/{character_id}/wallet/journal',
     scope: 'esi-wallet.read_character_wallet.v1',
+    group: 'wallet',
   },
   getCharacterWalletTransactions: {
     route: '/characters/{character_id}/wallet/transactions',
     scope: 'esi-wallet.read_character_wallet.v1',
+    group: 'wallet',
   },
   getCharacterAssets: {
     route: '/characters/{character_id}/assets',
     scope: 'esi-assets.read_assets.v1',
+    group: 'assets',
   },
   getCharacterMailHeaders: {
     route: '/characters/{character_id}/mail',
     scope: 'esi-mail.read_mail.v1',
+    group: 'mail',
   },
   getCharacterMail: {
     route: '/characters/{character_id}/mail/{mail_id}',
     scope: 'esi-mail.read_mail.v1',
+    group: 'mail',
   },
   getCharacterMailLabels: {
     route: '/characters/{character_id}/mail/labels',
     scope: 'esi-mail.read_mail.v1',
+    group: 'mail',
   },
   getCharacterMailingLists: {
     route: '/characters/{character_id}/mail/lists',
     scope: 'esi-mail.read_mail.v1',
+    group: 'mail',
   },
   putCharacterMail: {
     route: '/characters/{character_id}/mail/{mail_id}/',
     scope: 'esi-mail.organize_mail.v1',
+    group: 'mail',
   },
 
   // Base grant, deliberately (mail-reply-and-forward decision): every
@@ -147,30 +264,37 @@ export const ESI_REGISTRY = {
   postCharacterMail: {
     route: '/characters/{character_id}/mail/',
     scope: 'esi-mail.send_mail.v1',
+    group: 'mail',
   },
   getCharacterNotifications: {
     route: '/characters/{character_id}/notifications',
     scope: 'esi-characters.read_notifications.v1',
+    group: 'notifications',
   },
   getCharacterCalendar: {
     route: '/characters/{character_id}/calendar',
     scope: 'esi-calendar.read_calendar_events.v1',
+    group: 'calendar',
   },
   getCharacterCalendarEvent: {
     route: '/characters/{character_id}/calendar/{event_id}',
     scope: 'esi-calendar.read_calendar_events.v1',
+    group: 'calendar',
   },
   putCharacterCalendarResponse: {
     route: '/characters/{character_id}/calendar/{event_id}/',
     scope: 'esi-calendar.respond_calendar_events.v1',
+    group: 'calendar',
   },
   getCharacterContracts: {
     route: '/characters/{character_id}/contracts',
     scope: 'esi-contracts.read_character_contracts.v1',
+    group: 'contracts',
   },
   getCharacterContractItems: {
     route: '/characters/{character_id}/contracts/{contract_id}/items',
     scope: 'esi-contracts.read_character_contracts.v1',
+    group: 'contracts',
   },
   getPublicContractItems: {
     route: '/contracts/public/items/{contract_id}',
@@ -179,14 +303,17 @@ export const ESI_REGISTRY = {
   getCharacterOrders: {
     route: '/characters/{character_id}/orders',
     scope: 'esi-markets.read_character_orders.v1',
+    group: 'marketOrders',
   },
   getCharacterOrderHistory: {
     route: '/characters/{character_id}/orders/history',
     scope: 'esi-markets.read_character_orders.v1',
+    group: 'marketOrders',
   },
   getCharacterIndustryJobs: {
     route: '/characters/{character_id}/industry/jobs',
     scope: 'esi-industry.read_character_jobs.v1',
+    group: 'industry',
   },
   /**
    * Base grant, like every other single-route D3 view (mail, calendar,
@@ -200,6 +327,7 @@ export const ESI_REGISTRY = {
   getCharacterMining: {
     route: '/characters/{character_id}/mining/',
     scope: 'esi-industry.read_character_mining.v1',
+    group: 'mining',
   },
 
   getCharacterPublicInfo: {
@@ -216,7 +344,7 @@ export const ESI_REGISTRY = {
   },
   /**
    * In the `corp` group, not the base grant: reading this needs its own scope
-   * regardless of the other eight, so a Character cannot know their corp role
+   * regardless of the other nine, so a Character cannot know their corp role
    * until they opt in. That costs the "you just made Director, grant now"
    * proactive nudge (`CorpGrantPrompt`) for anyone who never granted the group
    * before — `useCorpAccess` answers `not-granted` instead, and Settings'
@@ -232,6 +360,7 @@ export const ESI_REGISTRY = {
   getCharacterClones: {
     route: '/characters/{character_id}/clones',
     scope: 'esi-clones.read_clones.v1',
+    group: 'characterDetails',
   },
   getUniverseStructure: {
     route: '/universe/structures/{structure_id}',
@@ -240,10 +369,12 @@ export const ESI_REGISTRY = {
   getCharacterPlanets: {
     route: '/characters/{character_id}/planets',
     scope: 'esi-planets.manage_planets.v1',
+    group: 'planets',
   },
   getCharacterPlanet: {
     route: '/characters/{character_id}/planets/{planet_id}',
     scope: 'esi-planets.manage_planets.v1',
+    group: 'planets',
   },
   getUniversePlanet: {
     route: '/universe/planets/{planet_id}',
@@ -256,14 +387,17 @@ export const ESI_REGISTRY = {
   getCharacterContacts: {
     route: '/characters/{character_id}/contacts',
     scope: 'esi-characters.read_contacts.v1',
+    group: 'characterDetails',
   },
   getCharacterLoyaltyPoints: {
     route: '/characters/{character_id}/loyalty/points',
     scope: 'esi-characters.read_loyalty.v1',
+    group: 'characterDetails',
   },
   getCharacterStandings: {
     route: '/characters/{character_id}/standings/',
     scope: 'esi-characters.read_standings.v1',
+    group: 'characterDetails',
   },
   getLoyaltyStoreOffers: {
     route: '/loyalty/stores/{corporation_id}/offers/',
@@ -272,6 +406,7 @@ export const ESI_REGISTRY = {
   getCharacterLocation: {
     route: '/characters/{character_id}/location',
     scope: 'esi-location.read_location.v1',
+    group: 'characterDetails',
   },
   getRoute: {
     route: '/route/{origin}/{destination}',

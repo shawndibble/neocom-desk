@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { SCOPES, SCOPES_STRING, revokedScopes, scopesForGroup } from './scopes';
+import { CORE_GRANT, SCOPES, SCOPES_STRING, revokedScopes, scopesForGroup } from './scopes';
 import {
   ESI_REGISTRY,
+  PERMISSIONS,
   PUBLIC,
   SCOPE_GROUPS,
   isScopeRequired,
@@ -10,7 +11,33 @@ import {
 
 const specs: readonly EsiEndpointSpec[] = Object.values(ESI_REGISTRY);
 
-describe('SCOPES', () => {
+const DEFAULT_ON_GROUPS = SCOPE_GROUPS.filter((group) => PERMISSIONS[group].defaultOn);
+const OPT_IN_GROUPS = SCOPE_GROUPS.filter((group) => !PERMISSIONS[group].defaultOn);
+
+describe('CORE_GRANT', () => {
+  // Hand-written, not derived: the spelling backstop, same reasoning as
+  // SCOPES below.
+  it('lists exactly the Core Grant scopes', () => {
+    expect([...CORE_GRANT].sort()).toEqual(
+      [
+        'esi-skills.read_skills.v1',
+        'esi-skills.read_skillqueue.v1',
+        'esi-universe.read_structures.v1',
+        'esi-search.search_structures.v1',
+      ].sort()
+    );
+  });
+
+  it('covers every scope an endpoint with no Permission requires', () => {
+    const required = specs
+      .filter((endpoint) => endpoint.group === undefined)
+      .map((endpoint) => endpoint.scope)
+      .filter(isScopeRequired);
+    expect([...new Set(required)].sort()).toEqual([...CORE_GRANT].sort());
+  });
+});
+
+describe('SCOPES (Base Grant)', () => {
   // Hand-written, not derived: SCOPES is computed from registry.ts, so a
   // derived expectation would assert nothing. This is the spelling backstop.
   // Most scopes here are reads — `organize_mail`, `send_mail` and
@@ -54,12 +81,12 @@ describe('SCOPES', () => {
     expect(SCOPES).not.toContain(PUBLIC);
   });
 
-  it('covers every scope an UNGROUPED registry endpoint requires', () => {
-    const required = specs
-      .filter((endpoint) => endpoint.group === undefined)
-      .map((endpoint) => endpoint.scope)
-      .filter(isScopeRequired);
-    expect([...new Set(required)].sort()).toEqual([...SCOPES].sort());
+  it('equals the Core Grant plus every default-on Permission, with nothing else', () => {
+    const expected = new Set<string>([
+      ...CORE_GRANT,
+      ...DEFAULT_ON_GROUPS.flatMap((group) => scopesForGroup(group)),
+    ]);
+    expect(new Set(SCOPES)).toEqual(expected);
   });
 
   it('exposes a space-joined string for the SSO scope parameter', () => {
@@ -70,7 +97,7 @@ describe('SCOPES', () => {
 
 describe('scopesForGroup', () => {
   // Hand-written for the same reason as the SCOPES list above: the spelling
-  // backstop for the opt-in group, which no derived expectation can provide.
+  // backstop for the opt-in groups, which no derived expectation can provide.
   it("lists exactly the corp group's scopes", () => {
     expect([...scopesForGroup('corp')].sort()).toEqual(
       [
@@ -109,18 +136,61 @@ describe('scopesForGroup', () => {
   });
 
   /**
-   * Acceptance criterion 1, with teeth. The base/group split is decided per
-   * *endpoint*, so one ungrouped endpoint declaring a corp scope would put it
-   * back on every user's consent screen with nothing else failing. Overlap is
-   * an error to fix at the declaration, never something to subtract here.
+   * Acceptance criterion: opt-in Permissions stay out of the Base Grant, and
+   * every default-on Permission is actually part of it.
    */
-  it('shares no scope with the base SCOPES set', () => {
+  it('keeps opt-in groups out of the Base Grant and default-on groups inside it', () => {
     const base = new Set<string>(SCOPES);
-    for (const group of SCOPE_GROUPS) {
+    for (const group of OPT_IN_GROUPS) {
       expect(
         scopesForGroup(group).filter((scope) => base.has(scope)),
         group
       ).toEqual([]);
+    }
+    for (const group of DEFAULT_ON_GROUPS) {
+      for (const scope of scopesForGroup(group)) {
+        expect(base.has(scope), `${group}: ${scope}`).toBe(true);
+      }
+    }
+  });
+
+  /**
+   * Acceptance criterion 1, with teeth. The Core-Grant/Permission split is
+   * decided per *endpoint*, so one endpoint declaring a scope inconsistently
+   * would put it in two places at once with nothing else failing. Overlap is
+   * an error to fix at the declaration, never something to subtract here.
+   */
+  it('assigns every scope to the Core Grant or to exactly one Permission — never both, never neither', () => {
+    const core = new Set<string>(CORE_GRANT);
+    const seen = new Map<string, string>();
+    for (const group of SCOPE_GROUPS) {
+      for (const scope of scopesForGroup(group)) {
+        expect(core.has(scope), `${scope} in both Core Grant and ${group}`).toBe(false);
+        const owner = seen.get(scope);
+        expect(
+          owner === undefined || owner === group,
+          `${scope} in both ${owner} and ${group}`
+        ).toBe(true);
+        seen.set(scope, group);
+      }
+    }
+  });
+
+  /**
+   * A scope repeated across endpoints (e.g. `read_mail` on four routes) must
+   * resolve to the same group everywhere it's declared — enforced at the
+   * registry, not subtracted here.
+   */
+  it('resolves every scope to the same group on every endpoint that declares it', () => {
+    const groupByScope = new Map<string, string | undefined>();
+    for (const spec of specs) {
+      if (!isScopeRequired(spec.scope)) continue;
+      const owner = groupByScope.get(spec.scope);
+      if (owner === undefined && !groupByScope.has(spec.scope)) {
+        groupByScope.set(spec.scope, spec.group);
+        continue;
+      }
+      expect(spec.group, spec.scope).toBe(owner);
     }
   });
 
@@ -145,6 +215,25 @@ describe('scopesForGroup', () => {
   it('leaves every declared group non-empty — an empty group is a dead declaration', () => {
     for (const group of SCOPE_GROUPS) {
       expect(scopesForGroup(group).length, group).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('PERMISSIONS', () => {
+  it('has a label key, a caption key and a default-on flag for every group', () => {
+    for (const group of SCOPE_GROUPS) {
+      const meta = PERMISSIONS[group];
+      expect(meta.labelKey, group).toMatch(/^permissions\./);
+      expect(meta.captionKey, group).toMatch(/^permissions\./);
+      expect(typeof meta.defaultOn, group).toBe('boolean');
+    }
+  });
+
+  it('marks corp and structureMarkets opt-in and every other group default-on', () => {
+    expect(PERMISSIONS.corp.defaultOn).toBe(false);
+    expect(PERMISSIONS.structureMarkets.defaultOn).toBe(false);
+    for (const group of DEFAULT_ON_GROUPS) {
+      expect(PERMISSIONS[group].defaultOn, group).toBe(true);
     }
   });
 });
