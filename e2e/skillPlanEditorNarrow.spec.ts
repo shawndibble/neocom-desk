@@ -165,3 +165,30 @@ test('the entry priority pill keeps its pointer-sized box at and above md (1280p
   const height = await pill.evaluate((el) => el.getBoundingClientRect().height);
   expect(height).toBeLessThan(24);
 });
+
+/**
+ * Skill Plan Boosters (#1407): a plan can now hold a second cerebral
+ * accelerator that starts once the first lapses, rather than only ever "now".
+ * Exercised on a phone because "Add accelerator" and each row's remove
+ * control are new tap targets this project pins to `sm`-tier (36px) here,
+ * same as every other control in this file.
+ */
+test('adds a second accelerator on a phone, with a full sm-tier remove control (36px)', async ({
+  page,
+}) => {
+  await signInAndGoto(page);
+  await seedPlan(page, [PLAN_ENTRY]);
+  await page.goto(`./skills/plans/${PLAN_ID}`);
+  await page.setViewportSize(PHONE);
+
+  await page.getByRole('button', { name: /plan tools/i }).click();
+  const addAccelerator = page.getByRole('button', { name: 'Add accelerator' });
+  await addAccelerator.click();
+  await addAccelerator.click();
+
+  const removeButtons = page.getByRole('button', { name: 'Remove accelerator' });
+  await expect(removeButtons).toHaveCount(2);
+
+  const height = await removeButtons.first().evaluate((el) => el.getBoundingClientRect().height);
+  expect(height).toBeGreaterThanOrEqual(36);
+});

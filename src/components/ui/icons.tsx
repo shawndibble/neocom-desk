@@ -245,6 +245,8 @@ export const Buy = withWeight(ShoppingCart);
 export const Reaction = withWeight(Flask);
 /** Promote a derived prereq row into a real Skill Plan entry (CONTEXT.md "Prereq Promotion"). */
 export const AddToPlan = withWeight(Plus);
+/** Append a new row to an editable list, e.g. another Booster (#1407). */
+export const AddRow = withWeight(Plus);
 /** A row's browser-notification channel is currently on (issue #364). */
 export const BrowserNotifyOn = withWeight(Bell);
 
