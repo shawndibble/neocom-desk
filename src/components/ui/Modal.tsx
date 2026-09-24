@@ -4,7 +4,7 @@ import { IconButton } from './IconButton';
 import * as Icon from './icons';
 import { PortalContainerProvider } from './portalContainer';
 
-export type ModalPlacement = 'center' | 'sheet' | 'wide';
+export type ModalPlacement = 'center' | 'sheet' | 'wide' | 'media';
 
 interface ModalProps {
   /** Parent owns the state; the modal never closes itself. */
@@ -23,7 +23,7 @@ interface ModalProps {
    */
   titleActions?: ReactNode;
   children: ReactNode;
-  /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `wide` for multi-column content (e.g. a comparison matrix). */
+  /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `wide` for multi-column content (e.g. a comparison matrix), `media` for an enlarged image — sized to its content up to 95% of the viewport. */
   placement?: ModalPlacement;
 }
 
@@ -89,7 +89,10 @@ export function Modal({
       ? 'mx-auto mt-auto mb-0 max-h-[85vh] w-full max-w-md rounded-b-none'
       : placement === 'wide'
         ? 'm-auto max-h-[85vh] w-full max-w-5xl'
-        : 'm-auto max-h-[85vh] w-full max-w-lg';
+        : placement === 'media'
+          ? 'm-auto max-h-[95vh] w-fit max-w-[95vw]'
+          : 'm-auto max-h-[85vh] w-full max-w-lg';
+  const heightClass = placement === 'media' ? 'max-h-[95vh]' : 'max-h-[85vh]';
 
   return (
     <dialog
@@ -116,7 +119,7 @@ export function Modal({
         // one portaled to `document.body` would
         // land behind the top layer — see `portalContainer.ts`.
         <PortalContainerProvider value={portalContainer}>
-          <div className="flex max-h-[85vh] flex-col">
+          <div className={`flex ${heightClass} flex-col`}>
             <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
               <h2
                 id={titleId}

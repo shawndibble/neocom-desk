@@ -125,6 +125,19 @@ describe('Login', () => {
     }
   });
 
+  it('enlarges a screenshot in a dialog when it is clicked', async () => {
+    const user = userEvent.setup();
+    renderLogin();
+    await user.click(
+      await screen.findByRole('button', { name: /enlarge screenshot: build plans/i })
+    );
+    const dialog = await screen.findByRole('dialog', { name: /build plans with profit/i });
+    expect(within(dialog).getByRole('img')).toHaveAttribute(
+      'src',
+      '/screenshots/desktop-build-plan.webp'
+    );
+  });
+
   // The catalog is the page's claim about what shipped, and it silently rotted
   // once before: the eight rows it listed predated Moon Mining, Corporation,
   // Notifications and the Open Orders worklist. This pins the rows that exist,

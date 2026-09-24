@@ -1075,7 +1075,7 @@
     "writeExceptions": "It also asks for three permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; and replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client. Nothing else in the app writes to EVE.",
     "eyebrow": "Free · Open source · Runs in your browser",
     "heading": "Answers, not API dumps.",
-    "trustLine": "It never trades or touches your colonies. Your refresh token never leaves this device.",
+    "trustLine": "Your refresh token never leaves this device.",
     "previewLabel": "Example — signed-in view",
     "previewCorp": "Deep Space Transport",
     "answersHeading": "The questions it exists to answer",
@@ -1109,6 +1109,7 @@
     "screenshotsHeading": "See it in action",
     "screenshotsLead": "Real screens from a real pilot. The same app runs on a desktop browser or installed on your phone.",
     "screenshotsPhoneHeading": "On your phone",
+    "screenshotEnlarge": "Enlarge screenshot: {{caption}}",
     "screenshots": {
       "orderDetail": {
         "alt": "An open sell order: who is cheaper at the station, system and region, and whether there is a better exit.",

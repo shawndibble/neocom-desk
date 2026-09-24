@@ -8,6 +8,7 @@ import { db } from '@/db';
 import {
   DataAgeBadge,
   LogoMark,
+  Modal,
   Panel,
   SEVERITY_TEXT,
   SeverityIcon,
@@ -143,21 +144,23 @@ const FEATURE_GROUPS: { group: string; items: LandingRow[] }[] = [
 interface Screenshot {
   file: string;
   key: string;
+  width: number;
+  height: number;
 }
 
 const DESKTOP_SCREENSHOTS: Screenshot[] = [
-  { file: 'desktop-order-detail', key: 'orderDetail' },
-  { file: 'desktop-build-plan', key: 'buildPlan' },
-  { file: 'desktop-lp-store', key: 'lpStore' },
-  { file: 'desktop-calendar', key: 'calendar' },
-  { file: 'desktop-contracts', key: 'contracts' },
+  { file: 'desktop-order-detail', key: 'orderDetail', width: 1600, height: 900 },
+  { file: 'desktop-build-plan', key: 'buildPlan', width: 1600, height: 900 },
+  { file: 'desktop-lp-store', key: 'lpStore', width: 1600, height: 900 },
+  { file: 'desktop-calendar', key: 'calendar', width: 1600, height: 900 },
+  { file: 'desktop-contracts', key: 'contracts', width: 1600, height: 900 },
 ];
 
 const PHONE_SCREENSHOTS: Screenshot[] = [
-  { file: 'phone-overview', key: 'phoneOverview' },
-  { file: 'phone-alerts', key: 'phoneAlerts' },
-  { file: 'phone-wallet', key: 'phoneWallet' },
-  { file: 'phone-price-history', key: 'phonePriceHistory' },
+  { file: 'phone-overview', key: 'phoneOverview', width: 540, height: 1104 },
+  { file: 'phone-alerts', key: 'phoneAlerts', width: 540, height: 1104 },
+  { file: 'phone-wallet', key: 'phoneWallet', width: 540, height: 1104 },
+  { file: 'phone-price-history', key: 'phonePriceHistory', width: 540, height: 1104 },
 ];
 
 /**
@@ -215,6 +218,10 @@ export function Login() {
   // NotificationFeedPanel.tsx already accept for the real thing. Lazy
   // initializers run once on mount rather than every render.
   const [previewFetchedAt] = useState(() => new Date(Date.now() - 2 * MINUTE_MS));
+
+  // The gallery capture shown enlarged, or null. One modal for the page
+  // rather than one per figure: only one can be open at a time anyway.
+  const [zoomed, setZoomed] = useState<Screenshot | null>(null);
 
   // Bookmark/back-button case: a Character already exists, so the marketing
   // page is not the right thing to show — mirror App.tsx's root gate.
@@ -434,9 +441,9 @@ export function Login() {
           page never scrolls sideways at phone width.
         */}
         <ul className="mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3">
-          {DESKTOP_SCREENSHOTS.map(({ file, key }) => (
-            <li key={key} className="w-[85%] shrink-0 snap-start md:w-[70%]">
-              <ScreenshotFigure file={file} i18nKey={key} width={1600} height={900} />
+          {DESKTOP_SCREENSHOTS.map((shot) => (
+            <li key={shot.key} className="w-[85%] shrink-0 snap-start md:w-[70%]">
+              <ScreenshotFigure shot={shot} onOpen={() => setZoomed(shot)} />
             </li>
           ))}
         </ul>
@@ -444,12 +451,28 @@ export function Login() {
           {t('login.screenshotsPhoneHeading')}
         </h3>
         <ul className="mt-3 grid grid-cols-2 gap-4 md:grid-cols-4">
-          {PHONE_SCREENSHOTS.map(({ file, key }) => (
-            <li key={key}>
-              <ScreenshotFigure file={file} i18nKey={key} width={540} height={1104} />
+          {PHONE_SCREENSHOTS.map((shot) => (
+            <li key={shot.key}>
+              <ScreenshotFigure shot={shot} onOpen={() => setZoomed(shot)} />
             </li>
           ))}
         </ul>
+        <Modal
+          open={zoomed !== null}
+          onClose={() => setZoomed(null)}
+          title={zoomed ? t(`login.screenshots.${zoomed.key}.caption`) : ''}
+          placement="media"
+        >
+          {zoomed && (
+            <img
+              src={`/screenshots/${zoomed.file}.webp`}
+              alt={t(`login.screenshots.${zoomed.key}.alt`)}
+              width={zoomed.width}
+              height={zoomed.height}
+              className="mx-auto block h-auto max-h-[80vh] w-auto max-w-full"
+            />
+          )}
+        </Modal>
       </LandingSection>
 
       <LandingSection id="login-features" heading={t('login.featuresHeading')}>
@@ -556,35 +579,33 @@ function LandingSection({
 }
 
 /**
- * One gallery capture. Explicit `width`/`height` reserve the box before the
- * lazy image arrives, so the page does not jump as a visitor scrolls into it.
+ * One gallery capture, as a button that opens it enlarged — at strip size a
+ * desktop screen's table text is too small to read. Explicit `width`/`height`
+ * reserve the box before the lazy image arrives, so the page does not jump
+ * as a visitor scrolls into it.
  */
-function ScreenshotFigure({
-  file,
-  i18nKey,
-  width,
-  height,
-}: {
-  file: string;
-  i18nKey: string;
-  width: number;
-  height: number;
-}) {
+function ScreenshotFigure({ shot, onOpen }: { shot: Screenshot; onOpen: () => void }) {
   const { t } = useTranslation();
+  const caption = t(`login.screenshots.${shot.key}.caption`);
   return (
     <figure>
-      <img
-        src={`/screenshots/${file}.webp`}
-        alt={t(`login.screenshots.${i18nKey}.alt`)}
-        width={width}
-        height={height}
-        loading="lazy"
-        decoding="async"
-        className="h-auto w-full rounded-xs border border-line"
-      />
-      <figcaption className="mt-2 text-sm text-text-dim">
-        {t(`login.screenshots.${i18nKey}.caption`)}
-      </figcaption>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={t('login.screenshotEnlarge', { caption })}
+        className="block w-full cursor-zoom-in rounded-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+      >
+        <img
+          src={`/screenshots/${shot.file}.webp`}
+          alt={t(`login.screenshots.${shot.key}.alt`)}
+          width={shot.width}
+          height={shot.height}
+          loading="lazy"
+          decoding="async"
+          className="h-auto w-full rounded-xs border border-line transition-colors hover:border-accent"
+        />
+      </button>
+      <figcaption className="mt-2 text-sm text-text-dim">{caption}</figcaption>
     </figure>
   );
 }
