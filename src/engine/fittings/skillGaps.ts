@@ -11,7 +11,7 @@ import type { Fitting, FittingModule } from './types';
 export interface SkillGaps {
   /** `moduleKey` of every module the pilot lacks a required skill level for. */
   unusableModuleKeys: ReadonlySet<string>;
-  /** One entry per skill short of the Fitting's highest requirement, at that level. */
+  /** One entry per skill lacksSkill of the Fitting's highest requirement, at that level. */
   missing: PlanEntry[];
 }
 
@@ -41,17 +41,18 @@ export function computeSkillGaps(
   requirementsByType: ReadonlyMap<number, readonly RequiredSkill[]>,
   skillLevels: ReadonlyMap<number, number>
 ): SkillGaps {
-  const short = (req: RequiredSkill) => (skillLevels.get(req.skillTypeID) ?? 0) < req.level;
+  const lacksSkill = (req: RequiredSkill) => (skillLevels.get(req.skillTypeID) ?? 0) < req.level;
 
   const unusable = new Set<string>();
   for (const module of fitting.modules) {
-    if ((requirementsByType.get(module.typeId) ?? []).some(short)) unusable.add(moduleKey(module));
+    if ((requirementsByType.get(module.typeId) ?? []).some(lacksSkill))
+      unusable.add(moduleKey(module));
   }
 
   const highest = new Map<number, number>();
   for (const typeId of fittingRequirementTypeIds(fitting)) {
     for (const req of requirementsByType.get(typeId) ?? []) {
-      if (short(req))
+      if (lacksSkill(req))
         highest.set(req.skillTypeID, Math.max(highest.get(req.skillTypeID) ?? 0, req.level));
     }
   }

@@ -602,11 +602,11 @@
 
   /*
    * One-shot flash for a Fitting readout that just went over budget. The
-   * text still says "over by N" (DESIGN.md ง7: colour never alone); this is
+   * text still says "over by N" (DESIGN.md ยง7: colour never alone); this is
    * only the attention cue, and reduced motion swaps it for a single fade.
    */
   .flash-danger {
-    animation: flash-danger 0.6s ease-out 2;
+    animation: flash-danger 0.9s ease-out 1;
   }
 
   @keyframes flash-danger {

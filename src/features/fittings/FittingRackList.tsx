@@ -20,7 +20,7 @@ interface ResourceBarProps {
  * A CPU/PG/calibration/drone-bandwidth bar. `null` used/total render as a loading skeleton.
  * Over budget turns `danger` with the overage stated in words, and flashes once
  * each time the readout goes from within budget to over (a Character switch
- * that re-states it included) — the `null` gap while it recomputes doesn't count.
+ * that re-states it included) â€” the `null` gap while it recomputes doesn't count.
  */
 function ResourceBar({ label, used, total }: ResourceBarProps) {
   const { t } = useTranslation();
@@ -58,7 +58,7 @@ function ResourceBar({ label, used, total }: ResourceBarProps) {
           key={flashKey}
           className={`w-24 shrink-0 text-right ${overBudget ? 'text-danger' : 'text-text-dim'} ${flashKey > 0 && overBudget ? 'flash-danger' : ''}`}
         >
-          {known ? `${used.toFixed(1)} / ${total.toFixed(1)}` : '…'}
+          {known ? `${used.toFixed(1)} / ${total.toFixed(1)}` : 'â€¦'}
         </span>
       </div>
       {overBudget && (
