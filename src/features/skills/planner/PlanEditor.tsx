@@ -84,6 +84,7 @@ import { useColumnVisibility } from './columnPreference';
 import { useGroupingMode, GROUPING_MODES, type GroupingMode } from './groupingMode';
 import { attributePairBandStarts } from './attributePairBands';
 import { PlanHeader } from './PlanHeader';
+import { planProgress } from '@/engine/planProgress';
 import { PlanEditorLayout } from './PlanEditorLayout';
 import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import { InjectorFactsPanel } from './InjectorFactsPanel';
@@ -568,6 +569,22 @@ export function PlanEditor({
     () => milestoneStatuses.filter((s) => s.state === 'orphaned'),
     [milestoneStatuses]
   );
+  const headerProgress = useMemo(
+    () => planProgress(plan.entries, catalog.engineSkills, trainedSkills),
+    [plan.entries, catalog.engineSkills, trainedSkills]
+  );
+  const headerNextStep = useMemo(() => {
+    const first = schedule.scheduled[0];
+    const name = first && catalog.engineSkills.get(first.skillTypeID)?.name;
+    return first && name
+      ? {
+          name,
+          level: first.level,
+          cumulativeSeconds: first.cumulativeSeconds,
+          startDate: schedule.startDate,
+        }
+      : null;
+  }, [schedule, catalog.engineSkills]);
   const headerNextMilestone = useMemo(() => {
     const next = nextMilestone(milestoneStatuses);
     return next && next.finish ? { name: next.milestone.name, finish: next.finish } : null;
@@ -1707,6 +1724,9 @@ export function PlanEditor({
           projectedFinish={planFinish}
           badge={headerBadge}
           nextMilestone={headerNextMilestone}
+          progress={headerProgress}
+          nextStep={headerNextStep}
+          trainedKnown={trainedSkillsKnown}
         />
 
         {/* Plan Milestones (CONTEXT.md) whose entry was removed from the plan
