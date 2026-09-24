@@ -1,4 +1,4 @@
-import { Fragment, memo, useEffect, useState } from 'react';
+import { Fragment, memo, useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
   KeyboardSensor,
@@ -36,6 +36,7 @@ import type { AttributePair } from './attributePairBands';
 import type { ColumnVisibility } from './columnPreference';
 import type { MergedRow } from './queueRows';
 import { remapInstruction } from './remapInstruction';
+import { buildRowAnnouncer, formatLevelLabel } from './rowAnnouncer';
 
 /** A band header's grouping (#115): either mode carries enough to render its label. */
 export type BandInfo =
@@ -121,16 +122,19 @@ interface TimeCellProps {
   dim?: boolean;
   /** Desktop columns are fixed-width so they line up under their headers; the narrow meta line packs its values inline instead. */
   fixedWidth?: boolean;
+  /** "Takes" or "Done by" — the desktop column header is visual only, so `sr-only` (`CorpBoardRow`'s pattern) gives the cell its own accessible name without changing what's on screen. */
+  label?: string;
 }
 
 /** One training-time value: a duration ("Takes") or a finish date ("Done by"). */
-function TimeCell({ value, dim = false, fixedWidth = true }: TimeCellProps) {
+function TimeCell({ value, dim = false, fixedWidth = true, label }: TimeCellProps) {
   return (
     <span
       className={`${fixedWidth ? TIME_CELL : 'shrink-0 whitespace-nowrap'} tabular-nums ${
         dim ? 'text-text-dim' : ''
       }`}
     >
+      {label && <span className="sr-only">{label}: </span>}
       {value}
     </span>
   );
@@ -371,6 +375,55 @@ function MilestoneRowMenu({ rowLabel, status, onAdd, onRename, onRemove }: Miles
   );
 }
 
+interface MoveMenuProps {
+  /** For the menu trigger's accessible name — the row's own label. */
+  rowLabel: string;
+  id: string;
+  /** Same call a drag onto that row makes — see `EntryList`'s `handleDragEnd`. */
+  onReorder: (activeId: string, overId: string) => void;
+  /** The entry/marker row immediately above/below this one, or undefined at a boundary — see `EntryList`'s `reorderNeighbors`. Undefined disables that item rather than leaving it a no-op. */
+  moveUpTargetId: string | undefined;
+  moveDownTargetId: string | undefined;
+}
+
+/**
+ * A row's non-drag reorder affordance (#1493, WCAG 2.5.7) — one menu behind
+ * one `ICON_BUTTON` slot, same trade `MilestoneRowMenu` above makes for its
+ * Rename/Remove pair. Two standalone Up/Down buttons would cost two slots
+ * each; #223 shipped exactly that and it was reverted for squeezing the row's
+ * name column on a phone.
+ */
+function MoveMenu({ rowLabel, id, onReorder, moveUpTargetId, moveDownTargetId }: MoveMenuProps) {
+  const { t } = useTranslation();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={ICON_BUTTON}
+          aria-label={t('plans.moveLabel', { name: rowLabel })}
+        >
+          <Icon.Sort size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          disabled={!moveUpTargetId}
+          onSelect={() => moveUpTargetId && onReorder(id, moveUpTargetId)}
+        >
+          {t('plans.moveUp')}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          disabled={!moveDownTargetId}
+          onSelect={() => moveDownTargetId && onReorder(id, moveDownTargetId)}
+        >
+          {t('plans.moveDown')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 interface EntryRowProps {
   row: Extract<MergedRow, { kind: 'entry' }>;
   name: string;
@@ -390,6 +443,10 @@ interface EntryRowProps {
   onAddMilestone: (skillTypeID: number, targetLevel: number) => void;
   onRenameMilestone: (milestoneId: string) => void;
   onRemoveMilestone: (milestoneId: string) => void;
+  /** Forwarded straight to `MoveMenu` — see its own props for what these mean. */
+  onReorder: (activeId: string, overId: string) => void;
+  moveUpTargetId: string | undefined;
+  moveDownTargetId: string | undefined;
 }
 
 /**
@@ -416,6 +473,9 @@ const EntryRow = memo(function EntryRow({
   onAddMilestone,
   onRenameMilestone,
   onRemoveMilestone,
+  onReorder,
+  moveUpTargetId,
+  moveDownTargetId,
 }: EntryRowProps) {
   const { t } = useTranslation();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
@@ -425,7 +485,7 @@ const EntryRow = memo(function EntryRow({
   // Names the level, not just the skill: a plan holds one row per level, so
   // two rows of the same skill would otherwise offer two buttons with the
   // identical accessible name "Remove Gunnery".
-  const rowLabel = `${name} ${ROMAN[entry.targetLevel - 1]}`;
+  const rowLabel = formatLevelLabel(name, entry.targetLevel);
 
   const dragHandle = (
     <button
@@ -478,6 +538,16 @@ const EntryRow = memo(function EntryRow({
     />
   );
 
+  const moveMenu = (
+    <MoveMenu
+      rowLabel={rowLabel}
+      id={row.id}
+      onReorder={onReorder}
+      moveUpTargetId={moveUpTargetId}
+      moveDownTargetId={moveDownTargetId}
+    />
+  );
+
   const removeButton = (
     <button
       type="button"
@@ -524,12 +594,18 @@ const EntryRow = memo(function EntryRow({
       {isDesktop ? (
         <div className="flex items-center justify-between gap-2">
           {dragHandle}
+          {moveMenu}
           {nameSpan}
           {attributeBadge}
           {priorityControl}
-          {columns.perLevelTime && <TimeCell value={formatDuration(row.seconds)} dim />}
+          {columns.perLevelTime && (
+            <TimeCell value={formatDuration(row.seconds)} dim label={t('plans.columnTakes')} />
+          )}
           {columns.cumulativeTime && (
-            <TimeCell value={doneByText(row.cumulativeSeconds, startDate)} />
+            <TimeCell
+              value={doneByText(row.cumulativeSeconds, startDate)}
+              label={t('plans.columnDoneBy')}
+            />
           )}
           {milestoneMenu}
           {removeButton}
@@ -538,6 +614,7 @@ const EntryRow = memo(function EntryRow({
         <>
           <div className="flex items-center justify-between gap-2">
             {dragHandle}
+            {moveMenu}
             {nameSpan}
             {milestoneMenu}
             {removeButton}
@@ -584,7 +661,7 @@ const PrereqRow = memo(function PrereqRow({
 }: PrereqRowProps) {
   const { t } = useTranslation();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
-  const label = `${name} ${ROMAN[row.step.level - 1]}`;
+  const label = formatLevelLabel(name, row.step.level);
 
   const dragHandle = (
     <button
@@ -658,9 +735,14 @@ const PrereqRow = memo(function PrereqRow({
           {dragHandle}
           {nameSpan}
           {attributeBadge}
-          {columns.perLevelTime && <TimeCell value={formatDuration(row.step.seconds)} />}
+          {columns.perLevelTime && (
+            <TimeCell value={formatDuration(row.step.seconds)} label={t('plans.columnTakes')} />
+          )}
           {columns.cumulativeTime && (
-            <TimeCell value={doneByText(row.step.cumulativeSeconds, startDate)} />
+            <TimeCell
+              value={doneByText(row.step.cumulativeSeconds, startDate)}
+              label={t('plans.columnDoneBy')}
+            />
           )}
           {promoteButton}
         </div>
@@ -688,6 +770,12 @@ interface MarkerRowProps {
   onRemove: (markerIndex: number) => void;
   /** Opens the manual attribute editor (RemapMarkerModal) for this marker. */
   onEdit: (markerIndex: number) => void;
+  /** `describeRow`'s output for this row — same name a drag announcement would use. */
+  rowLabel: string;
+  /** Forwarded straight to `MoveMenu` — see its own props for what these mean. */
+  onReorder: (activeId: string, overId: string) => void;
+  moveUpTargetId: string | undefined;
+  moveDownTargetId: string | undefined;
 }
 
 /**
@@ -710,6 +798,10 @@ const MarkerRow = memo(function MarkerRow({
   implants,
   onRemove,
   onEdit,
+  rowLabel,
+  onReorder,
+  moveUpTargetId,
+  moveDownTargetId,
 }: MarkerRowProps) {
   const { t } = useTranslation();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(id);
@@ -730,6 +822,13 @@ const MarkerRow = memo(function MarkerRow({
       >
         <Icon.DragHandle />
       </button>
+      <MoveMenu
+        rowLabel={rowLabel}
+        id={id}
+        onReorder={onReorder}
+        moveUpTargetId={moveUpTargetId}
+        moveDownTargetId={moveDownTargetId}
+      />
       {attributes ? (
         <button
           type="button"
@@ -853,17 +952,38 @@ export function EntryList({
     if (over && active.id !== over.id) onReorder(String(active.id), String(over.id));
   }
 
+  const { describeRow, announcements } = useMemo(
+    () => buildRowAnnouncer(rows, nameFor, t),
+    [rows, nameFor, t]
+  );
+  const sortableIds = useMemo(() => rows.map((r) => r.id), [rows]);
+
+  /** Entry/marker row id -> its nearest entry/marker neighbors, for the Move menu. A prereq row has no position of its own to move (planDrop.ts resolves a drop onto one back to the entry it belongs to), so it's skipped here the same way it's skipped in `planDrop`'s own `planRows`. */
+  const reorderNeighbors = useMemo(() => {
+    const neighbors = new Map<string, { upId?: string; downId?: string }>();
+    let lastId: string | undefined;
+    for (const r of rows) {
+      if (r.kind === 'prereq') continue;
+      neighbors.set(r.id, { upId: lastId });
+      if (lastId !== undefined) neighbors.set(lastId, { ...neighbors.get(lastId), downId: r.id });
+      lastId = r.id;
+    }
+    return neighbors;
+  }, [rows]);
+
   if (rows.length === 0) {
     return <EmptyState title={t('plans.yourEntriesEmpty')} className="py-4" />;
   }
-
-  const sortableIds = rows.map((r) => r.id);
 
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragEnd={handleDragEnd}
+      accessibility={{
+        announcements,
+        screenReaderInstructions: { draggable: t('plans.dragInstructions') },
+      }}
       // Wider edge threshold and stronger acceleration than dnd-kit's default
       // (#408): the entry list's own scroller is often the last few hundred
       // pixels of a long capped-height panel, and the default threshold gave
@@ -909,6 +1029,9 @@ export function EntryList({
                       onAddMilestone={onAddMilestone}
                       onRenameMilestone={onRenameMilestone}
                       onRemoveMilestone={onRemoveMilestone}
+                      onReorder={onReorder}
+                      moveUpTargetId={reorderNeighbors.get(row.id)?.upId}
+                      moveDownTargetId={reorderNeighbors.get(row.id)?.downId}
                     />
                   )}
                   {row.kind === 'prereq' && (
@@ -932,6 +1055,10 @@ export function EntryList({
                       implants={markerImplants}
                       onRemove={onRemoveMarker}
                       onEdit={onEditMarker}
+                      rowLabel={describeRow(row.id)}
+                      onReorder={onReorder}
+                      moveUpTargetId={reorderNeighbors.get(row.id)?.upId}
+                      moveDownTargetId={reorderNeighbors.get(row.id)?.downId}
                     />
                   )}
                 </Fragment>

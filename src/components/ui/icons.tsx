@@ -142,7 +142,7 @@ export const Descend = withWeight(CaretRight);
 export const Expanded = withWeight(CaretDown);
 /** Flattens a drill-down tree into one flat list of every item beneath it. Deliberately not `Sort`, which marks a sortable column — this changes what the view contains, not the order it comes in. */
 export const FlatList = withWeight(ListBullets);
-/** A column that can be sorted but currently isn't. */
+/** A column that can be sorted but currently isn't — also the Skill Plan row's Move-up/down menu trigger, same glyph either way. */
 export const Sort = withWeight(CaretUpDown);
 /** Ascending: a sorted-ascending column, or "move this row up". */
 export const Ascending = withWeight(ArrowUp);
