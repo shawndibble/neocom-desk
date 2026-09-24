@@ -1,5 +1,8 @@
 export type ComboboxNavKey = 'ArrowDown' | 'ArrowUp' | 'Home' | 'End';
 
+/** Keys a roving-highlight listbox intercepts from its search input. */
+export const COMBOBOX_NAV_KEYS: readonly string[] = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
+
 /**
  * Roving-highlight index math for a listbox attached to a text input, kept
  * free of the DOM so it's cheap to test: arrows wrap end-to-end, Home/End

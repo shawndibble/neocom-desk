@@ -186,4 +186,72 @@ describe('MultiSelect', () => {
     await user.click(screen.getByRole('option', { name: 'Alice' }));
     expect(screen.getByPlaceholderText('Search')).toBeInTheDocument();
   });
+
+  it('moves the highlight with arrow keys and toggles the highlighted option with Enter', async () => {
+    const onToggle = vi.fn();
+    render(
+      <MultiSelect
+        trigger={<button>Open</button>}
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={onToggle}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const user = await openMenu();
+    const search = screen.getByPlaceholderText('Search');
+    await user.type(search, '{ArrowDown}{ArrowDown}');
+    expect(screen.getByRole('option', { name: 'Bob' })).toHaveAttribute(
+      'id',
+      search.getAttribute('aria-activedescendant')
+    );
+    await user.type(search, '{Enter}');
+    expect(onToggle).toHaveBeenCalledWith(2);
+    expect(screen.getByPlaceholderText('Search')).toBeInTheDocument();
+  });
+
+  it('wraps from the last option back to the first with ArrowDown', async () => {
+    render(
+      <MultiSelect
+        trigger={<button>Open</button>}
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const user = await openMenu();
+    const search = screen.getByPlaceholderText('Search');
+    await user.type(search, '{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}');
+    expect(screen.getByRole('option', { name: 'Alice' })).toHaveAttribute(
+      'id',
+      search.getAttribute('aria-activedescendant')
+    );
+  });
+
+  it('resets the highlight when the search query changes', async () => {
+    render(
+      <MultiSelect
+        trigger={<button>Open</button>}
+        options={OPTIONS}
+        selected={new Set()}
+        onToggle={() => {}}
+        searchPlaceholder="Search"
+        noResultsLabel="No matches"
+      />
+    );
+    const user = await openMenu();
+    const search = screen.getByPlaceholderText('Search');
+    await user.type(search, '{ArrowDown}');
+    expect(search).toHaveAttribute('aria-activedescendant');
+    await user.type(search, 'a');
+    expect(search).not.toHaveAttribute('aria-activedescendant');
+    await user.type(search, '{ArrowDown}');
+    expect(screen.getByRole('option', { name: 'Alice' })).toHaveAttribute(
+      'id',
+      search.getAttribute('aria-activedescendant')
+    );
+  });
 });
