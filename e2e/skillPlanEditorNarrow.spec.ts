@@ -255,7 +255,7 @@ test('the Skill injectors panel renders with a priced Large Skill Injector at 39
   // IskAmount's visually hidden text carries the exact figure the compact
   // shorthand elides — the stubbed sell price. One injector needed, so the
   // per-injector and total rows both read 700,000,000 ISK.
-  await expect(page.locator('.sr-only', { hasText: /^700,000,000\.00 ISK$/ })).toHaveCount(2);
+  await expect(page.locator('.sr-only', { hasText: /^\s*700,000,000\.00 ISK$/ })).toHaveCount(2);
 });
 
 test("naming a milestone from an entry row shows it as the header's next milestone", async ({
