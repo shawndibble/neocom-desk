@@ -604,99 +604,66 @@ describe('AppraisalPanel', () => {
   });
 });
 
-describe('AppraisalPanel — Undercut', () => {
-  // Rows are Price-Percent-scaled (90%); the undercut reads `items`, unscaled.
-  const UNDERCUT_OUTCOME = outcome({
+describe('AppraisalPanel — Copy sell list', () => {
+  // Rows are Price-Percent-scaled (90%); the sell list reads `items`, unscaled.
+  const SELL_LIST_OUTCOME = outcome({
     appraisal: {
       ...APPRAISAL,
-      rows: [
-        ...APPRAISAL.rows,
-        {
-          typeId: 777,
-          name: 'Thin Spread Module',
-          quantity: 1,
-          buyEach: 900,
-          sellEach: 900.9,
-          buyTotal: 900,
-          sellTotal: 900.9,
-        },
-        {
-          typeId: 555,
-          name: 'Unlisted Widget',
-          quantity: 1,
-          buyEach: 10,
-          sellEach: null,
-          buyTotal: 10,
-          sellTotal: null,
-        },
-      ],
       items: [
         { typeId: 2048, name: 'Damage Control II', quantity: 3, buy: 498_500, sell: 512_000 },
         { typeId: 999, name: 'Civilian Gatling Railgun', quantity: 4, buy: null, sell: 1_000 },
-        { typeId: 777, name: 'Thin Spread Module', quantity: 1, buy: 1_000, sell: 1_001 },
-        { typeId: 555, name: 'Unlisted Widget', quantity: 1, buy: 10, sell: null },
       ],
     },
   });
 
-  function undercutButton() {
-    return screen.getByRole('button', { name: 'Undercut' });
+  function copyButton() {
+    return screen.getByRole('button', { name: 'Copy sell list' });
   }
 
-  it('hides the undercut column until the button is pressed', async () => {
-    renderPanel({ controller: controller({ result: UNDERCUT_OUTCOME }) });
-    expect(undercutButton()).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.queryByRole('columnheader', { name: 'List at' })).not.toBeInTheDocument();
-
-    await userEvent.click(undercutButton());
-    expect(undercutButton()).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('columnheader', { name: 'List at' })).toBeInTheDocument();
+  it('disables the button with nobody to undercut', () => {
+    renderPanel({
+      controller: controller({
+        result: outcome({ appraisal: { ...APPRAISAL, items: [] } }),
+      }),
+    });
+    expect(copyButton()).toBeDisabled();
   });
 
-  it('prices one tick under the cheapest seller at 100% of market, ignoring Price Percent', async () => {
-    renderPanel({ controller: controller({ result: UNDERCUT_OUTCOME }) });
-    await userEvent.click(undercutButton());
-    const row = screen.getByRole('row', { name: /Damage Control II/ });
-    expect(within(row).getByText('511,900.00')).toBeInTheDocument();
-  });
-
-  it('copies plain digits for EVE’s price field', async () => {
+  it('copies one name/quantity/price line per sellable item, ignoring Price Percent', async () => {
     const written: string[] = [];
     configureClipboard(async (text) => {
       written.push(text);
     });
-    renderPanel({ controller: controller({ result: UNDERCUT_OUTCOME }) });
-    await userEvent.click(undercutButton());
-    const row = screen.getByRole('row', { name: /Civilian Gatling Railgun/ });
-    await userEvent.click(within(row).getByRole('button', { name: /^Copy 999\.90/ }));
-    expect(written).toEqual(['999.90']);
+    renderPanel({ controller: controller({ result: SELL_LIST_OUTCOME }) });
+    await userEvent.click(copyButton());
+    expect(written).toEqual(['Damage Control II\t3\t511900\nCivilian Gatling Railgun\t4\t999.90']);
     configureClipboard(null);
   });
+});
 
-  it('shows a dash, never a price, where nobody is selling', async () => {
-    renderPanel({ controller: controller({ result: UNDERCUT_OUTCOME }) });
-    await userEvent.click(undercutButton());
-    const row = screen.getByRole('row', { name: /Unlisted Widget/ });
-    expect(within(row).queryByRole('button', { name: /^Copy/ })).not.toBeInTheDocument();
+describe('AppraisalPanel — Columns', () => {
+  it('hides an optional column once toggled off, and shows it again', async () => {
+    renderPanel({ controller: controller({ result: outcome() }) });
+    expect(screen.getByRole('columnheader', { name: 'Buy each' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Buy each' }));
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('columnheader', { name: 'Buy each' })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    await userEvent.click(await screen.findByRole('menuitemcheckbox', { name: 'Buy each' }));
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('columnheader', { name: 'Buy each' })).toBeInTheDocument();
   });
 
-  it('warns where the undercut pays no more than selling to the best buy order', async () => {
-    renderPanel({ controller: controller({ result: UNDERCUT_OUTCOME }) });
-    await userEvent.click(undercutButton());
-    const thin = screen.getByRole('row', { name: /Thin Spread Module/ });
+  it('offers Refine total only once a row actually carries refine data', async () => {
+    renderPanel({ controller: controller({ result: outcome() }) });
+    await userEvent.click(screen.getByRole('button', { name: 'Columns' }));
+    await screen.findByRole('menuitemcheckbox', { name: 'Buy each' });
     expect(
-      within(thin).getByTitle(/pays no more than selling into the best buy order/)
-    ).toBeInTheDocument();
-    const healthy = screen.getByRole('row', { name: /Damage Control II/ });
-    expect(
-      within(healthy).queryByTitle(/pays no more than selling into the best buy order/)
+      screen.queryByRole('menuitemcheckbox', { name: 'Refine total' })
     ).not.toBeInTheDocument();
-  });
-
-  it('says the prices are only as fresh as the last price fetch', async () => {
-    renderPanel({ controller: controller({ result: UNDERCUT_OUTCOME }) });
-    await userEvent.click(undercutButton());
-    expect(screen.getByText(/Refresh before listing/)).toBeInTheDocument();
   });
 });
 
