@@ -306,6 +306,11 @@ export function BuildGroupPanel({
   // verdict from disagreeing with the index row for the same group.
   const groupProfit = profitOf(rollup.totalCost, rollup.buyCost);
   const groupVerdict = verdictOf(groupProfit, rollup.unpriceable || rollup.profit === null);
+  // Which way the numbers point, independent of whether they can be trusted:
+  // an unknown verdict (a material has no price) still carries a signed
+  // saving, and wording it as "BUY is cheaper by -X" was the bug. Headline and
+  // sub-line both read this, so they can't disagree at exactly zero.
+  const buildIsCheaper = groupProfit !== null && (groupVerdict === 'build' || groupProfit > 0);
 
   // Materials merge Need/Owned/Still-to-buy into one table now (issue: group
   // page redesign) — but a material fully covered by this group's own build
@@ -351,29 +356,28 @@ export function BuildGroupPanel({
     if (groupProfit === null || rollup.buyCost === null) {
       return [material, jobFees, duration, volume].join(' · ');
     }
-    const pct =
-      groupProfit >= 0
-        ? rollup.buyCost > 0
-          ? (groupProfit / rollup.buyCost) * 100
-          : null
-        : rollup.totalCost > 0
-          ? (-groupProfit / rollup.totalCost) * 100
-          : null;
+    const pct = buildIsCheaper
+      ? rollup.buyCost > 0
+        ? (groupProfit / rollup.buyCost) * 100
+        : null
+      : rollup.totalCost > 0
+        ? (-groupProfit / rollup.totalCost) * 100
+        : null;
     // A mixed-hub group has no one "buying at X" to name (see the mixed-hub
     // notice further down) — the percent still stands on its own without it.
     const hub = rollup.singleHub ? hubLabel(rollup.hubIds[0]) : null;
-    const comparisonKey =
-      groupProfit >= 0
-        ? hub
-          ? 'industry.groupVerdictCheaperAt'
-          : 'industry.groupVerdictCheaper'
-        : hub
-          ? 'industry.groupVerdictMoreAt'
-          : 'industry.groupVerdictMore';
+    const comparisonKey = buildIsCheaper
+      ? hub
+        ? 'industry.groupVerdictCheaperAt'
+        : 'industry.groupVerdictCheaper'
+      : hub
+        ? 'industry.groupVerdictMoreAt'
+        : 'industry.groupVerdictMore';
     const comparison = pct === null ? null : t(comparisonKey, { percent: formatPercent(pct), hub });
     return [comparison, material, jobFees, duration, volume].filter(Boolean).join(' · ');
   }, [
     groupProfit,
+    buildIsCheaper,
     groupVolume,
     rollup.buyCost,
     rollup.totalCost,
@@ -649,7 +653,11 @@ export function BuildGroupPanel({
           <p
             className={cx(
               'inline-flex items-center gap-1.5 text-base font-semibold tabular-nums',
-              groupProfit === null ? 'text-text-dim' : iskToneClass(groupProfit)
+              groupProfit === null
+                ? 'text-text-dim'
+                : groupVerdict === 'unknown'
+                  ? 'text-warning'
+                  : iskToneClass(groupProfit)
             )}
           >
             <span className="sr-only">{t('industry.acquisitionVerdictLabel')} </span>
@@ -664,7 +672,7 @@ export function BuildGroupPanel({
               ? t('industry.verdictUnknown')
               : groupVerdict === 'build'
                 ? t('industry.verdictBuild', { amount: formatIsk(groupProfit) })
-                : groupProfit > 0
+                : buildIsCheaper
                   ? t('industry.verdictBuildCheaper', { amount: formatIsk(groupProfit) })
                   : t('industry.verdictBuy', { amount: formatIsk(-groupProfit) })}
           </p>
