@@ -62,12 +62,16 @@ export function roundPriceDown(p: number): number | null {
 /**
  * The smallest legal price at or above `p` — the safety-floor direction:
  * never below the true value, even when `p` itself carries sub-cent noise
- * from its own upstream division.
+ * from its own upstream division. Never below the hard 0.01 ISK minimum
+ * either: a positive input tinier than half a cent (`p < CENTS_EPSILON`)
+ * would otherwise `Math.ceil` to `-0` — not a legal price, and not `null`
+ * either since `legalOrNull` already accepted `p` — so `pCents` is floored
+ * at 1 (0.01 ISK), the smallest legal price at or above ANY positive input.
  */
 export function roundPriceUp(p: number): number | null {
   if (legalOrNull(p) === null) return null;
   const tickCents = tickCentsForExponent(exponentOf(p));
-  const pCents = Math.ceil(p * 100 - CENTS_EPSILON);
+  const pCents = Math.max(1, Math.ceil(p * 100 - CENTS_EPSILON));
   return (Math.ceil(pCents / tickCents) * tickCents) / 100;
 }
 

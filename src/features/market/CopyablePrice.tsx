@@ -25,9 +25,12 @@
  * Unlike `CopyableTotal`, the "copied" confirmation never swaps into
  * `IconButton`'s `tooltip` prop: that prop's own contract (WCAG 2.5.3 Label
  * in Name) requires its text stay a substring of `label`, which "Copied to
- * clipboard" is not. The confirmation instead only ever reaches the `status`
- * live region below — the tooltip and the button's accessible name stay the
- * copy prompt at all times.
+ * clipboard" is not. The confirmation instead reaches the `status` live
+ * region below for a screen reader, and — since that region is `sr-only`, so
+ * a pointer user clicking the button would otherwise see no reaction at all —
+ * a swap of the glyph itself, copy icon to checkmark, for a couple of
+ * seconds. The tooltip and the button's accessible name stay the copy prompt
+ * throughout; only the (decorative, `aria-hidden`) icon changes.
  *
  * `showValue` (default `true`) drops the leading price text — icon-only —
  * for a call site whose surrounding sentence already states the same figure
@@ -75,7 +78,7 @@ export function CopyablePrice({
     <>
       {showValue && formatted}
       <IconButton
-        icon={<Icon.CopyToClipboard />}
+        icon={copied ? <Icon.Done /> : <Icon.CopyToClipboard />}
         label={copyLabel}
         onClick={() => void copy()}
         className="ml-1 align-middle"

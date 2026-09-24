@@ -81,6 +81,15 @@ describe('roundPriceUp', () => {
     expect(roundPriceUp(999.95)).toBe(1000);
   });
 
+  it('floors a positive sub-cent input to the 0.01 minimum, never -0', () => {
+    // A tiny enough positive input used to `Math.ceil` straight through 0.01
+    // to `-0` — a value that is neither a legal price nor `null`. The
+    // smallest legal price at or above ANY positive input is 0.01.
+    expect(roundPriceUp(1e-10)).toBe(0.01);
+    expect(Object.is(roundPriceUp(1e-10), -0)).toBe(false);
+    expect(roundPriceUp(0.005)).toBeCloseTo(0.01, 6);
+  });
+
   it('returns null for non-finite or non-positive input', () => {
     expect(roundPriceUp(0)).toBeNull();
     expect(roundPriceUp(-1)).toBeNull();
