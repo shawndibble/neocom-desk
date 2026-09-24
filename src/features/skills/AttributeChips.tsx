@@ -81,13 +81,16 @@ export function AttributeChips({
               // nothing. The bare total stays bare.
               value={
                 breakdown ? (
+                  // The total as real text with the breakdown after it,
+                  // hidden visually — not an `aria-label`, which a role-less
+                  // span may not carry (see `IskAmount`).
                   <Tooltip content={breakdown} openOnTap>
                     <span
                       tabIndex={0}
-                      aria-label={breakdown}
                       className="cursor-help rounded-xs focus-visible:outline-2 focus-visible:outline-accent"
                     >
-                      <span aria-hidden="true">{effective}</span>
+                      {effective}
+                      <span className="sr-only"> {breakdown}</span>
                     </span>
                   </Tooltip>
                 ) : (

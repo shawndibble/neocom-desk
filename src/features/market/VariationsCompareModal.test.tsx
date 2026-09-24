@@ -162,7 +162,7 @@ describe('VariationsCompareModal', () => {
     expect(await screen.findByText('Worth')).toBeInTheDocument();
     expect(screen.getByText('Estimated Price')).toBeInTheDocument();
     // Shorthand on screen (#947); the exact figure is the accessible name.
-    expect(screen.getByLabelText('100.00 ISK')).toBeInTheDocument();
+    expect(screen.getByText('100.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
   it('closes on Escape', async () => {

@@ -84,7 +84,7 @@ describe('CorpVitalsRail runway', () => {
     // name, so assert on that — "10B" alone would still read the same after a
     // 10,004,000,000 regression.
     expect(screen.getByText('10B')).toBeInTheDocument();
-    expect(screen.getByLabelText('10,000,000,000.00 ISK')).toBeInTheDocument();
+    expect(screen.getByText('10,000,000,000.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
   it('follows the journal division when it is not the master wallet', () => {
