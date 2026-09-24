@@ -287,23 +287,16 @@ interface Snapshot {
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   loyaltyNeedsReauth: boolean;
   corporationNames: Map<number, string>;
-  /**
-   * Recent fills, read only so a journal line can name the item behind it.
-   * The fills themselves are listed on Market's History › Transactions view.
-   */
-  transactions: readonly WalletTransactionCommon[];
-  typeNames: Map<number, string>;
 }
 
 async function loadWalletSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const [balanceStatus, journalResult, loyaltyStatus, transactionsResult] = await Promise.all([
+  const [balanceStatus, journalResult, loyaltyStatus] = await Promise.all([
     loadWalletBalanceWithStatus(characterId),
     loadWalletJournal(characterId),
     loadCharacterLoyaltyPoints(characterId),
-    loadWalletTransactions(characterId),
   ]);
   const { cached: balanceResult, needsReauth: balanceNeedsReauth } = balanceStatus;
   const { cached: loyaltyResult, needsReauth: loyaltyNeedsReauth } = loyaltyStatus;
@@ -312,12 +305,7 @@ async function loadWalletSnapshot(
   const corporationIds = signal.cancelled
     ? []
     : (loyaltyResult?.data ?? []).map((entry) => entry.corporation_id);
-  const transactions = transactionsResult?.data ?? [];
-  const typeIds = signal.cancelled ? [] : [...new Set(transactions.map((txn) => txn.type_id))];
-  const [corporationNames, typeNames] = await Promise.all([
-    resolveNames(corporationIds),
-    loadTypeNames(typeIds),
-  ]);
+  const corporationNames = await resolveNames(corporationIds);
   return {
     balanceResult,
     balanceNeedsReauth,
@@ -326,9 +314,24 @@ async function loadWalletSnapshot(
     loyaltyResult,
     loyaltyNeedsReauth,
     corporationNames,
-    transactions,
-    typeNames,
   };
+}
+
+/**
+ * The Character's recent fills, read only so a journal line can name the item
+ * behind it (the fills themselves are listed on Market's History ›
+ * Transactions view). Its own load, not part of `loadWalletSnapshot`: the
+ * Balance tab would otherwise wait on a cursor walk it never shows.
+ */
+interface PersonalFillsSnapshot {
+  transactions: readonly WalletTransactionCommon[];
+  typeNames: Map<number, string>;
+}
+
+async function loadPersonalFills(characterId: number): Promise<PersonalFillsSnapshot> {
+  const transactions = (await loadWalletTransactions(characterId))?.data ?? [];
+  const typeNames = await loadTypeNames([...new Set(transactions.map((txn) => txn.type_id))]);
+  return { transactions, typeNames };
 }
 
 /** Balances and the division names, which need two separate reads and two separate scopes. */
@@ -780,6 +783,20 @@ export function Wallet() {
     { name: 'wallet:corp-transactions', characterId: activeCharacterId }
   );
 
+  // Opt-in the same way: fetched only once the personal Journal tab is open,
+  // and retained across a tab toggle by the snapshot cache.
+  const personalFills = useCorpSnapshot<PersonalFillsSnapshot | null>(
+    walletTab === 'journal' && !showingCorp && activeCharacterId !== null
+      ? `${activeCharacterId}`
+      : null,
+    async () => (activeCharacterId === null ? null : loadPersonalFills(activeCharacterId)),
+    { name: 'wallet:personal-fills', characterId: activeCharacterId }
+  );
+  const handlePersonalRefresh = () => {
+    refresh();
+    personalFills.refresh();
+  };
+
   const divisionLabel = (entry: WalletDivision) =>
     entry.name ?? t('wallet.corpDivisionFallback', { division: entry.division });
 
@@ -988,8 +1005,8 @@ export function Wallet() {
     [handleAddToQuickbar, quickbarAvailable, handleShowInfo]
   );
 
-  const personalTransactions = data?.transactions ?? EMPTY_TRANSACTIONS;
-  const personalTypeNames = data?.typeNames ?? NO_NAMES;
+  const personalTransactions = personalFills.data?.transactions ?? EMPTY_TRANSACTIONS;
+  const personalTypeNames = personalFills.data?.typeNames ?? NO_NAMES;
   const personalLinkFor = useMemo(
     () => journalTransactionLinks(personalTransactions),
     [personalTransactions]
@@ -1135,7 +1152,7 @@ export function Wallet() {
             <IconButton
               icon={<Icon.Refresh />}
               label={t('wallet.refresh')}
-              onClick={showingCorp ? handleCorpRefresh : refresh}
+              onClick={showingCorp ? handleCorpRefresh : handlePersonalRefresh}
               disabled={
                 showingCorp
                   ? corpBalances.loading || corpJournal.loading || corpTransactions.loading
