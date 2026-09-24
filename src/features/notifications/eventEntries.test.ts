@@ -44,6 +44,7 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
     }
     expect(Object.fromEntries(owners)).toEqual({
       extractorExpiringLeadHours: ['planetaryExtractorExpiring'],
+      skillQueueEndingLeadHours: ['skillQueueEnding'],
       walletBalanceChangedThresholdIsk: ['walletBalanceChanged'],
       structureFuelLowDays: ['structureFuelLow'],
       corpWalletBalanceFloorIsk: ['corpWalletThreshold'],
@@ -119,5 +120,32 @@ describe('one event through its entry', () => {
       'Kestrel: Keepstar was due to run out of fuel.'
     );
     expect(entry.thresholds.fields.map((field) => field.key)).toEqual(['structureFuelLowDays']);
+  });
+
+  it('skillQueueEnding: fires as the tail crosses its lead time, pushes hedged, owns its own lead-hours threshold', () => {
+    const entry = NOTIFICATION_EVENT_ENTRIES.skillQueueEnding;
+    const LEAD = 6 * 3_600_000;
+    const tailEntry = {
+      skillId: 3300,
+      finishedLevel: 4,
+      queuePosition: 0,
+      endingLeadMs: LEAD,
+    };
+    const finishMs = T0 + LEAD + 5 * 60_000;
+    const fires = entry.diff(
+      C,
+      { entries: [{ ...tailEntry, finishMs }], nowMs: T0 },
+      { entries: [{ ...tailEntry, finishMs }], nowMs: T0 + 5 * 60_000 }
+    );
+    expect(fires).toHaveLength(1);
+    expect(entry.copy.poll(fires[0], PILOT, {}).body).toBe(
+      "Kestrel's skill queue will run dry in under 6 hours."
+    );
+    expect(entry.projection.push(fires[0], PILOT, {}).body).toBe(
+      "Kestrel's skill queue was due to run dry in under 6 hours."
+    );
+    expect(entry.thresholds.fields.map((field) => field.key)).toEqual([
+      'skillQueueEndingLeadHours',
+    ]);
   });
 });

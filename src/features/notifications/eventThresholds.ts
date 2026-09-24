@@ -18,6 +18,8 @@ export interface CharacterEventThresholds {
   structureFuelLowDays?: number;
   /** Hours before an extractor's `expiry_time` that trigger `planetaryExtractorExpiring` (issue #750) — one of `EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS`. */
   extractorExpiringLeadHours?: number;
+  /** Hours before the skill queue's tail entry finishes that trigger `skillQueueEnding` (issue #1410) — one of `SKILL_QUEUE_ENDING_LEAD_HOUR_OPTIONS`. */
+  skillQueueEndingLeadHours?: number;
   /** ISK balance at or under which `corpWalletThreshold` fires its `balanceBelow` half. */
   corpWalletBalanceFloorIsk?: number;
   /** ISK amount a single journal entry must exceed to fire `corpWalletThreshold`'s `transactionAbove` half. */
@@ -34,12 +36,29 @@ export const STRUCTURE_FUEL_LOW_DAY_OPTIONS: readonly number[] = [7, 3, 1];
 /** The lead times `planetaryExtractorExpiring`'s inline control offers (issue #750), replacing the old fixed 24h/12h pair. */
 export const EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS: readonly number[] = [24, 12, 6, 1];
 
+/**
+ * The lead times `skillQueueEnding`'s inline control offers (issue #1410),
+ * all within the 72-hour Projection Horizon (`engine/projection.ts`'s
+ * `PROJECTION_HORIZON_MS`) a Scheduled Push can actually reach.
+ */
+export const SKILL_QUEUE_ENDING_LEAD_HOUR_OPTIONS: readonly number[] = [48, 24, 12, 6];
+
 /** A week's warning is the issue's own justification: "a director planning a fuel run wants a week's warning." */
 export const DEFAULT_STRUCTURE_FUEL_LOW_DAYS = 7;
 export const DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS = 6;
 export const DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK = 50_000_000;
 export const DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK = 100_000_000;
 export const DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK = 1_000_000;
+/**
+ * Matches the roster's own `ENDING_SOON_MS` display constant
+ * (`features/skills/queueStatus.ts`) — a pilot's first warning should not
+ * arrive later than the "ending soon" flag they already see there. Kept as
+ * its own literal rather than importing that constant: this module
+ * deliberately imports nothing at runtime (see the file's own doc comment),
+ * since it is reachable from the service worker. A test in
+ * `eventThresholds.test.ts` pins the two together instead.
+ */
+export const DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS = 24;
 
 /**
  * How Settings edits a field:
@@ -94,6 +113,16 @@ export const THRESHOLD_FIELDS: { readonly [K in ThresholdKey]: ThresholdField<K>
       labelKey: 'settings.notifications.extractorExpiringLeadTimeLabel',
       options: EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS,
       optionKey: 'settings.notifications.extractorExpiringLeadTimeOption',
+    },
+  },
+  skillQueueEndingLeadHours: {
+    key: 'skillQueueEndingLeadHours',
+    defaultValue: DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.skillQueueEndingLeadTimeLabel',
+      options: SKILL_QUEUE_ENDING_LEAD_HOUR_OPTIONS,
+      optionKey: 'settings.notifications.skillQueueEndingLeadTimeOption',
     },
   },
   corpWalletBalanceFloorIsk: {

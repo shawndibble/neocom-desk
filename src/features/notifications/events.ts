@@ -77,6 +77,16 @@ const CATALOG = [
     scope: requiredScope('getCharacterSkillQueue'),
   },
   {
+    // A lead-time warning (issue #1410), so a pilot can top up the queue
+    // before it goes idle — ESI has no write endpoint, so a paused or
+    // already-empty queue is `characterNotTraining`'s to report, not this
+    // event's.
+    id: 'skillQueueEnding',
+    labelKey: 'settings.notifications.event.skillQueueEnding',
+    defaultChannels: 'both',
+    scope: requiredScope('getCharacterSkillQueue'),
+  },
+  {
     // Opt-in behind sync.spExtractionMonitoringEnabled — the scope below
     // just gates whether the event can fire at all once a pilot turns
     // monitoring on; `pollDomains.ts`'s spExtractionDomain checks the

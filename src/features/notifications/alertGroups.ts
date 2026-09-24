@@ -95,6 +95,8 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   structureFuelLow: 'warning',
   corpWalletThreshold: 'warning',
   planetaryExtractorExpiring: 'warning',
+  // A lead-time warning, same shape as the extractor one above.
+  skillQueueEnding: 'warning',
   // A loss already happened — the same "standing fault" reasoning as the
   // group above, not "waiting on you": collateral is already forfeited by
   // the time this fires (issue #1091).

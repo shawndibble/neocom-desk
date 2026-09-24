@@ -47,6 +47,50 @@ describe('occurrenceKey', () => {
     expect(occurrenceKey(base, T0)).not.toEqual(occurrenceKey({ ...base, finishMs: T0 + 1 }, T0));
   });
 
+  it('derives the same key for two identical skillQueueEnding fires', () => {
+    const fire: NotificationFire = {
+      eventId: 'skillQueueEnding',
+      characterId: 7,
+      skillId: 3300,
+      level: 4,
+      finishMs: T0,
+      thresholdMs: 6 * 3_600_000,
+    };
+    expect(occurrenceKey(fire, T0)).toEqual(occurrenceKey({ ...fire }, T0 + 60_000));
+  });
+
+  it('gives skillQueueEnding a different key for a different tail finish time (a new tail)', () => {
+    const base: NotificationFire = {
+      eventId: 'skillQueueEnding',
+      characterId: 7,
+      skillId: 3300,
+      level: 4,
+      finishMs: T0,
+      thresholdMs: 6 * 3_600_000,
+    };
+    expect(occurrenceKey(base, T0)).not.toEqual(occurrenceKey({ ...base, finishMs: T0 + 1 }, T0));
+  });
+
+  it('gives skillQueueEnding a different key for the same tail re-armed at a different lead time, so a lower-then-raised threshold re-fires as a new occurrence', () => {
+    // The re-arm case `diffSkillQueueEnding` documents: fire once at 24h,
+    // drop below the window at 6h (no fire), raise back to 24h before the
+    // tail finishes (fires again, per its own window-crossing rule). Without
+    // `thresholdMs` in the key, that second, genuinely new fire would
+    // compute the identical key to the first and get dropped as already
+    // delivered.
+    const base: NotificationFire = {
+      eventId: 'skillQueueEnding',
+      characterId: 7,
+      skillId: 3300,
+      level: 4,
+      finishMs: T0,
+      thresholdMs: 24 * 3_600_000,
+    };
+    expect(occurrenceKey(base, T0)).not.toEqual(
+      occurrenceKey({ ...base, thresholdMs: 6 * 3_600_000 }, T0)
+    );
+  });
+
   it('buckets characterNotTraining by day, agreeing within the same day and disagreeing across days', () => {
     const fire: NotificationFire = {
       eventId: 'characterNotTraining',
@@ -396,6 +440,18 @@ describe('occurrenceFiredAt', () => {
     };
     expect(occurrenceFiredAt(fire, T0)).toBe(finishMs);
     expect(occurrenceFiredAt({ ...fire, finishMs: null }, T0)).toBe(T0);
+  });
+
+  it('dates skillQueueEnding by the poll, since the tail finish is a future deadline, not the moment observed', () => {
+    const fire: NotificationFire = {
+      eventId: 'skillQueueEnding',
+      characterId: 7,
+      skillId: 3300,
+      level: 4,
+      finishMs: T0 + 6 * 3_600_000,
+      thresholdMs: 6 * 3_600_000,
+    };
+    expect(occurrenceFiredAt(fire, T0)).toBe(T0);
   });
 
   it("dates an eveNotification by ESI's own timestamp, and falls back when it cannot be parsed", () => {

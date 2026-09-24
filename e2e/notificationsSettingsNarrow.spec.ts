@@ -34,6 +34,16 @@ function characterToggle(page: Page) {
   return page.getByRole('button', { name: CHARACTER_NAME, exact: true });
 }
 
+/**
+ * The Character's own section, not the "All Characters" master row: that row
+ * (`AllCharactersNotificationSection.tsx`) is always open and lists every
+ * event too, so an unscoped `getByText`/`getByRole` lookup for an event's own
+ * label or control matches twice on this page.
+ */
+function characterSection(page: Page) {
+  return characterToggle(page).locator('xpath=ancestor::div[contains(@class, "rounded-xs")][1]');
+}
+
 test('per-Character disclosure header meets the 44px touch floor at 390px, and still expands/collapses', async ({
   page,
 }) => {
@@ -101,4 +111,24 @@ test('per-Character disclosure header drops the touch-tier floor at and above md
   // slip through a loose upper bound.
   expect(height).toBeGreaterThanOrEqual(24);
   expect(height).toBeLessThanOrEqual(36);
+});
+
+test('skillQueueEnding row and its lead-time select stay visible at 390px (issue #1410)', async ({
+  page,
+}) => {
+  // The threshold row (`ThresholdControls`) sits in the same wrapping flex
+  // layout as every other inline control here, so a narrow viewport is where
+  // a control silently sliding off-row would first show up — the same class
+  // of regression `extractorExpiringLeadHours`'s neighbouring row risks.
+  await gotoNotificationSettings(page);
+  await page.setViewportSize(PHONE);
+
+  const toggle = characterToggle(page);
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+  const section = characterSection(page);
+  await expect(section.getByText('Skill Queue Ending', { exact: true })).toBeVisible();
+  await expect(
+    section.getByRole('combobox', { name: 'Warn this far before the skill queue runs dry:' })
+  ).toBeVisible();
 });

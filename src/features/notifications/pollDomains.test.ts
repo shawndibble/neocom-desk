@@ -156,6 +156,7 @@ describe('POLL_DOMAINS', () => {
     expect([...skillQueueDomain.eventIds].sort()).toEqual([
       'characterNotTraining',
       'skillLevelComplete',
+      'skillQueueEnding',
     ]);
   });
 });
@@ -167,7 +168,7 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
 
   it("lists each domain's events in catalog order, from the entries naming its source", () => {
     expect(Object.fromEntries(POLL_DOMAINS.map((domain) => [domain.id, domain.eventIds]))).toEqual({
-      skillQueue: ['skillLevelComplete', 'characterNotTraining'],
+      skillQueue: ['skillLevelComplete', 'characterNotTraining', 'skillQueueEnding'],
       spExtraction: ['spExtractionReady'],
       industryJobs: ['industryJobComplete'],
       colonies: ['planetaryExtractionDone', 'planetaryExtractorExpiring'],
@@ -337,6 +338,36 @@ describe('projection wiring', () => {
     expect(rows[0].eventId).toEqual('skillLevelComplete');
     expect(rows[0].body).toContain('Gunnery');
     expect(rows[1].eventId).toEqual('characterNotTraining');
+  });
+
+  it("projects skillQueueEnding at the Character's current lead time, not the one baked into the baseline (issue #1410, same reasoning as #1248/#1259)", async () => {
+    // A Settings lead-time change rebuilds the Projection from the saved
+    // baseline, whose `endingLeadMs` is whatever was in force at load time.
+    useNotificationPreferences.setState({
+      value: withCharacterEventThreshold(
+        DEFAULT_NOTIFICATION_PREFERENCES,
+        7,
+        'skillQueueEndingLeadHours',
+        12
+      ),
+      hydrated: true,
+    });
+    const finishMs = T0 + 20 * HOUR_MS;
+    const snapshot = {
+      entries: [
+        {
+          skillId: 3300,
+          finishedLevel: 4,
+          queuePosition: 0,
+          finishMs,
+          endingLeadMs: 6 * HOUR_MS,
+        },
+      ],
+      nowMs: T0,
+    };
+    const rows = await skillQueueDomain.projection!(7, 'Kestrel', snapshot, T0);
+    const ending = rows.find((r) => r.eventId === 'skillQueueEnding');
+    expect(ending?.fireAt).toEqual(finishMs - 12 * HOUR_MS);
   });
 
   it('resolves item names for industry jobs', async () => {
