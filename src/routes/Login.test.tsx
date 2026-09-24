@@ -73,6 +73,21 @@ beforeEach(async () => {
 });
 
 describe('Login', () => {
+  it('shows only logo, name and the sign-in button in the Play Store app', async () => {
+    vi.spyOn(document, 'referrer', 'get').mockReturnValue('android-app://com.neocomdesk.app');
+    renderLogin();
+    expect(await screen.findAllByRole('button', { name: /log in with eve online/i })).toHaveLength(
+      1
+    );
+    expect(screen.queryByRole('heading', { name: /answers, not api dumps/i })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Neocom Desk' })).toBeInTheDocument();
+    expect(screen.queryByText(/signing in lets it read/i)).toBeNull();
+    expect(
+      screen.getByRole('button', { name: /log in with custom permissions/i })
+    ).toBeInTheDocument();
+    vi.restoreAllMocks();
+  });
+
   it('shows the app name, hero heading and SSO button', async () => {
     renderLogin();
     expect(
@@ -313,13 +328,15 @@ describe('Login', () => {
     await waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
   });
 
-  it('opens the Customize permissions dialog from the link under the login button (#1522)', async () => {
+  it('opens the custom permissions dialog from the link under the login button (#1522)', async () => {
     const user = userEvent.setup();
     renderLogin();
-    const [firstLink] = await screen.findAllByRole('button', { name: /customize permissions/i });
+    const [firstLink] = await screen.findAllByRole('button', {
+      name: /log in with custom permissions/i,
+    });
     await user.click(firstLink);
 
-    const dialog = await screen.findByRole('dialog', { name: /customize permissions/i });
+    const dialog = await screen.findByRole('dialog', { name: /log in with custom permissions/i });
     expect(within(dialog).getByRole('checkbox', { name: 'Wallet' })).toBeChecked();
     expect(within(dialog).getByRole('checkbox', { name: /skills & skill queue/i })).toBeDisabled();
   });
