@@ -36,7 +36,10 @@
 // above does not bite this key.
 //
 // The five preferences behind Settings' Defaults and Corporation panels: the
-// trade hub the Market Browser opens at, the facility a first Build Plan
+// default trade hub Contracts, LP Store, BPC Sourcing and notification
+// polling price against (and what a device's first-ever Market Browser visit
+// seeds from — see features/market/browserHub.ts for why the Browser's own,
+// day-to-day hub is device-local instead), the facility a first Build Plan
 // assumes, the ME an unowned sub-build is quoted at, the PI expiring-soon
 // window, and the corp roster's dark threshold. A pilot who says "quote my
 // builds at my rigged Azbel" is answering for themselves, not for one machine,

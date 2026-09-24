@@ -13,6 +13,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { useMarketHub } from '@/features/market/hub';
+import { useMarketBrowserHub } from '@/features/market/browserHub';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
 import { clearOrderBookCache } from '@/features/market/orderBook';
 import { usePickedSystems } from '@/features/route/currentSystem';
@@ -144,6 +145,7 @@ beforeEach(async () => {
   await db.characters.put({ characterId: 1, name: 'Pilot One', ownerHash: 'oh', addedAt: 0 });
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
   useMarketHub.setState({ value: 'jita', hydrated: false });
+  useMarketBrowserHub.setState({ value: 'jita', hydrated: false });
   useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
   usePickedSystems.setState({ value: {}, hydrated: false });
   loadCharacterSolarSystemId.mockReset();
