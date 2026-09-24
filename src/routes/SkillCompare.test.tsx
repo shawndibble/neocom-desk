@@ -269,6 +269,9 @@ describe('SkillCompare', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.queryByText('Miners')).not.toBeInTheDocument());
     expect(screen.getByText('No saved comparisons yet.')).toBeInTheDocument();
+    expect(
+      screen.getByText('Pick characters, then use Save comparison to reopen that set later.')
+    ).toBeInTheDocument();
   });
 
   it('degrades a saved comparison naming a since-removed character instead of breaking', async () => {

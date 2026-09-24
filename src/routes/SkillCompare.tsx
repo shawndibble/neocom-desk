@@ -482,7 +482,11 @@ export function SkillCompare() {
           {t('skillCompare.savedTitle')}
         </h2>
         {comparisonsValue.items.length === 0 ? (
-          <EmptyState title={t('skillCompare.savedEmpty')} className="py-6" />
+          <EmptyState
+            title={t('skillCompare.savedEmpty')}
+            hint={t('skillCompare.savedEmptyHint')}
+            className="py-6"
+          />
         ) : (
           <ul className="rounded-xs border border-line">
             {comparisonsValue.items.map((comparison) => (
