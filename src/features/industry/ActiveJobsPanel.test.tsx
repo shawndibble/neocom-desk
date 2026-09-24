@@ -670,156 +670,152 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
     expect(await screen.findByText('Widget Gamma')).toBeInTheDocument();
     expect(search).toBe('');
   });
-});
 
-describe('ActiveJobsPanel: a filter that hides every job stays clearable (#1477)', () => {
-  // Pinned clock: every job here ends hours out, so none reads as done or
-  // completing soon and the Status menu stays out of the way.
-  beforeEach(() => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.setSystemTime(NOW);
-  });
-
-  function job(overrides: Record<string, unknown> = {}) {
-    return {
-      job_id: 1,
-      activity_id: 1,
-      blueprint_type_id: 100,
-      product_type_id: 200,
-      facility_id: 60003760,
-      station_id: 60003760,
-      runs: 1,
-      start_date: new Date(NOW.getTime() - 30 * 60_000).toISOString(),
-      end_date: new Date(NOW.getTime() + 5 * 60 * 60_000).toISOString(),
-      status: 'active',
-      ...overrides,
-    };
-  }
-
-  function renderAt(url: string) {
-    const probe = { search: '' };
-    function SearchProbe() {
-      probe.search = useLocation().search;
-      return null;
-    }
-    render(
-      <MemoryRouter initialEntries={[url]}>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
-        <SearchProbe />
-      </MemoryRouter>
-    );
-    return probe;
-  }
-
-  function filterGroup() {
-    return screen.getByRole('group', { name: 'Filter jobs' });
-  }
-
-  it('keeps the Activity menu for a filtered-out activity when only one activity remains, and unchecking it restores the rows', async () => {
-    server.use(
-      http.get(jobsUrl(), () =>
-        HttpResponse.json([
-          job({ job_id: 1, blueprint_type_id: 100 }),
-          job({ job_id: 2, blueprint_type_id: 300, product_type_id: undefined }),
-        ])
-      )
-    );
-    const user = userEvent.setup();
-    const probe = renderAt('/industry/plans?jobs.activity=11');
-
-    await expandJobs(user);
-    expect(screen.getByText('No jobs match these filters')).toBeInTheDocument();
-
-    await user.click(within(filterGroup()).getByRole('button', { name: 'Activity (1)' }));
-    const reaction = screen.getByRole('menuitemcheckbox', { name: 'Reaction' });
-    expect(reaction).toHaveAttribute('aria-checked', 'true');
-    await user.click(reaction);
-    await user.keyboard('{Escape}');
-
-    expect(await screen.findByText('Widget Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
-    expect(probe.search).toBe('');
-  });
-
-  it('lists a selected-but-absent activity as a checked item beside the present ones, with the fallback label for an unknown id', async () => {
-    server.use(
-      http.get(jobsUrl(), () =>
-        HttpResponse.json([
-          job({ job_id: 1, activity_id: 1, blueprint_type_id: 100 }),
-          job({ job_id: 2, activity_id: 8, blueprint_type_id: 300, product_type_id: undefined }),
-        ])
-      )
-    );
-    const user = userEvent.setup();
-    renderAt('/industry/plans?jobs.activity=11,999');
-
-    await expandJobs(user);
-    await user.click(within(filterGroup()).getByRole('button', { name: 'Activity (2)' }));
-
-    const items = screen.getAllByRole('menuitemcheckbox');
-    const expected = [
-      ['Manufacturing', 'false'],
-      ['Invention', 'false'],
-      ['Reaction', 'true'],
-      ['Activity #999', 'true'],
-    ];
-    expect(items).toHaveLength(expected.length);
-    expected.forEach(([name, checked], i) => {
-      expect(items[i]).toHaveAccessibleName(name);
-      expect(items[i]).toHaveAttribute('aria-checked', checked);
+  describe('a filter that hides every job stays clearable (#1477)', () => {
+    // Pinned clock: every job here ends hours out, so none reads as done or
+    // completing soon and the Status menu stays out of the way.
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.setSystemTime(NOW);
     });
 
-    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Activity #999' }));
-    await user.keyboard('{Escape}');
-    expect(within(filterGroup()).getByRole('button', { name: 'Activity (1)' })).toBeInTheDocument();
-  });
+    function renderAt(url: string) {
+      const probe = { search: '' };
+      function SearchProbe() {
+        probe.search = useLocation().search;
+        return null;
+      }
+      render(
+        <MemoryRouter initialEntries={[url]}>
+          <ActiveJobsPanel
+            characterId={CHAR_ID}
+            onAddToQuickbar={() => {}}
+            quickbarAvailable={true}
+            onShowInfo={() => {}}
+          />
+          <SearchProbe />
+        </MemoryRouter>
+      );
+      return probe;
+    }
 
-  it('offers "Reset filters" on the filtered-to-zero state, clearing both filters and leaving the rest of the URL alone', async () => {
-    server.use(
-      http.get(jobsUrl(), () =>
-        HttpResponse.json([
-          job({ job_id: 1, blueprint_type_id: 100 }),
-          job({ job_id: 2, blueprint_type_id: 300, product_type_id: undefined }),
-        ])
-      )
-    );
-    const user = userEvent.setup();
-    const probe = renderAt('/industry/plans?jobs.activity=11&jobs.status=done&tab=keep');
+    function filterGroup() {
+      return screen.getByRole('group', { name: 'Filter jobs' });
+    }
 
-    await expandJobs(user);
-    expect(screen.getByText('No jobs match these filters')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+    it('keeps the Activity menu for a filtered-out activity when only one activity remains, and unchecking it restores the rows', async () => {
+      server.use(
+        http.get(jobsUrl(), () =>
+          HttpResponse.json([
+            manufacturingJob({ job_id: 1, blueprint_type_id: 100 }),
+            manufacturingJob({ job_id: 2, blueprint_type_id: 300, product_type_id: undefined }),
+          ])
+        )
+      );
+      const user = userEvent.setup();
+      const probe = renderAt('/industry/plans?jobs.activity=11');
 
-    expect(await screen.findByText('Widget Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Reset filters' })).not.toBeInTheDocument();
-    const params = new URLSearchParams(probe.search);
-    expect(params.has('jobs.activity')).toBe(false);
-    expect(params.has('jobs.status')).toBe(false);
-    expect(params.get('tab')).toBe('keep');
-  });
+      await expandJobs(user);
+      expect(screen.getByText('No jobs match these filters')).toBeInTheDocument();
 
-  it('still hides the Activity menu with no filter applied and only one activity present', async () => {
-    server.use(
-      http.get(jobsUrl(), () =>
-        HttpResponse.json([
-          job({ job_id: 1, blueprint_type_id: 100 }),
-          job({ job_id: 2, blueprint_type_id: 300, product_type_id: undefined }),
-        ])
-      )
-    );
-    const user = userEvent.setup();
-    renderAt('/industry/plans');
+      await user.click(within(filterGroup()).getByRole('button', { name: 'Activity (1)' }));
+      const reaction = screen.getByRole('menuitemcheckbox', { name: 'Reaction' });
+      expect(reaction).toHaveAttribute('aria-checked', 'true');
+      await user.click(reaction);
+      await user.keyboard('{Escape}');
 
-    await expandJobs(user);
-    expect(screen.getByText('Widget Alpha')).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Filter jobs' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Reset filters' })).not.toBeInTheDocument();
+      expect(await screen.findByText('Widget Alpha')).toBeInTheDocument();
+      expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
+      expect(probe.search).toBe('');
+    });
+
+    it('lists a selected-but-absent activity as a checked item beside the present ones, with the fallback label for an unknown id', async () => {
+      server.use(
+        http.get(jobsUrl(), () =>
+          HttpResponse.json([
+            manufacturingJob({ job_id: 1, activity_id: 1, blueprint_type_id: 100 }),
+            manufacturingJob({
+              job_id: 2,
+              activity_id: 8,
+              blueprint_type_id: 300,
+              product_type_id: undefined,
+            }),
+          ])
+        )
+      );
+      const user = userEvent.setup();
+      renderAt('/industry/plans?jobs.activity=11,999');
+
+      await expandJobs(user);
+      await user.click(within(filterGroup()).getByRole('button', { name: 'Activity (2)' }));
+
+      const items = screen.getAllByRole('menuitemcheckbox');
+      const expected = [
+        ['Manufacturing', 'false'],
+        ['Invention', 'false'],
+        ['Reaction', 'true'],
+        ['Activity #999', 'true'],
+      ];
+      expect(items).toHaveLength(expected.length);
+      expected.forEach(([name, checked], i) => {
+        expect(items[i]).toHaveAccessibleName(name);
+        expect(items[i]).toHaveAttribute('aria-checked', checked);
+      });
+
+      await user.click(screen.getByRole('menuitemcheckbox', { name: 'Activity #999' }));
+      await user.keyboard('{Escape}');
+      expect(
+        within(filterGroup()).getByRole('button', { name: 'Activity (1)' })
+      ).toBeInTheDocument();
+    });
+
+    it('offers "Reset filters" on the filtered-to-zero state, clearing both filters and leaving the rest of the URL alone', async () => {
+      server.use(
+        http.get(jobsUrl(), () =>
+          HttpResponse.json([
+            manufacturingJob({ job_id: 1, blueprint_type_id: 100 }),
+            manufacturingJob({ job_id: 2, blueprint_type_id: 300, product_type_id: undefined }),
+          ])
+        )
+      );
+      const user = userEvent.setup();
+      const probe = renderAt(
+        '/industry/plans?jobs.activity=11&jobs.status=done&jobs.chars=current&highlight=1&tab=keep'
+      );
+
+      await expandJobs(user);
+      expect(screen.getByText('No jobs match these filters')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+      expect(await screen.findByText('Widget Alpha')).toBeInTheDocument();
+      expect(screen.getByText('Widget Gamma')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Reset filters' })).not.toBeInTheDocument();
+      const params = new URLSearchParams(probe.search);
+      expect(params.has('jobs.activity')).toBe(false);
+      expect(params.has('jobs.status')).toBe(false);
+      expect(params.get('tab')).toBe('keep');
+      // The character picker's own param group and the job highlight both survive.
+      expect(params.get('jobs.chars')).toBe('current');
+      expect(screen.getByText('Widget Alpha').closest('tr')).toHaveClass('row-pulse');
+    });
+
+    it('still hides the Activity menu with no filter applied and only one activity present', async () => {
+      server.use(
+        http.get(jobsUrl(), () =>
+          HttpResponse.json([
+            manufacturingJob({ job_id: 1, blueprint_type_id: 100 }),
+            manufacturingJob({ job_id: 2, blueprint_type_id: 300, product_type_id: undefined }),
+          ])
+        )
+      );
+      const user = userEvent.setup();
+      renderAt('/industry/plans');
+
+      await expandJobs(user);
+      expect(screen.getByText('Widget Alpha')).toBeInTheDocument();
+      expect(screen.queryByRole('group', { name: 'Filter jobs' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Reset filters' })).not.toBeInTheDocument();
+    });
   });
 });
 

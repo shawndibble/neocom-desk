@@ -201,7 +201,7 @@ export function ActiveJobsPanel({
 }: ActiveJobsPanelProps) {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
-  // View-only filters (not persisted): plain Sets, empty meaning "every
+  // URL-backed filters (ADR 0015), empty meaning "every
   // activity"/"every status" — matching how no chip pressed reads as no
   // filter everywhere else in the app. Deliberately not the shared
   // `MultiSelectFilter`/`toggleFilterMember` convention (`'all'` as the
