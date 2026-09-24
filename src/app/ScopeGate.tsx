@@ -6,6 +6,7 @@ import { useGrantedScopes } from './useGrantedScopes';
 import {
   isGatedRoute,
   missingScopesForRoute,
+  permissionsForRoute,
   routeStringsNamespace,
   type AppRoutePath,
 } from './routeScopes';
@@ -50,7 +51,7 @@ export function ScopeGate({ path, children }: ScopeGateProps) {
       title={t(`${namespace}.reauthTitle`)}
       hint={t(`${namespace}.reauthHint`)}
       actionLabel={t(`${namespace}.reauthAction`)}
-      onLogin={() => void beginEveLogin()}
+      onLogin={() => void beginEveLogin({ groups: permissionsForRoute(path) })}
       soleAction
     />
   );
