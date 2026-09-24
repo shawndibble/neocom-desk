@@ -76,3 +76,18 @@ export function tagUnifiedRows(
     fromFit: fromFit.has(row.skillTypeID),
   }));
 }
+
+/**
+ * Groups the Ships view by Mastery tier (I first, fit-only rows last),
+ * training time ascending within a tier. `1e10` comfortably exceeds any
+ * real skill's training seconds, so it never lets a later tier's row sort
+ * ahead of an earlier tier's. Trained rows sink last (`sortRows`'s rule for
+ * an `undefined` sort value), same as before this view grouped by tier.
+ */
+export function masteryRowSortValue(
+  row: Pick<UnifiedShipRow, 'status' | 'seconds' | 'highestMasteryTier'>
+): number | undefined {
+  if (row.status === 'trained') return undefined;
+  const tier = row.highestMasteryTier ?? 5;
+  return tier * 1e10 + row.seconds;
+}

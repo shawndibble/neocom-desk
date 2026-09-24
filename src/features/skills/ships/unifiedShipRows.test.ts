@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mergeShipEntries, tagUnifiedRows } from './unifiedShipRows';
+import { masteryRowSortValue, mergeShipEntries, tagUnifiedRows } from './unifiedShipRows';
 import { buildFitCheckRows } from './fitCheckRows';
 import type { EngineSkill, PlanEntry, ScheduledStep, TrainedSkill } from '@/engine/types';
 import type { SkillPrereq } from '@/sde/types';
@@ -133,5 +133,43 @@ describe('tagUnifiedRows', () => {
       highestMasteryTier: null,
       fromFit: true,
     });
+  });
+});
+
+describe('masteryRowSortValue', () => {
+  it('a trained row: undefined regardless of tier, so sortRows sinks it last', () => {
+    expect(
+      masteryRowSortValue({ status: 'trained', seconds: 0, highestMasteryTier: 3 })
+    ).toBeUndefined();
+  });
+
+  it('tier ordering beats training time: a tier I row with huge seconds still sorts before a tier IV row with tiny seconds', () => {
+    const tierI = masteryRowSortValue({
+      status: 'partial',
+      seconds: 999_999_999,
+      highestMasteryTier: 0,
+    });
+    const tierIV = masteryRowSortValue({ status: 'partial', seconds: 1, highestMasteryTier: 3 });
+    expect(tierI).toBeLessThan(tierIV!);
+  });
+
+  it('within the same tier: shorter training time sorts first', () => {
+    const shorter = masteryRowSortValue({ status: 'partial', seconds: 100, highestMasteryTier: 1 });
+    const longer = masteryRowSortValue({ status: 'partial', seconds: 200, highestMasteryTier: 1 });
+    expect(shorter).toBeLessThan(longer!);
+  });
+
+  it('a fit-only row (no mastery tier): sorts after every tiered row', () => {
+    const tierV = masteryRowSortValue({
+      status: 'partial',
+      seconds: 999_999_999,
+      highestMasteryTier: 4,
+    });
+    const fitOnly = masteryRowSortValue({
+      status: 'partial',
+      seconds: 1,
+      highestMasteryTier: null,
+    });
+    expect(fitOnly).toBeGreaterThan(tierV!);
   });
 });
