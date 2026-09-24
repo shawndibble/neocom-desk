@@ -643,6 +643,8 @@ describe('OpenOrdersPanel', () => {
 
     const dialog = await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
     await waitFor(() => expect(within(dialog).queryByText('Checking...')).not.toBeInTheDocument());
+    // "Who is cheaper" starts folded (issue #1428).
+    fireEvent.click(within(dialog).getByRole('button', { name: /Who is cheaper/ }));
 
     const systemRow = within(dialog).getByText('System').closest('div');
     const regionRow = within(dialog).getByText('Region').closest('div');
