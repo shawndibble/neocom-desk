@@ -6,7 +6,7 @@ import type { StatusResult } from '@/esi/cache';
 import type { CharacterCorporationRoles } from '@/esi/endpoints';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
-import { beginGrantPermission } from '@/app/loginFlow';
+import { beginEveLogin } from '@/app/loginFlow';
 import { ESI_REGISTRY, SCOPE_GROUPS } from '@/esi/registry';
 import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
 import { loadCharacterRoles } from '@/features/corp/roles';
@@ -17,11 +17,11 @@ vi.mock('@/features/corp/roles', async (importOriginal) => ({
   loadCharacterRoles: vi.fn(),
 }));
 vi.mock('@/app/useGrantedScopes', () => ({ useGrantedScopes: vi.fn() }));
-vi.mock('@/app/loginFlow', () => ({ beginGrantPermission: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
 const mockedLoadRoles = vi.mocked(loadCharacterRoles);
 const mockedGrantedScopes = vi.mocked(useGrantedScopes);
-const mockedGrant = vi.mocked(beginGrantPermission);
+const mockedGrant = vi.mocked(beginEveLogin);
 
 const CHARACTER_ID = 42;
 const ALL_CORP_SCOPES = [...scopesForGroup('corp')];
@@ -90,7 +90,7 @@ describe('PermissionsPanel — every Permission', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Grant Mail' }));
 
-    expect(mockedGrant).toHaveBeenCalledWith('mail', CHARACTER_ID);
+    expect(mockedGrant).toHaveBeenCalledWith({ characterId: CHARACTER_ID, groups: ['mail'] });
   });
 
   it('has no Remove action anywhere', () => {
@@ -125,7 +125,7 @@ describe('PermissionsPanel — the Corporation row', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Grant Corporation' }));
 
-    expect(mockedGrant).toHaveBeenCalledWith('corp', CHARACTER_ID);
+    expect(mockedGrant).toHaveBeenCalledWith({ characterId: CHARACTER_ID, groups: ['corp'] });
   });
 
   it('not-granted: offers Grant, since roles are unknowable until then', () => {

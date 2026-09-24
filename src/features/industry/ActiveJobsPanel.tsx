@@ -21,6 +21,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { db } from '@/db';
 import { loadTypes } from '@/sde/loadSde';
 import type { TypeMap } from '@/sde/types';
@@ -893,7 +894,11 @@ export function ActiveJobsPanel({
               title={`${entry.characterName} — ${t('industry.jobsReauthTitle')}`}
               hint={t('industry.jobsReauthHint')}
               actionLabel={t('industry.jobsReauthAction')}
-              onLogin={() => void beginEveLogin()}
+              onLogin={() =>
+                void beginEveLogin({
+                  groups: permissionsForEndpoints(['getCharacterIndustryJobs']),
+                })
+              }
             />
           ))}
           {jobsFanOutSkipped.map((s) => (
@@ -912,7 +917,9 @@ export function ActiveJobsPanel({
           title={t('industry.jobsReauthTitle')}
           hint={t('industry.jobsReauthHint')}
           actionLabel={t('industry.jobsReauthAction')}
-          onLogin={() => void beginEveLogin()}
+          onLogin={() =>
+            void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterIndustryJobs']) })
+          }
         />
       ) : jobs.length === 0 ? (
         // Only the "no data at all" case reaches here — `noneActive` has

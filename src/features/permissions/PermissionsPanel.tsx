@@ -1,7 +1,8 @@
 /**
  * The per-Character Permissions section in Settings (#1524): every Permission
  * with its label, caption and granted/missing state, and a Grant button on each
- * missing one. There is no Remove — revocation stays on CCP's own site
+ * missing one — `beginEveLogin` asks for the stored grant plus the Core Grant
+ * plus that Permission (#1520). There is no Remove — revocation stays on CCP's own site
  * (docs/context/decisions/20260924-143410-customize-permissions-at-sign-in-core-grant-plus.md).
  *
  * Replaces the old Corp access row, whose two-axis gate lives on in the
@@ -18,7 +19,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
-import { beginGrantPermission } from '@/app/loginFlow';
+import { beginEveLogin } from '@/app/loginFlow';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { PERMISSIONS, SCOPE_GROUPS, type ScopeGroup } from '@/esi/registry';
 import { isPermissionGranted } from '@/esi/scopes';
@@ -99,7 +100,9 @@ export function PermissionsPanel() {
                         <Button
                           size="sm"
                           aria-label={t('settings.permissions.grantAria', { permission: label })}
-                          onClick={() => void beginGrantPermission(group, activeCharacterId)}
+                          onClick={() =>
+                            void beginEveLogin({ characterId: activeCharacterId, groups: [group] })
+                          }
                         >
                           {t('settings.permissions.grant')}
                         </Button>

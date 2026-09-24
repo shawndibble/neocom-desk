@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest';
 import * as endpointsModule from './endpoints';
 // Raw source of endpoints.ts, for the marker-comment parity check below.
 import endpointsSource from './endpoints.ts?raw';
-import { ESI_REGISTRY, PUBLIC, type EsiEndpointSpec } from './registry';
+import { ESI_REGISTRY, PUBLIC, permissionsForEndpoints, type EsiEndpointSpec } from './registry';
 
 /** Names of every exported wrapper function in endpoints.ts. */
 const wrapperNames = Object.entries(endpointsModule)
@@ -76,5 +76,31 @@ describe('parity with the endpoints.ts marker comments', () => {
     }));
     const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
     expect(declared.sort(byName)).toEqual([...markers].sort(byName));
+  });
+});
+
+describe('permissionsForEndpoints', () => {
+  it('names the one Permission an endpoint belongs to', () => {
+    expect(permissionsForEndpoints(['getCharacterMailHeaders'])).toEqual(['mail']);
+  });
+
+  it('dedupes across endpoints sharing a Permission', () => {
+    expect(permissionsForEndpoints(['getCharacterWallet', 'getCharacterWalletJournal'])).toEqual([
+      'wallet',
+    ]);
+  });
+
+  it('returns nothing for a Core Grant endpoint — there is no Permission to name', () => {
+    expect(permissionsForEndpoints(['getCharacterSkills'])).toEqual([]);
+  });
+
+  it('returns nothing for a PUBLIC-only endpoint', () => {
+    expect(permissionsForEndpoints(['getUniverseStation'])).toEqual([]);
+  });
+
+  it('names every distinct Permission across a mixed endpoint list', () => {
+    expect(
+      [...permissionsForEndpoints(['getCharacterMailHeaders', 'getCharacterContracts'])].sort()
+    ).toEqual(['contracts', 'mail']);
   });
 });

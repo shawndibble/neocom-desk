@@ -25,6 +25,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { CharacterBadge } from '@/features/character/assetBrowserRows';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { resolveCharacterFilter } from '@/features/character/characterFilterValue';
@@ -816,7 +817,9 @@ export function OpenOrdersPanel({
             title={`${entry.characterName} — ${t('orders.reauthTitle')}`}
             hint={t('orders.reauthHint')}
             actionLabel={t('orders.reauthAction')}
-            onLogin={() => void beginEveLogin()}
+            onLogin={() =>
+              void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterOrders']) })
+            }
           />
         ))}
         {fromCacheAny && (
