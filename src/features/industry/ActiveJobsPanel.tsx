@@ -201,8 +201,8 @@ export function ActiveJobsPanel({
 }: ActiveJobsPanelProps) {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
-  // URL-backed filters (ADR 0015), empty meaning "every
-  // activity"/"every status" — matching how no chip pressed reads as no
+  // URL-backed filters (ADR 0015), empty meaning "every activity"/"every
+  // status" — matching how no chip pressed reads as no
   // filter everywhere else in the app. Deliberately not the shared
   // `MultiSelectFilter`/`toggleFilterMember` convention (`'all'` as the
   // no-filter sentinel): that pair is built for a picker that starts fully
@@ -479,21 +479,19 @@ export function ActiveJobsPanel({
    */
   const showCharacterFilter = jobsFilterCandidates.length > 1;
 
-  // Menu entries only for activities actually present — an entry for an
-  // activity type this character never runs would just be a permanently-dead
-  // toggle.
   const presentActivityIds = useMemo(
     () => [...new Set(jobs.map((job) => job.activity_id))].sort((a, b) => a - b),
     [jobs]
   );
-  // Plus any still-selected activity with no job left (a character switch,
-  // delivered jobs, a shared URL) — shown checked so it can be unchecked.
+  // Menu entries: present activities (an activity this character never runs
+  // would be a dead toggle), plus any still-selected one with no job left
+  // (character switch, delivered jobs, shared URL) so it can be unchecked.
   const activityMenuIds = useMemo(
     () => [...new Set([...presentActivityIds, ...activityIds])].sort((a, b) => a - b),
     [presentActivityIds, activityIds]
   );
   // Only worth a control once there is more than one activity to tell apart —
-  // or while a filter is applied, same guard as Status below (#1477).
+  // or while a filter is applied, same guard as Status below.
   const showActivityFilter = activityFilter.size > 0 || presentActivityIds.length > 1;
   // Kept mounted while a status filter is still active even if no job
   // currently matches it — losing the control out from under an applied
