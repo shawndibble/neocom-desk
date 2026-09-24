@@ -68,3 +68,21 @@ export function setQuickbarItemTarget(
     return { ...item, targetPrice: target.price, targetDirection: target.direction };
   });
 }
+
+/**
+ * Pins an item (if it isn't already) and sets its price alert target in one
+ * list edit (issue #1427). Composing `add` then `setTarget` through
+ * `useQuickbar` would have the second write put back a list without the new
+ * item, since both compute from the same stale `items` closure. A `null`
+ * target clears a pinned item's alert but keeps it pinned, and does nothing to
+ * an unpinned one.
+ */
+export function pinWithTarget(
+  items: readonly QuickbarItem[],
+  typeId: number,
+  name: string,
+  target: QuickbarTarget
+): QuickbarItem[] {
+  if (target === null) return setQuickbarItemTarget(items, typeId, null);
+  return setQuickbarItemTarget(addQuickbarItem(items, { typeId, name }), typeId, target);
+}

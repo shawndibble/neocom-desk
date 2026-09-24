@@ -18,9 +18,10 @@
  * station tier whenever both are in hand.
  */
 import type { UndercutScope } from '@/engine/market/undercut';
+import { undercutPrice, outbidPrice } from '@/engine/market/priceTick';
 import type { OpenOrderRow } from './openOrdersModel';
 
-/** What matching the rival's price would do to a unit, once the fees are paid. Only ever known when the order has a cost basis. */
+/** What undercutting the rival's price would do to a unit, once the fees are paid. Only ever known when the order has a cost basis. */
 export interface MatchOutcome {
   kind: 'profit' | 'loss';
   /** Always positive — `kind` carries the sign. */
@@ -35,17 +36,27 @@ export type OrderRowSummary =
       gapIsk: number;
       /** How many rivals beat me in this scope, or null when only the aggregate tier has been read. */
       sellersUnderMe: number | null;
+      /** One legal tick under `rivalPrice` — the suggested new price, never a tie with the rival. Null only once undercutting would fall below the 0.01 ISK minimum tick. */
+      suggestedPrice: number | null;
       match: MatchOutcome | null;
     }
   | { kind: 'belowFloor'; lossPerUnit: number }
   | { kind: 'expiring'; daysLeft: number | null; volumeRemain: number }
-  | { kind: 'outbid'; rivalPrice: number; gapIsk: number; sellersUnderMe: number | null }
+  | {
+      kind: 'outbid';
+      rivalPrice: number;
+      gapIsk: number;
+      sellersUnderMe: number | null;
+      /** One legal tick over `rivalPrice` — the suggested bid to take the lead. */
+      suggestedPrice: number | null;
+    }
   | { kind: 'noCostBasis' }
   | { kind: 'best' };
 
-function matchOutcome(row: OpenOrderRow, rivalPrice: number): MatchOutcome | null {
-  if (row.isBuyOrder || !row.floor) return null;
-  const margin = rivalPrice - row.floor.relist;
+/** `suggestedPrice` is already the legal undercut price (or null) — the margin is judged there, never against the rival's raw (tied) price. */
+function matchOutcome(row: OpenOrderRow, suggestedPrice: number | null): MatchOutcome | null {
+  if (row.isBuyOrder || !row.floor || suggestedPrice === null) return null;
+  const margin = suggestedPrice - row.floor.relist;
   return margin >= 0 ? { kind: 'profit', amount: margin } : { kind: 'loss', amount: -margin };
 }
 
@@ -83,13 +94,15 @@ export function orderRowSummary(row: OpenOrderRow): OrderRowSummary | null {
             : 'region';
       const rival = rivalFor(row, scope);
       if (!rival) return null;
+      const suggestedPrice = undercutPrice(rival.price);
       return {
         kind: 'undercut',
         scope,
         rivalPrice: rival.price,
         gapIsk: rival.gapIsk,
         sellersUnderMe: rival.sellersUnderMe,
-        match: matchOutcome(row, rival.price),
+        suggestedPrice,
+        match: matchOutcome(row, suggestedPrice),
       };
     }
     case 'expiringOrStale':
@@ -107,6 +120,7 @@ export function orderRowSummary(row: OpenOrderRow): OrderRowSummary | null {
         rivalPrice: rival.price,
         gapIsk: rival.gapIsk,
         sellersUnderMe: rival.sellersUnderMe,
+        suggestedPrice: outbidPrice(rival.price),
       };
     }
     case 'healthy':

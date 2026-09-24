@@ -3209,6 +3209,8 @@
     "rangeJumps_other": "{{count}} jumps",
     "contextMenu": {
       "addToQuickbar": "Add to Quickbar",
+      "setPriceAlert": "Set price alert…",
+      "editPriceAlert": "Edit price alert…",
       "showInfo": "Show info",
       "addToCompare": "Add to Compare",
       "compareVariations": "Compare Variations",
@@ -3348,16 +3350,19 @@
       "empty": "No items yet — right-click an item and choose Add to Quickbar.",
       "viewInAppraisal": "View in Appraisal",
       "removeItem": "Remove {{name}} from Quickbar",
-      "reorderItem": "Reorder {{name}}",
-      "priceAlert": {
-        "button": "Set price alert for {{name}}",
-        "priceLabel": "Target price (ISK)",
-        "directionLabel": "Direction",
-        "directionAbove": "At or above",
-        "directionBelow": "At or below",
-        "save": "Save",
-        "clear": "Clear alert"
-      }
+      "reorderItem": "Reorder {{name}}"
+    },
+    "priceAlert": {
+      "button": "Set price alert for {{name}}",
+      "priceLabel": "Target price (ISK)",
+      "directionLabel": "Direction",
+      "directionAbove": "At or above",
+      "directionBelow": "At or below",
+      "save": "Save",
+      "clear": "Clear alert",
+      "hubLine": "Compares against lowest sell at {{hub}}.",
+      "currentPrice": "Now {{price}} ISK",
+      "dialogTitle": "Price alert: {{name}}"
     },
     "variations": {
       "title": "Variations",
@@ -3420,9 +3425,9 @@
         "undercutRegion": "Region cheapest is {{price}}",
         "sellersUnderMe_one": "{{count}} seller under you",
         "sellersUnderMe_other": "{{count}} sellers under you",
-        "matchProfit": "matching still clears {{amount}} a unit",
-        "matchLoss": "matching loses {{amount}} a unit",
-        "matchTooltip": "Their price minus your break-even floor (Never sell below).\n{{rival}} − {{floor}}",
+        "matchProfit": "undercutting still clears {{amount}} a unit",
+        "matchLoss": "undercutting loses {{amount}} a unit",
+        "matchTooltip": "Your undercut price minus your break-even floor (Never sell below).\n{{undercut}} − {{floor}}",
         "belowFloor": "Selling at this price loses {{amount}} a unit",
         "expiring": "{{days}}d left with {{units}} unsold",
         "expiringUnknown": "{{units}} still unsold",
@@ -3493,11 +3498,11 @@
       "scopeTightestBites": "The closest one matters most: same station, then same system, then same region",
       "verdict": {
         "letGo": "Do not chase this one",
-        "letGoDetail": "Matching the cheapest seller would lose you {{amount}} ISK on every unit.",
-        "matchThem": "Match their price",
-        "matchThemDetail": "Matching their price still leaves you {{amount}} ISK a unit after fees.",
+        "letGoDetail": "Undercutting to {{price}} would still lose you {{amount}} ISK on every unit.",
+        "matchThem": "Undercut to {{price}}",
+        "matchThemDetail": "Undercutting to {{price}} still leaves you {{amount}} ISK a unit after fees.",
         "raisePrice": "Put the price up",
-        "raisePriceDetail": "Every unit sells for {{amount}} ISK less than it cost you to make.",
+        "raisePriceDetail": "Every unit sells for {{amount}} ISK less than it cost you to make. Put it back up to {{price}}.",
         "leaveItAlone": "Leave it alone",
         "leaveItAloneDetail": "Nobody is cheaper here, and it sells for more than it cost you."
       },
@@ -3525,7 +3530,7 @@
       "exitsTitle": "Is there a better exit?",
       "exitHold": "Hold at {{price}}",
       "exitHoldSellsIn": "Hold at {{price}}, sells in {{days}}d",
-      "exitMatchStation": "Match the station at {{price}}",
+      "exitUndercutStation": "Undercut the station at {{price}}",
       "exitDumpToBuyOrder": "Dump into the best buy order at your station, {{price}}",
       "exitPerUnit": "{{amount}} / unit",
       "exitHaulTitle": "Haul to another trade hub",
@@ -3583,7 +3588,10 @@
       "scopeClear": "Nobody cheaper here",
       "quickAnswer": "Quick answer",
       "whoIsCheaper": "Who is cheaper, and where",
-      "floorWorking": "Where that price comes from"
+      "floorWorking": "Where that price comes from",
+      "outbidAt": "Outbid at {{price}}",
+      "copyPrice": "Copy {{price}}",
+      "priceCopied": "Copied to clipboard"
     },
     "emptySellBlueprintHint": "Copies of this blueprint are traded on contract, not on the market.",
     "searchBpcContracts": "Search BPC contracts"

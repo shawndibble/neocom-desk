@@ -13,8 +13,10 @@
  * floors differ by exactly that:
  * - HOLDING and DUMPING into a buy order pay sales tax only. The broker fee
  *   on the listing is already sunk, so `floor.fill` is the break-even.
- * - MATCHING is a price edit, which charges the broker fee a second time,
- *   so `floor.relist` is the break-even.
+ * - UNDERCUTTING (relisting one legal tick below the rival — see
+ *   `docs/context/decisions/`, superseding this file's old "matching"
+ *   wording) is a price edit, which charges the broker fee a second time, so
+ *   `floor.relist` is the break-even.
  * - REPROCESSING and selling the materials into the buy orders that already
  *   exist pays sales tax on that sale, and the broker fee on the listing you
  *   cancel is gone either way — so `floor.fill` again, against the material
@@ -27,8 +29,9 @@ import type { TradeHub } from '@/market/hubs';
 import type { ReprocessingType } from '@/sde/types';
 import { reprocessingValue, reprocessingYield } from '@/engine/industry/reprocessing';
 import { refiningEfficiency, type CharacterModifiers } from '@/engine/industry/characterModifiers';
+import { undercutPrice } from '@/engine/market/priceTick';
 
-export type OrderExitKind = 'hold' | 'matchStation' | 'dumpToBuyOrder' | 'reprocess';
+export type OrderExitKind = 'hold' | 'undercutStation' | 'dumpToBuyOrder' | 'reprocess';
 
 export interface OrderExit {
   kind: OrderExitKind;
@@ -121,11 +124,19 @@ export function orderExits({ row, competitors, reprocessing }: OrderExitsInput):
 
   const rivalPrice = row.deepUndercut?.byScope.station?.price ?? row.station.bestPrice;
   if (rivalPrice !== null && rivalPrice !== undefined && row.station.beatsMe) {
-    exits.push({
-      kind: 'matchStation',
-      price: rivalPrice,
-      netPerUnit: rivalPrice - row.floor.relist,
-    });
+    // The suggested price is one legal tick UNDER the rival, never a tie —
+    // EVE has not accepted a matching price since the March 2020 patch
+    // (issue #1421). `undercutPrice` returns null only once undercutting
+    // would fall below the 0.01 ISK minimum tick, which this exit has
+    // nothing honest to offer against.
+    const price = undercutPrice(rivalPrice);
+    if (price !== null) {
+      exits.push({
+        kind: 'undercutStation',
+        price,
+        netPerUnit: price - row.floor.relist,
+      });
+    }
   }
 
   const buyPrice = competitors ? bestLocalBuyPrice(row, competitors) : null;

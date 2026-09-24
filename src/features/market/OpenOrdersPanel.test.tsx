@@ -15,6 +15,9 @@ import { loadCorrectedSkills, type CorrectedSkills } from '@/features/skills/cor
 import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import type { MarketOrder } from '@/esi/endpoints';
 import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
+import { orderFloor } from '@/engine/market/orderFloor';
+import { roundPriceUp } from '@/engine/market/priceTick';
+import { formatIskAuto } from '@/lib/isk';
 
 vi.mock('./openOrdersData', () => ({ loadAllCharactersOpenOrders: vi.fn() }));
 vi.mock('./orderCostBasis', () => ({
@@ -470,6 +473,47 @@ describe('OpenOrdersPanel', () => {
 
     const belowFloorGroup = await screen.findByTestId('order-group-belowFloor');
     expect(within(belowFloorGroup).getByText('Never sell below')).toBeInTheDocument();
+  });
+
+  it('rounds the floor column up to a legal price, same as the modal, text only (issue #1421)', async () => {
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [BELOW_FLOOR_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    // unitCost 1000 (vs. BELOW_FLOOR_ORDER's 500 price) lands the exact
+    // break-even ("relist") at a fractional, non-legal price whose rounded-up
+    // figure changes even the whole-ISK digits shown (formatIskAuto drops to
+    // 0 decimals above 100 ISK) — a fixture where the fix is actually visible
+    // on screen, not just in the cents place.
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(1000)]]));
+
+    renderPanel();
+
+    const belowFloorGroup = await screen.findByTestId('order-group-belowFloor');
+    const floor = orderFloor({
+      unitCost: 1000,
+      remainingQuantity: BELOW_FLOOR_ORDER.volume_remain,
+      accountingLevel: 5,
+      brokerRelationsLevel: 5,
+      advancedBrokerRelationsLevel: 0,
+    });
+    if (!floor) throw new Error('expected a floor for this fixture');
+    const rounded = roundPriceUp(floor.relist) ?? floor.relist;
+    expect(formatIskAuto(rounded)).not.toBe(formatIskAuto(floor.relist));
+
+    // The column shows the rounded, legal figure — never the exact break-even.
+    expect(within(belowFloorGroup).getByText(formatIskAuto(rounded))).toBeInTheDocument();
+    expect(
+      within(belowFloorGroup).queryByText(formatIskAuto(floor.relist))
+    ).not.toBeInTheDocument();
   });
 
   it('drops the floor column once a filter narrows the visible rows to ones with no floor, even though a filtered-out row still has one', async () => {
