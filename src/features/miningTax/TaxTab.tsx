@@ -9,6 +9,7 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
   EmptyState,
+  FilterChip,
   IconButton,
   PageHeader,
   Panel,
@@ -1188,21 +1189,23 @@ export function TaxTab({ tabBar }: TaxTabProps) {
               Settled Payees are hidden from the Balances strip by default —
               a balance of zero is not a thing to act on. The control belongs
               with the other three filters rather than on the strip's own
-              label, and is a pressed/unpressed `Button` rather than a
-              checkbox so all four read as one row of the same control. Only
-              offered when hiding is actually doing something: with nothing
-              settled the toggle would change nothing on screen.
+              label, and is a `FilterChip` rather than a checkbox: a pressed
+              view toggle, drawn the way every other one in the app is. At
+              `sm` it shares the small `Button` dropdown triggers' height and
+              uppercase 11px type, so the row still reads as one control row —
+              and it stays off the accent fill, which here belongs to the
+              selection toolbar's Settle Up just below. Only offered when
+              hiding is actually doing something: with nothing settled the
+              toggle would change nothing on screen.
             */}
             {settledCount > 0 && (
-              <Button
+              <FilterChip
                 size="sm"
                 className="ml-auto"
-                variant={showSettled ? 'primary' : 'ghost'}
-                aria-pressed={showSettled}
-                onClick={() => setShowSettled(!showSettled)}
-              >
-                {t('miningTax.settledPayeesFilter')}
-              </Button>
+                label={t('miningTax.settledPayeesFilter')}
+                selected={showSettled}
+                onToggle={() => setShowSettled(!showSettled)}
+              />
             )}
           </div>
 

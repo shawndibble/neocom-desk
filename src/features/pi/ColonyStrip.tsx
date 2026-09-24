@@ -141,7 +141,7 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
       */}
       <span
         aria-hidden="true"
-        className="col-start-3 row-start-1 hidden items-center gap-0.5 justify-self-end rounded-xs border border-line-bright px-1.5 py-[3px] text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase group-hover:border-accent-dim group-hover:text-accent sm:col-start-5 sm:flex"
+        className="col-start-3 row-start-1 hidden items-center gap-0.5 justify-self-end rounded-xs border border-line-bright px-1.5 py-[3px] text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase group-hover:border-accent-dim group-hover:text-accent sm:col-start-5 sm:flex"
       >
         {t('piAdvisor.detailsAction')}
       </span>
@@ -163,7 +163,7 @@ function LockedRow({ level, total, atMax }: { level: number; total: number; atMa
   const { t } = useTranslation();
   return (
     <div className="flex items-center gap-2.5 border-t border-line px-3 py-2">
-      <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-line-bright px-1.5 text-[0.625rem] font-bold tracking-widest text-text-dim uppercase">
+      <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-line-bright px-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {t('piAdvisor.colonySlotLockedTag')}
       </span>
       <span className="min-w-0 text-xs text-text-dim">

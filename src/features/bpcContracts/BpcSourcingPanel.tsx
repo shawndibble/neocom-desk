@@ -1068,7 +1068,7 @@ export function BpcSourcingPanel() {
         header: t('bpcContracts.sourceColumn'),
         sortValue: (row) => row.source,
         render: (row) => (
-          <span className="inline-flex items-center rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+          <span className="inline-flex items-center rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
             {row.source === 'contract'
               ? t('bpcContracts.sourceContractSingular')
               : row.source === 'market'
