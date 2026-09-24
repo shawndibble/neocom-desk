@@ -761,6 +761,7 @@ const skillPlanSpec: CollectionSpec<SkillPlanRecord, RemotePlanDoc> = {
     // `number | null`, and null is a value Firestore stores happily.
     ...(p.whatIfImplants !== undefined ? { whatIfImplants: p.whatIfImplants } : {}),
     ...(p.booster !== undefined ? { booster: p.booster } : {}),
+    ...(p.milestones !== undefined ? { milestones: p.milestones } : {}),
     updatedAt: p.updatedAt,
     ownerHash,
     deleted: false,
@@ -775,6 +776,7 @@ const skillPlanSpec: CollectionSpec<SkillPlanRecord, RemotePlanDoc> = {
     ...(r.markerAttributes !== undefined ? { markerAttributes: r.markerAttributes } : {}),
     ...(r.whatIfImplants !== undefined ? { whatIfImplants: r.whatIfImplants } : {}),
     ...(r.booster !== undefined ? { booster: r.booster } : {}),
+    ...(r.milestones !== undefined ? { milestones: r.milestones } : {}),
     updatedAt: r.updatedAt,
   }),
   bulkPutLocal: (records) => db.skillPlans.bulkPut(records),

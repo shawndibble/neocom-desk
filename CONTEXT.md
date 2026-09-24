@@ -625,6 +625,21 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   the most urgent entry that depends on it — the plan's banded view and the
   optimizer's "suggest full reorder" both key off this effective value, not
   each entry's own raw setting.
+- **Plan Milestone**: A named goal ("Fly Loki") pinned to a Skill Plan entry's
+  skill level, not to its position — anchored by (skillTypeID, level) so it
+  survives a reorder or the plan's own "suggest full reorder" by construction
+  (`engine/skillPlanMilestones.ts`). Three states against the current **Skill
+  Plan schedule**: _projected_ (its step is still scheduled — the date is when
+  that step, and every prerequisite it needs, finishes training), _reached_
+  (the step is gone because the level is already trained), and _orphaned_ (the
+  step is gone and the level was never trained — usually because the entry
+  was removed, though a lowered target level or a catalog-unknown skill reach
+  it the same way; shown with a remove action rather than dropped silently).
+  The plan header shows only the soonest still-_projected_ one — an orphaned
+  goal has no date to rank by, so it never counts as "next." See
+  `docs/context/decisions/` for why this doesn't reuse **Remap Marker**
+  storage: a marker is an entry-list _position_, while a milestone means "when
+  these skills are done, wherever they end up."
 - **Plan Setup**: The folded block of a Build Plan's inputs — runs, ME/TE, build location, facility, rig, tax, trade hub, material price basis — read as a row of chips until "Edit setup" opens the controls. The same fields as before; only their default visibility changed (see docs/context/decisions, 2026-09-06 verdict-first).
 - **Production Log**: The cross-plan, cross-item realized-profit rollup
   (issue #525) — every **Production Run** the character has logged,

@@ -362,6 +362,23 @@
       "spUnknown": "Unknown until your total SP loads.",
       "none": "Your plan is already covered by unallocated SP — no injectors needed.",
       "alphaCaveat": "Alpha Clone injection limits differ from the numbers above."
+    },
+    "milestone": {
+      "addLabel": "Add milestone to {{name}}",
+      "addTitle": "Name this milestone",
+      "rename": "Rename",
+      "renameTitle": "Rename milestone",
+      "remove": "Remove",
+      "removeLabel": "Remove milestone {{name}}",
+      "menuLabel": "Milestone actions for {{name}}",
+      "next": "Next milestone",
+      "projected": "Projected",
+      "reached": "Reached",
+      "orphaned": "Entry removed",
+      "orphanedNotice": "{{name}} — entry removed from plan",
+      "namePlaceholder": "Goal name (e.g. \"Fly Loki\")",
+      "save": "Save",
+      "cancel": "Cancel"
     }
   },
   "skillCompare": {

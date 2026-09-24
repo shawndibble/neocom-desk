@@ -52,6 +52,10 @@ const defaultProps = {
   onEditMarker: noop,
   onSetPriority: noop,
   onPromotePrereq: noop,
+  milestoneStatusFor: () => undefined,
+  onAddMilestone: noop,
+  onRenameMilestone: noop,
+  onRemoveMilestone: noop,
 };
 
 /** jsdom's default `window.matchMedia` never matches, so EntryList renders its narrow (below-`md`) layout by default; mock it to exercise the desktop layout. */
@@ -593,7 +597,10 @@ describe('EntryList one row per level', () => {
       try {
         render(<EntryList rows={[entryRow(1, [0], [4])]} bandsAt={new Map()} {...defaultProps} />);
         expect(screen.getByText(/^Skill 1 IV$/)).toBeInTheDocument();
-        expect(screen.queryByRole('button', { expanded: false })).toBeNull();
+        // The retired per-level disclosure (#254) is gone outright, not just
+        // hidden — unlike the row's own legitimate menus (priority, Plan
+        // Milestone), there is no "levels trained" list left for anything to
+        // disclose.
         expect(screen.queryByRole('list', { name: /levels trained/i })).toBeNull();
       } finally {
         restore();
@@ -631,5 +638,73 @@ describe('EntryList one row per level', () => {
     const rows = screen.getAllByRole('listitem');
     expect(within(rows[0]).queryByRole('img', { name: /booster/i })).toBeNull();
     expect(within(rows[1]).getByRole('img', { name: /booster/i })).toBeInTheDocument();
+  });
+});
+
+describe('EntryList Plan Milestones (CONTEXT.md)', () => {
+  it("offers Add milestone on a row with none, anchored to that row's skill and level", async () => {
+    const user = userEvent.setup();
+    const added: Array<[number, number]> = [];
+    render(
+      <EntryList
+        rows={[entryRow(1, [0], [4])]}
+        bandsAt={new Map()}
+        {...defaultProps}
+        onAddMilestone={(skillTypeID, targetLevel) => added.push([skillTypeID, targetLevel])}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /add milestone to skill 1 iv/i }));
+    expect(added).toEqual([[1, 4]]);
+  });
+
+  it('shows the milestone badge and offers Rename/Remove once one is anchored', async () => {
+    const user = userEvent.setup();
+    const finish = new Date('2026-09-01T00:00:00Z');
+    const renamed: string[] = [];
+    const removed: string[] = [];
+    render(
+      <EntryList
+        rows={[entryRow(1, [0], [4])]}
+        bandsAt={new Map()}
+        {...defaultProps}
+        milestoneStatusFor={() => ({
+          milestone: { id: 'm1', name: 'Fly Loki', skillTypeID: 1, level: 4 },
+          state: 'projected',
+          finish,
+        })}
+        onRenameMilestone={(id) => renamed.push(id)}
+        onRemoveMilestone={(id) => removed.push(id)}
+      />
+    );
+
+    expect(screen.getByText('Fly Loki')).toBeInTheDocument();
+    expect(screen.getByText(formatLocalDate(finish))).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /milestone actions for skill 1 iv/i }));
+    await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    expect(renamed).toEqual(['m1']);
+
+    await user.click(screen.getByRole('button', { name: /milestone actions for skill 1 iv/i }));
+    await user.click(screen.getByRole('menuitem', { name: 'Remove' }));
+    expect(removed).toEqual(['m1']);
+  });
+
+  it('reads Reached instead of a date once the goal is already trained', () => {
+    render(
+      <EntryList
+        rows={[entryRow(1, [0], [4])]}
+        bandsAt={new Map()}
+        {...defaultProps}
+        milestoneStatusFor={() => ({
+          milestone: { id: 'm1', name: 'Fly Loki', skillTypeID: 1, level: 4 },
+          state: 'reached',
+          finish: null,
+        })}
+      />
+    );
+
+    expect(screen.getByText('Fly Loki')).toBeInTheDocument();
+    expect(screen.getByText('Reached')).toBeInTheDocument();
   });
 });
