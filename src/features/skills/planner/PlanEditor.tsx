@@ -467,6 +467,7 @@ export function PlanEditor({
           markerAttributes: plan.markerAttributes,
           whatIfImplants: plan.whatIfImplants,
           booster: plan.booster,
+          boosters: plan.boosters,
         },
         {
           catalog,
@@ -485,6 +486,7 @@ export function PlanEditor({
       plan.markerAttributes,
       plan.whatIfImplants,
       plan.booster,
+      plan.boosters,
       catalog,
       trainedSkills,
       queueEntries,
