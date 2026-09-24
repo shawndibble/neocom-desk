@@ -530,6 +530,9 @@ describe('BpcSourcingPanel', () => {
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('listbox', { name: 'Matching blueprints' })).not.toBeInTheDocument();
     expect(screen.getByPlaceholderText('Search blueprint name…')).toHaveValue('Rifter');
+
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('listbox', { name: 'Matching blueprints' })).toBeInTheDocument();
   });
 
   it('summarises one blueprint once it is picked from the suggestions', async () => {

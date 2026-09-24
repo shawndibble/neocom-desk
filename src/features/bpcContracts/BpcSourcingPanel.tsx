@@ -734,7 +734,14 @@ export function BpcSourcingPanel() {
       : null;
 
   function handleSuggestionKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (openSuggestions === null) return;
+    // ArrowDown brings an Escape-dismissed list back, as a combobox does.
+    if (openSuggestions === null) {
+      if (e.key === 'ArrowDown' && suggestionsDismissed && suggestions.length > 0) {
+        e.preventDefault();
+        setSuggestionsDismissed(false);
+      }
+      return;
+    }
     switch (e.key) {
       case 'ArrowDown':
       case 'ArrowUp':

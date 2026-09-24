@@ -208,6 +208,17 @@ describe('OrderDetailModal', () => {
     expect(regionRow).toHaveTextContent('Nobody cheaper here');
   });
 
+  it('exposes "Who is cheaper" as a table with column and row headers', () => {
+    const deep: RegionCompetition = { competitors: [], fetchedAt: Date.now(), truncated: false };
+    renderModal({ row: BASE_ROW, deep, stationChecked: true });
+    expandAll();
+
+    const table = screen.getByRole('table', { name: 'Who is cheaper, and where' });
+    expect(within(table).getAllByRole('columnheader')).toHaveLength(5);
+    expect(within(table).getByRole('columnheader', { name: 'How close' })).toBeInTheDocument();
+    expect(within(table).getByRole('rowheader', { name: 'Region' })).toBeInTheDocument();
+  });
+
   it('shows a rival price and jump count for a checked, beaten region scope', () => {
     // Deliberately not the row's own `problem`/badge, so the "Region" text in
     // this section can't be confused with a "Region" scope-distance badge in
