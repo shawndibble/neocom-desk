@@ -16,22 +16,26 @@ import type { ColonyStatus } from '@/engine/pi/types';
 import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
 import type { IndustryJob } from '@/esi/endpoints';
 import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { loadAllColonyDetails, loadCharacterPlanets } from '@/features/pi/data';
+import { loadPlanetName } from '@/features/pi/names';
+import { extractorProgramsFromPins } from '@/features/pi/adapters';
+import { loadTypeNames } from '@/features/character/typeNames';
 
 /*
- * The fetch layers below are `import()`ed inside the loaders that use them,
- * not at the top of this file, and that is about the *landing route*.
+ * `Overview` is the landing route and stays in the entry chunk (every other
+ * route is code-split, `app/routeChunks.ts`), so anything this module names
+ * statically is in the first paint's graph. Two rules follow:
  *
- * `Overview` is imported eagerly by `App.tsx` — it is what the app opens on —
- * so anything this module names statically lands in the graph the browser must
- * pull and the dev server must transform before the first paint of any page,
- * login included. Two of these chains are large out of proportion to what the
- * board shows: `miningTax/snapshot` reaches the ledger, payees, assignments,
- * reconciliation and `sde/loadSde` for two numbers, and `pi/data` reaches the
- * colony detail fan-out for four rows.
- *
- * Every one of them is already behind an `async` loader that runs after mount,
- * so deferring costs nothing at the point of use — the card was going to wait
- * for a network round trip anyway.
+ * - The PI fetch layer (`pi/data`, `pi/names`, `pi/adapters`) and
+ *   `character/typeNames` are imported statically. The boot graph already
+ *   holds them � `app/prefetch.ts`, the notification poller and the Calendar
+ *   route warmer all name them � so an `import()` here cannot move them out
+ *   of the entry chunk; Rollup reports it as an ineffective dynamic import.
+ * - `miningTax/snapshot` stays behind `import()`. It reaches the ledger,
+ *   payees, assignments, reconciliation and `sde/loadSde` for two numbers,
+ *   and its only other importer is the code-split Mining page, so deferring
+ *   it genuinely keeps that chain off the first paint. The card was going to
+ *   wait for a network round trip anyway.
  */
 
 // --- Planetary ------------------------------------------------------------
@@ -76,7 +80,6 @@ export async function loadPlanetaryBoard(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<PlanetaryBoardData> {
-  const { loadAllColonyDetails, loadCharacterPlanets } = await import('@/features/pi/data');
   const { cached, needsReauth } = await loadCharacterPlanets(characterId);
   const loadedAt = Date.now();
   const planets = cached?.data ?? [];
@@ -89,10 +92,6 @@ export async function loadPlanetaryBoard(
   };
   if (signal.cancelled || planets.length === 0) return base;
 
-  const [{ loadPlanetName }, { extractorProgramsFromPins }] = await Promise.all([
-    import('@/features/pi/names'),
-    import('@/features/pi/adapters'),
-  ]);
   const [details, names] = await Promise.all([
     loadAllColonyDetails(
       characterId,
@@ -190,10 +189,7 @@ export async function loadIndustryBoard(characterId: number): Promise<IndustryBo
   // Blueprint id as the fallback: research and copying jobs have no product,
   // and "Ishtar Blueprint" is still the right thing to call that row.
   const typeIds = jobs.map((job) => job.product_type_id ?? job.blueprint_type_id);
-  const names =
-    typeIds.length > 0
-      ? await import('@/features/character/typeNames').then((m) => m.loadTypeNames(typeIds))
-      : new Map<number, string>();
+  const names = typeIds.length > 0 ? await loadTypeNames(typeIds) : new Map<number, string>();
   const productNames = new Map<number, string>();
   for (const job of jobs) {
     const name = names.get(job.product_type_id ?? job.blueprint_type_id);
