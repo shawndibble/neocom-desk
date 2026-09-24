@@ -8,10 +8,11 @@
  * on close (Radix popovers and `Modal`'s children do) gets a fresh read of the
  * saved target each time it opens, with no sync effect.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  FieldError,
   Select,
   SelectContent,
   SelectItem,
@@ -45,6 +46,8 @@ export function PriceAlertForm({
   const { t } = useTranslation();
   const [direction, setDirection] = useState<'above' | 'below'>(targetDirection ?? 'above');
   const [text, setText] = useState(targetPrice !== undefined ? formatIsk(targetPrice) : '');
+  const [error, setError] = useState(false);
+  const errorId = useId();
   const hasTarget = targetPrice !== undefined && targetDirection !== undefined;
 
   // The hub the alert polls (`priceAlertDomain` → the synced Settings default),
@@ -69,7 +72,10 @@ export function PriceAlertForm({
 
   function handleSave() {
     const amount = parseIskAmount(text);
-    if (amount === null || amount <= 0) return;
+    if (amount === null || amount <= 0) {
+      setError(true);
+      return;
+    }
     onSave({ price: Math.round(amount), direction });
     onClose();
   }
@@ -95,9 +101,15 @@ export function PriceAlertForm({
           inputMode="decimal"
           autoFocus
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          aria-invalid={error}
+          aria-describedby={error ? errorId : undefined}
+          onChange={(e) => {
+            setText(e.target.value);
+            setError(false);
+          }}
         />
       </label>
+      {error && <FieldError id={errorId}>{t('market.priceAlert.invalidPrice')}</FieldError>}
       <Select value={direction} onValueChange={(value) => setDirection(value as typeof direction)}>
         <SelectTrigger size="sm" aria-label={t('market.priceAlert.directionLabel')}>
           <SelectValue />

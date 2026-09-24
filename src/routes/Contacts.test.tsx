@@ -299,6 +299,23 @@ describe('Contacts', () => {
       expect(table.getAllByText('1 of 2').length).toBe(4);
     });
 
+    // Which characters hold the contact is only in the count's tooltip, so the
+    // count has to take keyboard focus to open it (WCAG 2.1.1).
+    it('names the characters missing a contact when its count takes keyboard focus', async () => {
+      await addSecondCharacter();
+      await cacheSecondCharacterContacts([contactsPayload[0]]);
+      render(<App />);
+      await screen.findByText('Good Friend');
+
+      fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+
+      const table = within(await screen.findByRole('table', { name: /across/i }));
+      const count = table.getAllByText('1 of 2')[0]!;
+      expect(count).toHaveAttribute('tabindex', '0');
+      fireEvent.focus(count);
+      expect(screen.getByRole('tooltip')).toHaveTextContent('Not a contact of: Pilot Two');
+    });
+
     it('narrows to the contacts the characters do not agree on', async () => {
       await addSecondCharacter();
       await cacheSecondCharacterContacts([contactsPayload[0]]);

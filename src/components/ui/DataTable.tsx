@@ -413,6 +413,9 @@ export function DataTable<T>({
         onKeyDown={
           onRowClick || expandableRow
             ? (event) => {
+                // Only the row's own keys: a focused control inside it (a
+                // tooltip trigger, a link) keeps its Enter/Space to itself.
+                if (event.target !== event.currentTarget) return;
                 if (event.key !== 'Enter' && event.key !== ' ') return;
                 event.preventDefault();
                 activate();

@@ -441,6 +441,17 @@ describe('DataTable', () => {
       expect(onRowClick).toHaveBeenCalledWith(rows[0]);
     });
 
+    // A focusable control inside the row (a tooltip trigger, a link) owns its
+    // own Enter/Space; the row must not also activate from the bubbled key.
+    it('ignores Enter/Space bubbling up from something focused inside the row', () => {
+      const onRowClick = vi.fn();
+      renderTable({ onRowClick });
+      const [cell] = screen.getAllByRole('cell');
+      fireEvent.keyDown(cell!, { key: 'Enter' });
+      fireEvent.keyDown(cell!, { key: ' ' });
+      expect(onRowClick).not.toHaveBeenCalled();
+    });
+
     it('leaves rows non-focusable when no row click handler is wired up', () => {
       renderTable();
       const [, firstRow] = screen.getAllByRole('row');

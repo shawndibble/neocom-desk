@@ -72,10 +72,9 @@ interface StandingIconProps {
  * exact number never disappears: it is in the accessible name and the
  * tooltip, e.g. "Excellent standing (10)".
  *
- * `role="img"` with a tooltip rather than a focusable trigger, following
- * `NotificationsPanel`'s badge: the meaning has to reach a screen reader, but
- * a tab stop on every row of a long contact list costs more than the tag is
- * worth.
+ * `role="img"`, and a tab stop: the number is in the accessible name for a
+ * screen reader, but a sighted keyboard reader only gets it from the tooltip,
+ * which opens on focus the way it opens on hover (WCAG 2.1.1).
  */
 export function StandingIcon({ value, label, className = '' }: StandingIconProps) {
   const { t } = useTranslation();
@@ -89,7 +88,12 @@ export function StandingIcon({ value, label, className = '' }: StandingIconProps
     });
   return (
     <Tooltip content={resolvedLabel} openOnTap>
-      <span role="img" aria-label={resolvedLabel} className={`inline-flex shrink-0 ${className}`}>
+      <span
+        role="img"
+        aria-label={resolvedLabel}
+        tabIndex={0}
+        className={`inline-flex shrink-0 focus-visible:outline-2 focus-visible:outline-accent ${className}`}
+      >
         <svg
           viewBox="0 0 9 9"
           width="1rem"

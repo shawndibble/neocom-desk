@@ -104,6 +104,9 @@ interface SourcingInputProps {
    * association, so this id changes nothing a screen reader announces.
    */
   id?: string;
+  /** Marks the field invalid and ties it to `describedBy`'s error text (issue #1488). */
+  invalid?: boolean;
+  describedBy?: string;
   parse: (raw: string) => number | undefined;
   onCommit: (value: number | undefined) => void;
 }
@@ -133,6 +136,8 @@ export function SourcingInput({
   widthClassName,
   placeholder,
   id,
+  invalid,
+  describedBy,
   parse,
   onCommit,
 }: SourcingInputProps) {
@@ -141,6 +146,8 @@ export function SourcingInput({
   return (
     <TextInput
       id={id}
+      aria-invalid={invalid}
+      aria-describedby={describedBy}
       size="sm"
       type="text"
       inputMode={inputMode}

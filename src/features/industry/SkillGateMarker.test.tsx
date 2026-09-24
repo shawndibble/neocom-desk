@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { SkillGateMarker } from './SkillGateMarker';
@@ -64,5 +64,29 @@ describe('SkillGateMarker', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('Industry — → V')).toBeInTheDocument();
     expect(screen.getByText('Best on Vex Kado')).toBeInTheDocument();
+  });
+
+  // The shortfall rows and the best character are nowhere but the tooltip, so
+  // a keyboard has to be able to open it (WCAG 2.1.1).
+  it('takes keyboard focus and reveals the shortfall there', () => {
+    const verdict: SkillGateVerdict = {
+      gated: true,
+      shortfall: [{ typeID: 3380, haveLevel: 2, needLevel: 5 }],
+      bestCharacterId: 7,
+    };
+    render(
+      <SkillGateMarker
+        verdict={verdict}
+        nameForSkill={nameForSkill}
+        nameForCharacter={nameForCharacter}
+      />
+    );
+    const marker = screen.getByRole('img');
+    expect(marker).toHaveAttribute('tabindex', '0');
+    fireEvent.focus(marker);
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Industry II → V');
+    expect(tooltip).toHaveTextContent('Best on Vex Kado');
+    expect(marker).toHaveAttribute('aria-describedby', tooltip.id);
   });
 });
