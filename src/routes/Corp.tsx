@@ -531,7 +531,7 @@ export function Corp() {
 
   // Reached the URL without the access for it. A bare explanation, not the
   // section's shell drawn over nothing — that would be a lock, and corp UI
-  // hides rather than locks (CONTEXT.md round 35). Settings' Corp access row is
+  // hides rather than locks (CONTEXT.md round 35). Settings' Corporation permission row is
   // where the two-axis gate is actually explained and, where possible, fixed.
   if (gate.status === 'denied') {
     return (

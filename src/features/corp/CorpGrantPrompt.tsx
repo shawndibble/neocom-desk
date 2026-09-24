@@ -14,7 +14,7 @@
  * granting makes the prompt moot for the current group, and declining must
  * not be re-litigated on the next boot for that same group. If the group
  * grows later (round 41), the recorded offer no longer covers it and the
- * prompt is eligible again — the Settings Corp access row is the durable path
+ * prompt is eligible again — the Settings Corporation permission row is the durable path
  * back regardless.
  */
 import { useEffect } from 'react';

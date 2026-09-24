@@ -1,7 +1,7 @@
 // Kicks off EVE SSO: stash PKCE state, then leave the app for login.eveonline.com.
 import { startLogin, scopesForRetry, takeRetryBudget } from '@/auth/session';
-import { SCOPES, scopesForGroup } from '@/esi/scopes';
-import type { ScopeGroup } from '@/esi/registry';
+import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
+import type { Scope, ScopeGroup } from '@/esi/registry';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { assignLocation } from './navigation';
@@ -20,7 +20,8 @@ export interface EveLoginOptions {
 }
 
 /**
- * The scope set to ask SSO for: the base `SCOPES`, plus any requested group,
+ * The scope set to ask SSO for: `base` (the Base Grant unless a caller names
+ * a narrower one), plus any requested group,
  * plus `characterId`'s own stored grant when there is a Character to union
  * with. `null` means there is not — see the two branches on the exported
  * functions below.
@@ -32,21 +33,25 @@ export interface EveLoginOptions {
  */
 async function requestedScopes(
   characterId: number | null,
-  groups: readonly ScopeGroup[]
+  groups: readonly ScopeGroup[],
+  base: readonly Scope[] = SCOPES
 ): Promise<string[]> {
-  const base = [...SCOPES, ...groups.flatMap((group) => [...scopesForGroup(group)])];
-  if (characterId === null) return [...new Set(base)];
+  const requested = groups.flatMap((group) => [...scopesForGroup(group)]);
+  if (characterId === null) return [...new Set([...base, ...requested])];
   try {
     const token = await db.tokens.get(characterId);
     // `?? []` as everywhere else that reads a stored grant (app/prefetch.ts,
     // app/useGrantedScopes.ts): `scopes` post-dates the table, so a record
     // written before it exists has no such field however the type reads.
-    return [...new Set([...base, ...(token?.scopes ?? [])])];
+    return [...new Set([...base, ...requested, ...(token?.scopes ?? [])])];
   } catch {
     // A broken Dexie may cost the user their cache; it must never cost them
     // their way back in — nor turn a Grant press into a plain re-auth, which
-    // is why the requested group is already in `base`.
-    return [...new Set(base)];
+    // is why the requested group is still asked for. The fallback is the full
+    // Base Grant even for a narrower `base`: EVE issues a token carrying
+    // exactly what was requested, so guessing low would silently strip every
+    // Permission this Character held.
+    return [...new Set([...SCOPES, ...requested])];
   }
 }
 
@@ -55,7 +60,7 @@ async function requestedScopes(
  * the two branches incremental auth splits login into (issue #295).
  *
  * Every caller is pressed from a Character context: a `ReauthBanner`, the
- * `AuthFailureNotice`, a `ScopeGate`, the Settings Corp access row, the corp
+ * `AuthFailureNotice`, a `ScopeGate`, the Settings Corporation permission row, the corp
  * grant prompt. So the request unions with that Character's stored grant, and
  * asking for less would quietly throw away a grant they already made — EVE
  * issues a token carrying exactly what was requested, so the loss is real.
@@ -70,6 +75,18 @@ async function requestedScopes(
 export async function beginEveLogin(options: EveLoginOptions = {}): Promise<void> {
   const characterId = options.characterId ?? useActiveCharacter.getState().activeCharacterId;
   assignLocation(await startLogin(await requestedScopes(characterId, options.groups ?? [])));
+}
+
+/**
+ * Grant one Permission to a known Character — the Settings Permissions
+ * section's Grant button (#1524). Asks for the Character's stored grant plus
+ * the Core Grant plus `group`, never the whole Base Grant: a Character who
+ * customized Permissions away at sign-in would otherwise be re-asked for every
+ * one of them to get the one they pressed Grant on.
+ */
+export async function beginGrantPermission(group: ScopeGroup, characterId?: number): Promise<void> {
+  const id = characterId ?? useActiveCharacter.getState().activeCharacterId;
+  assignLocation(await startLogin(await requestedScopes(id, [group], CORE_GRANT)));
 }
 
 /**

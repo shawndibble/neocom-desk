@@ -2,14 +2,14 @@ import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } 
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { db, type TokenRecord } from '@/db';
-import { SCOPES, revokedScopes, scopesForGroup } from '@/esi/scopes';
+import { CORE_GRANT, SCOPES, revokedScopes, scopesForGroup } from '@/esi/scopes';
 import { completeLogin } from '@/auth/session';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 const { assignLocation } = vi.hoisted(() => ({ assignLocation: vi.fn<(url: string) => void>() }));
 vi.mock('./navigation', () => ({ assignLocation }));
 
-import { beginAddCharacterLogin, beginEveLogin } from './loginFlow';
+import { beginAddCharacterLogin, beginEveLogin, beginGrantPermission } from './loginFlow';
 
 const CHAR_ID = 2112625428;
 const OTHER_CHAR_ID = 90000001;
@@ -162,7 +162,7 @@ describe('beginAddCharacterLogin', () => {
 
 // ---------------------------------------------------------------------------
 // Branch 2 — a known character. Every entry point here is initiated from a
-// character context (the Settings Corp access row, the role-gain prompt, the
+// character context (the Settings Corporation permission row, the role-gain prompt, the
 // ReauthBanner), so the grant to union with *is* knowable, and asking for less
 // than it would throw away a grant the character already made.
 // ---------------------------------------------------------------------------
@@ -299,5 +299,55 @@ describe('beginEveLogin: a broken Dexie', () => {
 
     get.mockRestore();
     expect(requestedScopes()).toEqual(expect.arrayContaining([...scopesForGroup('corp')]));
+  });
+});
+
+/**
+ * The Settings Permissions section's Grant (#1524): the stored grant, plus the
+ * Core Grant, plus that one Permission — never the whole Base Grant, which
+ * would re-ask for every Permission the user customized away.
+ */
+describe('beginGrantPermission', () => {
+  it('asks for the Core Grant plus the Permission, not the Base Grant', async () => {
+    await seedGrant(CHAR_ID, [...CORE_GRANT]);
+
+    await beginGrantPermission('mail', CHAR_ID);
+
+    expect(requestedScopes().sort()).toEqual([...CORE_GRANT, ...scopesForGroup('mail')].sort());
+    expect(requestedScopes()).not.toContain(scopesForGroup('wallet')[0]);
+  });
+
+  it('keeps everything the Character already granted', async () => {
+    await seedGrant(CHAR_ID, [...CORE_GRANT, ...scopesForGroup('wallet')]);
+
+    await beginGrantPermission('corp', CHAR_ID);
+
+    const requested = requestedScopes();
+    for (const scope of scopesForGroup('wallet')) expect(requested, scope).toContain(scope);
+    for (const scope of scopesForGroup('corp')) expect(requested, scope).toContain(scope);
+    expect(requested).toEqual([...new Set(requested)]);
+  });
+
+  it('defaults to the active Character', async () => {
+    useActiveCharacter.setState({ activeCharacterId: CHAR_ID });
+    await seedGrant(CHAR_ID, [...CORE_GRANT, EXTRA_SCOPE]);
+
+    await beginGrantPermission('mail');
+
+    expect(requestedScopes()).toContain(EXTRA_SCOPE);
+  });
+
+  it('falls back to the Base Grant plus the Permission when the stored grant cannot be read', async () => {
+    // Core + Permission alone would come back as a token carrying exactly
+    // that, silently narrowing a fully granted Character to a handful of
+    // pages. Over-asking once is the recoverable mistake.
+    const get = vi.spyOn(db.tokens, 'get').mockRejectedValue(new Error('store closed'));
+
+    await beginGrantPermission('corp', CHAR_ID);
+
+    get.mockRestore();
+    expect(requestedScopes().sort()).toEqual(
+      [...new Set([...SCOPES, ...scopesForGroup('corp')])].sort()
+    );
   });
 });
