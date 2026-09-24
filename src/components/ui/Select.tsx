@@ -35,7 +35,7 @@ export function SelectTrigger({ className, children, size = 'md', ...props }: Se
       className={cx(
         fieldBaseClassName,
         fieldSizeClassName[size],
-        'flex items-center justify-between gap-2 outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[placeholder]:text-text-dim',
+        'flex items-center justify-between gap-2 data-[disabled]:pointer-events-none data-[disabled]:opacity-40 data-[placeholder]:text-text-dim',
         // The trigger is a fixed-height control, so a label a few pixels wider
         // than the box must not wrap — two lines of text overflow the height
         // rather than growing it. Callers size these to their known options, but
