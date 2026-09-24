@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, Tabs, type TabItem } from '@/components/ui';
+import { fieldBaseClassName } from '@/components/ui/controlStyles';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import { readFromClipboard } from '@/lib/clipboard';
 import type { PlanXmlDocumentErrorCode } from './planXmlDocument';
@@ -154,7 +155,7 @@ export function ImportClipboardDialog({
                 setPreview(null);
               }}
               rows={8}
-              className="w-full rounded-xs border border-line bg-panel-2 p-2 text-xs text-text"
+              className={`${fieldBaseClassName} w-full p-2 text-xs`}
             />
 
             <div className="flex flex-wrap items-center gap-2">
