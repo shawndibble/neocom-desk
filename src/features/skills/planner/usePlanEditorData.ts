@@ -11,17 +11,10 @@ import {
   type CachedResult,
 } from '@/features/skills/data';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { DEFAULT_ATTRIBUTES } from './planSchedule';
 import { remapAvailability, type RemapAvailability } from './remapAvailability';
 import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
 import type { CharacterAttributes, SkillQueueEntry } from '@/esi/endpoints';
-
-const DEFAULT_ATTRIBUTES: Attributes = {
-  intelligence: 20,
-  memory: 20,
-  perception: 20,
-  willpower: 20,
-  charisma: 19,
-};
 
 export interface PlanEditorData {
   catalog: SkillCatalog | null;

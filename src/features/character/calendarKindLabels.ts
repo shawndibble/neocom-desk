@@ -14,4 +14,5 @@ export const KIND_LABEL: Record<CharacterBoardItemKind, string> = {
   planetExtraction: 'calendar.kind.planetExtraction',
   contractExpiry: 'calendar.kind.contractExpiry',
   orderExpiry: 'calendar.kind.orderExpiry',
+  skillPlan: 'calendar.kind.skillPlan',
 };
