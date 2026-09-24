@@ -498,6 +498,13 @@ describe('PlanEditor tools pane', () => {
     ).toBeInTheDocument();
   });
 
+  it('Your entries header carries no total or finish readout (#1414)', () => {
+    renderEditor(vi.fn());
+    const header = screen.getByRole('heading', { name: 'Your entries' }).parentElement!;
+    expect(within(header).queryByText(/Finishes/)).not.toBeInTheDocument();
+    expect(header.textContent).toBe('Your entries');
+  });
+
   it('starts the plan when the live queue ends and shows the queue as a collapsed lead line (#1403)', () => {
     renderEditor(vi.fn(), {
       queueEntries: [
@@ -510,7 +517,7 @@ describe('PlanEditor tools pane', () => {
         },
       ],
     });
-    expect(screen.getByText(/Finishes 2099-01-0/)).toBeInTheDocument();
+    expect(screen.getAllByText(/^2099-01-0/).length).toBeGreaterThan(0);
     expect(screen.getByText(/In-game queue: 1 skill, finishes 2099-01-0/)).toBeInTheDocument();
   });
 
