@@ -30,6 +30,21 @@ describe('MarketItemLink', () => {
     );
   });
 
+  it('forces the given hub even when the current page has a different region', () => {
+    render(
+      <MemoryRouter initialEntries={['/market?region=10000002']}>
+        <MarketItemLink typeId={9899} hubId="amarr">
+          Ocular Filter - Basic
+        </MarketItemLink>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('link', { name: 'Ocular Filter - Basic' })).toHaveAttribute(
+      'href',
+      '/market/browser?type=9899&hub=amarr'
+    );
+  });
+
   it('shows a visible focus ring when focused via keyboard', () => {
     render(
       <MemoryRouter initialEntries={['/wallet']}>

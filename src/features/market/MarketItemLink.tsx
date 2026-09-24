@@ -7,6 +7,14 @@ interface MarketItemLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElemen
   children: ReactNode;
   /** Replaces the default inline-link look, e.g. to draw it as a button. */
   className?: string;
+  /**
+   * Force the link to this trade hub, overriding whatever region/hub the
+   * current URL already carries (#1463). For a caller pricing at a hub of
+   * its own — e.g. a Planetary Industry plan's saved trade hub — inheriting
+   * the Market Browser's current location would silently show a different
+   * price than the one already on screen.
+   */
+  hubId?: string;
 }
 
 /**
@@ -18,9 +26,15 @@ interface MarketItemLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElemen
  * Extra anchor props (and `ref`) pass through to the `Link`, so a `Tooltip`
  * trigger (`asChild`) can wrap it and have its handlers land on the anchor.
  */
-export function MarketItemLink({ typeId, children, className, ...rest }: MarketItemLinkProps) {
+export function MarketItemLink({
+  typeId,
+  children,
+  className,
+  hubId,
+  ...rest
+}: MarketItemLinkProps) {
   const location = useLocation();
-  const params = marketLinkParams(typeId, location.search);
+  const params = marketLinkParams(typeId, location.search, hubId);
   return (
     <Link
       {...rest}

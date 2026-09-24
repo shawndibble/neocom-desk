@@ -91,7 +91,20 @@ export function resolveAgainstCatalogue<T>(
  * with neither (e.g. Skills' implant chips, #405) gets just the typeId, same
  * as opening `/market?type=…` fresh.
  */
-export function marketLinkParams(typeId: number, currentSearch: string): Record<string, string> {
+/**
+ * `forcedHubId`, when given, wins over whatever region/hub the current URL
+ * already carries (issue #1463): a caller pricing at a hub of its own — e.g.
+ * a Planetary Industry plan's saved trade hub — must not have that silently
+ * swapped for the Market Browser's current location, which can show a
+ * different price than the one already on screen.
+ */
+export function marketLinkParams(
+  typeId: number,
+  currentSearch: string,
+  forcedHubId?: string
+): Record<string, string> {
+  if (forcedHubId !== undefined)
+    return buildMarketParams(typeId, { mode: 'hub', hubId: forcedHubId });
   const parsed = parseMarketParams((key) => new URLSearchParams(currentSearch).get(key));
   if (parsed.regionId !== null)
     return buildMarketParams(typeId, { mode: 'region', regionId: parsed.regionId });
