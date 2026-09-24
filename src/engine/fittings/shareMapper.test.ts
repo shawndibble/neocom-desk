@@ -1,0 +1,72 @@
+import { describe, expect, it } from 'vitest';
+import { encodeFittingShare, decodeFittingShare } from '@/engine/fitting/fittingShare';
+import { fittingToShareInput, shareToFitting } from './shareMapper';
+import type { Fitting } from './types';
+
+function fitting(overrides: Partial<Fitting> = {}): Fitting {
+  return {
+    name: 'Rifter',
+    shipTypeId: 587,
+    modules: [],
+    drones: [],
+    cargo: [],
+    ...overrides,
+  };
+}
+
+describe('fittingToShareInput / shareToFitting', () => {
+  it('round-trips a plain hull with no items', () => {
+    const original = fitting();
+    const restored = shareToFitting(fittingToShareInput(original), original.name);
+    expect(restored).toEqual(original);
+  });
+
+  it('round-trips modules across every slot category, including a loaded charge', () => {
+    const original = fitting({
+      modules: [
+        { slot: 'high', slotIndex: 0, typeId: 2456, state: 'active', chargeTypeId: 12608 },
+        { slot: 'medium', slotIndex: 1, typeId: 439, state: 'online' },
+        { slot: 'low', slotIndex: 0, typeId: 2046, state: 'online' },
+        { slot: 'rig', slotIndex: 0, typeId: 31105, state: 'online' },
+        { slot: 'subsystem', slotIndex: 0, typeId: 32396, state: 'online' },
+      ],
+    });
+    const restored = shareToFitting(fittingToShareInput(original), original.name);
+    expect(restored).toEqual(original);
+  });
+
+  it('round-trips a fully-active drone stack and a bay-only stack', () => {
+    const original = fitting({
+      drones: [
+        { typeId: 2454, quantity: 3, state: 'active' },
+        { typeId: 2456, quantity: 2, state: 'online' },
+      ],
+    });
+    const restored = shareToFitting(fittingToShareInput(original), original.name);
+    expect(restored).toEqual(original);
+  });
+
+  it('round-trips cargo', () => {
+    const original = fitting({ cargo: [{ typeId: 12608, quantity: 50 }] });
+    const restored = shareToFitting(fittingToShareInput(original), original.name);
+    expect(restored).toEqual(original);
+  });
+
+  it('round-trips through the real encode/decode codec, name aside (the payload never carries it)', async () => {
+    const original = fitting({
+      shipTypeId: 587,
+      modules: [{ slot: 'high', slotIndex: 0, typeId: 2456, state: 'active' }],
+      drones: [{ typeId: 2454, quantity: 1, state: 'active' }],
+    });
+
+    const encoded = await encodeFittingShare(fittingToShareInput(original));
+    expect(encoded.ok).toBe(true);
+    if (!encoded.ok) return;
+    const decoded = await decodeFittingShare(encoded.payload);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+
+    const restored = shareToFitting(decoded.value, original.name);
+    expect(restored).toEqual(original);
+  });
+});

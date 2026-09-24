@@ -14,6 +14,7 @@
     "corp": "Corporation",
     "skills": "Skills",
     "industry": "Industry",
+    "fittings": "Fittings",
     "market": "Market",
     "groups": {
       "progression": "Progression",
@@ -46,6 +47,102 @@
     "staleGrantHintNamed": "EVE turned down a request for {{character}}'s data. If you removed this app's access in EVE's third-party application list, log in again to restore it.",
     "staleGrantAction": "Log in again with EVE Online",
     "dismiss": "Dismiss"
+  },
+  "fittings": {
+    "load": {
+      "title": "Load",
+      "pasteLabel": "Paste EFT fit text",
+      "pastePlaceholder": "[Rifter, My Fit]\n125mm Gatling AutoCannon I\n...",
+      "button": "Load",
+      "shareError": {
+        "invalid": "That link isn't a valid Fitting.",
+        "unsupported-version": "That link was made by a newer version of Neocom Desk."
+      },
+      "tooLargeToShare": "This Fitting is loaded, but too large to carry in a link — reloading this page will lose it.",
+      "unresolvedTitle_one": "{{count}} line wasn't recognized",
+      "unresolvedTitle_other": "{{count}} lines weren't recognized",
+      "unresolvedLine": "Line {{line}}: \"{{text}}\" — {{reason}}"
+    },
+    "list": {
+      "title": "List",
+      "cpu": "CPU",
+      "powergrid": "Powergrid",
+      "calibration": "Calibration",
+      "droneBandwidth": "Drone bandwidth",
+      "drones": "Drones",
+      "rack": {
+        "high": "High slots",
+        "medium": "Mid slots",
+        "low": "Low slots",
+        "rig": "Rigs",
+        "subsystem": "Subsystems"
+      },
+      "droneState": {
+        "online": "in bay",
+        "active": "active"
+      },
+      "moduleState": {
+        "offline": "offline",
+        "online": "online",
+        "active": "active",
+        "overload": "overloaded"
+      }
+    },
+    "stats": {
+      "show": "Show detail",
+      "hide": "Hide detail",
+      "error": "Couldn't load ship data for this fit.",
+      "loadingIndeterminate": "Downloading ship data…",
+      "loading": "Downloading ship data… {{pct}}%",
+      "damageType": {
+        "em": "EM",
+        "thermal": "Thermal",
+        "kinetic": "Kinetic",
+        "explosive": "Explosive"
+      },
+      "section": {
+        "capacitor": "Capacitor",
+        "offense": "Offense",
+        "defense": "Defense",
+        "targeting": "Targeting",
+        "navigation": "Navigation",
+        "drones": "Drones",
+        "fitting": "Fitting",
+        "price": "Price"
+      },
+      "capacitorStable": "Stable at {{pct}}%",
+      "capacitorDepletes": "Depletes in {{seconds}}s",
+      "capacitorCapacity": "Capacity: {{value}} GJ",
+      "capacitorRecharge": "Recharge time: {{seconds}}s",
+      "offenseComingSoon": "Per-weapon damage is coming in a follow-up ticket.",
+      "defenseEhp": "{{value}} EHP",
+      "shield": "Shield",
+      "armor": "Armor",
+      "hull": "Hull",
+      "maxTargetRange": "Targeting range: {{value}} km",
+      "maxLockedTargets": "Max locked targets: {{value}}",
+      "scanResolution": "Scan resolution: {{value}} mm",
+      "signatureRadius": "Signature radius: {{value}} m",
+      "maxVelocityMeta": "{{value}} m/s",
+      "maxVelocity": "Max velocity: {{value}} m/s",
+      "agility": "Inertia modifier: {{value}}",
+      "mass": "Mass: {{value}} t",
+      "warpSpeed": "Warp speed: {{value}} AU/s",
+      "droneDps": "Drone DPS: {{value}}",
+      "droneBandwidthLine": "Bandwidth: {{used}} / {{total}} Mbit/s",
+      "droneCapacity": "Bay capacity: {{value}} m3",
+      "cpuLine": "CPU: {{used}} / {{total}} tf",
+      "powergridLine": "Powergrid: {{used}} / {{total}} MW",
+      "calibrationLine": "Calibration: {{used}} / {{total}}",
+      "unknownItems_one": "{{count}} item has no data in this build",
+      "unknownItems_other": "{{count}} items have no data in this build",
+      "priceSellMeta": "Sells for {{value}} ISK",
+      "priceBuy": "Buy orders: {{value}} ISK",
+      "priceSell": "Sell orders: {{value}} ISK",
+      "priceUnpriced_one": "{{count}} item has no price at this hub",
+      "priceUnpriced_other": "{{count}} items have no price at this hub",
+      "priceLoading": "Pricing…"
+    }
   },
   "skills": {
     "trainedTab": "Trained",

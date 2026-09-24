@@ -74,5 +74,111 @@ describe('extractFittingStats', () => {
     expect(stats.cpuUsed).toBe(0);
     expect(stats.ehp).toBe(0);
     expect(stats.droneDps).toBe(0);
+    expect(stats.shield).toEqual({
+      hp: 0,
+      emResonance: 0,
+      thermalResonance: 0,
+      kineticResonance: 0,
+      explosiveResonance: 0,
+    });
+  });
+
+  it('reads capacitor capacity and recharge time straight off the ship', () => {
+    const stats = extractFittingStats(
+      [],
+      attrs({ capacitorCapacity: 375, capacitorRechargeTime: 125000 }),
+      []
+    );
+
+    expect(stats.capacitorCapacity).toBe(375);
+    expect(stats.capacitorRechargeTime).toBe(125000);
+  });
+
+  it("reads each layer's hp and four resonances", () => {
+    const stats = extractFittingStats(
+      [],
+      attrs({
+        shieldCapacity: 450,
+        shieldEmResonance: 1,
+        shieldExplosiveResonance: 0.5,
+        shieldKineticResonance: 0.6,
+        shieldThermalResonance: 0.8,
+        armorHp: 405,
+        armorEmResonance: 0.4,
+        armorExplosiveResonance: 0.9,
+        armorKineticResonance: 0.75,
+        armorThermalResonance: 0.65,
+        hullHp: 350,
+        hullEmResonance: 1,
+        hullExplosiveResonance: 1,
+        hullKineticResonance: 1,
+        hullThermalResonance: 1,
+      }),
+      []
+    );
+
+    expect(stats.shield).toEqual({
+      hp: 450,
+      emResonance: 1,
+      explosiveResonance: 0.5,
+      kineticResonance: 0.6,
+      thermalResonance: 0.8,
+    });
+    expect(stats.armor).toEqual({
+      hp: 405,
+      emResonance: 0.4,
+      explosiveResonance: 0.9,
+      kineticResonance: 0.75,
+      thermalResonance: 0.65,
+    });
+    expect(stats.hull).toEqual({
+      hp: 350,
+      emResonance: 1,
+      explosiveResonance: 1,
+      kineticResonance: 1,
+      thermalResonance: 1,
+    });
+  });
+
+  it('reads targeting and navigation straight off the ship', () => {
+    const stats = extractFittingStats(
+      [],
+      attrs({
+        maxTargetRange: 22500,
+        maxLockedTargets: 4,
+        scanResolution: 660,
+        signatureRadius: 35,
+        maxVelocity: 391.4625,
+        agility: 3.2,
+        mass: 1067000,
+        warpSpeed: 3,
+      }),
+      []
+    );
+
+    expect(stats.targeting).toEqual({
+      maxTargetRange: 22500,
+      maxLockedTargets: 4,
+      scanResolution: 660,
+      signatureRadius: 35,
+    });
+    expect(stats.navigation).toEqual({
+      maxVelocity: 391.4625,
+      agility: 3.2,
+      mass: 1067000,
+      warpSpeed: 3,
+    });
+  });
+
+  it('reads drone bandwidth/capacity totals and calibration total straight off the ship', () => {
+    const stats = extractFittingStats(
+      [],
+      attrs({ droneBandwidth: 75, droneCapacity: 125, calibration: 400 }),
+      []
+    );
+
+    expect(stats.droneBandwidthTotal).toBe(75);
+    expect(stats.droneCapacity).toBe(125);
+    expect(stats.calibrationTotal).toBe(400);
   });
 });

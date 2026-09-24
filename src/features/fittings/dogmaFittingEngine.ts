@@ -1,7 +1,12 @@
 import wasmInit, { calculate, load_sde } from '@eveshipfit/dogma-engine';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import { extractFittingStats } from '@/engine/fittings/stats';
-import type { Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
+import {
+  ITEM_DOGMA_ATTRIBUTE,
+  type Fitting,
+  type FittingStats,
+  type PilotProfile,
+} from '@/engine/fittings/types';
 
 /**
  * ADR 0016's "one seam module": the only place `@eveshipfit/dogma-engine` is
@@ -129,9 +134,30 @@ export async function computeFittingStats(
   await loadDogmaEngine(onProgress);
   const dogmaFit = fittingToDogmaFit(fitting, profile);
   const calculation = calculate(dogmaFit);
-  return extractFittingStats(
+  const baseStats = extractFittingStats(
     dogmaFit.items.map((item) => item.type_id),
     calculation.ship.attributes,
     calculation.items
   );
+
+  // Calibration and drone bandwidth have no single ship-level "used" id the
+  // way cpuFree/powerFree do (see types.ts's DOGMA_ATTRIBUTE doc comment) —
+  // summed here instead, since only this seam has both `dogmaFit.items`'
+  // slot types and `calculation.items`' per-item attribute values. A drone
+  // stack only draws bandwidth while deployed ('active'); one sitting in the
+  // bay ('online') draws none.
+  let calibrationUsed = 0;
+  let droneBandwidthUsed = 0;
+  dogmaFit.items.forEach((item, index) => {
+    const itemAttributes = calculation.items[index]?.attributes;
+    if (!itemAttributes) return;
+    if (item.slot.type === 'rig') {
+      calibrationUsed += itemAttributes.get(ITEM_DOGMA_ATTRIBUTE.calibrationCost)?.value ?? 0;
+    } else if (item.slot.type === 'drone_bay' && item.state === 'active') {
+      const perDrone = itemAttributes.get(ITEM_DOGMA_ATTRIBUTE.droneBandwidthNeeded)?.value ?? 0;
+      droneBandwidthUsed += perDrone * (item.quantity ?? 1);
+    }
+  });
+
+  return { ...baseStats, calibrationUsed, droneBandwidthUsed };
 }
