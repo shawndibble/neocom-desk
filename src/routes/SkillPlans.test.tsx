@@ -1289,7 +1289,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
 
     expect(await within(header()).findByText('Remap savings')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
+    await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
     await user.type(await screen.findByLabelText('Expires'), '2099-01-01T00:00');
 
     await waitFor(() => {
@@ -1471,7 +1471,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     });
   });
 
-  it('shows the bonus/expiry inputs only once the booster is enabled, and flags a past expiry as expired', async () => {
+  it('shows the bonus/expiry inputs only once an accelerator row exists, and flags a past expiry as expired', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
@@ -1480,9 +1480,9 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     expect(screen.queryByLabelText('Expires')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
-    // `find`, not `get`: the Booster is saved on the plan now, so the tick
-    // travels through Dexie and back before the expiry row exists.
+    await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
+    // `find`, not `get`: the Booster is saved on the plan now, so the row
+    // travels through Dexie and back before the expiry field exists.
     const expiresInput = await screen.findByLabelText('Expires');
     expect(screen.queryByText('Expired')).not.toBeInTheDocument();
 
@@ -1503,7 +1503,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
       within(queuePanel).getByText(/^\d+[dhm]/, { selector: 'header span' });
     const durationBefore = durationHeader().textContent;
 
-    await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
+    await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
     await user.type(await screen.findByLabelText('Expires'), '2099-01-01T00:00');
     expect(screen.queryByText('Expired')).not.toBeInTheDocument();
 
@@ -1521,17 +1521,20 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
     await user.click(await screen.findByRole('option', { name: '+5' }));
-    await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
+    await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
     await user.type(await screen.findByLabelText('Expires'), '2099-01-01T00:00');
 
     await waitFor(async () => {
       const stored = await db.skillPlans.get('plan-1');
       expect(stored?.whatIfImplants).toEqual({ kind: 'preset', preset: '+5' });
-      expect(stored?.booster).toEqual({
-        enabled: true,
-        bonus: 3,
-        expiresAt: new Date(2099, 0, 1, 0, 0).getTime(),
-      });
+      expect(stored?.boosters).toEqual([
+        {
+          enabled: true,
+          bonus: 3,
+          startsAt: null,
+          expiresAt: new Date(2099, 0, 1, 0, 0).getTime(),
+        },
+      ]);
     });
 
     // The reported bug: reopening the page put every control back to its

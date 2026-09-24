@@ -52,7 +52,9 @@ export interface RemotePlanDoc extends RemoteDoc {
   markers?: number[];
   markerAttributes?: (Attributes | null)[];
   whatIfImplants?: WhatIfImplantSelection;
+  /** Legacy single Booster; superseded by `boosters` but still written (#1407). */
   booster?: PlanBooster;
+  boosters?: PlanBooster[];
   milestones?: PlanMilestone[];
 }
 

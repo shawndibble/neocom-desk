@@ -57,7 +57,6 @@ import type { PlaceRemapsResult, RemapSegment } from '@/engine/optimizer';
 import type {
   AttributeName,
   Attributes,
-  Booster,
   CloneState,
   Implants,
   PlanEntry,
@@ -131,23 +130,12 @@ import {
   MIN_IMPLANT_BONUS,
   WHAT_IF_IMPLANT_PRESETS,
 } from './whatIfImplants';
-import {
-  BOOSTER_QUICK_PICKS,
-  boosterExpiryFromInput,
-  boosterExpiryFromNow,
-  boosterExpiryToInput,
-  clampBoosterBonus,
-  resolvePlanBooster,
-  toBooster,
-  MAX_BOOSTER_BONUS,
-} from './planBooster';
+import { resolvePlanBoosters, toBoosters } from './planBooster';
+import { BoosterList } from './BoosterList';
 import { ImportClipboardDialog } from './ImportClipboardDialog';
 import { useScopedState } from './useScopedState';
 import { attributeShort, remapInstruction } from './remapInstruction';
-import {
-  ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID,
-  BOOSTER_MARKET_GROUP_ID,
-} from './plannerMarketGroups';
+import { ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID } from './plannerMarketGroups';
 import { buildMarketGroupParams } from '@/engine/market/urlState';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
@@ -161,7 +149,7 @@ export type PlanPatch = Partial<
     | 'markers'
     | 'markerAttributes'
     | 'whatIfImplants'
-    | 'booster'
+    | 'boosters'
     | 'milestones'
   >
 >;
@@ -420,78 +408,22 @@ export function PlanEditor({
   const detectedAccelerator =
     attributeBaseline?.kind === 'accelerated' ? attributeBaseline.acceleratorBonus : null;
 
-  // Booster (CONTEXT.md): a single optional cerebral accelerator, applying a
-  // uniform bonus to every attribute until its expiry. Saved on the plan for
-  // the same reason as the lens above.
+  // Boosters (CONTEXT.md): an ordered list of cerebral accelerators, each a
+  // uniform bonus to every attribute from an optional start until its
+  // expiry — EVE has one booster slot, so at most one is ever live. Saved on
+  // the plan for the same reason as the lens above.
   //
-  // A pure derivation, not seeded state — the prefill rule and its "an
-  // absent field is what 'unanswered' means" gate live in planBooster.ts,
+  // A pure derivation, not seeded state — the prefill rule and its "neither
+  // field stored is what 'unanswered' means" gate live in planBooster.ts,
   // where they are unit-tested; the moment the user touches any control the
-  // whole answer is written back through `patchBooster`.
-  const planBooster = useMemo<PlanBooster>(
-    () => resolvePlanBooster(plan.booster, detectedAccelerator),
-    [plan.booster, detectedAccelerator]
+  // whole answer is written back through `onChange` below. Field-level
+  // editing state (draft text, the blur-commit rule, quick picks) lives in
+  // `BoosterList` itself, which owns rendering this control.
+  const planBoosters = useMemo<PlanBooster[]>(
+    () => resolvePlanBoosters(plan.boosters, plan.booster, detectedAccelerator),
+    [plan.boosters, plan.booster, detectedAccelerator]
   );
-  const patchBooster = (patch: Partial<PlanBooster>): void =>
-    onUpdate({ booster: { ...planBooster, ...patch } });
-
-  const booster = useMemo<Booster | null>(() => toBooster(planBooster), [planBooster]);
-  const activeBoosters = useMemo<Booster[]>(() => (booster ? [booster] : []), [booster]);
-
-  // The expiry control edits text; the plan stores the instant that text
-  // names. A value that names no instant — half-typed, or emptied — has
-  // nowhere to live on the plan, so it is held here until the field is left.
-  //
-  // Committing an empty value on `change` is what makes this necessary, and
-  // it is a data-loss path, not a cosmetic one: a native `datetime-local`
-  // reports `value === ''` for ANY incomplete state, including the moment a
-  // segment of an already-complete value is cleared to retype it. Writing
-  // `null` there would erase a saved expiry mid-edit, re-cost the plan, and
-  // push the erasure to the user's other devices two seconds later. So an
-  // empty field is committed on blur — where it means "no expiry", the
-  // legitimate answer — and an unfinished one is simply dropped, leaving the
-  // stored value standing.
-  //
-  // Keyed, so a draft can only ever mask the value it was typed against:
-  // switching plans, or a sync pulling a new expiry in from another device
-  // mid-typing, both discard it.
-  const [expiryDraft, setExpiryDraft] = useState<{ key: string; text: string } | null>(null);
-  const expiryDraftKey = `${plan.id}:${planBooster.expiresAt ?? ''}`;
-  const boosterExpiresAtInput =
-    (expiryDraft?.key === expiryDraftKey ? expiryDraft.text : null) ??
-    boosterExpiryToInput(planBooster.expiresAt);
-  const handleBoosterExpiryChange = (raw: string): void => {
-    const expiresAt = boosterExpiryFromInput(raw);
-    if (expiresAt === null) {
-      setExpiryDraft({ key: expiryDraftKey, text: raw });
-      return;
-    }
-    setExpiryDraft(null);
-    patchBooster({ expiresAt });
-  };
-  const handleBoosterExpiryBlur = (): void => {
-    if (expiryDraft === null) return;
-    setExpiryDraft(null);
-    // Only a deliberately emptied field is an answer. Anything else is an
-    // edit the user walked away from, and the stored expiry survives it.
-    if (expiryDraft.text === '' && planBooster.expiresAt !== null) {
-      patchBooster({ expiresAt: null });
-    }
-  };
-  // Bypasses the datetime-local round trip entirely: a quick pick is a
-  // direct answer, not text to parse, so any half-typed draft it supersedes
-  // is dropped along with it.
-  const handleBoosterQuickPick = (hours: number): void => {
-    setExpiryDraft(null);
-    patchBooster({ expiresAt: boosterExpiryFromNow(hours) });
-  };
-
-  // Display-only "expired" hint: reads the wall clock, which is unavoidably
-  // impure (there's no ticking-clock store in this codebase to subscribe to
-  // instead). computeSchedule itself is unaffected — it already treats a
-  // past expiry as "no bonus" regardless of this flag.
-  // eslint-disable-next-line react-hooks/purity -- see comment above
-  const boosterExpired = booster !== null && booster.expiresAt.getTime() <= Date.now();
+  const activeBoosters = useMemo(() => toBoosters(planBoosters), [planBoosters]);
 
   // useCallback'd (#408): both cross into EntryList as per-row props
   // (`nameFor`/`attributesFor`), which now wraps its rows in `React.memo` —
@@ -565,6 +497,7 @@ export function PlanEditor({
           markerAttributes: plan.markerAttributes,
           whatIfImplants: plan.whatIfImplants,
           booster: plan.booster,
+          boosters: plan.boosters,
         },
         {
           catalog,
@@ -583,6 +516,7 @@ export function PlanEditor({
       plan.markerAttributes,
       plan.whatIfImplants,
       plan.booster,
+      plan.boosters,
       catalog,
       trainedSkills,
       queueEntries,
@@ -1727,99 +1661,11 @@ export function PlanEditor({
             ))}
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <label className="flex items-center gap-1.5">
-              <input
-                type="checkbox"
-                checked={planBooster.enabled}
-                onChange={(e) => patchBooster({ enabled: e.target.checked })}
-                className="size-4 shrink-0 cursor-pointer accent-accent"
-              />
-              {t('plans.booster')}
-            </label>
-            {marketGroupLink(t('plans.boosterMarketLink'), BOOSTER_MARKET_GROUP_ID)}
-          </div>
-          {/* Outside the checkbox's own block on purpose: unticking it is a
-              legitimate answer ("that accelerator is gone"), and the reason
-              the sheet was corrected has to survive that. */}
-          {detectedAccelerator !== null && (
-            <p className="text-[0.6875rem] text-text-dim">
-              {t('plans.boosterDetected', { bonus: detectedAccelerator })}
-            </p>
-          )}
-          {planBooster.enabled && (
-            // Indented under its own checkbox: these only exist while the
-            // booster is on, and the rule says so without a second heading.
-            <div className="space-y-2 border-l border-line pl-2">
-              <label className="flex items-center justify-between gap-2">
-                {t('plans.boosterBonus')}
-                <TextInput
-                  size="md"
-                  type="number"
-                  min={1}
-                  // Generous by design (planBooster.ts): a detected bonus
-                  // the field could not hold would be prefilled into an
-                  // invalid input.
-                  max={MAX_BOOSTER_BONUS}
-                  value={planBooster.bonus}
-                  // Clamped at the write, like Remaps Available above and
-                  // the industry panel's runs/ME/TE: storing a 45 the plan
-                  // is not costed under would make the record disagree with
-                  // every number on the page, and would resurrect the 45 the
-                  // day the cap moves.
-                  onChange={(e) =>
-                    patchBooster({ bonus: clampBoosterBonus(Number(e.target.value)) })
-                  }
-                  className="field-no-spinner w-16 text-center"
-                />
-              </label>
-              <label className="flex items-center justify-between gap-2">
-                {t('plans.boosterExpiresAt')}
-                {/* `min-w-0` so a datetime field can shrink inside the
-                    sidebar instead of forcing the column wider. */}
-                <TextInput
-                  size="md"
-                  type="datetime-local"
-                  // The control edits local wall-clock text; the plan stores
-                  // the instant it names, because the plan syncs and a bare
-                  // wall-clock string would mean a different moment on a
-                  // device in another timezone (planBooster.ts).
-                  value={boosterExpiresAtInput}
-                  onChange={(e) => handleBoosterExpiryChange(e.target.value)}
-                  onBlur={handleBoosterExpiryBlur}
-                  className="min-w-0 flex-1"
-                />
-              </label>
-              {/* One click each, so the notice below has something to act
-                  on immediately instead of sending the user to a native
-                  date picker. */}
-              <div
-                role="group"
-                aria-label={t('plans.boosterQuickPicks')}
-                className="flex flex-wrap gap-1"
-              >
-                {BOOSTER_QUICK_PICKS.map(({ hours }) => (
-                  <button
-                    key={hours}
-                    type="button"
-                    onClick={() => handleBoosterQuickPick(hours)}
-                    className="min-h-7 rounded-xs border border-line px-1.5 text-[0.6875rem] text-text-dim hover:border-line-bright hover:text-text"
-                  >
-                    {hours % 24 === 0
-                      ? t('plans.boosterQuickPickDays', { days: hours / 24 })
-                      : t('plans.boosterQuickPickHours', { hours })}
-                  </button>
-                ))}
-              </div>
-              {/* A blank expiry means no Booster is applied at all, so a
-                  prefilled bonus would otherwise sit there looking active
-                  while every number on the page ignored it. */}
-              {detectedAccelerator !== null && planBooster.expiresAt === null && (
-                <p className="text-warning">{t('plans.boosterDetectedNoExpiry')}</p>
-              )}
-              {boosterExpired && <p className="text-warning">{t('plans.boosterExpired')}</p>}
-            </div>
-          )}
+          <BoosterList
+            boosters={planBoosters}
+            detectedAccelerator={detectedAccelerator}
+            onChange={(boosters) => onUpdate({ boosters })}
+          />
         </div>
       ),
     },

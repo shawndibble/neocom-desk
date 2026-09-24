@@ -263,7 +263,11 @@ describe('PlanEditor tools pane', () => {
     // what-if lenses over it — which change the numbers, not the plan.
     expect(within(attributesSection).getByText('Intelligence')).toBeInTheDocument();
     expect(within(attributesSection).getByLabelText('What-if implants')).toBeInTheDocument();
-    expect(within(attributesSection).getByLabelText('Booster')).toBeInTheDocument();
+    // No accelerator configured, so the Booster section is its empty state:
+    // just the affordance to add one, not a permanently-visible checkbox.
+    expect(
+      within(attributesSection).getByRole('button', { name: 'Add accelerator' })
+    ).toBeInTheDocument();
 
     // Import/Export: plan-level file operations, now icon buttons portaled
     // into the route's page header rather than a tools-pane section.
@@ -1223,17 +1227,19 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     expect(bonusInputValues()).toEqual(['5', '5', '5', '5', '5']);
   });
 
-  it('saves the whole Booster answer the first time any part of it is touched', async () => {
+  it('saves the whole Booster answer the moment a row is added', async () => {
+    // No checkbox exists until a row does — "Add accelerator" is the
+    // empty-state affordance a list uses instead of one always-present box.
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
     await openTools(user);
 
-    await user.click(screen.getByLabelText('Booster'));
+    await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
 
-    // Not just the box: a stored Booster is what tells the editor the user
-    // has answered, so it has to carry the bonus and expiry it was showing.
+    // Not just an empty row: a stored Booster is what tells the editor the
+    // user has answered, so it has to carry the bonus the new row opens on.
     expect(onUpdate).toHaveBeenCalledWith({
-      booster: { enabled: true, bonus: 3, expiresAt: null },
+      boosters: [{ enabled: true, bonus: 3, startsAt: null, expiresAt: null }],
     });
   });
 
@@ -1242,13 +1248,20 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     const { onUpdate } = renderEditor();
     await openTools(user);
 
-    await user.click(screen.getByLabelText('Booster'));
+    await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
     await user.type(screen.getByLabelText('Expires'), '2099-01-01T00:00');
 
     // Local time, because that is what a datetime-local control means — and
     // an instant, because the plan syncs to devices in other timezones.
     expect(onUpdate).toHaveBeenLastCalledWith({
-      booster: { enabled: true, bonus: 3, expiresAt: new Date(2099, 0, 1, 0, 0).getTime() },
+      boosters: [
+        {
+          enabled: true,
+          bonus: 3,
+          startsAt: null,
+          expiresAt: new Date(2099, 0, 1, 0, 0).getTime(),
+        },
+      ],
     });
     expect(screen.getByLabelText<HTMLInputElement>('Expires').value).toBe('2099-01-01T00:00');
   });
@@ -1258,7 +1271,12 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     renderEditor(vi.fn(), {
       plan: {
         ...PLAN,
-        booster: { enabled: true, bonus: 6, expiresAt: new Date(2099, 5, 2, 13, 45).getTime() },
+        booster: {
+          enabled: true,
+          bonus: 6,
+          startsAt: null,
+          expiresAt: new Date(2099, 5, 2, 13, 45).getTime(),
+        },
       },
     });
     await openTools(user);
@@ -1276,7 +1294,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     const user = userEvent.setup();
     const saved = new Date(2099, 0, 1, 0, 0).getTime();
     const { onUpdate } = renderEditor(vi.fn(), {
-      plan: { ...PLAN, booster: { enabled: true, bonus: 3, expiresAt: saved } },
+      plan: { ...PLAN, booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: saved } },
     });
     await openTools(user);
 
@@ -1291,7 +1309,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     const user = userEvent.setup();
     const saved = new Date(2099, 0, 1, 0, 0).getTime();
     const { onUpdate } = renderEditor(vi.fn(), {
-      plan: { ...PLAN, booster: { enabled: true, bonus: 3, expiresAt: saved } },
+      plan: { ...PLAN, booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: saved } },
     });
     await openTools(user);
 
@@ -1299,7 +1317,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     await user.tab();
 
     expect(onUpdate).toHaveBeenCalledWith({
-      booster: { enabled: true, bonus: 3, expiresAt: null },
+      boosters: [{ enabled: true, bonus: 3, startsAt: null, expiresAt: null }],
     });
   });
 
@@ -1307,7 +1325,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     const user = userEvent.setup();
     const saved = new Date(2099, 0, 1, 0, 0).getTime();
     const { onUpdate } = renderEditor(vi.fn(), {
-      plan: { ...PLAN, booster: { enabled: true, bonus: 3, expiresAt: saved } },
+      plan: { ...PLAN, booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: saved } },
     });
     await openTools(user);
 
@@ -1319,14 +1337,25 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     // One write, carrying the new instant. The incomplete states the control
     // reports along the way must not each land on the plan.
     expect(onUpdate.mock.calls).toEqual([
-      [{ booster: { enabled: true, bonus: 3, expiresAt: new Date(2100, 5, 2, 13, 45).getTime() } }],
+      [
+        {
+          boosters: [
+            {
+              enabled: true,
+              bonus: 3,
+              startsAt: null,
+              expiresAt: new Date(2100, 5, 2, 13, 45).getTime(),
+            },
+          ],
+        },
+      ],
     ]);
   });
 
   it('clamps the bonus where it is written, not only where it is read', async () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor(vi.fn(), {
-      plan: { ...PLAN, booster: { enabled: true, bonus: 3, expiresAt: null } },
+      plan: { ...PLAN, booster: { enabled: true, bonus: 3, startsAt: null, expiresAt: null } },
     });
     await openTools(user);
 
@@ -1336,7 +1365,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
 
     // Never a stored 45 the plan is not costed under.
     expect(onUpdate).toHaveBeenLastCalledWith({
-      booster: { enabled: true, bonus: 30, expiresAt: null },
+      boosters: [{ enabled: true, bonus: 30, startsAt: null, expiresAt: null }],
     });
   });
 
@@ -1350,7 +1379,10 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
         acceleratorBonus: 12,
         attributes: ATTRIBUTES,
       },
-      plan: { ...PLAN, booster: { enabled: false, bonus: 12, expiresAt: null } },
+      plan: {
+        ...PLAN,
+        booster: { enabled: false, bonus: 12, startsAt: null, expiresAt: null },
+      },
     });
     await openTools(user);
 
@@ -1359,9 +1391,10 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
 });
 
 describe('a character with no accelerator', () => {
-  // The normal state, and a total no-op: same control, same defaults, nothing
-  // said. Asserted on its own rather than as a corollary of the case above,
-  // because "detection fires on a clean sheet" is the way this fix breaks.
+  // The normal state, and a total no-op: nothing stored, nothing detected, so
+  // the list is empty and only "Add accelerator" shows — the same as
+  // "detection fires on a clean sheet" would look, which is the way this fix
+  // breaks, hence asserting it on its own rather than as a corollary above.
   it.each([
     ['a legal sheet', { kind: 'legal' as const, attributes: ATTRIBUTES }],
     ['ESI not read yet', null],
@@ -1371,7 +1404,8 @@ describe('a character with no accelerator', () => {
     renderEditor(vi.fn(), attributeBaseline === undefined ? {} : { attributeBaseline });
     await openTools(user);
 
-    expect(screen.getByLabelText<HTMLInputElement>('Booster').checked).toBe(false);
+    expect(screen.queryByLabelText('Booster')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Add accelerator' })).toBeInTheDocument();
     expect(screen.queryByText(/cerebral accelerator/i)).toBeNull();
     expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
     expect(screen.queryByText(/cannot be read/i)).toBeNull();
@@ -1391,8 +1425,9 @@ describe('an attribute sheet nothing explains', () => {
     await openTools(user);
 
     expect(screen.getByText(/totalling 160/i)).toBeInTheDocument();
-    // No accelerator was recovered, so nothing is prefilled either.
-    expect(screen.getByLabelText<HTMLInputElement>('Booster').checked).toBe(false);
+    // No accelerator was recovered, so nothing is prefilled either — the
+    // list stays empty, same as the no-accelerator case above.
+    expect(screen.queryByLabelText('Booster')).toBeNull();
   });
 });
 

@@ -393,7 +393,7 @@ describe('plan lens field mapping (What-If Implants + Booster)', () => {
   // themselves — a plan that synced without them would quote different
   // training times on the other device.
   const whatIfImplants = { kind: 'custom' as const, bonuses: { memory: 5, perception: 4 } };
-  const booster = { enabled: true, bonus: 12, expiresAt: 4_102_444_800_000 };
+  const booster = { enabled: true, bonus: 12, startsAt: null, expiresAt: 4_102_444_800_000 };
 
   it('round-trips both through push and pull', async () => {
     await db.skillPlans.add(plan({ whatIfImplants, booster }));
@@ -411,11 +411,14 @@ describe('plan lens field mapping (What-If Implants + Booster)', () => {
   });
 
   it('carries a Booster with no expiry set — null is a value, undefined is not', async () => {
-    await db.skillPlans.add(plan({ booster: { enabled: false, bonus: 3, expiresAt: null } }));
+    await db.skillPlans.add(
+      plan({ booster: { enabled: false, bonus: 3, startsAt: null, expiresAt: null } })
+    );
     await triggerSync(1);
     expect(remoteStore.get(PLANS_PATH)?.get('p1')?.booster).toEqual({
       enabled: false,
       bonus: 3,
+      startsAt: null,
       expiresAt: null,
     });
   });
@@ -426,6 +429,57 @@ describe('plan lens field mapping (What-If Implants + Booster)', () => {
     const remote = remoteStore.get(PLANS_PATH)?.get('p1');
     expect(remote && 'whatIfImplants' in remote).toBe(false);
     expect(remote && 'booster' in remote).toBe(false);
+    expect(remote && 'boosters' in remote).toBe(false);
+  });
+});
+
+describe('plan boosters list field mapping (#1407)', () => {
+  const boosters = [
+    { enabled: true, bonus: 6, startsAt: null, expiresAt: 1000 },
+    { enabled: true, bonus: 4, startsAt: 1000, expiresAt: 2000 },
+  ];
+
+  it('round-trips the list through push and pull', async () => {
+    await db.skillPlans.add(plan({ boosters }));
+    await triggerSync(1);
+    const remote = remoteStore.get(PLANS_PATH)?.get('p1');
+    expect(remote?.boosters).toEqual(boosters);
+
+    await db.skillPlans.delete('p1');
+    seedRemote(PLANS_PATH, [remoteDoc({ boosters, updatedAt: Date.now() + 1000 })]);
+    await triggerSync(1);
+    const local = await db.skillPlans.get('p1');
+    expect(local?.boosters).toEqual(boosters);
+  });
+
+  it('also writes the first entry as the legacy booster field, for a build still on the single-Booster shape', async () => {
+    await db.skillPlans.add(plan({ boosters }));
+    await triggerSync(1);
+    expect(remoteStore.get(PLANS_PATH)?.get('p1')?.booster).toEqual(boosters[0]);
+  });
+
+  it('writes a disabled legacy booster for an explicit empty list, so an older build does not re-prefill', async () => {
+    await db.skillPlans.add(plan({ boosters: [] }));
+    await triggerSync(1);
+    const remote = remoteStore.get(PLANS_PATH)?.get('p1');
+    expect(remote?.boosters).toEqual([]);
+    expect(remote?.booster).toEqual({ enabled: false, bonus: 0, startsAt: null, expiresAt: null });
+  });
+
+  it('ignores a legacy booster once boosters is present, on both push and pull', async () => {
+    const legacy = { enabled: true, bonus: 20, startsAt: null, expiresAt: 9000 };
+    await db.skillPlans.add(plan({ boosters, booster: legacy }));
+    await triggerSync(1);
+    // Push overwrites the legacy mirror with boosters[0], not what was stored.
+    expect(remoteStore.get(PLANS_PATH)?.get('p1')?.booster).toEqual(boosters[0]);
+
+    await db.skillPlans.delete('p1');
+    seedRemote(PLANS_PATH, [
+      remoteDoc({ boosters, booster: legacy, updatedAt: Date.now() + 1000 }),
+    ]);
+    await triggerSync(1);
+    const local = await db.skillPlans.get('p1');
+    expect(local?.boosters).toEqual(boosters);
   });
 });
 
@@ -668,7 +722,12 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
       { intelligence: 17, memory: 17, perception: 27, willpower: 21, charisma: 17 },
     ],
     whatIfImplants: { kind: 'preset', preset: '+4' },
-    booster: { enabled: true, bonus: 6, expiresAt: 4_102_444_800_000 },
+    // Identical content on purpose: pushing derives the legacy mirror from
+    // boosters[0] (planSync.ts), so the generic per-field loop below only
+    // holds if this fixture already agrees with itself the way a real write
+    // would.
+    booster: { enabled: true, bonus: 6, startsAt: null, expiresAt: 4_102_444_800_000 },
+    boosters: [{ enabled: true, bonus: 6, startsAt: null, expiresAt: 4_102_444_800_000 }],
     milestones: [{ id: 'm1', name: 'Fly Loki', skillTypeID: 3327, level: 5 }],
     updatedAt: Date.now() - 1000,
   };
@@ -718,6 +777,7 @@ describe('every stored field of a plan reaches the remote doc and comes back', (
   it('pins the Skill Plan fields, so a new one has to be routed deliberately', () => {
     expect(Object.keys(fullSkillPlan).sort()).toEqual([
       'booster',
+      'boosters',
       'characterId',
       'entries',
       'id',

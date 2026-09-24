@@ -1,15 +1,21 @@
 /**
- * A Skill Plan's **Booster** (CONTEXT.md): the cerebral accelerator the plan
- * is costed under — one uniform attribute bonus, live until an expiry.
+ * A Skill Plan's **Boosters** (CONTEXT.md): the cerebral accelerators the plan
+ * is costed under — an ordered list, each a uniform attribute bonus live from
+ * an optional start until an expiry. EVE has one booster slot, so at most one
+ * is ever actually live; a second accelerator is something a pilot plans to
+ * run *later*, once the first lapses, not at the same time.
  *
- * Persisted on the plan (`SkillPlanRecord.booster`) and synced with it, so
- * the shape has to survive a round trip through Firestore and back into a
- * different device's Dexie. Two consequences shape this module:
+ * Persisted on the plan (`SkillPlanRecord.boosters`, with `booster` kept as a
+ * one-release legacy mirror of the first entry — see `planSync.ts`) and
+ * synced with it, so the shape has to survive a round trip through Firestore
+ * and back into a different device's Dexie. Two consequences shape this
+ * module:
  *
- * - The expiry is stored as an **instant** (epoch ms), not as the
- *   `datetime-local` string the control edits. A bare wall-clock string means
+ * - `startsAt`/`expiresAt` are stored as **instants** (epoch ms), not as the
+ *   `datetime-local` strings the controls edit. A bare wall-clock string means
  *   a different moment in every timezone, so `boosterExpiryToInput` /
- *   `boosterExpiryFromInput` convert at the edge instead.
+ *   `boosterExpiryFromInput` convert at the edge instead — for both fields,
+ *   despite the "expiry" name, since the round trip is identical for either.
  * - Everything read back is normalized rather than trusted, the same way
  *   `markers.ts` normalizes marker positions on every read: a stored value
  *   can come from an older build or a remote doc, and a NaN bonus reaching
@@ -37,12 +43,17 @@ export const MAX_BOOSTER_BONUS = 30;
 const MIN_BOOSTER_BONUS = 0;
 
 /**
- * What a plan with no stored Booster is costed under: none at all. `bonus`
- * is the common accelerator tier, so ticking the box lands on a sensible
- * figure rather than on zero, and `expiresAt: null` keeps it inert until the
- * user says when it runs out.
+ * What a plan with no Boosters at all is costed under. `bonus` is the common
+ * accelerator tier, so ticking "add accelerator" lands on a sensible figure
+ * rather than on zero, and both instants stay null (already-running-with-no-
+ * known-expiry is the state the row opens in) until the user says otherwise.
  */
-export const DEFAULT_PLAN_BOOSTER: PlanBooster = { enabled: false, bonus: 3, expiresAt: null };
+export const DEFAULT_PLAN_BOOSTER: PlanBooster = {
+  enabled: false,
+  bonus: 3,
+  startsAt: null,
+  expiresAt: null,
+};
 
 /** The shape a `datetime-local` control emits: `YYYY-MM-DDTHH:mm`. */
 const DATETIME_LOCAL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
@@ -75,64 +86,146 @@ function usableInstant(raw: unknown): number | null {
 }
 
 /**
- * A usable `PlanBooster` from whatever was stored, falling back to
- * `DEFAULT_PLAN_BOOSTER` when the value is not a booster at all.
- *
- * `undefined` is not an error case but the meaningful one: the plan has never
- * had a Booster configured, which is what lets `PlanEditor` prefill a
- * detected in-game accelerator without ever stomping a user's own answer.
+ * A usable single `PlanBooster` row from whatever was stored, falling back to
+ * `DEFAULT_PLAN_BOOSTER` when the value is not a booster row at all.
  */
-export function normalizePlanBooster(raw: unknown): PlanBooster {
+export function normalizePlanBoosterRow(raw: unknown): PlanBooster {
   if (typeof raw !== 'object' || raw === null) return DEFAULT_PLAN_BOOSTER;
   const record = raw as Record<string, unknown>;
   if (typeof record.enabled !== 'boolean') return DEFAULT_PLAN_BOOSTER;
   return {
     enabled: record.enabled,
     bonus: clampBoosterBonus(record.bonus),
+    startsAt: usableInstant(record.startsAt),
     expiresAt: usableInstant(record.expiresAt),
   };
 }
 
-/**
- * The Booster a plan is costed under: the stored answer, or — while it has
- * none — a cerebral accelerator detected in the character's ESI sheet
- * (`engine/attributeBaseline.ts`), prefilled into the control the user
- * already knows.
- *
- * The plan storing NOTHING is what "the user has not answered" means, and it
- * is the whole gate: an answer that happens to read like a default is still
- * an answer. Unticking the box — "that accelerator is gone" — stores
- * `enabled: false`, and this must not prefill over it on the next visit.
- *
- * The expiry is left null on the prefill on purpose: no ESI endpoint exposes
- * a running booster's life, only the arithmetic that recovers its size, and
- * a blank expiry applies nothing at all (see `toBooster`).
- */
-export function resolvePlanBooster(
-  stored: unknown | undefined,
-  detectedAccelerator: number | null
-): PlanBooster {
-  if (stored !== undefined) return normalizePlanBooster(stored);
-  return detectedAccelerator !== null
-    ? { enabled: true, bonus: clampBoosterBonus(detectedAccelerator), expiresAt: null }
-    : DEFAULT_PLAN_BOOSTER;
+/** Ascending by start; `startsAt: null` ("already running") sorts first. */
+function sortByStart(boosters: readonly PlanBooster[]): PlanBooster[] {
+  return [...boosters].sort((a, b) => (a.startsAt ?? -Infinity) - (b.startsAt ?? -Infinity));
 }
 
 /**
- * The engine-native `Booster` this plan schedules with, or null when it
- * schedules with none.
+ * Clamp overlapping rows so at most one Booster is ever live at once, the way
+ * EVE's single booster slot forces it to be. Rows are sorted by start, and
+ * each one's start is pulled forward to the previous (enabled, expiring) row's
+ * expiry if it would otherwise begin before that row lapses — "one after
+ * another" is the model, so a later accelerator simply waits its turn. A row
+ * entirely swallowed by an earlier one is left with a start at or past its own
+ * expiry, which `toBoosters` then reads as contributing nothing.
  *
- * A blank expiry is "null", not "already expired": the user has said an
- * accelerator is running but not until when, and inventing a window would
- * quote training times nothing supports. (An expiry in the *past* is a
+ * A disabled row, or one with no expiry yet, is inert: it neither clamps a
+ * neighbour nor is clamped against one, since it applies no bonus for
+ * `toBoosters` to protect the schedule from.
+ */
+export function clampBoosterOverlaps(boosters: readonly PlanBooster[]): PlanBooster[] {
+  const sorted = sortByStart(boosters);
+  // null until the first enabled, expiring row sets it — so that row (even
+  // one with startsAt: null, "already running") is never clamped against a
+  // frontier that does not exist yet.
+  let inForceUntil: number | null = null;
+  return sorted.map((row) => {
+    if (!row.enabled || row.expiresAt === null) return row;
+    const startsAt =
+      inForceUntil !== null && (row.startsAt === null || row.startsAt < inForceUntil)
+        ? inForceUntil
+        : row.startsAt;
+    inForceUntil = inForceUntil === null ? row.expiresAt : Math.max(inForceUntil, row.expiresAt);
+    return startsAt === row.startsAt ? row : { ...row, startsAt };
+  });
+}
+
+/**
+ * True when two enabled, expiry-bearing rows in `boosters` would overlap —
+ * the state the editor blocks a user from saving (`clampBoosterOverlaps`
+ * exists for reading a value that reached this shape anyway, e.g. synced from
+ * an older build).
+ */
+export function hasOverlappingBoosters(boosters: readonly PlanBooster[]): boolean {
+  const windows = sortByStart(boosters)
+    .filter((b) => b.enabled && b.expiresAt !== null)
+    .map((b) => ({ start: b.startsAt ?? -Infinity, end: b.expiresAt as number }));
+  for (let i = 1; i < windows.length; i++) {
+    if (windows[i].start < windows[i - 1].end) return true;
+  }
+  return false;
+}
+
+/**
+ * The Boosters list a plan stores, normalized: reads the current `boosters`
+ * list when present, otherwise wraps a legacy single `booster` into a
+ * one-element list, then clamps whatever the result overlaps.
+ *
+ * `raw` and `legacy` are the plan's two stored fields as-is (`undefined` when
+ * absent) — the presence check belongs to the caller (`resolvePlanBoosters`),
+ * since only it knows whether "nothing stored" should prefill.
+ */
+export function normalizePlanBoosters(raw: unknown, legacy?: unknown): PlanBooster[] {
+  if (Array.isArray(raw)) return clampBoosterOverlaps(raw.map(normalizePlanBoosterRow));
+  if (legacy !== undefined) return clampBoosterOverlaps([normalizePlanBoosterRow(legacy)]);
+  return [];
+}
+
+/**
+ * The Boosters a plan is costed under: the stored answer, or — while it has
+ * none — a cerebral accelerator detected in the character's ESI sheet
+ * (`engine/attributeBaseline.ts`), prefilled into a single row the user
+ * already knows.
+ *
+ * The plan storing NOTHING in *either* field is what "the user has not
+ * answered" means, and it is the whole gate: an answer that happens to read
+ * like a default (including an explicitly empty `boosters: []`) is still an
+ * answer. Unticking every row's box — "those accelerators are gone" — must
+ * not prefill back over it on the next visit.
+ *
+ * The prefilled row's expiry is left null on purpose: no ESI endpoint exposes
+ * a running booster's life, only the arithmetic that recovers its size, and a
+ * blank expiry applies nothing at all (see `toBoosters`).
+ */
+export function resolvePlanBoosters(
+  storedBoosters: unknown | undefined,
+  storedLegacyBooster: unknown | undefined,
+  detectedAccelerator: number | null
+): PlanBooster[] {
+  if (storedBoosters !== undefined || storedLegacyBooster !== undefined) {
+    return normalizePlanBoosters(storedBoosters, storedLegacyBooster);
+  }
+  return detectedAccelerator !== null
+    ? [
+        {
+          enabled: true,
+          bonus: clampBoosterBonus(detectedAccelerator),
+          startsAt: null,
+          expiresAt: null,
+        },
+      ]
+    : [];
+}
+
+/**
+ * The engine-native Boosters this plan schedules with: one per row that is
+ * enabled, has an expiry, and (after overlap-clamping) still starts before
+ * that expiry — a row fully swallowed by an earlier one contributes nothing.
+ *
+ * A blank expiry reads as "no window at all", not "already expired": the user
+ * has said an accelerator is running but not until when, and inventing one
+ * would quote training times nothing supports. (An expiry in the *past* is a
  * different thing and stays a real Booster here — `computeSchedule` already
  * ignores a lapsed one, and the editor shows an "expired" hint instead.)
  */
-export function toBooster(planBooster: PlanBooster): Booster | null {
-  if (!planBooster.enabled || planBooster.expiresAt === null) return null;
-  const bonus: Partial<Attributes> = {};
-  for (const name of ATTRIBUTE_NAMES) bonus[name] = planBooster.bonus;
-  return { bonus, expiresAt: new Date(planBooster.expiresAt) };
+export function toBoosters(planBoosters: readonly PlanBooster[]): Booster[] {
+  const boosters: Booster[] = [];
+  for (const row of clampBoosterOverlaps(planBoosters)) {
+    if (!row.enabled || row.expiresAt === null) continue;
+    if (row.startsAt !== null && row.startsAt >= row.expiresAt) continue;
+    const bonus: Partial<Attributes> = {};
+    for (const name of ATTRIBUTE_NAMES) bonus[name] = row.bonus;
+    const booster: Booster = { bonus, expiresAt: new Date(row.expiresAt) };
+    if (row.startsAt !== null) booster.startsAt = new Date(row.startsAt);
+    boosters.push(booster);
+  }
+  return boosters;
 }
 
 /** One quick-pick option: an accelerator duration, named in hours. */
@@ -157,15 +250,18 @@ export const BOOSTER_QUICK_PICKS: readonly BoosterQuickPick[] = [
 ];
 
 /**
- * The expiry a quick pick sets: now plus the picked duration.
+ * The expiry a quick pick sets: `from` plus the picked duration. `from`
+ * defaults to now, but a row with its own future `startsAt` passes that
+ * instead — a quick pick measured from "now" on a row that has not started
+ * yet would set an expiry before its own start.
  *
- * Takes `now` as a parameter rather than reading the clock itself so the
- * caller's own impurity is the only one on record (see `boosterExpired` in
- * `PlanEditor`, which does the same for the same reason) and so this stays
+ * Takes `now`/`from` as a parameter rather than reading the clock itself so
+ * the caller's own impurity is the only one on record (see `boosterExpired`
+ * in `PlanEditor`, which does the same for the same reason) and so this stays
  * unit-testable without faking `Date`.
  */
-export function boosterExpiryFromNow(hours: number, now: number = Date.now()): number {
-  return now + hours * 60 * 60 * 1000;
+export function boosterExpiryFromNow(hours: number, from: number = Date.now()): number {
+  return from + hours * 60 * 60 * 1000;
 }
 
 /** An instant as the local wall-clock string a `datetime-local` input takes. */

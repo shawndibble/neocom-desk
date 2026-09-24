@@ -93,7 +93,7 @@ here — they go one per file in `docs/context/decisions/`.
   formulas cannot be copied. See
   `docs/context/decisions/20260911-073307-blueprint-acquisition-cost-as-a-tier-optimized-material.md`
   (issue #838).
-- **Booster**: Cerebral accelerator; user toggles it on manually with an expiry date for training-time math. Stored on the Skill Plan and synced with it, like What-If Implants above (round 33).
+- **Booster**: Cerebral accelerator; user adds it manually with an optional start and an expiry date for training-time math. A Skill Plan holds an ordered list of Boosters, run one after another — EVE has a single booster slot, so at most one is ever live — with overlaps rejected in the editor and clamped on read (#1407). Stored on the Skill Plan and synced with it, like What-If Implants above (round 33).
 - **BPC**: An owned Blueprint Copy — an ESI blueprint instance with a finite
   number of `runs` remaining (`CharacterBlueprint.runs`,
   `esi/endpoints.ts`). Distinct from a **BPO**, which never depletes.
