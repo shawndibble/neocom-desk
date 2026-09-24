@@ -22,6 +22,7 @@ import { AuthFailureNotice } from './AuthFailureNotice';
 import { useGrantedScopes, useLockedRoutes } from './useGrantedScopes';
 import { warmRoute } from './routeWarm';
 import { preloadRouteChunk } from './routeChunks';
+import { ErrorBoundary } from './ErrorBoundary';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
@@ -656,16 +657,20 @@ export function Layout() {
         */}
         <div ref={outletRef} tabIndex={-1} className="focus:outline-none">
           {/* Routes are code-split (`routeChunks.ts`): the shell stays put
-              while a page's chunk loads on its first visit. */}
-          <Suspense
-            fallback={
-              <div className="flex justify-center py-16">
-                <Spinner label={t('common.loading')} />
-              </div>
-            }
-          >
-            <Outlet />
-          </Suspense>
+              while a page's chunk loads on its first visit, and a page that
+              throws — or whose chunk will not load — fails inside the shell,
+              clearing once the pilot navigates elsewhere. */}
+          <ErrorBoundary inline resetKey={location.pathname}>
+            <Suspense
+              fallback={
+                <div className="flex justify-center py-16">
+                  <Spinner label={t('common.loading')} />
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       </main>
 
