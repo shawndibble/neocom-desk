@@ -148,6 +148,7 @@ export function IndustryGroupPage() {
         activeCharacterId={activeCharacterId}
         activeTab="plans"
         onTabChange={(id) => navigate(industryTabHref(id as IndustryTab))}
+        tabsActivation="manual"
         blueprintsNeedsReauth={blueprintsNeedsReauth}
         onAddToQuickbar={quickbar.add}
         quickbarAvailable={quickbar.available}

@@ -80,7 +80,7 @@ describe('VariationsTable', () => {
     renderTable({ rows: [ROWS[0]], totalCount: 1, prices: new Map([[588, summary(null, 90)]]) });
     expect(screen.getByText('No sell orders')).toBeInTheDocument();
     // Shorthand on screen (#947); the exact figure is the accessible name.
-    expect(screen.getByLabelText('90.00 ISK')).toBeInTheDocument();
+    expect(screen.getByText('90.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
   it('shows the shared "no orders" fallback when neither side has an order', () => {

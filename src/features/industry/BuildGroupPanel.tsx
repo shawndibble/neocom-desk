@@ -587,7 +587,11 @@ export function BuildGroupPanel({
           reads the way a page heading does rather than sitting in a frame. */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
-          <h1 className="truncate text-sm font-semibold tracking-widest text-text uppercase">
+          {/* `tabIndex={-1}`: route focus (`app/routeFocus.ts`) lands here after navigation. */}
+          <h1
+            tabIndex={-1}
+            className="truncate text-sm font-semibold tracking-widest text-text uppercase focus:outline-none"
+          >
             {group.name}
           </h1>
           <span className="shrink-0 text-xs text-text-dim">

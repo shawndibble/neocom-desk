@@ -12,6 +12,13 @@ export interface IndustryHeaderProps {
   onAddToQuickbar: (typeId: number, itemName: string) => void;
   quickbarAvailable: boolean;
   onShowInfo: (typeId: number, itemName: string) => void;
+  /**
+   * `'manual'` for `IndustryPlanPage`/`IndustryGroupPage`, whose `onTabChange`
+   * navigates away rather than swapping content in place — see `Tabs`'
+   * `activation` doc. Defaults to `'automatic'`, matching `Industry.tsx`'s own
+   * in-page tab switch, which arrow keys already handle correctly.
+   */
+  tabsActivation?: 'automatic' | 'manual';
 }
 
 /**
@@ -31,6 +38,7 @@ export function IndustryHeader({
   onAddToQuickbar,
   quickbarAvailable,
   onShowInfo,
+  tabsActivation = 'automatic',
 }: IndustryHeaderProps) {
   const { t } = useTranslation();
   return (
@@ -59,6 +67,7 @@ export function IndustryHeader({
         value={activeTab}
         onChange={(id) => onTabChange(id as IndustryTab)}
         tabs={industryTabs(t)}
+        activation={tabsActivation}
       />
     </>
   );

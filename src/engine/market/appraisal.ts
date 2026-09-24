@@ -292,6 +292,35 @@ export interface AppraisalNetTotals {
   brokerFeePct: number;
 }
 
+/** The sell-order price that beats every seller at the hub, for one pasted item. */
+export interface AppraisalUndercut {
+  /** One legal tick under the cheapest sell order — what to type into EVE's price field. */
+  price: number;
+  /**
+   * True when that price is no better than the best buy order: selling into
+   * the buy order instead pays the same or more, today, with no broker fee.
+   */
+  atOrBelowBuy: boolean;
+}
+
+/**
+ * The Appraisal's Undercut view: what to list each pasted item at so it
+ * sits cheapest at the hub. Reads the unscaled `AppraisalItem`, never a
+ * Price-Percent-scaled row — the price is a real order being beaten, not a
+ * negotiated fraction of one — and is the same price `appraisalNet`'s
+ * `listNet` is built on, so the column and the chip always agree.
+ *
+ * Null when nobody is selling (nothing to undercut) or the cheapest seller
+ * already sits on the 0.01 ISK floor (no legal price below it).
+ */
+export function appraisalUndercut(
+  item: Pick<AppraisalItem, 'buy' | 'sell'>
+): AppraisalUndercut | null {
+  const price = item.sell === null ? null : undercutPrice(item.sell);
+  if (price === null) return null;
+  return { price, atOrBelowBuy: item.buy !== null && price <= item.buy };
+}
+
 /**
  * Net-of-fees totals for the two ways to sell what was pasted, always at
  * 100% of market regardless of the appraisal's own Price Percent — reads
@@ -314,9 +343,9 @@ export function appraisalNet(
       instantNet += buyTotal - salesTax(buyTotal, accountingLevel);
     }
 
-    const undercut = item.sell === null ? null : undercutPrice(item.sell);
+    const undercut = appraisalUndercut(item);
     if (undercut !== null) {
-      const listValue = undercut * item.quantity;
+      const listValue = undercut.price * item.quantity;
       const fee = brokerFee(
         listValue,
         brokerRelationsLevel,

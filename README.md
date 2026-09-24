@@ -10,23 +10,37 @@ Live: https://neocomdesk.com
 
 - **Characters** — EVE SSO (PKCE) sign-in, many characters side by side,
   per-character overview with training queue summary.
-- **Skills** — trained skills, attributes/implants, in-game queue. **Skill
-  Plans**: drag-and-drop entries with prerequisite auto-insert, in-game
-  queue import, clipboard import/export, and an optimizer aware of remaps,
-  implants ("what-if" overrides), and cerebral accelerators.
+- **Skills** — trained skills, attributes/implants, clones, in-game queue.
+  **Skill Plans**: drag-and-drop entries with prerequisite auto-insert,
+  milestones, in-game queue import, clipboard import/export, and an
+  optimizer aware of remaps, implants ("what-if" overrides), and sequenced
+  cerebral accelerators. Ship mastery, fit check, and a side-by-side
+  character comparison.
 - **Industry** — Build Plans for manufacturing and reaction jobs:
   blueprint/formula search, materials, job fees and taxes, facility presets
   (NPC stations and player structures with rig bonuses), build-vs-buy and
-  sale-profitability verdicts against live trade hub prices, active jobs
-  panel.
-- **Market Browser** — general item price lookup at any trade hub or
-  region: SDE-backed search, a quickbar of saved items, side-by-side
-  compare, and live order books.
+  sale-profitability verdicts against live trade hub prices, sub-builds,
+  a production log, opportunities, and an active jobs panel.
+- **BPC sourcing** — search every publicly contracted blueprint copy by
+  ME/TE, runs, price, region and jump range, flagging BPOs that may beat it.
+- **Market** — item price lookup at any region or all regions: SDE-backed
+  search, jump-range and security filters, a quickbar of saved items,
+  side-by-side compare, live order books, price history, price alerts, and
+  an Appraisal of pasted items or EFT fits (net of fees, with LP store
+  acquisition).
+- **Open Orders** — every character's market orders filed under what is
+  wrong with them (undercut, below the relist floor, expiring), with each
+  exit priced net of fees.
+- **Mining** — mining overview (output, ISK/hr, raw vs refined) and a moon
+  rental tax ledger: payees, assignments with snapshotted tax, and payment
+  matching.
 - **Planetary Industry** — colony list with extractor/factory pins and
-  expiry warnings, plus a chain planner (sourcing floor, planet/pin layout,
-  customs rate, margin and CPU/powergrid footprint).
-- **Character data views** — wallet, assets, mail, calendar, contracts, and
-  market orders, all read-only, cached locally, and viewable offline.
+  expiry warnings, a chain planner (sourcing floor, planet/pin layout,
+  customs rate, margin and CPU/powergrid footprint), and an advisor.
+- **Character data views** — wallet and loyalty store, assets, mail,
+  calendar, contracts, and contacts, cached locally and viewable offline.
+  Read-only except replying to/forwarding mail, marking mail read, and
+  calendar RSVPs.
 - **Corp tools** — role-gated ops board (structures, moon extractions),
   vitals, member roster, corp assets and wallet, for characters holding the
   relevant in-game roles.

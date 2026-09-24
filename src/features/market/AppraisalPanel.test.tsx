@@ -116,8 +116,8 @@ describe('AppraisalPanel', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     const row = screen.getByRole('row', { name: /Damage Control II/ });
     // Totals render as shorthand (#947); the exact figure is the accessible name.
-    expect(within(row).getByLabelText('1,345,950 ISK')).toBeInTheDocument();
-    expect(within(row).getByLabelText('1,382,400 ISK')).toBeInTheDocument();
+    expect(within(row).getByText('1,345,950 ISK', { selector: '.sr-only' })).toBeInTheDocument();
+    expect(within(row).getByText('1,382,400 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
   /** A null price is "nobody is trading this", not "this is free". */
@@ -194,7 +194,7 @@ describe('AppraisalPanel', () => {
       renderPanel({ controller: controller({ result: netOutcome() }) });
       // Only row 1 has a buy price: 10,000 raw total, 7.5% sales tax
       // (Accounting 0) — 10,000 - 750 = 9,250. Row 2 contributes nothing.
-      expect(screen.getByLabelText('9,250 ISK')).toBeInTheDocument();
+      expect(screen.getByText('9,250 ISK', { selector: '.sr-only' })).toBeInTheDocument();
     });
 
     it('never shows the net chips while the active Character’s skills are still loading', () => {
@@ -367,7 +367,9 @@ describe('AppraisalPanel', () => {
     it('adds a refine column and total when a row carries refine data', () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });
       const veldsparRow = screen.getByRole('row', { name: /Veldspar/ });
-      expect(within(veldsparRow).getByLabelText('8,000 ISK')).toBeInTheDocument();
+      expect(
+        within(veldsparRow).getByText('8,000 ISK', { selector: '.sr-only' })
+      ).toBeInTheDocument();
       expect(screen.getAllByText('Refine total').length).toBeGreaterThan(0);
     });
 
@@ -411,8 +413,10 @@ describe('AppraisalPanel', () => {
       };
       renderPanel({ controller: controller({ result: partBatch }) });
       const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
-      const refineCell = within(oreRow).getByLabelText('15,436,890 ISK').parentElement;
-      const buyCell = within(oreRow).getByLabelText('15,984,000 ISK').parentElement;
+      const refineCell = within(oreRow).getByText('15,436,890 ISK', { selector: '.sr-only' })
+        .parentElement?.parentElement;
+      const buyCell = within(oreRow).getByText('15,984,000 ISK', { selector: '.sr-only' })
+        .parentElement?.parentElement;
       expect(refineCell?.className).toContain('text-accent');
       expect(buyCell?.className).not.toContain('text-accent');
     });
@@ -426,7 +430,8 @@ describe('AppraisalPanel', () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });
       const dcuRow = screen.getByRole('row', { name: /Damage Control II/ });
       // The highlight lives on the cell wrapper around the shorthand figure.
-      const buyCell = within(dcuRow).getByLabelText('1,345,950 ISK').parentElement;
+      const buyCell = within(dcuRow).getByText('1,345,950 ISK', { selector: '.sr-only' })
+        .parentElement?.parentElement;
       expect(buyCell?.className).not.toContain('text-accent');
     });
   });
@@ -596,6 +601,102 @@ describe('AppraisalPanel', () => {
   it('reports a catalogue that would not load', () => {
     renderPanel({ controller: controller({ failed: true }) });
     expect(screen.getByText("Couldn't load the market catalogue")).toBeInTheDocument();
+  });
+});
+
+describe('AppraisalPanel — Undercut', () => {
+  // Rows are Price-Percent-scaled (90%); the undercut reads `items`, unscaled.
+  const UNDERCUT_OUTCOME = outcome({
+    appraisal: {
+      ...APPRAISAL,
+      rows: [
+        ...APPRAISAL.rows,
+        {
+          typeId: 777,
+          name: 'Thin Spread Module',
+          quantity: 1,
+          buyEach: 900,
+          sellEach: 900.9,
+          buyTotal: 900,
+          sellTotal: 900.9,
+        },
+        {
+          typeId: 555,
+          name: 'Unlisted Widget',
+          quantity: 1,
+          buyEach: 10,
+          sellEach: null,
+          buyTotal: 10,
+          sellTotal: null,
+        },
+      ],
+      items: [
+        { typeId: 2048, name: 'Damage Control II', quantity: 3, buy: 498_500, sell: 512_000 },
+        { typeId: 999, name: 'Civilian Gatling Railgun', quantity: 4, buy: null, sell: 1_000 },
+        { typeId: 777, name: 'Thin Spread Module', quantity: 1, buy: 1_000, sell: 1_001 },
+        { typeId: 555, name: 'Unlisted Widget', quantity: 1, buy: 10, sell: null },
+      ],
+    },
+  });
+
+  function undercutButton() {
+    return screen.getByRole('button', { name: 'Undercut' });
+  }
+
+  it('hides the undercut column until the button is pressed', async () => {
+    renderPanel({ controller: controller({ result: UNDERCUT_OUTCOME }) });
+    expect(undercutButton()).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('columnheader', { name: 'List at' })).not.toBeInTheDocument();
+
+    await userEvent.click(undercutButton());
+    expect(undercutButton()).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('columnheader', { name: 'List at' })).toBeInTheDocument();
+  });
+
+  it('prices one tick under the cheapest seller at 100% of market, ignoring Price Percent', async () => {
+    renderPanel({ controller: controller({ result: UNDERCUT_OUTCOME }) });
+    await userEvent.click(undercutButton());
+    const row = screen.getByRole('row', { name: /Damage Control II/ });
+    expect(within(row).getByText('511,900.00')).toBeInTheDocument();
+  });
+
+  it('copies plain digits for EVE’s price field', async () => {
+    const written: string[] = [];
+    configureClipboard(async (text) => {
+      written.push(text);
+    });
+    renderPanel({ controller: controller({ result: UNDERCUT_OUTCOME }) });
+    await userEvent.click(undercutButton());
+    const row = screen.getByRole('row', { name: /Civilian Gatling Railgun/ });
+    await userEvent.click(within(row).getByRole('button', { name: /^Copy 999\.90/ }));
+    expect(written).toEqual(['999.90']);
+    configureClipboard(null);
+  });
+
+  it('shows a dash, never a price, where nobody is selling', async () => {
+    renderPanel({ controller: controller({ result: UNDERCUT_OUTCOME }) });
+    await userEvent.click(undercutButton());
+    const row = screen.getByRole('row', { name: /Unlisted Widget/ });
+    expect(within(row).queryByRole('button', { name: /^Copy/ })).not.toBeInTheDocument();
+  });
+
+  it('warns where the undercut pays no more than selling to the best buy order', async () => {
+    renderPanel({ controller: controller({ result: UNDERCUT_OUTCOME }) });
+    await userEvent.click(undercutButton());
+    const thin = screen.getByRole('row', { name: /Thin Spread Module/ });
+    expect(
+      within(thin).getByTitle(/pays no more than selling into the best buy order/)
+    ).toBeInTheDocument();
+    const healthy = screen.getByRole('row', { name: /Damage Control II/ });
+    expect(
+      within(healthy).queryByTitle(/pays no more than selling into the best buy order/)
+    ).not.toBeInTheDocument();
+  });
+
+  it('says the prices are only as fresh as the last price fetch', async () => {
+    renderPanel({ controller: controller({ result: UNDERCUT_OUTCOME }) });
+    await userEvent.click(undercutButton());
+    expect(screen.getByText(/Refresh before listing/)).toBeInTheDocument();
   });
 });
 

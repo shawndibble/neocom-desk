@@ -38,6 +38,10 @@ export interface AlertGroupRowProps {
   showCharacter: boolean;
   /** The whole row, not its id: the caller has to know which Character to sync the dismissal under. */
   onDismissEntry: (entry: NotificationFeedRecord) => void;
+  /** The row's own focus anchor — the caller moves focus here when a neighboring row disappears. */
+  toggleRef?: (el: HTMLButtonElement | null) => void;
+  /** Per-entry focus anchor for the dismiss button, keyed by `entry.id` — same reason as `toggleRef`. */
+  entryDismissRef?: (entryId: string, el: HTMLButtonElement | null) => void;
 }
 
 export function AlertGroupRow({
@@ -49,6 +53,8 @@ export function AlertGroupRow({
   nameById,
   showCharacter,
   onDismissEntry,
+  toggleRef,
+  entryDismissRef,
 }: AlertGroupRowProps) {
   const { t } = useTranslation();
 
@@ -68,6 +74,7 @@ export function AlertGroupRow({
           opening the type — every fire inside already carries its own age.
         */}
         <button
+          ref={toggleRef}
           type="button"
           aria-expanded={expanded}
           onClick={onToggle}
@@ -128,6 +135,7 @@ export function AlertGroupRow({
                   : null
               }
               onDismiss={() => onDismissEntry(entry)}
+              dismissRef={entryDismissRef ? (el) => entryDismissRef(entry.id, el) : undefined}
             />
           ))}
         </ul>
@@ -140,11 +148,13 @@ function AlertFireRow({
   entry,
   name,
   onDismiss,
+  dismissRef,
 }: {
   entry: NotificationFeedRecord;
   /** Null on a one-Character device — see `showCharacter`. */
   name: string | null;
   onDismiss: () => void;
+  dismissRef?: (el: HTMLButtonElement | null) => void;
 }) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -205,6 +215,7 @@ function AlertFireRow({
         {body}
       </Link>
       <IconButton
+        ref={dismissRef}
         icon={<Icon.Close />}
         label={t('alerts.dismissOne', { title: entry.title })}
         variant="plain"

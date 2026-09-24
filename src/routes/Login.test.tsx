@@ -132,7 +132,7 @@ describe('Login', () => {
       'Wallet & LP',
       'Assets',
       'Planetary Industry',
-      'Moon Mining',
+      'Mining',
       'Corporation',
       'Alerts',
       'Notifications',

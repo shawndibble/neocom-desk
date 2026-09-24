@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { SkillType } from '@/sde/types';
@@ -141,6 +141,25 @@ describe('SkillPicker', () => {
 
     expect(onAdd).toHaveBeenCalledWith({ skillTypeID: 1, targetLevel: 3 });
     expect(input).toHaveValue('');
+  });
+
+  it('returns focus to the search box and announces the pick once the level button unmounts', async () => {
+    const user = userEvent.setup();
+    render(
+      <SkillPicker skills={SKILLS} catalog={CATALOG} trainedSkills={NO_TRAINED} onAdd={vi.fn()} />
+    );
+
+    const input = screen.getByRole('searchbox');
+    await user.type(input, 'frigate');
+    const firstItem = (await screen.findAllByRole('listitem'))[0];
+    if (!firstItem) throw new Error('expected at least one result');
+    await user.click(within(firstItem).getByRole('button', { name: /^Frigate/ }));
+    await user.click(screen.getByRole('button', { name: 'Level III' }));
+
+    expect(input).toHaveFocus();
+    await waitFor(() =>
+      expect(screen.getByRole('status')).toHaveTextContent('Added Frigate Level III')
+    );
   });
 
   it('matches description text, not just name', async () => {

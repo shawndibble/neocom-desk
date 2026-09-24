@@ -110,9 +110,15 @@ describe('PriceHistoryPanel', () => {
     await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
     // Shorthand on screen (#947), so each figure is matched by its accessible
     // name and still checked against the label it sits beside.
-    expect(screen.getByLabelText('30.00 ISK').parentElement).toHaveTextContent('High');
-    expect(screen.getByLabelText('10.00 ISK').parentElement).toHaveTextContent('Low');
-    expect(screen.getByLabelText('20.00 ISK').parentElement).toHaveTextContent('Median');
+    expect(
+      screen.getByText('30.00 ISK', { selector: '.sr-only' }).parentElement?.parentElement
+    ).toHaveTextContent('High');
+    expect(
+      screen.getByText('10.00 ISK', { selector: '.sr-only' }).parentElement?.parentElement
+    ).toHaveTextContent('Low');
+    expect(
+      screen.getByText('20.00 ISK', { selector: '.sr-only' }).parentElement?.parentElement
+    ).toHaveTextContent('Median');
   });
 
   it('takes the summary high and low from the days\u2019 own extremes, not their averages', async () => {
@@ -127,8 +133,12 @@ describe('PriceHistoryPanel', () => {
       <PriceHistoryPanel regionId={10000002} typeId={34} itemName="Tritanium" now={FIXED_NOW} />
     );
     await waitFor(() => expect(screen.getByTestId('chart')).toBeInTheDocument());
-    expect(screen.getByLabelText('44.00 ISK').parentElement).toHaveTextContent('High');
-    expect(screen.getByLabelText('4.00 ISK').parentElement).toHaveTextContent('Low');
+    expect(
+      screen.getByText('44.00 ISK', { selector: '.sr-only' }).parentElement?.parentElement
+    ).toHaveTextContent('High');
+    expect(
+      screen.getByText('4.00 ISK', { selector: '.sr-only' }).parentElement?.parentElement
+    ).toHaveTextContent('Low');
   });
 
   it('sums traded volume and averages the daily order count across the range', async () => {

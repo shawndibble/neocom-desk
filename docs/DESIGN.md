@@ -560,6 +560,9 @@ surfaces — `bg` / `panel` / `panel-2`:
   that meets AA on its own.
 - Focus: visible `outline-accent` ring on all interactive elements (never `outline-none`
   without replacement).
+  The exception is a non-interactive `tabIndex={-1}` target that only takes focus
+  programmatically — a page's `<h1>` and the route outlet (`app/routeFocus.ts`) —
+  which uses `focus:outline-none`: a ring there reads as a control that isn't one.
 - Color never the sole signal: ISK deltas keep signs, statuses keep words/icons,
   clock kinds keep their glyph and their written name.
 - **The nominal palette (§1) is reinforcement, never the signal.** Seven hues cannot be

@@ -60,7 +60,13 @@ export function PageHeader({ title, meta, actions, subNav, className = '' }: Pag
         className
       )}
     >
-      <h1 className="text-xl font-semibold tracking-widest uppercase">{title}</h1>
+      {/* `tabIndex={-1}`: route focus (`app/routeFocus.ts`) lands here after navigation. */}
+      <h1
+        tabIndex={-1}
+        className="text-xl font-semibold tracking-widest uppercase focus:outline-none"
+      >
+        {title}
+      </h1>
       {meta}
       {subNav && (
         <div className="order-last w-full min-w-0 md:order-none md:w-auto md:flex-1">{subNav}</div>
