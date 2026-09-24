@@ -28,8 +28,10 @@ import {
   IconButton,
   IskAmount,
   TextInput,
+  Tooltip,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { formatIsk } from '@/lib/isk';
 import type { BuildPlanRecord } from '@/db';
 import { iskToneClass } from '@/features/character/format';
 import { BlueprintPicker } from './BlueprintPicker';
@@ -52,6 +54,14 @@ export interface PlanRollupStats {
   profit: number | null;
   /** Build/Buy verdict: buy price minus build cost, positive means cheaper to build. Independent of `profit` above. */
   verdict: PlanVerdictTag;
+  /**
+   * The two totals the verdict compares — what building costs (materials +
+   * job fees) and what buying the product(s) outright costs. Null when
+   * unpriceable; the verdict tag's tooltip shows them so the call is
+   * explainable, since `profit` above is a different question.
+   */
+  buildCost?: number | null;
+  buyCost?: number | null;
 }
 
 /** One plan row's Est. total / Verdict / Runs — everything the pricing/records data supplies per plan. */
@@ -70,7 +80,15 @@ const VERDICT_TAG_CLASS: Record<PlanVerdictTag, string> = {
   unknown: 'text-text-faint border-line',
 };
 
-function VerdictTag({ verdict }: { verdict: PlanVerdictTag }) {
+function VerdictTag({
+  verdict,
+  buildCost,
+  buyCost,
+}: {
+  verdict: PlanVerdictTag;
+  buildCost?: number | null;
+  buyCost?: number | null;
+}) {
   const { t } = useTranslation();
   const label =
     verdict === 'build'
@@ -78,12 +96,43 @@ function VerdictTag({ verdict }: { verdict: PlanVerdictTag }) {
       : verdict === 'buy'
         ? t('industry.verdictTagBuy')
         : t('industry.verdictTagUnknown');
-  return (
+  const tag = (
     <span
       className={`rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold uppercase tracking-widest ${VERDICT_TAG_CLASS[verdict]}`}
     >
       {label}
     </span>
+  );
+  if (verdict === 'unknown' || buildCost == null || buyCost == null) return tag;
+  return (
+    <Tooltip
+      content={
+        // Labels left, figures right, so the two totals compare by eye.
+        <table className="w-full border-separate border-spacing-x-3 border-spacing-y-0.5 tabular-nums">
+          <tbody>
+            <tr>
+              <th scope="row" className="text-left font-semibold">
+                {t('industry.verdictTagBuild')}
+              </th>
+              <td className="text-right">
+                {t('industry.verdictTagAmount', { amount: formatIsk(buildCost) })}
+              </td>
+            </tr>
+            <tr>
+              <th scope="row" className="text-left font-semibold">
+                {t('industry.verdictTagBuy')}
+              </th>
+              <td className="text-right">
+                {t('industry.verdictTagAmount', { amount: formatIsk(buyCost) })}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      }
+      openOnTap
+    >
+      {tag}
+    </Tooltip>
   );
 }
 
@@ -352,7 +401,11 @@ function PlanRow({
         <ProfitCell profit={stats?.profit ?? null} />
       </span>
       <span className="hidden w-14 shrink-0 justify-end sm:flex">
-        <VerdictTag verdict={stats?.verdict ?? 'unknown'} />
+        <VerdictTag
+          verdict={stats?.verdict ?? 'unknown'}
+          buildCost={stats?.buildCost}
+          buyCost={stats?.buyCost}
+        />
       </span>
       <span className="hidden w-8 shrink-0 text-right sm:block">
         <RunsCell runs={stats?.runs ?? 0} />
@@ -467,7 +520,11 @@ function GroupHeader({
         <ProfitCell profit={stats?.profit ?? null} />
       </span>
       <span className="hidden w-14 shrink-0 justify-end sm:flex">
-        <VerdictTag verdict={stats?.verdict ?? 'unknown'} />
+        <VerdictTag
+          verdict={stats?.verdict ?? 'unknown'}
+          buildCost={stats?.buildCost}
+          buyCost={stats?.buyCost}
+        />
       </span>
       {/* Runs has no group-level meaning — a group aggregates cost, not a
           production history of its own — so this column stays a fixed-width

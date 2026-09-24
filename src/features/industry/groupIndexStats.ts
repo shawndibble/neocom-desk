@@ -72,5 +72,10 @@ export function computeGroupIndexStats(
   // unpriced, so `rollup.profit` stays null. Gate on both, or the tag reads
   // confident next to a "—" profit.
   const unpriceable = rollup.unpriceable || rollup.profit === null;
-  return { profit: rollup.profit, verdict: verdictOf(savings, unpriceable) };
+  return {
+    profit: rollup.profit,
+    verdict: verdictOf(savings, unpriceable),
+    buildCost: unpriceable ? null : rollup.totalCost,
+    buyCost: unpriceable ? null : rollup.buyCost,
+  };
 }
