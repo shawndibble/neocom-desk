@@ -16,11 +16,15 @@ import {
 } from '@/components/ui';
 import { characterAvatarBoxClassName } from '@/components/ui/characterAvatarBox';
 import {
+  AllCharacters,
   Clones,
   Container,
+  Contracts,
   Corporation,
   ICON_SIZE,
+  ImportClipboard,
   Industry,
+  MailInbox,
   Market,
   MoonMining,
   Notifications,
@@ -61,44 +65,34 @@ interface LandingRow {
 }
 
 /**
- * The four questions the page leads with. Each one names a surface a signed-in
+ * The questions the page leads with. Each one names a surface a signed-in
  * pilot actually opens, so the claim under it can be checked against the app
- * rather than admired — no benefit here is broader than what ships.
+ * rather than admired — no benefit here is broader than what ships. The first
+ * is the multi-character one on purpose: it is the claim the tagline makes,
+ * and a question is where a reader checks a claim. Keep the count even — the
+ * grid is two columns wide.
  */
 const ANSWERS: LandingRow[] = [
+  { icon: AllCharacters, key: 'attention' },
   { icon: Orders, key: 'orders' },
   { icon: Industry, key: 'build' },
   { icon: Skills, key: 'training' },
-  { icon: MoonMining, key: 'moon' },
+  { icon: Planetary, key: 'colonies' },
+  { icon: ImportClipboard, key: 'appraisal' },
 ];
 
 /**
  * The feature catalog under the answers, grouped the way the app's own nav
- * groups its routes (Progression / Economy / Operations) so the page and the
- * signed-in shell describe the same product in the same order.
+ * groups its routes (`Layout.tsx`: Progression / Economy / Social) so the page
+ * and the signed-in shell describe the same product in the same order. The
+ * nav's ungrouped head — Alerts and Corporation beside Overview — has no label
+ * there; here it is "Command", with Notifications riding along as Alerts'
+ * delivery path. Clones sits under Progression rather than the character
+ * sub-nav it lives in, because it is pitched as what training runs on.
  */
 const FEATURE_GROUPS: { group: string; items: LandingRow[] }[] = [
   {
-    group: 'progression',
-    items: [
-      { icon: Skills, key: 'skills' },
-      { icon: Clones, key: 'clones' },
-    ],
-  },
-  {
-    group: 'economy',
-    items: [
-      { icon: Industry, key: 'industry' },
-      { icon: Market, key: 'market' },
-      { icon: Orders, key: 'orders' },
-      { icon: Wallet, key: 'walletOrders' },
-      { icon: Container, key: 'assets' },
-      { icon: Planetary, key: 'planetary' },
-      { icon: MoonMining, key: 'miningTax' },
-    ],
-  },
-  {
-    group: 'operations',
+    group: 'command',
     items: [
       { icon: Corporation, key: 'corp' },
       // Alerts is the record of what fired; Notifications is how it gets to
@@ -107,9 +101,63 @@ const FEATURE_GROUPS: { group: string; items: LandingRow[] }[] = [
       // belongs to the feed you read rather than to the delivery mechanism.
       { icon: Notifications, key: 'alerts' },
       { icon: ScheduledPush, key: 'notifications' },
-      { icon: Social, key: 'social' },
     ],
   },
+  {
+    group: 'progression',
+    items: [
+      { icon: Skills, key: 'skills' },
+      { icon: Clones, key: 'clones' },
+      { icon: Industry, key: 'industry' },
+      { icon: MoonMining, key: 'miningTax' },
+      { icon: Planetary, key: 'planetary' },
+    ],
+  },
+  {
+    group: 'economy',
+    items: [
+      { icon: Market, key: 'market' },
+      { icon: Orders, key: 'orders' },
+      { icon: Wallet, key: 'walletOrders' },
+      { icon: Container, key: 'assets' },
+      { icon: Contracts, key: 'contracts' },
+    ],
+  },
+  {
+    group: 'social',
+    items: [
+      { icon: MailInbox, key: 'social' },
+      { icon: Social, key: 'contacts' },
+    ],
+  },
+];
+
+/**
+ * One captured screen in the "See it in action" gallery: the file under
+ * `public/screenshots/` and the `login.screenshots.*` key its alt text and
+ * caption live under. Real captures (the Play Store listing's), not mockups —
+ * the hero preview already covers "what it would look like"; this answers
+ * "what does it actually look like". WebP sits outside the PWA precache glob,
+ * so a signed-in user never downloads them.
+ */
+interface Screenshot {
+  file: string;
+  key: string;
+}
+
+const DESKTOP_SCREENSHOTS: Screenshot[] = [
+  { file: 'desktop-order-detail', key: 'orderDetail' },
+  { file: 'desktop-build-plan', key: 'buildPlan' },
+  { file: 'desktop-lp-store', key: 'lpStore' },
+  { file: 'desktop-calendar', key: 'calendar' },
+  { file: 'desktop-contracts', key: 'contracts' },
+];
+
+const PHONE_SCREENSHOTS: Screenshot[] = [
+  { file: 'phone-overview', key: 'phoneOverview' },
+  { file: 'phone-alerts', key: 'phoneAlerts' },
+  { file: 'phone-wallet', key: 'phoneWallet' },
+  { file: 'phone-price-history', key: 'phonePriceHistory' },
 ];
 
 /**
@@ -377,6 +425,33 @@ export function Login() {
         </div>
       </LandingSection>
 
+      <LandingSection id="login-screenshots" heading={t('login.screenshotsHeading')}>
+        <p className="mt-2 max-w-2xl text-sm text-text-dim">{t('login.screenshotsLead')}</p>
+        {/*
+          A scroll-snap strip rather than a grid: five 16:9 captures side by
+          side would each be too small to read, and stacked they would be the
+          longest section on the page. The strip scrolls inside itself, so the
+          page never scrolls sideways at phone width.
+        */}
+        <ul className="mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-3">
+          {DESKTOP_SCREENSHOTS.map(({ file, key }) => (
+            <li key={key} className="w-[85%] shrink-0 snap-start md:w-[70%]">
+              <ScreenshotFigure file={file} i18nKey={key} width={1600} height={900} />
+            </li>
+          ))}
+        </ul>
+        <h3 className="mt-10 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+          {t('login.screenshotsPhoneHeading')}
+        </h3>
+        <ul className="mt-3 grid grid-cols-2 gap-4 md:grid-cols-4">
+          {PHONE_SCREENSHOTS.map(({ file, key }) => (
+            <li key={key}>
+              <ScreenshotFigure file={file} i18nKey={key} width={540} height={1104} />
+            </li>
+          ))}
+        </ul>
+      </LandingSection>
+
       <LandingSection id="login-features" heading={t('login.featuresHeading')}>
         {FEATURE_GROUPS.map(({ group, items }) => (
           <div key={group} className="mt-6">
@@ -435,7 +510,6 @@ export function Login() {
       </section>
 
       <footer className="flex flex-wrap justify-center gap-6 px-6 py-6 text-xs text-text-dim">
-        <span>{t('login.footerMultiChar')}</span>
         <span>{t('login.footerOffline')}</span>
         <a
           href={REPO_URL}
@@ -478,6 +552,40 @@ function LandingSection({
         {children}
       </div>
     </section>
+  );
+}
+
+/**
+ * One gallery capture. Explicit `width`/`height` reserve the box before the
+ * lazy image arrives, so the page does not jump as a visitor scrolls into it.
+ */
+function ScreenshotFigure({
+  file,
+  i18nKey,
+  width,
+  height,
+}: {
+  file: string;
+  i18nKey: string;
+  width: number;
+  height: number;
+}) {
+  const { t } = useTranslation();
+  return (
+    <figure>
+      <img
+        src={`/screenshots/${file}.webp`}
+        alt={t(`login.screenshots.${i18nKey}.alt`)}
+        width={width}
+        height={height}
+        loading="lazy"
+        decoding="async"
+        className="h-auto w-full rounded-xs border border-line"
+      />
+      <figcaption className="mt-2 text-sm text-text-dim">
+        {t(`login.screenshots.${i18nKey}.caption`)}
+      </figcaption>
+    </figure>
   );
 }
 

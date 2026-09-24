@@ -75,7 +75,9 @@ describe('Login', () => {
   it('shows the app name, hero heading and SSO button', async () => {
     renderLogin();
     expect(
-      await screen.findByRole('heading', { name: /command deck for every character you fly/i })
+      await screen.findByRole('heading', {
+        name: /the math you'd do in a spreadsheet, already done/i,
+      })
     ).toBeInTheDocument();
     expect(screen.getByText('Neocom Desk')).toBeInTheDocument();
     const buttons = screen.getAllByRole('button', { name: /log in with eve online/i });
@@ -84,7 +86,9 @@ describe('Login', () => {
 
   it('links the footer "Free & open source" text to the repo', async () => {
     renderLogin();
-    await screen.findByRole('heading', { name: /command deck for every character you fly/i });
+    await screen.findByRole('heading', {
+      name: /the math you'd do in a spreadsheet, already done/i,
+    });
     expect(screen.getByRole('link', { name: /free & open source/i })).toHaveAttribute(
       'href',
       'https://github.com/shawndibble/neocom-desk'
@@ -102,6 +106,23 @@ describe('Login', () => {
     expect(
       screen.getByRole('heading', { name: /is this blueprint worth building today/i })
     ).toBeInTheDocument();
+    // The tagline sells "every character you fly"; this is the question that
+    // backs it up.
+    expect(
+      screen.getByRole('heading', { name: /which character needs my attention/i })
+    ).toBeInTheDocument();
+  });
+
+  it('shows real screenshots, each with alt text, lazily loaded', async () => {
+    renderLogin();
+    const gallery = within(await screen.findByRole('region', { name: /see it in action/i }));
+    const images = gallery.getAllByRole('img');
+    expect(images).toHaveLength(9);
+    for (const image of images) {
+      expect(image.getAttribute('alt')).toBeTruthy();
+      expect(image).toHaveAttribute('loading', 'lazy');
+      expect(image.getAttribute('src')).toMatch(/^\/screenshots\/[a-z-]+\.webp$/);
+    }
   });
 
   // The catalog is the page's claim about what shipped, and it silently rotted
@@ -120,7 +141,8 @@ describe('Login', () => {
       await screen.findByRole('region', { name: /everything outside the client/i })
     );
 
-    for (const group of ['Progression', 'Economy', 'Operations']) {
+    // Layout.tsx's nav groups, plus "Command" for its unlabelled head.
+    for (const group of ['Command', 'Progression', 'Economy', 'Social']) {
       expect(catalog.getByRole('heading', { name: group })).toBeInTheDocument();
     }
     for (const feature of [
@@ -136,7 +158,9 @@ describe('Login', () => {
       'Corporation',
       'Alerts',
       'Notifications',
-      'Mail, Calendar & Contracts',
+      'Contracts',
+      'Mail & Calendar',
+      'Contacts & Standings',
     ]) {
       expect(catalog.getByText(feature)).toBeInTheDocument();
     }
@@ -204,26 +228,34 @@ describe('Login', () => {
   it('answers the trust objections and enumerates the scopes it asks for', async () => {
     renderLogin();
     expect(
-      await screen.findByRole('heading', { name: /read-only, and it stays that way/i })
+      await screen.findByRole('heading', { name: /it writes only when you tell it to/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /never writes to your account/i })
+      screen.getByRole('heading', { name: /no trades, no colony changes/i })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: /your refresh token stays in this browser/i })
     ).toBeInTheDocument();
 
-    const permissions = screen.getByText(/signing in grants read-only access/i);
+    const permissions = screen.getByText(/signing in lets it read/i);
     for (const phrase of new Set(Object.values(READ_ONLY_PHRASES))) {
       expect(permissions).toHaveTextContent(phrase);
     }
   });
 
-  it('discloses each write scope in its own fine-print line, not the read-only sentence', async () => {
-    renderLogin();
-    await screen.findByRole('heading', { name: /read-only, and it stays that way/i });
+  it('never calls the app read-only, since the Base Grant carries write scopes', async () => {
+    const { container } = renderLogin();
+    await screen.findByRole('group', { name: /signed-in view/i });
+    expect(container.textContent ?? '').not.toMatch(
+      /read-only access|it never writes|read-only, and/i
+    );
+  });
 
-    const permissions = screen.getByText(/signing in grants read-only access/i);
+  it('discloses each write scope in its own fine-print line, not the read sentence', async () => {
+    renderLogin();
+    await screen.findByRole('heading', { name: /it writes only when you tell it to/i });
+
+    const permissions = screen.getByText(/signing in lets it read/i);
     for (const phrase of Object.values(WRITE_SCOPE_PHRASES)) {
       expect(permissions).not.toHaveTextContent(phrase);
       expect(screen.getByText(new RegExp(phrase, 'i'))).toBeInTheDocument();
