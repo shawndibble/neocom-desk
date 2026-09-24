@@ -523,6 +523,9 @@ export function Industry() {
               skills={modifiers.skills}
               plans={plans}
               onOpenRun={openRunFromRecords}
+              onAddToQuickbar={quickbar.add}
+              quickbarAvailable={quickbar.available}
+              onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
             />
           ) : comparing ? (
             comparePlans.length >= 2 ? (
