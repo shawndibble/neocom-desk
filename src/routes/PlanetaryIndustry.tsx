@@ -330,7 +330,7 @@ function CardStat({
 }) {
   return (
     <div>
-      <div className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+      <div className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {label}
       </div>
       <div className={`text-sm font-medium tabular-nums ${accent ? 'text-accent' : 'text-text'}`}>
