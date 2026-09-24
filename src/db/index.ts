@@ -1,6 +1,6 @@
 import Dexie, { type EntityTable } from 'dexie';
 import { emitUpgradeBlocked } from './blockedSignal';
-import type { Attributes, Implants, PlanEntry } from '@/engine/types';
+import type { Attributes, Implants, PlanEntry, PlanMilestone } from '@/engine/types';
 import type {
   FacilityKind,
   MaterialPriceBasis,
@@ -132,6 +132,13 @@ export interface SkillPlanRecord {
    * the only one the editor may prefill from a detected in-game accelerator.
    */
   booster?: PlanBooster;
+  /**
+   * Named goals pinned to a plan entry's skill level ("Fly Loki") — CONTEXT.md
+   * "Plan Milestone". Optional and additive, like `markers` above — not
+   * indexed, so no Dexie schema version bump. Absent means the plan has never
+   * had one, which is how every plan behaved before this existed.
+   */
+  milestones?: PlanMilestone[];
   /** Epoch ms of the last edit. */
   updatedAt: number;
 }

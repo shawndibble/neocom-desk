@@ -231,6 +231,8 @@ export const ImportClipboard = withWeight(Clipboard);
 export const OptimizeRemaps = withWeight(Sliders);
 /** Drop a remap marker at the current end of the queue (#224 icon-only toolbar). */
 export const AddMarker = withWeight(Flag);
+/** Pins a named goal ("Fly Loki") to a plan entry row — CONTEXT.md "Plan Milestone". Same glyph as `AddMarker`, named for the goal-marking sense rather than the remap sense. */
+export const Milestone = withWeight(Flag);
 /** Tune remaps against the plan's existing markers (#224 icon-only toolbar). */
 export const OptimizeAtMarkers = withWeight(Target);
 /** Open the mobile filter sheet — the one control a narrow filter row collapses to (`FilterBar`). */

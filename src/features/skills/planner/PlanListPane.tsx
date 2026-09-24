@@ -81,6 +81,7 @@ export function PlanListPane({
       // than the plan it was copied from.
       ...(source.whatIfImplants ? { whatIfImplants: source.whatIfImplants } : {}),
       ...(source.booster ? { booster: source.booster } : {}),
+      ...(source.milestones ? { milestones: source.milestones } : {}),
     };
     await db.skillPlans.add(copy);
     syncAfterEdit();
