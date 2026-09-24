@@ -13,7 +13,7 @@ import {
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { remapAvailability, type RemapAvailability } from './remapAvailability';
 import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
-import type { CharacterAttributes } from '@/esi/endpoints';
+import type { CharacterAttributes, SkillQueueEntry } from '@/esi/endpoints';
 
 const DEFAULT_ATTRIBUTES: Attributes = {
   intelligence: 20,
@@ -55,6 +55,10 @@ export interface PlanEditorData {
   attributeBaseline: AttributeBaseline | null;
   implants: Implants;
   remapInfo: RemapAvailability | null;
+  /** The live in-game queue (empty when unread) — it trains before any plan does. */
+  queueEntries: readonly SkillQueueEntry[];
+  /** When the queue was read, for a `DataAgeBadge`; null when it never was. */
+  queueFetchedAt: Date | null;
 }
 
 /**
@@ -75,6 +79,8 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
   // Remaps Available (CONTEXT.md): ESI bonus remaps + the yearly remap when
   // off cooldown. Prefills new plans' remapCount; user-editable per plan.
   const [remapInfo, setRemapInfo] = useState<RemapAvailability | null>(null);
+  const [queueEntries, setQueueEntries] = useState<readonly SkillQueueEntry[]>([]);
+  const [queueFetchedAt, setQueueFetchedAt] = useState<Date | null>(null);
 
   useEffect(() => {
     if (characterId === null) return;
@@ -93,6 +99,8 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
       // optimized against levels the character already trained past.
       setTrainedSkills(corrected.trained);
       setTrainedSkillsKnown(corrected.skillsResult !== null);
+      setQueueEntries(corrected.queueResult?.data ?? []);
+      setQueueFetchedAt(corrected.queueResult?.fetchedAt ?? null);
       if (attrs?.data) {
         // An `impossible` sheet yields no baseline at all, so the scheduler
         // falls back to the same placeholder it uses when ESI cannot be read.
@@ -120,5 +128,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
     attributeBaseline,
     implants,
     remapInfo,
+    queueEntries,
+    queueFetchedAt,
   };
 }

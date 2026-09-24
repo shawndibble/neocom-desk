@@ -7,6 +7,7 @@ import {
   completedSpGain,
   deriveQueueState,
   isQueuePaused,
+  projectQueueEnd,
   type CompletedLevel,
 } from './queueStatus';
 import type { CharacterSkill, SkillQueueEntry } from '@/esi/endpoints';
@@ -539,5 +540,48 @@ describe('applyTrainingProgress', () => {
       NOW
     );
     expect(merged.get(3387)).toEqual({ level: 3, sp: 16_000 });
+  });
+});
+
+describe('projectQueueEnd', () => {
+  const trained = new Map([[101, { level: 2, sp: 1000 }]]);
+
+  it('starts now for an empty queue, trained unchanged', () => {
+    const r = projectQueueEnd(trained, [], NOW);
+    expect(r).toMatchObject({ startMs: NOW, paused: false, queuedLevels: [] });
+    expect(r.trained.get(101)?.level).toBe(2);
+  });
+
+  it('starts now for a paused queue and flags it', () => {
+    const r = projectQueueEnd(trained, [entry({ queue_position: 1 })], NOW);
+    expect(r.startMs).toBe(NOW);
+    expect(r.paused).toBe(true);
+  });
+
+  it('starts at the last finish_date and counts queued levels as trained', () => {
+    const end = '2026-09-11T12:00:00Z';
+    const r = projectQueueEnd(
+      trained,
+      [
+        entry({ queue_position: 1, finished_level: 3, finish_date: '2026-09-01T12:00:00Z' }),
+        entry({ queue_position: 2, finished_level: 4, finish_date: end }),
+      ],
+      NOW
+    );
+    expect(r.startMs).toBe(Date.parse(end));
+    expect(r.trained.get(101)?.level).toBe(3);
+    expect(r.trained.get(102)?.level).toBe(4);
+    expect(r.queuedLevels).toHaveLength(2);
+    expect(r.paused).toBe(false);
+  });
+
+  it('starts now when the queue already finished', () => {
+    const r = projectQueueEnd(
+      trained,
+      [entry({ queue_position: 1, finished_level: 3, finish_date: '2026-08-01T12:00:00Z' })],
+      NOW
+    );
+    expect(r.startMs).toBe(NOW);
+    expect(r.queuedLevels).toEqual([]);
   });
 });
