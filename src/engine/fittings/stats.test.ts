@@ -31,6 +31,16 @@ describe('extractFittingStats', () => {
     expect(stats.powergridUsed).toBe(800);
   });
 
+  it('reads the hull slot layout per rack', () => {
+    const stats = extractFittingStats(
+      [],
+      attrs({ hiSlots: 4, medSlots: 3, lowSlots: 5, rigSlots: 3, subsystemSlots: 5 }),
+      []
+    );
+
+    expect(stats.slotLayout).toEqual({ high: 4, medium: 3, low: 5, rig: 3, subsystem: 5 });
+  });
+
   it('reads ehp and drone dps straight from the engine-derived attributes', () => {
     const stats = extractFittingStats([], attrs({ ehp: 24187.5, droneDamagePerSecond: 171.3 }), []);
 

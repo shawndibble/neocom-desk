@@ -103,6 +103,8 @@ export interface FittingStats {
   /** Rig calibration, points. */
   calibrationUsed: number;
   calibrationTotal: number;
+  /** How many slots the hull has in each rack, so the Ring view can draw the empty ones. */
+  slotLayout: Record<FittingSlotKind, number>;
   droneDps: number;
   droneBandwidthUsed: number;
   droneBandwidthTotal: number;
@@ -182,6 +184,11 @@ export const DOGMA_ATTRIBUTE = {
   droneBandwidth: 1271,
   droneCapacity: 283,
   calibration: 1132,
+  hiSlots: 14,
+  medSlots: 13,
+  lowSlots: 12,
+  rigSlots: 1137,
+  subsystemSlots: 1367,
 } as const;
 
 /**

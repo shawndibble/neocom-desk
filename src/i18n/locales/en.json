@@ -94,6 +94,17 @@
         "overload": "overloaded"
       }
     },
+    "view": {
+      "label": "Fitting view",
+      "ring": "Ring",
+      "list": "List"
+    },
+    "ring": {
+      "title": "Ring",
+      "slotFitted": "{{rack}} {{index}}, {{state}}",
+      "slotEmpty": "{{rack}} {{index}}, empty",
+      "openStats": "Stats"
+    },
     "stats": {
       "show": "Show detail",
       "hide": "Hide detail",

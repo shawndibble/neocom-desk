@@ -81,6 +81,13 @@ export function extractFittingStats(
     powergridTotal,
     powergridUsed: powergridTotal - readAttribute(shipAttributes, DOGMA_ATTRIBUTE.powerFree),
     calibrationTotal: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.calibration),
+    slotLayout: {
+      high: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.hiSlots),
+      medium: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.medSlots),
+      low: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.lowSlots),
+      rig: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.rigSlots),
+      subsystem: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.subsystemSlots),
+    },
     droneDps: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.droneDamagePerSecond),
     droneBandwidthTotal: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.droneBandwidth),
     droneCapacity: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.droneCapacity),

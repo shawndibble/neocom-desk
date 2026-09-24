@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Panel, TypeIcon } from '@/components/ui';
 import {
@@ -8,7 +7,8 @@ import {
   type FittingSlotKind,
   type FittingStats,
 } from '@/engine/fittings/types';
-import { moduleKey, resourceOverage } from '@/engine/fittings/skillGaps';
+import { moduleKey } from '@/engine/fittings/skillGaps';
+import { useOverBudgetFlash } from './useOverBudgetFlash';
 
 interface ResourceBarProps {
   label: string;
@@ -24,17 +24,9 @@ interface ResourceBarProps {
  */
 function ResourceBar({ label, used, total }: ResourceBarProps) {
   const { t } = useTranslation();
+  const { overage, overBudget, flashKey } = useOverBudgetFlash(used, total);
   const known = used !== null && total !== null;
   const pct = known && total > 0 ? Math.min(100, (used / total) * 100) : 0;
-  const overage = resourceOverage(used, total);
-  const overBudget = overage > 0;
-
-  const [wasOver, setWasOver] = useState(false);
-  const [flashKey, setFlashKey] = useState(0);
-  if (known && overBudget !== wasOver) {
-    setWasOver(overBudget);
-    if (overBudget) setFlashKey((key) => key + 1);
-  }
 
   return (
     <div>
