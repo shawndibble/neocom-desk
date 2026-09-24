@@ -454,6 +454,44 @@ describe('appraisePaste', () => {
       expect(appraisal.totals.cheapestBuyViaLp).toBe(0);
     });
   });
+
+  describe('net-of-fees inputs (issue #1426)', () => {
+    it('reports null Accounting/Broker Relations levels with no active Character', async () => {
+      server.use(aggregates(PRICED));
+
+      const outcome = await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100, null);
+
+      expect(outcome.accountingLevel).toBeNull();
+      expect(outcome.brokerRelationsLevel).toBeNull();
+    });
+
+    it("resolves the active Character's own Accounting and Broker Relations levels", async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({});
+      mockedLoadCorrectedSkills.mockResolvedValue(
+        skillsFixture([
+          [SKILL_IDS.accounting, 4],
+          [SKILL_IDS.brokerRelations, 2],
+        ])
+      );
+
+      const outcome = await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100, 1);
+
+      expect(outcome.accountingLevel).toBe(4);
+      expect(outcome.brokerRelationsLevel).toBe(2);
+    });
+
+    it('reads 0 for an untrained Accounting/Broker Relations, same as any other skill', async () => {
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({});
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+
+      const outcome = await appraisePaste('Tritanium\t100', DEFAULT_TRADE_HUB, 100, 1);
+
+      expect(outcome.accountingLevel).toBe(0);
+      expect(outcome.brokerRelationsLevel).toBe(0);
+    });
+  });
 });
 
 describe('compareHubs', () => {

@@ -48,6 +48,7 @@ import {
 } from '@/engine/market/appraisalMatch';
 import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
 import { appliedRefiningImplantPct } from '@/engine/industry/characterModifiers';
+import { SKILL_IDS } from '@/engine/industry/types';
 import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import { findLpOfferMatches, toLpOfferInputs } from '@/features/market/appraisalLpAcquisition';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
@@ -66,6 +67,10 @@ export interface AppraisalOutcome {
    * actually saw the bonus even though the character has it (issue #1227).
    */
   implantBonusPct: number;
+  /** The active Character's own skill level, or null with no active Character. Feeds `appraisalNet`. */
+  accountingLevel: number | null;
+  /** Same as `accountingLevel`, for Broker Relations. */
+  brokerRelationsLevel: number | null;
 }
 
 /**
@@ -215,6 +220,8 @@ export async function appraisePaste(
     appraisal: buildAppraisal(items, pricePercent),
     unmatched,
     implantBonusPct: implantApplied ? (modifiers?.refiningImplantPct ?? 0) : 0,
+    accountingLevel: modifiers ? (modifiers.skills[SKILL_IDS.accounting] ?? 0) : null,
+    brokerRelationsLevel: modifiers ? (modifiers.skills[SKILL_IDS.brokerRelations] ?? 0) : null,
   };
 }
 
