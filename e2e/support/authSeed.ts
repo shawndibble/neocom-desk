@@ -74,8 +74,17 @@ interface SeedPayload {
  * Drop-in for `loginAndSelectCharacter(page)` followed by
  * `page.goto(path)` — pass the route the spec actually asserts against, or
  * omit it for `/overview`, which is where the real flow ends up.
+ *
+ * `scopes` defaults to the full fixture grant; a spec proving a narrower
+ * grant (e.g. Core Grant only) passes its own. `expiresAt` stays far in the
+ * future regardless, so nothing in the app ever refreshes this token mid-test
+ * and quietly widens the grant back via `installSsoMock`'s own default.
  */
-export async function signInAndGoto(page: Page, path = './overview'): Promise<void> {
+export async function signInAndGoto(
+  page: Page,
+  path = './overview',
+  scopes: readonly string[] = SCOPES
+): Promise<void> {
   await page.route(`**/${BLANK_PATH}`, (route) =>
     route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>seed</title>' })
   );
@@ -92,10 +101,10 @@ export async function signInAndGoto(page: Page, path = './overview'): Promise<vo
     },
     token: {
       characterId: CHARACTER_ID,
-      accessToken: makeAccessToken(),
+      accessToken: makeAccessToken(scopes),
       refreshToken: 'fake-refresh',
       expiresAt: EXP_SECONDS * 1000,
-      scopes: [...SCOPES],
+      scopes: [...scopes],
     },
     setting: { key: ACTIVE_CHARACTER_KEY, value: CHARACTER_ID },
   };

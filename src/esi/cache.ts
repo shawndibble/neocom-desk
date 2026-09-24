@@ -7,8 +7,9 @@
  */
 import { db } from '@/db';
 import { emitEsiAuthFailure } from './authFailureSignal';
-import { isAuthFailure } from './client';
+import { EsiError, isAuthFailure } from './client';
 import { isCachePurgePending } from './cachePurge';
+import { ESI_REGISTRY, isScopeRequired, type EsiEndpointId } from './registry';
 import type { TruncatableResult } from './paginated';
 
 export interface CachedResult<T> {
@@ -506,6 +507,34 @@ export async function loadWithCacheStatus<T>(
   );
 }
 
+/**
+ * Whether a 401/403 is worth the shell-wide re-auth notice (issue #1521).
+ *
+ * `emitEsiAuthFailure` exists for a scope that *was* granted going stale — a
+ * revoke performed in EVE's third-party-application portal is invisible
+ * locally until the next token refresh
+ * (docs/context/decisions/20260831-140406-the-whole-app-sits-behind-authentication.md).
+ * A route whose gated component briefly mounts before `ScopeGate` resolves
+ * the active grant (`app/ScopeGate.tsx`'s documented pass-through window) can
+ * fire this same 401/403 shape for a scope the stored grant never claimed at
+ * all — that is not a revoke, it is the route's own gate about to correct
+ * itself, and the shell notice must stay silent for it. `needsReauth` on the
+ * result is unaffected either way: the caller's own banner is the right
+ * signal for "not granted", this only gates the *second*, shell-wide one.
+ *
+ * `AuthError` (the refresh grant itself failing) has no single endpoint to
+ * check and is always worth reporting — it means nothing this Character
+ * holds can be trusted, not that one scope is missing.
+ */
+async function isWorthReportingToShell(characterId: number, err: unknown): Promise<boolean> {
+  if (!(err instanceof EsiError) || err.endpointId === undefined) return true;
+  const spec = ESI_REGISTRY[err.endpointId as EsiEndpointId] as
+    (typeof ESI_REGISTRY)[EsiEndpointId] | undefined;
+  if (!spec || !isScopeRequired(spec.scope)) return true;
+  const token = await db.tokens.get(characterId);
+  return (token?.scopes ?? []).includes(spec.scope);
+}
+
 async function loadWithCacheStatusLive<T>(
   characterId: number,
   key: string,
@@ -537,8 +566,11 @@ async function loadWithCacheStatusLive<T>(
       // The shell renders one notice (src/app/Layout.tsx). Covers the window
       // the route scope gate cannot: a revoke done in EVE's third-party-app
       // portal is invisible locally until the next token refresh, so the
-      // stored grant still looks complete.
-      emitEsiAuthFailure(characterId);
+      // stored grant still looks complete. Gated by isWorthReportingToShell
+      // (issue #1521) so a scope never granted at all — the common case a
+      // route's own ScopeGate/banner already communicates — does not also
+      // paint the shell-wide notice.
+      if (await isWorthReportingToShell(characterId, err)) emitEsiAuthFailure(characterId);
       if (options.skipCacheOnAuthFailure) return { cached: null, needsReauth: true };
     }
   }
@@ -668,7 +700,8 @@ async function loadPaginatedWithCacheStatusLive<T>(
     // re-login instead of a silent empty list (issue #14).
     if (detectAuthFailure(err)) {
       needsReauth = true;
-      emitEsiAuthFailure(characterId);
+      // Gated by isWorthReportingToShell (issue #1521) — see loadWithCacheStatusLive.
+      if (await isWorthReportingToShell(characterId, err)) emitEsiAuthFailure(characterId);
       if (options.skipCacheOnAuthFailure) return { cached: null, needsReauth: true };
     }
   }

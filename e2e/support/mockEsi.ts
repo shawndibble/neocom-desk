@@ -222,6 +222,18 @@ export async function installEsiMock(page: Page): Promise<void> {
       });
     }
 
+    // BPC Sourcing's region lookup (Industry's `sourcing` tab, getUniverseRegion).
+    const regionMatch = /^\/universe\/regions\/(\d+)$/.exec(path);
+    if (regionMatch) {
+      const regionId = Number(regionMatch[1]);
+      return json({
+        region_id: regionId,
+        name: `Region ${regionId}`,
+        description: '',
+        constellations: [],
+      });
+    }
+
     // Unknown ESI path: fall through to the network guard so it shows up as
     // an explicit "unmocked request" failure rather than a silent 404.
     await route.fallback();
