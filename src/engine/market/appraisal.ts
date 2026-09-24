@@ -52,7 +52,10 @@ import {
   type ReprocessingMaterial,
 } from '@/engine/industry/reprocessing';
 import { refiningEfficiency, type CharacterModifiers } from '@/engine/industry/characterModifiers';
+import { brokerFee, brokerFeePct, salesTax, salesTaxPct } from '@/engine/industry/fees';
 import type { AppraisalLpOption } from '@/engine/market/lpAcquisition';
+import { undercutPrice } from '@/engine/market/priceTick';
+import type { ResolvedStandings } from '@/engine/market/standings';
 
 /** Refine-then-sell value for one item's full pasted quantity, at 100% price. */
 export interface AppraisalRefine {
@@ -126,6 +129,14 @@ export interface AppraisalTotals {
 export interface Appraisal {
   rows: AppraisalRow[];
   totals: AppraisalTotals;
+  /**
+   * The same items, unscaled — `appraisalNet` reads these rather than
+   * `AppraisalRow`'s percent-scaled `buyEach`/`sellEach`, per the net-of-fees
+   * figures always being quoted at 100% of market
+   * (`20260924-010954-appraisal-shows-net-of-fees-totals-at-100.md`). Same
+   * order as `rows`, one per row.
+   */
+  items: readonly AppraisalItem[];
 }
 
 function scale(price: number | null, percent: number): number | null {
@@ -252,6 +263,79 @@ export function buildAppraisal(items: readonly AppraisalItem[], pricePercent: nu
       cheapestBuy,
       cheapestBuyViaLp,
     },
+    items,
+  };
+}
+
+/** The character inputs `appraisalNet` needs, resolved by the caller from Character Modifiers and hub standings. */
+export interface AppraisalNetFees {
+  accountingLevel: number;
+  brokerRelationsLevel: number;
+  /** The character's standing toward the trade hub's NPC station owner. */
+  standing: ResolvedStandings;
+}
+
+/** What actually reaches the wallet, at 100% of market — see `Appraisal.items`'s doc. */
+export interface AppraisalNetTotals {
+  /** Selling every priced item into buy orders now: raw buy total minus sales tax. */
+  instantNet: number;
+  /**
+   * Listing every priced item one legal tick under its best sell: that
+   * undercut total minus sales tax minus broker fee (100 ISK minimum, once
+   * per item — one pasted type is one listing, the same "per stack listed"
+   * rule `ownedStockSale` applies to a material).
+   */
+  listNet: number;
+  /** The character's own sales-tax rate, percent — for the chip tooltip. */
+  salesTaxPct: number;
+  /** The character's own broker-fee rate at this hub, percent — for the chip tooltip. */
+  brokerFeePct: number;
+}
+
+/**
+ * Net-of-fees totals for the two ways to sell what was pasted, always at
+ * 100% of market regardless of the appraisal's own Price Percent — reads
+ * `AppraisalItem.buy`/`.sell` (unscaled) via `Appraisal.items`, never the
+ * `AppraisalRow`'s own percent-scaled `buyEach`/`sellEach`. An item missing
+ * the relevant price is excluded from that side's net only, the same "an
+ * unpriced side stays out of a total, never free" rule `buildAppraisal`
+ * itself applies.
+ */
+export function appraisalNet(
+  items: readonly AppraisalItem[],
+  { accountingLevel, brokerRelationsLevel, standing }: AppraisalNetFees
+): AppraisalNetTotals {
+  let instantNet = 0;
+  let listNet = 0;
+
+  for (const item of items) {
+    if (item.buy !== null) {
+      const buyTotal = item.buy * item.quantity;
+      instantNet += buyTotal - salesTax(buyTotal, accountingLevel);
+    }
+
+    const undercut = item.sell === null ? null : undercutPrice(item.sell);
+    if (undercut !== null) {
+      const listValue = undercut * item.quantity;
+      const fee = brokerFee(
+        listValue,
+        brokerRelationsLevel,
+        standing.factionStanding,
+        standing.corpStanding
+      );
+      listNet += listValue - salesTax(listValue, accountingLevel) - fee;
+    }
+  }
+
+  return {
+    instantNet,
+    listNet,
+    salesTaxPct: salesTaxPct(accountingLevel),
+    brokerFeePct: brokerFeePct(
+      brokerRelationsLevel,
+      standing.factionStanding,
+      standing.corpStanding
+    ),
   };
 }
 

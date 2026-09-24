@@ -14,7 +14,7 @@
  * `Panel` above an optional, foldable Compare Hubs section once something
  * has been appraised.
  */
-import { useState, type ReactElement, type ReactNode } from 'react';
+import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -32,8 +32,14 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { Caret } from '@/components/ui/Disclosure';
 import { fieldBaseClassName } from '@/components/ui/controlStyles';
-import { lpBeatsMarket, refineBeatsSellAsIs, type AppraisalRow } from '@/engine/market/appraisal';
+import {
+  appraisalNet,
+  lpBeatsMarket,
+  refineBeatsSellAsIs,
+  type AppraisalRow,
+} from '@/engine/market/appraisal';
 import { countPasteLines } from '@/engine/market/appraisalPaste';
+import type { ResolvedStandings } from '@/engine/market/standings';
 import { iskToneClass } from '@/features/character/format';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
@@ -56,6 +62,8 @@ interface AppraisalPanelProps {
   onPricePercentChange: (value: number) => void;
   /** The hub the figures are quoted at — the panel's own provenance chip, and what a Share link (#831) is generated against. */
   hub: TradeHub;
+  /** The active Character's standing toward this hub's NPC station owner, for the net-of-fees chips' broker fee. */
+  standing: ResolvedStandings;
   /** Same per-item context menu as the tree and the Variations table: null until requested, then per-typeId lookups. */
   blueprintCatalog: BlueprintCatalog | null;
   onRequestBlueprintCatalog: () => void;
@@ -98,6 +106,7 @@ export function AppraisalPanel({
   pricePercent,
   onPricePercentChange,
   hub,
+  standing,
   blueprintCatalog,
   onRequestBlueprintCatalog,
   onAddToQuickbar,
@@ -213,6 +222,19 @@ export function AppraisalPanel({
   const totals = result?.appraisal.totals;
   const unmatched = result?.unmatched ?? [];
   const implantBonusPct = result?.implantBonusPct ?? 0;
+  const accountingLevel = result?.accountingLevel ?? null;
+  const brokerRelationsLevel = result?.brokerRelationsLevel ?? null;
+  // Null while skills are loading, or with no active Character — falls back
+  // to the result panel's own loading/empty states rather than ever showing
+  // a base-rate (untrained) figure.
+  const net = useMemo(() => {
+    if (result === null || accountingLevel === null || brokerRelationsLevel === null) return null;
+    return appraisalNet(result.appraisal.items, {
+      accountingLevel,
+      brokerRelationsLevel,
+      standing,
+    });
+  }, [result, accountingLevel, brokerRelationsLevel, standing]);
   // Undefined per row when the type has no reprocessing data at all — the
   // column only earns its place on screen when at least one row has
   // something to show, which is also exactly when there is nothing to show
@@ -473,6 +495,33 @@ export function AppraisalPanel({
                   value={<IskAmount value={totals.buy} revealOn="tap" decimals={0} />}
                   tooltip={t('market.appraisal.buyTotalHelp')}
                 />
+                {net && (
+                  <StatChip
+                    label={t('market.appraisal.instantNet')}
+                    value={
+                      <span className={iskToneClass(net.instantNet)}>
+                        <IskAmount value={net.instantNet} revealOn="tap" decimals={0} />
+                      </span>
+                    }
+                    tooltip={t('market.appraisal.instantNetHelp', {
+                      tax: net.salesTaxPct.toFixed(2),
+                    })}
+                  />
+                )}
+                {net && (
+                  <StatChip
+                    label={t('market.appraisal.listNet')}
+                    value={
+                      <span className={iskToneClass(net.listNet)}>
+                        <IskAmount value={net.listNet} revealOn="tap" decimals={0} />
+                      </span>
+                    }
+                    tooltip={t('market.appraisal.listNetHelp', {
+                      tax: net.salesTaxPct.toFixed(2),
+                      broker: net.brokerFeePct.toFixed(2),
+                    })}
+                  />
+                )}
                 <StatChip
                   label={t('market.appraisal.spread')}
                   value={
