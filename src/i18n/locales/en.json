@@ -353,6 +353,7 @@
     "untitledName": "Untitled comparison",
     "savedTitle": "Saved comparisons",
     "savedEmpty": "No saved comparisons yet.",
+    "savedEmptyHint": "Pick characters, then use Save comparison to reopen that set later.",
     "rename": "Rename",
     "delete": "Delete",
     "deleteConfirm": "Delete this saved comparison? This can't be undone.",
