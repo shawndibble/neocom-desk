@@ -4,6 +4,14 @@ import { Button } from '@/components/ui';
 
 interface Props {
   children: ReactNode;
+  /**
+   * Renders the error inside the app shell rather than as a full page — for
+   * the boundary around `Layout`'s outlet, where the rail must survive a page
+   * that failed (a render throw, or a route chunk that would not load).
+   */
+  inline?: boolean;
+  /** A change clears the error: navigating away from a failed page recovers. */
+  resetKey?: string;
 }
 
 interface State {
@@ -15,10 +23,16 @@ interface State {
  * wrong, so a missing catalog must not turn a recoverable error into a blank
  * page.
  */
-function ErrorScreen() {
+function ErrorScreen({ inline }: { inline: boolean }) {
   const { t } = useTranslation();
+  // Inside the shell the page already sits in `Layout`'s `<main>`.
+  const Wrapper = inline ? 'section' : 'main';
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-3 bg-bg p-6 text-center text-text">
+    <Wrapper
+      className={`flex flex-col items-center justify-center gap-3 p-6 text-center text-text ${
+        inline ? 'py-16' : 'min-h-screen bg-bg'
+      }`}
+    >
       <h1 className="text-sm font-semibold tracking-widest uppercase">
         {t('error.title', { defaultValue: 'Something went wrong' })}
       </h1>
@@ -31,7 +45,7 @@ function ErrorScreen() {
       <Button size="sm" onClick={() => window.location.reload()}>
         {t('error.reload', { defaultValue: 'Reload' })}
       </Button>
-    </main>
+    </Wrapper>
   );
 }
 
@@ -53,11 +67,21 @@ export class ErrorBoundary extends Component<Props, State> {
     return { failed: true };
   }
 
+  componentDidUpdate(prev: Props): void {
+    if (this.state.failed && prev.resetKey !== this.props.resetKey) {
+      this.setState({ failed: false });
+    }
+  }
+
   componentDidCatch(error: Error, info: ErrorInfo): void {
     if (import.meta.env.DEV) console.error('Unhandled render error', error, info.componentStack);
   }
 
   render(): ReactNode {
-    return this.state.failed ? <ErrorScreen /> : this.props.children;
+    return this.state.failed ? (
+      <ErrorScreen inline={this.props.inline ?? false} />
+    ) : (
+      this.props.children
+    );
   }
 }

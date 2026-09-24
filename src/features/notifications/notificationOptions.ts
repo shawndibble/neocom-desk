@@ -25,7 +25,7 @@
  * notification rather than derived at click time because the Service Worker
  * handling the click has no idea which fire produced it.
  */
-import { HIGHLIGHT_PARAM } from '@/lib/useHighlightParam';
+import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import type { NotificationEventId } from './events';
 
 const ICON_URL = '/icons/icon-192.png';
