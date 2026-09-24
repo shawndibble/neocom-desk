@@ -16,10 +16,13 @@
  * the answer cannot change with `remapCount` (a 0..5 user input). A segment's
  * cost then depends on when it starts, which is why costs are resolved lazily
  * against `dp[k-1][i]` rather than aggregated: sp-per-pair stops being a
- * sufficient key once the start matters. The DP stays valid
- * because segment cost is monotonically non-decreasing in start time — a later
- * start can only mean less Booster — so a minimal prefix is still the best
- * prefix to extend.
+ * sufficient key once the start matters. The DP stays valid because a
+ * segment's FINISH time is monotonically non-decreasing in its start time — a
+ * later start can only mean an equal or smaller stacked Booster bonus over the
+ * segment's own lifetime, never a larger one — so a minimal prefix is still
+ * the best prefix to extend, even though a Booster's own `startsAt` means a
+ * later start is not guaranteed to see *less* Booster (a not-yet-live one can
+ * still begin partway through).
  *
  * DP over pair-runs (maximal step runs sharing one attribute pair): segment
  * boundaries inside a run are dominated by boundaries at its edges, so only

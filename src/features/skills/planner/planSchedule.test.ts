@@ -61,7 +61,7 @@ describe('schedulePlan', () => {
       entries: [entry(10, 2), entry(20, 2)],
       markers: [1],
       markerAttributes: [null],
-      booster: { enabled: true, bonus: 5, expiresAt: NOW + 30 * 86_400_000 },
+      booster: { enabled: true, bonus: 5, startsAt: null, expiresAt: NOW + 30 * 86_400_000 },
     };
     const got = schedulePlan(plan, inputs(), NOW);
     const bare = schedulePlan({ ...plan, booster: undefined }, inputs(), NOW);

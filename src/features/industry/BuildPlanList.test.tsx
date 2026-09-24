@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { BuildPlanRecord } from '@/db';
@@ -121,6 +121,43 @@ describe('BuildPlanList', () => {
     expect(screen.getByText('Merlin run')).toBeInTheDocument();
     expect(screen.getByText('Astero')).toBeInTheDocument();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
+  it('explains the verdict on hover with the build and buy totals it compared', async () => {
+    render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        statsByPlanId={
+          new Map([
+            [
+              'a',
+              {
+                profit: -125_200,
+                verdict: 'build',
+                buildCost: 1_000_000,
+                buyCost: 1_500_000,
+                runs: 1,
+              },
+            ],
+          ])
+        }
+      />
+    );
+
+    await userEvent.hover(screen.getByText('Build'));
+
+    const tip = await screen.findByRole('tooltip');
+    expect(within(tip).getByRole('row', { name: /Build/ })).toHaveTextContent('1,000,000 ISK');
+    expect(within(tip).getByRole('row', { name: /Buy/ })).toHaveTextContent('1,500,000 ISK');
   });
 });
 

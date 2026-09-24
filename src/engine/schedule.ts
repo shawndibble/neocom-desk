@@ -56,7 +56,8 @@ const EPSILON_SP = 1e-9;
 
 /**
  * Compute per-step training time. Rates are piecewise-constant: when a booster
- * expires mid-step, the step is split and the remainder trains at the reduced rate.
+ * starts or expires mid-step, the step is split at that instant and trains
+ * the remainder at the changed rate.
  */
 export function computeSchedule(
   steps: readonly PlanStep[],
@@ -77,9 +78,19 @@ export function computeSchedule(
   }
   const startMs = startDate?.getTime() ?? 0;
 
-  // Booster expiry offsets in seconds from start (rate breakpoints).
-  const expiryOffsets = boosters
-    .map((b) => (b.expiresAt.getTime() - startMs) / 1000)
+  // Each booster's live window, in seconds from start. Absent startsAt means
+  // already running (live from before the schedule begins).
+  const boosterWindows = boosters.map((b) => ({
+    bonus: b.bonus,
+    startOffset: b.startsAt ? (b.startsAt.getTime() - startMs) / 1000 : -Infinity,
+    expiryOffset: (b.expiresAt.getTime() - startMs) / 1000,
+  }));
+
+  // Rate breakpoints: every start and expiry offset that still lies ahead.
+  const breakpoints = [
+    ...boosterWindows.map((w) => w.startOffset),
+    ...boosterWindows.map((w) => w.expiryOffset),
+  ]
     .filter((offset) => offset > 0)
     .sort((a, b) => a - b);
 
@@ -100,15 +111,16 @@ export function computeSchedule(
     elapsedSeconds: number
   ): number => {
     let value = baseAttributes[name] + (implants[name] ?? 0);
-    for (const booster of boosters) {
-      const offset = (booster.expiresAt.getTime() - startMs) / 1000;
-      if (elapsedSeconds < offset) value += booster.bonus[name] ?? 0;
+    for (const { bonus, startOffset, expiryOffset } of boosterWindows) {
+      if (elapsedSeconds >= startOffset && elapsedSeconds < expiryOffset) {
+        value += bonus[name] ?? 0;
+      }
     }
     return value;
   };
 
   const nextBreakpointAfter = (elapsedSeconds: number): number => {
-    for (const offset of expiryOffsets) {
+    for (const offset of breakpoints) {
       if (offset > elapsedSeconds) return offset;
     }
     return Infinity;

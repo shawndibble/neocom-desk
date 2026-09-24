@@ -760,7 +760,19 @@ const skillPlanSpec: CollectionSpec<SkillPlanRecord, RemotePlanDoc> = {
     // with it. Same omit-when-absent rule; a Booster's own `expiresAt` is
     // `number | null`, and null is a value Firestore stores happily.
     ...(p.whatIfImplants !== undefined ? { whatIfImplants: p.whatIfImplants } : {}),
-    ...(p.booster !== undefined ? { booster: p.booster } : {}),
+    ...(p.boosters !== undefined
+      ? {
+          boosters: p.boosters,
+          // Legacy compat for one release (#1407): a device still on the
+          // single-Booster build reads only `booster`. An empty list is
+          // itself an answer ("no accelerators"), so it writes a disabled
+          // row rather than omitting the key — omitting it would let an
+          // older build's own prefill logic re-arm.
+          booster: p.boosters[0] ?? { enabled: false, bonus: 0, startsAt: null, expiresAt: null },
+        }
+      : p.booster !== undefined
+        ? { booster: p.booster }
+        : {}),
     ...(p.milestones !== undefined ? { milestones: p.milestones } : {}),
     updatedAt: p.updatedAt,
     ownerHash,
@@ -776,6 +788,7 @@ const skillPlanSpec: CollectionSpec<SkillPlanRecord, RemotePlanDoc> = {
     ...(r.markerAttributes !== undefined ? { markerAttributes: r.markerAttributes } : {}),
     ...(r.whatIfImplants !== undefined ? { whatIfImplants: r.whatIfImplants } : {}),
     ...(r.booster !== undefined ? { booster: r.booster } : {}),
+    ...(r.boosters !== undefined ? { boosters: r.boosters } : {}),
     ...(r.milestones !== undefined ? { milestones: r.milestones } : {}),
     updatedAt: r.updatedAt,
   }),
