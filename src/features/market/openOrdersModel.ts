@@ -41,7 +41,7 @@
  */
 import type { OpenOrdersSnapshot, CharacterOpenOrders } from './openOrdersData';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
-import type { OrderCostBasis } from './orderCostBasis';
+import type { OrderCostBasis, WalletBasisGap } from './orderCostBasis';
 import { stationPriceKey } from './stationPriceKey';
 import type { HubAggregate } from '@/market/fuzzwork';
 import type { MarketOrder } from '@/esi/endpoints';
@@ -108,6 +108,8 @@ export interface OpenOrderRow {
   expiry: OrderExpiry | null;
   floor: OrderFloor | null;
   costBasis: OrderCostBasis | null;
+  /** Why the wallet could not supply a cost basis, when the order was eligible for one. */
+  walletGap?: WalletBasisGap | null;
   station: StationTier;
   /** Present only when the deep (system/region) check has been run for this order. */
   deepUndercut: UndercutResult | null;
@@ -148,6 +150,8 @@ export interface BuildRowsInput {
   stationPrices: ReadonlyMap<string, HubAggregate>;
   /** Keyed orderId. */
   costBases: ReadonlyMap<number, OrderCostBasis>;
+  /** Keyed orderId. */
+  walletBasisGaps?: ReadonlyMap<number, WalletBasisGap>;
   /**
    * Keyed orderId; only for orders whose region book has been fetched.
    * `truncated` rides alongside `competitors` (not a parallel map) so a
@@ -257,6 +261,7 @@ function buildRow(
     typeNames,
     stationPrices,
     costBases,
+    walletBasisGaps,
     deepCompetition,
     structureCompetition,
     stationNames,
@@ -349,6 +354,7 @@ function buildRow(
     expiry,
     floor,
     costBasis,
+    walletGap: costBasis ? null : (walletBasisGaps?.get(order.order_id) ?? null),
     station,
     deepUndercut,
     worstScope,

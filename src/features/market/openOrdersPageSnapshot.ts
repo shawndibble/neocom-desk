@@ -25,7 +25,12 @@ import type { RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import type { HubAggregate } from '@/market/fuzzwork';
 import { loadAllCharactersOpenOrders, type OpenOrdersSnapshot } from './openOrdersData';
-import { loadOrderCostBases, type OrderCostBasis } from './orderCostBasis';
+import {
+  loadOrderCostBases,
+  loadWalletOrderCostBases,
+  type OrderCostBasis,
+  type WalletBasisGap,
+} from './orderCostBasis';
 import { loadStationBestPrices } from './orderCompetition';
 import { loadOrderProblemSamples } from './orderProblemSamples';
 import type { OrderProblemSample } from '@/engine/market/orderProblemHistory';
@@ -49,6 +54,8 @@ export interface OpenOrdersPageSnapshot {
   /** Keyed `${locationId}:${typeId}`. */
   stationPrices: Map<string, HubAggregate>;
   costBases: Map<number, OrderCostBasis>;
+  /** Why an eligible unlinked sell order got no wallet-derived cost basis (issue #1422). Keyed orderId. */
+  walletBasisGaps: Map<number, WalletBasisGap>;
   /**
    * Rolling `OrderProblem` history per order id, oldest first.
    * Read here rather than written: the page records the *next* sample only
@@ -94,6 +101,7 @@ export async function loadOpenOrdersSnapshot(
       stationsLoaded: false,
       stationPrices: new Map(),
       costBases: new Map(),
+      walletBasisGaps: new Map(),
       problemSamples: new Map(),
       skillsByCharacter: new Map(),
       standingsByOrder: new Map(),
@@ -134,11 +142,20 @@ export async function loadOpenOrdersSnapshot(
   const stationsLoaded = npcStationsSettled.ok;
 
   const costBases = new Map<number, OrderCostBasis>();
+  const walletBasisGaps = new Map<number, WalletBasisGap>();
   await Promise.all(
     openOrders.entries.map(async (entry) => {
       const ids = orderIdsByCharacter.get(entry.characterId) ?? [];
       const map = await loadOrderCostBases(entry.characterId, ids);
       for (const [orderId, basis] of map) costBases.set(orderId, basis);
+      // A Production Run basis always wins; the wallet only fills what it left.
+      const wallet = await loadWalletOrderCostBases(
+        entry.characterId,
+        entry.orders,
+        new Set(map.keys())
+      );
+      for (const [orderId, basis] of wallet.bases) costBases.set(orderId, basis);
+      for (const [orderId, gap] of wallet.gaps) walletBasisGaps.set(orderId, gap);
     })
   );
 
@@ -189,6 +206,7 @@ export async function loadOpenOrdersSnapshot(
     stationsLoaded,
     stationPrices,
     costBases,
+    walletBasisGaps,
     problemSamples,
     skillsByCharacter,
     standingsByOrder,

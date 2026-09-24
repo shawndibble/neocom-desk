@@ -228,6 +228,7 @@ export function Overview() {
       typeNames: snapshot.typeNames,
       stationPrices: snapshot.stationPrices,
       costBases: snapshot.costBases,
+      walletBasisGaps: snapshot.walletBasisGaps,
       stationNames: new Map([...snapshot.npcStations].map(([id, s]) => [id, s.name])),
       skillsByCharacter: snapshot.skillsByCharacter,
       now: snapshot.now,

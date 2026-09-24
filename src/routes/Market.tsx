@@ -47,6 +47,7 @@ import {
 } from '@/features/market/marketTree';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { ItemPriceAlertBell } from '@/features/market/ItemPriceAlertBell';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { RequiredSkillsSection } from '@/features/market/RequiredSkillsSection';
@@ -102,7 +103,7 @@ const ROW_CAP = 15;
  * The page's own top-level tabs: Market Browser plus a character's Open
  * orders and History — previously the separate `/orders` route (open +
  * history) and Wallet's Transactions tab. Distinct from `itemTab` below,
- * which is the *selected item's* own Market Data / Price History split and
+ * which is the *selected item's* own Order Book / Price History split and
  * has nothing to do with this.
  *
  * `history` and `history/transactions` are one tab wearing two hats: both are
@@ -497,6 +498,7 @@ export function Market() {
     write: writeQuickbar,
     add: handleAddToQuickbar,
     setTarget: handleSetQuickbarTarget,
+    pinWithTarget: handlePinWithTarget,
   } = useQuickbar(activeCharacterId);
 
   function handleRemoveFromQuickbar(typeId: number) {
@@ -968,12 +970,21 @@ export function Market() {
             meta={
               selectedItem &&
               selectedTypeId !== null && (
-                <IconButton
-                  size="sm"
-                  icon={<Icon.Info />}
-                  label={t('market.contextMenu.showInfo')}
-                  onClick={() => handleShowInfo(selectedTypeId, selectedItem.name)}
-                />
+                <span className="flex flex-wrap items-center gap-1">
+                  <ItemPriceAlertBell
+                    typeId={selectedTypeId}
+                    name={selectedItem.name}
+                    item={quickbarItems.find((i) => i.typeId === selectedTypeId)}
+                    disabled={activeCharacterId === null}
+                    onPin={handlePinWithTarget}
+                  />
+                  <IconButton
+                    size="sm"
+                    icon={<Icon.Info />}
+                    label={t('market.contextMenu.showInfo')}
+                    onClick={() => handleShowInfo(selectedTypeId, selectedItem.name)}
+                  />
+                </span>
               )
             }
             padded={selectedTypeId === null}

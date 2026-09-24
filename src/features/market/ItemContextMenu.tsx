@@ -5,7 +5,7 @@
  * materials (round 27), product heading, revenue and owned-sale rows, and the
  * recipe and Blueprint Acquisition modals.
  */
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
@@ -19,6 +19,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { marketLinkParams } from '@/engine/market/urlState';
 import { usePiPlannable } from '@/features/pi/usePiPlannable';
 import { useCompareSet } from './compareSet';
+import { PriceAlertDialog, PriceAlertMenuItem } from './PriceAlertDialog';
 
 export interface ItemContextMenuProps {
   typeId: number;
@@ -89,6 +90,7 @@ export function ItemContextMenu({
   const location = useLocation();
   const addToCompare = useCompareSet((state) => state.add);
   const piPlannable = usePiPlannable(typeId);
+  const [alertOpen, setAlertOpen] = useState(false);
 
   // `industry.*`, not `market.*`: `BuildPlanContextMenu` offers this same
   // action on the pages this richer menu doesn't reach (the BPC search table,
@@ -101,66 +103,76 @@ export function ItemContextMenu({
         : t('industry.contextMenu.buildPlan');
 
   return (
-    <ContextMenu onOpenChange={onOpenChange}>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem
-          disabled={!quickbarAvailable}
-          title={quickbarAvailable ? undefined : t('market.contextMenu.quickbarNoCharacter')}
-          onSelect={() => onAddToQuickbar(typeId, itemName)}
-        >
-          {t('market.contextMenu.addToQuickbar')}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => onShowInfo(typeId, itemName)}>
-          {t('market.contextMenu.showInfo')}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => addToCompare({ typeId, itemName })}>
-          {t('market.contextMenu.addToCompare')}
-        </ContextMenuItem>
-        {onCompareVariations && (
-          <ContextMenuItem onSelect={onCompareVariations}>
-            {t('market.contextMenu.compareVariations')}
+    <>
+      <ContextMenu onOpenChange={onOpenChange}>
+        <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem
+            disabled={!quickbarAvailable}
+            title={quickbarAvailable ? undefined : t('market.contextMenu.quickbarNoCharacter')}
+            onSelect={() => onAddToQuickbar(typeId, itemName)}
+          >
+            {t('market.contextMenu.addToQuickbar')}
           </ContextMenuItem>
-        )}
-        <ContextMenuItem
-          onSelect={() => {
-            const params = marketLinkParams(typeId, location.search);
-            navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
-          }}
-        >
-          {t('market.contextMenu.viewInMarket')}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => void writeToClipboard(itemName)}>
-          {t('market.contextMenu.copyName')}
-        </ContextMenuItem>
-        <ContextMenuItem
-          disabled={!blueprintTypeID}
-          onSelect={() => {
-            if (blueprintTypeID) navigate(`${industryTabHref('plans')}?product=${typeId}`);
-          }}
-        >
-          {buildPlanLabel}
-        </ContextMenuItem>
-        {onViewInIndustryAsMaterial && (
-          <ContextMenuItem onSelect={onViewInIndustryAsMaterial}>
-            {t('market.contextMenu.viewInIndustryAsMaterial')}
+          <PriceAlertMenuItem
+            typeId={typeId}
+            available={quickbarAvailable}
+            onSelect={() => setAlertOpen(true)}
+          />
+          <ContextMenuItem onSelect={() => onShowInfo(typeId, itemName)}>
+            {t('market.contextMenu.showInfo')}
           </ContextMenuItem>
-        )}
-        {onToggleBuildHere && (
-          <ContextMenuItem onSelect={onToggleBuildHere}>
-            {t(
-              buildingHere
-                ? 'market.contextMenu.buyInsteadOfBuilding'
-                : 'market.contextMenu.addMaterialComponents'
-            )}
+          <ContextMenuItem onSelect={() => addToCompare({ typeId, itemName })}>
+            {t('market.contextMenu.addToCompare')}
           </ContextMenuItem>
-        )}
-        {piPlannable && (
-          <ContextMenuItem onSelect={() => navigate(`/planetary-industry/plan?type=${typeId}`)}>
-            {t('market.contextMenu.piPlan')}
+          {onCompareVariations && (
+            <ContextMenuItem onSelect={onCompareVariations}>
+              {t('market.contextMenu.compareVariations')}
+            </ContextMenuItem>
+          )}
+          <ContextMenuItem
+            onSelect={() => {
+              const params = marketLinkParams(typeId, location.search);
+              navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
+            }}
+          >
+            {t('market.contextMenu.viewInMarket')}
           </ContextMenuItem>
-        )}
-      </ContextMenuContent>
-    </ContextMenu>
+          <ContextMenuItem onSelect={() => void writeToClipboard(itemName)}>
+            {t('market.contextMenu.copyName')}
+          </ContextMenuItem>
+          <ContextMenuItem
+            disabled={!blueprintTypeID}
+            onSelect={() => {
+              if (blueprintTypeID) navigate(`${industryTabHref('plans')}?product=${typeId}`);
+            }}
+          >
+            {buildPlanLabel}
+          </ContextMenuItem>
+          {onViewInIndustryAsMaterial && (
+            <ContextMenuItem onSelect={onViewInIndustryAsMaterial}>
+              {t('market.contextMenu.viewInIndustryAsMaterial')}
+            </ContextMenuItem>
+          )}
+          {onToggleBuildHere && (
+            <ContextMenuItem onSelect={onToggleBuildHere}>
+              {t(
+                buildingHere
+                  ? 'market.contextMenu.buyInsteadOfBuilding'
+                  : 'market.contextMenu.addMaterialComponents'
+              )}
+            </ContextMenuItem>
+          )}
+          {piPlannable && (
+            <ContextMenuItem onSelect={() => navigate(`/planetary-industry/plan?type=${typeId}`)}>
+              {t('market.contextMenu.piPlan')}
+            </ContextMenuItem>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
+      {alertOpen && (
+        <PriceAlertDialog typeId={typeId} itemName={itemName} onClose={() => setAlertOpen(false)} />
+      )}
+    </>
   );
 }

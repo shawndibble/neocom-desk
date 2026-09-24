@@ -594,7 +594,7 @@
   }
 
   /*
-   * A row of the Market Data order book that is one of my own orders
+   * A row of the Order Book that is one of my own orders
    * (`routes/Market.tsx`). A flat accent wash, and nothing else: the book is
    * scanned down the price column, and a badge or a second line under the
    * price would break that column on some rows and not others. Unlike

@@ -282,6 +282,7 @@ describe('PlanEditor tools pane', () => {
     for (const name of [
       'Optimize for me',
       'Reorder only',
+      'Shortest first',
       'Place remaps only',
       'Use my remap markers',
     ]) {
@@ -413,6 +414,44 @@ describe('PlanEditor tools pane', () => {
 
     await clickOptimizeMode(user, 'Reorder only');
     const dialog = screen.getByRole('dialog', { name: 'Suggested reorder' });
+
+    await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it("opens Shortest first's preview in a Modal; Accept applies the reorder and closes it", async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+    await openTools(user);
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    await clickOptimizeMode(user, 'Shortest first');
+
+    const dialog = screen.getByRole('dialog', { name: 'Suggested shortest-first sort' });
+    expect(within(dialog).getByText('Skill B I')).toBeInTheDocument();
+    expect(within(dialog).getByText('Skill A I')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      entries: [
+        { skillTypeID: 20, targetLevel: 1, priority: 'high' },
+        { skillTypeID: 10, targetLevel: 1 },
+      ],
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('Reject closes the Shortest first Modal without updating the plan', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+    await openTools(user);
+
+    await clickOptimizeMode(user, 'Shortest first');
+    const dialog = screen.getByRole('dialog', { name: 'Suggested shortest-first sort' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
 

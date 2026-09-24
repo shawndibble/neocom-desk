@@ -49,7 +49,7 @@ describe('orderExits', () => {
     expect(orderExits({ row: BASE_ROW })).toEqual([{ kind: 'hold', price: 500, netPerUnit: 120 }]);
   });
 
-  it('prices matching against the relist floor, which pays the broker fee again', () => {
+  it('prices undercutting one legal tick below the rival against the relist floor, which pays the broker fee again', () => {
     const row: OpenOrderRow = {
       ...BASE_ROW,
       problem: 'undercutStation',
@@ -57,11 +57,22 @@ describe('orderExits', () => {
       worstScope: 'station',
       station: { bestPrice: 450, beatsMe: true, gapIsk: 50, gapPct: 10 },
     };
-    expect(orderExits({ row })).toContainEqual({
-      kind: 'matchStation',
-      price: 450,
-      netPerUnit: 50,
-    });
+    // undercutPrice(450) = 449.90 — one legal tick under the rival, never a tie.
+    const exit = orderExits({ row }).find((e) => e.kind === 'undercutStation');
+    expect(exit?.price).toBe(449.9);
+    expect(exit?.netPerUnit).toBeCloseTo(49.9, 6);
+  });
+
+  it('offers no undercut exit once undercutting would fall below the 0.01 ISK minimum tick', () => {
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      problem: 'undercutStation',
+      problems: ['undercutStation'],
+      worstScope: 'station',
+      floor: { relist: 0.005, fill: 0.004 },
+      station: { bestPrice: 0.01, beatsMe: true, gapIsk: 0, gapPct: 0 },
+    };
+    expect(orderExits({ row }).map((e) => e.kind)).toEqual(['hold']);
   });
 
   it('offers the best buy order at my own station, priced against the fill floor', () => {
