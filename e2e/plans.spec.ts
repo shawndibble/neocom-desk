@@ -58,7 +58,8 @@ test('optimize remaps shows attribute segments and savings', async ({ page }) =>
   await addCaldariCruiserToNewPlan(page);
 
   await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
-  await page.getByRole('button', { name: 'Optimize remaps' }).click();
+  await page.getByRole('button', { name: 'Optimize' }).click();
+  await page.getByRole('menuitem', { name: 'Place remaps only' }).click();
 
   // The verdict opens its own Accept/Reject Modal, mirroring "Suggest
   // reorder" — no longer inline in the tools pane's Actions section.
@@ -66,6 +67,23 @@ test('optimize remaps shows attribute segments and savings', async ({ page }) =>
   await expect(dialog.getByText(/Remapping saves (?:\d+[dhm]\s*)+/)).toBeVisible();
   await expect(dialog.getByText('Segment 1')).toBeVisible();
   await expect(dialog.getByText(/remap to (?:[A-Z]{3} \d+ \/ ){4}[A-Z]{3} \d+/)).toBeVisible();
+});
+
+test('"Optimize for me" reorders and places remaps in one preview; Accept applies both (#1411)', async ({
+  page,
+}) => {
+  await addCaldariCruiserToNewPlan(page);
+
+  await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
+  await page.getByRole('button', { name: 'Optimize' }).click();
+  await page.getByRole('menuitem', { name: 'Optimize for me' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Optimize for me' });
+  await expect(dialog.getByText(/^Total (?:\d+[dhm]\s*)+→ (?:\d+[dhm]\s*)+/)).toBeVisible();
+  await expect(dialog.getByText('Segment 1')).toBeVisible();
+
+  await dialog.getByRole('button', { name: 'Accept' }).click();
+  await expect(dialog).not.toBeVisible();
 });
 
 test('the plan summary and tools stay in view while the entries queue scrolls (#221 successor)', async ({
@@ -162,17 +180,18 @@ test('the plan summary and tools stay in view while the entries queue scrolls (#
   await expect(summaryPanel).toBeInViewport();
   await expect(entriesHeading).toBeInViewport();
   await expect(page.getByRole('heading', { name: 'Plan tools' })).toBeInViewport();
-  await expect(page.getByRole('button', { name: 'Optimize remaps' })).toBeInViewport();
+  await expect(page.getByRole('button', { name: 'Optimize' })).toBeInViewport();
 
   // And the summary strip stays pinned when the *window* scrolls, not just
   // when the capped list does. The entry list has its own cap, so what makes
   // the page taller than the viewport here is the sidebar itself (attributes,
   // What-If Implants, Booster) — the real case the sticky exists for. Firing
-  // Optimize remaps is incidental setup at this point (its result now opens
-  // its own Modal rather than growing the sidebar), kept only so the guard
-  // below isn't the only thing exercising the click.
+  // the remaps optimizer is incidental setup at this point (its result now
+  // opens its own Modal rather than growing the sidebar), kept only so the
+  // guard below isn't the only thing exercising the click.
   await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
-  await page.getByRole('button', { name: 'Optimize remaps' }).click();
+  await page.getByRole('button', { name: 'Optimize' }).click();
+  await page.getByRole('menuitem', { name: 'Place remaps only' }).click();
   await expect(page.getByText(/^Remapping saves|^No remap improves/)).toBeVisible();
 
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
