@@ -983,6 +983,15 @@ describe('PlanEditor grouping toggle (#115)', () => {
     expect(screen.getByText('High priority')).toBeInTheDocument();
   });
 
+  it('draws no band header when every entry is Normal priority (#1415)', () => {
+    renderEditor(vi.fn(), {
+      plan: { ...PLAN, entries: PLAN.entries.map((e) => ({ ...e, priority: 'normal' as const })) },
+    });
+
+    expect(screen.queryByText('Normal priority')).not.toBeInTheDocument();
+    expect(screen.queryByText('High priority')).not.toBeInTheDocument();
+  });
+
   it('switching to Attribute pair regroups the entry list without updating the plan', async () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
