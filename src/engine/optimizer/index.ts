@@ -21,7 +21,12 @@ export type {
   RemapSegment,
 } from '@/engine/optimizer/placeRemaps';
 
-export { isValidOrder, suggestReorder } from '@/engine/optimizer/reorderSuggestion';
+export {
+  isValidOrder,
+  sortShortestFirst,
+  suggestReorder,
+} from '@/engine/optimizer/reorderSuggestion';
+export type { SortShortestFirstOptions } from '@/engine/optimizer/reorderSuggestion';
 
 export { optimizeForMe } from '@/engine/optimizer/optimizeForMe';
 export type { OptimizeForMeResult } from '@/engine/optimizer/optimizeForMe';

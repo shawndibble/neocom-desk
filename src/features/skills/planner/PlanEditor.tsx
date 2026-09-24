@@ -54,6 +54,7 @@ import {
   optimizeForMe,
   MAX_SUPPORTED_REMAPS,
   placeRemaps,
+  sortShortestFirst,
   suggestReorder,
   ATTRIBUTE_NAMES,
 } from '@/engine/optimizer';
@@ -296,7 +297,7 @@ export function PlanEditor({
   // button, cleared after a couple of seconds. Additive to the full
   // Panel/Modal results those same actions already produce below.
   const [markerConfirm, setMarkerConfirm] = useState(false);
-  const [reorderConfirm, setReorderConfirm] = useState(false);
+  const [reorderConfirm, setReorderConfirm] = useState<'attributes' | 'shortest' | null>(null);
   // A promoted prereq row is a quieter change than it looks (a dimmed row
   // turns into user data), so it says so. A "that worked" note about the
   // change that just landed, so it clears on its own timer, not with the plan.
@@ -391,7 +392,10 @@ export function PlanEditor({
   // moment a plan happens to carry any markers.
   const [markersPanelOpenHeld, setMarkersPanelOpen] = useScopedState<boolean>(planScope);
   const markersPanelOpen = markersPanelOpenHeld ?? false;
-  const [reorderPreview, setReorderPreview] = useScopedState<PlanStep[]>(planScope);
+  const [reorderPreview, setReorderPreview] = useScopedState<{
+    kind: 'attributes' | 'shortest';
+    steps: PlanStep[];
+  }>(planScope);
   // Outcome of the last drag on the entry list. A drop that would land a
   // skill after something requiring it is refused rather than silently
   // re-normalized back (planDrop.ts), so the refusal has to say why. It
@@ -1429,14 +1433,33 @@ export function PlanEditor({
 
   function handleSuggestReorder() {
     if (scheduled.length === 0) return;
-    setReorderPreview(suggestReorder(scheduled, catalog.engineSkills, priorityMap));
-    setReorderConfirm(true);
-    setTimeout(() => setReorderConfirm(false), 2000);
+    setReorderPreview({
+      kind: 'attributes',
+      steps: suggestReorder(scheduled, catalog.engineSkills, priorityMap),
+    });
+    setReorderConfirm('attributes');
+    setTimeout(() => setReorderConfirm(null), 2000);
+  }
+
+  /** "Shortest first": same preview/Accept-Reject flow as "Reorder only", fastest-ready-step-first instead of attribute-pair grouping. */
+  function handleSortShortest() {
+    if (scheduled.length === 0) return;
+    setReorderPreview({
+      kind: 'shortest',
+      steps: sortShortestFirst(
+        scheduled,
+        catalog.engineSkills,
+        { attributes, implants: effectiveImplants, cloneState },
+        priorityMap
+      ),
+    });
+    setReorderConfirm('shortest');
+    setTimeout(() => setReorderConfirm(null), 2000);
   }
 
   function acceptReorder() {
     if (!reorderPreview) return;
-    update(applyReorderSuggestion(plan.entries, reorderPreview));
+    update(applyReorderSuggestion(plan.entries, reorderPreview.steps));
     setReorderPreview(null);
   }
 
@@ -1494,7 +1517,7 @@ export function PlanEditor({
     );
   }
 
-  /** The Optimize menu's four items, in display order — one shared shape (label, hint, disabled, handler) instead of four near-identical `DropdownMenuItem` blocks. */
+  /** The Optimize menu's items, in display order — one shared shape (label, hint, disabled, handler) instead of near-identical `DropdownMenuItem` blocks. */
   const optimizeMenuItems: {
     key: string;
     label: string;
@@ -1517,6 +1540,13 @@ export function PlanEditor({
       hint: t('plans.optimizeModeReorderHint'),
       disabled: scheduled.length === 0,
       onSelect: handleSuggestReorder,
+    },
+    {
+      key: 'shortest',
+      label: t('plans.sortShortest'),
+      hint: t('plans.sortShortestTooltip'),
+      disabled: scheduled.length === 0,
+      onSelect: handleSortShortest,
     },
     {
       key: 'remaps',
@@ -1626,7 +1656,14 @@ export function PlanEditor({
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            {reorderConfirm && confirmation(t('plans.reorderSuggested'))}
+            {reorderConfirm &&
+              confirmation(
+                t(
+                  reorderConfirm === 'shortest'
+                    ? 'plans.sortShortestSuggested'
+                    : 'plans.reorderSuggested'
+                )
+              )}
             {optimizeConfirm && confirmation(optimizeConfirm)}
             {toolAction({
               icon: <Icon.AddMarker size={Icon.ICON_SIZE.sm} />,
@@ -2118,10 +2155,14 @@ export function PlanEditor({
       <Modal
         open={reorderPreview !== null}
         onClose={() => setReorderPreview(null)}
-        title={t('plans.reorderPreviewTitle')}
+        title={t(
+          reorderPreview?.kind === 'shortest'
+            ? 'plans.sortShortestPreviewTitle'
+            : 'plans.reorderPreviewTitle'
+        )}
       >
         <ul className="max-h-56 overflow-y-auto text-xs">
-          {reorderPreview?.map((step, i) => (
+          {reorderPreview?.steps.map((step, i) => (
             <li
               key={`${step.skillTypeID}-${step.level}-${i}`}
               className="border-b border-line py-1 last:border-b-0"

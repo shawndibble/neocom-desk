@@ -86,6 +86,35 @@ test('"Optimize for me" reorders and places remaps in one preview; Accept applie
   await expect(dialog).not.toBeVisible();
 });
 
+test('"Shortest first" pulls a quick standalone skill ahead of the slow Caldari Cruiser chain', async ({
+  page,
+}) => {
+  await addCaldariCruiserToNewPlan(page);
+
+  // "Social" (rank 1, no prereqs) trains far faster than the rest of the
+  // Caldari Cruiser chain still to come (Spaceship Command II, Caldari
+  // Destroyer I-III, Caldari Cruiser I), so it should surface ahead of them.
+  await page.getByPlaceholder('Search skills…').fill('Social');
+  await page.getByRole('button', { name: /^Social/ }).click();
+  await page.getByRole('button', { name: 'Level I', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Remove Social' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Optimize' }).click();
+  await page.getByRole('menuitem', { name: 'Shortest first' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Suggested shortest-first sort' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Accept' }).click();
+  await expect(dialog).not.toBeVisible();
+
+  const queue = page.locator('ul', { hasText: 'Caldari Cruiser I' });
+  const rows = await queue.locator('li').allTextContents();
+  const socialIndex = rows.findIndex((row) => row.includes('Social I'));
+  const cruiserIndex = rows.findIndex((row) => row.includes('Caldari Cruiser I'));
+  expect(socialIndex).toBeGreaterThanOrEqual(0);
+  expect(socialIndex).toBeLessThan(cruiserIndex);
+});
+
 test('the plan summary and tools stay in view while the entries queue scrolls (#221 successor)', async ({
   page,
 }) => {
