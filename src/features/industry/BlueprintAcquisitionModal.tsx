@@ -26,10 +26,11 @@
  * from the local SDE snapshot only (`loadContractLocationInfo`) — no ESI
  * call per row; a player structure stays unnamed.
  */
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  FieldError,
   IconButton,
   Modal,
   Select,
@@ -188,6 +189,9 @@ export function BlueprintAcquisitionModal({
   const [manualPrice, setManualPrice] = useState(
     sourcing?.overridePrice === undefined ? '' : String(sourcing.overridePrice)
   );
+  const [meError, setMeError] = useState(false);
+  const [teError, setTeError] = useState(false);
+  const manualErrorId = useId();
 
   const [hubId, setHubId] = useState<TradeHub['id']>(
     getTradeHub(planHubId)?.id ?? DEFAULT_TRADE_HUB.id
@@ -288,7 +292,11 @@ export function BlueprintAcquisitionModal({
   function applyManual() {
     const me = unmaskNumber(manualMe);
     const te = unmaskNumber(manualTe);
-    if (me === undefined || te === undefined) return;
+    if (me === undefined || te === undefined) {
+      setMeError(me === undefined);
+      setTeError(te === undefined);
+      return;
+    }
     const price = unmaskNumber(manualPrice);
     onSourcingChange(blueprintTypeID, {
       acquisitionTierOverride: {
@@ -624,7 +632,12 @@ export function BlueprintAcquisitionModal({
                 className="w-16"
                 inputMode="numeric"
                 value={manualMe}
-                onChange={(e) => setManualMe(e.target.value)}
+                aria-invalid={meError}
+                aria-describedby={meError ? manualErrorId : undefined}
+                onChange={(e) => {
+                  setManualMe(e.target.value);
+                  setMeError(false);
+                }}
               />
             </label>
             <label className="flex flex-col gap-1">
@@ -634,7 +647,12 @@ export function BlueprintAcquisitionModal({
                 className="w-16"
                 inputMode="numeric"
                 value={manualTe}
-                onChange={(e) => setManualTe(e.target.value)}
+                aria-invalid={teError}
+                aria-describedby={teError ? manualErrorId : undefined}
+                onChange={(e) => {
+                  setManualTe(e.target.value);
+                  setTeError(false);
+                }}
               />
             </label>
             <label className="flex flex-col gap-1">
@@ -656,6 +674,11 @@ export function BlueprintAcquisitionModal({
               onClick={applyManual}
             />
           </div>
+          {(meError || teError) && (
+            <FieldError id={manualErrorId}>
+              {t('industry.blueprintAcquisitionManualError')}
+            </FieldError>
+          )}
         </section>
       </div>
     </Modal>

@@ -92,6 +92,7 @@ export function MailComposeBox({
   const [highlight, setHighlight] = useState<number | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const listboxId = `mail-compose-recipient-listbox-${header.mail_id}`;
+  const errorId = `mail-compose-error-${header.mail_id}`;
 
   // First-field focus (issue #1485): Forward's recipient search is the real
   // first field (it sits above Subject); `skipNextPickerOpenRef` stops that
@@ -274,6 +275,7 @@ export function MailComposeBox({
 
   function addRecipient(candidate: RecipientCandidate) {
     touchedRef.current = true;
+    setError(null);
     setRecipients((prev) => [
       ...prev,
       {
@@ -302,6 +304,10 @@ export function MailComposeBox({
 
   function removeRecipient(target: RecipientChip) {
     touchedRef.current = true;
+    // Clears a stale send-failure message too — otherwise removing the last
+    // recipient re-wires an unrelated old error onto the recipients field via
+    // `noRecipientsError`, which reads `recipients.length` alone.
+    setError(null);
     setRecipients((prev) => prev.filter((r) => chipKey(r) !== chipKey(target)));
   }
 
@@ -349,6 +355,7 @@ export function MailComposeBox({
   }
 
   const headingKey = kind === 'reply' ? 'mail.composeReplyHeading' : 'mail.composeForwardHeading';
+  const noRecipientsError = error !== null && recipients.length === 0;
 
   return (
     <div className="mt-3 space-y-3 border-t border-line pt-3">
@@ -356,7 +363,12 @@ export function MailComposeBox({
         {t(headingKey)}
       </p>
 
-      <div role="group" aria-label={t('mail.recipientsLabel')} className="flex flex-wrap gap-1.5">
+      <div
+        role="group"
+        aria-label={t('mail.recipientsLabel')}
+        aria-describedby={noRecipientsError ? errorId : undefined}
+        className="flex flex-wrap gap-1.5"
+      >
         {recipients.map((r) => (
           <span
             key={chipKey(r)}
@@ -392,6 +404,8 @@ export function MailComposeBox({
             }
             placeholder={t('mail.recipientSearchPlaceholder')}
             aria-label={t('mail.addRecipient')}
+            aria-invalid={noRecipientsError}
+            aria-describedby={noRecipientsError ? errorId : undefined}
             value={recipientQuery}
             onChange={(e) => {
               setRecipientQuery(e.target.value);
@@ -473,7 +487,11 @@ export function MailComposeBox({
         className={`${fieldBaseClassName} w-full p-2 text-sm`}
       />
 
-      {error && <p className="text-xs text-danger">{error}</p>}
+      {error && (
+        <p id={errorId} role="alert" className="text-xs text-danger">
+          {error}
+        </p>
+      )}
 
       <div className="flex items-center gap-2">
         <Button variant="primary" size="sm" onClick={() => void handleSend()} disabled={sending}>

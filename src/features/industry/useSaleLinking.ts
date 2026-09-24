@@ -28,9 +28,17 @@ export interface ManualSaleForm {
 
 const EMPTY_MANUAL_FORM: ManualSaleForm = { quantity: '', unitPrice: '' };
 
+export interface ManualSaleErrors {
+  quantity: boolean;
+  unitPrice: boolean;
+}
+
+const NO_MANUAL_ERRORS: ManualSaleErrors = { quantity: false, unitPrice: false };
+
 interface ManualSaleState {
   runId: string;
   form: ManualSaleForm;
+  errors: ManualSaleErrors;
 }
 
 /**
@@ -86,7 +94,7 @@ export function useSaleLinking(
   }
 
   function openManualSale(runId: string) {
-    setManualSale({ runId, form: EMPTY_MANUAL_FORM });
+    setManualSale({ runId, form: EMPTY_MANUAL_FORM, errors: NO_MANUAL_ERRORS });
   }
 
   function closeManualSale() {
@@ -94,14 +102,30 @@ export function useSaleLinking(
   }
 
   function setManualSaleForm(updater: (form: ManualSaleForm) => ManualSaleForm) {
-    setManualSale((state) => (state ? { ...state, form: updater(state.form) } : state));
+    setManualSale((state) => {
+      if (!state) return state;
+      const form = updater(state.form);
+      // Only the field that actually changed loses its error — editing quantity
+      // must not silently clear a still-blank unitPrice's invalid state.
+      const errors = {
+        quantity: form.quantity === state.form.quantity ? state.errors.quantity : false,
+        unitPrice: form.unitPrice === state.form.unitPrice ? state.errors.unitPrice : false,
+      };
+      return { ...state, form, errors };
+    });
   }
 
   async function saveManualSale() {
     if (!manualSale) return;
     const quantity = unmaskNumber(manualSale.form.quantity);
     const unitPrice = unmaskNumber(manualSale.form.unitPrice);
-    if (!quantity || unitPrice === undefined) return;
+    if (!quantity || unitPrice === undefined) {
+      setManualSale({
+        ...manualSale,
+        errors: { quantity: !quantity, unitPrice: unitPrice === undefined },
+      });
+      return;
+    }
     const now = Date.now();
     await db.productionSaleLinks.add({
       id: `${characterId}:manual:${crypto.randomUUID()}`,

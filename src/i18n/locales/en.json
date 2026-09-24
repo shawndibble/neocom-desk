@@ -576,6 +576,7 @@
     "blueprintAcquisitionManualMe": "ME",
     "blueprintAcquisitionManualTe": "TE",
     "blueprintAcquisitionManualPrice": "Price",
+    "blueprintAcquisitionManualError": "Enter a number for ME and TE.",
     "blueprintAcquisitionOpenPicker": "Choose blueprint tier",
     "bpAcqHubLabel": "Compare at trade hub",
     "bpAcqHubHint": "Contracts and market orders are read for this hub's region. Changing it here doesn't change the plan's trade hub.",
@@ -737,6 +738,8 @@
     "moreSaleOptions": "More sale options",
     "manualSale": "Manual / Private Sale",
     "manualSaleHint": "Record a disposal that isn't in your wallet history or open orders — gifted, sold privately, or reprocessed and sold as something else.",
+    "manualSaleQuantityError": "Enter a quantity greater than 0.",
+    "manualSaleUnitPriceError": "Enter a unit price.",
     "linkedSales": "Linked sales",
     "link": "Link",
     "watch": "Watch",
@@ -3392,7 +3395,8 @@
       "clear": "Clear alert",
       "hubLine": "Compares against lowest sell at {{hub}}.",
       "currentPrice": "Now {{price}} ISK",
-      "dialogTitle": "Price alert: {{name}}"
+      "dialogTitle": "Price alert: {{name}}",
+      "invalidPrice": "Enter a price above 0."
     },
     "variations": {
       "title": "Variations",
