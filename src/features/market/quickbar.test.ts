@@ -4,6 +4,7 @@ import {
   removeQuickbarItem,
   reorderQuickbarItems,
   setQuickbarItemTarget,
+  pinWithTarget,
   hasQuickbarTarget,
   quickbarToPasteText,
 } from './quickbar';
@@ -157,5 +158,51 @@ describe('hasQuickbarTarget', () => {
         targetDirection: 'above',
       })
     ).toBe(true);
+  });
+});
+
+describe('pinWithTarget', () => {
+  const target = { price: 100, direction: 'above' as const };
+
+  it('appends an unpinned item with its target', () => {
+    expect(pinWithTarget([{ typeId: 1, name: 'Tritanium' }], 2, 'Rifter', target)).toEqual([
+      { typeId: 1, name: 'Tritanium' },
+      { typeId: 2, name: 'Rifter', targetPrice: 100, targetDirection: 'above' },
+    ]);
+  });
+
+  it('keeps a pinned item in place and sets its target', () => {
+    expect(
+      pinWithTarget(
+        [
+          { typeId: 1, name: 'Tritanium' },
+          { typeId: 2, name: 'Rifter' },
+        ],
+        1,
+        'Tritanium',
+        target
+      )
+    ).toEqual([
+      { typeId: 1, name: 'Tritanium', targetPrice: 100, targetDirection: 'above' },
+      { typeId: 2, name: 'Rifter' },
+    ]);
+  });
+
+  it('clears a pinned item target but keeps the item', () => {
+    expect(
+      pinWithTarget(
+        [{ typeId: 1, name: 'Tritanium', targetPrice: 5, targetDirection: 'below' }],
+        1,
+        'Tritanium',
+        null
+      )
+    ).toEqual([{ typeId: 1, name: 'Tritanium' }]);
+  });
+
+  it('is a no-op copy when clearing an unpinned item', () => {
+    const items = [{ typeId: 1, name: 'Tritanium' }];
+    const next = pinWithTarget(items, 2, 'Rifter', null);
+    expect(next).toEqual(items);
+    expect(next).not.toBe(items);
   });
 });

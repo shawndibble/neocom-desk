@@ -9,7 +9,12 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type QuickbarItem } from '@/db';
 import { scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
-import { addQuickbarItem, setQuickbarItemTarget, type QuickbarTarget } from './quickbar';
+import {
+  addQuickbarItem,
+  pinWithTarget,
+  setQuickbarItemTarget,
+  type QuickbarTarget,
+} from './quickbar';
 
 export interface Quickbar {
   /** Empty until the live query resolves, and with nobody active. */
@@ -22,6 +27,8 @@ export interface Quickbar {
   add: (typeId: number, itemName: string) => void;
   /** Fire-and-forget target set/clear (issue #680). `null` clears the item's price alert. */
   setTarget: (typeId: number, target: QuickbarTarget) => void;
+  /** Pins the item if needed and sets/clears its target in one write (issue #1427). */
+  pinWithTarget: (typeId: number, itemName: string, target: QuickbarTarget) => void;
 }
 
 export function useQuickbar(activeCharacterId: number | null): Quickbar {
@@ -48,5 +55,7 @@ export function useQuickbar(activeCharacterId: number | null): Quickbar {
     write,
     add: (typeId, itemName) => void write(addQuickbarItem(items, { typeId, name: itemName })),
     setTarget: (typeId, target) => void write(setQuickbarItemTarget(items, typeId, target)),
+    pinWithTarget: (typeId, itemName, target) =>
+      void write(pinWithTarget(items, typeId, itemName, target)),
   };
 }

@@ -21,100 +21,13 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  IconButton,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  TextInput,
-  TypeIcon,
-} from '@/components/ui';
+import { IconButton, Popover, PopoverContent, PopoverTrigger, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { formatIsk, formatIskCompact, parseIskAmount } from '@/lib/isk';
+import { formatIskCompact } from '@/lib/isk';
 import { ItemContextMenu } from './ItemContextMenu';
+import { PriceAlertForm } from './PriceAlertForm';
 import { hasQuickbarTarget, type QuickbarTarget } from './quickbar';
 import type { QuickbarItem } from '@/db';
-
-/**
- * The target-price popover's own form state, editing a copy rather than the
- * item directly — only committed to the Quickbar on Save (issue #680).
- * Radix unmounts `PopoverContent` on close by default, so this component
- * remounts (and so re-reads `item`'s current target into its initial state)
- * every time the popover opens rather than needing a sync effect.
- */
-function PriceAlertForm({
-  item,
-  onSave,
-  onClear,
-  onClose,
-}: {
-  item: QuickbarItem;
-  onSave: (target: { price: number; direction: 'above' | 'below' }) => void;
-  onClear: () => void;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-  const [direction, setDirection] = useState<'above' | 'below'>(item.targetDirection ?? 'above');
-  const [text, setText] = useState(
-    item.targetPrice !== undefined ? formatIsk(item.targetPrice) : ''
-  );
-  const hasTarget = hasQuickbarTarget(item);
-
-  function handleSave() {
-    const amount = parseIskAmount(text);
-    if (amount === null || amount <= 0) return;
-    onSave({ price: Math.round(amount), direction });
-    onClose();
-  }
-
-  return (
-    <div className="flex w-48 flex-col gap-2 p-2 text-xs">
-      <label className="flex flex-col gap-1">
-        <span className="text-text-dim">{t('market.quickbar.priceAlert.priceLabel')}</span>
-        <TextInput
-          size="sm"
-          type="text"
-          inputMode="decimal"
-          autoFocus
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
-      </label>
-      <Select value={direction} onValueChange={(value) => setDirection(value as typeof direction)}>
-        <SelectTrigger size="sm" aria-label={t('market.quickbar.priceAlert.directionLabel')}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="above">{t('market.quickbar.priceAlert.directionAbove')}</SelectItem>
-          <SelectItem value="below">{t('market.quickbar.priceAlert.directionBelow')}</SelectItem>
-        </SelectContent>
-      </Select>
-      <div className="flex justify-end gap-2">
-        {hasTarget && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              onClear();
-              onClose();
-            }}
-          >
-            {t('market.quickbar.priceAlert.clear')}
-          </Button>
-        )}
-        <Button size="sm" variant="primary" onClick={handleSave}>
-          {t('market.quickbar.priceAlert.save')}
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 interface QuickbarRowProps {
   item: QuickbarItem;
@@ -194,13 +107,15 @@ function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget, menu }: 
           <IconButton
             size="sm"
             icon={<Icon.PriceAlert />}
-            label={t('market.quickbar.priceAlert.button', { name: item.name })}
+            label={t('market.priceAlert.button', { name: item.name })}
             pressed={hasTarget}
           />
         </PopoverTrigger>
         <PopoverContent align="end">
           <PriceAlertForm
-            item={item}
+            typeId={item.typeId}
+            targetPrice={item.targetPrice}
+            targetDirection={item.targetDirection}
             onSave={(target) => onSetTarget(item.typeId, target)}
             onClear={() => onSetTarget(item.typeId, null)}
             onClose={() => setPopoverOpen(false)}
