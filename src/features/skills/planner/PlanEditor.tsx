@@ -36,18 +36,14 @@ import {
   useViewportBoundedHeight,
   VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
 } from '@/lib/useViewportBoundedHeight';
-import {
-  computeSkillPlanSchedule,
-  stepKey,
-  type SkillPlanScheduleInput,
-  type StepKey,
-} from '@/engine/skillPlanSchedule';
+import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
 import {
   milestoneKey,
   milestoneStates,
   nextMilestone,
   type MilestoneStatus,
 } from '@/engine/skillPlanMilestones';
+import { schedulePlan } from './planSchedule';
 import { parseSkillQueue } from '@/engine/queueImport';
 import { exportPlanToClipboard } from '@/engine/clipboardExport';
 import {
@@ -220,15 +216,6 @@ interface PlanEditorProps {
    */
   headerActionsContainer?: HTMLElement | null;
   onUpdate: (patch: PlanPatch) => void;
-}
-
-/**
- * The Skill Plan schedule (engine/skillPlanSchedule.ts), started at `startMs`.
- * The wall-clock read lives in the component's one-shot `useState` initializer
- * rather than in render.
- */
-function scheduleFrom(startMs: number, input: Omit<SkillPlanScheduleInput, 'startDate'>) {
-  return computeSkillPlanSchedule({ ...input, startDate: new Date(startMs) });
 }
 
 const NO_QUEUE: readonly SkillQueueEntry[] = [];
@@ -560,31 +547,43 @@ export function PlanEditor({
     () => projectQueueEnd(trainedSkills, queueEntries, loadedAtMs),
     [trainedSkills, queueEntries, loadedAtMs]
   );
-  const scheduleTrained = queueProjection.trained;
+  // Costed by `schedulePlan`, the same call the Calendar makes, so the two
+  // can never quote different dates for one plan.
   const schedule = useMemo(
     () =>
-      scheduleFrom(queueProjection.startMs, {
-        entries: plan.entries,
-        skills: catalog.engineSkills,
-        trainedSkills: scheduleTrained,
-        attributes,
-        implants: effectiveImplants,
-        boosters: activeBoosters,
-        markers: plan.markers,
-        markerAttributes: normalizedMarkerAttributes,
-        cloneState,
-      }),
+      schedulePlan(
+        {
+          entries: plan.entries,
+          markers: plan.markers,
+          markerAttributes: plan.markerAttributes,
+          whatIfImplants: plan.whatIfImplants,
+          booster: plan.booster,
+        },
+        {
+          catalog,
+          trained: trainedSkills,
+          queueEntries,
+          attributes,
+          attributeBaseline,
+          implants,
+          cloneState,
+        },
+        loadedAtMs
+      ),
     [
       plan.entries,
-      catalog,
-      queueProjection.startMs,
-      scheduleTrained,
-      attributes,
-      effectiveImplants,
-      activeBoosters,
       plan.markers,
-      normalizedMarkerAttributes,
+      plan.markerAttributes,
+      plan.whatIfImplants,
+      plan.booster,
+      catalog,
+      trainedSkills,
+      queueEntries,
+      attributes,
+      attributeBaseline,
+      implants,
       cloneState,
+      loadedAtMs,
     ]
   );
   const {

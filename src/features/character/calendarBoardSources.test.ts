@@ -13,11 +13,54 @@ import {
   toIndustryJobSources,
   toOrderExpirySources,
   toPlanetExtractionSources,
+  toSkillPlanSources,
   toSkillTrainingSources,
 } from './calendarBoardSources';
 
 const ISO = (s: string) => s;
 const name = (id: number) => `Type ${id}`;
+
+describe('toSkillPlanSources', () => {
+  const start = new Date('2026-09-23T12:00:00Z');
+  const step = (skillTypeID: number, level: number, cumulativeSeconds: number) => ({
+    skillTypeID,
+    level,
+    sp: 0,
+    seconds: 0,
+    cumulativeSeconds,
+  });
+  const queued = (skill_id: number, finished_level: number): SkillQueueEntry => ({
+    skill_id,
+    queue_position: 0,
+    finished_level,
+    finish_date: '2026-09-23T10:00:00Z',
+  });
+
+  it('makes one row per step, dated startDate plus its cumulative seconds', () => {
+    const rows = toSkillPlanSources(
+      { scheduled: [step(7, 2, 3600), step(7, 3, 7200)], startDate: start },
+      [],
+      name
+    );
+    expect(rows).toEqual([
+      { id: '7:2', subject: 'Type 7 II', detail: '', deadlineMs: start.getTime() + 3_600_000 },
+      { id: '7:3', subject: 'Type 7 III', detail: '', deadlineMs: start.getTime() + 7_200_000 },
+    ]);
+  });
+
+  it('drops a step the live queue already carries, so the queue row wins', () => {
+    const rows = toSkillPlanSources(
+      { scheduled: [step(7, 2, 3600), step(7, 3, 7200)], startDate: start },
+      [queued(7, 2)],
+      name
+    );
+    expect(rows.map((r) => r.id)).toEqual(['7:3']);
+  });
+
+  it('is an empty list, not undefined, when nothing is left to train', () => {
+    expect(toSkillPlanSources({ scheduled: [], startDate: start }, [], name)).toEqual([]);
+  });
+});
 
 describe('toCalendarEventSources', () => {
   const event = (overrides: Partial<CalendarEventSummary> = {}): CalendarEventSummary => ({

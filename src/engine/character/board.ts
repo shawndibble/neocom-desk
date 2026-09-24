@@ -1,5 +1,5 @@
 /**
- * The character's Coming Up board: six heterogeneous clocks in, one ordered
+ * The character's Coming Up board: seven heterogeneous clocks in, one ordered
  * list out.
  *
  * The corp side of this exists already (`engine/corp/board.ts`) and answers the
@@ -7,8 +7,9 @@
  * fleet op they said they would attend, a skill about to finish and waste
  * training time, a job sitting undelivered, an extractor program running out,
  * a contract about to expire with collateral on it, a sell order about to
- * lapse. Those live in six ESI endpoints and, before this, on five separate
- * routes. Merging them into one deadline-ordered list *is* the feature.
+ * lapse, and the steps of a Skill Plan projected past the queue. Six of those
+ * live in ESI endpoints and, before this, on five separate routes. Merging them
+ * into one deadline-ordered list *is* the feature.
  *
  * Pure by construction (CLAUDE.md): plain numbers and strings in, plain objects
  * out. `nowMs` is a parameter rather than a `Date.now()` call, so every
@@ -44,6 +45,7 @@ export const CHARACTER_BOARD_ITEM_KINDS = [
   'planetExtraction',
   'contractExpiry',
   'orderExpiry',
+  'skillPlan',
 ] as const;
 
 export type CharacterBoardItemKind = (typeof CHARACTER_BOARD_ITEM_KINDS)[number];
@@ -116,6 +118,8 @@ export interface CharacterBoardSources {
   planetExtractions?: readonly BoardClockSource[];
   contractExpiries?: readonly BoardClockSource[];
   orderExpiries?: readonly BoardClockSource[];
+  /** Projected Skill Plan steps — a forecast, not an ESI clock. */
+  skillPlan?: readonly BoardClockSource[];
 }
 
 /** Which `CharacterBoardSources` field carries each kind — the one place the two names meet. */
@@ -126,6 +130,7 @@ const SOURCE_KEY = {
   planetExtraction: 'planetExtractions',
   contractExpiry: 'contractExpiries',
   orderExpiry: 'orderExpiries',
+  skillPlan: 'skillPlan',
 } as const satisfies Record<CharacterBoardItemKind, keyof CharacterBoardSources>;
 
 const KIND_RANK = new Map<CharacterBoardItemKind, number>(
@@ -144,6 +149,16 @@ const KIND_RANK = new Map<CharacterBoardItemKind, number>(
  */
 export function runsPastItsDeadline(kind: CharacterBoardItemKind): boolean {
   return kind === 'calendarEvent';
+}
+
+/**
+ * Kinds whose deadlines are forecasts rather than ESI clocks. A Skill Plan
+ * step lands when the plan says it would, which moves with the queue, the
+ * attributes and the Clone State — so every surface marks it as projected
+ * (a hollow dot, a word), never by colour alone.
+ */
+export function isProjectedKind(kind: CharacterBoardItemKind): boolean {
+  return kind === 'skillPlan';
 }
 
 function isCalendarEvent(source: BoardClockSource): source is BoardCalendarEventSource {

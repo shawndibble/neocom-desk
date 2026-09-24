@@ -1,5 +1,5 @@
 /**
- * Kind to tokens: fill and text tone, for the six clocks the Calendar merges.
+ * Kind to tokens: fill and text tone, for the seven clocks the Calendar merges.
  *
  * The sibling of `severityTone.ts`, and deliberately its opposite. That one
  * colours a **magnitude** — how close a deadline is, on an ordered ladder.
@@ -24,7 +24,7 @@
  * need to carry alone: the closest pair under deuteranopia is industry/orders
  * at ΔE 12, which is a weak *reinforcement* rather than a lost signal.
  */
-import type { CharacterBoardItemKind } from '@/engine/character/board';
+import { isProjectedKind, type CharacterBoardItemKind } from '@/engine/character/board';
 
 /** Background fill — flat, per DESIGN.md §6. Map dots, ticker segments, menu swatches. */
 export const KIND_FILL: Record<CharacterBoardItemKind, string> = {
@@ -34,6 +34,7 @@ export const KIND_FILL: Record<CharacterBoardItemKind, string> = {
   planetExtraction: 'bg-kind-planet-extraction',
   contractExpiry: 'bg-kind-contract-expiry',
   orderExpiry: 'bg-kind-order-expiry',
+  skillPlan: 'bg-kind-skill-plan',
 };
 
 /** Text tone — the rail's countdown and the glyph beside it. */
@@ -44,4 +45,22 @@ export const KIND_TEXT: Record<CharacterBoardItemKind, string> = {
   planetExtraction: 'text-kind-planet-extraction',
   contractExpiry: 'text-kind-contract-expiry',
   orderExpiry: 'text-kind-order-expiry',
+  skillPlan: 'text-kind-skill-plan',
 };
+
+/**
+ * A map dot: filled for a real clock, an outline for a projected one. The
+ * shape is the signal, so a forecast is never read as a commitment by hue.
+ */
+export function kindDotClassName(kind: CharacterBoardItemKind): string {
+  return isProjectedKind(kind)
+    ? 'size-1.5 rounded-full border border-kind-skill-plan'
+    : `size-1.5 rounded-full ${KIND_FILL[kind]}`;
+}
+
+/** A ticker segment (2px tall): solid for a real clock, a dashed line for a projected one. */
+export function kindSegmentClassName(kind: CharacterBoardItemKind): string {
+  return isProjectedKind(kind)
+    ? 'flex-1 border-t-2 border-dashed border-kind-skill-plan'
+    : `flex-1 ${KIND_FILL[kind]}`;
+}

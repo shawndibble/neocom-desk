@@ -17,7 +17,7 @@ import type { DayLoad } from '@/engine/character/deadlines';
 import { localMidnight } from '@/engine/character/deadlines';
 import type { GridDay } from '@/lib/calendarGrid';
 import { cx } from '@/lib/cx';
-import { KIND_FILL } from '@/components/ui/kindTone';
+import { kindSegmentClassName } from '@/components/ui/kindTone';
 import { useDayLoadLabel } from './dayLoadLabel';
 
 export interface CalendarDayTickerProps {
@@ -87,7 +87,7 @@ export function CalendarDayTicker({
             */}
             <span aria-hidden="true" className="flex h-0.5 w-6 gap-px overflow-hidden rounded-full">
               {load?.kinds.map((kind) => (
-                <span key={kind} className={`flex-1 ${KIND_FILL[kind]}`} />
+                <span key={kind} className={kindSegmentClassName(kind)} />
               ))}
             </span>
             <span className="h-3.5 text-[0.6875rem] leading-3.5 text-text-dim tabular-nums">

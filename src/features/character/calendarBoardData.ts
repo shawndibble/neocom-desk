@@ -1,5 +1,5 @@
 /**
- * The Calendar page's six reads, and the one snapshot they collapse into.
+ * The Calendar page's six ESI reads and its one Skill Plan projection, and the one snapshot they collapse into.
  *
  * Fetch + cache only — the ESI-shape-to-board-source conversion lives next
  * door in `calendarBoardSources.ts`, and the ranking lives in
@@ -30,12 +30,14 @@ import { loadCharacterSkillQueueWithStatus } from '@/features/skills/data';
 import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
 import { loadCharacterPlanets, readCachedColonyDetails } from '@/features/pi/data';
 import { readCachedPlanetNames } from '@/features/pi/names';
+import { loadSkillPlanBoard, type SkillPlanChoice } from './calendarSkillPlan';
 import {
   toCalendarEventSources,
   toContractExpirySources,
   toIndustryJobSources,
   toOrderExpirySources,
   toPlanetExtractionSources,
+  toSkillPlanSources,
   toSkillTrainingSources,
   type ColonyPins,
 } from './calendarBoardSources';
@@ -47,6 +49,14 @@ export interface CalendarBoardData {
   planetExtractions?: BoardClockSource[];
   contractExpiries?: BoardClockSource[];
   orderExpiries?: BoardClockSource[];
+  /** Projected steps of the chosen Skill Plan. Left `undefined` when none is chosen or it could not be costed. */
+  skillPlan?: BoardClockSource[];
+  /** The Character's Skill Plans, for the picker under the filter menu. */
+  skillPlanChoices: SkillPlanChoice[];
+  /** The plan the board is projecting, or null. */
+  chosenSkillPlanId: string | null;
+  /** Why the chosen plan has no rows — set only when the scheduler could not cost it. */
+  skillPlanError: string | null;
   /**
    * Kinds whose source was read at all — empty or not.
    *
@@ -95,15 +105,24 @@ function readRows<T>(result: StatusResult<T[]>): readonly T[] | undefined {
 }
 
 export async function loadCalendarBoard(characterId: number): Promise<CalendarBoardData> {
-  const [eventsResult, queueResult, jobsResult, planetsResult, contractsResult, ordersResult] =
-    await Promise.all([
-      loadCalendarEvents(characterId),
-      loadCharacterSkillQueueWithStatus(characterId),
-      loadCharacterIndustryJobs(characterId),
-      loadCharacterPlanets(characterId),
-      loadContracts(characterId),
-      loadOrders(characterId),
-    ]);
+  const loadedAtMs = Date.now();
+  const [
+    eventsResult,
+    queueResult,
+    jobsResult,
+    planetsResult,
+    contractsResult,
+    ordersResult,
+    skillPlanBoard,
+  ] = await Promise.all([
+    loadCalendarEvents(characterId),
+    loadCharacterSkillQueueWithStatus(characterId),
+    loadCharacterIndustryJobs(characterId),
+    loadCharacterPlanets(characterId),
+    loadContracts(characterId),
+    loadOrders(characterId),
+    loadSkillPlanBoard(characterId, loadedAtMs),
+  ]);
 
   const events = readRows(eventsResult);
   const queue = readRows(queueResult);
@@ -147,7 +166,10 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
 
   // One name resolution for every id the board will show, rather than one per
   // source: `loadTypeNames` is a single SDE read either way.
+  const planSchedule =
+    skillPlanBoard.outcome.status === 'ready' ? skillPlanBoard.outcome.schedule : undefined;
   const typeIds = new Set<number>();
+  for (const step of planSchedule?.scheduled ?? []) typeIds.add(step.skillTypeID);
   for (const entry of queue ?? []) typeIds.add(entry.skill_id);
   for (const job of jobs ?? []) typeIds.add(job.product_type_id ?? job.blueprint_type_id);
   for (const order of orders ?? []) typeIds.add(order.type_id);
@@ -170,6 +192,12 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     { kind: 'planetExtraction', result: planetsResult, rows: planets },
     { kind: 'contractExpiry', result: contractsResult, rows: contracts },
     { kind: 'orderExpiry', result: ordersResult, rows: orders },
+    // Not an ESI read: no cache metadata, and nothing to re-authorise.
+    {
+      kind: 'skillPlan',
+      result: { cached: null, needsReauth: false },
+      rows: planSchedule?.scheduled,
+    },
   ] satisfies {
     kind: CharacterBoardItemKind;
     result: StatusResult<unknown[]>;
@@ -188,6 +216,11 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     planetExtractions: planets && toPlanetExtractionSources(colonies),
     contractExpiries: contracts && toContractExpirySources(contracts),
     orderExpiries: orders && toOrderExpirySources(orders, typeName),
+    skillPlan: planSchedule && toSkillPlanSources(planSchedule, queue ?? [], typeName),
+    skillPlanChoices: skillPlanBoard.choices,
+    chosenSkillPlanId: skillPlanBoard.chosenId,
+    skillPlanError:
+      skillPlanBoard.outcome.status === 'error' ? skillPlanBoard.outcome.reason : null,
     readableKinds: sources.filter((s) => s.rows !== undefined).map((s) => s.kind),
     reauthKinds: sources.filter((s) => s.result.needsReauth).map((s) => s.kind),
     oldestFetchedAt:
@@ -196,6 +229,6 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
         : null,
     fromCache: cached.some((result) => result.fromCache),
     events: [...(events ?? [])],
-    loadedAtMs: Date.now(),
+    loadedAtMs,
   };
 }

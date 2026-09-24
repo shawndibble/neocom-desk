@@ -31,7 +31,7 @@ import { localMidnight } from '@/engine/character/deadlines';
 import { weekdayLabels, type GridDay } from '@/lib/calendarGrid';
 import { cx } from '@/lib/cx';
 
-import { KIND_FILL } from '@/components/ui/kindTone';
+import { kindDotClassName } from '@/components/ui/kindTone';
 import { useDayLoadLabel } from './dayLoadLabel';
 
 export interface CalendarMapProps {
@@ -137,11 +137,7 @@ export function CalendarMap({ days, loads, nowMs, selectedDayMs, onSelectDay }: 
               {load && (
                 <span className="mt-auto flex flex-wrap items-center gap-1 pt-1">
                   {load.kinds.map((kind) => (
-                    <span
-                      key={kind}
-                      aria-hidden="true"
-                      className={`size-1.5 rounded-full ${KIND_FILL[kind]}`}
-                    />
+                    <span key={kind} aria-hidden="true" className={kindDotClassName(kind)} />
                   ))}
                 </span>
               )}
