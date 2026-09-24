@@ -24,6 +24,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   EmptyState,
+  FilterChip,
   Panel,
   Select,
   SelectContent,
@@ -32,7 +33,6 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-  FilterChip,
   Spinner,
   TextInput,
   buttonClassName,
