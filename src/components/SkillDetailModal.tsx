@@ -18,7 +18,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Modal, Spinner } from '@/components/ui';
+import { Button, EmptyState, Modal, Spinner } from '@/components/ui';
 import { SkillRequirementsList } from '@/features/skills/SkillRequirementsList';
 import {
   buildSkillRequirements,
@@ -46,6 +46,9 @@ export function SkillDetailModal() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
 
   const [state, setState] = useState<ModalState>(IDLE);
+  // Bumped by "Try again" to re-run the load effect in place — the page's
+  // own Refresh sits behind the modal overlay, out of reach.
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (!request) return;
@@ -76,7 +79,7 @@ export function SkillDetailModal() {
     return () => {
       cancelled = true;
     };
-  }, [request, activeCharacterId]);
+  }, [request, activeCharacterId, attempt]);
 
   if (!request) return null;
 
@@ -88,10 +91,21 @@ export function SkillDetailModal() {
         <div className="flex justify-center py-8">
           <Spinner label={t('common.loading')} />
         </div>
-      ) : state.status === 'error' || state.status === 'not-found' ? (
+      ) : state.status === 'error' ? (
         <EmptyState
           title={t('common.loadFailedTitle')}
-          hint={t('common.loadFailedHint')}
+          hint={t('skills.detail.loadFailedHint')}
+          action={
+            <Button size="sm" onClick={() => setAttempt((n) => n + 1)}>
+              {t('common.retry')}
+            </Button>
+          }
+          className="py-8"
+        />
+      ) : state.status === 'not-found' ? (
+        <EmptyState
+          title={t('skills.detail.notFoundTitle')}
+          hint={t('skills.detail.notFoundHint')}
           className="py-8"
         />
       ) : (
