@@ -60,7 +60,7 @@ import type {
   WhatIfImplantPreset,
   WhatIfImplantSelection,
 } from '@/db';
-import type { CharacterAttributes } from '@/esi/endpoints';
+import type { CharacterAttributes, SkillQueueEntry } from '@/esi/endpoints';
 import { AttributeChips } from '@/features/skills/AttributeChips';
 import { loadCharacterSkillQueue, type CachedResult } from '../data';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -74,6 +74,8 @@ import { attributePairBandStarts } from './attributePairBands';
 import { PlanHeader } from './PlanHeader';
 import { PlanEditorLayout } from './PlanEditorLayout';
 import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
+import { LiveQueueLead } from './LiveQueueLead';
+import { projectQueueEnd } from '@/features/skills/queueStatus';
 import { evaluateOptimizationBadge, toOptimizationBadge } from './planHeaderStats';
 import { markerVerdict, remapVerdict, type OptimizeVerdict } from './optimizeVerdict';
 import { cloneStateFor, useCloneStates, withCloneState } from '../cloneState';
@@ -169,6 +171,9 @@ interface PlanEditorProps {
   attributeBaseline?: AttributeBaseline | null;
   /** Remaps Available from ESI (bonus + yearly), for the hint next to the count input. */
   remapInfo: RemapAvailability | null;
+  /** The live in-game queue: the plan's schedule starts where it ends. */
+  queueEntries?: readonly SkillQueueEntry[];
+  queueFetchedAt?: Date | null;
   /**
    * The plan list, rendered at the top of the sidebar this component lays
    * out. Passed in rather than imported so the route keeps owning plan CRUD
@@ -195,13 +200,15 @@ interface PlanEditorProps {
 }
 
 /**
- * The Skill Plan schedule (engine/skillPlanSchedule.ts), started "now". The
- * wall-clock read sits out here, not in the component body, where it would be
- * an impure call during render.
+ * The Skill Plan schedule (engine/skillPlanSchedule.ts), started at `startMs`.
+ * The wall-clock read lives in the component's one-shot `useState` initializer
+ * rather than in render.
  */
-function scheduleFromNow(input: Omit<SkillPlanScheduleInput, 'startDate'>) {
-  return computeSkillPlanSchedule({ ...input, startDate: new Date() });
+function scheduleFrom(startMs: number, input: Omit<SkillPlanScheduleInput, 'startDate'>) {
+  return computeSkillPlanSchedule({ ...input, startDate: new Date(startMs) });
 }
+
+const NO_QUEUE: readonly SkillQueueEntry[] = [];
 
 /** An Optimize Remaps result, with each segment's first step held by key rather than index. */
 type OptimizeRun = PlaceRemapsResult & { anchorKeys: (StepKey | undefined)[] };
@@ -217,6 +224,8 @@ export function PlanEditor({
   attributesResult,
   attributeBaseline = null,
   remapInfo,
+  queueEntries = NO_QUEUE,
+  queueFetchedAt = null,
   listPane,
   headerActionsContainer = null,
   onUpdate,
@@ -499,12 +508,21 @@ export function PlanEditor({
     [plan.markers, plan.markerAttributes, plan.entries.length]
   );
 
+  // The in-game queue trains first, so the plan starts when it ends and every
+  // queued level counts as trained by then. One instant feeds the schedule,
+  // Optimize Remaps' Booster origin, so the savings figure and the total agree.
+  const [loadedAtMs] = useState(() => Date.now());
+  const queueProjection = useMemo(
+    () => projectQueueEnd(trainedSkills, queueEntries, loadedAtMs),
+    [trainedSkills, queueEntries, loadedAtMs]
+  );
+  const scheduleTrained = queueProjection.trained;
   const schedule = useMemo(
     () =>
-      scheduleFromNow({
+      scheduleFrom(queueProjection.startMs, {
         entries: plan.entries,
         skills: catalog.engineSkills,
-        trainedSkills,
+        trainedSkills: scheduleTrained,
         attributes,
         implants: effectiveImplants,
         boosters: activeBoosters,
@@ -515,7 +533,8 @@ export function PlanEditor({
     [
       plan.entries,
       catalog,
-      trainedSkills,
+      queueProjection.startMs,
+      scheduleTrained,
       attributes,
       effectiveImplants,
       activeBoosters,
@@ -843,7 +862,9 @@ export function PlanEditor({
       // The same Boosters the computed queue schedules with, so the savings
       // figure and the queue total cannot disagree.
       booster:
-        activeBoosters.length > 0 ? { boosters: activeBoosters, startDate: new Date() } : undefined,
+        activeBoosters.length > 0
+          ? { boosters: activeBoosters, startDate: new Date(queueProjection.startMs) }
+          : undefined,
     });
     const verdict = remapVerdict(result, remapCount);
     setOptimizeResult({ ...result, anchorKeys: anchorKeysOf(result.segments) });
@@ -1675,6 +1696,11 @@ export function PlanEditor({
           }
         >
           <div className="space-y-3">
+            <LiveQueueLead
+              projection={queueProjection}
+              fetchedAt={queueFetchedAt}
+              nameFor={nameFor}
+            />
             <SkillPicker
               skills={pickerSkills}
               catalog={catalog}
