@@ -2095,7 +2095,10 @@
       "noKindsHint": "Pick at least one type from the filter to see what is coming up."
     },
     "sourcesNeedLogin": "Some sources need a new login: {{sources}}.",
-    "emptyTitle": "No event detail cached"
+    "detailLoadFailedHint": "Couldn't fetch this event's details. You may be offline or ESI may be busy — try again in a moment. If it keeps failing, the event may have been deleted or your invitation withdrawn.",
+    "detailReauthTitle": "Log in again to see this event",
+    "detailReauthHint": "EVE rejected this character's login when fetching the event's details. Log this character in again to restore calendar access.",
+    "reauthAction": "Log in again with EVE Online"
   },
   "clones": {
     "title": "Clones",
