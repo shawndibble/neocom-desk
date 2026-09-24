@@ -190,6 +190,12 @@ async function openPlanTools() {
   }
 }
 
+/** Opens the Actions section's "Optimize" dropdown and clicks one of its mode items (#1411). */
+async function clickOptimizeMode(user: ReturnType<typeof userEvent.setup>, name: string) {
+  await user.click(screen.getByRole('button', { name: 'Optimize' }));
+  await user.click(screen.getByRole('menuitem', { name }));
+}
+
 /**
  * The tools-pane section a heading titles (Actions / Attributes /
  * Import / Export). `closest('section')`, not `parentElement`: a heading
@@ -896,7 +902,7 @@ describe('SkillPlans editor: optimize remaps', () => {
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+    await clickOptimizeMode(user, 'Place remaps only');
 
     // A savings verdict now gets its own Accept/Reject Modal, next to the
     // button that produced it — it used to render inline, then a Panel of
@@ -937,11 +943,11 @@ describe('SkillPlans editor: optimize remaps', () => {
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+    await clickOptimizeMode(user, 'Place remaps only');
 
     expect(
       await screen.findByText(
-        'No remap improves this plan in its current order \u2014 keeping current attributes. Try "Suggest reorder" to group similar skills first, then optimize again.'
+        'No remap improves this plan in its current order \u2014 keeping current attributes. Try "Reorder only" to group similar skills first, then optimize again.'
       )
     ).toBeInTheDocument();
     expect(screen.queryByText(/Segment 1/)).not.toBeInTheDocument();
@@ -953,7 +959,7 @@ describe('SkillPlans editor: optimize remaps', () => {
   // on cooldown — so `placeRemaps` short-circuits before evaluating
   // anything. The identical plan at remapCount 1 saves time (first test in
   // this block), so "no remap improves this plan in its current order" is
-  // false, and its advice to try "Suggest reorder" cannot help.
+  // false, and its advice to try "Reorder only" cannot help.
   it('says the plan has no remaps to spend, rather than blaming the plan order, at 0 Remaps Available', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(
@@ -970,8 +976,8 @@ describe('SkillPlans editor: optimize remaps', () => {
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    const toolbar = screen.getByRole('button', { name: 'Optimize remaps' }).closest('section')!;
-    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+    const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
+    await clickOptimizeMode(user, 'Place remaps only');
 
     expect(
       await screen.findByText(
@@ -1000,7 +1006,7 @@ describe('SkillPlans editor: optimize remaps', () => {
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+    await clickOptimizeMode(user, 'Place remaps only');
     expect(await screen.findByText(/^Remapping saves/)).toBeInTheDocument();
 
     const entriesPanel = screen.getByText('Your entries').closest('section')!;
@@ -1036,8 +1042,8 @@ describe('SkillPlans editor: optimize remaps', () => {
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    const toolbar = screen.getByRole('button', { name: 'Optimize remaps' }).closest('section')!;
-    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+    const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
+    await clickOptimizeMode(user, 'Place remaps only');
 
     // Additive: the full panel result (asserted elsewhere above) still
     // renders — this only checks the new beside-the-button confirmation.
@@ -1107,9 +1113,10 @@ describe('SkillPlans editor: remap markers', () => {
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    const optimizeButton = screen.getByRole('button', { name: 'Optimize at my markers' });
-    expect(optimizeButton).toBeEnabled();
-    await user.click(optimizeButton);
+    await user.click(screen.getByRole('button', { name: 'Optimize' }));
+    const optimizeItem = screen.getByRole('menuitem', { name: 'Use my remap markers' });
+    expect(optimizeItem).not.toHaveAttribute('aria-disabled', 'true');
+    await user.click(optimizeItem);
 
     await screen.findByText(/^Remapping saves/);
     expect(toolsSection('Actions')).toBeInTheDocument();
@@ -1146,10 +1153,8 @@ describe('SkillPlans editor: remap markers', () => {
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    const toolbar = screen
-      .getByRole('button', { name: 'Optimize at my markers' })
-      .closest('section')!;
-    await user.click(screen.getByRole('button', { name: 'Optimize at my markers' }));
+    const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
+    await clickOptimizeMode(user, 'Use my remap markers');
 
     expect(
       await screen.findByText(
@@ -1179,9 +1184,7 @@ describe('SkillPlans editor: remap markers', () => {
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    const toolbar = screen
-      .getByRole('button', { name: 'Optimize at my markers' })
-      .closest('section')!;
+    const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
 
     // Standing, not a post-click toast: a plan carrying a remap line says
     // what that line saves the moment it is opened. The button beside it
@@ -1190,13 +1193,18 @@ describe('SkillPlans editor: remap markers', () => {
   });
 
   it('disables "Optimize at my markers" when the plan has no markers', async () => {
+    const user = userEvent.setup();
     await db.skillPlans.add(seedPlan({ entries: [{ skillTypeID: 1, targetLevel: 3 }] }));
     goToPlanEditor();
     render(<App />);
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    expect(screen.getByRole('button', { name: 'Optimize at my markers' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Optimize' }));
+    expect(screen.getByRole('menuitem', { name: 'Use my remap markers' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
   });
 });
 
@@ -1215,7 +1223,7 @@ describe('SkillPlans editor: the remap cap is disclosed', () => {
     goToPlanEditor();
     render(<App />);
     await openPlanTools();
-    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+    await clickOptimizeMode(user, 'Place remaps only');
     await screen.findByText(/^Remapping saves|^No remap improves/);
   };
 
@@ -1296,7 +1304,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
       expect(within(header()).queryByText('Remap savings')).not.toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: 'Optimize remaps' }));
+    await clickOptimizeMode(user, 'Place remaps only');
     await screen.findByText(/^Remapping saves|^No remap improves/);
 
     await waitFor(() => {
@@ -1405,7 +1413,7 @@ describe('SkillPlans editor: suggest reorder', () => {
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    await user.click(screen.getByRole('button', { name: 'Suggest reorder' }));
+    await clickOptimizeMode(user, 'Reorder only');
 
     expect(await screen.findByRole('heading', { name: 'Suggested reorder' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Accept' }));
@@ -1438,8 +1446,8 @@ describe('SkillPlans editor: suggest reorder', () => {
     await openPlanTools();
 
     await screen.findByText('Your entries');
-    const toolbar = screen.getByRole('button', { name: 'Suggest reorder' }).closest('section')!;
-    await user.click(screen.getByRole('button', { name: 'Suggest reorder' }));
+    const toolbar = screen.getByRole('button', { name: 'Optimize' }).closest('section')!;
+    await clickOptimizeMode(user, 'Reorder only');
 
     // Additive: the reorder-preview modal (asserted elsewhere above) still
     // opens — this only checks the new beside-the-button confirmation.
