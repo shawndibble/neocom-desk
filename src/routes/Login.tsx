@@ -15,6 +15,7 @@ import {
   Spinner,
   StatChip,
 } from '@/components/ui';
+import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { characterAvatarBoxClassName } from '@/components/ui/characterAvatarBox';
 import {
   AllCharacters,
@@ -230,6 +231,10 @@ export function Login() {
   // rather than one per figure: only one can be open at a time anyway.
   const [zoomed, setZoomed] = useState<Screenshot | null>(null);
 
+  // One Customize permissions dialog for the whole page, opened from either
+  // "Log in" button's own link right under it.
+  const [customizing, setCustomizing] = useState(false);
+
   // Bookmark/back-button case: a Character already exists, so the marketing
   // page is not the right thing to show — mirror App.tsx's root gate.
   const characterCount = useLiveQuery(() => db.characters.count());
@@ -264,6 +269,7 @@ export function Login() {
           <p className="mt-4 max-w-md text-text-dim">{t('app.tagline')}</p>
           <div className="mt-7 flex flex-col items-start gap-3">
             <SsoButton pending={pending} onClick={onLogin} label={t('login.button')} />
+            <CustomizeLink onClick={() => setCustomizing(true)} />
             <span className="text-xs text-text-dim">{t('login.trustLine')}</span>
           </div>
         </div>
@@ -534,10 +540,13 @@ export function Login() {
       <section className="border-t border-line px-6 py-14 text-center">
         <h2 className="text-2xl font-semibold">{t('login.bottomCtaHeading')}</h2>
         <p className="mx-auto mt-3 max-w-lg text-sm text-text-dim">{t('login.bottomCtaBody')}</p>
-        <div className="mt-6 flex justify-center">
+        <div className="mt-6 flex flex-col items-center gap-3">
           <SsoButton pending={pending} onClick={onLogin} label={t('login.button')} />
+          <CustomizeLink onClick={() => setCustomizing(true)} />
         </div>
       </section>
+
+      <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
 
       <footer className="flex flex-wrap justify-center gap-6 px-6 py-6 text-xs text-text-dim">
         <span>{t('login.footerOffline')}</span>
@@ -618,6 +627,20 @@ function ScreenshotFigure({ shot, onOpen }: { shot: Screenshot; onOpen: () => vo
       </button>
       <figcaption className="mt-2 text-sm text-text-dim">{caption}</figcaption>
     </figure>
+  );
+}
+
+/** Opens the Customize permissions dialog — always right under a "Log in" button, never a substitute for one. */
+function CustomizeLink({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="text-xs text-text-dim underline decoration-line hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+    >
+      {t('permissions.customize.linkLabel')}
+    </button>
   );
 }
 
