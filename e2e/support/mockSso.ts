@@ -17,21 +17,29 @@ function base64url(json: unknown): string {
     .replace(/=+$/, '');
 }
 
-/** Access token shaped exactly as src/auth/jwt.ts's decodeAccessToken expects. */
-export function makeAccessToken(): string {
+/**
+ * Access token shaped exactly as src/auth/jwt.ts's decodeAccessToken expects.
+ * `scopes` defaults to the full fixture grant so every existing caller is
+ * unaffected; a spec proving a narrower grant (e.g. Core Grant only) passes
+ * its own.
+ */
+export function makeAccessToken(scopes: readonly string[] = SCOPES): string {
   const header = base64url({ alg: 'RS256', typ: 'JWT' });
   const payload = base64url({
     sub: `CHARACTER:EVE:${CHARACTER_ID}`,
     name: CHARACTER_NAME,
     owner: OWNER_HASH,
     exp: EXP_SECONDS,
-    scp: [...SCOPES],
+    scp: [...scopes],
     iss: 'login.eveonline.com',
   });
   return `${header}.${payload}.fakesig`;
 }
 
-export async function installSsoMock(page: Page): Promise<void> {
+export async function installSsoMock(
+  page: Page,
+  scopes: readonly string[] = SCOPES
+): Promise<void> {
   // GET /v2/oauth/authorize -> 302 straight back to the app's own callback,
   // echoing state and the caller's redirect_uri (works for any dev port).
   await page.route('https://login.eveonline.com/v2/oauth/authorize*', async (route) => {
@@ -57,7 +65,7 @@ export async function installSsoMock(page: Page): Promise<void> {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        access_token: makeAccessToken(),
+        access_token: makeAccessToken(scopes),
         token_type: 'Bearer',
         expires_in: 1199,
         refresh_token: 'fake-refresh',

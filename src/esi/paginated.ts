@@ -1,4 +1,4 @@
-import { esiFetch, EsiError, recordEsiActivity, outcomeForError } from './client';
+import { esiFetch, EsiError, attachEndpointId, recordEsiActivity, outcomeForError } from './client';
 import type { EsiFetchOptions } from './client';
 
 /**
@@ -80,6 +80,7 @@ export async function fetchAllPagesStatus<T>(
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') throw err;
     recordEsiActivity(endpointId, characterId, outcomeForError(err));
+    attachEndpointId(err, endpointId);
     throw err;
   }
 }

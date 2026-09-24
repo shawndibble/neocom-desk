@@ -19,7 +19,7 @@ import type { EsiEndpointId } from './registry';
 
 // `EsiError` lives in `./errors` so the budget can throw one without importing
 // the client back (issue #655), but this stays its canonical import path.
-export { EsiError, EsiBudgetError, EsiTimeoutError } from './errors';
+export { EsiError, EsiBudgetError, EsiTimeoutError, attachEndpointId } from './errors';
 
 export const ESI_BASE_URL = 'https://esi.evetech.net';
 export const COMPATIBILITY_DATE = '2026-08-01';
@@ -192,7 +192,10 @@ async function gatedFetch(url: URL, init: RequestInit, signal: AbortSignal): Pro
   }
 }
 
-async function errorFromResponse(response: Response): Promise<EsiError> {
+async function errorFromResponse(
+  response: Response,
+  endpointId?: EsiEndpointId
+): Promise<EsiError> {
   let body: unknown;
   let message = `ESI request failed with status ${response.status}`;
   try {
@@ -208,7 +211,7 @@ async function errorFromResponse(response: Response): Promise<EsiError> {
   } catch {
     // Non-JSON error body; keep the status message.
   }
-  return new EsiError(response.status, message, body);
+  return new EsiError(response.status, message, body, endpointId);
 }
 
 /**
@@ -257,7 +260,7 @@ export async function esiFetch<T>(
         response = await gatedFetch(url, init, scope.signal);
       } catch (retryErr) {
         if (!(retryErr instanceof EsiBudgetError)) throw retryErr;
-        throw await errorFromResponse(response);
+        throw await errorFromResponse(response, endpointId);
       }
     }
 
@@ -273,7 +276,7 @@ export async function esiFetch<T>(
         expires: response.headers.get('expires'),
       };
     }
-    if (!response.ok) throw await errorFromResponse(response);
+    if (!response.ok) throw await errorFromResponse(response, endpointId);
 
     // Parsed before recordActivity: a body that fails to parse is this
     // request's outcome, not a second event stacked on top of a 'success'
