@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@/i18n';
+import { formatLocalDate } from '@/lib/localDate';
 import { PlanHeader } from './PlanHeader';
 
 describe('PlanHeader', () => {
@@ -18,6 +19,7 @@ describe('PlanHeader', () => {
           skillCount={0}
           projectedFinish={new Date('2026-09-01T00:00:00Z')}
           badge={null}
+          nextMilestone={null}
         />
       );
 
@@ -32,6 +34,7 @@ describe('PlanHeader', () => {
         skillCount={4}
         projectedFinish={new Date('2026-09-01T00:00:00Z')}
         badge={null}
+        nextMilestone={null}
       />
     );
 
@@ -40,7 +43,15 @@ describe('PlanHeader', () => {
   });
 
   it('pins itself at a plain top-0, with no offset measured off a neighbouring panel', () => {
-    render(<PlanHeader totalSeconds={0} skillCount={0} projectedFinish={null} badge={null} />);
+    render(
+      <PlanHeader
+        totalSeconds={0}
+        skillCount={0}
+        projectedFinish={null}
+        badge={null}
+        nextMilestone={null}
+      />
+    );
 
     // It stays pinned because the window can still scroll when the sidebar
     // outgrows the viewport. What retires #221/#229 is that it is now the
@@ -52,7 +63,15 @@ describe('PlanHeader', () => {
   });
 
   it('shows an empty finish rather than inventing a date for an empty plan', () => {
-    render(<PlanHeader totalSeconds={0} skillCount={0} projectedFinish={null} badge={null} />);
+    render(
+      <PlanHeader
+        totalSeconds={0}
+        skillCount={0}
+        projectedFinish={null}
+        badge={null}
+        nextMilestone={null}
+      />
+    );
 
     expect(screen.getByText('—')).toBeInTheDocument();
   });
@@ -69,6 +88,7 @@ describe('PlanHeader', () => {
           requestedRemapCount: 2,
           capped: false,
         }}
+        nextMilestone={null}
       />
     );
 
@@ -88,6 +108,7 @@ describe('PlanHeader', () => {
           requestedRemapCount: 5,
           capped: true,
         }}
+        nextMilestone={null}
       />
     );
 
@@ -107,6 +128,7 @@ describe('PlanHeader', () => {
           requestedRemapCount: 1,
           capped: false,
         }}
+        nextMilestone={null}
       />
     );
 
@@ -131,6 +153,7 @@ describe('PlanHeader', () => {
           requestedRemapCount: 2,
           capped: false,
         }}
+        nextMilestone={null}
       />
     );
 
@@ -140,5 +163,35 @@ describe('PlanHeader', () => {
     // suggest going looking for them.
     expect(strip).not.toHaveClass('lg:flex-nowrap');
     expect(strip).not.toHaveClass('lg:overflow-x-auto');
+  });
+
+  it('shows the next Plan Milestone, name and date', () => {
+    const finish = new Date('2026-09-01T00:00:00Z');
+    render(
+      <PlanHeader
+        totalSeconds={0}
+        skillCount={0}
+        projectedFinish={null}
+        badge={null}
+        nextMilestone={{ name: 'Fly Loki', finish }}
+      />
+    );
+
+    expect(screen.getByText('Fly Loki')).toBeInTheDocument();
+    expect(screen.getByText(formatLocalDate(finish))).toBeInTheDocument();
+  });
+
+  it('shows no milestone chip once none is left ahead', () => {
+    render(
+      <PlanHeader
+        totalSeconds={0}
+        skillCount={0}
+        projectedFinish={null}
+        badge={null}
+        nextMilestone={null}
+      />
+    );
+
+    expect(screen.queryByText('Fly Loki')).not.toBeInTheDocument();
   });
 });

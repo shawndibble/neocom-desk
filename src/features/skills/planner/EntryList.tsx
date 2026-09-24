@@ -27,6 +27,7 @@ import {
 import { controlHeightClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
+import type { MilestoneState, MilestoneStatus } from '@/engine/skillPlanMilestones';
 import type { AttributeName, Attributes, Implants, PlanPriority } from '@/engine/types';
 import { formatDuration, stepFinish } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
@@ -40,7 +41,8 @@ export type BandInfo =
   { kind: 'priority'; priority: PlanPriority } | ({ kind: 'attributePair' } & AttributePair);
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
-const ICON_BUTTON = 'w-7 justify-center';
+/** Exported for the orphaned-milestone notice in PlanEditor.tsx, whose remove button matches this row's own icon buttons. */
+export const ICON_BUTTON = 'w-7 justify-center';
 /**
  * Every training-time cell and its desktop column header, so the two cannot
  * drift apart and leave the numbers unaligned. 6rem holds the widest duration
@@ -295,6 +297,85 @@ function AlphaCapMark() {
   );
 }
 
+/** i18n key for a milestone's state, e.g. 'reached' -> 'plans.milestone.reached'. */
+function milestoneStateKey(state: MilestoneState): string {
+  return `plans.milestone.${state}`;
+}
+
+/**
+ * Plan Milestone (CONTEXT.md): a named goal ("Fly Loki") pinned to this row's
+ * skill level. Decorative only — sits beside the name so a flagged row reads
+ * as one at a glance; the Add/Rename/Remove actions live in the row's own
+ * `MilestoneRowMenu` instead, so this never has to fight the name's own
+ * `truncate` for click area.
+ */
+function MilestoneMark({ status }: { status: MilestoneStatus }) {
+  const { t } = useTranslation();
+  const dateText =
+    status.state === 'projected' && status.finish
+      ? formatLocalDate(status.finish)
+      : t(milestoneStateKey(status.state));
+  return (
+    <span
+      title={status.milestone.name}
+      className="ml-2 inline-flex shrink-0 items-center gap-1 rounded-xs border border-line-bright px-1 text-[0.6875rem] text-text-dim"
+    >
+      <Icon.Milestone size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+      <span className="max-w-[8rem] truncate">{status.milestone.name}</span>
+      <span className="tabular-nums">{dateText}</span>
+    </span>
+  );
+}
+
+interface MilestoneRowMenuProps {
+  /** For the menu trigger's accessible name — the row's own label ("Loki IV"). */
+  rowLabel: string;
+  /** Present when this row already carries a milestone — swaps Add for Rename/Remove. */
+  status: MilestoneStatus | undefined;
+  onAdd: () => void;
+  onRename: () => void;
+  onRemove: () => void;
+}
+
+/**
+ * The row's second control (the first is `PriorityPill`): a bare "Add
+ * milestone" button when the row has none — one action needs no menu to sit
+ * behind — or a Rename/Remove menu once it does, where a single fixed-width
+ * slot has to offer two.
+ */
+function MilestoneRowMenu({ rowLabel, status, onAdd, onRename, onRemove }: MilestoneRowMenuProps) {
+  const { t } = useTranslation();
+  if (!status) {
+    return (
+      <Button
+        size="sm"
+        className={ICON_BUTTON}
+        onClick={onAdd}
+        aria-label={t('plans.milestone.addLabel', { name: rowLabel })}
+      >
+        <Icon.Milestone size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+      </Button>
+    );
+  }
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          size="sm"
+          className={ICON_BUTTON}
+          aria-label={t('plans.milestone.menuLabel', { name: rowLabel })}
+        >
+          <Icon.Milestone size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={onRename}>{t('plans.milestone.rename')}</DropdownMenuItem>
+        <DropdownMenuItem onSelect={onRemove}>{t('plans.milestone.remove')}</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 interface EntryRowProps {
   row: Extract<MergedRow, { kind: 'entry' }>;
   name: string;
@@ -309,6 +390,11 @@ interface EntryRowProps {
   isDesktop: boolean;
   onRemove: (skillTypeID: number, targetLevel: number) => void;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
+  /** This row's Plan Milestone (CONTEXT.md), if one is anchored to its skill/level. */
+  milestoneStatus: MilestoneStatus | undefined;
+  onAddMilestone: (skillTypeID: number, targetLevel: number) => void;
+  onRenameMilestone: (milestoneId: string) => void;
+  onRemoveMilestone: (milestoneId: string) => void;
 }
 
 /**
@@ -331,6 +417,10 @@ const EntryRow = memo(function EntryRow({
   isDesktop,
   onRemove,
   onSetPriority,
+  milestoneStatus,
+  onAddMilestone,
+  onRenameMilestone,
+  onRemoveMilestone,
 }: EntryRowProps) {
   const { t } = useTranslation();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
@@ -365,6 +455,7 @@ const EntryRow = memo(function EntryRow({
         {boosted && <BoosterMark />}
         {alphaCapped && <AlphaCapMark />}
       </span>
+      {milestoneStatus && <MilestoneMark status={milestoneStatus} />}
     </span>
   );
 
@@ -382,6 +473,16 @@ const EntryRow = memo(function EntryRow({
       touchTarget={!isDesktop}
     />
   ) : null;
+
+  const milestoneMenu = (
+    <MilestoneRowMenu
+      rowLabel={rowLabel}
+      status={milestoneStatus}
+      onAdd={() => onAddMilestone(entry.skillTypeID, entry.targetLevel)}
+      onRename={() => milestoneStatus && onRenameMilestone(milestoneStatus.milestone.id)}
+      onRemove={() => milestoneStatus && onRemoveMilestone(milestoneStatus.milestone.id)}
+    />
+  );
 
   const removeButton = (
     <Button
@@ -437,6 +538,7 @@ const EntryRow = memo(function EntryRow({
           {columns.cumulativeTime && (
             <TimeCell value={doneByText(row.cumulativeSeconds, startDate)} />
           )}
+          {milestoneMenu}
           {removeButton}
         </div>
       ) : (
@@ -444,6 +546,7 @@ const EntryRow = memo(function EntryRow({
           <div className="flex items-center justify-between gap-2">
             {dragHandle}
             {nameSpan}
+            {milestoneMenu}
             {removeButton}
           </div>
           {metaLine}
@@ -703,6 +806,12 @@ interface EntryListProps {
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
   /** Turn a derived prereq row into a real entry where it already sits (CONTEXT.md "Prereq Promotion"). */
   onPromotePrereq: (rowId: string) => void;
+  /** An entry row's Plan Milestone (CONTEXT.md), keyed by (skillTypeID, level) — see `skillPlanSchedule.ts`'s `stepKey`. Derived prereq rows never carry one (out of scope). */
+  milestoneStatusFor: (skillTypeID: number, targetLevel: number) => MilestoneStatus | undefined;
+  onAddMilestone: (skillTypeID: number, targetLevel: number) => void;
+  /** Opens the naming Modal, prefilled, for an existing milestone. */
+  onRenameMilestone: (milestoneId: string) => void;
+  onRemoveMilestone: (milestoneId: string) => void;
 }
 
 /**
@@ -737,6 +846,10 @@ export function EntryList({
   onEditMarker,
   onSetPriority,
   onPromotePrereq,
+  milestoneStatusFor,
+  onAddMilestone,
+  onRenameMilestone,
+  onRemoveMilestone,
 }: EntryListProps) {
   const { t } = useTranslation();
   const isDesktop = useIsDesktop();
@@ -803,6 +916,13 @@ export function EntryList({
                       isDesktop={isDesktop}
                       onRemove={onRemove}
                       onSetPriority={onSetPriority}
+                      milestoneStatus={milestoneStatusFor(
+                        row.entry.skillTypeID,
+                        row.entry.targetLevel
+                      )}
+                      onAddMilestone={onAddMilestone}
+                      onRenameMilestone={onRenameMilestone}
+                      onRemoveMilestone={onRemoveMilestone}
                     />
                   )}
                   {row.kind === 'prereq' && (
