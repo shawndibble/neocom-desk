@@ -1,0 +1,318 @@
+import { describe, it, expect } from 'vitest';
+import {
+  encodeFittingShare,
+  decodeFittingShare,
+  FITTING_SHARE_VERSION,
+  MAX_SLOTS_PER_CATEGORY,
+  MAX_DRONE_STACKS,
+  MAX_FIGHTERS,
+  MAX_CARGO_ITEMS,
+  MAX_IMPLANTS,
+  MAX_BOOSTERS,
+  type FittingShareInput,
+} from './fittingShare';
+
+const emptyModules = { high: [], mid: [], low: [], rig: [], subsystem: [] };
+
+/** Deflates+base64url's an arbitrary raw body, bypassing `encodeFittingShare`'s
+ * own validation — for tests that need to hand-craft a forged decompressed
+ * payload rather than encode a real `FittingShareInput`. */
+async function packRawBody(body: string): Promise<string> {
+  const bytes = new TextEncoder().encode(body);
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  }).pipeThrough(
+    new CompressionStream('deflate-raw') as ReadableWritablePair<Uint8Array, Uint8Array>
+  );
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  const total = chunks.reduce((n, c) => n + c.byteLength, 0);
+  const compressed = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    compressed.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  let binary = '';
+  for (const b of compressed) binary += String.fromCharCode(b);
+  const b64url = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return `${FITTING_SHARE_VERSION}.${b64url}`;
+}
+
+function minimalInput(): FittingShareInput {
+  return {
+    hullTypeId: 24698, // Vexor
+    modules: emptyModules,
+    drones: [],
+    fighters: [],
+    cargo: [],
+  };
+}
+
+function cruiserInput(): FittingShareInput {
+  return {
+    hullTypeId: 24698,
+    modules: {
+      high: [
+        { slotIndex: 0, typeId: 2929, state: 'active', chargeTypeId: 12608 },
+        { slotIndex: 1, typeId: 2929, state: 'active', chargeTypeId: 12608 },
+        { slotIndex: 2, typeId: 2929, state: 'active', chargeTypeId: 12608 },
+        { slotIndex: 4, typeId: 21486, state: 'online' },
+      ],
+      mid: [
+        { slotIndex: 0, typeId: 2281, state: 'online' },
+        { slotIndex: 1, typeId: 5945, state: 'online' },
+        { slotIndex: 2, typeId: 1978, state: 'offline' },
+      ],
+      low: [
+        { slotIndex: 0, typeId: 519, state: 'online' },
+        { slotIndex: 1, typeId: 519, state: 'online' },
+        { slotIndex: 2, typeId: 22291, state: 'online' },
+      ],
+      rig: [{ slotIndex: 0, typeId: 31120, state: 'online' }],
+      subsystem: [],
+    },
+    drones: [
+      { typeId: 2454, count: 5, active: 5 },
+      { typeId: 2446, count: 5, active: 0 },
+    ],
+    fighters: [],
+    cargo: [
+      { typeId: 12608, quantity: 400 },
+      { typeId: 28668, quantity: 1 },
+    ],
+    implantSet: { implants: [13236, 13232], boosters: [10228] },
+  };
+}
+
+describe('encodeFittingShare / decodeFittingShare round trip', () => {
+  it('round-trips a minimal fitting (hull only)', async () => {
+    const input = minimalInput();
+    const encoded = await encodeFittingShare(input);
+    expect(encoded.ok).toBe(true);
+    if (!encoded.ok) return;
+    const decoded = await decodeFittingShare(encoded.payload);
+    expect(decoded).toEqual({ ok: true, value: input });
+  });
+
+  it('round-trips a full cruiser fitting: modules with state and charge, drones with active counts, cargo, implant/booster set', async () => {
+    const input = cruiserInput();
+    const encoded = await encodeFittingShare(input);
+    expect(encoded.ok).toBe(true);
+    if (!encoded.ok) return;
+    const decoded = await decodeFittingShare(encoded.payload);
+    expect(decoded).toEqual({ ok: true, value: input });
+  });
+
+  it('preserves slot position across a gap (no shifting of later modules into an earlier empty slot)', async () => {
+    const input = minimalInput();
+    input.modules = {
+      ...emptyModules,
+      high: [{ slotIndex: 4, typeId: 2929, state: 'active' }],
+    };
+    const encoded = await encodeFittingShare(input);
+    expect(encoded.ok).toBe(true);
+    if (!encoded.ok) return;
+    const decoded = await decodeFittingShare(encoded.payload);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(decoded.value.modules.high).toEqual([{ slotIndex: 4, typeId: 2929, state: 'active' }]);
+  });
+
+  it('round-trips every module state', async () => {
+    const input = minimalInput();
+    input.modules = {
+      ...emptyModules,
+      high: [
+        { slotIndex: 0, typeId: 1, state: 'offline' },
+        { slotIndex: 1, typeId: 2, state: 'online' },
+        { slotIndex: 2, typeId: 3, state: 'active' },
+        { slotIndex: 3, typeId: 4, state: 'overload' },
+      ],
+    };
+    const encoded = await encodeFittingShare(input);
+    expect(encoded.ok).toBe(true);
+    if (!encoded.ok) return;
+    const decoded = await decodeFittingShare(encoded.payload);
+    expect(decoded).toEqual({ ok: true, value: input });
+  });
+
+  it('an unknown/made-up type ID survives the round trip unchanged (engine layer never validates against a catalog)', async () => {
+    const input = minimalInput();
+    input.hullTypeId = 999999999;
+    input.modules = {
+      ...emptyModules,
+      high: [{ slotIndex: 0, typeId: 888888888, state: 'online' }],
+    };
+    const encoded = await encodeFittingShare(input);
+    expect(encoded.ok).toBe(true);
+    if (!encoded.ok) return;
+    const decoded = await decodeFittingShare(encoded.payload);
+    expect(decoded).toEqual({ ok: true, value: input });
+  });
+
+  it('round-trips an explicit empty implant set distinctly from no implant set at all', async () => {
+    const input = minimalInput();
+    input.implantSet = { implants: [], boosters: [] };
+    const encoded = await encodeFittingShare(input);
+    expect(encoded.ok).toBe(true);
+    if (!encoded.ok) return;
+    const decoded = await decodeFittingShare(encoded.payload);
+    expect(decoded).toEqual({ ok: true, value: input });
+    if (decoded.ok) {
+      expect(decoded.value.implantSet).toEqual({ implants: [], boosters: [] });
+    }
+  });
+
+  it('encodes a typical cruiser fitting to a compact URL-safe string', async () => {
+    const encoded = await encodeFittingShare(cruiserInput());
+    expect(encoded.ok).toBe(true);
+    if (!encoded.ok) return;
+    expect(encoded.payload).toMatch(/^[A-Za-z0-9_.-]+$/);
+    expect(encoded.payload.length).toBeLessThan(400);
+  });
+
+  it('carries the version prefix', async () => {
+    const encoded = await encodeFittingShare(minimalInput());
+    expect(encoded.ok).toBe(true);
+    if (!encoded.ok) return;
+    expect(encoded.payload.startsWith(`${FITTING_SHARE_VERSION}.`)).toBe(true);
+  });
+});
+
+describe('encodeFittingShare ceilings', () => {
+  it('rejects more modules in one category than MAX_SLOTS_PER_CATEGORY', async () => {
+    const input = minimalInput();
+    input.modules = {
+      ...emptyModules,
+      high: Array.from({ length: MAX_SLOTS_PER_CATEGORY + 1 }, (_, i) => ({
+        slotIndex: i,
+        typeId: 1,
+        state: 'online' as const,
+      })),
+    };
+    const encoded = await encodeFittingShare(input);
+    expect(encoded).toEqual({ ok: false, reason: 'too-large' });
+  });
+
+  it('rejects more drone stacks than MAX_DRONE_STACKS', async () => {
+    const input = minimalInput();
+    input.drones = Array.from({ length: MAX_DRONE_STACKS + 1 }, () => ({
+      typeId: 1,
+      count: 1,
+      active: 0,
+    }));
+    const encoded = await encodeFittingShare(input);
+    expect(encoded).toEqual({ ok: false, reason: 'too-large' });
+  });
+
+  it('rejects more fighters than MAX_FIGHTERS', async () => {
+    const input = minimalInput();
+    input.fighters = Array.from({ length: MAX_FIGHTERS + 1 }, () => ({ typeId: 1, count: 1 }));
+    const encoded = await encodeFittingShare(input);
+    expect(encoded).toEqual({ ok: false, reason: 'too-large' });
+  });
+
+  it('rejects more cargo items than MAX_CARGO_ITEMS', async () => {
+    const input = minimalInput();
+    input.cargo = Array.from({ length: MAX_CARGO_ITEMS + 1 }, () => ({ typeId: 1, quantity: 1 }));
+    const encoded = await encodeFittingShare(input);
+    expect(encoded).toEqual({ ok: false, reason: 'too-large' });
+  });
+
+  it('rejects more implants than MAX_IMPLANTS', async () => {
+    const input = minimalInput();
+    input.implantSet = {
+      implants: Array.from({ length: MAX_IMPLANTS + 1 }, (_, i) => i + 1),
+      boosters: [],
+    };
+    const encoded = await encodeFittingShare(input);
+    expect(encoded).toEqual({ ok: false, reason: 'too-large' });
+  });
+
+  it('rejects more boosters than MAX_BOOSTERS', async () => {
+    const input = minimalInput();
+    input.implantSet = {
+      implants: [],
+      boosters: Array.from({ length: MAX_BOOSTERS + 1 }, (_, i) => i + 1),
+    };
+    const encoded = await encodeFittingShare(input);
+    expect(encoded).toEqual({ ok: false, reason: 'too-large' });
+  });
+});
+
+describe('decodeFittingShare error handling', () => {
+  it('never throws on garbage input', async () => {
+    await expect(decodeFittingShare('not a real payload at all')).resolves.toBeDefined();
+  });
+
+  it('rejects a payload with no version separator', async () => {
+    const decoded = await decodeFittingShare('garbage-with-no-dot');
+    expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('rejects an unknown version with a typed reason distinct from a corrupt payload', async () => {
+    const encoded = await encodeFittingShare(minimalInput());
+    expect(encoded.ok).toBe(true);
+    if (!encoded.ok) return;
+    const body = encoded.payload.slice(encoded.payload.indexOf('.'));
+    const decoded = await decodeFittingShare(`99${body}`);
+    expect(decoded).toEqual({ ok: false, reason: 'unsupported-version' });
+  });
+
+  it('rejects a corrupt (non-decompressible) payload after a valid version prefix', async () => {
+    const decoded = await decodeFittingShare(`${FITTING_SHARE_VERSION}.not-valid-deflate-data`);
+    expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('rejects an empty payload', async () => {
+    const decoded = await decodeFittingShare('');
+    expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('rejects a forged payload that decompresses past the size cap rather than hanging or crashing', async () => {
+    // A highly repetitive body compresses tiny but decompresses huge — the
+    // classic "decompression bomb" shape. This should come back `invalid`,
+    // never throw and never allocate the full decompressed size.
+    const payload = await packRawBody('0'.repeat(2_000_000));
+    const decoded = await decodeFittingShare(payload);
+    expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('rejects a base64url segment past MAX_ENCODED_LENGTH before ever attempting to inflate it', async () => {
+    const decoded = await decodeFittingShare(`${FITTING_SHARE_VERSION}.${'A'.repeat(20001)}`);
+    expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('rejects a module tuple missing its state field', async () => {
+    const body = ['1', '1:1;;;;', '', '', '', ''].join('|');
+    const decoded = await decodeFittingShare(await packRawBody(body));
+    expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('rejects a module tuple with an out-of-range state token', async () => {
+    const body = ['1', '0:1:9;;;;', '', '', '', ''].join('|');
+    const decoded = await decodeFittingShare(await packRawBody(body));
+    expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('rejects a drone stack whose active count exceeds its total count', async () => {
+    const body = ['1', ';;;;', '1:1:2', '', '', ''].join('|');
+    const decoded = await decodeFittingShare(await packRawBody(body));
+    expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('rejects a numeric token long enough to overflow parseInt to Infinity', async () => {
+    const body = ['1', ';;;;', '', '', `${'z'.repeat(300)}:1`, ''].join('|');
+    const decoded = await decodeFittingShare(await packRawBody(body));
+    expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+  });
+});
