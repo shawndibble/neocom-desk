@@ -746,7 +746,6 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                   type="checkbox"
                   aria-label={t('miningTax.selectForBulkAction')}
                   checked={selection.has(dr.key)}
-                  onClick={(e) => e.stopPropagation()}
                   onChange={() => toggleRowSelected(dr.key)}
                   className="size-4 shrink-0 cursor-pointer accent-accent"
                 />
