@@ -99,6 +99,20 @@
   --color-kind-order-expiry: #c9d96a;
   --color-kind-skill-plan: #e0d0a8;
 
+  /*
+   * Damage types — a second NOMINAL set, and a deliberate exception to the
+   * clock-kind rule above (DESIGN.md §1): these are the game's own EM/
+   * Thermal/Kinetic/Explosive colours, kept as-is because every EVE player
+   * already reads them that way. Added with the Fittings section — see
+   * docs/context/decisions/20260924-150509-fittings-section-a-fitter-after-all.md.
+   * Only for damage types (resist bars, damage profiles, breakdowns), never
+   * for status; a red meaning "over budget" stays `danger`, never `dmg-*`.
+   */
+  --color-dmg-em: #4f9fe8;
+  --color-dmg-thermal: #e0524a;
+  --color-dmg-kinetic: #a3adb8;
+  --color-dmg-explosive: #e8a13d;
+
   /* Type — system stack approximating EVE's condensed sans */
   --font-sans: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;

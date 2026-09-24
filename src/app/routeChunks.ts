@@ -53,6 +53,7 @@ export const loadIndustryGroupPage = named(
   () => import('@/routes/IndustryGroupPage'),
   'IndustryGroupPage'
 );
+export const loadFittings = named(() => import('@/routes/Fittings'), 'Fittings');
 export const loadCorp = named(() => import('@/routes/Corp'), 'Corp');
 export const loadCorpMembers = named(() => import('@/routes/CorpMembers'), 'CorpMembers');
 export const loadCorpAssets = named(() => import('@/routes/CorpAssets'), 'CorpAssets');
@@ -100,6 +101,7 @@ const PRELOADERS: Record<Exclude<AppRoutePath, '/overview'>, () => Promise<Route
   '/industry': loadIndustry,
   '/industry/plans/:planId': loadIndustryPlanPage,
   '/industry/groups/:groupId': loadIndustryGroupPage,
+  '/fittings': loadFittings,
   '/market': loadMarket,
   '/wallet': loadWallet,
   '/wallet/loyalty/:corporationId': loadLoyaltyStore,

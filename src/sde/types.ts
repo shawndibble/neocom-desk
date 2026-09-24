@@ -141,6 +141,21 @@ export type ReprocessingMap = Record<string, ReprocessingType>;
 export type TypeMap = Record<string, TypeInfo>;
 
 /**
+ * Which rack a Fitting item goes in — the same five values
+ * `engine/fittings/types.ts`'s `FittingSlotKind` uses, plus `'drone'` for
+ * anything in the Drone category. Not derivable from `TypeInfo.groupID`
+ * alone: which of the "requires a slot" dogma effects
+ * (loPower/hiPower/medPower/rigSlot/subSystem) a type carries is what decides
+ * its rack in EVE, not its group (issue #1532; `scripts/build-fitting-slots.mjs`).
+ * A type absent from this map takes no rack at all (ammo, cargo, the hull
+ * itself, ships, drone-bay-less items).
+ */
+export type FittingSlotAssignment = 'high' | 'medium' | 'low' | 'rig' | 'subsystem' | 'drone';
+
+/** public/data/fittingSlots.json: typeID (as a string key) -> its rack. */
+export type FittingSlotMap = Record<string, FittingSlotAssignment>;
+
+/**
  * One manufacturing blueprint's fully flattened material tree — sub-builds
  * (a material that is itself another manufacturing blueprint's product)
  * resolved recursively at SDE-build time down to base, non-producible

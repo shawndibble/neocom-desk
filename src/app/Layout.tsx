@@ -139,6 +139,7 @@ const NAV_PATHS = [
   '/alerts',
   '/skills',
   '/industry',
+  '/fittings',
   '/mining',
   '/planetary-industry',
   '/market',
@@ -580,6 +581,11 @@ export function Layout() {
             to="/industry"
             label={t(NAV_LABEL_KEYS['/industry'])}
             locked={locked.has('/industry')}
+          />
+          <NavItem
+            to="/fittings"
+            label={t(NAV_LABEL_KEYS['/fittings'])}
+            locked={locked.has('/fittings')}
           />
           <NavItem
             to="/mining"

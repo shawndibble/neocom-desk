@@ -58,6 +58,7 @@ const SkillShips = lazy(routeChunks.loadSkillShips);
 const Industry = lazy(routeChunks.loadIndustry);
 const IndustryPlanPage = lazy(routeChunks.loadIndustryPlanPage);
 const IndustryGroupPage = lazy(routeChunks.loadIndustryGroupPage);
+const Fittings = lazy(routeChunks.loadFittings);
 const Corp = lazy(routeChunks.loadCorp);
 const CorpMembers = lazy(routeChunks.loadCorpMembers);
 const CorpAssets = lazy(routeChunks.loadCorpAssets);
@@ -127,6 +128,7 @@ const ROUTE_ELEMENTS = {
   '/industry': <Industry />,
   '/industry/plans/:planId': <IndustryPlanPage />,
   '/industry/groups/:groupId': <IndustryGroupPage />,
+  '/fittings': <Fittings />,
   '/market': <Market />,
   '/wallet': <Wallet />,
   '/wallet/loyalty/:corporationId': <LoyaltyStore />,

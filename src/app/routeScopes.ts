@@ -81,6 +81,10 @@ export const ROUTE_REQUIREMENTS = {
   '/overview': UNGATED,
   '/skills/trained': UNGATED,
   '/industry': UNGATED,
+  // Load (EFT paste) and stats are entirely local/SDE + the pinned dogma
+  // engine; nothing here reads a Character-scoped ESI endpoint yet. Saving to
+  // My Fittings or to EVE (#1538/#1540) will need their own scope.
+  '/fittings': UNGATED,
   // Detail routes off the index (same reasoning as `/skills/plans/:planId`
   // above): each mixes the same blueprints/jobs/skills reads the index does,
   // gated at the panel level, not the route.
