@@ -689,6 +689,43 @@ describe('OrderDetailModal', () => {
       station: { bestPrice: 450, beatsMe: true, gapIsk: 50, gapPct: 10 },
     };
 
+    it('shows the wallet ledger for a wallet-derived cost basis', () => {
+      renderModal({
+        row: {
+          ...BASE_ROW,
+          costBasis: {
+            source: 'wallet',
+            unitCost: 400,
+            unitsCovered: 10,
+            buyCount: 2,
+            oldestBuy: '2026-01-01T00:00:00Z',
+            newestBuy: '2026-01-05T00:00:00Z',
+            buys: [{ date: '2026-01-05T00:00:00Z', quantity: 10, unitPrice: 400 }],
+            truncated: false,
+          },
+        },
+      });
+      expect(screen.getByText('Units priced from your wallet')).toBeInTheDocument();
+      expect(screen.getByText('Wallet buys used')).toBeInTheDocument();
+      expect(screen.getByText(/10 at 400.00 ISK on/)).toBeInTheDocument();
+      expect(
+        screen.getByText(/Broker fees paid when you bought are not included/)
+      ).toBeInTheDocument();
+    });
+
+    it('says how much of the stock the wallet covers when it only partly does', () => {
+      renderModal({
+        row: {
+          ...BASE_ROW,
+          volumeRemain: 30,
+          walletGap: { kind: 'partial', coveredUnits: 12, pool: 30, truncated: false },
+        },
+      });
+      expect(
+        screen.getByText('Your wallet shows buys for 12 of these 30 units.')
+      ).toBeInTheDocument();
+    });
+
     it('falls back to the badge advice when there is no floor to judge against', () => {
       renderModal({ row: UNDERCUT_ROW, stationChecked: true });
 
@@ -696,7 +733,9 @@ describe('OrderDetailModal', () => {
       expect(screen.queryByText('Do not chase this one')).not.toBeInTheDocument();
       // And the exits card says why it has nothing to offer.
       expect(
-        screen.getByText('Link a build and we can work out what each way out is worth.')
+        screen.getByText(
+          'Link a build, or buy with this character, and we can work out what each way out is worth.'
+        )
       ).toBeInTheDocument();
     });
 
@@ -771,7 +810,9 @@ describe('OrderDetailModal', () => {
       });
 
       expect(
-        screen.getByText('Link a build and we can work out what each way out is worth.')
+        screen.getByText(
+          'Link a build, or buy with this character, and we can work out what each way out is worth.'
+        )
       ).toBeInTheDocument();
       expect(screen.getByText(/Amarr bids 600.00/)).toBeInTheDocument();
     });

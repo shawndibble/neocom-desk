@@ -6,7 +6,7 @@ import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { OpenOrdersPanel } from './OpenOrdersPanel';
 import { loadAllCharactersOpenOrders, type OpenOrdersSnapshot } from './openOrdersData';
-import { loadOrderCostBases, type OrderCostBasis } from './orderCostBasis';
+import { loadOrderCostBases, type ProductionRunBasis } from './orderCostBasis';
 import { loadStationBestPrices, loadRegionCompetition, loadJumpsBetween } from './orderCompetition';
 import { loadPriceHistory } from './priceHistory';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -17,7 +17,10 @@ import type { MarketOrder } from '@/esi/endpoints';
 import { historyPoint } from '@/engine/market/__fixtures__/priceHistory';
 
 vi.mock('./openOrdersData', () => ({ loadAllCharactersOpenOrders: vi.fn() }));
-vi.mock('./orderCostBasis', () => ({ loadOrderCostBases: vi.fn() }));
+vi.mock('./orderCostBasis', () => ({
+  loadOrderCostBases: vi.fn(),
+  loadWalletOrderCostBases: vi.fn(async () => ({ bases: new Map(), gaps: new Map() })),
+}));
 vi.mock('./orderCompetition', () => ({
   loadStationBestPrices: vi.fn(),
   loadRegionCompetition: vi.fn(),
@@ -81,7 +84,7 @@ function skillsFixture(trained: [number, number][]): CorrectedSkills {
   };
 }
 
-function costBasis(unitCost: number): OrderCostBasis {
+function costBasis(unitCost: number): ProductionRunBasis {
   return {
     unitCost,
     runId: 'run-1',
