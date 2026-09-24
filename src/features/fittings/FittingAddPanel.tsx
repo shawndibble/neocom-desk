@@ -214,7 +214,7 @@ export function FittingAddPanel({
               <li key={entry.typeId}>
                 <Button
                   align="start"
-                  className="min-h-11 w-full"
+                  className="w-full"
                   disabled={!placeable}
                   onClick={() => onAdd(entry.typeId, entryRack)}
                 >

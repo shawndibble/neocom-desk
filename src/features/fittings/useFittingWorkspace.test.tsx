@@ -102,6 +102,24 @@ describe('useFittingWorkspace editing', () => {
     );
   });
 
+  it('still pushes when a run of one control starts faster than its first write lands', async () => {
+    const view = await renderAt(RIFTER);
+    const before = view.result.current.location.search;
+
+    act(() => {
+      for (const inBay of [2, 3])
+        view.result.current.workspace.edit(
+          (f) => setDroneCounts(f, 2454, { inSpace: 0, inBay }),
+          'drone-bay-2454'
+        );
+    });
+    await waitFor(() => expect(view.result.current.location.search).not.toBe(before));
+    expect(view.result.current.navigationType).toBe('PUSH');
+
+    act(() => view.result.current.navigate(-1));
+    await waitFor(() => expect(view.result.current.location.search).toBe(before));
+  });
+
   it('keeps the previous stats through a same-hull edit instead of blanking them', async () => {
     const view = await renderAt(RIFTER);
     await waitFor(() => expect(view.result.current.workspace.stats).not.toBeNull());

@@ -7,8 +7,10 @@
  * `classifyRuleBreaks` turns what it reports into the two chips it drives.
  */
 
-/** `FittingSlotKind` plus the drone bay — `FittingSlotAssignment` in `src/sde/types.ts`. */
-export type CandidateRack = 'high' | 'medium' | 'low' | 'rig' | 'subsystem' | 'drone';
+import type { FittingSlotKind } from './types';
+
+/** A rack plus the drone bay — the same values as `FittingSlotAssignment` in `src/sde/types.ts`. */
+export type CandidateRack = FittingSlotKind | 'drone';
 
 export interface CandidateEntry {
   typeId: number;

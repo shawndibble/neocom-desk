@@ -112,7 +112,8 @@ export function useFittingWorkspace(): FittingWorkspace {
   // same rendered Fitting and lose one.
   const latestFittingRef = useRef<Fitting | null>(null);
   const editSeqRef = useRef(0);
-  const lastEditRef = useRef<{ key: string; at: number } | null>(null);
+  // The coalesce key and time of the last edit that wrote the URL.
+  const lastWriteRef = useRef<{ key: string; at: number } | null>(null);
 
   // Decode whenever the URL's `f` changes — a fresh load's own write below, a
   // pasted link, or Back/Forward. A stale decode from a param that changed
@@ -125,6 +126,9 @@ export function useFittingWorkspace(): FittingWorkspace {
     if (own?.code !== shareCode) {
       setUnresolved([]);
       setTooLargeToShare(false);
+      // Back/Forward or a pasted link ends any coalescing run: the next edit
+      // pushes rather than overwriting the entry just navigated to.
+      lastWriteRef.current = null;
     }
     if (shareCode === null) {
       latestFittingRef.current = null;
@@ -203,15 +207,6 @@ export function useFittingWorkspace(): FittingWorkspace {
       latestFittingRef.current = next;
       setFitting(next);
 
-      const now = Date.now();
-      const last = lastEditRef.current;
-      const coalesce =
-        coalesceKey !== undefined &&
-        last !== null &&
-        last.key === coalesceKey &&
-        now - last.at < COALESCE_MS;
-      lastEditRef.current = coalesceKey === undefined ? null : { key: coalesceKey, at: now };
-
       const seq = ++editSeqRef.current;
       void (async () => {
         const encoded = await encodeFittingShare(fittingToShareInput(next));
@@ -221,6 +216,18 @@ export function useFittingWorkspace(): FittingWorkspace {
         // until an edit brings it back under the limit.
         setTooLargeToShare(!encoded.ok);
         if (!encoded.ok) return;
+        // Push or replace is decided against the last edit that actually
+        // wrote, not the last one asked for: a superseded first edit of a run
+        // never wrote, so the one that does must still push, or the pre-edit
+        // entry would be overwritten and Back would skip past it.
+        const now = Date.now();
+        const last = lastWriteRef.current;
+        const coalesce =
+          coalesceKey !== undefined &&
+          last !== null &&
+          last.key === coalesceKey &&
+          now - last.at < COALESCE_MS;
+        lastWriteRef.current = coalesceKey === undefined ? null : { key: coalesceKey, at: now };
         ownWriteRef.current = { code: encoded.payload, fitting: next };
         setShareCode(encoded.payload, { push: !coalesce });
       })();

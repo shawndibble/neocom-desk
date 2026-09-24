@@ -208,6 +208,54 @@ function ModuleRow({
   );
 }
 
+/** Sets one of a drone type's two counts, keeping the other as the Fitting has it now. */
+function withDroneCount(
+  fitting: Fitting,
+  typeId: number,
+  counts: Partial<{ inSpace: number; inBay: number }>
+): Fitting {
+  const current = droneGroups(fitting).find((group) => group.typeId === typeId);
+  return setDroneCounts(fitting, typeId, {
+    inSpace: counts.inSpace ?? current?.inSpace ?? 0,
+    inBay: counts.inBay ?? current?.inBay ?? 0,
+  });
+}
+
+/**
+ * A drone count box. Keeps what's being typed as a local draft, so the box
+ * can be emptied on the way to a new number instead of snapping back; each
+ * complete number is committed as it's typed.
+ */
+function DroneCountInput({
+  label,
+  value,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  onCommit: (count: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <label className="flex items-center gap-1 text-xs text-text-dim">
+      {label}
+      <TextInput
+        type="number"
+        min={0}
+        size="sm"
+        className="w-16"
+        value={draft ?? String(value)}
+        onChange={(event) => {
+          const raw = event.target.value;
+          setDraft(raw);
+          if (raw !== '' && Number.isFinite(Number(raw))) onCommit(Number(raw));
+        }}
+        onBlur={() => setDraft(null)}
+      />
+    </label>
+  );
+}
+
 function AddSlotButton({
   label,
   selected,
@@ -220,7 +268,7 @@ function AddSlotButton({
   return (
     <Button
       align="start"
-      className={`min-h-11 w-full border border-dashed ${selected ? 'border-accent bg-accent/10' : 'border-line'}`}
+      className={`w-full border border-dashed ${selected ? 'border-accent bg-accent/10' : 'border-line'}`}
       aria-pressed={selected}
       onClick={onClick}
     >
@@ -356,50 +404,26 @@ export function FittingRackList({
                 >
                   <TypeIcon typeId={group.typeId} size={32} width={24} height={24} />
                   <span className="min-w-0 flex-1 truncate text-xs">{name}</span>
-                  <label className="flex items-center gap-1 text-xs text-text-dim">
-                    {t('fittings.edit.inSpace')}
-                    <TextInput
-                      type="number"
-                      min={0}
-                      size="sm"
-                      className="w-16"
-                      value={group.inSpace}
-                      onChange={(event) => {
-                        // Mid-edit empty box: wait for a number rather than reading it as 0.
-                        if (event.target.value === '') return;
-                        edit(
-                          (f) =>
-                            setDroneCounts(f, group.typeId, {
-                              inSpace: Number(event.target.value),
-                              inBay: group.inBay,
-                            }),
-                          `drone-space-${group.typeId}`
-                        );
-                      }}
-                    />
-                  </label>
-                  <label className="flex items-center gap-1 text-xs text-text-dim">
-                    {t('fittings.edit.inBay')}
-                    <TextInput
-                      type="number"
-                      min={0}
-                      size="sm"
-                      className="w-16"
-                      value={group.inBay}
-                      onChange={(event) => {
-                        // Mid-edit empty box: wait for a number rather than reading it as 0.
-                        if (event.target.value === '') return;
-                        edit(
-                          (f) =>
-                            setDroneCounts(f, group.typeId, {
-                              inSpace: group.inSpace,
-                              inBay: Number(event.target.value),
-                            }),
-                          `drone-bay-${group.typeId}`
-                        );
-                      }}
-                    />
-                  </label>
+                  <DroneCountInput
+                    label={t('fittings.edit.inSpace')}
+                    value={group.inSpace}
+                    onCommit={(inSpace) =>
+                      edit(
+                        (f) => withDroneCount(f, group.typeId, { inSpace }),
+                        `drone-space-${group.typeId}`
+                      )
+                    }
+                  />
+                  <DroneCountInput
+                    label={t('fittings.edit.inBay')}
+                    value={group.inBay}
+                    onCommit={(inBay) =>
+                      edit(
+                        (f) => withDroneCount(f, group.typeId, { inBay }),
+                        `drone-bay-${group.typeId}`
+                      )
+                    }
+                  />
                   <IconButton
                     icon={<Close />}
                     size="sm"
