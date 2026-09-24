@@ -582,7 +582,7 @@ describe('Wallet', () => {
     it('is not offered for a personal wallet', async () => {
       render(<App />);
       expect(await screen.findByRole('tab', { name: 'Journal' })).toBeInTheDocument();
-      expect(screen.queryByRole('tab', { name: 'Transactions' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: 'Corp Transactions' })).not.toBeInTheDocument();
     });
 
     it('lists a division’s fills, and filters them by side', async () => {
@@ -646,7 +646,7 @@ describe('Wallet', () => {
       await user.click(ownerButton('Corporation'));
 
       // Back on the corp side, the tab is offered again and its filter is empty.
-      await user.click(await screen.findByRole('tab', { name: 'Transactions' }));
+      await user.click(await screen.findByRole('tab', { name: 'Corp Transactions' }));
       const table = await screen.findByRole('table', { name: 'Transactions' });
       expect(await within(table).findByText('Tritanium')).toBeInTheDocument();
       expect(screen.getByPlaceholderText('Search item…')).toHaveValue('');
