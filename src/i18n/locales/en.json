@@ -447,6 +447,7 @@
   },
   "industry": {
     "title": "Build Plans",
+    "moreActionsLabel": "More actions for {{name}}",
     "contextMenu": {
       "buildPlan": "Build Plan",
       "buildPlanChecking": "Build Plan (checking…)",
@@ -3249,6 +3250,7 @@
     "rangeSystem": "System",
     "rangeJumps_one": "{{count}} jump",
     "rangeJumps_other": "{{count}} jumps",
+    "moreActionsLabel": "More actions for {{name}}",
     "contextMenu": {
       "addToQuickbar": "Add to Quickbar",
       "setPriceAlert": "Set price alert…",

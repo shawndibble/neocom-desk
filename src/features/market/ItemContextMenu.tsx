@@ -14,12 +14,21 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  IconButton,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { writeToClipboard } from '@/lib/clipboard';
 import { marketLinkParams } from '@/engine/market/urlState';
 import { usePiPlannable } from '@/features/pi/usePiPlannable';
 import { useCompareSet } from './compareSet';
 import { PriceAlertDialog, PriceAlertMenuItem } from './PriceAlertDialog';
+
+/** `ContextMenuItem` and `DropdownMenuItem` share this shape — both spread onto a Radix `Item`. */
+type MenuItemComponent = typeof ContextMenuItem;
 
 export interface ItemContextMenuProps {
   typeId: number;
@@ -59,8 +68,16 @@ export interface ItemContextMenuProps {
 export type ItemMenuFor = (typeId: number, trigger: ReactElement) => ReactElement;
 
 /**
- * Item context menu: add to Quickbar, show info, add to Compare, view in
- * Market, copy name, jump to a Build Plan, jump to a PI Plan.
+ * The item list shared by `ItemContextMenu` (right-click) and
+ * `ItemMoreActions` (the visible button, issue #1498) — one hook so the two
+ * can never drift. `MenuItem` picks which menu family's item component
+ * renders each entry; `onAlertRequest` opens the caller's own
+ * `PriceAlertDialog` instance, since each trigger owns its `alertOpen` state
+ * independently (an alert opened from the button shouldn't depend on the
+ * context menu ever having rendered).
+ *
+ * Add to Quickbar, show info, add to Compare, view in Market, copy name,
+ * jump to a Build Plan, jump to a PI Plan.
  *
  * The PI action asks for itself rather than taking a prop the way
  * `blueprintTypeID` does: `pi.json` is 15KB against `blueprints.json`'s
@@ -71,26 +88,27 @@ export type ItemMenuFor = (typeId: number, trigger: ReactElement) => ReactElemen
  * have expected otherwise. Nothing renders while the answer is unknown, so
  * the row never appears under a cursor already in the menu.
  */
-export function ItemContextMenu({
-  typeId,
-  itemName,
-  blueprintTypeID,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
-  onCompareVariations,
-  onViewInIndustryAsMaterial,
-  onToggleBuildHere,
-  buildingHere,
-  onOpenChange,
-  children,
-}: ItemContextMenuProps) {
+function useItemMenuNodes(
+  {
+    typeId,
+    itemName,
+    blueprintTypeID,
+    onAddToQuickbar,
+    quickbarAvailable,
+    onShowInfo,
+    onCompareVariations,
+    onViewInIndustryAsMaterial,
+    onToggleBuildHere,
+    buildingHere,
+  }: Omit<ItemContextMenuProps, 'children' | 'onOpenChange'>,
+  MenuItem: MenuItemComponent,
+  onAlertRequest: () => void
+): ReactElement[] {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const addToCompare = useCompareSet((state) => state.add);
   const piPlannable = usePiPlannable(typeId);
-  const [alertOpen, setAlertOpen] = useState(false);
 
   // `industry.*`, not `market.*`: `BuildPlanContextMenu` offers this same
   // action on the pages this richer menu doesn't reach (the BPC search table,
@@ -102,74 +120,130 @@ export function ItemContextMenu({
         ? t('industry.contextMenu.noBlueprintOptions')
         : t('industry.contextMenu.buildPlan');
 
+  const nodes: ReactElement[] = [
+    <MenuItem
+      key="addToQuickbar"
+      disabled={!quickbarAvailable}
+      title={quickbarAvailable ? undefined : t('market.contextMenu.quickbarNoCharacter')}
+      onSelect={() => onAddToQuickbar(typeId, itemName)}
+    >
+      {t('market.contextMenu.addToQuickbar')}
+    </MenuItem>,
+    <PriceAlertMenuItem
+      key="priceAlert"
+      as={MenuItem}
+      typeId={typeId}
+      available={quickbarAvailable}
+      onSelect={onAlertRequest}
+    />,
+    <MenuItem key="showInfo" onSelect={() => onShowInfo(typeId, itemName)}>
+      {t('market.contextMenu.showInfo')}
+    </MenuItem>,
+    <MenuItem key="addToCompare" onSelect={() => addToCompare({ typeId, itemName })}>
+      {t('market.contextMenu.addToCompare')}
+    </MenuItem>,
+  ];
+  if (onCompareVariations) {
+    nodes.push(
+      <MenuItem key="compareVariations" onSelect={onCompareVariations}>
+        {t('market.contextMenu.compareVariations')}
+      </MenuItem>
+    );
+  }
+  nodes.push(
+    <MenuItem
+      key="viewInMarket"
+      onSelect={() => {
+        const params = marketLinkParams(typeId, location.search);
+        navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
+      }}
+    >
+      {t('market.contextMenu.viewInMarket')}
+    </MenuItem>,
+    <MenuItem key="copyName" onSelect={() => void writeToClipboard(itemName)}>
+      {t('market.contextMenu.copyName')}
+    </MenuItem>,
+    <MenuItem
+      key="buildPlan"
+      disabled={!blueprintTypeID}
+      onSelect={() => {
+        if (blueprintTypeID) navigate(`${industryTabHref('plans')}?product=${typeId}`);
+      }}
+    >
+      {buildPlanLabel}
+    </MenuItem>
+  );
+  if (onViewInIndustryAsMaterial) {
+    nodes.push(
+      <MenuItem key="viewInIndustryAsMaterial" onSelect={onViewInIndustryAsMaterial}>
+        {t('market.contextMenu.viewInIndustryAsMaterial')}
+      </MenuItem>
+    );
+  }
+  if (onToggleBuildHere) {
+    nodes.push(
+      <MenuItem key="toggleBuildHere" onSelect={onToggleBuildHere}>
+        {t(
+          buildingHere
+            ? 'market.contextMenu.buyInsteadOfBuilding'
+            : 'market.contextMenu.addMaterialComponents'
+        )}
+      </MenuItem>
+    );
+  }
+  if (piPlannable) {
+    nodes.push(
+      <MenuItem key="piPlan" onSelect={() => navigate(`/planetary-industry/plan?type=${typeId}`)}>
+        {t('market.contextMenu.piPlan')}
+      </MenuItem>
+    );
+  }
+  return nodes;
+}
+
+export function ItemContextMenu(props: ItemContextMenuProps) {
+  const { typeId, itemName, onOpenChange, children } = props;
+  const [alertOpen, setAlertOpen] = useState(false);
+  const items = useItemMenuNodes(props, ContextMenuItem, () => setAlertOpen(true));
+
   return (
     <>
       <ContextMenu onOpenChange={onOpenChange}>
         <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem
-            disabled={!quickbarAvailable}
-            title={quickbarAvailable ? undefined : t('market.contextMenu.quickbarNoCharacter')}
-            onSelect={() => onAddToQuickbar(typeId, itemName)}
-          >
-            {t('market.contextMenu.addToQuickbar')}
-          </ContextMenuItem>
-          <PriceAlertMenuItem
-            typeId={typeId}
-            available={quickbarAvailable}
-            onSelect={() => setAlertOpen(true)}
-          />
-          <ContextMenuItem onSelect={() => onShowInfo(typeId, itemName)}>
-            {t('market.contextMenu.showInfo')}
-          </ContextMenuItem>
-          <ContextMenuItem onSelect={() => addToCompare({ typeId, itemName })}>
-            {t('market.contextMenu.addToCompare')}
-          </ContextMenuItem>
-          {onCompareVariations && (
-            <ContextMenuItem onSelect={onCompareVariations}>
-              {t('market.contextMenu.compareVariations')}
-            </ContextMenuItem>
-          )}
-          <ContextMenuItem
-            onSelect={() => {
-              const params = marketLinkParams(typeId, location.search);
-              navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
-            }}
-          >
-            {t('market.contextMenu.viewInMarket')}
-          </ContextMenuItem>
-          <ContextMenuItem onSelect={() => void writeToClipboard(itemName)}>
-            {t('market.contextMenu.copyName')}
-          </ContextMenuItem>
-          <ContextMenuItem
-            disabled={!blueprintTypeID}
-            onSelect={() => {
-              if (blueprintTypeID) navigate(`${industryTabHref('plans')}?product=${typeId}`);
-            }}
-          >
-            {buildPlanLabel}
-          </ContextMenuItem>
-          {onViewInIndustryAsMaterial && (
-            <ContextMenuItem onSelect={onViewInIndustryAsMaterial}>
-              {t('market.contextMenu.viewInIndustryAsMaterial')}
-            </ContextMenuItem>
-          )}
-          {onToggleBuildHere && (
-            <ContextMenuItem onSelect={onToggleBuildHere}>
-              {t(
-                buildingHere
-                  ? 'market.contextMenu.buyInsteadOfBuilding'
-                  : 'market.contextMenu.addMaterialComponents'
-              )}
-            </ContextMenuItem>
-          )}
-          {piPlannable && (
-            <ContextMenuItem onSelect={() => navigate(`/planetary-industry/plan?type=${typeId}`)}>
-              {t('market.contextMenu.piPlan')}
-            </ContextMenuItem>
-          )}
-        </ContextMenuContent>
+        <ContextMenuContent>{items}</ContextMenuContent>
       </ContextMenu>
+      {alertOpen && (
+        <PriceAlertDialog typeId={typeId} itemName={itemName} onClose={() => setAlertOpen(false)} />
+      )}
+    </>
+  );
+}
+
+/**
+ * Visible "More actions" trigger for the same item menu (WCAG 2.1.1, issue
+ * #1498) — every surface that wraps a row in `ItemContextMenu` renders this
+ * beside it so the row has a keyboard path independent of whatever element
+ * `ItemContextMenu`'s trigger happens to be.
+ */
+export function ItemMoreActions(props: Omit<ItemContextMenuProps, 'children' | 'onOpenChange'>) {
+  const { t } = useTranslation();
+  const { typeId, itemName } = props;
+  const [alertOpen, setAlertOpen] = useState(false);
+  const items = useItemMenuNodes(props, DropdownMenuItem, () => setAlertOpen(true));
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <IconButton
+            icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
+            label={t('market.moreActionsLabel', { name: itemName })}
+            variant="plain"
+            size="sm"
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">{items}</DropdownMenuContent>
+      </DropdownMenu>
       {alertOpen && (
         <PriceAlertDialog typeId={typeId} itemName={itemName} onClose={() => setAlertOpen(false)} />
       )}
