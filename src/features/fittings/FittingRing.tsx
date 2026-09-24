@@ -110,12 +110,17 @@ function SlotButton({
   const { t } = useTranslation();
   const { module } = slot;
   const rackLabel = t(`fittings.list.rack.${slot.rack}`);
-  const label = module
+  const fittedLabel = module
     ? t('fittings.ring.slotFitted', {
         rack: rackLabel,
         index: slot.index + 1,
         state: t(`fittings.list.moduleState.${module.state}`),
       })
+    : '';
+  const label = module
+    ? cantUse
+      ? `${fittedLabel}, ${t('fittings.list.cantUse')}`
+      : fittedLabel
     : t('fittings.ring.slotEmpty', { rack: rackLabel, index: slot.index + 1 });
   const className = `absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border bg-panel-2 ${
     cantUse ? 'border-danger' : module ? 'border-border' : 'border-dashed border-border'

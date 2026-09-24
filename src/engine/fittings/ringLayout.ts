@@ -51,7 +51,7 @@ const RACK_CENTRE_DEG: Partial<Record<FittingSlotKind, number>> = {
 const RING_RADIUS = 42;
 /** Inward step for every other slot of a crowded rack, so 44px targets never overlap. */
 const ZIGZAG_INSET = 13;
-const RACK_SPAN_DEG = 84;
+const RACK_SPAN_DEG = 70;
 const MAX_STEP_DEG = 26;
 const ZIGZAG_FROM = 5;
 
