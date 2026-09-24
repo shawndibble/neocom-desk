@@ -589,6 +589,7 @@ describe('MaterialsTable', () => {
       fireEvent.contextMenu(row!);
 
       expect(screen.getByRole('menuitem', { name: 'Add to Quickbar' })).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'Set price alert…' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'Add to Compare' })).toBeInTheDocument();
       expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();

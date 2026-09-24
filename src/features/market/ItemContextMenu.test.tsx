@@ -155,3 +155,25 @@ describe('ItemContextMenu — price alert', () => {
     expect(await screen.findByRole('dialog', { name: 'Price alert: Tritanium' })).toBeTruthy();
   });
 });
+
+describe('ItemContextMenu — price alert availability', () => {
+  it('disables the item with no active character', async () => {
+    render(
+      <MemoryRouter>
+        <ItemContextMenu
+          typeId={TRITANIUM}
+          itemName="Tritanium"
+          blueprintTypeID={null}
+          onAddToQuickbar={vi.fn()}
+          quickbarAvailable={false}
+          onShowInfo={vi.fn()}
+        >
+          <button type="button">Tritanium</button>
+        </ItemContextMenu>
+      </MemoryRouter>
+    );
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+    const item = await screen.findByRole('menuitem', { name: 'Set price alert…' });
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+  });
+});
