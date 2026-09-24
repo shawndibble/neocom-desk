@@ -12,6 +12,7 @@ import type { CharacterAttributes, SkillQueueEntry } from '@/esi/endpoints';
 import { buildUnlockIndex } from '@/engine/skillUnlocks';
 import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import type { SkillCatalog } from '../skillMap';
+import type { RemapAvailability } from './remapAvailability';
 import { PlanEditor } from './PlanEditor';
 
 const loadCharacterSkillQueue =
@@ -1461,6 +1462,24 @@ describe('removing an entry requires confirmation (#408)', () => {
   });
 });
 
+describe('yearly remap on cooldown (#1404)', () => {
+  it('shows the savings badge for a plan whose only remap is the on-cooldown yearly one', () => {
+    // The bug this regresses: 0 bonus remaps, yearly on cooldown, and the
+    // default plan.remapCount of 0 used to hide the badge entirely — even
+    // though the yearly remap, honoring its cooldown, has real savings to
+    // report.
+    const remapInfo: RemapAvailability = {
+      available: 0,
+      bonus: 0,
+      yearlyReady: false,
+      cooldownUntil: new Date(Date.now() + 1000),
+    };
+    renderEditor(vi.fn(), { plan: { ...PLAN, remapCount: 0 }, remapInfo });
+
+    expect(screen.getByText('Remap savings')).toBeInTheDocument();
+  });
+});
+
 describe('queue import into a non-empty plan asks Append or Replace (#1402)', () => {
   beforeEach(() => {
     loadCharacterSkillQueue.mockReset();
@@ -1608,6 +1627,35 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
 
     resolveQueue(queueResult([]));
     await waitFor(() => expect(importButton).not.toBeDisabled());
+  });
+
+  it('drops a fetch that resolves after the user has switched to a different plan', async () => {
+    let resolveQueue: (value: CachedResult<SkillQueueEntry[]>) => void = () => {};
+    loadCharacterSkillQueue.mockReturnValue(
+      new Promise((resolve) => {
+        resolveQueue = resolve;
+      })
+    );
+    const user = userEvent.setup();
+    const { onUpdate, replacePlan } = renderEditor();
+
+    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+
+    // Switched to a different plan while the fetch for plan-1 is still in
+    // flight — this component has no key={plan.id} at the route, so the same
+    // instance stays mounted and just re-renders with new props.
+    replacePlan(() => ({ ...PLAN, id: 'plan-2' }));
+    onUpdate.mockClear();
+
+    await act(async () => {
+      resolveQueue(queueResult([{ skill_id: 20, finished_level: 3, queue_position: 0 }]));
+      await Promise.resolve();
+    });
+
+    // Neither the choice Modal (which would let Append/Replace merge plan-1's
+    // fetch into plan-2's entries) nor any write ever lands (#1402).
+    expect(screen.queryByText(/in-game queue has/i)).not.toBeInTheDocument();
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 });
 
