@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -11,7 +12,9 @@ import {
 } from '@/lib/useViewportBoundedHeight';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { newPlan } from './newPlan';
-import { PlanList } from './PlanList';
+import { PlanList, type PlanRowStats } from './PlanList';
+import { schedulePlan, type PlanScheduleInputs } from './planSchedule';
+import { cloneStateFor, useCloneStates } from '../cloneState';
 import type { RemapAvailability } from './remapAvailability';
 
 interface PlanListPaneProps {
@@ -29,6 +32,12 @@ interface PlanListPaneProps {
    */
   height?: 'viewport' | 'sidebar';
   className?: string;
+  /**
+   * When given, each row shows its plan's total time and finish, costed by
+   * `schedulePlan` — the call the editor and Calendar make, so the three agree.
+   * Left out on the editor route, whose sidebar stays name-only.
+   */
+  scheduleInputs?: Omit<PlanScheduleInputs, 'cloneState'> & { trainedSkillsKnown: boolean };
 }
 
 /**
@@ -45,6 +54,7 @@ export function PlanListPane({
   remapInfo,
   height = 'viewport',
   className,
+  scheduleInputs,
 }: PlanListPaneProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -54,6 +64,38 @@ export function PlanListPane({
     async () => db.skillPlans.where('characterId').equals(activeCharacterId).toArray(),
     [activeCharacterId]
   );
+
+  const showStats = scheduleInputs !== undefined;
+  const cloneStates = useCloneStates((state) => state.value);
+  const cloneStatesHydrated = useCloneStates((state) => state.hydrated);
+  const hydrateCloneStates = useCloneStates((state) => state.hydrate);
+  useEffect(() => {
+    if (showStats) void hydrateCloneStates();
+  }, [showStats, hydrateCloneStates]);
+  // One instant per mount, like the editor, so the figures match its summary.
+  const [loadedAtMs] = useState(() => Date.now());
+  const stats = useMemo(() => {
+    // Held back until ESI has answered and Clone State is read: costing
+    // against the empty stand-ins would flash catalog-only, Omega-default figures.
+    if (!plans || !scheduleInputs?.trainedSkillsKnown || !cloneStatesHydrated) return undefined;
+    const inputs: PlanScheduleInputs = {
+      catalog: scheduleInputs.catalog,
+      trained: scheduleInputs.trained,
+      queueEntries: scheduleInputs.queueEntries,
+      attributes: scheduleInputs.attributes,
+      attributeBaseline: scheduleInputs.attributeBaseline,
+      implants: scheduleInputs.implants,
+      cloneState: cloneStateFor(cloneStates, activeCharacterId),
+    };
+    const out = new Map<string, PlanRowStats>();
+    for (const plan of plans) {
+      const schedule = schedulePlan(plan, inputs, loadedAtMs);
+      if (schedule.error === null || schedule.error === undefined) {
+        out.set(plan.id, { totalSeconds: schedule.totalSeconds, finish: schedule.finish });
+      }
+    }
+    return out;
+  }, [plans, scheduleInputs, cloneStates, cloneStatesHydrated, activeCharacterId, loadedAtMs]);
 
   const [scrollerRef, scrollerMaxHeight] = useViewportBoundedHeight(VIEWPORT_BOUNDED_BOTTOM_GAP_PX);
 
@@ -128,6 +170,7 @@ export function PlanListPane({
         ) : (
           <PlanList
             plans={plans}
+            stats={stats}
             onOpen={(id) => navigate(`/skills/plans/${id}`)}
             onCreate={() => void handleCreate()}
             onDuplicate={(id) => void handleDuplicate(id)}

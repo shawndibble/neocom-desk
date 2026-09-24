@@ -4,6 +4,9 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
+import type { SkillCatalog } from '@/features/skills/skillMap';
+import type { EngineSkill } from '@/engine/types';
+import type { SkillPlanRecord } from '@/db';
 import { PlanListPane } from './PlanListPane';
 
 const CHAR_ID = 91;
@@ -67,5 +70,82 @@ describe('PlanListPane: viewport height ignoring the mobile tab bar (#1096)', ()
     } finally {
       restore();
     }
+  });
+});
+
+describe('PlanListPane: per-plan schedule stats (#1416)', () => {
+  const skill: EngineSkill = {
+    typeID: 10,
+    name: 'A',
+    rank: 1,
+    primary: 'intelligence',
+    secondary: 'memory',
+    prereqs: [],
+    alphaMaxLevel: 5,
+  };
+  const catalog: SkillCatalog = {
+    engineSkills: new Map([[skill.typeID, skill]]),
+    bySkillTypeID: new Map(),
+    unlocksByTypeID: new Map(),
+  };
+  const scheduleInputs = (trainedSkillsKnown: boolean) => ({
+    catalog,
+    trained: new Map(),
+    trainedSkillsKnown,
+    queueEntries: [],
+    attributes: { intelligence: 20, memory: 20, perception: 20, willpower: 20, charisma: 19 },
+    attributeBaseline: null,
+    implants: {},
+  });
+
+  async function seed() {
+    await db.skillPlans.add({
+      id: 'p1',
+      characterId: CHAR_ID,
+      name: 'Empty plan',
+      entries: [],
+      remapCount: 0,
+      updatedAt: Date.now(),
+    } as unknown as SkillPlanRecord);
+  }
+
+  it('shows the stats line once trained skills are known', async () => {
+    await seed();
+    render(
+      <MemoryRouter>
+        <PlanListPane
+          activeCharacterId={CHAR_ID}
+          remapInfo={null}
+          scheduleInputs={scheduleInputs(true)}
+        />
+      </MemoryRouter>
+    );
+    expect(await screen.findByText('Nothing to train')).toBeInTheDocument();
+  });
+
+  it('holds the line back until trained skills are known', async () => {
+    await seed();
+    render(
+      <MemoryRouter>
+        <PlanListPane
+          activeCharacterId={CHAR_ID}
+          remapInfo={null}
+          scheduleInputs={scheduleInputs(false)}
+        />
+      </MemoryRouter>
+    );
+    await screen.findByText('Empty plan');
+    expect(screen.queryByText('Nothing to train')).not.toBeInTheDocument();
+  });
+
+  it('stays name-only without scheduleInputs (the editor sidebar)', async () => {
+    await seed();
+    render(
+      <MemoryRouter>
+        <PlanListPane activeCharacterId={CHAR_ID} remapInfo={null} />
+      </MemoryRouter>
+    );
+    await screen.findByText('Empty plan');
+    expect(screen.queryByText('Nothing to train')).not.toBeInTheDocument();
   });
 });

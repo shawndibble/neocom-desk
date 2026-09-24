@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Navigate } from 'react-router-dom';
 import { PageHeader, Spinner } from '@/components/ui';
@@ -19,8 +20,41 @@ export function SkillPlans() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const hydrated = useActiveCharacter((state) => state.hydrated);
-  const { catalog, attributesResult, implants, attributeBaseline, remapInfo } =
-    usePlanEditorData(activeCharacterId);
+  const {
+    catalog,
+    attributesResult,
+    implants,
+    attributeBaseline,
+    remapInfo,
+    trainedSkills,
+    trainedSkillsKnown,
+    attributes,
+    queueEntries,
+  } = usePlanEditorData(activeCharacterId);
+  // Memoised: the list pane's per-plan costing re-runs when this changes.
+  const scheduleInputs = useMemo(
+    () =>
+      catalog
+        ? {
+            catalog,
+            trained: trainedSkills,
+            trainedSkillsKnown,
+            queueEntries,
+            attributes,
+            attributeBaseline,
+            implants,
+          }
+        : undefined,
+    [
+      catalog,
+      trainedSkills,
+      trainedSkillsKnown,
+      queueEntries,
+      attributes,
+      attributeBaseline,
+      implants,
+    ]
+  );
   const isDesktop = useIsDesktop();
 
   if (!hydrated) {
@@ -41,7 +75,11 @@ export function SkillPlans() {
           default, so without this a short right column gets pulled down to
           match a taller plan list, or vice versa. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_1fr] lg:items-start">
-        <PlanListPane activeCharacterId={activeCharacterId} remapInfo={remapInfo} />
+        <PlanListPane
+          activeCharacterId={activeCharacterId}
+          remapInfo={remapInfo}
+          scheduleInputs={scheduleInputs}
+        />
         {/* Desktop-only, like the placeholder it replaces: below `lg` the
             list owns the single column, and the editor takes it once a plan
             is open. */}

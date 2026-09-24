@@ -46,7 +46,6 @@ import { FitImportDialog } from '@/features/industry/FitImportDialog';
 import { applyFitImport, fitImportGroupName } from '@/features/industry/fitImport';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import { useComparedBuildResults } from '@/features/industry/useComparedBuildResults';
-import { useRunCountsByPlan } from '@/features/industry/useRunCountsByPlan';
 import { computeGroupIndexStats } from '@/features/industry/groupIndexStats';
 import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
 import { usePageTab } from '@/lib/usePageTab';
@@ -292,10 +291,11 @@ export function Industry() {
     modifiers,
     tradeHubStandings,
   });
-  const runCounts = useRunCountsByPlan(activeCharacterId);
-
   const statsByPlanId = useMemo(() => {
     const map = new Map<string, PlanIndexStats>();
+    // The Runs column is the plan's own `runs` input (how many runs the
+    // plan prices), not a count of logged Production Runs.
+    const runsByPlanId = new Map((plans ?? []).map((plan) => [plan.id, plan.runs]));
     for (const row of [...groupedRows, ...ungroupedRows]) {
       // Displayed figure is profit after fees (matches the detail page's
       // headline number) — but the Build/Buy verdict stays keyed off
@@ -313,11 +313,11 @@ export function Industry() {
         verdict: row.result?.recommendation ?? 'unknown',
         buildCost: row.result?.unpriceable ? null : (row.result?.totalCost ?? null),
         buyCost: row.result?.unpriceable ? null : (row.result?.buyCost ?? null),
-        runs: runCounts.get(row.planId) ?? 0,
+        runs: runsByPlanId.get(row.planId) ?? 0,
       });
     }
     return map;
-  }, [groupedRows, ungroupedRows, runCounts]);
+  }, [groupedRows, ungroupedRows, plans]);
 
   const statsByGroupId = useMemo(() => {
     const rowByPlanId = new Map(groupedRows.map((row) => [row.planId, row]));

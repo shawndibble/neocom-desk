@@ -35,6 +35,9 @@ const BADGE_URL = '/icons/badge-96.png';
 export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   skillLevelComplete: '/skills/trained',
   characterNotTraining: '/skills/trained',
+  // Skill Plans, not the trained-skills read view: the fix this warning
+  // prompts is queuing more steps from a plan before the queue goes idle.
+  skillQueueEnding: '/skills',
   // The Characters table view, not the skill tree: "ready to extract" is a
   // roster-wide, cross-character fact, and that table is where the SP-ready
   // column and its threshold live.

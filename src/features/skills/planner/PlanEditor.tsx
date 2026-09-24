@@ -1,6 +1,8 @@
 import {
   useCallback,
+  Fragment,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -17,6 +19,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconButton,
   Modal,
@@ -47,11 +50,17 @@ import { parseSkillQueue } from '@/engine/queueImport';
 import { exportPlanToClipboard } from '@/engine/clipboardExport';
 import {
   optimizeAtMarkers,
+  optimizeForMe,
   placeRemaps,
   suggestReorder,
   ATTRIBUTE_NAMES,
 } from '@/engine/optimizer';
-import type { PlaceRemapsResult, RemapSegment } from '@/engine/optimizer';
+import type {
+  OptimizeForMeResult,
+  PlaceRemapsOptions,
+  PlaceRemapsResult,
+  RemapSegment,
+} from '@/engine/optimizer';
 import type {
   AttributeName,
   Attributes,
@@ -118,13 +127,14 @@ import {
 } from './markers';
 import { planDrop, promotePrereq } from './planDrop';
 import { RemapMarkerModal } from './RemapMarkerModal';
-import { bandStarts } from './bands';
+import { bandStarts, meaningfulBandStarts } from './bands';
 import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueRows';
 import { remapBudget, type RemapAvailability } from './remapAvailability';
 import {
   whatIfImplants,
   normalizeWhatIfSelection,
   setWhatIfBonus,
+  toCustomSelection,
   MAX_IMPLANT_BONUS,
   MIN_IMPLANT_BONUS,
   WHAT_IF_IMPLANT_PRESETS,
@@ -240,6 +250,10 @@ export function PlanEditor({
   const isDesktop = useIsDesktop();
   const [copyConfirm, setCopyConfirm] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [optimizeMenuOpen, setOptimizeMenuOpen] = useState(false);
+  // Ties each Optimize menu item's `aria-label` (the mode name) to its hint
+  // span via `aria-describedby`, so the "why" still reaches screen readers.
+  const optimizeHintId = useId();
   const [importOpen, setImportOpen] = useState(false);
   const [importConfirm, setImportConfirm] = useState<string | null>(null);
   // The one outstanding timeout clearing importConfirm, so a second
@@ -350,6 +364,10 @@ export function PlanEditor({
   const planScope = [plan.id, plan.entries, plan.markers];
   const costingScope = [...planScope, cloneState];
   const [optimizeResult, setOptimizeResult] = useScopedState<OptimizeRun>(costingScope);
+  // Own scoped state, not `optimizeResult`'s shape: that one anchors segments
+  // to the current order's step keys, which a hypothetical reorder has none of yet.
+  const [optimizeForMePreview, setOptimizeForMePreview] =
+    useScopedState<OptimizeForMeResult>(costingScope);
   // Why each result came out the way it did (optimizeVerdict.ts). Held
   // beside the result rather than derived at render: the verdict depends on
   // the Remaps Available the run actually used, and the user can edit that
@@ -657,7 +675,10 @@ export function PlanEditor({
         [...placed].map(([id, pair]) => [id, { kind: 'attributePair', ...pair } as const])
       );
     }
-    const placed = placeBandHeaders(mergedRows, bandStarts(rows, priorityMap));
+    const placed = placeBandHeaders(
+      mergedRows,
+      meaningfulBandStarts(bandStarts(rows, priorityMap))
+    );
     return new Map(
       [...placed].map(([id, priority]) => [id, { kind: 'priority', priority } as const])
     );
@@ -891,13 +912,9 @@ export function PlanEditor({
     }
   }
 
-  // A "saves" verdict now also opens its own Accept/Reject Modal (below),
-  // beside this beside-the-button confirmation (#222) — the same pairing
-  // "Suggest reorder" already uses: an instant toast plus the Modal that
-  // holds the actual decision.
-  function handleOptimizeRemaps() {
-    if (scheduled.length === 0) return;
-    const result = placeRemaps(scheduled, catalog.engineSkills, {
+  /** Remap-placement inputs shared by every optimize flow that calls `placeRemaps` (directly, or via `optimizeForMe`). */
+  function buildRemapOptions(): PlaceRemapsOptions {
+    return {
       remapCount,
       currentAttributes: attributes,
       implants: effectiveImplants,
@@ -909,7 +926,16 @@ export function PlanEditor({
         activeBoosters.length > 0
           ? { boosters: activeBoosters, startDate: new Date(queueProjection.startMs) }
           : undefined,
-    });
+    };
+  }
+
+  // A "saves" verdict now also opens its own Accept/Reject Modal (below),
+  // beside this beside-the-button confirmation (#222) — the same pairing
+  // "Suggest reorder" already uses: an instant toast plus the Modal that
+  // holds the actual decision.
+  function handleOptimizeRemaps() {
+    if (scheduled.length === 0) return;
+    const result = placeRemaps(scheduled, catalog.engineSkills, buildRemapOptions());
     const verdict = remapVerdict(result, remapCount);
     // Whether the timed (on-cooldown yearly) slot actually ended up used:
     // every remap up to `timedRemap.remapCount` counted, not just requested.
@@ -933,18 +959,27 @@ export function PlanEditor({
    * Remaps) or a live read of the plan's existing markers (Optimize at my
    * markers) found. Replaces `plan.markers` wholesale rather than diffing —
    * that's "move the existing one, add the missing one" in a single write.
-   * Shared by both flows' Accept button: for Optimize at my markers this
-   * round-trips the plan's own markers back through the same conversion, so
-   * it is normally a no-op, but two markers that now delimit the same
-   * optimizer step (see markerAttributesByStepIndex below) collapse to one.
+   * Shared by all three flows' Accept button: for Optimize at my markers
+   * this round-trips the plan's own markers back through the same
+   * conversion, so it is normally a no-op, but two markers that now delimit
+   * the same optimizer step (see markerAttributesByStepIndex below) collapse
+   * to one. `entries` is only passed for "Optimize for me", whose segments
+   * are indexed against its own reordered entries, not the plan's current
+   * ones — the other two flows omit it and patch markers alone.
    */
-  function applySegmentsAsMarkers(segments: readonly RemapSegment[]) {
+  function applySegmentsAsMarkers(segments: readonly RemapSegment[], entries?: PlanEntry[]) {
     onUpdate({
-      markers: segmentsToMarkers(plan.entries, segments, catalog.engineSkills, trainedSkills),
+      markers: segmentsToMarkers(
+        entries ?? plan.entries,
+        segments,
+        catalog.engineSkills,
+        trainedSkills
+      ),
       // Wholesale replacement, not a diff against the old markers — any
       // manual override the old markers carried is for a segmentation this
       // search just discarded, so it has nothing left to attach to.
       markerAttributes: [],
+      ...(entries !== undefined ? { entries } : {}),
     });
   }
 
@@ -960,6 +995,25 @@ export function PlanEditor({
   function rejectOptimizeRemaps() {
     setOptimizeResult(null);
     setOptimizeVerdict(null);
+  }
+
+  /** Priority-respecting reorder, then remap placement on that new order, previewed as one Accept/Reject. */
+  function handleOptimizeForMe() {
+    if (scheduled.length === 0) return;
+    const result = optimizeForMe(scheduled, catalog.engineSkills, buildRemapOptions(), priorityMap);
+    setOptimizeForMePreview(result);
+  }
+
+  /** Accept on the "Optimize for me" preview Modal: one write, new order and remap markers together. */
+  function acceptOptimizeForMe() {
+    if (!optimizeForMePreview) return;
+    const newEntries = applyReorderSuggestion(plan.entries, optimizeForMePreview.order);
+    applySegmentsAsMarkers(optimizeForMePreview.remaps.segments, newEntries);
+    setOptimizeForMePreview(null);
+  }
+
+  function rejectOptimizeForMe() {
+    setOptimizeForMePreview(null);
   }
 
   function handleOptimizeAtMarkers() {
@@ -1244,7 +1298,8 @@ export function PlanEditor({
 
   function renderSegments(
     segments: readonly RemapSegment[],
-    anchorKeys: readonly (StepKey | undefined)[],
+    /** Resolves a segment's first step: by live-schedule key for an applied order, or directly by `startIndex` for a hypothetical one (Optimize for me's preview, not yet applied). */
+    anchorAt: (segment: RemapSegment, index: number) => PlanStep | undefined,
     /** Set only for an Optimize Remaps run that spent the on-cooldown yearly slot. */
     yearlyRemapAfter?: Date
   ) {
@@ -1254,11 +1309,7 @@ export function PlanEditor({
     return (
       <ul className="space-y-1">
         {segments.map((segment, index) => {
-          // Resolved by key against the live schedule: a step the plan no
-          // longer trains misses and its row is skipped, rather than an index
-          // naming whatever step now sits there (or nothing at all).
-          const key = anchorKeys[index];
-          const anchor = key === undefined ? undefined : schedule.stepByKey.get(key);
+          const anchor = anchorAt(segment, index);
           if (!anchor) return null;
           return (
             <li key={index} className="space-y-0.5 border-b border-line pb-1 last:border-b-0">
@@ -1332,7 +1383,14 @@ export function PlanEditor({
             )}
             {segments && (
               <div className="max-h-56 overflow-y-auto">
-                {renderSegments(segments.segments, segments.anchorKeys, segments.yearlyRemapAfter)}
+                {renderSegments(
+                  segments.segments,
+                  (_segment, index) => {
+                    const key = segments.anchorKeys[index];
+                    return key === undefined ? undefined : schedule.stepByKey.get(key);
+                  },
+                  segments.yearlyRemapAfter
+                )}
               </div>
             )}
             <div className="flex gap-2">
@@ -1418,6 +1476,49 @@ export function PlanEditor({
     );
   }
 
+  /** The Optimize menu's four items, in display order — one shared shape (label, hint, disabled, handler) instead of four near-identical `DropdownMenuItem` blocks. */
+  const optimizeMenuItems: {
+    key: string;
+    label: string;
+    hint: string;
+    disabled: boolean;
+    onSelect: () => void;
+    emphasize?: boolean;
+  }[] = [
+    {
+      key: 'for-me',
+      label: t('plans.optimizeForMe'),
+      hint: t('plans.optimizeForMeHint'),
+      disabled: scheduled.length === 0,
+      onSelect: handleOptimizeForMe,
+      emphasize: true,
+    },
+    {
+      key: 'reorder',
+      label: t('plans.optimizeModeReorder'),
+      hint: t('plans.optimizeModeReorderHint'),
+      disabled: scheduled.length === 0,
+      onSelect: handleSuggestReorder,
+    },
+    {
+      key: 'remaps',
+      label: t('plans.optimizeModeRemaps'),
+      hint: t('plans.optimizeModeRemapsHint'),
+      disabled: scheduled.length === 0,
+      onSelect: handleOptimizeRemaps,
+    },
+    {
+      key: 'markers',
+      label: t('plans.optimizeModeMarkers'),
+      hint:
+        (plan.markers?.length ?? 0) === 0
+          ? t('plans.optimizeModeMarkersDisabledHint')
+          : t('plans.optimizeModeMarkersHint'),
+      disabled: scheduled.length === 0 || (plan.markers?.length ?? 0) === 0,
+      onSelect: handleOptimizeAtMarkers,
+    },
+  ];
+
   const toolSections: PlanToolSection[] = [
     {
       id: 'actions',
@@ -1440,19 +1541,57 @@ export function PlanEditor({
               : t('plans.remapBudgetFallback', { count: plan.remapCount })}
           </p>
           <div className="space-y-1.5">
-            {toolAction({
-              icon: <Icon.SuggestReorder size={Icon.ICON_SIZE.sm} />,
-              label: t('plans.suggestReorder'),
-              onClick: handleSuggestReorder,
-              disabled: scheduled.length === 0,
-            })}
+            {/* One Optimize control replacing three stacked buttons: "Optimize
+                for me" leads as the default item, single modes stay below it. */}
+            <DropdownMenu open={optimizeMenuOpen} onOpenChange={setOptimizeMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="md"
+                  align="start"
+                  className="w-full"
+                  disabled={scheduled.length === 0}
+                >
+                  <span aria-hidden="true" className="shrink-0 text-text-dim">
+                    <Icon.OptimizeRemaps size={Icon.ICON_SIZE.sm} />
+                  </span>
+                  <span className="flex-1">{t('plans.optimize')}</span>
+                  <Icon.Expanded aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-64">
+                {optimizeMenuItems.map((item, index) => (
+                  <Fragment key={item.key}>
+                    {/* Separates "Optimize for me" (the default) from the
+                        three single modes below it. */}
+                    {index === 1 && <DropdownMenuSeparator />}
+                    <DropdownMenuItem
+                      aria-label={item.label}
+                      aria-describedby={`${optimizeHintId}-${item.key}`}
+                      // Closes the menu itself before invoking its handler, so
+                      // Radix's own close doesn't race the Modal's focus grab —
+                      // same fix as the Export menu's onSelect workaround above.
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        setOptimizeMenuOpen(false);
+                        item.onSelect();
+                      }}
+                      disabled={item.disabled}
+                    >
+                      <span className={item.emphasize ? 'block font-semibold' : 'block'}>
+                        {item.label}
+                      </span>
+                      <span
+                        id={`${optimizeHintId}-${item.key}`}
+                        className="block text-[0.6875rem] text-text-dim"
+                      >
+                        {item.hint}
+                      </span>
+                    </DropdownMenuItem>
+                  </Fragment>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             {reorderConfirm && confirmation(t('plans.reorderSuggested'))}
-            {toolAction({
-              icon: <Icon.OptimizeRemaps size={Icon.ICON_SIZE.sm} />,
-              label: t('plans.optimizeRemaps'),
-              onClick: handleOptimizeRemaps,
-              disabled: scheduled.length === 0,
-            })}
             {optimizeConfirm && confirmation(optimizeConfirm)}
             {toolAction({
               icon: <Icon.AddMarker size={Icon.ICON_SIZE.sm} />,
@@ -1460,12 +1599,6 @@ export function PlanEditor({
               onClick: handleAddMarker,
             })}
             {markerConfirm && confirmation(t('plans.markerAdded'))}
-            {toolAction({
-              icon: <Icon.OptimizeAtMarkers size={Icon.ICON_SIZE.sm} />,
-              label: t('plans.optimizeAtMarkers'),
-              onClick: handleOptimizeAtMarkers,
-              disabled: scheduled.length === 0 || (plan.markers?.length ?? 0) === 0,
-            })}
             {/* Standing, not a post-click toast: the moment the plan carries
                 a Remap Marker, what it saves is a fact about the plan, and
                 waiting behind a click hid it from the user who placed the
@@ -1567,12 +1700,14 @@ export function PlanEditor({
               {t('plans.whatIfImplants')}
               <Select
                 value={whatIf.kind === 'custom' ? 'custom' : whatIf.preset}
-                // 'custom' is a readout of the grid below, never a thing to
-                // pick: it is in the list only while it is already the state,
-                // and its `disabled` SelectItem is what keeps Radix from
-                // firing this for it.
+                // Picking 'custom' freezes what is in force into five editable
+                // slots without changing a number (toCustomSelection).
                 onValueChange={(value) =>
-                  setWhatIf({ kind: 'preset', preset: value as WhatIfImplantPreset })
+                  setWhatIf(
+                    value === 'custom'
+                      ? toCustomSelection(whatIf, implants)
+                      : { kind: 'preset', preset: value as WhatIfImplantPreset }
+                  )
                 }
               >
                 <SelectTrigger size="md" aria-label={t('plans.whatIfImplants')} className="w-36">
@@ -1588,13 +1723,7 @@ export function PlanEditor({
                           : preset}
                     </SelectItem>
                   ))}
-                  {whatIf.kind === 'custom' && (
-                    // Readout only — disabled so it displays as the trigger's
-                    // current value but can never be picked from the list.
-                    <SelectItem value="custom" disabled>
-                      {t('plans.whatIfCustom')}
-                    </SelectItem>
-                  )}
+                  <SelectItem value="custom">{t('plans.whatIfCustom')}</SelectItem>
                 </SelectContent>
               </Select>
             </label>
@@ -1602,46 +1731,53 @@ export function PlanEditor({
           </div>
 
           {/* EVE's hardwirings are per slot (+4 PER / +5 INT / nothing in
-              CHA), which a uniform preset cannot say. One row of five, always
-              visible: a preset fills them in, editing one leaves the other
-              four alone and flips the select above to "Custom", so what the
-              plan is being costed against is legible without opening
-              anything. The three-letter codes are the same abbreviation the
+              CHA), which a uniform preset cannot say. One row of five, shown
+              only under "Custom" (pick it, or edit a value): editing one
+              leaves the other four alone. Under a preset a one-line readout
+              says what the plan is being costed against. The three-letter codes are the same abbreviation the
               entry list's attribute-pair badge uses; each input's accessible
               name spells the attribute out. */}
-          <div
-            role="group"
-            aria-label={t('plans.whatIfPerAttribute')}
-            className="grid grid-cols-5 gap-1"
-          >
-            {ATTRIBUTE_NAMES.map((name) => (
-              <label key={name} className="flex flex-col items-center gap-0.5">
-                <span className="text-[0.625rem] tracking-wide text-text-dim uppercase">
-                  {attributeShort(name)}
-                </span>
-                <TextInput
-                  size="md"
-                  type="number"
-                  min={MIN_IMPLANT_BONUS}
-                  max={MAX_IMPLANT_BONUS}
-                  step={1}
-                  aria-label={t('plans.whatIfAttributeBonus', {
-                    attribute: t(`skills.attr.${name}`),
-                  })}
-                  value={effectiveImplants[name]}
-                  onChange={(e) =>
-                    setWhatIf(setWhatIfBonus(whatIf, implants, name, Number(e.target.value)))
-                  }
-                  // `field-no-spinner` (src/styles/index.css): Chrome draws
-                  // the spin buttons on hover and focus into a 29.6px content
-                  // box, taking about half of it and shoving the digit left —
-                  // so the cell under the cursor would break the row's
-                  // alignment with the other four.
-                  className="field-no-spinner w-full text-center"
-                />
-              </label>
-            ))}
-          </div>
+          {whatIf.kind === 'custom' ? (
+            <div
+              role="group"
+              aria-label={t('plans.whatIfPerAttribute')}
+              className="grid grid-cols-5 gap-1"
+            >
+              {ATTRIBUTE_NAMES.map((name) => (
+                <label key={name} className="flex flex-col items-center gap-0.5">
+                  <span className="text-[0.625rem] tracking-wide text-text-dim uppercase">
+                    {attributeShort(name)}
+                  </span>
+                  <TextInput
+                    size="md"
+                    type="number"
+                    min={MIN_IMPLANT_BONUS}
+                    max={MAX_IMPLANT_BONUS}
+                    step={1}
+                    aria-label={t('plans.whatIfAttributeBonus', {
+                      attribute: t(`skills.attr.${name}`),
+                    })}
+                    value={effectiveImplants[name]}
+                    onChange={(e) =>
+                      setWhatIf(setWhatIfBonus(whatIf, implants, name, Number(e.target.value)))
+                    }
+                    // `field-no-spinner` (src/styles/index.css): Chrome draws
+                    // the spin buttons on hover and focus into a 29.6px content
+                    // box, taking about half of it and shoving the digit left —
+                    // so the cell under the cursor would break the row's
+                    // alignment with the other four.
+                    className="field-no-spinner w-full text-center"
+                  />
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[0.6875rem] text-text-dim">
+              {ATTRIBUTE_NAMES.map(
+                (name) => `${attributeShort(name)} +${effectiveImplants[name]}`
+              ).join(' · ')}
+            </p>
+          )}
 
           <BoosterList
             boosters={planBoosters}
@@ -1721,17 +1857,7 @@ export function PlanEditor({
 
         {!isDesktop && toolsPane}
 
-        <Panel
-          title={t('plans.yourEntries')}
-          actions={
-            <div className="flex flex-wrap items-center justify-end gap-2 text-[0.6875rem] whitespace-nowrap text-text-dim">
-              <span className="tabular-nums">{formatDuration(totalSeconds)}</span>
-              {planFinish && (
-                <span>{t('plans.projectedFinish', { date: formatLocalDate(planFinish) })}</span>
-              )}
-            </div>
-          }
-        >
+        <Panel title={t('plans.yourEntries')}>
           <div className="space-y-3">
             <LiveQueueLead
               projection={queueProjection}
@@ -1977,6 +2103,47 @@ export function PlanEditor({
             {t('plans.reorderReject')}
           </Button>
         </div>
+      </Modal>
+
+      <Modal
+        open={optimizeForMePreview !== null}
+        onClose={rejectOptimizeForMe}
+        title={t('plans.optimizeForMeTitle')}
+      >
+        {optimizeForMePreview && (
+          <div className="space-y-2 text-xs">
+            <p className="font-semibold text-success">
+              {t('plans.optimizeForMeTotal', {
+                before: formatDuration(totalSeconds),
+                after: formatDuration(optimizeForMePreview.remaps.totalSeconds),
+              })}
+            </p>
+            <ul className="max-h-56 overflow-y-auto">
+              {optimizeForMePreview.order.map((step, i) => (
+                <li
+                  key={`${step.skillTypeID}-${step.level}-${i}`}
+                  className="border-b border-line py-1 last:border-b-0"
+                >
+                  {nameFor(step.skillTypeID)} {ROMAN[step.level - 1]}
+                </li>
+              ))}
+            </ul>
+            <div className="max-h-56 overflow-y-auto">
+              {renderSegments(
+                optimizeForMePreview.remaps.segments,
+                (segment) => optimizeForMePreview.order[segment.startIndex]
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="primary" size="sm" onClick={acceptOptimizeForMe}>
+                {t('plans.remapAccept')}
+              </Button>
+              <Button size="sm" onClick={rejectOptimizeForMe}>
+                {t('plans.remapReject')}
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {renderRemapPreviewModal({
