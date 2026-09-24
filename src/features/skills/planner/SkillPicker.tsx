@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, SearchInput } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { SkillType } from '@/sde/types';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import { rankedSearch } from '@/lib/rankedSearch';
@@ -147,7 +148,7 @@ export function SkillPicker({
               <button
                 type="button"
                 onClick={() => setSelected(selected === skill.typeID ? null : skill.typeID)}
-                className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+                className={`${tappableRowClassName} flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
               >
                 <span className="truncate">{skill.name}</span>
                 <span className="shrink-0 text-text-dim">{skill.groupName}</span>

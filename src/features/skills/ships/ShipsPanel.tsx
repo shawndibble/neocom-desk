@@ -15,7 +15,7 @@ import {
   Spinner,
   StatChip,
 } from '@/components/ui';
-import { fieldBaseClassName } from '@/components/ui/controlStyles';
+import { fieldBaseClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { formatDuration } from '@/lib/duration';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { readFromClipboard } from '@/lib/clipboard';
@@ -300,7 +300,7 @@ export function ShipsPanel({
                 <button
                   type="button"
                   onClick={() => pickShip(ship)}
-                  className="w-full px-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+                  className={`${tappableRowClassName} flex w-full items-center px-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
                 >
                   {ship.name}
                 </button>
