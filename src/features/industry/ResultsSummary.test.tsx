@@ -7,6 +7,38 @@ import type { BuildResult } from '@/engine/industry/types';
 import { ResultsSummary } from './ResultsSummary';
 import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type { MaterialCostLine } from '@/engine/industry/types';
+import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
+
+const NAMES: Record<number, string> = { 587: 'Rifter', 34: 'Tritanium' };
+const itemNameFor = (typeId: number) => NAMES[typeId] ?? `Type ${typeId}`;
+
+function itemMenuFor(typeId: number, trigger: React.ReactElement) {
+  return (
+    <ItemContextMenu
+      typeId={typeId}
+      itemName={itemNameFor(typeId)}
+      blueprintTypeID={null}
+      onAddToQuickbar={vi.fn()}
+      quickbarAvailable
+      onShowInfo={vi.fn()}
+    >
+      {trigger}
+    </ItemContextMenu>
+  );
+}
+
+function itemActionsFor(typeId: number) {
+  return (
+    <ItemMoreActions
+      typeId={typeId}
+      itemName={itemNameFor(typeId)}
+      blueprintTypeID={null}
+      onAddToQuickbar={vi.fn()}
+      quickbarAvailable
+      onShowInfo={vi.fn()}
+    />
+  );
+}
 
 /** One material the plan needs 100 of and the player already holds all 100 of. */
 const OWNED_MATERIALS: MaterialCostLine[] = [
@@ -434,6 +466,41 @@ describe('ResultsSummary: use or sell the owned materials', () => {
     renderSummary({ ownedSale: unpriced });
 
     expect(screen.getByText(/not enough price data to compare/i)).toBeTruthy();
+  });
+});
+
+describe('ResultsSummary: item actions button (issue #1498)', () => {
+  it('renders a focusable "More actions" button on the revenue row', () => {
+    renderSummary({ itemActionsFor });
+    expect(screen.getByRole('button', { name: 'More actions for Rifter' })).toBeInTheDocument();
+  });
+
+  it('opens the identical item menu the revenue row’s right-click path opens', async () => {
+    const user = userEvent.setup();
+    renderSummary({ itemMenuFor, itemActionsFor });
+
+    const revenueRow = screen.getByText('Rifter').closest('tr')!;
+    fireEvent.contextMenu(revenueRow);
+    const contextMenuItems = screen
+      .getAllByRole('menuitem')
+      .map((item) => item.textContent)
+      .sort();
+    await user.keyboard('{Escape}');
+
+    await user.click(screen.getByRole('button', { name: 'More actions for Rifter' }));
+    const buttonMenuItems = screen
+      .getAllByRole('menuitem')
+      .map((item) => item.textContent)
+      .sort();
+
+    expect(buttonMenuItems).toEqual(contextMenuItems);
+  });
+
+  it('renders a "More actions" button per owned-sale row', async () => {
+    renderSummary({ ownedSale: OWNED_SALE, itemActionsFor });
+    await userEvent.click(screen.getByRole('button', { name: /per material/i }));
+
+    expect(screen.getByRole('button', { name: 'More actions for Tritanium' })).toBeInTheDocument();
   });
 });
 

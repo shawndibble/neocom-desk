@@ -7,7 +7,7 @@ import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
 import { materialCostLines } from '@/engine/industry/sourcing';
 import type {
   EffectiveMaterial,
@@ -542,6 +542,23 @@ function menuFor(blueprintByProduct: Record<number, number>, handlers = {}) {
   };
 }
 
+/** `rowActions` mirror of `menuFor` — same props, the visible button instead of the right-click wrapper. */
+function actionsFor(blueprintByProduct: Record<number, number>, handlers = {}) {
+  return function rowActions(material: MaterialCostLine) {
+    return (
+      <ItemMoreActions
+        typeId={material.typeID}
+        itemName={nameFor(material.typeID)}
+        blueprintTypeID={blueprintByProduct[material.typeID] ?? null}
+        onAddToQuickbar={vi.fn()}
+        quickbarAvailable
+        onShowInfo={vi.fn()}
+        {...handlers}
+      />
+    );
+  };
+}
+
 describe('MaterialsTable', () => {
   it('renders a row per material with quantity, unit price and line total', () => {
     renderTable();
@@ -641,6 +658,42 @@ describe('MaterialsTable', () => {
       fireEvent.contextMenu(row!);
       await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
       expect(onShowInfo).toHaveBeenCalledWith(9840, 'Mechanical Parts');
+    });
+  });
+
+  describe('row actions button (issue #1498)', () => {
+    it('renders a focusable "More actions" button per row', () => {
+      renderTable({ rowActions: actionsFor({ 9840: 9841 }) });
+      expect(
+        screen.getByRole('button', { name: 'More actions for Mechanical Parts' })
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'More actions for Tritanium' })
+      ).toBeInTheDocument();
+    });
+
+    it('opens the identical item menu the right-click path opens', async () => {
+      const user = userEvent.setup();
+      renderTable({
+        rowContextMenu: menuFor({ 9840: 9841 }),
+        rowActions: actionsFor({ 9840: 9841 }),
+      });
+
+      const contextRow = screen.getByText('Mechanical Parts').closest('tr');
+      fireEvent.contextMenu(contextRow!);
+      const contextMenuItems = screen
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent)
+        .sort();
+      await user.keyboard('{Escape}');
+
+      await user.click(screen.getByRole('button', { name: 'More actions for Mechanical Parts' }));
+      const buttonMenuItems = screen
+        .getAllByRole('menuitem')
+        .map((item) => item.textContent)
+        .sort();
+
+      expect(buttonMenuItems).toEqual(contextMenuItems);
     });
   });
 });

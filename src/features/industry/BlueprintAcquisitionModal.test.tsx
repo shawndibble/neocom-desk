@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -11,6 +11,7 @@ import { getOrderBook } from '@/features/market/orderBook';
 import { loadGlobalMarkets } from '@/sde/loadMarketSde';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
 import { DEFAULT_LP_VALUE, useLpValue } from '@/features/loyalty/lpValue';
+import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
 import { BlueprintAcquisitionModal, type AcquisitionOwnedCopy } from './BlueprintAcquisitionModal';
 
 vi.mock('@/features/market/appraisalLpAcquisition', () => ({ findLpOfferMatches: vi.fn() }));
@@ -156,6 +157,34 @@ function renderModal(
 
 function section(heading: string): HTMLElement {
   return screen.getByRole('heading', { name: heading }).closest('section')!;
+}
+
+function itemMenuFor(typeId: number, trigger: React.ReactElement) {
+  return (
+    <ItemContextMenu
+      typeId={typeId}
+      itemName="Astero Blueprint"
+      blueprintTypeID={null}
+      onAddToQuickbar={vi.fn()}
+      quickbarAvailable
+      onShowInfo={vi.fn()}
+    >
+      {trigger}
+    </ItemContextMenu>
+  );
+}
+
+function itemActionsFor(typeId: number) {
+  return (
+    <ItemMoreActions
+      typeId={typeId}
+      itemName="Astero Blueprint"
+      blueprintTypeID={null}
+      onAddToQuickbar={vi.fn()}
+      quickbarAvailable
+      onShowInfo={vi.fn()}
+    />
+  );
 }
 
 describe('BlueprintAcquisitionModal — Owned', () => {
@@ -481,5 +510,34 @@ describe('BlueprintAcquisitionModal — LP Store', () => {
       overridePrice: 962_000_000,
     });
     expect(useLpValue.getState().value).toBe(1000);
+  });
+});
+
+describe('BlueprintAcquisitionModal — title actions button (issue #1498)', () => {
+  it('renders a focusable "More actions" button beside the title', () => {
+    renderModal({ itemActionsFor });
+    expect(
+      screen.getByRole('button', { name: 'More actions for Astero Blueprint' })
+    ).toBeInTheDocument();
+  });
+
+  it('opens the identical item menu the title’s right-click path opens', async () => {
+    const user = userEvent.setup();
+    renderModal({ itemMenuFor, itemActionsFor });
+
+    fireEvent.contextMenu(screen.getByText('Blueprint tier: Astero Blueprint'));
+    const contextMenuItems = screen
+      .getAllByRole('menuitem')
+      .map((item) => item.textContent)
+      .sort();
+    await user.keyboard('{Escape}');
+
+    await user.click(screen.getByRole('button', { name: 'More actions for Astero Blueprint' }));
+    const buttonMenuItems = screen
+      .getAllByRole('menuitem')
+      .map((item) => item.textContent)
+      .sort();
+
+    expect(buttonMenuItems).toEqual(contextMenuItems);
   });
 });

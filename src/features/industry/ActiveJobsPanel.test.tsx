@@ -515,6 +515,39 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
     expect(onAddToQuickbar).toHaveBeenCalledWith(200, 'Widget Beta');
   });
 
+  it('gives a job row a visible "More actions" button with the same items as the right-click menu (issue #1498)', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([manufacturingJob()])));
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    await expandJobs(user);
+
+    // menuTypeId resolves to the job's product (200 -> Widget Beta), same as
+    // the row's right-click menu.
+    const moreActionsButton = screen.getByRole('button', { name: 'More actions for Widget Beta' });
+    await user.click(moreActionsButton);
+    const buttonItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
+    await user.keyboard('{Escape}');
+
+    const row = screen.getByText('Widget Alpha').closest('tr')!;
+    fireEvent.contextMenu(row);
+    const contextItems = await screen
+      .findAllByRole('menuitem')
+      .then((els) => els.map((el) => el.textContent));
+
+    expect(buttonItems).toEqual(contextItems);
+  });
+
   it('disables the Build Plan action for a job with no product (research/copying/invention)', async () => {
     server.use(
       http.get(jobsUrl(), () =>
