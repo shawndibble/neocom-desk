@@ -39,9 +39,12 @@ import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { orderVerdict, type OrderVerdictKind } from './orderVerdict';
+import { orderRowSummary } from './orderRowSummary';
 import { orderExits, hubHaulGaps, type HubBuyPrice, type ReprocessingInput } from './orderExits';
 import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
 import { appliedRefiningImplantPct } from '@/engine/industry/characterModifiers';
+import { roundPriceUp } from '@/engine/market/priceTick';
+import { CopyablePrice } from './CopyablePrice';
 
 export interface OrderDetailModalProps {
   open: boolean;
@@ -360,6 +363,18 @@ function computeSellThrough(
   });
 }
 
+/**
+ * The suggested bid for a beaten buy order — one legal tick over the rival
+ * (issue #1421) — or null when there is no rival price in hand to quote yet.
+ * Reads `orderRowSummary` directly rather than `OrderRowSummaryText`'s own
+ * internal call, since the quick answer needs the bare number to hand to
+ * `CopyablePrice`, not the formatted sentence.
+ */
+function outbidSuggestion(row: OpenOrderRow): number | null {
+  const summary = orderRowSummary(row);
+  return summary?.kind === 'outbid' ? summary.suggestedPrice : null;
+}
+
 export function OrderDetailModal({
   open,
   row,
@@ -412,6 +427,7 @@ export function OrderDetailModal({
     (system.kind === 'clear' || system.kind === 'unavailable' || system.kind === 'notChecked') &&
     region.kind === 'clear';
   const verdict = orderVerdict(row);
+  const outbidSuggestedPrice = row.isBuyOrder ? outbidSuggestion(row) : null;
   const exits = orderExits({ row, competitors: deep?.competitors, reprocessing });
   // Named only when it moved the number: never on scrap (f4b5a3f5).
   const refineImplantPct = reprocessing
@@ -445,19 +461,35 @@ export function OrderDetailModal({
               <>
                 {/*
                   A real call, only ever reachable with an Order Floor. With
-                  no cost basis linked there is no way to tell "match them"
+                  no cost basis linked there is no way to tell "undercut them"
                   from "let this one go", so the badge's generic advice is
                   the fallback below — which is the common case, not the
                   exception.
                 */}
                 <p className={cx('mt-1.5 text-xl font-semibold', VERDICT_TONE[verdict.kind])}>
-                  {t(`market.orders.verdict.${verdict.kind}`)}
+                  {t(`market.orders.verdict.${verdict.kind}`, {
+                    price: verdict.price === null ? '' : formatIsk(verdict.price, 2),
+                  })}
                 </p>
                 <p className="mt-1 text-sm text-text-dim">
                   {t(`market.orders.verdict.${verdict.kind}Detail`, {
                     amount: verdict.amount === null ? '' : formatIsk(verdict.amount, 2),
+                    price: verdict.price === null ? '' : formatIsk(verdict.price, 2),
                   })}
                 </p>
+                {/*
+                  The one number this call rests on, ready to paste straight
+                  into EVE's own price field. Icon-only: the detail sentence
+                  right above already states this exact figure for every
+                  kind that reaches here (letGoDetail, matchThemDetail,
+                  raisePriceDetail all carry {{price}}) — showing it again as
+                  visible text here would read as "520.10 520.10 [copy]".
+                */}
+                {verdict.price !== null && (
+                  <p className="mt-1.5 text-sm">
+                    <CopyablePrice price={verdict.price} showValue={false} />
+                  </p>
+                )}
               </>
             ) : badge ? (
               // The badge's own "?" tooltip already carries the fuller
@@ -472,6 +504,16 @@ export function OrderDetailModal({
             <p className="mt-2">
               <OrderRowSummaryText row={row} />
             </p>
+            {/* Outbid buy orders get their own suggested bid — `orderVerdict` is a sell-side idea only, so this is the one place a buy order sees a suggested price. */}
+            {outbidSuggestedPrice !== null && (
+              <p className="mt-1.5 flex items-center gap-1.5 text-sm">
+                <span>
+                  {t('market.orders.outbidAt', { price: formatIsk(outbidSuggestedPrice, 2) })}
+                </span>
+                {/* Icon-only: the sentence above already states this price. */}
+                <CopyablePrice price={outbidSuggestedPrice} showValue={false} />
+              </p>
+            )}
           </section>
 
           <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
@@ -485,7 +527,17 @@ export function OrderDetailModal({
             <StatCard
               label={t('market.orders.floorLabel')}
               tooltip={t('market.orders.floorHelp')}
-              value={row.floor ? formatIsk(row.floor.relist, 2) : t('common.unknown')}
+              // Rounded UP to the nearest legal price (issue #1421): the
+              // number shown is safe to type into an order, never below the
+              // exact break-even. `belowFloor` detection elsewhere still
+              // compares against the EXACT `row.floor.relist`, never this.
+              value={
+                row.floor ? (
+                  <CopyablePrice price={roundPriceUp(row.floor.relist) ?? row.floor.relist} />
+                ) : (
+                  t('common.unknown')
+                )
+              }
               tone={row.floor && row.price < row.floor.relist ? 'danger' : 'default'}
               caption={t(
                 row.costBasis
@@ -798,10 +850,20 @@ export function OrderDetailModal({
                       // (design decision): `floor.fill` — what leaving the
                       // order alone would net once it sells — appears only in
                       // the prose below, which is the one place the smaller
-                      // number is the answer to something.
+                      // number is the answer to something. Rounded UP to a
+                      // legal price for display, same as the stat chip above
+                      // — the ledger math itself still sums to the exact
+                      // `row.floor.relist`, never the rounded figure.
                       <LedgerRow
                         label={t('market.orders.floorLabel')}
-                        value={`${formatIsk(row.floor.relist, 2)} ISK`}
+                        value={
+                          <>
+                            <CopyablePrice
+                              price={roundPriceUp(row.floor.relist) ?? row.floor.relist}
+                            />{' '}
+                            ISK
+                          </>
+                        }
                       />
                     )}
                   </dl>
@@ -863,15 +925,26 @@ export function OrderDetailModal({
                             }
                           )}
                     </span>
-                    <span
-                      className={cx(
-                        'shrink-0 tabular-nums',
-                        exit.netPerUnit >= 0 ? 'text-isk-pos' : 'text-isk-neg'
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      {/*
+                        Only the undercut exit is a price to TYPE somewhere —
+                        hold, dump and reprocess are all facts already true,
+                        not suggestions. Icon-only: the sentence to the left
+                        (`exitUndercutStation`) already states this price.
+                      */}
+                      {exit.kind === 'undercutStation' && (
+                        <CopyablePrice price={exit.price} showValue={false} />
                       )}
-                    >
-                      {t('market.orders.exitPerUnit', {
-                        amount: `${exit.netPerUnit >= 0 ? '+' : ''}${formatIsk(exit.netPerUnit, 2)}`,
-                      })}
+                      <span
+                        className={cx(
+                          'tabular-nums',
+                          exit.netPerUnit >= 0 ? 'text-isk-pos' : 'text-isk-neg'
+                        )}
+                      >
+                        {t('market.orders.exitPerUnit', {
+                          amount: `${exit.netPerUnit >= 0 ? '+' : ''}${formatIsk(exit.netPerUnit, 2)}`,
+                        })}
+                      </span>
                     </span>
                   </p>
                 ))
@@ -1049,7 +1122,7 @@ function stationRank(
   return { rank: better + 1, total: atMyStation.length };
 }
 
-function LedgerRow({ label, value }: { label: string; value: string }) {
+function LedgerRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <>
       <dt className="text-text-dim uppercase tracking-widest font-semibold">{label}</dt>

@@ -42,7 +42,7 @@ describe('orderVerdict', () => {
     expect(orderVerdict(row)).toBeNull();
   });
 
-  it('says let it go when matching the rival would sell under the floor', () => {
+  it('says let it go when undercutting the rival would sell under the floor', () => {
     const row: OpenOrderRow = {
       ...BASE_ROW,
       problem: 'undercutStation',
@@ -51,10 +51,14 @@ describe('orderVerdict', () => {
       station: { bestPrice: 450, beatsMe: true, gapIsk: 50, gapPct: 10 },
       floor: { relist: 480, fill: 470 },
     };
-    expect(orderVerdict(row)).toEqual({ kind: 'letGo', amount: 30 });
+    // undercutPrice(450) = 449.90, one legal tick under the rival — 480 - 449.90 = 30.10.
+    const verdict = orderVerdict(row);
+    expect(verdict?.kind).toBe('letGo');
+    expect(verdict?.amount).toBeCloseTo(30.1, 6);
+    expect(verdict?.price).toBe(449.9);
   });
 
-  it('says match them when the rival price still clears the floor', () => {
+  it('says undercut them when the suggested price still clears the floor', () => {
     const row: OpenOrderRow = {
       ...BASE_ROW,
       problem: 'undercutStation',
@@ -63,10 +67,14 @@ describe('orderVerdict', () => {
       station: { bestPrice: 450, beatsMe: true, gapIsk: 50, gapPct: 10 },
       floor: { relist: 400, fill: 390 },
     };
-    expect(orderVerdict(row)).toEqual({ kind: 'matchThem', amount: 50 });
+    // undercutPrice(450) = 449.90 — 449.90 - 400 = 49.90.
+    const verdict = orderVerdict(row);
+    expect(verdict?.kind).toBe('matchThem');
+    expect(verdict?.amount).toBeCloseTo(49.9, 6);
+    expect(verdict?.price).toBe(449.9);
   });
 
-  it('says raise the price for a below-floor order, with the shortfall', () => {
+  it('says raise the price for a below-floor order, with the shortfall and the rounded-up target', () => {
     const row: OpenOrderRow = {
       ...BASE_ROW,
       problem: 'belowFloor',
@@ -74,12 +82,23 @@ describe('orderVerdict', () => {
       belowFloor: true,
       floor: { relist: 700, fill: 600 },
     };
-    expect(orderVerdict(row)).toEqual({ kind: 'raisePrice', amount: 200 });
+    expect(orderVerdict(row)).toEqual({ kind: 'raisePrice', amount: 200, price: 700 });
+  });
+
+  it('rounds the raise-price target up to a legal price, even when the exact floor is not one', () => {
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      problem: 'belowFloor',
+      problems: ['belowFloor'],
+      belowFloor: true,
+      floor: { relist: 724.45, fill: 600 },
+    };
+    expect(orderVerdict(row)?.price).toBe(724.5);
   });
 
   it('says leave it alone for a healthy order with a floor', () => {
     const row: OpenOrderRow = { ...BASE_ROW, floor: { relist: 400, fill: 390 } };
-    expect(orderVerdict(row)).toEqual({ kind: 'leaveItAlone', amount: null });
+    expect(orderVerdict(row)).toEqual({ kind: 'leaveItAlone', amount: null, price: null });
   });
 
   it('has no verdict for an expiring order — the badge advice is the honest answer', () => {

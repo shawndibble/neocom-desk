@@ -8,6 +8,8 @@ import type { OpenOrderRow, CharacterSkills } from './openOrdersModel';
 import type { RegionCompetition } from './orderCompetition';
 import type { PriceHistoryResult } from './priceHistory';
 import { orderFloor } from '@/engine/market/orderFloor';
+import { roundPriceUp } from '@/engine/market/priceTick';
+import { configureClipboard } from '@/lib/clipboard';
 import { historyPoint as buildHistoryPoint } from '@/engine/market/__fixtures__/priceHistory';
 import { characterModifiers, NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 
@@ -433,11 +435,15 @@ describe('OrderDetailModal', () => {
     const costPerUnit = rowValue('Cost per unit');
     const salesTax = rowValue('Sales tax');
     const brokerFeeValue = rowValue('Broker fee (relist discount applied)');
-    const relist = rowValue('Never sell below');
 
     expect(costPerUnit).toBeCloseTo(unitCost, 2);
-    expect(costPerUnit + salesTax + brokerFeeValue).toBeCloseTo(relist, 1);
-    expect(relist).toBeCloseTo(floor.relist, 2);
+    // The ledger math sums to the EXACT break-even, never the rounded-up
+    // price the "Never sell below" row now displays (issue #1421) —
+    // `belowFloor` detection stays exact for the same reason.
+    expect(costPerUnit + salesTax + brokerFeeValue).toBeCloseTo(floor.relist, 1);
+    // The displayed figure is that same break-even, rounded UP to a legal price.
+    const relistShown = rowValue('Never sell below');
+    expect(relistShown).toBe(roundPriceUp(floor.relist));
   });
 
   it('spreads the broker fee minimum across a large remaining quantity, not re-applied per unit', () => {
@@ -479,12 +485,11 @@ describe('OrderDetailModal', () => {
     const costPerUnit = rowValue('Cost per unit');
     const salesTax = rowValue('Sales tax');
     const brokerFeeValue = rowValue('Broker fee (relist discount applied)');
-    const relist = rowValue('Never sell below');
 
     // The whole point of the fix: the fee ledger must not show ~100 ISK.
     expect(brokerFeeValue).toBeLessThan(5);
-    expect(costPerUnit + salesTax + brokerFeeValue).toBeCloseTo(relist, 1);
-    expect(relist).toBeCloseTo(floor.relist, 2);
+    expect(costPerUnit + salesTax + brokerFeeValue).toBeCloseTo(floor.relist, 1);
+    expect(rowValue('Never sell below')).toBe(roundPriceUp(floor.relist));
   });
 
   it('closes via the modal header close button', async () => {
@@ -744,11 +749,60 @@ describe('OrderDetailModal', () => {
       renderModal({ row, stationChecked: true });
 
       expect(screen.getByText('Do not chase this one')).toBeInTheDocument();
-      // Holding nets price - fill; matching nets rival price - relist.
+      // Holding nets price - fill; undercutting (one legal tick under the
+      // 450 rival, i.e. 449.90 — issue #1421) nets that price - relist.
       expect(screen.getByText('Hold at 500.00')).toBeInTheDocument();
       expect(screen.getByText('+30.00 / unit')).toBeInTheDocument();
-      expect(screen.getByText('Match the station at 450.00')).toBeInTheDocument();
-      expect(screen.getByText('-30.00 / unit')).toBeInTheDocument();
+      expect(screen.getByText('Undercut the station at 449.90')).toBeInTheDocument();
+      expect(screen.getByText('-30.10 / unit')).toBeInTheDocument();
+    });
+
+    it('copies the exact legal suggested price through the injected clipboard writer, in plain digits', async () => {
+      const written: string[] = [];
+      configureClipboard(async (text) => {
+        written.push(text);
+      });
+      const row: OpenOrderRow = { ...UNDERCUT_ROW, floor: { relist: 400, fill: 390 } };
+      renderModal({ row, stationChecked: true });
+
+      const user = userEvent.setup();
+      // The verdict's own suggested price: undercutPrice(450) = 449.90 —
+      // scoped to the quick-answer section, since the exits list below
+      // coincidentally suggests the very same price for its own undercut row.
+      const quickAnswer = screen.getByText('Quick answer').closest('section')!;
+      await user.click(within(quickAnswer).getByRole('button', { name: 'Copy 449.90' }));
+      expect(written).toEqual(['449.90']);
+
+      configureClipboard(null);
+    });
+
+    it('offers a suggested bid for an outbid buy order, with its own copy button', async () => {
+      const written: string[] = [];
+      configureClipboard(async (text) => {
+        written.push(text);
+      });
+      const row: OpenOrderRow = {
+        ...BASE_ROW,
+        isBuyOrder: true,
+        problem: 'outbid',
+        problems: ['outbid'],
+        worstScope: 'station',
+        station: { bestPrice: 520, beatsMe: true, gapIsk: 20, gapPct: 4 },
+      };
+      renderModal({ row, stationChecked: true });
+
+      // outbidPrice(520) = 520.10 — one legal tick over the rival bid.
+      expect(screen.getByText('Outbid at 520.10')).toBeInTheDocument();
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: 'Copy 520.10' }));
+      expect(written).toEqual(['520.10']);
+
+      configureClipboard(null);
+    });
+
+    it('offers no outbid suggestion for a sell order', () => {
+      renderModal({ row: UNDERCUT_ROW, stationChecked: true });
+      expect(screen.queryByText(/^Outbid at/)).not.toBeInTheDocument();
     });
 
     it('names reprocessing as not built rather than estimating it', () => {

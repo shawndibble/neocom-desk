@@ -44,6 +44,9 @@ export function OrderRowSummaryText({ row }: { row: OpenOrderRow }): ReactElemen
           )
         );
       }
+      // `summary.match` is only ever non-null once `suggestedPrice` is
+      // non-null too (`matchOutcome` in orderRowSummary.ts returns null
+      // otherwise), so this is safe to format unconditionally below.
       // The match clause is the only one whose tone differs from the rest of
       // the sentence — a loss there is the reason not to follow the rival.
       return (
@@ -54,7 +57,7 @@ export function OrderRowSummaryText({ row }: { row: OpenOrderRow }): ReactElemen
               {' · '}
               <Tooltip
                 content={t('market.orders.rowSummary.matchTooltip', {
-                  rival: formatIskAuto(summary.rivalPrice),
+                  undercut: formatIskAuto(summary.suggestedPrice ?? summary.rivalPrice),
                   floor: row.floor ? formatIskAuto(row.floor.relist) : '',
                 })}
                 openOnTap
