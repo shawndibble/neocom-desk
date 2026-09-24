@@ -41,7 +41,7 @@ export interface FittingCargoItem {
   quantity: number;
 }
 
-/** An implant/booster set a Fitting carries, EVE's own slot order (issue #1535). */
+/** An implant/booster set a Fitting carries, EVE's own slot order. */
 export interface FittingImplantSet {
   implants: readonly number[];
   boosters: readonly number[];
@@ -50,9 +50,8 @@ export interface FittingImplantSet {
 /**
  * One ship hull plus everything loaded into it (CONTEXT.md **Fitting**).
  * `implantSet`, when carried, is what a "Fitting's" implant basis toggle
- * reads from (issue #1535); `undefined` means this Fitting carries no set of
- * its own and stats fall back to the active Character's clone via
- * `PilotProfile`.
+ * reads from; `undefined` means stats fall back to the active Character's
+ * clone via `PilotProfile` instead.
  */
 export interface Fitting {
   name: string;

@@ -1,19 +1,14 @@
 /**
- * Edits the implant/booster set a Fitting carries (issue #1535, scope
- * decision `20260924-150509-fittings-section-a-fitter-after-all.md`: "The set
- * is edited from a picker in the Fitting's header").
+ * Edits the implant/booster set a Fitting carries.
  *
  * Adds by exact (case-insensitive) item name via the same `loadItemNameMap`
  * the EFT loader resolves names through — there is no per-slot SDE attribute
  * baked into this build's snapshot to drive a "browse implant slot 3" style
- * picker, so this trims to a name-search add/remove list instead. Each add or
- * remove writes straight through `onChange`, which the caller wires to
- * `useFittingWorkspace`'s `setImplantSet` — live, like every other edit this
- * workspace makes.
+ * picker, so this trims to a name-search add/remove list instead.
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, SearchInput, TypeIcon } from '@/components/ui';
+import { Button, IconButton, Modal, SearchInput, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { MAX_BOOSTERS, MAX_IMPLANTS } from '@/engine/fitting/fittingShare';
 import type { FittingImplantSet } from '@/engine/fittings/types';
@@ -61,21 +56,19 @@ function SlotList({ heading, typeIds, max, names, onAdd, onRemove, error }: Slot
             const name = names.get(typeId) ?? t('fittings.implants.unknownType', { typeId });
             return (
               <li
-                // Duplicate ids are legal (the picker enforces no uniqueness
-                // beyond the slot count), so the id alone isn't a stable key.
-                key={`${typeId}-${index}`}
+                key={`${typeId}-${index}`} // ids may repeat — see onRemove's own doc
                 className="flex items-center gap-2 rounded-xs bg-panel-2 p-1.5"
               >
                 <TypeIcon typeId={typeId} size={32} width={20} height={20} />
                 <span className="flex-1 truncate text-sm">{name}</span>
-                <Button
+                <IconButton
+                  variant="plain"
                   size="sm"
-                  variant="ghost"
-                  aria-label={t('fittings.implants.remove', { name })}
+                  tone="danger"
+                  icon={<Icon.Close />}
+                  label={t('fittings.implants.remove', { name })}
                   onClick={() => onRemove(index)}
-                >
-                  <Icon.Close size={Icon.ICON_SIZE.sm} />
-                </Button>
+                />
               </li>
             );
           })}
@@ -114,22 +107,7 @@ export function ImplantSetPicker({ open, onClose, implantSet, onChange }: Implan
   const [implantError, setImplantError] = useState<string | null>(null);
   const [boosterError, setBoosterError] = useState<string | null>(null);
 
-  // Edited locally rather than read straight off the `implantSet` prop:
-  // `onChange` round-trips through an async encode + `?f=` write before the
-  // parent's prop reflects it, so two quick adds reading that prop would
-  // both see the same stale list and the second would silently overwrite the
-  // first. Re-seeded from the prop only when the modal transitions to open —
-  // never while it stays open, so the workspace's own async round trip
-  // doesn't stomp on an edit still in flight.
-  const [localSet, setLocalSet] = useState<FittingImplantSet>(implantSet ?? EMPTY_SET);
-  // React's own "adjust state during render" pattern (not an effect, not a
-  // ref: https://react.dev/learn/you-might-not-need-an-effect) for "reset
-  // when a prop changes" — here, when `open` flips false -> true.
-  const [prevOpen, setPrevOpen] = useState(open);
-  if (open !== prevOpen) {
-    setPrevOpen(open);
-    if (open) setLocalSet(implantSet ?? EMPTY_SET);
-  }
+  const set = implantSet ?? EMPTY_SET;
 
   useEffect(() => {
     if (!open) return;
@@ -138,13 +116,8 @@ export function ImplantSetPicker({ open, onClose, implantSet, onChange }: Implan
 
   useEffect(() => {
     if (!open) return;
-    void loadTypeNames([...localSet.implants, ...localSet.boosters]).then(setNames);
-  }, [open, localSet.implants, localSet.boosters]);
-
-  function commit(next: FittingImplantSet) {
-    setLocalSet(next);
-    onChange(next);
-  }
+    void loadTypeNames([...set.implants, ...set.boosters]).then(setNames);
+  }, [open, set.implants, set.boosters]);
 
   function addTo(kind: 'implants' | 'boosters', rawName: string) {
     const entry = nameMap.get(rawName.toLowerCase());
@@ -154,11 +127,11 @@ export function ImplantSetPicker({ open, onClose, implantSet, onChange }: Implan
       return;
     }
     setError(null);
-    commit({ ...localSet, [kind]: [...localSet[kind], entry.typeID] });
+    void onChange({ ...set, [kind]: [...set[kind], entry.typeID] });
   }
 
   function removeFrom(kind: 'implants' | 'boosters', index: number) {
-    commit({ ...localSet, [kind]: localSet[kind].filter((_, i) => i !== index) });
+    void onChange({ ...set, [kind]: set[kind].filter((_, i) => i !== index) });
   }
 
   return (
@@ -166,7 +139,7 @@ export function ImplantSetPicker({ open, onClose, implantSet, onChange }: Implan
       <div className="space-y-4 p-3">
         <SlotList
           heading={t('fittings.implants.implantsHeading')}
-          typeIds={localSet.implants}
+          typeIds={set.implants}
           max={MAX_IMPLANTS}
           names={names}
           onAdd={(name) => addTo('implants', name)}
@@ -175,7 +148,7 @@ export function ImplantSetPicker({ open, onClose, implantSet, onChange }: Implan
         />
         <SlotList
           heading={t('fittings.implants.boostersHeading')}
-          typeIds={localSet.boosters}
+          typeIds={set.boosters}
           max={MAX_BOOSTERS}
           names={names}
           onAdd={(name) => addTo('boosters', name)}

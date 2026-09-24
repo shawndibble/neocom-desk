@@ -1,9 +1,9 @@
 /**
- * Orchestrates the Fittings page (issue #1532): the open Fitting lives in the
- * `?f=` Share Link (CONTEXT.md **Share Link**) — every load rewrites it, a
- * reload or a pasted URL decodes it back. Stats (dogma engine, lazy) and
- * price (hub order book) are two independent loads off the same `fitting`,
- * which is why price can resolve well before stats do.
+ * Orchestrates the Fittings page: the open Fitting lives in the `?f=` Share
+ * Link (CONTEXT.md **Share Link**) — every load rewrites it, a reload or a
+ * pasted URL decodes it back. Stats (dogma engine, lazy) and price (hub order
+ * book) are two independent loads off the same `fitting`, which is why price
+ * can resolve well before stats do.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -22,7 +22,12 @@ import {
   defaultImplantBasis,
   type ImplantBasis,
 } from '@/engine/fittings/implantBasis';
-import type { Fitting, FittingImplantSet, FittingStats } from '@/engine/fittings/types';
+import type {
+  Fitting,
+  FittingImplantSet,
+  FittingStats,
+  PilotProfile,
+} from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadTypes, loadFittingSlots, loadSkills } from '@/sde/loadSde';
@@ -47,7 +52,7 @@ export interface FittingWorkspace {
   /** Set when a successfully-loaded Fitting was too large to fit a Share Link. */
   tooLargeToShare: boolean;
   loadFromEftText: (text: string) => Promise<void>;
-  /** "My clone" vs "Fitting's" (issue #1535) — the basis the open Fitting's stats read implants/boosters from. */
+  /** "My clone" vs "Fitting's" — the basis the open Fitting's stats read implants/boosters from. */
   implantBasis: ImplantBasis;
   /** `false` with no active Character: there is no clone to label "My clone", so the basis is always "fitting". */
   canUseCloneBasis: boolean;
@@ -60,6 +65,9 @@ export interface FittingWorkspace {
   price: Appraisal | null;
 }
 
+/** What the decode effect resets after this workspace's own `?f=` write, keyed by which write it was. */
+type PendingWrite = 'external' | 'load' | 'edit';
+
 export function useFittingWorkspace(): FittingWorkspace {
   const [shareCode, setShareCode] = useUrlParam('f', nullableTextParam());
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -70,9 +78,6 @@ export function useFittingWorkspace(): FittingWorkspace {
   const [tooLargeToShare, setTooLargeToShare] = useState(false);
   // User's explicit toggle pick, layered over `defaultImplantBasis`'s
   // per-Fitting default; `null` means "no override yet, use the default".
-  // Reset only when the URL's `f` changes for a reason other than this
-  // workspace's own write (a pasted link, Back/Forward, a fresh EFT load) —
-  // never on a picker edit, which must not snap the toggle back.
   const [basisOverride, setBasisOverride] = useState<ImplantBasis | null>(null);
 
   const [stats, setStats] = useState<FittingStats | null>(null);
@@ -81,20 +86,13 @@ export function useFittingWorkspace(): FittingWorkspace {
 
   const [price, setPrice] = useState<Appraisal | null>(null);
 
-  // Set by `loadFromEftText` right before its own `setShareCode` write, so
-  // the decode effect below can tell "the URL changed because we just wrote
-  // it" (keep the unresolved list that write's own paste just reported) apart
-  // from every other way `shareCode` changes — a pasted link, Back/Forward —
-  // where a *previous* paste's stale unresolved list must not linger next to
-  // the unrelated fitting that URL change just loaded.
-  const ownWriteRef = useRef(false);
-  // Set by `setImplantSet` right before its own write, same idea as
-  // `ownWriteRef` but narrower: a picker edit must not reset `basisOverride`
-  // (it's editing the *same* Fitting the toggle already applies to), but a
-  // fresh EFT paste — which also sets `ownWriteRef` — is a genuinely
-  // different Fitting and must still drop a stale override from whatever
-  // was open before it.
-  const implantEditRef = useRef(false);
+  // Set right before this workspace's own `setShareCode` write, so the decode
+  // effect below can tell its own write apart from every other way `shareCode`
+  // changes (a pasted link, Back/Forward). `'load'` (a fresh EFT paste) keeps
+  // this render's own `unresolved`/`tooLargeToShare` but is still a different
+  // Fitting, so `basisOverride` still resets; `'edit'` (a picker edit on the
+  // *same* Fitting) keeps both.
+  const pendingWriteRef = useRef<PendingWrite>('external');
 
   // Decode whenever the URL's `f` changes — a fresh load's own write below, a
   // pasted link, or Back/Forward. A stale decode from a param that changed
@@ -102,15 +100,13 @@ export function useFittingWorkspace(): FittingWorkspace {
   // result.
   useEffect(() => {
     let cancelled = false;
-    if (ownWriteRef.current) {
-      ownWriteRef.current = false;
-    } else {
+    const pending = pendingWriteRef.current;
+    pendingWriteRef.current = 'external';
+    if (pending === 'external') {
       setUnresolved([]);
       setTooLargeToShare(false);
-    }
-    if (implantEditRef.current) {
-      implantEditRef.current = false;
-    } else {
+      setBasisOverride(null);
+    } else if (pending === 'load') {
       setBasisOverride(null);
     }
     if (shareCode === null) {
@@ -140,6 +136,18 @@ export function useFittingWorkspace(): FittingWorkspace {
     };
   }, [shareCode]);
 
+  // Only actually marks a write "ours" when the code is really changing: an
+  // identical re-write no-ops `useUrlParam`, so the decode effect never
+  // re-runs to consume the flag, which would wrongly suppress the *next*
+  // external change's reset.
+  const commitShareWrite = useCallback(
+    (payload: string, kind: Exclude<PendingWrite, 'external'>) => {
+      if (payload !== shareCode) pendingWriteRef.current = kind;
+      setShareCode(payload);
+    },
+    [shareCode, setShareCode]
+  );
+
   const loadFromEftText = useCallback(
     async (text: string) => {
       const [typeByName, slotByTypeId] = await Promise.all([loadItemNameMap(), loadFittingSlots()]);
@@ -154,12 +162,7 @@ export function useFittingWorkspace(): FittingWorkspace {
       if (encoded.ok) {
         // The decode effect above picks this up and sets `fitting` — one path
         // for "a Fitting is now open", whether it arrived by paste or by URL.
-        // Only actually flags "mine" when the code is really changing: an
-        // identical re-paste writes the same URL, which `useUrlParam` no-ops
-        // and the effect below then never re-runs to consume the flag,
-        // wrongly suppressing the *next* external change's reset.
-        if (encoded.payload !== shareCode) ownWriteRef.current = true;
-        setShareCode(encoded.payload);
+        commitShareWrite(encoded.payload, 'load');
       } else {
         // Still shown — a Fitting this large just can't round-trip through a
         // reload or a pasted link until it's edited down.
@@ -167,7 +170,7 @@ export function useFittingWorkspace(): FittingWorkspace {
         setFitting(loaded);
       }
     },
-    [shareCode, setShareCode]
+    [commitShareWrite]
   );
 
   // No active Character means no clone to label "My clone" — the basis is
@@ -187,28 +190,44 @@ export function useFittingWorkspace(): FittingWorkspace {
       const encoded = await encodeFittingShare(fittingToShareInput(updated));
       setTooLargeToShare(!encoded.ok);
       if (encoded.ok) {
-        // Same "mine" bookkeeping as `loadFromEftText`, plus `implantEditRef`
-        // so this write also spares `basisOverride` — this is the same
-        // Fitting the toggle already applies to, just carrying a new set.
-        if (encoded.payload !== shareCode) {
-          ownWriteRef.current = true;
-          implantEditRef.current = true;
-        }
-        setShareCode(encoded.payload);
+        // Updates `fitting` straight away rather than waiting on the decode
+        // effect's async round trip: two quick edits both reading the old
+        // `fitting` off the URL round trip would race and one would be lost.
+        setFitting(updated);
+        commitShareWrite(encoded.payload, 'edit');
       } else {
         // Same "still shown" trick as `loadFromEftText`'s own too-large branch.
         setShareError(null);
         setFitting(updated);
       }
     },
-    [fitting, shareCode, setShareCode]
+    [fitting, commitShareWrite]
   );
 
-  // Stats: the active Character's own profile, or All V with no Character at
-  // all (the logged-out Share Link view is #1544's; this covers the same
-  // fallback for the ordinary route rendering before hydration resolves).
-  // The resolved implant basis then swaps in the Fitting's own carried set
-  // where "fitting" applies (issue #1535).
+  // The active Character's own profile, or All V with no Character at all
+  // (the logged-out Share Link view; also the fallback for the ordinary
+  // route rendering before hydration resolves). Kept separate from the stats
+  // effect below so toggling `implantBasis` alone doesn't re-fetch skills.
+  const [rawProfile, setRawProfile] = useState<PilotProfile | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new Character, not a render-time derivation
+    setRawProfile(null);
+    void (async () => {
+      const profile =
+        activeCharacterId === null
+          ? buildAllVProfile([...(await loadSkills()).map((skill) => skill.typeID)])
+          : await loadActivePilotProfile(activeCharacterId);
+      if (!cancelled) setRawProfile(profile);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeCharacterId]);
+
+  // Stats: recomputes whenever the Fitting, the raw profile, or the resolved
+  // implant basis changes — the last two independently, so flipping the
+  // toggle never re-fetches skills/implants just to re-run the same swap.
   useEffect(() => {
     let cancelled = false;
     // Cleared unconditionally, not only when `fitting` becomes null — a
@@ -219,14 +238,9 @@ export function useFittingWorkspace(): FittingWorkspace {
     setStatsError(false);
     setStatsProgress(null);
     setStats(null);
-    if (fitting === null) return;
+    if (fitting === null || rawProfile === null) return;
     void (async () => {
       try {
-        const rawProfile =
-          activeCharacterId === null
-            ? buildAllVProfile([...(await loadSkills()).map((skill) => skill.typeID)])
-            : await loadActivePilotProfile(activeCharacterId);
-        if (cancelled) return;
         const profile = applyImplantBasis(rawProfile, fitting, implantBasis);
         const result = await computeFittingStats(fitting, profile, (progress) => {
           if (!cancelled) setStatsProgress(progress);
@@ -239,7 +253,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     return () => {
       cancelled = true;
     };
-  }, [fitting, activeCharacterId, implantBasis]);
+  }, [fitting, rawProfile, implantBasis]);
 
   // Price: independent of the dogma engine, so it can — and should — resolve
   // well before stats do.

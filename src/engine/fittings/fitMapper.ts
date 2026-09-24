@@ -2,7 +2,7 @@ import type { Fit, FitItem, Slot } from '@eveshipfit/dogma-engine';
 import type { Fitting, FittingModule, PilotProfile } from './types';
 
 /** EVE numbers implant/booster slots starting at 1, not 0 (dogma-engine's own `Slot` doc). */
-const IMPLANT_SLOT_START = 1;
+const SLOT_INDEX_START = 1;
 
 function moduleToFitItem(module: FittingModule): FitItem {
   const slot: Slot = { type: module.slot, index: module.slotIndex };
@@ -11,6 +11,21 @@ function moduleToFitItem(module: FittingModule): FitItem {
     slot,
     state: module.state,
     ...(module.chargeTypeId === undefined ? {} : { charge: { type_id: module.chargeTypeId } }),
+  };
+}
+
+/** An implant or booster, numbered from `SLOT_INDEX_START` — same shape either way, just the slot type and (for a booster) side effects. */
+function slottedItem(
+  typeId: number,
+  index: number,
+  slotType: 'implant' | 'booster',
+  extra?: Pick<FitItem, 'booster_side_effects'>
+): FitItem {
+  return {
+    type_id: typeId,
+    slot: { type: slotType, index: index + SLOT_INDEX_START },
+    state: 'online',
+    ...extra,
   };
 }
 
@@ -35,20 +50,12 @@ export function fittingToDogmaFit(fitting: Fitting, profile: PilotProfile): Fit 
       quantity: item.quantity,
       state: 'offline',
     })),
-    ...profile.implantTypeIds.map((typeId, index): FitItem => ({
-      type_id: typeId,
-      slot: { type: 'implant', index: index + IMPLANT_SLOT_START },
-      state: 'online',
-    })),
-    // Side effects always off (issue #1535's own AC): there is no UI to roll
-    // or pick one, and an empty array is the engine's own "none" (see
-    // `FitItem.booster_side_effects`'s doc in `esf_dogma_engine.d.ts`).
-    ...profile.boosterTypeIds.map((typeId, index): FitItem => ({
-      type_id: typeId,
-      slot: { type: 'booster', index: index + IMPLANT_SLOT_START },
-      state: 'online',
-      booster_side_effects: [],
-    })),
+    ...profile.implantTypeIds.map((typeId, index) => slottedItem(typeId, index, 'implant')),
+    // Side effects always off — no UI to roll or pick one, and an empty array
+    // is the engine's own "none" (`FitItem.booster_side_effects`'s doc).
+    ...profile.boosterTypeIds.map((typeId, index) =>
+      slottedItem(typeId, index, 'booster', { booster_side_effects: [] })
+    ),
   ];
 
   return {

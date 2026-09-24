@@ -17,8 +17,8 @@
  *   which is what the round-trip test below actually needs to hold.
  *
  * Fighters and implant sets are both real fields on the wire shape.
- * `implantSet` is threaded straight through both directions (issue #1535),
- * `undefined` and `{implants: [], boosters: []}` staying distinct the way
+ * `implantSet` is threaded straight through both directions, `undefined` and
+ * `{implants: [], boosters: []}` staying distinct the way
  * `fittingShare.ts`'s own codec keeps them. Fighters have no home on the
  * domain `Fitting` at all — no capital ship fitting exists in the app —
  * and stay dropped in both directions; a fighter bay surviving a share round

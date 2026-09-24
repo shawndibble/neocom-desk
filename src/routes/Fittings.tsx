@@ -6,11 +6,10 @@ import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
 
 /**
- * The Fittings section's tracer slice (issue #1532): paste EFT to Load a
- * Fitting, a List view of what's fitted, and the game's own collapsible stat
- * sections. My clone vs Fitting's implants/boosters landed in #1535. Editing
- * (#1533), the Ring view (#1536) and everything else the scope decision
- * lists land in their own tickets.
+ * The Fittings section: paste EFT to Load a Fitting, a List view of what's
+ * fitted, the game's own collapsible stat sections, and the My clone vs
+ * Fitting's implant/booster toggle. Editing, the Ring view and everything
+ * else the scope decision lists land in their own tickets.
  */
 export function Fittings() {
   const { t } = useTranslation();

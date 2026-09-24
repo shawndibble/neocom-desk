@@ -1,11 +1,7 @@
 /**
- * "My clone" vs "Fitting's" (issue #1535): the active basis is always
- * labelled via `Tabs`'s own selected-state styling, and the edit-set button
- * that opens `ImplantSetPicker` sits right beside it. The scope decision puts
- * this toggle "beside the Character name" — the Fittings route otherwise
- * shows no Character identity at all, so this reads it straight from Dexie
- * (`CharacterHeader`'s own pattern) rather than inventing a route-level
- * header this ticket doesn't otherwise need.
+ * "My clone" vs "Fitting's", beside the Character's name — the Fittings
+ * route otherwise shows no Character identity, so this reads it straight
+ * from Dexie rather than inventing a route-level header.
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
