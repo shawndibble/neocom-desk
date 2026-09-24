@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { OpenOrdersPanel } from './OpenOrdersPanel';
@@ -125,6 +125,27 @@ const onShowInfo = vi.fn();
 function renderPanel(initialEntry = '/market/orders') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
+      <OpenOrdersPanel
+        blueprintCatalog={null}
+        onRequestBlueprintCatalog={onRequestBlueprintCatalog}
+        onAddToQuickbar={vi.fn()}
+        quickbarAvailable
+        onShowInfo={onShowInfo}
+      />
+    </MemoryRouter>
+  );
+}
+
+/** Renders the current URL's search string alongside the panel, for asserting `?highlight=` is spent on arrival (issue #1423). */
+function CurrentSearch() {
+  const location = useLocation();
+  return <p data-testid="location-search">{location.search}</p>;
+}
+
+function renderPanelWithLocation(initialEntry: string) {
+  return render(
+    <MemoryRouter initialEntries={[initialEntry]}>
+      <CurrentSearch />
       <OpenOrdersPanel
         blueprintCatalog={null}
         onRequestBlueprintCatalog={onRequestBlueprintCatalog}
@@ -414,6 +435,88 @@ describe('OpenOrdersPanel', () => {
     expect(
       within(screen.getByTestId('order-group-healthy')).getByText('Pyerite')
     ).toBeInTheDocument();
+  });
+
+  // issue #1423: a marketOrderUndercut (or marketOrderFilled) notification
+  // deep-links here with `?highlight=<orderId>`, per decision
+  // `20260908-123516` — the row must land expanded and pulsed even when its
+  // group is the healthy one, folded by default.
+  describe('?highlight= deep link (issue #1423)', () => {
+    it('expands the healthy group and pulses the highlighted row, without touching Show healthy orders', async () => {
+      const scrollIntoView = vi
+        .spyOn(Element.prototype, 'scrollIntoView')
+        .mockImplementation(() => {});
+      mockedLoadAll.mockResolvedValue(
+        snapshot([
+          {
+            characterId: 1,
+            characterName: 'Alpha',
+            orders: [NO_COST_BASIS_ORDER],
+            fetchedAt: Date.now(),
+            fromCache: false,
+            needsReauth: false,
+          },
+        ])
+      );
+
+      renderPanel('/market/orders?highlight=103');
+
+      const group = await screen.findByTestId('order-group-healthy');
+      // Expanded on arrival, with no click on "Show healthy orders" — the
+      // toggle still reads "Show healthy orders" (untouched: the URL's
+      // `hideHealthy` default was never flipped), but the table is visible
+      // anyway.
+      expect(screen.getByRole('button', { name: 'Show healthy orders' })).toBeInTheDocument();
+      expect(within(group).getByRole('table')).toBeInTheDocument();
+      const pulsed = within(group).getByText('Pyerite').closest('[data-row-key]');
+      expect(pulsed).toHaveAttribute('data-row-key', '103');
+      expect(pulsed?.className).toContain('row-pulse');
+      expect(scrollIntoView.mock.instances).toContain(pulsed);
+      scrollIntoView.mockRestore();
+    });
+
+    it('is harmless when the highlighted id matches no order — a stale link, or an order since closed', async () => {
+      mockedLoadAll.mockResolvedValue(
+        snapshot([
+          {
+            characterId: 1,
+            characterName: 'Alpha',
+            orders: [NO_COST_BASIS_ORDER],
+            fetchedAt: Date.now(),
+            fromCache: false,
+            needsReauth: false,
+          },
+        ])
+      );
+
+      renderPanel('/market/orders?highlight=999999');
+
+      // The healthy group stays folded, same as with no highlight at all —
+      // nothing forces it open for an id that matches nothing on screen.
+      const group = await screen.findByTestId('order-group-healthy');
+      expect(within(group).queryByRole('table')).not.toBeInTheDocument();
+    });
+
+    it('spends the highlight param on arrival, matched or not', async () => {
+      vi.spyOn(Element.prototype, 'scrollIntoView').mockImplementation(() => {});
+      mockedLoadAll.mockResolvedValue(
+        snapshot([
+          {
+            characterId: 1,
+            characterName: 'Alpha',
+            orders: [NO_COST_BASIS_ORDER],
+            fetchedAt: Date.now(),
+            fromCache: false,
+            needsReauth: false,
+          },
+        ])
+      );
+
+      renderPanelWithLocation('/market/orders?highlight=103');
+
+      await screen.findByText('Pyerite');
+      await waitFor(() => expect(screen.getByTestId('location-search').textContent).toBe(''));
+    });
   });
 
   it('shows the noCostBasis badge and drops the floor column when nothing has one', async () => {
