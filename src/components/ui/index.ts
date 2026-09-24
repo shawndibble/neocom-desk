@@ -61,6 +61,9 @@ export {
   DropdownMenuItem,
   DropdownMenuCheckboxItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from './DropdownMenu';
 export { ColumnPickerMenu } from './ColumnPickerMenu';
 export { MultiSelect } from './MultiSelect';

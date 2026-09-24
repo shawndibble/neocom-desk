@@ -22,6 +22,13 @@
  *
  * Labels come from the same `market.contextMenu.*` / `industry.contextMenu.*`
  * keys `ItemContextMenu` uses — one action, one wording, wherever it appears.
+ *
+ * `BpcOfferMoreActions` (issue #1498) is the visible, keyboard-reachable
+ * equivalent of this menu, but only for the BPC Sourcing table's offer rows —
+ * the other three surfaces above keep the right-click-only menu unchanged,
+ * per the ticket's scope. It shares this file's item list through
+ * `useBuildPlanMenuNodes` so the two can't drift, the same shape
+ * `ItemContextMenu`'s `useItemMenuNodes` uses for its own button/menu pair.
  */
 import { useEffect, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -32,7 +39,13 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  IconButton,
 } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { writeToClipboard } from '@/lib/clipboard';
 import { marketLinkParams } from '@/engine/market/urlState';
 import { useCompareSet } from '@/features/market/compareSet';
@@ -42,6 +55,9 @@ import {
   type PlannableIndex,
 } from './plannableProduct';
 import { applyPlanSeed, type BuildPlanSeed } from './planSeed';
+
+/** `ContextMenuItem` and `DropdownMenuItem` share this shape — both spread onto a Radix `Item`. */
+type MenuItemComponent = typeof ContextMenuItem;
 
 export interface BuildPlanContextMenuProps {
   /** The row's own type — a blueprint on the BPC table, anything at all in a contract. */
@@ -64,18 +80,21 @@ export interface BuildPlanContextMenuProps {
   seed?: BuildPlanSeed | null;
 }
 
-export function BuildPlanContextMenu({
-  typeId,
-  trigger,
-  itemName,
-  seed,
-}: BuildPlanContextMenuProps) {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const addToCompare = useCompareSet((state) => state.add);
+/**
+ * Resolves the plannable-product index on first open. Shared by the
+ * right-click menu and the visible button (issue #1498) — each trigger owns
+ * its own instance (same reasoning as `ItemContextMenu`'s per-trigger
+ * `alertOpen`), so a failed fetch on one retries on that trigger's own next
+ * open rather than depending on the other having been opened first.
+ * `loadBlueprints` underneath is already memoized, so two instances resolving
+ * independently still only fetches `blueprints.json` once.
+ */
+function usePlannableIndexOnOpen(): {
+  index: PlannableIndex | null;
+  onOpenChange: (open: boolean) => void;
+} {
   const [index, setIndex] = useState<PlannableIndex | null>(null);
-  /** Bumped on every open until the index resolves, so a failed fetch retries on the next right-click instead of reading "checking…" forever. */
+  /** Bumped on every open until the index resolves, so a failed fetch retries on the next open instead of reading "checking…" forever. */
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -94,51 +113,128 @@ export function BuildPlanContextMenu({
     };
   }, [attempt, index]);
 
+  return {
+    index,
+    onOpenChange: (open) => {
+      if (open && !index) setAttempt((n) => n + 1);
+    },
+  };
+}
+
+/**
+ * The item list shared by `BuildPlanContextMenu` (right-click) and
+ * `BpcOfferMoreActions` (the visible button, issue #1498) — one function
+ * so the two can't drift. `MenuItem` picks which menu family's item component
+ * renders each entry, the same parameter `ItemContextMenu`'s
+ * `useItemMenuNodes` takes.
+ */
+function useBuildPlanMenuNodes(
+  { typeId, itemName, seed }: Pick<BuildPlanContextMenuProps, 'typeId' | 'itemName' | 'seed'>,
+  index: PlannableIndex | null,
+  MenuItem: MenuItemComponent
+): ReactElement[] {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const addToCompare = useCompareSet((state) => state.add);
+
   /** `undefined` while the index is still loading, mirroring `ItemContextMenu`'s `blueprintTypeID`. */
   const productTypeId = index ? plannableProductTypeID(index, typeId) : undefined;
 
-  return (
-    <ContextMenu
-      onOpenChange={(open) => {
-        if (open && !index) setAttempt((n) => n + 1);
+  const nodes: ReactElement[] = [
+    <MenuItem
+      key="viewInMarket"
+      onSelect={() => {
+        const params = marketLinkParams(typeId, location.search);
+        navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
       }}
     >
+      {t('market.contextMenu.viewInMarket')}
+    </MenuItem>,
+  ];
+  if (itemName !== undefined) {
+    nodes.push(
+      <MenuItem key="addToCompare" onSelect={() => addToCompare({ typeId, itemName })}>
+        {t('market.contextMenu.addToCompare')}
+      </MenuItem>,
+      <MenuItem key="copyName" onSelect={() => void writeToClipboard(itemName)}>
+        {t('market.contextMenu.copyName')}
+      </MenuItem>
+    );
+  }
+  nodes.push(
+    <MenuItem
+      key="buildPlan"
+      disabled={productTypeId == null}
+      onSelect={() => {
+        if (productTypeId == null) return;
+        const params = new URLSearchParams({ product: String(productTypeId) });
+        applyPlanSeed(params, seed ?? null);
+        navigate(`${industryTabHref('plans')}?${params.toString()}`);
+      }}
+    >
+      {productTypeId === undefined
+        ? t('industry.contextMenu.buildPlanChecking')
+        : productTypeId === null
+          ? t('industry.contextMenu.noBlueprintOptions')
+          : t('industry.contextMenu.buildPlan')}
+    </MenuItem>
+  );
+  return nodes;
+}
+
+export function BuildPlanContextMenu({
+  typeId,
+  trigger,
+  itemName,
+  seed,
+}: BuildPlanContextMenuProps) {
+  const { index, onOpenChange } = usePlannableIndexOnOpen();
+  const items = useBuildPlanMenuNodes({ typeId, itemName, seed }, index, ContextMenuItem);
+
+  return (
+    <ContextMenu onOpenChange={onOpenChange}>
       <ContextMenuTrigger asChild>{trigger}</ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem
-          onSelect={() => {
-            const params = marketLinkParams(typeId, location.search);
-            navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
-          }}
-        >
-          {t('market.contextMenu.viewInMarket')}
-        </ContextMenuItem>
-        {itemName !== undefined && (
-          <ContextMenuItem onSelect={() => addToCompare({ typeId, itemName })}>
-            {t('market.contextMenu.addToCompare')}
-          </ContextMenuItem>
-        )}
-        {itemName !== undefined && (
-          <ContextMenuItem onSelect={() => void writeToClipboard(itemName)}>
-            {t('market.contextMenu.copyName')}
-          </ContextMenuItem>
-        )}
-        <ContextMenuItem
-          disabled={productTypeId == null}
-          onSelect={() => {
-            if (productTypeId == null) return;
-            const params = new URLSearchParams({ product: String(productTypeId) });
-            applyPlanSeed(params, seed ?? null);
-            navigate(`${industryTabHref('plans')}?${params.toString()}`);
-          }}
-        >
-          {productTypeId === undefined
-            ? t('industry.contextMenu.buildPlanChecking')
-            : productTypeId === null
-              ? t('industry.contextMenu.noBlueprintOptions')
-              : t('industry.contextMenu.buildPlan')}
-        </ContextMenuItem>
-      </ContextMenuContent>
+      <ContextMenuContent>{items}</ContextMenuContent>
     </ContextMenu>
+  );
+}
+
+/**
+ * Visible "More actions" trigger for the same item list (WCAG 2.1.1, issue
+ * #1498) — rendered only by the BPC Sourcing table's offer rows, which is the
+ * one surface among this menu's four call sites the ticket asks for a visible
+ * button on; the other three keep `BuildPlanContextMenu`'s right-click-only
+ * behavior.
+ *
+ * `itemName` stays optional, matching `BuildPlanContextMenuProps` — an
+ * unresolved name still omits Copy/Compare but must not block the button
+ * itself from rendering, since the row's own right-click menu is available in
+ * that state too and a keyboard user needs the same access. The accessible
+ * name falls back to `#<typeId>`, the same placeholder `BpcSourcingPanel`'s
+ * own Item column already prints for an unresolved name, rather than reading
+ * "More actions for undefined".
+ */
+export function BpcOfferMoreActions({
+  typeId,
+  itemName,
+  seed,
+}: Omit<BuildPlanContextMenuProps, 'trigger'>) {
+  const { t } = useTranslation();
+  const { index, onOpenChange } = usePlannableIndexOnOpen();
+  const items = useBuildPlanMenuNodes({ typeId, itemName, seed }, index, DropdownMenuItem);
+
+  return (
+    <DropdownMenu onOpenChange={onOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <IconButton
+          icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
+          label={t('industry.moreActionsLabel', { name: itemName ?? `#${typeId}` })}
+          variant="plain"
+          size="sm"
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">{items}</DropdownMenuContent>
+    </DropdownMenu>
   );
 }

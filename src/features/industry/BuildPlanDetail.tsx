@@ -62,7 +62,11 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
-import { ItemContextMenu, type ItemMenuFor } from '@/features/market/ItemContextMenu';
+import {
+  ItemContextMenu,
+  ItemMoreActions,
+  type ItemMenuFor,
+} from '@/features/market/ItemContextMenu';
 import {
   nameForType,
   toIndustryBlueprint,
@@ -996,6 +1000,43 @@ export function BuildPlanDetail({
   }
 
   /**
+   * The visible "More actions" button beside the same menu (WCAG 2.1.1,
+   * issue #1498) — every surface `itemContextMenu`/`itemMenuFor` wraps also
+   * renders one of these, built from the identical props so the right-click
+   * menu and the button can never list different actions.
+   */
+  function itemActionsFor(
+    typeId: number,
+    buildHere?: { onToggle: () => void; building: boolean }
+  ): ReactElement {
+    return (
+      <ItemMoreActions
+        typeId={typeId}
+        itemName={nameForType(catalog, typeId)}
+        blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}
+        onAddToQuickbar={onAddToQuickbar}
+        quickbarAvailable={quickbarAvailable}
+        onShowInfo={onShowInfo}
+        onToggleBuildHere={buildHere?.onToggle}
+        buildingHere={buildHere?.building}
+      />
+    );
+  }
+
+  /** The materials table's own row — same `buildHere` wiring as `materialContextMenu`. */
+  function materialActionsFor(material: MaterialTableRow): ReactElement {
+    return itemActionsFor(
+      material.typeID,
+      canBuildHere(material.typeID)
+        ? {
+            onToggle: () => toggleBuildHere(material.typeID),
+            building: material.subBuilds.length > 0,
+          }
+        : undefined
+    );
+  }
+
+  /**
    * Puts the plan's outstanding materials on the clipboard as multibuy text,
    * so the whole run can be ordered in one paste in-game.
    *
@@ -1094,6 +1135,7 @@ export function BuildPlanDetail({
           productName={entry.productName}
           productTypeID={entry.productTypeID}
           itemMenuFor={itemMenuFor}
+          itemActionsFor={itemActionsFor}
           runs={plan.runs}
           ownedSale={ownedSale}
           breakdown={breakdownContext}
@@ -1630,6 +1672,7 @@ export function BuildPlanDetail({
                 onSourcingChange={changeOneSourcing}
                 detection={detection}
                 rowContextMenu={materialContextMenu}
+                rowActions={materialActionsFor}
                 makeOrBuy={materialAdvice}
                 canBuildHere={canBuildHere}
                 onToggleBuildHere={toggleBuildHere}
@@ -1644,6 +1687,7 @@ export function BuildPlanDetail({
                 nameFor={(typeID) => nameForType(catalog, typeID)}
                 onOpenRecipe={setRecipeTypeId}
                 itemMenuFor={itemMenuFor}
+                itemActionsFor={itemActionsFor}
               />
               {acquisitionPickerTypeId !== null && (
                 <BlueprintAcquisitionModal
@@ -1652,6 +1696,7 @@ export function BuildPlanDetail({
                   blueprintTypeID={acquisitionPickerTypeId}
                   blueprintName={nameForType(catalog, acquisitionPickerTypeId)}
                   itemMenuFor={itemMenuFor}
+                  itemActionsFor={itemActionsFor}
                   ownedCopies={acquisitionPickerOwnedCopies}
                   sourcing={plan.materialSourcing?.[acquisitionPickerTypeId]}
                   onSourcingChange={changeOneSourcing}
@@ -1781,6 +1826,7 @@ export function BuildPlanDetail({
               nameFor={(typeID) => nameForType(catalog, typeID)}
               totalVolume={materialVolume}
               itemMenuFor={itemMenuFor}
+              itemActionsFor={itemActionsFor}
               onOpenBreakdown={() => setBreakdownOpen(true)}
             />
           </CollapsiblePanel>

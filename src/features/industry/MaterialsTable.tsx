@@ -39,6 +39,13 @@ interface MaterialsTableProps {
   detection?: OwnedStockDetection;
   /** Wraps each row in the shared item context menu; omitted where the caller has no menu to offer. */
   rowContextMenu?: (material: MaterialTableRow, tr: ReactElement) => ReactElement;
+  /**
+   * Visible "More actions" button for the row (WCAG 2.1.1, issue #1498) —
+   * the same item menu `rowContextMenu` opens on right-click/long-press,
+   * reachable by keyboard. Rendered in a trailing column; omitted where the
+   * caller has no menu to offer.
+   */
+  rowActions?: (material: MaterialTableRow) => ReactElement;
   /** Make-or-buy verdicts by material typeID. A material with no entry has no advice to show; omitted entirely where the caller can't price recipes. */
   makeOrBuy?: ReadonlyMap<number, MakeOrBuy>;
   /**
@@ -384,6 +391,7 @@ export function MaterialsTable({
   onSourcingChange,
   detection,
   rowContextMenu,
+  rowActions,
   makeOrBuy,
   canBuildHere,
   onToggleBuildHere,
@@ -787,6 +795,16 @@ export function MaterialsTable({
           );
         },
       },
+      ...(rowActions
+        ? [
+            {
+              id: 'actions',
+              header: '',
+              align: 'right',
+              render: (material: MaterialTableRow) => rowActions(material),
+            } satisfies DataTableColumn<MaterialTableRow>,
+          ]
+        : []),
     ],
     [
       t,
@@ -796,6 +814,7 @@ export function MaterialsTable({
       pricesReady,
       onSourcingChange,
       detection,
+      rowActions,
       makeOrBuy,
       canBuildHere,
       onToggleBuildHere,

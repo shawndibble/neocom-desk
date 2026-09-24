@@ -100,7 +100,10 @@ import {
   JumpRangeSelect,
 } from '@/features/route/JumpRangeControls';
 import { renderJumpsCell } from '@/features/route/jumpsCell';
-import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
+import {
+  BuildPlanContextMenu,
+  BpcOfferMoreActions,
+} from '@/features/industry/BuildPlanContextMenu';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { loadBlueprints } from '@/sde/loadSde';
 import { isSyncConfigured } from '@/app/syncStatus';
@@ -1225,6 +1228,22 @@ export function BpcSourcingPanel() {
     for (const id of BPC_SEARCH_COLUMN_IDS) {
       if (visibleColumns.includes(id)) cols.push(bpcColumnsById[id]);
     }
+    cols.push({
+      // Visible keyboard-reachable equivalent of the row's own
+      // `rowContextMenu` below (WCAG 2.1.1, issue #1498) — same item list,
+      // same seed, through `BuildPlanContextMenu`'s shared
+      // `useBuildPlanMenuNodes`, so the two can't drift.
+      id: 'moreActions',
+      header: '',
+      align: 'right',
+      render: (row) => (
+        <BpcOfferMoreActions
+          typeId={row.typeId}
+          itemName={blueprintNames.get(row.typeId)}
+          seed={row.runs === -1 ? null : { me: row.me, te: row.te, runs: row.runs }}
+        />
+      ),
+    });
     return cols;
   }, [
     t,

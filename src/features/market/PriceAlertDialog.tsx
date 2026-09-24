@@ -20,26 +20,37 @@ function useQuickbarItem(typeId: number) {
   return { quickbar, item: quickbar.items.find((i) => i.typeId === typeId) };
 }
 
+/** `ContextMenuItem` and `DropdownMenuItem` share this shape — both spread onto a Radix `Item`. */
+type MenuItemComponent = typeof ContextMenuItem;
+
+/**
+ * `as` lets `ItemContextMenu`'s visible "More actions" counterpart
+ * (`ItemMoreActions`, issue #1498) render this same entry into a
+ * `DropdownMenuItem` instead of a `ContextMenuItem` — the right-click menu
+ * and the button must never drift.
+ */
 export function PriceAlertMenuItem({
   typeId,
   available,
   onSelect,
+  as: MenuItem = ContextMenuItem,
 }: {
   typeId: number;
   available: boolean;
   onSelect: () => void;
+  as?: MenuItemComponent;
 }) {
   const { t } = useTranslation();
   const { item } = useQuickbarItem(typeId);
   const hasTarget = item?.targetPrice !== undefined && item.targetDirection !== undefined;
   return (
-    <ContextMenuItem
+    <MenuItem
       disabled={!available}
       title={available ? undefined : t('market.contextMenu.quickbarNoCharacter')}
       onSelect={onSelect}
     >
       {t(hasTarget ? 'market.contextMenu.editPriceAlert' : 'market.contextMenu.setPriceAlert')}
-    </ContextMenuItem>
+    </MenuItem>
   );
 }
 

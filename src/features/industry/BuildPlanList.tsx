@@ -24,6 +24,10 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   EmptyState,
   IconButton,
   IskAmount,
@@ -36,6 +40,7 @@ import type { BuildPlanRecord } from '@/db';
 import { iskToneClass } from '@/features/character/format';
 import { BlueprintPicker } from './BlueprintPicker';
 import { BuildPlanRowContextMenu } from './BuildPlanRowContextMenu';
+import { BuildPlanRowMoreActions } from './BuildPlanRowMoreActions';
 import type { BuildGroup } from './buildGroups';
 import { groupDropId, planDropId, planIdFromDropId, resolveGroupDrop } from './groupDrop';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
@@ -377,25 +382,36 @@ function PlanRow({
           onDone={() => setRenaming(false)}
         />
       ) : (
-        // Only Delete stays a visible button; move-to-group/rename/duplicate
-        // move into the row's context menu, so delete doesn't get lost among
-        // four same-weight icons.
-        <BuildPlanRowContextMenu
-          plan={plan}
-          groups={groups}
-          onRename={() => setRenaming(true)}
-          onDuplicate={() => onDuplicate(plan.id)}
-          onMovePlan={(groupId) => onMovePlan(plan.id, groupId)}
-        >
-          <button
-            type="button"
-            onClick={() => onSelect(plan.id)}
-            onDoubleClick={() => setRenaming(true)}
-            className="flex-1 truncate text-left"
+        // Delete stays its own visible button; move-to-group/rename/duplicate
+        // live in the row's context menu, plus this visible "More actions"
+        // button beside the name for keyboard/screen-reader reach (WCAG
+        // 2.1.1, issue #1498) — the same three items, built from the same
+        // callbacks, so the two menus can't drift apart.
+        <>
+          <BuildPlanRowContextMenu
+            plan={plan}
+            groups={groups}
+            onRename={() => setRenaming(true)}
+            onDuplicate={() => onDuplicate(plan.id)}
+            onMovePlan={(groupId) => onMovePlan(plan.id, groupId)}
           >
-            {plan.name}
-          </button>
-        </BuildPlanRowContextMenu>
+            <button
+              type="button"
+              onClick={() => onSelect(plan.id)}
+              onDoubleClick={() => setRenaming(true)}
+              className="flex-1 truncate text-left"
+            >
+              {plan.name}
+            </button>
+          </BuildPlanRowContextMenu>
+          <BuildPlanRowMoreActions
+            plan={plan}
+            groups={groups}
+            onRename={() => setRenaming(true)}
+            onDuplicate={() => onDuplicate(plan.id)}
+            onMovePlan={(groupId) => onMovePlan(plan.id, groupId)}
+          />
+        </>
       )}
       <span className="w-24 shrink-0 text-right">
         <ProfitCell profit={stats?.profit ?? null} />
@@ -495,26 +511,45 @@ function GroupHeader({
           onDone={() => setRenaming(false)}
         />
       ) : (
-        // Rename lives in the context menu now, same as a plan row's own
-        // name button — a second always-visible icon here was shifting the
-        // Est. total/Verdict/Runs columns over for every group header.
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            <button
-              type="button"
-              onClick={onSelect}
-              onDoubleClick={() => setRenaming(true)}
-              className="flex-1 truncate text-left font-semibold"
-            >
-              {group.name}
-            </button>
-          </ContextMenuTrigger>
-          <ContextMenuContent>
-            <ContextMenuItem onSelect={() => setRenaming(true)}>
-              {t('industry.rename')}
-            </ContextMenuItem>
-          </ContextMenuContent>
-        </ContextMenu>
+        // Rename lives in the context menu, same as a plan row's own name
+        // button — a second always-visible icon here was shifting the Est.
+        // total/Verdict/Runs columns over for every group header. The
+        // one-item "More actions" button beside it is the keyboard/
+        // screen-reader path to that same Rename (WCAG 2.1.1, issue #1498).
+        <>
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
+              <button
+                type="button"
+                onClick={onSelect}
+                onDoubleClick={() => setRenaming(true)}
+                className="flex-1 truncate text-left font-semibold"
+              >
+                {group.name}
+              </button>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem onSelect={() => setRenaming(true)}>
+                {t('industry.rename')}
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton
+                icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
+                label={t('industry.moreActionsLabel', { name: group.name })}
+                variant="plain"
+                size="sm"
+              />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => setRenaming(true)}>
+                {t('industry.rename')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
       )}
       <span className="w-24 shrink-0 text-right">
         <ProfitCell profit={stats?.profit ?? null} />
