@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import '@/i18n';
 import MiningYieldCharts from './MiningYieldCharts';
 
@@ -17,6 +17,33 @@ describe('MiningYieldCharts', () => {
     render(<MiningYieldCharts dailyRate={[]} typeComparison={typeComparison} showRefining />);
     expect(screen.getByText('Raw vs. refined value by type')).toBeInTheDocument();
     expect(screen.queryByText('Refining hidden. Raw value only.')).not.toBeInTheDocument();
+  });
+
+  it('gives screen readers each chart as a table of every day and every type', () => {
+    render(
+      <MiningYieldCharts
+        dailyRate={[{ date: '2026-09-01', iskPerHour: 1234567, source: 'saved' }]}
+        typeComparison={typeComparison}
+        showRefining
+      />
+    );
+    const rate = screen.getByRole('table', { name: 'ISK/hr trend' });
+    expect(within(rate).getByRole('columnheader', { name: 'ISK/hr' })).toBeInTheDocument();
+    expect(within(rate).getByText('1,234,567 ISK')).toBeInTheDocument();
+
+    const compare = screen.getByRole('table', { name: 'Raw vs. refined value by type' });
+    expect(within(compare).getByText('Veldspar')).toBeInTheDocument();
+    expect(within(compare).getByText('1,000 ISK')).toBeInTheDocument();
+    expect(within(compare).getByText('1,200 ISK')).toBeInTheDocument();
+  });
+
+  it('drops the refined column from the type table when refining is hidden', () => {
+    render(
+      <MiningYieldCharts dailyRate={[]} typeComparison={typeComparison} showRefining={false} />
+    );
+    const compare = screen.getByRole('table', { name: 'Value by ore type' });
+    expect(within(compare).getByText('1,000 ISK')).toBeInTheDocument();
+    expect(within(compare).queryByText('1,200 ISK')).not.toBeInTheDocument();
   });
 
   it('retitles the chart to raw-only and shows the hidden-refining note when off', () => {

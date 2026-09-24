@@ -395,6 +395,7 @@ function MarketGroupTree({
         <button
           type="button"
           disabled={!expandable}
+          aria-expanded={expandable ? expanded : undefined}
           onClick={() => onToggle(group.id)}
           style={{ paddingLeft: `${depth * 0.75}rem` }}
           className={`flex w-full items-center gap-1.5 py-1 text-left text-xs text-text hover:text-accent disabled:hover:text-text ${
