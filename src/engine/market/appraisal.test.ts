@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   appraisalNet,
+  appraisalUndercut,
   buildAppraisal,
   buildHubComparison,
   computeAppraisalRefine,
@@ -545,5 +546,51 @@ describe('appraisalNet (issue #1426)', () => {
     const { salesTaxPct, brokerFeePct } = appraisalNet([item()], fees);
     expect(salesTaxPct).toBeCloseTo(3.375, 6);
     expect(brokerFeePct).toBeCloseTo(3, 6);
+  });
+});
+
+describe('appraisalUndercut', () => {
+  function item(overrides: Partial<AppraisalItem> = {}): AppraisalItem {
+    return { typeId: 1, name: 'Item', quantity: 10, buy: 1_000, sell: 1_234_000, ...overrides };
+  }
+
+  it('prices one legal tick under the cheapest seller at the hub', () => {
+    expect(appraisalUndercut(item())).toEqual({ price: 1_233_000, atOrBelowBuy: false });
+  });
+
+  it('drops to the smaller tick at an exact power of ten', () => {
+    expect(appraisalUndercut(item({ sell: 1_000 }))?.price).toBe(999.9);
+  });
+
+  it('is null when nobody is selling, never a zero price', () => {
+    expect(appraisalUndercut(item({ sell: null }))).toBeNull();
+  });
+
+  it('is null when the best sell already sits at the 0.01 ISK floor', () => {
+    expect(appraisalUndercut(item({ sell: 0.01, buy: null }))).toBeNull();
+  });
+
+  it('flags an undercut that lands at or under the best buy — selling instantly pays the same or more', () => {
+    expect(appraisalUndercut(item({ sell: 1_001, buy: 1_000 }))).toEqual({
+      price: 1_000,
+      atOrBelowBuy: true,
+    });
+    expect(appraisalUndercut(item({ sell: 1_001, buy: 1_000.5 }))?.atOrBelowBuy).toBe(true);
+  });
+
+  it('never flags a row nobody is buying', () => {
+    expect(appraisalUndercut(item({ buy: null }))?.atOrBelowBuy).toBe(false);
+  });
+
+  it('ignores Price Percent — it reads the unscaled item, so the column agrees with List Net', () => {
+    const priced = item({ quantity: 100, sell: 1_000, buy: null });
+    const undercut = appraisalUndercut(priced);
+    const { listNet } = appraisalNet([priced], {
+      accountingLevel: 0,
+      brokerRelationsLevel: 0,
+      standing: ZERO_STANDINGS,
+    });
+    const listValue = (undercut?.price ?? 0) * priced.quantity;
+    expect(listNet).toBeCloseTo(listValue - listValue * 0.075 - listValue * 0.03, 4);
   });
 });
