@@ -528,7 +528,7 @@ here — they go one per file in `docs/context/decisions/`.
   kind. A structure service that is off is a standing fault with no instant, so
   it has no place in a Kind Card's ordering or on the Deadline Strip, and it
   gets a surface with no clock instead.
-- **Optimize Modes**: Skill Plan optimizer actions — "optimize now" (optimizer chooses remap placement, keeps order), "optimize at remap points" (user drags **Remap Markers** into the plan; optimizer computes the best attribute spread for each marker-delimited segment), "suggest full reorder" (attribute-grouped reorder honoring prerequisites; user accepts or rejects). Reorder never applies silently.
+- **Optimize Modes**: Skill Plan optimizer actions, reached through one "Optimize" dropdown — "optimize for me" (the default: attribute-grouped, priority-respecting reorder followed by remap placement on that new order, previewed and applied together), "reorder only" (attribute-grouped reorder honoring prerequisites and **Plan Priority**, keeps the current remaps), "place remaps only" (optimizer chooses remap placement, keeps the current order), "use my remap markers" (user drags **Remap Markers** into the plan; optimizer computes the best attribute spread for each marker-delimited segment). Every mode previews in a Modal; nothing applies silently.
 - **Order Count**: How many orders ticked for an item in a Region on one day
   (ESI's `order_count`). A read on how many parties were trading, not on how
   much moved — **Traded Volume** answers that, and the two diverge when a few

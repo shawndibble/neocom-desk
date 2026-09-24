@@ -23,4 +23,7 @@ export type {
 
 export { isValidOrder, suggestReorder } from '@/engine/optimizer/reorderSuggestion';
 
+export { optimizeForMe } from '@/engine/optimizer/optimizeForMe';
+export type { OptimizeForMeResult } from '@/engine/optimizer/optimizeForMe';
+
 export { effectivePriority, higherPriority, priorityRank } from '@/engine/planPriority';
