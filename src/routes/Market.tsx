@@ -84,7 +84,7 @@ import { AppraisalPanel } from '@/features/market/AppraisalPanel';
 import { useAppraisal } from '@/features/market/useAppraisal';
 import { useMarketPricePercent } from '@/features/market/pricePercent';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
-import { useBlueprintCatalog } from '@/features/market/useBlueprintCatalog';
+import { blueprintTypeIdFor, useBlueprintCatalog } from '@/features/market/useBlueprintCatalog';
 import { useMarketCatalogue } from '@/features/market/useMarketCatalogue';
 import { useMarketBrowser } from '@/features/market/useMarketBrowser';
 import {
@@ -405,10 +405,7 @@ function MarketGroupTree({
           <ul>
             {children.map((child) => renderGroup(child, depth + 1))}
             {items.map((item) => {
-              const blueprintTypeID =
-                blueprintCatalog === null
-                  ? undefined
-                  : (blueprintCatalog.byProductTypeID.get(item.typeId)?.blueprintTypeID ?? null);
+              const blueprintTypeID = blueprintTypeIdFor(blueprintCatalog, item.typeId);
               return (
                 <li key={item.typeId}>
                   <ItemContextMenu
@@ -957,6 +954,11 @@ export function Market() {
               onReorder={handleReorderQuickbar}
               onSetTarget={handleSetQuickbarTarget}
               onViewInAppraisal={handleViewQuickbarInAppraisal}
+              onAddToQuickbar={handleAddToQuickbar}
+              quickbarAvailable={activeCharacterId !== null}
+              onShowInfo={handleShowInfo}
+              blueprintTypeIdFor={(typeId) => blueprintTypeIdFor(blueprintCatalog, typeId)}
+              onRequestBlueprintCatalog={ensureBlueprintCatalog}
             />
           </Panel>
 
