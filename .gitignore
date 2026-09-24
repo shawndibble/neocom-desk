@@ -10,6 +10,11 @@ test-results
 .DS_Store
 .auth-profile
 
+# Copied from @eveshipfit/dogma-engine and @eveshipfit/sde at dev/build time
+# (vite.config.ts's copyDogmaEngineAssets plugin) so they can be fetched
+# lazily at runtime instead of bundled — see src/features/fittings/dogmaFittingEngine.ts.
+public/vendor/dogma/
+
 # Screenshots the Advisor spec captures for review. Artifacts, not fixtures.
 e2e-output/
 

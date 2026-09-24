@@ -3854,6 +3854,9 @@
     },
     "dataTitle": "Data",
     "dataHint": "Clear locally cached EVE data if a view looks stale or you're troubleshooting — the app refetches from ESI as needed.",
+    "dataAttributionTitle": "Data credit",
+    "dataAttributionText": "Ship, module and character data — including the ship-fitting stats in Fittings — is EVE Online data owned by CCP hf. and used here under its Developer License Agreement.",
+    "dataAttributionLink": "Read the license",
     "clearCache": "Clear cached ESI data",
     "clearCacheConfirm": "Cache cleared.",
     "backup": {

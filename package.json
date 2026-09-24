@@ -32,6 +32,8 @@
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@eveshipfit/dogma-engine": "13.0.1",
+    "@eveshipfit/sde": "7.3542233.0",
     "@phosphor-icons/react": "^2.1.10",
     "@sentry/react": "^10.73.0",
     "@tanstack/react-virtual": "^3.14.10",

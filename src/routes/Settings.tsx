@@ -450,6 +450,35 @@ function DataPanel() {
 }
 
 /**
+ * CCP's Developer License Agreement, which this app's SDE snapshot and ESI
+ * access already depend on, requires a credit for CCP-owned data; the
+ * Fittings section's ship-fitting math (`@eveshipfit/sde`, ADR 0016) ships
+ * its own copy of that agreement as `LICENSE.EVE`, vendored at
+ * `/vendor/dogma/LICENSE.EVE` alongside the data itself
+ * (`vite.config.ts`'s `copyDogmaEngineAssets`). This had no home anywhere in
+ * the app before Fittings — issue #1531.
+ */
+function DataAttributionPanel() {
+  const { t } = useTranslation();
+
+  return (
+    <Panel title={t('settings.dataAttributionTitle')}>
+      <p className="text-xs text-text-dim">
+        {t('settings.dataAttributionText')}{' '}
+        <a
+          href="/vendor/dogma/LICENSE.EVE"
+          target="_blank"
+          rel="noreferrer"
+          className="text-accent underline"
+        >
+          {t('settings.dataAttributionLink')}
+        </a>
+      </p>
+    </Panel>
+  );
+}
+
+/**
  * Undoes the preferences pages remember silently — a pinned sort, a filter, a
  * remembered tab. Those have no control of their own anywhere, by design
  * (a duplicate control on this page is a second thing that can drift from what
@@ -1145,6 +1174,7 @@ export function Settings() {
             <CorpAccessPanel />
           </div>
           <DataPanel />
+          <DataAttributionPanel />
         </div>
       )}
       {/* The Overview feed's "Settings" link targets `/settings/notifications` directly now. */}
