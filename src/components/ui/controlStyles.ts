@@ -41,7 +41,9 @@ export const fieldSizeClassName: Record<ControlSize, string> = {
 
 /**
  * A full-width list row that is itself the tap target — the `<label>` wrapping
- * a checkbox in Mining Tax's Settle Up / Link Payment / Bulk Dismiss dialogs.
+ * a checkbox in Mining Tax's Settle Up / Link Payment / Bulk Dismiss dialogs,
+ * and the single-line pick-a-row `<button>`s in the blueprint, skill and ship
+ * pickers, the Build Group member list and the trained-skills list.
  *
  * Not a `ControlSize`: those rows keep their own `px-2 py-1.5 text-xs`
  * density, and a single line of that lands at 28px — exactly `sm`'s pointer
