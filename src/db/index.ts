@@ -80,17 +80,21 @@ export type WhatIfImplantSelection =
   | { readonly kind: 'custom'; readonly bonuses: Implants };
 
 /**
- * A Skill Plan's Booster (CONTEXT.md): the cerebral accelerator the plan is
- * costed under. `expiresAt` is an **instant** (epoch ms), not the
- * `datetime-local` string the input edits — the plan syncs across devices,
- * and a bare wall-clock string would mean a different moment in each
- * timezone. `null` means no expiry has been entered yet, in which case
- * nothing is applied however `enabled` reads.
+ * A Skill Plan's Booster (CONTEXT.md): one cerebral accelerator the plan is
+ * costed under, one of a `boosters` list run one after another (EVE has a
+ * single booster slot, so two can never be live at once). `startsAt` and
+ * `expiresAt` are **instants** (epoch ms), not the `datetime-local` strings
+ * the inputs edit — the plan syncs across devices, and a bare wall-clock
+ * string would mean a different moment in each timezone. `startsAt: null`
+ * means "already running"; `expiresAt: null` means no expiry has been
+ * entered yet, in which case this row applies nothing however `enabled` reads.
  */
 export interface PlanBooster {
   enabled: boolean;
   /** Uniform per-attribute bonus while the accelerator is live. */
   bonus: number;
+  /** `null` means already running. */
+  startsAt: number | null;
   expiresAt: number | null;
 }
 
@@ -127,11 +131,24 @@ export interface SkillPlanRecord {
    */
   whatIfImplants?: WhatIfImplantSelection;
   /**
-   * Booster the plan is costed under. Optional the same way, and its absence
-   * carries meaning beyond "off": a plan that has never had one configured is
-   * the only one the editor may prefill from a detected in-game accelerator.
+   * Legacy single Booster the plan is costed under. Superseded by `boosters`
+   * (#1407) but still written — as the list's first entry — for one release,
+   * so a device on an older build reading this plan next still sees an
+   * answer instead of losing it on its own next write. Optional, and its
+   * absence carries meaning beyond "off": a plan that has never had one
+   * configured is the only one the editor may prefill from a detected
+   * in-game accelerator.
    */
   booster?: PlanBooster;
+  /**
+   * Ordered list of Boosters the plan is costed under, one after another —
+   * EVE has a single booster slot, so at most one is ever live. Optional and
+   * additive like `booster` was: absent means the plan has never answered
+   * (see `booster`'s own doc for what that unlocks). `[]` is itself an
+   * answer — "no accelerators" — and is written and read distinctly from
+   * "never configured".
+   */
+  boosters?: PlanBooster[];
   /**
    * Named goals pinned to a plan entry's skill level ("Fly Loki") — CONTEXT.md
    * "Plan Milestone". Optional and additive, like `markers` above — not

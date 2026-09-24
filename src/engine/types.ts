@@ -46,9 +46,14 @@ export type CloneState = 'alpha' | 'omega';
 /** Implant bonuses, +0..+5 per attribute. Missing key = +0. */
 export type Implants = Partial<Attributes>;
 
-/** Cerebral accelerator: flat attribute bonuses active until expiry. */
+/**
+ * Cerebral accelerator: flat attribute bonuses active from `startsAt`
+ * (absent = already running) until `expiresAt`.
+ */
 export interface Booster {
   bonus: Partial<Attributes>;
+  /** Absent means already running — live from the start of the schedule. */
+  startsAt?: Date;
   expiresAt: Date;
 }
 

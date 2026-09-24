@@ -495,3 +495,16 @@ describe('BuildGroupPanel — bulk owned-stock actions', () => {
     expect(screen.getByRole('button', { name: 'Use none' })).toBeTruthy();
   });
 });
+
+describe('BuildGroupPanel — verdict band wording when the verdict is unknown', () => {
+  it('says BUILD is cheaper, with a positive amount and percent, when building is cheaper but a price is missing', () => {
+    const unpriced = row('a', [material(34, 100)]);
+    (unpriced.groupResult as { unpriceable: boolean }).unpriceable = true;
+    mockedUseComparedBuildResults.mockReturnValue([unpriced]);
+    renderPanel([plan('a', 'jita')]);
+
+    expect(screen.getByText(/BUILD is cheaper by/)).toBeTruthy();
+    expect(screen.queryByText(/BUY is cheaper by -/)).toBeNull();
+    expect(screen.queryByText(/-\d+(\.\d+)?% more than buying/)).toBeNull();
+  });
+});

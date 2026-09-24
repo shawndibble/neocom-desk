@@ -394,6 +394,59 @@ describe('bestAttributes with Boosters', () => {
     );
     expect(late.seconds).toBeGreaterThan(early.seconds);
   });
+
+  it('applies nothing before a Booster with a future startsAt begins', () => {
+    const bonus = { intelligence: 10, memory: 10, perception: 10, willpower: 10, charisma: 10 };
+    const plain = bestAttributes(steps, skills);
+    const notYetLive = bestAttributes(
+      steps,
+      skills,
+      {},
+      { boosters: [{ bonus, startsAt: after(1e9), expiresAt: after(2e9) }], startDate: START }
+    );
+    expect(notYetLive.seconds).toBeCloseTo(plain.seconds, 6);
+  });
+
+  it('credits a Booster only from its startsAt onward, agreeing with computeSchedule', async () => {
+    const { computeSchedule } = await import('@/engine/schedule');
+    const bonus = { intelligence: 12, perception: 12 };
+    const boosters = [{ bonus, startsAt: after(1000), expiresAt: after(5000) }];
+    const result = bestAttributes(steps, skills, { memory: 3 }, { boosters, startDate: START });
+
+    const scheduled = computeSchedule(
+      steps,
+      { attributes: result.attributes, implants: { memory: 3 }, boosters, startDate: START },
+      skills
+    );
+    const total = scheduled[scheduled.length - 1].cumulativeSeconds;
+    expect(result.seconds).toBeCloseTo(total, 6);
+
+    // The deferred Booster must not be as good as one live from t=0.
+    const immediate = bestAttributes(
+      steps,
+      skills,
+      { memory: 3 },
+      { boosters: [{ bonus, expiresAt: after(5000) }], startDate: START }
+    );
+    expect(result.seconds).toBeGreaterThan(immediate.seconds);
+  });
+
+  it('agrees with computeSchedule for two back-to-back Boosters (a start breakpoint and an expiry breakpoint)', async () => {
+    const { computeSchedule } = await import('@/engine/schedule');
+    const boosters = [
+      { bonus: { intelligence: 12 }, expiresAt: after(2000) },
+      { bonus: { perception: 12 }, startsAt: after(2000), expiresAt: after(5000) },
+    ];
+    const result = bestAttributes(steps, skills, { memory: 3 }, { boosters, startDate: START });
+
+    const scheduled = computeSchedule(
+      steps,
+      { attributes: result.attributes, implants: { memory: 3 }, boosters, startDate: START },
+      skills
+    );
+    const total = scheduled[scheduled.length - 1].cumulativeSeconds;
+    expect(result.seconds).toBeCloseTo(total, 6);
+  });
 });
 
 describe('allocationCostTable', () => {

@@ -1289,7 +1289,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
 
     expect(await within(header()).findByText('Remap savings')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
+    await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
     await user.type(await screen.findByLabelText('Expires'), '2099-01-01T00:00');
 
     await waitFor(() => {
@@ -1457,8 +1457,8 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
-    const durationHeader = () =>
-      within(queuePanel).getByText(/^\d+[dhm]/, { selector: 'header span' });
+    const summaryPanel = screen.getByText('Plan summary').closest('section')!;
+    const durationHeader = () => within(summaryPanel).getByText(/^\d+[dhm]/);
     const durationBefore = durationHeader().textContent;
 
     const select = screen.getByRole('combobox', { name: 'What-if implants' });
@@ -1471,7 +1471,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
     });
   });
 
-  it('shows the bonus/expiry inputs only once the booster is enabled, and flags a past expiry as expired', async () => {
+  it('shows the bonus/expiry inputs only once an accelerator row exists, and flags a past expiry as expired', async () => {
     const user = userEvent.setup();
     await db.skillPlans.add(seedPlan());
     goToPlanEditor();
@@ -1480,9 +1480,9 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     expect(screen.queryByLabelText('Expires')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
-    // `find`, not `get`: the Booster is saved on the plan now, so the tick
-    // travels through Dexie and back before the expiry row exists.
+    await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
+    // `find`, not `get`: the Booster is saved on the plan now, so the row
+    // travels through Dexie and back before the expiry field exists.
     const expiresInput = await screen.findByLabelText('Expires');
     expect(screen.queryByText('Expired')).not.toBeInTheDocument();
 
@@ -1499,11 +1499,11 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
-    const durationHeader = () =>
-      within(queuePanel).getByText(/^\d+[dhm]/, { selector: 'header span' });
+    const summaryPanel = screen.getByText('Plan summary').closest('section')!;
+    const durationHeader = () => within(summaryPanel).getByText(/^\d+[dhm]/);
     const durationBefore = durationHeader().textContent;
 
-    await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
+    await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
     await user.type(await screen.findByLabelText('Expires'), '2099-01-01T00:00');
     expect(screen.queryByText('Expired')).not.toBeInTheDocument();
 
@@ -1521,17 +1521,20 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
     await user.click(await screen.findByRole('option', { name: '+5' }));
-    await user.click(screen.getByRole('checkbox', { name: 'Booster' }));
+    await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
     await user.type(await screen.findByLabelText('Expires'), '2099-01-01T00:00');
 
     await waitFor(async () => {
       const stored = await db.skillPlans.get('plan-1');
       expect(stored?.whatIfImplants).toEqual({ kind: 'preset', preset: '+5' });
-      expect(stored?.booster).toEqual({
-        enabled: true,
-        bonus: 3,
-        expiresAt: new Date(2099, 0, 1, 0, 0).getTime(),
-      });
+      expect(stored?.boosters).toEqual([
+        {
+          enabled: true,
+          bonus: 3,
+          startsAt: null,
+          expiresAt: new Date(2099, 0, 1, 0, 0).getTime(),
+        },
+      ]);
     });
 
     // The reported bug: reopening the page put every control back to its
@@ -1704,10 +1707,14 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
     const items = await within(panel).findAllByRole('listitem');
     expect(items).toHaveLength(2);
 
-    const finishNote = within(panel).getByText(/^Finishes \d{4}-\d{2}-\d{2}$/);
-    const planFinishDate = finishNote.textContent!.replace('Finishes ', '');
+    const summary = screen.getByText('Plan summary').closest('section')!;
+    const planFinishDate = within(summary)
+      .getByText('Projected finish')
+      .parentElement!.textContent!.replace('Projected finish', '')
+      .trim();
+    expect(planFinishDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
-    // The row's own finish is the same value the panel header projects —
+    // The row's own finish is the same value the Plan summary projects —
     // one number, computed one way (#20 acceptance criterion). The separate
     // start→finish line is gone: it restated the running total a third way
     // and cost every row a line it couldn't spare on a phone.
@@ -1721,7 +1728,7 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
 
     const panel = (await screen.findByText('Your entries')).closest('section')!;
     await within(panel).findByText('No entries yet. Add a skill below.');
-    expect(within(panel).queryByText(/^Finishes/)).not.toBeInTheDocument();
+    expect(within(panel).queryByText(/Finishes/)).not.toBeInTheDocument();
   });
 });
 

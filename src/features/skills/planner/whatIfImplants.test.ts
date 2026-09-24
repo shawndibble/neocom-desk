@@ -5,6 +5,7 @@ import {
   DEFAULT_WHAT_IF_SELECTION,
   normalizeWhatIfSelection,
   setWhatIfBonus,
+  toCustomSelection,
   whatIfImplants,
 } from './whatIfImplants';
 
@@ -103,6 +104,37 @@ describe('whatIfImplants per-attribute sets', () => {
       willpower: 0,
       charisma: 0,
     });
+  });
+});
+
+describe('toCustomSelection', () => {
+  const zeros = { intelligence: 0, memory: 0, perception: 0, willpower: 0, charisma: 0 };
+
+  it("freezes 'current' as the clone's real per-slot set", () => {
+    expect(toCustomSelection(preset('current'), { perception: 4, memory: 3 })).toEqual(
+      custom({ ...zeros, perception: 4, memory: 3 })
+    );
+  });
+
+  it('freezes a uniform preset as that number in every slot', () => {
+    expect(toCustomSelection(preset('+4'), {})).toEqual(
+      custom({ intelligence: 4, memory: 4, perception: 4, willpower: 4, charisma: 4 })
+    );
+  });
+
+  it('freezes "none" as zeros', () => {
+    expect(toCustomSelection(preset('none'), { memory: 5 })).toEqual(custom(zeros));
+  });
+
+  it('returns an existing custom set unchanged, whatever the clone wears', () => {
+    const set = { ...zeros, willpower: 2 };
+    expect(toCustomSelection(custom(set), { memory: 5 })).toEqual(custom(set));
+  });
+
+  it('clamps like setWhatIfBonus does', () => {
+    expect(toCustomSelection(custom({ memory: 9, charisma: -3 }), {})).toEqual(
+      custom({ ...zeros, memory: 5 })
+    );
   });
 });
 

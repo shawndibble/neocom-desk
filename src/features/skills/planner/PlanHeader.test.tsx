@@ -195,3 +195,66 @@ describe('PlanHeader', () => {
     expect(screen.queryByText('Fly Loki')).not.toBeInTheDocument();
   });
 });
+
+describe('PlanHeader progress chips (#1409)', () => {
+  const base = {
+    totalSeconds: 3600,
+    skillCount: 2,
+    projectedFinish: null,
+    badge: null,
+    nextMilestone: null,
+  };
+  const progress = { trainedSp: 500_000, totalSp: 2_000_000, fraction: 0.25 };
+  const nextStep = {
+    name: 'Gunnery',
+    level: 3,
+    cumulativeSeconds: 0,
+    startDate: new Date('2026-09-01T12:00:00Z'),
+  };
+
+  it('shows the trained percentage and the next step', () => {
+    render(<PlanHeader {...base} progress={progress} nextStep={nextStep} />);
+    expect(screen.getByText('Trained')).toBeInTheDocument();
+    expect(screen.getByText(/25%/)).toBeInTheDocument();
+    expect(screen.getByText('Next step')).toBeInTheDocument();
+    expect(screen.getByText(/Gunnery III/)).toBeInTheDocument();
+  });
+
+  it('reads — while trained data is unknown', () => {
+    render(
+      <PlanHeader
+        {...base}
+        projectedFinish={new Date('2026-09-02T12:00:00Z')}
+        progress={progress}
+        nextStep={nextStep}
+        trainedKnown={false}
+      />
+    );
+    expect(screen.getAllByText('—')).toHaveLength(2);
+    expect(screen.queryByText(/25%/)).not.toBeInTheDocument();
+  });
+
+  it('shows no progress chips for an empty plan', () => {
+    render(
+      <PlanHeader
+        {...base}
+        progress={{ trainedSp: 0, totalSp: 0, fraction: null }}
+        nextStep={null}
+      />
+    );
+    expect(screen.queryByText('Trained')).not.toBeInTheDocument();
+    expect(screen.queryByText('Next step')).not.toBeInTheDocument();
+  });
+
+  it('reads 100% and nothing left when fully trained', () => {
+    render(
+      <PlanHeader
+        {...base}
+        progress={{ trainedSp: 10, totalSp: 10, fraction: 1 }}
+        nextStep={null}
+      />
+    );
+    expect(screen.getByText(/100%/)).toBeInTheDocument();
+    expect(screen.getByText('Nothing left to train')).toBeInTheDocument();
+  });
+});
