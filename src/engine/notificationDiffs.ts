@@ -18,6 +18,7 @@
 import { colonyStatus } from './pi/colonyStatus';
 import { diffRoster } from './corp/members';
 import { isSpExtractionReady } from './spExtraction';
+import type { StationUndercutState } from './market/stationUndercutState';
 
 export interface SkillQueueEntrySnapshot {
   skillId: number;
@@ -1122,6 +1123,149 @@ export function diffMarketOrderFilled(
       orderId: entry.orderId,
       typeId: entry.typeId,
       quantity: entry.quantity,
+    });
+  }
+  return fires;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Market orders: station undercut/outbid (issue #1423)                      */
+/* -------------------------------------------------------------------------- */
+
+export interface OrderUndercutEntrySnapshot {
+  orderId: number;
+  typeId: number;
+  isBuyOrder: boolean;
+  locationId: number;
+  /** My own order's price — an Occurrence Key input (a relist is a new occurrence) and half of the re-arm rule below. */
+  price: number;
+  /** This poll's own classification (`engine/market/stationUndercutState.ts`), stored honestly — never frozen. What carries meaning across an `unknown` poll is `armed`, not this field. */
+  state: StationUndercutState;
+  /** The rival price `state` was read from, or null when `state` is 'unknown'. */
+  rivalPrice: number | null;
+  /**
+   * Whether a `'beaten'` reading on the *next* poll should fire — the
+   * anti-flap latch this event needs because a plain pairwise `state`
+   * comparison cannot tell `clear → unknown → beaten` (must fire) apart from
+   * `beaten → unknown → beaten` (must stay silent): both read as
+   * `prev.state === 'unknown'` at the pairwise level. See
+   * `docs/context/decisions/20260924-003053-undercut-alerts-classify-the-station-tier-in-the.md`.
+   *
+   * Set by `buildOrderUndercutEntry` when this snapshot is built: `clear` →
+   * `true` (a later `beaten` should fire), `beaten` → `false` (already
+   * reported), `unknown` → carried forward unchanged from what `armed` was
+   * before this poll (frozen — an outage proves nothing either way).
+   */
+  armed: boolean;
+}
+
+export interface OrderUndercutSnapshot {
+  entries: readonly OrderUndercutEntrySnapshot[];
+  nowMs: number;
+}
+
+export interface MarketOrderUndercutFire {
+  eventId: 'marketOrderUndercut';
+  characterId: number;
+  orderId: number;
+  typeId: number;
+  isBuyOrder: boolean;
+  price: number;
+  /** Always a real price: this fire only ever exists for a `'beaten'` reading, which `classifyStationUndercut` never pairs with a null rival price. */
+  rivalPrice: number;
+}
+
+/**
+ * Whether this order's `'beaten'` reading, if this poll produced one, should
+ * actually fire — shared unchanged between `buildOrderUndercutEntry` (which
+ * uses it to decide what `armed` to persist through an `unknown` poll) and
+ * `diffMarketOrderUndercut` (which uses it to decide whether to fire this
+ * poll). The two must agree on this exact computation, or an `unknown` poll's
+ * stored `armed` and the diff's own firing decision for the very same
+ * transition could silently disagree.
+ *
+ * - No baseline for this Character at all (`prevSnapshot` undefined) — never
+ *   armed. This module's usual first-poll-is-silent rule.
+ * - This exact order absent from the previous poll's entries — armed. A
+ *   brand-new order already beaten the first time it's seen still fires
+ *   (owner decision #5, issue #1423) — the reverse of "missing from prev is
+ *   always silent", which only applies to a wholly missing snapshot, not one
+ *   order missing from an otherwise-present one.
+ * - The order's own price changed since the previous poll — armed. A relist
+ *   is always a fresh occurrence (owner decision #4), independent of whatever
+ *   `state` was doing.
+ * - Otherwise — whatever the previous poll's own entry had already decided,
+ *   carried forward as-is. This is what lets an `unknown` poll in between
+ *   freeze the answer rather than resetting it.
+ */
+function wasArmedBefore(
+  prevSnapshot: OrderUndercutSnapshot | undefined,
+  prevEntry: OrderUndercutEntrySnapshot | undefined,
+  price: number
+): boolean {
+  if (!prevSnapshot) return false;
+  if (!prevEntry) return true;
+  if (prevEntry.price !== price) return true;
+  return prevEntry.armed;
+}
+
+/**
+ * Builds one order's stored snapshot entry, folding in the `armed` latch
+ * against the previous poll's baseline. Pure and synchronous — the poll
+ * domain's `load()` does the async classification (Fuzzwork reads); this is
+ * what `pollDomains.ts`'s `marketOrderUndercutDomain.toSnapshot` calls per
+ * entry, and what this module's own sequential tests call directly to prove
+ * the three-poll shape without going through the domain at all.
+ */
+export function buildOrderUndercutEntry(
+  order: {
+    orderId: number;
+    typeId: number;
+    isBuyOrder: boolean;
+    locationId: number;
+    price: number;
+    state: StationUndercutState;
+    rivalPrice: number | null;
+  },
+  prevSnapshot: OrderUndercutSnapshot | undefined
+): OrderUndercutEntrySnapshot {
+  const prevEntry = prevSnapshot?.entries.find((entry) => entry.orderId === order.orderId);
+  const armedBefore = wasArmedBefore(prevSnapshot, prevEntry, order.price);
+  const armed = order.state === 'unknown' ? armedBefore : order.state === 'clear';
+  return { ...order, armed };
+}
+
+/**
+ * Fires once per order newly read `'beaten'` at its own station — undercut
+ * for a sell order, outbid for a buy order (issue #1423). See the `armed`
+ * latch above for how this stays correct across an `unknown` poll in between
+ * (a Fuzzwork outage neither arms nor disarms anything) and across a relist
+ * (always re-arms, whatever `state` was doing).
+ *
+ * `prev === undefined` fires nothing — `wasArmedBefore` already encodes this,
+ * but the explicit guard matches every other diff in this module and skips
+ * the per-entry work on a poll that could never fire anyway.
+ */
+export function diffMarketOrderUndercut(
+  characterId: number,
+  prev: OrderUndercutSnapshot | undefined,
+  next: OrderUndercutSnapshot
+): MarketOrderUndercutFire[] {
+  if (!prev) return [];
+  const prevByOrderId = new Map(prev.entries.map((entry) => [entry.orderId, entry]));
+  const fires: MarketOrderUndercutFire[] = [];
+  for (const entry of next.entries) {
+    if (entry.state !== 'beaten' || entry.rivalPrice === null) continue;
+    const prevEntry = prevByOrderId.get(entry.orderId);
+    if (!wasArmedBefore(prev, prevEntry, entry.price)) continue;
+    fires.push({
+      eventId: 'marketOrderUndercut',
+      characterId,
+      orderId: entry.orderId,
+      typeId: entry.typeId,
+      isBuyOrder: entry.isBuyOrder,
+      price: entry.price,
+      rivalPrice: entry.rivalPrice,
     });
   }
   return fires;
