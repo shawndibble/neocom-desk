@@ -8,12 +8,7 @@
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from '@/components/ui';
+import { MenuItem, RowActionsMenu } from '@/components/ui';
 import {
   resolveOrderLocation,
   type NpcStationLookup,
@@ -51,22 +46,28 @@ export function OrderRowContextMenu({
   const priceText = `${formatIsk(order.price, 2)} ISK`;
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{trigger}</ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem onSelect={() => void writeToClipboard(locationText)}>
-          {t('market.contextMenu.copyLocation')}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => void writeToClipboard(priceText)}>
-          {t('market.contextMenu.copyPrice')}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => onShowInfo(typeId, itemName)}>
-          {t('market.contextMenu.showInfo')}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => onFilterToStation(order.location_id)}>
-          {t('market.contextMenu.filterToStation')}
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+    <RowActionsMenu
+      // Price first: an order book lists many orders at one station, and the
+      // price is what tells their buttons apart.
+      name={`${priceText}, ${locationText}`}
+      items={
+        <>
+          <MenuItem onSelect={() => void writeToClipboard(locationText)}>
+            {t('market.contextMenu.copyLocation')}
+          </MenuItem>
+          <MenuItem onSelect={() => void writeToClipboard(priceText)}>
+            {t('market.contextMenu.copyPrice')}
+          </MenuItem>
+          <MenuItem onSelect={() => onShowInfo(typeId, itemName)}>
+            {t('market.contextMenu.showInfo')}
+          </MenuItem>
+          <MenuItem onSelect={() => onFilterToStation(order.location_id)}>
+            {t('market.contextMenu.filterToStation')}
+          </MenuItem>
+        </>
+      }
+    >
+      {trigger}
+    </RowActionsMenu>
   );
 }

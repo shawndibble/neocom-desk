@@ -1,5 +1,6 @@
 import { Fragment, useRef, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+import { RowMoreActions } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { formatIskAuto } from '@/lib/isk';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
@@ -60,12 +61,12 @@ export function OpenOrdersList({
         const badge = orderBadgeFor(row);
         const offHub = isOffHubStation(row.stationName, row.locationId);
         const listRow = (
-          <li data-row-key={row.orderId}>
+          <li data-row-key={row.orderId} className="flex items-start">
             <button
               type="button"
               onClick={() => onOpen(row)}
               className={cx(
-                'flex min-h-11 w-full flex-col gap-1 px-3 py-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                'flex min-h-11 min-w-0 flex-1 flex-col gap-1 px-3 py-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
                 row.orderId === highlightId && 'row-pulse'
               )}
             >
@@ -96,6 +97,8 @@ export function OpenOrdersList({
                 {offHub && <span className="text-warning">{t('market.orders.offHub')}</span>}
               </span>
             </button>
+            {/* Beside the button, not in it — buttons don't nest. */}
+            <RowMoreActions className="mt-1.5 mr-1 shrink-0" />
           </li>
         );
         return (

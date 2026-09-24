@@ -461,6 +461,7 @@ export function Skills() {
                               <SkillRowContextMenu
                                 activeCharacterId={activeCharacterId}
                                 skillTypeID={skill.skillTypeID}
+                                skillName={skill.name}
                                 currentLevel={skill.level}
                                 tooltipContent={skill.description}
                               >

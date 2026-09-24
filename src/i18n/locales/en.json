@@ -1417,11 +1417,13 @@
     "loadingEllipsis": "Loading…",
     "unknown": "—",
     "aboutLabel": "About {{label}}",
+    "moreActionsLabel": "More actions for {{name}}",
     "dataTable": {
       "sortBy": "Sort by",
       "sortLabel": "Sort: {{column}} {{arrow}}",
       "sortOption": "{{column}} {{arrow}}",
-      "sortNone": "Sort"
+      "sortNone": "Sort",
+      "actionsHeader": "Actions"
     },
     "offlineTitle": "Showing cached data",
     "refreshFailedTitle": "Refresh failed — showing cached data",
@@ -3250,7 +3252,6 @@
     "rangeSystem": "System",
     "rangeJumps_one": "{{count}} jump",
     "rangeJumps_other": "{{count}} jumps",
-    "moreActionsLabel": "More actions for {{name}}",
     "contextMenu": {
       "addToQuickbar": "Add to Quickbar",
       "setPriceAlert": "Set price alert…",
@@ -3993,7 +3994,6 @@
         "showInfo": "Show info",
         "viewInMarket": "View in Market"
       },
-      "moreActionsLabel": "More actions for {{name}}",
       "severity": {
         "critical": "Critical",
         "warning": "Due soon",

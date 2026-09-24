@@ -337,6 +337,17 @@ describe('failed vs. genuinely empty reads', () => {
 });
 
 describe('row context menu (issue #420)', () => {
+  it('opens the same menu from a visible More actions button on the row (#1497)', async () => {
+    const user = userEvent.setup();
+    renderAssets();
+    await user.click(await screen.findByRole('link', { name: /Division 1/ }));
+
+    await user.click(await screen.findByRole('button', { name: 'More actions for Tritanium' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+  });
+
   it('offers View in Market and Copy name on an asset row, with no Build Plan lookup', async () => {
     const user = userEvent.setup();
     renderAssets();

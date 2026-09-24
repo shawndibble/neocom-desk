@@ -309,6 +309,18 @@ describe('LoyaltyStore item context menu (issue #716)', () => {
     });
   });
 
+  it('opens the same menu from a visible More actions button on the row (#1497)', async () => {
+    const user = userEvent.setup();
+    renderStore();
+    await user.click(
+      screen.getByRole('button', { name: 'More actions for Scourge Fury Heavy Missile' })
+    );
+
+    await user.click(await screen.findByRole('menuitem', { name: 'View in Market' }));
+    expect(probe.pathname).toBe('/market/browser');
+    expect(probe.search).toContain('type=200');
+  });
+
   it('acts on the offer item for a direct-item offer', async () => {
     const user = userEvent.setup();
     renderStore();

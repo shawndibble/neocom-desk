@@ -187,7 +187,7 @@ test.describe('Open Orders — compact phone list (#1429)', () => {
     await page.setViewportSize(PHONE);
     await page.goto('./market/orders');
 
-    const row = page.getByRole('button', { name: /Mexallon/ });
+    const row = page.getByRole('button', { name: /^Mexallon/ });
     await expect(row).toBeVisible();
     expect(await row.evaluate((el) => el.getBoundingClientRect().height)).toBeGreaterThanOrEqual(
       44

@@ -5,30 +5,16 @@
  * materials (round 27), product heading, revenue and owned-sale rows, and the
  * recipe and Blueprint Acquisition modals.
  */
-import { useState, type ReactElement } from 'react';
+import { useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  IconButton,
-} from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
+import { MenuItem, RowActionsContext, RowActionsMenu, RowMoreActions } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
 import { marketLinkParams } from '@/engine/market/urlState';
 import { usePiPlannable } from '@/features/pi/usePiPlannable';
 import { useCompareSet } from './compareSet';
 import { PriceAlertDialog, PriceAlertMenuItem } from './PriceAlertDialog';
-
-/** `ContextMenuItem` and `DropdownMenuItem` share this shape — both spread onto a Radix `Item`. */
-type MenuItemComponent = typeof ContextMenuItem;
 
 export interface ItemContextMenuProps {
   typeId: number;
@@ -67,17 +53,19 @@ export interface ItemContextMenuProps {
  */
 export type ItemMenuFor = (typeId: number, trigger: ReactElement) => ReactElement;
 
+/** Everything the menu's entries need — the props minus the trigger wiring. */
+type ItemMenuProps = Omit<ItemContextMenuProps, 'children' | 'onOpenChange'>;
+
 /**
- * The item list shared by `ItemContextMenu` (right-click) and
- * `ItemMoreActions` (the visible button, issue #1498) — one hook so the two
- * can never drift. `MenuItem` picks which menu family's item component
- * renders each entry; `onAlertRequest` opens the caller's own
- * `PriceAlertDialog` instance, since each trigger owns its `alertOpen` state
- * independently (an alert opened from the button shouldn't depend on the
- * context menu ever having rendered).
+ * The item menu's entries, shared by `ItemContextMenu` (right-click, and the
+ * row's `RowMoreActions` button it publishes to) and `ItemMoreActions` (a
+ * standalone button, issue #1498) — one list, so none of them can drift.
+ * Written with the kind-agnostic `MenuItem`, which renders as whichever menu
+ * family it lands in. `onAlertRequest` opens the caller's own
+ * `PriceAlertDialog`.
  *
- * Add to Quickbar, show info, add to Compare, view in Market, copy name,
- * jump to a Build Plan, jump to a PI Plan.
+ * Add to Quickbar, show info, add to Compare, view in
+ * Market, copy name, jump to a Build Plan, jump to a PI Plan.
  *
  * The PI action asks for itself rather than taking a prop the way
  * `blueprintTypeID` does: `pi.json` is 15KB against `blueprints.json`'s
@@ -88,7 +76,7 @@ export type ItemMenuFor = (typeId: number, trigger: ReactElement) => ReactElemen
  * have expected otherwise. Nothing renders while the answer is unknown, so
  * the row never appears under a cursor already in the menu.
  */
-function useItemMenuNodes(
+function useItemMenuItems(
   {
     typeId,
     itemName,
@@ -100,10 +88,9 @@ function useItemMenuNodes(
     onViewInIndustryAsMaterial,
     onToggleBuildHere,
     buildingHere,
-  }: Omit<ItemContextMenuProps, 'children' | 'onOpenChange'>,
-  MenuItem: MenuItemComponent,
+  }: ItemMenuProps,
   onAlertRequest: () => void
-): ReactElement[] {
+): ReactNode {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -120,98 +107,84 @@ function useItemMenuNodes(
         ? t('industry.contextMenu.noBlueprintOptions')
         : t('industry.contextMenu.buildPlan');
 
-  const nodes: ReactElement[] = [
-    <MenuItem
-      key="addToQuickbar"
-      disabled={!quickbarAvailable}
-      title={quickbarAvailable ? undefined : t('market.contextMenu.quickbarNoCharacter')}
-      onSelect={() => onAddToQuickbar(typeId, itemName)}
-    >
-      {t('market.contextMenu.addToQuickbar')}
-    </MenuItem>,
-    <PriceAlertMenuItem
-      key="priceAlert"
-      as={MenuItem}
-      typeId={typeId}
-      available={quickbarAvailable}
-      onSelect={onAlertRequest}
-    />,
-    <MenuItem key="showInfo" onSelect={() => onShowInfo(typeId, itemName)}>
-      {t('market.contextMenu.showInfo')}
-    </MenuItem>,
-    <MenuItem key="addToCompare" onSelect={() => addToCompare({ typeId, itemName })}>
-      {t('market.contextMenu.addToCompare')}
-    </MenuItem>,
-  ];
-  if (onCompareVariations) {
-    nodes.push(
-      <MenuItem key="compareVariations" onSelect={onCompareVariations}>
-        {t('market.contextMenu.compareVariations')}
+  return (
+    <>
+      <MenuItem
+        disabled={!quickbarAvailable}
+        title={quickbarAvailable ? undefined : t('market.contextMenu.quickbarNoCharacter')}
+        onSelect={() => onAddToQuickbar(typeId, itemName)}
+      >
+        {t('market.contextMenu.addToQuickbar')}
       </MenuItem>
-    );
-  }
-  nodes.push(
-    <MenuItem
-      key="viewInMarket"
-      onSelect={() => {
-        const params = marketLinkParams(typeId, location.search);
-        navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
-      }}
-    >
-      {t('market.contextMenu.viewInMarket')}
-    </MenuItem>,
-    <MenuItem key="copyName" onSelect={() => void writeToClipboard(itemName)}>
-      {t('market.contextMenu.copyName')}
-    </MenuItem>,
-    <MenuItem
-      key="buildPlan"
-      disabled={!blueprintTypeID}
-      onSelect={() => {
-        if (blueprintTypeID) navigate(`${industryTabHref('plans')}?product=${typeId}`);
-      }}
-    >
-      {buildPlanLabel}
-    </MenuItem>
+      <PriceAlertMenuItem typeId={typeId} available={quickbarAvailable} onSelect={onAlertRequest} />
+      <MenuItem onSelect={() => onShowInfo(typeId, itemName)}>
+        {t('market.contextMenu.showInfo')}
+      </MenuItem>
+      <MenuItem onSelect={() => addToCompare({ typeId, itemName })}>
+        {t('market.contextMenu.addToCompare')}
+      </MenuItem>
+      {onCompareVariations && (
+        <MenuItem onSelect={onCompareVariations}>
+          {t('market.contextMenu.compareVariations')}
+        </MenuItem>
+      )}
+      <MenuItem
+        onSelect={() => {
+          const params = marketLinkParams(typeId, location.search);
+          navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
+        }}
+      >
+        {t('market.contextMenu.viewInMarket')}
+      </MenuItem>
+      <MenuItem onSelect={() => void writeToClipboard(itemName)}>
+        {t('market.contextMenu.copyName')}
+      </MenuItem>
+      <MenuItem
+        disabled={!blueprintTypeID}
+        onSelect={() => {
+          if (blueprintTypeID) navigate(`${industryTabHref('plans')}?product=${typeId}`);
+        }}
+      >
+        {buildPlanLabel}
+      </MenuItem>
+      {onViewInIndustryAsMaterial && (
+        <MenuItem onSelect={onViewInIndustryAsMaterial}>
+          {t('market.contextMenu.viewInIndustryAsMaterial')}
+        </MenuItem>
+      )}
+      {onToggleBuildHere && (
+        <MenuItem onSelect={onToggleBuildHere}>
+          {t(
+            buildingHere
+              ? 'market.contextMenu.buyInsteadOfBuilding'
+              : 'market.contextMenu.addMaterialComponents'
+          )}
+        </MenuItem>
+      )}
+      {piPlannable && (
+        <MenuItem onSelect={() => navigate(`/planetary-industry/plan?type=${typeId}`)}>
+          {t('market.contextMenu.piPlan')}
+        </MenuItem>
+      )}
+    </>
   );
-  if (onViewInIndustryAsMaterial) {
-    nodes.push(
-      <MenuItem key="viewInIndustryAsMaterial" onSelect={onViewInIndustryAsMaterial}>
-        {t('market.contextMenu.viewInIndustryAsMaterial')}
-      </MenuItem>
-    );
-  }
-  if (onToggleBuildHere) {
-    nodes.push(
-      <MenuItem key="toggleBuildHere" onSelect={onToggleBuildHere}>
-        {t(
-          buildingHere
-            ? 'market.contextMenu.buyInsteadOfBuilding'
-            : 'market.contextMenu.addMaterialComponents'
-        )}
-      </MenuItem>
-    );
-  }
-  if (piPlannable) {
-    nodes.push(
-      <MenuItem key="piPlan" onSelect={() => navigate(`/planetary-industry/plan?type=${typeId}`)}>
-        {t('market.contextMenu.piPlan')}
-      </MenuItem>
-    );
-  }
-  return nodes;
 }
 
+/**
+ * Item context menu. Also publishes its items, so a `RowMoreActions` in the
+ * row (or `DataTable`'s `rowMoreActions` column) opens exactly these (WCAG
+ * 2.1.1, issue #1497).
+ */
 export function ItemContextMenu(props: ItemContextMenuProps) {
   const { typeId, itemName, onOpenChange, children } = props;
   const [alertOpen, setAlertOpen] = useState(false);
-  const items = useItemMenuNodes(props, ContextMenuItem, () => setAlertOpen(true));
+  const items = useItemMenuItems(props, () => setAlertOpen(true));
 
   return (
     <>
-      <ContextMenu onOpenChange={onOpenChange}>
-        <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-        <ContextMenuContent>{items}</ContextMenuContent>
-      </ContextMenu>
+      <RowActionsMenu name={itemName} items={items} onOpenChange={onOpenChange}>
+        {children}
+      </RowActionsMenu>
       {alertOpen && (
         <PriceAlertDialog typeId={typeId} itemName={itemName} onClose={() => setAlertOpen(false)} />
       )}
@@ -221,29 +194,20 @@ export function ItemContextMenu(props: ItemContextMenuProps) {
 
 /**
  * Visible "More actions" trigger for the same item menu (WCAG 2.1.1, issue
- * #1498) — every surface that wraps a row in `ItemContextMenu` renders this
- * beside it so the row has a keyboard path independent of whatever element
- * `ItemContextMenu`'s trigger happens to be.
+ * #1498), for a surface whose button can't sit inside `ItemContextMenu`'s
+ * trigger — it builds its own copy of the items rather than reading a
+ * surrounding `ItemContextMenu`'s.
  */
-export function ItemMoreActions(props: Omit<ItemContextMenuProps, 'children' | 'onOpenChange'>) {
-  const { t } = useTranslation();
+export function ItemMoreActions(props: ItemMenuProps) {
   const { typeId, itemName } = props;
   const [alertOpen, setAlertOpen] = useState(false);
-  const items = useItemMenuNodes(props, DropdownMenuItem, () => setAlertOpen(true));
+  const items = useItemMenuItems(props, () => setAlertOpen(true));
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <IconButton
-            icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
-            label={t('market.moreActionsLabel', { name: itemName })}
-            variant="plain"
-            size="sm"
-          />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">{items}</DropdownMenuContent>
-      </DropdownMenu>
+      <RowActionsContext.Provider value={{ name: itemName, items }}>
+        <RowMoreActions />
+      </RowActionsContext.Provider>
       {alertOpen && (
         <PriceAlertDialog typeId={typeId} itemName={itemName} onClose={() => setAlertOpen(false)} />
       )}

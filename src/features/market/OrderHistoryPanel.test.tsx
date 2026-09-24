@@ -162,7 +162,7 @@ describe('OrderHistoryPanel — phone', () => {
     load([historyOrder({ volume_remain: 1, volume_total: 3 })]);
     renderPanel();
 
-    const toggle = await screen.findByRole('button', { name: /Damage Control II/ });
+    const toggle = await screen.findByRole('button', { name: /^Damage Control II/ });
     expect(screen.queryByRole('table')).toBeNull();
     expect(within(toggle).getByText('2/3')).toBeInTheDocument();
     expect(within(toggle).getByText('460.8K')).toBeInTheDocument();
@@ -190,11 +190,11 @@ describe('OrderHistoryPanel — phone', () => {
       historyOrder({ order_id: 2, type_id: 2, price: 1_000 }),
     ]);
     renderPanel();
-    await screen.findByRole('button', { name: /Cheap Thing/ });
+    await screen.findByRole('button', { name: /^Cheap Thing/ });
 
     const names = () =>
       screen
-        .getAllByRole('button', { name: /Thing/ })
+        .getAllByRole('button', { name: /^(Cheap|Pricey) Thing/ })
         .map((b) => b.textContent?.match(/(Cheap|Pricey) Thing/)?.[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Sort by Price' }));
     expect(names()).toEqual(['Cheap Thing', 'Pricey Thing']);
@@ -205,7 +205,7 @@ describe('OrderHistoryPanel — phone', () => {
   it('carries the item context menu on every row', async () => {
     load([historyOrder()]);
     renderPanel();
-    fireEvent.contextMenu(await screen.findByRole('button', { name: /Damage Control II/ }));
+    fireEvent.contextMenu(await screen.findByRole('button', { name: /^Damage Control II/ }));
     expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
   });
 });

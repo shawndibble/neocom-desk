@@ -31,7 +31,7 @@ test('skill-group disclosure header meets the 44px touch floor at 390px, and sti
   await gotoTrainedSkills(page);
   await page.setViewportSize(PHONE);
 
-  const header = page.getByRole('button', { name: /Spaceship Command/ });
+  const header = page.getByRole('button', { name: /^Spaceship Command/ });
   await expect(header).toBeVisible();
   await expect(header).toHaveAttribute('aria-expanded', 'false');
 
@@ -55,7 +55,7 @@ test('skill-group disclosure header drops the touch-tier floor at and above md (
   await gotoTrainedSkills(page);
   await page.setViewportSize(DESKTOP);
 
-  const header = page.getByRole('button', { name: /Spaceship Command/ });
+  const header = page.getByRole('button', { name: /^Spaceship Command/ });
   await expect(header).toBeVisible();
 
   const height = await header.evaluate((el) => el.getBoundingClientRect().height);
@@ -74,7 +74,7 @@ test('skill-group disclosure header drops the touch-tier floor at and above md (
  * that same 28px above it.
  */
 async function caldariFrigateRow(page: Page) {
-  await page.getByRole('button', { name: /Spaceship Command/ }).click();
+  await page.getByRole('button', { name: /^Spaceship Command/ }).click();
   const row = page.getByRole('button', { name: /^Caldari Frigate/ });
   await expect(row).toBeVisible();
   return row;

@@ -26,6 +26,7 @@ import {
   Tabs,
   TextInput,
   TypeIcon,
+  RowMoreActions,
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import type { MarketOrderColumnId } from '@/features/market/marketOrderColumns';
@@ -421,23 +422,29 @@ function MarketGroupTree({
                       if (open) onRequestBlueprintCatalog();
                     }}
                   >
-                    <button
-                      type="button"
-                      onClick={() => onSelect(item.typeId)}
-                      style={{ paddingLeft: `${(depth + 1) * 0.75 + 0.75}rem` }}
-                      // Read back on Back-to-finder (issue #1485), to return focus
-                      // to the row that opened the item panel — `data-` rather
-                      // than an id/ref, since the tree fully unmounts/remounts
-                      // whenever a search collapses or re-expands a group.
-                      data-tree-item-id={item.typeId}
-                      aria-current={selectedTypeId === item.typeId ? 'true' : undefined}
-                      className={`flex min-h-11 w-full items-center gap-1.5 truncate py-1 text-left text-xs hover:text-accent md:min-h-0 ${
-                        selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
-                      }`}
-                    >
-                      <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
-                      <span className="truncate">{item.name}</span>
-                    </button>
+                    {/* The trigger holds the More actions button beside the
+                        item button (buttons don't nest), so both sit inside
+                        the menu. */}
+                    <div className="flex items-center">
+                      <button
+                        type="button"
+                        onClick={() => onSelect(item.typeId)}
+                        style={{ paddingLeft: `${(depth + 1) * 0.75 + 0.75}rem` }}
+                        // Read back on Back-to-finder (issue #1485), to return focus
+                        // to the row that opened the item panel — `data-` rather
+                        // than an id/ref, since the tree fully unmounts/remounts
+                        // whenever a search collapses or re-expands a group.
+                        data-tree-item-id={item.typeId}
+                        aria-current={selectedTypeId === item.typeId ? 'true' : undefined}
+                        className={`flex min-h-11 min-w-0 flex-1 items-center gap-1.5 truncate py-1 text-left text-xs hover:text-accent md:min-h-0 ${
+                          selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
+                        }`}
+                      >
+                        <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{item.name}</span>
+                      </button>
+                      <RowMoreActions />
+                    </div>
                   </ItemContextMenu>
                 </li>
               );
@@ -1215,6 +1222,7 @@ export function Market() {
                               label={t('market.sell')}
                               defaultSort={{ columnId: 'price', direction: 'asc' }}
                               rowContextMenu={orderRowContextMenu}
+                              rowMoreActions
                               rowClassName={(o) =>
                                 myOrderIds.has(o.order_id) ? 'row-mine' : undefined
                               }
@@ -1303,6 +1311,7 @@ export function Market() {
                               label={t('market.buy')}
                               defaultSort={{ columnId: 'price', direction: 'desc' }}
                               rowContextMenu={orderRowContextMenu}
+                              rowMoreActions
                               rowClassName={(o) =>
                                 myOrderIds.has(o.order_id) ? 'row-mine' : undefined
                               }

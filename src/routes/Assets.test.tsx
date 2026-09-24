@@ -710,6 +710,18 @@ describe('station pins (issue #84)', () => {
 });
 
 describe('item context menu (issue #83)', () => {
+  it('opens the same menu from a visible More actions button on the row (#1497)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await openLocation(user, JITA);
+
+    await user.click(await screen.findByRole('button', { name: 'More actions for Tritanium' }));
+
+    expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+  });
+
   it('opens the shared item context menu on right-click, with a View in Market action', async () => {
     const user = userEvent.setup();
     render(<App />);
