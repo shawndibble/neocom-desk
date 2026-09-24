@@ -10,7 +10,7 @@ test('logs in via mocked EVE SSO, picks a character, sees the overview wallet', 
   // substrings — the permissions-hint paragraph also mentions "Neocom Desk".
   await expect(page.getByText('Neocom Desk', { exact: true })).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: /command deck for every character you fly/i })
+    page.getByRole('heading', { name: /the math you'd do in a spreadsheet, already done/i })
   ).toBeVisible();
 
   // The landing page repeats this CTA (hero + closing band) — .first() is the

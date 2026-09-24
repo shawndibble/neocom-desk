@@ -1103,7 +1103,7 @@
       },
       "appraisal": {
         "question": "What is this pile of loot actually worth?",
-        "answer": "Paste straight from your inventory, a multibuy or a fitting. The appraisal prices it at the trade hub you pick three ways — sold into buy orders now, listed one step under the cheapest seller, or reprocessed with your own skills — each net of the sales tax and broker fee that route pays. Copy a ready-made sell list, or share the result as a link."
+        "answer": "Paste straight from your inventory, a multibuy or a fitting. The appraisal prices it at the trade hub you pick three ways — sold into buy orders now or listed one step under the cheapest seller, each net of the sales tax and broker fee that route pays, and reprocessed with your own skills. Copy a ready-made sell list, or share the result as a link."
       }
     },
     "screenshotsHeading": "See it in action",
@@ -1217,7 +1217,7 @@
       },
       "contracts": {
         "name": "Contracts",
-        "desc": "Every contract your characters are party to and what it held, plus a search of public item exchange and courier contracts by jump range, with ISK per jump for couriers.",
+        "desc": "Your contract history and what each one held, plus a search of public item exchange and courier contracts by jump range, with ISK per jump for couriers.",
         "tag": "Yours + public"
       },
       "social": {
@@ -1227,7 +1227,7 @@
       },
       "contacts": {
         "name": "Contacts & Standings",
-        "desc": "Contacts and standings for one character, or across all of them at once to see where your characters disagree.",
+        "desc": "Contacts and the standings you set on them, for one character or across all of them at once, flagging where your characters disagree.",
         "tag": "Every character"
       }
     },
