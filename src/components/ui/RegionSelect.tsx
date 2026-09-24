@@ -118,7 +118,7 @@ export function RegionSelect({
           className={cx(
             fieldBaseClassName,
             fieldSizeClassName[size],
-            'flex items-center justify-between gap-2 overflow-hidden whitespace-nowrap outline-none',
+            'flex items-center justify-between gap-2 overflow-hidden whitespace-nowrap',
             className
           )}
         >
