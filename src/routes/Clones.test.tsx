@@ -177,6 +177,9 @@ describe('Clones', () => {
     // answering one throttled batch with one GET /universe/types/{id} per
     // implant would deepen the outage for every other panel in the app.
     // Degrading to the placeholder until something asks again is the trade.
+    // The one type request below is the tooltip description lookup (#1379), one
+    // per distinct implant — it is not a name fallback, and the name stays a
+    // placeholder even though that response carries one.
     let typeRequests = 0;
     server.use(
       http.post(
@@ -200,7 +203,7 @@ describe('Clones', () => {
 
     expect(await screen.findByText('Type #19540')).toBeInTheDocument();
     expect(screen.queryByText('High-grade Ascendancy Alpha')).not.toBeInTheDocument();
-    expect(typeRequests).toBe(0);
+    expect(typeRequests).toBe(1);
   });
 
   it('renders a clone in an inaccessible structure as an id fallback, without a re-auth banner', async () => {

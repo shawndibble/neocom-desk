@@ -10,13 +10,14 @@ import {
   ReauthBanner,
   Spinner,
   StatChip,
+  Tooltip,
   type DataTableColumn,
   type StatChipTone,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
-import { loadCharacterClones } from '@/features/character/clones';
+import { loadCharacterClones, loadImplantDescriptions } from '@/features/character/clones';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { loadCharacterSpSummary } from '@/features/character/characterSp';
 import { getLastKnownSpSummary, type CharacterSpSummary } from '@/stores/characterSp';
@@ -43,6 +44,8 @@ interface Snapshot {
   /** Effective level of Infomorph Synchronizing; 0 when unknown/untrained. */
   infomorphLevel: number;
   implantNames: Map<number, string>;
+  /** Markup-stripped implant descriptions for the name tooltips; absent ids get no tooltip. */
+  implantDescriptions: Map<number, string>;
   /** Jump-clone and home-clone location names, keyed by `location_id`. */
   locationNames: Map<number, string>;
   /** Total/unallocated SP for the shared Character-overview header. */
@@ -72,7 +75,10 @@ async function loadClonesSnapshot(
 
   // Already superseded: skip the name resolves, their results would be discarded.
   const implantTypeIds = signal.cancelled ? [] : [...new Set(clones.flatMap((c) => c.implants))];
-  const implantNames = await loadTypeNames(implantTypeIds);
+  const [implantNames, implantDescriptions] = await Promise.all([
+    loadTypeNames(implantTypeIds),
+    loadImplantDescriptions(implantTypeIds),
+  ]);
 
   // Ids to resolve for one location type: every jump clone of that type, plus
   // the home clone's location if it happens to be that type too.
@@ -115,10 +121,25 @@ async function loadClonesSnapshot(
     clonesNeedsReauth,
     infomorphLevel,
     implantNames,
+    implantDescriptions,
     locationNames,
     sp,
     loadedAt,
   };
+}
+
+/** An implant name linking to Market, with its description in a hover/focus tooltip when it has one. */
+function ImplantLink({
+  typeId,
+  name,
+  description,
+}: {
+  typeId: number;
+  name: string;
+  description?: string;
+}) {
+  const link = <MarketItemLink typeId={typeId}>{name}</MarketItemLink>;
+  return description ? <Tooltip content={description}>{link}</Tooltip> : link;
 }
 
 /** Clones: jump clones, their locations and implants, plus the current jump cooldown. */
@@ -135,6 +156,7 @@ export function Clones() {
   const clonesNeedsReauth = data?.clonesNeedsReauth ?? false;
   const infomorphLevel = data?.infomorphLevel ?? 0;
   const implantNames = data?.implantNames ?? NO_NAMES;
+  const implantDescriptions = data?.implantDescriptions ?? NO_NAMES;
   const locationNames = data?.locationNames ?? NO_NAMES;
   // Falls back to the last SP another tab already loaded for this character,
   // not straight to "—": this tab's own read is still in flight the instant
@@ -186,14 +208,16 @@ export function Clones() {
             : clone.implants.map((id, index) => (
                 <Fragment key={id}>
                   {index > 0 && ', '}
-                  <MarketItemLink typeId={id}>
-                    {implantNames.get(id) ?? `Type #${id}`}
-                  </MarketItemLink>
+                  <ImplantLink
+                    typeId={id}
+                    name={implantNames.get(id) ?? `Type #${id}`}
+                    description={implantDescriptions.get(id)}
+                  />
                 </Fragment>
               )),
       },
     ],
-    [t, locationNames, implantNames]
+    [t, locationNames, implantNames, implantDescriptions]
   );
 
   if (!hydrated) {

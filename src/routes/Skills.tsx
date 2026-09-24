@@ -41,7 +41,7 @@ import { textParam } from '@/lib/urlState';
 import { filterSkillGroups } from '@/features/skills/skillGroupFilter';
 import type { CompletedLevel } from '@/features/skills/queueStatus';
 import type { CachedResult } from '@/features/skills/data';
-import { stripEveMarkup } from '@/features/skills/typeDisplay';
+import { stripEveMarkup, typeDescription } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
 import { skillCsvColumns, skillCsvRows, type SkillGroup } from '@/features/skills/skillsCsv';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -110,7 +110,7 @@ async function loadSkillsSnapshot(
     return {
       typeId: id,
       name: info?.name ?? `#${id}`,
-      description: info?.description ? stripEveMarkup(info.description) : null,
+      description: typeDescription(info?.description),
       attributeSlot: Object.keys(extractAttributeBonuses(info?.dogma_attributes)).length > 0,
     };
   });
