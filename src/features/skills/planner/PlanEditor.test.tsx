@@ -641,7 +641,7 @@ describe('PlanEditor tools pane', () => {
       ],
     });
     expect(screen.getAllByText(/^2099-01-0/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/In-game queue: 1 skill, finishes 2099-01-0/)).toBeInTheDocument();
+    expect(screen.getByText(/Trains first in game: 1 skill, until 2099-01-0/)).toBeInTheDocument();
   });
 
   it("costs the plan's total training time and finish date per marker segment, not just the savings badge (#1232)", async () => {

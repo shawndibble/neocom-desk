@@ -547,13 +547,13 @@ describe('projectQueueEnd', () => {
   const trained = new Map([[101, { level: 2, sp: 1000 }]]);
 
   it('starts now for an empty queue, trained unchanged', () => {
-    const r = projectQueueEnd(trained, [], NOW);
+    const r = projectQueueEnd(trained, [], NOW, []);
     expect(r).toMatchObject({ startMs: NOW, paused: false, queuedLevels: [] });
     expect(r.trained.get(101)?.level).toBe(2);
   });
 
   it('starts now for a paused queue and flags it', () => {
-    const r = projectQueueEnd(trained, [entry({ queue_position: 1 })], NOW);
+    const r = projectQueueEnd(trained, [entry({ queue_position: 1 })], NOW, []);
     expect(r.startMs).toBe(NOW);
     expect(r.paused).toBe(true);
   });
@@ -566,7 +566,8 @@ describe('projectQueueEnd', () => {
         entry({ queue_position: 1, finished_level: 3, finish_date: '2026-09-01T12:00:00Z' }),
         entry({ queue_position: 2, finished_level: 4, finish_date: end }),
       ],
-      NOW
+      NOW,
+      []
     );
     expect(r.startMs).toBe(Date.parse(end));
     expect(r.trained.get(101)?.level).toBe(3);
@@ -615,7 +616,8 @@ describe('projectQueueEnd', () => {
     const r = projectQueueEnd(
       trained,
       [entry({ queue_position: 1, finished_level: 3, finish_date: '2026-08-01T12:00:00Z' })],
-      NOW
+      NOW,
+      []
     );
     expect(r.startMs).toBe(NOW);
     expect(r.queuedLevels).toEqual([]);

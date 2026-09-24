@@ -241,8 +241,7 @@ export function PlanEditor({
 }: PlanEditorProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  // Which side the tools pane lands on, and whether the entry list gets its
-  // own capped scroller — the same hook the rest of the app's two-column
+  // Which side the tools pane lands on — the same hook the rest of the app's two-column
   // layouts switch on, so this pane can never disagree with them.
   const isDesktop = useIsDesktop();
   const [copyConfirm, setCopyConfirm] = useState(false);
@@ -483,8 +482,8 @@ export function PlanEditor({
     [plan.markers, plan.markerAttributes, plan.entries.length]
   );
 
-  // The in-game queue trains first, so the plan starts when it ends and every
-  // queued level counts as trained by then. One instant feeds the schedule,
+  // The queue's lead (the levels ahead of the first one this plan lists)
+  // trains first, so the plan starts when it ends. One instant feeds the schedule,
   // Optimize Remaps' Booster origin, so the savings figure and the total agree.
   const [loadedAtMs] = useState(() => Date.now());
   const queueProjection = useMemo(
@@ -1951,45 +1950,38 @@ export function PlanEditor({
                 </>
               }
             />
-            {/* Outside the scroller, so a refusal is on screen wherever in a
-                long queue the drag happened. */}
             {dropError && (
               <p role="alert" className="text-xs text-danger">
                 {dropError}
               </p>
             )}
             {promoteConfirm && confirmation(promoteConfirm)}
-            {/* No scroller of its own: the page is the one scrollbar. A capped
-                list beside a sidebar taller than the viewport gave two, and
-                on a phone a nested scroller traps the list. */}
-            <div>
-              {error ? (
-                <p className="text-xs text-danger">{t('plans.computeError', { message: error })}</p>
-              ) : (
-                <EntryList
-                  rows={mergedRows}
-                  bandsAt={bandsAt}
-                  nameFor={nameFor}
-                  attributesFor={attributesFor}
-                  columns={columnVisibility}
-                  boostedSteps={boostedSteps}
-                  alphaCappedSteps={alphaCappedSteps}
-                  startDate={startDate}
-                  onReorder={handleDrop}
-                  onPromotePrereq={handlePromotePrereq}
-                  onRemove={requestRemoveEntry}
-                  onRemoveMarker={handleRemoveMarker}
-                  markerAttributesFor={markerAttributesFor}
-                  markerImplants={effectiveImplants}
-                  onEditMarker={setEditingMarkerIndex}
-                  onSetPriority={handleSetPriority}
-                  milestoneStatusFor={milestoneStatusFor}
-                  onAddMilestone={handleAddMilestone}
-                  onRenameMilestone={handleRenameMilestone}
-                  onRemoveMilestone={handleRemoveMilestone}
-                />
-              )}
-            </div>
+            {error ? (
+              <p className="text-xs text-danger">{t('plans.computeError', { message: error })}</p>
+            ) : (
+              <EntryList
+                rows={mergedRows}
+                bandsAt={bandsAt}
+                nameFor={nameFor}
+                attributesFor={attributesFor}
+                columns={columnVisibility}
+                boostedSteps={boostedSteps}
+                alphaCappedSteps={alphaCappedSteps}
+                startDate={startDate}
+                onReorder={handleDrop}
+                onPromotePrereq={handlePromotePrereq}
+                onRemove={requestRemoveEntry}
+                onRemoveMarker={handleRemoveMarker}
+                markerAttributesFor={markerAttributesFor}
+                markerImplants={effectiveImplants}
+                onEditMarker={setEditingMarkerIndex}
+                onSetPriority={handleSetPriority}
+                milestoneStatusFor={milestoneStatusFor}
+                onAddMilestone={handleAddMilestone}
+                onRenameMilestone={handleRenameMilestone}
+                onRemoveMilestone={handleRemoveMilestone}
+              />
+            )}
           </div>
         </Panel>
       </PlanEditorLayout>

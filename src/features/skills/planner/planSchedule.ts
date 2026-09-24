@@ -58,7 +58,7 @@ export interface PlanScheduleInputs {
   cloneState: CloneState;
 }
 
-/** The plan's schedule, started when the live queue runs dry (`nowMs` if it is empty). */
+/** The plan's schedule, started when the live queue's lead ends (`nowMs` if there is none). */
 export function schedulePlan(
   plan: SchedulablePlan,
   inputs: PlanScheduleInputs,

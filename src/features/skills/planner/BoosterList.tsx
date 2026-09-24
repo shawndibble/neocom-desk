@@ -91,7 +91,7 @@ interface BoosterRowProps {
   row: PlanBooster;
   rowKey: string;
   detectedAccelerator: number | null;
-  /** A start time only matters for an accelerator queued behind another, so the first row hides it until set. */
+  /** Whether this row shows its Starts field. */
   showStart: boolean;
   overlaps: boolean;
   onPatch: (patch: Partial<PlanBooster>) => boolean;
@@ -274,6 +274,7 @@ export function BoosterList({ boosters, detectedAccelerator, onChange }: Booster
             rowKey={`booster-${index}`}
             row={row}
             detectedAccelerator={detectedAccelerator}
+            // A start only matters for an accelerator queued behind another.
             showStart={index > 0 || row.startsAt !== null}
             overlaps={overlaps}
             onPatch={(patch) => patchRow(index, patch)}
