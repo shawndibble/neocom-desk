@@ -788,6 +788,7 @@
     "jobsFilterStatus": "Status",
     "jobsFilterWithCount": "{{label}} ({{count}})",
     "jobsFilteredEmptyTitle": "No jobs match these filters",
+    "jobsResetFilters": "Reset filters",
     "jobsColBlueprint": "Blueprint",
     "jobsColActivity": "Activity",
     "jobsColRuns": "Runs",

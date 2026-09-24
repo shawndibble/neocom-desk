@@ -486,8 +486,15 @@ export function ActiveJobsPanel({
     () => [...new Set(jobs.map((job) => job.activity_id))].sort((a, b) => a - b),
     [jobs]
   );
-  // Only worth a control once there is more than one activity to tell apart.
-  const showActivityFilter = presentActivityIds.length > 1;
+  // Plus any still-selected activity with no job left (a character switch,
+  // delivered jobs, a shared URL) — shown checked so it can be unchecked.
+  const activityMenuIds = useMemo(
+    () => [...new Set([...presentActivityIds, ...activityIds])].sort((a, b) => a - b),
+    [presentActivityIds, activityIds]
+  );
+  // Only worth a control once there is more than one activity to tell apart —
+  // or while a filter is applied, same guard as Status below (#1477).
+  const showActivityFilter = activityFilter.size > 0 || presentActivityIds.length > 1;
   // Kept mounted while a status filter is still active even if no job
   // currently matches it — losing the control out from under an applied
   // filter would leave the list silently narrowed with no way to clear it.
@@ -519,6 +526,10 @@ export function ActiveJobsPanel({
       ? activityIds.filter((id) => id !== activityId)
       : [...activityIds, activityId];
     setJobFilters({ 'jobs.activity': next });
+  }
+
+  function resetJobFilters() {
+    setJobFilters({ 'jobs.activity': [], 'jobs.status': new Set() });
   }
 
   function toggleStatus(status: JobStatusFilter) {
@@ -896,7 +907,7 @@ export function ActiveJobsPanel({
                           count: activityFilter.size,
                         })
                   }
-                  items={presentActivityIds.map((activityId) => ({
+                  items={activityMenuIds.map((activityId) => ({
                     value: activityId,
                     label: t(activityI18nKey(activityId), { id: activityId }),
                   }))}
@@ -925,7 +936,16 @@ export function ActiveJobsPanel({
             </div>
           )}
           {filteredJobs.length === 0 ? (
-            <EmptyState title={t('industry.jobsFilteredEmptyTitle')} className="py-4" />
+            // Jobs exist but none pass, so a filter is always on here.
+            <EmptyState
+              title={t('industry.jobsFilteredEmptyTitle')}
+              className="py-4"
+              action={
+                <Button size="sm" onClick={resetJobFilters}>
+                  {t('industry.jobsResetFilters')}
+                </Button>
+              }
+            />
           ) : (
             // Six columns overflow the route's `lg:grid-cols-[20rem_1fr]`
             // column at tablet widths; `.dt-stack` only rescues below `sm`.
