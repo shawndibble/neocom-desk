@@ -28,7 +28,7 @@ export interface VariationsTableProps {
   /** Absent key = not yet requested; undefined value = still loading. */
   prices: ReadonlyMap<number, OrderBookSummary | undefined>;
   onSelect: (typeId: number) => void;
-  /** Opens the attribute-compare modal for every row currently shown here — both the header button and each row's "Compare Variations" menu action. */
+  /** Adds every row currently shown here to the Compare Set and opens the Compare drawer on Attributes — both the header button and each row's "Compare Variations" menu action. */
   onCompare: () => void;
   /** Same per-item context menu as the tree (issue #147): null until requested, then per-typeId lookups. */
   blueprintCatalog: BlueprintCatalog | null;

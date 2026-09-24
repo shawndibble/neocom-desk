@@ -178,9 +178,15 @@ here — they go one per file in `docs/context/decisions/`.
   it look empty for a reason that is not about the pilot's data. Map, ticker
   and rail all read the same board, so a day cannot show a dot for something
   the rail declines to list.
-- **Compare**: A tab that puts the Quickbar's items side by side on best sell,
-  best buy, spread and volume, under the same **Location Mode** as the order
-  book beside it — the Trade Hub's region when that book is All regions.
+- **Compare**: A resizable bottom drawer over the **Compare Set**, not a tab
+  — it opens beside the order book rather than covering it, since comparing
+  happens _while_ browsing. Two views: Prices (best sell, best buy, spread
+  and volume, under the same **Location Mode** as the order book beside it —
+  the Trade Hub's region when that book is All regions) and Attributes (dogma
+  attributes grouped by category, plus an Estimated Price row — what the
+  Variations table's own "Compare" button opens it on). Distinct from
+  **Appraisal**'s **Compare hubs**, which prices one pasted pile across the
+  five trade hubs rather than several items against each other.
 - **Compare Set**: The short-lived selection of items being priced against each
   other right now — usually variants of one thing. Distinct from the
   **Quickbar**, which is the durable list of items the user returns to across

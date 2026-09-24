@@ -3333,7 +3333,15 @@
       "clearAll": "Clear all",
       "expand": "Expand",
       "restore": "Restore",
-      "resize": "Resize the drawer"
+      "resize": "Resize the drawer",
+      "viewLabel": "Compare view",
+      "viewPrices": "Prices",
+      "viewAttributes": "Attributes",
+      "attributeColumn": "Attribute",
+      "worth": "Worth",
+      "estimatedPrice": "Estimated Price",
+      "errorTitle": "Couldn't load comparison",
+      "errorHint": "Try again, or reload the page."
     },
     "quickbar": {
       "title": "Quickbar",
@@ -3361,14 +3369,6 @@
       "capped": "Showing {{limit}} of {{total}}",
       "compare": "Compare",
       "exportCsv": "Export Variations to CSV"
-    },
-    "variationsCompare": {
-      "title": "Compare Variations",
-      "attributeColumn": "Attribute",
-      "worth": "Worth",
-      "estimatedPrice": "Estimated Price",
-      "errorTitle": "Couldn't load comparison",
-      "errorHint": "Try again, or reload the page."
     },
     "itemDetail": {
       "volume": "Volume: {{volume}} m3",

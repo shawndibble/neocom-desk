@@ -1,12 +1,27 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { ESI_BASE_URL } from '@/esi/client';
+import { db } from '@/db';
+import { loadAttributeDictionary } from '@/sde/loadMarketSde';
+import { loadSkills } from '@/sde/loadSde';
 import { useCompareSet } from './compareSet';
 import { CompareDrawer } from './CompareDrawer';
+
+vi.mock('@/sde/loadMarketSde', () => ({
+  loadAttributeDictionary: vi.fn(),
+}));
+vi.mock('@/sde/loadSde', () => ({
+  loadSkills: vi.fn(),
+  loadTypes: vi.fn(async () => ({})),
+  loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
+}));
+
+const mockedLoadDictionary = vi.mocked(loadAttributeDictionary);
+const mockedLoadSkills = vi.mocked(loadSkills);
 
 const REGION_ID = 10000002;
 const ITEM_A = { typeId: 34, itemName: 'Tritanium' };
@@ -49,15 +64,33 @@ const server = setupServer(
           ]
         : [];
     return HttpResponse.json(orders, { headers: { 'X-Pages': '1' } });
-  })
+  }),
+  http.get(`${ESI_BASE_URL}/universe/types/:typeId`, ({ params }) =>
+    HttpResponse.json({
+      type_id: Number(params.typeId),
+      name: params.typeId === String(ITEM_A.typeId) ? ITEM_A.itemName : ITEM_B.itemName,
+      description: '',
+      group_id: 25,
+      published: true,
+      dogma_attributes: [{ attribute_id: 9, value: 1200 }],
+    })
+  )
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
+afterEach(async () => {
+  server.resetHandlers();
+  vi.clearAllMocks();
+  await db.esiCache.clear();
+});
 
 beforeEach(() => {
-  useCompareSet.setState({ items: [] });
+  useCompareSet.setState({ items: [], view: 'prices', openRequest: 0 });
+  mockedLoadDictionary.mockResolvedValue({
+    9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
+  });
+  mockedLoadSkills.mockResolvedValue([]);
 });
 
 function renderDrawer() {
@@ -177,5 +210,65 @@ describe('CompareDrawer', () => {
     fireEvent.pointerUp(window);
 
     expect(region).toHaveStyle({ height: '380px' });
+  });
+
+  it('switches to the Attributes view and shows the dogma matrix, hiding the CSV export', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A, ITEM_B] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (2)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+
+    await user.click(within(region).getByRole('button', { name: 'Attributes' }));
+
+    expect(await within(region).findByText('Structure Hitpoints')).toBeInTheDocument();
+    expect(within(region).getByText('Worth')).toBeInTheDocument();
+    expect(within(region).getByText('Estimated Price')).toBeInTheDocument();
+    expect(within(region).queryByLabelText('Export Compare Set to CSV')).not.toBeInTheDocument();
+
+    await user.click(within(region).getByRole('button', { name: 'Prices' }));
+    expect(within(region).getByLabelText('Export Compare Set to CSV')).toBeInTheDocument();
+    expect(within(region).queryByText('Structure Hitpoints')).not.toBeInTheDocument();
+  });
+
+  it('a pending open request from before mount (Variations "Compare") opens straight to the requested view', async () => {
+    act(() => {
+      useCompareSet.setState({ items: [ITEM_A] });
+      useCompareSet.getState().openIn('attributes');
+    });
+    renderDrawer();
+
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    expect(
+      within(region).getByRole('button', { name: 'Attributes', pressed: true })
+    ).toBeInTheDocument();
+    expect(await within(region).findByText('Worth')).toBeInTheDocument();
+  });
+
+  it('a later openIn call while the drawer is closed opens it on the requested view', async () => {
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    expect(screen.queryByRole('region')).not.toBeInTheDocument();
+
+    act(() => useCompareSet.getState().openIn('attributes'));
+
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    expect(
+      within(region).getByRole('button', { name: 'Attributes', pressed: true })
+    ).toBeInTheDocument();
+  });
+
+  it('a later openIn call does not collapse an already-expanded drawer', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    await user.click(within(region).getByRole('button', { name: 'Expand' }));
+    expect(region.style.height).toBe('80vh');
+
+    act(() => useCompareSet.getState().openIn('attributes'));
+
+    expect(region.style.height).toBe('80vh');
   });
 });

@@ -199,7 +199,7 @@ describe('VariationsTable', () => {
       expect(onShowInfo).toHaveBeenCalledWith(587, 'Rifter');
     });
 
-    it('opens the compare modal for the whole table via the row-level Compare Variations action', async () => {
+    it('triggers onCompare for the whole table via the row-level Compare Variations action', async () => {
       const user = userEvent.setup();
       const onCompare = vi.fn();
       renderTable({ onCompare });

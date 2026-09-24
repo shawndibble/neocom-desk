@@ -58,7 +58,6 @@ import { useCompareSet } from '@/features/market/compareSet';
 import { QuickbarList } from '@/features/market/QuickbarList';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { VariationsTable } from '@/features/market/VariationsTable';
-import { VariationsCompareModal } from '@/features/market/VariationsCompareModal';
 import {
   quickbarToPasteText,
   removeQuickbarItem,
@@ -523,9 +522,20 @@ export function Market() {
     setInfoModalItem({ typeId, itemName });
   }
 
-  // Variations "Compare" (issue #146): every row currently shown in the
-  // Variations table, side by side — see VariationsCompareModal.
-  const [compareModalOpen, setCompareModalOpen] = useState(false);
+  // Variations "Compare" (issue #146, folded into the Compare drawer's
+  // Attributes view by #1425): adds every row currently shown in the
+  // Variations table, plus the selected item itself, to the Compare Set and
+  // opens the drawer on Attributes — see CompareAttributesMatrix.
+  const addManyToCompare = useCompareSet((state) => state.addMany);
+  const openCompareIn = useCompareSet((state) => state.openIn);
+  function handleCompareVariations() {
+    if (!variationsResult || !selectedItem || selectedTypeId === null) return;
+    addManyToCompare([
+      { typeId: selectedTypeId, itemName: selectedItem.name },
+      ...variationsResult.rows.map((row) => ({ typeId: row.typeId, itemName: row.name })),
+    ]);
+    openCompareIn('attributes');
+  }
 
   const { blueprintCatalog, ensureBlueprintCatalog } = useBlueprintCatalog();
 
@@ -1281,7 +1291,7 @@ export function Market() {
                           truncated={variationsResult.truncated}
                           prices={variationPrices}
                           onSelect={handleSelectItem}
-                          onCompare={() => setCompareModalOpen(true)}
+                          onCompare={handleCompareVariations}
                           blueprintCatalog={blueprintCatalog}
                           onRequestBlueprintCatalog={ensureBlueprintCatalog}
                           onAddToQuickbar={handleAddToQuickbar}
@@ -1306,14 +1316,6 @@ export function Market() {
           itemName={infoModalItem.itemName}
           location={orderBookLocation}
           onClose={() => setInfoModalItem(null)}
-        />
-      )}
-
-      {compareModalOpen && variationsResult && (
-        <VariationsCompareModal
-          items={variationsResult.rows}
-          prices={variationPrices}
-          onClose={() => setCompareModalOpen(false)}
         />
       )}
     </div>

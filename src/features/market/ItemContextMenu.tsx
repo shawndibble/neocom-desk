@@ -29,7 +29,7 @@ export interface ItemContextMenuProps {
   /** False with no active character — the Quickbar has nobody to save the item under. */
   quickbarAvailable: boolean;
   onShowInfo: (typeId: number, itemName: string) => void;
-  /** Variations-table rows only (issue #147): opens the attribute-compare modal for the row's variation group. Omitted elsewhere. */
+  /** Variations-table rows only (issue #147): adds the row's variation group to the Compare Set and opens the Compare drawer on Attributes. Omitted elsewhere. */
   onCompareVariations?: () => void;
   /** Present only when at least one of the character's own Build Plans consumes this item as a material (issue #414); omitted when unknown or when no plan does. */
   onViewInIndustryAsMaterial?: () => void;
