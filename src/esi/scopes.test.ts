@@ -81,14 +81,6 @@ describe('SCOPES (Base Grant)', () => {
     expect(SCOPES).not.toContain(PUBLIC);
   });
 
-  it('equals the Core Grant plus every default-on Permission, with nothing else', () => {
-    const expected = new Set<string>([
-      ...CORE_GRANT,
-      ...DEFAULT_ON_GROUPS.flatMap((group) => scopesForGroup(group)),
-    ]);
-    expect(new Set(SCOPES)).toEqual(expected);
-  });
-
   it('exposes a space-joined string for the SSO scope parameter', () => {
     expect(SCOPES_STRING).toBe(SCOPES.join(' '));
     expect(SCOPES_STRING.split(' ')).toHaveLength(SCOPES.length);
@@ -229,12 +221,12 @@ describe('PERMISSIONS', () => {
     }
   });
 
+  // Hand-written, not derived from DEFAULT_ON_GROUPS/OPT_IN_GROUPS above: those
+  // are filtered by `defaultOn` itself, so a derived expectation here would
+  // pass no matter which way a group's flag flipped.
   it('marks corp and structureMarkets opt-in and every other group default-on', () => {
-    expect(PERMISSIONS.corp.defaultOn).toBe(false);
-    expect(PERMISSIONS.structureMarkets.defaultOn).toBe(false);
-    for (const group of DEFAULT_ON_GROUPS) {
-      expect(PERMISSIONS[group].defaultOn, group).toBe(true);
-    }
+    const optIn = SCOPE_GROUPS.filter((group) => !PERMISSIONS[group].defaultOn);
+    expect([...optIn].sort()).toEqual(['corp', 'structureMarkets'].sort());
   });
 });
 

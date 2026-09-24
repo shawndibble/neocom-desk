@@ -3,7 +3,7 @@
  * with one narrow, explicit exception: `esi-mail.organize_mail.v1` marks a
  * mail read on ESI when it's opened here. Every other scope below is a read.
  * `esi-markets.structure_markets.v1` (issue #538) is opt-in only — behind the
- * `structureMarkets` group, never the base grant — since checking a player
+ * `structureMarkets` group, never the Base Grant — since checking a player
  * structure's own market is a need almost nobody's orders have.
  *
  * Derived from `registry.ts`, never hand-maintained, so a scope is here only
@@ -19,8 +19,7 @@ import {
   type ScopeGroup,
 } from './registry';
 
-export type { Scope, ScopeGroup };
-export { PERMISSIONS, SCOPE_GROUPS };
+export type { Scope };
 
 /**
  * Widened to the interface so the optional `group` reads uniformly. Straight

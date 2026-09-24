@@ -158,8 +158,8 @@ export interface EsiEndpointSpec {
    * The Permission (Scope Group) this endpoint's scope belongs to. **Absent
    * means the Core Grant** — the handful of scopes every Character is asked
    * for at sign-in and which belong to no Permission (skills, skill queue,
-   * structure lookup) — so leaving it off is the rare case, reserved for
-   * those.
+   * structure lookup and search) — so leaving it off is the rare case,
+   * reserved for those.
    *
    * Every other endpoint declares one of the 13 `SCOPE_GROUPS`: the eleven
    * default-on ones together with the Core Grant make up the **Base Grant**
@@ -343,13 +343,13 @@ export const ESI_REGISTRY = {
     scope: PUBLIC,
   },
   /**
-   * In the `corp` group, not the base grant: reading this needs its own scope
+   * In the `corp` group, not the Base Grant: reading this needs its own scope
    * regardless of the other nine, so a Character cannot know their corp role
    * until they opt in. That costs the "you just made Director, grant now"
    * proactive nudge (`CorpGrantPrompt`) for anyone who never granted the group
    * before — `useCorpAccess` answers `not-granted` instead, and Settings'
    * Corp access row is the only way in. A Character who already held this
-   * scope from the old base grant keeps it (`app/loginFlow.ts` unions with
+   * scope from the old Base Grant keeps it (`app/loginFlow.ts` unions with
    * the stored grant), so nothing changes for them.
    */
   getCharacterRoles: {
@@ -558,7 +558,7 @@ export const ESI_REGISTRY = {
   },
   /**
    * The corp assets list #295 meant to register and did not (issue #327). Its
-   * scope is the corp twin of the base grant's `esi-assets.read_assets.v1` and
+   * scope is the corp twin of the Base Grant's `esi-assets.read_assets.v1` and
    * still belongs in the group: a line member can no more read their corp's
    * hangars than its wallet.
    */
