@@ -543,6 +543,8 @@ export function Contracts() {
             typeOptions={typeOptions}
           />
           {filteredContracts.length === 0 ? (
+            // Zero matches with no active filter can't happen today (an empty
+            // list is caught above), but the reset only belongs where a filter is on.
             isContractsFilterActive(filter) ? (
               <EmptyState
                 title={t('contracts.noFilterMatches')}

@@ -329,6 +329,22 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     });
   });
 
+  it('Reset filters clears a search-only filter from the URL too', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByText('Rifter fit');
+
+    await user.type(screen.getByPlaceholderText('Search issuer or title…'), 'zzzznomatch');
+    await waitFor(() => expect(window.location.search).toContain('history.q=zzzznomatch'));
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(new URLSearchParams(window.location.search).has('history.q')).toBe(false)
+    );
+  });
+
   it('on a narrow viewport, the filter sheet reopens cleared after Reset filters', async () => {
     const real = window.matchMedia;
     window.matchMedia = ((media: string) =>
