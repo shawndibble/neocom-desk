@@ -34,6 +34,16 @@ function characterToggle(page: Page) {
   return page.getByRole('button', { name: CHARACTER_NAME, exact: true });
 }
 
+/**
+ * The Character's own section, not the "All Characters" master row: that row
+ * (`AllCharactersNotificationSection.tsx`) is always open and lists every
+ * event too, so an unscoped `getByText`/`getByRole` lookup for an event's own
+ * label or control matches twice on this page.
+ */
+function characterSection(page: Page) {
+  return characterToggle(page).locator('xpath=ancestor::div[contains(@class, "rounded-xs")][1]');
+}
+
 test('per-Character disclosure header meets the 44px touch floor at 390px, and still expands/collapses', async ({
   page,
 }) => {
@@ -116,8 +126,9 @@ test('skillQueueEnding row and its lead-time select stay visible at 390px (issue
   const toggle = characterToggle(page);
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 
-  await expect(page.getByText('Skill Queue Ending', { exact: true })).toBeVisible();
+  const section = characterSection(page);
+  await expect(section.getByText('Skill Queue Ending', { exact: true })).toBeVisible();
   await expect(
-    page.getByRole('combobox', { name: 'Warn this far before the skill queue runs dry:' })
+    section.getByRole('combobox', { name: 'Warn this far before the skill queue runs dry:' })
   ).toBeVisible();
 });
