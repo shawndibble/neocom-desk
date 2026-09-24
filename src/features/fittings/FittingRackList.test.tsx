@@ -2,7 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@/i18n';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
-import { FittingRackList } from './FittingRackList';
+import { FittingRackList as EditableRackList } from './FittingRackList';
+
+type RackListProps = Parameters<typeof EditableRackList>[0];
+
+/** The read-only props these tests care about; the editing ones get inert defaults. */
+function FittingRackList(props: Pick<RackListProps, 'fitting' | 'stats' | 'unusableModuleKeys'>) {
+  return (
+    <EditableRackList
+      moduleResults={null}
+      catalogue={null}
+      engineReady={false}
+      profile={null}
+      edit={() => {}}
+      target={null}
+      onSelectTarget={() => {}}
+      {...props}
+    />
+  );
+}
 
 const fitting: Fitting = {
   name: 'Test',

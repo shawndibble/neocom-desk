@@ -46,6 +46,22 @@ describe('fittingToShareInput / shareToFitting', () => {
     expect(restored).toEqual(original);
   });
 
+  it('round-trips one drone type split between space and bay through the real codec (the editor writes this)', async () => {
+    const original = fitting({
+      drones: [
+        { typeId: 2454, quantity: 2, state: 'active' },
+        { typeId: 2454, quantity: 3, state: 'online' },
+      ],
+    });
+    const encoded = await encodeFittingShare(fittingToShareInput(original));
+    expect(encoded.ok).toBe(true);
+    if (!encoded.ok) return;
+    const decoded = await decodeFittingShare(encoded.payload);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(shareToFitting(decoded.value, original.name)).toEqual(original);
+  });
+
   it('round-trips cargo', () => {
     const original = fitting({ cargo: [{ typeId: 12608, quantity: 50 }] });
     const restored = shareToFitting(fittingToShareInput(original), original.name);
