@@ -1215,6 +1215,7 @@ export function Market() {
                               label={t('market.sell')}
                               defaultSort={{ columnId: 'price', direction: 'asc' }}
                               rowContextMenu={orderRowContextMenu}
+                              rowMoreActions
                               rowClassName={(o) =>
                                 myOrderIds.has(o.order_id) ? 'row-mine' : undefined
                               }
@@ -1303,6 +1304,7 @@ export function Market() {
                               label={t('market.buy')}
                               defaultSort={{ columnId: 'price', direction: 'desc' }}
                               rowContextMenu={orderRowContextMenu}
+                              rowMoreActions
                               rowClassName={(o) =>
                                 myOrderIds.has(o.order_id) ? 'row-mine' : undefined
                               }

@@ -288,6 +288,20 @@
       content: none;
     }
 
+    /* The More actions button (`rowMoreActions`): a control, not a field —
+       no label gutter, sat at the card's bottom right. */
+    .dt-stack td.dt-actions {
+      align-self: flex-end;
+      justify-self: end;
+      grid-column: 1 / -1;
+      padding: 0;
+      min-height: 0;
+    }
+
+    .dt-stack td.dt-actions::before {
+      content: none;
+    }
+
     /*
      * The dense card (`stackLayout="dense"`): two lines instead of one field
      * per line, for a long list a reader scans rather than reads — a courier
@@ -347,6 +361,13 @@
       /* The card's headline figure — a size step above the title, two above
          the meta line, so it reads as the number the whole card is for. */
       font-size: 0.9375rem;
+    }
+
+    /* On line one, after the title and headline figure. */
+    .dt-stack.dt-stack-dense td.dt-actions {
+      order: -1;
+      flex: none;
+      align-self: center;
     }
 
     .dt-stack.dt-stack-dense td.dt-meta {

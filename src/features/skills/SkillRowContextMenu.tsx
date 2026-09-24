@@ -4,11 +4,13 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import {
   ContextMenu,
   ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSub,
-  ContextMenuSubContent,
-  ContextMenuSubTrigger,
   ContextMenuTrigger,
+  MenuItem,
+  MenuSub,
+  MenuSubContent,
+  MenuSubTrigger,
+  RowActionsContext,
+  RowMoreActions,
   Tooltip,
 } from '@/components/ui';
 import { db, type SkillPlanRecord } from '@/db';
@@ -19,6 +21,8 @@ import { upsertEntry } from './planner/reorder';
 export interface SkillRowContextMenuProps {
   activeCharacterId: number;
   skillTypeID: number;
+  /** The skill's name, for the row's "More actions" button. */
+  skillName: string;
   /** The character's current trained level (0-5) for this skill. */
   currentLevel: number;
   /**
@@ -56,7 +60,10 @@ async function addSkillToPlan(
 }
 
 /**
- * Right-click "Add to Skill Plan" for a Skills-page row (#405). Targets an
+ * Right-click "Add to Skill Plan" for a Skills-page row (#405), and a visible
+ * "More actions" button beside the row opening the same menu — the only way
+ * a keyboard user reaches it (WCAG 2.1.1). The button is the row's sibling,
+ * not inside it: the row is itself a `<button>`, and buttons don't nest. Targets an
  * existing plan by name via a submenu rather than a single "the current
  * plan" — Skill Plans has no notion of an active/current plan (each is only
  * ever open one at a time via its own route,
@@ -66,6 +73,7 @@ async function addSkillToPlan(
 export function SkillRowContextMenu({
   activeCharacterId,
   skillTypeID,
+  skillName,
   currentLevel,
   tooltipContent,
   children,
@@ -87,35 +95,44 @@ export function SkillRowContextMenu({
     withMenu
   );
 
+  const items = (
+    <MenuSub>
+      <MenuSubTrigger
+        disabled={maxed}
+        title={maxed ? t('skills.contextMenu.maxLevelTitle') : undefined}
+      >
+        {t('skills.contextMenu.addToSkillPlan')}
+      </MenuSubTrigger>
+      <MenuSubContent>
+        {plans && plans.length > 0 ? (
+          plans.map((plan) => (
+            <MenuItem
+              key={plan.id}
+              onSelect={() =>
+                void addSkillToPlan(plan, skillTypeID, targetLevel, activeCharacterId)
+              }
+            >
+              {plan.name}
+            </MenuItem>
+          ))
+        ) : (
+          <MenuItem disabled>{t('skills.contextMenu.noPlans')}</MenuItem>
+        )}
+      </MenuSubContent>
+    </MenuSub>
+  );
+
   return (
-    <ContextMenu>
-      {trigger}
-      <ContextMenuContent>
-        <ContextMenuSub>
-          <ContextMenuSubTrigger
-            disabled={maxed}
-            title={maxed ? t('skills.contextMenu.maxLevelTitle') : undefined}
-          >
-            {t('skills.contextMenu.addToSkillPlan')}
-          </ContextMenuSubTrigger>
-          <ContextMenuSubContent>
-            {plans && plans.length > 0 ? (
-              plans.map((plan) => (
-                <ContextMenuItem
-                  key={plan.id}
-                  onSelect={() =>
-                    void addSkillToPlan(plan, skillTypeID, targetLevel, activeCharacterId)
-                  }
-                >
-                  {plan.name}
-                </ContextMenuItem>
-              ))
-            ) : (
-              <ContextMenuItem disabled>{t('skills.contextMenu.noPlans')}</ContextMenuItem>
-            )}
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-      </ContextMenuContent>
-    </ContextMenu>
+    <RowActionsContext.Provider value={{ name: skillName, items }}>
+      <div className="flex items-center">
+        <div className="min-w-0 flex-1">
+          <ContextMenu>
+            {trigger}
+            <ContextMenuContent>{items}</ContextMenuContent>
+          </ContextMenu>
+        </div>
+        <RowMoreActions />
+      </div>
+    </RowActionsContext.Provider>
   );
 }

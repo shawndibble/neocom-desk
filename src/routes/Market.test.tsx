@@ -1298,6 +1298,24 @@ describe('Quickbar (issue #7)', () => {
 describe('Market Browser order row context menu (issue #6)', () => {
   afterEach(() => configureClipboard(null));
 
+  it('opens the same menu from a visible More actions button on the row (#1497)', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    configureClipboard(writeText);
+    server.use(ordersHandler({ count: 0 }));
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    await user.click(await screen.findByText('Rifter'));
+    const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
+    await user.click(
+      within(sellTable).getByRole('button', { name: /^More actions for Jita IV - Moon 4/ })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Copy price' }));
+
+    expect(writeText).toHaveBeenCalledWith('1,000,000.00 ISK');
+  });
+
   it('copies the location and price to the clipboard', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     configureClipboard(writeText);

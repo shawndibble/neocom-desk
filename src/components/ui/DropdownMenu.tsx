@@ -61,3 +61,40 @@ export function DropdownMenuSeparator({
     <DropdownMenuPrimitive.Separator className={cx('my-1 h-px bg-line', className)} {...props} />
   );
 }
+
+export const DropdownMenuSub = DropdownMenuPrimitive.Sub;
+
+export function DropdownMenuSubTrigger({
+  className,
+  children,
+  ...props
+}: ComponentProps<typeof DropdownMenuPrimitive.SubTrigger>) {
+  return (
+    <DropdownMenuPrimitive.SubTrigger
+      className={cx(menuItemClassName, 'justify-between data-[state=open]:bg-panel-2', className)}
+      {...props}
+    >
+      {children}
+      <span aria-hidden="true" className="text-text-dim">
+        ›
+      </span>
+    </DropdownMenuPrimitive.SubTrigger>
+  );
+}
+
+export function DropdownMenuSubContent({
+  className,
+  ...props
+}: ComponentProps<typeof DropdownMenuPrimitive.SubContent>) {
+  // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
+  // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
+  const container = usePortalContainer();
+  return (
+    <DropdownMenuPrimitive.Portal container={container}>
+      <DropdownMenuPrimitive.SubContent
+        className={cx(menuContentClassName, className)}
+        {...props}
+      />
+    </DropdownMenuPrimitive.Portal>
+  );
+}

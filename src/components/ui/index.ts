@@ -61,7 +61,20 @@ export {
   DropdownMenuItem,
   DropdownMenuCheckboxItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from './DropdownMenu';
+export {
+  MenuItem,
+  MenuSub,
+  MenuSubTrigger,
+  MenuSubContent,
+  RowActionsMenu,
+  RowMoreActions,
+} from './RowActions';
+export { RowActionsContext } from './rowActionsContext';
+export type { RowActions } from './rowActionsContext';
 export { ColumnPickerMenu } from './ColumnPickerMenu';
 export { MultiSelect } from './MultiSelect';
 export type { MultiSelectGroup, MultiSelectOption, MultiSelectProps } from './MultiSelect';

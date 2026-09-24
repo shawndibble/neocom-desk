@@ -1055,7 +1055,7 @@ describe('OpenOrdersPanel — phone', () => {
     await screen.findByTestId('order-group-belowFloor');
 
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
-    const row = screen.getByRole('button', { name: /Tritanium/ });
+    const row = screen.getByRole('button', { name: /^Tritanium/ });
     expect(row).toBeInTheDocument();
     // The row's own sentence — the plain-English half of the badge (decision
     // 20260906-170442) — stays even in the compact list.
@@ -1079,7 +1079,7 @@ describe('OpenOrdersPanel — phone', () => {
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
 
     renderPanel();
-    const row = await screen.findByRole('button', { name: /Tritanium/ });
+    const row = await screen.findByRole('button', { name: /^Tritanium/ });
     await user.click(row);
 
     expect(await screen.findByRole('dialog', { name: 'Alpha · Tritanium' })).toBeInTheDocument();
@@ -1103,7 +1103,7 @@ describe('OpenOrdersPanel — phone', () => {
     );
 
     renderPanel();
-    await screen.findByRole('button', { name: /Mexallon/ });
+    await screen.findByRole('button', { name: /^Mexallon/ });
 
     expect(screen.queryByText(/Never sell below/)).not.toBeInTheDocument();
   });
@@ -1124,12 +1124,12 @@ describe('OpenOrdersPanel — phone', () => {
     );
 
     renderPanel();
-    const row = await screen.findByRole('button', { name: /Mexallon/ });
+    const row = await screen.findByRole('button', { name: /^Mexallon/ });
     expect(row).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Expiring or stale · 1' }));
 
-    expect(screen.queryByRole('button', { name: /Mexallon/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Mexallon/ })).not.toBeInTheDocument();
   });
 
   it("renders the undercut row's match clause as plain text, not a nested focusable tooltip trigger", async () => {
@@ -1161,7 +1161,7 @@ describe('OpenOrdersPanel — phone', () => {
     );
 
     renderPanel();
-    const row = await screen.findByRole('button', { name: /Tritanium/ });
+    const row = await screen.findByRole('button', { name: /^Tritanium/ });
     expect(row).toHaveTextContent('still clears');
     expect(within(row).queryByRole('button')).not.toBeInTheDocument();
     expect(row.querySelector('[tabindex]')).toBeNull();

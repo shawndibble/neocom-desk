@@ -13,7 +13,7 @@
 
 import type { ReactElement, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { IconButton, IskAmount } from '@/components/ui';
+import { IconButton, IskAmount, RowMoreActions } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { formatVolume } from '@/features/market/format';
@@ -277,7 +277,8 @@ interface ItemRowProps {
  * below ~500px — this reflows instead of clipping or scrolling sideways.
  *
  * Full item detail (icon, volume, location, jumps-away) lives behind the
- * right-click context menu's "Show info" action, not on the row itself.
+ * row's menu's "Show info" action — right-click, or the More actions button
+ * the menu publishes into the row — not on the row itself.
  */
 export function ItemRow({
   name,
@@ -318,6 +319,7 @@ export function ItemRow({
               </span>
             </span>
           </span>
+          <RowMoreActions />
         </div>
       )}
     </div>

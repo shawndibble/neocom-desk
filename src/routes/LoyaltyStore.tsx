@@ -494,6 +494,7 @@ export function LoyaltyStore() {
           onSortChange={offersSortProps.onSortChange}
           onRowClick={selectRow}
           rowContextMenu={rowContextMenu}
+          rowMoreActions
           selectedRowKey={selectedRow?.offer.offer_id ?? null}
           rowClassName={(row) =>
             row.offer.offer_id === selectedRow?.offer.offer_id ? 'bg-panel-2' : undefined

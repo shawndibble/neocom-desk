@@ -21,7 +21,14 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconButton, Popover, PopoverContent, PopoverTrigger, TypeIcon } from '@/components/ui';
+import {
+  IconButton,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  RowMoreActions,
+  TypeIcon,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { formatIskCompact } from '@/lib/isk';
 import { ItemContextMenu } from './ItemContextMenu';
@@ -84,23 +91,28 @@ function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget, menu }: 
           if (open) menu.onRequestBlueprintCatalog();
         }}
       >
-        <button
-          type="button"
-          onClick={() => onSelect(item.typeId)}
-          aria-current={selected ? 'true' : undefined}
-          className={`flex flex-1 items-center gap-1.5 truncate text-left hover:text-accent ${
-            selected ? 'text-accent' : 'text-text-dim'
-          }`}
-        >
-          <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
-          <span className="truncate">{item.name}</span>
-          {hasTarget && (
-            <span className="shrink-0 text-text-dim">
-              {(item.targetDirection === 'above' ? '≥ ' : '≤ ') +
-                formatIskCompact(item.targetPrice!)}
-            </span>
-          )}
-        </button>
+        {/* The trigger holds the More actions button beside the item
+            button (buttons don't nest), so both sit inside the menu. */}
+        <div className="flex min-w-0 flex-1 items-center">
+          <button
+            type="button"
+            onClick={() => onSelect(item.typeId)}
+            aria-current={selected ? 'true' : undefined}
+            className={`flex min-w-0 flex-1 items-center gap-1.5 truncate text-left hover:text-accent ${
+              selected ? 'text-accent' : 'text-text-dim'
+            }`}
+          >
+            <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
+            <span className="truncate">{item.name}</span>
+            {hasTarget && (
+              <span className="shrink-0 text-text-dim">
+                {(item.targetDirection === 'above' ? '≥ ' : '≤ ') +
+                  formatIskCompact(item.targetPrice!)}
+              </span>
+            )}
+          </button>
+          <RowMoreActions />
+        </div>
       </ItemContextMenu>
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <PopoverTrigger asChild>

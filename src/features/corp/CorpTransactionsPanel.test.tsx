@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { CorpTransactionsPanel } from './CorpTransactionsPanel';
@@ -59,6 +60,18 @@ function renderPanel(overrides: Partial<Parameters<typeof CorpTransactionsPanel>
 }
 
 describe('CorpTransactionsPanel — the row as an item', () => {
+  it('opens the same menu from a visible More actions button on the row (#1497)', async () => {
+    const user = userEvent.setup();
+    const { onShowInfo } = renderPanel();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'More actions for Damage Control II' })
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Show info' }));
+
+    expect(onShowInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
+  });
+
   it('carries the item context menu on every row', async () => {
     const { onShowInfo } = renderPanel();
 

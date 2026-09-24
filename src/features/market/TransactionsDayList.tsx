@@ -1,5 +1,6 @@
 import { Fragment, useMemo, useRef, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+import { RowMoreActions } from '@/components/ui';
 import { cx } from '@/lib/cx';
 import { clampIskZero, formatIsk } from '@/lib/isk';
 import { formatDateOnly } from '@/lib/timestamp';
@@ -117,7 +118,7 @@ export function TransactionsDayList({
                   <li
                     data-row-key={txn.transaction_id}
                     className={cx(
-                      'grid min-h-13 grid-cols-[4rem_minmax(0,1fr)_auto] items-center gap-x-3 px-3 py-2 hover:bg-panel-2',
+                      'grid min-h-13 grid-cols-[4rem_minmax(0,1fr)_auto_auto] items-center gap-x-3 py-2 pr-1 pl-3 hover:bg-panel-2',
                       txn.transaction_id === highlightId && 'row-pulse'
                     )}
                   >
@@ -141,6 +142,7 @@ export function TransactionsDayList({
                     >
                       {signedIsk(total, 2)}
                     </span>
+                    <RowMoreActions />
                   </li>
                 );
                 return (

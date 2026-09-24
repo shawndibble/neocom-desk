@@ -1,6 +1,12 @@
 import { Fragment, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import { buttonClassName, nextDataTableSort, sortRows, type DataTableSort } from '@/components/ui';
+import {
+  buttonClassName,
+  nextDataTableSort,
+  RowMoreActions,
+  sortRows,
+  type DataTableSort,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
@@ -157,6 +163,9 @@ export function OrderHistoryList({
                   >
                     {t('orders.viewInMarket')}
                   </MarketItemLink>
+                  {/* In the opened row rather than beside it, so the collapsed
+                      rows keep lining up under the column header. */}
+                  <RowMoreActions className="self-end" />
                 </div>
               )}
             </li>

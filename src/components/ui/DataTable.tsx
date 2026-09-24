@@ -15,6 +15,7 @@ import { fieldBaseClassName } from './controlStyles';
 import { groupSortedRows } from './dataTableGroup';
 import * as Icon from './icons';
 import { InfoTooltip } from './Tooltip';
+import { RowMoreActions } from './RowActions';
 import { nextDataTableSort, sortRows } from './dataTableSort';
 
 export interface DataTableSort {
@@ -233,6 +234,15 @@ interface DataTableProps<T> {
    */
   rowContextMenu?: (row: T, tr: ReactElement) => ReactElement;
   /**
+   * Appends a trailing cell holding a visible "More actions" button that
+   * opens the same items as `rowContextMenu` (WCAG 2.1.1) — the row itself
+   * is only reachable by Shift+F10 on a focused row, which few keyboard
+   * users know. Needs a `rowContextMenu` whose wrapper publishes its items
+   * (`RowActionsMenu`, e.g. via `ItemContextMenu`); the cell stays empty
+   * otherwise.
+   */
+  rowMoreActions?: boolean;
+  /**
    * Makes the whole row a click target — e.g. re-anchoring the page on the
    * row's item, rather than requiring a click on one specific cell. Also
    * gets `tabIndex={0}` and responds to Enter/Space, same focus treatment as
@@ -329,6 +339,7 @@ export function DataTable<T>({
   onSortChange,
   density = 'default',
   rowContextMenu,
+  rowMoreActions = false,
   onRowClick,
   expandableRow,
   responsive = 'stack',
@@ -433,6 +444,10 @@ export function DataTable<T>({
     setSort(nextDataTableSort(sort, column.id));
   }
 
+  // Cells after the caller's columns: the disclosure chevron and the More
+  // actions button. Full-width rows span them too.
+  const trailingColumns = (expandableRow ? 1 : 0) + (rowMoreActions ? 1 : 0);
+
   function renderRow(row: T, index: number, member = false) {
     const key = rowKey(row, index);
     const expanded = expandableRow !== undefined && expandedRowKey === key;
@@ -519,6 +534,19 @@ export function DataTable<T>({
               </td>
             );
           })()}
+        {rowMoreActions && (
+          <td
+            role="cell"
+            // No vertical padding: the button is already taller than a line
+            // of text, and would otherwise stretch every row it sits in.
+            className={cx(
+              density === 'compact' ? 'px-1' : 'px-2',
+              'dt-actions w-0 py-0 text-right'
+            )}
+          >
+            <RowMoreActions />
+          </td>
+        )}
       </tr>
     );
     const mainRow = rowContextMenu ? rowContextMenu(row, tr) : tr;
@@ -528,7 +556,11 @@ export function DataTable<T>({
         {mainRow}
         {expanded && (
           <tr role="row" className="dt-row-detail">
-            <td role="cell" colSpan={columns.length + 1} className="bg-panel-2 px-3 py-3">
+            <td
+              role="cell"
+              colSpan={columns.length + trailingColumns}
+              className="bg-panel-2 px-3 py-3"
+            >
               {expandableRow.renderDetail(row)}
             </td>
           </tr>
@@ -677,6 +709,11 @@ export function DataTable<T>({
           {expandableRow && (
             <th role="columnheader" scope="col" aria-hidden="true" className="w-0 p-0" />
           )}
+          {rowMoreActions && (
+            <th role="columnheader" scope="col" className="w-0 p-0">
+              <span className="sr-only">{t('common.dataTable.actionsHeader')}</span>
+            </th>
+          )}
         </tr>
       </thead>
       <tbody role="rowgroup" className="divide-y divide-line">
@@ -694,7 +731,7 @@ export function DataTable<T>({
               return (
                 <Fragment key={`dt-group:${key}`}>
                   <tr role="row" className="dt-group-header hover:bg-panel-2">
-                    <td role="cell" colSpan={columns.length} className="p-0">
+                    <td role="cell" colSpan={columns.length + trailingColumns} className="p-0">
                       <button
                         type="button"
                         aria-expanded={expanded}

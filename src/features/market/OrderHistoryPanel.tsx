@@ -368,6 +368,7 @@ export function OrderHistoryPanel({
               rowKey={(order) => order.order_id}
               label={t('orders.historyTab')}
               rowContextMenu={rowContextMenu}
+              rowMoreActions
               {...sortProps}
             />
           )}
