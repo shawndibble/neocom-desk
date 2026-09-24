@@ -8,8 +8,9 @@ import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
 /**
  * The Fittings section's tracer slice (issue #1532): paste EFT to Load a
  * Fitting, a List view of what's fitted, and the game's own collapsible stat
- * sections. Editing (#1533), the Ring view (#1536), implants (#1535) and
- * everything else the scope decision lists land in their own tickets.
+ * sections. My clone vs Fitting's implants/boosters landed in #1535. Editing
+ * (#1533), the Ring view (#1536) and everything else the scope decision
+ * lists land in their own tickets.
  */
 export function Fittings() {
   const { t } = useTranslation();
@@ -26,7 +27,14 @@ export function Fittings() {
       />
       {workspace.fitting && (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <FittingRackList fitting={workspace.fitting} stats={workspace.stats} />
+          <FittingRackList
+            fitting={workspace.fitting}
+            stats={workspace.stats}
+            implantBasis={workspace.implantBasis}
+            canUseCloneBasis={workspace.canUseCloneBasis}
+            onImplantBasisChange={workspace.setImplantBasis}
+            onImplantSetChange={workspace.setImplantSet}
+          />
           <FittingStatsSections
             stats={workspace.stats}
             statsProgress={workspace.statsProgress}

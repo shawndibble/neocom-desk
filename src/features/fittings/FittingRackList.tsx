@@ -3,10 +3,13 @@ import { Panel, TypeIcon } from '@/components/ui';
 import {
   FITTING_SLOT_KINDS,
   type Fitting,
+  type FittingImplantSet,
   type FittingModule,
   type FittingSlotKind,
   type FittingStats,
 } from '@/engine/fittings/types';
+import type { ImplantBasis } from '@/engine/fittings/implantBasis';
+import { ImplantBasisControl } from './ImplantBasisControl';
 
 interface ResourceBarProps {
   label: string;
@@ -61,16 +64,38 @@ function RackRow({ module }: { module: FittingModule }) {
 interface FittingRackListProps {
   fitting: Fitting;
   stats: FittingStats | null;
+  implantBasis: ImplantBasis;
+  canUseCloneBasis: boolean;
+  onImplantBasisChange: (basis: ImplantBasis) => void;
+  onImplantSetChange: (implantSet: FittingImplantSet | undefined) => void;
 }
 
-export function FittingRackList({ fitting, stats }: FittingRackListProps) {
+export function FittingRackList({
+  fitting,
+  stats,
+  implantBasis,
+  canUseCloneBasis,
+  onImplantBasisChange,
+  onImplantSetChange,
+}: FittingRackListProps) {
   const { t } = useTranslation();
   const modulesByRack = new Map<FittingSlotKind, FittingModule[]>();
   for (const rack of FITTING_SLOT_KINDS) modulesByRack.set(rack, []);
   for (const module of fitting.modules) modulesByRack.get(module.slot)?.push(module);
 
   return (
-    <Panel title={t('fittings.list.title')}>
+    <Panel
+      title={t('fittings.list.title')}
+      actions={
+        <ImplantBasisControl
+          basis={implantBasis}
+          canUseCloneBasis={canUseCloneBasis}
+          onBasisChange={onImplantBasisChange}
+          implantSet={fitting.implantSet}
+          onImplantSetChange={onImplantSetChange}
+        />
+      }
+    >
       <div className="space-y-3">
         <div className="space-y-1.5">
           <ResourceBar

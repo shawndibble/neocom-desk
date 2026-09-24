@@ -4,12 +4,15 @@ import type { PilotProfile } from './types';
  * A profile from the active Character: skills at Effective Skill Level
  * (CONTEXT.md) and the implants in the active clone. Copies the skills map
  * so the profile is a snapshot, not a live view onto the caller's data.
+ * `boosterTypeIds` is always empty — ESI exposes no "active booster" read
+ * (issue #1535); a Fitting's own carried boosters reach the dogma fit through
+ * `applyImplantBasis` instead.
  */
 export function buildPilotProfile(
   effectiveSkillLevels: ReadonlyMap<number, number>,
   implantTypeIds: readonly number[]
 ): PilotProfile {
-  return { skillLevels: new Map(effectiveSkillLevels), implantTypeIds };
+  return { skillLevels: new Map(effectiveSkillLevels), implantTypeIds, boosterTypeIds: [] };
 }
 
 /**
@@ -21,5 +24,6 @@ export function buildAllVProfile(allSkillTypeIds: readonly number[]): PilotProfi
   return {
     skillLevels: new Map(allSkillTypeIds.map((typeId) => [typeId, 5])),
     implantTypeIds: [],
+    boosterTypeIds: [],
   };
 }

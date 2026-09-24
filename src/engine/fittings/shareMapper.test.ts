@@ -52,12 +52,46 @@ describe('fittingToShareInput / shareToFitting', () => {
     expect(restored).toEqual(original);
   });
 
+  it('round-trips a carried implant set', () => {
+    const original = fitting({ implantSet: { implants: [19540, 19553], boosters: [30006] } });
+    const restored = shareToFitting(fittingToShareInput(original), original.name);
+    expect(restored).toEqual(original);
+  });
+
+  it('round-trips an explicitly empty implant set distinctly from no set at all', () => {
+    const original = fitting({ implantSet: { implants: [], boosters: [] } });
+    const restored = shareToFitting(fittingToShareInput(original), original.name);
+    expect(restored.implantSet).toEqual({ implants: [], boosters: [] });
+  });
+
+  it('carries no implantSet key at all when the Fitting carries no set', () => {
+    const original = fitting();
+    const shareInput = fittingToShareInput(original);
+    expect(shareInput.implantSet).toBeUndefined();
+    const restored = shareToFitting(shareInput, original.name);
+    expect(restored.implantSet).toBeUndefined();
+  });
+
   it('round-trips through the real encode/decode codec, name aside (the payload never carries it)', async () => {
     const original = fitting({
       shipTypeId: 587,
       modules: [{ slot: 'high', slotIndex: 0, typeId: 2456, state: 'active' }],
       drones: [{ typeId: 2454, quantity: 1, state: 'active' }],
     });
+
+    const encoded = await encodeFittingShare(fittingToShareInput(original));
+    expect(encoded.ok).toBe(true);
+    if (!encoded.ok) return;
+    const decoded = await decodeFittingShare(encoded.payload);
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+
+    const restored = shareToFitting(decoded.value, original.name);
+    expect(restored).toEqual(original);
+  });
+
+  it('round-trips a carried implant set through the real encode/decode codec', async () => {
+    const original = fitting({ implantSet: { implants: [19540], boosters: [30006, 30008] } });
 
     const encoded = await encodeFittingShare(fittingToShareInput(original));
     expect(encoded.ok).toBe(true);

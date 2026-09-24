@@ -142,6 +142,23 @@
       "priceUnpriced_one": "{{count}} item has no price at this hub",
       "priceUnpriced_other": "{{count}} items have no price at this hub",
       "priceLoading": "Pricing…"
+    },
+    "implants": {
+      "basis": {
+        "label": "Implants from",
+        "clone": "My clone",
+        "fitting": "Fitting's"
+      },
+      "editSet": "Edit set",
+      "modalTitle": "Implants & boosters",
+      "implantsHeading": "Implants",
+      "boostersHeading": "Boosters",
+      "empty": "None",
+      "addPlaceholder": "Item name",
+      "add": "Add",
+      "remove": "Remove {{name}}",
+      "notFound": "No item found with that exact name.",
+      "full": "This set is already full."
     }
   },
   "skills": {

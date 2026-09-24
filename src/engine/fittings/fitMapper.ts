@@ -40,6 +40,15 @@ export function fittingToDogmaFit(fitting: Fitting, profile: PilotProfile): Fit 
       slot: { type: 'implant', index: index + IMPLANT_SLOT_START },
       state: 'online',
     })),
+    // Side effects always off (issue #1535's own AC): there is no UI to roll
+    // or pick one, and an empty array is the engine's own "none" (see
+    // `FitItem.booster_side_effects`'s doc in `esf_dogma_engine.d.ts`).
+    ...profile.boosterTypeIds.map((typeId, index): FitItem => ({
+      type_id: typeId,
+      slot: { type: 'booster', index: index + IMPLANT_SLOT_START },
+      state: 'online',
+      booster_side_effects: [],
+    })),
   ];
 
   return {

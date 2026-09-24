@@ -17,7 +17,12 @@ import {
 } from '@/engine/fittings/eftLoader';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
 import { buildAllVProfile } from '@/engine/fittings/pilotProfile';
-import type { Fitting, FittingStats } from '@/engine/fittings/types';
+import {
+  applyImplantBasis,
+  defaultImplantBasis,
+  type ImplantBasis,
+} from '@/engine/fittings/implantBasis';
+import type { Fitting, FittingImplantSet, FittingStats } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadTypes, loadFittingSlots, loadSkills } from '@/sde/loadSde';
@@ -42,6 +47,13 @@ export interface FittingWorkspace {
   /** Set when a successfully-loaded Fitting was too large to fit a Share Link. */
   tooLargeToShare: boolean;
   loadFromEftText: (text: string) => Promise<void>;
+  /** "My clone" vs "Fitting's" (issue #1535) — the basis the open Fitting's stats read implants/boosters from. */
+  implantBasis: ImplantBasis;
+  /** `false` with no active Character: there is no clone to label "My clone", so the basis is always "fitting". */
+  canUseCloneBasis: boolean;
+  setImplantBasis: (basis: ImplantBasis) => void;
+  /** Edits the set the open Fitting carries — writes through to `?f=` like any other edit. `undefined` removes it. */
+  setImplantSet: (implantSet: FittingImplantSet | undefined) => Promise<void>;
   stats: FittingStats | null;
   statsProgress: DogmaAssetProgress | null;
   statsError: boolean;
@@ -56,6 +68,12 @@ export function useFittingWorkspace(): FittingWorkspace {
   const [shareError, setShareError] = useState<ShareDecodeError | null>(null);
   const [unresolved, setUnresolved] = useState<EftUnresolvedItem[]>([]);
   const [tooLargeToShare, setTooLargeToShare] = useState(false);
+  // User's explicit toggle pick, layered over `defaultImplantBasis`'s
+  // per-Fitting default; `null` means "no override yet, use the default".
+  // Reset only when the URL's `f` changes for a reason other than this
+  // workspace's own write (a pasted link, Back/Forward, a fresh EFT load) —
+  // never on a picker edit, which must not snap the toggle back.
+  const [basisOverride, setBasisOverride] = useState<ImplantBasis | null>(null);
 
   const [stats, setStats] = useState<FittingStats | null>(null);
   const [statsProgress, setStatsProgress] = useState<DogmaAssetProgress | null>(null);
@@ -82,6 +100,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     } else {
       setUnresolved([]);
       setTooLargeToShare(false);
+      setBasisOverride(null);
     }
     if (shareCode === null) {
       // Synchronous, not a subscription, so the rule's usual "derive during
@@ -140,9 +159,42 @@ export function useFittingWorkspace(): FittingWorkspace {
     [shareCode, setShareCode]
   );
 
+  // No active Character means no clone to label "My clone" — the basis is
+  // always "fitting" (the scope decision's "Share links open ... at All V").
+  const canUseCloneBasis = activeCharacterId !== null;
+  const implantBasis: ImplantBasis =
+    fitting === null
+      ? 'clone'
+      : !canUseCloneBasis
+        ? 'fitting'
+        : (basisOverride ?? defaultImplantBasis(fitting));
+
+  const setImplantSet = useCallback(
+    async (implantSet: FittingImplantSet | undefined) => {
+      if (fitting === null) return;
+      const updated: Fitting = { ...fitting, implantSet };
+      const encoded = await encodeFittingShare(fittingToShareInput(updated));
+      setTooLargeToShare(!encoded.ok);
+      if (encoded.ok) {
+        // Same "mine" bookkeeping as `loadFromEftText` — this write must not
+        // reset `unresolved`/`tooLargeToShare`/`basisOverride` the way an
+        // externally-arriving `?f=` change does.
+        if (encoded.payload !== shareCode) ownWriteRef.current = true;
+        setShareCode(encoded.payload);
+      } else {
+        // Same "still shown" trick as `loadFromEftText`'s own too-large branch.
+        setShareError(null);
+        setFitting(updated);
+      }
+    },
+    [fitting, shareCode, setShareCode]
+  );
+
   // Stats: the active Character's own profile, or All V with no Character at
   // all (the logged-out Share Link view is #1544's; this covers the same
   // fallback for the ordinary route rendering before hydration resolves).
+  // The resolved implant basis then swaps in the Fitting's own carried set
+  // where "fitting" applies (issue #1535).
   useEffect(() => {
     let cancelled = false;
     // Cleared unconditionally, not only when `fitting` becomes null — a
@@ -156,11 +208,12 @@ export function useFittingWorkspace(): FittingWorkspace {
     if (fitting === null) return;
     void (async () => {
       try {
-        const profile =
+        const rawProfile =
           activeCharacterId === null
             ? buildAllVProfile([...(await loadSkills()).map((skill) => skill.typeID)])
             : await loadActivePilotProfile(activeCharacterId);
         if (cancelled) return;
+        const profile = applyImplantBasis(rawProfile, fitting, implantBasis);
         const result = await computeFittingStats(fitting, profile, (progress) => {
           if (!cancelled) setStatsProgress(progress);
         });
@@ -172,7 +225,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     return () => {
       cancelled = true;
     };
-  }, [fitting, activeCharacterId]);
+  }, [fitting, activeCharacterId, implantBasis]);
 
   // Price: independent of the dogma engine, so it can — and should — resolve
   // well before stats do.
@@ -199,6 +252,10 @@ export function useFittingWorkspace(): FittingWorkspace {
     unresolved,
     tooLargeToShare,
     loadFromEftText,
+    implantBasis,
+    canUseCloneBasis,
+    setImplantBasis: setBasisOverride,
+    setImplantSet,
     stats,
     statsProgress,
     statsError,
