@@ -109,7 +109,7 @@ export const ROUTE_REQUIREMENTS = {
    * *hides* rather than locks (CONTEXT.md round 35). Declaring the corp
    * endpoints here would put a `ReauthBanner` in front of a `roles-without-grant`
    * Character — offering a re-login for a grant the `CorpGrantPrompt` and the
-   * Settings Corp access row exist to ask for properly — and in front of a
+   * Settings Corporation Permission row exist to ask for properly — and in front of a
    * `none` Character it would promise that logging in again unlocks something,
    * which no login ever will.
    */

@@ -101,6 +101,16 @@ export function permissionForScope(scope: string): ScopeGroup | undefined {
   return GROUP_BY_SCOPE.get(scope);
 }
 
+/**
+ * Whether `granted` holds every scope of `group`. A partial grant — a scope
+ * added to the group after the Character granted it — reads as missing,
+ * because only another Grant moves it.
+ */
+export function isPermissionGranted(group: ScopeGroup, granted: readonly string[]): boolean {
+  const held = new Set(granted);
+  return scopesForGroup(group).every((scope) => held.has(scope));
+}
+
 /** Space-joined form for the SSO authorize URL `scope` parameter. */
 export const SCOPES_STRING: string = SCOPES.join(' ');
 
