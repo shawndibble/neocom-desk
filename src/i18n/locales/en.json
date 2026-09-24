@@ -3955,6 +3955,7 @@
         "showInfo": "Show info",
         "viewInMarket": "View in Market"
       },
+      "moreActionsLabel": "More actions for {{name}}",
       "severity": {
         "critical": "Critical",
         "warning": "Due soon",
