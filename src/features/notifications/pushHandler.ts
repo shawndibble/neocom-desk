@@ -28,7 +28,10 @@
  * `getMessagePayloadInternal`/`propagateDataPayload`). `characterId` is
  * therefore parsed from a string, not read as one.
  */
-import i18n from '@/i18n';
+import { createInstance } from 'i18next';
+// Named, not default: Vite exports each top-level key of a JSON module on its
+// own, so only the `notifications` subtree reaches the service worker bundle.
+import { notifications } from '@/i18n/locales/en.json';
 import {
   notificationOptionsFor,
   fallbackNotificationOptions,
@@ -36,6 +39,21 @@ import {
 } from './notificationOptions';
 import { NOTIFICATION_EVENT_IDS, type NotificationEventId } from './events';
 import type { NewNotificationFeedEntry } from './feed';
+
+/**
+ * The service worker's own i18next instance, not `@/i18n`: that module loads
+ * every locale string plus `react-i18next` (and React with it) — about half a
+ * megabyte in `sw.mjs` for the two fallback strings a push can need. Same
+ * locale file, same keys; only the subtree this handler reads.
+ */
+const i18n = createInstance();
+void i18n.init({
+  resources: { en: { translation: { notifications } } },
+  lng: 'en',
+  fallbackLng: 'en',
+  initAsync: false,
+  interpolation: { escapeValue: false },
+});
 
 export interface PushEnv {
   showNotification: (title: string, options: AppNotificationOptions) => Promise<void>;

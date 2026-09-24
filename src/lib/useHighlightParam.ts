@@ -18,13 +18,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { parsePositiveInt } from '@/engine/market/urlState';
-
-/**
- * The query key. Lives here rather than beside the route table because both
- * the link that writes it and the table that reads it point at this module,
- * and a second spelling would break the pair silently.
- */
-export const HIGHLIGHT_PARAM = 'highlight';
+import { HIGHLIGHT_PARAM } from './highlightParam';
 
 export function useHighlightParam(): number | null {
   const [searchParams, setSearchParams] = useSearchParams();

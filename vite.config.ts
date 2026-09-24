@@ -160,7 +160,28 @@ function spaFallbackHtml() {
 
 export default defineConfig({
   base: '/',
-  build: { sourcemap: sentryAuthToken ? 'hidden' : false },
+  build: {
+    sourcemap: sentryAuthToken ? 'hidden' : false,
+    rolldownOptions: {
+      output: {
+        // Routes are already split per page (`src/app/routeChunks.ts`); what
+        // is left in the entry is the boot-time vendor code. Pulled into
+        // chunks of their own so an app deploy — which changes the entry's
+        // hash every time — does not re-download React and Sentry with it.
+        // Only libraries every page loads at boot: a broad `node_modules`
+        // group would drag route-only ones (recharts) into the first paint.
+        codeSplitting: {
+          groups: [
+            {
+              name: 'vendor-react',
+              test: /node_modules[\\/](react|react-dom|scheduler|react-router|react-router-dom)[\\/]/,
+            },
+            { name: 'vendor-sentry', test: /node_modules[\\/]@sentry(-internal)?[\\/]/ },
+          ],
+        },
+      },
+    },
+  },
   // Port pinned: the EVE SSO dev callback URL must match exactly, so the
   // port cannot be allowed to drift when 5173 happens to be busy.
   server: { port: 5173, strictPort: true },

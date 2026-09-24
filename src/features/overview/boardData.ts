@@ -28,8 +28,8 @@ import { loadTypeNames } from '@/features/character/typeNames';
  *
  * - The PI fetch layer (`pi/data`, `pi/names`, `pi/adapters`) and
  *   `character/typeNames` are imported statically. The boot graph already
- *   holds them � `app/prefetch.ts`, the notification poller and the Calendar
- *   route warmer all name them � so an `import()` here cannot move them out
+ *   holds them — `app/prefetch.ts`, the notification poller and the Calendar
+ *   route warmer all name them — so an `import()` here cannot move them out
  *   of the entry chunk; Rollup reports it as an ineffective dynamic import.
  * - `miningTax/snapshot` stays behind `import()`. It reaches the ledger,
  *   payees, assignments, reconciliation and `sde/loadSde` for two numbers,

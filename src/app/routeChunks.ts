@@ -22,66 +22,65 @@ import type { AppRoutePath } from './routeScopes';
 
 type RouteModule = { default: ComponentType };
 
-// Named exports, not default: `lazy()` wants `{ default }`, so each loader
-// re-shapes its module rather than every route file changing its export.
-export const loadCharacters = () =>
-  import('@/routes/Characters').then((m): RouteModule => ({ default: m.Characters }));
-export const loadAlerts = () =>
-  import('@/routes/Alerts').then((m): RouteModule => ({ default: m.Alerts }));
-export const loadSkills = () =>
-  import('@/routes/Skills').then((m): RouteModule => ({ default: m.Skills }));
-export const loadSkillPlans = () =>
-  import('@/routes/SkillPlans').then((m): RouteModule => ({ default: m.SkillPlans }));
-export const loadSkillPlanEditor = () =>
-  import('@/routes/SkillPlanEditor').then((m): RouteModule => ({ default: m.SkillPlanEditor }));
-export const loadSkillCompare = () =>
-  import('@/routes/SkillCompare').then((m): RouteModule => ({ default: m.SkillCompare }));
-export const loadSkillShips = () =>
-  import('@/routes/SkillShips').then((m): RouteModule => ({ default: m.SkillShips }));
-export const loadIndustry = () =>
-  import('@/routes/Industry').then((m): RouteModule => ({ default: m.Industry }));
-export const loadIndustryPlanPage = () =>
-  import('@/routes/IndustryPlanPage').then((m): RouteModule => ({ default: m.IndustryPlanPage }));
-export const loadIndustryGroupPage = () =>
-  import('@/routes/IndustryGroupPage').then((m): RouteModule => ({ default: m.IndustryGroupPage }));
-export const loadCorp = () =>
-  import('@/routes/Corp').then((m): RouteModule => ({ default: m.Corp }));
-export const loadCorpMembers = () =>
-  import('@/routes/CorpMembers').then((m): RouteModule => ({ default: m.CorpMembers }));
-export const loadCorpAssets = () =>
-  import('@/routes/CorpAssets').then((m): RouteModule => ({ default: m.CorpAssets }));
-export const loadMarket = () =>
-  import('@/routes/Market').then((m): RouteModule => ({ default: m.Market }));
-export const loadWallet = () =>
-  import('@/routes/Wallet').then((m): RouteModule => ({ default: m.Wallet }));
-export const loadMoonMiningTax = () =>
-  import('@/routes/MoonMiningTax').then((m): RouteModule => ({ default: m.MoonMiningTax }));
-export const loadLoyaltyStore = () =>
-  import('@/routes/LoyaltyStore').then((m): RouteModule => ({ default: m.LoyaltyStore }));
-export const loadClones = () =>
-  import('@/routes/Clones').then((m): RouteModule => ({ default: m.Clones }));
-export const loadPlanetaryIndustry = () =>
-  import('@/routes/PlanetaryIndustry').then((m): RouteModule => ({ default: m.PlanetaryIndustry }));
-export const loadAssets = () =>
-  import('@/routes/Assets').then((m): RouteModule => ({ default: m.Assets }));
-export const loadMail = () =>
-  import('@/routes/Mail').then((m): RouteModule => ({ default: m.Mail }));
-export const loadCalendar = () =>
-  import('@/routes/Calendar').then((m): RouteModule => ({ default: m.Calendar }));
-export const loadContracts = () =>
-  import('@/routes/Contracts').then((m): RouteModule => ({ default: m.Contracts }));
-export const loadContacts = () =>
-  import('@/routes/Contacts').then((m): RouteModule => ({ default: m.Contacts }));
-export const loadEmploymentHistory = () =>
-  import('@/routes/EmploymentHistory').then((m): RouteModule => ({ default: m.EmploymentHistory }));
-export const loadSettings = () =>
-  import('@/routes/Settings').then((m): RouteModule => ({ default: m.Settings }));
-export const loadStyleguide = () =>
-  import('@/routes/Styleguide').then((m): RouteModule => ({ default: m.Styleguide }));
-export const loadAppraisalShared = () =>
-  import('@/routes/AppraisalShared').then((m): RouteModule => ({ default: m.AppraisalShared }));
-export const loadErrorProbe = () =>
-  import('@/routes/ErrorProbe').then((m): RouteModule => ({ default: m.ErrorProbe }));
+/**
+ * Route files use named exports, and `lazy()` wants `{ default }`: re-shape
+ * the module here rather than giving every route file a default export. The
+ * `import()` stays a literal at each call site — that is what Rollup splits on.
+ */
+function named<K extends string>(
+  importer: () => Promise<Record<K, ComponentType>>,
+  key: K
+): () => Promise<RouteModule> {
+  return () => importer().then((m) => ({ default: m[key] }));
+}
+
+export const loadCharacters = named(() => import('@/routes/Characters'), 'Characters');
+export const loadAlerts = named(() => import('@/routes/Alerts'), 'Alerts');
+export const loadSkills = named(() => import('@/routes/Skills'), 'Skills');
+export const loadSkillPlans = named(() => import('@/routes/SkillPlans'), 'SkillPlans');
+export const loadSkillPlanEditor = named(
+  () => import('@/routes/SkillPlanEditor'),
+  'SkillPlanEditor'
+);
+export const loadSkillCompare = named(() => import('@/routes/SkillCompare'), 'SkillCompare');
+export const loadSkillShips = named(() => import('@/routes/SkillShips'), 'SkillShips');
+export const loadIndustry = named(() => import('@/routes/Industry'), 'Industry');
+export const loadIndustryPlanPage = named(
+  () => import('@/routes/IndustryPlanPage'),
+  'IndustryPlanPage'
+);
+export const loadIndustryGroupPage = named(
+  () => import('@/routes/IndustryGroupPage'),
+  'IndustryGroupPage'
+);
+export const loadCorp = named(() => import('@/routes/Corp'), 'Corp');
+export const loadCorpMembers = named(() => import('@/routes/CorpMembers'), 'CorpMembers');
+export const loadCorpAssets = named(() => import('@/routes/CorpAssets'), 'CorpAssets');
+export const loadMarket = named(() => import('@/routes/Market'), 'Market');
+export const loadWallet = named(() => import('@/routes/Wallet'), 'Wallet');
+export const loadMoonMiningTax = named(() => import('@/routes/MoonMiningTax'), 'MoonMiningTax');
+export const loadLoyaltyStore = named(() => import('@/routes/LoyaltyStore'), 'LoyaltyStore');
+export const loadClones = named(() => import('@/routes/Clones'), 'Clones');
+export const loadPlanetaryIndustry = named(
+  () => import('@/routes/PlanetaryIndustry'),
+  'PlanetaryIndustry'
+);
+export const loadAssets = named(() => import('@/routes/Assets'), 'Assets');
+export const loadMail = named(() => import('@/routes/Mail'), 'Mail');
+export const loadCalendar = named(() => import('@/routes/Calendar'), 'Calendar');
+export const loadContracts = named(() => import('@/routes/Contracts'), 'Contracts');
+export const loadContacts = named(() => import('@/routes/Contacts'), 'Contacts');
+export const loadEmploymentHistory = named(
+  () => import('@/routes/EmploymentHistory'),
+  'EmploymentHistory'
+);
+export const loadSettings = named(() => import('@/routes/Settings'), 'Settings');
+export const loadStyleguide = named(() => import('@/routes/Styleguide'), 'Styleguide');
+export const loadAppraisalShared = named(
+  () => import('@/routes/AppraisalShared'),
+  'AppraisalShared'
+);
+export const loadErrorProbe = named(() => import('@/routes/ErrorProbe'), 'ErrorProbe');
 
 /**
  * Every feature route but the eager `/overview`, keyed the way `Layout`'s
