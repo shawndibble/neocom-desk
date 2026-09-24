@@ -23,7 +23,14 @@ const SCOPE_KEY = {
   region: 'market.orders.rowSummary.undercutRegion',
 } as const;
 
-export function OrderRowSummaryText({ row }: { row: OpenOrderRow }): ReactElement | null {
+export function OrderRowSummaryText({
+  row,
+  interactive = true,
+}: {
+  row: OpenOrderRow;
+  /** Drops the match clause's `Tooltip` trigger, leaving plain text — same reasoning as `OrderProblemBadge`'s own `interactive` prop. */
+  interactive?: boolean;
+}): ReactElement | null {
   const { t } = useTranslation();
   const summary = orderRowSummary(row);
   if (!summary) return null;
@@ -49,31 +56,38 @@ export function OrderRowSummaryText({ row }: { row: OpenOrderRow }): ReactElemen
       // otherwise), so this is safe to format unconditionally below.
       // The match clause is the only one whose tone differs from the rest of
       // the sentence — a loss there is the reason not to follow the rival.
+      const matchNode = summary.match && (
+        <span
+          tabIndex={interactive ? 0 : undefined}
+          className={cx(
+            summary.match.kind === 'loss' ? 'text-danger' : 'text-success',
+            interactive && 'cursor-help underline decoration-dotted underline-offset-2',
+            interactive &&
+              (summary.match.kind === 'loss' ? 'decoration-danger/50' : 'decoration-success/50')
+          )}
+        >
+          {parts[parts.length - 1]}
+        </span>
+      );
       return (
         <span className="text-xs text-text-dim">
           {parts.slice(0, summary.match ? -1 : undefined).join(' · ')}
-          {summary.match && (
+          {matchNode && (
             <>
               {' · '}
-              <Tooltip
-                content={t('market.orders.rowSummary.matchTooltip', {
-                  undercut: formatIskAuto(summary.suggestedPrice ?? summary.rivalPrice),
-                  floor: row.floor ? formatIskAuto(row.floor.relist) : '',
-                })}
-                openOnTap
-              >
-                <span
-                  tabIndex={0}
-                  className={cx(
-                    'cursor-help underline decoration-dotted underline-offset-2',
-                    summary.match.kind === 'loss'
-                      ? 'text-danger decoration-danger/50'
-                      : 'text-success decoration-success/50'
-                  )}
+              {interactive ? (
+                <Tooltip
+                  content={t('market.orders.rowSummary.matchTooltip', {
+                    undercut: formatIskAuto(summary.suggestedPrice ?? summary.rivalPrice),
+                    floor: row.floor ? formatIskAuto(row.floor.relist) : '',
+                  })}
+                  openOnTap
                 >
-                  {parts[parts.length - 1]}
-                </span>
-              </Tooltip>
+                  {matchNode}
+                </Tooltip>
+              ) : (
+                matchNode
+              )}
             </>
           )}
         </span>

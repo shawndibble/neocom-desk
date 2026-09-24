@@ -54,6 +54,14 @@ interface OrderProblemBadgeProps {
   /** Short trailing detail already formatted by the caller, e.g. "-8.4%" or "7 jumps". */
   detail?: string;
   className?: string;
+  /**
+   * Drops the `InfoTooltip` "?" trigger, leaving a plain (non-focusable)
+   * pill. Default true everywhere the badge sits in ordinary flow. A caller
+   * that wraps the whole badge in its own `<button>` (`OpenOrdersList`'s
+   * tap-to-open row) must pass `false` — a `<button>` cannot legally contain
+   * another one, and the nested trigger would fight the row's own tap.
+   */
+  interactive?: boolean;
 }
 
 /**
@@ -67,6 +75,7 @@ export function OrderProblemBadge({
   kind,
   detail,
   className = '',
+  interactive = true,
 }: OrderProblemBadgeProps): ReactElement {
   const { t } = useTranslation();
   const label = t(`market.orders.badge.${kind}`);
@@ -81,10 +90,12 @@ export function OrderProblemBadge({
     >
       <span>{label}</span>
       {detail && <span className="normal-case tracking-normal">{detail}</span>}
-      <InfoTooltip
-        label={t('common.aboutLabel', { label })}
-        content={t(`market.orders.badge.${kind}Help`)}
-      />
+      {interactive && (
+        <InfoTooltip
+          label={t('common.aboutLabel', { label })}
+          content={t(`market.orders.badge.${kind}Help`)}
+        />
+      )}
     </span>
   );
 }

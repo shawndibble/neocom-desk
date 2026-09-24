@@ -53,6 +53,7 @@ import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
 import { appliedRefiningImplantPct } from '@/engine/industry/characterModifiers';
 import { roundPriceUp } from '@/engine/market/priceTick';
 import { CopyablePrice } from './CopyablePrice';
+import { MarketItemLink } from './MarketItemLink';
 
 export interface OrderDetailModalProps {
   open: boolean;
@@ -711,6 +712,20 @@ export function OrderDetailModal({
             )}
             <p className="mt-2">
               <OrderRowSummaryText row={row} />
+            </p>
+            {/*
+              The phone list's row is plain text, not `MarketItemLink` (a
+              link nested in the row's own tap target would be nested
+              interactive content) — this is where a phone reader reaches
+              the item's Market listing instead.
+            */}
+            <p className="mt-1.5">
+              <MarketItemLink
+                typeId={row.typeId}
+                className={buttonClassName({ variant: 'ghost', size: 'sm' })}
+              >
+                {t('orders.viewInMarket')}
+              </MarketItemLink>
             </p>
             {/* Outbid buy orders get their own suggested bid — `orderVerdict` is a sell-side idea only, so this is the one place a buy order sees a suggested price. */}
             {outbidSuggestedPrice !== null && (
