@@ -127,6 +127,7 @@ import {
   whatIfImplants,
   normalizeWhatIfSelection,
   setWhatIfBonus,
+  toCustomSelection,
   MAX_IMPLANT_BONUS,
   MIN_IMPLANT_BONUS,
   WHAT_IF_IMPLANT_PRESETS,
@@ -1602,12 +1603,14 @@ export function PlanEditor({
               {t('plans.whatIfImplants')}
               <Select
                 value={whatIf.kind === 'custom' ? 'custom' : whatIf.preset}
-                // 'custom' is a readout of the grid below, never a thing to
-                // pick: it is in the list only while it is already the state,
-                // and its `disabled` SelectItem is what keeps Radix from
-                // firing this for it.
+                // Picking 'custom' freezes what is in force into five editable
+                // slots without changing a number (toCustomSelection).
                 onValueChange={(value) =>
-                  setWhatIf({ kind: 'preset', preset: value as WhatIfImplantPreset })
+                  setWhatIf(
+                    value === 'custom'
+                      ? toCustomSelection(whatIf, implants)
+                      : { kind: 'preset', preset: value as WhatIfImplantPreset }
+                  )
                 }
               >
                 <SelectTrigger size="md" aria-label={t('plans.whatIfImplants')} className="w-36">
@@ -1623,13 +1626,7 @@ export function PlanEditor({
                           : preset}
                     </SelectItem>
                   ))}
-                  {whatIf.kind === 'custom' && (
-                    // Readout only — disabled so it displays as the trigger's
-                    // current value but can never be picked from the list.
-                    <SelectItem value="custom" disabled>
-                      {t('plans.whatIfCustom')}
-                    </SelectItem>
-                  )}
+                  <SelectItem value="custom">{t('plans.whatIfCustom')}</SelectItem>
                 </SelectContent>
               </Select>
             </label>
@@ -1637,46 +1634,53 @@ export function PlanEditor({
           </div>
 
           {/* EVE's hardwirings are per slot (+4 PER / +5 INT / nothing in
-              CHA), which a uniform preset cannot say. One row of five, always
-              visible: a preset fills them in, editing one leaves the other
-              four alone and flips the select above to "Custom", so what the
-              plan is being costed against is legible without opening
-              anything. The three-letter codes are the same abbreviation the
+              CHA), which a uniform preset cannot say. One row of five, shown
+              only under "Custom" (pick it, or edit a value): editing one
+              leaves the other four alone. Under a preset a one-line readout
+              says what the plan is being costed against. The three-letter codes are the same abbreviation the
               entry list's attribute-pair badge uses; each input's accessible
               name spells the attribute out. */}
-          <div
-            role="group"
-            aria-label={t('plans.whatIfPerAttribute')}
-            className="grid grid-cols-5 gap-1"
-          >
-            {ATTRIBUTE_NAMES.map((name) => (
-              <label key={name} className="flex flex-col items-center gap-0.5">
-                <span className="text-[0.625rem] tracking-wide text-text-dim uppercase">
-                  {attributeShort(name)}
-                </span>
-                <TextInput
-                  size="md"
-                  type="number"
-                  min={MIN_IMPLANT_BONUS}
-                  max={MAX_IMPLANT_BONUS}
-                  step={1}
-                  aria-label={t('plans.whatIfAttributeBonus', {
-                    attribute: t(`skills.attr.${name}`),
-                  })}
-                  value={effectiveImplants[name]}
-                  onChange={(e) =>
-                    setWhatIf(setWhatIfBonus(whatIf, implants, name, Number(e.target.value)))
-                  }
-                  // `field-no-spinner` (src/styles/index.css): Chrome draws
-                  // the spin buttons on hover and focus into a 29.6px content
-                  // box, taking about half of it and shoving the digit left —
-                  // so the cell under the cursor would break the row's
-                  // alignment with the other four.
-                  className="field-no-spinner w-full text-center"
-                />
-              </label>
-            ))}
-          </div>
+          {whatIf.kind === 'custom' ? (
+            <div
+              role="group"
+              aria-label={t('plans.whatIfPerAttribute')}
+              className="grid grid-cols-5 gap-1"
+            >
+              {ATTRIBUTE_NAMES.map((name) => (
+                <label key={name} className="flex flex-col items-center gap-0.5">
+                  <span className="text-[0.625rem] tracking-wide text-text-dim uppercase">
+                    {attributeShort(name)}
+                  </span>
+                  <TextInput
+                    size="md"
+                    type="number"
+                    min={MIN_IMPLANT_BONUS}
+                    max={MAX_IMPLANT_BONUS}
+                    step={1}
+                    aria-label={t('plans.whatIfAttributeBonus', {
+                      attribute: t(`skills.attr.${name}`),
+                    })}
+                    value={effectiveImplants[name]}
+                    onChange={(e) =>
+                      setWhatIf(setWhatIfBonus(whatIf, implants, name, Number(e.target.value)))
+                    }
+                    // `field-no-spinner` (src/styles/index.css): Chrome draws
+                    // the spin buttons on hover and focus into a 29.6px content
+                    // box, taking about half of it and shoving the digit left —
+                    // so the cell under the cursor would break the row's
+                    // alignment with the other four.
+                    className="field-no-spinner w-full text-center"
+                  />
+                </label>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[0.6875rem] text-text-dim">
+              {ATTRIBUTE_NAMES.map(
+                (name) => `${attributeShort(name)} +${effectiveImplants[name]}`
+              ).join(' · ')}
+            </p>
+          )}
 
           <BoosterList
             boosters={planBoosters}

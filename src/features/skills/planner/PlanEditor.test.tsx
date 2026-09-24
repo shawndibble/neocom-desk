@@ -185,6 +185,12 @@ function bonusInputValues(): string[] {
   );
 }
 
+/** Open the What-If Implants picker and choose an option by name. */
+async function chooseWhatIf(user: ReturnType<typeof userEvent.setup>, option: string) {
+  await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
+  await user.click(await screen.findByRole('option', { name: option }));
+}
+
 /** A clone wearing an unmatched set — the case a uniform "+N" cannot say. */
 const FITTED: Implants = { perception: 4, memory: 3 };
 
@@ -995,13 +1001,15 @@ describe('PlanEditor what-if implants', () => {
     await openTools(user);
 
     expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('Current');
-    expect(bonusInputValues()).toEqual(['0', '3', '4', '0', '0']);
+    expect(screen.getByText('INT +0 · MEM +3 · PER +4 · WIL +0 · CHA +0')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Memory implant bonus')).toBeNull();
   });
 
   it('suppresses the platform spinner, which would break the row on hover', async () => {
     const user = userEvent.setup();
     renderWithImplants();
     await openTools(user);
+    await chooseWhatIf(user, 'Custom');
 
     // Measured: five fields across a 294px sidebar leaves a 29.6px content
     // box each, and Chrome's hover/focus spin buttons take about half of it
@@ -1017,22 +1025,34 @@ describe('PlanEditor what-if implants', () => {
     expect(screen.getByLabelText('Remaps available')).toHaveClass('field-no-spinner');
   });
 
-  it('a preset fills all five in one click', async () => {
+  it('a preset reads out all five with no inputs, and Custom is offered', async () => {
     const user = userEvent.setup();
     renderWithImplants();
     await openTools(user);
 
-    await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
-    await user.click(await screen.findByRole('option', { name: '+4' }));
+    await chooseWhatIf(user, '+4');
 
-    expect(bonusInputValues()).toEqual(['4', '4', '4', '4', '4']);
-    // "Custom" is not offered while a preset is in force — you become custom
-    // by editing a value, not by picking it. Reopen the list (Radix closes it
-    // on selection) to check what it currently offers; wait for a known
-    // option first so the list is confirmed open, not just not-yet-rendered.
+    expect(screen.getByText('INT +4 · MEM +4 · PER +4 · WIL +4 · CHA +4')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Memory implant bonus')).toBeNull();
     await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
-    expect(await screen.findByRole('option', { name: '+4' })).toBeInTheDocument();
-    expect(screen.queryByRole('option', { name: 'Custom' })).toBeNull();
+    expect(await screen.findByRole('option', { name: 'Custom' })).toBeInTheDocument();
+  });
+
+  it('picking Custom seeds the inputs from the preset in force, unchanged', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor(vi.fn(), { implants: FITTED });
+    await openTools(user);
+
+    await chooseWhatIf(user, 'Custom');
+
+    expect(bonusInputValues()).toEqual(['0', '3', '4', '0', '0']);
+    expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('Custom');
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      whatIfImplants: {
+        kind: 'custom',
+        bonuses: { intelligence: 0, memory: 3, perception: 4, willpower: 0, charisma: 0 },
+      },
+    });
   });
 
   it('editing one slot leaves the other four alone and stops claiming the preset', async () => {
@@ -1040,8 +1060,8 @@ describe('PlanEditor what-if implants', () => {
     renderWithImplants();
     await openTools(user);
 
-    await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
-    await user.click(await screen.findByRole('option', { name: '+4' }));
+    await chooseWhatIf(user, '+4');
+    await chooseWhatIf(user, 'Custom');
     const perception = screen.getByLabelText('Perception implant bonus');
     await user.clear(perception);
     await user.type(perception, '5');
@@ -1054,6 +1074,7 @@ describe('PlanEditor what-if implants', () => {
     const user = userEvent.setup();
     renderWithImplants();
     await openTools(user);
+    await chooseWhatIf(user, 'Custom');
 
     const memory = screen.getByLabelText('Memory implant bonus');
     await user.clear(memory);
@@ -1067,17 +1088,17 @@ describe('PlanEditor what-if implants', () => {
     renderWithImplants();
     await openTools(user);
 
-    await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
-    await user.click(await screen.findByRole('option', { name: '+5' }));
+    await chooseWhatIf(user, '+5');
+    await chooseWhatIf(user, 'Custom');
     const charisma = screen.getByLabelText('Charisma implant bonus');
     await user.clear(charisma);
     await user.type(charisma, '1');
     expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('Custom');
 
-    await user.click(screen.getByRole('combobox', { name: 'What-if implants' }));
-    await user.click(await screen.findByRole('option', { name: 'Current' }));
+    await chooseWhatIf(user, 'Current');
 
-    expect(bonusInputValues()).toEqual(['0', '3', '4', '0', '0']);
+    expect(screen.getByText('INT +0 · MEM +3 · PER +4 · WIL +0 · CHA +0')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Memory implant bonus')).toBeNull();
   });
 
   it('links to Market, scoped to the attribute enhancer implants category (issue #407)', async () => {
@@ -1203,6 +1224,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     const user = userEvent.setup();
     const { onUpdate } = renderEditor(vi.fn(), { implants: FITTED });
     await openTools(user);
+    await chooseWhatIf(user, 'Custom');
 
     const perception = screen.getByLabelText('Perception implant bonus');
     await user.clear(perception);
@@ -1225,7 +1247,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     await openTools(user);
 
     expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('+5');
-    expect(bonusInputValues()).toEqual(['5', '5', '5', '5', '5']);
+    expect(screen.getByText('INT +5 · MEM +5 · PER +5 · WIL +5 · CHA +5')).toBeInTheDocument();
   });
 
   it('saves the whole Booster answer the moment a row is added', async () => {
