@@ -488,7 +488,11 @@ export function OrderDetailModal({
               value={row.floor ? formatIsk(row.floor.relist, 2) : t('common.unknown')}
               tone={row.floor && row.price < row.floor.relist ? 'danger' : 'default'}
               caption={t(
-                row.costBasis ? 'market.orders.statFloorCaption' : 'market.orders.statFloorNoBasis'
+                row.costBasis
+                  ? row.costBasis.source === 'wallet'
+                    ? 'market.orders.statFloorCaptionWallet'
+                    : 'market.orders.statFloorCaption'
+                  : 'market.orders.statFloorNoBasis'
               )}
             />
             <StatCard
@@ -665,6 +669,19 @@ export function OrderDetailModal({
                 <>
                   <p className="text-sm text-text">{t('market.orders.noCostBasisTitle')}</p>
                   <p className="text-xs text-text-dim">{t('market.orders.noCostBasisHint')}</p>
+                  {row.walletGap && (
+                    <p className="text-xs text-text-dim">
+                      {row.walletGap.kind === 'partial'
+                        ? t('market.orders.walletBasisPartial', {
+                            covered: row.walletGap.coveredUnits.toLocaleString(),
+                            total: row.walletGap.pool.toLocaleString(),
+                          })
+                        : t('market.orders.walletBasisHistoryShort')}
+                      {row.walletGap.truncated
+                        ? ' ' + t('market.orders.walletBasisTruncated')
+                        : null}
+                    </p>
+                  )}
                   <Link
                     to="/industry"
                     className={buttonClassName({ variant: 'ghost', size: 'sm' })}
@@ -675,22 +692,44 @@ export function OrderDetailModal({
               ) : (
                 <>
                   <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                    <LedgerRow
-                      label={t('industry.quantity')}
-                      value={row.costBasis.runQuantity.toLocaleString()}
-                    />
-                    <LedgerRow
-                      label={t('industry.materialCost')}
-                      value={`${formatIsk(row.costBasis.materialCost)} ISK`}
-                    />
-                    <LedgerRow
-                      label={t('industry.jobFee')}
-                      value={`${formatIsk(row.costBasis.jobFee)} ISK`}
-                    />
-                    <LedgerRow
-                      label={t('industry.totalCost')}
-                      value={`${formatIsk(row.costBasis.materialCost + row.costBasis.jobFee)} ISK`}
-                    />
+                    {row.costBasis.source === 'wallet' ? (
+                      <>
+                        <LedgerRow
+                          label={t('market.orders.walletBasisUnits')}
+                          value={row.costBasis.unitsCovered.toLocaleString()}
+                        />
+                        <LedgerRow
+                          label={t('market.orders.walletBasisBuys')}
+                          value={row.costBasis.buyCount.toLocaleString()}
+                        />
+                        <LedgerRow
+                          label={t('market.orders.walletBasisRange')}
+                          value={t('market.orders.walletBasisRangeValue', {
+                            from: new Date(row.costBasis.oldestBuy).toLocaleDateString(),
+                            to: new Date(row.costBasis.newestBuy).toLocaleDateString(),
+                          })}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <LedgerRow
+                          label={t('industry.quantity')}
+                          value={row.costBasis.runQuantity.toLocaleString()}
+                        />
+                        <LedgerRow
+                          label={t('industry.materialCost')}
+                          value={`${formatIsk(row.costBasis.materialCost)} ISK`}
+                        />
+                        <LedgerRow
+                          label={t('industry.jobFee')}
+                          value={`${formatIsk(row.costBasis.jobFee)} ISK`}
+                        />
+                        <LedgerRow
+                          label={t('industry.totalCost')}
+                          value={`${formatIsk(row.costBasis.materialCost + row.costBasis.jobFee)} ISK`}
+                        />
+                      </>
+                    )}
                     {/*
                       Per unit, not per run — the pivot from the batch totals
                       above to the per-unit figures below. `unitCost` is
@@ -702,6 +741,14 @@ export function OrderDetailModal({
                       label={t('market.orders.costPerUnit')}
                       value={`${formatIsk(row.costBasis.unitCost, 2)} ISK`}
                     />
+                    {row.costBasis.source === 'wallet' && (
+                      <p className="col-span-2 text-text-dim">
+                        {t('market.orders.walletBasisNoBuyFee')}
+                        {row.costBasis.truncated
+                          ? ' ' + t('market.orders.walletBasisTruncated')
+                          : null}
+                      </p>
+                    )}
                     {/*
                       Rendered as ISK off `floor.relist`, not as a bare
                       percentage: `unitCost + salesTax(relist) +

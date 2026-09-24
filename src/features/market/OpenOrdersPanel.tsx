@@ -362,6 +362,7 @@ export function OpenOrdersPanel({
       typeNames: snapshot.typeNames,
       stationPrices: snapshot.stationPrices,
       costBases: snapshot.costBases,
+      walletBasisGaps: snapshot.walletBasisGaps,
       deepCompetition: deepCompetitionByOrderId,
       structureCompetition: structureCache.byKey,
       stationNames,

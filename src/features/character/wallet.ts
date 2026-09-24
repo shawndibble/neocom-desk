@@ -141,6 +141,12 @@ export function loadWalletJournalWithStatus(
   );
 }
 
+/** Whether the character granted the wallet scope — checked up front so callers never provoke a live 403. */
+export async function hasWalletScope(characterId: number): Promise<boolean> {
+  const token = await db.tokens.get(characterId);
+  return (token?.scopes ?? []).includes(WALLET_SCOPE);
+}
+
 /** Transactions. `truncated` means the fetch stopped at the page cap. */
 export async function loadWalletTransactions(
   characterId: number
