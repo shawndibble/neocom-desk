@@ -700,12 +700,14 @@ describe('OrderDetailModal', () => {
             buyCount: 2,
             oldestBuy: '2026-01-01T00:00:00Z',
             newestBuy: '2026-01-05T00:00:00Z',
+            buys: [{ date: '2026-01-05T00:00:00Z', quantity: 10, unitPrice: 400 }],
             truncated: false,
           },
         },
       });
       expect(screen.getByText('Units priced from your wallet')).toBeInTheDocument();
       expect(screen.getByText('Wallet buys used')).toBeInTheDocument();
+      expect(screen.getByText(/10 at 400.00 ISK on/)).toBeInTheDocument();
       expect(
         screen.getByText(/Broker fees paid when you bought are not included/)
       ).toBeInTheDocument();

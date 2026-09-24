@@ -57,7 +57,15 @@ describe('walletCostBasis', () => {
       ],
     });
     // 10 x 200 + 5 x 100 = 2500 / 15
-    expect(result).toMatchObject({ status: 'covered', unitsCovered: 15, buyCount: 2 });
+    expect(result).toMatchObject({
+      status: 'covered',
+      unitsCovered: 15,
+      buyCount: 2,
+      buys: [
+        { date: '2026-01-02T00:00:00Z', quantity: 10, unitPrice: 200 },
+        { date: '2026-01-01T00:00:00Z', quantity: 5, unitPrice: 100 },
+      ],
+    });
     expect(result?.status === 'covered' && result.unitCost).toBeCloseTo(2500 / 15);
   });
 

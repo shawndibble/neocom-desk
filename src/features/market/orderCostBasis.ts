@@ -13,7 +13,11 @@
  */
 import { db, type ProductionOrderWatchRecord, type ProductionRunRecord } from '@/db';
 import { hasWalletScope, loadWalletTransactions } from '@/features/character/wallet';
-import { walletCostBasis, type WalletTrade } from '@/engine/market/walletCostBasis';
+import {
+  walletCostBasis,
+  type WalletBuyUsed,
+  type WalletTrade,
+} from '@/engine/market/walletCostBasis';
 import type { MarketOrder } from '@/esi/endpoints';
 
 /** Cost taken from a Production Run linked to the order (the original source). */
@@ -36,6 +40,8 @@ export interface WalletBasis {
   buyCount: number;
   oldestBuy: string;
   newestBuy: string;
+  /** The buys the cost was averaged from, newest first — the ledger names them. */
+  buys: WalletBuyUsed[];
   /** The wallet fetch hit its page cap, so older history may exist. */
   truncated: boolean;
 }
@@ -157,6 +163,7 @@ export async function loadWalletOrderCostBases(
           buyCount: result.buyCount,
           oldestBuy: result.oldestBuy,
           newestBuy: result.newestBuy,
+          buys: result.buys,
           truncated: result.truncated,
         });
       } else if (result.status === 'partial') {

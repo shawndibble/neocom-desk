@@ -742,12 +742,20 @@ export function OrderDetailModal({
                       value={`${formatIsk(row.costBasis.unitCost, 2)} ISK`}
                     />
                     {row.costBasis.source === 'wallet' && (
-                      <p className="col-span-2 text-text-dim">
-                        {t('market.orders.walletBasisNoBuyFee')}
-                        {row.costBasis.truncated
-                          ? ' ' + t('market.orders.walletBasisTruncated')
-                          : null}
-                      </p>
+                      <div className="col-span-2 space-y-0.5 text-text-dim">
+                        <ul>
+                          {row.costBasis.buys.map((buy, i) => (
+                            <li key={i}>
+                              {t('market.orders.walletBasisBuyLine', {
+                                quantity: buy.quantity.toLocaleString(),
+                                price: formatIsk(buy.unitPrice, 2),
+                                date: new Date(buy.date).toLocaleDateString(),
+                              })}
+                            </li>
+                          ))}
+                        </ul>
+                        <p>{t('market.orders.walletBasisNoBuyFee')}</p>
+                      </div>
                     )}
                     {/*
                       Rendered as ISK off `floor.relist`, not as a bare

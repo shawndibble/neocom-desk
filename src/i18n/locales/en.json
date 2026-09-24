@@ -3505,6 +3505,7 @@
       "walletBasisBuys": "Wallet buys used",
       "walletBasisRange": "Bought between",
       "walletBasisRangeValue": "{{from}} to {{to}}",
+      "walletBasisBuyLine": "{{quantity}} at {{price}} ISK on {{date}}",
       "walletBasisNoBuyFee": "Broker fees paid when you bought are not included, so the real cost is slightly higher.",
       "walletBasisPartial": "Your wallet shows buys for {{covered}} of these {{total}} units.",
       "walletBasisHistoryShort": "Your wallet history has sales with no matching buy, so we can't tell which stock this is.",

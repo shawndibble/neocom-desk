@@ -40,10 +40,18 @@ export type WalletCostBasisResult =
       buyCount: number;
       oldestBuy: string;
       newestBuy: string;
+      /** The buys priced, newest first; the boundary buy's quantity is the part used. */
+      buys: WalletBuyUsed[];
       truncated: boolean;
     }
   | { status: 'partial'; coveredUnits: number; pool: number; truncated: boolean }
   | { status: 'historyShort'; truncated: boolean };
+
+export interface WalletBuyUsed {
+  date: string;
+  quantity: number;
+  unitPrice: number;
+}
 
 interface Lot {
   date: string;
@@ -87,14 +95,14 @@ export function walletCostBasis(input: WalletCostBasisInput): WalletCostBasisRes
 
   let needed = pool;
   let cost = 0;
-  let buyCount = 0;
+  const buys: WalletBuyUsed[] = [];
   let oldestBuy = '';
   let newestBuy = '';
   for (let i = left.length - 1; i >= 0 && needed > 0; i--) {
     const taken = Math.min(left[i].remaining, needed);
     needed -= taken;
     cost += taken * left[i].unitPrice;
-    buyCount += 1;
+    buys.push({ date: left[i].date, quantity: taken, unitPrice: left[i].unitPrice });
     if (newestBuy === '') newestBuy = left[i].date;
     oldestBuy = left[i].date;
   }
@@ -102,9 +110,10 @@ export function walletCostBasis(input: WalletCostBasisInput): WalletCostBasisRes
     status: 'covered',
     unitCost: cost / pool,
     unitsCovered: pool,
-    buyCount,
+    buyCount: buys.length,
     oldestBuy,
     newestBuy,
+    buys,
     truncated,
   };
 }
