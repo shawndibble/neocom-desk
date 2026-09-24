@@ -1480,8 +1480,12 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
+    // Scoped to PlanHeader's own "Training time" chip by its unique label,
+    // not a bare duration-shaped regex: the header also carries a Remap
+    // savings chip once a plan has savings to show, and both render
+    // duration-shaped text, so an unscoped `/^\d+[dhm]/` match is ambiguous.
     const durationHeader = () =>
-      within(queuePanel).getByText(/^\d+[dhm]/, { selector: 'header span' });
+      screen.getByText('Training time').parentElement!.querySelector('span:last-child')!;
     const durationBefore = durationHeader().textContent;
 
     const select = screen.getByRole('combobox', { name: 'What-if implants' });
@@ -1522,8 +1526,11 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
+    // See the sibling "recomputes training time..." test above: scoped to
+    // PlanHeader's own "Training time" chip, since an unscoped duration
+    // regex can also match its Remap savings chip.
     const durationHeader = () =>
-      within(queuePanel).getByText(/^\d+[dhm]/, { selector: 'header span' });
+      screen.getByText('Training time').parentElement!.querySelector('span:last-child')!;
     const durationBefore = durationHeader().textContent;
 
     await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
