@@ -1,5 +1,6 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { cx } from '@/lib/cx';
+import { COMBOBOX_NAV_KEYS, moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import {
   filterMultiSelectGroups,
   type MultiSelectGroup,
@@ -39,7 +40,11 @@ export interface MultiSelectProps<Id> {
  * with a live text input inside the same content — see
  * docs/context/decisions/20260905-114550-hand-build-aria-comboboxes-rather-than-buy-radix.md.
  * Options use the `listbox`/`option` roles instead of Radix's `menuitemcheckbox`
- * for the same reason.
+ * for the same reason. Keyboard nav follows the same hand-built shape as
+ * `RegionSelect`: focus stays in the search input, `aria-activedescendant`
+ * tracks a roving highlight moved by arrow keys, and Enter acts on the
+ * highlighted option — Space is left alone since typing one into the search
+ * box must still insert a space, not toggle a row.
  */
 export function MultiSelect<Id>({
   trigger,
@@ -54,6 +59,8 @@ export function MultiSelect<Id>({
 }: MultiSelectProps<Id>) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [highlight, setHighlight] = useState<number | null>(null);
+  const listId = useId();
 
   const normalizedGroups = useMemo<readonly MultiSelectGroup<Id>[]>(
     () => groups ?? [{ label: '', options: options ?? [] }],
@@ -64,21 +71,66 @@ export function MultiSelect<Id>({
     [normalizedGroups, query]
   );
   const hasResults = filteredGroups.some((group) => group.options.length > 0);
+  const flatOptions = useMemo(
+    () => filteredGroups.flatMap((group) => group.options),
+    [filteredGroups]
+  );
+
+  useEffect(() => {
+    if (highlight === null) return;
+    document.getElementById(`${listId}-${highlight}`)?.scrollIntoView?.({ block: 'nearest' });
+  }, [highlight, listId]);
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    setHighlight(null);
+  }
+
+  function handleQueryChange(next: string) {
+    setQuery(next);
+    setHighlight(null);
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (COMBOBOX_NAV_KEYS.includes(event.key)) {
+      event.preventDefault();
+      setHighlight(moveHighlight(event.key as ComboboxNavKey, highlight, flatOptions.length));
+    } else if (event.key === 'Enter' && highlight !== null && flatOptions[highlight]) {
+      event.preventDefault();
+      onToggle(flatOptions[highlight].id);
+    }
+  }
+
+  let flatIndex = -1;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent className={cx('w-64 p-0', contentClassName)}>
         {typeof extraContent === 'function' ? extraContent(() => setOpen(false)) : extraContent}
         <div className="p-1">
           <SearchInput
+            autoFocus
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => handleQueryChange(event.target.value)}
+            onKeyDown={onKeyDown}
             placeholder={searchPlaceholder}
             aria-label={searchPlaceholder}
+            role="combobox"
+            aria-controls={listId}
+            aria-expanded="true"
+            aria-autocomplete="list"
+            aria-activedescendant={
+              highlight === null || !flatOptions[highlight] ? undefined : `${listId}-${highlight}`
+            }
           />
         </div>
-        <div role="listbox" aria-multiselectable="true" className="max-h-64 overflow-y-auto p-1">
+        <div
+          id={listId}
+          role="listbox"
+          aria-multiselectable="true"
+          className="max-h-64 overflow-y-auto p-1"
+        >
           {!hasResults && <p className="px-2 py-1.5 text-sm text-text-dim">{noResultsLabel}</p>}
           {filteredGroups.map((group) => (
             <div key={group.label}>
@@ -89,12 +141,15 @@ export function MultiSelect<Id>({
               )}
               {group.options.map((option) => {
                 const checked = selected.has(option.id);
+                const index = ++flatIndex;
                 return (
                   <div
                     key={String(option.id)}
+                    id={`${listId}-${index}`}
                     role="option"
                     aria-selected={checked}
-                    className={menuItemClassName}
+                    className={cx(menuItemClassName, index === highlight && 'bg-panel-2')}
+                    onMouseDown={(event) => event.preventDefault()}
                     onClick={() => onToggle(option.id)}
                   >
                     <span aria-hidden="true" className="inline-block w-3 text-center">
