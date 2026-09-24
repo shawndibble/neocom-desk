@@ -511,7 +511,14 @@ export function Mail() {
 
   // `enabled: !isDesktop` — narrow-only; see `useFocusHeading`'s own doc
   // comment for why that's a separate param rather than folded into the key.
-  useFocusHeading(readerHeadingRef, body === undefined ? null : selectedId, !isDesktop);
+  // Off while composing too: Reply/Forward render from the header alone, so a
+  // pilot can open one before the body loads — the compose box then mounts
+  // with the body, and its own focus must not lose to this heading's.
+  useFocusHeading(
+    readerHeadingRef,
+    body === undefined ? null : selectedId,
+    !isDesktop && composeKind === null
+  );
 
   if (!hydrated) {
     return (

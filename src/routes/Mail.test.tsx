@@ -169,6 +169,38 @@ describe('Mail', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Reply' })).toHaveFocus());
   });
 
+  it('Reply opened before the body loads still focuses the compose box, not the reader heading', async () => {
+    // Reply renders from the header alone, so a quick pilot can open it while
+    // the body is still loading — the reader heading's focus-on-load must not
+    // then take focus from the compose box that mounts alongside it.
+    let releaseBody: () => void = () => {};
+    const bodyGate = new Promise<void>((resolve) => {
+      releaseBody = resolve;
+    });
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/mail/1`, async () => {
+        await bodyGate;
+        return HttpResponse.json({
+          from: 90000001,
+          subject: 'Fleet up!',
+          body: 'Undock <b>now</b>.',
+          read: false,
+          recipients: [{ recipient_id: 90000003, recipient_type: 'character' }],
+        });
+      })
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByText('Fleet up!'));
+    await user.click(await screen.findByRole('button', { name: 'Reply' }));
+
+    // The compose box mounts with the body, on the same commit as the
+    // reader heading the body's arrival would otherwise focus.
+    releaseBody();
+    expect(await screen.findByText('Undock now.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveFocus());
+  });
+
   it('reading pane sender name opens the shared Public Info Modal (issue #787)', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/90000001`, () =>
