@@ -4,7 +4,7 @@ import { IconButton } from './IconButton';
 import * as Icon from './icons';
 import { PortalContainerProvider } from './portalContainer';
 
-export type ModalPlacement = 'center' | 'sheet' | 'wide';
+export type ModalPlacement = 'center' | 'sheet' | 'wide' | 'media';
 
 interface ModalProps {
   /** Parent owns the state; the modal never closes itself. */
@@ -23,9 +23,23 @@ interface ModalProps {
    */
   titleActions?: ReactNode;
   children: ReactNode;
-  /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `wide` for multi-column content (e.g. a comparison matrix). */
+  /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `wide` for multi-column content (e.g. a comparison matrix), `media` for an enlarged image — sized to its content up to 95% of the viewport. */
   placement?: ModalPlacement;
 }
+
+/**
+ * Per placement: the dialog's own box, and the height cap that box and its
+ * inner column share — one entry, so the two can never disagree.
+ */
+const PLACEMENT_CLASSES: Record<ModalPlacement, { dialogClass: string; heightClass: string }> = {
+  center: { dialogClass: 'm-auto w-full max-w-lg', heightClass: 'max-h-[85vh]' },
+  sheet: {
+    dialogClass: 'mx-auto mt-auto mb-0 w-full max-w-md rounded-b-none',
+    heightClass: 'max-h-[85vh]',
+  },
+  wide: { dialogClass: 'm-auto w-full max-w-5xl', heightClass: 'max-h-[85vh]' },
+  media: { dialogClass: 'm-auto w-fit max-w-[95vw]', heightClass: 'max-h-[95vh]' },
+};
 
 /**
  * Modal on the native `<dialog>` (`showModal()`), which supplies what a
@@ -84,12 +98,7 @@ export function Modal({
     };
   }, [open]);
 
-  const placementClass =
-    placement === 'sheet'
-      ? 'mx-auto mt-auto mb-0 max-h-[85vh] w-full max-w-md rounded-b-none'
-      : placement === 'wide'
-        ? 'm-auto max-h-[85vh] w-full max-w-5xl'
-        : 'm-auto max-h-[85vh] w-full max-w-lg';
+  const { dialogClass, heightClass } = PLACEMENT_CLASSES[placement];
 
   return (
     <dialog
@@ -108,7 +117,7 @@ export function Modal({
         // ones that landed on its ::backdrop.
         if (event.target === dialogRef.current) onClose();
       }}
-      className={`fixed inset-0 h-fit overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${placementClass}`}
+      className={`fixed inset-0 h-fit overflow-hidden rounded-xs border border-line bg-panel p-0 text-text shadow-lg shadow-black/50 backdrop:bg-black/60 ${heightClass} ${dialogClass}`}
     >
       {open && (
         // The provider spans the header too, not just the body: a title can
@@ -116,7 +125,7 @@ export function Modal({
         // one portaled to `document.body` would
         // land behind the top layer — see `portalContainer.ts`.
         <PortalContainerProvider value={portalContainer}>
-          <div className="flex max-h-[85vh] flex-col">
+          <div className={`flex ${heightClass} flex-col`}>
             <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
               <h2
                 id={titleId}

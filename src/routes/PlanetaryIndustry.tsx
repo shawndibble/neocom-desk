@@ -19,6 +19,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { db } from '@/db';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { PlanPanel } from '@/features/pi/PlanPanel';
@@ -1076,7 +1077,9 @@ export function PlanetaryIndustry() {
               title={t('pi.reauthTitle')}
               hint={t('pi.reauthHint')}
               actionLabel={t('pi.reauthAction')}
-              onLogin={() => void beginEveLogin()}
+              onLogin={() =>
+                void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterPlanets']) })
+              }
             />
           )}
           {!planetsNeedsReauth && error && (

@@ -27,6 +27,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { db } from '@/db';
 import {
   loadWalletBalanceWithStatus,
@@ -1342,7 +1343,11 @@ export function Wallet() {
                       title={t('wallet.reauthTitle')}
                       hint={t('wallet.reauthHint')}
                       actionLabel={t('wallet.reauthAction')}
-                      onLogin={() => void beginEveLogin()}
+                      onLogin={() =>
+                        void beginEveLogin({
+                          groups: permissionsForEndpoints(['getCharacterWallet']),
+                        })
+                      }
                     />
                   ) : balanceResult ? (
                     <p
@@ -1386,7 +1391,11 @@ export function Wallet() {
                   title={t('loyalty.reauthTitle')}
                   hint={t('loyalty.reauthHint')}
                   actionLabel={t('loyalty.reauthAction')}
-                  onLogin={() => void beginEveLogin()}
+                  onLogin={() =>
+                    void beginEveLogin({
+                      groups: permissionsForEndpoints(['getCharacterLoyaltyPoints']),
+                    })
+                  }
                 />
               </div>
             ) : !loyaltyResult || otherLoyalty.length === 0 ? (

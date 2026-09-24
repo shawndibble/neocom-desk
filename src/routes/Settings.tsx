@@ -77,7 +77,7 @@ import { CharacterFilterControl } from '@/features/character/CharacterFilterCont
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { NotificationsPanel } from '@/features/notifications/NotificationsPanel';
-import { CorpAccessPanel } from '@/features/corp/CorpAccessPanel';
+import { PermissionsPanel } from '@/features/permissions/PermissionsPanel';
 import { FaqPanel } from '@/features/faq/FaqPanel';
 import { db } from '@/db';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
@@ -1166,12 +1166,14 @@ export function Settings() {
             </Panel>
           </div>
           {/*
-            Anchor for anything that needs to send a Character here to grant corp
-            access — with corp UI hidden rather than locked, this row is the only
-            way in for a Character that dismissed the one-time prompt.
+            `#corp-access` is the older deep-link anchor, kept so existing links
+            still land here: with corp UI hidden rather than locked, the
+            Corporation row is the only way in for a Character that dismissed
+            the one-time prompt. It sits on the whole section rather than that
+            row, which is not rendered for a Character with no Corp Role.
           */}
           <div id="corp-access" className="scroll-mt-4">
-            <CorpAccessPanel />
+            <PermissionsPanel />
           </div>
           <DataPanel />
           <DataAttributionPanel />

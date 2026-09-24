@@ -1,6 +1,6 @@
 // Kicks off EVE SSO: stash PKCE state, then leave the app for login.eveonline.com.
 import { startLogin, scopesForRetry, takeRetryBudget } from '@/auth/session';
-import { SCOPES, scopesForGroup } from '@/esi/scopes';
+import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
 import type { ScopeGroup } from '@/esi/registry';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -20,10 +20,20 @@ export interface EveLoginOptions {
 }
 
 /**
- * The scope set to ask SSO for: the base `SCOPES`, plus any requested group,
- * plus `characterId`'s own stored grant when there is a Character to union
- * with. `null` means there is not — see the two branches on the exported
- * functions below.
+ * The scope set to ask SSO for.
+ *
+ * With no known Character (`characterId === null`, i.e. Add Character), the
+ * returning identity is unknowable until EVE sends them back, so this asks
+ * for the whole `SCOPES` (Base Grant) and nothing else — the decision doc's
+ * "plain login still asks for the whole Base Grant" rule.
+ *
+ * With a known Character, this is a re-login for someone already looking at
+ * their own data — a `ReauthBanner`, a `ScopeGate`, a Grant button — so
+ * re-asking for the whole Base Grant would silently re-request every
+ * Permission the Character declined at sign-in (issue #1520). It asks for
+ * just the `CORE_GRANT`, plus any named `groups` (the one Permission a
+ * banner's endpoints resolved to, or an opt-in group like `corp`), plus
+ * `characterId`'s own stored grant.
  *
  * Unioning *stored* scopes rather than naming new ones is what keeps the union
  * safe: every scope in it was granted to this client id already, so SSO cannot
@@ -34,8 +44,8 @@ async function requestedScopes(
   characterId: number | null,
   groups: readonly ScopeGroup[]
 ): Promise<string[]> {
-  const base = [...SCOPES, ...groups.flatMap((group) => [...scopesForGroup(group)])];
-  if (characterId === null) return [...new Set(base)];
+  if (characterId === null) return [...new Set(SCOPES)];
+  const base = [...CORE_GRANT, ...groups.flatMap((group) => [...scopesForGroup(group)])];
   try {
     const token = await db.tokens.get(characterId);
     // `?? []` as everywhere else that reads a stored grant (app/prefetch.ts,
@@ -55,7 +65,7 @@ async function requestedScopes(
  * the two branches incremental auth splits login into (issue #295).
  *
  * Every caller is pressed from a Character context: a `ReauthBanner`, the
- * `AuthFailureNotice`, a `ScopeGate`, the Settings Corp access row, the corp
+ * `AuthFailureNotice`, a `ScopeGate`, the Settings Corporation Permission row, the corp
  * grant prompt. So the request unions with that Character's stored grant, and
  * asking for less would quietly throw away a grant they already made — EVE
  * issues a token carrying exactly what was requested, so the loss is real.

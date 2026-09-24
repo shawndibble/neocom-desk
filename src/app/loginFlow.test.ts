@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach, vi } 
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { db, type TokenRecord } from '@/db';
-import { SCOPES, revokedScopes, scopesForGroup } from '@/esi/scopes';
+import { CORE_GRANT, SCOPES, revokedScopes, scopesForGroup } from '@/esi/scopes';
 import { completeLogin } from '@/auth/session';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
@@ -162,7 +162,7 @@ describe('beginAddCharacterLogin', () => {
 
 // ---------------------------------------------------------------------------
 // Branch 2 — a known character. Every entry point here is initiated from a
-// character context (the Settings Corp access row, the role-gain prompt, the
+// character context (the Settings Corporation Permission row, the role-gain prompt, the
 // ReauthBanner), so the grant to union with *is* knowable, and asking for less
 // than it would throw away a grant the character already made.
 // ---------------------------------------------------------------------------
@@ -187,10 +187,13 @@ describe('beginEveLogin: re-auth for a known character', () => {
     expect(requestedScopes()).not.toContain(EXTRA_SCOPE);
   });
 
-  it('sends the base set for a character with no stored grant at all', async () => {
+  it('sends only the Core Grant for a character with no stored grant and no named Permission (AC 3)', async () => {
+    // #1520: a bare re-auth with no identifiable Permission must never re-ask
+    // for the whole Base Grant, or it would re-request every Permission the
+    // Character declined at sign-in.
     await beginEveLogin({ characterId: CHAR_ID });
 
-    expect(requestedScopes().sort()).toEqual([...SCOPES].sort());
+    expect(requestedScopes().sort()).toEqual([...CORE_GRANT].sort());
   });
 
   /**
@@ -233,11 +236,27 @@ describe('beginEveLogin: re-auth for a known character', () => {
 // ---------------------------------------------------------------------------
 
 describe('beginEveLogin: requesting a scope group', () => {
-  it('adds every scope in the group to the base set', async () => {
+  it('asks for the Core Grant plus the named group, never the whole Base Grant (AC 1)', async () => {
+    // A Character holding only the Core Grant plus Wallet presses the Mail
+    // banner: SSO must be asked for Core + Wallet (stored) + Mail (named) and
+    // nothing else — not every other default-on Permission.
+    await seedGrant(CHAR_ID, [...CORE_GRANT, ...scopesForGroup('wallet')]);
+
+    await beginEveLogin({ characterId: CHAR_ID, groups: ['mail'] });
+
+    const requested = new Set(requestedScopes());
+    for (const scope of CORE_GRANT) expect(requested.has(scope), scope).toBe(true);
+    for (const scope of scopesForGroup('wallet')) expect(requested.has(scope), scope).toBe(true);
+    for (const scope of scopesForGroup('mail')) expect(requested.has(scope), scope).toBe(true);
+    for (const scope of scopesForGroup('contracts'))
+      expect(requested.has(scope), scope).toBe(false);
+  });
+
+  it('adds every scope in the group to the Core Grant', async () => {
     await beginEveLogin({ characterId: CHAR_ID, groups: ['corp'] });
 
     const requested = new Set(requestedScopes());
-    for (const scope of SCOPES) expect(requested.has(scope), scope).toBe(true);
+    for (const scope of CORE_GRANT) expect(requested.has(scope), scope).toBe(true);
     for (const scope of scopesForGroup('corp')) expect(requested.has(scope), scope).toBe(true);
   });
 
@@ -280,14 +299,15 @@ describe('beginEveLogin: requesting a scope group', () => {
 });
 
 describe('beginEveLogin: a broken Dexie', () => {
-  it('falls back to the base SCOPES when the stored grant cannot be read', async () => {
-    // A broken Dexie must cost the user their cache, never their way back in.
+  it('falls back to the Core Grant when the stored grant cannot be read', async () => {
+    // A broken Dexie must cost the user their cache, never their way back in
+    // — but it must not turn an unreadable grant into a full Base Grant ask.
     const get = vi.spyOn(db.tokens, 'get').mockRejectedValue(new Error('store closed'));
 
     await beginEveLogin({ characterId: CHAR_ID });
 
     get.mockRestore();
-    expect(requestedScopes().sort()).toEqual([...SCOPES].sort());
+    expect(requestedScopes().sort()).toEqual([...CORE_GRANT].sort());
   });
 
   it('still asks for a requested group when the stored grant cannot be read', async () => {

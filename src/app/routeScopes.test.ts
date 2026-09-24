@@ -6,6 +6,7 @@ import {
   UNGATED,
   isGatedRoute,
   missingScopesForRoute,
+  permissionsForRoute,
   requiredScopesForRoute,
   routeStringsNamespace,
   type AppRoutePath,
@@ -138,6 +139,19 @@ describe('every route must declare its scope requirement', () => {
       '/share/appraisal',
       '/styleguide',
     ]);
+  });
+});
+
+describe('permissionsForRoute', () => {
+  it('names the one Permission a gated route’s re-login banner should ask for', () => {
+    expect(permissionsForRoute('/mail')).toEqual(['mail']);
+    expect(permissionsForRoute('/assets')).toEqual(['assets']);
+    expect(permissionsForRoute('/clones')).toEqual(['characterDetails']);
+  });
+
+  it('names nothing for an ungated route — no identifiable Permission to ask for (AC 3)', () => {
+    expect(permissionsForRoute('/overview')).toEqual([]);
+    expect(permissionsForRoute('/market')).toEqual([]);
   });
 });
 

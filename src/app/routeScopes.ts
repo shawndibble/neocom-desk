@@ -11,8 +11,10 @@
 import {
   ESI_REGISTRY,
   isScopeRequired,
+  permissionsForEndpoints,
   type EsiEndpointId,
   type Scope,
+  type ScopeGroup,
   type ScopeRequirement,
 } from '@/esi/registry';
 
@@ -107,7 +109,7 @@ export const ROUTE_REQUIREMENTS = {
    * *hides* rather than locks (CONTEXT.md round 35). Declaring the corp
    * endpoints here would put a `ReauthBanner` in front of a `roles-without-grant`
    * Character — offering a re-login for a grant the `CorpGrantPrompt` and the
-   * Settings Corp access row exist to ask for properly — and in front of a
+   * Settings Corporation Permission row exist to ask for properly — and in front of a
    * `none` Character it would promise that logging in again unlocks something,
    * which no login ever will.
    */
@@ -285,4 +287,17 @@ export function missingScopesForRoute(
 ): readonly Scope[] {
   const held = new Set(granted);
   return requiredScopesForRoute(path).filter((scope) => !held.has(scope));
+}
+
+/**
+ * The Permission(s) a gated route's re-login banner should ask for, derived
+ * from the same `endpoints` list the route declares — so pressing the Mail
+ * banner asks for exactly Mail, never every Permission (issue #1520).
+ * `[]` for an ungated route, which `beginEveLogin` treats as "no identifiable
+ * Permission" and asks for the Core Grant plus the stored grant only.
+ */
+export function permissionsForRoute(path: AppRoutePath): readonly ScopeGroup[] {
+  const requirement = ROUTE_REQUIREMENTS[path];
+  if (requirement === UNGATED) return [];
+  return permissionsForEndpoints(requirement.endpoints);
 }

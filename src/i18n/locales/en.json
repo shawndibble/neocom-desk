@@ -1168,20 +1168,23 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Signing in grants read-only access to your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, corporation roles, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data is a separate grant, requested only if you open the corporation pages. Log in again after an update to pick up newly requested permissions.",
-    "writeExceptions": "Three exceptions: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; and replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client. Those are the only writes this app ever makes.",
-    "eyebrow": "Read-only · Free · Open source",
-    "heading": "Command deck for every character you fly.",
-    "trustLine": "Read-only access. Your refresh token never leaves this device.",
+    "permissionsHint": "Signing in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, corporation roles, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions.",
+    "writeExceptions": "It also asks for three permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; and replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client. Nothing else in the app writes to EVE.",
+    "eyebrow": "Free · Open source · Runs in your browser",
+    "heading": "Answers, not API dumps.",
+    "trustLine": "Your refresh token never leaves this device.",
     "previewLabel": "Example — signed-in view",
-    "previewCharacterName": "Aurelia Vex",
     "previewCorp": "Deep Space Transport",
     "answersHeading": "The questions it exists to answer",
-    "answersLead": "Not another dump of what the API returned — the number you were going to work out by hand, already worked out, for every character at once.",
+    "answersLead": "Each of these is a page you open after signing in, with the number you would have worked out by hand already worked out.",
     "answers": {
+      "attention": {
+        "question": "Which character needs my attention?",
+        "answer": "The character list shows every pilot’s training queue at a glance: training, paused, ending soon or sitting idle. Alerts gathers what fired for every character on this device, not just the one you are looking at: skills finished, jobs ready to deliver, colonies stopped, orders undercut, mail waiting. Open a character and its board leads with the nearest deadline."
+      },
       "orders": {
         "question": "Which of my orders is quietly losing ISK?",
-        "answer": "Open Orders is a worklist, not a list. Every order is filed under the worst thing wrong with it — undercut at your station, system or region, sitting under the price where relisting stops paying, or about to expire — worst first, across every character you fly. Open one and it prices the ways out: hold, match the station, dump into a standing buy order, or refine it and sell the materials, each net of the fee that exit actually pays, plus the hubs bidding more and how many jumps away they are."
+        "answer": "Open Orders is a worklist, not a list. Every order is filed under the worst thing wrong with it — undercut at your station, system or region, sitting under the price where relisting stops paying, or about to expire — worst first, across every character you fly. Open one and it prices the ways out: hold, undercut the station, dump into a standing buy order, or reprocess it and sell the materials, each net of the fee that exit actually pays, plus the trade hubs bidding more and how many jumps away they are."
       },
       "build": {
         "question": "Is this blueprint worth building today?",
@@ -1189,20 +1192,82 @@
       },
       "training": {
         "question": "What is this training plan really going to cost me?",
-        "answer": "Drag skills into a plan and it schedules against the character's real attributes, implants and queue. The optimizer places remaps for you — or at markers you drop yourself — and re-costs the plan under what-if implants and an accelerator before you spend anything. Put your characters side by side to see which of them should be training it."
+        "answer": "Drag skills into a plan and it schedules against the character’s real attributes, implants and queue. The optimizer places remaps for you — or at markers you drop yourself — and re-costs the plan under what-if implants and an accelerator before you spend anything. Put your characters side by side to see which of them should be training it."
       },
-      "moon": {
-        "question": "Who owes what on the moon rental?",
-        "answer": "Your mining ledger becomes an invoice. Each day's ore in each system is assigned to a payee at a tax rate snapshotted on the spot, so a later price move never rewrites what was owed. If ESI reports more ore for a day you already assigned, it flags itself for review with the before and after. Then settle up against the donations and contracts you actually sent."
+      "colonies": {
+        "question": "Are my colonies earning what they could?",
+        "answer": "The PI Advisor reads every colony and lists what is not working — idle facilities, storage that fills before you are back — then prices what is being left on the table: the ISK/hr you would add by tuning what is already built, and, as a separate figure, by rebuilding from scratch. Every rate is net of export customs and sales tax at your own Accounting level."
+      },
+      "appraisal": {
+        "question": "What is this pile of loot actually worth?",
+        "answer": "Paste straight from your inventory, a multibuy or a fitting. The appraisal prices it at the trade hub you pick three ways — sold into buy orders now or listed one step under the cheapest seller, each net of the sales tax and broker fee that route pays, and reprocessed with your own skills. Copy a ready-made sell list, or share the result as a link."
+      }
+    },
+    "screenshotsHeading": "See it in action",
+    "screenshotsLead": "Real screens from a real pilot. The same app runs on a desktop browser or installed on your phone.",
+    "screenshotsPhoneHeading": "On your phone",
+    "screenshotEnlarge": "Enlarge: {{alt}}",
+    "screenshots": {
+      "orderDetail": {
+        "alt": "An open sell order: who is cheaper at the station, system and region, and whether there is a better exit.",
+        "caption": "Every order explains what it is losing to"
+      },
+      "buildPlan": {
+        "alt": "A Build Plan for an Orca: profit after fees, materials with sub-builds, and costs and revenue.",
+        "caption": "Build plans with profit after fees"
+      },
+      "lpStore": {
+        "alt": "The CONCORD loyalty store ranked by ISK per LP, with one offer’s net profit broken down.",
+        "caption": "LP offers ranked by ISK per LP"
+      },
+      "calendar": {
+        "alt": "The in-game calendar by month, beside a list of upcoming events and their RSVP state.",
+        "caption": "The in-game calendar, outside the game"
+      },
+      "contracts": {
+        "alt": "Contract history with one item exchange contract opened to show what it held.",
+        "caption": "Every contract, and what was in it"
+      },
+      "phoneOverview": {
+        "alt": "A character’s Overview board on a phone: next deadline, training, wallet, open orders and mining tax.",
+        "caption": "Overview"
+      },
+      "phoneAlerts": {
+        "alt": "Alerts on a phone, grouped by type across every character.",
+        "caption": "Alerts"
+      },
+      "phoneWallet": {
+        "alt": "A wallet balance chart and loyalty point totals on a phone.",
+        "caption": "Wallet"
+      },
+      "phonePriceHistory": {
+        "alt": "A market price history chart on a phone, with daily range, average and volume.",
+        "caption": "Price history"
       }
     },
     "featuresHeading": "Everything outside the client",
     "featureGroups": {
+      "command": "Command",
       "progression": "Progression",
       "economy": "Economy",
-      "operations": "Operations"
+      "social": "Social"
     },
     "features": {
+      "corp": {
+        "name": "Corporation",
+        "desc": "Ops board, wallet divisions, corp industry jobs, division-grouped assets and a member roster that flags who has gone dark. Gated on your in-game roles.",
+        "tag": "Role-gated"
+      },
+      "alerts": {
+        "name": "Alerts",
+        "desc": "Every alert this device has fired, grouped by type — including the ones belonging to a character you were not looking at. Search it, filter by character, mute a type, or dismiss a whole group from its row.",
+        "tag": "Every character"
+      },
+      "notifications": {
+        "name": "Notifications",
+        "desc": "Per character, per event. Skills, industry jobs, extractors, calendar events and — with the corporation grant — structure fuel carry a timestamp, so those arrive with the app closed; order fills, mail, contracts and price alerts fire while it is open.",
+        "tag": "Push"
+      },
       "skills": {
         "name": "Skills",
         "desc": "Drag-and-drop skill plans, a remap-, implant- and accelerator-aware optimizer, live queue import, ship mastery and fit checks, and a side-by-side character comparison.",
@@ -1215,12 +1280,22 @@
       },
       "industry": {
         "name": "Industry",
-        "desc": "Build plans for manufacturing and reactions: materials, job fees, facility rigs and taxes at live hub prices, with a production log that tracks what each run really made, and a search across every public BPC contract by ME/TE, runs, price and jumps.",
+        "desc": "Build plans for manufacturing and reactions: materials, job fees, facility rigs and taxes at live hub prices. A production log tracks what each run really made, Opportunities ranks the blueprints you own and scans the market for what is profitable to build, and BPC Search covers every public blueprint-copy contract by ME/TE, runs, price and jumps.",
         "tag": "Manufacturing"
+      },
+      "miningTax": {
+        "name": "Mining",
+        "desc": "Your output, ISK/hr and raw-vs-refined value over time, plus a tax ledger for moons you mine in someone else’s space: each day’s ore in each system assigned to the payee you owe, tax and ISK snapshotted at assignment, splits, settle-up and payment matching.",
+        "tag": "Ledger"
+      },
+      "planetary": {
+        "name": "Planetary Industry",
+        "desc": "Colonies, extraction timers and idle warnings, a chain planner that fits pins against CPU and powergrid, and an advisor that shows what each colony could earn by tuning or rebuilding it.",
+        "tag": "Planning"
       },
       "market": {
         "name": "Market",
-        "desc": "Order books for any region or all of them, filtered by jump range and security, with price history, side-by-side compare, price alerts, and an appraisal of pasted items or EFT fits net of fees. Built on public price data, so it works whatever you did or didn't grant.",
+        "desc": "Order books for any region or all of them, filtered by jump range and security, with price history, side-by-side compare, price alerts, and an appraisal of pasted items or fits net of fees. Built on public price data, so it works whatever you did or didn't grant.",
         "tag": "No scope needed"
       },
       "orders": {
@@ -1238,42 +1313,27 @@
         "desc": "Every hangar, station and structure your characters hold, searchable, with player structures resolved to real names.",
         "tag": "Read-only"
       },
-      "planetary": {
-        "name": "Planetary Industry",
-        "desc": "Colonies, extraction timers and idle warnings, plus a chain planner that fits pins against CPU and powergrid and prices the output at your hub.",
-        "tag": "Planning"
-      },
-      "miningTax": {
-        "name": "Mining",
-        "desc": "Your output, ISK/hr and raw-vs-refined value over time, plus the moon rental ledger: per-day, per-system ore assigned to payees, tax and ISK snapshotted at assignment, splits, settle-up and payment matching.",
-        "tag": "Ledger"
-      },
-      "corp": {
-        "name": "Corporation",
-        "desc": "Ops board, wallet divisions, corp industry jobs, division-grouped assets and a member roster that flags who has gone dark. Gated on your in-game roles.",
-        "tag": "Role-gated"
-      },
-      "alerts": {
-        "name": "Alerts",
-        "desc": "Every alert this device has fired, grouped by type — including the ones belonging to a character you were not looking at. Search it, filter by character, mute a type, or clear a whole group from its row.",
-        "tag": "Every character"
-      },
-      "notifications": {
-        "name": "Notifications",
-        "desc": "Per character, per event. Skills, industry jobs, extractors, calendar events and structure alarms carry a timestamp, so those arrive with the app closed; order fills, mail and contracts fire while it is open.",
-        "tag": "Push"
+      "contracts": {
+        "name": "Contracts",
+        "desc": "Your contract history and what each one held, plus a search of public item exchange and courier contracts by jump range, with ISK per jump for couriers.",
+        "tag": "Yours + public"
       },
       "social": {
-        "name": "Mail, Calendar & Contracts",
-        "desc": "In-game mail with reply and forward, a calendar you can RSVP from, contracts and standings, all without launching the client.",
+        "name": "Mail & Calendar",
+        "desc": "In-game mail with reply and forward, and a calendar you can RSVP from, without launching the client.",
         "tag": "Out of game"
+      },
+      "contacts": {
+        "name": "Contacts & Standings",
+        "desc": "Contacts and the standings you set on them, for one character or across all of them at once, flagging where your characters disagree.",
+        "tag": "Every character"
       }
     },
-    "trustHeading": "Read-only, and it stays that way",
+    "trustHeading": "It reads. It writes only when you act.",
     "trust": {
       "readOnly": {
-        "name": "It never writes to your account",
-        "desc": "No order is placed, no colony is touched. The only writes anywhere in the app: marking mail read, RSVPing to an invite, and sending a reply or forward you write yourself."
+        "name": "Three writes, and nothing else",
+        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, and a reply or forward you write goes out through your account. Nothing else in the app writes to EVE."
       },
       "token": {
         "name": "Your refresh token stays in this browser",
@@ -1290,7 +1350,6 @@
     },
     "bottomCtaHeading": "Undock into your dashboard.",
     "bottomCtaBody": "One EVE SSO login to start. Add as many characters as you fly — they all sit side by side.",
-    "footerMultiChar": "Multi-character from day one",
     "footerOffline": "Offline-capable PWA",
     "footerOpenSource": "Free & open source",
     "footerPrivacy": "Privacy policy"
@@ -3919,6 +3978,9 @@
       "noResults": "No matching events or characters",
       "emptyTitle": "Add a character to configure notifications",
       "reauthHint": "This character hasn't granted the permission this notification needs. Re-authorize the character to enable it.",
+      "needsPermission": "Needs the {{permission}} permission",
+      "grantPermission": "Grant",
+      "grantPermissionLabel": "Grant the {{permission}} permission for {{event}}",
       "corpCapabilityHint": "This character doesn't hold the in-game corporation role this notification needs. Re-authorizing won't fix it — a corp Director has to grant the role.",
       "event": {
         "skillLevelComplete": "Skill Level Complete",
@@ -4085,7 +4147,19 @@
     "days_other": "{{count}} days",
     "resetViewPrefs": "Reset saved view preferences",
     "resetViewPrefsHint": "Pages remember sorts, filters and expanded sections as you use them. This puts them all back to their defaults. Your characters, groups, plans and saved comparisons are untouched.",
-    "resetViewPrefsConfirm": "View preferences reset."
+    "resetViewPrefsConfirm": "View preferences reset.",
+    "permissions": {
+      "title": "Permissions",
+      "hint": "What this character lets Neocom Desk read from EVE. Grant adds one permission and keeps the rest. To take one away, revoke it on EVE's own site.",
+      "selectCharacter": "Select a character to see its permissions.",
+      "checking": "Checking…",
+      "granted": "Granted",
+      "missing": "Not granted",
+      "grant": "Grant",
+      "grantAria": "Grant {{permission}}",
+      "corpRoles": "Roles: {{roles}}",
+      "corpRolesUnknown": "Corporation roles show once granted."
+    }
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",
@@ -4132,7 +4206,7 @@
     "boardTitle": "Ops board",
     "dataAgeNote": "EVE caches corporation data for about an hour, so anything due sooner than that may already have happened — check the game client before acting on a short timer.",
     "noAccessTitle": "No corporation access",
-    "noAccessHint": "This character's in-game corporation roles do not open any corp data. Settings has a Corp access row that explains what is needed.",
+    "noAccessHint": "This character's in-game corporation roles do not open any corp data. Roles can only be changed in game.",
     "vitalsTitle": "Vitals",
     "peopleTitle": "People",
     "board": {
@@ -4250,23 +4324,7 @@
     "grantPromptUnnamedCorporation": "your corporation",
     "grantPromptGrant": "Grant access",
     "grantPromptDismiss": "Not now",
-    "grantPromptHint": "Either way, Settings has a Corp access row whenever you want it.",
-    "accessTitle": "Corp access",
-    "accessHint": "Corp data needs two things: a corporation role, granted in game, and access to the corp endpoints, granted here. Roles are read from EVE and can only be changed in game.",
-    "accessCharacterUnknown": "Select a character to see its corp access.",
-    "accessRolesLabel": "Roles",
-    "accessRolesNone": "None",
-    "accessRolesUnknown": "Unknown until granted",
-    "accessGrantLabel": "Access",
-    "accessGrantChecking": "Checking…",
-    "accessGrantGranted": "Granted",
-    "accessGrantMissing": "Not granted",
-    "accessGrantNotApplicable": "Not applicable",
-    "accessGrantButton": "Grant access",
-    "accessUnknownHint": "Reading this character's corporation roles.",
-    "accessNoneHint": "This character holds no corporation role that opens corp data, so granting access would unlock nothing.",
-    "accessMissingHint": "Corp data stays hidden until this character grants access.",
-    "accessReadyHint": "This character can see the corp data its roles allow.",
+    "grantPromptHint": "Either way, you can grant it any time from Settings, under Permissions.",
     "standing": {
       "title": "Standing",
       "dueSoon": "Due in 24h",

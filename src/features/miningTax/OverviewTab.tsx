@@ -29,6 +29,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { formatVolume } from '@/features/market/format';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
@@ -516,7 +517,12 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                     </span>
                     <Button
                       size="sm"
-                      onClick={() => void beginEveLogin({ characterId: c.characterId })}
+                      onClick={() =>
+                        void beginEveLogin({
+                          characterId: c.characterId,
+                          groups: permissionsForEndpoints(['getCharacterMining']),
+                        })
+                      }
                     >
                       {t('miningTax.reauthAction')}
                     </Button>

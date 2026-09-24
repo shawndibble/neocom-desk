@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { CORE_GRANT, SCOPES, SCOPES_STRING, revokedScopes, scopesForGroup } from './scopes';
+import {
+  CORE_GRANT,
+  SCOPES,
+  SCOPES_STRING,
+  permissionForScope,
+  isPermissionGranted,
+  revokedScopes,
+  scopesForGroup,
+} from './scopes';
 import {
   ESI_REGISTRY,
   PERMISSIONS,
@@ -211,6 +219,24 @@ describe('scopesForGroup', () => {
   });
 });
 
+describe('permissionForScope', () => {
+  it('names the Permission a grouped scope belongs to (issue #1525)', () => {
+    expect(permissionForScope('esi-industry.read_character_jobs.v1')).toBe('industry');
+    expect(permissionForScope('esi-wallet.read_character_wallet.v1')).toBe('wallet');
+    expect(permissionForScope('esi-characters.read_notifications.v1')).toBe('notifications');
+  });
+
+  it('is undefined for a Core Grant scope, which belongs to no Permission', () => {
+    for (const scope of CORE_GRANT) expect(permissionForScope(scope)).toBeUndefined();
+  });
+
+  it('inverts scopesForGroup for every Permission', () => {
+    for (const group of SCOPE_GROUPS) {
+      for (const scope of scopesForGroup(group)) expect(permissionForScope(scope)).toBe(group);
+    }
+  });
+});
+
 describe('PERMISSIONS', () => {
   it('has a label key, a caption key and a default-on flag for every group', () => {
     for (const group of SCOPE_GROUPS) {
@@ -277,5 +303,33 @@ describe('revokedScopes', () => {
     expect(revokedScopes(['esi-corporations.read_divisions.v1'], [])).toEqual([
       'esi-corporations.read_divisions.v1',
     ]);
+  });
+});
+
+describe('isPermissionGranted', () => {
+  // `.every` over an empty list is vacuously true, so a group that derived no
+  // scopes would read as granted for every Character, forever.
+  it('never has a Permission with no scopes to hold', () => {
+    for (const group of SCOPE_GROUPS)
+      expect(scopesForGroup(group).length, group).toBeGreaterThan(0);
+  });
+
+  it('is granted when every scope of the Permission is held', () => {
+    expect(isPermissionGranted('mail', [...CORE_GRANT, ...scopesForGroup('mail')])).toBe(true);
+  });
+
+  it('is missing when nothing of the Permission is held', () => {
+    expect(isPermissionGranted('mail', [...CORE_GRANT])).toBe(false);
+  });
+
+  // A partial grant (a scope added to the group after the Character granted
+  // it) still needs the Grant button to move, so it reads as missing.
+  it('is missing when only part of the Permission is held', () => {
+    expect(isPermissionGranted('corp', scopesForGroup('corp').slice(1))).toBe(false);
+  });
+
+  it('ignores scopes of other Permissions', () => {
+    expect(isPermissionGranted('wallet', [...SCOPES])).toBe(true);
+    expect(isPermissionGranted('corp', [...SCOPES])).toBe(false);
   });
 });

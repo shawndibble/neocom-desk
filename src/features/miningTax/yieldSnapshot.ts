@@ -253,8 +253,10 @@ export async function loadMiningYieldSnapshot(showRefining = true): Promise<Mini
   // typeNames.ts's 404-only narrowing). Only that specific, expected
   // rejection is tolerated per id — the same "missing = 0 contribution, not
   // thrown" convention `valueMiningYield` already uses. Anything else (a
-  // budget refusal, a 5xx, a timeout) still fails the whole snapshot rather
-  // than being silently priced as "not tradable".
+  // budget refusal, a 5xx, a timeout) is never priced as "not tradable":
+  // `loadPriceHistory` answers it from its cached history when it has one
+  // (past days' averages don't change), and otherwise fails the whole
+  // snapshot.
   const historyAttempts = await Promise.allSettled(
     historyTypeIds.map(
       async (typeId) =>

@@ -18,6 +18,7 @@ function input(overrides: Partial<CharacterSectionHeightInput> = {}): CharacterS
     expanded: false,
     visibleEventIds: [],
     rowEnabledFor: () => true,
+    missingPermissionFor: () => false,
     hasEveNotificationScope: false,
     touchViewport: false,
     ...overrides,
@@ -62,6 +63,22 @@ describe('estimateCharacterSectionHeight', () => {
       input({ expanded: true, visibleEventIds: [ORDINARY, 'industryJobComplete'] })
     );
     expect(two).toBeGreaterThan(one);
+  });
+
+  it('adds the Needs-permission line, taller on touch where its Grant button is (issue #1525)', () => {
+    const at = (touchViewport: boolean, missing: boolean) =>
+      estimateCharacterSectionHeight(
+        input({
+          expanded: true,
+          visibleEventIds: [ORDINARY],
+          rowEnabledFor: () => !missing,
+          missingPermissionFor: () => missing,
+          touchViewport,
+        })
+      );
+    // py-1.5 + 1px border around a `size="sm"` Button: h-7 at md, h-9 below.
+    expect(at(false, true) - at(false, false)).toBe(41);
+    expect(at(true, true) - at(true, false)).toBe(49);
   });
 
   it('adds the extractor hint regardless of rowEnabled', () => {

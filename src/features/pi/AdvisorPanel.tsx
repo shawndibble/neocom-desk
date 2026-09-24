@@ -38,6 +38,7 @@ import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
 import { EmptyState, Panel, ReauthBanner, Modal, Spinner } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { formatIsk } from '@/lib/isk';
 import { loadPi, loadPiPlanetRadius } from '@/sde/loadSde';
 import { db } from '@/db';
@@ -1043,7 +1044,9 @@ export function AdvisorPanel({
         title={t('pi.reauthTitle')}
         hint={t('pi.reauthHint')}
         actionLabel={t('pi.reauthAction')}
-        onLogin={() => void beginEveLogin()}
+        onLogin={() =>
+          void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterPlanets']) })
+        }
       />
     );
   }

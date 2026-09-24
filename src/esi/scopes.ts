@@ -1,7 +1,10 @@
 /**
- * ESI OAuth scopes for Neocom Desk v1. Read-only by design (see CONTEXT.md),
- * with one narrow, explicit exception: `esi-mail.organize_mail.v1` marks a
- * mail read on ESI when it's opened here. Every other scope below is a read.
+ * ESI OAuth scopes for Neocom Desk v1. Reads by design (see CONTEXT.md), with
+ * three narrow, user-triggered writes: `esi-mail.organize_mail.v1` marks a
+ * mail read on ESI when it's opened here, `esi-calendar.respond_calendar_events.v1`
+ * sends an RSVP, and `esi-mail.send_mail.v1` sends a reply or forward. Every
+ * other scope below is a read — `esi-planets.manage_planets.v1` included,
+ * whatever its name says.
  * `esi-markets.structure_markets.v1` (issue #538) is opt-in only — behind the
  * `structureMarkets` group, never the Base Grant — since checking a player
  * structure's own market is a need almost nobody's orders have.
@@ -77,6 +80,35 @@ export const SCOPES: readonly Scope[] = [
  */
 export function scopesForGroup(group: ScopeGroup): readonly Scope[] {
   return derive((spec) => spec.group === group);
+}
+
+const GROUP_BY_SCOPE: ReadonlyMap<string, ScopeGroup> = new Map(
+  SPECS.flatMap((spec) =>
+    spec.group !== undefined && isScopeRequired(spec.scope)
+      ? [[spec.scope, spec.group] as const]
+      : []
+  )
+);
+
+/**
+ * The Permission (Scope Group) a scope belongs to — the inverse of
+ * `scopesForGroup`. `undefined` for a Core Grant scope (it belongs to no
+ * Permission) or a scope this app does not model. Lets a surface that gates on
+ * one scope name the Permission to ask for (Notification settings, issue
+ * #1525). Each scope sits in exactly one Permission (`scopes.test.ts`).
+ */
+export function permissionForScope(scope: string): ScopeGroup | undefined {
+  return GROUP_BY_SCOPE.get(scope);
+}
+
+/**
+ * Whether `granted` holds every scope of `group`. A partial grant — a scope
+ * added to the group after the Character granted it — reads as missing,
+ * because only another Grant moves it.
+ */
+export function isPermissionGranted(group: ScopeGroup, granted: readonly string[]): boolean {
+  const held = new Set(granted);
+  return scopesForGroup(group).every((scope) => held.has(scope));
 }
 
 /** Space-joined form for the SSO authorize URL `scope` parameter. */

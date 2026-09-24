@@ -29,6 +29,8 @@ export interface CharacterSectionHeightInput {
   visibleEventIds: readonly NotificationEventId[];
   /** True once this Character both holds the event's scope and its corp capability, if any. */
   rowEnabledFor: (eventId: NotificationEventId) => boolean;
+  /** True when the event needs a Permission this Character hasn't granted — the row gains a Needs-permission line (issue #1525). */
+  missingPermissionFor: (eventId: NotificationEventId) => boolean;
   /** Whether this Character holds `eveNotification`'s own scope (family/type rows gate on this alone, never capability). */
   hasEveNotificationScope: boolean;
   /**
@@ -46,6 +48,8 @@ type InternalRowKind =
   | 'column-captions'
   | 'event'
   | 'row-hint'
+  | 'permission-hint'
+  | 'permission-hint-touch'
   | 'threshold-controls'
   | 'threshold-controls-with-hint'
   | 'corp-best-effort-hint'
@@ -70,6 +74,10 @@ const ROW_HEIGHT: Record<InternalRowKind, number> = {
   event: 33,
   // An Event Entry's `rowHintKey` paragraph (today only the extractor's).
   'row-hint': 48,
+  // The Needs-permission line (issue #1525): py-1.5 and a 1px border around
+  // a `size="sm"` Grant button, which is `h-7` at `md` and `h-9` below it.
+  'permission-hint': 41,
+  'permission-hint-touch': 49,
   // An Event Entry's inline threshold block — one select or ISK field, or
   // corp wallet's two side by side — without and with its hint line.
   'threshold-controls': 44,
@@ -99,6 +107,9 @@ export function estimateCharacterSectionHeight(input: CharacterSectionHeightInpu
 
     // Mirrors `NotificationsPanel.tsx`'s row: both read the Event Entry.
     const { rowHintKey, thresholds } = eventEntry(eventId);
+    if (input.missingPermissionFor(eventId)) {
+      height += ROW_HEIGHT[input.touchViewport ? 'permission-hint-touch' : 'permission-hint'];
+    }
     if (rowHintKey !== null) height += ROW_HEIGHT['row-hint'];
     if (thresholds !== null && rowEnabled) {
       height +=

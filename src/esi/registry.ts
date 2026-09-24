@@ -317,12 +317,13 @@ export const ESI_REGISTRY = {
   },
   /**
    * Base grant, like every other single-route D3 view (mail, calendar,
-   * contracts, clones, contacts, loyalty) — `ScopeGate`'s re-auth banner calls
-   * `beginEveLogin()` with no scope group, so a route gated on a grouped scope
-   * would offer a re-login that never actually requests it (issue #523). The
-   * `corp` group's own grant flow (`CorpGrantPrompt`) exists because a corp
-   * role is discoverable and this isn't — nothing here can tell a renter needs
-   * this scope before they visit the page and ask for it themselves.
+   * contracts, clones, contacts, loyalty) — declaring its own group is what
+   * lets `permissionsForRoute` derive the right Permission for `ScopeGate`'s
+   * re-login banner (issue #1520), rather than the banner over-asking for
+   * every Permission. The `corp` group's own grant flow (`CorpGrantPrompt`)
+   * exists because a corp role is discoverable and this isn't — nothing here
+   * can tell a renter needs this scope before they visit the page and ask
+   * for it themselves.
    */
   getCharacterMining: {
     route: '/characters/{character_id}/mining/',
@@ -348,7 +349,7 @@ export const ESI_REGISTRY = {
    * until they opt in. That costs the "you just made Director, grant now"
    * proactive nudge (`CorpGrantPrompt`) for anyone who never granted the group
    * before — `useCorpAccess` answers `not-granted` instead, and Settings'
-   * Corp access row is the only way in. A Character who already held this
+   * Corporation Permission row is the only way in. A Character who already held this
    * scope from the old Base Grant keeps it (`app/loginFlow.ts` unions with
    * the stored grant), so nothing changes for them.
    */
@@ -587,4 +588,22 @@ export type Scope = Exclude<(typeof ESI_REGISTRY)[EsiEndpointId]['scope'], Publi
 /** Narrows a declared requirement to a real scope, dropping the PUBLIC marker. */
 export function isScopeRequired(requirement: ScopeRequirement): requirement is Scope {
   return requirement !== PUBLIC;
+}
+
+/**
+ * Distinct Permissions the given endpoints belong to, in declaration order.
+ * An endpoint declaring no `group` (Core Grant) contributes nothing — a
+ * banner or gate whose endpoints are all Core Grant has no Permission to ask
+ * for, which is exactly the re-login banner's "no identifiable Permission"
+ * case (issue #1520): it should ask for the Core Grant plus the Character's
+ * stored grant, never the whole Base Grant.
+ */
+export function permissionsForEndpoints(ids: readonly EsiEndpointId[]): readonly ScopeGroup[] {
+  return [
+    ...new Set(
+      ids
+        .map((id) => (ESI_REGISTRY[id] as EsiEndpointSpec).group)
+        .filter((group): group is ScopeGroup => group !== undefined)
+    ),
+  ];
 }

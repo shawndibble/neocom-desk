@@ -531,8 +531,9 @@ export function Corp() {
 
   // Reached the URL without the access for it. A bare explanation, not the
   // section's shell drawn over nothing — that would be a lock, and corp UI
-  // hides rather than locks (CONTEXT.md round 35). Settings' Corp access row is
-  // where the two-axis gate is actually explained and, where possible, fixed.
+  // hides rather than locks (CONTEXT.md round 35). The copy says roles only
+  // change in game; a Character that holds a role but lacks the grant can fix
+  // that from Settings' Corporation Permission row.
   if (gate.status === 'denied') {
     return (
       <div className="space-y-4">
