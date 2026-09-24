@@ -116,6 +116,19 @@ export function setWhatIfBonus(
 }
 
 /**
+ * Switch to "Custom" without changing a number: the five slots are whatever
+ * the selection in force resolves to right now ("Current" against the real
+ * implants), frozen as the user's own set. Picking Custom is only ever a way
+ * to reveal the inputs — nothing is re-costed until one is edited.
+ */
+export function toCustomSelection(
+  selection: WhatIfImplantSelection,
+  currentImplants: Implants
+): WhatIfImplantSelection {
+  return { kind: 'custom', bonuses: whatIfImplants(selection, currentImplants) };
+}
+
+/**
  * A usable selection from whatever was stored on the plan, falling back to
  * `DEFAULT_WHAT_IF_SELECTION` when the value is not a selection at all.
  *
