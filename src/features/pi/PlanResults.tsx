@@ -325,9 +325,8 @@ export function PlanChainTable({ rows, productName, hubId }: PlanChainTableProps
         // Titles the card below `sm`: the tier chip carries the hierarchy that
         // indentation carries on desktop, so no depth gutter is spent at 390px.
         primary: true,
-        // Carries `hubId` explicitly (#1463): the plan's hub is not in the
-        // URL, so the link's default region/hub inheritance would drop it
-        // and open at a different price than this row's own unit-price cell.
+        // Plan hub isn't in the URL, so it must be carried explicitly to
+        // match this row's own unit-price cell — see MarketItemLink's hubId.
         render: (row) => (
           <MarketItemLink typeId={row.typeId} hubId={hubId}>
             {row.name}

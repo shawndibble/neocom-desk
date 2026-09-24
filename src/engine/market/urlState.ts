@@ -91,11 +91,9 @@ export function resolveAgainstCatalogue<T>(
  * with neither (e.g. Skills' implant chips, #405) gets just the typeId, same
  * as opening `/market?type=…` fresh.
  *
- * `forcedHubId`, when given, wins over that URL-preserving behaviour
- * entirely (#1463): a caller pricing at a hub of its own — e.g. a Planetary
- * Industry plan's saved trade hub — must not have that silently swapped for
- * the Market Browser's current location, which can show a different price
- * than the one already on screen.
+ * `forcedHubId`, when given, wins over the URL entirely — the caller's own
+ * resolved hub must not be silently swapped for the browser's current
+ * location, which can price differently than what's already on screen.
  */
 export function marketLinkParams(
   typeId: number,

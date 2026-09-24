@@ -7,13 +7,7 @@ interface MarketItemLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElemen
   children: ReactNode;
   /** Replaces the default inline-link look, e.g. to draw it as a button. */
   className?: string;
-  /**
-   * Force the link to this trade hub, overriding whatever region/hub the
-   * current URL already carries (#1463). For a caller pricing at a hub of
-   * its own — e.g. a Planetary Industry plan's saved trade hub — inheriting
-   * the Market Browser's current location would silently show a different
-   * price than the one already on screen.
-   */
+  /** Forces `marketLinkParams`' hub override — see its own doc for why. */
   hubId?: string;
 }
 

@@ -112,8 +112,8 @@ function TestHarness({
 
 function renderPanel(typeId: number | null = BROADCAST_NODE) {
   const onTypeIdChange = vi.fn();
-  // MemoryRouter: the chain table's commodity names are now MarketItemLinks
-  // (#1463), which read `useLocation` from a router context.
+  // MemoryRouter: the chain table's commodity names are MarketItemLinks,
+  // which read `useLocation` from a router context.
   const { unmount } = render(
     <MemoryRouter>
       <TestHarness typeId={typeId} onTypeIdChange={onTypeIdChange} />
@@ -387,7 +387,7 @@ describe('PlanPanel', () => {
     renderPanel();
     const table = await screen.findByRole('table', { name: /Production chain for Broadcast Node/ });
     // Jita is the default hub — the link must carry it explicitly rather
-    // than relying on the Market Browser's own default (#1463).
+    // than relying on the Market Browser's own default.
     expect(within(table).getByRole('link', { name: 'Broadcast Node' })).toHaveAttribute(
       'href',
       `/market/browser?type=${BROADCAST_NODE}&hub=jita`
