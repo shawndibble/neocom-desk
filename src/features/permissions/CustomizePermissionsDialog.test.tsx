@@ -97,6 +97,46 @@ describe('CustomizePermissionsDialog', () => {
     expect(screen.getByText('Optional · 1 of 13')).toBeInTheDocument();
   });
 
+  it('disables every Permission checkbox and Submit until hydration resolves, so a fast click can’t fork from the pre-hydration default', async () => {
+    const realHydrate = useCustomizePermissionsSelection.getState().hydrate;
+    // Stored selection is Mail only, but `hydrate` never resolves during the
+    // first half of this test — the store stays `hydrated: false` on
+    // purpose, to prove the UI stays locked rather than racing ahead on the
+    // pre-hydration `DEFAULT_ON_GROUPS`.
+    useCustomizePermissionsSelection.setState({
+      value: ['mail'],
+      hydrated: false,
+      hydrate: () => new Promise<void>(() => {}),
+    });
+
+    render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
+    const wallet = await screen.findByRole('checkbox', { name: 'Wallet' });
+    expect(wallet).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: /log in with selected permissions/i })
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Select all' })).toBeDisabled();
+
+    // Hydration lands.
+    useCustomizePermissionsSelection.setState({ hydrated: true, hydrate: realHydrate });
+    await waitFor(() => expect(wallet).not.toBeDisabled());
+    expect(screen.getByRole('checkbox', { name: 'Mail' })).toBeChecked();
+    expect(wallet).not.toBeChecked();
+  });
+
+  it('still logs in even when persisting the selection fails (quota, private browsing)', async () => {
+    const setValue = vi
+      .spyOn(useCustomizePermissionsSelection.getState(), 'setValue')
+      .mockRejectedValue(new Error('quota exceeded'));
+    const user = userEvent.setup();
+    render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
+
+    await user.click(screen.getByRole('button', { name: /log in with selected permissions/i }));
+
+    await waitFor(() => expect(mockedLogin).toHaveBeenCalledTimes(1));
+    setValue.mockRestore();
+  });
+
   it('remembers the submitted selection for the next open', async () => {
     const user = userEvent.setup();
     render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
