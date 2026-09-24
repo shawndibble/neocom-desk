@@ -607,3 +607,15 @@ export function permissionsForEndpoints(ids: readonly EsiEndpointId[]): readonly
     ),
   ];
 }
+
+/**
+ * Distinct scopes the given endpoints require, in declaration order. Mirrors
+ * `routeScopes.ts`'s `requiredScopesForRoute`, but keyed off an endpoint list
+ * directly — for a panel-level grant check that has no route of its own to
+ * ask `routeScopes.ts` about (e.g. "is this one figure's fallback in play").
+ */
+export function requiredScopesForEndpoints(ids: readonly EsiEndpointId[]): readonly Scope[] {
+  return [...new Set(ids.map((id) => (ESI_REGISTRY[id] as EsiEndpointSpec).scope))].filter(
+    isScopeRequired
+  );
+}

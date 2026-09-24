@@ -21,12 +21,42 @@ export class EsiError extends Error {
    */
   readonly status: number;
   readonly body: unknown;
+  /**
+   * The `ESI_REGISTRY` key of the endpoint that answered this, when known —
+   * only ever the `esiFetch` caller's own `endpointId` option, so this stays
+   * a plain string rather than importing `registry.ts`'s `EsiEndpointId`
+   * (this file deliberately imports nothing; see the module doc comment).
+   * `esi/cache.ts` reads it to tell "this scope was never granted" apart from
+   * "this scope was granted and ESI just rejected it anyway" before deciding
+   * whether a 401/403 is worth the shell-wide re-auth notice.
+   *
+   * Not `readonly`: a multi-request loader's per-page `esiFetch` calls
+   * withhold `endpointId` on purpose (so a 25-page list logs one activity
+   * entry, not 25), so an error from page 2+ carries none. `attachEndpointId`
+   * below patches it in afterwards, from the option the loader always has.
+   */
+  endpointId?: string;
 
-  constructor(status: number, message: string, body?: unknown) {
+  constructor(status: number, message: string, body?: unknown, endpointId?: string) {
     super(message);
     this.name = 'EsiError';
     this.status = status;
     this.body = body;
+    this.endpointId = endpointId;
+  }
+}
+
+/**
+ * Patches `endpointId` onto an `EsiError` a multi-request loader's own catch
+ * just caught, when the per-page/per-cursor `esiFetch` call that threw it was
+ * built without one (`paginated.ts`'s `fetchAllPagesStatus`,
+ * `endpoints.ts`'s `fetchTransactionCursor` — see `EsiError.endpointId`'s
+ * doc comment for why). A no-op for anything else, so callers can run it
+ * unconditionally in a catch block before rethrowing.
+ */
+export function attachEndpointId(err: unknown, endpointId: string | undefined): void {
+  if (err instanceof EsiError && err.endpointId === undefined && endpointId !== undefined) {
+    err.endpointId = endpointId;
   }
 }
 

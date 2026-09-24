@@ -10,7 +10,7 @@
  * compile error.
  */
 import { uniqueTransactions } from './uniqueTransactions';
-import { esiFetch, recordEsiActivity, outcomeForError } from './client';
+import { esiFetch, recordEsiActivity, outcomeForError, attachEndpointId } from './client';
 import type { EsiResult } from './client';
 import { fetchAllPagesStatus } from './paginated';
 import type { PaginatedResult, TruncatableResult } from './paginated';
@@ -412,6 +412,7 @@ async function fetchTransactionCursor<T extends WalletTransactionCommon>(
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') throw err;
     recordEsiActivity(endpointId, characterId, outcomeForError(err));
+    attachEndpointId(err, endpointId);
     throw err;
   }
   recordEsiActivity(endpointId, characterId, 'success');

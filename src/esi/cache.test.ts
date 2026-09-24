@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { db } from '@/db';
+import { AuthError } from '@/auth/sso';
 import { EsiError } from './client';
 import {
   invalidateFreshness,
@@ -20,12 +21,14 @@ import {
   corpCacheKey,
 } from './cache';
 import { clearCachePurgePending, purgeCharacterCacheOrSuppress } from './cachePurge';
+import { onEsiAuthFailure } from './authFailureSignal';
 
 const CHAR_ID = 91;
 const KEY = 'thing';
 
 beforeEach(async () => {
   await db.esiCache.clear();
+  await db.tokens.clear();
   // Module state, not Dexie state: without this one test's failed revalidation
   // for [91, 'thing'] silently suppresses the next test's fetch for the same key.
   resetRevalidationState();
@@ -129,6 +132,94 @@ describe('loadWithCacheStatus — default auth-failure detection', () => {
     const result = await loadWithCacheStatus(CHAR_ID, KEY, async () => 'live-value');
     expect(result.needsReauth).toBe(false);
     expect(result.cached?.fromCache).toBe(false);
+  });
+});
+
+describe('loadWithCacheStatus — shell auth-failure signal (issue #1521)', () => {
+  /**
+   * A route whose gated component briefly mounts before `ScopeGate` resolves
+   * the active grant (`app/ScopeGate.tsx`'s documented "passes children
+   * through while the Dexie read is in flight" window) can fire this exact
+   * shape: a 403 for a scope the stored grant never claimed in the first
+   * place. The shell's runtime auth-failure notice exists for a *revoked*
+   * scope (docs/context/decisions/20260831-140406-the-whole-app-sits-behind-authentication.md)
+   * and must stay silent for one that was simply never granted — the route's
+   * own `ScopeGate`/`needsReauth` banner is already the right signal for that.
+   */
+  it('does not emit the shell auth-failure signal for a scope the stored grant never claimed', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'x',
+      refreshToken: 'y',
+      expiresAt: Date.now() + 100_000,
+      scopes: ['esi-skills.read_skills.v1'],
+    });
+    const onFailure = vi.fn();
+    const unsubscribe = onEsiAuthFailure(onFailure);
+
+    await loadWithCacheStatus(CHAR_ID, KEY, async () => {
+      throw new EsiError(403, 'missing scope', undefined, 'getCharacterClones');
+    });
+    unsubscribe();
+
+    expect(onFailure).not.toHaveBeenCalled();
+  });
+
+  it('still emits the shell auth-failure signal when the stored grant does claim the scope (a genuine revoke)', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'x',
+      refreshToken: 'y',
+      expiresAt: Date.now() + 100_000,
+      scopes: ['esi-clones.read_clones.v1'],
+    });
+    const onFailure = vi.fn();
+    const unsubscribe = onEsiAuthFailure(onFailure);
+
+    await loadWithCacheStatus(CHAR_ID, KEY, async () => {
+      throw new EsiError(403, 'missing scope', undefined, 'getCharacterClones');
+    });
+    unsubscribe();
+
+    expect(onFailure).toHaveBeenCalledWith(CHAR_ID);
+  });
+
+  it('still emits for a refresh failure (AuthError), which has no single endpoint to check', async () => {
+    const onFailure = vi.fn();
+    const unsubscribe = onEsiAuthFailure(onFailure);
+
+    await loadWithCacheStatus(CHAR_ID, KEY, async () => {
+      throw new AuthError('invalid_grant', 'refresh failed', 400);
+    });
+    unsubscribe();
+
+    expect(onFailure).toHaveBeenCalledWith(CHAR_ID);
+  });
+
+  /**
+   * Same gate, exercised through the paginated path: a paginated endpoint's
+   * per-page esiFetch calls withhold endpointId (esi/paginated.ts), which is
+   * exactly the case that let a Core-only Character's /assets sweep leak the
+   * shell notice before esi/endpoints.ts's fetchTransactionCursor and
+   * paginated.ts's fetchAllPagesStatus started patching it back in.
+   */
+  it('does not emit for a paginated endpoint 403 when the stored grant never claimed its scope', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'x',
+      refreshToken: 'y',
+      expiresAt: Date.now() + 100_000,
+      scopes: ['esi-skills.read_skills.v1'],
+    });
+    const onFailure = vi.fn();
+    const unsubscribe = onEsiAuthFailure(onFailure);
+
+    await loadPaginatedWithCacheStatus(CHAR_ID, KEY, async () => {
+      throw new EsiError(403, 'missing scope', undefined, 'getCharacterAssets');
+    });
+    unsubscribe();
+
+    expect(onFailure).not.toHaveBeenCalled();
   });
 });
 

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, NativeSelect, Panel, TextInput, TypeIcon } from '@/components/ui';
 import { AddRow, Close } from '@/components/ui/icons';
@@ -19,6 +19,7 @@ import {
   type FittingStats,
   type PilotProfile,
 } from '@/engine/fittings/types';
+import { moduleKey, resourceOverage } from '@/engine/fittings/skillGaps';
 import { checkCharges } from './dogmaFittingEngine';
 import type { AddTarget } from './addTarget';
 import type { FittingCatalogue } from './useFittingCatalogue';
@@ -35,31 +36,56 @@ interface ResourceBarProps {
   total: number | null;
 }
 
-/** A CPU/PG/calibration/drone-bandwidth bar. `null` used/total render as a loading skeleton. */
+/**
+ * A CPU/PG/calibration/drone-bandwidth bar. `null` used/total render as a loading skeleton.
+ * Over budget turns `danger` with the overage stated in words, and flashes once
+ * each time the readout goes from within budget to over (a Character switch
+ * that re-states it included) — the `null` gap while it recomputes doesn't count.
+ */
 function ResourceBar({ label, used, total }: ResourceBarProps) {
+  const { t } = useTranslation();
   const known = used !== null && total !== null;
   const pct = known && total > 0 ? Math.min(100, (used / total) * 100) : 0;
-  const overBudget = known && used > total;
+  const overage = resourceOverage(used, total);
+  const overBudget = overage > 0;
+
+  const [wasOver, setWasOver] = useState(false);
+  const [flashKey, setFlashKey] = useState(0);
+  if (known && overBudget !== wasOver) {
+    setWasOver(overBudget);
+    if (overBudget) setFlashKey((key) => key + 1);
+  }
+
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="w-28 shrink-0 text-text-dim">{label}</span>
-      <div
-        role="meter"
-        aria-label={label}
-        aria-valuenow={known ? used : undefined}
-        aria-valuemax={known ? total : undefined}
-        className="h-2 flex-1 overflow-hidden rounded-full bg-panel-2"
-      >
-        {known && (
-          <div
-            className={`h-full rounded-full ${overBudget ? 'bg-danger' : 'bg-accent'}`}
-            style={{ width: `${pct}%` }}
-          />
-        )}
+    <div>
+      <div className="flex items-center gap-2 text-xs">
+        <span className="w-28 shrink-0 text-text-dim">{label}</span>
+        <div
+          role="meter"
+          aria-label={label}
+          aria-valuenow={known ? used : undefined}
+          aria-valuemax={known ? total : undefined}
+          className="h-2 flex-1 overflow-hidden rounded-full bg-panel-2"
+        >
+          {known && (
+            <div
+              className={`h-full rounded-full ${overBudget ? 'bg-danger' : 'bg-accent'}`}
+              style={{ width: `${pct}%` }}
+            />
+          )}
+        </div>
+        <span
+          key={flashKey}
+          className={`w-24 shrink-0 text-right ${overBudget ? 'text-danger' : 'text-text-dim'} ${flashKey > 0 && overBudget ? 'flash-danger' : ''}`}
+        >
+          {known ? `${used.toFixed(1)} / ${total.toFixed(1)}` : '…'}
+        </span>
       </div>
-      <span className={`w-24 shrink-0 text-right ${overBudget ? 'text-danger' : 'text-text-dim'}`}>
-        {known ? `${used.toFixed(1)} / ${total.toFixed(1)}` : '…'}
-      </span>
+      {overBudget && (
+        <p className="pl-30 text-right text-xs text-danger">
+          {t('fittings.list.overBy', { amount: overage.toFixed(1) })}
+        </p>
+      )}
     </div>
   );
 }
@@ -80,11 +106,14 @@ interface ModuleRowProps extends EditContext {
   module: FittingModule;
   /** This module's own calculation — null while it's being worked out. */
   result: FittingModuleResult | null;
+  /** The active Character lacks the skills for it. */
+  cantUse: boolean;
 }
 
 function ModuleRow({
   module,
   result,
+  cantUse,
   fitting,
   catalogue,
   engineReady,
@@ -122,6 +151,11 @@ function ModuleRow({
     <div className="flex flex-wrap items-center gap-2 rounded-xs bg-panel-2 p-1.5">
       <TypeIcon typeId={typeId} size={32} width={24} height={24} />
       <span className="min-w-0 flex-1 truncate text-xs">{name}</span>
+      {cantUse && (
+        <span className="shrink-0 rounded-xs border border-danger px-1 text-[0.6875rem] font-semibold text-danger">
+          {t('fittings.list.cantUse')}
+        </span>
+      )}
       <NativeSelect
         size="sm"
         aria-label={t('fittings.edit.stateLabel', { name })}
@@ -202,6 +236,8 @@ interface FittingRackListProps extends EditContext {
   moduleResults: FittingModuleResult[] | null;
   target: AddTarget | null;
   onSelectTarget: (target: AddTarget) => void;
+  /** `moduleKey`s the active Character lacks the skills for. */
+  unusableModuleKeys?: ReadonlySet<string>;
 }
 
 /**
@@ -221,6 +257,7 @@ export function FittingRackList({
   edit,
   target,
   onSelectTarget,
+  unusableModuleKeys,
 }: FittingRackListProps) {
   const { t } = useTranslation();
   const context = { fitting, catalogue, engineReady, profile, edit };
@@ -283,6 +320,7 @@ export function FittingRackList({
                         {...context}
                         module={entry.module}
                         result={moduleResults?.[entry.index] ?? null}
+                        cantUse={unusableModuleKeys?.has(moduleKey(entry.module)) ?? false}
                       />
                     );
                   }

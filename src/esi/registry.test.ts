@@ -5,7 +5,13 @@ import { describe, it, expect } from 'vitest';
 import * as endpointsModule from './endpoints';
 // Raw source of endpoints.ts, for the marker-comment parity check below.
 import endpointsSource from './endpoints.ts?raw';
-import { ESI_REGISTRY, PUBLIC, permissionsForEndpoints, type EsiEndpointSpec } from './registry';
+import {
+  ESI_REGISTRY,
+  PUBLIC,
+  permissionsForEndpoints,
+  requiredScopesForEndpoints,
+  type EsiEndpointSpec,
+} from './registry';
 
 /** Names of every exported wrapper function in endpoints.ts. */
 const wrapperNames = Object.entries(endpointsModule)
@@ -102,5 +108,23 @@ describe('permissionsForEndpoints', () => {
     expect(
       [...permissionsForEndpoints(['getCharacterMailHeaders', 'getCharacterContracts'])].sort()
     ).toEqual(['contracts', 'mail']);
+  });
+});
+
+describe('requiredScopesForEndpoints', () => {
+  it('names the scope an endpoint requires', () => {
+    expect(requiredScopesForEndpoints(['getCharacterImplants'])).toEqual([
+      ESI_REGISTRY.getCharacterImplants.scope,
+    ]);
+  });
+
+  it('dedupes a scope shared across endpoints', () => {
+    expect(requiredScopesForEndpoints(['getCharacterWallet', 'getCharacterWalletJournal'])).toEqual(
+      [ESI_REGISTRY.getCharacterWallet.scope]
+    );
+  });
+
+  it('drops PUBLIC-only endpoints', () => {
+    expect(requiredScopesForEndpoints(['getUniverseStation'])).toEqual([]);
   });
 });

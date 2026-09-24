@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useTranslation } from 'react-i18next';
 import { Modal, PageHeader, Panel } from '@/components/ui';
 import { useIsDesktop } from '@/lib/useIsDesktop';
@@ -9,6 +10,8 @@ import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
 import { FittingLoadCard } from '@/features/fittings/FittingLoadCard';
 import { FittingRackList } from '@/features/fittings/FittingRackList';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
+import { MissingSkillsChip } from '@/features/fittings/MissingSkillsChip';
+import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
 import { useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
 import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
 
@@ -25,6 +28,8 @@ export function Fittings() {
   const catalogue = useFittingCatalogue();
   const isDesktop = useIsDesktop();
   const [target, setTarget] = useState<AddTarget | null>(null);
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
 
   const { fitting, stats, edit } = workspace;
   const slotCounts = stats?.slotCounts ?? null;
@@ -92,17 +97,27 @@ export function Fittings() {
       />
       {fitting && (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <FittingRackList
-            fitting={fitting}
-            stats={stats}
-            moduleResults={moduleResults}
-            catalogue={catalogue}
-            engineReady={workspace.engineReady}
-            profile={workspace.profile}
-            edit={edit}
-            target={target}
-            onSelectTarget={setTarget}
-          />
+          <div className="space-y-3">
+            {gaps && gaps.missing.length > 0 && activeCharacterId !== null && (
+              <MissingSkillsChip
+                entries={gaps.missing}
+                characterId={activeCharacterId}
+                fittingName={fitting.name}
+              />
+            )}
+            <FittingRackList
+              fitting={fitting}
+              stats={stats}
+              moduleResults={moduleResults}
+              catalogue={catalogue}
+              engineReady={workspace.engineReady}
+              profile={workspace.profile}
+              edit={edit}
+              target={target}
+              onSelectTarget={setTarget}
+              unusableModuleKeys={gaps?.unusableModuleKeys}
+            />
+          </div>
           <div className="space-y-3">
             {isDesktop && <Panel title={addTitle}>{addPanel}</Panel>}
             <FittingStatsSections

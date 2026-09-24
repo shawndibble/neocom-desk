@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { requiredScopesForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import { requiredScopesForRoute, type AppRoutePath } from './routeScopes';
 
 /**
@@ -43,4 +44,20 @@ export function useLockedRoutes(paths: readonly AppRoutePath[]): ReadonlySet<App
       paths.filter((path) => requiredScopesForRoute(path).some((scope) => !held.has(scope)))
     );
   }, [granted, paths]);
+}
+
+/**
+ * Whether the active Character's grant covers every scope `endpoints`
+ * declares — for a figure that degrades to a documented assumption rather
+ * than gating a whole page (issue #1526). `undefined` while the grant is
+ * still unknown, so a caller can hold its note back rather than flash it on
+ * a cold load, same as `useGrantedScopes` itself.
+ */
+export function useEndpointsGranted(endpoints: readonly EsiEndpointId[]): boolean | undefined {
+  const granted = useGrantedScopes();
+  return useMemo(() => {
+    if (granted === undefined) return undefined;
+    const held = new Set(granted);
+    return requiredScopesForEndpoints(endpoints).every((scope) => held.has(scope));
+  }, [granted, endpoints]);
 }
