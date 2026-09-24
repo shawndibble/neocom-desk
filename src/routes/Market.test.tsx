@@ -334,6 +334,9 @@ beforeEach(async () => {
   await db.characters.clear();
   await db.settings.clear();
   await db.quickbars.clear();
+  // Price history reads through esiCache; a row left by one test would answer
+  // the next test's request for the same item without reaching its handler.
+  await db.esiCache.clear();
   // Market needs no ESI scope and no *active* Character, but the feature area
   // sits behind RequireCharacter, so one must exist for the route to render.
   await db.characters.put({ characterId: 1, name: 'Pilot One', ownerHash: 'oh', addedAt: 0 });

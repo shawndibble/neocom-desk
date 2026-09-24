@@ -49,7 +49,7 @@ export interface CorpAccess {
    * because the state is `none`: a member with only office-scoped or cosmetic
    * roles resolves to `none` and still has roles to name.
    *
-   * Exists for the Settings Corp access row, which explains *why* a Character
+   * Exists for the Settings Corporation Permission row, which explains *why* a Character
    * can read what it can. Capabilities cannot say that on their own, and
    * nothing here should compare a role string — that is `engine/corpRoles.ts`.
    */

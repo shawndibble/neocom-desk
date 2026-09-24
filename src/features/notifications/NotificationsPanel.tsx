@@ -61,6 +61,7 @@ import {
   NOTIFICATION_EVENT_IDS,
   eventLabelKey,
   isCorpEventId,
+  missingEventPermission,
   type NotificationEventDef,
   type NotificationEventId,
 } from './events';
@@ -112,6 +113,8 @@ import {
 import { webPushSupport } from '@/sync/deviceRegistration';
 import { enableWebPush } from './webPush';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { beginEveLogin } from '@/app/loginFlow';
+import { PERMISSIONS, type ScopeGroup } from '@/esi/registry';
 import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
 import { useUrlParam } from '@/lib/useUrlState';
@@ -182,7 +185,13 @@ function characterEventRowState(
   eventId: NotificationEventId,
   grantedScopes: ReadonlySet<string>,
   characterCapabilities: CorpCapabilities | undefined
-): { hasScope: boolean; capabilityMissing: boolean; rowEnabled: boolean } {
+): {
+  hasScope: boolean;
+  capabilityMissing: boolean;
+  rowEnabled: boolean;
+  /** The ungranted Permission behind a missing scope (issue #1525); `null` for a Core Grant scope. */
+  missingPermission: ScopeGroup | null;
+} {
   const def = eventDef(eventId);
   const hasScope = def.scope === undefined || grantedScopes.has(def.scope);
   // A capability not yet resolved reads as held (see the capability
@@ -192,7 +201,12 @@ function characterEventRowState(
     def.corpCapability === undefined ||
     (characterCapabilities?.[def.corpCapability] ?? true)
   );
-  return { hasScope, capabilityMissing, rowEnabled: hasScope && !capabilityMissing };
+  return {
+    hasScope,
+    capabilityMissing,
+    rowEnabled: hasScope && !capabilityMissing,
+    missingPermission: missingEventPermission(eventId, grantedScopes),
+  };
 }
 
 export function NotificationsPanel() {
@@ -421,6 +435,9 @@ export function NotificationsPanel() {
         visibleEventIds,
         rowEnabledFor: (eventId) =>
           characterEventRowState(eventId, grantedScopes, characterCapabilities).rowEnabled,
+        missingPermissionFor: (eventId) =>
+          characterEventRowState(eventId, grantedScopes, characterCapabilities)
+            .missingPermission !== null,
         hasEveNotificationScope: characterEventRowState(
           'eveNotification',
           grantedScopes,
@@ -733,12 +750,11 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
           <ul className="divide-y divide-line">
             {visibleEventIds.map((eventId) => {
               const def = eventDef(eventId);
-              const { hasScope, capabilityMissing, rowEnabled } = characterEventRowState(
-                eventId,
-                grantedScopes,
-                characterCapabilities
-              );
+              const { hasScope, capabilityMissing, rowEnabled, missingPermission } =
+                characterEventRowState(eventId, grantedScopes, characterCapabilities);
               const eventLabel = t(def.labelKey);
+              const permissionLabel =
+                missingPermission === null ? undefined : t(PERMISSIONS[missingPermission].labelKey);
               const entry = eventEntry(eventId);
               return (
                 <li key={eventId}>
@@ -759,6 +775,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                           disabledReason={
                             !hasScope ? 'scope' : capabilityMissing ? 'capability' : null
                           }
+                          missingPermissionLabel={permissionLabel}
                           checked={isEventEnabledFor(prefs, eventId, channel)}
                           onToggle={() =>
                             void toggleEventChannelPref(
@@ -772,6 +789,39 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                       ))}
                     </div>
                   </div>
+                  {/*
+                    A declined Permission (issue #1525): the row stays
+                    listed but disabled, says which Permission it needs,
+                    and Grant asks for that one Permission for this
+                    Character — rather than hiding the alert (hides the
+                    reason) or leaving it on but never firing (looks like
+                    a bug). Granting updates the stored token, which
+                    re-enables the row through `grantedScopes`.
+                  */}
+                  {missingPermission !== null && (
+                    <p className="flex items-center gap-2 border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
+                      <span>
+                        {t('settings.notifications.needsPermission', {
+                          permission: permissionLabel,
+                        })}
+                      </span>
+                      <Button
+                        size="sm"
+                        aria-label={t('settings.notifications.grantPermissionLabel', {
+                          permission: permissionLabel,
+                          event: eventLabel,
+                        })}
+                        onClick={() =>
+                          void beginEveLogin({
+                            characterId: character.characterId,
+                            groups: [missingPermission],
+                          })
+                        }
+                      >
+                        {t('settings.notifications.grantPermission')}
+                      </Button>
+                    </p>
+                  )}
                   {/*
                     The event's own delivery caveat, shown whatever the
                     Character's grants (extractor lead time, issues
@@ -967,6 +1017,7 @@ function ChannelCheckbox({
   eventLabel,
   enabled,
   disabledReason,
+  missingPermissionLabel,
   checked,
   onToggle,
 }: {
@@ -974,6 +1025,8 @@ function ChannelCheckbox({
   eventLabel: string;
   enabled: boolean;
   disabledReason: 'scope' | 'capability' | null;
+  /** Names the declined Permission in the scope tooltip (issue #1525); absent for a Core Grant scope. */
+  missingPermissionLabel?: string;
   checked: boolean;
   onToggle: () => void;
 }) {
@@ -996,12 +1049,14 @@ function ChannelCheckbox({
     />
   );
   if (enabled) return checkbox;
-  const hintKey =
+  const hint =
     disabledReason === 'capability'
-      ? 'settings.notifications.corpCapabilityHint'
-      : 'settings.notifications.reauthHint';
+      ? t('settings.notifications.corpCapabilityHint')
+      : missingPermissionLabel !== undefined
+        ? t('settings.notifications.needsPermission', { permission: missingPermissionLabel })
+        : t('settings.notifications.reauthHint');
   return (
-    <Tooltip content={t(hintKey)} openOnTap>
+    <Tooltip content={hint} openOnTap>
       {checkbox}
     </Tooltip>
   );

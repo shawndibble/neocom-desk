@@ -1,6 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { ESI_REGISTRY } from '@/esi/registry';
-import { NOTIFICATION_EVENTS, NOTIFICATION_EVENT_IDS, isCorpEventId } from './events';
+import { CORE_GRANT, scopesForGroup } from '@/esi/scopes';
+import {
+  NOTIFICATION_EVENTS,
+  NOTIFICATION_EVENT_IDS,
+  isCorpEventId,
+  missingEventPermission,
+} from './events';
 import { isEventEnabledFor, isEveTypeEnabledFor } from './eventSelection';
 
 describe('NOTIFICATION_EVENTS', () => {
@@ -159,5 +165,25 @@ describe('isCorpEventId', () => {
       expect(isCorpEventId(id)).toBe(true);
     }
     expect(isCorpEventId('newMail')).toBe(false);
+  });
+});
+
+describe('missingEventPermission (issue #1525)', () => {
+  const coreOnly = new Set<string>(CORE_GRANT);
+
+  it('names the ungranted Permission an event needs', () => {
+    expect(missingEventPermission('industryJobComplete', coreOnly)).toBe('industry');
+    expect(missingEventPermission('walletBalanceChanged', coreOnly)).toBe('wallet');
+    expect(missingEventPermission('eveNotification', coreOnly)).toBe('notifications');
+  });
+
+  it('is null once that Permission is granted', () => {
+    const withIndustry = new Set<string>([...CORE_GRANT, ...scopesForGroup('industry')]);
+    expect(missingEventPermission('industryJobComplete', withIndustry)).toBeNull();
+  });
+
+  it('is null for events backed by public data or the Core Grant', () => {
+    expect(missingEventPermission('priceAlertTriggered', new Set())).toBeNull();
+    expect(missingEventPermission('skillLevelComplete', coreOnly)).toBeNull();
   });
 });

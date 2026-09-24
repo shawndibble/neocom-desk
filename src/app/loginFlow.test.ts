@@ -162,7 +162,7 @@ describe('beginAddCharacterLogin', () => {
 
 // ---------------------------------------------------------------------------
 // Branch 2 — a known character. Every entry point here is initiated from a
-// character context (the Settings Corp access row, the role-gain prompt, the
+// character context (the Settings Corporation Permission row, the role-gain prompt, the
 // ReauthBanner), so the grant to union with *is* knowable, and asking for less
 // than it would throw away a grant the character already made.
 // ---------------------------------------------------------------------------
