@@ -170,10 +170,10 @@ describe('TransactionsPanel — phone', () => {
     expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
 
-  it('switches to Orders from the header toggle', async () => {
+  it('switches to Ended orders from the header toggle', async () => {
     load([transaction()]);
     const { onViewChange } = renderPanel();
-    fireEvent.click(await screen.findByRole('button', { name: 'Orders' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Ended orders' }));
     expect(onViewChange).toHaveBeenCalledWith('history');
   });
 });

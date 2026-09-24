@@ -76,7 +76,7 @@ export interface MarketBrowserController {
   filterResult: MarketTreeFilterResult | null;
   handleToggle: (groupId: number) => void;
 
-  /** Market Data / Price History — Market Data by default. */
+  /** Order Book / Price History — Order Book by default. */
   itemTab: 'orders' | 'history';
   setItemTab: (next: 'orders' | 'history') => void;
 }

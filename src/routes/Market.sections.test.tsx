@@ -221,13 +221,15 @@ describe('Market top-level tabs', () => {
       'Transactions'
     );
     expect(
-      screen.getByRole('button', { name: 'About Orders and Transactions' })
+      screen.getByRole('button', { name: 'About ended orders and transactions' })
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole('combobox', { name: 'History view' }));
-    await user.click(await screen.findByRole('option', { name: 'Orders' }));
+    await user.click(await screen.findByRole('option', { name: 'Ended orders' }));
     expect(await screen.findByText('expired')).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: 'History view' })).toHaveTextContent('Orders');
+    expect(screen.getByRole('combobox', { name: 'History view' })).toHaveTextContent(
+      'Ended orders'
+    );
   });
 });
 

@@ -319,7 +319,8 @@ async function loadCorpBalances(
 
 /**
  * The three tabs, of which `transactions` exists only for a corporation wallet
- * (issue #570) — the character's fills live on Market's own Transactions tab.
+ * (issue #570) — the character's fills live on Market's History › Transactions
+ * view.
  */
 export type WalletTab = 'balance' | 'journal' | 'transactions';
 
@@ -375,7 +376,8 @@ interface CorpWalletViewProps {
  * Reuses the page's own journal columns rather than declaring its own — ESI
  * returns the same schema for both journals, which is the whole reason this
  * direction works. There is no loyalty panel (that is a Character's own); nor
- * a Transactions tab (Market's own now — personal-only, see TransactionsPanel).
+ * a Transactions tab (Market's History view now — personal-only, see
+ * TransactionsPanel).
  */
 function CorpWalletView({
   tab,
@@ -506,7 +508,7 @@ function CorpWalletView({
 
 /**
  * Wallet: ISK balance and journal. Read-only, cached for offline. Recent
- * transactions moved to Market's own Transactions tab.
+ * transactions moved to Market's History › Transactions view.
  *
  * For a Character holding the corp wallet capability the same page also shows
  * the corporation's wallet, one division at a time (issue #298) — the same
@@ -1077,7 +1079,7 @@ export function Wallet() {
             ? [
                 { id: 'balance', label: t('wallet.balanceTab') },
                 { id: 'journal', label: t('wallet.journalTab') },
-                { id: 'transactions', label: t('wallet.transactionsTab') },
+                { id: 'transactions', label: t('wallet.corpTransactionsTab') },
               ]
             : [
                 { id: 'balance', label: t('wallet.balanceTab') },
