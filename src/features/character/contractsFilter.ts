@@ -66,3 +66,13 @@ export function contractTypeOptions(contracts: readonly Contract[]): Contract['t
 export function activeContractsFilterCount(filter: ContractsFilter): number {
   return [filter.status, filter.type].filter((v) => v !== null).length;
 }
+
+/**
+ * Whether any criterion actually narrows the list — what decides if a
+ * zero-match empty state offers "Reset filters" (issue #1466). Unlike the
+ * count, text counts here; whitespace-only text doesn't, since
+ * `filterContracts` trims it away.
+ */
+export function isContractsFilterActive(filter: ContractsFilter): boolean {
+  return filter.text.trim() !== '' || activeContractsFilterCount(filter) > 0;
+}

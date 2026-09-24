@@ -14,6 +14,7 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
+import { NARROW_QUERY } from '@/lib/useIsNarrow';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -291,17 +292,95 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     expect(within(table).queryByText('Courier')).not.toBeInTheDocument();
   });
 
-  it('tells the pilot how to get back to every contract when no contract matches the filters', async () => {
+  it('offers one-click Reset filters when the filters match no contract', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/contracts/history?history.all=1');
+    render(<App />);
+    await screen.findByText('Rifter fit');
+
+    await user.click(screen.getByRole('button', { name: 'Outstanding' }));
+    await user.type(screen.getByPlaceholderText('Search issuer or title…'), 'zzzznomatch');
+
+    expect(await screen.findByText('No contracts match your filters.')).toBeInTheDocument();
+    expect(
+      screen.getByText('No contract matches the current search and filters.')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Clear the search or reset the status/type filters to see every contract.')
+    ).not.toBeInTheDocument();
+    await waitFor(() => expect(window.location.search).toContain('history.q=zzzznomatch'));
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+    const table = await screen.findByRole('table', { name: 'Contracts' });
+    expect(within(table).getByText('Rifter fit')).toBeInTheDocument();
+    expect(within(table).getByText('Courier')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search issuer or title…')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Outstanding' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.search);
+      expect(params.has('history.q')).toBe(false);
+      expect(params.has('history.status')).toBe(false);
+      expect(params.has('history.type')).toBe(false);
+      expect(params.get('history.all')).toBe('1');
+    });
+  });
+
+  it('Reset filters clears a search-only filter from the URL too', async () => {
     const user = userEvent.setup();
     render(<App />);
     await screen.findByText('Rifter fit');
 
     await user.type(screen.getByPlaceholderText('Search issuer or title…'), 'zzzznomatch');
+    await waitFor(() => expect(window.location.search).toContain('history.q=zzzznomatch'));
 
-    expect(screen.getByText('No contracts match your filters.')).toBeInTheDocument();
-    expect(
-      screen.getByText('Clear the search or reset the status/type filters to see every contract.')
-    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(new URLSearchParams(window.location.search).has('history.q')).toBe(false)
+    );
+  });
+
+  it('on a narrow viewport, the filter sheet reopens cleared after Reset filters', async () => {
+    const real = window.matchMedia;
+    window.matchMedia = ((media: string) =>
+      ({
+        media,
+        matches: media === NARROW_QUERY,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList) as typeof window.matchMedia;
+    try {
+      const user = userEvent.setup();
+      render(<App />);
+      await screen.findAllByText('Rifter fit');
+
+      await user.click(screen.getByRole('button', { name: 'Filters' }));
+      let sheet = await screen.findByRole('dialog');
+      await user.click(within(sheet).getByRole('button', { name: 'Outstanding' }));
+      await user.click(within(sheet).getByRole('button', { name: 'Apply' }));
+      await user.type(screen.getByPlaceholderText('Search issuer or title…'), 'zzzznomatch');
+
+      await user.click(await screen.findByRole('button', { name: 'Reset filters' }));
+      await screen.findAllByText('Rifter fit');
+
+      await user.click(screen.getByRole('button', { name: 'Filters' }));
+      sheet = await screen.findByRole('dialog');
+      expect(within(sheet).getByRole('button', { name: 'Outstanding' })).toHaveAttribute(
+        'aria-pressed',
+        'false'
+      );
+    } finally {
+      window.matchMedia = real;
+    }
   });
 
   it('the truncation notice has a retry action', async () => {
