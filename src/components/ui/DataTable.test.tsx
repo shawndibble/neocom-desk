@@ -16,6 +16,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from './ContextMenu';
+import { Tooltip } from './Tooltip';
 
 interface Row {
   id: number;
@@ -472,6 +473,10 @@ describe('DataTable', () => {
                   </button>
                   <input type="checkbox" aria-label={`Tick ${row.item}`} onChange={onTick} />
                   {createPortal(<button type="button">Menu {row.item}</button>, document.body)}
+                  <span tabIndex={0}>Figure {row.item}</span>
+                  <Tooltip content="Why" openOnTap>
+                    <span tabIndex={0}>Tag {row.item}</span>
+                  </Tooltip>
                 </>
               ),
             },
@@ -522,6 +527,24 @@ describe('DataTable', () => {
         renderWithControls(onRowClick, vi.fn());
         await user.click(screen.getByRole('button', { name: 'Menu Tritanium' }));
         expect(onRowClick).not.toHaveBeenCalled();
+      });
+
+      it('a tap-to-open tooltip trigger keeps the click from the row', async () => {
+        const user = userEvent.setup();
+        const onRowClick = vi.fn();
+        renderWithControls(onRowClick, vi.fn());
+        await user.click(screen.getByText('Tag Tritanium'));
+        expect(onRowClick).not.toHaveBeenCalled();
+      });
+
+      // Focusable only so the keyboard can reach a hover tooltip (an ISK
+      // figure) — it has no click action of its own.
+      it('a click on a merely focusable span still runs the row', async () => {
+        const user = userEvent.setup();
+        const onRowClick = vi.fn();
+        renderWithControls(onRowClick, vi.fn());
+        await user.click(screen.getByText('Figure Tritanium'));
+        expect(onRowClick).toHaveBeenCalledWith(rows[0]);
       });
 
       it('a click on plain row content still runs the row', async () => {

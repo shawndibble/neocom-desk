@@ -87,7 +87,10 @@ export interface DataTableColumn<T> {
 
 /**
  * What counts as a control of its own inside a clickable row: anything the
- * user can click or focus to do something other than open the row.
+ * user can click to do something other than open the row. A bare
+ * `tabIndex={0}` isn't enough — an ISK figure is focusable only so the
+ * keyboard can reach its hover tooltip, and a click on it still opens the
+ * row. A tap-to-open tooltip trigger marks itself with `data-row-control`.
  */
 const ROW_CONTROL_SELECTOR = [
   'a[href]',
@@ -102,7 +105,7 @@ const ROW_CONTROL_SELECTOR = [
   '[role="link"]',
   '[role="menuitem"]',
   '[role="switch"]',
-  '[tabindex]:not([tabindex="-1"])',
+  '[data-row-control]',
 ].join(',');
 
 /**
