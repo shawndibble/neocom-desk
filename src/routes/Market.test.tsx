@@ -741,7 +741,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     expect(within(table).queryByText('Cormorant')).not.toBeInTheDocument();
   });
 
-  it('opens the compare modal from the Variations header button, with a column per row shown in the table (issue #146)', async () => {
+  it('opens the Compare drawer on Attributes from the Variations header button, with the selected item plus a column per row shown in the table (issue #146, folded into the drawer by #1425)', async () => {
     const dogma = (typeId: number, hp: number) =>
       http.get(`${ESI_BASE_URL}/universe/types/${typeId}`, () =>
         HttpResponse.json({
@@ -755,6 +755,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
       );
     server.use(
       destroyerOrdersHandler(new Map()),
+      dogma(MERLIN_TYPE_ID, 1100),
       dogma(KESTREL_TYPE_ID, 1200),
       dogma(CORAX_TYPE_ID, 1400),
       dogma(CORMORANT_TYPE_ID, 1600)
@@ -768,19 +769,19 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
 
     await user.click(screen.getByRole('button', { name: 'Compare' }));
 
-    const dialog = await screen.findByRole('dialog', { name: 'Compare Variations' });
-    // A column per row the table is showing, and the selected item is not
-    // one of them — it isn't a row in that table either. Each name repeats
-    // once per attribute category, since the matrix is one DataTable per
-    // category (#1128).
-    expect(await within(dialog).findAllByText('Kestrel')).not.toHaveLength(0);
-    expect(within(dialog).getAllByText('Corax')).not.toHaveLength(0);
-    expect(within(dialog).queryAllByText('Merlin')).toHaveLength(0);
-    // Estimated Price leads, then the dogma rows fetched for the modal.
-    expect(within(dialog).getByText('Estimated Price')).toBeInTheDocument();
-    expect(within(dialog).getByText('1,200 HP')).toBeInTheDocument();
-
-    await user.keyboard('{Escape}');
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    expect(
+      within(region).getByRole('button', { name: 'Attributes', pressed: true })
+    ).toBeInTheDocument();
+    // A column per row the table is showing, plus the selected item itself
+    // (owner decision #2). Each name repeats once per attribute category,
+    // since the matrix is one DataTable per category (#1128).
+    expect(await within(region).findAllByText('Merlin')).not.toHaveLength(0);
+    expect(within(region).getAllByText('Kestrel')).not.toHaveLength(0);
+    expect(within(region).getAllByText('Corax')).not.toHaveLength(0);
+    // Estimated Price leads, then the dogma rows fetched for the matrix.
+    expect(within(region).getByText('Estimated Price')).toBeInTheDocument();
+    expect(within(region).getByText('1,200 HP')).toBeInTheDocument();
   });
 
   it('right-clicks a Variations row to open its item context menu, including Compare Variations (issue #147)', async () => {
@@ -807,7 +808,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.keyboard('{Escape}');
   });
 
-  it("opens the compare modal from a row's Compare Variations action, same as the header button (issue #147)", async () => {
+  it("opens the Compare drawer on Attributes from a row's Compare Variations action, same as the header button (issue #147, folded into the drawer by #1425)", async () => {
     const dogma = (typeId: number, hp: number) =>
       http.get(`${ESI_BASE_URL}/universe/types/${typeId}`, () =>
         HttpResponse.json({
@@ -821,6 +822,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
       );
     server.use(
       destroyerOrdersHandler(new Map()),
+      dogma(MERLIN_TYPE_ID, 1100),
       dogma(KESTREL_TYPE_ID, 1200),
       dogma(CORAX_TYPE_ID, 1400),
       dogma(CORMORANT_TYPE_ID, 1600)
@@ -836,12 +838,10 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     fireEvent.contextMenu(kestrelRow);
     await user.click(screen.getByRole('menuitem', { name: 'Compare Variations' }));
 
-    const dialog = await screen.findByRole('dialog', { name: 'Compare Variations' });
-    expect(within(dialog).getAllByText('Kestrel')).not.toHaveLength(0);
-    expect(within(dialog).getAllByText('Corax')).not.toHaveLength(0);
-    expect(within(dialog).queryAllByText('Merlin')).toHaveLength(0);
-
-    await user.keyboard('{Escape}');
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    expect(await within(region).findAllByText('Merlin')).not.toHaveLength(0);
+    expect(within(region).getAllByText('Kestrel')).not.toHaveLength(0);
+    expect(within(region).getAllByText('Corax')).not.toHaveLength(0);
   });
 
   it('right-clicking a Variations row opens the menu without also re-anchoring on it (left/right-click non-interference, issue #147)', async () => {

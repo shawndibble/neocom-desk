@@ -4,7 +4,7 @@
  * it, opened from a link under the order groups. Built on the repo's own
  * `Modal` (`placement="wide"` per the ticket, even though the content is a
  * single column — consistent with `RemapMarkerModal`'s always-mounted
- * pattern rather than `VariationsCompareModal`'s mount-on-open one, since
+ * pattern rather than `ItemDetailModal`'s mount-on-open one, since
  * the parent here owns `open` the same way).
  */
 import { useTranslation } from 'react-i18next';
