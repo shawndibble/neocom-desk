@@ -435,6 +435,9 @@ export function NotificationsPanel() {
         visibleEventIds,
         rowEnabledFor: (eventId) =>
           characterEventRowState(eventId, grantedScopes, characterCapabilities).rowEnabled,
+        missingPermissionFor: (eventId) =>
+          characterEventRowState(eventId, grantedScopes, characterCapabilities)
+            .missingPermission !== null,
         hasEveNotificationScope: characterEventRowState(
           'eveNotification',
           grantedScopes,
