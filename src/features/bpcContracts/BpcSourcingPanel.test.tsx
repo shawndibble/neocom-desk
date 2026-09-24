@@ -448,8 +448,8 @@ describe('BpcSourcingPanel', () => {
     await screen.findByRole('table', { name: 'BPC Search' });
 
     await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
-    const suggestions = screen.getByRole('list', { name: 'Matching blueprints' });
-    await user.click(within(suggestions).getByRole('button'));
+    const suggestions = screen.getByRole('listbox', { name: 'Matching blueprints' });
+    await user.click(within(suggestions).getByRole('option'));
 
     const params = new URLSearchParams(window.location.search);
     expect(window.location.pathname).toBe('/industry/sourcing');
@@ -486,10 +486,53 @@ describe('BpcSourcingPanel', () => {
 
     await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
 
-    const suggestions = screen.getByRole('list', { name: 'Matching blueprints' });
+    const suggestions = screen.getByRole('listbox', { name: 'Matching blueprints' });
     expect(within(suggestions).getByText('Rifter Blueprint')).toBeInTheDocument();
     expect(within(suggestions).getByText('2 offers')).toBeInTheDocument();
     expect(within(suggestions).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
+  });
+
+  it('works the suggestions as a combobox: arrow keys highlight, Enter picks, count announced', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 1, typeId: 638 }), row({ contractId: 2, typeId: 638 })])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('table', { name: 'BPC Search' });
+
+    const box = screen.getByPlaceholderText('Search blueprint name…');
+    expect(box).toHaveAttribute('role', 'combobox');
+    expect(box).toHaveAttribute('aria-expanded', 'false');
+    await user.type(box, 'Rifter');
+    expect(box).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('1 matching blueprint')).toHaveAttribute('role', 'status');
+
+    await user.keyboard('{ArrowDown}');
+    const option = screen.getByRole('option', { name: /Rifter Blueprint/ });
+    expect(option).toHaveAttribute('aria-selected', 'true');
+    expect(box).toHaveAttribute('aria-activedescendant', option.id);
+    expect(
+      screen.getByText('1 matching blueprint. Rifter Blueprint highlighted.')
+    ).toBeInTheDocument();
+
+    await user.keyboard('{Enter}');
+    expect(new URLSearchParams(window.location.search).get('sourcing.type')).toBe('638');
+    expect(screen.queryByRole('listbox', { name: 'Matching blueprints' })).not.toBeInTheDocument();
+  });
+
+  it('hides the suggestions on Escape without clearing the typed text', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('table', { name: 'BPC Search' });
+
+    await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox', { name: 'Matching blueprints' })).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search blueprint name…')).toHaveValue('Rifter');
+
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('listbox', { name: 'Matching blueprints' })).toBeInTheDocument();
   });
 
   it('summarises one blueprint once it is picked from the suggestions', async () => {
@@ -506,8 +549,8 @@ describe('BpcSourcingPanel', () => {
     await screen.findByRole('table', { name: 'BPC Search' });
 
     await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
-    const suggestions = screen.getByRole('list', { name: 'Matching blueprints' });
-    await user.click(within(suggestions).getByRole('button'));
+    const suggestions = screen.getByRole('listbox', { name: 'Matching blueprints' });
+    await user.click(within(suggestions).getByRole('option'));
 
     expect(screen.getByText('3 offers on contract')).toBeInTheDocument();
     // Scoped to the chips: these figures also appear in the region strip and
@@ -519,7 +562,7 @@ describe('BpcSourcingPanel', () => {
       screen.getAllByText('5,000,000.00 ISK', { selector: '.sr-only' })[0]
     );
     // The suggestion list closes once a blueprint is pinned.
-    expect(screen.queryByRole('list', { name: 'Matching blueprints' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('listbox', { name: 'Matching blueprints' })).not.toBeInTheDocument();
   });
 
   it('compares the cheapest offer per region for the picked blueprint', async () => {
@@ -536,7 +579,7 @@ describe('BpcSourcingPanel', () => {
 
     await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
     await user.click(
-      within(screen.getByRole('list', { name: 'Matching blueprints' })).getByRole('button')
+      within(screen.getByRole('listbox', { name: 'Matching blueprints' })).getByRole('option')
     );
 
     const strip = screen.getByText('Cheapest by region').parentElement as HTMLElement;
@@ -577,7 +620,7 @@ describe('BpcSourcingPanel', () => {
 
     await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
     await user.click(
-      within(screen.getByRole('list', { name: 'Matching blueprints' })).getByRole('button')
+      within(screen.getByRole('listbox', { name: 'Matching blueprints' })).getByRole('option')
     );
     expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
 
@@ -1169,7 +1212,7 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
 
       await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
       await user.click(
-        within(screen.getByRole('list', { name: 'Matching blueprints' })).getByRole('button')
+        within(screen.getByRole('listbox', { name: 'Matching blueprints' })).getByRole('option')
       );
 
       // Inline beside Cheapest by region, one headed group per BPO source.

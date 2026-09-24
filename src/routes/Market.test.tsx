@@ -368,6 +368,16 @@ describe('Market Browser', () => {
     expect(screen.queryByText('Ore')).not.toBeInTheDocument();
   });
 
+  it('tells assistive tech whether a Market Group is expanded', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const ships = (await screen.findByText('Ships')).closest('button')!;
+    expect(ships).toHaveAttribute('aria-expanded', 'false');
+    await user.click(ships);
+    expect(ships).toHaveAttribute('aria-expanded', 'true');
+  });
+
   it('shows a "type more" hint below the search threshold instead of silently showing the full tree (issue #412)', async () => {
     const user = userEvent.setup();
     render(<App />);

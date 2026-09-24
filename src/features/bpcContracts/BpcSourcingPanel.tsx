@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+  type InputHTMLAttributes,
+  type KeyboardEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -111,6 +119,7 @@ import type { CachedResult } from '@/esi/cache';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
+import { moveHighlight, type ComboboxNavKey } from '@/lib/comboboxNav';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -309,6 +318,8 @@ interface BpcFilterBarProps {
   jumps: JumpRange;
   onJumpsChange: (next: JumpRange) => void;
   currentSystem: CurrentSystemState;
+  /** The blueprint box's combobox wiring — role, expanded state, active option and arrow keys — owned by the panel, which renders the listbox. */
+  searchComboboxProps: InputHTMLAttributes<HTMLInputElement>;
 }
 
 function BpcFilterBar({
@@ -322,6 +333,7 @@ function BpcFilterBar({
   jumps,
   onJumpsChange,
   currentSystem,
+  searchComboboxProps,
 }: BpcFilterBarProps) {
   const { t } = useTranslation();
   const activeCount = [
@@ -367,6 +379,7 @@ function BpcFilterBar({
           onChange={(event) => onChange({ ...filter, typeQuery: event.target.value })}
           placeholder={t('bpcContracts.searchPlaceholder')}
           className="min-w-48 flex-1"
+          {...searchComboboxProps}
         />
       }
     >
@@ -705,6 +718,69 @@ export function BpcSourcingPanel() {
   const selectedName =
     selectedTypeId === null ? null : (blueprintNames.get(selectedTypeId) ?? `#${selectedTypeId}`);
 
+  // The suggestion list is an inline ARIA combobox, the same hand-built
+  // pattern as BuildLocationPicker: focus stays in the search box, arrow keys
+  // move a highlight, Enter picks it, Escape hides the list. The highlight is
+  // clamped rather than reset when a filter change shrinks the list.
+  const suggestionIdPrefix = useId();
+  const suggestionListboxId = `${suggestionIdPrefix}-listbox`;
+  const suggestionOptionId = (typeId: number) => `${suggestionIdPrefix}-option-${typeId}`;
+  const [highlightedIndex, setHighlightedIndex] = useState<number | null>(null);
+  const [suggestionsDismissed, setSuggestionsDismissed] = useState(false);
+  const openSuggestions = !suggestionsDismissed && suggestions.length > 0 ? suggestions : null;
+  const highlightedSuggestion =
+    openSuggestions !== null && highlightedIndex !== null
+      ? (openSuggestions[Math.min(highlightedIndex, openSuggestions.length - 1)] ?? null)
+      : null;
+
+  function handleSuggestionKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    // ArrowDown brings an Escape-dismissed list back, as a combobox does.
+    if (openSuggestions === null) {
+      if (e.key === 'ArrowDown' && suggestionsDismissed && suggestions.length > 0) {
+        e.preventDefault();
+        setSuggestionsDismissed(false);
+      }
+      return;
+    }
+    switch (e.key) {
+      case 'ArrowDown':
+      case 'ArrowUp':
+      case 'Home':
+      case 'End':
+        e.preventDefault();
+        setHighlightedIndex((current) =>
+          moveHighlight(
+            e.key as ComboboxNavKey,
+            current === null ? null : Math.min(current, openSuggestions.length - 1),
+            openSuggestions.length
+          )
+        );
+        break;
+      case 'Enter':
+        if (highlightedSuggestion !== null) {
+          e.preventDefault();
+          selectBlueprint(highlightedSuggestion);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        setSuggestionsDismissed(true);
+        setHighlightedIndex(null);
+        break;
+    }
+  }
+
+  const searchComboboxProps: InputHTMLAttributes<HTMLInputElement> = {
+    role: 'combobox',
+    'aria-autocomplete': 'list',
+    'aria-expanded': openSuggestions !== null,
+    'aria-controls': suggestionListboxId,
+    'aria-activedescendant': highlightedSuggestion
+      ? suggestionOptionId(highlightedSuggestion.typeId)
+      : undefined,
+    onKeyDown: handleSuggestionKeyDown,
+  };
+
   /** Picking from the autocomplete puts the blueprint's full name in the box, the way a combobox does — the field keeps showing what is being filtered on. */
   function selectBlueprint(suggestion: BlueprintSuggestion) {
     setParams({
@@ -720,6 +796,10 @@ export function BpcSourcingPanel() {
 
   /** Editing the text drops the pinned blueprint — otherwise the box would show one name while the table filtered on another. */
   function changeFilter(next: UiFilter) {
+    if (next.typeQuery !== uiFilter.typeQuery) {
+      setHighlightedIndex(null);
+      setSuggestionsDismissed(false);
+    }
     setParams({
       ...(next.typeQuery !== uiFilter.typeQuery ? { 'sourcing.type': null } : {}),
       'sourcing.q': next.typeQuery,
@@ -1341,6 +1421,7 @@ export function BpcSourcingPanel() {
             jumps={jumps}
             onJumpsChange={(next) => setParams({ 'sourcing.jumps': next, 'sourcing.all': false })}
             currentSystem={currentSystem}
+            searchComboboxProps={searchComboboxProps}
           />
           {/* Outside the bar: collapsed, its controls unmount, and this is
               exactly when the pilot needs telling the range is not applied. */}
@@ -1353,36 +1434,54 @@ export function BpcSourcingPanel() {
           {/* Inset on its own ground with an accent edge, because as a plain
               list flush against the filter bar it read as more page furniture
               and went unnoticed — the whole feature hangs on picking from it. */}
-          {suggestions.length > 0 && (
+          {/* Always mounted, so the count is announced when the list appears. */}
+          <span role="status" aria-live="polite" className="sr-only">
+            {openSuggestions !== null &&
+              (highlightedSuggestion
+                ? t('bpcContracts.suggestionsHighlighted', {
+                    count: openSuggestions.length,
+                    name: highlightedSuggestion.name,
+                  })
+                : t('bpcContracts.suggestionsCount', { count: openSuggestions.length }))}
+          </span>
+          {openSuggestions !== null && (
             <div className="border-b border-line bg-panel-2 px-3 py-2">
               <p className="pb-1.5 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
                 {t('bpcContracts.suggestionsHeading')}
               </p>
               <ul
+                id={suggestionListboxId}
+                role="listbox"
                 aria-label={t('bpcContracts.suggestionsLabel')}
                 className="max-h-72 overflow-y-auto rounded-xs border border-line-bright bg-panel"
               >
-                {suggestions.map((suggestion) => (
-                  <li key={suggestion.typeId} className="border-b border-line last:border-b-0">
-                    <button
-                      type="button"
-                      onClick={() => selectBlueprint(suggestion)}
-                      className="flex min-h-11 w-full items-center gap-3 px-3 py-1.5 text-left text-sm hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent md:min-h-9"
-                    >
-                      <span className="min-w-0 flex-1 truncate">{suggestion.name}</span>
-                      {/* Hidden on the narrowest screens rather than wrapped: three
+                {openSuggestions.map((suggestion) => (
+                  <li
+                    key={suggestion.typeId}
+                    id={suggestionOptionId(suggestion.typeId)}
+                    role="option"
+                    aria-selected={suggestion === highlightedSuggestion}
+                    // Keeps focus in the search box, so a click never blurs it first.
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => selectBlueprint(suggestion)}
+                    className={cx(
+                      'flex min-h-11 w-full cursor-pointer items-center gap-3 border-b border-line px-3 py-1.5 text-left text-sm last:border-b-0 md:min-h-9',
+                      suggestion === highlightedSuggestion ? 'bg-panel-2' : 'hover:bg-panel-2'
+                    )}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{suggestion.name}</span>
+                    {/* Hidden on the narrowest screens rather than wrapped: three
                           columns in a 390px row squeezes the name, which is the
                           one part that has to stay readable. */}
-                      <span className="hidden shrink-0 text-[0.6875rem] tabular-nums text-text-dim sm:inline">
-                        {t('bpcContracts.suggestionBestMeTe', {
-                          me: suggestion.bestMe,
-                          te: suggestion.bestTe,
-                        })}
-                      </span>
-                      <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim">
-                        {t('bpcContracts.regionOffers', { count: suggestion.offerCount })}
-                      </span>
-                    </button>
+                    <span className="hidden shrink-0 text-[0.6875rem] tabular-nums text-text-dim sm:inline">
+                      {t('bpcContracts.suggestionBestMeTe', {
+                        me: suggestion.bestMe,
+                        te: suggestion.bestTe,
+                      })}
+                    </span>
+                    <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim">
+                      {t('bpcContracts.regionOffers', { count: suggestion.offerCount })}
+                    </span>
                   </li>
                 ))}
               </ul>

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -784,7 +784,15 @@ export function Wallet() {
       {
         id: 'corporation',
         header: t('loyalty.corporation'),
-        render: (entry) => corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`,
+        // A real link as well as the row click: the row alone has no link
+        // role or name, so keyboard and screen-reader users could not tell
+        // it leads to the LP Store. DataTable ignores row clicks that land on
+        // a link, so the two never double-navigate.
+        render: (entry) => (
+          <Link to={`/wallet/loyalty/${entry.corporation_id}`} className="hover:text-accent">
+            {corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
+          </Link>
+        ),
         sortValue: (entry) =>
           corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`,
       },

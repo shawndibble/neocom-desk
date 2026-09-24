@@ -120,6 +120,17 @@ describe('Wallet', () => {
     expect(screen.queryByText('#1000419')).not.toBeInTheDocument();
   });
 
+  it("links each loyalty row's corporation name to its LP Store", async () => {
+    render(<App />);
+    expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();
+    // A real link, not just a row click — a screen reader or keyboard user
+    // reaches the LP Store by name.
+    expect(screen.getByRole('link', { name: 'Caldari Navy' })).toHaveAttribute(
+      'href',
+      '/wallet/loyalty/1000167'
+    );
+  });
+
   it('opens a Copy Name / Show Info menu on a loyalty row right-click', async () => {
     render(<App />);
     expect(await screen.findByText(/4,500\.00/)).toBeInTheDocument();

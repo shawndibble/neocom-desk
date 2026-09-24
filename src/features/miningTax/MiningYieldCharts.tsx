@@ -18,8 +18,9 @@ import {
   type TooltipContentProps,
 } from 'recharts';
 import type { PriceSource } from '@/engine/miningTax/priceBasis';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Panel } from '@/components/ui';
+import { DataTable, Panel, type DataTableColumn } from '@/components/ui';
 import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { topTypesWithOther, type RankedType } from './topTypes';
@@ -135,6 +136,49 @@ export default function MiningYieldCharts({
       : 'miningTax.overview.compareChartTitleRawOnly'
   );
 
+  // Screen-reader tables, one per chart: `role="img"` hides the bars, and
+  // the ore chart folds its tail into "Other", so the table carries every
+  // type rather than the drawn bars.
+  const rateColumns = useMemo<DataTableColumn<DailyRatePoint>[]>(
+    () => [
+      {
+        id: 'date',
+        header: t('miningTax.overview.dateColumn'),
+        render: (point) => formatDateTick(point.date),
+      },
+      {
+        id: 'iskPerHour',
+        header: t('miningTax.overview.iskPerHour'),
+        render: (point) => `${formatIsk(point.iskPerHour, 0)} ISK`,
+      },
+    ],
+    [t]
+  );
+  const compareColumns = useMemo<DataTableColumn<TypeComparisonPoint>[]>(
+    () => [
+      {
+        id: 'type',
+        header: t('miningTax.overview.typeColumn'),
+        render: (point) => point.typeName,
+      },
+      {
+        id: 'rawValue',
+        header: t('miningTax.overview.rawSellValue'),
+        render: (point) => `${formatIsk(point.rawValue, 0)} ISK`,
+      },
+      ...(showRefining
+        ? [
+            {
+              id: 'refineValue',
+              header: t('miningTax.overview.refineValue'),
+              render: (point: TypeComparisonPoint) => `${formatIsk(point.refineValue, 0)} ISK`,
+            },
+          ]
+        : []),
+    ],
+    [t, showRefining]
+  );
+
   // Past TOP_TYPE_LIMIT the rest fold into one "Other" bar, so the card
   // stops growing with the number of types; the table below lists every one.
   const { top, other } = topTypesWithOther(typeComparison, {
@@ -194,6 +238,14 @@ export default function MiningYieldCharts({
             </BarChart>
           </ResponsiveContainer>
         </div>
+        {/* A sibling of the `role="img"` box, never a child — see WalletBalanceChart. */}
+        <DataTable
+          columns={rateColumns}
+          rows={dailyRate}
+          rowKey={(point) => point.date}
+          label={t('miningTax.overview.rateChartTitle')}
+          className="sr-only"
+        />
         <ul className="mt-1 flex flex-wrap gap-x-3.5 text-[0.6875rem] text-text-dim">
           {LEGEND_SOURCES.map((source) => (
             <li key={source} className="flex items-center gap-1">
@@ -267,6 +319,13 @@ export default function MiningYieldCharts({
             </BarChart>
           </ResponsiveContainer>
         </div>
+        <DataTable
+          columns={compareColumns}
+          rows={typeComparison}
+          rowKey={(point) => point.typeId}
+          label={compareChartTitle}
+          className="sr-only"
+        />
         {!showRefining && (
           <p className="mt-1 text-[0.6875rem] text-text-dim">
             {t('miningTax.overview.refiningHiddenNote')}
