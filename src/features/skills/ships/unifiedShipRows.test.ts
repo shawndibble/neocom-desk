@@ -68,6 +68,30 @@ describe('mergeShipEntries', () => {
     expect(fromFit.has(100)).toBe(true);
   });
 
+  it('a skill required at its final level from tier I onward (cumulative SDE bundles): tags the earliest tier, not the last one it appears in', () => {
+    const tiers: readonly (readonly SkillPrereq[])[] = [
+      [{ skillTypeID: 100, level: 3 }],
+      [{ skillTypeID: 100, level: 3 }],
+      [{ skillTypeID: 100, level: 3 }],
+      [{ skillTypeID: 100, level: 3 }],
+      [{ skillTypeID: 100, level: 3 }],
+    ];
+    const { highestMasteryTier } = mergeShipEntries(tiers, null);
+    expect(highestMasteryTier.get(100)).toBe(0);
+  });
+
+  it('a skill whose required level rises partway through the cumulative bundles: tags the tier it first reaches its max level', () => {
+    const tiers: readonly (readonly SkillPrereq[])[] = [
+      [{ skillTypeID: 100, level: 1 }],
+      [{ skillTypeID: 100, level: 1 }],
+      [{ skillTypeID: 100, level: 3 }],
+      [{ skillTypeID: 100, level: 3 }],
+      [{ skillTypeID: 100, level: 3 }],
+    ];
+    const { highestMasteryTier } = mergeShipEntries(tiers, null);
+    expect(highestMasteryTier.get(100)).toBe(2);
+  });
+
   it('null fitEntries (no fit attached): mastery tiers alone, nothing tagged fromFit', () => {
     const tiers: readonly (readonly SkillPrereq[])[] = [
       [{ skillTypeID: 100, level: 1 }],
