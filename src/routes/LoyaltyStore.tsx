@@ -56,7 +56,7 @@ import { useQuickbar } from '@/features/market/useQuickbar';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 function iskPerLpTone(value: number | null): string {
-  return value === null ? 'text-text-faint' : iskToneClass(value);
+  return value === null ? 'text-text-dim' : iskToneClass(value);
 }
 
 /**

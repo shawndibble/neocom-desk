@@ -41,6 +41,7 @@ import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { VIEW_PREFERENCE_KEYS } from '@/lib/viewPreferenceKeys';
 import { DEFAULT_MOBILE_TABS, MOBILE_TABS_KEY, useMobileTabs } from '@/lib/mobileTabs';
+import { SINGLE_KEY_SHORTCUTS_SETTING_KEY, useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -104,6 +105,7 @@ beforeEach(async () => {
   useDarkThreshold.setState({ value: 30, hydrated: false });
   useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
   useMobileTabs.setState({ value: DEFAULT_MOBILE_TABS, hydrated: false });
+  useSingleKeyShortcuts.setState({ value: true, hydrated: false });
   useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: false });
   useNotificationPromptState.setState({
     value: { ...DEFAULT_NOTIFICATION_PROMPT_STATE, seen: true },
@@ -154,6 +156,24 @@ describe('Settings', () => {
     expect(screen.getByText('Switch character')).toBeInTheDocument();
     expect(screen.getByText('Open Settings')).toBeInTheDocument();
     expect(screen.getByText('Close the open dialog')).toBeInTheDocument();
+  });
+
+  it('turns the single-key shortcuts off, persists it, and says so in the list (issue #1494)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    const toggle = screen.getByRole('checkbox', { name: /single-key shortcuts/i });
+    expect(toggle).toBeChecked();
+    expect(screen.queryByText(/single-key shortcuts are off/i)).not.toBeInTheDocument();
+
+    await user.click(toggle);
+
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByText(/single-key shortcuts are off/i)).toBeInTheDocument();
+    await waitFor(async () =>
+      expect((await db.settings.get(SINGLE_KEY_SHORTCUTS_SETTING_KEY))?.value).toBe(false)
+    );
   });
 
   it('shows an empty state when nothing has been fetched yet (issue #32)', async () => {

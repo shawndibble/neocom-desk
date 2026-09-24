@@ -77,7 +77,7 @@ export interface PlanIndexStats extends PlanRollupStats {
 const VERDICT_TAG_CLASS: Record<PlanVerdictTag, string> = {
   build: 'text-success border-success/50',
   buy: 'text-warning border-warning/50',
-  unknown: 'text-text-faint border-line',
+  unknown: 'text-text-dim border-line',
 };
 
 function VerdictTag({

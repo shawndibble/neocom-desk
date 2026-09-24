@@ -88,8 +88,11 @@ export function BuildStrategySelect({
 // has something to hover, since it draws no underline of its own.
 const ACTIVE_CLASSES =
   'inline-flex h-7 shrink-0 cursor-help items-center rounded-xs border border-accent-dim bg-accent/15 px-2 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase';
+// No `opacity-*`: it read as inactive well enough already (grey border + dim
+// text vs. the accent chip beside it) without also taking the text below
+// AA (issue #1491 — the faded chip was 3.2:1, `text-dim` alone is 6.6:1).
 const RESERVED_CLASSES =
-  'inline-flex h-7 shrink-0 cursor-help items-center rounded-xs border border-line bg-panel-2 px-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase opacity-60';
+  'inline-flex h-7 shrink-0 cursor-help items-center rounded-xs border border-line bg-panel-2 px-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
 interface CraftScopeChipsProps {
   /**

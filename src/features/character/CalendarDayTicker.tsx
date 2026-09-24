@@ -74,7 +74,7 @@ export function CalendarDayTicker({
             </span>
             <span
               className={`text-base leading-none font-semibold tabular-nums ${
-                day.isToday ? 'text-accent' : isPast ? 'text-text-faint' : 'text-text'
+                day.isToday ? 'text-accent' : isPast ? 'text-text-dim' : 'text-text'
               }`}
             >
               {day.date.getDate()}

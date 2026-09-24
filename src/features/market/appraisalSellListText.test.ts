@@ -10,9 +10,9 @@ const ITEMS: AppraisalItem[] = [
 ];
 
 describe('appraisalSellListText', () => {
-  it('lists one tab-separated name/quantity/price line per item with a seller', () => {
+  it('lists one tab-separated name/price line per item with a seller, no quantity', () => {
     expect(appraisalSellListText(ITEMS)).toBe(
-      'Damage Control II\t3\t511900\nCivilian Gatling Railgun\t4\t999.90'
+      'Damage Control II\t511900\nCivilian Gatling Railgun\t999.90'
     );
   });
 

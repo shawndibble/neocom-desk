@@ -521,11 +521,9 @@ function openJobsColumn(
       // urgent, not less.
       const tone = open === max ? 'text-danger' : open / max >= 0.5 ? 'text-warning' : 'text-text';
       return (
-        // Row click navigates to Overview — this tag must not also fire that on tap.
         <Tooltip openOnTap content={t('characters.openJobsTooltip', { used: running, max })}>
           <span
             tabIndex={0}
-            onClick={(event) => event.stopPropagation()}
             className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
           >
             {open}
@@ -619,14 +617,12 @@ function buildColumns(
           return <span className={tone}>{t(`characters.queueStates.${row.queue.state}`)}</span>;
         }
         return (
-          // Row click navigates to Overview — this tag must not also fire that on tap.
           <Tooltip
             openOnTap
             content={formatTimestamp(new Date(row.queue.trainingFinishMs), timeZone)}
           >
             <span
               tabIndex={0}
-              onClick={(event) => event.stopPropagation()}
               className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
             >
               {formatDuration((row.queue.trainingFinishMs - Date.now()) / 1000)}
@@ -660,11 +656,9 @@ function buildColumns(
         const label =
           expiryMs <= Date.now() ? t('pi.expired') : formatDuration((expiryMs - Date.now()) / 1000);
         return (
-          // Row click navigates to Overview — this tag must not also fire that on tap.
           <Tooltip openOnTap content={formatTimestamp(new Date(expiryMs), timeZone)}>
             <span
               tabIndex={0}
-              onClick={(event) => event.stopPropagation()}
               className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
             >
               {/* The countdown alone is a colour-only tell of the underlying
@@ -709,21 +703,16 @@ function buildColumns(
       header: t('characters.column.starred'),
       align: 'right',
       sortValue: (row) => Number(row.starred),
-      // Row click navigates to Overview (see the table's `onRowClick`) — this
-      // button must not also fire that when toggling the star, so it stops
-      // the click before it bubbles to the `<tr>`.
       render: (row) => (
-        <span onClick={(event) => event.stopPropagation()}>
-          <IconButton
-            size="sm"
-            icon={<Icon.Pin weight={row.starred ? 'fill' : 'light'} />}
-            label={t(row.starred ? 'characters.unstar' : 'characters.star', {
-              name: row.character.name,
-            })}
-            pressed={row.starred}
-            onClick={() => onToggleStarred(row.character.characterId)}
-          />
-        </span>
+        <IconButton
+          size="sm"
+          icon={<Icon.Pin weight={row.starred ? 'fill' : 'light'} />}
+          label={t(row.starred ? 'characters.unstar' : 'characters.star', {
+            name: row.character.name,
+          })}
+          pressed={row.starred}
+          onClick={() => onToggleStarred(row.character.characterId)}
+        />
       ),
     },
   };

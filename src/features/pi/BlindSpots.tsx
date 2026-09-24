@@ -44,7 +44,7 @@ export function BlindSpots({ spots }: { spots: readonly BlindSpot[] }) {
       <ul className="space-y-1.5">
         {spots.map((spot) => (
           <li key={spot.key} className="flex items-baseline gap-2.5">
-            <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-transparent bg-panel-2 px-1.5 text-[0.625rem] font-bold tracking-widest text-text-faint uppercase">
+            <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-transparent bg-panel-2 px-1.5 text-[0.625rem] font-bold tracking-widest text-text-dim uppercase">
               {t('piAdvisor.blindTag')}
             </span>
             <span className="min-w-0 text-xs text-text-dim">

@@ -1,4 +1,12 @@
-import { Fragment, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import {
+  Fragment,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
@@ -78,6 +86,46 @@ export interface DataTableColumn<T> {
 }
 
 /**
+ * What counts as a control of its own inside a clickable row: anything the
+ * user can click to do something other than open the row. A bare
+ * `tabIndex={0}` isn't enough — an ISK figure is focusable only so the
+ * keyboard can reach its hover tooltip, and a click on it still opens the
+ * row. A tap-to-open tooltip trigger marks itself with `data-row-control`.
+ */
+const ROW_CONTROL_SELECTOR = [
+  'a[href]',
+  'button',
+  'input',
+  'select',
+  'textarea',
+  'label',
+  'summary',
+  '[role="button"]',
+  '[role="checkbox"]',
+  '[role="link"]',
+  '[role="menuitem"]',
+  '[role="switch"]',
+  '[data-row-control]',
+].join(',');
+
+/**
+ * Whether a click on a clickable row is the row's own — not one that landed on
+ * a control inside it (a star button, a bulk-select checkbox, a tooltip
+ * trigger), and not one bubbled up through React from something portaled out
+ * of it (a menu or modal opened from the row). Keyboard activation of such a
+ * control fires a click too, so this is also what keeps Enter/Space on it
+ * from opening the row. Pages need no `stopPropagation` workaround of their
+ * own.
+ */
+function isRowOwnEvent(event: MouseEvent<HTMLElement>): boolean {
+  const row = event.currentTarget;
+  const target = event.target;
+  if (!(target instanceof Element) || !row.contains(target)) return false;
+  const control = target.closest(ROW_CONTROL_SELECTOR);
+  return control === null || control === row || !row.contains(control);
+}
+
+/**
  * Wraps a dense-stack (`stackLayout="dense"`) column's `render` output when
  * it's more than one inline piece (a value plus a badge, a name plus a
  * security-status suffix). The dense meta line puts a `·` separator right
@@ -128,7 +176,11 @@ interface DataTableProps<T> {
    * collided on every field it has.
    */
   rowKey: (row: T, index: number) => string | number;
-  /** Row-level classes, e.g. Contracts dimming expired rows with `opacity-50`. */
+  /**
+   * Row-level classes. Not for dimming a row's own text below AA (issue
+   * #1491) — a stale/lapsed row keeps full-contrast text and carries a
+   * non-color cue instead (Contracts' status icon + tooltip).
+   */
   rowClassName?: (row: T) => string | undefined;
   /**
    * The row a notification pointed at (`lib/useHighlightParam`): scrolled into
@@ -409,12 +461,19 @@ export function DataTable<T>({
           rowClassName?.(row)
         )}
         tabIndex={focusable ? 0 : undefined}
-        onClick={onRowClick || expandableRow ? activate : undefined}
+        onClick={
+          onRowClick || expandableRow
+            ? (event) => {
+                if (isRowOwnEvent(event)) activate();
+              }
+            : undefined
+        }
         onKeyDown={
           onRowClick || expandableRow
             ? (event) => {
                 // Only the row's own keys: a focused control inside it (a
-                // tooltip trigger, a link) keeps its Enter/Space to itself.
+                // tooltip trigger, a button, a checkbox) keeps its Enter/Space
+                // to itself.
                 if (event.target !== event.currentTarget) return;
                 if (event.key !== 'Enter' && event.key !== ' ') return;
                 event.preventDefault();

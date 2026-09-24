@@ -132,7 +132,7 @@ function Row({ row, rank, dim }: { row: WorklistRow; rank: number; dim?: boolean
         dim ? 'opacity-80' : ''
       }`}
     >
-      <span className="text-xs text-text-faint tabular-nums">{rank}</span>
+      <span className="text-xs text-text-dim tabular-nums">{rank}</span>
       <span className="flex min-w-0 items-baseline gap-2">
         <VerbTag verb={VERB[row.verb]} />
         <span className="text-xs text-text">

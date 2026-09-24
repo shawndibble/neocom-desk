@@ -371,7 +371,7 @@ export function ShipsPanel({
             >
               {t('skills.ships.attachFit')}
             </button>
-            <p className="text-xs text-text-faint">{t('skills.ships.attachFitHint')}</p>
+            <p className="text-xs text-text-dim">{t('skills.ships.attachFitHint')}</p>
           </>
         )}
         {fitResult?.warnings.map((warning, i) => (

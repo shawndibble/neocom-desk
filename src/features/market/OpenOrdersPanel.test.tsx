@@ -887,16 +887,17 @@ describe('OpenOrdersPanel', () => {
       expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
     });
 
-    it('still renders a zero-count problem chip, dimmed', async () => {
+    it('still renders a zero-count problem chip, at full contrast', async () => {
       const user = userEvent.setup();
       renderMixedFixture();
       await screen.findByText('2 of 3 orders match');
       await openFunnel(user);
 
-      // Nothing in this fixture is undercut at the station tier.
+      // Nothing in this fixture is undercut at the station tier. The `0`
+      // itself is the cue — no opacity fade below AA (issue #1491).
       const chip = screen.getByRole('button', { name: /^Undercut at my station/ });
       expect(chip).toHaveTextContent('0');
-      expect(chip.className).toContain('opacity-50');
+      expect(chip.className).not.toContain('opacity-50');
     });
 
     it('narrows the list with the cost-basis chip pair', async () => {

@@ -44,7 +44,7 @@
 
   /* Hairlines (always 1px) */
   --color-line: #2a3442;
-  --color-line-bright: #3d4c5f;
+  --color-line-bright: #586c86; /* 3.15:1 vs panel-2 — also the resting input border (issue #1491) */
 
   /* Text hierarchy */
   --color-text: #dee7ee;
@@ -55,6 +55,7 @@
   --color-accent: #57c7f4;
   --color-accent-dim: #2e7da3; /* borders/fills only — not text */
   --color-accent-contrast: #04181f; /* text on accent fills */
+  --color-selection: #276c8d; /* text-selection fill only — accent-dim darkened for 4.64:1 with `text` (issue #1491) */
 
   /* Status */
   --color-success: #5fd584;
@@ -638,6 +639,17 @@
     scrollbar-gutter: stable;
   }
 
+  /* Below md the phone tab bar (Layout) is fixed over the bottom of the
+     viewport — including desktop at 200% zoom. Without this, focusing a
+     control near the bottom scrolls it only as far as the viewport edge,
+     i.e. under the bar (WCAG 2.4.11). Bar: min-h-11 + 1px border + the
+     safe-area inset; the extra 0.75rem keeps the focus ring clear too. */
+  @media (width < 48rem) {
+    :root {
+      scroll-padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+    }
+  }
+
   body {
     background-color: var(--color-bg);
     color: var(--color-text);
@@ -646,7 +658,7 @@
   }
 
   ::selection {
-    background-color: var(--color-accent-dim);
+    background-color: var(--color-selection);
     color: var(--color-text);
   }
 }

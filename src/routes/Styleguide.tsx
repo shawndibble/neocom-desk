@@ -327,7 +327,9 @@ export function Styleguide() {
             columns={SAMPLE_COLUMNS}
             rows={SAMPLE_ROWS}
             rowKey={(row) => row.id}
-            rowClassName={(row) => (row.qty < 0 ? 'opacity-50' : undefined)}
+            // A fill, not an opacity fade on the row's own text — see
+            // `rowClassName`'s doc comment (issue #1491).
+            rowClassName={(row) => (row.qty < 0 ? 'bg-danger/5' : undefined)}
           />
         </Panel>
       </Section>

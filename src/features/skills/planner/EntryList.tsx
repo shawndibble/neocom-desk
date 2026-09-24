@@ -154,11 +154,16 @@ function MetaValue({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Priority pill tones — hierarchy by text weight only; status colors carry meaning here (docs/DESIGN.md §6). */
+/**
+ * Priority pill tones — hierarchy by text weight/style, not color alone;
+ * status colors carry meaning here (docs/DESIGN.md §6). `low` is italic
+ * rather than `text-faint`, which is below AA (issue #1491) and would also
+ * have made `low` and `normal` identical, since both use `border-line`.
+ */
 const PRIORITY_TONE: Record<PlanPriority, string> = {
   high: 'border-line-bright text-text',
   normal: 'border-line text-text-dim',
-  low: 'border-line text-text-faint',
+  low: 'border-line text-text-dim italic',
 };
 
 interface PriorityPillProps {
@@ -726,7 +731,7 @@ const PrereqRow = memo(function PrereqRow({
     <li
       ref={setNodeRef}
       style={style}
-      className={`border-b border-line px-2 py-1.5 text-xs text-text-faint italic last:border-b-0 ${
+      className={`border-b border-line px-2 py-1.5 text-xs text-text-dim italic last:border-b-0 ${
         isDragging ? 'bg-panel-2' : ''
       }`}
     >

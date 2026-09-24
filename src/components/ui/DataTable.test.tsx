@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { createPortal } from 'react-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
@@ -15,6 +16,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from './ContextMenu';
+import { Tooltip } from './Tooltip';
 
 interface Row {
   id: number;
@@ -450,6 +452,108 @@ describe('DataTable', () => {
       fireEvent.keyDown(cell!, { key: 'Enter' });
       fireEvent.keyDown(cell!, { key: ' ' });
       expect(onRowClick).not.toHaveBeenCalled();
+    });
+
+    // A control inside a clickable row runs its own action only — by mouse
+    // and by keyboard — with no stopPropagation workaround on the page.
+    describe('controls inside the row', () => {
+      function renderWithControls(onRowClick: () => void, onStar: () => void) {
+        const onTick = vi.fn();
+        renderTable({
+          onRowClick,
+          columns: [
+            ...columns,
+            {
+              id: 'controls',
+              header: 'Controls',
+              render: (row) => (
+                <>
+                  <button type="button" onClick={onStar}>
+                    Star {row.item}
+                  </button>
+                  <input type="checkbox" aria-label={`Tick ${row.item}`} onChange={onTick} />
+                  {createPortal(<button type="button">Menu {row.item}</button>, document.body)}
+                  <span tabIndex={0}>Figure {row.item}</span>
+                  <Tooltip content="Why" openOnTap>
+                    <span tabIndex={0}>Tag {row.item}</span>
+                  </Tooltip>
+                </>
+              ),
+            },
+          ],
+        });
+        return { onTick };
+      }
+
+      it('a button click runs the button, not the row', async () => {
+        const user = userEvent.setup();
+        const onRowClick = vi.fn();
+        const onStar = vi.fn();
+        renderWithControls(onRowClick, onStar);
+        await user.click(screen.getByRole('button', { name: 'Star Tritanium' }));
+        expect(onStar).toHaveBeenCalledTimes(1);
+        expect(onRowClick).not.toHaveBeenCalled();
+      });
+
+      it('Enter and Space on a focused button run the button, not the row', async () => {
+        const user = userEvent.setup();
+        const onRowClick = vi.fn();
+        const onStar = vi.fn();
+        renderWithControls(onRowClick, onStar);
+        screen.getByRole('button', { name: 'Star Tritanium' }).focus();
+        await user.keyboard('{Enter}');
+        await user.keyboard(' ');
+        expect(onStar).toHaveBeenCalledTimes(2);
+        expect(onRowClick).not.toHaveBeenCalled();
+      });
+
+      it('Space on a focused checkbox ticks it, not the row', async () => {
+        const user = userEvent.setup();
+        const onRowClick = vi.fn();
+        const { onTick } = renderWithControls(onRowClick, vi.fn());
+        const box = screen.getByRole('checkbox', { name: 'Tick Tritanium' });
+        box.focus();
+        await user.keyboard(' ');
+        expect(onTick).toHaveBeenCalledTimes(1);
+        expect(box).toBeChecked();
+        expect(onRowClick).not.toHaveBeenCalled();
+      });
+
+      // React bubbles events through portals along the component tree, so a
+      // menu or modal opened from inside the row would otherwise reach it.
+      it('a click inside something portaled out of the row does not reach the row', async () => {
+        const user = userEvent.setup();
+        const onRowClick = vi.fn();
+        renderWithControls(onRowClick, vi.fn());
+        await user.click(screen.getByRole('button', { name: 'Menu Tritanium' }));
+        expect(onRowClick).not.toHaveBeenCalled();
+      });
+
+      it('a tap-to-open tooltip trigger keeps the click from the row', async () => {
+        const user = userEvent.setup();
+        const onRowClick = vi.fn();
+        renderWithControls(onRowClick, vi.fn());
+        await user.click(screen.getByText('Tag Tritanium'));
+        expect(onRowClick).not.toHaveBeenCalled();
+      });
+
+      // Focusable only so the keyboard can reach a hover tooltip (an ISK
+      // figure) — it has no click action of its own.
+      it('a click on a merely focusable span still runs the row', async () => {
+        const user = userEvent.setup();
+        const onRowClick = vi.fn();
+        renderWithControls(onRowClick, vi.fn());
+        await user.click(screen.getByText('Figure Tritanium'));
+        expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+      });
+
+      it('a click on plain row content still runs the row', async () => {
+        const user = userEvent.setup();
+        const onRowClick = vi.fn();
+        renderWithControls(onRowClick, vi.fn());
+        await user.click(screen.getAllByRole('cell')[0]!);
+        expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+      });
     });
 
     it('leaves rows non-focusable when no row click handler is wired up', () => {

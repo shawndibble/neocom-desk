@@ -194,6 +194,9 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchCancel}
           onClick={suppressEchoedClose}
+          // A tap opens this bubble, so a clickable table row must leave the
+          // tap to it rather than open the row too (see DataTable).
+          data-row-control={openOnTap ? '' : undefined}
         >
           {trigger}
         </TooltipPrimitive.Trigger>

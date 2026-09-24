@@ -124,7 +124,7 @@ export function CurrentQueuePanel({ characterId, catalog }: CurrentQueuePanelPro
                 <li
                   key={`${entry.skill_id}-${entry.finished_level}-${entry.queue_position}`}
                   className={`flex items-center justify-between gap-2 border-b border-line px-2 py-1.5 text-xs last:border-b-0 ${
-                    status === 'completed' ? 'text-text-faint' : ''
+                    status === 'completed' ? 'text-text-dim' : ''
                   }`}
                 >
                   <span className="flex-1 truncate">

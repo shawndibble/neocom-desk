@@ -36,10 +36,10 @@ worth more than a better picker on one control.
 
 ### Lines
 
-| Token         | Value     | Use                                                                          |
-| ------------- | --------- | ---------------------------------------------------------------------------- |
-| `line`        | `#2a3442` | Default hairline. Always 1px. Panel borders, table row separators, dividers. |
-| `line-bright` | `#3d4c5f` | Hover/focus-adjacent borders, emphasized separators.                         |
+| Token         | Value     | Use                                                                                                                                                                                      |
+| ------------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `line`        | `#2a3442` | Default hairline. Always 1px. Panel borders, table row separators, dividers.                                                                                                             |
+| `line-bright` | `#586c86` | Hover/focus-adjacent borders, emphasized separators, and every field's resting border (3.15:1 against `panel-2` — `line` itself is only 1.35:1, below the 3:1 floor for a visible edge). |
 
 ### Text hierarchy
 
@@ -51,14 +51,15 @@ worth more than a better picker on one control.
 
 ### Accent + status
 
-| Token             | Value     | Use                                                                                                 |
-| ----------------- | --------- | --------------------------------------------------------------------------------------------------- |
-| `accent`          | `#57c7f4` | Interactive: links, primary buttons, active tab underline, selection, focus rings, progress.        |
-| `accent-dim`      | `#2e7da3` | Accent-tinted borders/fills where full accent is too loud (e.g. selected row border). Not for text. |
-| `accent-contrast` | `#04181f` | Text/icon color **on** accent fills (primary button label).                                         |
-| `success`         | `#5fd584` | Positive status: training active, order filled, "fresh data".                                       |
-| `warning`         | `#f5b94a` | Caution: stale data, low skill, expiring booster.                                                   |
-| `danger`          | `#ff7369` | Errors, destructive actions, failed fetch.                                                          |
+| Token             | Value     | Use                                                                                                                                       |
+| ----------------- | --------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `accent`          | `#57c7f4` | Interactive: links, primary buttons, active tab underline, selection, focus rings, progress.                                              |
+| `accent-dim`      | `#2e7da3` | Accent-tinted borders/fills where full accent is too loud (e.g. selected row border). Not for text.                                       |
+| `accent-contrast` | `#04181f` | Text/icon color **on** accent fills (primary button label).                                                                               |
+| `selection`       | `#276c8d` | `::selection` fill only — a darkened `accent-dim` so highlighted `text` clears 4.5:1 (`accent-dim` itself is too light for that pairing). |
+| `success`         | `#5fd584` | Positive status: training active, order filled, "fresh data".                                                                             |
+| `warning`         | `#f5b94a` | Caution: stale data, low skill, expiring booster.                                                                                         |
+| `danger`          | `#ff7369` | Errors, destructive actions, failed fetch.                                                                                                |
 
 ### ISK / market deltas
 
@@ -530,17 +531,19 @@ route ad hoc.
 
 - Contrast (WCAG AA ≥ 4.5:1 for text) — measured ratios:
 
-| Pair                                           | Ratio                 |
-| ---------------------------------------------- | --------------------- |
-| `text` on `bg` / `panel` / `panel-2`           | 15.45 / 14.50 / 13.53 |
-| `text-dim` on `bg` / `panel` / `panel-2`       | 7.53 / 7.07 / 6.60    |
-| `accent` on `bg` / `panel`                     | 10.02 / 9.41          |
-| `success` on `bg` / `panel`                    | 10.44 / 9.80          |
-| `warning` on `bg` / `panel`                    | 10.98 / 10.31         |
-| `danger` on `bg` / `panel`                     | 7.28 / 6.84           |
-| `isk-pos` / `isk-neg` on `panel`               | 10.05 / 7.49          |
-| `accent-contrast` on `accent` (primary button) | 9.42                  |
-| `text-faint` on `bg` (decorative only)         | 3.54 ⚠                |
+| Pair                                                             | Ratio                 |
+| ---------------------------------------------------------------- | --------------------- |
+| `text` on `bg` / `panel` / `panel-2`                             | 15.45 / 14.50 / 13.53 |
+| `text-dim` on `bg` / `panel` / `panel-2`                         | 7.53 / 7.07 / 6.60    |
+| `accent` on `bg` / `panel`                                       | 10.02 / 9.41          |
+| `success` on `bg` / `panel`                                      | 10.44 / 9.80          |
+| `warning` on `bg` / `panel`                                      | 10.98 / 10.31         |
+| `danger` on `bg` / `panel`                                       | 7.28 / 6.84           |
+| `isk-pos` / `isk-neg` on `panel`                                 | 10.05 / 7.49          |
+| `accent-contrast` on `accent` (primary button)                   | 9.42                  |
+| `text-faint` on `bg` (decorative only)                           | 3.54 ⚠                |
+| `line-bright` on `panel-2` (resting field border, non-text ≥3:1) | 3.15                  |
+| `::selection` fill / `text`                                      | 4.64                  |
 
 Clock-kind tokens (§1) color countdown **text**, so all seven are measured on all three
 surfaces — `bg` / `panel` / `panel-2`:
@@ -556,8 +559,11 @@ surfaces — `bg` / `panel` / `panel-2`:
 | `kind-skill-plan`        | 12.67 / 11.90 / 11.10 |
 
 - `text-faint` and `accent-dim` fail AA by design — restricted to non-text decoration.
-- Hairlines are decorative (1.5–2:1); interactive boundaries always carry a text label
-  that meets AA on its own.
+- Hairlines are decorative (1.5–2:1), except a field's resting border
+  (`line-bright`, 3.15:1 — the non-text 3:1 floor, not the 4.5:1 text one):
+  that edge has to be visible on its own since an empty field carries no text
+  yet. Every other interactive boundary still carries a text label that meets
+  AA independently of its border.
 - Focus: visible `outline-accent` ring on all interactive elements (never `outline-none`
   without replacement).
   The exception is a non-interactive `tabIndex={-1}` target that only takes focus

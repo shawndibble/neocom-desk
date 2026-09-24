@@ -3928,7 +3928,10 @@
     "switchCharacter": "Switch character",
     "openSettings": "Open Settings",
     "showShortcuts": "Show this shortcut list",
-    "close": "Close the open dialog"
+    "close": "Close the open dialog",
+    "enabledLabel": "Single-key shortcuts",
+    "enabledHint": "The keys below work anywhere outside a text field. Turn them off if you set them off by accident, for example with speech input. Stays on this device.",
+    "disabledNote": "Single-key shortcuts are off. Esc still closes an open dialog. Stays on this device."
   },
   "activityLog": {
     "title": "Activity Log",

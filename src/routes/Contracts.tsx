@@ -334,7 +334,10 @@ export function Contracts() {
           const label = t(CONTRACT_STATUS_KEY[contract.status]);
           return isStale(contract) ? (
             <Tooltip content={t('contracts.staleTooltip')} openOnTap>
-              <span>{label}</span>
+              <span className="inline-flex items-center gap-1">
+                <Icon.Warn aria-hidden="true" size={Icon.ICON_SIZE.sm} className="shrink-0" />
+                {label}
+              </span>
             </Tooltip>
           ) : (
             label
@@ -571,7 +574,6 @@ export function Contracts() {
                 rows={visibleContracts}
                 rowKey={(contract) => contract.contract_id}
                 highlightRowKey={highlightedContractId}
-                rowClassName={(contract) => (isStale(contract) ? 'opacity-50' : undefined)}
                 rowContextMenu={contractRowContextMenu}
                 {...historySortProps}
               />
