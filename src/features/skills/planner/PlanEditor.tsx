@@ -86,6 +86,7 @@ import { attributePairBandStarts } from './attributePairBands';
 import { PlanHeader } from './PlanHeader';
 import { PlanEditorLayout } from './PlanEditorLayout';
 import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
+import { InjectorFactsPanel } from './InjectorFactsPanel';
 import { LiveQueueLead } from './LiveQueueLead';
 import { projectQueueEnd } from '@/features/skills/queueStatus';
 import { evaluateOptimizationBadge, toOptimizationBadge } from './planHeaderStats';
@@ -181,6 +182,10 @@ interface PlanEditorProps {
   /** The live in-game queue: the plan's schedule starts where it ends. */
   queueEntries?: readonly SkillQueueEntry[];
   queueFetchedAt?: Date | null;
+  /** Queue-corrected total SP (`usePlanEditorData`), for the Skill injectors panel; null until /skills has loaded. */
+  totalSp?: number | null;
+  /** ESI's `unallocated_sp`, for the Skill injectors panel. */
+  unallocatedSp?: number | null;
   /**
    * The plan list, rendered at the top of the sidebar this component lays
    * out. Passed in rather than imported so the route keeps owning plan CRUD
@@ -228,6 +233,8 @@ export function PlanEditor({
   remapInfo,
   queueEntries = NO_QUEUE,
   queueFetchedAt = null,
+  totalSp = null,
+  unallocatedSp = null,
   listPane,
   headerActionsContainer = null,
   onUpdate,
@@ -1660,6 +1667,18 @@ export function PlanEditor({
             onChange={(boosters) => onUpdate({ boosters })}
           />
         </div>
+      ),
+    },
+    {
+      id: 'injectors',
+      title: t('plans.injectors.title'),
+      content: (
+        <InjectorFactsPanel
+          scheduled={scheduled}
+          totalSp={totalSp}
+          unallocatedSp={unallocatedSp}
+          cloneState={cloneState}
+        />
       ),
     },
   ];
