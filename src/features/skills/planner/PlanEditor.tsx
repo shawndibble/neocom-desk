@@ -1760,17 +1760,7 @@ export function PlanEditor({
 
         {!isDesktop && toolsPane}
 
-        <Panel
-          title={t('plans.yourEntries')}
-          actions={
-            <div className="flex flex-wrap items-center justify-end gap-2 text-[0.6875rem] whitespace-nowrap text-text-dim">
-              <span className="tabular-nums">{formatDuration(totalSeconds)}</span>
-              {planFinish && (
-                <span>{t('plans.projectedFinish', { date: formatLocalDate(planFinish) })}</span>
-              )}
-            </div>
-          }
-        >
+        <Panel title={t('plans.yourEntries')}>
           <div className="space-y-3">
             <LiveQueueLead
               projection={queueProjection}

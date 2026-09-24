@@ -1457,8 +1457,8 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
-    const durationHeader = () =>
-      within(queuePanel).getByText(/^\d+[dhm]/, { selector: 'header span' });
+    const summaryPanel = screen.getByText('Plan summary').closest('section')!;
+    const durationHeader = () => within(summaryPanel).getByText(/^\d+[dhm]/);
     const durationBefore = durationHeader().textContent;
 
     const select = screen.getByRole('combobox', { name: 'What-if implants' });
@@ -1499,8 +1499,8 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
-    const durationHeader = () =>
-      within(queuePanel).getByText(/^\d+[dhm]/, { selector: 'header span' });
+    const summaryPanel = screen.getByText('Plan summary').closest('section')!;
+    const durationHeader = () => within(summaryPanel).getByText(/^\d+[dhm]/);
     const durationBefore = durationHeader().textContent;
 
     await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
@@ -1707,10 +1707,14 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
     const items = await within(panel).findAllByRole('listitem');
     expect(items).toHaveLength(2);
 
-    const finishNote = within(panel).getByText(/^Finishes \d{4}-\d{2}-\d{2}$/);
-    const planFinishDate = finishNote.textContent!.replace('Finishes ', '');
+    const summary = screen.getByText('Plan summary').closest('section')!;
+    const planFinishDate = within(summary)
+      .getByText('Projected finish')
+      .parentElement!.textContent!.replace('Projected finish', '')
+      .trim();
+    expect(planFinishDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
-    // The row's own finish is the same value the panel header projects —
+    // The row's own finish is the same value the Plan summary projects —
     // one number, computed one way (#20 acceptance criterion). The separate
     // start→finish line is gone: it restated the running total a third way
     // and cost every row a line it couldn't spare on a phone.
@@ -1724,7 +1728,7 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
 
     const panel = (await screen.findByText('Your entries')).closest('section')!;
     await within(panel).findByText('No entries yet. Add a skill below.');
-    expect(within(panel).queryByText(/^Finishes/)).not.toBeInTheDocument();
+    expect(within(panel).queryByText(/Finishes/)).not.toBeInTheDocument();
   });
 });
 
