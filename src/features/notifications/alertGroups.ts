@@ -101,6 +101,10 @@ const EVENT_SEVERITY: Readonly<Partial<Record<NotificationEventId, DeadlineSever
   // group above, not "waiting on you": collateral is already forfeited by
   // the time this fires (issue #1091).
   contractFailed: 'warning',
+  // A rival is beating you right now, but it costs nothing to be a poll late
+  // fixing it (issue #1423) — same tier as the fuel/wallet standing faults
+  // above, not critical.
+  marketOrderUndercut: 'warning',
   // Waiting on you, but nothing is burning.
   spExtractionReady: 'watch',
   industryJobComplete: 'watch',

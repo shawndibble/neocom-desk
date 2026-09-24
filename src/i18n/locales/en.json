@@ -2979,6 +2979,11 @@
         "body": "Someone bought {{item}} from {{character}}.",
         "bodyWithQuantity": "Someone bought {{quantity}} x {{item}} from {{character}}."
       },
+      "marketOrderUndercut": {
+        "title": "Order undercut",
+        "sellBody": "{{character}}'s {{item}} sell order at {{price}} ISK was undercut at its station ({{rival}} ISK).",
+        "buyBody": "{{character}}'s {{item}} buy order at {{price}} ISK was outbid at its station ({{rival}} ISK)."
+      },
       "structureFuelLow": {
         "title": "Structure fuel low",
         "body": "{{character}}: {{structure}} has less than {{days}} days of fuel remaining."
@@ -3703,6 +3708,7 @@
         "planetaryExtractionDone": "Planetary Extraction Done",
         "planetaryExtractorExpiring": "Planetary Extractor Expiring",
         "marketOrderFilled": "Sell Order Filled",
+        "marketOrderUndercut": "Market Order Undercut",
         "newCalendarEvent": "New Calendar Event",
         "calendarEventStarting": "Calendar Event Starting",
         "contractAccepted": "Contract Accepted",
@@ -3718,6 +3724,7 @@
         "priceAlertTriggered": "Quickbar Price Alert"
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled for notifications — open the app at least that often to keep it current. The Planetary Industry page always shows the real expiry.",
+      "marketOrderUndercutStationOnlyHint": "Only checks your order's own station, and only while the app is open — it does not compare prices across the wider system or region.",
       "corpEventBestEffortHint": "Best-effort: fires only while the app is open. Not a substitute for in-game alerts.",
       "scheduledPushBadge": "Arrives even with the app closed — the backend schedules this one up to 72 hours ahead. Needs notification permission, and on iPhone and iPad the app installed to the home screen. Every other event needs the app open.",
       "extractorExpiringLeadTimeLabel": "Warn this far before an extractor expires:",

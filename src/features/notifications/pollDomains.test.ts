@@ -9,6 +9,7 @@ import {
   contractDomain,
   walletDomain,
   marketOrderDomain,
+  marketOrderUndercutDomain,
   structureFuelDomain,
   eveNotificationDomain,
   corpIndustryJobDomain,
@@ -24,7 +25,7 @@ import { SUBJECT_ROUTED_EVENT_IDS } from './notificationOptions';
 import { eventEntry } from './eventEntries';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { resolveNames } from '@/features/character/names';
-import { getHubPrices } from '@/market/prices';
+import { getHubPrices, getStationPrices } from '@/market/prices';
 import { useMarketHub } from '@/features/market/hub';
 import { getTradeHub } from '@/market/hubs';
 import {
@@ -93,7 +94,7 @@ vi.mock('@/features/pi/data', () => ({
   loadCharacterPlanets: vi.fn(),
   loadAllColonyDetails: vi.fn(),
 }));
-vi.mock('@/market/prices', () => ({ getHubPrices: vi.fn() }));
+vi.mock('@/market/prices', () => ({ getHubPrices: vi.fn(), getStationPrices: vi.fn() }));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
 vi.mock('@/features/character/names', () => ({ resolveNames: vi.fn() }));
 
@@ -177,6 +178,7 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
       contracts: ['contractAccepted', 'contractCompleted', 'contractFailed'],
       wallet: ['walletBalanceChanged'],
       marketOrders: ['marketOrderFilled'],
+      marketOrderUndercut: ['marketOrderUndercut'],
       eveNotification: ['eveNotification'],
       structureFuel: ['structureFuelLow'],
       corpIndustryJobs: ['corpIndustryJobReady'],
@@ -275,6 +277,136 @@ describe('deriveMarketOrderEntries', () => {
       ]
     );
     expect(entries[0]).toMatchObject({ typeId: 12345, quantity: 250 });
+  });
+});
+
+describe('marketOrderUndercutDomain', () => {
+  beforeEach(() => {
+    vi.mocked(loadOrders).mockReset();
+    vi.mocked(getStationPrices).mockReset();
+  });
+
+  it('returns null (skip this poll) on reauth or no cache, same as marketOrderDomain', async () => {
+    vi.mocked(loadOrders).mockResolvedValue({ needsReauth: true, cached: null });
+    expect(await marketOrderUndercutDomain.load(1)).toBeNull();
+    expect(getStationPrices).not.toHaveBeenCalled();
+  });
+
+  it('drops a structure-parked order entirely — never asks Fuzzwork about it (issue #1423)', async () => {
+    vi.mocked(loadOrders).mockResolvedValue(
+      statusResult([marketOrder({ order_id: 1, location_id: 1_000_000_000_001 })], false)
+    );
+    const entries = await marketOrderUndercutDomain.load(1);
+    expect(entries).toEqual([]);
+    expect(getStationPrices).not.toHaveBeenCalled();
+  });
+
+  it('groups type ids by station before pricing, and classifies each order off its own side', async () => {
+    vi.mocked(loadOrders).mockResolvedValue(
+      statusResult(
+        [
+          marketOrder({ order_id: 1, location_id: 60003760, type_id: 34, price: 100 }),
+          marketOrder({
+            order_id: 2,
+            location_id: 60003760,
+            type_id: 35,
+            price: 50,
+            is_buy_order: true,
+          }),
+        ],
+        false
+      )
+    );
+    vi.mocked(getStationPrices).mockImplementation(async (stationId, typeIds) => {
+      expect(stationId).toBe(60003760);
+      expect([...typeIds].sort()).toEqual([34, 35]);
+      return new Map([
+        [34, { sellMin: 95, buyMax: null, sellVolume: 1, buyVolume: 0 }],
+        [35, { sellMin: null, buyMax: 55, sellVolume: 0, buyVolume: 1 }],
+      ]);
+    });
+
+    const entries = await marketOrderUndercutDomain.load(1);
+    expect(entries).toEqual([
+      {
+        orderId: 1,
+        typeId: 34,
+        isBuyOrder: false,
+        locationId: 60003760,
+        price: 100,
+        state: 'beaten',
+        rivalPrice: 95,
+      },
+      {
+        orderId: 2,
+        typeId: 35,
+        isBuyOrder: true,
+        locationId: 60003760,
+        price: 50,
+        state: 'beaten',
+        rivalPrice: 55,
+      },
+    ]);
+  });
+
+  it('reads a station getStationPrices never priced (e.g. never fetched) as unknown', async () => {
+    vi.mocked(loadOrders).mockResolvedValue(
+      statusResult([marketOrder({ order_id: 1, location_id: 60003760, type_id: 34 })], false)
+    );
+    vi.mocked(getStationPrices).mockResolvedValue(new Map());
+    const entries = await marketOrderUndercutDomain.load(1);
+    expect(entries).toEqual([
+      {
+        orderId: 1,
+        typeId: 34,
+        isBuyOrder: false,
+        locationId: 60003760,
+        price: 100,
+        state: 'unknown',
+        rivalPrice: null,
+      },
+    ]);
+  });
+
+  it("folds the previous poll's baseline into the stored armed latch, so the diff fires off the same transition (toSnapshot + diff wiring)", () => {
+    const rawEntry = {
+      orderId: 1,
+      typeId: 34,
+      isBuyOrder: false,
+      locationId: 60003760,
+      price: 100,
+    };
+    const prev = marketOrderUndercutDomain.toSnapshot(
+      [{ ...rawEntry, state: 'clear', rivalPrice: 105 }],
+      1000
+    );
+    const next = marketOrderUndercutDomain.toSnapshot(
+      [{ ...rawEntry, state: 'beaten', rivalPrice: 95 }],
+      2000,
+      prev
+    );
+    expect(next).toMatchObject({
+      nowMs: 2000,
+      entries: [{ ...rawEntry, state: 'beaten', rivalPrice: 95, armed: false }],
+    });
+    expect(
+      marketOrderUndercutDomain.diff(
+        1,
+        prev,
+        next,
+        new Set<NotificationEventId>(['marketOrderUndercut'])
+      )
+    ).toEqual([
+      {
+        eventId: 'marketOrderUndercut',
+        characterId: 1,
+        orderId: 1,
+        typeId: 34,
+        isBuyOrder: false,
+        price: 100,
+        rivalPrice: 95,
+      },
+    ]);
   });
 });
 
@@ -1055,6 +1187,7 @@ describe('copy wiring', () => {
           contractId: 1,
           jobId: 1,
           memberCharacterId: 1,
+          orderId: 1,
         } as never) !== undefined
     );
     expect([...routed].sort()).toEqual([...SUBJECT_ROUTED_EVENT_IDS].sort());
