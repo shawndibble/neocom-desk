@@ -69,7 +69,7 @@ export function VerbTag({ verb }: { verb: DirectiveVerb }) {
   const { t } = useTranslation();
   return (
     <span
-      className={`inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border px-1.5 text-[0.625rem] font-bold tracking-widest uppercase ${VERB_CLASS[verb]}`}
+      className={`inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border px-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase ${VERB_CLASS[verb]}`}
     >
       {t(`piAdvisor.verb.${verb}`)}
     </span>
@@ -227,7 +227,7 @@ export function SectionLabel({ children }: { children: ReactNode }) {
 export function EstimateBadge() {
   const { t } = useTranslation();
   return (
-    <span className="inline-flex h-4 shrink-0 items-center rounded-xs border border-warning/60 px-1 text-[0.625rem] font-semibold tracking-widest text-warning uppercase">
+    <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-warning/60 px-1.5 text-[0.6875rem] font-semibold tracking-widest text-warning uppercase">
       {t('piAdvisor.estimateBadge')}
     </span>
   );

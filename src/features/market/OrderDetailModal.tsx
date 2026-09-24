@@ -279,7 +279,7 @@ function ScopeRow({
     <span role="rowheader" className={cx(CELL, 'pl-3')}>
       <span
         className={cx(
-          'inline-flex h-5 w-fit items-center rounded-xs border px-1.5 text-[0.625rem] font-semibold tracking-widest uppercase',
+          'inline-flex h-5 w-fit items-center rounded-xs border px-1.5 text-[0.6875rem] font-semibold tracking-widest uppercase',
           SCOPE_PILL[scope]
         )}
       >

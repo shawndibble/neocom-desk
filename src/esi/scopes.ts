@@ -1,7 +1,10 @@
 /**
- * ESI OAuth scopes for Neocom Desk v1. Read-only by design (see CONTEXT.md),
- * with one narrow, explicit exception: `esi-mail.organize_mail.v1` marks a
- * mail read on ESI when it's opened here. Every other scope below is a read.
+ * ESI OAuth scopes for Neocom Desk v1. Reads by design (see CONTEXT.md), with
+ * three narrow, user-triggered writes: `esi-mail.organize_mail.v1` marks a
+ * mail read on ESI when it's opened here, `esi-calendar.respond_calendar_events.v1`
+ * sends an RSVP, and `esi-mail.send_mail.v1` sends a reply or forward. Every
+ * other scope below is a read — `esi-planets.manage_planets.v1` included,
+ * whatever its name says.
  * `esi-markets.structure_markets.v1` (issue #538) is opt-in only — behind the
  * `structureMarkets` group, never the Base Grant — since checking a player
  * structure's own market is a need almost nobody's orders have.
