@@ -15,6 +15,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, Spinner, TextInput } from '@/components/ui';
+import { fieldBaseClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import {
@@ -442,7 +443,7 @@ export function MailComposeBox({
           setBody(e.target.value);
         }}
         rows={8}
-        className="w-full rounded-xs border border-line bg-panel-2 p-2 text-sm text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent"
+        className={`${fieldBaseClassName} w-full p-2 text-sm`}
       />
 
       {error && <p className="text-xs text-danger">{error}</p>}

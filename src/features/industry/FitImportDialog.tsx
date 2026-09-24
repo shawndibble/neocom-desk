@@ -11,6 +11,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal } from '@/components/ui';
+import { fieldBaseClassName } from '@/components/ui/controlStyles';
 import { readFromClipboard } from '@/lib/clipboard';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import type { BlueprintCatalog } from './blueprintCatalog';
@@ -70,7 +71,7 @@ export function FitImportDialog({ catalog, onApply, onClose }: FitImportDialogPr
             setPreview(null);
           }}
           rows={10}
-          className="w-full rounded-xs border border-line bg-panel-2 p-2 font-mono text-xs text-text"
+          className={`${fieldBaseClassName} w-full p-2 font-mono text-xs`}
         />
 
         <div className="flex flex-wrap items-center gap-2">

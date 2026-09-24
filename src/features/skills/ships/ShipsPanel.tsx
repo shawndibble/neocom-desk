@@ -15,6 +15,7 @@ import {
   Spinner,
   StatChip,
 } from '@/components/ui';
+import { fieldBaseClassName } from '@/components/ui/controlStyles';
 import { formatDuration } from '@/lib/duration';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { readFromClipboard } from '@/lib/clipboard';
@@ -341,7 +342,7 @@ export function ShipsPanel({
                 setFit({ kind: 'idle' });
               }}
               rows={6}
-              className="w-full rounded-xs border border-line bg-panel-2 p-2 text-xs text-text"
+              className={`${fieldBaseClassName} w-full p-2 text-xs`}
               placeholder={t('skills.fitCheck.pastePlaceholder')}
             />
             <div className="flex flex-wrap items-center gap-2">

@@ -18,6 +18,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, TextInput } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { PlanBooster } from '@/db';
 import { buildMarketGroupParams } from '@/engine/market/urlState';
@@ -197,7 +198,7 @@ function BoosterRow({
                 onClick={() =>
                   patch({ expiresAt: boosterExpiryFromNow(hours, row.startsAt ?? Date.now()) })
                 }
-                className="min-h-7 rounded-xs border border-line px-1.5 text-[0.6875rem] text-text-dim hover:border-line-bright hover:text-text"
+                className={`${tappableRowClassName} rounded-xs border border-line px-1.5 text-[0.6875rem] text-text-dim hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
               >
                 {hours % 24 === 0
                   ? t('plans.boosterQuickPickDays', { days: hours / 24 })
