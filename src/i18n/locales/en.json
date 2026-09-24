@@ -1074,12 +1074,12 @@
     "permissionsHint": "Signing in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, corporation roles, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions.",
     "writeExceptions": "It also asks for three permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; and replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client. Nothing else in the app writes to EVE.",
     "eyebrow": "Free · Open source · Runs in your browser",
-    "heading": "The math you'd do in a spreadsheet, already done.",
+    "heading": "Answers, not API dumps.",
     "trustLine": "It never trades or touches your colonies. Your refresh token never leaves this device.",
     "previewLabel": "Example — signed-in view",
     "previewCorp": "Deep Space Transport",
     "answersHeading": "The questions it exists to answer",
-    "answersLead": "Not another dump of what the API returned. Each of these is a page you open after signing in, with the number already worked out.",
+    "answersLead": "Each of these is a page you open after signing in, with the number you would have worked out by hand already worked out.",
     "answers": {
       "attention": {
         "question": "Which character needs my attention?",

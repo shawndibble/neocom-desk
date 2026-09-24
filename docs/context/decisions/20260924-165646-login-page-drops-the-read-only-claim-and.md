@@ -15,8 +15,7 @@ Supersedes parts of `20260907-010343-login-page-sells-the-shipped-product-and-a.
 
 - **The headline sells the worked-out answer, not multi-character.** Handling
   several characters is table stakes among EVE tools and the page already said
-  it five times. The hero now leads with "the math you'd do in a spreadsheet,
-  already done"; multi-character stays in the tagline and is backed by a
+  it five times. The hero now leads with "Answers, not API dumps."; multi-character stays in the tagline and is backed by a
   question ("Which character needs my attention?") rather than repeated.
 
 - **The moon-rental question is dropped.** "Who owes what on the moon rental"

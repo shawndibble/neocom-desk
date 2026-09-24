@@ -76,7 +76,7 @@ describe('Login', () => {
     renderLogin();
     expect(
       await screen.findByRole('heading', {
-        name: /the math you'd do in a spreadsheet, already done/i,
+        name: /answers, not api dumps/i,
       })
     ).toBeInTheDocument();
     expect(screen.getByText('Neocom Desk')).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe('Login', () => {
   it('links the footer "Free & open source" text to the repo', async () => {
     renderLogin();
     await screen.findByRole('heading', {
-      name: /the math you'd do in a spreadsheet, already done/i,
+      name: /answers, not api dumps/i,
     });
     expect(screen.getByRole('link', { name: /free & open source/i })).toHaveAttribute(
       'href',
