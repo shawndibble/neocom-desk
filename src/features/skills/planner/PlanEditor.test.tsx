@@ -8,12 +8,23 @@ import type { SkillType } from '@/sde/types';
 import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
 import type { SkillPlanRecord } from '@/db';
 import type { CachedResult } from '@/features/skills/data';
-import type { CharacterAttributes } from '@/esi/endpoints';
+import type { CharacterAttributes, SkillQueueEntry } from '@/esi/endpoints';
 import { buildUnlockIndex } from '@/engine/skillUnlocks';
 import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import type { SkillCatalog } from '../skillMap';
 import type { RemapAvailability } from './remapAvailability';
 import { PlanEditor } from './PlanEditor';
+
+const loadCharacterSkillQueue =
+  vi.fn<(characterId: number) => Promise<CachedResult<SkillQueueEntry[]> | null>>();
+
+vi.mock('../data', () => ({
+  loadCharacterSkillQueue: (characterId: number) => loadCharacterSkillQueue(characterId),
+}));
+
+function queueResult(entries: SkillQueueEntry[]): CachedResult<SkillQueueEntry[]> {
+  return { data: entries, fetchedAt: new Date(), fromCache: false, truncated: false };
+}
 
 function skill(overrides: Partial<SkillType> & Pick<SkillType, 'typeID' | 'name'>): SkillType {
   return {
@@ -474,6 +485,22 @@ describe('PlanEditor tools pane', () => {
     expect(
       within(entriesPanel).getByText(/^([A-Z]{3} \d+)( \/ [A-Z]{3} \d+){4}$/)
     ).toBeInTheDocument();
+  });
+
+  it('starts the plan when the live queue ends and shows the queue as a collapsed lead line (#1403)', () => {
+    renderEditor(vi.fn(), {
+      queueEntries: [
+        {
+          skill_id: 999999,
+          queue_position: 0,
+          finished_level: 3,
+          start_date: '2098-12-01T00:00:00Z',
+          finish_date: '2099-01-01T12:00:00Z',
+        },
+      ],
+    });
+    expect(screen.getByText(/Finishes 2099-01-0/)).toBeInTheDocument();
+    expect(screen.getByText(/In-game queue: 1 skill, finishes 2099-01-0/)).toBeInTheDocument();
   });
 
   it("costs the plan's total training time and finish date per marker segment, not just the savings badge (#1232)", async () => {
@@ -1450,6 +1477,185 @@ describe('yearly remap on cooldown (#1404)', () => {
     renderEditor(vi.fn(), { plan: { ...PLAN, remapCount: 0 }, remapInfo });
 
     expect(screen.getByText('Remap savings')).toBeInTheDocument();
+  });
+});
+
+describe('queue import into a non-empty plan asks Append or Replace (#1402)', () => {
+  beforeEach(() => {
+    loadCharacterSkillQueue.mockReset();
+  });
+
+  it('imports straight in, with no Modal, when the plan is empty', async () => {
+    loadCharacterSkillQueue.mockResolvedValue(
+      queueResult([{ skill_id: 20, finished_level: 3, queue_position: 0 }])
+    );
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor(vi.fn(), { plan: { ...PLAN, entries: [] } });
+
+    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+
+    await waitFor(() =>
+      expect(onUpdate).toHaveBeenCalledWith({ entries: [{ skillTypeID: 20, targetLevel: 3 }] })
+    );
+    expect(screen.queryByText('Append')).not.toBeInTheDocument();
+  });
+
+  it('opens the choice Modal instead of changing anything, for a non-empty plan', async () => {
+    loadCharacterSkillQueue.mockResolvedValue(
+      queueResult([{ skill_id: 20, finished_level: 3, queue_position: 0 }])
+    );
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+
+    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+
+    await waitFor(() => expect(screen.getByText(/in-game queue has 1 skill/i)).toBeInTheDocument());
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('Append keeps every existing entry and adds only the new level', async () => {
+    loadCharacterSkillQueue.mockResolvedValue(
+      queueResult([{ skill_id: 20, finished_level: 3, queue_position: 0 }])
+    );
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+
+    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
+    await user.click(screen.getByRole('button', { name: 'Append' }));
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      entries: [
+        { skillTypeID: 10, targetLevel: 1 },
+        { skillTypeID: 20, targetLevel: 1, priority: 'high' },
+        { skillTypeID: 20, targetLevel: 3 },
+      ],
+    });
+  });
+
+  it('Replace swaps the entries and clears Remap Markers', async () => {
+    loadCharacterSkillQueue.mockResolvedValue(
+      queueResult([{ skill_id: 20, finished_level: 3, queue_position: 0 }])
+    );
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor(vi.fn(), { plan: { ...PLAN, markers: [1] } });
+
+    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
+    await user.click(screen.getByRole('button', { name: 'Replace plan' }));
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      entries: [{ skillTypeID: 20, targetLevel: 3 }],
+      markers: [],
+      markerAttributes: [],
+    });
+  });
+
+  it('Undo restores the prior entries and markers exactly', async () => {
+    loadCharacterSkillQueue.mockResolvedValue(
+      queueResult([{ skill_id: 20, finished_level: 3, queue_position: 0 }])
+    );
+    const user = userEvent.setup();
+    const originalPlan = { ...PLAN, markers: [1] };
+    const { onUpdate } = renderEditor(vi.fn(), { plan: originalPlan });
+
+    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
+    await user.click(screen.getByRole('button', { name: 'Replace plan' }));
+
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+
+    expect(onUpdate).toHaveBeenLastCalledWith({
+      entries: originalPlan.entries,
+      markers: originalPlan.markers,
+      // `?? []`, not the fixture's `undefined` field itself — the snapshot
+      // normalizes an absent marker-attributes list the same way a Replace's
+      // own write already does, so a sync write never carries an explicit
+      // `undefined` value (Firestore rejects those).
+      markerAttributes: originalPlan.markerAttributes ?? [],
+    });
+  });
+
+  it('an empty queue never replaces or empties the plan', async () => {
+    loadCharacterSkillQueue.mockResolvedValue(queueResult([]));
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+
+    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+
+    await waitFor(() =>
+      expect(screen.getByText(/in-game skill queue is empty/i)).toBeInTheDocument()
+    );
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('a later Append clears a stale Undo from an earlier Replace', async () => {
+    loadCharacterSkillQueue
+      .mockResolvedValueOnce(queueResult([{ skill_id: 20, finished_level: 3, queue_position: 0 }]))
+      .mockResolvedValueOnce(queueResult([{ skill_id: 20, finished_level: 4, queue_position: 0 }]));
+    const user = userEvent.setup();
+    renderEditor();
+
+    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
+    await user.click(screen.getByRole('button', { name: 'Replace plan' }));
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
+    await user.click(screen.getByRole('button', { name: 'Append' }));
+
+    // The Append confirmation must not carry the earlier Replace's Undo —
+    // clicking it would silently revert everything since, including this
+    // Append (#1402).
+    expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument();
+  });
+
+  it('disables the Import button while a fetch is already in flight', async () => {
+    let resolveQueue: (value: CachedResult<SkillQueueEntry[]>) => void = () => {};
+    loadCharacterSkillQueue.mockReturnValue(
+      new Promise((resolve) => {
+        resolveQueue = resolve;
+      })
+    );
+    const user = userEvent.setup();
+    renderEditor();
+
+    const importButton = screen.getByRole('button', { name: 'Import from skill queue' });
+    await user.click(importButton);
+    expect(importButton).toBeDisabled();
+
+    resolveQueue(queueResult([]));
+    await waitFor(() => expect(importButton).not.toBeDisabled());
+  });
+
+  it('drops a fetch that resolves after the user has switched to a different plan', async () => {
+    let resolveQueue: (value: CachedResult<SkillQueueEntry[]>) => void = () => {};
+    loadCharacterSkillQueue.mockReturnValue(
+      new Promise((resolve) => {
+        resolveQueue = resolve;
+      })
+    );
+    const user = userEvent.setup();
+    const { onUpdate, replacePlan } = renderEditor();
+
+    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+
+    // Switched to a different plan while the fetch for plan-1 is still in
+    // flight — this component has no key={plan.id} at the route, so the same
+    // instance stays mounted and just re-renders with new props.
+    replacePlan(() => ({ ...PLAN, id: 'plan-2' }));
+    onUpdate.mockClear();
+
+    await act(async () => {
+      resolveQueue(queueResult([{ skill_id: 20, finished_level: 3, queue_position: 0 }]));
+      await Promise.resolve();
+    });
+
+    // Neither the choice Modal (which would let Append/Replace merge plan-1's
+    // fetch into plan-2's entries) nor any write ever lands (#1402).
+    expect(screen.queryByText(/in-game queue has/i)).not.toBeInTheDocument();
+    expect(onUpdate).not.toHaveBeenCalled();
   });
 });
 

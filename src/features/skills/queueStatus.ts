@@ -265,3 +265,36 @@ export function completedSpGain(
   }
   return gain;
 }
+
+export interface QueueEndProjection {
+  /** When the plan can start: the last queued finish, or `nowMs` when there is nothing to wait for. */
+  startMs: number;
+  /** Trained skills as of `startMs`, every queued level counted as done. */
+  trained: Map<number, TrainedSkill>;
+  /** The levels still to finish, in queue order. */
+  queuedLevels: SkillQueueEntry[];
+  paused: boolean;
+}
+
+/**
+ * Where a Skill Plan starts: the in-game queue trains first (ESI has no
+ * write endpoint), so the plan begins when it runs dry. A paused or empty
+ * queue leaves nothing to wait for — an absent date is not a future date.
+ */
+export function projectQueueEnd(
+  trained: ReadonlyMap<number, TrainedSkill>,
+  entries: readonly SkillQueueEntry[],
+  nowMs: number
+): QueueEndProjection {
+  const paused = isQueuePaused(entries);
+  const queued = classifySkillQueue(entries, nowMs)
+    .filter((row) => row.secondsRemaining !== null)
+    .map((row) => row.entry);
+  const startMs = queued.reduce((max, e) => Math.max(max, finishMs(e) ?? max), nowMs);
+  return {
+    startMs,
+    trained: applyCompletedQueueEntries(trained, entries, startMs),
+    queuedLevels: queued,
+    paused,
+  };
+}
