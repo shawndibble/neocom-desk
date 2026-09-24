@@ -446,6 +446,22 @@ describe('Market Browser', () => {
     expect(within(buyTable).getByText('500,000.00')).toBeInTheDocument();
   });
 
+  it('focuses the item panel heading on selection, and the tree row on Back (issue #1485)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rift');
+    const treeRow = (await screen.findByText('Rifter')).closest('button');
+    expect(treeRow).not.toBeNull();
+    await user.click(treeRow as HTMLButtonElement);
+
+    const heading = await screen.findByRole('heading', { name: 'Rifter' });
+    expect(heading).toHaveFocus();
+
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(treeRow).toHaveFocus());
+  });
+
   it('an ESI failure shows a failed state, not an empty book and not a spinner', async () => {
     // `getOrderBook` throws on any ESI failure. The fetch effect once let
     // that reject into nothing and spun forever; the fix after that read the

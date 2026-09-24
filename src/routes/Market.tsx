@@ -46,6 +46,7 @@ import {
   type MarketTreeFilterResult,
 } from '@/features/market/marketTree';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useFocusHeading } from '@/lib/useFocusHeading';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemPriceAlertBell } from '@/features/market/ItemPriceAlertBell';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
@@ -425,6 +426,11 @@ function MarketGroupTree({
                       type="button"
                       onClick={() => onSelect(item.typeId)}
                       style={{ paddingLeft: `${(depth + 1) * 0.75 + 0.75}rem` }}
+                      // Read back on Back-to-finder (issue #1485), to return focus
+                      // to the row that opened the item panel — `data-` rather
+                      // than an id/ref, since the tree fully unmounts/remounts
+                      // whenever a search collapses or re-expands a group.
+                      data-tree-item-id={item.typeId}
                       aria-current={selectedTypeId === item.typeId ? 'true' : undefined}
                       className={`flex min-h-11 w-full items-center gap-1.5 truncate py-1 text-left text-xs hover:text-accent md:min-h-0 ${
                         selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
@@ -589,6 +595,41 @@ export function Market() {
     }
   }, [location.state]);
 
+  // Focus management for the finder <-> item panel swap below the `lg:`
+  // breakpoint (issue #1485): selecting an item hides the finder and shows
+  // the item panel with no focus cue, and Back does the reverse. `enabled:
+  // !isDesktop`, not folded into the key, since on desktop both panels stay
+  // on screen (the row/button that was clicked keeps its own focus) — and
+  // `isDesktop` itself flips on a plain resize/rotation, independent of any
+  // selection, so folding it into the key would read that resize as a fresh
+  // selection and steal focus the pilot never asked to move.
+  const itemHeadingRef = useRef<HTMLHeadingElement>(null);
+  useFocusHeading(itemHeadingRef, selectedTypeId, !isDesktop);
+
+  // The finder Panel's own root, so Back can look up the tree button the
+  // item was opened from without a global `document.querySelector` risking a
+  // same-id match elsewhere (the Quickbar list also renders per-typeId rows).
+  const finderPanelRef = useRef<HTMLElement>(null);
+  // The item that was open when Back was pressed — read once by the effect
+  // below, then cleared, so an unrelated `selectedTypeId` change (e.g. a
+  // fresh deep link) never triggers a focus restore that wasn't asked for.
+  const backToFinderTypeIdRef = useRef<number | null>(null);
+  function handleBackToFinderAndRestoreFocus() {
+    backToFinderTypeIdRef.current = selectedTypeId;
+    handleBackToFinder();
+  }
+  useEffect(() => {
+    if (selectedTypeId !== null) return;
+    const wantedTypeId = backToFinderTypeIdRef.current;
+    if (wantedTypeId === null) return;
+    backToFinderTypeIdRef.current = null;
+    const treeButton = finderPanelRef.current?.querySelector<HTMLElement>(
+      `[data-tree-item-id="${wantedTypeId}"]`
+    );
+    if (treeButton) treeButton.focus();
+    else searchInputRef.current?.focus();
+  }, [selectedTypeId]);
+
   // Held here rather than inside `AppraisalPanel` so a pasted list survives a
   // trip to the Browser tab, and so the header's refresh button can drive it.
   const appraisal = useAppraisal(effectiveHub, pricePercent, activeCharacterId);
@@ -723,7 +764,7 @@ export function Market() {
       size="sm"
       icon={<Icon.Back />}
       label={t('market.backToFinder')}
-      onClick={handleBackToFinder}
+      onClick={handleBackToFinderAndRestoreFocus}
     />
   ) : undefined;
 
@@ -896,7 +937,10 @@ export function Market() {
 
       {tab === 'browser' && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
-          <Panel className={isDesktop || selectedTypeId === null ? '' : 'hidden'}>
+          <Panel
+            ref={finderPanelRef}
+            className={isDesktop || selectedTypeId === null ? '' : 'hidden'}
+          >
             <SearchInput
               ref={searchInputRef}
               value={query}
@@ -972,6 +1016,7 @@ export function Market() {
           <Panel
             className={isDesktop || selectedTypeId !== null ? '' : 'hidden'}
             title={selectedItem?.name}
+            headingRef={itemHeadingRef}
             meta={
               selectedItem &&
               selectedTypeId !== null && (

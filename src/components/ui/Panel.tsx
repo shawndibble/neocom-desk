@@ -1,7 +1,15 @@
-import { forwardRef, type CSSProperties, type ReactNode } from 'react';
+import { forwardRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
 
 interface PanelProps {
   title?: string;
+  /**
+   * Exposes the title's own `<h2>` node (tabbable via `tabIndex={-1}` whenever
+   * this is set), for a caller that needs to move focus onto it — e.g.
+   * Market's item panel, a list-to-detail view where the control that opened
+   * this panel disappears on the same render (issue #1485). Left unset, the
+   * header renders exactly as before.
+   */
+  headingRef?: RefObject<HTMLHeadingElement | null>;
   actions?: ReactNode;
   /**
    * Sits to the left of the title, inside the same left-hand group. For a
@@ -67,6 +75,7 @@ interface PanelProps {
 export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
   {
     title,
+    headingRef,
     actions,
     actionsFill = false,
     leading,
@@ -100,7 +109,11 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
             <div className="flex min-w-0 items-center gap-2">
               {leading}
               {title && (
-                <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                <h2
+                  ref={headingRef}
+                  tabIndex={headingRef ? -1 : undefined}
+                  className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                >
                   {title}
                 </h2>
               )}
