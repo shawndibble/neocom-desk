@@ -629,14 +629,14 @@ describe('AppraisalPanel — Copy sell list', () => {
     expect(copyButton()).toBeDisabled();
   });
 
-  it('copies one name/quantity/price line per sellable item, ignoring Price Percent', async () => {
+  it('copies one name/price line per sellable item, no quantity, ignoring Price Percent', async () => {
     const written: string[] = [];
     configureClipboard(async (text) => {
       written.push(text);
     });
     renderPanel({ controller: controller({ result: SELL_LIST_OUTCOME }) });
     await userEvent.click(copyButton());
-    expect(written).toEqual(['Damage Control II\t3\t511900\nCivilian Gatling Railgun\t4\t999.90']);
+    expect(written).toEqual(['Damage Control II\t511900\nCivilian Gatling Railgun\t999.90']);
     configureClipboard(null);
   });
 });
