@@ -151,8 +151,7 @@ export function PlanListPane({
         // the window, not a fixed number of rows.
         className={height === 'sidebar' ? 'max-h-[40vh] overflow-y-auto' : 'overflow-y-auto'}
         style={
-          // Desktop-only, like the editor route's own list pane
-          // (`PlanEditor.tsx`): below `lg` this cap ignores the fixed mobile
+          // Desktop-only: below `lg` this cap ignores the fixed mobile
           // tab bar (it measures `window.innerHeight`, which the bar overlays
           // rather than shrinks), sizing the scroller past the visible area
           // and hiding its bottom rows behind the bar (#1096). `<main>`

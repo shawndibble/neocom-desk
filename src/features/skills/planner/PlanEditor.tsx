@@ -34,10 +34,6 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
-import {
-  useViewportBoundedHeight,
-  VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
-} from '@/lib/useViewportBoundedHeight';
 import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
 import {
   milestoneKey,
@@ -245,8 +241,7 @@ export function PlanEditor({
 }: PlanEditorProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  // Which side the tools pane lands on, and whether the entry list gets its
-  // own capped scroller — the same hook the rest of the app's two-column
+  // Which side the tools pane lands on — the same hook the rest of the app's two-column
   // layouts switch on, so this pane can never disagree with them.
   const isDesktop = useIsDesktop();
   const [copyConfirm, setCopyConfirm] = useState(false);
@@ -318,14 +313,6 @@ export function PlanEditor({
     skillTypeID: number;
     targetLevel: number;
   } | null>(null);
-
-  // The entry list is the only thing that scrolls independently: it gets a
-  // live-measured cap so it fills the room actually left below it, while the
-  // summary strip and the sidebar beside it stay put. That replaces the pair
-  // of sticky panels this pane used to run (#221/#229), whose offsets had to
-  // be measured off each other's rendered height and drifted apart whenever
-  // either one's content changed height.
-  const [listScrollerRef, listMaxHeight] = useViewportBoundedHeight(VIEWPORT_BOUNDED_BOTTOM_GAP_PX);
 
   // "Columns" control (#114): a device-local view preference, applying the
   // same way across every plan on this device rather than per-plan.
@@ -495,13 +482,13 @@ export function PlanEditor({
     [plan.markers, plan.markerAttributes, plan.entries.length]
   );
 
-  // The in-game queue trains first, so the plan starts when it ends and every
-  // queued level counts as trained by then. One instant feeds the schedule,
+  // The queue's lead (the levels ahead of the first one this plan lists)
+  // trains first, so the plan starts when it ends. One instant feeds the schedule,
   // Optimize Remaps' Booster origin, so the savings figure and the total agree.
   const [loadedAtMs] = useState(() => Date.now());
   const queueProjection = useMemo(
-    () => projectQueueEnd(trainedSkills, queueEntries, loadedAtMs),
-    [trainedSkills, queueEntries, loadedAtMs]
+    () => projectQueueEnd(trainedSkills, queueEntries, loadedAtMs, plan.entries),
+    [trainedSkills, queueEntries, loadedAtMs, plan.entries]
   );
   // Costed by `schedulePlan`, the same call the Calendar makes, so the two
   // can never quote different dates for one plan.
@@ -1963,52 +1950,38 @@ export function PlanEditor({
                 </>
               }
             />
-            {/* Outside the scroller, so a refusal is on screen wherever in a
-                long queue the drag happened. */}
             {dropError && (
               <p role="alert" className="text-xs text-danger">
                 {dropError}
               </p>
             )}
             {promoteConfirm && confirmation(promoteConfirm)}
-            {/* Only the list scrolls: the panel header, the view controls and
-                the picker above stay put, so adding a skill never means
-                scrolling back up past a long queue to reach the field. The
-                cap is measured live against the viewport, and applies at `lg`
-                only — below it the page itself scrolls and a nested scroller
-                would just trap the list inside one. */}
-            <div
-              ref={listScrollerRef}
-              className="lg:overflow-y-auto"
-              style={isDesktop && listMaxHeight !== null ? { maxHeight: listMaxHeight } : undefined}
-            >
-              {error ? (
-                <p className="text-xs text-danger">{t('plans.computeError', { message: error })}</p>
-              ) : (
-                <EntryList
-                  rows={mergedRows}
-                  bandsAt={bandsAt}
-                  nameFor={nameFor}
-                  attributesFor={attributesFor}
-                  columns={columnVisibility}
-                  boostedSteps={boostedSteps}
-                  alphaCappedSteps={alphaCappedSteps}
-                  startDate={startDate}
-                  onReorder={handleDrop}
-                  onPromotePrereq={handlePromotePrereq}
-                  onRemove={requestRemoveEntry}
-                  onRemoveMarker={handleRemoveMarker}
-                  markerAttributesFor={markerAttributesFor}
-                  markerImplants={effectiveImplants}
-                  onEditMarker={setEditingMarkerIndex}
-                  onSetPriority={handleSetPriority}
-                  milestoneStatusFor={milestoneStatusFor}
-                  onAddMilestone={handleAddMilestone}
-                  onRenameMilestone={handleRenameMilestone}
-                  onRemoveMilestone={handleRemoveMilestone}
-                />
-              )}
-            </div>
+            {error ? (
+              <p className="text-xs text-danger">{t('plans.computeError', { message: error })}</p>
+            ) : (
+              <EntryList
+                rows={mergedRows}
+                bandsAt={bandsAt}
+                nameFor={nameFor}
+                attributesFor={attributesFor}
+                columns={columnVisibility}
+                boostedSteps={boostedSteps}
+                alphaCappedSteps={alphaCappedSteps}
+                startDate={startDate}
+                onReorder={handleDrop}
+                onPromotePrereq={handlePromotePrereq}
+                onRemove={requestRemoveEntry}
+                onRemoveMarker={handleRemoveMarker}
+                markerAttributesFor={markerAttributesFor}
+                markerImplants={effectiveImplants}
+                onEditMarker={setEditingMarkerIndex}
+                onSetPriority={handleSetPriority}
+                milestoneStatusFor={milestoneStatusFor}
+                onAddMilestone={handleAddMilestone}
+                onRenameMilestone={handleRenameMilestone}
+                onRemoveMilestone={handleRemoveMilestone}
+              />
+            )}
           </div>
         </Panel>
       </PlanEditorLayout>

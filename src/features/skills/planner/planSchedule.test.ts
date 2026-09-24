@@ -93,14 +93,28 @@ describe('schedulePlan', () => {
     expect(got.totalSeconds).toBeLessThan(bare.totalSeconds);
   });
 
-  it('starts where the live queue ends and counts queued levels as trained', () => {
+  it('starts where the live queue ends for skills the plan does not list', () => {
     const queueEnd = NOW + 2 * 3_600_000;
     const s = schedulePlan(
       { entries: [entry(10, 2)] },
-      inputs({ queueEntries: [queued(queueEnd)] }),
+      inputs({ queueEntries: [{ ...queued(queueEnd), skill_id: 99 }] }),
       NOW
     );
     expect(s.startDate.getTime()).toBe(queueEnd);
-    expect(s.scheduled.map((step) => `${step.skillTypeID}:${step.level}`)).toEqual(['10:2']);
+    expect(s.scheduled.map((step) => `${step.skillTypeID}:${step.level}`)).toEqual([
+      '10:1',
+      '10:2',
+    ]);
+  });
+
+  it('costs a plan that mirrors the live queue in full, from now', () => {
+    const s = schedulePlan(
+      { entries: [entry(10, 2)] },
+      inputs({ queueEntries: [queued(NOW + 2 * 3_600_000)] }),
+      NOW
+    );
+    expect(s.startDate.getTime()).toBe(NOW);
+    expect(s.totalSeconds).toBeGreaterThan(0);
+    expect(s.scheduled).toHaveLength(2);
   });
 });

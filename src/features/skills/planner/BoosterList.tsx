@@ -91,6 +91,8 @@ interface BoosterRowProps {
   row: PlanBooster;
   rowKey: string;
   detectedAccelerator: number | null;
+  /** Whether this row shows its Starts field. */
+  showStart: boolean;
   overlaps: boolean;
   onPatch: (patch: Partial<PlanBooster>) => boolean;
   onRemove: () => void;
@@ -100,6 +102,7 @@ function BoosterRow({
   row,
   rowKey,
   detectedAccelerator,
+  showStart,
   overlaps,
   onPatch,
   onRemove,
@@ -163,18 +166,20 @@ function BoosterRow({
               className="field-no-spinner w-16 text-center"
             />
           </label>
-          <label className="flex items-center justify-between gap-2">
-            {t('plans.boosterStartsAt')}
-            <TextInput
-              size="md"
-              type="datetime-local"
-              placeholder={t('plans.boosterStartsNow')}
-              value={startsAtField.inputValue}
-              onChange={(e) => startsAtField.onChange(e.target.value)}
-              onBlur={startsAtField.onBlur}
-              className="min-w-0 flex-1"
-            />
-          </label>
+          {showStart && (
+            <label className="flex items-center justify-between gap-2">
+              {t('plans.boosterStartsAt')}
+              <TextInput
+                size="md"
+                type="datetime-local"
+                placeholder={t('plans.boosterStartsNow')}
+                value={startsAtField.inputValue}
+                onChange={(e) => startsAtField.onChange(e.target.value)}
+                onBlur={startsAtField.onBlur}
+                className="min-w-0 flex-1"
+              />
+            </label>
+          )}
           <label className="flex items-center justify-between gap-2">
             {t('plans.boosterExpiresAt')}
             <TextInput
@@ -269,6 +274,8 @@ export function BoosterList({ boosters, detectedAccelerator, onChange }: Booster
             rowKey={`booster-${index}`}
             row={row}
             detectedAccelerator={detectedAccelerator}
+            // A start only matters for an accelerator queued behind another.
+            showStart={index > 0 || row.startsAt !== null}
             overlaps={overlaps}
             onPatch={(patch) => patchRow(index, patch)}
             onRemove={() => removeRow(index)}
