@@ -125,7 +125,10 @@
       "close": "Close"
     },
     "detail": {
-      "title": "Skill Detail"
+      "title": "Skill Detail",
+      "loadFailedHint": "Something went wrong loading this skill. Try again.",
+      "notFoundTitle": "Skill not found",
+      "notFoundHint": "This skill isn't in the skill catalog."
     },
     "contextMenu": {
       "addToSkillPlan": "Add to Skill Plan",
@@ -1416,6 +1419,7 @@
     },
     "loadFailedTitle": "Could not load",
     "loadFailedHint": "Something went wrong fetching this. Try Refresh.",
+    "retry": "Try again",
     "spaceOption": {
       "highsec": "Highsec",
       "lowsec": "Lowsec",
