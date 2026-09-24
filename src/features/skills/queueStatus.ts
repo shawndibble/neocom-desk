@@ -1,5 +1,5 @@
 import type { CharacterSkill, SkillQueueEntry } from '@/esi/endpoints';
-import type { TrainedSkill } from '@/engine/types';
+import type { PlanEntry, TrainedSkill } from '@/engine/types';
 
 /**
  * What a row of the in-game queue is doing as of a given instant.
@@ -287,20 +287,39 @@ export interface QueueEndProjection {
  * Where a Skill Plan starts: the in-game queue trains first (ESI has no
  * write endpoint), so the plan begins when it runs dry. A paused or empty
  * queue leaves nothing to wait for — an absent date is not a future date.
+ *
+ * `planEntries` are the plan's own entries. The queue trains in order, so
+ * only the part ahead of the first level the plan lists is waited on and
+ * counted as trained; from that level on the plan costs its own entries.
+ * Otherwise a plan copied from the in-game queue reads as finished (0m, no
+ * skills left), and one sharing most of it counts the shared levels twice:
+ * once inside the queue's end date and again as plan steps.
  */
 export function projectQueueEnd(
   trained: ReadonlyMap<number, TrainedSkill>,
   entries: readonly SkillQueueEntry[],
-  nowMs: number
+  nowMs: number,
+  planEntries: readonly PlanEntry[] = []
 ): QueueEndProjection {
   const paused = isQueuePaused(entries);
-  const queued = classifySkillQueue(entries, nowMs)
+  const planned = new Map<number, number>();
+  for (const p of planEntries) {
+    planned.set(p.skillTypeID, Math.max(planned.get(p.skillTypeID) ?? 0, p.targetLevel));
+  }
+  const pending = classifySkillQueue(entries, nowMs)
     .filter((row) => row.secondsRemaining !== null)
     .map((row) => row.entry);
+  const firstPlanned = pending.findIndex((e) => (planned.get(e.skill_id) ?? 0) >= e.finished_level);
+  const queued = firstPlanned === -1 ? pending : pending.slice(0, firstPlanned);
+  const cutoff = firstPlanned === -1 ? Infinity : pending[firstPlanned].queue_position;
   const startMs = queued.reduce((max, e) => Math.max(max, finishMs(e) ?? max), nowMs);
   return {
     startMs,
-    trained: applyCompletedQueueEntries(trained, entries, startMs),
+    trained: applyCompletedQueueEntries(
+      trained,
+      entries.filter((e) => e.queue_position < cutoff),
+      startMs
+    ),
     queuedLevels: queued,
     paused,
   };

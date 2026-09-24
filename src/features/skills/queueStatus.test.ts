@@ -575,6 +575,42 @@ describe('projectQueueEnd', () => {
     expect(r.paused).toBe(false);
   });
 
+  it('waits only on the queue ahead of the first level the plan lists', () => {
+    const queue = [
+      entry({ queue_position: 1, finished_level: 3, finish_date: '2026-09-01T12:00:00Z' }),
+      entry({ queue_position: 2, finished_level: 4, finish_date: '2026-09-11T12:00:00Z' }),
+      entry({ queue_position: 3, finished_level: 2, finish_date: '2026-09-20T12:00:00Z' }),
+    ];
+    // 102 is planned; 103 trains after it in game, so waiting for the queue's
+    // end would count 102's time twice.
+    const r = projectQueueEnd(trained, queue, NOW, [{ skillTypeID: 102, targetLevel: 5 }]);
+    expect(r.startMs).toBe(Date.parse('2026-09-01T12:00:00Z'));
+    expect(r.trained.get(101)?.level).toBe(3);
+    expect(r.trained.get(102)).toBeUndefined();
+    expect(r.trained.get(103)).toBeUndefined();
+    expect(r.queuedLevels.map((e) => e.skill_id)).toEqual([101]);
+  });
+
+  it('starts now when the plan lists the queue head', () => {
+    const queue = [
+      entry({ queue_position: 1, finished_level: 3, finish_date: '2026-09-01T12:00:00Z' }),
+      entry({ queue_position: 2, finished_level: 4, finish_date: '2026-09-11T12:00:00Z' }),
+    ];
+    const r = projectQueueEnd(trained, queue, NOW, [{ skillTypeID: 101, targetLevel: 3 }]);
+    expect(r.startMs).toBe(NOW);
+    expect(r.queuedLevels).toEqual([]);
+    expect(r.trained.get(101)?.level).toBe(2);
+  });
+
+  it('still waits on a queued level above the plan’s own target', () => {
+    const queue = [
+      entry({ queue_position: 1, finished_level: 3, finish_date: '2026-09-01T12:00:00Z' }),
+    ];
+    const r = projectQueueEnd(trained, queue, NOW, [{ skillTypeID: 101, targetLevel: 2 }]);
+    expect(r.startMs).toBe(Date.parse('2026-09-01T12:00:00Z'));
+    expect(r.trained.get(101)?.level).toBe(3);
+  });
+
   it('starts now when the queue already finished', () => {
     const r = projectQueueEnd(
       trained,

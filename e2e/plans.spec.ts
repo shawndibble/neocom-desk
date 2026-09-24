@@ -119,16 +119,11 @@ test('"Shortest first" pulls a quick standalone skill ahead of the slow Caldari 
   expect(socialIndex).toBeLessThan(cruiserIndex);
 });
 
-test('the plan summary and tools stay in view while the entries queue scrolls (#221 successor)', async ({
-  page,
-}) => {
-  // The pane used to pin two panels — the summary strip and a toolbar below
-  // it — whose `top` offsets had to be derived from each other's rendered
-  // height, and overlapped whenever that derivation went stale (#221/#229).
-  // Only the entry list is capped now, so the strip above it and the tools
-  // beside it stay put structurally, with nothing to keep in sync. Needs
-  // enough entries to actually overflow that cap, which is measured against
-  // the live viewport height (#237), not a flat constant.
+test('a long plan scrolls the page, with the summary strip pinned above it', async ({ page }) => {
+  // The entry list used to carry its own viewport-measured cap (#237), which
+  // beside a sidebar taller than the viewport put two scrollbars on screen.
+  // Now the page is the only scroller and the summary strip (`lg:sticky`)
+  // is what stays put.
   await addCaldariCruiserToNewPlan(page);
   await page.getByRole('button', { name: 'Import' }).click();
   await page.getByRole('menuitem', { name: 'From text or file…' }).click();
@@ -159,75 +154,12 @@ test('the plan summary and tools stay in view while the entries queue scrolls (#
   await dialog.getByRole('button', { name: 'Apply' }).click();
   await expect(dialog).toBeHidden();
 
-  // Confirm the setup actually overflows the capped list — otherwise the
-  // wheel scroll below has nothing to do and this test would pass vacuously.
-  // Exact class match: other elements combine `overflow-y-auto` with more
-  // utility classes.
-  await expect(async () => {
-    const overflowed = await page.evaluate(() => {
-      const el = Array.from(document.querySelectorAll<HTMLElement>('div')).find(
-        (d) => d.className.trim() === 'lg:overflow-y-auto'
-      );
-      return !!el && el.scrollHeight > el.clientHeight + 50;
-    });
-    expect(overflowed).toBe(true);
-  }).toPass();
+  // No nested scroller: the entries grow the page instead.
+  await expect(page.locator('div[class="lg:overflow-y-auto"]')).toHaveCount(0);
 
-  // Closing the dialog returns focus to the "Import" button in
-  // the page header, and the browser scrolls that button into view. Once the
-  // sidebar is taller than the viewport that button is below the fold, so the
-  // page lands scrolled and every coordinate measured afterwards is off by
-  // however far it went. Establish the precondition rather than assuming it:
-  // this test is about a page sitting at its natural top.
-  await page.evaluate(() => window.scrollTo(0, 0));
-
-  // Real wheel scroll over the entries area, not a container scrollTop
-  // assignment — the browser picks the scrolling ancestor the same way a
-  // real user's scroll would, which a synthetic `el.scrollTop = n` can get
-  // wrong (and did, while writing this test).
-  //
-  // Aim at the capped list itself, not an offset guessed from the heading
-  // above it: `heading.y + height + 100` fell 10px short of the list's top
-  // once the page scrolled, landing on the summary panel's chip row, so the
-  // wheel went to the window and this test failed for a reason that had
-  // nothing to do with the sticky panes it exists to protect. Exact class
-  // match, for the same reason the overflow probe above uses one.
-  const entriesHeading = page.getByRole('heading', { name: 'Your entries' });
-  const scroller = page.locator('div[class="lg:overflow-y-auto"]');
-  const box = await scroller.boundingBox();
-  if (!box) throw new Error('expected the capped entry list to be visible');
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.wheel(0, 700);
-  await page.waitForTimeout(100);
-
-  // The list is what consumed the wheel. Without this, everything below can
-  // hold with nothing having scrolled anywhere — which is exactly how the
-  // premise broke silently the first time.
-  expect(await scroller.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
-
-  // The list scrolled inside its own box, so everything framing it is still
-  // on screen: the summary strip above, the panel's own header, and the
-  // tools sidebar beside it.
   const summaryPanel = page
     .getByRole('heading', { name: 'Plan summary' })
     .locator('xpath=ancestor::section[1]');
-  await expect(summaryPanel).toBeInViewport();
-  await expect(entriesHeading).toBeInViewport();
-  await expect(page.getByRole('heading', { name: 'Plan tools' })).toBeInViewport();
-  await expect(page.getByRole('button', { name: 'Optimize' })).toBeInViewport();
-
-  // And the summary strip stays pinned when the *window* scrolls, not just
-  // when the capped list does. The entry list has its own cap, so what makes
-  // the page taller than the viewport here is the sidebar itself (attributes,
-  // What-If Implants, Booster) — the real case the sticky exists for. Firing
-  // Optimize remaps is incidental setup at this point (its result now opens
-  // its own Modal rather than growing the sidebar), kept only so the guard
-  // below isn't the only thing exercising the click. No manual remap count
-  // any more — the fixture's live budget already reads 1.
-  await page.getByRole('button', { name: 'Optimize' }).click();
-  await page.getByRole('menuitem', { name: 'Place remaps only' }).click();
-  await expect(page.getByText(/^Remapping saves|^No remap improves/)).toBeVisible();
-
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.waitForTimeout(100);
 

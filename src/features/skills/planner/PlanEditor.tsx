@@ -34,10 +34,6 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
-import {
-  useViewportBoundedHeight,
-  VIEWPORT_BOUNDED_BOTTOM_GAP_PX,
-} from '@/lib/useViewportBoundedHeight';
 import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
 import {
   milestoneKey,
@@ -319,14 +315,6 @@ export function PlanEditor({
     targetLevel: number;
   } | null>(null);
 
-  // The entry list is the only thing that scrolls independently: it gets a
-  // live-measured cap so it fills the room actually left below it, while the
-  // summary strip and the sidebar beside it stay put. That replaces the pair
-  // of sticky panels this pane used to run (#221/#229), whose offsets had to
-  // be measured off each other's rendered height and drifted apart whenever
-  // either one's content changed height.
-  const [listScrollerRef, listMaxHeight] = useViewportBoundedHeight(VIEWPORT_BOUNDED_BOTTOM_GAP_PX);
-
   // "Columns" control (#114): a device-local view preference, applying the
   // same way across every plan on this device rather than per-plan.
   const columnVisibility = useColumnVisibility((state) => state.value);
@@ -500,8 +488,8 @@ export function PlanEditor({
   // Optimize Remaps' Booster origin, so the savings figure and the total agree.
   const [loadedAtMs] = useState(() => Date.now());
   const queueProjection = useMemo(
-    () => projectQueueEnd(trainedSkills, queueEntries, loadedAtMs),
-    [trainedSkills, queueEntries, loadedAtMs]
+    () => projectQueueEnd(trainedSkills, queueEntries, loadedAtMs, plan.entries),
+    [trainedSkills, queueEntries, loadedAtMs, plan.entries]
   );
   // Costed by `schedulePlan`, the same call the Calendar makes, so the two
   // can never quote different dates for one plan.
@@ -1971,17 +1959,10 @@ export function PlanEditor({
               </p>
             )}
             {promoteConfirm && confirmation(promoteConfirm)}
-            {/* Only the list scrolls: the panel header, the view controls and
-                the picker above stay put, so adding a skill never means
-                scrolling back up past a long queue to reach the field. The
-                cap is measured live against the viewport, and applies at `lg`
-                only — below it the page itself scrolls and a nested scroller
-                would just trap the list inside one. */}
-            <div
-              ref={listScrollerRef}
-              className="lg:overflow-y-auto"
-              style={isDesktop && listMaxHeight !== null ? { maxHeight: listMaxHeight } : undefined}
-            >
+            {/* No scroller of its own: the page is the one scrollbar. A capped
+                list beside a sidebar taller than the viewport gave two, and
+                on a phone a nested scroller traps the list. */}
+            <div>
               {error ? (
                 <p className="text-xs text-danger">{t('plans.computeError', { message: error })}</p>
               ) : (
