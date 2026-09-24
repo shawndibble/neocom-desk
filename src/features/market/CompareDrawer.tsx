@@ -7,7 +7,7 @@
  */
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, DataTable, IconButton, IskAmount, Spinner } from '@/components/ui';
+import { Button, DataTable, IconButton, IskAmount, Spinner, TypeIcon } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { controlHeightClassName } from '@/components/ui/controlStyles';
@@ -18,6 +18,9 @@ import type { OrderBookLocation } from './orderBookView';
 import { compareCsvColumns } from './compareCsv';
 import { formatVolume } from './format';
 import { downloadCsv } from '@/lib/downloadCsv';
+import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import { ItemContextMenu } from './ItemContextMenu';
+import { blueprintTypeIdFor } from './useBlueprintCatalog';
 
 const DRAWER_ID = 'compare-drawer';
 const MIN_HEIGHT = 160;
@@ -33,10 +36,23 @@ function clampHeight(value: number): number {
 export interface CompareDrawerProps {
   location: OrderBookLocation;
   refreshTick: number;
+  blueprintCatalog: BlueprintCatalog | null;
+  onRequestBlueprintCatalog: () => void;
+  onAddToQuickbar: (typeId: number, itemName: string) => void;
+  quickbarAvailable: boolean;
+  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 /** Mounted only while the Compare Set is non-empty — see Market.tsx. Unmounting on empty resets the drawer's own open/height state for free. */
-export function CompareDrawer({ location, refreshTick }: CompareDrawerProps) {
+export function CompareDrawer({
+  location,
+  refreshTick,
+  blueprintCatalog,
+  onRequestBlueprintCatalog,
+  onAddToQuickbar,
+  quickbarAvailable,
+  onShowInfo,
+}: CompareDrawerProps) {
   const { t } = useTranslation();
   const items = useCompareSet((state) => state.items);
   const removeItem = useCompareSet((state) => state.remove);
@@ -92,7 +108,26 @@ export function CompareDrawer({ location, refreshTick }: CompareDrawerProps) {
       {
         id: 'item',
         header: t('market.compare.columnItem'),
-        render: (row) => row.itemName,
+        // The menu wraps only this cell, not the row (unlike sibling surfaces):
+        // the row also holds a Remove button, which must not open it.
+        render: (row) => (
+          <ItemContextMenu
+            typeId={row.typeId}
+            itemName={row.itemName}
+            blueprintTypeID={blueprintTypeIdFor(blueprintCatalog, row.typeId)}
+            onAddToQuickbar={onAddToQuickbar}
+            quickbarAvailable={quickbarAvailable}
+            onShowInfo={onShowInfo}
+            onOpenChange={(open) => {
+              if (open) onRequestBlueprintCatalog();
+            }}
+          >
+            <span className="flex items-center gap-1.5">
+              <TypeIcon typeId={row.typeId} size={32} className="h-4 w-4 shrink-0" />
+              <span>{row.itemName}</span>
+            </span>
+          </ItemContextMenu>
+        ),
       },
       {
         id: 'bestSell',
@@ -158,7 +193,15 @@ export function CompareDrawer({ location, refreshTick }: CompareDrawerProps) {
         ),
       },
     ],
-    [t, removeItem]
+    [
+      t,
+      removeItem,
+      blueprintCatalog,
+      onRequestBlueprintCatalog,
+      onAddToQuickbar,
+      quickbarAvailable,
+      onShowInfo,
+    ]
   );
 
   return (

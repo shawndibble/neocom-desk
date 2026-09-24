@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, afterAll, afterEach, beforeEach } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { ESI_BASE_URL } from '@/esi/client';
 import { useCompareSet } from './compareSet';
@@ -57,20 +58,33 @@ afterAll(() => server.close());
 afterEach(() => server.resetHandlers());
 
 beforeEach(() => {
+  vi.clearAllMocks();
   useCompareSet.setState({ items: [] });
 });
 
+const drawerHandlers = {
+  onRequestBlueprintCatalog: vi.fn(),
+  onShowInfo: vi.fn(),
+};
+
 function renderDrawer() {
   return render(
-    <CompareDrawer
-      location={{
-        mode: 'region',
-        regionId: REGION_ID,
-        hubStationId: 60003760,
-        globalMarkets: new Map(),
-      }}
-      refreshTick={0}
-    />
+    <MemoryRouter>
+      <CompareDrawer
+        location={{
+          mode: 'region',
+          regionId: REGION_ID,
+          hubStationId: 60003760,
+          globalMarkets: new Map(),
+        }}
+        refreshTick={0}
+        blueprintCatalog={null}
+        onRequestBlueprintCatalog={drawerHandlers.onRequestBlueprintCatalog}
+        onAddToQuickbar={vi.fn()}
+        quickbarAvailable
+        onShowInfo={drawerHandlers.onShowInfo}
+      />
+    </MemoryRouter>
   );
 }
 
@@ -122,6 +136,24 @@ describe('CompareDrawer', () => {
     await user.click(screen.getByRole('button', { name: 'Remove Tritanium' }));
 
     expect(useCompareSet.getState().items).toEqual([]);
+  });
+
+  it('opens the item context menu from the item cell only, requesting the blueprint catalog', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Remove Tritanium' }));
+    expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
+    expect(drawerHandlers.onRequestBlueprintCatalog).not.toHaveBeenCalled();
+
+    fireEvent.contextMenu(within(region).getByText('Tritanium'));
+    await user.click(await screen.findByRole('menuitem', { name: 'Show info' }));
+
+    expect(drawerHandlers.onRequestBlueprintCatalog).toHaveBeenCalled();
+    expect(drawerHandlers.onShowInfo).toHaveBeenCalledWith(ITEM_A.typeId, ITEM_A.itemName);
   });
 
   it('clears the whole set from the drawer header', async () => {
