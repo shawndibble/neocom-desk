@@ -56,11 +56,17 @@ export function invalidateHubPrices(stationId: number, typeIds: readonly number[
 }
 
 /**
- * Sell/buy aggregates for typeIds at hub, from cache where fresh. Falls back
- * to null prices per type (not a thrown error) when Fuzzwork is unreachable.
+ * Sell/buy aggregates for typeIds at one station, from cache where fresh.
+ * Falls back to null prices per type (not a thrown error) when Fuzzwork is
+ * unreachable. Station-keyed rather than hub-keyed (issue #1423) so a caller
+ * that only ever has a bare `location_id` — the Foreground Poller's
+ * `marketOrderUndercutDomain`, checking a Character's own order's station,
+ * not one of the five Trade Hubs — can share this same 15-minute cache
+ * without constructing a `TradeHub` object for it. `getHubPrices` below is
+ * now a thin wrapper over this for the hub-shaped callers.
  */
-export async function getHubPrices(
-  hub: TradeHub,
+export async function getStationPrices(
+  stationId: number,
   typeIds: number[],
   now: Clock = Date.now
 ): Promise<Map<number, HubAggregate>> {
@@ -69,7 +75,7 @@ export async function getHubPrices(
   const nowMs = now();
 
   for (const typeId of typeIds) {
-    const cached = hubPriceCache.get(hubCacheKey(hub.stationId, typeId));
+    const cached = hubPriceCache.get(hubCacheKey(stationId, typeId));
     if (cached && cached.expiresAt > nowMs) {
       result.set(typeId, cached.value);
     } else {
@@ -83,7 +89,7 @@ export async function getHubPrices(
       // Chunked internally; a failure partway through discards earlier
       // batches too. Acceptable: the retry below re-fetches everything,
       // nothing gets cached as a false "no price".
-      fetched = await fetchAggregates(hub.stationId, stale);
+      fetched = await fetchAggregates(stationId, stale);
     } catch {
       // Fuzzwork unreachable: serve nulls for this call but cache nothing,
       // so the next refresh (open or manual button) retries instead of
@@ -92,7 +98,7 @@ export async function getHubPrices(
     for (const typeId of stale) {
       const value = fetched?.get(typeId) ?? NULL_AGGREGATE;
       if (fetched) {
-        hubPriceCache.set(hubCacheKey(hub.stationId, typeId), {
+        hubPriceCache.set(hubCacheKey(stationId, typeId), {
           value,
           expiresAt: nowMs + HUB_PRICE_TTL_MS,
         });
@@ -102,6 +108,18 @@ export async function getHubPrices(
   }
 
   return result;
+}
+
+/**
+ * Sell/buy aggregates for typeIds at hub, from cache where fresh. Falls back
+ * to null prices per type (not a thrown error) when Fuzzwork is unreachable.
+ */
+export async function getHubPrices(
+  hub: TradeHub,
+  typeIds: number[],
+  now: Clock = Date.now
+): Promise<Map<number, HubAggregate>> {
+  return getStationPrices(hub.stationId, typeIds, now);
 }
 
 /** Global adjusted/average prices (job-cost EIV), cached for an hour. */

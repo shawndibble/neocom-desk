@@ -83,6 +83,7 @@ import { OrderHistoryPanel } from '@/features/market/OrderHistoryPanel';
 import { TransactionsPanel } from '@/features/market/TransactionsPanel';
 import { AppraisalPanel } from '@/features/market/AppraisalPanel';
 import { useAppraisal } from '@/features/market/useAppraisal';
+import { tradeHubStanding, useTradeHubStandings } from '@/features/market/useTradeHubStandings';
 import { useMarketPricePercent } from '@/features/market/pricePercent';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { blueprintTypeIdFor, useBlueprintCatalog } from '@/features/market/useBlueprintCatalog';
@@ -591,6 +592,9 @@ export function Market() {
   // Held here rather than inside `AppraisalPanel` so a pasted list survives a
   // trip to the Browser tab, and so the header's refresh button can drive it.
   const appraisal = useAppraisal(effectiveHub, pricePercent, activeCharacterId);
+  // Feeds the net-of-fees chips' broker fee — resolved once per character,
+  // same as every other configurable-Trade-Hub broker-fee surface.
+  const tradeHubStandings = useTradeHubStandings(activeCharacterId);
 
   const {
     orderBookLoading,
@@ -880,6 +884,7 @@ export function Market() {
           pricePercent={pricePercent}
           onPricePercentChange={(value) => void setPricePercent(value)}
           hub={effectiveHub}
+          standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
           blueprintCatalog={blueprintCatalog}
           onRequestBlueprintCatalog={ensureBlueprintCatalog}
           onAddToQuickbar={handleAddToQuickbar}

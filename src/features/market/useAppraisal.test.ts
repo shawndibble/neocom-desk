@@ -22,9 +22,12 @@ function outcome(sell: number): AppraisalOutcome {
         cheapestBuy: sell,
         cheapestBuyViaLp: 0,
       },
+      items: [],
     },
     unmatched: [],
     implantBonusPct: 0,
+    accountingLevel: null,
+    brokerRelationsLevel: null,
   };
 }
 

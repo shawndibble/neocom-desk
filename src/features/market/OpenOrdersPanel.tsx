@@ -31,6 +31,7 @@ import { resolveCharacterFilter } from '@/features/character/characterFilterValu
 import { loadReprocessing } from '@/sde/loadSde';
 import type { ReprocessingType } from '@/sde/types';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
+import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useUrlFilter } from '@/lib/useUrlState';
 import { useLazyRowCache } from '@/lib/useLazyRowCache';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -136,6 +137,18 @@ function stationShortName(name: string): string {
   return dashIndex === -1 ? name : name.slice(0, dashIndex);
 }
 
+/** The highlighted row's own group always wins over either fold mechanism (decision `20260924-...`, step 9). */
+function isGroupFolded(
+  problem: OrderProblem,
+  highlightedRow: OpenOrderRow | null,
+  filter: OpenOrdersFilter,
+  collapsedGroups: ReadonlySet<OrderProblem>
+): boolean {
+  if (problem === highlightedRow?.problem) return false;
+  if (problem === 'healthy') return filter.hideHealthy;
+  return collapsedGroups.has(problem);
+}
+
 interface ActiveChipDisplay {
   id: string;
   label: string;
@@ -181,6 +194,12 @@ export function OpenOrdersPanel({
     OPEN_ORDERS_FIELD_TO_PARAM,
     DEFAULT_OPEN_ORDERS_FILTER_PARAMS
   );
+  /**
+   * The order a Notification Event (an undercut, or a fill) sent the reader
+   * to, spent once on arrival (`useHighlightParam`'s own doc). Landing on the
+   * row that prompted the click, decision `20260908-123516`.
+   */
+  const highlightId = useHighlightParam();
   const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   /** Groups the player has folded away by hand. `healthy` is never in here — see the toggle below. */
@@ -373,6 +392,19 @@ export function OpenOrdersPanel({
       now: snapshot.now,
     });
   }, [snapshot, deepCompetitionByOrderId, structureCache.byKey, stationNames]);
+
+  /**
+   * The highlighted row, found across every group before any fold/filter
+   * narrows the screen — null when nothing matches is harmless (decision
+   * `20260908-123516`). Read off `allRows`, not `groupingRows`: this only
+   * forces open the row's own fold state, never an active content filter
+   * (search/problem/character) — narrowing that too is an open judgment call
+   * (see the scope decision file).
+   */
+  const highlightedRow = useMemo(
+    () => (highlightId === null ? null : (allRows.find((r) => r.orderId === highlightId) ?? null)),
+    [allRows, highlightId]
+  );
 
   /**
    * Takes this load's `OrderProblem` reading for every open order and drops
@@ -990,10 +1022,10 @@ export function OpenOrdersPanel({
               // `collapsedGroups`: that flag is also what the "N of M orders
               // match" count reads, so two mechanisms would let the caret and
               // the count disagree about whether healthy orders are showing.
-              const folded =
-                group.problem === 'healthy'
-                  ? filter.hideHealthy
-                  : collapsedGroups.has(group.problem);
+              // `isGroupFolded` reads `highlightedRow` live rather than a
+              // `setFilter`/`setCollapsedGroups` write, so it never races
+              // `useHighlightParam`'s own URL write on first render.
+              const folded = isGroupFolded(group.problem, highlightedRow, filter, collapsedGroups);
               const toggle = () => {
                 if (group.problem === 'healthy') {
                   setFilter({ ...filter, hideHealthy: !filter.hideHealthy });
@@ -1084,6 +1116,7 @@ export function OpenOrdersPanel({
                       rowKey={(row) => row.orderId}
                       rowContextMenu={rowContextMenu}
                       label={`${groupTitle} · ${group.rows.length}`}
+                      highlightRowKey={highlightId}
                     />
                   )}
                 </div>

@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { Appraisal } from '@/engine/market/appraisal';
+import { ZERO_STANDINGS } from '@/engine/market/standings';
 import { configureClipboard } from '@/lib/clipboard';
 import { TRADE_HUBS } from '@/market/hubs';
 import { AppraisalPanel } from './AppraisalPanel';
@@ -58,10 +59,18 @@ const APPRAISAL: Appraisal = {
     cheapestBuy: 0,
     cheapestBuyViaLp: 0,
   },
+  items: [],
 };
 
 function outcome(overrides: Partial<AppraisalOutcome> = {}): AppraisalOutcome {
-  return { appraisal: APPRAISAL, unmatched: [], implantBonusPct: 0, ...overrides };
+  return {
+    appraisal: APPRAISAL,
+    unmatched: [],
+    implantBonusPct: 0,
+    accountingLevel: null,
+    brokerRelationsLevel: null,
+    ...overrides,
+  };
 }
 
 /**
@@ -84,6 +93,7 @@ function renderPanel(
         pricePercent={90}
         onPricePercentChange={onPricePercentChange}
         hub={TRADE_HUBS[0]}
+        standing={ZERO_STANDINGS}
         blueprintCatalog={null}
         onRequestBlueprintCatalog={onRequestBlueprintCatalog}
         onAddToQuickbar={onAddToQuickbar}
@@ -121,6 +131,88 @@ describe('AppraisalPanel', () => {
   it('says how many rows were left out of a total', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     expect(screen.getByText(/1 item has no orders on one side at this hub/)).toBeInTheDocument();
+  });
+
+  describe('net-of-fees chips (issue #1426)', () => {
+    const NET_APPRAISAL: Appraisal = {
+      rows: [
+        {
+          typeId: 2048,
+          name: 'Damage Control II',
+          quantity: 10,
+          buyEach: 1_000,
+          sellEach: 1_050,
+          buyTotal: 10_000,
+          sellTotal: 10_500,
+        },
+        {
+          // Unpriced on the buy side only, so it must count toward the list
+          // net but drop out of the instant net.
+          typeId: 999,
+          name: 'Civilian Gatling Railgun',
+          quantity: 4,
+          buyEach: null,
+          sellEach: 1_000,
+          buyTotal: null,
+          sellTotal: 4_000,
+        },
+      ],
+      totals: {
+        buy: 10_000,
+        sell: 14_500,
+        spread: 4_500,
+        unpricedRows: 1,
+        refine: 0,
+        refineUnpricedRows: 0,
+        cheapestBuy: 0,
+        cheapestBuyViaLp: 0,
+      },
+      items: [
+        { typeId: 2048, name: 'Damage Control II', quantity: 10, buy: 1_000, sell: 1_050 },
+        { typeId: 999, name: 'Civilian Gatling Railgun', quantity: 4, buy: null, sell: 1_000 },
+      ],
+    };
+
+    function netOutcome(overrides: Partial<AppraisalOutcome> = {}): AppraisalOutcome {
+      return {
+        appraisal: NET_APPRAISAL,
+        unmatched: [],
+        implantBonusPct: 0,
+        accountingLevel: 0,
+        brokerRelationsLevel: 0,
+        ...overrides,
+      };
+    }
+
+    it('renders both net-of-fees chips once the active Character is resolved', () => {
+      renderPanel({ controller: controller({ result: netOutcome() }) });
+      expect(screen.getByText('You receive, selling now')).toBeInTheDocument();
+      expect(screen.getByText('You receive, listing')).toBeInTheDocument();
+    });
+
+    it('excludes a row unpriced on the buy side from the instant net only', () => {
+      renderPanel({ controller: controller({ result: netOutcome() }) });
+      // Only row 1 has a buy price: 10,000 raw total, 7.5% sales tax
+      // (Accounting 0) — 10,000 - 750 = 9,250. Row 2 contributes nothing.
+      expect(screen.getByLabelText('9,250 ISK')).toBeInTheDocument();
+    });
+
+    it('never shows the net chips while the active Character’s skills are still loading', () => {
+      renderPanel({
+        controller: controller({
+          result: netOutcome({ accountingLevel: null, brokerRelationsLevel: null }),
+        }),
+      });
+      expect(screen.queryByText('You receive, selling now')).not.toBeInTheDocument();
+      expect(screen.queryByText('You receive, listing')).not.toBeInTheDocument();
+    });
+
+    it('wraps whole chips in the totals strip rather than scrolling sideways', () => {
+      renderPanel({ controller: controller({ result: netOutcome() }) });
+      const strip = screen.getByText('You receive, selling now').closest('.flex-wrap');
+      expect(strip).not.toBeNull();
+      expect(strip).not.toHaveClass('overflow-x-auto');
+    });
   });
 
   // The reflow itself is CSS behind a media query and is measured in
@@ -262,9 +354,12 @@ describe('AppraisalPanel', () => {
             cheapestBuy: 0,
             cheapestBuyViaLp: 0,
           },
+          items: [],
         },
         unmatched: [],
         implantBonusPct: 0,
+        accountingLevel: null,
+        brokerRelationsLevel: null,
         ...overrides,
       };
     }
@@ -375,9 +470,12 @@ describe('AppraisalPanel', () => {
             cheapestBuy: 2_232_400,
             cheapestBuyViaLp: 1,
           },
+          items: [],
         },
         unmatched: [],
         implantBonusPct: 0,
+        accountingLevel: null,
+        brokerRelationsLevel: null,
         ...overrides,
       };
     }
@@ -486,6 +584,7 @@ describe('AppraisalPanel', () => {
               cheapestBuy: 0,
               cheapestBuyViaLp: 0,
             },
+            items: [],
           },
           unmatched: [{ name: 'Nope', lines: [1] }],
         }),

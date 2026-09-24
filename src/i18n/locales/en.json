@@ -2979,6 +2979,11 @@
         "body": "Someone bought {{item}} from {{character}}.",
         "bodyWithQuantity": "Someone bought {{quantity}} x {{item}} from {{character}}."
       },
+      "marketOrderUndercut": {
+        "title": "Order undercut",
+        "sellBody": "{{character}}'s {{item}} sell order at {{price}} ISK was undercut at its station ({{rival}} ISK).",
+        "buyBody": "{{character}}'s {{item}} buy order at {{price}} ISK was outbid at its station ({{rival}} ISK)."
+      },
       "structureFuelLow": {
         "title": "Structure fuel low",
         "body": "{{character}}: {{structure}} has less than {{days}} days of fuel remaining."
@@ -3268,6 +3273,10 @@
       "sellTotalHelp": "What the list costs to buy outright, from sell orders at this hub.",
       "buyTotal": "Buy total",
       "buyTotalHelp": "What the list fetches if you sell into buy orders at this hub right now.",
+      "instantNet": "You receive, selling now",
+      "instantNetHelp": "Selling into buy orders here, after {{tax}}% sales tax. No broker fee: filling an order lists nothing. Always at 100% of market.",
+      "listNet": "You receive, listing",
+      "listNetHelp": "Listing one price step under the cheapest seller here, after {{tax}}% sales tax and a {{broker}}% broker fee, 100 ISK minimum per row. Always at 100% of market.",
       "refineTotal": "Refine total",
       "refineTotalHelp": "What refining the list with the active Character's own reprocessing skills would fetch, sold into buy orders at this hub. Assumes an NPC station's 50% base rate and no ore-specialisation skill — neither is modelled — so a trained miner's real yield runs higher than shown.",
       "refineImplantHint": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
@@ -3716,6 +3725,7 @@
         "planetaryExtractionDone": "Planetary Extraction Done",
         "planetaryExtractorExpiring": "Planetary Extractor Expiring",
         "marketOrderFilled": "Sell Order Filled",
+        "marketOrderUndercut": "Market Order Undercut",
         "newCalendarEvent": "New Calendar Event",
         "calendarEventStarting": "Calendar Event Starting",
         "contractAccepted": "Contract Accepted",
@@ -3731,6 +3741,7 @@
         "priceAlertTriggered": "Quickbar Price Alert"
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled for notifications — open the app at least that often to keep it current. The Planetary Industry page always shows the real expiry.",
+      "marketOrderUndercutStationOnlyHint": "Only checks your order's own station, and only while the app is open — it does not compare prices across the wider system or region.",
       "corpEventBestEffortHint": "Best-effort: fires only while the app is open. Not a substitute for in-game alerts.",
       "scheduledPushBadge": "Arrives even with the app closed — the backend schedules this one up to 72 hours ahead. Needs notification permission, and on iPhone and iPad the app installed to the home screen. Every other event needs the app open.",
       "extractorExpiringLeadTimeLabel": "Warn this far before an extractor expires:",

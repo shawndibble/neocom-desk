@@ -68,6 +68,10 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // `notificationUrlForSubject` adds `?highlight=` where the fire knows its
   // subject, which pulses that row on arrival.
   marketOrderFilled: '/market/history/transactions',
+  // Open Orders, not History — the order this fires about is (still) an open
+  // one (issue #1423). `notificationUrlForSubject` adds `?highlight=`, which
+  // pulses that row on arrival, same as `marketOrderFilled`'s destination.
+  marketOrderUndercut: '/market/orders',
   // ~100 EVE-native types (issue #274), most with no corresponding page in
   // the app. `/alerts` is a deliberate choice for this event rather than an
   // inherited default — and now a real destination rather than a shrug: the
@@ -160,6 +164,7 @@ const highlightRow: SubjectUrl = (base, subjectId) =>
  */
 const SUBJECT_URLS: Partial<Record<NotificationEventId, SubjectUrl>> = {
   marketOrderFilled: highlightRow,
+  marketOrderUndercut: highlightRow,
   walletBalanceChanged: highlightRow,
   contractAccepted: highlightRow,
   contractCompleted: highlightRow,

@@ -107,6 +107,10 @@ describe('alertSeverity', () => {
     expect(alertSeverity({ kind: 'event', eventId: 'priceAlertTriggered' })).toBe('clear');
   });
 
+  it('treats a station undercut as a standing fault worth acting on, unlike a filled order', () => {
+    expect(alertSeverity({ kind: 'event', eventId: 'marketOrderUndercut' })).toBe('warning');
+  });
+
   it('puts something that stopped happening above something that finished', () => {
     // Nothing training is a standing fault; a level completing is an FYI.
     expect(alertSeverity({ kind: 'event', eventId: 'characterNotTraining' })).toBe('warning');
