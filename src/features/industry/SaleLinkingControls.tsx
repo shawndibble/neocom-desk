@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -7,6 +8,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   EmptyState,
+  FieldError,
   IconButton,
   Modal,
   Spinner,
@@ -174,6 +176,8 @@ function WatchPicker({
  */
 export function SaleLinkingModals({ sale }: { sale: SaleLinking }) {
   const { t } = useTranslation();
+  const quantityErrorId = useId();
+  const unitPriceErrorId = useId();
   return (
     <>
       <Modal
@@ -214,6 +218,8 @@ export function SaleLinkingModals({ sale }: { sale: SaleLinking }) {
                 label={t('industry.quantity')}
                 inputMode="numeric"
                 widthClassName="w-full"
+                invalid={sale.manualSale?.errors.quantity}
+                describedBy={sale.manualSale?.errors.quantity ? quantityErrorId : undefined}
                 parse={(raw) => unmaskNumber(raw)}
                 onCommit={(value) =>
                   sale.setManualSaleForm((f) => ({
@@ -222,6 +228,11 @@ export function SaleLinkingModals({ sale }: { sale: SaleLinking }) {
                   }))
                 }
               />
+              {sale.manualSale?.errors.quantity && (
+                <FieldError id={quantityErrorId}>
+                  {t('industry.manualSaleQuantityError')}
+                </FieldError>
+              )}
             </label>
             <label className="flex flex-col gap-1 text-xs">
               {t('industry.unitPrice')}
@@ -230,6 +241,8 @@ export function SaleLinkingModals({ sale }: { sale: SaleLinking }) {
                 label={t('industry.unitPrice')}
                 inputMode="numeric"
                 widthClassName="w-full"
+                invalid={sale.manualSale?.errors.unitPrice}
+                describedBy={sale.manualSale?.errors.unitPrice ? unitPriceErrorId : undefined}
                 parse={(raw) => unmaskNumber(raw)}
                 onCommit={(value) =>
                   sale.setManualSaleForm((f) => ({
@@ -238,6 +251,11 @@ export function SaleLinkingModals({ sale }: { sale: SaleLinking }) {
                   }))
                 }
               />
+              {sale.manualSale?.errors.unitPrice && (
+                <FieldError id={unitPriceErrorId}>
+                  {t('industry.manualSaleUnitPriceError')}
+                </FieldError>
+              )}
             </label>
           </div>
           <Button

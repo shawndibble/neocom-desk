@@ -43,4 +43,31 @@ describe('PriceAlertForm', () => {
     expect(screen.getByText(/Compares against lowest sell at Jita/)).toBeTruthy();
     expect(await screen.findByText(/Now 6 ISK|Now 5 ISK/)).toBeTruthy();
   });
+
+  it('announces an error and marks the field invalid instead of saving an empty price', () => {
+    const { onSave, onClose } = renderForm();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toMatch(/Enter a price above 0/);
+    const input = screen.getByLabelText(/Target price/);
+    expect(input.getAttribute('aria-invalid')).toBe('true');
+    expect(input.getAttribute('aria-describedby')).toBe(alert.id);
+  });
+
+  it('announces an error for a zero or non-numeric price', () => {
+    renderForm();
+    fireEvent.change(screen.getByLabelText(/Target price/), { target: { value: 'abc' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('alert').textContent).toMatch(/Enter a price above 0/);
+  });
+
+  it('clears the error once the price is edited again', () => {
+    renderForm();
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('alert')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Target price/), { target: { value: '100' } });
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
 });

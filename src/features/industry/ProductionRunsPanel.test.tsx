@@ -424,6 +424,29 @@ describe('ProductionRunsPanel', () => {
     expect(link).toMatchObject({ runId: 'run-1', quantity: 3, unitPrice: 80_000 });
   });
 
+  it('announces an error and marks the fields invalid instead of saving an empty manual sale', async () => {
+    await addRun();
+    const user = userEvent.setup();
+    renderPanel(null);
+    await expandRuns(user);
+    await screen.findByRole('button', { name: 'Sold' });
+
+    await chooseSoldMenuItem(user, 'Manual / Private Sale');
+    const dialog = await screen.findByRole('dialog', { name: 'Manual / Private Sale' });
+    await user.click(within(dialog).getByRole('button', { name: 'Save run' }));
+
+    const alerts = within(dialog).getAllByRole('alert');
+    expect(alerts).toHaveLength(2);
+    const qtyInput = within(dialog).getByLabelText('Qty');
+    const priceInput = within(dialog).getByLabelText('Unit price');
+    expect(qtyInput.getAttribute('aria-invalid')).toBe('true');
+    expect(priceInput.getAttribute('aria-invalid')).toBe('true');
+    expect(qtyInput.getAttribute('aria-describedby')).toBe(alerts[0].id);
+    expect(priceInput.getAttribute('aria-describedby')).toBe(alerts[1].id);
+    expect(await db.productionSaleLinks.count()).toBe(0);
+    expect(screen.getByRole('dialog', { name: 'Manual / Private Sale' })).toBeTruthy();
+  });
+
   it('opens the Log Production dialog on a bumped logRequest, without clicking', async () => {
     const { rerender } = render(
       <ProductionRunsPanel

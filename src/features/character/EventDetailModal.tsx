@@ -226,7 +226,9 @@ export function EventDetailModal({
               })}
             </div>
             {rsvpFailed && (
-              <p className="mt-2 text-[0.6875rem] text-danger">{t('calendar.rsvpFailed')}</p>
+              <p role="alert" className="mt-2 text-[0.6875rem] text-danger">
+                {t('calendar.rsvpFailed')}
+              </p>
             )}
           </div>
           <div className="space-y-2 border-t border-line pt-2">
