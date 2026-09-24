@@ -13,7 +13,7 @@ export const RESPONSE_TEXT_TONE: Record<CalendarEventSummary['event_response'], 
   accepted: 'text-success',
   declined: 'text-danger',
   tentative: 'text-warning',
-  not_responded: 'text-text-faint',
+  not_responded: 'text-text-dim',
 };
 
 /** Badge fill for `EventDetailModal`'s status pill — same tone family as `RESPONSE_TEXT_TONE`, plus a fill and border. */
@@ -21,7 +21,7 @@ export const RESPONSE_BADGE_TONE: Record<CalendarEventSummary['event_response'],
   accepted: 'border-success/40 bg-success/10 text-success',
   declined: 'border-danger/40 bg-danger/10 text-danger',
   tentative: 'border-warning/40 bg-warning/10 text-warning',
-  not_responded: 'border-line bg-panel-2 text-text-faint',
+  not_responded: 'border-line bg-panel-2 text-text-dim',
 };
 
 /** The glyph for each response — `EventDetailModal`'s status pill and its RSVP buttons. */

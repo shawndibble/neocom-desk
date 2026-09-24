@@ -95,7 +95,7 @@ function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget, menu }: 
           <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
           <span className="truncate">{item.name}</span>
           {hasTarget && (
-            <span className="shrink-0 text-text-faint">
+            <span className="shrink-0 text-text-dim">
               {(item.targetDirection === 'above' ? '≥ ' : '≤ ') +
                 formatIskCompact(item.targetPrice!)}
             </span>

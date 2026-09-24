@@ -29,9 +29,15 @@ export const controlHeightClassName: Record<ControlSize, string> = {
   md: 'h-11 md:h-9',
 };
 
-/** Border, fill, text and focus ring. `bg-panel-2` is DESIGN.md §1's input fill. */
+/**
+ * Border, fill, text and focus ring. `bg-panel-2` is DESIGN.md §1's input fill.
+ * Border is `line-bright`, not `line` — `line` is only 1.35:1 against `panel-2`,
+ * below the 3:1 floor for a visible resting edge (issue #1491). Placeholder is
+ * `text-dim`, not `text-faint` — `text-faint` is below 4.5:1 and a placeholder
+ * is the only visible prompt in some pickers.
+ */
 export const fieldBaseClassName =
-  'rounded-xs border border-line bg-panel-2 text-text placeholder:text-text-faint focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40';
+  'rounded-xs border border-line-bright bg-panel-2 text-text placeholder:text-text-dim focus-visible:outline-2 focus-visible:outline-accent disabled:pointer-events-none disabled:opacity-40';
 
 /** A field's horizontal padding and type scale, on top of the shared height. */
 export const fieldSizeClassName: Record<ControlSize, string> = {

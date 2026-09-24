@@ -1154,7 +1154,7 @@ export function OrderDetailModal({
                   </div>
                 )}
                 {!reprocessing && (
-                  <p className="flex items-baseline justify-between gap-3 text-text-faint">
+                  <p className="flex items-baseline justify-between gap-3 text-text-dim">
                     <span>{t('market.orders.exitReprocessNotBuilt')}</span>
                     <span className="shrink-0">{t('market.orders.exitNotBuilt')}</span>
                   </p>
@@ -1191,7 +1191,7 @@ export function OrderDetailModal({
                     )}
                   </>
                 )}
-                <p className="text-text-faint">{t('market.orders.orderSoFarNotBuilt')}</p>
+                <p className="text-text-dim">{t('market.orders.orderSoFarNotBuilt')}</p>
               </div>
             </Disclosure>
           </section>

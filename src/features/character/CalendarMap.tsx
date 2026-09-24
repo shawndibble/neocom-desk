@@ -121,11 +121,7 @@ export function CalendarMap({ days, loads, nowMs, selectedDayMs, onSelectDay }: 
               <span className="flex items-baseline justify-between">
                 <span
                   className={`text-[0.6875rem] tabular-nums ${
-                    day.isToday
-                      ? 'font-semibold text-accent'
-                      : isPast || !day.inCurrentMonth
-                        ? 'text-text-faint'
-                        : 'text-text-dim'
+                    day.isToday ? 'font-semibold text-accent' : 'text-text-dim'
                   }`}
                 >
                   {day.date.getDate()}

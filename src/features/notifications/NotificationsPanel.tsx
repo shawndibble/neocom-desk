@@ -744,7 +744,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
                 <li key={eventId}>
                   <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs hover:bg-panel-2">
                     <span className="flex min-w-0 items-center gap-1.5">
-                      <span className={rowEnabled ? 'text-text' : 'text-text-faint'}>
+                      <span className={rowEnabled ? 'text-text' : 'text-text-dim'}>
                         {eventLabel}
                       </span>
                       {PUSH_BADGED_EVENT_IDS.has(eventId) && <ScheduledPushBadge />}

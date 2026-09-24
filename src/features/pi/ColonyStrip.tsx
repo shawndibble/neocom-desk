@@ -67,9 +67,7 @@ function State({ row }: { row: ColonyStripRow }) {
   // A colony nothing can be read from has not been found to be fine — saying
   // "as is" there would claim a check that never ran.
   if (row.load === null && row.hoursToFull === null) {
-    return (
-      <span className="text-right text-xs text-text-faint">{t('piAdvisor.colonyUnknown')}</span>
-    );
+    return <span className="text-right text-xs text-text-dim">{t('piAdvisor.colonyUnknown')}</span>;
   }
   return (
     <span className="text-right text-xs text-text-dim">{t('piAdvisor.colonyStateClear')}</span>
@@ -101,7 +99,7 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
     >
       <span className="min-w-0 truncate text-xs">
         {name}{' '}
-        <span className="text-[0.6875rem] text-text-faint">
+        <span className="text-[0.6875rem] text-text-dim">
           {t(`pi.planetType.${row.planetType}`)}
         </span>
       </span>
@@ -126,11 +124,7 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
 
       <span
         className={`col-start-3 row-start-1 text-right text-xs tabular-nums sm:col-start-4 ${
-          row.hoursToFull === null
-            ? 'text-text-faint'
-            : row.overflowing
-              ? 'text-warning'
-              : 'text-text-dim'
+          row.hoursToFull !== null && row.overflowing ? 'text-warning' : 'text-text-dim'
         }`}
       >
         {row.hoursToFull === null ? t('piAdvisor.colonyUnknown') : span(row.hoursToFull, t)}
@@ -169,7 +163,7 @@ function LockedRow({ level, total, atMax }: { level: number; total: number; atMa
   const { t } = useTranslation();
   return (
     <div className="flex items-center gap-2.5 border-t border-line px-3 py-2">
-      <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-line-bright px-1.5 text-[0.625rem] font-bold tracking-widest text-text-faint uppercase">
+      <span className="inline-flex h-[1.125rem] shrink-0 items-center rounded-xs border border-line-bright px-1.5 text-[0.625rem] font-bold tracking-widest text-text-dim uppercase">
         {t('piAdvisor.colonySlotLockedTag')}
       </span>
       <span className="min-w-0 text-xs text-text-dim">

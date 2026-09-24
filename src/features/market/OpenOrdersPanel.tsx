@@ -877,11 +877,11 @@ export function OpenOrdersPanel({
                         label={t(`market.orders.group.${problem}`)}
                         count={count}
                         selected={selected}
-                        // A zero-count problem still renders (dimmed via
-                        // className, still a real focusable button) — the
-                        // player can see it's clean rather than wonder where
-                        // it went, per the ticket.
-                        className={count === 0 ? 'opacity-50' : undefined}
+                        // A zero-count problem still renders, still a real
+                        // focusable button, so the player can see it's clean
+                        // rather than wonder where it went — the `0` itself
+                        // is the cue; no `opacity-50` fade below AA on top of
+                        // it (issue #1491).
                         onToggle={() =>
                           setDraft({
                             ...draft,

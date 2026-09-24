@@ -154,7 +154,7 @@ describe('Contracts', () => {
     expect(within(table).getByText('Finished')).toBeInTheDocument();
   });
 
-  it('dims only a lapsed, unclaimed contract — not a finished one whose deadline has simply passed', async () => {
+  it('flags only a lapsed, unclaimed contract — not a finished one whose deadline has simply passed', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, ({ request }) => {
         const page = new URL(request.url).searchParams.get('page');
@@ -180,15 +180,17 @@ describe('Contracts', () => {
     const table = screen.getByRole('table', { name: 'Contracts' });
 
     const freshRow = within(table).getByText('Rifter fit').closest('tr');
-    expect(freshRow).not.toHaveClass('opacity-50');
+    expect(freshRow?.querySelector('svg')).not.toBeInTheDocument();
 
+    // Lapsed rows carry a non-color cue (icon + tooltip) rather than dimming
+    // the row's own text below AA (issue #1491).
     const staleRow = within(table).getByText('Lapsed offer').closest('tr');
-    expect(staleRow).toHaveClass('opacity-50');
+    expect(staleRow?.querySelector('svg')).toBeInTheDocument();
 
-    // Finished, with a deadline in the past — no longer dims (issue: was
+    // Finished, with a deadline in the past — not flagged (issue: was
     // status-blind, so almost every completed contract dimmed).
     const finishedRow = within(table).getByText('Courier').closest('tr');
-    expect(finishedRow).not.toHaveClass('opacity-50');
+    expect(finishedRow?.querySelector('svg')).not.toBeInTheDocument();
   });
 
   it('opens the contract detail modal on click', async () => {

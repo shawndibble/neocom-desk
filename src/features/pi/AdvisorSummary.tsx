@@ -221,7 +221,13 @@ export function AdvisorSummary({ list, earnings, spots, controls }: AdvisorSumma
             </div>
             <div className="mt-1.5 flex flex-wrap justify-between gap-x-3 text-[0.6875rem] text-text-dim">
               <span>
-                <span className="text-accent-dim">■</span>{' '}
+                {/* A fill+border swatch, not colored text — `accent-dim` is
+                    borders/fills only (DESIGN.md §1); as a glyph's own text
+                    color it read at 3.7:1 (issue #1491). */}
+                <span
+                  aria-hidden="true"
+                  className="inline-block size-2 rounded-[1px] border border-line-bright bg-accent-dim align-[-1px]"
+                />{' '}
                 {t('piAdvisor.summaryEarnBarNow', { isk: formatIsk(now) })}
               </span>
               <span>
