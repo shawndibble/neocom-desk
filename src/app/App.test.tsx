@@ -47,7 +47,7 @@ describe('boot gate spinner (UX-REVIEW #1)', () => {
     render(<App />);
     expect(screen.getByText('Neocom Desk')).toBeInTheDocument();
     expect(screen.getByText('Loading…')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
   });
 });
 

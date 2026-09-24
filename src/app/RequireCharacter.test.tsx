@@ -39,7 +39,7 @@ describe('RequireCharacter', () => {
     renderAt('/market');
     // Not "logged out" — redirecting here would bounce every user to /login on
     // every cold load.
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading' })).toBeInTheDocument();
     expect(screen.queryByText(/login page/)).not.toBeInTheDocument();
   });
 
