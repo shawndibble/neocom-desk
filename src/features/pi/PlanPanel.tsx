@@ -32,6 +32,7 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
+  FilterChip,
   Spinner,
   TextInput,
   buttonClassName,
@@ -480,19 +481,13 @@ export function PlanPanel({
               className="flex flex-wrap gap-1.5"
             >
               {floors.map((candidate) => (
-                <button
+                <FilterChip
                   key={candidate}
-                  type="button"
-                  aria-pressed={candidate === effectiveFloor}
-                  onClick={() => setControl({ floor: candidate })}
-                  className={buttonClassName({
-                    variant: candidate === effectiveFloor ? 'primary' : 'ghost',
-                    size: 'md',
-                    className: 'px-2.5',
-                  })}
-                >
-                  {t(`piPlan.floorOption.${candidate}`)}
-                </button>
+                  size="md"
+                  label={t(`piPlan.floorOption.${candidate}`)}
+                  selected={candidate === effectiveFloor}
+                  onToggle={() => setControl({ floor: candidate })}
+                />
               ))}
             </div>
             <span className="block text-xs text-text-dim">{t('piPlan.floorHint')}</span>

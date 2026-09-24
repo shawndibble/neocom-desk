@@ -82,7 +82,7 @@ interface CharacterBadgeProps {
 export function CharacterBadge({ characterName, t }: CharacterBadgeProps) {
   return (
     <span
-      className="ml-1.5 shrink-0 rounded-xs border border-line bg-panel-2 px-1 py-0.5 text-[0.625rem] text-text-dim"
+      className="ml-1.5 shrink-0 rounded-xs border border-line bg-panel-2 px-1 py-0.5 text-[0.6875rem] text-text-dim"
       title={t('assets.crossCharacterBadge', { character: characterName })}
     >
       {characterName}
