@@ -74,8 +74,17 @@ here — they go one per file in `docs/context/decisions/`.
   Distinct from **Build Opportunities**' own former "Auto Build Depth"
   control (issue #652), removed as unused ahead of this rename — see the
   same 20260910 decision file.
-- **Base Grant**: What every Character is asked for at sign-in — `SCOPES`, and
-  nothing from any Scope Group.
+- **Base Grant**: What the plain "Log in" button asks a Character for: the
+  **Core Grant** plus every **Permission** that is on by default. A user who
+  wants less picks it under "Customize permissions" instead, and the plain
+  button asks for everything so nobody who takes it meets a later prompt.
+  Distinct from the Core Grant, which is only the part that cannot be
+  unchecked.
+- **Core Grant**: The scopes every Character must grant, and which "Customize
+  permissions" shows checked and locked: skills, the skill queue, and structure
+  lookup (names and search). They are here because leaving them out makes other
+  numbers silently wrong (training time, industry time, fees) or leaves
+  structures unnamed across the app, rather than just emptying one page.
 - **Base sheet** — the character's attributes as base + remap alone: five
   values, each 17..27, totalling exactly 99. The only thing a remap can
   change, the space the optimizer searches, and the input `computeSchedule`
@@ -646,6 +655,13 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   the most urgent entry that depends on it — the plan's banded view and the
   optimizer's "suggest full reorder" both key off this effective value, not
   each entry's own raw setting.
+- **Permission**: The user-facing name for a **Scope Group**: one checkbox
+  under "Customize permissions," labelled with the pages it unlocks (Wallet,
+  Market orders, Contracts, Assets, Industry, Mining, Planets, Mail, Calendar,
+  EVE notifications, Character details, Corporation, Structure markets). A
+  declined Permission empties only the pages that need it, and each of those
+  shows a banner offering to log in again and grant it. Never used for the
+  **Core Grant**, which is not a choice.
 - **Plan Milestone**: A named goal ("Fly Loki") pinned to a Skill Plan entry's
   skill level, not to its position — anchored by (skillTypeID, level) so it
   survives a reorder or the plan's own "suggest full reorder" by construction
@@ -780,12 +796,10 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   diff answers "what changed since last time", a Scheduled Push answers "what
   becomes true at 14:32 on Thursday". Only events carrying a future timestamp
   in their own ESI data can be delivered this way.
-- **Scope Group**: A named, opt-in set of OAuth scopes a Character is asked for
-  only when they ask for the feature, rather than at sign-in with everyone
-  else. Declared per endpoint in `esi/registry.ts` (`group: 'corp'`); absent
-  means the Base Grant. `SCOPES` derives from the ungrouped endpoints and
-  `scopesForGroup(group)` from the grouped ones, both from the same registry.
-  `corp` is the only group today.
+- **Scope Group**: A named set of OAuth scopes granted or declined as one
+  unit, called a **Permission** wherever the user sees it. Every scope
+  outside the **Core Grant** belongs to exactly one group. Declared per
+  endpoint in `esi/registry.ts`, so one scope can never sit in two groups.
 - **Seeded Build Plan**: A **Build Plan** opened from a BPC Sourcing **Offer**,
   from a blueprint line in a BPC contract's contents list, or from a
   **Contract Search** item row (issue #931), at that copy's own ME, TE and

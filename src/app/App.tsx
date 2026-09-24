@@ -1,4 +1,4 @@
-import { useEffect, type ReactElement } from 'react';
+import { lazy, Suspense, useEffect, type ReactElement } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import { withSentryReactRouterV7Routing } from '@sentry/react';
@@ -15,37 +15,8 @@ import { useBackgroundSync } from './backgroundSync';
 import { prefetchCharacterData } from './prefetch';
 import { Login } from '@/routes/Login';
 import { Callback } from '@/routes/Callback';
-import { Characters } from '@/routes/Characters';
+import * as routeChunks from './routeChunks';
 import { Overview } from '@/routes/Overview';
-import { Alerts } from '@/routes/Alerts';
-import { Skills } from '@/routes/Skills';
-import { SkillPlans } from '@/routes/SkillPlans';
-import { SkillPlanEditor } from '@/routes/SkillPlanEditor';
-import { SkillCompare } from '@/routes/SkillCompare';
-import { SkillShips } from '@/routes/SkillShips';
-import { Industry } from '@/routes/Industry';
-import { Fittings } from '@/routes/Fittings';
-import { IndustryPlanPage } from '@/routes/IndustryPlanPage';
-import { IndustryGroupPage } from '@/routes/IndustryGroupPage';
-import { Corp } from '@/routes/Corp';
-import { CorpMembers } from '@/routes/CorpMembers';
-import { CorpAssets } from '@/routes/CorpAssets';
-import { Market } from '@/routes/Market';
-import { Wallet } from '@/routes/Wallet';
-import { MoonMiningTax } from '@/routes/MoonMiningTax';
-import { LoyaltyStore } from '@/routes/LoyaltyStore';
-import { Clones } from '@/routes/Clones';
-import { PlanetaryIndustry } from '@/routes/PlanetaryIndustry';
-import { Assets } from '@/routes/Assets';
-import { Mail } from '@/routes/Mail';
-import { Calendar } from '@/routes/Calendar';
-import { Contracts } from '@/routes/Contracts';
-import { Contacts } from '@/routes/Contacts';
-import { EmploymentHistory } from '@/routes/EmploymentHistory';
-import { Settings } from '@/routes/Settings';
-import { Styleguide } from '@/routes/Styleguide';
-import { AppraisalShared } from '@/routes/AppraisalShared';
-import { ErrorProbe } from '@/routes/ErrorProbe';
 import { NotFound } from '@/routes/NotFound';
 import { Layout } from './Layout';
 import { AnalyticsPageViewTracker } from './AnalyticsPageViewTracker';
@@ -53,6 +24,8 @@ import { DocumentTitleTracker } from './DocumentTitleTracker';
 import { ReloadPrompt } from './ReloadPrompt';
 import { InstallPrompt } from './InstallPrompt';
 import { BootScreen } from './BootScreen';
+import { Spinner } from '@/components/ui';
+import { useTranslation } from 'react-i18next';
 import { RequireCharacter } from './RequireCharacter';
 import { ScopeGate } from './ScopeGate';
 import { TabRoute } from './TabRoute';
@@ -72,6 +45,54 @@ import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 // (tokenProvider.ts) so a dead refresh grant is reported centrally instead of
 // surfacing as an empty view in whichever feature happened to ask first.
 configureEsi({ getToken: (characterId) => getAccessTokenReportingFailures(characterId) });
+
+// Code-split routes (`routeChunks.ts`). Login, Callback, Overview and
+// NotFound stay eager above: a cold load can land on them before any choice.
+const Characters = lazy(routeChunks.loadCharacters);
+const Alerts = lazy(routeChunks.loadAlerts);
+const Skills = lazy(routeChunks.loadSkills);
+const SkillPlans = lazy(routeChunks.loadSkillPlans);
+const SkillPlanEditor = lazy(routeChunks.loadSkillPlanEditor);
+const SkillCompare = lazy(routeChunks.loadSkillCompare);
+const SkillShips = lazy(routeChunks.loadSkillShips);
+const Industry = lazy(routeChunks.loadIndustry);
+const IndustryPlanPage = lazy(routeChunks.loadIndustryPlanPage);
+const IndustryGroupPage = lazy(routeChunks.loadIndustryGroupPage);
+const Fittings = lazy(routeChunks.loadFittings);
+const Corp = lazy(routeChunks.loadCorp);
+const CorpMembers = lazy(routeChunks.loadCorpMembers);
+const CorpAssets = lazy(routeChunks.loadCorpAssets);
+const Market = lazy(routeChunks.loadMarket);
+const Wallet = lazy(routeChunks.loadWallet);
+const MoonMiningTax = lazy(routeChunks.loadMoonMiningTax);
+const LoyaltyStore = lazy(routeChunks.loadLoyaltyStore);
+const Clones = lazy(routeChunks.loadClones);
+const PlanetaryIndustry = lazy(routeChunks.loadPlanetaryIndustry);
+const Assets = lazy(routeChunks.loadAssets);
+const Mail = lazy(routeChunks.loadMail);
+const Calendar = lazy(routeChunks.loadCalendar);
+const Contracts = lazy(routeChunks.loadContracts);
+const Contacts = lazy(routeChunks.loadContacts);
+const EmploymentHistory = lazy(routeChunks.loadEmploymentHistory);
+const Settings = lazy(routeChunks.loadSettings);
+const Styleguide = lazy(routeChunks.loadStyleguide);
+const AppraisalShared = lazy(routeChunks.loadAppraisalShared);
+const ErrorProbe = lazy(routeChunks.loadErrorProbe);
+
+/**
+ * Suspense fallback for the lazy routes outside `Layout` (`/styleguide`,
+ * `/share/appraisal`, `/error`). Feature routes suspend inside `Layout`'s own
+ * boundary instead, so the shell stays up. Not `BootScreen`: that one reports
+ * a boot stall after ten seconds, and a slow chunk is not a stalled boot.
+ */
+function RouteFallback() {
+  const { t } = useTranslation();
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-bg text-text">
+      <Spinner label={t('common.loading')} />
+    </main>
+  );
+}
 
 /**
  * `<Routes>` with Sentry's route-pattern reporting layered on, so a navigation
@@ -242,39 +263,41 @@ export function App() {
         <AuthFailureRedirect />
         <AnalyticsPageViewTracker />
         <DocumentTitleTracker />
-        <SentryRoutes>
-          <Route path="/" element={<Root />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/callback" element={<Callback />} />
-          {/* Below: a logged-in Character, then the route's own scopes. */}
-          <Route element={<RequireCharacter />}>
-            <Route element={<Layout />}>
-              {/* A tabbed page (`pageTabs.ts`) mounts once at `<path>/*`, so
+        <Suspense fallback={<RouteFallback />}>
+          <SentryRoutes>
+            <Route path="/" element={<Root />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/callback" element={<Callback />} />
+            {/* Below: a logged-in Character, then the route's own scopes. */}
+            <Route element={<RequireCharacter />}>
+              <Route element={<Layout />}>
+                {/* A tabbed page (`pageTabs.ts`) mounts once at `<path>/*`, so
                   its tabs are one route instance: switching tab keeps the
                   page mounted, and none of the tables above gain an entry. */}
-              {FEATURE_ROUTES.map(([path, element]) => {
-                const tabs = PAGE_TABS[path];
-                const gated = <ScopeGate path={path}>{element}</ScopeGate>;
-                return (
-                  <Route
-                    key={path}
-                    path={routePatternFor(path)}
-                    element={tabs ? <TabRoute page={tabs}>{gated}</TabRoute> : gated}
-                  />
-                );
-              })}
+                {FEATURE_ROUTES.map(([path, element]) => {
+                  const tabs = PAGE_TABS[path];
+                  const gated = <ScopeGate path={path}>{element}</ScopeGate>;
+                  return (
+                    <Route
+                      key={path}
+                      path={routePatternFor(path)}
+                      element={tabs ? <TabRoute page={tabs}>{gated}</TabRoute> : gated}
+                    />
+                  );
+                })}
+              </Route>
             </Route>
-          </Route>
-          <Route path="/styleguide" element={<Styleguide />} />
-          {/* The app's first real unauthenticated content route (#831) — a
+            <Route path="/styleguide" element={<Styleguide />} />
+            {/* The app's first real unauthenticated content route (#831) — a
               Share link must open with no session and no Character, so it
               sits outside RequireCharacter/ScopeGate the same way /styleguide
               does. routeScopes.test.ts asserts this exemption is deliberate. */}
-          <Route path="/share/appraisal" element={<AppraisalShared />} />
-          {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
-          <Route path="/error" element={<ErrorProbe />} />
-          <Route path="*" element={<NotFound />} />
-        </SentryRoutes>
+            <Route path="/share/appraisal" element={<AppraisalShared />} />
+            {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
+            <Route path="/error" element={<ErrorProbe />} />
+            <Route path="*" element={<NotFound />} />
+          </SentryRoutes>
+        </Suspense>
         <ReloadPrompt />
         <PublicInfoModal />
         <SkillDetailModal />

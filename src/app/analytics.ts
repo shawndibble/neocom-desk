@@ -29,15 +29,34 @@ async function loadAnalytics(): Promise<Analytics | null> {
   return getAnalytics(getFirebaseApp());
 }
 
+/**
+ * A failed chunk load (a stale hash after a deploy, or a flaky mobile
+ * connection) isn't cached, so a later page view can try again rather than
+ * re-throwing the same rejected promise on every route change.
+ */
 function getAnalyticsInstance(): Promise<Analytics | null> {
-  analyticsPromise ??= loadAnalytics();
+  analyticsPromise ??= loadAnalytics().catch((error: unknown) => {
+    analyticsPromise = undefined;
+    throw error;
+  });
   return analyticsPromise;
 }
 
+/**
+ * Callers fire-and-forget this on every route change, so a failed chunk load
+ * drops the page view instead of rejecting — only the load is guarded, so a
+ * bug in `logEvent`'s payload still surfaces.
+ */
 export async function trackPageView(pagePath: string, pageTitle?: string): Promise<void> {
-  const analytics = await getAnalyticsInstance();
-  if (!analytics) return;
-  const { logEvent } = await import('firebase/analytics');
+  let analytics: Analytics | null;
+  let logEvent: typeof import('firebase/analytics').logEvent;
+  try {
+    analytics = await getAnalyticsInstance();
+    if (!analytics) return;
+    ({ logEvent } = await import('firebase/analytics'));
+  } catch {
+    return;
+  }
   logEvent(analytics, 'page_view', {
     page_path: pagePath,
     page_title: pageTitle,

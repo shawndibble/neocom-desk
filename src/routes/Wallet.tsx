@@ -31,6 +31,7 @@ import { db } from '@/db';
 import {
   loadWalletBalanceWithStatus,
   loadWalletJournal,
+  loadWalletTransactions,
   loadAllCharactersWalletBalances,
   totalWalletBalance,
   type CharacterWalletBalance,
@@ -80,6 +81,8 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
+import { JournalDescriptionCell } from '@/features/character/JournalDescriptionCell';
+import { journalTransactionLinks } from '@/features/character/journalTransactionLink';
 import {
   activeWalletJournalFilterCount,
   EMPTY_JOURNAL_FILTER_PARAMS,
@@ -95,6 +98,7 @@ import type {
   CorporationWalletDivision,
   CorporationWalletTransaction,
   WalletJournalEntry,
+  WalletTransactionCommon,
 } from '@/esi/endpoints';
 import { walletBalanceHistory, walletBalanceTrend } from '@/engine/wallet/balanceHistory';
 
@@ -249,6 +253,13 @@ const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const EMPTY_JOURNAL: readonly WalletJournalEntry[] = [];
 /** Same, for the corp transactions tab. */
 const EMPTY_TRANSACTIONS: readonly CorporationWalletTransaction[] = [];
+/** Same, for the personal fills the journal links its market lines to. */
+const EMPTY_FILLS: readonly WalletTransactionCommon[] = [];
+
+/** The one spelling of an item id from a resolved-names map; an unresolved id reads as `Type #id`. */
+function typeNameLookup(names: ReadonlyMap<number, string>): (typeId: number) => string {
+  return (typeId) => names.get(typeId) ?? `Type #${typeId}`;
+}
 
 /** `?owner=`/`?division=` params (issue #419, #1302). */
 const OWNER_PARAM = enumParam<DataOwner>(['personal', 'corporation'], 'personal');
@@ -298,6 +309,23 @@ async function loadWalletSnapshot(
     loyaltyNeedsReauth,
     corporationNames,
   };
+}
+
+/**
+ * The Character's recent fills, read only so a journal line can name the item
+ * behind it (the fills themselves are listed on Market's History ›
+ * Transactions view). Its own load, not part of `loadWalletSnapshot`: the
+ * Balance tab would otherwise wait on a cursor walk it never shows.
+ */
+interface PersonalFillsSnapshot {
+  transactions: readonly WalletTransactionCommon[];
+  typeNames: Map<number, string>;
+}
+
+async function loadPersonalFills(characterId: number): Promise<PersonalFillsSnapshot> {
+  const transactions = (await loadWalletTransactions(characterId))?.data ?? [];
+  const typeNames = await loadTypeNames([...new Set(transactions.map((txn) => txn.type_id))]);
+  return { transactions, typeNames };
 }
 
 /** Balances and the division names, which need two separate reads and two separate scopes. */
@@ -720,13 +748,15 @@ export function Wallet() {
   // endpoint, so nothing is fetched until the tab is opened — and once it has
   // been opened for this division, `visitedTransactionsKey` keeps the key
   // alive so a tab toggle doesn't walk the cursor again (issue #413's fix,
-  // applied to the new tab).
+  // applied to the new tab). The Journal tab opens it too: its market lines
+  // name their item from these same fills.
   const corpTransactionsBaseKey = showingCorp
     ? `${activeCharacterId}:${corporationId}:${effectiveDivision}`
     : null;
   const [visitedTransactionsKey, setVisitedTransactionsKey] = useState<string | null>(null);
+  const corpTransactionsWanted = walletTab === 'transactions' || walletTab === 'journal';
   if (
-    walletTab === 'transactions' &&
+    corpTransactionsWanted &&
     corpTransactionsBaseKey !== null &&
     visitedTransactionsKey !== corpTransactionsBaseKey
   ) {
@@ -734,7 +764,7 @@ export function Wallet() {
   }
   const corpTransactions = useCorpSnapshot<CorpTransactionsSnapshot | null>(
     corpTransactionsBaseKey !== null &&
-      (walletTab === 'transactions' || visitedTransactionsKey === corpTransactionsBaseKey)
+      (corpTransactionsWanted || visitedTransactionsKey === corpTransactionsBaseKey)
       ? corpTransactionsBaseKey
       : null,
     async () =>
@@ -743,6 +773,32 @@ export function Wallet() {
         : loadCorpTransactions(activeCharacterId, corporationId, effectiveDivision),
     { name: 'wallet:corp-transactions', characterId: activeCharacterId }
   );
+
+  // Opt-in the same way: fetched only once the personal Journal tab is open,
+  // and — like the corp reads above — kept alive once visited, so a tab
+  // toggle doesn't walk the cursor again.
+  const personalFillsBaseKey =
+    !showingCorp && activeCharacterId !== null ? `${activeCharacterId}` : null;
+  const [visitedFillsKey, setVisitedFillsKey] = useState<string | null>(null);
+  if (
+    walletTab === 'journal' &&
+    personalFillsBaseKey !== null &&
+    visitedFillsKey !== personalFillsBaseKey
+  ) {
+    setVisitedFillsKey(personalFillsBaseKey);
+  }
+  const personalFills = useCorpSnapshot<PersonalFillsSnapshot | null>(
+    personalFillsBaseKey !== null &&
+      (walletTab === 'journal' || visitedFillsKey === personalFillsBaseKey)
+      ? personalFillsBaseKey
+      : null,
+    async () => (activeCharacterId === null ? null : loadPersonalFills(activeCharacterId)),
+    { name: 'wallet:personal-fills', characterId: activeCharacterId }
+  );
+  const handlePersonalRefresh = () => {
+    refresh();
+    personalFills.refresh();
+  };
 
   const divisionLabel = (entry: WalletDivision) =>
     entry.name ?? t('wallet.corpDivisionFallback', { division: entry.division });
@@ -863,8 +919,15 @@ export function Wallet() {
     walletBalanceColumns.map((column) => column.id)
   );
 
-  const journalColumns = useMemo<DataTableColumn<WalletJournalEntry>[]>(
-    () => [
+  /**
+   * One column set for both journals — ESI returns the same schema for each —
+   * built per journal only because each links its lines to its own fills.
+   */
+  const buildJournalColumns = useCallback(
+    (
+      linkFor: (entry: WalletJournalEntry) => WalletTransactionCommon | undefined,
+      nameFor: (typeId: number) => string
+    ): DataTableColumn<WalletJournalEntry>[] => [
       {
         id: 'date',
         header: t('wallet.date'),
@@ -885,7 +948,16 @@ export function Wallet() {
       {
         id: 'description',
         header: t('wallet.description'),
-        render: (entry) => entry.description,
+        render: (entry) => {
+          const transaction = linkFor(entry);
+          return (
+            <JournalDescriptionCell
+              description={entry.description}
+              transaction={transaction}
+              itemName={transaction ? nameFor(transaction.type_id) : ''}
+            />
+          );
+        },
         sortValue: (entry) => entry.description,
       },
       {
@@ -909,6 +981,18 @@ export function Wallet() {
       },
     ],
     [t, timeZone]
+  );
+
+  const personalTransactions = personalFills.data?.transactions ?? EMPTY_FILLS;
+  const personalTypeNames = personalFills.data?.typeNames ?? NO_NAMES;
+  const personalLinkFor = useMemo(
+    () => journalTransactionLinks(personalTransactions),
+    [personalTransactions]
+  );
+  const personalNameFor = useMemo(() => typeNameLookup(personalTypeNames), [personalTypeNames]);
+  const journalColumns = useMemo(
+    () => buildJournalColumns(personalLinkFor, personalNameFor),
+    [buildJournalColumns, personalLinkFor, personalNameFor]
   );
 
   // Unsorted: `DataTable`'s own controlled `sort` below is the one place
@@ -957,9 +1041,14 @@ export function Wallet() {
   const corpTypeNames = corpTransactions.data?.typeNames ?? NO_NAMES;
   // The one spelling of an item id on this tab: the table's column, the CSV
   // and the search all go through it, so what is drawn is what is searched.
-  const nameForType = useCallback(
-    (typeId: number) => corpTypeNames.get(typeId) ?? `Type #${typeId}`,
-    [corpTypeNames]
+  const nameForType = useMemo(() => typeNameLookup(corpTypeNames), [corpTypeNames]);
+  const corpLinkFor = useMemo(
+    () => journalTransactionLinks(corpTransactionRows),
+    [corpTransactionRows]
+  );
+  const corpJournalColumns = useMemo(
+    () => buildJournalColumns(corpLinkFor, nameForType),
+    [buildJournalColumns, corpLinkFor, nameForType]
   );
 
   // In the URL (`txn.*`, issue #1302), and reset on a division switch for the
@@ -1027,11 +1116,11 @@ export function Wallet() {
             <IconButton
               icon={<Icon.Refresh />}
               label={t('wallet.refresh')}
-              onClick={showingCorp ? handleCorpRefresh : refresh}
+              onClick={showingCorp ? handleCorpRefresh : handlePersonalRefresh}
               disabled={
                 showingCorp
                   ? corpBalances.loading || corpJournal.loading || corpTransactions.loading
-                  : loading
+                  : loading || personalFills.loading
               }
             />
           </>
@@ -1126,7 +1215,7 @@ export function Wallet() {
             journalResult={corpJournalResult}
             journal={corpJournalEntries}
             journalLoading={corpJournal.loading && corpJournal.data === null}
-            journalColumns={journalColumns}
+            journalColumns={corpJournalColumns}
             journalFilter={journalFilter}
             onJournalFilterChange={setJournalFilter}
             journalSort={journalSortProps.sort}

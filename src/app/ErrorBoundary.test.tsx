@@ -39,4 +39,33 @@ describe('ErrorBoundary', () => {
     );
     expect(screen.queryByText(/dexie is unhappy/i)).not.toBeInTheDocument();
   });
+
+  it('inline, fails inside the shell rather than as a page of its own', () => {
+    render(
+      <main>
+        <ErrorBoundary inline>
+          <Boom />
+        </ErrorBoundary>
+      </main>
+    );
+    expect(screen.getByRole('heading', { name: /something went wrong/i })).toBeInTheDocument();
+    // One landmark: the shell's own `<main>`, not a second one nested in it.
+    expect(screen.getAllByRole('main')).toHaveLength(1);
+  });
+
+  it('recovers when resetKey changes, so navigating away clears a failed page', () => {
+    const { rerender } = render(
+      <ErrorBoundary inline resetKey="/market">
+        <Boom />
+      </ErrorBoundary>
+    );
+    expect(screen.getByRole('heading', { name: /something went wrong/i })).toBeInTheDocument();
+
+    rerender(
+      <ErrorBoundary inline resetKey="/wallet">
+        <p>wallet</p>
+      </ErrorBoundary>
+    );
+    expect(screen.getByText('wallet')).toBeInTheDocument();
+  });
 });

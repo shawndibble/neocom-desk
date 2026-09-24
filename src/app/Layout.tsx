@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { pageKeyFor } from './pageTabs';
 import { useRouteFocus } from './routeFocus';
@@ -11,10 +11,18 @@ import { isSyncConfigured } from './syncStatus';
 import { SyncStatusDot } from './SyncStatusDot';
 import { SyncErrorNote } from './SyncErrorNote';
 import { useSyncStatus } from './useSyncStatus';
-import { CharacterAvatar, characterAvatarBoxClassName, LogoMark, Modal } from '@/components/ui';
+import {
+  CharacterAvatar,
+  characterAvatarBoxClassName,
+  LogoMark,
+  Modal,
+  Spinner,
+} from '@/components/ui';
 import { AuthFailureNotice } from './AuthFailureNotice';
 import { useGrantedScopes, useLockedRoutes } from './useGrantedScopes';
 import { warmRoute } from './routeWarm';
+import { preloadRouteChunk } from './routeChunks';
+import { ErrorBoundary } from './ErrorBoundary';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 import { NotificationPermissionPrompt } from '@/features/notifications/NotificationPermissionPrompt';
 import { ForegroundNotificationPoller } from '@/features/notifications/ForegroundNotificationPoller';
@@ -188,10 +196,16 @@ function NavItem({ to, label, locked, badge, presentation = 'rail', onClick }: N
    * compose scope-gated reads, so `routeWarm.ts` filters on the endpoints its
    * loader actually reaches.
    *
+   * The route's code chunk (`routeChunks.ts`) is preloaded on the same
+   * intent, ungated: fetching JavaScript spends no ESI request.
+   *
    * A touch device fires neither event until the tap itself, so on the phone's
    * two surfaces this is inert rather than wasted.
    */
-  const warm = () => void warmRoute(to, activeCharacterId, granted);
+  const warm = () => {
+    preloadRouteChunk(to);
+    void warmRoute(to, activeCharacterId, granted);
+  };
   const tab = presentation === 'tab';
   const counted = badge !== undefined && badge > 0;
   // The lock marker rides on `title`, and the count on `aria-label`: a second
@@ -648,7 +662,21 @@ export function Layout() {
           (`routeFocus.ts`) lands here instead.
         */}
         <div ref={outletRef} tabIndex={-1} className="focus:outline-none">
-          <Outlet />
+          {/* Routes are code-split (`routeChunks.ts`): the shell stays put
+              while a page's chunk loads on its first visit, and a page that
+              throws — or whose chunk will not load — fails inside the shell,
+              clearing once the pilot navigates elsewhere. */}
+          <ErrorBoundary inline resetKey={location.pathname}>
+            <Suspense
+              fallback={
+                <div className="flex justify-center py-16">
+                  <Spinner label={t('common.loading')} />
+                </div>
+              }
+            >
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </div>
       </main>
 
