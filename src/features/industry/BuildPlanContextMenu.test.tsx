@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
-import { BuildPlanContextMenu } from './BuildPlanContextMenu';
+import { BuildPlanContextMenu, BpcOfferMoreActions } from './BuildPlanContextMenu';
 import type { BlueprintMap } from '@/sde/types';
 
 const loadBlueprints = vi.fn();
@@ -146,5 +147,65 @@ describe('BuildPlanContextMenu', () => {
     fireEvent.contextMenu(screen.getByTestId('row'));
     await screen.findByRole('menuitem', { name: 'Build Plan' });
     expect(loadBlueprints).toHaveBeenCalled();
+  });
+});
+
+// Issue #1498: the BPC Sourcing table's offer rows render this beside
+// `BuildPlanContextMenu` so the row has a keyboard path (WCAG 2.1.1)
+// independent of the right-click trigger.
+describe('BpcOfferMoreActions', () => {
+  function renderMoreActions(itemName?: string) {
+    return render(
+      <MemoryRouter initialEntries={['/bpc-contracts']}>
+        <BpcOfferMoreActions typeId={638} {...(itemName ? { itemName } : {})} />
+        <Routes>
+          <Route path="*" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>
+    );
+  }
+
+  it('gives the row a focusable "More actions" button naming its subject', () => {
+    renderMoreActions('Rifter Blueprint');
+    expect(
+      screen.getByRole('button', { name: 'More actions for Rifter Blueprint' })
+    ).toBeInTheDocument();
+  });
+
+  it('falls back to the typeID when the row has no resolved name yet', () => {
+    renderMoreActions();
+    expect(screen.getByRole('button', { name: 'More actions for #638' })).toBeInTheDocument();
+  });
+
+  it('opens the same items from the button as from the context menu', async () => {
+    const user = userEvent.setup();
+    renderMoreActions('Rifter Blueprint');
+
+    await user.click(screen.getByRole('button', { name: 'More actions for Rifter Blueprint' }));
+    // Waits for the Build Plan label to settle (it starts as "checking…"
+    // until the blueprint index resolves), so this list isn't captured
+    // mid-load.
+    await screen.findByRole('menuitem', { name: 'Build Plan' });
+    const buttonItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
+    await user.keyboard('{Escape}');
+
+    render(
+      <MemoryRouter initialEntries={['/bpc-contracts']}>
+        <BuildPlanContextMenu
+          typeId={638}
+          itemName="Rifter Blueprint"
+          trigger={
+            <button type="button" data-testid="row">
+              Rifter Blueprint
+            </button>
+          }
+        />
+      </MemoryRouter>
+    );
+    fireEvent.contextMenu(screen.getByTestId('row'));
+    await screen.findByRole('menuitem', { name: 'Build Plan' });
+    const contextItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
+
+    expect(buttonItems).toEqual(contextItems);
   });
 });

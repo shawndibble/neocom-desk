@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
@@ -78,5 +79,23 @@ describe('MarketWideOpportunitiesPanel row context menu', () => {
     fireEvent.contextMenu(screen.getByText('Widget Gamma').closest('tr')!);
 
     expect(await screen.findByText(/no blueprint/i)).toBeInTheDocument();
+  });
+
+  it('gives the row a visible "More actions" button with the same items as its right-click menu (issue #1498)', async () => {
+    const onAddToQuickbar = vi.fn();
+    renderPanel({ onAddToQuickbar });
+    const user = userEvent.setup();
+    const row = screen.getByText('Widget Beta').closest('tr')!;
+
+    await user.click(within(row).getByRole('button', { name: 'More actions for Widget Beta' }));
+    const buttonItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
+    await user.keyboard('{Escape}');
+
+    fireEvent.contextMenu(row);
+    const contextItems = await screen
+      .findAllByRole('menuitem')
+      .then((els) => els.map((el) => el.textContent));
+
+    expect(buttonItems).toEqual(contextItems);
   });
 });

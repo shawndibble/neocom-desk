@@ -15,6 +15,13 @@ interface ModalProps {
   onClose: () => void;
   /** Visible heading and the dialog's accessible name. Usually a string; a node is for a title that needs inline styling (e.g. a colored value), since `aria-labelledby` reads whatever text content renders. */
   title: ReactNode;
+  /**
+   * Rendered beside the title, outside the `<h2>` `aria-labelledby` points
+   * to — a "More actions" button here (issue #1498) must not fold its own
+   * `aria-label` into the dialog's accessible name the way an element
+   * inside `title` would.
+   */
+  titleActions?: ReactNode;
   children: ReactNode;
   /** `center` for dialogs, `sheet` for a bottom-anchored mobile drawer, `wide` for multi-column content (e.g. a comparison matrix). */
   placement?: ModalPlacement;
@@ -31,7 +38,15 @@ interface ModalProps {
  * for modals), and stays content-sized rather than viewport-filling — otherwise
  * it would cover its own `::backdrop`.
  */
-export function Modal({ open, id, onClose, title, children, placement = 'center' }: ModalProps) {
+export function Modal({
+  open,
+  id,
+  onClose,
+  title,
+  titleActions,
+  children,
+  placement = 'center',
+}: ModalProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -105,10 +120,11 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
             <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
               <h2
                 id={titleId}
-                className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                className="min-w-0 flex-1 truncate text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
               >
                 {title}
               </h2>
+              {titleActions}
               {/* `Icon.Close` via `IconButton`, not the hand-rolled "×" glyph
                 this replaced: DESIGN.md's icon rules require an icon-only
                 control to be an `IconButton` and forbid a dingbat character

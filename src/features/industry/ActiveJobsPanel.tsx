@@ -57,7 +57,7 @@ import {
   type JobSlotSkills,
   type JobSlotCharacterInput,
 } from '@/engine/industry/jobSlots';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { CharacterBadge } from '@/features/character/assetBrowserRows';
 import {
@@ -670,8 +670,40 @@ export function ActiveJobsPanel({
           return <time dateTime={endDate.toISOString()}>{formatEveDateTime(endDate)}</time>;
         },
       },
+      {
+        // Visible keyboard-reachable equivalent of the row's right-click menu
+        // (WCAG 2.1.1, issue #1498) — same item list as `jobContextMenu` below,
+        // through the shared `useItemMenuNodes` hook, so the two can't drift.
+        id: 'moreActions',
+        header: '',
+        align: 'right',
+        render: (job) => {
+          const menuTypeId = contextMenuTypeId(job);
+          return (
+            <ItemMoreActions
+              typeId={menuTypeId}
+              itemName={nameForBlueprint(menuTypeId)}
+              blueprintTypeID={job.product_type_id !== undefined ? job.blueprint_type_id : null}
+              onAddToQuickbar={onAddToQuickbar}
+              quickbarAvailable={quickbarAvailable}
+              onShowInfo={onShowInfo}
+            />
+          );
+        },
+      },
     ],
-    [t, now, soon, done, jobTone, nameForBlueprint, showCharacterColumn]
+    [
+      t,
+      now,
+      soon,
+      done,
+      jobTone,
+      nameForBlueprint,
+      showCharacterColumn,
+      onAddToQuickbar,
+      quickbarAvailable,
+      onShowInfo,
+    ]
   );
   const sortProps = useUrlSort(
     'jobs.sort',

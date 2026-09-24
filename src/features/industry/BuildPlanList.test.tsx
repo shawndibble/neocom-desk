@@ -444,3 +444,125 @@ describe('BuildPlanList: dragging a plan into a group (#627)', () => {
     expect(screen.queryByText('Buzzard')).not.toBeInTheDocument();
   });
 });
+
+// Covers the visible "More actions" button beside a plan row's name (WCAG
+// 2.1.1 fix for keyboard-unreachable row actions, issue #1498) and that it
+// lists the same items as the right-click menu, including the "Move to
+// group" submenu's destinations.
+describe('BuildPlanList: "More actions" button for a plan row (#1498)', () => {
+  const GROUPS = [{ id: 'g1', name: 'Buzzard fit', order: 0 }];
+  const PLANS = [
+    plan({ id: 'a', name: 'Buzzard', buildGroupId: 'g1' }),
+    plan({ id: 'c', name: 'Rokh' }),
+  ];
+
+  function renderWithGroups(overrides: Record<string, unknown> = {}) {
+    return render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        groups={GROUPS}
+        expandedGroupIds={new Set(['g1'])}
+        {...overrides}
+      />
+    );
+  }
+
+  it('gives the row a focusable "More actions" button naming the plan', () => {
+    renderWithGroups();
+    expect(screen.getByRole('button', { name: 'More actions for Rokh' })).toBeInTheDocument();
+  });
+
+  it('opens the same items from the button as from the row context menu, including group destinations', async () => {
+    const user = userEvent.setup();
+    renderWithGroups();
+
+    await user.click(screen.getByRole('button', { name: 'More actions for Rokh' }));
+    expect(screen.getByRole('menuitem', { name: 'Move to group' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Duplicate' })).toBeInTheDocument();
+
+    // Clicking the sub-trigger opens its submenu, same as a real menu.
+    await user.click(screen.getByRole('menuitem', { name: 'Move to group' }));
+    expect(await screen.findByRole('menuitem', { name: 'Buzzard fit' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'No group' })).toBeInTheDocument();
+    await user.keyboard('{Escape}{Escape}');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+
+    const target = screen.getByText('Rokh');
+    target.focus();
+    fireEvent.contextMenu(target);
+    expect(screen.getByRole('menuitem', { name: 'Move to group' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Duplicate' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('menuitem', { name: 'Move to group' }));
+    expect(await screen.findByRole('menuitem', { name: 'Buzzard fit' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'No group' })).toBeInTheDocument();
+  });
+
+  it('renames the plan from the "More actions" button', async () => {
+    const user = userEvent.setup();
+    renderWithGroups();
+
+    await user.click(screen.getByRole('button', { name: 'More actions for Rokh' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
+
+    expect(screen.getByRole('textbox', { name: 'Rename' })).toBeInTheDocument();
+  });
+});
+
+// Covers the visible "More actions" button beside a group header's name
+// (WCAG 2.1.1, issue #1498) — a smaller, one-item version of the same fix,
+// since a group header's only right-click action is Rename.
+describe('BuildPlanList: "More actions" button for a group header (#1498)', () => {
+  const GROUPS = [{ id: 'g1', name: "Loru's Max Hacker — Buzzard", order: 0 }];
+  const PLANS = [plan({ id: 'a', name: 'Buzzard', buildGroupId: 'g1' })];
+
+  function renderGrouped(overrides: Record<string, unknown> = {}) {
+    return render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        groups={GROUPS}
+        {...overrides}
+      />
+    );
+  }
+
+  it('gives the header a focusable "More actions" button naming the group', () => {
+    renderGrouped();
+    expect(
+      screen.getByRole('button', { name: "More actions for Loru's Max Hacker — Buzzard" })
+    ).toBeInTheDocument();
+  });
+
+  it('opens Rename from the "More actions" button, matching the right-click menu', async () => {
+    const user = userEvent.setup();
+    renderGrouped();
+
+    await user.click(
+      screen.getByRole('button', { name: "More actions for Loru's Max Hacker — Buzzard" })
+    );
+    expect(screen.getAllByRole('menuitem').map((el) => el.textContent)).toEqual(['Rename']);
+
+    await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    expect(screen.getByRole('textbox', { name: 'Rename group' })).toBeInTheDocument();
+  });
+});

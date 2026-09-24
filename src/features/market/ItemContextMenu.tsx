@@ -5,11 +5,11 @@
  * materials (round 27), product heading, revenue and owned-sale rows, and the
  * recipe and Blueprint Acquisition modals.
  */
-import { useState, type ReactElement } from 'react';
+import { useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { industryTabHref } from '@/features/industry/industryTabs';
-import { MenuItem, RowActionsMenu } from '@/components/ui';
+import { MenuItem, RowActionsContext, RowActionsMenu, RowMoreActions } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
 import { marketLinkParams } from '@/engine/market/urlState';
 import { usePiPlannable } from '@/features/pi/usePiPlannable';
@@ -53,8 +53,18 @@ export interface ItemContextMenuProps {
  */
 export type ItemMenuFor = (typeId: number, trigger: ReactElement) => ReactElement;
 
+/** Everything the menu's entries need — the props minus the trigger wiring. */
+type ItemMenuProps = Omit<ItemContextMenuProps, 'children' | 'onOpenChange'>;
+
 /**
- * Item context menu: add to Quickbar, show info, add to Compare, view in
+ * The item menu's entries, shared by `ItemContextMenu` (right-click, and the
+ * row's `RowMoreActions` button it publishes to) and `ItemMoreActions` (a
+ * standalone button, issue #1498) — one list, so none of them can drift.
+ * Written with the kind-agnostic `MenuItem`, which renders as whichever menu
+ * family it lands in. `onAlertRequest` opens the caller's own
+ * `PriceAlertDialog`.
+ *
+ * Add to Quickbar, show info, add to Compare, view in
  * Market, copy name, jump to a Build Plan, jump to a PI Plan.
  *
  * The PI action asks for itself rather than taking a prop the way
@@ -66,26 +76,26 @@ export type ItemMenuFor = (typeId: number, trigger: ReactElement) => ReactElemen
  * have expected otherwise. Nothing renders while the answer is unknown, so
  * the row never appears under a cursor already in the menu.
  */
-export function ItemContextMenu({
-  typeId,
-  itemName,
-  blueprintTypeID,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
-  onCompareVariations,
-  onViewInIndustryAsMaterial,
-  onToggleBuildHere,
-  buildingHere,
-  onOpenChange,
-  children,
-}: ItemContextMenuProps) {
+function useItemMenuItems(
+  {
+    typeId,
+    itemName,
+    blueprintTypeID,
+    onAddToQuickbar,
+    quickbarAvailable,
+    onShowInfo,
+    onCompareVariations,
+    onViewInIndustryAsMaterial,
+    onToggleBuildHere,
+    buildingHere,
+  }: ItemMenuProps,
+  onAlertRequest: () => void
+): ReactNode {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const addToCompare = useCompareSet((state) => state.add);
   const piPlannable = usePiPlannable(typeId);
-  const [alertOpen, setAlertOpen] = useState(false);
 
   // `industry.*`, not `market.*`: `BuildPlanContextMenu` offers this same
   // action on the pages this richer menu doesn't reach (the BPC search table,
@@ -97,9 +107,7 @@ export function ItemContextMenu({
         ? t('industry.contextMenu.noBlueprintOptions')
         : t('industry.contextMenu.buildPlan');
 
-  // Published to `RowMoreActions` as well as the right-click menu, so a
-  // row's visible "More actions" button opens exactly these (WCAG 2.1.1).
-  const items = (
+  return (
     <>
       <MenuItem
         disabled={!quickbarAvailable}
@@ -108,11 +116,7 @@ export function ItemContextMenu({
       >
         {t('market.contextMenu.addToQuickbar')}
       </MenuItem>
-      <PriceAlertMenuItem
-        typeId={typeId}
-        available={quickbarAvailable}
-        onSelect={() => setAlertOpen(true)}
-      />
+      <PriceAlertMenuItem typeId={typeId} available={quickbarAvailable} onSelect={onAlertRequest} />
       <MenuItem onSelect={() => onShowInfo(typeId, itemName)}>
         {t('market.contextMenu.showInfo')}
       </MenuItem>
@@ -164,12 +168,46 @@ export function ItemContextMenu({
       )}
     </>
   );
+}
+
+/**
+ * Item context menu. Also publishes its items, so a `RowMoreActions` in the
+ * row (or `DataTable`'s `rowMoreActions` column) opens exactly these (WCAG
+ * 2.1.1, issue #1497).
+ */
+export function ItemContextMenu(props: ItemContextMenuProps) {
+  const { typeId, itemName, onOpenChange, children } = props;
+  const [alertOpen, setAlertOpen] = useState(false);
+  const items = useItemMenuItems(props, () => setAlertOpen(true));
 
   return (
     <>
       <RowActionsMenu name={itemName} items={items} onOpenChange={onOpenChange}>
         {children}
       </RowActionsMenu>
+      {alertOpen && (
+        <PriceAlertDialog typeId={typeId} itemName={itemName} onClose={() => setAlertOpen(false)} />
+      )}
+    </>
+  );
+}
+
+/**
+ * Visible "More actions" trigger for the same item menu (WCAG 2.1.1, issue
+ * #1498), for a surface whose button can't sit inside `ItemContextMenu`'s
+ * trigger — it builds its own copy of the items rather than reading a
+ * surrounding `ItemContextMenu`'s.
+ */
+export function ItemMoreActions(props: ItemMenuProps) {
+  const { typeId, itemName } = props;
+  const [alertOpen, setAlertOpen] = useState(false);
+  const items = useItemMenuItems(props, () => setAlertOpen(true));
+
+  return (
+    <>
+      <RowActionsContext.Provider value={{ name: itemName, items }}>
+        <RowMoreActions />
+      </RowActionsContext.Provider>
       {alertOpen && (
         <PriceAlertDialog typeId={typeId} itemName={itemName} onClose={() => setAlertOpen(false)} />
       )}

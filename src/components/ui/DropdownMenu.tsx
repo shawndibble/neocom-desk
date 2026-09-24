@@ -11,6 +11,7 @@ import { menuContentClassName, menuItemClassName } from './menuStyles';
  */
 export const DropdownMenu = DropdownMenuPrimitive.Root;
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
+export const DropdownMenuSub = DropdownMenuPrimitive.Sub;
 
 export function DropdownMenuContent({
   className,
@@ -61,8 +62,6 @@ export function DropdownMenuSeparator({
     <DropdownMenuPrimitive.Separator className={cx('my-1 h-px bg-line', className)} {...props} />
   );
 }
-
-export const DropdownMenuSub = DropdownMenuPrimitive.Sub;
 
 export function DropdownMenuSubTrigger({
   className,

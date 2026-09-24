@@ -15,6 +15,13 @@ interface BuildRecipeModalProps {
   onOpenRecipe: (typeID: number) => void;
   /** Wraps the title and each input row in the item context menu; omitted where the caller has none to offer. */
   itemMenuFor?: ItemMenuFor;
+  /**
+   * Visible "More actions" button for the title and each input row (WCAG
+   * 2.1.1, issue #1498) — before this, the title was a bare `<span>` and
+   * each row a bare `<li>`, neither reachable by keyboard at all. Omitted
+   * where the caller has none to offer.
+   */
+  itemActionsFor?: (typeId: number) => ReactElement;
 }
 
 /**
@@ -43,6 +50,7 @@ export function BuildRecipeModal({
   nameFor,
   onOpenRecipe,
   itemMenuFor,
+  itemActionsFor,
 }: BuildRecipeModalProps) {
   const { t } = useTranslation();
   const name = recipe ? nameFor(recipe.typeID) : '';
@@ -55,6 +63,7 @@ export function BuildRecipeModal({
       open={recipe !== null}
       onClose={onClose}
       title={recipe ? withMenu(recipe.typeID, <span>{title}</span>) : title}
+      titleActions={recipe && itemActionsFor ? itemActionsFor(recipe.typeID) : undefined}
     >
       {recipe && (
         <div className="space-y-4">
@@ -92,7 +101,10 @@ export function BuildRecipeModal({
                           </Button>
                         )}
                       </span>
-                      <span className="tabular-nums">{input.quantity.toLocaleString()}</span>
+                      <span className="inline-flex items-center gap-2">
+                        <span className="tabular-nums">{input.quantity.toLocaleString()}</span>
+                        {itemActionsFor && itemActionsFor(input.typeID)}
+                      </span>
                     </li>
                   )}
                 </Fragment>

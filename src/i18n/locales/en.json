@@ -447,6 +447,7 @@
   },
   "industry": {
     "title": "Build Plans",
+    "moreActionsLabel": "More actions for {{name}}",
     "contextMenu": {
       "buildPlan": "Build Plan",
       "buildPlanChecking": "Build Plan (checking…)",

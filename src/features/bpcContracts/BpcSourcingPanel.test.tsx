@@ -388,6 +388,42 @@ describe('BpcSourcingPanel', () => {
     });
   });
 
+  // Issue #1498 (WCAG 2.1.1): a visible, keyboard-reachable equivalent of the
+  // row's right-click menu, offering the identical item list.
+  it('gives an offer row a focusable "More actions" button opening the same items as right-click', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 1, typeId: 638, regionId: 10000002 })])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    await within(table).findByText('Rifter Blueprint');
+
+    const moreActionsButton = within(table).getByRole('button', {
+      name: 'More actions for Rifter Blueprint',
+    });
+    expect(moreActionsButton).toBeInTheDocument();
+
+    await user.click(moreActionsButton);
+    // Waits for the Build Plan label to settle (it starts as "checking…"
+    // until the blueprint index resolves), so this list isn't captured
+    // mid-load.
+    await screen.findByRole('menuitem', { name: 'Build Plan' });
+    const buttonItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
+    // The row also has `onRowClick` (opens the contract detail modal) —
+    // `DataTable`'s `ROW_CONTROL_SELECTOR` is supposed to exempt this button
+    // from that handler. Checked here rather than assumed.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await user.keyboard('{Escape}');
+
+    fireEvent.contextMenu(within(table).getByText('Rifter Blueprint'));
+    await screen.findByRole('menuitem', { name: 'Build Plan' });
+    const contextItems = screen.getAllByRole('menuitem').map((el) => el.textContent);
+
+    expect(buttonItems).toEqual(contextItems);
+  });
+
   it('still lands on the sourcing tab from the old /bpc-contracts link', async () => {
     loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([row({ contractId: 1, typeId: 638 })]));
     window.history.pushState({}, '', '/bpc-contracts');

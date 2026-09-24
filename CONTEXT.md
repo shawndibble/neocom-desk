@@ -236,6 +236,7 @@ here — they go one per file in `docs/context/decisions/`.
   display, or pay it — see `docs/context/decisions/` (mail reply and
   forward): a rejected send surfaces ESI's own error text and points the
   pilot at the in-game client instead.
+- **Damage Profile**: The mix of EM, Thermal, Kinetic and Explosive damage a **Fitting**'s tank is measured against — uniform, one pure type, a common NPC faction's average, or one the pilot defines. Changes EHP, never raw HP or resists. Distinct from a **Target Profile**, which is about what the Fitting shoots at.
 - **Dark**: A member with no login for the corp's inactivity span or more —
   the pilot's own setting (14/30/60/90 days), defaulting to
   `DARK_AFTER_DAYS` (30). `engine/corp/members.ts` still owns the default and
@@ -306,6 +307,7 @@ here — they go one per file in `docs/context/decisions/`.
   `NetworkColony.exportablePerHour`, computed by `colonyExportablePerHour`.
 - **Facility Preset**: Industry location model: NPC station or player structure type + rig level. Manufacturing structures (Raitaru/Azbel/Sotiyo, engineering complexes) and reaction structures (Athanor/Tatara, refineries — no NPC-station equivalent) each use their own **Industry Activity**'s rig bonuses and security-multiplier table (issue #460); the two never mix on one facility. Drives ME/time/cost bonuses in a Build Plan.
 - **Fit Import**: Pasting EFT fit text into Industry to get a **Build Group** holding one **Build Plan** per buildable item in the fit, named from the paste's own `[Ship, Fit]` header. Counts quantities the way a fit expresses them — one line per copy fitted _and_ the `xN` suffix, both reaching the same total — and reports what it could not build (faction, named and meta modules have no blueprint, and a fifth of a routine paste is normally one of those) rather than dropping it silently. New plans take their ME from the assumed-ME preference and their TE from the assumed-TE one rather than 0, since most of a T2 fit needs an invented BPC (ME2 / TE4 without a decryptor) and quoting it unresearched overstates the group's cost and understates its job time. Distinct from the Skill Planner's clipboard import, which reads the same text for the skills it demands, and from **Appraisal**, which reads it for what the loadout costs to buy; all three share `parseEftFit` and nothing else.
+- **Fitting**: One ship hull plus everything loaded into it — modules, charges, drones, fighters, cargo — under a name. The thing the Fittings section opens, edits, shares and compares. Its numbers (CPU, powergrid, damage, tank, capacitor…) are worked out for the active Character's skills, so switching Character re-states the same Fitting for the new pilot. The implants and combat boosters in play are either that Character's own clone or the set the Fitting itself carries, whichever the pilot has chosen; a Fitting that carries a set opens on it. The one exception to the active Character is a share link opened with nobody logged in, which is stated at every skill level V and says so. Distinct from an **In-game Fitting**, which is a Fitting as the game itself stores it on a Character, and from **Fit Import**, which turns fit text into Build Plans.
 - **Foreground Poller**: Client-side interval (5 minutes) that checks each
   enabled Notification Event's underlying ESI data while the app is open and
   the tab/window is visible; paused via the Page Visibility API when
@@ -351,6 +353,7 @@ here — they go one per file in `docs/context/decisions/`.
   "at what price do I stop losing ISK," which only holds net of the fees an
   actual sale pays.
 - **High-Tech Production Plant**: The planetary pin that makes a P3 from two P2s. The tier above an **Advanced Industry Facility**, and the reason the Advisor will not offer one to a pilot whose colonies make no P2: it has nothing to put in it unless the P2s are bought at a hub and hauled in.
+- **In-game Fitting**: A **Fitting** as the game stores it on one Character, read and written through ESI. Never copied into the app's own storage — opening one loads it like any other source. Carries less than a Fitting can: no module offline/overheat state, no binding of a charge to a particular module, no implants. The game has no edit, so saving a changed Fitting back replaces the In-game Fitting with a new one. Corporation fittings are not In-game Fittings in this sense: ESI does not expose them, and they reach the app only as an exported file that is **Load**ed.
 - **Include Reactions**: A manufacturing-activity Build Plan's own toggle,
   off by default, for whether a reaction-produced sub-input anywhere in its
   material tree can be recursively built rather than only marked advisory.
@@ -427,6 +430,7 @@ here — they go one per file in `docs/context/decisions/`.
   Structure timers, Moon chunks, Industry jobs — showing that kind's most urgent
   few and counting the rest. Fed by the one engine ranking, never a second one,
   and gated on the Corp Capability that opens its own read.
+- **Load**: Bringing a **Fitting** into the Fittings section from any outside source — EFT text, a DNA or in-game chat link, an exported fittings file, an **In-game Fitting**, a share link, another site's fit link, or a killmail. Loading stores nothing; only an explicit save does. Distinct from **Fit Import**, which turns fit text into Build Plans.
 - **Local Draw**: What a PI colony's own factories take an hour off the
   products that colony makes, by input typeID. Counted for every factory line
   whatever its status — a line one of whose inputs is imported still eats the
@@ -798,6 +802,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   against the decoded pairs and renders a read-only, unauthenticated view; the
   app's first real unauthenticated content route. Stateless — nothing is
   stored server-side, and there is nothing to expire or revoke.
+  A **Fitting** has its own Share Link, the same idea: the Fitting itself
+  (hull, modules and their state, charges, drones, cargo, any implant set)
+  compressed into the URL. It opens without a session, stated at every skill
+  level V. Inside the app, that same URL is where an open Fitting lives while it
+  is edited, so the address bar is always a Share Link.
 - **Shorthand ISK**: An ISK figure rendered abbreviated (`1.3B`) by the
   `IskAmount` component, with the exact value one gesture away — hover,
   keyboard focus, or touch — and in the element's accessible name so a screen
@@ -856,6 +865,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   on it. The four System Labels are the Mail page's folder filter: a
   multi-select toggle group, so any subset of them can be shown at once (see
   `docs/context/decisions/`, 2026-09-07).
+- **Target Profile**: The signature radius and speed of an imagined target that a **Fitting**'s applied damage is worked out against — built-in NPC classes or one the pilot defines. Changes applied DPS and its graphs, never raw DPS. Distinct from a **Damage Profile**, which is about what shoots at the Fitting.
 - **Throughput** (planetary): a **second budget, independent of the Pin
   Budget** — whether the colony's links can carry the material flow and
   whether a buffer cycle fits in the Launchpad and Storage Facility. This, not

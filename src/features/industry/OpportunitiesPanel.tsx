@@ -38,7 +38,7 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
@@ -386,6 +386,28 @@ export function OpportunitiesPanel({
           )}
         </span>
       ),
+    },
+    {
+      // Visible keyboard-reachable equivalent of `rowContextMenu` below (WCAG
+      // 2.1.1, issue #1498) — same conditional: a row whose product type is
+      // unknown has no item to open a menu for, so it renders bare.
+      id: 'moreActions',
+      header: '',
+      align: 'right',
+      render: (row) => {
+        const { productTypeID, productName, blueprintTypeID } = row.candidate.catalogEntry;
+        if (productTypeID === null) return null;
+        return (
+          <ItemMoreActions
+            typeId={productTypeID}
+            itemName={productName}
+            blueprintTypeID={blueprintTypeID}
+            onAddToQuickbar={onAddToQuickbar}
+            quickbarAvailable={quickbarAvailable}
+            onShowInfo={onShowInfo}
+          />
+        );
+      },
     },
   ];
   // A row whose product type is unknown has no item to open a menu for, so it

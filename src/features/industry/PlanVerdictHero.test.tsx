@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { BuildResult } from '@/engine/industry/types';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
@@ -9,6 +10,7 @@ import { PlanVerdictHero } from './PlanVerdictHero';
 import type { BreakdownContext } from './CalculationBreakdown';
 import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type { MaterialCostLine } from '@/engine/industry/types';
+import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
 
 /** One material the plan needs 100 of and the player already holds all 100 of. */
 const OWNED_MATERIALS: MaterialCostLine[] = [
@@ -100,6 +102,42 @@ function Harness({
 
 function renderHero(overrides: HeroOverrides & { openBreakdown?: boolean } = {}) {
   return render(<Harness {...overrides} />);
+}
+
+function renderHeroWithRouter(overrides: HeroOverrides & { openBreakdown?: boolean } = {}) {
+  return render(
+    <MemoryRouter>
+      <Harness {...overrides} />
+    </MemoryRouter>
+  );
+}
+
+function itemMenuFor(typeId: number, trigger: React.ReactElement) {
+  return (
+    <ItemContextMenu
+      typeId={typeId}
+      itemName="Rifter"
+      blueprintTypeID={null}
+      onAddToQuickbar={vi.fn()}
+      quickbarAvailable
+      onShowInfo={vi.fn()}
+    >
+      {trigger}
+    </ItemContextMenu>
+  );
+}
+
+function itemActionsFor(typeId: number) {
+  return (
+    <ItemMoreActions
+      typeId={typeId}
+      itemName="Rifter"
+      blueprintTypeID={null}
+      onAddToQuickbar={vi.fn()}
+      quickbarAvailable
+      onShowInfo={vi.fn()}
+    />
+  );
 }
 
 describe('PlanVerdictHero: verdict labels and prose', () => {
@@ -234,6 +272,38 @@ describe('PlanVerdictHero: calculation breakdown', () => {
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText(/Reactions have no ME/i)).toBeTruthy();
     expect(within(dialog).queryByText(/after ME 10/i)).toBeNull();
+  });
+});
+
+describe('PlanVerdictHero: heading actions button (issue #1498)', () => {
+  it('renders a focusable "More actions" button beside the heading', () => {
+    renderHeroWithRouter({ productTypeID: 587, itemActionsFor });
+    expect(screen.getByRole('button', { name: 'More actions for Rifter' })).toBeInTheDocument();
+  });
+
+  it('opens the identical item menu the heading’s right-click path opens', async () => {
+    const user = userEvent.setup();
+    renderHeroWithRouter({ productTypeID: 587, itemMenuFor, itemActionsFor });
+
+    fireEvent.contextMenu(screen.getByRole('heading', { name: 'Rifter' }));
+    const contextMenuItems = screen
+      .getAllByRole('menuitem')
+      .map((item) => item.textContent)
+      .sort();
+    await user.keyboard('{Escape}');
+
+    await user.click(screen.getByRole('button', { name: 'More actions for Rifter' }));
+    const buttonMenuItems = screen
+      .getAllByRole('menuitem')
+      .map((item) => item.textContent)
+      .sort();
+
+    expect(buttonMenuItems).toEqual(contextMenuItems);
+  });
+
+  it('renders nothing without a productTypeID', () => {
+    renderHeroWithRouter({ itemActionsFor });
+    expect(screen.queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
   });
 });
 

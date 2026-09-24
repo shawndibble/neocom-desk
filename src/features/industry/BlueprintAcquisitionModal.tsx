@@ -26,7 +26,15 @@
  * from the local SDE snapshot only (`loadContractLocationInfo`) — no ESI
  * call per row; a player structure stays unnamed.
  */
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -105,6 +113,12 @@ interface BlueprintAcquisitionModalProps {
   planHubId: TradeHub['id'];
   /** Wraps the title (the blueprint's own name) in the item context menu; omitted where the caller has none to offer. */
   itemMenuFor?: ItemMenuFor;
+  /**
+   * Visible "More actions" button beside the title (WCAG 2.1.1, issue
+   * #1498) — the title was a bare `<span>` with no focusable trigger of its
+   * own. Omitted where the caller has none to offer.
+   */
+  itemActionsFor?: (typeId: number) => ReactElement;
 }
 
 /** Names for `ids`, resolved one by one as they land; a missing entry means not resolved yet. */
@@ -181,6 +195,7 @@ export function BlueprintAcquisitionModal({
   onSearchBpcSourcing,
   planHubId,
   itemMenuFor,
+  itemActionsFor,
 }: BlueprintAcquisitionModalProps) {
   const { t } = useTranslation();
   const override = sourcing?.acquisitionTierOverride;
@@ -449,6 +464,7 @@ export function BlueprintAcquisitionModal({
             )
           : t('industry.blueprintAcquisitionModalTitle', { name: blueprintName })
       }
+      titleActions={itemActionsFor?.(blueprintTypeID)}
     >
       <div className="flex flex-col gap-4 text-xs">
         <div className="flex flex-col gap-1">

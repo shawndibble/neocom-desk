@@ -20,6 +20,10 @@ function useQuickbarItem(typeId: number) {
   return { quickbar, item: quickbar.items.find((i) => i.typeId === typeId) };
 }
 
+/**
+ * Kind-agnostic `MenuItem`, so the same entry renders into the right-click
+ * menu and its visible "More actions" counterpart — the two must never drift.
+ */
 export function PriceAlertMenuItem({
   typeId,
   available,

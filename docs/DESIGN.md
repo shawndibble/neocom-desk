@@ -129,6 +129,33 @@ Computed, not a fixed token set: call the function rather than hand-picking a
 color, and always render the numeric value (`0.9`, `-0.3`, …) alongside the
 color — colour is never the only signal (§7).
 
+### Damage types
+
+| Token           | Value     | Use                          |
+| --------------- | --------- | ---------------------------- |
+| `dmg-em`        | `#4f9fe8` | EM damage and resist.        |
+| `dmg-thermal`   | `#e0524a` | Thermal damage and resist.   |
+| `dmg-kinetic`   | `#a3adb8` | Kinetic damage and resist.   |
+| `dmg-explosive` | `#e8a13d` | Explosive damage and resist. |
+
+A second nominal set, and a deliberate exception to the clock-kind rule above.
+These colours belong to the game rather than to this app. Every EVE player
+reads blue, red, grey and orange as EM, Thermal, Kinetic and Explosive on
+sight, so recolouring them to keep clear of the status tones would cost more
+than the clash does. That's the same reasoning that lets security status
+follow the game's own scale. `dmg-thermal` sits close to `danger`, so:
+
+- Use them only for damage types: resist bars, damage profiles, damage
+  breakdowns. Never for status, and never for anything else that happens to
+  come in fours.
+- Always pair each one with its written type name or its percentage (§7). A
+  resist bar prints its number, and a legend names the four.
+- Where a red means "over budget" or "can't use", it is `danger` on its own
+  element, never a damage-type fill.
+
+Added with the Fittings section — see
+`docs/context/decisions/20260924-150509-fittings-section-a-fitter-after-all.md`.
+
 ## 2. Typography
 
 No bundled fonts, no new deps — system stack approximating EVE's condensed sans

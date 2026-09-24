@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -122,6 +122,13 @@ interface ResultsSummaryProps {
   totalVolume: MaterialVolumeTotals;
   /** Wraps the revenue (product) and owned-sale (material) rows in the item context menu; omitted where the caller has none to offer. */
   itemMenuFor?: ItemMenuFor;
+  /**
+   * Visible "More actions" button for the revenue and owned-sale rows (WCAG
+   * 2.1.1, issue #1498) — the same item menu `itemMenuFor` opens on
+   * right-click/long-press, reachable by keyboard. Omitted where the caller
+   * has none to offer.
+   */
+  itemActionsFor?: (typeId: number) => ReactElement;
 }
 
 /**
@@ -153,6 +160,7 @@ export function ResultsSummary({
   nameFor,
   totalVolume,
   itemMenuFor,
+  itemActionsFor,
 }: ResultsSummaryProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -186,8 +194,18 @@ export function ResultsSummary({
         className: 'tabular-nums',
         render: (row) => formatIsk(row.lineTotal),
       },
+      ...(itemActionsFor && productTypeID !== null
+        ? [
+            {
+              id: 'actions',
+              header: '',
+              align: 'right',
+              render: () => itemActionsFor(productTypeID),
+            } satisfies DataTableColumn<RevenueRow>,
+          ]
+        : []),
     ],
-    [t]
+    [t, itemActionsFor, productTypeID]
   );
 
   const saleColumns = useMemo<DataTableColumn<OwnedStockSaleLine>[]>(
@@ -214,8 +232,18 @@ export function ResultsSummary({
         className: 'tabular-nums',
         render: (row) => formatIsk(row.net),
       },
+      ...(itemActionsFor
+        ? [
+            {
+              id: 'actions',
+              header: '',
+              align: 'right',
+              render: (row) => itemActionsFor(row.typeID),
+            } satisfies DataTableColumn<OwnedStockSaleLine>,
+          ]
+        : []),
     ],
-    [t, nameFor]
+    [t, nameFor, itemActionsFor]
   );
 
   if (pricesLoading) {

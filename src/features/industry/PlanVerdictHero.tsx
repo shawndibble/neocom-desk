@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IskAmount, Panel, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -57,6 +57,13 @@ interface PlanVerdictHeroProps {
   productTypeID?: number | null;
   /** Wraps the product heading in the item context menu; omitted where the caller has none to offer. */
   itemMenuFor?: ItemMenuFor;
+  /**
+   * Visible "More actions" button beside the product heading (WCAG 2.1.1,
+   * issue #1498) — the hero's `<h2>` has no focusable trigger of its own, so
+   * this is that surface's only keyboard path to the item menu. Omitted
+   * where the caller has none to offer.
+   */
+  itemActionsFor?: (typeId: number) => ReactElement;
   runs: number;
   /** Both liquidation bases; the hero states the sell-now one. Null with no owned stock priced. */
   ownedSale: { instant: OwnedStockSale; order: OwnedStockSale } | null;
@@ -85,6 +92,7 @@ export function PlanVerdictHero({
   productName,
   productTypeID,
   itemMenuFor,
+  itemActionsFor,
   runs,
   ownedSale,
   breakdown,
@@ -137,6 +145,7 @@ export function PlanVerdictHero({
               ) : (
                 <h2 className="text-text">{productName}</h2>
               )}
+              {itemActionsFor && productTypeID != null && itemActionsFor(productTypeID)}
               {skillGate?.gated && nameForSkill && nameForCharacter && (
                 <SkillGateMarker
                   verdict={skillGate}
