@@ -96,6 +96,7 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import { assetCsvRows, assetsCsvColumns } from '@/features/character/assetsCsv';
 import { getAdjustedPrices } from '@/market/prices';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { useFocusHeading } from '@/lib/useFocusHeading';
 
 const SEARCH_DEBOUNCE_MS = 250;
 const SEARCH_PARAM = textParam();
@@ -331,6 +332,14 @@ function CorpAssetsView() {
     [wildcard]
   );
 
+  // Level-heading focus (issue #1485), same mechanism and same reasoning as
+  // `Assets.tsx`: a division/container link, or Back, unmounts the control
+  // the pilot just activated, so focus needs somewhere to land. Shared by
+  // whichever of the two header blocks below is rendered (root division list
+  // / drilled level) — only one exists at a time.
+  const levelHeadingRef = useRef<HTMLHeadingElement>(null);
+  useFocusHeading(levelHeadingRef, wildcard);
+
   const groups = data?.groups ?? null;
   const typeNames = data?.labels.types ?? EMPTY_CORP_ASSET_LABELS.types;
   const divisionNames = data?.divisionNames ?? EMPTY_DIVISION_NAMES;
@@ -507,6 +516,16 @@ function CorpAssetsView() {
       : resolved.group
         ? groupLabel(t, resolved.group.id, divisionNames)
         : '';
+  // For the level heading's sr-only item-count suffix (issue #1485) — a leaf
+  // item never actually appears in `resolved.trail` (nothing drills into
+  // one), but the type still allows it, hence the `kind !== 'item'` narrow.
+  const lastTrailNode = resolved.trail[resolved.trail.length - 1];
+  const currentItemCount =
+    lastTrailNode !== undefined
+      ? lastTrailNode.kind !== 'item'
+        ? lastTrailNode.itemCount
+        : null
+      : (resolved.group?.itemCount ?? null);
 
   return (
     <div className="space-y-4">
@@ -607,9 +626,37 @@ function CorpAssetsView() {
                   variant="plain"
                   onClick={() => void navigate(parentHref)}
                 />
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                <h2
+                  ref={levelHeadingRef}
+                  tabIndex={-1}
+                  className="min-w-0 flex-1 truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
                   {currentLabel}
-                </span>
+                  {currentItemCount !== null && (
+                    <span className="sr-only">
+                      {t('corp.assets.levelHeading.itemsSuffix', {
+                        items: t('corp.assets.itemCount', { count: currentItemCount }),
+                      })}
+                    </span>
+                  )}
+                </h2>
+              </div>
+            )}
+            {!searchActive && pathGroupId === null && (
+              <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5">
+                <h2
+                  ref={levelHeadingRef}
+                  tabIndex={-1}
+                  className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                >
+                  {/* "Groups" on purpose, not "divisions": `groups` here is
+                      the seven hangar divisions plus any non-empty flag
+                      groups (Office, Deliveries, Impounded, Asset Safety,
+                      Other) — a corp with an office folder would otherwise
+                      read a division count that undercounts what's actually
+                      listed below. */}
+                  {t('corp.assets.groupCount', { count: (groups ?? []).length })}
+                </h2>
               </div>
             )}
             {searchActive && (

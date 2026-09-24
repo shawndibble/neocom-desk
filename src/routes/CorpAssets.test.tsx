@@ -206,6 +206,20 @@ describe('division layout (AC1)', () => {
     expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
   });
 
+  it('moves focus to the level heading on drill-in, and back to the root heading on Back (issue #1485)', async () => {
+    const user = userEvent.setup();
+    renderAssets();
+    await user.click(await screen.findByRole('link', { name: /Division 3/ }));
+
+    const levelHeading = await screen.findByRole('heading', { name: /Division 3/ });
+    expect(levelHeading).toHaveFocus();
+
+    await user.click(screen.getByRole('button', { name: 'Back one level' }));
+
+    const rootHeading = await screen.findByRole('heading', { name: /group/i });
+    expect(rootHeading).toHaveFocus();
+  });
+
   it('falls back to the raw id when an item name will not resolve', async () => {
     mocked.loadCorpAssetLabels.mockResolvedValue({ types: new Map(), locations: new Map() });
     const user = userEvent.setup();
@@ -222,6 +236,10 @@ describe('special flag groups (AC3)', () => {
     );
     await divisionList();
     expect(screen.getByRole('link', { name: /Asset Safety/ })).toBeInTheDocument();
+    // The root heading's count (issue #1485) must include this 8th group —
+    // seven hangar divisions plus Asset Safety — not just the seven
+    // divisions, which would undercount what's actually listed below it.
+    expect(screen.getByRole('heading', { name: '8 groups' })).toBeInTheDocument();
   });
 
   it('shows none of the four flag groups when nothing sits in them', async () => {

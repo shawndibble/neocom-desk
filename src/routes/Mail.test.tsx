@@ -139,6 +139,36 @@ describe('Mail', () => {
     expect(await screen.findByText('Undock now.')).toBeInTheDocument();
   });
 
+  it('focuses the reader heading on open, and the mail row on Back (issue #1485)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const subjectText = await screen.findByText('Fleet up!');
+    const rowButton = subjectText.closest('button');
+    expect(rowButton).not.toBeNull();
+
+    await user.click(rowButton as HTMLButtonElement);
+    const readerHeading = await screen.findByRole('heading', { name: 'Fleet up!' });
+    expect(readerHeading).toHaveFocus();
+
+    await user.click(screen.getByRole('button', { name: 'Back' }));
+    await waitFor(() => expect(rowButton).toHaveFocus());
+  });
+
+  it('opening Reply focuses the compose box, and Cancel returns focus to the Reply button (issue #1485)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByText('Fleet up!'));
+
+    await user.click(await screen.findByRole('button', { name: 'Reply' }));
+
+    await waitFor(() => expect(screen.getByLabelText('Subject')).toHaveFocus());
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    // The Reply button unmounts while composing and remounts fresh once
+    // Cancel closes it — re-query rather than reusing the pre-compose element.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reply' })).toHaveFocus());
+  });
+
   it('reading pane sender name opens the shared Public Info Modal (issue #787)', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/90000001`, () =>

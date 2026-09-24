@@ -1890,6 +1890,9 @@
     },
     "itemCount_one": "{{count}} item",
     "itemCount_other": "{{count}} items",
+    "levelHeading": {
+      "itemsSuffix": ", {{items}}"
+    },
     "emptyLocation": "Nothing stored here.",
     "section": {
       "pinned": "Pinned",
@@ -4042,6 +4045,11 @@
       "columnLocation": "Location",
       "itemCount_one": "{{count}} item",
       "itemCount_other": "{{count}} items",
+      "levelHeading": {
+        "itemsSuffix": ", {{items}}"
+      },
+      "groupCount_one": "{{count}} group",
+      "groupCount_other": "{{count}} groups",
       "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this corporation has more.",
       "noAccessTitle": "Corp assets need Director",
       "noAccessHint": "EVE only opens the corporation asset list to a Director. No other corporation role can see it, and granting access here will not change that.",
