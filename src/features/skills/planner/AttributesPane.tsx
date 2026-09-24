@@ -1,9 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, Panel } from '@/components/ui';
 import { AttributeChips } from '@/features/skills/AttributeChips';
-import { formatLocalDate } from '@/lib/localDate';
 import type { CachedResult } from '@/features/skills/data';
-import type { RemapAvailability } from './remapAvailability';
 import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
 import type { CharacterAttributes } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
@@ -14,7 +12,6 @@ interface AttributesPaneProps {
   implantBonuses: Implants;
   /** How the base sheet was arrived at — null until ESI has been read at all. */
   attributeBaseline?: AttributeBaseline | null;
-  remapInfo: RemapAvailability | null;
   className?: string;
 }
 
@@ -34,7 +31,6 @@ export function AttributesPane({
   result,
   implantBonuses,
   attributeBaseline = null,
-  remapInfo,
   className,
 }: AttributesPaneProps) {
   const { t } = useTranslation();
@@ -49,16 +45,6 @@ export function AttributesPane({
         implantBonuses={implantBonuses}
         boosterBonus={acceleratorBonusOf(attributeBaseline)}
       />
-      {remapInfo && (
-        <p className="mt-3 text-xs text-text-dim">
-          {remapInfo.yearlyReady
-            ? t('plans.remapFromEveReady', { bonus: remapInfo.bonus })
-            : t('plans.remapFromEveCooldown', {
-                bonus: remapInfo.bonus,
-                date: remapInfo.cooldownUntil ? formatLocalDate(remapInfo.cooldownUntil) : '',
-              })}
-        </p>
-      )}
     </Panel>
   );
 }

@@ -273,19 +273,22 @@ describe('PlanEditor tools pane', () => {
     for (const name of ['Optimize remaps', 'Optimize at my markers', 'Suggest reorder']) {
       expect(within(actions).queryByRole('button', { name })).toBeNull();
     }
+    // No free-typed remap count: with no ESI attributes (this harness's
+    // default `remapInfo={null}`), the read-only summary falls back to the
+    // plan's stored `remapCount`.
+    expect(within(actions).getByText(/^Remaps: 1 /)).toBeInTheDocument();
 
     await user.click(within(actions).getByRole('button', { name: 'Optimize' }));
     for (const name of [
       'Optimize for me',
       'Reorder only',
+      'Shortest first',
       'Place remaps only',
       'Use my remap markers',
     ]) {
       expect(screen.getByRole('menuitem', { name })).toBeInTheDocument();
     }
     await user.keyboard('{Escape}');
-
-    expect(within(actions).getByLabelText('Remaps available')).toBeInTheDocument();
 
     // Attributes: the sheet every estimate is costed against, then the two
     // what-if lenses over it — which change the numbers, not the plan.
@@ -411,6 +414,44 @@ describe('PlanEditor tools pane', () => {
 
     await clickOptimizeMode(user, 'Reorder only');
     const dialog = screen.getByRole('dialog', { name: 'Suggested reorder' });
+
+    await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it("opens Shortest first's preview in a Modal; Accept applies the reorder and closes it", async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+    await openTools(user);
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    await clickOptimizeMode(user, 'Shortest first');
+
+    const dialog = screen.getByRole('dialog', { name: 'Suggested shortest-first sort' });
+    expect(within(dialog).getByText('Skill B I')).toBeInTheDocument();
+    expect(within(dialog).getByText('Skill A I')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      entries: [
+        { skillTypeID: 20, targetLevel: 1, priority: 'high' },
+        { skillTypeID: 10, targetLevel: 1 },
+      ],
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('Reject closes the Shortest first Modal without updating the plan', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+    await openTools(user);
+
+    await clickOptimizeMode(user, 'Shortest first');
+    const dialog = screen.getByRole('dialog', { name: 'Suggested shortest-first sort' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
 
@@ -551,9 +592,7 @@ describe('PlanEditor tools pane', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
     expect(
-      within(dialog).getByText(
-        'This plan has 0 remaps to spend, so nothing was placed — raise "Remaps available" above and optimize again.'
-      )
+      within(dialog).getByText('This plan has 0 remaps to spend, so nothing was placed.')
     ).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Accept' })).toBeNull();
 
@@ -1120,9 +1159,6 @@ describe('PlanEditor what-if implants', () => {
     for (const attribute of ['Intelligence', 'Memory', 'Perception', 'Willpower', 'Charisma']) {
       expect(screen.getByLabelText(`${attribute} implant bonus`)).toHaveClass('field-no-spinner');
     }
-    // The pane's other two number fields are the same field at the same
-    // size, so they behave the same way on hover.
-    expect(screen.getByLabelText('Remaps available')).toHaveClass('field-no-spinner');
   });
 
   it('a preset reads out all five with no inputs, and Custom is offered', async () => {
@@ -1635,6 +1671,39 @@ describe('yearly remap on cooldown (#1404)', () => {
     renderEditor(vi.fn(), { plan: { ...PLAN, remapCount: 0 }, remapInfo });
 
     expect(screen.getByText('Remap savings')).toBeInTheDocument();
+  });
+});
+
+describe('derived remap budget summary, no manual override (#1412)', () => {
+  it('shows the live EVE count when the yearly remap is ready, ignoring a stale plan.remapCount', async () => {
+    const user = userEvent.setup();
+    const remapInfo: RemapAvailability = {
+      available: 2,
+      bonus: 1,
+      yearlyReady: true,
+      cooldownUntil: null,
+    };
+    // A stale stored value (5) the optimizer must not honor now that live
+    // ESI data is available — only the offline-fallback path reads it.
+    renderEditor(vi.fn(), { plan: { ...PLAN, remapCount: 5 }, remapInfo });
+    await openTools(user);
+
+    expect(screen.getByText('Remaps: 1 bonus now · yearly ready')).toBeInTheDocument();
+    expect(screen.queryByRole('spinbutton', { name: /remap/i })).toBeNull();
+  });
+
+  it('shows the cooldown date when the yearly remap is not ready yet', async () => {
+    const user = userEvent.setup();
+    const remapInfo: RemapAvailability = {
+      available: 1,
+      bonus: 1,
+      yearlyReady: false,
+      cooldownUntil: new Date('2027-03-12T00:00:00Z'),
+    };
+    renderEditor(vi.fn(), { plan: { ...PLAN, remapCount: 5 }, remapInfo });
+    await openTools(user);
+
+    expect(screen.getByText(/^Remaps: 1 bonus now · yearly from /)).toBeInTheDocument();
   });
 });
 

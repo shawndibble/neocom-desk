@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { isValidOrder, suggestReorder } from '@/engine/optimizer/reorderSuggestion';
-import type { AttributeName, EngineSkill, PlanStep, SkillPrereq } from '@/engine/types';
+import {
+  isValidOrder,
+  sortShortestFirst,
+  suggestReorder,
+} from '@/engine/optimizer/reorderSuggestion';
+import type { AttributeName, Attributes, EngineSkill, PlanStep, SkillPrereq } from '@/engine/types';
 
 const skill = (
   typeID: number,
@@ -14,6 +18,14 @@ const skillMap = (...list: EngineSkill[]): Map<number, EngineSkill> =>
   new Map(list.map((s) => [s.typeID, s]));
 
 const step = (skillTypeID: number, level: number): PlanStep => ({ skillTypeID, level });
+
+const FLAT_ATTRS: Attributes = {
+  intelligence: 20,
+  memory: 20,
+  perception: 20,
+  willpower: 20,
+  charisma: 20,
+};
 
 const sortedKey = (steps: readonly PlanStep[]): string =>
   steps
@@ -181,5 +193,114 @@ describe('suggestReorder', () => {
       const steps = [step(1, 1), step(2, 1), step(3, 1), step(2, 2)];
       expect(suggestReorder(steps, skills)).toEqual(suggestReorder(steps, skills, new Map()));
     });
+  });
+});
+
+describe('sortShortestFirst', () => {
+  const options = { attributes: FLAT_ATTRS };
+
+  it('returns empty and single-step plans unchanged', () => {
+    const skills = skillMap(skill(1, 'perception', 'willpower'));
+    expect(sortShortestFirst([], skills, options)).toEqual([]);
+    expect(sortShortestFirst([step(1, 1)], skills, options)).toEqual([step(1, 1)]);
+  });
+
+  it('orders independent steps ascending by training time', () => {
+    const skills = skillMap(
+      skill(1, 'perception', 'willpower', [], 5), // long
+      skill(2, 'intelligence', 'memory', [], 1) // short
+    );
+    const steps = [step(1, 1), step(2, 1)];
+    expect(sortShortestFirst(steps, skills, options)).toEqual([step(2, 1), step(1, 1)]);
+  });
+
+  it('keeps a long prerequisite ahead of the short step it unblocks', () => {
+    const skills = skillMap(
+      skill(1, 'perception', 'willpower', [], 5), // long prereq
+      skill(2, 'intelligence', 'memory', [{ typeID: 1, level: 1 }], 1) // short dependent
+    );
+    const steps = [step(2, 1), step(1, 1)];
+    const result = sortShortestFirst(steps, skills, options);
+    expect(result).toEqual([step(1, 1), step(2, 1)]);
+    expect(isValidOrder(result, skills)).toBe(true);
+  });
+
+  it('keeps same-skill levels ascending regardless of training time', () => {
+    const skills = skillMap(skill(1, 'perception', 'willpower'));
+    const steps = [step(1, 3), step(1, 1), step(1, 2)];
+    expect(sortShortestFirst(steps, skills, options)).toEqual([step(1, 1), step(1, 2), step(1, 3)]);
+  });
+
+  it('places high-priority steps ahead of normal ones regardless of training time, including an effectively-high prereq', () => {
+    // 1: normal, fast, independent. 3: effectively-high prereq of 2, but slow.
+    // 2: high, depends on 3.
+    const skills = skillMap(
+      skill(1, 'intelligence', 'memory', [], 1),
+      skill(2, 'perception', 'willpower', [{ typeID: 3, level: 1 }], 1),
+      skill(3, 'charisma', 'willpower', [], 5)
+    );
+    const steps = [step(1, 1), step(2, 1), step(3, 1)];
+    const priorities = new Map([
+      [2, 'high' as const],
+      [3, 'high' as const],
+    ]);
+    const result = sortShortestFirst(steps, skills, options, priorities);
+    expect(result).toEqual([step(3, 1), step(2, 1), step(1, 1)]);
+  });
+
+  it('keeps original order among ties', () => {
+    const skills = skillMap(
+      skill(1, 'perception', 'willpower'),
+      skill(2, 'intelligence', 'memory')
+    );
+    const steps = [step(1, 1), step(2, 1)];
+    expect(sortShortestFirst(steps, skills, options)).toEqual(steps);
+  });
+
+  it('returns a valid permutation for a deep prereq chain', () => {
+    const skills = skillMap(
+      skill(1, 'perception', 'willpower'),
+      skill(2, 'intelligence', 'memory', [{ typeID: 1, level: 3 }]),
+      skill(3, 'perception', 'willpower', [{ typeID: 2, level: 2 }]),
+      skill(4, 'charisma', 'willpower', [{ typeID: 3, level: 1 }])
+    );
+    const steps = [
+      step(1, 1),
+      step(1, 2),
+      step(1, 3),
+      step(2, 1),
+      step(2, 2),
+      step(3, 1),
+      step(4, 1),
+      step(1, 4),
+      step(2, 3),
+    ];
+    const result = sortShortestFirst(steps, skills, options);
+    expect(isValidOrder(result, skills)).toBe(true);
+    expect(result).toHaveLength(steps.length);
+  });
+
+  it("costs steps on the skill's own attribute pair, including implants", () => {
+    const attrs: Attributes = {
+      intelligence: 27,
+      memory: 21,
+      perception: 17,
+      willpower: 17,
+      charisma: 17,
+    };
+    const skills = skillMap(
+      skill(1, 'perception', 'willpower'), // slow pair here
+      skill(2, 'intelligence', 'memory') // fast pair here, plus an implant bump
+    );
+    const steps = [step(1, 1), step(2, 1)]; // slow skill listed first
+    const result = sortShortestFirst(steps, skills, {
+      attributes: attrs,
+      implants: { intelligence: 3 },
+    });
+    expect(result).toEqual([step(2, 1), step(1, 1)]);
+  });
+
+  it('throws on unknown skill typeIDs', () => {
+    expect(() => sortShortestFirst([step(99, 1)], skillMap(), options)).toThrow(/99/);
   });
 });

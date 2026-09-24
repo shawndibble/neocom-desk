@@ -57,7 +57,9 @@ test('exports the computed queue to the clipboard', async ({ page, context }) =>
 test('optimize remaps shows attribute segments and savings', async ({ page }) => {
   await addCaldariCruiserToNewPlan(page);
 
-  await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
+  // No manual remap count any more — CHARACTER_ATTRIBUTES has no bonus
+  // remaps and no cooldown, so the live budget already reads 1 (the yearly
+  // remap, ready).
   await page.getByRole('button', { name: 'Optimize' }).click();
   await page.getByRole('menuitem', { name: 'Place remaps only' }).click();
 
@@ -74,7 +76,9 @@ test('"Optimize for me" reorders and places remaps in one preview; Accept applie
 }) => {
   await addCaldariCruiserToNewPlan(page);
 
-  await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
+  // No manual remap count any more — CHARACTER_ATTRIBUTES has no bonus
+  // remaps and no cooldown, so the live budget already reads 1 (the yearly
+  // remap, ready).
   await page.getByRole('button', { name: 'Optimize' }).click();
   await page.getByRole('menuitem', { name: 'Optimize for me' }).click();
 
@@ -84,6 +88,35 @@ test('"Optimize for me" reorders and places remaps in one preview; Accept applie
 
   await dialog.getByRole('button', { name: 'Accept' }).click();
   await expect(dialog).not.toBeVisible();
+});
+
+test('"Shortest first" pulls a quick standalone skill ahead of the slow Caldari Cruiser chain', async ({
+  page,
+}) => {
+  await addCaldariCruiserToNewPlan(page);
+
+  // "Social" (rank 1, no prereqs) trains far faster than the rest of the
+  // Caldari Cruiser chain still to come (Spaceship Command II, Caldari
+  // Destroyer I-III, Caldari Cruiser I), so it should surface ahead of them.
+  await page.getByPlaceholder('Search skills…').fill('Social');
+  await page.getByRole('button', { name: /^Social/ }).click();
+  await page.getByRole('button', { name: 'Level I', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Remove Social' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Optimize' }).click();
+  await page.getByRole('menuitem', { name: 'Shortest first' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Suggested shortest-first sort' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Accept' }).click();
+  await expect(dialog).not.toBeVisible();
+
+  const queue = page.locator('ul', { hasText: 'Caldari Cruiser I' });
+  const rows = await queue.locator('li').allTextContents();
+  const socialIndex = rows.findIndex((row) => row.includes('Social I'));
+  const cruiserIndex = rows.findIndex((row) => row.includes('Caldari Cruiser I'));
+  expect(socialIndex).toBeGreaterThanOrEqual(0);
+  expect(socialIndex).toBeLessThan(cruiserIndex);
 });
 
 test('the plan summary and tools stay in view while the entries queue scrolls (#221 successor)', async ({
@@ -187,10 +220,10 @@ test('the plan summary and tools stay in view while the entries queue scrolls (#
   // when the capped list does. The entry list has its own cap, so what makes
   // the page taller than the viewport here is the sidebar itself (attributes,
   // What-If Implants, Booster) — the real case the sticky exists for. Firing
-  // the remaps optimizer is incidental setup at this point (its result now
-  // opens its own Modal rather than growing the sidebar), kept only so the
-  // guard below isn't the only thing exercising the click.
-  await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
+  // Optimize remaps is incidental setup at this point (its result now opens
+  // its own Modal rather than growing the sidebar), kept only so the guard
+  // below isn't the only thing exercising the click. No manual remap count
+  // any more — the fixture's live budget already reads 1.
   await page.getByRole('button', { name: 'Optimize' }).click();
   await page.getByRole('menuitem', { name: 'Place remaps only' }).click();
   await expect(page.getByText(/^Remapping saves|^No remap improves/)).toBeVisible();

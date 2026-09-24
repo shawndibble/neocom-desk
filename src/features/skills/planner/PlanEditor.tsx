@@ -22,7 +22,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconButton,
-  InfoTooltip,
   Modal,
   Panel,
   Select,
@@ -52,8 +51,8 @@ import { exportPlanToClipboard } from '@/engine/clipboardExport';
 import {
   optimizeAtMarkers,
   optimizeForMe,
-  MAX_SUPPORTED_REMAPS,
   placeRemaps,
+  sortShortestFirst,
   suggestReorder,
   ATTRIBUTE_NAMES,
 } from '@/engine/optimizer';
@@ -131,7 +130,7 @@ import { planDrop, promotePrereq } from './planDrop';
 import { RemapMarkerModal } from './RemapMarkerModal';
 import { bandStarts, meaningfulBandStarts } from './bands';
 import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueRows';
-import { timedRemapFrom, type RemapAvailability } from './remapAvailability';
+import { remapBudget, type RemapAvailability } from './remapAvailability';
 import {
   whatIfImplants,
   normalizeWhatIfSelection,
@@ -155,13 +154,7 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 export type PlanPatch = Partial<
   Pick<
     SkillPlanRecord,
-    | 'entries'
-    | 'remapCount'
-    | 'markers'
-    | 'markerAttributes'
-    | 'whatIfImplants'
-    | 'boosters'
-    | 'milestones'
+    'entries' | 'markers' | 'markerAttributes' | 'whatIfImplants' | 'boosters' | 'milestones'
   >
 >;
 
@@ -298,7 +291,7 @@ export function PlanEditor({
   // button, cleared after a couple of seconds. Additive to the full
   // Panel/Modal results those same actions already produce below.
   const [markerConfirm, setMarkerConfirm] = useState(false);
-  const [reorderConfirm, setReorderConfirm] = useState(false);
+  const [reorderConfirm, setReorderConfirm] = useState<'attributes' | 'shortest' | null>(null);
   // A promoted prereq row is a quieter change than it looks (a dimmed row
   // turns into user data), so it says so. A "that worked" note about the
   // change that just landed, so it clears on its own timer, not with the plan.
@@ -393,7 +386,10 @@ export function PlanEditor({
   // moment a plan happens to carry any markers.
   const [markersPanelOpenHeld, setMarkersPanelOpen] = useScopedState<boolean>(planScope);
   const markersPanelOpen = markersPanelOpenHeld ?? false;
-  const [reorderPreview, setReorderPreview] = useScopedState<PlanStep[]>(planScope);
+  const [reorderPreview, setReorderPreview] = useScopedState<{
+    kind: 'attributes' | 'shortest';
+    steps: PlanStep[];
+  }>(planScope);
   // Outcome of the last drag on the entry list. A drop that would land a
   // skill after something requiring it is refused rather than silently
   // re-normalized back (planDrop.ts), so the refusal has to say why. It
@@ -648,27 +644,17 @@ export function PlanEditor({
     [plan.entries]
   );
 
-  // The yearly remap on cooldown is still usable, just not before it ends
-  // (#1404) — the feature layer raises the count to include it (still
-  // capped) and hands the optimizer the cooldown's offset from plan start so
-  // it never places that one too early. `new Date()` here matches every
-  // other "plan starts now" read in this component (e.g. `scheduleFromNow`);
-  // memoized on `remapInfo` alone so its reference stays stable across
-  // renders the way `plan.remapCount` etc. already are, rather than
-  // invalidating the header badge's own memo below on every render.
-  const timedRemap = useMemo(() => timedRemapFrom(remapInfo, new Date()), [remapInfo]);
-
-  // The plan keeps whatever count the user set (ESI prefills bonus remaps),
-  // raised to include an on-cooldown yearly remap even if the user hasn't
-  // bumped the field themselves. This is the REQUESTED count — uncapped —
-  // so `evaluateOptimizationBadge` can still tell a genuine over-cap request
-  // from one the timed remap alone accounts for.
-  const requestedRemapCount = timedRemap
-    ? Math.max(plan.remapCount, timedRemap.remapCount)
-    : plan.remapCount;
-  // Only the optimizer is capped, and the header badge says so rather than
-  // quietly answering a different question than the one on screen.
-  const remapCount = Math.min(requestedRemapCount, MAX_SUPPORTED_REMAPS);
+  // `new Date()` matches every other "plan starts now" read in this
+  // component (e.g. `scheduleFromNow`). Memoized so its reference stays
+  // stable across renders, not invalidating the header badge's own memo.
+  const budget = useMemo(
+    () => remapBudget(remapInfo, plan.remapCount, new Date()),
+    [remapInfo, plan.remapCount]
+  );
+  // `requestedRemapCount` stays uncapped so `evaluateOptimizationBadge` can
+  // tell a genuine over-cap request from one the timed remap alone accounts
+  // for; `remapCount` is what the optimizer actually gets.
+  const { timed: timedRemap, count: requestedRemapCount, evaluatedCount: remapCount } = budget;
 
   // #112: merge "Your entries" and the computed queue into one row list —
   // one row per entry (own aggregated per-level/cumulative time) plus dimmed
@@ -1431,14 +1417,33 @@ export function PlanEditor({
 
   function handleSuggestReorder() {
     if (scheduled.length === 0) return;
-    setReorderPreview(suggestReorder(scheduled, catalog.engineSkills, priorityMap));
-    setReorderConfirm(true);
-    setTimeout(() => setReorderConfirm(false), 2000);
+    setReorderPreview({
+      kind: 'attributes',
+      steps: suggestReorder(scheduled, catalog.engineSkills, priorityMap),
+    });
+    setReorderConfirm('attributes');
+    setTimeout(() => setReorderConfirm(null), 2000);
+  }
+
+  /** "Shortest first": same preview/Accept-Reject flow as "Reorder only", fastest-ready-step-first instead of attribute-pair grouping. */
+  function handleSortShortest() {
+    if (scheduled.length === 0) return;
+    setReorderPreview({
+      kind: 'shortest',
+      steps: sortShortestFirst(
+        scheduled,
+        catalog.engineSkills,
+        { attributes, implants: effectiveImplants, cloneState },
+        priorityMap
+      ),
+    });
+    setReorderConfirm('shortest');
+    setTimeout(() => setReorderConfirm(null), 2000);
   }
 
   function acceptReorder() {
     if (!reorderPreview) return;
-    update(applyReorderSuggestion(plan.entries, reorderPreview));
+    update(applyReorderSuggestion(plan.entries, reorderPreview.steps));
     setReorderPreview(null);
   }
 
@@ -1496,7 +1501,7 @@ export function PlanEditor({
     );
   }
 
-  /** The Optimize menu's four items, in display order — one shared shape (label, hint, disabled, handler) instead of four near-identical `DropdownMenuItem` blocks. */
+  /** The Optimize menu's items, in display order — one shared shape (label, hint, disabled, handler) instead of near-identical `DropdownMenuItem` blocks. */
   const optimizeMenuItems: {
     key: string;
     label: string;
@@ -1519,6 +1524,13 @@ export function PlanEditor({
       hint: t('plans.optimizeModeReorderHint'),
       disabled: scheduled.length === 0,
       onSelect: handleSuggestReorder,
+    },
+    {
+      key: 'shortest',
+      label: t('plans.sortShortest'),
+      hint: t('plans.sortShortestTooltip'),
+      disabled: scheduled.length === 0,
+      onSelect: handleSortShortest,
     },
     {
       key: 'remaps',
@@ -1545,38 +1557,21 @@ export function PlanEditor({
       title: t('plans.toolsActions'),
       content: (
         <div className="space-y-2">
-          {/* Remaps-available is a control with a value and an explanatory
-              hint, not header adornment — in a panel header the hint wrapped
-              to three lines and squeezed the title to nothing. */}
-          <div className="flex flex-wrap items-center gap-1 text-[0.6875rem] text-text-dim">
-            <label htmlFor="plan-remap-count">{t('plans.remapCount')}</label>
-            <InfoTooltip
-              label={t('plans.remapCountTooltipLabel')}
-              content={t('plans.remapCountTooltip')}
-            />
-            <TextInput
-              id="plan-remap-count"
-              size="md"
-              type="number"
-              min={0}
-              max={5}
-              value={plan.remapCount}
-              onChange={(e) =>
-                onUpdate({ remapCount: Math.min(5, Math.max(0, Number(e.target.value) || 0)) })
-              }
-              className="field-no-spinner w-14 text-center"
-            />
-          </div>
-          {remapInfo && (
-            <p className="text-[0.6875rem] text-text-dim">
-              {remapInfo.yearlyReady
-                ? t('plans.remapFromEveReady', { bonus: remapInfo.bonus })
-                : t('plans.remapFromEveCooldown', {
-                    bonus: remapInfo.bonus,
-                    date: remapInfo.cooldownUntil ? formatLocalDate(remapInfo.cooldownUntil) : '',
-                  })}
-            </p>
-          )}
+          {/* Read-only: the optimizer's whole remap budget comes from EVE
+              now, not a free-typed number the optimizer half ignored. */}
+          <p className="text-[0.6875rem] text-text-dim">
+            {remapInfo
+              ? `${t('plans.remapBudget', { bonus: remapInfo.bonus })} ${
+                  remapInfo.yearlyReady
+                    ? t('plans.remapBudgetYearlyReady')
+                    : t('plans.remapBudgetYearlyFrom', {
+                        date: remapInfo.cooldownUntil
+                          ? formatLocalDate(remapInfo.cooldownUntil)
+                          : '',
+                      })
+                }`
+              : t('plans.remapBudgetFallback', { count: plan.remapCount })}
+          </p>
           <div className="space-y-1.5">
             {/* One Optimize control replacing three stacked buttons: "Optimize
                 for me" leads as the default item, single modes stay below it. */}
@@ -1628,7 +1623,14 @@ export function PlanEditor({
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-            {reorderConfirm && confirmation(t('plans.reorderSuggested'))}
+            {reorderConfirm &&
+              confirmation(
+                t(
+                  reorderConfirm === 'shortest'
+                    ? 'plans.sortShortestSuggested'
+                    : 'plans.reorderSuggested'
+                )
+              )}
             {optimizeConfirm && confirmation(optimizeConfirm)}
             {toolAction({
               icon: <Icon.AddMarker size={Icon.ICON_SIZE.sm} />,
@@ -2146,10 +2148,14 @@ export function PlanEditor({
       <Modal
         open={reorderPreview !== null}
         onClose={() => setReorderPreview(null)}
-        title={t('plans.reorderPreviewTitle')}
+        title={t(
+          reorderPreview?.kind === 'shortest'
+            ? 'plans.sortShortestPreviewTitle'
+            : 'plans.reorderPreviewTitle'
+        )}
       >
         <ul className="max-h-56 overflow-y-auto text-xs">
-          {reorderPreview?.map((step, i) => (
+          {reorderPreview?.steps.map((step, i) => (
             <li
               key={`${step.skillTypeID}-${step.level}-${i}`}
               className="border-b border-line py-1 last:border-b-0"
