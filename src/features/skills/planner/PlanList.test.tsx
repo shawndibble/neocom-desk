@@ -50,3 +50,35 @@ describe('PlanList delete confirmation (#408: names the plan)', () => {
     expect(onDelete).toHaveBeenCalledWith('2');
   });
 });
+
+describe('PlanList row stats (#1416)', () => {
+  const props = {
+    onOpen: noop,
+    onCreate: noop,
+    onDuplicate: noop,
+    onDelete: noop,
+    onRename: noop,
+  };
+
+  it('shows duration and finish under the name, and "Nothing to train" for an empty plan', () => {
+    render(
+      <PlanList
+        plans={[plan('1', 'Alpha'), plan('2', 'Beta')]}
+        {...props}
+        stats={
+          new Map([
+            ['1', { totalSeconds: 86_400, finish: new Date(2026, 0, 2) }],
+            ['2', { totalSeconds: 0, finish: null }],
+          ])
+        }
+      />
+    );
+    expect(screen.getByText(/1d.*· finishes/)).toBeInTheDocument();
+    expect(screen.getByText('Nothing to train')).toBeInTheDocument();
+  });
+
+  it('renders the name only without stats', () => {
+    render(<PlanList plans={[plan('1', 'Alpha')]} {...props} />);
+    expect(screen.queryByText(/finishes|Nothing to train/)).not.toBeInTheDocument();
+  });
+});
