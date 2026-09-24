@@ -1958,13 +1958,23 @@
     "due": "in {{duration}}",
     "prevFortnight": "Previous fortnight",
     "nextFortnight": "Next fortnight",
+    "projected": "Projected",
+    "projectedKind": "{{kind}} (projected)",
+    "skillPlan": {
+      "title": "Skill plan to project",
+      "none": "No Skill Plans for this character",
+      "choose": "Choose a plan",
+      "error": "Could not be scheduled",
+      "errorReason": "Could not be scheduled: {{reason}}"
+    },
     "kind": {
       "calendarEvent": "Calendar events",
       "skillTraining": "Skill queue",
       "industryJob": "Industry jobs",
       "planetExtraction": "Planets",
       "contractExpiry": "Contracts",
-      "orderExpiry": "Market orders"
+      "orderExpiry": "Market orders",
+      "skillPlan": "Skill plan"
     },
     "detail": {
       "industryJob": {
