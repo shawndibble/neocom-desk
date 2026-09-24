@@ -77,16 +77,49 @@
         "rig": "Rigs",
         "subsystem": "Subsystems"
       },
-      "droneState": {
-        "online": "in bay",
-        "active": "active"
-      },
       "moduleState": {
         "offline": "offline",
         "online": "online",
         "active": "active",
         "overload": "overloaded"
       }
+    },
+    "edit": {
+      "stateLabel": "State of {{name}}",
+      "chargeLabel": "Charge in {{name}}",
+      "noCharge": "No charge",
+      "remove": "Remove {{name}}",
+      "emptySlot": "Empty — add to {{rack}}",
+      "addDrones": "Add drones",
+      "inSpace": "In space",
+      "inBay": "In bay",
+      "slotsWaitForShipData": "Empty slots appear once the ship data has downloaded."
+    },
+    "add": {
+      "title": "Add",
+      "titleFor": "Add to {{rack}}",
+      "rack": {
+        "high": "high slot",
+        "medium": "mid slot",
+        "low": "low slot",
+        "rig": "rig slot",
+        "subsystem": "subsystem slot",
+        "drone": "drone bay"
+      },
+      "searchLabel": "Search items to add",
+      "searchPlaceholder": "Search modules, rigs, drones…",
+      "fitsSlot": "Fits this slot",
+      "fitsSlotTooltip": "Only items that go in the slot you picked. Pick an empty slot to use it.",
+      "fitsHull": "Fits this hull",
+      "fitsHullTooltip": "Hides items this ship can't take at all: no hardpoint, the wrong rig size, or restricted to other hulls. Items that only overflow CPU or powergrid still show.",
+      "canFly": "Can fly",
+      "canFlyTooltip": "Only items your character has every required skill for.",
+      "metaLabel": "Meta level",
+      "metaAny": "Any meta level",
+      "waitingForShipData": "Ship data is still downloading. You can search now; adding, and the fits-this-hull and can-fly filters, switch on once it's ready.",
+      "loadingCatalogue": "Loading items…",
+      "noResults": "No matching items.",
+      "missingSkills": "Missing skills"
     },
     "stats": {
       "show": "Show detail",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { extractFittingStats } from './stats';
-import { DOGMA_ATTRIBUTE } from './types';
+import { extractFittingStats, extractModuleResult } from './stats';
+import { DOGMA_ATTRIBUTE, ITEM_DOGMA_ATTRIBUTE } from './types';
 
 function attrs(
   values: Partial<Record<keyof typeof DOGMA_ATTRIBUTE, number>>
@@ -180,5 +180,39 @@ describe('extractFittingStats', () => {
     expect(stats.droneBandwidthTotal).toBe(75);
     expect(stats.droneCapacity).toBe(125);
     expect(stats.calibrationTotal).toBe(400);
+  });
+});
+
+describe('extractFittingStats slot counts', () => {
+  it("reads each rack's size off the ship, so a subsystem's added slots show up", () => {
+    const stats = extractFittingStats(
+      [],
+      attrs({ hiSlots: 3, medSlots: 4, lowSlots: 2, rigSlots: 3, subsystemSlots: 4 }),
+      []
+    );
+    expect(stats.slotCounts).toEqual({ high: 3, medium: 4, low: 2, rig: 3, subsystem: 4 });
+  });
+});
+
+describe('extractModuleResult', () => {
+  it("reads the reached and highest state plus the module's charge groups", () => {
+    const attributes = new Map([
+      [ITEM_DOGMA_ATTRIBUTE.chargeGroup1, { value: 83 }],
+      [ITEM_DOGMA_ATTRIBUTE.chargeGroup2, { value: 372 }],
+      [ITEM_DOGMA_ATTRIBUTE.chargeGroup3, { value: 0 }],
+      [ITEM_DOGMA_ATTRIBUTE.chargeSize, { value: 1 }],
+    ]);
+    expect(extractModuleResult({ attributes, state: 'active', max_state: 'overload' })).toEqual({
+      state: 'active',
+      maxState: 'overload',
+      chargeGroupIds: [83, 372],
+    });
+  });
+
+  it('gives a module that takes no charge an empty charge group list', () => {
+    expect(
+      extractModuleResult({ attributes: new Map(), state: 'online', max_state: 'online' })
+        .chargeGroupIds
+    ).toEqual([]);
   });
 });

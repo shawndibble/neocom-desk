@@ -150,6 +150,24 @@ describe('useUrlParam', () => {
   });
 });
 
+function Pushing() {
+  const [only, setOnly] = useUrlParam('panel.only', ONLY);
+  return (
+    <button type="button" onClick={() => setOnly(!only, { push: true })}>
+      push {String(only)}
+    </button>
+  );
+}
+
+describe('useUrlParam push', () => {
+  it('pushes a history entry when asked, so Back returns to the previous value', async () => {
+    const user = userEvent.setup();
+    renderAt('/p', <Pushing />);
+    await user.click(screen.getByRole('button', { name: 'push false' }));
+    expect(probe()).toBe('/p?panel.only=1|PUSH');
+  });
+});
+
 const DEFAULT_SORT = { columnId: 'name', direction: 'asc' } as const;
 const COLUMNS = ['name', 'value'];
 function Sorted() {
