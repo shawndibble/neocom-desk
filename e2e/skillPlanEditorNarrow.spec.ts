@@ -107,6 +107,27 @@ test('the back-to-plan-list link is a full sm-tier control (36px) at 390px', asy
   expect(height).toBeGreaterThanOrEqual(36);
 });
 
+test('the header Import and Export buttons are labelled and fit at 390px without overflow', async ({
+  page,
+}) => {
+  await signInAndGoto(page);
+  await seedPlan(page);
+  await page.goto(`./skills/plans/${PLAN_ID}`);
+  await page.setViewportSize(PHONE);
+
+  for (const name of ['Import', 'Export']) {
+    const button = page.getByRole('button', { name, exact: true });
+    await expect(button).toBeVisible();
+    const height = await button.evaluate((el) => el.getBoundingClientRect().height);
+    expect(height).toBeGreaterThanOrEqual(36);
+  }
+
+  const overflows = await page.evaluate(
+    () => document.documentElement.scrollWidth > document.documentElement.clientWidth
+  );
+  expect(overflows).toBe(false);
+});
+
 test('the back-to-plan-list link stays absent at and above lg (1280px), where the list is on screen', async ({
   page,
 }) => {

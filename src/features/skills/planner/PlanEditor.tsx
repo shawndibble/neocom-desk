@@ -250,6 +250,8 @@ export function PlanEditor({
   const isDesktop = useIsDesktop();
   const [copyConfirm, setCopyConfirm] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [importMenuOpen, setImportMenuOpen] = useState(false);
+  const openImportDialogAfterMenuRef = useRef(false);
   const [optimizeMenuOpen, setOptimizeMenuOpen] = useState(false);
   // Ties each Optimize menu item's `aria-label` (the mode name) to its hint
   // span via `aria-describedby`, so the "why" still reaches screen readers.
@@ -1981,20 +1983,46 @@ export function PlanEditor({
       {headerActionsContainer &&
         createPortal(
           <>
-            <IconButton
-              icon={<Icon.ImportQueue />}
-              label={t('plans.importQueue')}
-              onClick={() => void handleImport()}
-              disabled={queueImporting}
-            />
-            <IconButton
-              icon={<Icon.ImportClipboard />}
-              label={t('plans.importClipboard')}
-              onClick={() => setImportOpen(true)}
-            />
+            <DropdownMenu open={importMenuOpen} onOpenChange={setImportMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" disabled={queueImporting}>
+                  <Icon.ImportClipboard aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+                  {t('plans.import')}
+                  <Icon.Expanded aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                onCloseAutoFocus={() => {
+                  // Open the dialog only once the menu has handed focus back to
+                  // the trigger: the native <dialog> records the focused
+                  // element to restore on close, and that must be the trigger,
+                  // not a menu item that is about to unmount.
+                  if (openImportDialogAfterMenuRef.current) {
+                    openImportDialogAfterMenuRef.current = false;
+                    setImportOpen(true);
+                  }
+                }}
+              >
+                <DropdownMenuItem onSelect={() => void handleImport()}>
+                  {t('plans.importFromQueueItem')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    openImportDialogAfterMenuRef.current = true;
+                  }}
+                >
+                  {t('plans.importFromTextOrFileItem')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <DropdownMenu open={exportMenuOpen} onOpenChange={setExportMenuOpen}>
               <DropdownMenuTrigger asChild>
-                <IconButton icon={<Icon.Export />} label={t('plans.export')} />
+                <Button size="sm">
+                  <Icon.Export aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+                  {t('plans.export')}
+                  <Icon.Expanded aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem

@@ -835,7 +835,8 @@ describe('SkillPlans editor: import / export', () => {
     render(<App />);
     await openPlanTools();
 
-    await user.click(await screen.findByRole('button', { name: 'Import from skill queue' }));
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From skill queue' }));
     const entriesPanel = screen.getByText('Your entries').closest('section')!;
     // The entry row's name and level render as separate text nodes ("Gunnery"
     // " " "III"), so match by regex rather than the exact string "Gunnery".
@@ -873,7 +874,8 @@ describe('SkillPlans editor: import / export', () => {
     render(<App />);
     await openPlanTools();
 
-    await user.click(await screen.findByRole('button', { name: 'Import from skill queue' }));
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From skill queue' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/invalid finished_level/);
   });
@@ -1589,8 +1591,9 @@ describe('SkillPlans editor: import from clipboard', () => {
     render(<App />);
     await openPlanTools();
 
-    await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
     await user.type(textarea, 'Gunnery III\nNot A Real Skill II');
     await user.click(within(dialog).getByRole('button', { name: 'Parse' }));
@@ -1621,8 +1624,9 @@ describe('SkillPlans editor: import from clipboard', () => {
     render(<App />);
     await openPlanTools();
 
-    await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
     await user.click(textarea);
     // user.type() treats [ ] { } as special key syntax — paste() takes the
@@ -1667,8 +1671,9 @@ describe('SkillPlans editor: import from clipboard', () => {
     render(<App />);
     await openPlanTools();
 
-    await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
     // Gunnery III: already trained to V. Spaceship Command I: not trained.
     await user.type(textarea, 'Gunnery III\nSpaceship Command I');
@@ -1704,8 +1709,9 @@ describe('SkillPlans editor: import from clipboard', () => {
     render(<App />);
     await openPlanTools();
 
-    await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
     await user.type(textarea, 'Gunnery III');
     await user.click(within(dialog).getByRole('button', { name: 'Parse' }));
