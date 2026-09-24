@@ -56,7 +56,9 @@ export function IskAmount({ value, revealOn, decimals = 2, className = '' }: Isk
           className
         )}
       >
-        {formatIskCompact(value)} <span className="sr-only">{exact}</span>
+        {formatIskCompact(value)}
+        {/* The separating space lives inside the hidden text, so no visible gap trails the figure. */}
+        <span className="sr-only"> {exact}</span>
       </span>
     </Tooltip>
   );

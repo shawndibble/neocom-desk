@@ -89,7 +89,8 @@ export function AttributeChips({
                       tabIndex={0}
                       className="cursor-help rounded-xs focus-visible:outline-2 focus-visible:outline-accent"
                     >
-                      {effective} <span className="sr-only">{breakdown}</span>
+                      {effective}
+                      <span className="sr-only"> {breakdown}</span>
                     </span>
                   </Tooltip>
                 ) : (
