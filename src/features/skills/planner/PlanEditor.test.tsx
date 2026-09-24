@@ -1609,6 +1609,35 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     resolveQueue(queueResult([]));
     await waitFor(() => expect(importButton).not.toBeDisabled());
   });
+
+  it('drops a fetch that resolves after the user has switched to a different plan', async () => {
+    let resolveQueue: (value: CachedResult<SkillQueueEntry[]>) => void = () => {};
+    loadCharacterSkillQueue.mockReturnValue(
+      new Promise((resolve) => {
+        resolveQueue = resolve;
+      })
+    );
+    const user = userEvent.setup();
+    const { onUpdate, replacePlan } = renderEditor();
+
+    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+
+    // Switched to a different plan while the fetch for plan-1 is still in
+    // flight — this component has no key={plan.id} at the route, so the same
+    // instance stays mounted and just re-renders with new props.
+    replacePlan(() => ({ ...PLAN, id: 'plan-2' }));
+    onUpdate.mockClear();
+
+    await act(async () => {
+      resolveQueue(queueResult([{ skill_id: 20, finished_level: 3, queue_position: 0 }]));
+      await Promise.resolve();
+    });
+
+    // Neither the choice Modal (which would let Append/Replace merge plan-1's
+    // fetch into plan-2's entries) nor any write ever lands (#1402).
+    expect(screen.queryByText(/in-game queue has/i)).not.toBeInTheDocument();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
 });
 
 describe('Clone State (#1233)', () => {

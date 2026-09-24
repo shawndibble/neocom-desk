@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -253,6 +261,14 @@ export function PlanEditor({
   // Whether a queue fetch is in flight — disables the Import button so a
   // second click can't race the first (#1402).
   const [queueImporting, setQueueImporting] = useState(false);
+  // Read inside handleImport's async continuation after an `await`, where the
+  // `plan` captured by that closure is whatever it was at call time and never
+  // changes — only a ref kept live across every render can tell that call
+  // apart from a plan switch that happened while it was in flight (#1402).
+  const currentPlanIdRef = useRef(plan.id);
+  useLayoutEffect(() => {
+    currentPlanIdRef.current = plan.id;
+  });
   // A snapshot taken just before a Replace, for the Undo beside its
   // confirmation — scoped to plan.id so switching plans can't apply an undo
   // meant for a different one (#1402).
@@ -739,12 +755,13 @@ export function PlanEditor({
     if (queueImporting) return;
     setQueueImporting(true);
     setImportError(null);
-    // Compared against plan.id once the fetch resolves: a plan switch mid-fetch
-    // means this result belongs to neither plan, so it's dropped (#1402).
+    // Compared against currentPlanIdRef once the fetch resolves: a plan
+    // switch mid-fetch means this result belongs to neither plan, so it's
+    // dropped rather than applied to whichever plan is now current (#1402).
     const requestedPlanId = plan.id;
     try {
       const result = await loadCharacterSkillQueue(characterId);
-      if (plan.id !== requestedPlanId) return;
+      if (currentPlanIdRef.current !== requestedPlanId) return;
       if (!result) return;
       const parsed = dedupeEntries(parseSkillQueue(result.data));
       // An empty in-game queue must never wipe the plan (#1402) — it parses
