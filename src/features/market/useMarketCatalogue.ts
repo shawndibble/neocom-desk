@@ -7,9 +7,8 @@
  * load for it.
  *
  * `variations.json` is fetched by its own effect, independent of the five
- * above: a slow or failed variations load must never block or error the rest
- * of the page (the Variations panel just falls back to Market Group
- * siblings — see `variationIndex` below).
+ * above — see `EMPTY_VARIATION_INDEX` for what a slow or failed load falls
+ * back to.
  */
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -60,7 +59,7 @@ export interface MarketCatalogue {
   solarSystemMap: ReadonlyMap<number, { name: string; security: number }>;
   allMarketRegionIds: number[];
   systemRegions: ReadonlyMap<number, { regionId: number }>;
-  /** Built once per SDE load, not per selection (see file doc). */
+  /** Built once per SDE load, not per selection — see `buildVariationIndex`'s doc for why. */
   variationIndex: VariationIndex;
 }
 
@@ -100,10 +99,7 @@ export function useMarketCatalogue(): MarketCatalogue {
     };
   }, [catalogueTick]);
 
-  // Fetched independently of the catalogue load above: variations.json is
-  // Variations-panel-only data, so a slow or failed fetch degrades that one
-  // panel to its Market-Group-sibling fallback (see variationIndex below)
-  // rather than blocking or erroring the whole Market route.
+  // Fetched independently of the catalogue load above (see `EMPTY_VARIATION_INDEX`).
   useEffect(() => {
     let cancelled = false;
     void loadVariations()
@@ -174,8 +170,7 @@ export function useMarketCatalogue(): MarketCatalogue {
     [solarSystems]
   );
 
-  // Defaults to EMPTY_VARIATION_INDEX before variations.json resolves, so
-  // the Variations panel falls back to siblings rather than going blank.
+  // See EMPTY_VARIATION_INDEX for the fallback this defaults to.
   const variationIndex = useMemo(
     () =>
       variationData

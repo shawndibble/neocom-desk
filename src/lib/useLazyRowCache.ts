@@ -12,15 +12,12 @@ import { useCallback, useRef, useState } from 'react';
 export interface LazyRowCacheLoadOptions {
   /**
    * Marks the key attempted the instant `load` is called, and keeps it that
-   * way — success OR failure — until `reset(key)`. Without this (the
-   * default), a rejected fetch is left retryable on the very next `load`
-   * call for that key.
-   *
-   * For a fetch where failure is a normal, possibly-permanent outcome (an
-   * ACL-denied structure, issue #538) rather than a transient one worth
-   * retrying on every unrelated re-render, `sticky` is what stops that from
-   * happening automatically — only a deliberate `reset` (a "check again"
-   * button) should re-arm it.
+   * way — success OR failure — until `reset(key)`, rather than leaving a
+   * rejected fetch retryable on the very next `load` call for that key (the
+   * default): for a fetch where failure is a normal, possibly-permanent
+   * outcome (an ACL-denied structure) rather than a transient one worth
+   * retrying on every unrelated re-render, only a deliberate `reset` (a
+   * "check again" button) should re-arm it.
    */
   sticky?: boolean;
 }
@@ -28,7 +25,6 @@ export interface LazyRowCacheLoadOptions {
 export interface LazyRowCache<K, V> {
   /** Resolved values so far. A fresh `Map` each time an entry is added, so it is safe to use directly in a `useMemo`/`useEffect` dependency array. */
   byKey: ReadonlyMap<K, V>;
-  /** Keys with a fetch currently in flight. */
   loadingKeys: ReadonlySet<K>;
   /** Keys whose most recent attempt rejected. For a non-`sticky` load this clears on the next `load` call for that key, the moment it starts. */
   failedKeys: ReadonlySet<K>;
@@ -52,7 +48,15 @@ export interface LazyRowCache<K, V> {
    * every render.
    */
   load: (key: K, fetchValue: () => Promise<V>, options?: LazyRowCacheLoadOptions) => Promise<void>;
-  /** Re-arms a `sticky` key for one more attempt. A no-op for a key that was never loaded `sticky` — it was never permanently gated to begin with. */
+  /**
+   * Invalidates `key`: clears its attempted-gate and any failed state, so
+   * the next `load` call for it fires a fresh fetch regardless of what's
+   * already resolved. General-purpose, not `sticky`-only — used both to
+   * re-arm a permanently-gated `sticky` key for one more attempt, and to
+   * force an unconditional refetch of a key whose value may be stale for a
+   * reason the key itself doesn't capture (`useOrderBookOrchestration`'s
+   * Variations price cache, paired with `load` on every manual refresh).
+   */
   reset: (key: K) => void;
 }
 

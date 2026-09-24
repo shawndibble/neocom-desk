@@ -26,6 +26,17 @@ export const MARKET_ORDER_COLUMN_IDS = [
 
 export type MarketOrderColumnId = (typeof MARKET_ORDER_COLUMN_IDS)[number];
 
+/** Sell has no `range`/`minVolume` — buy-order-only fields (ESI's `RegionOrder`). */
+export const SELL_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = [
+  'price',
+  'quantity',
+  'location',
+  'security',
+  'jumps',
+  'expiry',
+];
+export const BUY_ORDER_COLUMN_IDS: readonly MarketOrderColumnId[] = MARKET_ORDER_COLUMN_IDS;
+
 /** Every column shown today, so shipping the picker changes nothing on its own. */
 export const DEFAULT_VISIBLE_MARKET_ORDER_COLUMNS: readonly MarketOrderColumnId[] =
   MARKET_ORDER_COLUMN_IDS;

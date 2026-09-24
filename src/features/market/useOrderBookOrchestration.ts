@@ -51,6 +51,7 @@ import {
 import { getVariationRows, type VariationsResult } from '@/features/market/variations';
 import { resolveOrderLocation, type OrderBookSummary } from '@/engine/market/orderBook';
 import type { VariationIndex } from '@/engine/market/variations';
+import { useLazyRowCache } from '@/lib/useLazyRowCache';
 import type { TradeHub } from '@/market/hubs';
 import type { MarketLocationParam } from '@/engine/market/urlState';
 import type {
@@ -68,7 +69,7 @@ const REGIONS_UNAVAILABLE_FETCH: OrderBookFetch = {
   error: new Error('Market Region catalogue unavailable'),
 };
 
-/** `stationFilter` (:591 originally), URL-backed: a positive location id, or `null`. */
+/** `stationFilter`, URL-backed: a positive location id, or `null`. */
 const STATION_FILTER_PARAM: UrlParamCodec<number | null> = {
   parse: (raw) => (raw !== null && /^\d+$/.test(raw) ? Number(raw) : null),
   serialize: (value) => (value === null ? null : String(value)),
@@ -484,25 +485,24 @@ export function useOrderBookOrchestration({
     variationsResultRef.current = variationsResult;
   });
 
-  const [variationPrices, setVariationPrices] = useState<
-    ReadonlyMap<number, OrderBookSummary | undefined>
-  >(new Map());
-  // Same "adjusting state when a prop changes" pattern as resetKey above:
-  // clears stale row prices the instant the row set or the location changes,
-  // in the same render — an Effect would let the old item's prices flash
-  // under the new table. stationFilter is included so the table stays in
-  // step with the order-row "filter to this station" action (CONTEXT.md
-  // round 10) the same way the on-screen tables do; refreshTick deliberately
-  // isn't, so a manual refresh updates prices in place instead of blanking
-  // the table back to a loading state.
-  const variationResetKey = variationsResult
-    ? `${variationsResult.rows.map((row) => row.typeId).join(',')}:${chosenRegionId}:${orderBookLocation.mode}:${orderBookLocation.hubStationId}:${stationFilter ?? 'none'}`
-    : 'none';
-  const [variationResetForKey, setVariationResetForKey] = useState<string | null>(null);
-  if (variationResetKey !== variationResetForKey) {
-    setVariationResetForKey(variationResetKey);
-    setVariationPrices(new Map());
-  }
+  // Per-row price cache for the Variations table (`useLazyRowCache`), keyed
+  // by typeId AND the location signal (region/mode/station/stationFilter) —
+  // not typeId alone — so changing any of those reads as a brand new key
+  // with nothing cached yet: the table goes blank the instant the row set or
+  // the location changes, the same render, with no Effect-delayed flash of
+  // the old item's prices under the new one. refreshTick deliberately isn't
+  // part of the key: a manual refresh reuses the same key and pairs `reset`
+  // with `load` below to force a fresh fetch that overwrites the value in
+  // place, rather than blanking the table back to a loading state.
+  const variationCache = useLazyRowCache<string, OrderBookSummary>();
+  const variationLocationKey = `${chosenRegionId}:${orderBookLocation.mode}:${orderBookLocation.hubStationId}:${stationFilter ?? 'none'}`;
+  const variationPrices = useMemo(() => {
+    const m = new Map<number, OrderBookSummary | undefined>();
+    for (const row of variationsResult?.rows ?? []) {
+      m.set(row.typeId, variationCache.byKey.get(`${row.typeId}:${variationLocationKey}`));
+    }
+    return m;
+  }, [variationsResult, variationCache.byKey, variationLocationKey]);
 
   // Fetched independently of the main order book, so a slow row's price
   // never delays the order book's own render (acceptance criteria). Also
@@ -526,21 +526,28 @@ export function useOrderBookOrchestration({
       ORDER_BOOK_FANOUT_CONCURRENCY,
       async (row) => {
         if (cancelled) return;
-        const view = await loadOrderBookView(row.typeId, { ...orderBookLocation, stationFilter });
-        if (cancelled) return;
-        // A row's own price is a nice-to-have next to the order book that did
-        // load; a failed fetch reads as "no orders" (the empty summary) rather
-        // than stalling the table on a spinner forever.
-        const summary: OrderBookSummary =
-          view.status === 'failed'
+        const key = `${row.typeId}:${variationLocationKey}`;
+        // Forces this run to actually fetch even for a key it already
+        // resolved — the refreshTick case the key itself doesn't capture
+        // (see the field doc above). `load` still overwrites `byKey` in
+        // place once it resolves, so the row keeps showing its old price
+        // until the new one lands.
+        variationCache.reset(key);
+        await variationCache.load(key, async () => {
+          const view = await loadOrderBookView(row.typeId, { ...orderBookLocation, stationFilter });
+          // A row's own price is a nice-to-have next to the order book that did
+          // load; a failed fetch reads as "no orders" (the empty summary) rather
+          // than stalling the table on a spinner forever.
+          return view.status === 'failed'
             ? { bestSell: null, bestBuy: null, spread: null, availableVolume: 0 }
             : view.summary;
-        setVariationPrices((prev) => new Map(prev).set(row.typeId, summary));
+        });
       }
     );
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `variationCache.load`/`.reset` are the only stable, referenced parts of `variationCache` (see their own doc comments); `variationCache` itself is a fresh object every render (its `byKey` changes on every fetch), so depending on the whole object — which is what listing two of its members forces eslint to ask for — would run this effect on every render instead of only when these actually change. `variationLocationKey` is a plain derived string, safe to list directly.
   }, [
     variationsResult,
     orderBookLocation,
@@ -549,6 +556,9 @@ export function useOrderBookOrchestration({
     locationModeHydrated,
     globalMarkets,
     refreshTick,
+    variationLocationKey,
+    variationCache.load,
+    variationCache.reset,
   ]);
 
   // Manual refresh must bypass getOrderBook's 300s TTL cache (CONTEXT.md

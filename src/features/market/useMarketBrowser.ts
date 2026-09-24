@@ -4,17 +4,16 @@
  * preferences, and the Market Group tree's own search/expand state.
  *
  * The selected item and the current location are read from the URL
- * (CONTEXT.md round 7, issue #4), not held in component state: the query
- * string is the single source of truth, so a shared link and the browser's
- * own back/forward both just work. A parsed id that doesn't (yet, or ever)
- * resolve against the loaded catalogue falls back to the default view rather
- * than erroring — the catalogue slices still being null (first load) is
- * treated as "not yet known to be invalid", not "invalid".
- *
- * This also backs the page header's hub/region picker (`usesHubPicker`),
- * which renders above the tab body and applies to the Appraisal tab too — so
- * `Market.tsx` reads this hook's output even while another tab is showing,
- * the same reason `useAppraisal` is held at route level.
+ * (CONTEXT.md round 7), not held in component state — the query string is
+ * the single source of truth, so a shared link and the browser's own
+ * back/forward both just work, and it's why `Market.tsx` reads this hook's
+ * output at route level even while another tab is showing (this also backs
+ * the page header's hub/region picker, `usesHubPicker`, which applies to the
+ * Appraisal tab too — same reason `useAppraisal` is held there). A parsed id
+ * that doesn't (yet, or ever) resolve against the loaded catalogue falls back
+ * to the default view rather than erroring — the catalogue slices still
+ * being null (first load) is treated as "not yet known to be invalid", not
+ * "invalid".
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -63,7 +62,6 @@ export interface MarketBrowserController {
   chosenRegionId: number;
   hubHydrated: boolean;
   locationModeHydrated: boolean;
-  hubId: TradeHub['id'];
 
   handleModeChange: (mode: LocationMode) => void;
   handleHubChange: (id: TradeHub['id']) => void;
@@ -78,7 +76,7 @@ export interface MarketBrowserController {
   filterResult: MarketTreeFilterResult | null;
   handleToggle: (groupId: number) => void;
 
-  /** Market Data / Price History (issue #11) — Market Data by default. */
+  /** Market Data / Price History — Market Data by default. */
   itemTab: 'orders' | 'history';
   setItemTab: (next: 'orders' | 'history') => void;
 }
@@ -114,10 +112,8 @@ export function useMarketBrowser({
 
   const [itemTab, setItemTab] = useUrlParam('browser.itemTab', ITEM_TAB_PARAM);
 
-  // Split from the page's `hydratePricePercent` call (Market.tsx) — that one
-  // belongs to Appraisal, not the Browser/location state this hook owns. Two
-  // separate effects that each fire once on mount behave identically to the
-  // one they used to share.
+  // Separate from Appraisal's `hydratePricePercent` effect (Market.tsx) —
+  // different concern; two independent mount-effects behave the same as one.
   useEffect(() => {
     void hydrateHub();
     void hydrateLocationMode();
@@ -129,10 +125,10 @@ export function useMarketBrowser({
   );
 
   // Cross-page item links (MarketItemLink, ImplantChip, ItemContextMenu's
-  // "View in Market") now land on `/market/browser?type=...` directly
+  // "View in Market") land on `/market/browser?type=...` directly
   // (`engine/market/urlState.ts`'s `marketItemUrl`) — tab is a path segment,
-  // so there is no longer a "which tab is this?" ambiguity for a click that
-  // means "browse this item" to paper over.
+  // so a click that means "browse this item" carries no "which tab is this?"
+  // ambiguity to resolve.
   const typeIsValid = resolveAgainstCatalogue(
     parsedParams.typeId,
     types,
@@ -327,7 +323,6 @@ export function useMarketBrowser({
     chosenRegionId,
     hubHydrated,
     locationModeHydrated,
-    hubId,
     handleModeChange,
     handleHubChange,
     handleRegionChange,

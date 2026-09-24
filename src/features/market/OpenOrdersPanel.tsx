@@ -187,23 +187,19 @@ export function OpenOrdersPanel({
     () => new Set()
   );
   /**
-   * Six on-demand, per-row-expand caches, one `useLazyRowCache` each — same
-   * shape (a resolved-value map plus in-flight/failed tracking, filled by an
-   * on-open fetch), keyed differently, so what follows notes only what's
-   * particular to each: the key, and — where it isn't the default — the
-   * retry policy. See `useLazyRowCache` for the shared mechanics.
+   * Six per-row-expand caches, same `useLazyRowCache` shape — only what
+   * differs per one (key, retry policy) is noted below.
    */
   const deepCache = useLazyRowCache<string, RegionCompetition>();
   /**
-   * One player structure's market book (issue #538), keyed by locationId —
-   * every order parked at that structure, of any type or character, shares
-   * one fetch. Absent means "never attempted or still failing";
-   * `buildOpenOrderRows` and the detail modal both read that absence as
-   * "unavailable", same as an ungranted scope or an ACL denial. Loaded
-   * `sticky` (below): an ACL-denied (403) structure must not retry on every
-   * unrelated snapshot revalidation while the modal stays open (issue #538
-   * review) — only the modal's "Check deeper" button forces another attempt,
-   * via `structureCache.reset`.
+   * One player structure's market book, keyed by locationId — every order
+   * parked at that structure, of any type or character, shares one fetch.
+   * Absent means "never attempted or still failing"; `buildOpenOrderRows`
+   * and the detail modal both read that absence as "unavailable", same as
+   * an ungranted scope or an ACL denial. Loaded `sticky` (below): an
+   * ACL-denied (403) structure must not retry on every unrelated snapshot
+   * revalidation while the modal stays open — only the modal's "Check
+   * deeper" button forces another attempt, via `structureCache.reset`.
    */
   const structureCache = useLazyRowCache<number, StructureCompetition>();
   /** Jump distance between two solar systems, keyed by `"system:system"` — shared by the region-rival lookup and the trade-hub sweep below. */

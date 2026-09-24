@@ -92,11 +92,8 @@ import {
   type BrowserFilterValue,
 } from '@/features/market/useOrderBookOrchestration';
 import { useOrderRowSkills } from '@/features/market/useOrderRowSkills';
-import {
-  useMarketOrderColumns,
-  SELL_ORDER_COLUMN_IDS,
-  BUY_ORDER_COLUMN_IDS,
-} from '@/features/market/useMarketOrderColumns';
+import { useMarketOrderColumns } from '@/features/market/useMarketOrderColumns';
+import { SELL_ORDER_COLUMN_IDS, BUY_ORDER_COLUMN_IDS } from '@/features/market/marketOrderColumns';
 
 /** Rows shown per side before "show all" (CONTEXT.md). */
 const ROW_CAP = 15;
