@@ -8,7 +8,14 @@
  * hand-copied, so an endpoint that changes scope upstream updates this table
  * for free (same rule `app/routeScopes.ts` follows).
  */
-import { ESI_REGISTRY, isScopeRequired, type EsiEndpointId, type Scope } from '@/esi/registry';
+import {
+  ESI_REGISTRY,
+  isScopeRequired,
+  type EsiEndpointId,
+  type Scope,
+  type ScopeGroup,
+} from '@/esi/registry';
+import { permissionForScope } from '@/esi/scopes';
 import type { CorpCapability } from '@/engine/corpRoles';
 
 /** Everything a catalog row says about its event besides its id. */
@@ -245,6 +252,22 @@ const SCOPE_BY_EVENT = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, eve
 export function hasEventScope(eventId: NotificationEventId, scopes: ReadonlySet<string>): boolean {
   const scope = SCOPE_BY_EVENT.get(eventId);
   return scope === undefined || scopes.has(scope);
+}
+
+/**
+ * The Permission this event needs and `scopes` lacks, so Notification
+ * settings can say "Needs the <Permission> permission" with a Grant link
+ * (issue #1525). `null` when the scope is held, the event reads only public
+ * data (`priceAlertTriggered`), or its scope is in the Core Grant — a missing
+ * Core Grant scope has no Permission to ask for, so it stays a plain reauth.
+ */
+export function missingEventPermission(
+  eventId: NotificationEventId,
+  scopes: ReadonlySet<string>
+): ScopeGroup | null {
+  const scope = SCOPE_BY_EVENT.get(eventId);
+  if (scope === undefined || scopes.has(scope)) return null;
+  return permissionForScope(scope) ?? null;
 }
 
 export function eventLabelKey(eventId: NotificationEventId): string {

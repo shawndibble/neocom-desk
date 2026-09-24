@@ -596,7 +596,7 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(requestPermission).not.toHaveBeenCalled();
   });
 
-  it("disables a row and shows a reauth hint for a character missing that event's ESI scope", async () => {
+  it("disables a row and names the missing Permission, with a Grant button, for a character missing that event's ESI scope (issue #1525)", async () => {
     const user = userEvent.setup();
     render(<App />);
     // Pilot Two is not the active character, so its section still needs opening.
@@ -612,8 +612,12 @@ describe('Settings — Notifications (issue #170)', () => {
       name: 'New Mail, browser notifications',
     });
     expect(mailCheckbox).toHaveAttribute('aria-disabled', 'true');
+    expect(pilotTwoSection.getByText('Needs the Mail permission')).toBeInTheDocument();
+    expect(
+      pilotTwoSection.getByRole('button', { name: 'Grant the Mail permission for New Mail' })
+    ).toBeInTheDocument();
     fireEvent.pointerMove(mailCheckbox);
-    expect(await screen.findByText(/re-authorize the character/i)).toBeInTheDocument();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Needs the Mail permission');
 
     expect(
       pilotTwoSection.getByRole('checkbox', {
