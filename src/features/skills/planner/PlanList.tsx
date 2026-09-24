@@ -3,6 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, IconButton, Modal, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { SkillPlanRecord } from '@/db';
+import { formatDuration } from '@/lib/duration';
+import { formatLocalDate } from '@/lib/localDate';
+
+/** A plan's costed total and finish (`null` when there is nothing left to train). */
+export interface PlanRowStats {
+  totalSeconds: number;
+  finish: Date | null;
+}
 
 interface PlanListProps {
   plans: readonly SkillPlanRecord[];
@@ -11,6 +19,8 @@ interface PlanListProps {
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
+  /** Per-plan schedule figures by plan id; rows without an entry show name only. */
+  stats?: ReadonlyMap<string, PlanRowStats>;
 }
 
 function PlanRow({
@@ -19,8 +29,10 @@ function PlanRow({
   onDuplicate,
   onRequestDelete,
   onRename,
+  stats,
 }: {
   plan: SkillPlanRecord;
+  stats: PlanRowStats | undefined;
   onRequestDelete: (plan: SkillPlanRecord) => void;
 } & Pick<PlanListProps, 'onOpen' | 'onDuplicate' | 'onRename'>) {
   const { t } = useTranslation();
@@ -54,8 +66,18 @@ function PlanRow({
           className="flex-1"
         />
       ) : (
-        <button type="button" onClick={() => onOpen(plan.id)} className="flex-1 truncate text-left">
-          {plan.name}
+        <button type="button" onClick={() => onOpen(plan.id)} className="min-w-0 flex-1 text-left">
+          <span className="block truncate">{plan.name}</span>
+          {stats && (
+            <span className="block truncate text-[0.6875rem] text-text-dim tabular-nums">
+              {stats.finish === null
+                ? t('plans.listRowNothingToTrain')
+                : t('plans.listRowStats', {
+                    duration: formatDuration(stats.totalSeconds),
+                    date: formatLocalDate(stats.finish),
+                  })}
+            </span>
+          )}
         </button>
       )}
       {/* Same three controls as the Industry Build Plan list, from the same
@@ -93,6 +115,7 @@ export function PlanList({
   onDuplicate,
   onDelete,
   onRename,
+  stats,
 }: PlanListProps) {
   const { t } = useTranslation();
   const [deletingPlan, setDeletingPlan] = useState<SkillPlanRecord | null>(null);
@@ -119,6 +142,7 @@ export function PlanList({
               onDuplicate={onDuplicate}
               onRequestDelete={setDeletingPlan}
               onRename={onRename}
+              stats={stats?.get(plan.id)}
             />
           ))}
         </ul>
