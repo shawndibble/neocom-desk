@@ -55,7 +55,7 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
 
   it('carries a row hint only where Settings shows one regardless of grants', () => {
     const hinted = NOTIFICATION_EVENT_IDS.filter((id) => eventEntry(id).rowHintKey !== null);
-    expect(hinted).toEqual(['planetaryExtractorExpiring']);
+    expect(hinted).toEqual(['planetaryExtractorExpiring', 'marketOrderUndercut']);
   });
 });
 
@@ -87,6 +87,34 @@ describe('one event through its entry', () => {
     expect(fires).toEqual([{ eventId: 'contractAccepted', characterId: C, contractId: 7 }]);
     expect(entry.copy.subjectOf?.(fires[0])).toBe(7);
     expect(entry.copy.poll(fires[0], PILOT, {}).title).toBe('Contract accepted');
+  });
+
+  it('marketOrderUndercut: fires on crossing to beaten at its station, reads as undercut for a sell order, routes to the order row', () => {
+    const entry = NOTIFICATION_EVENT_ENTRIES.marketOrderUndercut;
+    const order = { orderId: 42, typeId: 34, isBuyOrder: false, locationId: 60003760, price: 100 };
+    const fires = entry.diff(
+      C,
+      { entries: [{ ...order, state: 'clear', rivalPrice: 105, armed: true }], nowMs: T0 },
+      { entries: [{ ...order, state: 'beaten', rivalPrice: 95, armed: false }], nowMs: T0 + 1000 }
+    );
+    expect(fires).toEqual([
+      {
+        eventId: 'marketOrderUndercut',
+        characterId: C,
+        orderId: 42,
+        typeId: 34,
+        isBuyOrder: false,
+        price: 100,
+        rivalPrice: 95,
+      },
+    ]);
+    expect(entry.copy.subjectOf?.(fires[0])).toBe(42);
+    expect(entry.copy.poll(fires[0], PILOT, { item: 'Tritanium' }).body).toBe(
+      "Kestrel's Tritanium sell order at 100.00 ISK was undercut at its station (95.00 ISK)."
+    );
+    expect(entry.projection).toBeNull();
+    expect(entry.thresholds).toBeNull();
+    expect(entry.rowHintKey).toBe('settings.notifications.marketOrderUndercutStationOnlyHint');
   });
 
   it('corpMemberLeft: names the member, routes nowhere', () => {

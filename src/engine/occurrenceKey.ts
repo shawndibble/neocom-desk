@@ -42,6 +42,7 @@ import type {
   ContractNotificationFire,
   WalletNotificationFire,
   MarketOrderNotificationFire,
+  MarketOrderUndercutFire,
   EveNotificationFire,
   StructureFuelLowFire,
   CorpIndustryJobNotificationFire,
@@ -71,6 +72,7 @@ export type OccurrenceFire =
   | ContractNotificationFire
   | WalletNotificationFire
   | MarketOrderNotificationFire
+  | MarketOrderUndercutFire
   | EveNotificationFire
   | StructureFuelLowFire
   | CorpIndustryJobNotificationFire
@@ -129,6 +131,15 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
       return [characterId, fire.eventId, fire.contractId].join(':');
     case 'marketOrderFilled':
       return [characterId, fire.eventId, fire.orderId].join(':');
+    // The order's own price is the extra part: a relist at a new price is a
+    // new occurrence, but a beaten -> clear -> beaten cycle at an unchanged
+    // price reuses this key — the diff still fires, but `alreadyDelivered`
+    // suppresses the repeat toast and the feed row is overwritten in place
+    // rather than duplicated. Not `dayBucket`: this fire always has a real
+    // natural id (`orderId`), so bucketing by day would only throw away a
+    // genuine same-day re-undercut for no reason a day bucket exists to solve.
+    case 'marketOrderUndercut':
+      return [characterId, fire.eventId, fire.orderId, fire.price].join(':');
     case 'newMail':
       return [characterId, fire.eventId, fire.mailId].join(':');
     case 'eveNotification':
@@ -212,10 +223,12 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     case 'corpMemberJoined':
     case 'corpMemberLeft':
     case 'corpWalletThreshold':
-    // A price crossing has no timestamp of its own (issue #680) — Fuzzwork's
-    // aggregate carries no "as of" time finer than the poll that read it.
+    // A price crossing has no timestamp of its own — Fuzzwork's aggregate
+    // carries no "as of" time finer than the poll that read it. Same for a
+    // station undercut: no "as of" time either.
     // falls through
     case 'priceAlertTriggered':
+    case 'marketOrderUndercut':
       return nowMs;
     default: {
       const exhaustive: never = fire;

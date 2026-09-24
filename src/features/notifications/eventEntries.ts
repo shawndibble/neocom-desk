@@ -44,6 +44,7 @@ import {
   diffContractFailed,
   diffWalletBalanceChanged,
   diffMarketOrderFilled,
+  diffMarketOrderUndercut,
   diffEveNotification,
   diffStructureFuelLow,
   diffCorpIndustryJobReady,
@@ -62,6 +63,7 @@ import {
   type ContractNotificationFire,
   type WalletNotificationFire,
   type MarketOrderNotificationFire,
+  type MarketOrderUndercutFire,
   type EveNotificationFire,
   type StructureFuelLowFire,
   type CorpIndustryJobNotificationFire,
@@ -78,6 +80,7 @@ import {
   type ContractSnapshot,
   type WalletSnapshot,
   type MarketOrderSnapshot,
+  type OrderUndercutSnapshot,
   type EveNotificationSnapshot,
   type StructureFuelSnapshot,
   type CorpIndustryJobSnapshot,
@@ -97,6 +100,7 @@ import {
   contractCopy,
   walletCopy,
   marketOrderCopy,
+  marketOrderUndercutCopy,
   eveNotificationCopy,
   structureFuelCopy,
   corpIndustryJobCopy,
@@ -128,6 +132,7 @@ export type AnyNotificationFire =
   | ContractNotificationFire
   | WalletNotificationFire
   | MarketOrderNotificationFire
+  | MarketOrderUndercutFire
   | EveNotificationFire
   | StructureFuelLowFire
   | CorpIndustryJobNotificationFire
@@ -166,6 +171,7 @@ export const SNAPSHOT_SOURCES = {
   contracts: source<ContractSnapshot>('contracts'),
   wallet: source<WalletSnapshot>('wallet'),
   marketOrders: source<MarketOrderSnapshot, ItemNames>('marketOrders'),
+  marketOrderUndercut: source<OrderUndercutSnapshot, ItemNames>('marketOrderUndercut'),
   eveNotification: source<EveNotificationSnapshot, EveNotificationNames>('eveNotification'),
   structureFuel: source<StructureFuelSnapshot>('structureFuel'),
   corpIndustryJobs: source<CorpIndustryJobSnapshot, ItemNames>('corpIndustryJobs'),
@@ -343,6 +349,17 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     projection: null,
     thresholds: null,
     rowHintKey: null,
+  }),
+  // Foreground-only, station-only (issue #1423, owner decisions #1/#2) — no
+  // Scheduled Push (needs a re-check the projector never does) and no
+  // system/region scope yet.
+  marketOrderUndercut: defineEvent({
+    source: SNAPSHOT_SOURCES.marketOrderUndercut,
+    diff: diffMarketOrderUndercut,
+    copy: marketOrderUndercutCopy,
+    projection: null,
+    thresholds: null,
+    rowHintKey: 'settings.notifications.marketOrderUndercutStationOnlyHint',
   }),
   newCalendarEvent: defineEvent({
     source: SNAPSHOT_SOURCES.calendar,

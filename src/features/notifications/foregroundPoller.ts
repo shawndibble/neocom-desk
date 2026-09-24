@@ -301,9 +301,14 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
       // load persists no snapshot and fires nothing, leaving the previous
       // baseline for the next complete poll.
       if (rows === null) continue;
-      const next = run.domain.toSnapshot(rows, deps.now());
-      snapshots.set(run, next);
       const previous = run.next[character.characterId];
+      // `previous` goes to `toSnapshot` as well as `diff` (issue #1423): a
+      // domain whose own snapshot needs to carry state forward across a poll
+      // that observed nothing new — `marketOrderUndercutDomain`'s `armed`
+      // latch surviving an `unknown` poll — reads the very same baseline the
+      // diff below compares against, never a second, possibly stale copy.
+      const next = run.domain.toSnapshot(rows, deps.now(), previous);
+      snapshots.set(run, next);
       fires.push(...run.domain.diff(character.characterId, previous, next, enabledEvents));
       // Unlike the diffs, not filtered per event: the row being retracted may
       // have been written by Web Push or another device, for either of this
