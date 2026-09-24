@@ -129,7 +129,7 @@ describe('Login', () => {
     const user = userEvent.setup();
     renderLogin();
     await user.click(
-      await screen.findByRole('button', { name: /enlarge screenshot: build plans/i })
+      await screen.findByRole('button', { name: /enlarge: a build plan for an orca/i })
     );
     const dialog = await screen.findByRole('dialog', { name: /build plans with profit/i });
     expect(within(dialog).getByRole('img')).toHaveAttribute(
@@ -241,10 +241,10 @@ describe('Login', () => {
   it('answers the trust objections and enumerates the scopes it asks for', async () => {
     renderLogin();
     expect(
-      await screen.findByRole('heading', { name: /it writes only when you tell it to/i })
+      await screen.findByRole('heading', { name: /it writes only when you act/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('heading', { name: /no trades, no colony changes/i })
+      screen.getByRole('heading', { name: /three writes, and nothing else/i })
     ).toBeInTheDocument();
     expect(
       screen.getByRole('heading', { name: /your refresh token stays in this browser/i })
@@ -266,7 +266,7 @@ describe('Login', () => {
 
   it('discloses each write scope in its own fine-print line, not the read sentence', async () => {
     renderLogin();
-    await screen.findByRole('heading', { name: /it writes only when you tell it to/i });
+    await screen.findByRole('heading', { name: /it writes only when you act/i });
 
     const permissions = screen.getByText(/signing in lets it read/i);
     for (const phrase of Object.values(WRITE_SCOPE_PHRASES)) {

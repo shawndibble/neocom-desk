@@ -26,7 +26,7 @@ Supersedes parts of `20260907-010343-login-page-sells-the-shipped-product-and-a.
   six — attention, orders, build, training, colonies (PI Advisor), appraisal —
   kept even because the grid is two columns.
 
-- **Catalog groups now mirror `Layout.tsx`'s nav exactly.** Progression
+- **Catalog groups now mirror `Layout.tsx`'s nav, Clones aside.** Progression
   (Skills, Clones, Industry, Mining, PI) / Economy (Market, Orders, Wallet,
   Assets, Contracts) / Social (Mail & Calendar, Contacts), with the nav's
   unlabelled head — Corporation and Alerts — as "Command", carrying

@@ -1109,7 +1109,7 @@
     "screenshotsHeading": "See it in action",
     "screenshotsLead": "Real screens from a real pilot. The same app runs on a desktop browser or installed on your phone.",
     "screenshotsPhoneHeading": "On your phone",
-    "screenshotEnlarge": "Enlarge screenshot: {{caption}}",
+    "screenshotEnlarge": "Enlarge: {{alt}}",
     "screenshots": {
       "orderDetail": {
         "alt": "An open sell order: who is cheaper at the station, system and region, and whether there is a better exit.",
@@ -1168,7 +1168,7 @@
       },
       "notifications": {
         "name": "Notifications",
-        "desc": "Per character, per event. Skills, industry jobs, extractors, calendar events and structure fuel carry a timestamp, so those arrive with the app closed; order fills, mail, contracts and price alerts fire while it is open.",
+        "desc": "Per character, per event. Skills, industry jobs, extractors, calendar events and — with the corporation grant — structure fuel carry a timestamp, so those arrive with the app closed; order fills, mail, contracts and price alerts fire while it is open.",
         "tag": "Push"
       },
       "skills": {
@@ -1188,7 +1188,7 @@
       },
       "miningTax": {
         "name": "Mining",
-        "desc": "Your output, ISK/hr and raw-vs-refined value over time, plus a tax ledger for moons you mine in someone else’s space: each day’s ore assigned to the payee who owns the moon, tax and ISK snapshotted at assignment, splits, settle-up and payment matching.",
+        "desc": "Your output, ISK/hr and raw-vs-refined value over time, plus a tax ledger for moons you mine in someone else’s space: each day’s ore in each system assigned to the payee you owe, tax and ISK snapshotted at assignment, splits, settle-up and payment matching.",
         "tag": "Ledger"
       },
       "planetary": {
@@ -1232,11 +1232,11 @@
         "tag": "Every character"
       }
     },
-    "trustHeading": "It reads. It writes only when you tell it to.",
+    "trustHeading": "It reads. It writes only when you act.",
     "trust": {
       "readOnly": {
-        "name": "No trades, no colony changes",
-        "desc": "It never places, edits or cancels an order, and never touches a colony. It writes to EVE in three places, each only when you act: marking a mail read by opening it, answering a calendar invite, and sending a reply or forward you wrote."
+        "name": "Three writes, and nothing else",
+        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, and a reply or forward you write goes out through your account. Nothing else in the app writes to EVE."
       },
       "token": {
         "name": "Your refresh token stays in this browser",

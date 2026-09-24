@@ -144,23 +144,30 @@ const FEATURE_GROUPS: { group: string; items: LandingRow[] }[] = [
 interface Screenshot {
   file: string;
   key: string;
-  width: number;
-  height: number;
+  size: { width: number; height: number };
+}
+
+/** Every capture of one form factor was encoded at the same size. */
+const DESKTOP_SIZE = { width: 1600, height: 900 };
+const PHONE_SIZE = { width: 540, height: 1104 };
+
+function screenshotSrc(shot: Screenshot): string {
+  return `/screenshots/${shot.file}.webp`;
 }
 
 const DESKTOP_SCREENSHOTS: Screenshot[] = [
-  { file: 'desktop-order-detail', key: 'orderDetail', width: 1600, height: 900 },
-  { file: 'desktop-build-plan', key: 'buildPlan', width: 1600, height: 900 },
-  { file: 'desktop-lp-store', key: 'lpStore', width: 1600, height: 900 },
-  { file: 'desktop-calendar', key: 'calendar', width: 1600, height: 900 },
-  { file: 'desktop-contracts', key: 'contracts', width: 1600, height: 900 },
+  { file: 'desktop-order-detail', key: 'orderDetail', size: DESKTOP_SIZE },
+  { file: 'desktop-build-plan', key: 'buildPlan', size: DESKTOP_SIZE },
+  { file: 'desktop-lp-store', key: 'lpStore', size: DESKTOP_SIZE },
+  { file: 'desktop-calendar', key: 'calendar', size: DESKTOP_SIZE },
+  { file: 'desktop-contracts', key: 'contracts', size: DESKTOP_SIZE },
 ];
 
 const PHONE_SCREENSHOTS: Screenshot[] = [
-  { file: 'phone-overview', key: 'phoneOverview', width: 540, height: 1104 },
-  { file: 'phone-alerts', key: 'phoneAlerts', width: 540, height: 1104 },
-  { file: 'phone-wallet', key: 'phoneWallet', width: 540, height: 1104 },
-  { file: 'phone-price-history', key: 'phonePriceHistory', width: 540, height: 1104 },
+  { file: 'phone-overview', key: 'phoneOverview', size: PHONE_SIZE },
+  { file: 'phone-alerts', key: 'phoneAlerts', size: PHONE_SIZE },
+  { file: 'phone-wallet', key: 'phoneWallet', size: PHONE_SIZE },
+  { file: 'phone-price-history', key: 'phonePriceHistory', size: PHONE_SIZE },
 ];
 
 /**
@@ -465,10 +472,10 @@ export function Login() {
         >
           {zoomed && (
             <img
-              src={`/screenshots/${zoomed.file}.webp`}
+              src={screenshotSrc(zoomed)}
               alt={t(`login.screenshots.${zoomed.key}.alt`)}
-              width={zoomed.width}
-              height={zoomed.height}
+              width={zoomed.size.width}
+              height={zoomed.size.height}
               className="mx-auto block h-auto max-h-[80vh] w-auto max-w-full"
             />
           )}
@@ -580,26 +587,30 @@ function LandingSection({
 
 /**
  * One gallery capture, as a button that opens it enlarged — at strip size a
- * desktop screen's table text is too small to read. Explicit `width`/`height`
- * reserve the box before the lazy image arrives, so the page does not jump
- * as a visitor scrolls into it.
+ * desktop screen's table text is too small to read. The button's label carries
+ * the image's alt — a button's children are presentational, so the alt alone
+ * would never be read — plus what clicking does, and not the caption the
+ * `<figcaption>` already reads. Explicit `width`/`height` reserve the box
+ * before the lazy image arrives, so the page does not jump as a visitor
+ * scrolls into it.
  */
 function ScreenshotFigure({ shot, onOpen }: { shot: Screenshot; onOpen: () => void }) {
   const { t } = useTranslation();
   const caption = t(`login.screenshots.${shot.key}.caption`);
+  const alt = t(`login.screenshots.${shot.key}.alt`);
   return (
     <figure>
       <button
         type="button"
         onClick={onOpen}
-        aria-label={t('login.screenshotEnlarge', { caption })}
+        aria-label={t('login.screenshotEnlarge', { alt })}
         className="block w-full cursor-zoom-in rounded-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         <img
-          src={`/screenshots/${shot.file}.webp`}
-          alt={t(`login.screenshots.${shot.key}.alt`)}
-          width={shot.width}
-          height={shot.height}
+          src={screenshotSrc(shot)}
+          alt={alt}
+          width={shot.size.width}
+          height={shot.size.height}
           loading="lazy"
           decoding="async"
           className="h-auto w-full rounded-xs border border-line transition-colors hover:border-accent"
