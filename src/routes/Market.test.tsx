@@ -1309,7 +1309,7 @@ describe('Market Browser order row context menu (issue #6)', () => {
     await user.click(await screen.findByText('Rifter'));
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     await user.click(
-      within(sellTable).getByRole('button', { name: /^More actions for Jita IV - Moon 4/ })
+      within(sellTable).getByRole('button', { name: /^More actions for 1,000,000.00 ISK, Jita IV/ })
     );
     await user.click(await screen.findByRole('menuitem', { name: 'Copy price' }));
 

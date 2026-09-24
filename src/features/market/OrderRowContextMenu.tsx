@@ -47,7 +47,9 @@ export function OrderRowContextMenu({
 
   return (
     <RowActionsMenu
-      name={locationText}
+      // Price first: an order book lists many orders at one station, and the
+      // price is what tells their buttons apart.
+      name={`${priceText}, ${locationText}`}
       items={
         <>
           <MenuItem onSelect={() => void writeToClipboard(locationText)}>

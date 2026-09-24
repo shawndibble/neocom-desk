@@ -111,10 +111,15 @@ export function OrderHistoryList({
 
   return (
     <div>
-      <div className={cx(columns, 'border-b border-line bg-panel-2 px-3')}>
-        {header('item', t('orders.item'), 'left')}
-        {header('filled', t('orders.filled'), 'right')}
-        {header('price', t('orders.price'), 'right')}
+      <div className="flex border-b border-line bg-panel-2">
+        <div className={cx(columns, 'min-w-0 flex-1 px-3')}>
+          {header('item', t('orders.item'), 'left')}
+          {header('filled', t('orders.filled'), 'right')}
+          {header('price', t('orders.price'), 'right')}
+        </div>
+        {/* Holds the rows' More actions column open, so the headers stay
+            over their values. */}
+        <span aria-hidden="true" className="mr-1 w-9 shrink-0 md:w-7" />
       </div>
       <ul aria-label={label} className="divide-y divide-line">
         {rows.map((order) => {
@@ -123,28 +128,32 @@ export function OrderHistoryList({
           const issued = formatDateOnly(new Date(order.issued), timeZone);
           const row = (
             <li className={cx(open && 'bg-panel-2')}>
-              <button
-                type="button"
-                aria-expanded={open}
-                onClick={() => setOpenId(open ? null : order.order_id)}
-                className={cx(
-                  columns,
-                  'min-h-13 w-full items-center px-3 py-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent'
-                )}
-              >
-                <span className="flex min-w-0 flex-col gap-0.5">
-                  <span className="truncate text-sm text-text">{name}</span>
-                  <span className="truncate text-xs text-text-dim">
-                    {sideLabel(order)} · {stateLabel(order)} · {issued}
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => setOpenId(open ? null : order.order_id)}
+                  className={cx(
+                    columns,
+                    'min-h-13 min-w-0 flex-1 items-center px-3 py-2 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent'
+                  )}
+                >
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="truncate text-sm text-text">{name}</span>
+                    <span className="truncate text-xs text-text-dim">
+                      {sideLabel(order)} · {stateLabel(order)} · {issued}
+                    </span>
                   </span>
-                </span>
-                <span className="text-right text-sm text-text-dim tabular-nums">
-                  {filledOf(order).toLocaleString()}/{order.volume_total.toLocaleString()}
-                </span>
-                <span className="text-right text-sm font-semibold text-text tabular-nums">
-                  {formatIskCompact(order.price)}
-                </span>
-              </button>
+                  <span className="text-right text-sm text-text-dim tabular-nums">
+                    {filledOf(order).toLocaleString()}/{order.volume_total.toLocaleString()}
+                  </span>
+                  <span className="text-right text-sm font-semibold text-text tabular-nums">
+                    {formatIskCompact(order.price)}
+                  </span>
+                </button>
+                {/* Beside the button, not in it — buttons don't nest. */}
+                <RowMoreActions className="mr-1 shrink-0" />
+              </div>
               {open && (
                 <div className="flex flex-col gap-3 px-3 pt-1 pb-3">
                   <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-sm tabular-nums">
@@ -163,9 +172,6 @@ export function OrderHistoryList({
                   >
                     {t('orders.viewInMarket')}
                   </MarketItemLink>
-                  {/* In the opened row rather than beside it, so the collapsed
-                      rows keep lining up under the column header. */}
-                  <RowMoreActions className="self-end" />
                 </div>
               )}
             </li>
