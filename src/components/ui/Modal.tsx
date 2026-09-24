@@ -132,7 +132,7 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
             <div
               ref={bodyRef}
               tabIndex={-1}
-              className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none${placement === 'sheet' ? ' scroll-pb-16' : ''}`}
+              className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none${placement === 'sheet' ? ' scroll-pb-20' : ''}`}
             >
               {children}
             </div>

@@ -1122,9 +1122,7 @@ export function Settings() {
                   {t(singleKeyShortcuts ? 'shortcuts.enabledHint' : 'shortcuts.disabledNote')}
                 </p>
               </div>
-              <dl
-                className={`max-w-md divide-y divide-line text-xs${singleKeyShortcuts ? '' : ' opacity-60'}`}
-              >
+              <dl className="max-w-md divide-y divide-line text-xs">
                 {SHORTCUTS.map((shortcut) => (
                   <div key={shortcut.id} className="flex items-center justify-between gap-4 py-2">
                     <dt className="text-text-dim">{t(shortcut.descriptionKey)}</dt>

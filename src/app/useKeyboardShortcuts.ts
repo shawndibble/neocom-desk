@@ -21,7 +21,9 @@ function isTypingTarget(target: EventTarget | null): boolean {
  */
 export function useKeyboardShortcuts(): void {
   const navigate = useNavigate();
-  const enabled = useSingleKeyShortcuts((state) => state.value);
+  // Off until hydrated, so a pilot who turned them off never gets a live key
+  // in the window before the stored choice loads.
+  const enabled = useSingleKeyShortcuts((state) => state.hydrated && state.value);
 
   useEffect(() => {
     if (!enabled) return;
