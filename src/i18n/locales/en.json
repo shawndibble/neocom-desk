@@ -1,7 +1,7 @@
 {
   "app": {
     "name": "Neocom Desk",
-    "tagline": "Skill plans, build margins, market orders, colonies and moon tax — every character you fly, in one browser tab."
+    "tagline": "Skill plans, build margins, market orders, colonies and mining tax — every character you fly, in one browser tab."
   },
   "boot": {
     "stalledHint": "Still loading. Another copy of the app may be holding your local data open.",
@@ -1095,7 +1095,7 @@
     "features": {
       "skills": {
         "name": "Skills",
-        "desc": "Drag-and-drop skill plans, a remap-, implant- and accelerator-aware optimizer, live queue import, and a side-by-side character comparison.",
+        "desc": "Drag-and-drop skill plans, a remap-, implant- and accelerator-aware optimizer, live queue import, ship mastery and fit checks, and a side-by-side character comparison.",
         "tag": "Planning"
       },
       "clones": {
@@ -1105,12 +1105,12 @@
       },
       "industry": {
         "name": "Industry",
-        "desc": "Build plans for manufacturing and reactions: materials, job fees, facility rigs and taxes at live hub prices, with a production log that tracks what each run really made.",
+        "desc": "Build plans for manufacturing and reactions: materials, job fees, facility rigs and taxes at live hub prices, with a production log that tracks what each run really made, and a search across every public BPC contract by ME/TE, runs, price and jumps.",
         "tag": "Manufacturing"
       },
       "market": {
         "name": "Market",
-        "desc": "Order books, spreads and variation comparison across Jita, Amarr, Dodixie, Rens and Hek. Built on public price data, so it works whatever you did or didn't grant.",
+        "desc": "Order books for any region or all of them, filtered by jump range and security, with price history, side-by-side compare, price alerts, and an appraisal of pasted items or EFT fits net of fees. Built on public price data, so it works whatever you did or didn't grant.",
         "tag": "No scope needed"
       },
       "orders": {
@@ -1134,8 +1134,8 @@
         "tag": "Planning"
       },
       "miningTax": {
-        "name": "Moon Mining",
-        "desc": "The rental ledger: per-day, per-system ore assigned to payees, tax and ISK snapshotted at assignment, splits, settle-up and payment matching.",
+        "name": "Mining",
+        "desc": "Your output, ISK/hr and raw-vs-refined value over time, plus the moon rental ledger: per-day, per-system ore assigned to payees, tax and ISK snapshotted at assignment, splits, settle-up and payment matching.",
         "tag": "Ledger"
       },
       "corp": {
@@ -1155,8 +1155,8 @@
       },
       "social": {
         "name": "Mail, Calendar & Contracts",
-        "desc": "In-game mail, upcoming events, contracts and standings, read without launching the client.",
-        "tag": "Read-only"
+        "desc": "In-game mail with reply and forward, a calendar you can RSVP from, contracts and standings, all without launching the client.",
+        "tag": "Out of game"
       }
     },
     "trustHeading": "Read-only, and it stays that way",
