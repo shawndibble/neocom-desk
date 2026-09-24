@@ -546,7 +546,7 @@ export function PlanPanel({
               extractionRateField={effectiveFloor === 'P0' ? extractionRateField : undefined}
               planetSlots={planetSlots(consolidationLevel)}
             />
-            <PlanChainTable rows={rows} productName={selected.name} />
+            <PlanChainTable rows={rows} productName={selected.name} hubId={hub.id} />
             <PlanSensitivity grid={grid} rates={sensitivityRates} />
           </>
         )}

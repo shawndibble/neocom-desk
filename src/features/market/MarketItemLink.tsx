@@ -7,6 +7,8 @@ interface MarketItemLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElemen
   children: ReactNode;
   /** Replaces the default inline-link look, e.g. to draw it as a button. */
   className?: string;
+  /** Forces `marketLinkParams`' hub override — see its own doc for why. */
+  hubId?: string;
 }
 
 /**
@@ -18,9 +20,15 @@ interface MarketItemLinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElemen
  * Extra anchor props (and `ref`) pass through to the `Link`, so a `Tooltip`
  * trigger (`asChild`) can wrap it and have its handlers land on the anchor.
  */
-export function MarketItemLink({ typeId, children, className, ...rest }: MarketItemLinkProps) {
+export function MarketItemLink({
+  typeId,
+  children,
+  className,
+  hubId,
+  ...rest
+}: MarketItemLinkProps) {
   const location = useLocation();
-  const params = marketLinkParams(typeId, location.search);
+  const params = marketLinkParams(typeId, location.search, hubId);
   return (
     <Link
       {...rest}

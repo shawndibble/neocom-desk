@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { PiData } from '@/sde/types';
 import { db } from '@/db';
@@ -111,7 +112,13 @@ function TestHarness({
 
 function renderPanel(typeId: number | null = BROADCAST_NODE) {
   const onTypeIdChange = vi.fn();
-  const { unmount } = render(<TestHarness typeId={typeId} onTypeIdChange={onTypeIdChange} />);
+  // MemoryRouter: the chain table's commodity names are MarketItemLinks,
+  // which read `useLocation` from a router context.
+  const { unmount } = render(
+    <MemoryRouter>
+      <TestHarness typeId={typeId} onTypeIdChange={onTypeIdChange} />
+    </MemoryRouter>
+  );
   return { onTypeIdChange, unmount };
 }
 
@@ -374,6 +381,53 @@ describe('PlanPanel', () => {
     // (docs/DESIGN.md §4a) — the tier chip carries the hierarchy instead.
     expect(within(table).getByText('Broadcast Node').closest('td')).toHaveClass('dt-primary');
     expect(within(table).getAllByText('P4')[0].closest('td')).not.toHaveClass('dt-primary');
+  });
+
+  it('links each commodity name to the Market Browser at the plan’s resolved hub', async () => {
+    renderPanel();
+    const table = await screen.findByRole('table', { name: /Production chain for Broadcast Node/ });
+    // Jita is the default hub — the link must carry it explicitly rather
+    // than relying on the Market Browser's own default.
+    expect(within(table).getByRole('link', { name: 'Broadcast Node' })).toHaveAttribute(
+      'href',
+      `/market/browser?type=${BROADCAST_NODE}&hub=jita`
+    );
+  });
+
+  it('follows a saved trade hub other than the device default', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    await verdict();
+
+    await user.click(screen.getByRole('combobox', { name: 'Trade hub' }));
+    await user.click(await screen.findByRole('option', { name: 'Amarr' }));
+
+    const table = await screen.findByRole('table', { name: /Production chain for Broadcast Node/ });
+    expect(within(table).getByRole('link', { name: 'Broadcast Node' })).toHaveAttribute(
+      'href',
+      `/market/browser?type=${BROADCAST_NODE}&hub=amarr`
+    );
+  });
+
+  it('still links a row whose own unit price is unknown at this hub', async () => {
+    const withoutTarget = { ...fullPrices };
+    delete withoutTarget[BROADCAST_NODE];
+    loadPlanPrices.mockResolvedValue({
+      prices: withoutTarget,
+      unpriced: [BROADCAST_NODE],
+      failed: false,
+      fetchedAt: new Date(),
+    });
+
+    renderPanel();
+    const table = await screen.findByRole('table', { name: /Production chain for Broadcast Node/ });
+    const row = within(table).getByText('Broadcast Node').closest('tr');
+    if (!row) throw new Error('row not found');
+    expect(row.querySelector('td[data-label="Hub price"]')).toHaveTextContent('—');
+    expect(within(row).getByRole('link', { name: 'Broadcast Node' })).toHaveAttribute(
+      'href',
+      `/market/browser?type=${BROADCAST_NODE}&hub=jita`
+    );
   });
 });
 

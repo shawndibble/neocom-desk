@@ -34,7 +34,9 @@ import {
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import type { PiTier, SourcingFloor } from '@/engine/pi/chain';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatIsk } from '@/lib/isk';
+import type { TradeHub } from '@/market/hubs';
 import { taxSplit, type PlanCostResult, type PlanRow, type SensitivityRow } from './planModel';
 
 const RATE_FORMAT = new Intl.NumberFormat('en', { maximumFractionDigits: 2 });
@@ -307,10 +309,12 @@ export function PlanVerdict({
 interface PlanChainTableProps {
   rows: PlanRow[];
   productName: string;
+  /** The plan's resolved trade hub — the same one the unit-price column read from. */
+  hubId: TradeHub['id'];
 }
 
 /** The expanded chain: what each tier needs per hour, what it costs in pins, and what the hub says about it. */
-export function PlanChainTable({ rows, productName }: PlanChainTableProps) {
+export function PlanChainTable({ rows, productName, hubId }: PlanChainTableProps) {
   const { t } = useTranslation();
 
   const columns = useMemo<DataTableColumn<PlanRow>[]>(
@@ -321,7 +325,13 @@ export function PlanChainTable({ rows, productName }: PlanChainTableProps) {
         // Titles the card below `sm`: the tier chip carries the hierarchy that
         // indentation carries on desktop, so no depth gutter is spent at 390px.
         primary: true,
-        render: (row) => row.name,
+        // Plan hub isn't in the URL, so it must be carried explicitly to
+        // match this row's own unit-price cell — see MarketItemLink's hubId.
+        render: (row) => (
+          <MarketItemLink typeId={row.typeId} hubId={hubId}>
+            {row.name}
+          </MarketItemLink>
+        ),
       },
       {
         id: 'tier',
@@ -390,7 +400,7 @@ export function PlanChainTable({ rows, productName }: PlanChainTableProps) {
           ),
       },
     ],
-    [t]
+    [t, hubId]
   );
 
   return (
