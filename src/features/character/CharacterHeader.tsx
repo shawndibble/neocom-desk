@@ -65,7 +65,11 @@ export function CharacterHeader({ characterId, totalSp, unallocatedSp }: Charact
         their own line and the name gets the full width.
       */}
       <div className="min-w-0 flex-1 basis-48">
-        <h1 className="truncate text-xl font-semibold tracking-widest uppercase">
+        {/* `tabIndex={-1}`: route focus (`app/routeFocus.ts`) lands here after navigation. */}
+        <h1
+          tabIndex={-1}
+          className="truncate text-xl font-semibold tracking-widest uppercase focus:outline-none"
+        >
           {character?.name ?? t('common.unknown')}
         </h1>
         <p className="truncate text-xs text-text-dim">

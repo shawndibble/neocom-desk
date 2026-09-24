@@ -14,7 +14,14 @@ describe('focusKeyFor', () => {
   it('treats a splat drill-down as the same page', () => {
     expect(focusKeyFor('/assets/60003760')).toBe('/assets');
     expect(focusKeyFor('/assets')).toBe('/assets');
-    expect(focusKeyFor('/corp/assets/1/2')).toBe('/corp/assets');
+    expect(focusKeyFor('/corp/assets/1/2')).toBe(focusKeyFor('/corp/assets'));
+  });
+
+  it('collapses a sub-nav’s sibling routes to one page', () => {
+    expect(focusKeyFor('/skills/trained')).toBe(focusKeyFor('/skills/plans'));
+    expect(focusKeyFor('/corp/members')).toBe(focusKeyFor('/corp'));
+    expect(focusKeyFor('/clones')).toBe(focusKeyFor('/overview'));
+    expect(focusKeyFor('/overview')).not.toBe(focusKeyFor('/mail'));
   });
 
   it('keeps a :param route one page across its params, apart from its list', () => {

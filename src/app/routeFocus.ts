@@ -6,25 +6,43 @@
  * keeps the page and must not yank focus away from what the pilot is using.
  */
 import { useEffect, useRef, type RefObject } from 'react';
-import { matchPath } from 'react-router-dom';
+import { pagePathFor } from './pagePathFor';
 import { tabbedPageFor } from './pageTabs';
-import { ROUTE_REQUIREMENTS } from './routeScopes';
+import type { AppRoutePath } from './routeScopes';
 
-const ROUTE_PATTERNS = Object.keys(ROUTE_REQUIREMENTS);
+/**
+ * Routes that are separate paths but one page to the pilot: each set shares a
+ * sub-nav (`SkillsSubNav`, `CorpSubNav`, `OverviewSubNav`) that stays on
+ * screen across the switch, so it behaves like a tab bar — the link just used
+ * is still there to keep focus on.
+ */
+const SUB_NAV_PAGES: Partial<Record<AppRoutePath, AppRoutePath>> = {
+  '/skills/trained': '/skills',
+  '/skills/plans': '/skills',
+  '/skills/compare': '/skills',
+  '/skills/ships': '/skills',
+  '/corp/members': '/corp',
+  '/corp/assets': '/corp',
+  '/clones': '/overview',
+  '/employment-history': '/overview',
+};
 
 /** How long a page that is still loading gets to render its `<h1>`. */
 export const HEADING_WAIT_MS = 2000;
 
 /**
- * Which page `pathname` is, for focus purposes: a tabbed page's base, or the
- * matched route pattern with any splat dropped, so `/assets` and
- * `/assets/60003760` are one page and `/skills/plans/1` and `/2` are another.
+ * Which page `pathname` is, for focus purposes: a tabbed page's base, a
+ * sub-nav page's section, or the matched route pattern with any splat
+ * dropped — so `/assets` and `/assets/60003760` are one page, and
+ * `/skills/plans/1` and `/2` are one page apart from the plan list.
  */
 export function focusKeyFor(pathname: string): string {
   const page = tabbedPageFor(pathname);
   if (page !== null) return page.base;
-  const pattern = ROUTE_PATTERNS.find((candidate) => matchPath(candidate, pathname));
-  return pattern ? pattern.replace(/\/\*$/, '') : pathname;
+  const pattern = pagePathFor(pathname);
+  if (pattern === '/*') return pathname;
+  const route = pattern.replace(/\/\*$/, '') as AppRoutePath;
+  return SUB_NAV_PAGES[route] ?? route;
 }
 
 function focusWithoutScroll(element: HTMLElement): void {
