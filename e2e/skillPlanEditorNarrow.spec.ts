@@ -254,3 +254,16 @@ test("naming a milestone from an entry row shows it as the header's next milesto
   await expect(page.getByText('Next milestone')).toBeVisible();
   await expect(page.getByText('Fly Loki').first()).toBeVisible();
 });
+
+test('the header progress chips wrap at 390px without horizontal scroll', async ({ page }) => {
+  await signInAndGoto(page);
+  await seedPlan(page, [PLAN_ENTRY]);
+  await page.setViewportSize(PHONE);
+  await page.goto(`./skills/plans/${PLAN_ID}`);
+
+  await expect(page.getByText('Next step', { exact: true })).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+});

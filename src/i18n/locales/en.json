@@ -352,6 +352,11 @@
     "headerNoFinish": "—",
     "headerSavingsLabel": "Remap savings",
     "headerSavingsNone": "None",
+    "headerTrained": "Trained",
+    "headerTrainedSp": "{{trained}} / {{total}} SP",
+    "headerNextStep": "Next step",
+    "headerNextStepValue": "{{name}} {{level}}",
+    "headerNothingLeft": "Nothing left to train",
     "injectors": {
       "title": "Skill injectors",
       "ifInjectedNow": "If injected now:",

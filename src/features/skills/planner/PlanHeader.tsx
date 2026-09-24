@@ -2,6 +2,10 @@ import { useTranslation } from 'react-i18next';
 import { Panel, StatChip } from '@/components/ui';
 import { formatDuration } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
+import { formatCompactNumber } from '@/lib/compactNumber';
+import { romanLevel } from '@/engine/projection';
+import type { PlanProgress } from '@/engine/planProgress';
+import { doneByText } from './doneBy';
 import { MIN_MEANINGFUL_SAVINGS_SECONDS, type OptimizationBadge } from './planHeaderStats';
 
 interface PlanHeaderProps {
@@ -16,6 +20,12 @@ interface PlanHeaderProps {
    * (`engine/skillPlanMilestones.ts`'s `nextMilestone`).
    */
   nextMilestone: { name: string; finish: Date } | null;
+  /** Share of the plan already trained; omitted by callers with no plan basis. */
+  progress?: PlanProgress;
+  /** The first step of the Skill Plan schedule, with what its "Done by" date needs. */
+  nextStep?: { name: string; level: number; cumulativeSeconds: number; startDate: Date } | null;
+  /** False until the character's trained skills have loaded: progress reads `—`, not 0%. */
+  trainedKnown?: boolean;
 }
 
 /**
@@ -28,9 +38,13 @@ export function PlanHeader({
   projectedFinish,
   badge,
   nextMilestone,
+  progress,
+  nextStep = null,
+  trainedKnown = true,
 }: PlanHeaderProps) {
   const { t } = useTranslation();
   const savingsSeconds = badge?.savingsSeconds ?? 0;
+  const progressFraction = progress?.fraction ?? null;
   const showsSavings = badge !== null && savingsSeconds >= MIN_MEANINGFUL_SAVINGS_SECONDS;
 
   return (
@@ -51,6 +65,48 @@ export function PlanHeader({
           label={t('plans.headerProjectedFinish')}
           value={projectedFinish ? formatLocalDate(projectedFinish) : t('plans.headerNoFinish')}
         />
+        {progress && progressFraction !== null && (
+          <StatChip
+            label={t('plans.headerTrained')}
+            value={
+              trainedKnown ? (
+                <>
+                  {Math.floor(progressFraction * 100)}%{' '}
+                  <span className="text-text-dim">
+                    {t('plans.headerTrainedSp', {
+                      trained: formatCompactNumber(progress.trainedSp),
+                      total: formatCompactNumber(progress.totalSp),
+                    })}
+                  </span>
+                </>
+              ) : (
+                '—'
+              )
+            }
+          />
+        )}
+        {progressFraction !== null && (
+          <StatChip
+            label={t('plans.headerNextStep')}
+            value={
+              !trainedKnown ? (
+                '—'
+              ) : nextStep ? (
+                <>
+                  {t('plans.headerNextStepValue', {
+                    name: nextStep.name,
+                    level: romanLevel(nextStep.level),
+                  })}{' '}
+                  <span className="text-text-dim">
+                    {doneByText(nextStep.cumulativeSeconds, nextStep.startDate)}
+                  </span>
+                </>
+              ) : (
+                t('plans.headerNothingLeft')
+              )
+            }
+          />
+        )}
         {nextMilestone && (
           <StatChip
             label={t('plans.milestone.next')}

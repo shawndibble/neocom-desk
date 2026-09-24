@@ -330,7 +330,8 @@ describe('PlanEditor tools pane', () => {
       'false'
     );
     expect(screen.getByRole('heading', { name: 'Your entries' })).toBeInTheDocument();
-    expect(screen.getByText('Skill A I')).toBeInTheDocument();
+    // The header's Next step chip repeats the first row's name, so match at least one.
+    expect(screen.getAllByText('Skill A I').length).toBeGreaterThan(0);
   });
 
   it('collapses Export into one control that reveals "to clipboard" / "to CSV" only after being opened', async () => {
