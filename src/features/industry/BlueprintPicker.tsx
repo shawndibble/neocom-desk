@@ -40,7 +40,7 @@ export function BlueprintPicker({ catalog, onPick, className = '' }: BlueprintPi
                   onPick(entry);
                   setQuery('');
                 }}
-                className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs hover:bg-panel-2"
+                className="flex w-full items-center justify-between gap-2 px-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
               >
                 <span className="truncate">{entry.productName}</span>
                 <span className="shrink-0 text-text-dim">#{entry.blueprintTypeID}</span>

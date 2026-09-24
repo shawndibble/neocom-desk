@@ -85,7 +85,7 @@ export function PriceBasisOptions({ value, onChange }: PriceBasisOptionsProps) {
           <input
             type="radio"
             name="mining-price-basis"
-            className="mt-0.5 accent-accent"
+            className="mt-0.5 size-4 shrink-0 cursor-pointer accent-accent"
             checked={current === choice}
             onChange={() => pick(choice)}
           />

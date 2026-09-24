@@ -148,7 +148,7 @@ export function LinkPaymentDialog({
                   <input
                     type="radio"
                     name="link-payment"
-                    className="mt-0.5"
+                    className="mt-0.5 size-4 shrink-0 cursor-pointer accent-accent"
                     checked={on}
                     onChange={() => pick(payment.key)}
                   />
@@ -194,6 +194,7 @@ export function LinkPaymentDialog({
                           type="checkbox"
                           checked={on}
                           onChange={() => toggle(m.assignment.id)}
+                          className="size-4 shrink-0 cursor-pointer accent-accent"
                           aria-label={t('miningTax.linkPaymentIncludeLabel', {
                             date: m.assignment.date,
                           })}

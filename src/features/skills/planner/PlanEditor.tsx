@@ -1346,6 +1346,7 @@ export function PlanEditor({
               checked={cloneState === 'alpha'}
               disabled={!cloneStatesHydrated}
               onChange={(e) => setCloneState(e.target.checked ? 'alpha' : 'omega')}
+              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
             />
             {t('plans.alphaClone')}
           </label>
@@ -1443,6 +1444,7 @@ export function PlanEditor({
                 type="checkbox"
                 checked={planBooster.enabled}
                 onChange={(e) => patchBooster({ enabled: e.target.checked })}
+                className="size-4 shrink-0 cursor-pointer accent-accent"
               />
               {t('plans.booster')}
             </label>

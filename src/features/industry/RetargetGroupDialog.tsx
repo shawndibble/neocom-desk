@@ -156,6 +156,7 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
                   id={`retarget-plan-${plan.id}`}
                   checked={checked.has(plan.id)}
                   onChange={() => toggle(plan.id)}
+                  className="size-4 shrink-0 cursor-pointer accent-accent"
                 />
                 <label htmlFor={`retarget-plan-${plan.id}`} className="flex flex-1 flex-col">
                   <span>{plan.name}</span>

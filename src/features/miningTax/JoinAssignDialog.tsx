@@ -184,6 +184,7 @@ export function JoinAssignDialog({
                       type="checkbox"
                       checked={selectedKeys.has(candidateKey(candidate))}
                       onChange={() => toggle(candidateKey(candidate))}
+                      className="size-4 shrink-0 cursor-pointer accent-accent"
                       aria-label={t('miningTax.joinIncludeLabel', {
                         date: candidate.row.entry.date,
                       })}

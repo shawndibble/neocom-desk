@@ -754,7 +754,7 @@ export function BuildGroupPanel({
                     <button
                       type="button"
                       onClick={() => onOpenPlan(plan.id)}
-                      className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel-2"
+                      className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
                     >
                       <span className="truncate">{plan.name}</span>
                       <span className="shrink-0 tabular-nums text-text-dim">

@@ -411,7 +411,7 @@ export function Skills() {
                       aria-expanded={expanded}
                       disabled={searching}
                       onClick={() => toggleGroup(group.groupName)}
-                      className={`flex min-h-11 w-full items-center justify-between gap-2 border-line px-3 py-1 text-left hover:bg-panel-2 disabled:hover:bg-transparent md:min-h-0 ${
+                      className={`flex min-h-11 w-full items-center justify-between gap-2 border-line px-3 py-1 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent disabled:hover:bg-transparent md:min-h-0 ${
                         expanded ? 'border-b' : ''
                       }`}
                     >
@@ -442,7 +442,7 @@ export function Skills() {
                                   current === skill.skillTypeID ? null : skill.skillTypeID
                                 )
                               }
-                              className={`flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs hover:bg-panel-2 ${
+                              className={`flex w-full items-center justify-between gap-2 py-1.5 text-left text-xs hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${
                                 selected ? 'bg-panel-2' : ''
                               }`}
                             >
