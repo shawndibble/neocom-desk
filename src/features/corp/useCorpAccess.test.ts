@@ -273,7 +273,7 @@ describe('useCorpAccess — switching Character', () => {
 });
 
 /**
- * The Settings Corporation permission row (#295) reports the roles themselves, not just
+ * The Settings Corporation Permission row (#295) reports the roles themselves, not just
  * the capabilities they imply: "you hold Station_Manager" is the sentence that
  * explains why only structures are readable, and a capability list cannot say
  * it. Raw ESI strings, for the same reason `corpCapabilities` tolerates

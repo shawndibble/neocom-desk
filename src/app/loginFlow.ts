@@ -60,7 +60,7 @@ async function requestedScopes(
  * the two branches incremental auth splits login into (issue #295).
  *
  * Every caller is pressed from a Character context: a `ReauthBanner`, the
- * `AuthFailureNotice`, a `ScopeGate`, the Settings Corporation permission row, the corp
+ * `AuthFailureNotice`, a `ScopeGate`, the Settings Corporation Permission row, the corp
  * grant prompt. So the request unions with that Character's stored grant, and
  * asking for less would quietly throw away a grant they already made — EVE
  * issues a token carrying exactly what was requested, so the loss is real.

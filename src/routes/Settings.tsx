@@ -1172,10 +1172,8 @@ export function Settings() {
             the one-time prompt. It sits on the whole section rather than that
             row, which is not rendered for a Character with no Corp Role.
           */}
-          <div id="permissions" className="scroll-mt-4">
-            <div id="corp-access" className="scroll-mt-4">
-              <PermissionsPanel />
-            </div>
+          <div id="corp-access" className="scroll-mt-4">
+            <PermissionsPanel />
           </div>
           <DataPanel />
           <DataAttributionPanel />

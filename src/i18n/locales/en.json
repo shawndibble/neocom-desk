@@ -4564,10 +4564,10 @@
       "3": "Within 3 jumps",
       "5": "Within 5 jumps",
       "10": "Within 10 jumps",
-      "15": "Within 15 jumps",
-      "20": "Within 20 jumps",
       "any": "Any distance",
-      "system": "Current system"
+      "system": "Current system",
+      "15": "Within 15 jumps",
+      "20": "Within 20 jumps"
     },
     "from": "From: {{system}}",
     "fromUnknown": "From: set your system",
