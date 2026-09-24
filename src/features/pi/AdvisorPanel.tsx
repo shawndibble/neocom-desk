@@ -672,7 +672,7 @@ function UnbuiltCard({
       planetType={advice.planetType}
       dashed
       footer={
-        <span className="text-[0.6875rem] text-text-faint">
+        <span className="text-[0.6875rem] text-text-dim">
           {plan.status === 'advised' ? t('piAdvisor.projectedFrom') : t('piAdvisor.notColonised')}
         </span>
       }
@@ -760,7 +760,7 @@ function UnbuiltPlanLines({ plan }: { plan: UnbuiltPlanAdvice }) {
           tier: best.tier,
         })}
       </DirectiveRow>
-      <p className="text-[0.6875rem] text-text-faint">
+      <p className="text-[0.6875rem] text-text-dim">
         {t('piAdvisor.buildPlanBasis', {
           units: Math.round(best.unitsPerHour).toLocaleString(),
         })}

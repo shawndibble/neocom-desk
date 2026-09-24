@@ -1045,7 +1045,7 @@ function ThresholdControls({
         />
       ))}
       {thresholds.hintKey !== null && (
-        <p className="mt-1 text-[0.6875rem] text-text-faint">{t(thresholds.hintKey)}</p>
+        <p className="mt-1 text-[0.6875rem] text-text-dim">{t(thresholds.hintKey)}</p>
       )}
     </div>
   );
