@@ -306,7 +306,9 @@ describe('BpcSourcingPanel', () => {
     expect(within(table).getByText('10')).toBeInTheDocument();
     // The price cell shows shorthand ("5M"); its accessible name carries the
     // exact figure.
-    expect(within(table).getByLabelText('5,000,000.00 ISK')).toBeInTheDocument();
+    expect(
+      within(table).getByText('5,000,000.00 ISK', { selector: '.sr-only' })
+    ).toBeInTheDocument();
   });
 
   it('marks a multi-type row’s price as the whole contract’s ask, and its ISK/run as unknowable (issue #1076)', async () => {
@@ -319,7 +321,9 @@ describe('BpcSourcingPanel', () => {
     const table = await screen.findByRole('table', { name: 'BPC Search' });
     await within(table).findByText('Rifter Blueprint');
     // The real ask is still shown, just marked — not silently hidden.
-    expect(within(table).getByLabelText('5,000,000.00 ISK')).toBeInTheDocument();
+    expect(
+      within(table).getByText('5,000,000.00 ISK', { selector: '.sr-only' })
+    ).toBeInTheDocument();
     expect(within(table).getByText('Whole contract')).toBeInTheDocument();
 
     // ISK/run is not a default-visible column — switch it on first.
@@ -473,10 +477,10 @@ describe('BpcSourcingPanel', () => {
     // Scoped to the chips: these figures also appear in the region strip and
     // the table, which is the point — all three have to agree.
     expect(screen.getByText('Cheapest').parentElement).toContainElement(
-      screen.getAllByLabelText('3,000,000.00 ISK')[0]
+      screen.getAllByText('3,000,000.00 ISK', { selector: '.sr-only' })[0]
     );
     expect(screen.getByText('Median').parentElement).toContainElement(
-      screen.getAllByLabelText('5,000,000.00 ISK')[0]
+      screen.getAllByText('5,000,000.00 ISK', { selector: '.sr-only' })[0]
     );
     // The suggestion list closes once a blueprint is pinned.
     expect(screen.queryByRole('list', { name: 'Matching blueprints' })).not.toBeInTheDocument();
@@ -521,7 +525,9 @@ describe('BpcSourcingPanel', () => {
     const table = await screen.findByRole('table', { name: 'BPC Search' });
     // Row 0 is the header; the cheapest row must lead under the default sort.
     expect(
-      within(within(table).getAllByRole('row')[1]).getByLabelText('1,000,000.00 ISK')
+      within(within(table).getAllByRole('row')[1]).getByText('1,000,000.00 ISK', {
+        selector: '.sr-only',
+      })
     ).toBeInTheDocument();
   });
 
@@ -1140,7 +1146,9 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       const contractCard = within(screen.getByRole('list', { name: 'Contract BPOs' })).getByRole(
         'listitem'
       );
-      expect(within(marketCard).getByLabelText('2,000,000.00 ISK')).toBeInTheDocument();
+      expect(
+        within(marketCard).getByText('2,000,000.00 ISK', { selector: '.sr-only' })
+      ).toBeInTheDocument();
       expect(marketCard).toHaveTextContent('incl. NPC-seeded');
       // System plus its security, never the station or region name.
       await waitFor(() => expect(marketCard).toHaveTextContent('Jita 0.9'));
@@ -1151,7 +1159,9 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       expect(
         within(marketCard).getByRole('button', { name: 'BPO may be cheaper' })
       ).toBeInTheDocument();
-      expect(within(contractCard).getByLabelText('40,000,000.00 ISK')).toBeInTheDocument();
+      expect(
+        within(contractCard).getByText('40,000,000.00 ISK', { selector: '.sr-only' })
+      ).toBeInTheDocument();
       // The group header names the source: no per-card "BPO" cue line, so
       // the card is as tall as a region card (three lines).
       expect(within(contractCard).queryByText('BPO')).not.toBeInTheDocument();
@@ -1209,11 +1219,15 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       expect(getOrderBook.mock.calls.every(([regionId]) => regionId === 10000002)).toBe(true);
       expect(screen.getByText(/Market BPOs checked in the Jita region/)).toBeInTheDocument();
 
-      expect(within(table).queryByLabelText('2,000,000.00 ISK')).not.toBeInTheDocument();
+      expect(
+        within(table).queryByText('2,000,000.00 ISK', { selector: '.sr-only' })
+      ).not.toBeInTheDocument();
       await openFilters(user);
       await user.click(screen.getByRole('button', { name: 'Market BPOs' }));
       // The market row itself: its order price, and its station.
-      expect(await within(table).findByLabelText('2,000,000.00 ISK')).toBeInTheDocument();
+      expect(
+        await within(table).findByText('2,000,000.00 ISK', { selector: '.sr-only' })
+      ).toBeInTheDocument();
       expect(within(table).getAllByText('Jita IV - Moon 4').length).toBeGreaterThan(0);
       // The hub's own station is marked (location 60003760 is the Jita hub).
       expect(within(table).getByText('Trade hub')).toBeInTheDocument();

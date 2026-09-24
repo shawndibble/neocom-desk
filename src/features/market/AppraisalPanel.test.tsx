@@ -116,8 +116,8 @@ describe('AppraisalPanel', () => {
     renderPanel({ controller: controller({ result: outcome() }) });
     const row = screen.getByRole('row', { name: /Damage Control II/ });
     // Totals render as shorthand (#947); the exact figure is the accessible name.
-    expect(within(row).getByLabelText('1,345,950 ISK')).toBeInTheDocument();
-    expect(within(row).getByLabelText('1,382,400 ISK')).toBeInTheDocument();
+    expect(within(row).getByText('1,345,950 ISK', { selector: '.sr-only' })).toBeInTheDocument();
+    expect(within(row).getByText('1,382,400 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
   /** A null price is "nobody is trading this", not "this is free". */
@@ -194,7 +194,7 @@ describe('AppraisalPanel', () => {
       renderPanel({ controller: controller({ result: netOutcome() }) });
       // Only row 1 has a buy price: 10,000 raw total, 7.5% sales tax
       // (Accounting 0) — 10,000 - 750 = 9,250. Row 2 contributes nothing.
-      expect(screen.getByLabelText('9,250 ISK')).toBeInTheDocument();
+      expect(screen.getByText('9,250 ISK', { selector: '.sr-only' })).toBeInTheDocument();
     });
 
     it('never shows the net chips while the active Character’s skills are still loading', () => {
@@ -367,7 +367,9 @@ describe('AppraisalPanel', () => {
     it('adds a refine column and total when a row carries refine data', () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });
       const veldsparRow = screen.getByRole('row', { name: /Veldspar/ });
-      expect(within(veldsparRow).getByLabelText('8,000 ISK')).toBeInTheDocument();
+      expect(
+        within(veldsparRow).getByText('8,000 ISK', { selector: '.sr-only' })
+      ).toBeInTheDocument();
       expect(screen.getAllByText('Refine total').length).toBeGreaterThan(0);
     });
 
@@ -411,8 +413,10 @@ describe('AppraisalPanel', () => {
       };
       renderPanel({ controller: controller({ result: partBatch }) });
       const oreRow = screen.getByRole('row', { name: /Mercoxit III-Grade/ });
-      const refineCell = within(oreRow).getByLabelText('15,436,890 ISK').parentElement;
-      const buyCell = within(oreRow).getByLabelText('15,984,000 ISK').parentElement;
+      const refineCell = within(oreRow).getByText('15,436,890 ISK', { selector: '.sr-only' })
+        .parentElement?.parentElement;
+      const buyCell = within(oreRow).getByText('15,984,000 ISK', { selector: '.sr-only' })
+        .parentElement?.parentElement;
       expect(refineCell?.className).toContain('text-accent');
       expect(buyCell?.className).not.toContain('text-accent');
     });
@@ -426,7 +430,8 @@ describe('AppraisalPanel', () => {
       renderPanel({ controller: controller({ result: refineOutcome() }) });
       const dcuRow = screen.getByRole('row', { name: /Damage Control II/ });
       // The highlight lives on the cell wrapper around the shorthand figure.
-      const buyCell = within(dcuRow).getByLabelText('1,345,950 ISK').parentElement;
+      const buyCell = within(dcuRow).getByText('1,345,950 ISK', { selector: '.sr-only' })
+        .parentElement?.parentElement;
       expect(buyCell?.className).not.toContain('text-accent');
     });
   });

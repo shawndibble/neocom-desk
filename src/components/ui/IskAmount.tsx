@@ -25,9 +25,18 @@ interface IskAmountProps {
 /**
  * An ISK figure shown as shorthand ("1.3B") with the exact value one gesture
  * away — hover, keyboard focus, or touch. Shorthand is a display treatment
- * only: the exact figure is the element's accessible name, so a screen reader
- * announces it with no gesture at all, and clipboard/CSV output keeps reading
- * the underlying number rather than anything rendered here.
+ * only: clipboard/CSV output keeps reading the underlying number rather than
+ * anything rendered here.
+ *
+ * A screen reader gets both figures as real text — the shorthand it sees on
+ * screen, then the exact value in visually hidden text — with no gesture at
+ * all. Not an `aria-label`: the trigger is a plain `<span>`, and ARIA forbids
+ * naming an element with no role, so many readers drop such a label and,
+ * with the shorthand hidden, read an empty cell.
+ *
+ * It stays a tab stop. The tooltip is the only way a sighted keyboard user
+ * reaches the exact figure, and `Tooltip` reveals on focus, so a figure that
+ * cannot take focus would hide that value from the keyboard entirely.
  *
  * Shorthand rounds to one fraction digit, so two different values can render
  * the same string. That is the trade a scanning surface makes, and it is why
@@ -42,13 +51,12 @@ export function IskAmount({ value, revealOn, decimals = 2, className = '' }: Isk
     <Tooltip content={exact} openOnTap={revealOn === 'tap'}>
       <span
         tabIndex={0}
-        aria-label={exact}
         className={cx(
           'cursor-help rounded-xs focus-visible:outline-2 focus-visible:outline-accent',
           className
         )}
       >
-        <span aria-hidden="true">{formatIskCompact(value)}</span>
+        {formatIskCompact(value)} <span className="sr-only">{exact}</span>
       </span>
     </Tooltip>
   );

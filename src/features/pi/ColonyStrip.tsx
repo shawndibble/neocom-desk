@@ -8,6 +8,7 @@
  * reachable has stopped being reachable — it is one click away instead of
  * six cards down.
  */
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ColonyStripRow } from './colonyStripModel';
 
@@ -52,6 +53,7 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
   const percent = row.load === null ? null : Math.min(100, Math.round(row.load * 100));
 
   const name = row.name ?? t('pi.planetLabel', { id: row.planetId });
+  const id = useId();
 
   return (
     <button
@@ -62,6 +64,9 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
       // Temperate 82% 2 faults 62 h" to a screen reader says everything except
       // what pressing it does.
       aria-label={t('piAdvisor.detailsLabel', { name })}
+      // The label replaces the row's text, so the state it shows comes back
+      // as the description: load, faults or steps, and how long it lasts.
+      aria-describedby={`${id}-load ${id}-state ${id}-full`}
       aria-haspopup="dialog"
       className="group grid w-full grid-cols-[1fr_4.5rem_5rem] items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2 text-left last:border-b-0 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:grid-cols-[1fr_6.5rem_4.5rem_5rem_auto]"
     >
@@ -73,6 +78,11 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
       </span>
 
       <span className="col-span-3 flex h-[5px] gap-[3px] sm:col-span-1">
+        <span id={`${id}-load`} className="sr-only">
+          {percent === null
+            ? t('piAdvisor.colonyLoadUnknownSr')
+            : t('piAdvisor.colonyLoadSr', { percent })}
+        </span>
         {percent === null ? (
           <span className="flex-1 rounded-[1px] bg-line" />
         ) : (
@@ -86,7 +96,7 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
         )}
       </span>
 
-      <span className="col-start-2 row-start-1 sm:col-start-3">
+      <span id={`${id}-state`} className="col-start-2 row-start-1 sm:col-start-3">
         <State row={row} />
       </span>
 
@@ -100,6 +110,12 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
         }`}
       >
         {row.hoursToFull === null ? t('piAdvisor.colonyUnknown') : span(row.hoursToFull, t)}
+      </span>
+      <span id={`${id}-full`} className="sr-only">
+        {row.hoursToFull === null
+          ? t('piAdvisor.colonyFullInUnknownSr')
+          : t('piAdvisor.colonyFullInSr', { span: span(row.hoursToFull, t) })}
+        {row.overflowing ? ` ${t('piAdvisor.colonyOverflowSr')}` : ''}
       </span>
 
       {/*

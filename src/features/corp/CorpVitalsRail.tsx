@@ -10,6 +10,7 @@
  * Station Manager who is not an Accountant simply has no rail: no error, no
  * empty state, nothing (CONTEXT.md round 35, AC3).
  */
+import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { IskAmount, Panel, StatChip } from '@/components/ui';
@@ -60,6 +61,7 @@ export function CorpVitalsRail({
     net,
     runwayDays: runway,
   } = vitalsFigures(divisions, journal, journalDivision, nowMs);
+  const balanceId = useId();
 
   return (
     <Panel title={t('corp.vitalsTitle')}>
@@ -91,6 +93,10 @@ export function CorpVitalsRail({
                 to={`/wallet?owner=corporation&division=${division.division}`}
                 className="flex items-baseline justify-between gap-3 border-b border-line py-2 last:border-b-0 hover:underline"
                 aria-label={t('corp.vitals.viewInWallet', { division: label })}
+                // The label names where the link goes and so replaces the
+                // row's text — the balance comes back as the description, or
+                // a screen reader never hears it.
+                aria-describedby={`${balanceId}-${division.division}`}
               >
                 {/*
                   The corporation's own name where it gave one — that is what
@@ -99,7 +105,9 @@ export function CorpVitalsRail({
                   client calls it too.
                 */}
                 <span className="min-w-0 truncate text-text-dim">{label}</span>
-                <span className="shrink-0 tabular-nums">{formatIsk(division.balance, 2)}</span>
+                <span id={`${balanceId}-${division.division}`} className="shrink-0 tabular-nums">
+                  {formatIsk(division.balance, 2)}
+                </span>
               </Link>
             );
           })}

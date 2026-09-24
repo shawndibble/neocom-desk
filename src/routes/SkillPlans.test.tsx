@@ -510,7 +510,9 @@ describe('SkillPlans: current attributes beside the plan list', () => {
 
     const panel = await attributesPanel();
     expect(await within(panel).findByText('23')).toBeInTheDocument();
-    expect(within(panel).getByLabelText('20 base + 3 implant = 23')).toBeInTheDocument();
+    expect(
+      within(panel).getByText('20 base + 3 implant = 23', { selector: '.sr-only' })
+    ).toBeInTheDocument();
   });
 
   it('says the attributes are unknown when ESI fails, rather than inventing a sheet', async () => {

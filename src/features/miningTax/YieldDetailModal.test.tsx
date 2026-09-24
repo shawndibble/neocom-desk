@@ -186,8 +186,12 @@ describe('YieldDetailModal', () => {
     renderModal();
     const ore = screen.getByRole('table', { name: 'Ore mined' });
     const veldspar = within(ore).getByRole('row', { name: /Veldspar/ });
-    expect(within(veldspar).getByLabelText('1,200 ISK')).toHaveClass('text-isk-pos');
-    expect(within(veldspar).getByLabelText('1,000 ISK')).not.toHaveClass('text-isk-pos');
+    expect(
+      within(veldspar).getByText('1,200 ISK', { selector: '.sr-only' }).parentElement
+    ).toHaveClass('text-isk-pos');
+    expect(
+      within(veldspar).getByText('1,000 ISK', { selector: '.sr-only' }).parentElement
+    ).not.toHaveClass('text-isk-pos');
   });
 
   it('suggests nothing on a day where nothing priced', () => {

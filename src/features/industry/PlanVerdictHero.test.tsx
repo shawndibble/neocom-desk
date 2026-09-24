@@ -158,7 +158,7 @@ describe('PlanVerdictHero: the big profit figure and qualifier line', () => {
   it('shows net profit as the big figure', () => {
     renderHero();
     // Shorthand on the face, the exact figure in the accessible name.
-    expect(screen.getByLabelText('435 ISK')).toBeInTheDocument();
+    expect(screen.getByText('435 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
   it('states the margin in the qualifier line', () => {
