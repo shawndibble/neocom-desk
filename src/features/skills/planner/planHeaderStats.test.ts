@@ -81,6 +81,22 @@ describe('evaluateOptimizationBadge', () => {
   // which asserts that remapping cannot help this plan — a verdict the run
   // never reached, and one that contradicts the editor's own "raise Remaps
   // available and optimize again". No chip at all, as for an empty plan.
+  it('threads timedRemap through to placeRemaps, so the badge cannot disagree with the button', () => {
+    const timedRemap = { notBeforeSeconds: 1e9 }; // past the whole plan
+    const badge = evaluateOptimizationBadge(STEPS, SKILLS, {
+      remapCount: 1,
+      currentAttributes: CURRENT,
+      timedRemap,
+    });
+    const direct = placeRemaps(STEPS, SKILLS, {
+      remapCount: 1,
+      currentAttributes: CURRENT,
+      timedRemap,
+    });
+    expect(badge).toMatchObject({ savingsSeconds: direct.savingsSeconds });
+    expect(direct.savingsSeconds).toBe(0); // sanity: the constraint actually bit
+  });
+
   it('returns null when the plan has no remaps to spend', () => {
     expect(
       evaluateOptimizationBadge(STEPS, SKILLS, { remapCount: 0, currentAttributes: CURRENT })

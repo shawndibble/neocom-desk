@@ -105,7 +105,7 @@ import { planDrop, promotePrereq } from './planDrop';
 import { RemapMarkerModal } from './RemapMarkerModal';
 import { bandStarts } from './bands';
 import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueRows';
-import type { RemapAvailability } from './remapAvailability';
+import { timedRemapFrom, type RemapAvailability } from './remapAvailability';
 import {
   whatIfImplants,
   normalizeWhatIfSelection,
@@ -203,7 +203,11 @@ function scheduleFromNow(input: Omit<SkillPlanScheduleInput, 'startDate'>) {
 }
 
 /** An Optimize Remaps result, with each segment's first step held by key rather than index. */
-type OptimizeRun = PlaceRemapsResult & { anchorKeys: (StepKey | undefined)[] };
+type OptimizeRun = PlaceRemapsResult & {
+  anchorKeys: (StepKey | undefined)[];
+  /** Set when this run's last remap is the on-cooldown yearly one — the modal notes its date. */
+  yearlyRemapAfter?: Date;
+};
 
 export function PlanEditor({
   characterId,
@@ -557,10 +561,27 @@ export function PlanEditor({
     [plan.entries]
   );
 
-  // The plan keeps whatever count the user set (ESI prefills bonus remaps).
+  // The yearly remap on cooldown is still usable, just not before it ends
+  // (#1404) — the feature layer raises the count to include it (still
+  // capped) and hands the optimizer the cooldown's offset from plan start so
+  // it never places that one too early. `new Date()` here matches every
+  // other "plan starts now" read in this component (e.g. `scheduleFromNow`);
+  // memoized on `remapInfo` alone so its reference stays stable across
+  // renders the way `plan.remapCount` etc. already are, rather than
+  // invalidating the header badge's own memo below on every render.
+  const timedRemap = useMemo(() => timedRemapFrom(remapInfo, new Date()), [remapInfo]);
+
+  // The plan keeps whatever count the user set (ESI prefills bonus remaps),
+  // raised to include an on-cooldown yearly remap even if the user hasn't
+  // bumped the field themselves. This is the REQUESTED count — uncapped —
+  // so `evaluateOptimizationBadge` can still tell a genuine over-cap request
+  // from one the timed remap alone accounts for.
+  const requestedRemapCount = timedRemap
+    ? Math.max(plan.remapCount, timedRemap.remapCount)
+    : plan.remapCount;
   // Only the optimizer is capped, and the header badge says so rather than
   // quietly answering a different question than the one on screen.
-  const remapCount = Math.min(plan.remapCount, MAX_SUPPORTED_REMAPS);
+  const remapCount = Math.min(requestedRemapCount, MAX_SUPPORTED_REMAPS);
 
   // #112: merge "Your entries" and the computed queue into one row list —
   // one row per entry (own aggregated per-level/cumulative time) plus dimmed
@@ -651,18 +672,21 @@ export function PlanEditor({
     }
     // A plan with no remaps to spend gets no chip on either path — the rule
     // and the reasoning live in evaluateOptimizationBadge, but the Booster
-    // branch below never reaches it.
-    if (plan.remapCount <= 0) return null;
+    // branch below never reaches it. Gated on the REQUESTED count: a plan
+    // with 0 bonus remaps and the yearly one on cooldown still has one to
+    // spend once the cooldown offset is honored.
+    if (requestedRemapCount <= 0) return null;
     if (activeBoosters.length > 0) {
       return optimizeResult
-        ? toOptimizationBadge(optimizeResult.savingsSeconds, remapCount, plan.remapCount)
+        ? toOptimizationBadge(optimizeResult.savingsSeconds, remapCount, requestedRemapCount)
         : null;
     }
     return evaluateOptimizationBadge(scheduled, catalog.engineSkills, {
-      remapCount: plan.remapCount,
+      remapCount: requestedRemapCount,
       currentAttributes: attributes,
       implants: effectiveImplants,
       cloneState,
+      timedRemap: timedRemap ?? undefined,
     });
   }, [
     markersAtCurrentPositions,
@@ -670,12 +694,13 @@ export function PlanEditor({
     activeBoosters,
     optimizeResult,
     remapCount,
-    plan.remapCount,
+    requestedRemapCount,
     scheduled,
     catalog,
     attributes,
     effectiveImplants,
     cloneState,
+    timedRemap,
   ]);
 
   const update = useCallback((entries: PlanEntry[]) => onUpdate({ entries }), [onUpdate]);
@@ -715,12 +740,18 @@ export function PlanEditor({
   // no remap at all — nothing to spend, or every marker at the plan's end —
   // is a no-op, not a finding about the plan, and saying "no meaningful
   // savings" for it sends the user off fixing the wrong thing.
-  function confirmRemapOutcome(verdict: OptimizeVerdict): string {
+  function yearlyRemapAfterNote(date: Date): string {
+    return t('plans.optimizeConfirmYearlyAfter', { date: formatLocalDate(date) });
+  }
+
+  function confirmRemapOutcome(verdict: OptimizeVerdict, yearlyRemapAfter?: Date): string {
     switch (verdict.kind) {
-      case 'saves':
-        return t('plans.optimizeConfirmSaves', {
+      case 'saves': {
+        const saves = t('plans.optimizeConfirmSaves', {
           duration: formatDuration(verdict.savingsSeconds),
         });
+        return yearlyRemapAfter ? `${saves}. ${yearlyRemapAfterNote(yearlyRemapAfter)}` : saves;
+      }
       case 'noRemapsAvailable':
         return t('plans.optimizeConfirmNoRemaps');
       case 'markersAtEnd':
@@ -741,15 +772,26 @@ export function PlanEditor({
       currentAttributes: attributes,
       implants: effectiveImplants,
       cloneState,
+      timedRemap: timedRemap ?? undefined,
       // The same Boosters the computed queue schedules with, so the savings
       // figure and the queue total cannot disagree.
       booster:
         activeBoosters.length > 0 ? { boosters: activeBoosters, startDate: new Date() } : undefined,
     });
     const verdict = remapVerdict(result, remapCount);
-    setOptimizeResult({ ...result, anchorKeys: anchorKeysOf(result.segments) });
+    // Whether the timed (on-cooldown yearly) slot actually ended up used:
+    // every remap up to `timedRemap.remapCount` counted, not just requested.
+    const usedTimedRemap =
+      !!timedRemap && result.segments.filter((s) => s.remap).length >= timedRemap.remapCount;
+    const yearlyRemapAfter =
+      usedTimedRemap && remapInfo?.cooldownUntil ? remapInfo.cooldownUntil : undefined;
+    setOptimizeResult({
+      ...result,
+      anchorKeys: anchorKeysOf(result.segments),
+      yearlyRemapAfter,
+    });
     setOptimizeVerdict(verdict);
-    setOptimizeConfirm(confirmRemapOutcome(verdict));
+    setOptimizeConfirm(confirmRemapOutcome(verdict, yearlyRemapAfter));
     setTimeout(() => setOptimizeConfirm(null), 2000);
   }
 
@@ -1032,8 +1074,13 @@ export function PlanEditor({
 
   function renderSegments(
     segments: readonly RemapSegment[],
-    anchorKeys: readonly (StepKey | undefined)[]
+    anchorKeys: readonly (StepKey | undefined)[],
+    /** Set only for an Optimize Remaps run that spent the on-cooldown yearly slot. */
+    yearlyRemapAfter?: Date
   ) {
+    const lastRemapIndex = yearlyRemapAfter
+      ? segments.reduce((last, segment, index) => (segment.remap ? index : last), -1)
+      : -1;
     return (
       <ul className="space-y-1">
         {segments.map((segment, index) => {
@@ -1059,6 +1106,9 @@ export function PlanEditor({
                     })
                   : t('plans.segmentCurrent', { skill: stepLabel(anchor) })}
               </p>
+              {index === lastRemapIndex && yearlyRemapAfter && (
+                <p className="text-text-dim">{yearlyRemapAfterNote(yearlyRemapAfter)}</p>
+              )}
             </li>
           );
         })}
@@ -1093,6 +1143,7 @@ export function PlanEditor({
     segments: {
       segments: readonly RemapSegment[];
       anchorKeys: readonly (StepKey | undefined)[];
+      yearlyRemapAfter?: Date;
     } | null;
     message: string;
     onAccept: () => void;
@@ -1111,7 +1162,7 @@ export function PlanEditor({
             )}
             {segments && (
               <div className="max-h-56 overflow-y-auto">
-                {renderSegments(segments.segments, segments.anchorKeys)}
+                {renderSegments(segments.segments, segments.anchorKeys, segments.yearlyRemapAfter)}
               </div>
             )}
             <div className="flex gap-2">

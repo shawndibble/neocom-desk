@@ -1164,6 +1164,165 @@ describe('a baseline outside EVE’s legal attribute space', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// timedRemap: the yearly remap comes back on a cooldown. When it's still on
+// cooldown, the feature layer feeds one extra allocation plus a
+// `notBeforeSeconds` floor (#1404) — the LAST allocation may not start
+// before that many seconds into the plan, because in EVE the player chooses
+// which remap to spend and the later one is always the one held back for the
+// cooldown. Bonus remaps (every earlier allocation) stay free to place
+// anywhere.
+// ---------------------------------------------------------------------------
+describe('placeRemaps timedRemap (yearly remap cooldown)', () => {
+  const skills = skillMap(skill(1, 'perception', 'willpower'), skill(2, 'intelligence', 'memory'));
+  const steps = [...levels(1, 3), ...levels(2, 3)]; // exactly 2 pair-runs
+
+  it('omitting timedRemap changes no existing result (remapCount 1)', () => {
+    const withTimedZero = placeRemaps(steps, skills, {
+      remapCount: 1,
+      currentAttributes: CURRENT,
+      timedRemap: { notBeforeSeconds: 0 },
+    });
+    const withoutTimed = placeRemaps(steps, skills, {
+      remapCount: 1,
+      currentAttributes: CURRENT,
+    });
+    expect(withTimedZero).toEqual(withoutTimed);
+  });
+
+  it('remapCount 1: disqualifying the first run edge forces the remap onto the next one', () => {
+    // Only two run edges exist (i=0, i=1). Setting notBeforeSeconds to
+    // exactly the elapsed time at i=1 rules out i=0 (prefix 0 < T) while
+    // leaving i=1 legal (prefix == T, not < T).
+    const prefixAtEdge1 = placeRemaps(steps.slice(0, 3), skills, {
+      remapCount: 0,
+      currentAttributes: CURRENT,
+    }).currentSeconds;
+    const result = placeRemaps(steps, skills, {
+      remapCount: 1,
+      currentAttributes: CURRENT,
+      timedRemap: { notBeforeSeconds: prefixAtEdge1 },
+    });
+    expect(result.segments).toHaveLength(2);
+    expect(result.segments[0]).toMatchObject({ startIndex: 0, endIndex: 2, remap: false });
+    expect(result.segments[1]).toMatchObject({ startIndex: 3, endIndex: 5, remap: true });
+  });
+
+  it('remapCount 1: a notBeforeSeconds beyond the whole plan falls back to no remap', () => {
+    const total = placeRemaps(steps, skills, {
+      remapCount: 0,
+      currentAttributes: CURRENT,
+    }).currentSeconds;
+    const result = placeRemaps(steps, skills, {
+      remapCount: 1,
+      currentAttributes: CURRENT,
+      timedRemap: { notBeforeSeconds: total + 1 },
+    });
+    expect(result.segments).toHaveLength(1);
+    expect(result.segments[0].remap).toBe(false);
+    expect(result.savingsSeconds).toBe(0);
+    expect(result.totalSeconds).toBe(result.currentSeconds);
+  });
+
+  it('remapCount 1: a Booster live does not let the remap land before notBeforeSeconds', () => {
+    const START = new Date('2026-08-30T00:00:00Z');
+    const booster = {
+      boosters: [
+        {
+          bonus: { intelligence: 1, memory: 1, perception: 1, willpower: 1, charisma: 1 },
+          expiresAt: new Date(START.getTime() + 1e9 * 1000),
+        },
+      ],
+      startDate: START,
+    };
+    // The elapsed time (WITH the Booster live) to reach edge i=1 — the same
+    // axis a real cooldown-end offset is measured on, so this is the
+    // boundary case: exactly satisfies i=1, still rules out i=0.
+    const prefixAtEdge1Boosted = placeRemaps(steps.slice(0, 3), skills, {
+      remapCount: 0,
+      currentAttributes: CURRENT,
+      booster,
+    }).currentSeconds;
+    const boosted = placeRemaps(steps, skills, {
+      remapCount: 1,
+      currentAttributes: CURRENT,
+      timedRemap: { notBeforeSeconds: prefixAtEdge1Boosted },
+      booster,
+    });
+    expect(boosted.segments).toHaveLength(2);
+    expect(boosted.segments[0]).toMatchObject({ startIndex: 0, endIndex: 2, remap: false });
+    expect(boosted.segments[1]).toMatchObject({ startIndex: 3, endIndex: 5, remap: true });
+  });
+
+  it('remapCount 2: falls back to a single unconstrained remap when the timed slot has nowhere to go', () => {
+    // With exactly 2 runs and remapCount 2, the only possible second-segment
+    // start is the boundary after run 0. Ruling that out with notBeforeSeconds
+    // set past the whole plan leaves the DP's k=2 row infeasible, so the
+    // fewest-segments search must fall back to the (unconstrained) k=1 row —
+    // the same answer remapCount 1 gives alone.
+    const total = placeRemaps(steps, skills, {
+      remapCount: 0,
+      currentAttributes: CURRENT,
+    }).currentSeconds;
+    const constrained = placeRemaps(steps, skills, {
+      remapCount: 2,
+      currentAttributes: CURRENT,
+      timedRemap: { notBeforeSeconds: total },
+    });
+    const oneRemap = placeRemaps(steps, skills, { remapCount: 1, currentAttributes: CURRENT });
+    expect(constrained.segments).toHaveLength(oneRemap.segments.length);
+    expect(constrained.totalSeconds).toBeCloseTo(oneRemap.totalSeconds, 6);
+    expect(constrained.savingsSeconds).toBeCloseTo(oneRemap.savingsSeconds, 6);
+  });
+
+  it('remapCount 2: the last remapped segment never starts before notBeforeSeconds', () => {
+    for (const seed of [3, 11, 27]) {
+      const { steps: genSteps, skills: genSkills } = generatePlan(6, seed, 2);
+      const base = placeRemaps(genSteps, genSkills, { remapCount: 2, currentAttributes: CURRENT });
+      const remapSegments = base.segments.filter((s) => s.remap);
+      if (remapSegments.length === 0) continue; // nothing to constrain against
+      const lastRemap = remapSegments[remapSegments.length - 1];
+      const lastIndex = base.segments.indexOf(lastRemap);
+      const startElapsed = base.segments.slice(0, lastIndex).reduce((acc, s) => acc + s.seconds, 0);
+      const notBeforeSeconds = startElapsed + Math.max(1, lastRemap.seconds * 0.1);
+
+      const constrained = placeRemaps(genSteps, genSkills, {
+        remapCount: 2,
+        currentAttributes: CURRENT,
+        timedRemap: { notBeforeSeconds },
+      });
+      const constrainedRemaps = constrained.segments.filter((s) => s.remap);
+      if (constrainedRemaps.length === 0) continue; // fell back to no remap, also legal
+      const lastConstrained = constrainedRemaps[constrainedRemaps.length - 1];
+      const constrainedStart = constrained.segments
+        .slice(0, constrained.segments.indexOf(lastConstrained))
+        .reduce((acc, s) => acc + s.seconds, 0);
+      expect(constrainedStart).toBeGreaterThanOrEqual(notBeforeSeconds - 1e-6);
+    }
+  });
+
+  it('remapCount 2: a single-run plan (fewer runs than requested remaps) is not gated at all', () => {
+    // Only one pair-run exists, so `maxSegments` collapses to 1 even though
+    // remapCount is 2 — there's no structural "second slot" for the floor to
+    // bind, and the one real slot is a bonus remap, not the timed one.
+    const skills = skillMap(skill(1, 'perception', 'willpower', 3));
+    const steps = levels(1, 5);
+    const total = placeRemaps(steps, skills, {
+      remapCount: 0,
+      currentAttributes: CURRENT,
+    }).currentSeconds;
+    const unconstrained = placeRemaps(steps, skills, { remapCount: 2, currentAttributes: CURRENT });
+    const result = placeRemaps(steps, skills, {
+      remapCount: 2,
+      currentAttributes: CURRENT,
+      // Would disqualify the only edge if the floor wrongly applied here.
+      timedRemap: { notBeforeSeconds: total },
+    });
+    expect(result.totalSeconds).toBeCloseTo(unconstrained.totalSeconds, 6);
+    expect(result.segments.some((s) => s.remap)).toBe(true);
+  });
+});
+
 describe('placeRemaps clone state', () => {
   it('doubles the Alpha baseline and savings but picks the same spread', () => {
     const skills = skillMap(skill(1, 'perception', 'willpower'));
