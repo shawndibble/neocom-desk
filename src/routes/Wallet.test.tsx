@@ -75,6 +75,9 @@ const server = setupServer(
   http.get(`https://esi.evetech.net/characters/${CHAR_ID}/loyalty/points`, () =>
     HttpResponse.json(loyaltyPayload)
   ),
+  http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/transactions`, () =>
+    HttpResponse.json([])
+  ),
   http.post('https://esi.evetech.net/universe/names', () =>
     HttpResponse.json([{ id: 1000167, name: 'Caldari Navy', category: 'corporation' }])
   )
@@ -188,6 +191,48 @@ describe('Wallet', () => {
     expect(rows).toHaveLength(3);
     expect(screen.getByText('Bounty')).toBeInTheDocument();
     expect(screen.getByText('Donation')).toBeInTheDocument();
+  });
+
+  it('names the item a market transaction line bought, linked to its Market listing', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/journal`, () =>
+        HttpResponse.json([
+          {
+            id: 3,
+            date: '2026-08-03T00:00:00Z',
+            ref_type: 'market_transaction',
+            description: 'Market: Pilot One bought stuff',
+            amount: -500,
+            balance: 3500,
+          },
+          ...journalPage1,
+        ])
+      ),
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet/transactions`, () =>
+        HttpResponse.json([
+          {
+            transaction_id: 70,
+            date: '2026-08-03T00:00:00Z',
+            location_id: 60003760,
+            type_id: 34,
+            unit_price: 5,
+            quantity: 100,
+            client_id: 9000,
+            is_buy: true,
+            journal_ref_id: 3,
+            is_personal: true,
+          },
+        ])
+      )
+    );
+    window.history.pushState({}, '', '/wallet/journal');
+    render(<App />);
+    const link = await screen.findByRole('link', { name: /Tritanium/ });
+    expect(link.getAttribute('href')).toContain('/market/browser?');
+    expect(link.getAttribute('href')).toContain('34');
+    // The bounty line has no fill behind it, so it names no item.
+    const bountyRow = document.querySelector('[data-row-key="1"]') as HTMLElement;
+    expect(within(bountyRow).queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('opens straight to the journal tab when a walletBalanceChanged notification deep-links here', async () => {

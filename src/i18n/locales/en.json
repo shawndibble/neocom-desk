@@ -1519,7 +1519,9 @@
     "dateToLabel": "To",
     "journalSearchPlaceholder": "Search description…",
     "journalNoFilterMatches": "No journal entries match this filter.",
-    "journalNoFilterMatchesHint": "Clear the search or reset the filters above to see every entry."
+    "journalNoFilterMatchesHint": "Clear the search or reset the filters above to see every entry.",
+    "journalItemBought": "Bought {{quantity}} × {{unitPrice}} = {{total}}",
+    "journalItemSold": "Sold {{quantity}} × {{unitPrice}} = {{total}}"
   },
   "miningTax": {
     "title": "Mining",

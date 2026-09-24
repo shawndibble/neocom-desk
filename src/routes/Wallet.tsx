@@ -1,4 +1,12 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactElement,
+} from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -31,6 +39,7 @@ import { db } from '@/db';
 import {
   loadWalletBalanceWithStatus,
   loadWalletJournal,
+  loadWalletTransactions,
   loadAllCharactersWalletBalances,
   totalWalletBalance,
   type CharacterWalletBalance,
@@ -64,6 +73,7 @@ import {
   loadCorporationWallets,
 } from '@/features/corp/wallet';
 import { CorpTransactionsPanel } from '@/features/corp/CorpTransactionsPanel';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { useHighlightParam } from '@/lib/useHighlightParam';
@@ -80,6 +90,8 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
+import { JournalDescriptionCell } from '@/features/character/JournalDescriptionCell';
+import { journalTransactionLinks } from '@/features/character/journalTransactionLink';
 import {
   activeWalletJournalFilterCount,
   EMPTY_JOURNAL_FILTER_PARAMS,
@@ -95,6 +107,7 @@ import type {
   CorporationWalletDivision,
   CorporationWalletTransaction,
   WalletJournalEntry,
+  WalletTransactionCommon,
 } from '@/esi/endpoints';
 import { walletBalanceHistory, walletBalanceTrend } from '@/engine/wallet/balanceHistory';
 
@@ -194,6 +207,8 @@ interface JournalTableProps {
   highlightRowKey?: number | null;
   sort: DataTableSort;
   onSortChange: (sort: DataTableSort) => void;
+  /** The item menu on a line tied to a market fill; other lines render as-is. */
+  rowContextMenu?: (entry: WalletJournalEntry, tr: ReactElement) => ReactElement;
 }
 
 /** The filter bar plus its result — either the table or a filtered-empty message. Shared by the personal and corp journal panels (issue #413). */
@@ -207,6 +222,7 @@ function JournalTable({
   highlightRowKey = null,
   sort,
   onSortChange,
+  rowContextMenu,
 }: JournalTableProps) {
   const { t } = useTranslation();
   return (
@@ -227,6 +243,7 @@ function JournalTable({
           highlightRowKey={highlightRowKey}
           sort={sort}
           onSortChange={onSortChange}
+          rowContextMenu={rowContextMenu}
         />
       )}
     </>
@@ -270,16 +287,23 @@ interface Snapshot {
   /** 401/403 (or a failed token refresh) means "log in again", not "offline". */
   loyaltyNeedsReauth: boolean;
   corporationNames: Map<number, string>;
+  /**
+   * Recent fills, read only so a journal line can name the item behind it.
+   * The fills themselves are listed on Market's History › Transactions view.
+   */
+  transactions: readonly WalletTransactionCommon[];
+  typeNames: Map<number, string>;
 }
 
 async function loadWalletSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const [balanceStatus, journalResult, loyaltyStatus] = await Promise.all([
+  const [balanceStatus, journalResult, loyaltyStatus, transactionsResult] = await Promise.all([
     loadWalletBalanceWithStatus(characterId),
     loadWalletJournal(characterId),
     loadCharacterLoyaltyPoints(characterId),
+    loadWalletTransactions(characterId),
   ]);
   const { cached: balanceResult, needsReauth: balanceNeedsReauth } = balanceStatus;
   const { cached: loyaltyResult, needsReauth: loyaltyNeedsReauth } = loyaltyStatus;
@@ -288,7 +312,12 @@ async function loadWalletSnapshot(
   const corporationIds = signal.cancelled
     ? []
     : (loyaltyResult?.data ?? []).map((entry) => entry.corporation_id);
-  const corporationNames = await resolveNames(corporationIds);
+  const transactions = transactionsResult?.data ?? [];
+  const typeIds = signal.cancelled ? [] : [...new Set(transactions.map((txn) => txn.type_id))];
+  const [corporationNames, typeNames] = await Promise.all([
+    resolveNames(corporationIds),
+    loadTypeNames(typeIds),
+  ]);
   return {
     balanceResult,
     balanceNeedsReauth,
@@ -297,6 +326,8 @@ async function loadWalletSnapshot(
     loyaltyResult,
     loyaltyNeedsReauth,
     corporationNames,
+    transactions,
+    typeNames,
   };
 }
 
@@ -361,6 +392,7 @@ interface CorpWalletViewProps {
   journalLoading: boolean;
   /** The page's own journal columns — the corp journal is the same table, not a second one. */
   journalColumns: DataTableColumn<WalletJournalEntry>[];
+  journalRowContextMenu: (entry: WalletJournalEntry, tr: ReactElement) => ReactElement;
   journalFilter: WalletJournalFilter;
   onJournalFilterChange: (filter: WalletJournalFilter) => void;
   journalSort: DataTableSort;
@@ -387,6 +419,7 @@ function CorpWalletView({
   journal,
   journalLoading,
   journalColumns,
+  journalRowContextMenu,
   journalFilter,
   onJournalFilterChange,
   journalSort,
@@ -499,6 +532,7 @@ function CorpWalletView({
             label={t('wallet.journalTab')}
             sort={journalSort}
             onSortChange={onJournalSortChange}
+            rowContextMenu={journalRowContextMenu}
           />
         </>
       )}
@@ -534,9 +568,9 @@ export function Wallet() {
   const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
     null
   );
-  function handleShowInfo(typeId: number, itemName: string) {
+  const handleShowInfo = useCallback((typeId: number, itemName: string) => {
     setInfoModalItem({ typeId, itemName });
-  }
+  }, []);
 
   // A notification's `walletBalanceChanged` deep link (`notificationOptions.ts`)
   // names the tab as a path segment (`/wallet/journal`) — the `Tabs`
@@ -720,13 +754,15 @@ export function Wallet() {
   // endpoint, so nothing is fetched until the tab is opened — and once it has
   // been opened for this division, `visitedTransactionsKey` keeps the key
   // alive so a tab toggle doesn't walk the cursor again (issue #413's fix,
-  // applied to the new tab).
+  // applied to the new tab). The Journal tab opens it too: its market lines
+  // name their item from these same fills.
   const corpTransactionsBaseKey = showingCorp
     ? `${activeCharacterId}:${corporationId}:${effectiveDivision}`
     : null;
   const [visitedTransactionsKey, setVisitedTransactionsKey] = useState<string | null>(null);
+  const corpTransactionsWanted = walletTab === 'transactions' || walletTab === 'journal';
   if (
-    walletTab === 'transactions' &&
+    corpTransactionsWanted &&
     corpTransactionsBaseKey !== null &&
     visitedTransactionsKey !== corpTransactionsBaseKey
   ) {
@@ -734,7 +770,7 @@ export function Wallet() {
   }
   const corpTransactions = useCorpSnapshot<CorpTransactionsSnapshot | null>(
     corpTransactionsBaseKey !== null &&
-      (walletTab === 'transactions' || visitedTransactionsKey === corpTransactionsBaseKey)
+      (corpTransactionsWanted || visitedTransactionsKey === corpTransactionsBaseKey)
       ? corpTransactionsBaseKey
       : null,
     async () =>
@@ -863,8 +899,15 @@ export function Wallet() {
     walletBalanceColumns.map((column) => column.id)
   );
 
-  const journalColumns = useMemo<DataTableColumn<WalletJournalEntry>[]>(
-    () => [
+  /**
+   * One column set for both journals — ESI returns the same schema for each —
+   * built per journal only because each links its lines to its own fills.
+   */
+  const buildJournalColumns = useCallback(
+    (
+      linkFor: (entry: WalletJournalEntry) => WalletTransactionCommon | undefined,
+      nameFor: (typeId: number) => string
+    ): DataTableColumn<WalletJournalEntry>[] => [
       {
         id: 'date',
         header: t('wallet.date'),
@@ -885,7 +928,16 @@ export function Wallet() {
       {
         id: 'description',
         header: t('wallet.description'),
-        render: (entry) => entry.description,
+        render: (entry) => {
+          const transaction = linkFor(entry);
+          return (
+            <JournalDescriptionCell
+              description={entry.description}
+              transaction={transaction}
+              itemName={transaction ? nameFor(transaction.type_id) : ''}
+            />
+          );
+        },
         sortValue: (entry) => entry.description,
       },
       {
@@ -909,6 +961,50 @@ export function Wallet() {
       },
     ],
     [t, timeZone]
+  );
+
+  /** The item menu every other item table carries (issue #817), on a line tied to a fill. */
+  const buildJournalRowMenu = useCallback(
+    (
+      linkFor: (entry: WalletJournalEntry) => WalletTransactionCommon | undefined,
+      nameFor: (typeId: number) => string
+    ) =>
+      (entry: WalletJournalEntry, tr: ReactElement): ReactElement => {
+        const transaction = linkFor(entry);
+        if (!transaction) return tr;
+        return (
+          <ItemContextMenu
+            typeId={transaction.type_id}
+            itemName={nameFor(transaction.type_id)}
+            blueprintTypeID={null}
+            onAddToQuickbar={handleAddToQuickbar}
+            quickbarAvailable={quickbarAvailable}
+            onShowInfo={handleShowInfo}
+          >
+            {tr}
+          </ItemContextMenu>
+        );
+      },
+    [handleAddToQuickbar, quickbarAvailable, handleShowInfo]
+  );
+
+  const personalTransactions = data?.transactions ?? EMPTY_TRANSACTIONS;
+  const personalTypeNames = data?.typeNames ?? NO_NAMES;
+  const personalLinkFor = useMemo(
+    () => journalTransactionLinks(personalTransactions),
+    [personalTransactions]
+  );
+  const personalNameFor = useCallback(
+    (typeId: number) => personalTypeNames.get(typeId) ?? `Type #${typeId}`,
+    [personalTypeNames]
+  );
+  const journalColumns = useMemo(
+    () => buildJournalColumns(personalLinkFor, personalNameFor),
+    [buildJournalColumns, personalLinkFor, personalNameFor]
+  );
+  const journalRowMenu = useMemo(
+    () => buildJournalRowMenu(personalLinkFor, personalNameFor),
+    [buildJournalRowMenu, personalLinkFor, personalNameFor]
   );
 
   // Unsorted: `DataTable`'s own controlled `sort` below is the one place
@@ -960,6 +1056,18 @@ export function Wallet() {
   const nameForType = useCallback(
     (typeId: number) => corpTypeNames.get(typeId) ?? `Type #${typeId}`,
     [corpTypeNames]
+  );
+  const corpLinkFor = useMemo(
+    () => journalTransactionLinks(corpTransactionRows),
+    [corpTransactionRows]
+  );
+  const corpJournalColumns = useMemo(
+    () => buildJournalColumns(corpLinkFor, nameForType),
+    [buildJournalColumns, corpLinkFor, nameForType]
+  );
+  const corpJournalRowMenu = useMemo(
+    () => buildJournalRowMenu(corpLinkFor, nameForType),
+    [buildJournalRowMenu, corpLinkFor, nameForType]
   );
 
   // In the URL (`txn.*`, issue #1302), and reset on a division switch for the
@@ -1126,7 +1234,8 @@ export function Wallet() {
             journalResult={corpJournalResult}
             journal={corpJournalEntries}
             journalLoading={corpJournal.loading && corpJournal.data === null}
-            journalColumns={journalColumns}
+            journalColumns={corpJournalColumns}
+            journalRowContextMenu={corpJournalRowMenu}
             journalFilter={journalFilter}
             onJournalFilterChange={setJournalFilter}
             journalSort={journalSortProps.sort}
@@ -1383,6 +1492,7 @@ export function Wallet() {
                 sort={journalSortProps.sort}
                 onSortChange={journalSortProps.onSortChange}
                 highlightRowKey={highlightedEntryId}
+                rowContextMenu={journalRowMenu}
               />
             </>
           )}
