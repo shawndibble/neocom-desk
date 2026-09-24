@@ -9,7 +9,11 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 const { assignLocation } = vi.hoisted(() => ({ assignLocation: vi.fn<(url: string) => void>() }));
 vi.mock('./navigation', () => ({ assignLocation }));
 
-import { beginAddCharacterLogin, beginEveLogin } from './loginFlow';
+import {
+  beginAddCharacterLogin,
+  beginCustomizedAddCharacterLogin,
+  beginEveLogin,
+} from './loginFlow';
 
 const CHAR_ID = 2112625428;
 const OTHER_CHAR_ID = 90000001;
@@ -228,6 +232,70 @@ describe('beginEveLogin: re-auth for a known character', () => {
     await beginEveLogin({ characterId: OTHER_CHAR_ID });
 
     expect(requestedScopes()).toContain(EXTRA_SCOPE);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Branch 1b — Add Character through the Customize permissions dialog (#1522):
+// same "nobody to union with" reasoning as `beginAddCharacterLogin`, but with
+// a hand-picked set of Permissions instead of every default-on one.
+// ---------------------------------------------------------------------------
+
+describe('beginCustomizedAddCharacterLogin', () => {
+  it('sends only the Core Grant when every Permission is unchecked (Select none)', async () => {
+    await beginCustomizedAddCharacterLogin([]);
+
+    expect(requestedScopes().sort()).toEqual([...CORE_GRANT].sort());
+  });
+
+  it('sends exactly SCOPES when every default-on Permission is checked (Select all default)', async () => {
+    const { DEFAULT_ON_GROUPS } = await import('@/esi/scopes');
+    await beginCustomizedAddCharacterLogin(DEFAULT_ON_GROUPS);
+
+    expect(requestedScopes().sort()).toEqual([...SCOPES].sort());
+  });
+
+  it('omits an unchecked Permission’s scopes entirely', async () => {
+    const { DEFAULT_ON_GROUPS } = await import('@/esi/scopes');
+    const withoutWalletAndMail = DEFAULT_ON_GROUPS.filter(
+      (group) => group !== 'wallet' && group !== 'mail'
+    );
+
+    await beginCustomizedAddCharacterLogin(withoutWalletAndMail);
+
+    const requested = new Set(requestedScopes());
+    for (const scope of scopesForGroup('wallet')) expect(requested.has(scope), scope).toBe(false);
+    for (const scope of scopesForGroup('mail')) expect(requested.has(scope), scope).toBe(false);
+  });
+
+  it('can ask for an opt-in group too (e.g. corp), since Customize offers all 13', async () => {
+    await beginCustomizedAddCharacterLogin(['corp']);
+
+    const requested = new Set(requestedScopes());
+    for (const scope of scopesForGroup('corp')) expect(requested.has(scope), scope).toBe(true);
+  });
+
+  it('does not inherit any stored character’s grant', async () => {
+    await seedGrant(OTHER_CHAR_ID, [...SCOPES, EXTRA_SCOPE]);
+
+    await beginCustomizedAddCharacterLogin([]);
+
+    expect(requestedScopes()).not.toContain(EXTRA_SCOPE);
+  });
+
+  it('end to end: the stored grant carries no scope from an unchecked Permission (AC 3)', async () => {
+    const { DEFAULT_ON_GROUPS } = await import('@/esi/scopes');
+    const withoutWalletAndMail = DEFAULT_ON_GROUPS.filter(
+      (group) => group !== 'wallet' && group !== 'mail'
+    );
+
+    await beginCustomizedAddCharacterLogin(withoutWalletAndMail);
+    const state = new URL(assignLocation.mock.calls.at(-1)![0]).searchParams.get('state')!;
+    await completeLogin({ code: 'good-code', state });
+
+    const stored = (await db.tokens.get(CHAR_ID))?.scopes ?? [];
+    for (const scope of scopesForGroup('wallet')) expect(stored, scope).not.toContain(scope);
+    for (const scope of scopesForGroup('mail')) expect(stored, scope).not.toContain(scope);
   });
 });
 
