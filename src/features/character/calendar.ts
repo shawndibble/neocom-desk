@@ -7,14 +7,7 @@ import {
   type CalendarEventDetail,
   type CalendarRsvpResponse,
 } from '@/esi/endpoints';
-import {
-  loadWithCache,
-  loadWithCacheStatus,
-  readCached,
-  writeCached,
-  type CachedResult,
-  type StatusResult,
-} from '@/esi/cache';
+import { loadWithCacheStatus, readCached, writeCached, type StatusResult } from '@/esi/cache';
 import { isAuthFailure } from '@/esi/client';
 import { emitEsiAuthFailure } from '@/esi/authFailureSignal';
 import { parseInstant } from '@/engine/esiInstant';
@@ -150,12 +143,16 @@ export async function loadCalendarEvents(
   return { ...result, cached: { ...result.cached, data } };
 }
 
-/** One event's full detail, fetched on open. ESI or cache. */
+/**
+ * One event's full detail, fetched on open. ESI or cache, with the
+ * auth-failure state exposed so the detail modal can offer a re-login rather
+ * than a Try again that can't help when nothing is cached.
+ */
 export function loadCalendarEvent(
   characterId: number,
   eventId: number
-): Promise<CachedResult<CalendarEventDetail> | null> {
-  return loadWithCache(
+): Promise<StatusResult<CalendarEventDetail>> {
+  return loadWithCacheStatus(
     characterId,
     KEYS.event(eventId),
     async () => (await getCharacterCalendarEvent(characterId, eventId)).data

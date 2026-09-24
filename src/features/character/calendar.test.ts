@@ -322,8 +322,27 @@ describe('loadCalendarEvent', () => {
       http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () => HttpResponse.json(detail))
     );
     const result = await loadCalendarEvent(CHAR_ID, 1);
-    expect(result?.data).toEqual(detail);
+    expect(result.needsReauth).toBe(false);
+    expect(result.cached?.data).toEqual(detail);
     expect((await db.esiCache.get([CHAR_ID, 'calendar:1']))?.value).toEqual(detail);
+  });
+
+  it('reports needsReauth on a 403 with nothing cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () =>
+        HttpResponse.json({ error: 'missing scope' }, { status: 403 })
+      )
+    );
+    const result = await loadCalendarEvent(CHAR_ID, 1);
+    expect(result).toEqual({ cached: null, needsReauth: true });
+  });
+
+  it('reports a plain failure (not needsReauth) offline with nothing cached', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () => HttpResponse.error())
+    );
+    const result = await loadCalendarEvent(CHAR_ID, 1);
+    expect(result).toEqual({ cached: null, needsReauth: false });
   });
 });
 

@@ -799,36 +799,44 @@ export function ActiveJobsPanel({
     </span>
   );
 
+  /**
+   * Last-updated, Export and Refresh. With a list to fold they live inside the
+   * accordion body, on the filter row's far right, so the title bar stays just
+   * the summary, the slot readout and the caret. With no list (idle, loading,
+   * re-auth, nothing cached) there is no body to hold them, so they fall back
+   * to the header — an idle panel must still be refreshable.
+   */
+  const listActions = (
+    <span className="flex items-center gap-2">
+      {dataAgeDate && <DataAgeBadge date={dataAgeDate} />}
+      <IconButton
+        size="sm"
+        icon={<Icon.Download />}
+        label={t('industry.exportCsvJobs')}
+        disabled={jobs.length === 0}
+        onClick={() => downloadCsv('industry-jobs', jobs, jobsCsvColumns(t, nameForBlueprint))}
+      />
+      <IconButton
+        size="sm"
+        icon={<Icon.Refresh />}
+        label={t('industry.jobsRefresh')}
+        onClick={listRefresh}
+        disabled={listLoading}
+      />
+    </span>
+  );
+
   return (
     <Panel
       title={t('industry.jobsTitle')}
       meta={jobsMeta}
       actions={
         <span className="flex items-center gap-2">
-          {dataAgeDate && <DataAgeBadge date={dataAgeDate} />}
-          {/* Grouped with `DataAgeBadge`, not appended after the caret: both
-              are passive, hover-only readouts (nothing to click), while
-              Export/Refresh/the caret are actions — interleaving the two
-              kinds breaks the toolbar's scan order, and the caret in
-              particular earns the literal last slot as this panel's primary
-              affordance. Landing in `actions` at all (rather than `meta`,
-              beside "N running · N done") is what answers the original ask:
-              it no longer reads as a description of what's currently running. */}
+          {/* In `actions` (rather than `meta`, beside "N running · N done") so
+              it doesn't read as a description of what's currently running;
+              the caret keeps the literal last slot as the primary affordance. */}
           {jobSlotSummaryElement}
-          <IconButton
-            size="sm"
-            icon={<Icon.Download />}
-            label={t('industry.exportCsvJobs')}
-            disabled={jobs.length === 0}
-            onClick={() => downloadCsv('industry-jobs', jobs, jobsCsvColumns(t, nameForBlueprint))}
-          />
-          <IconButton
-            size="sm"
-            icon={<Icon.Refresh />}
-            label={t('industry.jobsRefresh')}
-            onClick={listRefresh}
-            disabled={listLoading}
-          />
+          {!collapsible && listActions}
           {collapsible && (
             <IconButton
               size="sm"
@@ -889,50 +897,55 @@ export function ActiveJobsPanel({
               {listRefreshCount > 0 ? t('common.refreshFailedTitle') : t('common.offlineTitle')}
             </p>
           )}
-          {(showActivityFilter || showStatusFilter) && (
-            <div
-              role="group"
-              aria-label={t('industry.jobsFilterLabel')}
-              className="flex flex-wrap gap-1.5"
-            >
-              {showActivityFilter && (
-                <JobFilterMenu
-                  triggerLabel={
-                    activityFilter.size === 0
-                      ? t('industry.jobsFilterActivity')
-                      : t('industry.jobsFilterWithCount', {
-                          label: t('industry.jobsFilterActivity'),
-                          count: activityFilter.size,
-                        })
-                  }
-                  items={activityMenuIds.map((activityId) => ({
-                    value: activityId,
-                    label: t(activityI18nKey(activityId), { id: activityId }),
-                  }))}
-                  selected={activityFilter}
-                  onToggle={toggleActivity}
-                />
-              )}
-              {showStatusFilter && (
-                <JobFilterMenu
-                  triggerLabel={
-                    statusFilter.size === 0
-                      ? t('industry.jobsFilterStatus')
-                      : t('industry.jobsFilterWithCount', {
-                          label: t('industry.jobsFilterStatus'),
-                          count: statusFilter.size,
-                        })
-                  }
-                  items={[
-                    { value: 'completingSoon' as const, label: t('industry.jobsCompletingSoon') },
-                    { value: 'done' as const, label: t('industry.jobsDone') },
-                  ]}
-                  selected={statusFilter}
-                  onToggle={toggleStatus}
-                />
-              )}
-            </div>
-          )}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {(showActivityFilter || showStatusFilter) && (
+              <div
+                role="group"
+                aria-label={t('industry.jobsFilterLabel')}
+                className="flex flex-wrap gap-1.5"
+              >
+                {showActivityFilter && (
+                  <JobFilterMenu
+                    triggerLabel={
+                      activityFilter.size === 0
+                        ? t('industry.jobsFilterActivity')
+                        : t('industry.jobsFilterWithCount', {
+                            label: t('industry.jobsFilterActivity'),
+                            count: activityFilter.size,
+                          })
+                    }
+                    items={activityMenuIds.map((activityId) => ({
+                      value: activityId,
+                      label: t(activityI18nKey(activityId), { id: activityId }),
+                    }))}
+                    selected={activityFilter}
+                    onToggle={toggleActivity}
+                  />
+                )}
+                {showStatusFilter && (
+                  <JobFilterMenu
+                    triggerLabel={
+                      statusFilter.size === 0
+                        ? t('industry.jobsFilterStatus')
+                        : t('industry.jobsFilterWithCount', {
+                            label: t('industry.jobsFilterStatus'),
+                            count: statusFilter.size,
+                          })
+                    }
+                    items={[
+                      { value: 'completingSoon' as const, label: t('industry.jobsCompletingSoon') },
+                      { value: 'done' as const, label: t('industry.jobsDone') },
+                    ]}
+                    selected={statusFilter}
+                    onToggle={toggleStatus}
+                  />
+                )}
+              </div>
+            )}
+            {/* Always rendered here, even with no filters to offer — this is
+                the only place Export/Refresh live while the list is open. */}
+            <span className="ml-auto">{listActions}</span>
+          </div>
           {filteredJobs.length === 0 ? (
             // Jobs exist but none pass, so a filter is always on here.
             <EmptyState
