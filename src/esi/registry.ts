@@ -349,7 +349,7 @@ export const ESI_REGISTRY = {
    * until they opt in. That costs the "you just made Director, grant now"
    * proactive nudge (`CorpGrantPrompt`) for anyone who never granted the group
    * before — `useCorpAccess` answers `not-granted` instead, and Settings'
-   * Corp access row is the only way in. A Character who already held this
+   * Corporation Permission row is the only way in. A Character who already held this
    * scope from the old Base Grant keeps it (`app/loginFlow.ts` unions with
    * the stored grant), so nothing changes for them.
    */

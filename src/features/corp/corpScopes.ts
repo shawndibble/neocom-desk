@@ -37,7 +37,7 @@ import type { Scope } from '@/esi/registry';
  * after the group shipped: a Character who granted the corp group when it held
  * seven scopes is now missing the eighth, so `useCorpAccess` moves them from
  * `ready` to `roles-without-grant` and every corp surface hides until they
- * re-grant from the Settings Corp access row. The grant prompt is offered once
+ * re-grant from the Settings Corporation Permission row. The grant prompt is offered once
  * per Character per device (round 37) and will not re-offer. Every future
  * addition to the group carries the same cost.
  */
