@@ -63,12 +63,18 @@
       "unresolvedTitle_other": "{{count}} lines weren't recognized",
       "unresolvedLine": "Line {{line}}: \"{{text}}\" — {{reason}}"
     },
+    "missingSkills": {
+      "chip_one": "Missing {{count}} skill · {{time}}",
+      "chip_other": "Missing {{count}} skills · {{time}}"
+    },
     "list": {
       "title": "List",
       "cpu": "CPU",
       "powergrid": "Powergrid",
       "calibration": "Calibration",
       "droneBandwidth": "Drone bandwidth",
+      "overBy": "Over by {{amount}}",
+      "cantUse": "Can't use",
       "drones": "Drones",
       "rack": {
         "high": "High slots",

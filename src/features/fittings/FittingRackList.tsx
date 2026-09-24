@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Panel, TypeIcon } from '@/components/ui';
 import {
@@ -7,6 +8,7 @@ import {
   type FittingSlotKind,
   type FittingStats,
 } from '@/engine/fittings/types';
+import { moduleKey, resourceOverage } from '@/engine/fittings/skillGaps';
 
 interface ResourceBarProps {
   label: string;
@@ -14,36 +16,61 @@ interface ResourceBarProps {
   total: number | null;
 }
 
-/** A CPU/PG/calibration/drone-bandwidth bar. `null` used/total render as a loading skeleton. */
+/**
+ * A CPU/PG/calibration/drone-bandwidth bar. `null` used/total render as a loading skeleton.
+ * Over budget turns `danger` with the overage stated in words, and flashes once
+ * each time the readout goes from within budget to over (a Character switch
+ * that re-states it included) — the `null` gap while it recomputes doesn't count.
+ */
 function ResourceBar({ label, used, total }: ResourceBarProps) {
+  const { t } = useTranslation();
   const known = used !== null && total !== null;
   const pct = known && total > 0 ? Math.min(100, (used / total) * 100) : 0;
-  const overBudget = known && used > total;
+  const overage = resourceOverage(used, total);
+  const overBudget = overage > 0;
+
+  const [wasOver, setWasOver] = useState(false);
+  const [flashKey, setFlashKey] = useState(0);
+  if (known && overBudget !== wasOver) {
+    setWasOver(overBudget);
+    if (overBudget) setFlashKey((key) => key + 1);
+  }
+
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="w-28 shrink-0 text-text-dim">{label}</span>
-      <div
-        role="meter"
-        aria-label={label}
-        aria-valuenow={known ? used : undefined}
-        aria-valuemax={known ? total : undefined}
-        className="h-2 flex-1 overflow-hidden rounded-full bg-panel-2"
-      >
-        {known && (
-          <div
-            className={`h-full rounded-full ${overBudget ? 'bg-danger' : 'bg-accent'}`}
-            style={{ width: `${pct}%` }}
-          />
-        )}
+    <div>
+      <div className="flex items-center gap-2 text-xs">
+        <span className="w-28 shrink-0 text-text-dim">{label}</span>
+        <div
+          role="meter"
+          aria-label={label}
+          aria-valuenow={known ? used : undefined}
+          aria-valuemax={known ? total : undefined}
+          className="h-2 flex-1 overflow-hidden rounded-full bg-panel-2"
+        >
+          {known && (
+            <div
+              className={`h-full rounded-full ${overBudget ? 'bg-danger' : 'bg-accent'}`}
+              style={{ width: `${pct}%` }}
+            />
+          )}
+        </div>
+        <span
+          key={flashKey}
+          className={`w-24 shrink-0 text-right ${overBudget ? 'text-danger' : 'text-text-dim'} ${flashKey > 0 && overBudget ? 'flash-danger' : ''}`}
+        >
+          {known ? `${used.toFixed(1)} / ${total.toFixed(1)}` : '…'}
+        </span>
       </div>
-      <span className={`w-24 shrink-0 text-right ${overBudget ? 'text-danger' : 'text-text-dim'}`}>
-        {known ? `${used.toFixed(1)} / ${total.toFixed(1)}` : 'â€¦'}
-      </span>
+      {overBudget && (
+        <p className="pl-30 text-right text-xs text-danger">
+          {t('fittings.list.overBy', { amount: overage.toFixed(1) })}
+        </p>
+      )}
     </div>
   );
 }
 
-function RackRow({ module }: { module: FittingModule }) {
+function RackRow({ module, cantUse }: { module: FittingModule; cantUse: boolean }) {
   const { t } = useTranslation();
   return (
     <div className="flex items-center gap-2 rounded-xs bg-panel-2 p-1.5">
@@ -54,6 +81,11 @@ function RackRow({ module }: { module: FittingModule }) {
       <span className="truncate text-xs text-text-dim">
         {t(`fittings.list.moduleState.${module.state}`)}
       </span>
+      {cantUse && (
+        <span className="ml-auto shrink-0 rounded-xs border border-danger px-1 text-[0.6875rem] font-semibold text-danger">
+          {t('fittings.list.cantUse')}
+        </span>
+      )}
     </div>
   );
 }
@@ -61,9 +93,11 @@ function RackRow({ module }: { module: FittingModule }) {
 interface FittingRackListProps {
   fitting: Fitting;
   stats: FittingStats | null;
+  /** `moduleKey`s the active Character lacks the skills for. */
+  unusableModuleKeys?: ReadonlySet<string>;
 }
 
-export function FittingRackList({ fitting, stats }: FittingRackListProps) {
+export function FittingRackList({ fitting, stats, unusableModuleKeys }: FittingRackListProps) {
   const { t } = useTranslation();
   const modulesByRack = new Map<FittingSlotKind, FittingModule[]>();
   for (const rack of FITTING_SLOT_KINDS) modulesByRack.set(rack, []);
@@ -105,7 +139,11 @@ export function FittingRackList({ fitting, stats }: FittingRackListProps) {
               </p>
               <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                 {modules.map((module) => (
-                  <RackRow key={`${module.slot}-${module.slotIndex}`} module={module} />
+                  <RackRow
+                    key={moduleKey(module)}
+                    module={module}
+                    cantUse={unusableModuleKeys?.has(moduleKey(module)) ?? false}
+                  />
                 ))}
               </div>
             </div>
