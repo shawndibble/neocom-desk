@@ -201,8 +201,8 @@ export function ActiveJobsPanel({
 }: ActiveJobsPanelProps) {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
-  // View-only filters (not persisted): plain Sets, empty meaning "every
-  // activity"/"every status" — matching how no chip pressed reads as no
+  // URL-backed filters (ADR 0015), empty meaning "every activity"/"every
+  // status" — matching how no chip pressed reads as no
   // filter everywhere else in the app. Deliberately not the shared
   // `MultiSelectFilter`/`toggleFilterMember` convention (`'all'` as the
   // no-filter sentinel): that pair is built for a picker that starts fully
@@ -479,15 +479,20 @@ export function ActiveJobsPanel({
    */
   const showCharacterFilter = jobsFilterCandidates.length > 1;
 
-  // Menu entries only for activities actually present — an entry for an
-  // activity type this character never runs would just be a permanently-dead
-  // toggle.
   const presentActivityIds = useMemo(
     () => [...new Set(jobs.map((job) => job.activity_id))].sort((a, b) => a - b),
     [jobs]
   );
-  // Only worth a control once there is more than one activity to tell apart.
-  const showActivityFilter = presentActivityIds.length > 1;
+  // Menu entries: present activities (an activity this character never runs
+  // would be a dead toggle), plus any still-selected one with no job left
+  // (character switch, delivered jobs, shared URL) so it can be unchecked.
+  const activityMenuIds = useMemo(
+    () => [...new Set([...presentActivityIds, ...activityIds])].sort((a, b) => a - b),
+    [presentActivityIds, activityIds]
+  );
+  // Only worth a control once there is more than one activity to tell apart —
+  // or while a filter is applied, same guard as Status below.
+  const showActivityFilter = activityFilter.size > 0 || presentActivityIds.length > 1;
   // Kept mounted while a status filter is still active even if no job
   // currently matches it — losing the control out from under an applied
   // filter would leave the list silently narrowed with no way to clear it.
@@ -519,6 +524,10 @@ export function ActiveJobsPanel({
       ? activityIds.filter((id) => id !== activityId)
       : [...activityIds, activityId];
     setJobFilters({ 'jobs.activity': next });
+  }
+
+  function resetJobFilters() {
+    setJobFilters({ 'jobs.activity': [], 'jobs.status': new Set() });
   }
 
   function toggleStatus(status: JobStatusFilter) {
@@ -905,7 +914,7 @@ export function ActiveJobsPanel({
                             count: activityFilter.size,
                           })
                     }
-                    items={presentActivityIds.map((activityId) => ({
+                    items={activityMenuIds.map((activityId) => ({
                       value: activityId,
                       label: t(activityI18nKey(activityId), { id: activityId }),
                     }))}
@@ -938,7 +947,16 @@ export function ActiveJobsPanel({
             <span className="ml-auto">{listActions}</span>
           </div>
           {filteredJobs.length === 0 ? (
-            <EmptyState title={t('industry.jobsFilteredEmptyTitle')} className="py-4" />
+            // Jobs exist but none pass, so a filter is always on here.
+            <EmptyState
+              title={t('industry.jobsFilteredEmptyTitle')}
+              className="py-4"
+              action={
+                <Button size="sm" onClick={resetJobFilters}>
+                  {t('industry.jobsResetFilters')}
+                </Button>
+              }
+            />
           ) : (
             // Six columns overflow the route's `lg:grid-cols-[20rem_1fr]`
             // column at tablet widths; `.dt-stack` only rescues below `sm`.
