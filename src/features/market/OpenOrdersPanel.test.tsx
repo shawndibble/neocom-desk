@@ -8,6 +8,7 @@ import { OpenOrdersPanel } from './OpenOrdersPanel';
 import { loadAllCharactersOpenOrders, type OpenOrdersSnapshot } from './openOrdersData';
 import { loadOrderCostBases, type ProductionRunBasis } from './orderCostBasis';
 import { loadStationBestPrices, loadRegionCompetition, loadJumpsBetween } from './orderCompetition';
+import { stationPriceKey } from './stationPriceKey';
 import { loadPriceHistory } from './priceHistory';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadNpcStations } from '@/sde/loadMarketSde';
@@ -1126,5 +1127,40 @@ describe('OpenOrdersPanel — phone', () => {
     await user.click(screen.getByRole('button', { name: 'Expiring or stale · 1' }));
 
     expect(screen.queryByRole('button', { name: /Mexallon/ })).not.toBeInTheDocument();
+  });
+
+  it("renders the undercut row's match clause as plain text, not a nested focusable tooltip trigger", async () => {
+    // A cheap station rival beating my price, plus a cost basis, is what
+    // makes `orderRowSummary` return a `match` — the one clause that,
+    // on desktop, renders as its own `Tooltip` trigger (`tabIndex={0}`
+    // nested in the row). Nested inside this row's own `<button>` that
+    // would be invalid HTML and a focus/tap trap (issue #1429 code review).
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [{ ...BELOW_FLOOR_ORDER, price: 1000 }],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+    mockedCostBases.mockResolvedValue(new Map([[101, costBasis(100)]]));
+    mockedStationPrices.mockResolvedValue(
+      new Map([
+        [
+          stationPriceKey(STATION_A, 34),
+          { buyMax: null, sellMin: 900, sellVolume: 0, buyVolume: 0 },
+        ],
+      ])
+    );
+
+    renderPanel();
+    const row = await screen.findByRole('button', { name: /Tritanium/ });
+    expect(row).toHaveTextContent('still clears');
+    expect(within(row).queryByRole('button')).not.toBeInTheDocument();
+    expect(row.querySelector('[tabindex]')).toBeNull();
   });
 });

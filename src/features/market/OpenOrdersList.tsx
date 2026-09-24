@@ -4,12 +4,12 @@ import { cx } from '@/lib/cx';
 import { formatIskAuto } from '@/lib/isk';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { CharacterBadge } from '@/features/character/assetBrowserRows';
-import { roundPriceUp } from '@/engine/market/priceTick';
 import type { OpenOrderRow } from './openOrdersModel';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { isOffHubStation } from './hubStation';
+import { formatOrderFloorPrice, formatOrderRemaining } from './orderRowFormat';
 
 interface OpenOrdersListProps {
   rows: readonly OpenOrderRow[];
@@ -58,7 +58,7 @@ export function OpenOrdersList({
     <ul ref={listRef} aria-label={label} className="divide-y divide-line">
       {rows.map((row) => {
         const badge = orderBadgeFor(row);
-        const offHub = row.stationName !== null && isOffHubStation(row.locationId);
+        const offHub = isOffHubStation(row.stationName, row.locationId);
         const listRow = (
           <li data-row-key={row.orderId}>
             <button
@@ -82,17 +82,15 @@ export function OpenOrdersList({
                 {badge && (
                   <OrderProblemBadge kind={badge.kind} detail={badge.detail} interactive={false} />
                 )}
-                <OrderRowSummaryText row={row} />
+                <OrderRowSummaryText row={row} interactive={false} />
               </span>
               <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-text-dim tabular-nums">
                 <span>
-                  {t('orders.remaining')}: {row.volumeRemain.toLocaleString()} /{' '}
-                  {row.volumeTotal.toLocaleString()}
+                  {t('orders.remaining')}: {formatOrderRemaining(row.volumeRemain, row.volumeTotal)}
                 </span>
                 {showFloor && row.floor && (
                   <span>
-                    {t('market.orders.floorLabel')}:{' '}
-                    {formatIskAuto(roundPriceUp(row.floor.relist) ?? row.floor.relist)}
+                    {t('market.orders.floorLabel')}: {formatOrderFloorPrice(row.floor)}
                   </span>
                 )}
                 {offHub && <span className="text-warning">{t('market.orders.offHub')}</span>}
