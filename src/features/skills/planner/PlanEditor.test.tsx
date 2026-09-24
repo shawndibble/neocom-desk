@@ -199,6 +199,12 @@ const FITTED: Implants = { perception: 4, memory: 3 };
  * every test here runs below `lg` unless it opts in — which is where the
  * tools pane is a collapsed disclosure.
  */
+/** Import > From skill queue: the header's Import menu, then its queue item. */
+async function importFromQueue(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Import' }));
+  await user.click(screen.getByRole('menuitem', { name: 'From skill queue' }));
+}
+
 async function openTools(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /plan tools/i }));
 }
@@ -267,19 +273,22 @@ describe('PlanEditor tools pane', () => {
     for (const name of ['Optimize remaps', 'Optimize at my markers', 'Suggest reorder']) {
       expect(within(actions).queryByRole('button', { name })).toBeNull();
     }
+    // No free-typed remap count: with no ESI attributes (this harness's
+    // default `remapInfo={null}`), the read-only summary falls back to the
+    // plan's stored `remapCount`.
+    expect(within(actions).getByText(/^Remaps: 1 /)).toBeInTheDocument();
 
     await user.click(within(actions).getByRole('button', { name: 'Optimize' }));
     for (const name of [
       'Optimize for me',
       'Reorder only',
+      'Shortest first',
       'Place remaps only',
       'Use my remap markers',
     ]) {
       expect(screen.getByRole('menuitem', { name })).toBeInTheDocument();
     }
     await user.keyboard('{Escape}');
-
-    expect(within(actions).getByLabelText('Remaps available')).toBeInTheDocument();
 
     // Attributes: the sheet every estimate is costed against, then the two
     // what-if lenses over it — which change the numbers, not the plan.
@@ -293,7 +302,7 @@ describe('PlanEditor tools pane', () => {
 
     // Import/Export: plan-level file operations, now icon buttons portaled
     // into the route's page header rather than a tools-pane section.
-    for (const name of ['Import from skill queue', 'Import from clipboard', 'Export']) {
+    for (const name of ['Import', 'Export']) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument();
       expect(within(actions).queryByRole('button', { name })).toBeNull();
     }
@@ -315,22 +324,31 @@ describe('PlanEditor tools pane', () => {
     }
   });
 
-  it('renders Import/Export as icon-only controls (portaled to the page header)', () => {
+  it('renders Import/Export as labelled menu buttons (portaled to the page header)', () => {
     renderEditor();
 
-    for (const name of ['Import from skill queue', 'Import from clipboard', 'Export']) {
+    for (const name of ['Import', 'Export']) {
       const button = screen.getByRole('button', { name });
-      // Icon-only: the accessible name comes from aria-label, not visible text.
-      expect(button).toHaveAttribute('aria-label', name);
-      expect(button.textContent).toBe('');
+      // A visible text label, not an aria-label standing in for a glyph.
+      expect(button).not.toHaveAttribute('aria-label');
+      expect(button.textContent).toBe(name);
     }
+  });
+
+  it('opens the import dialog, titled "Import plan", from Import > From text or file…', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+
+    await user.click(screen.getByRole('button', { name: 'Import' }));
+    await user.click(screen.getByRole('menuitem', { name: 'From text or file…' }));
+
+    expect(await screen.findByRole('dialog', { name: 'Import plan' })).toBeInTheDocument();
   });
 
   it("doesn't render Import/Export when the caller has no header-actions slot to portal into", () => {
     renderEditor(vi.fn(), { headerActionsContainer: null });
 
-    expect(screen.queryByRole('button', { name: 'Import from skill queue' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Import from clipboard' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Import' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Export' })).toBeNull();
   });
 
@@ -396,6 +414,44 @@ describe('PlanEditor tools pane', () => {
 
     await clickOptimizeMode(user, 'Reorder only');
     const dialog = screen.getByRole('dialog', { name: 'Suggested reorder' });
+
+    await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
+
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it("opens Shortest first's preview in a Modal; Accept applies the reorder and closes it", async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+    await openTools(user);
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    await clickOptimizeMode(user, 'Shortest first');
+
+    const dialog = screen.getByRole('dialog', { name: 'Suggested shortest-first sort' });
+    expect(within(dialog).getByText('Skill B I')).toBeInTheDocument();
+    expect(within(dialog).getByText('Skill A I')).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Accept' }));
+
+    expect(onUpdate).toHaveBeenCalledWith({
+      entries: [
+        { skillTypeID: 20, targetLevel: 1, priority: 'high' },
+        { skillTypeID: 10, targetLevel: 1 },
+      ],
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('Reject closes the Shortest first Modal without updating the plan', async () => {
+    const user = userEvent.setup();
+    const { onUpdate } = renderEditor();
+    await openTools(user);
+
+    await clickOptimizeMode(user, 'Shortest first');
+    const dialog = screen.getByRole('dialog', { name: 'Suggested shortest-first sort' });
 
     await user.click(within(dialog).getByRole('button', { name: 'Reject' }));
 
@@ -536,9 +592,7 @@ describe('PlanEditor tools pane', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Optimize remaps' });
     expect(
-      within(dialog).getByText(
-        'This plan has 0 remaps to spend, so nothing was placed — raise "Remaps available" above and optimize again.'
-      )
+      within(dialog).getByText('This plan has 0 remaps to spend, so nothing was placed.')
     ).toBeInTheDocument();
     expect(within(dialog).queryByRole('button', { name: 'Accept' })).toBeNull();
 
@@ -860,7 +914,7 @@ describe('PlanEditor tools pane placement', () => {
     expect(screen.queryByLabelText('What-if implants')).toBeNull();
     // Import/Export portals to the page header, not the tools pane — on
     // screen regardless of the disclosure's state.
-    expect(screen.getByRole('button', { name: 'Import from skill queue' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import' })).toBeInTheDocument();
   });
 
   it('puts the tools in the sidebar under the plan list at `lg`+, always open', () => {
@@ -1105,9 +1159,6 @@ describe('PlanEditor what-if implants', () => {
     for (const attribute of ['Intelligence', 'Memory', 'Perception', 'Willpower', 'Charisma']) {
       expect(screen.getByLabelText(`${attribute} implant bonus`)).toHaveClass('field-no-spinner');
     }
-    // The pane's other two number fields are the same field at the same
-    // size, so they behave the same way on hover.
-    expect(screen.getByLabelText('Remaps available')).toHaveClass('field-no-spinner');
   });
 
   it('a preset reads out all five with no inputs, and Custom is offered', async () => {
@@ -1623,6 +1674,39 @@ describe('yearly remap on cooldown (#1404)', () => {
   });
 });
 
+describe('derived remap budget summary, no manual override (#1412)', () => {
+  it('shows the live EVE count when the yearly remap is ready, ignoring a stale plan.remapCount', async () => {
+    const user = userEvent.setup();
+    const remapInfo: RemapAvailability = {
+      available: 2,
+      bonus: 1,
+      yearlyReady: true,
+      cooldownUntil: null,
+    };
+    // A stale stored value (5) the optimizer must not honor now that live
+    // ESI data is available — only the offline-fallback path reads it.
+    renderEditor(vi.fn(), { plan: { ...PLAN, remapCount: 5 }, remapInfo });
+    await openTools(user);
+
+    expect(screen.getByText('Remaps: 1 bonus now · yearly ready')).toBeInTheDocument();
+    expect(screen.queryByRole('spinbutton', { name: /remap/i })).toBeNull();
+  });
+
+  it('shows the cooldown date when the yearly remap is not ready yet', async () => {
+    const user = userEvent.setup();
+    const remapInfo: RemapAvailability = {
+      available: 1,
+      bonus: 1,
+      yearlyReady: false,
+      cooldownUntil: new Date('2027-03-12T00:00:00Z'),
+    };
+    renderEditor(vi.fn(), { plan: { ...PLAN, remapCount: 5 }, remapInfo });
+    await openTools(user);
+
+    expect(screen.getByText(/^Remaps: 1 bonus now · yearly from /)).toBeInTheDocument();
+  });
+});
+
 describe('queue import into a non-empty plan asks Append or Replace (#1402)', () => {
   beforeEach(() => {
     loadCharacterSkillQueue.mockReset();
@@ -1635,7 +1719,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     const { onUpdate } = renderEditor(vi.fn(), { plan: { ...PLAN, entries: [] } });
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
 
     await waitFor(() =>
       expect(onUpdate).toHaveBeenCalledWith({ entries: [{ skillTypeID: 20, targetLevel: 3 }] })
@@ -1650,7 +1734,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
 
     await waitFor(() => expect(screen.getByText(/in-game queue has 1 skill/i)).toBeInTheDocument());
     expect(onUpdate).not.toHaveBeenCalled();
@@ -1663,7 +1747,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
     await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
     await user.click(screen.getByRole('button', { name: 'Append' }));
 
@@ -1683,7 +1767,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     const { onUpdate } = renderEditor(vi.fn(), { plan: { ...PLAN, markers: [1] } });
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
     await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
     await user.click(screen.getByRole('button', { name: 'Replace plan' }));
 
@@ -1702,7 +1786,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const originalPlan = { ...PLAN, markers: [1] };
     const { onUpdate } = renderEditor(vi.fn(), { plan: originalPlan });
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
     await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
     await user.click(screen.getByRole('button', { name: 'Replace plan' }));
 
@@ -1724,7 +1808,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
 
     await waitFor(() =>
       expect(screen.getByText(/in-game skill queue is empty/i)).toBeInTheDocument()
@@ -1739,12 +1823,12 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     renderEditor();
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
     await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
     await user.click(screen.getByRole('button', { name: 'Replace plan' }));
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
     await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
     await user.click(screen.getByRole('button', { name: 'Append' }));
 
@@ -1764,8 +1848,8 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     renderEditor();
 
-    const importButton = screen.getByRole('button', { name: 'Import from skill queue' });
-    await user.click(importButton);
+    const importButton = screen.getByRole('button', { name: 'Import' });
+    await importFromQueue(user);
     expect(importButton).toBeDisabled();
 
     resolveQueue(queueResult([]));
@@ -1782,7 +1866,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     const { onUpdate, replacePlan } = renderEditor();
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
 
     // Switched to a different plan while the fetch for plan-1 is still in
     // flight — this component has no key={plan.id} at the route, so the same

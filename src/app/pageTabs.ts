@@ -45,7 +45,7 @@ export const MINING_TABS = definePageTabs('/mining', [
 export const WALLET_TABS = definePageTabs('/wallet', [
   { id: 'balance', labelKey: 'wallet.balanceTab' },
   { id: 'journal', labelKey: 'wallet.journalTab' },
-  { id: 'transactions', labelKey: 'wallet.transactionsTab' },
+  { id: 'transactions', labelKey: 'wallet.corpTransactionsTab' },
 ]);
 
 /**

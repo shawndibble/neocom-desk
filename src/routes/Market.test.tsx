@@ -564,7 +564,7 @@ describe('Market Browser', () => {
 });
 
 describe('Price History tab (issue #11)', () => {
-  it('defaults to Market Data; opening Price History fetches and shows the chart', async () => {
+  it('defaults to Order Book; opening Price History fetches and shows the chart', async () => {
     const historyHits = { count: 0 };
     server.use(
       ordersHandler({ count: 0 }),
@@ -587,7 +587,7 @@ describe('Price History tab (issue #11)', () => {
     await user.type(await screen.findByRole('searchbox'), 'rift');
     await user.click(await screen.findByText('Rifter'));
     await screen.findByRole('table', { name: 'Sell Orders' });
-    expect(screen.getByRole('tab', { name: 'Market Data', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Order Book', selected: true })).toBeInTheDocument();
     expect(historyHits.count).toBe(0); // not fetched until the tab is opened
 
     await user.click(screen.getByRole('tab', { name: 'Price History' }));

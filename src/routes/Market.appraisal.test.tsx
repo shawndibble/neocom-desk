@@ -169,7 +169,7 @@ describe('Market Appraisal tab navigation', () => {
     await waitFor(() => expect(probe.pathname).toBe('/market/browser'));
     expect(probe.search).toContain('type=34');
     // The Browser's own item view, not the paste box it was clicked from.
-    expect(await screen.findByRole('tab', { name: 'Market Data' })).toBeInTheDocument();
+    expect(await screen.findByRole('tab', { name: 'Order Book' })).toBeInTheDocument();
     expect(screen.queryByLabelText(/Items from inventory/)).not.toBeInTheDocument();
   });
 });

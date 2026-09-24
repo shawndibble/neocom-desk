@@ -31,7 +31,8 @@ test('imports the in-game skill queue into an existing plan via Append', async (
   await page.waitForURL(/\/skills\/plans$/);
   await addCaldariCruiserToNewPlan(page);
 
-  await page.getByRole('button', { name: 'Import from skill queue' }).click();
+  await page.getByRole('button', { name: 'Import' }).click();
+  await page.getByRole('menuitem', { name: 'From skill queue' }).click();
   const dialog = page.getByRole('dialog', { name: 'Import from skill queue' });
   await expect(dialog.getByText(/in-game queue has 1 skill/i)).toBeVisible();
   await dialog.getByRole('button', { name: 'Append' }).click();

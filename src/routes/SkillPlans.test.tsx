@@ -835,7 +835,8 @@ describe('SkillPlans editor: import / export', () => {
     render(<App />);
     await openPlanTools();
 
-    await user.click(await screen.findByRole('button', { name: 'Import from skill queue' }));
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From skill queue' }));
     const entriesPanel = screen.getByText('Your entries').closest('section')!;
     // The entry row's name and level render as separate text nodes ("Gunnery"
     // " " "III"), so match by regex rather than the exact string "Gunnery".
@@ -873,7 +874,8 @@ describe('SkillPlans editor: import / export', () => {
     render(<App />);
     await openPlanTools();
 
-    await user.click(await screen.findByRole('button', { name: 'Import from skill queue' }));
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From skill queue' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/invalid finished_level/);
   });
@@ -948,13 +950,23 @@ describe('SkillPlans editor: optimize remaps', () => {
     expect(screen.queryByText(/Remapping saves/)).not.toBeInTheDocument();
   });
 
-  // The reported bug. New plans are seeded with Remaps Available from ESI,
-  // which is 0 for any character with no bonus remaps whose yearly remap is
-  // on cooldown — so `placeRemaps` short-circuits before evaluating
-  // anything. The identical plan at remapCount 1 saves time (first test in
-  // this block), so "no remap improves this plan in its current order" is
-  // false, and its advice to try "Reorder only" cannot help.
+  // The reported bug. Remaps Available comes from live ESI now (#1412), not
+  // a free-typed `plan.remapCount` — and with live ESI readable, the budget
+  // can never actually be 0: even a character with no bonus remaps whose
+  // yearly remap is on cooldown still gets a `timedRemap` slot (usable once
+  // the cooldown ends, per #1404), so `placeRemaps` always has at least one
+  // remap to place. 0-remaps-to-spend can only happen on the offline/no-scope
+  // fallback — ESI attributes unreadable and the plan's stored `remapCount`
+  // itself 0 — so that's what's mocked here. The identical plan at remapCount
+  // 1 saves time (first test in this block), so "no remap improves this plan
+  // in its current order" is false, and its advice to try "Reorder only"
+  // cannot help.
   it('says the plan has no remaps to spend, rather than blaming the plan order, at 0 Remaps Available', async () => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.error()
+      )
+    );
     const user = userEvent.setup();
     await db.skillPlans.add(
       seedPlan({
@@ -974,9 +986,7 @@ describe('SkillPlans editor: optimize remaps', () => {
     await clickOptimizeMode(user, 'Place remaps only');
 
     expect(
-      await screen.findByText(
-        'This plan has 0 remaps to spend, so nothing was placed — raise "Remaps available" above and optimize again.'
-      )
+      await screen.findByText('This plan has 0 remaps to spend, so nothing was placed.')
     ).toBeInTheDocument();
     expect(await within(toolbar).findByRole('status')).toHaveTextContent('No remaps to spend');
     // Not the order-blaming verdict, and not the generic inline confirmation.
@@ -1203,7 +1213,16 @@ describe('SkillPlans editor: remap markers', () => {
 });
 
 describe('SkillPlans editor: the remap cap is disclosed', () => {
-  const optimize = async (remapCount: number) => {
+  // Remaps Available is derived from live ESI now (#1412), not the plan's
+  // own remapCount, so "the plan asks for N" is driven by mocking ESI's
+  // bonus_remaps (with the yearly remap left ready, off cooldown) rather
+  // than by seedPlan — `available` = bonus_remaps + 1.
+  const optimize = async (available: number) => {
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.json({ ...attributesPayload, bonus_remaps: available - 1 })
+      )
+    );
     const user = userEvent.setup();
     await db.skillPlans.add(
       seedPlan({
@@ -1211,7 +1230,6 @@ describe('SkillPlans editor: the remap cap is disclosed', () => {
           { skillTypeID: 1, targetLevel: 3 },
           { skillTypeID: 3, targetLevel: 1 },
         ],
-        remapCount,
       })
     );
     goToPlanEditor();
@@ -1228,10 +1246,10 @@ describe('SkillPlans editor: the remap cap is disclosed', () => {
     expect(screen.getByText(/Evaluated with 2 remaps/i)).toBeInTheDocument();
   });
 
-  it.each([1, 2])('says nothing when the plan asks for %i remap(s)', async (remapCount) => {
+  it.each([1, 2])('says nothing when the plan asks for %i remap(s)', async (available) => {
     // Two is the cap, not a capped value: the note must not fire at the
     // boundary itself.
-    await optimize(remapCount);
+    await optimize(available);
     expect(screen.queryByText(/is not available yet/i)).not.toBeInTheDocument();
   });
 });
@@ -1263,14 +1281,27 @@ describe('SkillPlans editor: plan header (#21)', () => {
   it('omits the savings badge entirely when the plan has no remaps to spend', async () => {
     // Otherwise the header asserts "Remap savings: None" — remapping cannot
     // help this plan — while the Actions panel below it says the opposite:
-    // raise "Remaps available" and optimize again.
+    // the derived remap budget shows remaps to spend. Remaps Available is
+    // live-ESI now (#1412), not plan.remapCount — and with live ESI readable
+    // the budget can never actually be 0 (a `timedRemap` slot always covers
+    // an on-cooldown yearly remap, per #1404), so 0-remaps-to-spend can only
+    // happen on the offline/no-scope fallback: ESI attributes unreadable and
+    // the plan's stored `remapCount` itself 0.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/attributes`, () =>
+        HttpResponse.error()
+      )
+    );
     await db.skillPlans.add(seedTwoSkillPlan(0));
     goToPlanEditor();
     render(<App />);
     await openPlanTools();
-    // The ESI-derived hint proves attributes have loaded, so the header has
+    // The fallback text proves attributes have finished loading (unreadable)
+    // and the "no remaps" state was reached deliberately, so the header has
     // had its chance to render a badge and chose not to.
-    await screen.findByText('From EVE: 0 bonus + yearly ready');
+    await screen.findByText(
+      "Remaps: 0 (from this plan's saved value — ESI attributes unavailable)"
+    );
 
     expect(within(header()).queryByText('Remap savings')).not.toBeInTheDocument();
     expect(within(header()).queryByText('None')).not.toBeInTheDocument();
@@ -1337,15 +1368,18 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     await openPlanTools();
 
     expect(
-      await screen.findByText('From EVE: 2 bonus + yearly on cooldown until 2027-01-15')
+      await screen.findByText('Remaps: 2 bonus now · yearly from 2027-01-15')
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
     await user.click(await screen.findByRole('button', { name: 'New plan' }));
     await openPlanTools();
-    // Prefilled but user-editable: the yearly remap is on cooldown, so only
-    // the 2 bonus remaps count.
-    await waitFor(() => expect(screen.getByLabelText('Remaps available')).toHaveValue(2));
+    // Not user-editable anymore, but still seeded once at creation
+    // (offline-fallback `remapCount`) from live ESI: the yearly remap is on
+    // cooldown, so only the 2 bonus remaps count.
+    await waitFor(() =>
+      expect(screen.getByText('Remaps: 2 bonus now · yearly from 2027-01-15')).toBeInTheDocument()
+    );
     const created = (await db.skillPlans.where('characterId').equals(CHAR_ID).toArray()).find(
       (p) => p.name === 'Untitled plan'
     );
@@ -1368,25 +1402,16 @@ describe('SkillPlans editor: remaps available from ESI', () => {
     render(<App />);
     await openPlanTools();
 
-    expect(await screen.findByText('From EVE: 1 bonus + yearly ready')).toBeInTheDocument();
+    expect(await screen.findByText('Remaps: 1 bonus now · yearly ready')).toBeInTheDocument();
 
     await user.click(screen.getByRole('link', { name: 'Back to plans' }));
     await user.click(await screen.findByRole('button', { name: 'New plan' }));
     await openPlanTools();
-    await waitFor(() => expect(screen.getByLabelText('Remaps available')).toHaveValue(2));
-  });
-});
-
-describe('SkillPlans editor: Remaps input label (UX-REVIEW #6)', () => {
-  it('labels the remap count input "Remaps available" with a helper tooltip', async () => {
-    await db.skillPlans.add(seedPlan());
-    goToPlanEditor();
-    render(<App />);
-    await openPlanTools();
-
-    await screen.findByText('Your entries');
-    expect(screen.getByLabelText('Remaps available')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'About remaps available' })).toBeInTheDocument();
+    // The cooldown date is already past, so the new plan's derived display
+    // counts the yearly remap as ready too (1 bonus + yearly = 2 available).
+    await waitFor(() =>
+      expect(screen.getByText('Remaps: 1 bonus now · yearly ready')).toBeInTheDocument()
+    );
   });
 });
 
@@ -1459,8 +1484,12 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
-    const summaryPanel = screen.getByText('Plan summary').closest('section')!;
-    const durationHeader = () => within(summaryPanel).getByText(/^\d+[dhm]/);
+    // Scoped to PlanHeader's own "Training time" chip by its unique label,
+    // not a bare duration-shaped regex: the header also carries a Remap
+    // savings chip once a plan has savings to show, and both render
+    // duration-shaped text, so an unscoped `/^\d+[dhm]/` match is ambiguous.
+    const durationHeader = () =>
+      screen.getByText('Training time').parentElement!.querySelector('span:last-child')!;
     const durationBefore = durationHeader().textContent;
 
     const select = screen.getByRole('combobox', { name: 'What-if implants' });
@@ -1501,8 +1530,11 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     const queuePanel = (await screen.findByText('Your entries')).closest('section')!;
     await within(queuePanel).findAllByRole('listitem');
-    const summaryPanel = screen.getByText('Plan summary').closest('section')!;
-    const durationHeader = () => within(summaryPanel).getByText(/^\d+[dhm]/);
+    // See the sibling "recomputes training time..." test above: scoped to
+    // PlanHeader's own "Training time" chip, since an unscoped duration
+    // regex can also match its Remap savings chip.
+    const durationHeader = () =>
+      screen.getByText('Training time').parentElement!.querySelector('span:last-child')!;
     const durationBefore = durationHeader().textContent;
 
     await user.click(screen.getByRole('button', { name: 'Add accelerator' }));
@@ -1559,8 +1591,9 @@ describe('SkillPlans editor: import from clipboard', () => {
     render(<App />);
     await openPlanTools();
 
-    await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
     await user.type(textarea, 'Gunnery III\nNot A Real Skill II');
     await user.click(within(dialog).getByRole('button', { name: 'Parse' }));
@@ -1591,8 +1624,9 @@ describe('SkillPlans editor: import from clipboard', () => {
     render(<App />);
     await openPlanTools();
 
-    await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
     await user.click(textarea);
     // user.type() treats [ ] { } as special key syntax — paste() takes the
@@ -1637,8 +1671,9 @@ describe('SkillPlans editor: import from clipboard', () => {
     render(<App />);
     await openPlanTools();
 
-    await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
     // Gunnery III: already trained to V. Spaceship Command I: not trained.
     await user.type(textarea, 'Gunnery III\nSpaceship Command I');
@@ -1674,8 +1709,9 @@ describe('SkillPlans editor: import from clipboard', () => {
     render(<App />);
     await openPlanTools();
 
-    await user.click(await screen.findByRole('button', { name: 'Import from clipboard' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Import from clipboard' });
+    await user.click(await screen.findByRole('button', { name: 'Import' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'From text or file…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Import plan' });
     const textarea = within(dialog).getByLabelText(/paste an eft fit or a skill plan/i);
     await user.type(textarea, 'Gunnery III');
     await user.click(within(dialog).getByRole('button', { name: 'Parse' }));

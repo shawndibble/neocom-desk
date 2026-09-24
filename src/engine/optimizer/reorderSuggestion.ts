@@ -16,7 +16,15 @@
  */
 import { pairKey } from '@/engine/optimizer/bestAttributes';
 import { priorityRank } from '@/engine/planPriority';
-import type { EngineSkill, PlanPriority, PlanStep } from '@/engine/types';
+import { spBetween, timeToTrain, trainingRate } from '@/engine/sp';
+import type {
+  Attributes,
+  CloneState,
+  EngineSkill,
+  Implants,
+  PlanPriority,
+  PlanStep,
+} from '@/engine/types';
 
 interface PlanIndex {
   /** Sorted plan levels per skill. */
@@ -137,6 +145,75 @@ export function suggestReorder(
     if (emittedThisPass === 0) {
       throw new Error('Plan has unsatisfiable prerequisites; cannot reorder');
     }
+  }
+  return result;
+}
+
+export interface SortShortestFirstOptions {
+  attributes: Attributes;
+  implants?: Implants;
+  cloneState?: CloneState;
+}
+
+/**
+ * Reorder steps to front-load the quick ones: prereq-valid, and honoring
+ * Priority tiers (#27) — High before Normal before Low, using the same
+ * already-effective `priorities` map `suggestReorder` takes, so a
+ * lower-priority prerequisite already carries its dependent's urgency by the
+ * time it reaches here. Within a tier, a ready-set selection repeatedly picks
+ * the ready step with the lowest (priorityRank, seconds, original index) —
+ * scanning ready steps in original order and only replacing the current pick
+ * on a strict improvement keeps ties at the earliest index for free.
+ *
+ * Each step's training time is costed once, up front, Booster-blind (a
+ * Booster's bonus depends on when a step lands, which this reorder decides;
+ * costing against it would be circular). A linear scan per pick is fine at
+ * plan sizes (~200 steps); no heap is needed unless a test shows otherwise.
+ */
+export function sortShortestFirst(
+  steps: readonly PlanStep[],
+  skills: ReadonlyMap<number, EngineSkill>,
+  options: SortShortestFirstOptions,
+  priorities?: ReadonlyMap<number, PlanPriority>
+): PlanStep[] {
+  const { attributes, implants = {}, cloneState } = options;
+  const priorityFor = (typeID: number): PlanPriority => priorities?.get(typeID) ?? 'normal';
+
+  const seconds = steps.map((step) => {
+    const skill = skills.get(step.skillTypeID);
+    if (!skill) throw new Error(`Unknown skill typeID ${step.skillTypeID}`);
+    const sp = spBetween(skill.rank, step.level - 1, step.level);
+    const rate = trainingRate(
+      attributes[skill.primary] + (implants[skill.primary] ?? 0),
+      attributes[skill.secondary] + (implants[skill.secondary] ?? 0),
+      cloneState
+    );
+    return timeToTrain(sp, rate);
+  });
+
+  const index = buildPlanIndex(steps);
+  const emitted = new Array(steps.length).fill(false);
+  const result: PlanStep[] = [];
+
+  while (result.length < steps.length) {
+    let pickIndex = -1;
+    let pickRank = Infinity;
+    let pickSeconds = Infinity;
+    for (let i = 0; i < steps.length; i++) {
+      if (emitted[i] || !isReady(index, steps[i], skills)) continue;
+      const rank = priorityRank(priorityFor(steps[i].skillTypeID));
+      if (rank < pickRank || (rank === pickRank && seconds[i] < pickSeconds)) {
+        pickIndex = i;
+        pickRank = rank;
+        pickSeconds = seconds[i];
+      }
+    }
+    if (pickIndex === -1) {
+      throw new Error('Plan has unsatisfiable prerequisites; cannot reorder');
+    }
+    markEmitted(index, steps[pickIndex]);
+    emitted[pickIndex] = true;
+    result.push(steps[pickIndex]);
   }
   return result;
 }

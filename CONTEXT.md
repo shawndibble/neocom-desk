@@ -547,9 +547,18 @@ here — they go one per file in `docs/context/decisions/`.
   already paid at listing). Only `relist` is ever shown as a figure — the
   row and the modal's quick answer both read it alone; `fill` surfaces only
   inside the deeper breakdown, because the smaller number matters only when
-  deciding to leave an order alone rather than touch it. Null when nothing
-  is linked to the order — never a guessed floor, since a floor of zero
-  would make every rival look safe to follow.
+  deciding to leave an order alone rather than touch it. Null when there is
+  no cost basis — a linked Production Run, or a **Wallet Cost Basis** that
+  covers every unit — never a guessed floor, since a floor of zero would
+  make every rival look safe to follow.
+- **Wallet Cost Basis**: An unlinked personal sell order's cost, worked out
+  FIFO from the character's own wallet buys and sells of that type
+  (`src/engine/market/walletCostBasis.ts`). The unit cost is the weighted
+  average of the newest units still held, one pool per (character, type).
+  Offered only when the history covers every unit on those orders; otherwise
+  the order has no cost basis and says whether the wallet was partial or
+  short of history. Leaves out the broker fee paid at the buy. A linked
+  Production Run always takes precedence.
 - **Often Undercut**: The Open Orders badge for an order that reads `healthy` right now but has been undercut most of the times this page has watched it — `wasFrequentlyUndercut` in `src/engine/market/orderProblemHistory.ts`, over samples the page stores itself in `db.orderProblemSamples`. It is an `OrderBadgeKind`, never an **Order Problem**: the row stays in the healthy group, so nothing already reading worse is affected. A boolean with no count beside it, and silent until there are enough samples to judge.
 - **Order Depth**: A **Build Opportunities** row's `deep`/`moderate`/`thin`/`unknown` read on how much sell-order ISK sits at the hub against that row's own build cost — `classifyOrderDepth` in `src/engine/industry/opportunities.ts`, a `ProblemThresholds`-style typed threshold object (see **Order Problem**) since no such convention existed before this ticket. `unknown` when the product itself has no hub sell price, never guessed as thin.
 - **Order Problem**: The one thing wrong with an open order, from
@@ -730,7 +739,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   places it lands.
 - **Remap**: In-game reallocation of a character's attributes. The optimizer suggests where in a Skill Plan remaps should be placed.
 - **Remap Marker**: A user-placed row in a Skill Plan marking where the character will remap attributes. Draggable like a plan entry.
-- **Remaps Available**: How many attribute remaps the character can spend: bonus remaps (new characters get several) plus the yearly remap, counted even while it's on cooldown — usable from its cooldown date, not before (`docs/context/decisions/`). Read from the API (bonus_remaps, last_remap_date, cooldown); user may override. Optimizer must support the common single-remap case: train a leading segment on current attributes, then remap at the optimizer-chosen point.
+- **Remaps Available**: How many attribute remaps the character can spend: bonus remaps (new characters get several) plus the yearly remap, counted even while it's on cooldown — usable from its cooldown date, not before (`docs/context/decisions/`). Read from the API (bonus_remaps, last_remap_date, cooldown) and always planned with in full — no user override; a plan without readable ESI attributes falls back to a stored per-plan count instead (`docs/context/decisions/`). Optimizer must support the common single-remap case: train a leading segment on current attributes, then remap at the optimizer-chosen point.
 - **Requested Scopes**: What one authorize round trip asked SSO for, carried on
   its **Pending Login** and read back by `completeLogin`. The baseline the login
   path judges revocation against; the refresh path has none and uses the stored

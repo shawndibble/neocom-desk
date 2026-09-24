@@ -102,7 +102,7 @@ const ROW_CAP = 15;
  * The page's own top-level tabs: Market Browser plus a character's Open
  * orders and History — previously the separate `/orders` route (open +
  * history) and Wallet's Transactions tab. Distinct from `itemTab` below,
- * which is the *selected item's* own Market Data / Price History split and
+ * which is the *selected item's* own Order Book / Price History split and
  * has nothing to do with this.
  *
  * `history` and `history/transactions` are one tab wearing two hats: both are
