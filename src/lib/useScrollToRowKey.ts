@@ -56,4 +56,17 @@ export function useScrollToRowKey(
     if (!alreadyCurrent) el.focus({ preventScroll: true });
     currentRef.current = { key: rowKey, el, hadTabIndex };
   }, [containerRef, rowKey, rows]);
+
+  // Unmount only: the effect above already clears the previous row's
+  // attributes on every key change, but React drops a component with no
+  // warning to a hook — this is the only chance to leave the DOM as clean as
+  // it was found.
+  useEffect(() => {
+    return () => {
+      const current = currentRef.current;
+      if (!current) return;
+      current.el.removeAttribute('aria-current');
+      if (!current.hadTabIndex) current.el.removeAttribute('tabindex');
+    };
+  }, []);
 }

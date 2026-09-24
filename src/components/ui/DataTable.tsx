@@ -150,6 +150,11 @@ interface DataTableProps<T> {
    * `highlightRowKey`'s one-shot `"location"`: that one is a deep link the
    * reader arrives on and moves past, this one persists as long as the row
    * stays selected.
+   *
+   * Not meant to name the same row as `highlightRowKey` at once: the latter
+   * writes `aria-current` imperatively (`useScrollToRowKey`), which would
+   * fight this prop's declarative value on that row. No current caller
+   * passes both for the same key.
    */
   selectedRowKey?: string | number | null;
   /** Accessible name for the table. */

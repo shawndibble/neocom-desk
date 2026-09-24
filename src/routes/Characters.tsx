@@ -668,10 +668,10 @@ function buildColumns(
               className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${tone}`}
             >
               {/* The countdown alone is a colour-only tell of the underlying
-                  attention state (DESIGN.md §7) — this restores the word for
-                  screen readers without changing what a sighted reader sees. */}
-              <span className="sr-only">{t(`pi.attention.${attention}`)} </span>
-              {label}
+                  attention state (DESIGN.md §7) — colour-blind sighted readers
+                  need the word too, not just screen readers, so it prints
+                  rather than hiding in an sr-only span. */}
+              {t(`pi.attention.${attention}`)} · {label}
             </span>
           </Tooltip>
         );

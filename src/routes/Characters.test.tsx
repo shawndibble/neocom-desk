@@ -928,7 +928,9 @@ describe('Characters table view', () => {
       const pilotRow = within(table).getByText('Pilot One').closest('tr');
       if (!pilotRow) throw new Error('expected a Pilot One row');
       const piCell = within(pilotRow).getAllByRole('cell')[piIndex];
-      expect(within(piCell).getByText('Expiring soon')).toHaveClass('sr-only');
+      // Visible to a sighted reader, not only a screen reader — colour alone
+      // must not be what distinguishes attention states (DESIGN.md §7).
+      expect(piCell).toHaveTextContent('Expiring soon');
     } finally {
       snapshotSpy.mockRestore();
       attentionSpy.mockRestore();
@@ -1146,7 +1148,8 @@ describe('Characters table view', () => {
     const pilotRow = within(table).getByText('Pilot One').closest('tr');
     if (!pilotRow) throw new Error('expected a Pilot One row');
     const cell = within(pilotRow).getAllByRole('cell')[piIndex];
-    const value = await within(cell).findByText(/^\d+h \d+m$/);
+    // The countdown sits beside the attention word now (#1490), not alone.
+    const value = await within(cell).findByText(/\d+h \d+m/);
     expect(value).toHaveAttribute('tabIndex', '0');
   });
 });

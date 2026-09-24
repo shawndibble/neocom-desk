@@ -165,14 +165,14 @@ describe('Alerts', () => {
   });
 
   it('states each type row severity in text, not only by icon colour', async () => {
+    // `newMail` carries no entry in `EVENT_SEVERITY`, so `alertSeverity` falls
+    // back to 'watch' — asserting the exact word, not just membership in the
+    // four possible ones, so a wrong severity→label mapping would fail.
     await db.notificationFeed.bulkPut([entry({ id: 'mail-1' })]);
     renderPage();
 
     const row = (await screen.findByText('New Mail')).closest('li') as HTMLElement;
-    const icon = within(row).getByRole('img');
-    expect(['Critical', 'Due soon', 'Worth watching', 'Not urgent']).toContain(
-      icon.getAttribute('aria-label')
-    );
+    expect(within(row).getByRole('img')).toHaveAttribute('aria-label', 'Worth watching');
   });
 
   it('expands a type to the individual fires, each naming its character', async () => {
