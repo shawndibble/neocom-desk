@@ -1,0 +1,116 @@
+/**
+ * A row's actions, reachable two ways from one definition: the right-click
+ * (or long-press) context menu, and a visible "More actions" button a
+ * keyboard user can Tab to (WCAG 2.1.1).
+ *
+ * The items are written once, with the kind-agnostic `MenuItem`/`MenuSub*`
+ * below, and rendered into both menus — each item reads which Radix family
+ * it sits in from context, so the two can't drift. A row menu wrapper
+ * (`RowActionsMenu`, or a hand-rolled one that provides `RowActionsContext`)
+ * publishes its items; a `RowMoreActions` anywhere under it — a cell in the
+ * row, or `DataTable`'s `rowMoreActions` column — draws the button.
+ */
+import { useContext, type ComponentProps, type ReactElement } from 'react';
+import { useTranslation } from 'react-i18next';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from './ContextMenu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from './DropdownMenu';
+import { IconButton } from './IconButton';
+import * as Icon from './icons';
+import { MenuKindContext, RowActionsContext, type RowActions } from './rowActionsContext';
+
+export function MenuItem(props: ComponentProps<typeof ContextMenuItem>) {
+  return useContext(MenuKindContext) === 'dropdown' ? (
+    <DropdownMenuItem {...props} />
+  ) : (
+    <ContextMenuItem {...props} />
+  );
+}
+
+export function MenuSub(props: ComponentProps<typeof ContextMenuSub>) {
+  return useContext(MenuKindContext) === 'dropdown' ? (
+    <DropdownMenuSub {...props} />
+  ) : (
+    <ContextMenuSub {...props} />
+  );
+}
+
+export function MenuSubTrigger(props: ComponentProps<typeof ContextMenuSubTrigger>) {
+  return useContext(MenuKindContext) === 'dropdown' ? (
+    <DropdownMenuSubTrigger {...props} />
+  ) : (
+    <ContextMenuSubTrigger {...props} />
+  );
+}
+
+export function MenuSubContent(props: ComponentProps<typeof ContextMenuSubContent>) {
+  return useContext(MenuKindContext) === 'dropdown' ? (
+    <DropdownMenuSubContent {...props} />
+  ) : (
+    <ContextMenuSubContent {...props} />
+  );
+}
+
+/** Right-click menu around `trigger`, publishing the same items for `RowMoreActions`. */
+export function RowActionsMenu({
+  name,
+  items,
+  onOpenChange,
+  children,
+}: RowActions & { children: ReactElement }) {
+  return (
+    <RowActionsContext.Provider value={{ name, items, onOpenChange }}>
+      <ContextMenu onOpenChange={onOpenChange}>
+        <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+        <ContextMenuContent>{items}</ContextMenuContent>
+      </ContextMenu>
+    </RowActionsContext.Provider>
+  );
+}
+
+/**
+ * The visible trigger for the enclosing row's actions. A real dropdown rather
+ * than a synthetic right-click, so it announces `aria-haspopup`/`expanded`,
+ * lands focus on the first item when opened from the keyboard, and hands
+ * focus back to itself on close. `variant="plain"` drops the hairline border
+ * so it doesn't compete with the row's own content. Renders nothing outside
+ * a row that publishes actions.
+ */
+export function RowMoreActions({ className }: { className?: string }) {
+  const { t } = useTranslation();
+  const actions = useContext(RowActionsContext);
+  if (!actions) return null;
+  return (
+    <DropdownMenu onOpenChange={actions.onOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <IconButton
+          icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
+          label={t('common.moreActionsLabel', { name: actions.name })}
+          variant="plain"
+          size="sm"
+          className={className}
+        />
+      </DropdownMenuTrigger>
+      {/* Stops a right-click on an item bubbling (through the React tree,
+          portal or not) to the row's own context-menu trigger. */}
+      <DropdownMenuContent align="end" onContextMenu={(event) => event.stopPropagation()}>
+        <MenuKindContext.Provider value="dropdown">{actions.items}</MenuKindContext.Provider>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

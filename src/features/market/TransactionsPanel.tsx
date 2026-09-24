@@ -278,6 +278,7 @@ export function TransactionsPanel({
               rowKey={(txn) => txn.transaction_id}
               highlightRowKey={highlightId}
               rowContextMenu={rowContextMenu}
+              rowMoreActions
             />
           )}
         </>

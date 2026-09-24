@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { QuickbarList, type QuickbarListProps } from './QuickbarList';
@@ -34,6 +35,16 @@ describe('QuickbarList item context menu', () => {
   it('opens the item menu on the name button without selecting the row', async () => {
     const props = renderList();
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
+
+    expect(await screen.findByRole('menuitem', { name: /Show info/i })).toBeInTheDocument();
+    expect(props.onRequestBlueprintCatalog).toHaveBeenCalled();
+    expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
+  it('opens the same menu from a visible More actions button, without selecting the row (#1497)', async () => {
+    const user = userEvent.setup();
+    const props = renderList();
+    await user.click(screen.getByRole('button', { name: 'More actions for Tritanium' }));
 
     expect(await screen.findByRole('menuitem', { name: /Show info/i })).toBeInTheDocument();
     expect(props.onRequestBlueprintCatalog).toHaveBeenCalled();

@@ -9,7 +9,7 @@
  * item mounts only while the menu is open; the dialog only while it is.
  */
 import { useTranslation } from 'react-i18next';
-import { ContextMenuItem, Modal } from '@/components/ui';
+import { MenuItem, Modal } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { PriceAlertForm } from './PriceAlertForm';
 import { useQuickbar } from './useQuickbar';
@@ -20,25 +20,18 @@ function useQuickbarItem(typeId: number) {
   return { quickbar, item: quickbar.items.find((i) => i.typeId === typeId) };
 }
 
-/** `ContextMenuItem` and `DropdownMenuItem` share this shape — both spread onto a Radix `Item`. */
-type MenuItemComponent = typeof ContextMenuItem;
-
 /**
- * `as` lets `ItemContextMenu`'s visible "More actions" counterpart
- * (`ItemMoreActions`, issue #1498) render this same entry into a
- * `DropdownMenuItem` instead of a `ContextMenuItem` — the right-click menu
- * and the button must never drift.
+ * Kind-agnostic `MenuItem`, so the same entry renders into the right-click
+ * menu and its visible "More actions" counterpart — the two must never drift.
  */
 export function PriceAlertMenuItem({
   typeId,
   available,
   onSelect,
-  as: MenuItem = ContextMenuItem,
 }: {
   typeId: number;
   available: boolean;
   onSelect: () => void;
-  as?: MenuItemComponent;
 }) {
   const { t } = useTranslation();
   const { item } = useQuickbarItem(typeId);

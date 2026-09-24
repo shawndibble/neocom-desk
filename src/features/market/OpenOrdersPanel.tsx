@@ -1153,6 +1153,7 @@ export function OpenOrdersPanel({
                       rows={group.rows}
                       rowKey={(row) => row.orderId}
                       rowContextMenu={rowContextMenu}
+                      rowMoreActions
                       label={`${groupTitle} · ${group.rows.length}`}
                       highlightRowKey={highlightId}
                     />
