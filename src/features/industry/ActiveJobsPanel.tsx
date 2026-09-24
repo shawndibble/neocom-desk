@@ -721,7 +721,7 @@ export function ActiveJobsPanel({
         tabIndex={0}
         className="flex cursor-help items-center gap-1 text-xs tabular-nums underline decoration-dotted decoration-current/50 underline-offset-2"
       >
-        <span className="hidden text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase sm:inline">
+        <span className="hidden text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase sm:inline">
           {t('industry.jobSlotSummaryLabel')}
         </span>
         {JOB_SLOT_CATEGORIES.map((category, index) => {

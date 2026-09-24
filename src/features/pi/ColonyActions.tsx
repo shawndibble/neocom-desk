@@ -163,7 +163,7 @@ export function ColonyDirectives(props: ColonyActionProps) {
         </div>
       ))}
       {hidden > 0 && (
-        <p className="text-[0.6875rem] text-text-faint">
+        <p className="text-[0.6875rem] text-text-dim">
           {t('piAdvisor.moreInDetails', { count: hidden })}
         </p>
       )}
@@ -371,7 +371,7 @@ export function ColonyReasoning(props: ColonyActionProps) {
         </div>
       ))}
       {opportunities.length > 0 && (
-        <p className="text-[0.6875rem] text-text-faint">
+        <p className="text-[0.6875rem] text-text-dim">
           {t('piAdvisor.priceBasis', { hub: hub.systemName })}
         </p>
       )}
@@ -502,7 +502,7 @@ export function CapacityFootnote({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="space-y-1 text-[0.6875rem] text-text-faint">
+    <div className="space-y-1 text-[0.6875rem] text-text-dim">
       <p>
         {newLinkCost
           ? t('piAdvisor.capacityFootnote', {

@@ -219,7 +219,7 @@ export function AdvisorSummary({ list, earnings, spots, controls }: AdvisorSumma
               <span className="rounded-[1px] bg-accent-dim" style={{ width: `${nowWidth}%` }} />
               <span className="flex-1 rounded-[1px] bg-isk-pos" />
             </div>
-            <div className="mt-1.5 flex flex-wrap justify-between gap-x-3 text-[0.6875rem] text-text-faint">
+            <div className="mt-1.5 flex flex-wrap justify-between gap-x-3 text-[0.6875rem] text-text-dim">
               <span>
                 <span className="text-accent-dim">■</span>{' '}
                 {t('piAdvisor.summaryEarnBarNow', { isk: formatIsk(now) })}
@@ -252,7 +252,7 @@ export function AdvisorSummary({ list, earnings, spots, controls }: AdvisorSumma
                 })}
               </span>
             </div>
-            <p className="mt-1 text-[0.6875rem] leading-relaxed text-text-faint">
+            <p className="mt-1 text-[0.6875rem] leading-relaxed text-text-dim">
               {t('piAdvisor.summaryEarnRebuildHint')}
             </p>
           </div>

@@ -172,7 +172,7 @@ function EndpointPlace({
 function Figure({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-px">
-      <span className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+      <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
         {label}
       </span>
       <span className="tabular-nums">{value}</span>
@@ -301,7 +301,7 @@ export function CourierContractDetailModal({
 
         <section className="flex flex-col gap-2 rounded-xs border border-line bg-panel-2 p-3">
           <div className="flex flex-col gap-0.5">
-            <span className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('contractSearch.pickUpLabel')}
             </span>
             {/* Wraps rather than truncates: the station name and its region
@@ -323,7 +323,7 @@ export function CourierContractDetailModal({
           </div>
 
           <div className="flex flex-col gap-0.5">
-            <span className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('contractSearch.dropOffLabel')}
             </span>
             <span className="text-sm">{endpointName(row.destination)}</span>

@@ -497,7 +497,7 @@ export function ProductionLogPanel({
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-start">
         <div className="space-y-2">
           <div className="flex flex-col gap-1 rounded-xs border border-line bg-panel-2 px-3 py-2">
-            <span className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+            <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
               {t('industry.totalRealizedProfit')}
             </span>
             <span

@@ -190,7 +190,7 @@ function OrderDetailPanel({
         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-3">
           {isPlayerStructure && (
             <div>
-              <div className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+              <div className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('market.orderDetail.structureType')}
               </div>
               <div className="text-text">{t('market.orderDetail.playerStructure')}</div>
@@ -200,7 +200,7 @@ function OrderDetailPanel({
             const column = orderColumnsById[id];
             return (
               <div key={id}>
-                <div className="text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+                <div className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                   {column.header}
                 </div>
                 <div className="text-text">{column.render(order)}</div>

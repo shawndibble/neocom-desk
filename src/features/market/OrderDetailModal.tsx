@@ -560,7 +560,7 @@ export function OrderDetailModal({
             <h3 className="text-xs font-semibold tracking-widest text-text-dim uppercase">
               {t('market.orders.whoIsCheaper')}
             </h3>
-            <p className="text-[0.6875rem] text-text-faint">
+            <p className="text-[0.6875rem] text-text-dim">
               {t('market.orders.scopeTightestBites')}
             </p>
           </div>
