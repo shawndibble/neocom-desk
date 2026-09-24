@@ -46,6 +46,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Spinner,
   TextInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -89,6 +90,8 @@ export type { AcquisitionOwnedCopy } from './blueprintAcquisitionSources';
 
 /** `loading` until the fetch lands; `unavailable` = nothing to read (sync off, fetch failed). */
 type Load<T> = { status: 'loading' } | { status: 'unavailable' } | { status: 'ready'; data: T };
+/** Long enough that a section served from cache never flashes the arc. */
+const LOADING_SPINNER_DELAY_MS = 200;
 
 const ALL_REGIONS = 'all';
 const HUB_REGION = 'hub';
@@ -414,7 +417,7 @@ export function BlueprintAcquisitionModal({
             <span
               key={tag}
               // Accent is for the selected state only (DESIGN.md); static facts stay dim.
-              className={`ml-1.5 inline-block text-[0.625rem] font-semibold tracking-wider uppercase ${tag === selectedTag ? 'text-accent' : 'text-text-dim'}`}
+              className={`ml-1.5 inline-block text-[0.625rem] font-semibold tracking-widest uppercase ${tag === selectedTag ? 'text-accent' : 'text-text-dim'}`}
             >
               {tag}
             </span>
@@ -528,7 +531,14 @@ export function BlueprintAcquisitionModal({
             </Select>
           </div>
           {contracts.status === 'loading' ? (
-            <p className="text-text-dim">{t('industry.bpAcqContractsLoading')}</p>
+            <p className="flex items-center gap-2 text-text-dim">
+              <Spinner
+                size="sm"
+                delayMs={LOADING_SPINNER_DELAY_MS}
+                label={t('industry.bpAcqContractsLoading')}
+              />
+              {t('industry.bpAcqContractsLoading')}
+            </p>
           ) : contracts.status === 'unavailable' ? (
             <p className="text-text-dim">{t('industry.bpAcqContractsUnavailable')}</p>
           ) : contractSection.total === 0 ? (
@@ -574,7 +584,14 @@ export function BlueprintAcquisitionModal({
             </p>
           )}
           {market.status === 'loading' ? (
-            <p className="text-text-dim">{t('industry.bpAcqMarketLoading')}</p>
+            <p className="flex items-center gap-2 text-text-dim">
+              <Spinner
+                size="sm"
+                delayMs={LOADING_SPINNER_DELAY_MS}
+                label={t('industry.bpAcqMarketLoading')}
+              />
+              {t('industry.bpAcqMarketLoading')}
+            </p>
           ) : market.status === 'unavailable' || marketView?.status === 'failed' ? (
             <p className="text-text-dim">{t('industry.bpAcqMarketUnavailable')}</p>
           ) : marketSection.total === 0 ? (
@@ -619,7 +636,14 @@ export function BlueprintAcquisitionModal({
           </label>
           <p className="text-text-dim">{t('industry.bpAcqLpValueHint')}</p>
           {lp.status === 'loading' ? (
-            <p className="text-text-dim">{t('industry.bpAcqLpLoading')}</p>
+            <p className="flex items-center gap-2 text-text-dim">
+              <Spinner
+                size="sm"
+                delayMs={LOADING_SPINNER_DELAY_MS}
+                label={t('industry.bpAcqLpLoading')}
+              />
+              {t('industry.bpAcqLpLoading')}
+            </p>
           ) : lp.status === 'unavailable' ? (
             <p className="text-text-dim">{t('industry.bpAcqLpUnavailable')}</p>
           ) : lpSection.total === 0 ? (
