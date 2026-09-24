@@ -3,6 +3,7 @@ import type { PlanEntry } from '@/engine/types';
 import {
   dedupeEntries,
   upsertEntry,
+  appendImportedEntries,
   removeEntry,
   applyReorderSuggestion,
   entryId,
@@ -90,6 +91,32 @@ describe('upsertEntry', () => {
       targetLevel: 2,
     });
     expect(result).toEqual([{ skillTypeID: 1, targetLevel: 5 }]);
+  });
+});
+
+describe('appendImportedEntries', () => {
+  it("keeps existing order and appends the imported skill's new levels", () => {
+    const existing: PlanEntry[] = [{ skillTypeID: 1, targetLevel: 3 }];
+    const imported: PlanEntry[] = [
+      { skillTypeID: 2, targetLevel: 1 },
+      { skillTypeID: 1, targetLevel: 5 },
+    ];
+    expect(appendImportedEntries(existing, imported)).toEqual([
+      { skillTypeID: 1, targetLevel: 3 },
+      { skillTypeID: 2, targetLevel: 1 },
+      { skillTypeID: 1, targetLevel: 5 },
+    ]);
+  });
+
+  it('skips an imported level an existing row already covers', () => {
+    const existing: PlanEntry[] = [{ skillTypeID: 1, targetLevel: 5 }];
+    const imported: PlanEntry[] = [{ skillTypeID: 1, targetLevel: 2 }];
+    expect(appendImportedEntries(existing, imported)).toEqual([{ skillTypeID: 1, targetLevel: 5 }]);
+  });
+
+  it('leaves existing untouched for an empty imported list', () => {
+    const existing: PlanEntry[] = [{ skillTypeID: 1, targetLevel: 3 }];
+    expect(appendImportedEntries(existing, [])).toEqual(existing);
   });
 });
 

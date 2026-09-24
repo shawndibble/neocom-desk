@@ -56,6 +56,18 @@ export function upsertEntry(entries: readonly PlanEntry[], entry: PlanEntry): Pl
   return covered ? [...entries] : [...entries, entry];
 }
 
+/**
+ * Merge an imported entry list onto the existing one, `upsertEntry` rule per
+ * entry — shared by clipboard import (which always appends) and queue import's
+ * Append choice (#1402), so the two behave the same way.
+ */
+export function appendImportedEntries(
+  existing: readonly PlanEntry[],
+  imported: readonly PlanEntry[]
+): PlanEntry[] {
+  return imported.reduce<PlanEntry[]>((acc, entry) => upsertEntry(acc, entry), [...existing]);
+}
+
 /** Remove one row — the skill's other levels stay where the user put them. */
 export function removeEntry(
   entries: readonly PlanEntry[],

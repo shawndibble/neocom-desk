@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -88,6 +88,7 @@ import {
   dedupeEntries,
   removeEntry,
   upsertEntry,
+  appendImportedEntries,
   applyReorderSuggestion,
   setEntryPriority,
 } from './reorder';
@@ -239,7 +240,25 @@ export function PlanEditor({
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importConfirm, setImportConfirm] = useState<string | null>(null);
+  // The one outstanding timeout clearing importConfirm, so a second
+  // confirmation (Append's 4s vs. Replace's 10s) can supersede it rather than
+  // racing it (#1402).
+  const importConfirmTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  // A queue import parsed on a non-empty plan (#1402): held until the user
+  // picks Append or Replace on the choice Modal below. Scoped to plan.id,
+  // same as undoImport below — this component doesn't remount on a plan
+  // switch, so without that the Modal could stay open across one.
+  const [pendingQueueImport, setPendingQueueImport] = useScopedState<PlanEntry[]>([plan.id]);
+  // Whether a queue fetch is in flight — disables the Import button so a
+  // second click can't race the first (#1402).
+  const [queueImporting, setQueueImporting] = useState(false);
+  // A snapshot taken just before a Replace, for the Undo beside its
+  // confirmation — scoped to plan.id so switching plans can't apply an undo
+  // meant for a different one (#1402).
+  const [undoImport, setUndoImport] = useScopedState<
+    Pick<SkillPlanRecord, 'entries' | 'markers' | 'markerAttributes'>
+  >([plan.id]);
   // Inline, beside-the-button confirmations (#222) — same pattern as
   // copyConfirm/importConfirm above: small text next to the triggering
   // button, cleared after a couple of seconds. Additive to the full
@@ -699,12 +718,50 @@ export function PlanEditor({
 
   const update = useCallback((entries: PlanEntry[]) => onUpdate({ entries }), [onUpdate]);
 
+  /** Beside-the-button import confirmation, superseding whichever one is already showing rather than racing its timer (#1402). */
+  function showImportConfirm(message: string, durationMs: number) {
+    if (importConfirmTimeout.current) clearTimeout(importConfirmTimeout.current);
+    setImportConfirm(message);
+    importConfirmTimeout.current = setTimeout(() => setImportConfirm(null), durationMs);
+  }
+
+  /** Shared "Added N skill(s)" wording for both import paths that only ever append (clipboard, queue Append). */
+  function appendedCountMessage(imported: readonly PlanEntry[]): string {
+    const addedCount = imported.filter(
+      (entry) => (trainedSkills.get(entry.skillTypeID)?.level ?? 0) < entry.targetLevel
+    ).length;
+    return addedCount > 0
+      ? t('plans.importAddedCount', { count: addedCount })
+      : t('plans.importAddedNone');
+  }
+
   async function handleImport() {
+    if (queueImporting) return;
+    setQueueImporting(true);
     setImportError(null);
+    // Compared against plan.id once the fetch resolves: a plan switch mid-fetch
+    // means this result belongs to neither plan, so it's dropped (#1402).
+    const requestedPlanId = plan.id;
     try {
       const result = await loadCharacterSkillQueue(characterId);
+      if (plan.id !== requestedPlanId) return;
       if (!result) return;
-      update(dedupeEntries(parseSkillQueue(result.data)));
+      const parsed = dedupeEntries(parseSkillQueue(result.data));
+      // An empty in-game queue must never wipe the plan (#1402) — it parses
+      // to `[]` the same as a genuinely empty import, so this has to be
+      // caught before the "empty plan" fast path below would otherwise apply
+      // it as a no-op-looking "import".
+      if (parsed.length === 0) {
+        setImportError(t('plans.importQueueEmpty'));
+        return;
+      }
+      // An empty plan has nothing to lose, so it goes in with no prompt —
+      // the choice Modal below exists only to protect entries already there.
+      if (plan.entries.length === 0) {
+        update(parsed);
+        return;
+      }
+      setPendingQueueImport(parsed);
     } catch (err) {
       // BUG #3: malformed/corrupted queue data (parseSkillQueue validates
       // and throws) must surface as a visible, i18n'd note — not an
@@ -712,7 +769,49 @@ export function PlanEditor({
       setImportError(
         t('plans.importError', { message: err instanceof Error ? err.message : String(err) })
       );
+    } finally {
+      setQueueImporting(false);
     }
+  }
+
+  /** Append choice on the queue-import Modal (#1402): same merge rule clipboard import uses. */
+  function confirmQueueImportAppend() {
+    if (!pendingQueueImport) return;
+    const parsed = pendingQueueImport;
+    // A pending Undo describes a Replace this Append doesn't touch, but
+    // showing it beside an unrelated Append confirmation would let it revert
+    // this (and anything since) instead of just the Replace it was for.
+    setUndoImport(null);
+    update(appendImportedEntries(plan.entries, parsed));
+    showImportConfirm(appendedCountMessage(parsed), 4000);
+    setPendingQueueImport(null);
+  }
+
+  /** Replace choice on the queue-import Modal (#1402): swaps entries, clears Remap Markers, leaves an Undo. */
+  function confirmQueueImportReplace() {
+    if (!pendingQueueImport) return;
+    setUndoImport({
+      entries: plan.entries,
+      // `?? []`, not the possibly-undefined field itself: Firestore rejects
+      // an explicit `undefined` value, and an absent list already reads as
+      // empty everywhere else this plan uses it.
+      markers: plan.markers ?? [],
+      markerAttributes: plan.markerAttributes ?? [],
+    });
+    onUpdate({ entries: pendingQueueImport, markers: [], markerAttributes: [] });
+    // Longer than Append/clipboard's 4s — this one carries an Undo action, so
+    // it has to stay up long enough to use it.
+    showImportConfirm(t('plans.importQueueReplaced'), 10000);
+    setPendingQueueImport(null);
+  }
+
+  /** Undo beside the post-Replace confirmation: restores the snapshot taken just before it. */
+  function undoQueueImportReplace() {
+    if (!undoImport) return;
+    if (importConfirmTimeout.current) clearTimeout(importConfirmTimeout.current);
+    onUpdate(undoImport);
+    setUndoImport(null);
+    setImportConfirm(null);
   }
 
   async function handleExport() {
@@ -1208,11 +1307,12 @@ export function PlanEditor({
     return args.tooltip ? <Tooltip content={args.tooltip}>{button}</Tooltip> : button;
   }
 
-  /** Transient "it worked" note, under the action that produced it. */
-  function confirmation(message: string) {
+  /** Transient "it worked" note, under the action that produced it. `action`, when given, is an extra control beside it (e.g. Undo). */
+  function confirmation(message: string, action?: ReactNode) {
     return (
-      <p role="status" aria-live="polite" className="text-xs text-success">
+      <p role="status" aria-live="polite" className="flex items-center gap-2 text-xs text-success">
         {message}
+        {action}
       </p>
     );
   }
@@ -1718,6 +1818,7 @@ export function PlanEditor({
               icon={<Icon.ImportQueue />}
               label={t('plans.importQueue')}
               onClick={() => void handleImport()}
+              disabled={queueImporting}
             />
             <IconButton
               icon={<Icon.ImportClipboard />}
@@ -1752,7 +1853,15 @@ export function PlanEditor({
                 panel — a confirmation/error disconnected from its trigger
                 reads as belonging to something else. */}
             {copyConfirm && confirmation(t('plans.exportCopied'))}
-            {importConfirm && confirmation(importConfirm)}
+            {importConfirm &&
+              confirmation(
+                importConfirm,
+                undoImport && (
+                  <Button size="md" variant="ghost" onClick={undoQueueImportReplace}>
+                    {t('plans.importQueueUndo')}
+                  </Button>
+                )
+              )}
             {importError && (
               <p role="alert" className="text-xs text-danger">
                 {importError}
@@ -1765,18 +1874,11 @@ export function PlanEditor({
       {importOpen && (
         <ImportClipboardDialog
           onApply={(entries) => {
-            update(
-              entries.reduce((acc, entry) => upsertEntry(acc, entry), plan.entries as PlanEntry[])
-            );
-            const addedCount = entries.filter(
-              (entry) => (trainedSkills.get(entry.skillTypeID)?.level ?? 0) < entry.targetLevel
-            ).length;
-            setImportConfirm(
-              addedCount > 0
-                ? t('plans.importAddedCount', { count: addedCount })
-                : t('plans.importAddedNone')
-            );
-            setTimeout(() => setImportConfirm(null), 4000);
+            update(appendImportedEntries(plan.entries, entries));
+            // A pending Undo describes a Replace this doesn't touch — see
+            // confirmQueueImportAppend's comment above.
+            setUndoImport(null);
+            showImportConfirm(appendedCountMessage(entries), 4000);
             setImportOpen(false);
           }}
           onClose={() => setImportOpen(false)}
@@ -1784,6 +1886,32 @@ export function PlanEditor({
           trainedSkills={trainedSkills}
         />
       )}
+
+      {/* Queue import into a non-empty plan (#1402): neither choice applies
+          until the user picks one, so an empty or paused in-game queue can
+          never silently wipe a plan someone spent an hour building. */}
+      <Modal
+        open={pendingQueueImport !== null}
+        onClose={() => setPendingQueueImport(null)}
+        title={t('plans.importQueueChoiceTitle')}
+      >
+        <p className="text-xs text-text-dim">
+          {t('plans.importQueueChoiceBody', { count: pendingQueueImport?.length ?? 0 })}
+        </p>
+        <div className="mt-2 flex gap-2">
+          {/* md, not this file's usual sm-in-a-Modal: the ticket calls out the
+              44px touch floor by name for this Modal specifically. */}
+          <Button variant="primary" size="md" onClick={confirmQueueImportAppend}>
+            {t('plans.importQueueAppend')}
+          </Button>
+          <Button variant="danger" size="md" onClick={confirmQueueImportReplace}>
+            {t('plans.importQueueReplace')}
+          </Button>
+          <Button size="md" onClick={() => setPendingQueueImport(null)}>
+            {t('plans.importCancel')}
+          </Button>
+        </div>
+      </Modal>
 
       <Modal
         open={reorderPreview !== null}
