@@ -311,6 +311,8 @@ export function Industry() {
       map.set(row.planId, {
         profit: row.result?.profit ?? null,
         verdict: row.result?.recommendation ?? 'unknown',
+        buildCost: row.result?.unpriceable ? null : (row.result?.totalCost ?? null),
+        buyCost: row.result?.unpriceable ? null : (row.result?.buyCost ?? null),
         runs: runCounts.get(row.planId) ?? 0,
       });
     }

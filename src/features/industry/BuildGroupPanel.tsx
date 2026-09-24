@@ -352,7 +352,7 @@ export function BuildGroupPanel({
       return [material, jobFees, duration, volume].join(' · ');
     }
     const pct =
-      groupVerdict === 'build'
+      groupProfit >= 0
         ? rollup.buyCost > 0
           ? (groupProfit / rollup.buyCost) * 100
           : null
@@ -363,7 +363,7 @@ export function BuildGroupPanel({
     // notice further down) — the percent still stands on its own without it.
     const hub = rollup.singleHub ? hubLabel(rollup.hubIds[0]) : null;
     const comparisonKey =
-      groupVerdict === 'build'
+      groupProfit >= 0
         ? hub
           ? 'industry.groupVerdictCheaperAt'
           : 'industry.groupVerdictCheaper'
@@ -374,7 +374,6 @@ export function BuildGroupPanel({
     return [comparison, material, jobFees, duration, volume].filter(Boolean).join(' · ');
   }, [
     groupProfit,
-    groupVerdict,
     groupVolume,
     rollup.buyCost,
     rollup.totalCost,
@@ -665,7 +664,9 @@ export function BuildGroupPanel({
               ? t('industry.verdictUnknown')
               : groupVerdict === 'build'
                 ? t('industry.verdictBuild', { amount: formatIsk(groupProfit) })
-                : t('industry.verdictBuy', { amount: formatIsk(-groupProfit) })}
+                : groupProfit > 0
+                  ? t('industry.verdictBuildCheaper', { amount: formatIsk(groupProfit) })
+                  : t('industry.verdictBuy', { amount: formatIsk(-groupProfit) })}
           </p>
           <p className="text-xs tabular-nums text-text-dim">{verdictQualifiers}</p>
         </div>
