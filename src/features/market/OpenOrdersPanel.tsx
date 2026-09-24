@@ -1176,6 +1176,10 @@ export function OpenOrdersPanel({
 
       {detailRow && (
         <OrderDetailModal
+          // Keyed by orderId so the modal remounts (and its folded-section
+          // state resets) between orders, rather than reusing one instance
+          // across every row (issue #1428).
+          key={detailRow.orderId}
           open={detailOrderId !== null}
           row={detailRow}
           skills={snapshot.skillsByCharacter.get(detailRow.characterId)}
