@@ -14,13 +14,13 @@
  * `Panel` above an optional, foldable Compare Hubs section once something
  * has been appraised.
  */
-import { useMemo, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  ColumnPickerMenu,
   DataTable,
   EmptyState,
-  FilterChip,
   IconButton,
   IskAmount,
   Panel,
@@ -35,11 +35,9 @@ import { Caret } from '@/components/ui/Disclosure';
 import { fieldBaseClassName } from '@/components/ui/controlStyles';
 import {
   appraisalNet,
-  appraisalUndercut,
   lpBeatsMarket,
   refineBeatsSellAsIs,
   type AppraisalRow,
-  type AppraisalUndercut,
 } from '@/engine/market/appraisal';
 import { countPasteLines } from '@/engine/market/appraisalPaste';
 import type { ResolvedStandings } from '@/engine/market/standings';
@@ -50,9 +48,14 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { formatIskAuto } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
 import type { TradeHub } from '@/market/hubs';
+import {
+  APPRAISAL_COLUMN_IDS,
+  useVisibleAppraisalColumns,
+  type AppraisalColumnId,
+} from './appraisalColumns';
 import { appraisalCsvColumns } from './appraisalCsv';
+import { appraisalSellListText, hasAppraisalSellList } from './appraisalSellListText';
 import { buildAppraisalShareLink, MAX_SHARE_ITEMS } from './appraisalShareData';
-import { CopyablePrice } from './CopyablePrice';
 import { formatVolume } from './format';
 import { HubCompareCards } from './HubCompareCards';
 import { ItemContextMenu } from './ItemContextMenu';
@@ -122,10 +125,21 @@ export function AppraisalPanel({
   const { text, setText, result, compare, loading, failed } = controller;
   const [compareExpanded, setCompareExpanded] = useState(defaultCompareExpanded);
   const [shareCopied, setShareCopied] = useState(false);
-  // Off by default so the ledger reads as it always has; the pilot turns it on
-  // once they have decided to list rather than sell into buy orders.
-  const [undercutShown, setUndercutShown] = useState(false);
+  const [sellListCopied, setSellListCopied] = useState(false);
   const hubName = hub.systemName;
+
+  const visibleColumns = useVisibleAppraisalColumns((state) => state.value);
+  const setVisibleColumns = useVisibleAppraisalColumns((state) => state.setValue);
+  const hydrateVisibleColumns = useVisibleAppraisalColumns((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateVisibleColumns();
+  }, [hydrateVisibleColumns]);
+  function toggleColumn(id: AppraisalColumnId) {
+    const next = visibleColumns.includes(id)
+      ? visibleColumns.filter((existing) => existing !== id)
+      : [...visibleColumns, id];
+    void setVisibleColumns(next);
+  }
 
   async function handleShare() {
     if (!result) return;
@@ -137,6 +151,20 @@ export function AppraisalPanel({
       setShareCopied(true);
     } catch {
       setShareCopied(false);
+    }
+  }
+
+  const sellListItems = result?.appraisal.items ?? [];
+  const canCopySellList = hasAppraisalSellList(sellListItems);
+
+  async function handleCopySellList() {
+    if (!canCopySellList) return;
+    setSellListCopied(false);
+    try {
+      await writeToClipboard(appraisalSellListText(sellListItems));
+      setSellListCopied(true);
+    } catch {
+      setSellListCopied(false);
     }
   }
 
@@ -187,42 +215,6 @@ export function AppraisalPanel({
       render: (row) => <MarketItemLink typeId={row.typeId}>{row.name}</MarketItemLink>,
       sortValue: (row) => row.name,
     },
-    {
-      id: 'buyEach',
-      header: t('market.appraisal.columnBuyEach'),
-      align: 'right',
-      className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => eachCell(row.buyEach),
-      sortValue: (row) => row.buyEach ?? undefined,
-    },
-    {
-      id: 'sellEach',
-      header: t('market.appraisal.columnSellEach'),
-      align: 'right',
-      className: 'whitespace-nowrap tabular-nums text-text-dim',
-      render: (row) => eachCell(row.sellEach),
-      sortValue: (row) => row.sellEach ?? undefined,
-    },
-    {
-      id: 'buyTotal',
-      header: t('market.appraisal.columnBuyTotal'),
-      align: 'right',
-      className: 'whitespace-nowrap tabular-nums',
-      render: (row) =>
-        comparisonCell(
-          totalCell(row.buyTotal, 'longPress'),
-          row.refineTotal !== undefined && !refineBeatsSellAsIs(row)
-        ),
-      sortValue: (row) => row.buyTotal ?? undefined,
-    },
-    {
-      id: 'sellTotal',
-      header: t('market.appraisal.columnSellTotal'),
-      align: 'right',
-      className: 'whitespace-nowrap tabular-nums',
-      render: (row) => totalCell(row.sellTotal, 'longPress'),
-      sortValue: (row) => row.sellTotal ?? undefined,
-    },
   ];
 
   const rows = result?.appraisal.rows ?? [];
@@ -247,8 +239,55 @@ export function AppraisalPanel({
   // something to show, which is also exactly when there is nothing to show
   // with no active Character (`appraisalData.ts` never sets `refine` then).
   const hasRefine = rows.some((row) => row.refineTotal !== undefined);
-  if (hasRefine) {
-    columns.push({
+  // Undefined per row when nothing the active Character holds LP with sells
+  // this item — same "only earns its place once something has it" rule as
+  // the refine column, and also why this never shows with no active
+  // Character (`appraisalData.ts` never sets `lpOption` then).
+  const hasLpOption = rows.some((row) => row.lpCorpName !== undefined);
+
+  // The optional columns' catalog, keyed by `AppraisalColumnId` so the
+  // `ColumnPickerMenu` below and the push loop past it share one definition.
+  // Refine and LP store still only ever enter `availableColumns` when the
+  // data backing them exists — a picker toggle for a column with nothing to
+  // show would just be a lie.
+  const optionalColumnsById: Record<AppraisalColumnId, DataTableColumn<AppraisalRow>> = {
+    buyEach: {
+      id: 'buyEach',
+      header: t('market.appraisal.columnBuyEach'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums text-text-dim',
+      render: (row) => eachCell(row.buyEach),
+      sortValue: (row) => row.buyEach ?? undefined,
+    },
+    sellEach: {
+      id: 'sellEach',
+      header: t('market.appraisal.columnSellEach'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums text-text-dim',
+      render: (row) => eachCell(row.sellEach),
+      sortValue: (row) => row.sellEach ?? undefined,
+    },
+    buyTotal: {
+      id: 'buyTotal',
+      header: t('market.appraisal.columnBuyTotal'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums',
+      render: (row) =>
+        comparisonCell(
+          totalCell(row.buyTotal, 'longPress'),
+          row.refineTotal !== undefined && !refineBeatsSellAsIs(row)
+        ),
+      sortValue: (row) => row.buyTotal ?? undefined,
+    },
+    sellTotal: {
+      id: 'sellTotal',
+      header: t('market.appraisal.columnSellTotal'),
+      align: 'right',
+      className: 'whitespace-nowrap tabular-nums',
+      render: (row) => totalCell(row.sellTotal, 'longPress'),
+      sortValue: (row) => row.sellTotal ?? undefined,
+    },
+    refineTotal: {
       id: 'refineTotal',
       header: t('market.appraisal.columnRefineTotal'),
       align: 'right',
@@ -269,53 +308,8 @@ export function AppraisalPanel({
               )
             ),
       sortValue: (row) => row.refineTotal ?? undefined,
-    });
-  }
-
-  // The Undercut view, read from the unscaled items rather than the rows —
-  // see `20260924-124701-appraisal-undercut-lists-one-tick-under-the-hubs.md`.
-  const undercuts = useMemo(() => {
-    const byType = new Map<number, AppraisalUndercut | null>();
-    for (const item of result?.appraisal.items ?? [])
-      byType.set(item.typeId, appraisalUndercut(item));
-    return byType;
-  }, [result]);
-  if (undercutShown) {
-    columns.push({
-      id: 'undercut',
-      header: t('market.appraisal.columnUndercut'),
-      align: 'right',
-      className: 'whitespace-nowrap tabular-nums',
-      render: (row) => {
-        const undercut = undercuts.get(row.typeId);
-        if (!undercut) return '—';
-        return (
-          <span>
-            <CopyablePrice price={undercut.price} />
-            {undercut.atOrBelowBuy && (
-              <span
-                className="ml-0.5 text-warning"
-                title={t('market.appraisal.undercutAtOrBelowBuy', {
-                  price: formatIskAuto(undercut.price),
-                })}
-              >
-                *
-              </span>
-            )}
-          </span>
-        );
-      },
-      sortValue: (row) => undercuts.get(row.typeId)?.price,
-    });
-  }
-
-  // Undefined per row when nothing the active Character holds LP with sells
-  // this item — same "only earns its place once something has it" rule as
-  // the refine column, and also why this never shows with no active
-  // Character (`appraisalData.ts` never sets `lpOption` then).
-  const hasLpOption = rows.some((row) => row.lpCorpName !== undefined);
-  if (hasLpOption) {
-    columns.push({
+    },
+    lpTotal: {
       id: 'lpTotal',
       header: t('market.appraisal.columnLpTotal'),
       align: 'right',
@@ -348,7 +342,13 @@ export function AppraisalPanel({
         );
       },
       sortValue: (row) => row.lpIskCost ?? undefined,
-    });
+    },
+  };
+  const availableColumns = APPRAISAL_COLUMN_IDS.filter(
+    (id) => (id !== 'refineTotal' || hasRefine) && (id !== 'lpTotal' || hasLpOption)
+  );
+  for (const id of availableColumns) {
+    if (visibleColumns.includes(id)) columns.push(optionalColumnsById[id]);
   }
 
   // The same menu the tree, the Quickbar and the Variations table carry — an
@@ -477,6 +477,14 @@ export function AppraisalPanel({
           }
           actions={
             <>
+              <ColumnPickerMenu
+                available={availableColumns}
+                visible={visibleColumns}
+                columnsById={optionalColumnsById}
+                onToggle={toggleColumn}
+                buttonLabel={t('market.appraisal.columnsButton')}
+                menuTitle={t('market.appraisal.columnsMenuTitle')}
+              />
               <IconButton
                 size="sm"
                 icon={shareCopied ? <Icon.Done /> : <Icon.Share />}
@@ -490,6 +498,18 @@ export function AppraisalPanel({
                 }
                 disabled={rows.length === 0 || rows.length > MAX_SHARE_ITEMS}
                 onClick={() => void handleShare()}
+              />
+              <IconButton
+                size="sm"
+                icon={sellListCopied ? <Icon.Done /> : <Icon.CopyToClipboard />}
+                label={t('market.appraisal.copySellList')}
+                tooltip={
+                  sellListCopied
+                    ? t('market.appraisal.sellListCopied')
+                    : t('market.appraisal.sellListHelp', { hub: hubName })
+                }
+                disabled={!canCopySellList}
+                onClick={() => void handleCopySellList()}
               />
               <IconButton
                 size="sm"
@@ -595,17 +615,6 @@ export function AppraisalPanel({
                 )}
                 <StatChip label={t('market.appraisal.items')} value={rows.length} />
                 {loading && <Spinner label={t('common.loading')} size="sm" />}
-                {/* In the chip row rather than the Panel header: this row
-                    wraps, the header does not, and a text button there
-                    overflowed the page at phone width. */}
-                <FilterChip
-                  size="sm"
-                  label={t('market.appraisal.undercut')}
-                  selected={undercutShown}
-                  onToggle={() => setUndercutShown((shown) => !shown)}
-                  tooltip={t('market.appraisal.undercutHelp')}
-                  className="ml-auto"
-                />
               </div>
 
               {totals.unpricedRows > 0 && (
@@ -616,11 +625,6 @@ export function AppraisalPanel({
               {totals.refineUnpricedRows > 0 && (
                 <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-warning">
                   {t('market.appraisal.refineUnpriced', { count: totals.refineUnpricedRows })}
-                </p>
-              )}
-              {undercutShown && (
-                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-                  {t('market.appraisal.undercutNote', { hub: hubName })}
                 </p>
               )}
               {totals.cheapestBuyViaLp > 0 && (

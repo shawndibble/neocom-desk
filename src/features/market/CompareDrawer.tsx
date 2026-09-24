@@ -4,16 +4,40 @@
  * rather than covering it — comparing happens *while* browsing, so this is a
  * non-modal overlay, never `Modal`/`<dialog>` (that would inert the order
  * book the user is cross-referencing).
+ *
+ * Two views (issue #1425): Prices, the order-book summary table below, and
+ * Attributes, the dogma matrix folded in from the old
+ * `VariationsCompareModal` (`CompareAttributesMatrix.tsx`) — Variations
+ * "Compare" now adds its rows to this same Compare Set and requests the
+ * drawer open on Attributes (`useCompareSet`'s `openIn`) instead of opening
+ * a separate modal that covered the order book.
  */
-import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, DataTable, IconButton, IskAmount, Spinner, TypeIcon } from '@/components/ui';
+import {
+  Button,
+  DataTable,
+  EmptyState,
+  IconButton,
+  IskAmount,
+  Spinner,
+  TypeIcon,
+} from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { controlHeightClassName } from '@/components/ui/controlStyles';
+import { cx } from '@/lib/cx';
 import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
 import { useCompareSet } from './compareSet';
 import { useCompareRows, type CompareRow } from './useCompareRows';
+import { useCompareAttributes } from './useCompareAttributes';
+import { CompareAttributesMatrix } from './CompareAttributesMatrix';
 import type { OrderBookLocation } from './orderBookView';
 import { compareCsvColumns } from './compareCsv';
 import { formatVolume } from './format';
@@ -29,9 +53,22 @@ const DEFAULT_HEIGHT = 280;
 const FULL_HEIGHT = '80vh';
 const STEP = 24;
 
+/**
+ * `md` (48rem), matching this drawer's own phone/desktop split elsewhere in
+ * this file (`bottom-16 md:bottom-0`) — not `useIsPhone`'s `sm` threshold,
+ * which answers a different question (`useIsPhone.ts`). A third inline copy
+ * of this query is fine (`Layout.tsx` ~493, `EntryList.tsx` ~77 each already
+ * have their own); there's no shared hook for it.
+ */
+function isDesktopWidth(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia('(min-width: 48rem)').matches;
+}
+
 function clampHeight(value: number): number {
   return Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, value));
 }
+
+const VIEW_LABEL_KEYS = { prices: 'viewPrices', attributes: 'viewAttributes' } as const;
 
 export interface CompareDrawerProps {
   location: OrderBookLocation;
@@ -57,11 +94,34 @@ export function CompareDrawer({
   const items = useCompareSet((state) => state.items);
   const removeItem = useCompareSet((state) => state.remove);
   const clearSet = useCompareSet((state) => state.clear);
-
-  const [mode, setMode] = useState<'closed' | 'open' | 'full'>('closed');
+  const view = useCompareSet((state) => state.view);
+  const setView = useCompareSet((state) => state.setView);
+  // A pending `openRequest` at the very first render means `addMany` +
+  // `openIn` already ran in the same synchronous batch that mounted this
+  // drawer (a fresh Variations "Compare" click going from an empty Compare
+  // Set), so the initial mode is decided here.
+  const [mode, setMode] = useState<'closed' | 'open' | 'full'>(() =>
+    useCompareSet.getState().openRequest > 0 ? (isDesktopWidth() ? 'open' : 'full') : 'closed'
+  );
   const [heightPx, setHeightPx] = useState(DEFAULT_HEIGHT);
   const handleRef = useRef<HTMLButtonElement>(null);
   const dragRef = useRef<{ startY: number; startHeight: number } | null>(null);
+
+  // Every `openIn` is consumed once acted on — the one that mounted this
+  // drawer here, later ones in the listener — so a remount after leaving
+  // Market doesn't reopen the drawer on a request it already honoured. A
+  // later `openIn` (e.g. a second Variations "Compare" click) only opens a
+  // *closed* drawer; an already-open one just gets the view switch below, so
+  // this never downgrades a manually expanded `full` back to `open`.
+  useEffect(() => {
+    const store = useCompareSet.getState();
+    if (store.openRequest > 0) store.consumeOpenRequest();
+    return useCompareSet.subscribe((state, previous) => {
+      if (state.openRequest <= previous.openRequest) return;
+      state.consumeOpenRequest();
+      setMode((current) => (current === 'closed' ? (isDesktopWidth() ? 'open' : 'full') : current));
+    });
+  }, []);
 
   const rows = useCompareRows({
     items,
@@ -69,6 +129,7 @@ export function CompareDrawer({
     location,
     refreshTick,
   });
+  const attributes = useCompareAttributes(items, mode !== 'closed' && view === 'attributes');
 
   function close() {
     setMode('closed');
@@ -250,18 +311,48 @@ export function CompareDrawer({
             onKeyDown={onHandleKeyDown}
             className={`h-1.5 shrink-0 border-b border-line ${mode === 'open' ? 'cursor-row-resize hover:bg-panel-2' : ''}`}
           />
-          <header className="flex min-h-11 items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
-            <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('market.compare.handle', { count: items.length })}
-            </h2>
+          <header className="flex min-h-11 flex-wrap items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1 md:min-h-9">
             <div className="flex items-center gap-2">
-              <IconButton
-                size="sm"
-                icon={<Icon.Download />}
-                label={t('market.compare.exportCsv')}
-                disabled={rows.length === 0}
-                onClick={() => downloadCsv('market-compare', rows, compareCsvColumns(t))}
-              />
+              <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('market.compare.handle', { count: items.length })}
+              </h2>
+              {/* A hand-rolled toggle, not `HistoryViewSelect`'s select-on-desktop
+                  pattern: that one earns the select because its two options are
+                  a nuance most readers don't know they need (a tooltip explains
+                  the distinction); Prices vs Attributes needs no such
+                  explanation, so the compact always-visible toggle is right at
+                  every width, not just on a phone. */}
+              <span
+                role="group"
+                aria-label={t('market.compare.viewLabel')}
+                className="flex gap-0.5 rounded-xs border border-line bg-panel p-px"
+              >
+                {(['prices', 'attributes'] as const).map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={view === option}
+                    onClick={() => setView(option)}
+                    className={cx(
+                      `${controlHeightClassName.md} rounded-xs px-2 text-[0.6875rem] font-semibold tracking-widest uppercase focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`,
+                      view === option ? 'bg-panel-2 text-text' : 'text-text-dim hover:text-text'
+                    )}
+                  >
+                    {t(`market.compare.${VIEW_LABEL_KEYS[option]}`)}
+                  </button>
+                ))}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {view === 'prices' && (
+                <IconButton
+                  size="sm"
+                  icon={<Icon.Download />}
+                  label={t('market.compare.exportCsv')}
+                  disabled={rows.length === 0}
+                  onClick={() => downloadCsv('market-compare', rows, compareCsvColumns(t))}
+                />
+              )}
               <Button size="sm" onClick={() => setMode((m) => (m === 'full' ? 'open' : 'full'))}>
                 {mode === 'full' ? t('market.compare.restore') : t('market.compare.expand')}
               </Button>
@@ -277,7 +368,23 @@ export function CompareDrawer({
             </div>
           </header>
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {rows.length === 0 ? (
+            {view === 'attributes' ? (
+              attributes.loading || rows.length === 0 ? (
+                <div className="flex justify-center py-8">
+                  <Spinner label={t('common.loading')} />
+                </div>
+              ) : attributes.error || !attributes.data ? (
+                <EmptyState
+                  title={t('market.compare.errorTitle')}
+                  hint={t('market.compare.errorHint')}
+                  className="py-8"
+                />
+              ) : (
+                <div className="p-3">
+                  <CompareAttributesMatrix rows={rows} data={attributes.data} />
+                </div>
+              )
+            ) : rows.length === 0 ? (
               <div className="flex justify-center py-8">
                 <Spinner label={t('common.loading')} />
               </div>

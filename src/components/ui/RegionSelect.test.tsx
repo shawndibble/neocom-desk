@@ -42,6 +42,16 @@ const optionNames = () =>
   screen.getAllByRole('option').map((o) => o.textContent?.replace(/^✓/, ''));
 
 describe('RegionSelect', () => {
+  // Tailwind v4's `outline-none` sets `--tw-outline-style: none`, which the
+  // `focus-visible:outline-2` ring then inherits — so the two together draw
+  // nothing and a keyboard user cannot see where focus is (WCAG 2.4.7).
+  it('shows the accent focus ring on keyboard focus', () => {
+    render(<Harness />);
+    const el = screen.getByRole('combobox', { name: 'Region' });
+    expect(el).toHaveClass('focus-visible:outline-2', 'focus-visible:outline-accent');
+    expect(el).not.toHaveClass('outline-none');
+  });
+
   it('lists regions alphabetically whatever order they arrive in', async () => {
     const user = userEvent.setup();
     render(<Harness allLabel="All regions" />);

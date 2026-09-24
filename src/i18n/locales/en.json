@@ -2858,6 +2858,7 @@
     "noMatchTitle": "No offers match these filters",
     "noMatchHint": "Try clearing the search or the Affordable/Blueprints filters.",
     "selectPrompt": "Select an offer to see its profit breakdown.",
+    "selectedAnnouncement": "Showing {{name}}",
     "needMoreLp": "Needs {{amount}} more LP",
     "sellPriceAt": "Sell price ({{hub}})",
     "buyPriceAt": "Buy price ({{hub}})",
@@ -3288,6 +3289,11 @@
       "share": "Copy shareable link",
       "shareCopied": "Link copied",
       "shareTooLarge": "Too large to share as a link — use Export CSV instead.",
+      "columnsButton": "Columns",
+      "columnsMenuTitle": "Columns",
+      "copySellList": "Copy sell list",
+      "sellListCopied": "Sell list copied",
+      "sellListHelp": "Copy a sell list for every item, one price step under the cheapest seller at {{hub}}, ready to paste into EVE's Sell Items window via Import prices.",
       "columnQuantity": "Qty",
       "columnItem": "Item",
       "columnBuyEach": "Buy each",
@@ -3296,11 +3302,6 @@
       "columnSellTotal": "Sell total",
       "columnRefineTotal": "Refine total",
       "columnLpTotal": "LP store",
-      "columnUndercut": "List at",
-      "undercut": "Undercut",
-      "undercutHelp": "Show a sell price for every item, one price step under the cheapest seller at this hub, ready to copy into EVE.",
-      "undercutNote": "List at is one price step under the cheapest seller at {{hub}}, at 100% of market, as of the last price fetch, which can lag the live order book. Refresh before listing. EVE doesn't let apps place orders, so copy each price into the in-game sell window.",
-      "undercutAtOrBelowBuy": "Listing at {{price}} pays no more than selling into the best buy order — sell it now instead.",
       "sellTotal": "Sell total",
       "sellTotalHelp": "What the list costs to buy outright, from sell orders at this hub.",
       "buyTotal": "Buy total",
@@ -3376,7 +3377,15 @@
       "clearAll": "Clear all",
       "expand": "Expand",
       "restore": "Restore",
-      "resize": "Resize the drawer"
+      "resize": "Resize the drawer",
+      "viewLabel": "Compare view",
+      "viewPrices": "Prices",
+      "viewAttributes": "Attributes",
+      "attributeColumn": "Attribute",
+      "worth": "Worth",
+      "estimatedPrice": "Estimated Price",
+      "errorTitle": "Couldn't load comparison",
+      "errorHint": "Try again, or reload the page."
     },
     "quickbar": {
       "title": "Quickbar",
@@ -3408,14 +3417,6 @@
       "capped": "Showing {{limit}} of {{total}}",
       "compare": "Compare",
       "exportCsv": "Export Variations to CSV"
-    },
-    "variationsCompare": {
-      "title": "Compare Variations",
-      "attributeColumn": "Attribute",
-      "worth": "Worth",
-      "estimatedPrice": "Estimated Price",
-      "errorTitle": "Couldn't load comparison",
-      "errorHint": "Try again, or reload the page."
     },
     "itemDetail": {
       "volume": "Volume: {{volume}} m3",

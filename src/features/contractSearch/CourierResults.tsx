@@ -1187,16 +1187,28 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
                 should be.
               */}
               {multiple !== null && (
-                <span
-                  className={
-                    paysFarAboveGoingRate(multiple)
-                      ? 'rounded-xs border border-warning/40 px-1 text-[0.6875rem] font-normal text-warning'
-                      : 'text-[0.6875rem] font-normal text-text-dim'
-                  }
-                >
-                  {t('contractSearch.goingRateMultiple', {
-                    multiple: formatMagnitude(multiple),
-                  })}
+                <span className="flex items-center gap-1">
+                  <span
+                    className={
+                      paysFarAboveGoingRate(multiple)
+                        ? 'text-[0.6875rem] font-normal text-warning'
+                        : 'text-[0.6875rem] font-normal text-text-dim'
+                    }
+                  >
+                    {t('contractSearch.goingRateMultiple', {
+                      multiple: formatMagnitude(multiple),
+                    })}
+                  </span>
+                  {/* Colour alone used to be the only tell that this multiple
+                      is flagged (DESIGN.md §7) — the mobile lane header
+                      already names it via `RiskMarker`; this repeats that
+                      same word here. */}
+                  {paysFarAboveGoingRate(multiple) && (
+                    <RiskMarker
+                      kind="over-rate"
+                      detailOptions={{ multiple: formatMagnitude(multiple) }}
+                    />
+                  )}
                 </span>
               )}
             </div>

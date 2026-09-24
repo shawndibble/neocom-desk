@@ -25,6 +25,16 @@ function Harness() {
 }
 
 describe('Select', () => {
+  // Tailwind v4's `outline-none` sets `--tw-outline-style: none`, which the
+  // `focus-visible:outline-2` ring then inherits — so the two together draw
+  // nothing and a keyboard user cannot see where focus is (WCAG 2.4.7).
+  it('shows the accent focus ring on keyboard focus', () => {
+    render(<Harness />);
+    const el = screen.getByRole('combobox', { name: 'Region' });
+    expect(el).toHaveClass('focus-visible:outline-2', 'focus-visible:outline-accent');
+    expect(el).not.toHaveClass('outline-none');
+  });
+
   it('shows the selected value on the trigger', () => {
     render(<Harness />);
     expect(screen.getByRole('combobox', { name: 'Region' })).toHaveTextContent('The Forge');

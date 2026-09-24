@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildCompareMatrix, type CompareMatrixItem } from './attributeCompareMatrix';
 import type { AttributeDictionary } from './itemAttributes';
 
-/** The engine takes these already translated; the values match `market.variationsCompare.*`. */
+/** The engine takes these already translated; the values match `market.compare.*`. */
 const LABELS = { worth: 'Worth', estimatedPrice: 'Estimated Price' };
 const DICTIONARY: AttributeDictionary = {
   9: { name: 'Structure Hitpoints', unit: 'HP', category: 'Structure' },
