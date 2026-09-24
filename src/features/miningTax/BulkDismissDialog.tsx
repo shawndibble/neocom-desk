@@ -105,7 +105,7 @@ export function BulkDismissDialog({
                     {systemName(dr.row.entry.solarSystemId)}
                     {showCharacter && ` · ${dr.row.characterName}`}
                   </span>
-                  <span className={cx('shrink-0 tabular-nums', !on && 'text-text-faint')}>
+                  <span className={cx('shrink-0 tabular-nums', !on && 'text-text-dim')}>
                     {formatIsk(estimatedValueOf(dr))} ISK
                   </span>
                 </label>

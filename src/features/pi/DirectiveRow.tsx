@@ -47,7 +47,7 @@ const VERB_CLASS: Record<DirectiveVerb, string> = {
   // Flat and borderless, because it is not an action at all. It shared
   // `rebuild`'s outline once, which left the two rows differing only in their
   // wording — the exact collapse this verb exists to prevent.
-  asIs: 'border-transparent bg-panel-2 text-text-faint',
+  asIs: 'border-transparent bg-panel-2 text-text-dim',
 };
 
 /** How the right-hand number reads: ISK earned, budget freed, or a quiet projection. */
@@ -57,8 +57,12 @@ const TONE_CLASS: Record<DirectiveTone, string> = {
   gain: 'text-isk-pos',
   freed: 'text-warning',
   quiet: 'text-text-dim',
-  /** For a row that asks for nothing: the figure is a comparison, not a prize. */
-  muted: 'text-text-faint',
+  /**
+   * For a row that asks for nothing: the figure is a comparison, not a prize.
+   * Italic, not `text-dim` alone — `quiet` already owns that color, and
+   * `text-faint` (the tier below it) is below AA (issue #1491).
+   */
+  muted: 'text-text-dim italic',
 };
 
 export function VerbTag({ verb }: { verb: DirectiveVerb }) {

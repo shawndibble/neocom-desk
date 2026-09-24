@@ -44,7 +44,7 @@
 
   /* Hairlines (always 1px) */
   --color-line: #2a3442;
-  --color-line-bright: #3d4c5f;
+  --color-line-bright: #586c86; /* 3.15:1 vs panel-2 — also the resting input border (issue #1491) */
 
   /* Text hierarchy */
   --color-text: #dee7ee;
@@ -55,6 +55,7 @@
   --color-accent: #57c7f4;
   --color-accent-dim: #2e7da3; /* borders/fills only — not text */
   --color-accent-contrast: #04181f; /* text on accent fills */
+  --color-selection: #276c8d; /* text-selection fill only — accent-dim darkened for 4.64:1 with `text` (issue #1491) */
 
   /* Status */
   --color-success: #5fd584;
@@ -646,7 +647,7 @@
   }
 
   ::selection {
-    background-color: var(--color-accent-dim);
+    background-color: var(--color-selection);
     color: var(--color-text);
   }
 }

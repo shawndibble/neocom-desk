@@ -211,7 +211,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                         {systemName(r.assignment.solarSystemId)} · {r.characterName}
                         {payeeNames.length > 1 && ` · ${r.payeeName}`}
                       </span>
-                      <span className={cx('shrink-0 tabular-nums', !on && 'text-text-faint')}>
+                      <span className={cx('shrink-0 tabular-nums', !on && 'text-text-dim')}>
                         {formatIsk(r.assignment.taxOwed)} ISK
                       </span>
                     </label>

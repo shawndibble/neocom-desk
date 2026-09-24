@@ -213,7 +213,7 @@ export function Login() {
         >
           <span
             id="login-preview-label"
-            className="absolute -top-3 right-4 bg-bg px-1.5 text-[0.625rem] tracking-widest text-text-faint uppercase"
+            className="absolute -top-3 right-4 bg-bg px-1.5 text-[0.625rem] tracking-widest text-text-dim uppercase"
           >
             {t('login.previewLabel')}
           </span>

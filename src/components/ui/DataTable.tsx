@@ -128,7 +128,11 @@ interface DataTableProps<T> {
    * collided on every field it has.
    */
   rowKey: (row: T, index: number) => string | number;
-  /** Row-level classes, e.g. Contracts dimming expired rows with `opacity-50`. */
+  /**
+   * Row-level classes. Not for dimming a row's own text below AA (issue
+   * #1491) — a stale/lapsed row keeps full-contrast text and carries a
+   * non-color cue instead (Contracts' status icon + tooltip).
+   */
   rowClassName?: (row: T) => string | undefined;
   /**
    * The row a notification pointed at (`lib/useHighlightParam`): scrolled into

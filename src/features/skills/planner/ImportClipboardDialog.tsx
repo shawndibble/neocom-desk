@@ -250,7 +250,7 @@ export function ImportClipboardDialog({
                           <li
                             key={entry.skillTypeID}
                             className={`border-b border-line py-0.5 last:border-b-0 ${
-                              alreadyTrained ? 'text-text-faint italic' : ''
+                              alreadyTrained ? 'text-text-dim italic' : ''
                             }`}
                           >
                             {nameFor(entry.skillTypeID)} {ROMAN[entry.targetLevel - 1]}

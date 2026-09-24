@@ -204,7 +204,7 @@ export function LinkPaymentDialog({
                           {systemName(m.assignment.solarSystemId)}
                           {showCharacter && ` · ${m.row.characterName}`}
                         </span>
-                        <span className={cx('shrink-0 tabular-nums', !on && 'text-text-faint')}>
+                        <span className={cx('shrink-0 tabular-nums', !on && 'text-text-dim')}>
                           {formatIsk(m.assignment.taxOwed)} ISK
                         </span>
                       </label>

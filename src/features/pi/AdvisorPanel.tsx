@@ -482,7 +482,6 @@ function PlanetCard({
   name,
   planetType,
   dashed = false,
-  dim = false,
   footer,
   children,
 }: {
@@ -490,7 +489,6 @@ function PlanetCard({
   name: string | null;
   planetType: PlanetType | null;
   dashed?: boolean;
-  dim?: boolean;
   footer?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -499,7 +497,7 @@ function PlanetCard({
     <div
       className={`flex flex-col rounded-xs border bg-panel ${
         dashed ? 'border-dashed border-line-bright' : 'border-line'
-      } ${dim ? 'opacity-70' : ''}`}
+      }`}
     >
       <div className="flex items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-2">
         <span className="text-sm font-semibold">
@@ -791,7 +789,7 @@ function UncolonisableCard({
 }) {
   const { t } = useTranslation();
   return (
-    <PlanetCard planetId={advice.planetId} name={advice.name} planetType={null} dashed dim>
+    <PlanetCard planetId={advice.planetId} name={advice.name} planetType={null} dashed>
       <p className="text-xs text-text-dim">{t('piAdvisor.uncolonisableHint')}</p>
     </PlanetCard>
   );
@@ -1345,7 +1343,7 @@ export function AdvisorPanel({
           // `actions`, not `meta`: this is the row legend, and it has to sit
           // over the columns it names rather than trailing the title.
           actions={
-            <span className="text-[0.625rem] text-text-faint">
+            <span className="text-[0.625rem] text-text-dim">
               {t('piAdvisor.colonyStripMeta', { hours: Math.round(haulHours) })}
             </span>
           }

@@ -51,7 +51,7 @@ function Assume({ label, children }: { label: React.ReactNode; children: React.R
 
 /** Why the line above it matters, in the quietest type on the page. */
 function Footnote({ children }: { children: React.ReactNode }) {
-  return <p className="mt-1 text-[0.625rem] leading-relaxed text-text-faint">{children}</p>;
+  return <p className="mt-1 text-[0.625rem] leading-relaxed text-text-dim">{children}</p>;
 }
 
 /**
