@@ -31,6 +31,7 @@ import {
   SelectValue,
   TextInput,
   Tooltip,
+  iconButtonClassName,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
@@ -82,7 +83,7 @@ import { loadCharacterSkillQueue, type CachedResult } from '../data';
 import { writeToClipboard } from '@/lib/clipboard';
 import type { SkillCatalog } from '../skillMap';
 import { SkillPicker } from './SkillPicker';
-import { EntryList, ICON_BUTTON } from './EntryList';
+import { EntryList } from './EntryList';
 import type { BandInfo } from './EntryList';
 import { useColumnVisibility } from './columnPreference';
 import { useGroupingMode, GROUPING_MODES, type GroupingMode } from './groupingMode';
@@ -1867,15 +1868,15 @@ export function PlanEditor({
                 className="inline-flex items-center gap-1.5 rounded-xs border border-warning/60 px-1.5 py-0.5 text-warning"
               >
                 {t('plans.milestone.orphanedNotice', { name: status.milestone.name })}
-                <Button
-                  variant="danger"
-                  size="sm"
-                  className={ICON_BUTTON}
+                <button
+                  type="button"
+                  // Matches the entry rows' own remove button.
+                  className={iconButtonClassName({ size: 'sm', tone: 'danger' })}
                   onClick={() => handleRemoveMilestone(status.milestone.id)}
                   aria-label={t('plans.milestone.removeLabel', { name: status.milestone.name })}
                 >
                   <Icon.Close size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-                </Button>
+                </button>
               </span>
             ))}
           </div>

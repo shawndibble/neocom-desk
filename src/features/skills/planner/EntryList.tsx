@@ -17,12 +17,12 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useTranslation } from 'react-i18next';
 import {
-  Button,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   EmptyState,
+  iconButtonClassName,
 } from '@/components/ui';
 import { controlHeightClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
@@ -42,8 +42,15 @@ export type BandInfo =
   { kind: 'priority'; priority: PlanPriority } | ({ kind: 'attributePair' } & AttributePair);
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
-/** Exported for the orphaned-milestone notice in PlanEditor.tsx, whose remove button matches this row's own icon buttons. */
-export const ICON_BUTTON = 'w-7 justify-center';
+/**
+ * A row's icon-only buttons. `iconButtonClassName` on a bare `<button>`
+ * rather than `IconButton`, which wraps each one in a Tooltip — a Radix
+ * provider on every row of a long queue. It also never shrinks its glyph: a
+ * text `Button` narrowed to `w-7` kept its `px-2.5` padding and squeezed a
+ * 1rem icon into what was left, down to a dot.
+ */
+const ICON_BUTTON = iconButtonClassName({ size: 'sm' });
+const DANGER_ICON_BUTTON = iconButtonClassName({ size: 'sm', tone: 'danger' });
 /**
  * Every training-time cell and its desktop column header, so the two cannot
  * drift apart and leave the numbers unaligned. 6rem holds the widest duration
@@ -54,8 +61,8 @@ export const ICON_BUTTON = 'w-7 justify-center';
 const TIME_CELL = 'w-24 shrink-0 whitespace-nowrap text-right';
 /**
  * The name cell, shared by every row kind so the skill names form one column.
- * `min-w-0` is what lets the inner `truncate` still work once the cell became
- * a flex container to hold the level caret.
+ * `min-w-0` is what lets the inner `truncate` still work inside this flex
+ * container.
  */
 const NAME_CELL = 'flex min-w-0 flex-1 items-center gap-1.5';
 /**
@@ -64,8 +71,6 @@ const NAME_CELL = 'flex min-w-0 flex-1 items-center gap-1.5';
  * same column as the rows above and below them.
  */
 const ACTION_SPACER = 'w-7 shrink-0';
-/** Stands in for the level caret (`ICON_SIZE.sm`) on rows that have none, so names stay aligned. */
-const CARET_SPACER = 'w-4 shrink-0';
 /** Matches Layout.tsx's phone/desktop line (#114). */
 const DESKTOP_QUERY = '(min-width: 48rem)';
 
@@ -337,26 +342,26 @@ function MilestoneRowMenu({ rowLabel, status, onAdd, onRename, onRemove }: Miles
   const { t } = useTranslation();
   if (!status) {
     return (
-      <Button
-        size="sm"
+      <button
+        type="button"
         className={ICON_BUTTON}
         onClick={onAdd}
         aria-label={t('plans.milestone.addLabel', { name: rowLabel })}
       >
         <Icon.Milestone size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-      </Button>
+      </button>
     );
   }
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          size="sm"
+        <button
+          type="button"
           className={ICON_BUTTON}
           aria-label={t('plans.milestone.menuLabel', { name: rowLabel })}
         >
           <Icon.Milestone size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-        </Button>
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={onRename}>{t('plans.milestone.rename')}</DropdownMenuItem>
@@ -439,7 +444,6 @@ const EntryRow = memo(function EntryRow({
   // them necessary.
   const nameSpan = (
     <span className={NAME_CELL}>
-      <span aria-hidden="true" className={CARET_SPACER} />
       <span className="truncate">
         {name} {ROMAN[entry.targetLevel - 1]}
         {boosted && <BoosterMark />}
@@ -475,15 +479,14 @@ const EntryRow = memo(function EntryRow({
   );
 
   const removeButton = (
-    <Button
-      variant="danger"
-      size="sm"
-      className={ICON_BUTTON}
+    <button
+      type="button"
+      className={DANGER_ICON_BUTTON}
       onClick={() => onRemove(entry.skillTypeID, entry.targetLevel)}
       aria-label={t('plans.removeEntry', { name: rowLabel })}
     >
       <Icon.Close size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-    </Button>
+    </button>
   );
 
   /**
@@ -598,22 +601,18 @@ const PrereqRow = memo(function PrereqRow({
   // and deliberately not wrapped in a Tooltip, which would put a Radix
   // provider on every row of a long queue to restate the label.
   const promoteButton = (
-    <Button
-      size="sm"
+    <button
+      type="button"
       className={ICON_BUTTON}
       onClick={() => onPromote(row.id)}
       aria-label={t('plans.promotePrereq', { name: label })}
     >
       <Icon.AddToPlan size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-    </Button>
+    </button>
   );
 
-  // Carries the entry row's caret spacer too, so prereq and entry names sit in
-  // the same column even though a prereq row is a single level and never
-  // discloses anything.
   const nameSpan = (
     <span className={NAME_CELL}>
-      <span aria-hidden="true" className={CARET_SPACER} />
       <span className="truncate">
         {name} {ROMAN[row.step.level - 1]}
         <span className="ml-2 text-[0.625rem] uppercase">{t('plans.prereq')}</span>
@@ -752,15 +751,14 @@ const MarkerRow = memo(function MarkerRow({
           <span aria-hidden className="h-px flex-1 bg-accent/60" />
         </>
       )}
-      <Button
-        variant="danger"
-        size="sm"
-        className={ICON_BUTTON}
+      <button
+        type="button"
+        className={DANGER_ICON_BUTTON}
         aria-label={t('plans.removeMarker')}
         onClick={() => onRemove(markerIndex)}
       >
         <Icon.Close size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-      </Button>
+      </button>
     </li>
   );
 });
@@ -815,9 +813,7 @@ interface EntryListProps {
  * cumulative time) are individually toggleable, and rows fold to two lines
  * below the `md` breakpoint (#114).
  *
- * An entry row spanning several levels labels the range it trains ("I–V") and
- * discloses the individual levels and their times behind a caret (#254) — it
- * stays one draggable row, which is the point of the merge.
+ * Each entry row trains one level (reorder.ts) and names it.
  */
 export function EntryList({
   rows,
@@ -845,8 +841,8 @@ export function EntryList({
   const isDesktop = useIsDesktop();
   const sensors = useSensors(
     // A bare PointerSensor starts dragging on the first pixel of pointer
-    // movement, which both fires from ordinary jitter on a click (the level
-    // caret and remove button sit right beside the drag handle) and fights a
+    // movement, which both fires from ordinary jitter on a click (the
+    // row's buttons sit close to the drag handle) and fights a
     // tap-to-expand/tap-to-remove gesture on touch (#408). Requiring a small
     // travel distance first is dnd-kit's own recommended fix for exactly this.
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
