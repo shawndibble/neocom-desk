@@ -494,6 +494,7 @@ export function LoyaltyStore() {
           onSortChange={offersSortProps.onSortChange}
           onRowClick={selectRow}
           rowContextMenu={rowContextMenu}
+          selectedRowKey={selectedRow?.offer.offer_id ?? null}
           rowClassName={(row) =>
             row.offer.offer_id === selectedRow?.offer.offer_id ? 'bg-panel-2' : undefined
           }
@@ -653,6 +654,12 @@ export function LoyaltyStore() {
       {isDesktop ? (
         <div className="flex items-start gap-3">
           {list}
+          {/* The mobile branch below opens the same content in a `Modal`,
+              which announces itself on open — this split-panel layout just
+              repaints in place, so it needs its own announcement (#1490). */}
+          <p aria-live="polite" className="sr-only">
+            {selectedRow && t('loyaltyStore.selectedAnnouncement', { name: selectedRow.itemName })}
+          </p>
           <Panel className="min-w-0 flex-1">{detail}</Panel>
         </div>
       ) : (

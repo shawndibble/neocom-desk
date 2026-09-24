@@ -9,7 +9,7 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Caret, IconButton, SeverityIcon } from '@/components/ui';
+import { Caret, IconButton, SEVERITY_LABEL, SeverityIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { formatAge } from '@/lib/age';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -82,7 +82,7 @@ export function AlertGroupRow({
         >
           <Caret expanded={expanded} />
           <span className="flex shrink-0 items-center gap-1.5 text-sm font-semibold tabular-nums">
-            <SeverityIcon severity={group.severity} />
+            <SeverityIcon severity={group.severity} label={t(SEVERITY_LABEL[group.severity])} />
             {group.count}
           </span>
           <span className="min-w-0 flex-1 truncate text-sm">

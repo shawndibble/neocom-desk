@@ -410,6 +410,24 @@ describe('CourierResults route cell', () => {
   });
 });
 
+describe('CourierResults ISK/jump cell', () => {
+  it('names an over-rate haul in text on the desktop table too, not only by border colour', async () => {
+    knownJumps();
+    renderLanes();
+
+    const baitRow = await waitFor(() => {
+      const row = document.querySelector('tr[data-row-key="999"]');
+      if (!row) throw new Error('expected the bait row');
+      return row as HTMLElement;
+    });
+    expect(within(baitRow).getByText('Over rate')).toBeInTheDocument();
+
+    // An ordinary haul on the same lane carries the multiple with no marker.
+    const ordinaryRow = document.querySelector('tr[data-row-key="100"]') as HTMLElement;
+    expect(within(ordinaryRow).queryByText('Over rate')).not.toBeInTheDocument();
+  });
+});
+
 describe('CourierResults on a phone', () => {
   let restore: () => void;
   beforeEach(() => {

@@ -2858,6 +2858,7 @@
     "noMatchTitle": "No offers match these filters",
     "noMatchHint": "Try clearing the search or the Affordable/Blueprints filters.",
     "selectPrompt": "Select an offer to see its profit breakdown.",
+    "selectedAnnouncement": "Showing {{name}}",
     "needMoreLp": "Needs {{amount}} more LP",
     "sellPriceAt": "Sell price ({{hub}})",
     "buyPriceAt": "Buy price ({{hub}})",

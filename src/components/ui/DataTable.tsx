@@ -142,6 +142,21 @@ interface DataTableProps<T> {
    * data it pointed at.
    */
   highlightRowKey?: string | number | null;
+  /**
+   * Marks one row as the persistent current selection — e.g. the offer the
+   * LP Store's detail panel is showing. `aria-current="true"` on that row's
+   * `<tr>`, so the selection reads in text/AT rather than only through
+   * `rowClassName`'s background tint (DESIGN.md §7). Distinct from
+   * `highlightRowKey`'s one-shot `"location"`: that one is a deep link the
+   * reader arrives on and moves past, this one persists as long as the row
+   * stays selected.
+   *
+   * Not meant to name the same row as `highlightRowKey` at once: the latter
+   * writes `aria-current` imperatively (`useScrollToRowKey`), which would
+   * fight this prop's declarative value on that row. No current caller
+   * passes both for the same key.
+   */
+  selectedRowKey?: string | number | null;
   /** Accessible name for the table. */
   label: string;
   className?: string;
@@ -254,6 +269,7 @@ export function DataTable<T>({
   rowKey,
   rowClassName,
   highlightRowKey = null,
+  selectedRowKey = null,
   label,
   className = '',
   defaultSort,
@@ -382,6 +398,7 @@ export function DataTable<T>({
         // uses it to land on the fill a notification pointed at.
         data-row-key={key}
         aria-expanded={expandableRow ? expanded : undefined}
+        aria-current={selectedRowKey !== null && key === selectedRowKey ? 'true' : undefined}
         className={cx(
           'hover:bg-panel-2',
           member && 'dt-group-member',

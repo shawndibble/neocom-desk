@@ -263,6 +263,36 @@ describe('LoyaltyStore filters', () => {
   });
 });
 
+describe('LoyaltyStore selected offer (issue #1490)', () => {
+  it('marks the selected row aria-current and announces the change, on desktop', async () => {
+    useDesktopViewport();
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: 'Federal Navy Academy',
+      offersFetchedAt: null,
+      offersFromCache: false,
+      rows: [ITEM_ROW, BLUEPRINT_ROW],
+      catalog: null,
+      playerLp: 12_000,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+    const user = userEvent.setup();
+    renderStore();
+
+    await user.click(screen.getByText(ITEM_ROW.itemName));
+
+    expect(screen.getByRole('row', { name: new RegExp(ITEM_ROW.itemName) })).toHaveAttribute(
+      'aria-current',
+      'true'
+    );
+    // The desktop split panel repaints in place with no dialog to announce
+    // it — a live region says so, the way the mobile sheet does implicitly.
+    expect(screen.getByText(`Showing ${ITEM_ROW.itemName}`)).toBeInTheDocument();
+  });
+});
+
 describe('LoyaltyStore item context menu (issue #716)', () => {
   beforeEach(() => {
     useLoyaltyStoreOffers.mockReturnValue({
