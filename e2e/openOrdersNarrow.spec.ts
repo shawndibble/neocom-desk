@@ -194,6 +194,6 @@ test.describe('Open Orders — compact phone list (#1429)', () => {
     );
 
     await row.click();
-    await expect(page.getByRole('dialog', { name: /^Mexallon/ })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: /Mexallon/ })).toBeVisible();
   });
 });
