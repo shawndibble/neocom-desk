@@ -334,7 +334,7 @@ export const marketOrderCopy: DomainCopy<MarketOrderNotificationFire, ItemNames>
   subjectOf: (fire) => fire.typeId,
 };
 
-/* Market order undercut (issue #1423) -------------------------------------- */
+/* Market order undercut ------------------------------------------------------ */
 
 export const marketOrderUndercutCopy: DomainCopy<MarketOrderUndercutFire, ItemNames> = {
   poll: (fire, character, names) => {

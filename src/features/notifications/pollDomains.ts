@@ -241,13 +241,11 @@ interface PollDomainSpec<TRaw, TSnapshot, TFire extends AnyNotificationFire, TNa
   readonly load: (characterId: number) => Promise<TRaw[] | null>;
   /**
    * Turns what `load` returned into the snapshot the engine diffs compare.
-   * `prevSnapshot` — the character's persisted baseline from *before* this
-   * poll, the same value passed to `diff` as `prev` — is offered so a domain
-   * whose own snapshot needs to carry state forward across a poll that
-   * observed nothing new can do so (issue #1423's `marketOrderUndercutDomain`:
-   * an `armed` anti-flap latch that must survive an `unknown` poll in
-   * between). Every other domain ignores the third parameter; it costs them
-   * nothing since it's optional.
+   * `prevSnapshot` — the character's baseline from before this poll — lets a
+   * domain carry state forward across a poll that saw nothing new (an
+   * anti-flap latch that must survive an "unknown" reading in between, as
+   * `marketOrderUndercutDomain` needs). Every other domain ignores this
+   * optional third parameter.
    */
   readonly toSnapshot: (raw: readonly TRaw[], nowMs: number, prevSnapshot?: TSnapshot) => TSnapshot;
   /**
@@ -988,7 +986,7 @@ export const marketOrderDomain = defineDomain<
 });
 
 /* -------------------------------------------------------------------------- */
-/* Market orders: station undercut/outbid (issue #1423)                      */
+/* Market orders: station undercut/outbid                                     */
 /* -------------------------------------------------------------------------- */
 
 /** What `load()` produces per order, before `toSnapshot` folds in the `armed` anti-flap latch (`buildOrderUndercutEntry`). */
@@ -1019,14 +1017,12 @@ function isOrderUndercutEntrySnapshot(raw: unknown): raw is OrderUndercutEntrySn
 }
 
 /**
- * A new poll domain rather than widening `marketOrderDomain` (issue #1423,
- * per the ticket brief): `isMarketOrderEntrySnapshot` validates a closed shape,
- * and widening it would discard every device's stored `marketOrderFilled`
- * baseline on upgrade, risking a missed fill being reported as newly filled
- * against a rebuilt, empty baseline. A separate domain also means this fetch
- * — and the Fuzzwork calls inside it — is skipped entirely (AC5, same gate
- * `spExtractionDomain` uses) when `marketOrderUndercut` is off for every
- * Character, independent of whether `marketOrderFilled` is on.
+ * A new domain rather than widening `marketOrderDomain`: that would discard
+ * every device's stored `marketOrderFilled` baseline on upgrade, risking a
+ * missed fill reported as newly filled against an empty rebuilt baseline. A
+ * separate domain also means this fetch — and its Fuzzwork calls — is
+ * skipped entirely (same gate `spExtractionDomain` uses) when the event is
+ * off for every Character.
  */
 export const marketOrderUndercutDomain = defineDomain<
   OrderUndercutRawEntry,
@@ -1045,8 +1041,8 @@ export const marketOrderUndercutDomain = defineDomain<
     // NPC-station data only, and the page's own `orderCompetition.ts` already
     // routes those through `loadStructureCompetition` instead — asking
     // Fuzzwork about a structure id would spend a call for an answer it can
-    // never have. Station-only detection ships first (owner decision #2);
-    // these orders are simply absent from the snapshot.
+    // never have. Station-only detection ships first; these orders are
+    // simply absent from the snapshot.
     const npcOrders = result.cached.data.filter(
       (order) => order.location_id < UPWELL_STRUCTURE_ID_FLOOR
     );
@@ -1059,12 +1055,10 @@ export const marketOrderUndercutDomain = defineDomain<
       else typeIdsByStation.set(order.location_id, [order.type_id]);
     }
 
-    // Fanned out at most ESI_FANOUT_CONCURRENCY stations at a time
-    // (`loadStationBestPrices`'s own precedent) — a character with orders
-    // scattered across many stations must not fire them all at once.
-    // `getStationPrices` shares the same 15-minute cache the Open Orders page
-    // reads through (issue #1423's decision file), so two polls inside that
-    // window cost one Fuzzwork request per station, not two.
+    // Fanned out at most ESI_FANOUT_CONCURRENCY stations at a time, same
+    // precedent as `loadStationBestPrices`. `getStationPrices` shares the
+    // Open Orders page's 15-minute cache, so two polls inside that window
+    // cost one Fuzzwork request per station, not two.
     const pricesByStation = new Map<number, Map<number, HubAggregate>>();
     await mapWithConcurrencyLimit(
       [...typeIdsByStation.entries()],
@@ -1089,10 +1083,8 @@ export const marketOrderUndercutDomain = defineDomain<
       };
     });
   },
-  // The one domain whose snapshot needs the character's own previous
-  // baseline to build itself (issue #1423) — `buildOrderUndercutEntry` folds
-  // in the `armed` anti-flap latch, which is what lets `diffMarketOrderUndercut`
-  // tell `clear -> unknown -> beaten` apart from `beaten -> unknown -> beaten`.
+  // The one domain whose snapshot needs the previous baseline to build
+  // itself — `buildOrderUndercutEntry` folds in the `armed` anti-flap latch.
   toSnapshot: (entries, nowMs, prevSnapshot) => ({
     entries: entries.map((entry) => buildOrderUndercutEntry(entry, prevSnapshot)),
     nowMs,

@@ -1,28 +1,14 @@
 /**
  * Classifies one open market order against its own station's best rival
- * price, for the `marketOrderUndercut` Notification Event (issue #1423) —
- * `beaten` (undercut for a sell order, outbid for a buy order), `clear`, or
- * `unknown` when the station's price cannot be read at all.
+ * price: `beaten` (undercut for a sell order, outbid for a buy order),
+ * `clear`, or `unknown` when the station's price can't be read.
  *
- * Deliberately not a reuse of `openOrdersModel.ts`'s private `buildStationTier`:
- * that function reads a null best price as "no rival" (`beatsMe: false`),
- * which is right for its badge but wrong here. A null best price on the
- * order's OWN side (sell for a sell order, buy for a buy order) can only mean
- * the station's price could not be read — my own open order is itself an
- * order on that side, so Fuzzwork's aggregate for that side can never be
- * genuinely empty while my order stands. Collapsing "no answer" into "no
- * rival" here would read a Fuzzwork outage as "you're safe" and then, on the
- * next good poll, as a fresh undercut — the false all-clear this module
- * exists to avoid (see the `armed` latch in `engine/notificationDiffs.ts`).
- *
- * Only the strict-comparison direction rule is shared with `buildStationTier`
- * — a rival price EQUAL to mine does not beat me, because my own order sits
- * inside the aggregate too.
- *
- * Pure, and deliberately structural about its price input (`{ sellMin,
- * buyMax }`) rather than importing `HubAggregate` as a value: `src/engine`
- * must carry no runtime dependency on `src/market` (ARCHITECTURE.md). A
- * caller passing a real `HubAggregate` satisfies this shape for free.
+ * Not a reuse of `openOrdersModel.ts`'s `buildStationTier`: that function
+ * reads a null best price as "no rival", which is wrong here — my own order
+ * guarantees the station's own-side book is never genuinely empty, so a null
+ * reading can only be a failed fetch. Reading it as "no rival" would show a
+ * Fuzzwork outage as safe, then a false undercut on the next good poll (see
+ * the `armed` latch in `engine/notificationDiffs.ts`).
  */
 
 export type StationUndercutState = 'beaten' | 'clear' | 'unknown';
@@ -48,8 +34,6 @@ export function classifyStationUndercut(
 ): StationUndercutResult {
   if (!aggregate) return UNKNOWN;
   const bestPrice = isBuyOrder ? aggregate.buyMax : aggregate.sellMin;
-  // My own order guarantees at least one order on this side at this station —
-  // a null reading here is the fetch failing, never a genuinely empty book.
   if (bestPrice === null) return UNKNOWN;
   const beatsMe = isBuyOrder ? bestPrice > myPrice : bestPrice < myPrice;
   return beatsMe

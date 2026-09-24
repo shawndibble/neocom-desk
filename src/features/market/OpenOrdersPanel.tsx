@@ -136,6 +136,18 @@ function stationShortName(name: string): string {
   return dashIndex === -1 ? name : name.slice(0, dashIndex);
 }
 
+/** The highlighted row's own group always wins over either fold mechanism (decision `20260924-...`, step 9). */
+function isGroupFolded(
+  problem: OrderProblem,
+  highlightedRow: OpenOrderRow | null,
+  filter: OpenOrdersFilter,
+  collapsedGroups: ReadonlySet<OrderProblem>
+): boolean {
+  if (problem === highlightedRow?.problem) return false;
+  if (problem === 'healthy') return filter.hideHealthy;
+  return collapsedGroups.has(problem);
+}
+
 interface ActiveChipDisplay {
   id: string;
   label: string;
@@ -182,10 +194,9 @@ export function OpenOrdersPanel({
     DEFAULT_OPEN_ORDERS_FILTER_PARAMS
   );
   /**
-   * The order a Notification Event ("undercut at its station", issue #1423;
-   * or a fill) sent the reader to, spent once on arrival
-   * (`useHighlightParam`'s own doc comment). Landing on the row that
-   * prompted the click, decision `20260908-123516`.
+   * The order a Notification Event (an undercut, or a fill) sent the reader
+   * to, spent once on arrival (`useHighlightParam`'s own doc). Landing on the
+   * row that prompted the click, decision `20260908-123516`.
    */
   const highlightId = useHighlightParam();
   const [detailOrderId, setDetailOrderId] = useState<number | null>(null);
@@ -381,15 +392,12 @@ export function OpenOrdersPanel({
   }, [snapshot, deepCompetitionByOrderId, structureCache.byKey, stationNames]);
 
   /**
-   * The highlighted row itself, found across every group before any fold or
-   * filter narrows what is on screen — `null` when nothing matched (a stale
-   * link, or an order since closed), which is harmless (decision
-   * `20260908-123516`: "a key matching no row is harmless"). Read off
-   * `allRows`, not `groupingRows`: a content filter (search text, a problem
-   * chip, a character filter) narrowing what is on screen is a judgment call
-   * left unresolved here (see the scope decision file) — this only forces
-   * open the row's own FOLD state (the healthy toggle, a collapsed group),
-   * never an active content filter.
+   * The highlighted row, found across every group before any fold/filter
+   * narrows the screen — null when nothing matches is harmless (decision
+   * `20260908-123516`). Read off `allRows`, not `groupingRows`: this only
+   * forces open the row's own fold state, never an active content filter
+   * (search/problem/character) — narrowing that too is an open judgment call
+   * (see the scope decision file).
    */
   const highlightedRow = useMemo(
     () => (highlightId === null ? null : (allRows.find((r) => r.orderId === highlightId) ?? null)),
@@ -1006,19 +1014,10 @@ export function OpenOrdersPanel({
               // `collapsedGroups`: that flag is also what the "N of M orders
               // match" count reads, so two mechanisms would let the caret and
               // the count disagree about whether healthy orders are showing.
-              //
-              // The highlighted row's own group always wins over either fold
-              // mechanism (issue #1423, decision `20260924-...` "step 9"):
-              // read live off `highlightedRow`, not a `setFilter`/
-              // `setCollapsedGroups` write, so it never races
-              // `useHighlightParam`'s own URL write on first render and never
-              // depends on an effect running before this paint.
-              const folded =
-                group.problem === highlightedRow?.problem
-                  ? false
-                  : group.problem === 'healthy'
-                    ? filter.hideHealthy
-                    : collapsedGroups.has(group.problem);
+              // `isGroupFolded` reads `highlightedRow` live rather than a
+              // `setFilter`/`setCollapsedGroups` write, so it never races
+              // `useHighlightParam`'s own URL write on first render.
+              const folded = isGroupFolded(group.problem, highlightedRow, filter, collapsedGroups);
               const toggle = () => {
                 if (group.problem === 'healthy') {
                   setFilter({ ...filter, hideHealthy: !filter.hideHealthy });
