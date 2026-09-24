@@ -509,11 +509,8 @@ export function Mail() {
   // compose box's auto-quote — both must quote exactly what the pilot reads.
   const bodyText = body?.data.body ? stripEveMarkup(body.data.body) : '';
 
-  // `enabled: !isDesktop`, not folded into the key itself: `isDesktop` flips
-  // on a plain window resize/rotation, independent of any selection — if it
-  // were part of the key, narrowing the window while a mail was already open
-  // would read as "a new mail was just opened" and steal focus off whatever
-  // the pilot was actually doing (see `useFocusHeading`'s own doc comment).
+  // `enabled: !isDesktop` — narrow-only; see `useFocusHeading`'s own doc
+  // comment for why that's a separate param rather than folded into the key.
   useFocusHeading(readerHeadingRef, body === undefined ? null : selectedId, !isDesktop);
 
   if (!hydrated) {
@@ -859,6 +856,7 @@ export function Mail() {
                     readerHeadingRef.current = el;
                   }}
                   tabIndex={-1}
+                  className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   <EmptyState title={t('mail.emptyTitle')} className="py-4" />
                 </div>
@@ -875,7 +873,7 @@ export function Mail() {
                       readerHeadingRef.current = el;
                     }}
                     tabIndex={-1}
-                    className="text-base font-semibold text-text"
+                    className="text-base font-semibold text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   >
                     {body.data.subject || t('mail.noSubject')}
                   </h3>

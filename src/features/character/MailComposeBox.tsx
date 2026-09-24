@@ -93,21 +93,13 @@ export function MailComposeBox({
   const [pickerOpen, setPickerOpen] = useState(false);
   const listboxId = `mail-compose-recipient-listbox-${header.mail_id}`;
 
-  // First-field focus (issue #1485): the box replaces the Reply/Forward
-  // button that opened it (Mail.tsx swaps them in the same header slot) with
-  // no focus of its own, otherwise. Forward's recipient search sits above
-  // Subject in the DOM, so it — not Subject — is the genuine first field for
-  // that kind. Mail.tsx keys this component by `${mail_id}:${kind}`, so any
-  // new open (a different mail, or switching kind) is a fresh mount, exactly
-  // when this should re-fire.
+  // First-field focus (issue #1485): Forward's recipient search is the real
+  // first field (it sits above Subject); `skipNextPickerOpenRef` stops that
+  // field's own `onFocus` from popping its picker open on this programmatic
+  // focus. Runs once per mount, which a kind/mail switch already is —
+  // Mail.tsx keys this component by `${mail_id}:${kind}`.
   const recipientSearchRef = useRef<HTMLInputElement>(null);
   const subjectRef = useRef<HTMLInputElement>(null);
-  // The recipient search box's own `onFocus` opens its picker dropdown (see
-  // below) — right for a pilot who deliberately clicks into it, wrong for
-  // the mount-focus effect below, which would otherwise pop it open before
-  // anything has been typed. Set just ahead of the programmatic `.focus()`
-  // call, which dispatches its `focus` event synchronously, so the flag is
-  // already in place by the time `onFocus` reads it.
   const skipNextPickerOpenRef = useRef(false);
   useEffect(() => {
     if (kind === 'forward') {
@@ -116,7 +108,7 @@ export function MailComposeBox({
     } else {
       subjectRef.current?.focus();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per mount only; a `kind` change is itself a remount (Mail.tsx keys this component by `${mail_id}:${kind}`), exactly when this should refire
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only, see comment above
   }, []);
   function handleRecipientSearchFocus() {
     if (skipNextPickerOpenRef.current) {

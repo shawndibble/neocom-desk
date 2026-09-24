@@ -598,11 +598,8 @@ export function Market() {
   // Focus management for the finder <-> item panel swap below the `lg:`
   // breakpoint (issue #1485): selecting an item hides the finder and shows
   // the item panel with no focus cue, and Back does the reverse. `enabled:
-  // !isDesktop`, not folded into the key, since on desktop both panels stay
-  // on screen (the row/button that was clicked keeps its own focus) — and
-  // `isDesktop` itself flips on a plain resize/rotation, independent of any
-  // selection, so folding it into the key would read that resize as a fresh
-  // selection and steal focus the pilot never asked to move.
+  // !isDesktop` — see `useFocusHeading`'s own doc comment for why that's a
+  // separate param rather than folded into the key.
   const itemHeadingRef = useRef<HTMLHeadingElement>(null);
   useFocusHeading(itemHeadingRef, selectedTypeId, !isDesktop);
 

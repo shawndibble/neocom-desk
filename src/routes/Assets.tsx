@@ -1708,7 +1708,7 @@ export function Assets() {
                     <h2
                       ref={levelHeadingRef}
                       tabIndex={-1}
-                      className="truncate text-sm font-semibold"
+                      className="truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     >
                       {crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''}
                       {currentTotals && (
@@ -1767,7 +1767,7 @@ export function Assets() {
                   <h2
                     ref={levelHeadingRef}
                     tabIndex={-1}
-                    className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                    className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   >
                     {t('assets.section.locationCount', { count: sortedTree.length })}
                   </h2>

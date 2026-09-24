@@ -112,7 +112,11 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
                 <h2
                   ref={headingRef}
                   tabIndex={headingRef ? -1 : undefined}
-                  className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                  className={`text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase ${
+                    headingRef
+                      ? 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
+                      : ''
+                  }`}
                 >
                   {title}
                 </h2>

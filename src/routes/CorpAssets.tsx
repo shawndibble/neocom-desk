@@ -629,7 +629,7 @@ function CorpAssetsView() {
                 <h2
                   ref={levelHeadingRef}
                   tabIndex={-1}
-                  className="min-w-0 flex-1 truncate text-sm font-semibold"
+                  className="min-w-0 flex-1 truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   {currentLabel}
                   {currentItemCount !== null && (
@@ -647,7 +647,7 @@ function CorpAssetsView() {
                 <h2
                   ref={levelHeadingRef}
                   tabIndex={-1}
-                  className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                  className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   {/* "Groups" on purpose, not "divisions": `groups` here is
                       the seven hangar divisions plus any non-empty flag
