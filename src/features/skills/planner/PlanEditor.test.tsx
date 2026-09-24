@@ -12,6 +12,7 @@ import type { CharacterAttributes, SkillQueueEntry } from '@/esi/endpoints';
 import { buildUnlockIndex } from '@/engine/skillUnlocks';
 import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import type { SkillCatalog } from '../skillMap';
+import type { RemapAvailability } from './remapAvailability';
 import { PlanEditor } from './PlanEditor';
 
 const loadCharacterSkillQueue =
@@ -1458,6 +1459,24 @@ describe('removing an entry requires confirmation (#408)', () => {
 
     expect(onUpdate).not.toHaveBeenCalled();
     expect(screen.queryByText(/remove "skill a i+v?" from this plan/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('yearly remap on cooldown (#1404)', () => {
+  it('shows the savings badge for a plan whose only remap is the on-cooldown yearly one', () => {
+    // The bug this regresses: 0 bonus remaps, yearly on cooldown, and the
+    // default plan.remapCount of 0 used to hide the badge entirely — even
+    // though the yearly remap, honoring its cooldown, has real savings to
+    // report.
+    const remapInfo: RemapAvailability = {
+      available: 0,
+      bonus: 0,
+      yearlyReady: false,
+      cooldownUntil: new Date(Date.now() + 1000),
+    };
+    renderEditor(vi.fn(), { plan: { ...PLAN, remapCount: 0 }, remapInfo });
+
+    expect(screen.getByText('Remap savings')).toBeInTheDocument();
   });
 });
 

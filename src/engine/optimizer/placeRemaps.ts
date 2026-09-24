@@ -28,7 +28,10 @@
  * Cost: linear in pair-runs R, ~13 ms at 200 steps. With a Booster,
  * `remapCount >= 2` still costs ~0.4-0.9 s and cannot be made to cost less by
  * restructuring: a mid-segment expiry defeats aggregation outright. Identity
- * and measurements are in plan §5.6.
+ * and measurements are in plan §5.6. `timedRemap` (below) adds one O(1)
+ * comparison per DP cell — same complexity class, unmeasurable against these
+ * numbers; re-run this file's own perf-asserting tests if that ever stops
+ * being true.
  *
  * `remapCount = 1` keeps its own O(R) suffix scan: with one allocation only
  * the last DP column is reachable, so scanning run edges right-to-left gives
@@ -82,6 +85,15 @@ export interface PlaceRemapsOptions {
    * that do not exist.
    */
   cloneState?: CloneState;
+  /**
+   * The yearly remap's cooldown end, as seconds into the plan. Only the
+   * LAST allocation is held to this floor — bonus remaps (every earlier
+   * one) stay free to place anywhere, because in EVE the player chooses
+   * which remap to spend, and the later one is always the one worth
+   * holding for the cooldown. Omit when the yearly remap is already off
+   * cooldown; every existing caller does, and that path is untouched.
+   */
+  timedRemap?: { notBeforeSeconds: number };
 }
 
 /**
@@ -120,7 +132,7 @@ export function placeRemaps(
   skills: ReadonlyMap<number, EngineSkill>,
   options: PlaceRemapsOptions
 ): PlaceRemapsResult {
-  const { remapCount, currentAttributes, implants = {}, booster, cloneState } = options;
+  const { remapCount, currentAttributes, implants = {}, booster, cloneState, timedRemap } = options;
 
   const liveBoosters =
     booster?.boosters.filter((b) => b.expiresAt.getTime() > booster.startDate.getTime()) ?? [];
@@ -300,6 +312,10 @@ export function placeRemaps(
       const run = runs[i];
       suffixSp.set(run.pair, (suffixSp.get(run.pair) ?? 0) + run.sp);
       pairOrder = [run.pair, ...pairOrder.filter((pair) => pair !== run.pair)];
+      // The one remap here IS the last (and only) allocation, so a timed
+      // floor applies directly: a run edge earlier than notBeforeSeconds is
+      // never a legal placement, not merely a worse one.
+      if (timedRemap && currentPrefix[i] < timedRemap.notBeforeSeconds) continue;
       const spByPair = new Map<string, number>();
       for (const pair of pairOrder) spByPair.set(pair, suffixSp.get(pair)!);
       const best = segmentCostAt(
@@ -382,8 +398,19 @@ export function placeRemaps(
   }
   for (let j = 0; j <= runCount; j++) dp[0][j] = currentPrefix[j];
 
+  // The timed floor binds the LAST of the *requested* allocations — but only
+  // when there's structural room for all of them: `maxSegments` collapses
+  // below `remapCount` whenever the plan has fewer pair-runs than requested
+  // remaps, and in that case the "extra" allocation isn't a distinct segment
+  // at all, so gating on it would wrongly hold back a bonus remap that's the
+  // only one actually reachable. `-1` (never equal to any real `k`) disables
+  // the floor in that case, same as omitting `timedRemap` entirely.
+  const timedFloorRow = timedRemap && remapCount <= runCount ? maxSegments : -1;
+  const violatesTimedFloor = (elapsedSeconds: number): boolean =>
+    timedRemap !== undefined && elapsedSeconds < timedRemap.notBeforeSeconds;
+
   for (let k = 1; k <= maxSegments; k++) {
-    const previous = dp[k - 1];
+    const previousRow = dp[k - 1];
     const current = dp[k];
     const parents = parent[k];
     for (let a = 0; a < table.count; a++) {
@@ -404,8 +431,12 @@ export function placeRemaps(
             parents[x] = bestPrefixIndex;
           }
         }
-        if (x >= k - 1 && previous[x] !== Infinity) {
-          const candidate = previous[x] - prefixSeconds;
+        // Gating the running scan itself, rather than filtering afterwards,
+        // keeps the O(allocations * R) shape — an ineligible split index
+        // simply never becomes a candidate to extend from.
+        const eligible = k !== timedFloorRow || !violatesTimedFloor(previousRow[x]);
+        if (x >= k - 1 && previousRow[x] !== Infinity && eligible) {
+          const candidate = previousRow[x] - prefixSeconds;
           if (candidate < bestPrefix) {
             bestPrefix = candidate;
             bestPrefixIndex = x;
@@ -423,8 +454,9 @@ export function placeRemaps(
     // costed in one pass; doing it per (i, j) instead cost 21.7 s.
     if (boosted) {
       for (let i = k - 1; i < runCount; i++) {
-        const start = previous[i];
+        const start = previousRow[i];
         if (start === Infinity || start >= expirySeconds) continue;
+        if (k === timedFloorRow && violatesTimedFloor(start)) continue;
         const batch = bestAttributesAtBoundaries(
           steps,
           skills,

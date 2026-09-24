@@ -712,7 +712,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   places it lands.
 - **Remap**: In-game reallocation of a character's attributes. The optimizer suggests where in a Skill Plan remaps should be placed.
 - **Remap Marker**: A user-placed row in a Skill Plan marking where the character will remap attributes. Draggable like a plan entry.
-- **Remaps Available**: How many attribute remaps the character can spend: bonus remaps (new characters get several) plus the yearly remap when off cooldown. Read from the API (bonus_remaps, last_remap_date, cooldown); user may override. Optimizer must support the common single-remap case: train a leading segment on current attributes, then remap at the optimizer-chosen point.
+- **Remaps Available**: How many attribute remaps the character can spend: bonus remaps (new characters get several) plus the yearly remap, counted even while it's on cooldown — usable from its cooldown date, not before (`docs/context/decisions/`). Read from the API (bonus_remaps, last_remap_date, cooldown); user may override. Optimizer must support the common single-remap case: train a leading segment on current attributes, then remap at the optimizer-chosen point.
 - **Requested Scopes**: What one authorize round trip asked SSO for, carried on
   its **Pending Login** and read back by `completeLogin`. The baseline the login
   path judges revocation against; the refresh path has none and uses the stored
