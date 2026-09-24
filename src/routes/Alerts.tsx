@@ -17,7 +17,7 @@
  * Not to be merged with Settings' notification panel: that is *preferences*
  * (what may fire), this is the *record* (what did).
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -79,6 +79,12 @@ const FILTERABLE_SEVERITIES: readonly DeadlineSeverity[] = DEADLINE_SEVERITIES.f
 const ALL_CHARACTERS = 'all';
 
 /**
+ * Sentinel in `focusAfterRemoval`'s candidate list for the panel heading —
+ * never collides with a real group/entry key (Dexie ids, `alertGroupLabel` output).
+ */
+const PANEL_HEADING_FOCUS = '__panel-heading__';
+
+/**
  * `AlertsFilter` kept in the URL (ADR 0015) so a reload — or a link shared
  * with another pilot — reopens the same view. `severities` defaults to the
  * empty set, unlike `enumSetParam`'s own "all selected" default, to match
@@ -104,6 +110,35 @@ export function Alerts() {
   const prefsHydrated = useNotificationPreferences((state) => state.hydrated);
   const [filter, setFilter] = useUrlParams(ALERTS_FILTER_PARAMS);
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(() => new Set());
+
+  // Focus anchors for `focusAfterRemoval` below, tracking rows still mounted
+  // after a dismiss/mute unmounts the clicked one (WCAG 2.4.3). Plain
+  // mutable maps, not state: only read inside a click handler, never render.
+  const panelRef = useRef<HTMLElement>(null);
+  const groupRefs = useRef(new Map<string, HTMLButtonElement>());
+  const entryRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  // Focuses the first candidate still mounted — caller lists next row,
+  // previous row, then `PANEL_HEADING_FOCUS`. Safe to call before the click's
+  // own row unmounts: candidates are always other rows, already in the DOM.
+  function focusAfterRemoval(candidates: readonly string[]) {
+    for (const key of candidates) {
+      if (key === PANEL_HEADING_FOCUS) {
+        const heading = panelRef.current?.querySelector<HTMLHeadingElement>('h2');
+        if (heading) {
+          heading.tabIndex = -1;
+          heading.focus();
+          return;
+        }
+        continue;
+      }
+      const el = groupRefs.current.get(key) ?? entryRefs.current.get(key);
+      if (el) {
+        el.focus();
+        return;
+      }
+    }
+  }
 
   useEffect(() => {
     void hydrateNotificationPreferences();
@@ -193,7 +228,15 @@ export function Alerts() {
               <IconButton
                 icon={<Icon.DismissAll />}
                 label={t('alerts.dismissAll')}
-                onClick={() => void dismissFeedEntriesAndSync(liveEntries)}
+                onClick={() => {
+                  // Every unmuted group is about to empty out; only a muted
+                  // group shown via the chip can still be there afterwards.
+                  const survivor = visible.find((group) => group.muted);
+                  focusAfterRemoval(
+                    survivor ? [survivor.key, PANEL_HEADING_FOCUS] : [PANEL_HEADING_FOCUS]
+                  );
+                  void dismissFeedEntriesAndSync(liveEntries);
+                }}
               />
             )}
           </>
@@ -283,6 +326,7 @@ export function Alerts() {
       </FilterBar>
 
       <Panel
+        ref={panelRef}
         title={t('alerts.byType')}
         actions={<span className="text-[0.6875rem] text-text-dim">{t('alerts.deviceWide')}</span>}
       >
@@ -294,24 +338,60 @@ export function Alerts() {
           />
         ) : (
           <ul className="-mx-3 divide-y divide-line">
-            {visible.map((group) => (
-              <AlertGroupRow
-                key={group.key}
-                group={group}
-                expanded={expandedKeys.has(group.key)}
-                onToggle={() => toggleExpanded(group.key)}
-                onDismissGroup={() => void dismissFeedEntriesAndSync(group.entries)}
-                onToggleMute={() =>
-                  void setFeedMutedForCharacters(group.characterIds, group.target, !group.muted)
-                }
-                nameById={nameById}
-                // One Character on the device means every fire belongs to
-                // them, and the name on each row is width the body copy could
-                // have had.
-                showCharacter={characters.length > 1}
-                onDismissEntry={(entry) => void dismissFeedEntriesAndSync([entry])}
-              />
-            ))}
+            {visible.map((group, groupIndex) => {
+              // Next row, else previous, else panel heading — shared by
+              // dismiss-group, hide-on-mute, and dismiss-entry's last-in-group fallback.
+              const groupCandidates = [
+                visible[groupIndex + 1]?.key,
+                visible[groupIndex - 1]?.key,
+                PANEL_HEADING_FOCUS,
+              ].filter((key): key is string => key !== undefined);
+
+              return (
+                <AlertGroupRow
+                  key={group.key}
+                  group={group}
+                  expanded={expandedKeys.has(group.key)}
+                  onToggle={() => toggleExpanded(group.key)}
+                  onDismissGroup={() => {
+                    focusAfterRemoval(groupCandidates);
+                    void dismissFeedEntriesAndSync(group.entries);
+                  }}
+                  onToggleMute={() => {
+                    // Only disappears when muting it while the "muted types"
+                    // chip is off — otherwise this same row stays mounted.
+                    if (!group.muted && !filter.showMuted) focusAfterRemoval(groupCandidates);
+                    void setFeedMutedForCharacters(group.characterIds, group.target, !group.muted);
+                  }}
+                  nameById={nameById}
+                  // One Character on the device means every fire belongs to
+                  // them, and the name on each row is width the body copy
+                  // could have had.
+                  showCharacter={characters.length > 1}
+                  onDismissEntry={(entry) => {
+                    const entryIndex = group.entries.findIndex((e) => e.id === entry.id);
+                    const entryCandidates = [
+                      group.entries[entryIndex + 1]?.id,
+                      group.entries[entryIndex - 1]?.id,
+                    ].filter((id): id is string => id !== undefined);
+                    // No sibling entry: this was the group's last one, so
+                    // fall through to the group-level candidates.
+                    focusAfterRemoval(
+                      entryCandidates.length > 0 ? entryCandidates : groupCandidates
+                    );
+                    void dismissFeedEntriesAndSync([entry]);
+                  }}
+                  toggleRef={(el) => {
+                    if (el) groupRefs.current.set(group.key, el);
+                    else groupRefs.current.delete(group.key);
+                  }}
+                  entryDismissRef={(entryId, el) => {
+                    if (el) entryRefs.current.set(entryId, el);
+                    else entryRefs.current.delete(entryId);
+                  }}
+                />
+              );
+            })}
           </ul>
         )}
       </Panel>

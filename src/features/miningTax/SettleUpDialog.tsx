@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, Modal, TextInput } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -58,6 +58,19 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
   const [contractId, setContractId] = useState('');
   const [copied, setCopied] = useState<CopyTarget | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Next/Back unmount the step-1/step-2 block, dropping focus to
+  // `document.body` (WCAG 2.4.3) — refocus the new step, but not on mount
+  // (`Modal` already places initial focus), and not on `StrictMode`'s
+  // simulated remount (same `step` value, so the comparison stays false).
+  const stepRef = useRef<HTMLDivElement>(null);
+  const lastFocusedStepRef = useRef<Step | null>(null);
+  useEffect(() => {
+    if (lastFocusedStepRef.current !== null && lastFocusedStepRef.current !== step) {
+      stepRef.current?.focus();
+    }
+    lastFocusedStepRef.current = step;
+  }, [step]);
 
   const included = useMemo(
     () => rows.filter((r) => !excluded.has(r.assignment.id)),
@@ -166,7 +179,13 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
         </div>
 
         {step === 1 && (
-          <>
+          <div
+            ref={stepRef}
+            tabIndex={-1}
+            role="group"
+            aria-label={t('miningTax.settleUpStep1')}
+            className="space-y-3"
+          >
             <ul className="divide-y divide-line rounded-xs border border-line bg-panel-2">
               {rows.map((r) => {
                 const on = !excluded.has(r.assignment.id);
@@ -228,11 +247,17 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                 {t('filters.cancel')}
               </Button>
             </div>
-          </>
+          </div>
         )}
 
         {step === 2 && (
-          <>
+          <div
+            ref={stepRef}
+            tabIndex={-1}
+            role="group"
+            aria-label={t('miningTax.settleUpStep2')}
+            className="space-y-3"
+          >
             <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-3">
               <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('miningTax.settleUpAmountLabel')}
@@ -328,7 +353,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                 {t('miningTax.settleUpBack')}
               </Button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </Modal>
