@@ -24,6 +24,7 @@ function renderMenu(currentLevel = 2, tooltipContent?: string | null) {
     <SkillRowContextMenu
       activeCharacterId={CHAR_ID}
       skillTypeID={3300}
+      skillName="Gunnery"
       currentLevel={currentLevel}
       tooltipContent={tooltipContent}
     >
@@ -106,5 +107,32 @@ describe('SkillRowContextMenu — Add to Skill Plan (#405)', () => {
 
     fireEvent.contextMenu(row);
     expect(await screen.findByRole('menuitem', { name: 'Add to Skill Plan' })).toBeInTheDocument();
+  });
+
+  it('reaches Add to Skill Plan from the keyboard alone, via the More actions button (#1497)', async () => {
+    await db.skillPlans.add({
+      id: 'plan-1',
+      characterId: CHAR_ID,
+      name: 'PvP Fit',
+      entries: [],
+      remapCount: 0,
+      updatedAt: 0,
+    });
+    const user = userEvent.setup();
+    renderMenu(2);
+
+    await user.tab();
+    await user.tab();
+    expect(screen.getByRole('button', { name: 'More actions for Gunnery' })).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(await screen.findByRole('menuitem', { name: 'Add to Skill Plan' })).toHaveFocus();
+    await user.keyboard('{ArrowRight}');
+    await waitFor(() => expect(screen.getByRole('menuitem', { name: 'PvP Fit' })).toHaveFocus());
+    await user.keyboard('{Enter}');
+
+    await waitFor(async () => {
+      const plan = await db.skillPlans.get('plan-1');
+      expect(plan?.entries).toEqual([{ skillTypeID: 3300, targetLevel: 3 }]);
+    });
   });
 });

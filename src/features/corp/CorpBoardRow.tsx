@@ -12,21 +12,9 @@
  * `engine/corp/board.ts`. This file renders them and does no time arithmetic of
  * its own beyond formatting.
  */
-import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  IconButton,
-  Tooltip,
-} from '@/components/ui';
+import { MenuItem, RowActionsMenu, RowMoreActions, Tooltip } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { SEVERITY_ICON, SEVERITY_LABEL, SEVERITY_TEXT } from '@/components/ui/severityTone';
 import { marketItemUrl } from '@/engine/market/urlState';
@@ -193,65 +181,6 @@ function useBoardRowActions(
   return actions;
 }
 
-/** One `BoardRowAction` rendered into either menu family's item component. */
-function renderBoardRowAction(
-  action: BoardRowAction,
-  MenuItem: (props: { onSelect: () => void; children: ReactNode }) => ReactElement
-) {
-  return (
-    <MenuItem key={action.key} onSelect={action.onSelect}>
-      {action.label}
-    </MenuItem>
-  );
-}
-
-/**
- * Right-click surface for one row. `ContextMenuTrigger asChild` clones the
- * `<li>` itself rather than wrapping it, the same way `VariationsTable.tsx`
- * triggers off a `<tr>` — a wrapper element would break `<ul>` semantics and
- * the row's own layout.
- */
-function BoardRowMenu({
-  actions,
-  children,
-}: {
-  actions: BoardRowAction[];
-  children: ReactElement;
-}) {
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent>
-        {actions.map((action) => renderBoardRowAction(action, ContextMenuItem))}
-      </ContextMenuContent>
-    </ContextMenu>
-  );
-}
-
-/**
- * Visible trigger for the row's actions (WCAG 2.1.1) — the row's only
- * keyboard-focusable element. `variant="plain"` drops the hairline border so
- * it doesn't compete with the countdown for attention.
- */
-function BoardRowMoreActions({ subject, actions }: { subject: string; actions: BoardRowAction[] }) {
-  const { t } = useTranslation();
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <IconButton
-          icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
-          label={t('corp.board.moreActionsLabel', { name: subject })}
-          variant="plain"
-          size="sm"
-        />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {actions.map((action) => renderBoardRowAction(action, DropdownMenuItem))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 /**
  * One board row, exported so the Kind Cards (issue #566) render exactly this
  * and not an approximation of it.
@@ -271,7 +200,17 @@ export function CorpBoardRow({
   const { t } = useTranslation();
   const actions = useBoardRowActions(item, onShowInfo);
   return (
-    <BoardRowMenu actions={actions}>
+    // `ContextMenuTrigger asChild` clones the `<li>` itself rather than
+    // wrapping it, the same way `VariationsTable.tsx` triggers off a `<tr>` —
+    // a wrapper element would break `<ul>` semantics and the row's own layout.
+    <RowActionsMenu
+      name={item.subject}
+      items={actions.map((action) => (
+        <MenuItem key={action.key} onSelect={action.onSelect}>
+          {action.label}
+        </MenuItem>
+      ))}
+    >
       <li className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 last:border-b-0">
         <Countdown item={item} />
         <div className="min-w-0 flex-1">
@@ -285,8 +224,9 @@ export function CorpBoardRow({
           would crowd the one thing the row exists to show.
         */}
         <span className="sr-only">{t(SEVERITY_LABEL[item.severity])}</span>
-        <BoardRowMoreActions subject={item.subject} actions={actions} />
+        {/* The row's only keyboard-focusable element (WCAG 2.1.1). */}
+        <RowMoreActions />
       </li>
-    </BoardRowMenu>
+    </RowActionsMenu>
   );
 }

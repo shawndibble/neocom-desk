@@ -1,0 +1,5 @@
+# Scope decisions — BPC blueprint suggestions become an ARIA combobox (issue #1495)
+
+_Recorded 2026-09-24 · issue #1495._
+
+- **The BPC Sourcing blueprint suggestion list is now an inline ARIA combobox, which supersedes #608's "not attempted" call.** #608 (`20260908-161211-the-bpc-search-autocompletes-to-one-blueprint-which.md`) kept the list as Tab-reachable buttons because it assumed there was no working hand-built combobox to copy. `BuildLocationPicker` has been exactly that since #505 (`20260905-114550-hand-build-aria-comboboxes-rather-than-buy-radix.md`), and the 2026-09-24 accessibility audit (IND-10) flagged the list as unannounced. So the search box takes `role="combobox"` with `aria-activedescendant`, the list is a `role="listbox"` of options, Arrow/Home/End move the highlight, Enter picks and Escape hides the list, and a polite status region announces the count and the highlighted option. The list stays in flow under the filter bar, not in a floating popover. The options are no longer Tab stops; keyboard access goes through the search box.

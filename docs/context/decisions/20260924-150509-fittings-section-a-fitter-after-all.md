@@ -15,8 +15,8 @@ _Recorded 2026-09-24._
   against range and against target speed, under a chosen damage profile
   (four pure types plus the common NPC factions) and target profile. Custom
   profiles are user-authored and sync with settings. Fleet boosts and command
-  bursts are out of v1. The Reactive Armor Hardener is shown at its starting
-  split; adapted resists are not simulated.
+  bursts are out of v1. The Reactive Armor Hardener adapts to the selected damage profile — the
+  engine models this (ADR 0016).
 - **A Fitting's numbers follow the active Character.** Switching Character
   re-states the open Fitting live, with over-budget CPU/powergrid flashing.
   Implants and combat boosters come from the Character's clone or from the

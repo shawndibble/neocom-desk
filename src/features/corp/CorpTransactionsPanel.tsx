@@ -317,6 +317,7 @@ export function CorpTransactionsPanel({
               sort={sort}
               onSortChange={onSortChange}
               rowContextMenu={rowContextMenu}
+              rowMoreActions
             />
           )}
         </>

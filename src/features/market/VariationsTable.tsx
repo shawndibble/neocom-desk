@@ -169,6 +169,7 @@ export function VariationsTable({
         density="compact"
         onRowClick={(row) => onSelect(row.typeId)}
         rowContextMenu={rowContextMenu}
+        rowMoreActions
       />
     </div>
   );

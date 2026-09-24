@@ -130,7 +130,8 @@ async function readRow(page: Page, typeId: number): Promise<RowGeometry> {
     const row = table.querySelector(`tbody tr[data-row-key="${key}"]`) as HTMLElement;
     const style = getComputedStyle(row);
     const box = row.getBoundingClientRect();
-    const cells = [...row.querySelectorAll(':scope > td')].map((td) => {
+    // The More actions cell is a control, not a field — no label, no value.
+    const cells = [...row.querySelectorAll(':scope > td:not(.dt-actions)')].map((td) => {
       const cellBox = td.getBoundingClientRect();
       return {
         label: td.getAttribute('data-label') ?? '',

@@ -431,7 +431,7 @@ describe('Skills', () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
-    const frigateRow = await screen.findByRole('button', { name: /Frigate/ });
+    const frigateRow = await screen.findByRole('button', { name: /^Frigate/ });
     fireEvent.click(frigateRow);
 
     const prereqsHeading = await screen.findByText('Prerequisites');
@@ -445,7 +445,7 @@ describe('Skills', () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole('button', { name: /^Gunnery/ }));
-    const turretRow = await screen.findByRole('button', { name: /Small Hybrid Turret/ });
+    const turretRow = await screen.findByRole('button', { name: /^Small Hybrid Turret/ });
     fireEvent.click(turretRow);
 
     const unlocksHeading = await screen.findByText('Unlocks');
@@ -458,7 +458,7 @@ describe('Skills', () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole('button', { name: /^Gunnery/ }));
-    const turretRow = await screen.findByRole('button', { name: /Small Hybrid Turret/ });
+    const turretRow = await screen.findByRole('button', { name: /^Small Hybrid Turret/ });
     expect(turretRow.closest('li')?.querySelector('[role="tooltip"]')).toBeNull();
   });
 
@@ -466,7 +466,7 @@ describe('Skills', () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
-    fireEvent.click(await screen.findByRole('button', { name: /Frigate/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /^Frigate/ }));
 
     const prereqsHeading = await screen.findByText('Prerequisites');
     const panel = screen.getByRole('button', { name: /close/i }).closest('section')!;
@@ -480,7 +480,7 @@ describe('Skills', () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
-    const frigateRow = await screen.findByRole('button', { name: /Frigate/ });
+    const frigateRow = await screen.findByRole('button', { name: /^Frigate/ });
     fireEvent.click(frigateRow);
     expect(await screen.findByText('Prerequisites')).toBeInTheDocument();
 

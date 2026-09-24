@@ -276,7 +276,7 @@ function ScopeRow({
 }) {
   const { t } = useTranslation();
   const scopeLabel = (
-    <span className={cx(CELL, 'pl-3')}>
+    <span role="rowheader" className={cx(CELL, 'pl-3')}>
       <span
         className={cx(
           'inline-flex h-5 w-fit items-center rounded-xs border px-1.5 text-[0.625rem] font-semibold tracking-widest uppercase',
@@ -290,9 +290,10 @@ function ScopeRow({
 
   if (state.kind !== 'rival') {
     return (
-      <>
+      <div role="row" className="contents">
         {scopeLabel}
         <span
+          role="cell"
           className={cx(
             CELL,
             'col-span-2 pr-3 md:col-span-4',
@@ -303,7 +304,7 @@ function ScopeRow({
           {state.kind === 'notChecked' && t('market.orders.scopeNotChecked')}
           {state.kind === 'clear' && t('market.orders.scopeClear')}
         </span>
-      </>
+      </div>
     );
   }
 
@@ -321,9 +322,9 @@ function ScopeRow({
     : t('market.orders.scopeAggregateOnly');
 
   return (
-    <>
+    <div role="row" className="contents">
       {scopeLabel}
-      <span className={cx(CELL, 'flex flex-col gap-0.5')}>
+      <span role="cell" className={cx(CELL, 'flex flex-col gap-0.5')}>
         <span>{stationName ?? t('market.unknownStructure')}</span>
         <span className="text-[0.6875rem] text-text-dim">{whoText}</span>
         {/*
@@ -342,16 +343,19 @@ function ScopeRow({
           </span>
         )}
       </span>
-      <span className={cx(CELL, 'pr-3 text-right tabular-nums md:pr-2')}>
+      <span role="cell" className={cx(CELL, 'pr-3 text-right tabular-nums md:pr-2')}>
         {formatIsk(rival.price, 2)}
       </span>
-      <span className={cx(CELL, 'hidden text-right text-danger tabular-nums md:block')}>
+      <span role="cell" className={cx(CELL, 'hidden text-right text-danger tabular-nums md:block')}>
         {formatIsk(rival.gapIsk, 2)} · {rival.gapPct.toFixed(1)}%
       </span>
-      <span className={cx(CELL, 'hidden pr-3 text-right text-text-dim tabular-nums md:block')}>
+      <span
+        role="cell"
+        className={cx(CELL, 'hidden pr-3 text-right text-text-dim tabular-nums md:block')}
+      >
         {distanceText}
       </span>
-    </>
+    </div>
   );
 }
 
@@ -770,24 +774,47 @@ export function OrderDetailModal({
             player's own order all contribute cells to these tracks, so the
             price, gap and distance columns line up down the table. Rows
             cannot own a background or a border here, so the rule between
-            rows and the "my order" tint are painted per cell.
+            rows and the "my order" tint are painted per cell. Each row is a
+            `display: contents` box carrying `role="row"`, so the grid still
+            reads as a table with column headers to assistive tech.
           */}
-            <div className="grid grid-cols-[auto_1fr_auto] text-xs md:grid-cols-[auto_1fr_auto_auto_auto]">
-              <span className="px-2 pt-2 pl-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('market.orders.scopeColumn')}
-              </span>
-              <span className="px-2 pt-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('market.orders.scopeCheapestSeller')}
-              </span>
-              <span className="px-2 pt-2 pr-3 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:pr-2">
-                {t('market.orders.scopeTheirPrice')}
-              </span>
-              <span className="hidden px-2 pt-2 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:block">
-                {t('market.orders.scopeOverBy')}
-              </span>
-              <span className="hidden px-2 pt-2 pr-3 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:block">
-                {t('market.orders.scopeDistance')}
-              </span>
+            <div
+              role="table"
+              aria-label={t('market.orders.whoIsCheaper')}
+              className="grid grid-cols-[auto_1fr_auto] text-xs md:grid-cols-[auto_1fr_auto_auto_auto]"
+            >
+              <div role="row" className="contents">
+                <span
+                  role="columnheader"
+                  className="px-2 pt-2 pl-3 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                >
+                  {t('market.orders.scopeColumn')}
+                </span>
+                <span
+                  role="columnheader"
+                  className="px-2 pt-2 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+                >
+                  {t('market.orders.scopeCheapestSeller')}
+                </span>
+                <span
+                  role="columnheader"
+                  className="px-2 pt-2 pr-3 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:pr-2"
+                >
+                  {t('market.orders.scopeTheirPrice')}
+                </span>
+                <span
+                  role="columnheader"
+                  className="hidden px-2 pt-2 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:block"
+                >
+                  {t('market.orders.scopeOverBy')}
+                </span>
+                <span
+                  role="columnheader"
+                  className="hidden px-2 pt-2 pr-3 text-right text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase md:block"
+                >
+                  {t('market.orders.scopeDistance')}
+                </span>
+              </div>
               <ScopeRow
                 scope="station"
                 state={station}
@@ -811,22 +838,28 @@ export function OrderDetailModal({
                 jumps={regionJumps}
               />
               {/* My own order last, as the line every row above is measured against. */}
-              <span
-                className={cx(
-                  CELL,
-                  'bg-panel-2 pl-3 font-semibold tracking-widest text-accent uppercase'
-                )}
-              >
-                {t('market.orders.scopeMyOrder')}
-              </span>
-              <span className={cx(CELL, 'bg-panel-2')}>
-                {row.stationName ?? t('market.unknownStructure')}
-              </span>
-              <span className={cx(CELL, 'bg-panel-2 pr-3 text-right tabular-nums md:pr-2')}>
-                {formatIsk(row.price, 2)}
-              </span>
-              <span className={cx(CELL, 'hidden bg-panel-2 md:block')} />
-              <span className={cx(CELL, 'hidden bg-panel-2 md:block')} />
+              <div role="row" className="contents">
+                <span
+                  role="rowheader"
+                  className={cx(
+                    CELL,
+                    'bg-panel-2 pl-3 font-semibold tracking-widest text-accent uppercase'
+                  )}
+                >
+                  {t('market.orders.scopeMyOrder')}
+                </span>
+                <span role="cell" className={cx(CELL, 'bg-panel-2')}>
+                  {row.stationName ?? t('market.unknownStructure')}
+                </span>
+                <span
+                  role="cell"
+                  className={cx(CELL, 'bg-panel-2 pr-3 text-right tabular-nums md:pr-2')}
+                >
+                  {formatIsk(row.price, 2)}
+                </span>
+                <span role="cell" className={cx(CELL, 'hidden bg-panel-2 md:block')} />
+                <span role="cell" className={cx(CELL, 'hidden bg-panel-2 md:block')} />
+              </div>
             </div>
             <div className="px-3 pb-2">
               {allClean && (

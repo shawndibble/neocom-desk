@@ -26,6 +26,7 @@ import {
   EmptyState,
   IconButton,
   IskAmount,
+  RowMoreActions,
   Spinner,
   TypeIcon,
 } from '@/components/ui';
@@ -186,6 +187,7 @@ export function CompareDrawer({
             <span className="flex items-center gap-1.5">
               <TypeIcon typeId={row.typeId} size={32} className="h-4 w-4 shrink-0" />
               <span>{row.itemName}</span>
+              <RowMoreActions />
             </span>
           </ItemContextMenu>
         ),
