@@ -13,6 +13,9 @@
  * letting a previous corporation's or division's rows sit under a new label.
  * `load` itself is held in a latest-ref, exactly as `useRouteSnapshot` holds
  * its own: an inline arrow must not re-fire the effect every render.
+ *
+ * Nothing in it is corp-specific, so a personal read that is equally opt-in
+ * uses it too — Wallet's personal fills, loaded only for the Journal tab.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { invalidateFreshness } from '@/esi/cache';

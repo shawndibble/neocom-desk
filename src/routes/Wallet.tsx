@@ -1,12 +1,4 @@
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactElement,
-} from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -73,7 +65,6 @@ import {
   loadCorporationWallets,
 } from '@/features/corp/wallet';
 import { CorpTransactionsPanel } from '@/features/corp/CorpTransactionsPanel';
-import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { useHighlightParam } from '@/lib/useHighlightParam';
@@ -207,8 +198,6 @@ interface JournalTableProps {
   highlightRowKey?: number | null;
   sort: DataTableSort;
   onSortChange: (sort: DataTableSort) => void;
-  /** The item menu on a line tied to a market fill; other lines render as-is. */
-  rowContextMenu?: (entry: WalletJournalEntry, tr: ReactElement) => ReactElement;
 }
 
 /** The filter bar plus its result — either the table or a filtered-empty message. Shared by the personal and corp journal panels (issue #413). */
@@ -222,7 +211,6 @@ function JournalTable({
   highlightRowKey = null,
   sort,
   onSortChange,
-  rowContextMenu,
 }: JournalTableProps) {
   const { t } = useTranslation();
   return (
@@ -243,7 +231,6 @@ function JournalTable({
           highlightRowKey={highlightRowKey}
           sort={sort}
           onSortChange={onSortChange}
-          rowContextMenu={rowContextMenu}
         />
       )}
     </>
@@ -266,6 +253,13 @@ const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const EMPTY_JOURNAL: readonly WalletJournalEntry[] = [];
 /** Same, for the corp transactions tab. */
 const EMPTY_TRANSACTIONS: readonly CorporationWalletTransaction[] = [];
+/** Same, for the personal fills the journal links its market lines to. */
+const EMPTY_FILLS: readonly WalletTransactionCommon[] = [];
+
+/** The one spelling of an item id from a resolved-names map; an unresolved id reads as `Type #id`. */
+function typeNameLookup(names: ReadonlyMap<number, string>): (typeId: number) => string {
+  return (typeId) => names.get(typeId) ?? `Type #${typeId}`;
+}
 
 /** `?owner=`/`?division=` params (issue #419, #1302). */
 const OWNER_PARAM = enumParam<DataOwner>(['personal', 'corporation'], 'personal');
@@ -395,7 +389,6 @@ interface CorpWalletViewProps {
   journalLoading: boolean;
   /** The page's own journal columns — the corp journal is the same table, not a second one. */
   journalColumns: DataTableColumn<WalletJournalEntry>[];
-  journalRowContextMenu: (entry: WalletJournalEntry, tr: ReactElement) => ReactElement;
   journalFilter: WalletJournalFilter;
   onJournalFilterChange: (filter: WalletJournalFilter) => void;
   journalSort: DataTableSort;
@@ -422,7 +415,6 @@ function CorpWalletView({
   journal,
   journalLoading,
   journalColumns,
-  journalRowContextMenu,
   journalFilter,
   onJournalFilterChange,
   journalSort,
@@ -535,7 +527,6 @@ function CorpWalletView({
             label={t('wallet.journalTab')}
             sort={journalSort}
             onSortChange={onJournalSortChange}
-            rowContextMenu={journalRowContextMenu}
           />
         </>
       )}
@@ -571,9 +562,9 @@ export function Wallet() {
   const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
     null
   );
-  const handleShowInfo = useCallback((typeId: number, itemName: string) => {
+  function handleShowInfo(typeId: number, itemName: string) {
     setInfoModalItem({ typeId, itemName });
-  }, []);
+  }
 
   // A notification's `walletBalanceChanged` deep link (`notificationOptions.ts`)
   // names the tab as a path segment (`/wallet/journal`) — the `Tabs`
@@ -784,10 +775,22 @@ export function Wallet() {
   );
 
   // Opt-in the same way: fetched only once the personal Journal tab is open,
-  // and retained across a tab toggle by the snapshot cache.
+  // and — like the corp reads above — kept alive once visited, so a tab
+  // toggle doesn't walk the cursor again.
+  const personalFillsBaseKey =
+    !showingCorp && activeCharacterId !== null ? `${activeCharacterId}` : null;
+  const [visitedFillsKey, setVisitedFillsKey] = useState<string | null>(null);
+  if (
+    walletTab === 'journal' &&
+    personalFillsBaseKey !== null &&
+    visitedFillsKey !== personalFillsBaseKey
+  ) {
+    setVisitedFillsKey(personalFillsBaseKey);
+  }
   const personalFills = useCorpSnapshot<PersonalFillsSnapshot | null>(
-    walletTab === 'journal' && !showingCorp && activeCharacterId !== null
-      ? `${activeCharacterId}`
+    personalFillsBaseKey !== null &&
+      (walletTab === 'journal' || visitedFillsKey === personalFillsBaseKey)
+      ? personalFillsBaseKey
       : null,
     async () => (activeCharacterId === null ? null : loadPersonalFills(activeCharacterId)),
     { name: 'wallet:personal-fills', characterId: activeCharacterId }
@@ -980,48 +983,16 @@ export function Wallet() {
     [t, timeZone]
   );
 
-  /** The item menu every other item table carries (issue #817), on a line tied to a fill. */
-  const buildJournalRowMenu = useCallback(
-    (
-      linkFor: (entry: WalletJournalEntry) => WalletTransactionCommon | undefined,
-      nameFor: (typeId: number) => string
-    ) =>
-      (entry: WalletJournalEntry, tr: ReactElement): ReactElement => {
-        const transaction = linkFor(entry);
-        if (!transaction) return tr;
-        return (
-          <ItemContextMenu
-            typeId={transaction.type_id}
-            itemName={nameFor(transaction.type_id)}
-            blueprintTypeID={null}
-            onAddToQuickbar={handleAddToQuickbar}
-            quickbarAvailable={quickbarAvailable}
-            onShowInfo={handleShowInfo}
-          >
-            {tr}
-          </ItemContextMenu>
-        );
-      },
-    [handleAddToQuickbar, quickbarAvailable, handleShowInfo]
-  );
-
-  const personalTransactions = personalFills.data?.transactions ?? EMPTY_TRANSACTIONS;
+  const personalTransactions = personalFills.data?.transactions ?? EMPTY_FILLS;
   const personalTypeNames = personalFills.data?.typeNames ?? NO_NAMES;
   const personalLinkFor = useMemo(
     () => journalTransactionLinks(personalTransactions),
     [personalTransactions]
   );
-  const personalNameFor = useCallback(
-    (typeId: number) => personalTypeNames.get(typeId) ?? `Type #${typeId}`,
-    [personalTypeNames]
-  );
+  const personalNameFor = useMemo(() => typeNameLookup(personalTypeNames), [personalTypeNames]);
   const journalColumns = useMemo(
     () => buildJournalColumns(personalLinkFor, personalNameFor),
     [buildJournalColumns, personalLinkFor, personalNameFor]
-  );
-  const journalRowMenu = useMemo(
-    () => buildJournalRowMenu(personalLinkFor, personalNameFor),
-    [buildJournalRowMenu, personalLinkFor, personalNameFor]
   );
 
   // Unsorted: `DataTable`'s own controlled `sort` below is the one place
@@ -1070,10 +1041,7 @@ export function Wallet() {
   const corpTypeNames = corpTransactions.data?.typeNames ?? NO_NAMES;
   // The one spelling of an item id on this tab: the table's column, the CSV
   // and the search all go through it, so what is drawn is what is searched.
-  const nameForType = useCallback(
-    (typeId: number) => corpTypeNames.get(typeId) ?? `Type #${typeId}`,
-    [corpTypeNames]
-  );
+  const nameForType = useMemo(() => typeNameLookup(corpTypeNames), [corpTypeNames]);
   const corpLinkFor = useMemo(
     () => journalTransactionLinks(corpTransactionRows),
     [corpTransactionRows]
@@ -1081,10 +1049,6 @@ export function Wallet() {
   const corpJournalColumns = useMemo(
     () => buildJournalColumns(corpLinkFor, nameForType),
     [buildJournalColumns, corpLinkFor, nameForType]
-  );
-  const corpJournalRowMenu = useMemo(
-    () => buildJournalRowMenu(corpLinkFor, nameForType),
-    [buildJournalRowMenu, corpLinkFor, nameForType]
   );
 
   // In the URL (`txn.*`, issue #1302), and reset on a division switch for the
@@ -1156,7 +1120,7 @@ export function Wallet() {
               disabled={
                 showingCorp
                   ? corpBalances.loading || corpJournal.loading || corpTransactions.loading
-                  : loading
+                  : loading || personalFills.loading
               }
             />
           </>
@@ -1252,7 +1216,6 @@ export function Wallet() {
             journal={corpJournalEntries}
             journalLoading={corpJournal.loading && corpJournal.data === null}
             journalColumns={corpJournalColumns}
-            journalRowContextMenu={corpJournalRowMenu}
             journalFilter={journalFilter}
             onJournalFilterChange={setJournalFilter}
             journalSort={journalSortProps.sort}
@@ -1509,7 +1472,6 @@ export function Wallet() {
                 sort={journalSortProps.sort}
                 onSortChange={journalSortProps.onSortChange}
                 highlightRowKey={highlightedEntryId}
-                rowContextMenu={journalRowMenu}
               />
             </>
           )}
