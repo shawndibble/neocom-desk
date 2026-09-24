@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -13,6 +13,10 @@ vi.mock('@/features/character/wallet', () => ({ loadWalletTransactions }));
 
 const loadOrders = vi.hoisted(() => vi.fn());
 vi.mock('@/features/character/orders', () => ({ loadOrders }));
+
+const onAddToQuickbar = vi.fn();
+const onShowInfo = vi.fn();
+const MENU_PROPS = { onAddToQuickbar, quickbarAvailable: true, onShowInfo };
 
 const CHARACTER_ID = 1;
 const RIFTER_TYPE_ID = 587;
@@ -120,7 +124,14 @@ beforeEach(async () => {
 describe('ProductionLogPanel', () => {
   it('shows the empty state with no runs logged anywhere', () => {
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        {...MENU_PROPS}
+        {...MENU_PROPS}
+      />,
       { wrapper: MemoryRouter }
     );
     expect(screen.getByText('No production runs logged anywhere yet')).toBeInTheDocument();
@@ -148,7 +159,14 @@ describe('ProductionLogPanel', () => {
     });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        {...MENU_PROPS}
+        {...MENU_PROPS}
+      />,
       { wrapper: MemoryRouter }
     );
 
@@ -162,7 +180,14 @@ describe('ProductionLogPanel', () => {
     await addRun({ id: 'run-3', productTypeID: RAVEN_TYPE_ID, buildPlanId: 'plan-3', quantity: 1 });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        {...MENU_PROPS}
+        {...MENU_PROPS}
+      />,
       { wrapper: MemoryRouter }
     );
 
@@ -179,11 +204,76 @@ describe('ProductionLogPanel', () => {
   it('falls back to a typeID label when the catalog has no entry for it', async () => {
     await addRun({ productTypeID: 999999 });
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        {...MENU_PROPS}
+        {...MENU_PROPS}
+      />,
       { wrapper: MemoryRouter }
     );
     const byItemTable = await screen.findByRole('table', { name: 'By item' });
     expect(within(byItemTable).getByText('#999999')).toBeInTheDocument();
+  });
+
+  it('opens the shared item menu from a By item row', async () => {
+    await addRun({ productTypeID: RIFTER_TYPE_ID });
+    onAddToQuickbar.mockClear();
+    render(
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        {...MENU_PROPS}
+      />,
+      { wrapper: MemoryRouter }
+    );
+    const table = await screen.findByRole('table', { name: 'By item' });
+    fireEvent.contextMenu(within(table).getByText('Rifter').closest('tr')!);
+    fireEvent.click(await screen.findByText('Add to Quickbar'));
+    expect(onAddToQuickbar).toHaveBeenCalledWith(RIFTER_TYPE_ID, 'Rifter');
+  });
+
+  it('opens the item menu from a runs row without navigating to the Build Plan', async () => {
+    await addRun({ id: 'run-1', productTypeID: RAVEN_TYPE_ID, buildPlanId: 'plan-3' });
+    const onOpenRun = vi.fn();
+    onShowInfo.mockClear();
+    render(
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        onOpenRun={onOpenRun}
+        {...MENU_PROPS}
+      />,
+      { wrapper: MemoryRouter }
+    );
+    const table = await runsTable();
+    fireEvent.contextMenu(within(table).getAllByRole('row')[1]);
+    fireEvent.click(await screen.findByText('Show info'));
+    expect(onShowInfo).toHaveBeenCalledWith(RAVEN_TYPE_ID, 'Raven');
+    expect(onOpenRun).not.toHaveBeenCalled();
+  });
+
+  it('renders a row bare, with no menu, when the catalog has no entry for its product', async () => {
+    await addRun({ productTypeID: 999999 });
+    render(
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        {...MENU_PROPS}
+      />,
+      { wrapper: MemoryRouter }
+    );
+    const table = await screen.findByRole('table', { name: 'By item' });
+    fireEvent.contextMenu(within(table).getByText('#999999').closest('tr')!);
+    expect(screen.queryByText('Add to Quickbar')).not.toBeInTheDocument();
   });
 
   it('lists every run in the runs table without naming which Build Plan it came from', async () => {
@@ -191,7 +281,14 @@ describe('ProductionLogPanel', () => {
     await addRun({ id: 'run-2', buildPlanId: 'plan-3', productTypeID: RAVEN_TYPE_ID });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        {...MENU_PROPS}
+        {...MENU_PROPS}
+      />,
       { wrapper: MemoryRouter }
     );
 
@@ -219,7 +316,14 @@ describe('ProductionLogPanel', () => {
     });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        {...MENU_PROPS}
+        {...MENU_PROPS}
+      />,
       { wrapper: MemoryRouter }
     );
     const table = await runsTable();
@@ -239,7 +343,14 @@ describe('ProductionLogPanel', () => {
     await addRun({ id: 'run-recent', loggedAt: recent, updatedAt: recent, quantity: 42 });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        {...MENU_PROPS}
+        {...MENU_PROPS}
+      />,
       { wrapper: MemoryRouter }
     );
     // Both present before filtering.
@@ -259,7 +370,14 @@ describe('ProductionLogPanel', () => {
     await addRun({ id: 'run-2' });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        {...MENU_PROPS}
+        {...MENU_PROPS}
+      />,
       { wrapper: MemoryRouter }
     );
 
@@ -276,7 +394,14 @@ describe('ProductionLogPanel', () => {
     await addRun({ id: 'run-recent', loggedAt: recent, updatedAt: recent });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        {...MENU_PROPS}
+        {...MENU_PROPS}
+      />,
       { wrapper: MemoryRouter }
     );
 
@@ -299,7 +424,14 @@ describe('ProductionLogPanel', () => {
     await addRun({ id: 'run-old', loggedAt: old, updatedAt: old });
 
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        {...MENU_PROPS}
+        {...MENU_PROPS}
+      />,
       { wrapper: MemoryRouter }
     );
     const user = userEvent.setup();
@@ -318,6 +450,7 @@ describe('ProductionLogPanel', () => {
         catalog={CATALOG}
         skills={{}}
         plans={PLANS}
+        {...MENU_PROPS}
         onOpenRun={onOpenRun}
       />,
       { wrapper: MemoryRouter }
@@ -339,6 +472,7 @@ describe('ProductionLogPanel', () => {
         catalog={CATALOG}
         skills={{}}
         plans={PLANS}
+        {...MENU_PROPS}
         onOpenRun={onOpenRun}
       />,
       { wrapper: MemoryRouter }
@@ -355,7 +489,14 @@ describe('ProductionLogPanel', () => {
 
     const user = userEvent.setup();
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        {...MENU_PROPS}
+        {...MENU_PROPS}
+      />,
       { wrapper: MemoryRouter }
     );
     await runsTable();
@@ -381,7 +522,14 @@ describe('ProductionLogPanel', () => {
 
     const user = userEvent.setup();
     render(
-      <ProductionLogPanel characterId={CHARACTER_ID} catalog={CATALOG} skills={{}} plans={PLANS} />,
+      <ProductionLogPanel
+        characterId={CHARACTER_ID}
+        catalog={CATALOG}
+        skills={{}}
+        plans={PLANS}
+        {...MENU_PROPS}
+        {...MENU_PROPS}
+      />,
       { wrapper: MemoryRouter }
     );
     await runsTable();

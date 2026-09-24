@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -23,6 +23,7 @@ import { cx } from '@/lib/cx';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import {
@@ -65,6 +66,10 @@ interface ProductionLogPanelProps {
   plans: BuildPlanRecord[];
   /** Row click on the runs table: hands back the run's own Build Plan so the caller can jump to it. */
   onOpenRun?: (buildPlanId: string) => void;
+  onAddToQuickbar: (typeId: number, itemName: string) => void;
+  /** False with no active character — the Quickbar has nobody to save the item under. */
+  quickbarAvailable: boolean;
+  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 interface ItemRow {
@@ -284,6 +289,9 @@ export function ProductionLogPanel({
   skills,
   plans,
   onOpenRun,
+  onAddToQuickbar,
+  quickbarAvailable,
+  onShowInfo,
 }: ProductionLogPanelProps) {
   const { t } = useTranslation();
   const [dateRange, setDateRange] = useUrlParams(DATE_RANGE_PARAMS);
@@ -385,6 +393,26 @@ export function ProductionLogPanel({
     openInventoryValue,
     avgMarginPct,
   } = rollup;
+
+  // A product the catalog doesn't know (name fell back to `#<typeID>`) has no
+  // menu to offer: the row renders bare rather than opening one titled "#123".
+  const itemMenuFor = (typeId: number, itemName: string, tr: ReactElement): ReactElement => {
+    const entry = catalog.byProductTypeID.get(typeId);
+    return entry ? (
+      <ItemContextMenu
+        typeId={typeId}
+        itemName={itemName}
+        blueprintTypeID={entry.blueprintTypeID}
+        onAddToQuickbar={onAddToQuickbar}
+        quickbarAvailable={quickbarAvailable}
+        onShowInfo={onShowInfo}
+      >
+        {tr}
+      </ItemContextMenu>
+    ) : (
+      tr
+    );
+  };
 
   const columns: DataTableColumn<ItemRow>[] = [
     {
@@ -534,6 +562,7 @@ export function ProductionLogPanel({
                 columns={columns}
                 rows={itemRows}
                 rowKey={(r) => r.productTypeID}
+                rowContextMenu={(r, tr) => itemMenuFor(r.productTypeID, r.itemName, tr)}
                 label={t('industry.byItem')}
                 sort={knownSort(itemSort, columns)}
                 onSortChange={setItemSort}
@@ -557,6 +586,7 @@ export function ProductionLogPanel({
                   columns={runColumns}
                   rows={runRows}
                   rowKey={(r) => r.run.id}
+                  rowContextMenu={(r, tr) => itemMenuFor(r.run.productTypeID, r.itemName, tr)}
                   label={t('industry.allProductionRuns')}
                   sort={knownSort(runSort, runColumns)}
                   onSortChange={setRunSort}
