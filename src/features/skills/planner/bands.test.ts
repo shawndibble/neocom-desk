@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bandStarts } from './bands';
+import { bandStarts, meaningfulBandStarts } from './bands';
 import { buildRows } from './markers';
 import type { PlanEntry, PlanPriority } from '@/engine/types';
 
@@ -63,5 +63,44 @@ describe('bandStarts', () => {
     );
     expect(result.has(markerRow.id)).toBe(false);
     expect(result.size).toBe(1);
+  });
+});
+
+describe('meaningfulBandStarts', () => {
+  it('is empty for 0 or 1 band', () => {
+    expect(meaningfulBandStarts(new Map()).size).toBe(0);
+    expect(meaningfulBandStarts(new Map([['a', 'normal' as PlanPriority]])).size).toBe(0);
+  });
+
+  it('returns the starts unchanged for 2 or more bands', () => {
+    const starts = new Map<string, PlanPriority>([
+      ['a', 'high'],
+      ['b', 'normal'],
+    ]);
+    expect(meaningfulBandStarts(starts)).toBe(starts);
+  });
+
+  it('yields no header when every entry resolves to high (prereqs inherit it)', () => {
+    const rows = buildRows([entry(1), entry(2), entry(3)], undefined);
+    const all = priorities([
+      [1, 'high'],
+      [2, 'high'],
+      [3, 'high'],
+    ]);
+    expect(meaningfulBandStarts(bandStarts(rows, all)).size).toBe(0);
+  });
+
+  it('yields two headers for high then normal', () => {
+    const rows = buildRows([entry(1), entry(2)], undefined);
+    const result = meaningfulBandStarts(
+      bandStarts(
+        rows,
+        priorities([
+          [1, 'high'],
+          [2, 'normal'],
+        ])
+      )
+    );
+    expect(result.size).toBe(2);
   });
 });

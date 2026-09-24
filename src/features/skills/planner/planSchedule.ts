@@ -28,7 +28,7 @@ import {
 } from '@/features/skills/cloneState';
 import { normalizeMarkerAttributes } from './markers';
 import { normalizeWhatIfSelection, whatIfImplants } from './whatIfImplants';
-import { resolvePlanBooster, toBooster } from './planBooster';
+import { resolvePlanBoosters, toBoosters } from './planBooster';
 
 /** What the scheduler costs against when ESI's attribute sheet cannot be read or explained. */
 export const DEFAULT_ATTRIBUTES: Attributes = {
@@ -42,7 +42,7 @@ export const DEFAULT_ATTRIBUTES: Attributes = {
 /** The persisted fields of a plan that change its schedule. */
 export type SchedulablePlan = Pick<
   SkillPlanRecord,
-  'entries' | 'markers' | 'markerAttributes' | 'whatIfImplants' | 'booster'
+  'entries' | 'markers' | 'markerAttributes' | 'whatIfImplants' | 'booster' | 'boosters'
 >;
 
 export interface PlanScheduleInputs {
@@ -69,7 +69,9 @@ export function schedulePlan(
     inputs.attributeBaseline?.kind === 'accelerated'
       ? inputs.attributeBaseline.acceleratorBonus
       : null;
-  const booster = toBooster(resolvePlanBooster(plan.booster, detectedAccelerator));
+  const boosters = toBoosters(
+    resolvePlanBoosters(plan.boosters, plan.booster, detectedAccelerator)
+  );
   const queue = projectQueueEnd(inputs.trained, inputs.queueEntries, nowMs);
   return computeSkillPlanSchedule({
     entries: plan.entries,
@@ -77,7 +79,7 @@ export function schedulePlan(
     trainedSkills: queue.trained,
     attributes: inputs.attributes,
     implants,
-    boosters: booster ? [booster] : [],
+    boosters,
     markers: plan.markers,
     markerAttributes: normalizeMarkerAttributes(
       plan.markers,

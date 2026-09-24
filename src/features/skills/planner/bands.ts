@@ -28,3 +28,16 @@ export function bandStarts(
   }
   return starts;
 }
+
+/**
+ * `starts`, or nothing when it holds fewer than two bands. A plan whose
+ * entries all resolve to one effective priority has nothing to divide, and a
+ * lone "Normal priority" header over every fresh plan labels something the
+ * player can't see or change: the Priority column is off by default (an
+ * editing control, not a reading one — see `columnPreference`).
+ */
+export function meaningfulBandStarts(
+  starts: ReadonlyMap<string, PlanPriority>
+): ReadonlyMap<string, PlanPriority> {
+  return starts.size < 2 ? new Map() : starts;
+}

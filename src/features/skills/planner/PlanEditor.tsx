@@ -57,7 +57,6 @@ import type { PlaceRemapsResult, RemapSegment } from '@/engine/optimizer';
 import type {
   AttributeName,
   Attributes,
-  Booster,
   CloneState,
   Implants,
   PlanEntry,
@@ -85,6 +84,7 @@ import { useColumnVisibility } from './columnPreference';
 import { useGroupingMode, GROUPING_MODES, type GroupingMode } from './groupingMode';
 import { attributePairBandStarts } from './attributePairBands';
 import { PlanHeader } from './PlanHeader';
+import { planProgress } from '@/engine/planProgress';
 import { PlanEditorLayout } from './PlanEditorLayout';
 import { PlanToolsPane, type PlanToolSection } from './PlanToolsPane';
 import { InjectorFactsPanel } from './InjectorFactsPanel';
@@ -120,34 +120,24 @@ import {
 } from './markers';
 import { planDrop, promotePrereq } from './planDrop';
 import { RemapMarkerModal } from './RemapMarkerModal';
-import { bandStarts } from './bands';
+import { bandStarts, meaningfulBandStarts } from './bands';
 import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueRows';
 import { timedRemapFrom, type RemapAvailability } from './remapAvailability';
 import {
   whatIfImplants,
   normalizeWhatIfSelection,
   setWhatIfBonus,
+  toCustomSelection,
   MAX_IMPLANT_BONUS,
   MIN_IMPLANT_BONUS,
   WHAT_IF_IMPLANT_PRESETS,
 } from './whatIfImplants';
-import {
-  BOOSTER_QUICK_PICKS,
-  boosterExpiryFromInput,
-  boosterExpiryFromNow,
-  boosterExpiryToInput,
-  clampBoosterBonus,
-  resolvePlanBooster,
-  toBooster,
-  MAX_BOOSTER_BONUS,
-} from './planBooster';
+import { resolvePlanBoosters, toBoosters } from './planBooster';
+import { BoosterList } from './BoosterList';
 import { ImportClipboardDialog } from './ImportClipboardDialog';
 import { useScopedState } from './useScopedState';
 import { attributeShort, remapInstruction } from './remapInstruction';
-import {
-  ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID,
-  BOOSTER_MARKET_GROUP_ID,
-} from './plannerMarketGroups';
+import { ATTRIBUTE_ENHANCERS_MARKET_GROUP_ID } from './plannerMarketGroups';
 import { buildMarketGroupParams } from '@/engine/market/urlState';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
@@ -161,7 +151,7 @@ export type PlanPatch = Partial<
     | 'markers'
     | 'markerAttributes'
     | 'whatIfImplants'
-    | 'booster'
+    | 'boosters'
     | 'milestones'
   >
 >;
@@ -420,78 +410,22 @@ export function PlanEditor({
   const detectedAccelerator =
     attributeBaseline?.kind === 'accelerated' ? attributeBaseline.acceleratorBonus : null;
 
-  // Booster (CONTEXT.md): a single optional cerebral accelerator, applying a
-  // uniform bonus to every attribute until its expiry. Saved on the plan for
-  // the same reason as the lens above.
+  // Boosters (CONTEXT.md): an ordered list of cerebral accelerators, each a
+  // uniform bonus to every attribute from an optional start until its
+  // expiry — EVE has one booster slot, so at most one is ever live. Saved on
+  // the plan for the same reason as the lens above.
   //
-  // A pure derivation, not seeded state — the prefill rule and its "an
-  // absent field is what 'unanswered' means" gate live in planBooster.ts,
+  // A pure derivation, not seeded state — the prefill rule and its "neither
+  // field stored is what 'unanswered' means" gate live in planBooster.ts,
   // where they are unit-tested; the moment the user touches any control the
-  // whole answer is written back through `patchBooster`.
-  const planBooster = useMemo<PlanBooster>(
-    () => resolvePlanBooster(plan.booster, detectedAccelerator),
-    [plan.booster, detectedAccelerator]
+  // whole answer is written back through `onChange` below. Field-level
+  // editing state (draft text, the blur-commit rule, quick picks) lives in
+  // `BoosterList` itself, which owns rendering this control.
+  const planBoosters = useMemo<PlanBooster[]>(
+    () => resolvePlanBoosters(plan.boosters, plan.booster, detectedAccelerator),
+    [plan.boosters, plan.booster, detectedAccelerator]
   );
-  const patchBooster = (patch: Partial<PlanBooster>): void =>
-    onUpdate({ booster: { ...planBooster, ...patch } });
-
-  const booster = useMemo<Booster | null>(() => toBooster(planBooster), [planBooster]);
-  const activeBoosters = useMemo<Booster[]>(() => (booster ? [booster] : []), [booster]);
-
-  // The expiry control edits text; the plan stores the instant that text
-  // names. A value that names no instant — half-typed, or emptied — has
-  // nowhere to live on the plan, so it is held here until the field is left.
-  //
-  // Committing an empty value on `change` is what makes this necessary, and
-  // it is a data-loss path, not a cosmetic one: a native `datetime-local`
-  // reports `value === ''` for ANY incomplete state, including the moment a
-  // segment of an already-complete value is cleared to retype it. Writing
-  // `null` there would erase a saved expiry mid-edit, re-cost the plan, and
-  // push the erasure to the user's other devices two seconds later. So an
-  // empty field is committed on blur — where it means "no expiry", the
-  // legitimate answer — and an unfinished one is simply dropped, leaving the
-  // stored value standing.
-  //
-  // Keyed, so a draft can only ever mask the value it was typed against:
-  // switching plans, or a sync pulling a new expiry in from another device
-  // mid-typing, both discard it.
-  const [expiryDraft, setExpiryDraft] = useState<{ key: string; text: string } | null>(null);
-  const expiryDraftKey = `${plan.id}:${planBooster.expiresAt ?? ''}`;
-  const boosterExpiresAtInput =
-    (expiryDraft?.key === expiryDraftKey ? expiryDraft.text : null) ??
-    boosterExpiryToInput(planBooster.expiresAt);
-  const handleBoosterExpiryChange = (raw: string): void => {
-    const expiresAt = boosterExpiryFromInput(raw);
-    if (expiresAt === null) {
-      setExpiryDraft({ key: expiryDraftKey, text: raw });
-      return;
-    }
-    setExpiryDraft(null);
-    patchBooster({ expiresAt });
-  };
-  const handleBoosterExpiryBlur = (): void => {
-    if (expiryDraft === null) return;
-    setExpiryDraft(null);
-    // Only a deliberately emptied field is an answer. Anything else is an
-    // edit the user walked away from, and the stored expiry survives it.
-    if (expiryDraft.text === '' && planBooster.expiresAt !== null) {
-      patchBooster({ expiresAt: null });
-    }
-  };
-  // Bypasses the datetime-local round trip entirely: a quick pick is a
-  // direct answer, not text to parse, so any half-typed draft it supersedes
-  // is dropped along with it.
-  const handleBoosterQuickPick = (hours: number): void => {
-    setExpiryDraft(null);
-    patchBooster({ expiresAt: boosterExpiryFromNow(hours) });
-  };
-
-  // Display-only "expired" hint: reads the wall clock, which is unavoidably
-  // impure (there's no ticking-clock store in this codebase to subscribe to
-  // instead). computeSchedule itself is unaffected — it already treats a
-  // past expiry as "no bonus" regardless of this flag.
-  // eslint-disable-next-line react-hooks/purity -- see comment above
-  const boosterExpired = booster !== null && booster.expiresAt.getTime() <= Date.now();
+  const activeBoosters = useMemo(() => toBoosters(planBoosters), [planBoosters]);
 
   // useCallback'd (#408): both cross into EntryList as per-row props
   // (`nameFor`/`attributesFor`), which now wraps its rows in `React.memo` —
@@ -565,6 +499,7 @@ export function PlanEditor({
           markerAttributes: plan.markerAttributes,
           whatIfImplants: plan.whatIfImplants,
           booster: plan.booster,
+          boosters: plan.boosters,
         },
         {
           catalog,
@@ -583,6 +518,7 @@ export function PlanEditor({
       plan.markerAttributes,
       plan.whatIfImplants,
       plan.booster,
+      plan.boosters,
       catalog,
       trainedSkills,
       queueEntries,
@@ -634,6 +570,22 @@ export function PlanEditor({
     () => milestoneStatuses.filter((s) => s.state === 'orphaned'),
     [milestoneStatuses]
   );
+  const headerProgress = useMemo(
+    () => planProgress(plan.entries, catalog.engineSkills, trainedSkills),
+    [plan.entries, catalog.engineSkills, trainedSkills]
+  );
+  const headerNextStep = useMemo(() => {
+    const first = schedule.scheduled[0];
+    const name = first && catalog.engineSkills.get(first.skillTypeID)?.name;
+    return first && name
+      ? {
+          name,
+          level: first.level,
+          cumulativeSeconds: first.cumulativeSeconds,
+          startDate: schedule.startDate,
+        }
+      : null;
+  }, [schedule, catalog.engineSkills]);
   const headerNextMilestone = useMemo(() => {
     const next = nextMilestone(milestoneStatuses);
     return next && next.finish ? { name: next.milestone.name, finish: next.finish } : null;
@@ -724,7 +676,10 @@ export function PlanEditor({
         [...placed].map(([id, pair]) => [id, { kind: 'attributePair', ...pair } as const])
       );
     }
-    const placed = placeBandHeaders(mergedRows, bandStarts(rows, priorityMap));
+    const placed = placeBandHeaders(
+      mergedRows,
+      meaningfulBandStarts(bandStarts(rows, priorityMap))
+    );
     return new Map(
       [...placed].map(([id, priority]) => [id, { kind: 'priority', priority } as const])
     );
@@ -1651,12 +1606,14 @@ export function PlanEditor({
               {t('plans.whatIfImplants')}
               <Select
                 value={whatIf.kind === 'custom' ? 'custom' : whatIf.preset}
-                // 'custom' is a readout of the grid below, never a thing to
-                // pick: it is in the list only while it is already the state,
-                // and its `disabled` SelectItem is what keeps Radix from
-                // firing this for it.
+                // Picking 'custom' freezes what is in force into five editable
+                // slots without changing a number (toCustomSelection).
                 onValueChange={(value) =>
-                  setWhatIf({ kind: 'preset', preset: value as WhatIfImplantPreset })
+                  setWhatIf(
+                    value === 'custom'
+                      ? toCustomSelection(whatIf, implants)
+                      : { kind: 'preset', preset: value as WhatIfImplantPreset }
+                  )
                 }
               >
                 <SelectTrigger size="md" aria-label={t('plans.whatIfImplants')} className="w-36">
@@ -1672,13 +1629,7 @@ export function PlanEditor({
                           : preset}
                     </SelectItem>
                   ))}
-                  {whatIf.kind === 'custom' && (
-                    // Readout only — disabled so it displays as the trigger's
-                    // current value but can never be picked from the list.
-                    <SelectItem value="custom" disabled>
-                      {t('plans.whatIfCustom')}
-                    </SelectItem>
-                  )}
+                  <SelectItem value="custom">{t('plans.whatIfCustom')}</SelectItem>
                 </SelectContent>
               </Select>
             </label>
@@ -1686,140 +1637,59 @@ export function PlanEditor({
           </div>
 
           {/* EVE's hardwirings are per slot (+4 PER / +5 INT / nothing in
-              CHA), which a uniform preset cannot say. One row of five, always
-              visible: a preset fills them in, editing one leaves the other
-              four alone and flips the select above to "Custom", so what the
-              plan is being costed against is legible without opening
-              anything. The three-letter codes are the same abbreviation the
+              CHA), which a uniform preset cannot say. One row of five, shown
+              only under "Custom" (pick it, or edit a value): editing one
+              leaves the other four alone. Under a preset a one-line readout
+              says what the plan is being costed against. The three-letter codes are the same abbreviation the
               entry list's attribute-pair badge uses; each input's accessible
               name spells the attribute out. */}
-          <div
-            role="group"
-            aria-label={t('plans.whatIfPerAttribute')}
-            className="grid grid-cols-5 gap-1"
-          >
-            {ATTRIBUTE_NAMES.map((name) => (
-              <label key={name} className="flex flex-col items-center gap-0.5">
-                <span className="text-[0.625rem] tracking-wide text-text-dim uppercase">
-                  {attributeShort(name)}
-                </span>
-                <TextInput
-                  size="md"
-                  type="number"
-                  min={MIN_IMPLANT_BONUS}
-                  max={MAX_IMPLANT_BONUS}
-                  step={1}
-                  aria-label={t('plans.whatIfAttributeBonus', {
-                    attribute: t(`skills.attr.${name}`),
-                  })}
-                  value={effectiveImplants[name]}
-                  onChange={(e) =>
-                    setWhatIf(setWhatIfBonus(whatIf, implants, name, Number(e.target.value)))
-                  }
-                  // `field-no-spinner` (src/styles/index.css): Chrome draws
-                  // the spin buttons on hover and focus into a 29.6px content
-                  // box, taking about half of it and shoving the digit left —
-                  // so the cell under the cursor would break the row's
-                  // alignment with the other four.
-                  className="field-no-spinner w-full text-center"
-                />
-              </label>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            <label className="flex items-center gap-1.5">
-              <input
-                type="checkbox"
-                checked={planBooster.enabled}
-                onChange={(e) => patchBooster({ enabled: e.target.checked })}
-                className="size-4 shrink-0 cursor-pointer accent-accent"
-              />
-              {t('plans.booster')}
-            </label>
-            {marketGroupLink(t('plans.boosterMarketLink'), BOOSTER_MARKET_GROUP_ID)}
-          </div>
-          {/* Outside the checkbox's own block on purpose: unticking it is a
-              legitimate answer ("that accelerator is gone"), and the reason
-              the sheet was corrected has to survive that. */}
-          {detectedAccelerator !== null && (
+          {whatIf.kind === 'custom' ? (
+            <div
+              role="group"
+              aria-label={t('plans.whatIfPerAttribute')}
+              className="grid grid-cols-5 gap-1"
+            >
+              {ATTRIBUTE_NAMES.map((name) => (
+                <label key={name} className="flex flex-col items-center gap-0.5">
+                  <span className="text-[0.625rem] tracking-wide text-text-dim uppercase">
+                    {attributeShort(name)}
+                  </span>
+                  <TextInput
+                    size="md"
+                    type="number"
+                    min={MIN_IMPLANT_BONUS}
+                    max={MAX_IMPLANT_BONUS}
+                    step={1}
+                    aria-label={t('plans.whatIfAttributeBonus', {
+                      attribute: t(`skills.attr.${name}`),
+                    })}
+                    value={effectiveImplants[name]}
+                    onChange={(e) =>
+                      setWhatIf(setWhatIfBonus(whatIf, implants, name, Number(e.target.value)))
+                    }
+                    // `field-no-spinner` (src/styles/index.css): Chrome draws
+                    // the spin buttons on hover and focus into a 29.6px content
+                    // box, taking about half of it and shoving the digit left —
+                    // so the cell under the cursor would break the row's
+                    // alignment with the other four.
+                    className="field-no-spinner w-full text-center"
+                  />
+                </label>
+              ))}
+            </div>
+          ) : (
             <p className="text-[0.6875rem] text-text-dim">
-              {t('plans.boosterDetected', { bonus: detectedAccelerator })}
+              {ATTRIBUTE_NAMES.map(
+                (name) => `${attributeShort(name)} +${effectiveImplants[name]}`
+              ).join(' · ')}
             </p>
           )}
-          {planBooster.enabled && (
-            // Indented under its own checkbox: these only exist while the
-            // booster is on, and the rule says so without a second heading.
-            <div className="space-y-2 border-l border-line pl-2">
-              <label className="flex items-center justify-between gap-2">
-                {t('plans.boosterBonus')}
-                <TextInput
-                  size="md"
-                  type="number"
-                  min={1}
-                  // Generous by design (planBooster.ts): a detected bonus
-                  // the field could not hold would be prefilled into an
-                  // invalid input.
-                  max={MAX_BOOSTER_BONUS}
-                  value={planBooster.bonus}
-                  // Clamped at the write, like Remaps Available above and
-                  // the industry panel's runs/ME/TE: storing a 45 the plan
-                  // is not costed under would make the record disagree with
-                  // every number on the page, and would resurrect the 45 the
-                  // day the cap moves.
-                  onChange={(e) =>
-                    patchBooster({ bonus: clampBoosterBonus(Number(e.target.value)) })
-                  }
-                  className="field-no-spinner w-16 text-center"
-                />
-              </label>
-              <label className="flex items-center justify-between gap-2">
-                {t('plans.boosterExpiresAt')}
-                {/* `min-w-0` so a datetime field can shrink inside the
-                    sidebar instead of forcing the column wider. */}
-                <TextInput
-                  size="md"
-                  type="datetime-local"
-                  // The control edits local wall-clock text; the plan stores
-                  // the instant it names, because the plan syncs and a bare
-                  // wall-clock string would mean a different moment on a
-                  // device in another timezone (planBooster.ts).
-                  value={boosterExpiresAtInput}
-                  onChange={(e) => handleBoosterExpiryChange(e.target.value)}
-                  onBlur={handleBoosterExpiryBlur}
-                  className="min-w-0 flex-1"
-                />
-              </label>
-              {/* One click each, so the notice below has something to act
-                  on immediately instead of sending the user to a native
-                  date picker. */}
-              <div
-                role="group"
-                aria-label={t('plans.boosterQuickPicks')}
-                className="flex flex-wrap gap-1"
-              >
-                {BOOSTER_QUICK_PICKS.map(({ hours }) => (
-                  <button
-                    key={hours}
-                    type="button"
-                    onClick={() => handleBoosterQuickPick(hours)}
-                    className="min-h-7 rounded-xs border border-line px-1.5 text-[0.6875rem] text-text-dim hover:border-line-bright hover:text-text"
-                  >
-                    {hours % 24 === 0
-                      ? t('plans.boosterQuickPickDays', { days: hours / 24 })
-                      : t('plans.boosterQuickPickHours', { hours })}
-                  </button>
-                ))}
-              </div>
-              {/* A blank expiry means no Booster is applied at all, so a
-                  prefilled bonus would otherwise sit there looking active
-                  while every number on the page ignored it. */}
-              {detectedAccelerator !== null && planBooster.expiresAt === null && (
-                <p className="text-warning">{t('plans.boosterDetectedNoExpiry')}</p>
-              )}
-              {boosterExpired && <p className="text-warning">{t('plans.boosterExpired')}</p>}
-            </div>
-          )}
+
+          <BoosterList
+            boosters={planBoosters}
+            detectedAccelerator={detectedAccelerator}
+            onChange={(boosters) => onUpdate({ boosters })}
+          />
         </div>
       ),
     },
@@ -1861,6 +1731,9 @@ export function PlanEditor({
           projectedFinish={planFinish}
           badge={headerBadge}
           nextMilestone={headerNextMilestone}
+          progress={headerProgress}
+          nextStep={headerNextStep}
+          trainedKnown={trainedSkillsKnown}
         />
 
         {/* Plan Milestones (CONTEXT.md) whose entry was removed from the plan
@@ -1890,17 +1763,7 @@ export function PlanEditor({
 
         {!isDesktop && toolsPane}
 
-        <Panel
-          title={t('plans.yourEntries')}
-          actions={
-            <div className="flex flex-wrap items-center justify-end gap-2 text-[0.6875rem] whitespace-nowrap text-text-dim">
-              <span className="tabular-nums">{formatDuration(totalSeconds)}</span>
-              {planFinish && (
-                <span>{t('plans.projectedFinish', { date: formatLocalDate(planFinish) })}</span>
-              )}
-            </div>
-          }
-        >
+        <Panel title={t('plans.yourEntries')}>
           <div className="space-y-3">
             <LiveQueueLead
               projection={queueProjection}

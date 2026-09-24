@@ -1023,6 +1023,48 @@ describe('placeRemaps with Boosters', () => {
     });
     expect(expired.totalSeconds).toBeCloseTo(blind.totalSeconds, 9);
   });
+
+  it('reports, for every segment, the time computeSchedule says it takes with a startsAt Booster', async () => {
+    const { computeSchedule } = await import('@/engine/schedule');
+    const boosters = [{ bonus, startsAt: after(1000), expiresAt: after(6000) }];
+    const result = placeRemaps(steps, skills, {
+      remapCount: 2,
+      currentAttributes: CURRENT,
+      booster: { boosters, startDate: START },
+    });
+    let elapsedSeconds = 0;
+    for (const segment of result.segments) {
+      const segmentSteps = steps.slice(segment.startIndex, segment.endIndex + 1);
+      const scheduled = computeSchedule(
+        segmentSteps,
+        { attributes: segment.attributes, boosters, startDate: after(elapsedSeconds) },
+        skills
+      );
+      const segmentTotal = scheduled[scheduled.length - 1].cumulativeSeconds;
+      expect(segment.seconds).toBeCloseTo(segmentTotal, 6);
+      elapsedSeconds += segment.seconds;
+    }
+  });
+
+  it('stays fast at 300 steps with a Booster starting mid-plan', () => {
+    // A far-future expiry (well past every plausible finish) with a
+    // mid-plan startsAt makes almost every DP start call
+    // `bestAttributesAtBoundaries`, which is the case the piecewise-start
+    // rewrite risks slowing down: walking every step for a segment that
+    // never actually sees the Booster lapse.
+    const { steps: genSteps, skills: genSkills } = generatePlan(300, 7331);
+    const start = performance.now();
+    const result = placeRemaps(genSteps, genSkills, {
+      remapCount: 2,
+      currentAttributes: CURRENT,
+      booster: {
+        boosters: [{ bonus, startsAt: after(50_000), expiresAt: after(5_000_000) }],
+        startDate: START,
+      },
+    });
+    expect(performance.now() - start).toBeLessThan(3000);
+    expect(result.segments.length).toBeGreaterThanOrEqual(1);
+  });
 });
 
 /**
