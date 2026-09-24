@@ -172,6 +172,44 @@ test('the entry priority pill keeps its pointer-sized box at and above md (1280p
   expect(height).toBeLessThan(24);
 });
 
+/**
+ * Skill injectors panel (issue #1408): the tools pane collapses into a single
+ * `Disclosure` below `lg`, so this exercises both that collapse and the panel
+ * itself — a stubbed Fuzzwork price for Large Skill Injector (typeId 40520)
+ * so the price row renders a real figure instead of "no sell orders".
+ */
+test('the Skill injectors panel renders with a priced Large Skill Injector at 390px', async ({
+  page,
+}) => {
+  await signInAndGoto(page);
+  // Level 4, not the other tests' level 1: a level-1 rank-1 skill needs only
+  // 250 SP, comfortably under the fixture's 500 unallocated SP, so the panel
+  // would read "already covered" instead of exercising the priced path below.
+  await seedPlan(page, [{ skillTypeID: SKILL.spaceshipCommand, targetLevel: 4 }]);
+  await page.route('https://market.fuzzwork.co.uk/**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        40520: {
+          sell: { min: '700000000', volume: '50', orderCount: '12' },
+          buy: { max: '650000000', volume: '30', orderCount: '8' },
+        },
+      }),
+    });
+  });
+  await page.goto(`./skills/plans/${PLAN_ID}`);
+  await page.setViewportSize(PHONE);
+
+  await page.getByRole('button', { name: 'Plan tools' }).click();
+  await expect(page.getByRole('heading', { name: 'Skill injectors' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Large Skill Injector' })).toBeVisible();
+  // IskAmount's accessible name carries the exact figure the compact
+  // shorthand elides — the stubbed sell price. One injector needed, so the
+  // per-injector and total rows both read 700,000,000 ISK.
+  await expect(page.locator('[aria-label="700,000,000.00 ISK"]')).toHaveCount(2);
+});
+
 test("naming a milestone from an entry row shows it as the header's next milestone", async ({
   page,
 }) => {

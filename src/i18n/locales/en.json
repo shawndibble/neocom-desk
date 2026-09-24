@@ -348,6 +348,21 @@
     "headerNoFinish": "—",
     "headerSavingsLabel": "Remap savings",
     "headerSavingsNone": "None",
+    "injectors": {
+      "title": "Skill injectors",
+      "ifInjectedNow": "If injected now:",
+      "spToTrain": "SP still to train",
+      "unallocated": "Unallocated SP",
+      "gap": "SP gap",
+      "count": "Large Skill Injectors needed",
+      "surplus": "SP left over",
+      "pricePer": "Price per injector",
+      "priceTotal": "Total cost",
+      "noSellOrders": "No sell orders at {{hub}}",
+      "spUnknown": "Unknown until your total SP loads.",
+      "none": "Your plan is already covered by unallocated SP — no injectors needed.",
+      "alphaCaveat": "Alpha Clone injection limits differ from the numbers above."
+    },
     "milestone": {
       "addLabel": "Add milestone to {{name}}",
       "addTitle": "Name this milestone",

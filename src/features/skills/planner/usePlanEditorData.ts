@@ -52,6 +52,10 @@ export interface PlanEditorData {
   queueEntries: readonly SkillQueueEntry[];
   /** When the queue was read, for a `DataAgeBadge`; null when it never was. */
   queueFetchedAt: Date | null;
+  /** Queue-corrected total SP (`loadCorrectedSkills`), null until /skills has loaded. */
+  totalSp: number | null;
+  /** ESI's `unallocated_sp`, null until /skills has loaded or when ESI omits it. */
+  unallocatedSp: number | null;
 }
 
 /**
@@ -74,6 +78,8 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
   const [remapInfo, setRemapInfo] = useState<RemapAvailability | null>(null);
   const [queueEntries, setQueueEntries] = useState<readonly SkillQueueEntry[]>([]);
   const [queueFetchedAt, setQueueFetchedAt] = useState<Date | null>(null);
+  const [totalSp, setTotalSp] = useState<number | null>(null);
+  const [unallocatedSp, setUnallocatedSp] = useState<number | null>(null);
 
   useEffect(() => {
     if (characterId === null) return;
@@ -94,6 +100,8 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
       setTrainedSkillsKnown(corrected.skillsResult !== null);
       setQueueEntries(corrected.queueResult?.data ?? []);
       setQueueFetchedAt(corrected.queueResult?.fetchedAt ?? null);
+      setTotalSp(corrected.totalSp);
+      setUnallocatedSp(corrected.skillsResult?.data.unallocated_sp ?? null);
       if (attrs?.data) {
         // An `impossible` sheet yields no baseline at all, so the scheduler
         // falls back to the same placeholder it uses when ESI cannot be read.
@@ -123,5 +131,7 @@ export function usePlanEditorData(characterId: number | null): PlanEditorData {
     remapInfo,
     queueEntries,
     queueFetchedAt,
+    totalSp,
+    unallocatedSp,
   };
 }
