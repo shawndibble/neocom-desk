@@ -348,6 +348,11 @@
     "headerNoFinish": "—",
     "headerSavingsLabel": "Remap savings",
     "headerSavingsNone": "None",
+    "headerTrained": "Trained",
+    "headerTrainedSp": "{{trained}} / {{total}} SP",
+    "headerNextStep": "Next step",
+    "headerNextStepValue": "{{name}} {{level}}",
+    "headerNothingLeft": "Nothing left to train",
     "milestone": {
       "addLabel": "Add milestone to {{name}}",
       "addTitle": "Name this milestone",

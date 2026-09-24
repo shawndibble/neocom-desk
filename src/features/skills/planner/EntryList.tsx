@@ -29,8 +29,9 @@ import * as Icon from '@/components/ui/icons';
 import { PRIORITY_ORDER } from '@/engine/planPriority';
 import type { MilestoneState, MilestoneStatus } from '@/engine/skillPlanMilestones';
 import type { AttributeName, Attributes, Implants, PlanPriority } from '@/engine/types';
-import { formatDuration, stepFinish } from '@/lib/duration';
+import { formatDuration } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
+import { doneByText } from './doneBy';
 import type { AttributePair } from './attributePairBands';
 import type { ColumnVisibility } from './columnPreference';
 import type { MergedRow } from './queueRows';
@@ -142,17 +143,6 @@ function MetaValue({ label, value }: { label: string; value: string }) {
       <span className="text-text-dim">{label}</span> {value}
     </span>
   );
-}
-
-/**
- * When this step finishes training, as a local calendar date. Falls back to the
- * running total as a duration when the caller has no wall-clock basis to offer
- * (`startDate` omitted) — the number is still true, just not yet a date.
- */
-function doneByText(cumulativeSeconds: number, startDate: Date | undefined): string {
-  return startDate === undefined
-    ? formatDuration(cumulativeSeconds)
-    : formatLocalDate(stepFinish(cumulativeSeconds, startDate));
 }
 
 /** Priority pill tones — hierarchy by text weight only; status colors carry meaning here (docs/DESIGN.md §6). */
