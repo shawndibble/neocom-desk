@@ -401,6 +401,52 @@ describe('EntryList narrow vs desktop layout (#114)', () => {
       restore();
     }
   });
+
+  // The desktop header above these columns is visual only, so each cell
+  // carries its own `sr-only` label — the mobile meta line already showed
+  // this inline (`MetaValue`'s "Takes 1m" pairing).
+  it("labels each entry row's Takes/Done by cell for screen readers, on desktop only", () => {
+    const restore = mockDesktop(true);
+    try {
+      render(<EntryList rows={[entryRow(1, [5])]} bandsAt={new Map()} {...defaultProps} />);
+      expect(screen.getByText('Takes:')).toBeInTheDocument();
+      expect(screen.getByText('Done by:')).toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
+
+  it("labels a prereq row's cells too, and drops the sr-only labels on the narrow layout (already labelled inline)", () => {
+    const rows: MergedRow[] = [
+      {
+        kind: 'prereq',
+        id: 'prereq-9-1',
+        step: { skillTypeID: 9, level: 1, sp: 250, seconds: 50, cumulativeSeconds: 50 },
+        stepIndex: 0,
+      },
+      entryRow(1, [1]),
+    ];
+
+    let restore = mockDesktop(true);
+    try {
+      const { unmount } = render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+      // One label per row: the prereq row's own cell, and the entry row's.
+      expect(screen.getAllByText('Takes:')).toHaveLength(2);
+      expect(screen.getAllByText('Done by:')).toHaveLength(2);
+      unmount();
+    } finally {
+      restore();
+    }
+
+    restore = mockDesktop(false);
+    try {
+      render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+      expect(screen.queryByText('Takes:')).not.toBeInTheDocument();
+      expect(screen.queryByText('Done by:')).not.toBeInTheDocument();
+    } finally {
+      restore();
+    }
+  });
 });
 
 describe('EntryList finish date (#20)', () => {
@@ -435,31 +481,99 @@ describe('EntryList finish date (#20)', () => {
   });
 });
 
-describe('EntryList reorder affordance', () => {
-  it('offers the drag handle alone at every width — no Up/Down buttons', () => {
+describe('EntryList reorder affordance (#1493)', () => {
+  // See MoveMenu's own docstring for why this is a menu, not the twin
+  // Up/Down buttons #223 shipped and reverted.
+  const rows: MergedRow[] = [
+    entryRow(1, [0]),
+    { kind: 'marker', id: markerRowId(0), markerIndex: 0 },
+    entryRow(2, [1]),
+  ];
+
+  it('offers a Move menu beside the drag handle, at every width', () => {
     for (const desktop of [false, true]) {
       const restore = mockDesktop(desktop);
       try {
-        const rows: MergedRow[] = [
-          entryRow(1, [0]),
-          { kind: 'marker', id: markerRowId(0), markerIndex: 0 },
-          entryRow(2, [1]),
-        ];
         const { unmount } = render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
 
-        // Touch drag works on the handle (it carries `touch-action: none`),
-        // so the Up/Down pair #223 added as a stand-in is gone — it cost two
-        // 36px controls per row, which is what squeezed the skill name on a
-        // phone.
-        expect(screen.queryByRole('button', { name: /move .* (up|down)/i })).toBeNull();
-        expect(screen.getByRole('button', { name: /reorder skill 1/i })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /reorder remap marker/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /reorder skill 1 i/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Move Skill 1 I' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Move Remap marker' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Move Skill 2 I' })).toBeInTheDocument();
 
         unmount();
       } finally {
         restore();
       }
     }
+  });
+
+  it('moves an entry down onto the following row, the same drop a drag onto it would make', async () => {
+    const user = userEvent.setup();
+    const calls: Array<[string, string]> = [];
+    render(
+      <EntryList
+        rows={rows}
+        bandsAt={new Map()}
+        {...defaultProps}
+        onReorder={(activeId, overId) => calls.push([activeId, overId])}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Move Skill 1 I' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Move down' }));
+
+    expect(calls).toEqual([[entryId(entry(1, 1)), markerRowId(0)]]);
+  });
+
+  it('moves a marker up onto the preceding row', async () => {
+    const user = userEvent.setup();
+    const calls: Array<[string, string]> = [];
+    render(
+      <EntryList
+        rows={rows}
+        bandsAt={new Map()}
+        {...defaultProps}
+        onReorder={(activeId, overId) => calls.push([activeId, overId])}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Move Remap marker' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Move up' }));
+
+    expect(calls).toEqual([[markerRowId(0), entryId(entry(1, 1))]]);
+  });
+
+  it('disables Move up on the first row and Move down on the last, rather than moving nowhere', async () => {
+    const user = userEvent.setup();
+    render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+
+    await user.click(screen.getByRole('button', { name: 'Move Skill 1 I' }));
+    expect(screen.getByRole('menuitem', { name: 'Move up' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    await user.keyboard('{Escape}');
+
+    await user.click(screen.getByRole('button', { name: 'Move Skill 2 I' }));
+    expect(screen.getByRole('menuitem', { name: 'Move down' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+  });
+});
+
+describe('EntryList drag announcements (#1493)', () => {
+  // Dynamic per-drag naming/position is buildRowAnnouncer's job, unit-tested
+  // in rowAnnouncer.test.ts — jsdom can't drive an actual drag. This only
+  // checks the wiring reaches dnd-kit's `screenReaderInstructions`.
+  it('renders the translated keyboard instructions dnd-kit exposes up front', () => {
+    const rows: MergedRow[] = [
+      entryRow(1, [0]),
+      { kind: 'marker', id: markerRowId(0), markerIndex: 0 },
+    ];
+    render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
+    expect(screen.getByText(/to pick up an entry or remap marker/i)).toBeInTheDocument();
   });
 });
 
