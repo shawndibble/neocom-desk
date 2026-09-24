@@ -601,6 +601,31 @@
   }
 
   /*
+   * One-shot flash for a Fitting readout that just went over budget. The
+   * text still says "over by N" (DESIGN.md §7: colour never alone); this is
+   * only the attention cue, and reduced motion swaps it for a single fade.
+   */
+  .flash-danger {
+    animation: flash-danger 0.9s ease-out 1;
+  }
+
+  @keyframes flash-danger {
+    0%,
+    100% {
+      background-color: transparent;
+    }
+    40% {
+      background-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .flash-danger {
+      animation: row-pulse-fade 2.4s ease-out 1;
+    }
+  }
+
+  /*
    * Reduced motion drops the flashing but keeps the *ending*: one slow fade
    * from tint to nothing, no repeats.
    *

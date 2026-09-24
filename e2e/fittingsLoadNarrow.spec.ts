@@ -23,6 +23,24 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     page,
   }) => {
     await signInAndGoto(page, './fittings');
+    // The Fitting's skill gaps read each fitted type's requirements from
+    // `/universe/types/{id}`, which the shared ESI mock only carries a few
+    // fixture types for — answer for any id, with no skill requirements.
+    await page.route(/\/universe\/types\/\d+$/, async (route) => {
+      const typeId = Number(/\/universe\/types\/(\d+)$/.exec(route.request().url())![1]);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          type_id: typeId,
+          name: `Type ${typeId}`,
+          description: '',
+          group_id: 46,
+          published: true,
+          dogma_attributes: [],
+        }),
+      });
+    });
     await page.setViewportSize(PHONE);
 
     await page.getByLabel('Paste EFT fit text').fill(RIFTER_EFT);

@@ -3,7 +3,9 @@
  * `./urlState.ts`'s codecs.
  *
  * - **Replace, not push.** A filter keystroke or a sort click is not a place
- *   Back should return to; tab switches (`usePageTab`) are the pushes.
+ *   Back should return to; tab switches (`usePageTab`) are the pushes. A
+ *   write that *is* a place to return to — a Fitting edit (issue #1533) —
+ *   opts in with `{ push: true }`.
  * - **Debounced text.** A codec with `debounceMs` holds its value locally and
  *   writes once typing pauses; any other key changing in the same update
  *   flushes the pending text with it, in one navigation.
@@ -40,6 +42,11 @@ export type UrlParamSchema = Record<
   }
 >;
 
+/** `push` adds a history entry instead of replacing the current one. */
+export interface UrlWriteOptions {
+  push?: boolean;
+}
+
 export type UrlParamValues<S extends UrlParamSchema> = {
   [K in keyof S]: S[K] extends UrlParamCodec<infer T> ? T : never;
 };
@@ -48,7 +55,7 @@ type AnyCodec = UrlParamCodec<unknown>;
 
 export function useUrlParams<S extends UrlParamSchema>(
   schema: S
-): [UrlParamValues<S>, (patch: Partial<UrlParamValues<S>>) => void] {
+): [UrlParamValues<S>, (patch: Partial<UrlParamValues<S>>, options?: UrlWriteOptions) => void] {
   const location = useLocation();
   const navigate = useNavigate();
   const codecs = schema as unknown as Record<string, AnyCodec>;
@@ -81,7 +88,7 @@ export function useUrlParams<S extends UrlParamSchema>(
   );
 
   const flush = useCallback(
-    (values: Record<string, unknown>) => {
+    (values: Record<string, unknown>, push = false) => {
       timer.current = null;
       // One transition for both: `BrowserRouter` applies a navigation inside
       // `startTransition`, so clearing `pending` urgently would commit a frame
@@ -89,14 +96,14 @@ export function useUrlParams<S extends UrlParamSchema>(
       // write in that frame would start from the stale query string.
       startTransition(() => {
         setPending({});
-        writeParams(latest.current.location, latest.current.navigate, codecs, values);
+        writeParams(latest.current.location, latest.current.navigate, codecs, values, push);
       });
     },
     [codecs]
   );
 
   const setValues = useCallback(
-    (patch: Partial<UrlParamValues<S>>) => {
+    (patch: Partial<UrlParamValues<S>>, options?: UrlWriteOptions) => {
       const { urlValues: current, pending: queued } = latest.current;
       const next = { ...queued, ...(patch as Record<string, unknown>) };
       let wait = 0;
@@ -114,11 +121,11 @@ export function useUrlParams<S extends UrlParamSchema>(
       // sees this one's value as its "before".
       latest.current = { ...latest.current, pending: next };
       if (immediate || wait === 0) {
-        flush(next);
+        flush(next, options?.push);
         return;
       }
       setPending(next);
-      timer.current = setTimeout(() => flush(latest.current.pending), wait);
+      timer.current = setTimeout(() => flush(latest.current.pending, options?.push), wait);
     },
     [codecs, flush]
   );
@@ -131,7 +138,8 @@ function writeParams(
   location: Location,
   navigate: NavigateFunction,
   codecs: Record<string, AnyCodec>,
-  values: Record<string, unknown>
+  values: Record<string, unknown>,
+  push: boolean
 ): void {
   const params = new URLSearchParams(location.search);
   for (const [key, value] of Object.entries(values)) {
@@ -143,16 +151,20 @@ function writeParams(
   if (`?${search}` === location.search || (search === '' && location.search === '')) return;
   navigate(
     { pathname: location.pathname, search: search === '' ? '' : `?${search}`, hash: location.hash },
-    { replace: true, state: location.state }
+    { replace: !push, state: location.state }
   );
 }
 
 /** One URL-backed value; `useUrlParams` with a single key. */
-export function useUrlParam<T>(key: string, codec: UrlParamCodec<T>): [T, (value: T) => void] {
+export function useUrlParam<T>(
+  key: string,
+  codec: UrlParamCodec<T>
+): [T, (value: T, options?: UrlWriteOptions) => void] {
   const schema = useMemo(() => ({ [key]: codec }) as unknown as UrlParamSchema, [key, codec]);
   const [values, setValues] = useUrlParams(schema);
   const setValue = useCallback(
-    (value: T) => setValues({ [key]: value } as Partial<UrlParamValues<UrlParamSchema>>),
+    (value: T, options?: UrlWriteOptions) =>
+      setValues({ [key]: value } as Partial<UrlParamValues<UrlParamSchema>>, options),
     [key, setValues]
   );
   return [(values as Record<string, T>)[key], setValue];
