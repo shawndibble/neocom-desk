@@ -40,6 +40,8 @@ Legend: **Value** = value to a new/casual player. **Effort** = build cost agains
 
 ### 2.2 Ship fitting (we have none)
 
+> **Superseded (2026-09-24):** Neocom Desk now builds a fitter — see `docs/context/decisions/20260924-150509-fittings-section-a-fitter-after-all.md` and ADR 0016.
+
 We have zero fitting capability today. Full pyfa/EVE Workbench depth (DPS graphs, tank/resist modeling, drone/ammo swaps, stacking penalties, target-profile sim) is out of scope for a v1 companion app — that's a dedicated tool's whole job, not a bolt-on.
 
 **Minimal viable fitting interop** (interop only, not a fitting simulator):
