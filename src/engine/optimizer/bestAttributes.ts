@@ -233,43 +233,57 @@ interface BonusSegment {
   endSeconds: number;
 }
 
+/** One Booster's live window, as elapsed seconds from the segment's own start. */
+interface BoosterWindow {
+  bonus: Partial<Attributes>;
+  /** Clamped to 0: a start before this segment began means "already running". */
+  startOffset: number;
+  expiryOffset: number;
+}
+
+/** The stacked bonus of every window live at `t` (`startOffset <= t < expiryOffset`). */
+function stackedBonusAt(windows: readonly BoosterWindow[], t: number): Partial<Attributes> {
+  const bonus: Partial<Attributes> = {};
+  for (const w of windows) {
+    if (t < w.startOffset || t >= w.expiryOffset) continue;
+    for (const name of ATTRIBUTE_NAMES) {
+      const add = w.bonus[name] ?? 0;
+      if (add) bonus[name] = (bonus[name] ?? 0) + add;
+    }
+  }
+  return bonus;
+}
+
 /**
  * Break a set of live Boosters into time-ordered segments of constant stacked
  * bonus, so a walk can price each Booster for its own lifetime instead of the
  * whole stack for the shortest one's. Segment `k` runs from the previous
- * segment's `endSeconds` up to its own; the bonus drops by each Booster's
- * share as that Booster's own expiry is crossed. Always ends with a
- * zero-bonus, `Infinity`-ended segment once every live Booster has lapsed.
+ * segment's `endSeconds` up to its own; the stacked bonus changes whenever a
+ * Booster's own start or expiry is crossed. Always ends with an `Infinity`-
+ * ended segment once every live Booster has started and lapsed.
  */
 function bonusSegments(live: readonly Booster[], startMs: number): BonusSegment[] {
-  const byExpiry = new Map<number, Booster[]>();
-  for (const b of live) {
-    const t = (b.expiresAt.getTime() - startMs) / 1000;
-    const group = byExpiry.get(t);
-    if (group) group.push(b);
-    else byExpiry.set(t, [b]);
-  }
-  const times = [...byExpiry.keys()].sort((a, b) => a - b);
+  const windows: BoosterWindow[] = live
+    .map((b) => ({
+      bonus: b.bonus,
+      startOffset: b.startsAt ? Math.max(0, (b.startsAt.getTime() - startMs) / 1000) : 0,
+      expiryOffset: (b.expiresAt.getTime() - startMs) / 1000,
+    }))
+    .filter((w) => w.startOffset < w.expiryOffset);
 
-  const remaining: Partial<Attributes> = {};
-  for (const b of live) {
-    for (const name of ATTRIBUTE_NAMES) {
-      const add = b.bonus[name] ?? 0;
-      if (add) remaining[name] = (remaining[name] ?? 0) + add;
-    }
-  }
+  const breakpoints = [
+    ...new Set([...windows.map((w) => w.startOffset), ...windows.map((w) => w.expiryOffset)]),
+  ]
+    .filter((t) => t > 0)
+    .sort((a, b) => a - b);
 
   const segments: BonusSegment[] = [];
-  for (const t of times) {
-    segments.push({ bonus: { ...remaining }, endSeconds: t });
-    for (const b of byExpiry.get(t)!) {
-      for (const name of ATTRIBUTE_NAMES) {
-        const add = b.bonus[name] ?? 0;
-        if (add) remaining[name] = (remaining[name] ?? 0) - add;
-      }
-    }
+  let prev = 0;
+  for (const t of breakpoints) {
+    segments.push({ bonus: stackedBonusAt(windows, prev), endSeconds: t });
+    prev = t;
   }
-  segments.push({ bonus: remaining, endSeconds: Infinity });
+  segments.push({ bonus: stackedBonusAt(windows, prev), endSeconds: Infinity });
   return segments;
 }
 

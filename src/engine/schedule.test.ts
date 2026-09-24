@@ -128,6 +128,101 @@ describe('computeSchedule', () => {
     expect(step.seconds).toBeCloseTo((250 / 31) * 60, 6);
   });
 
+  it('a Booster with startsAt speeds only steps that train after it begins', () => {
+    // Unboosted (rate 25) for the first 300 s -> 125 SP; remaining 125 SP
+    // boosted (rate 35) once the Booster starts.
+    const [step] = computeSchedule(
+      L1,
+      {
+        attributes: attrs(20, 10),
+        boosters: [
+          {
+            bonus: { intelligence: 10 },
+            startsAt: new Date(300_000),
+            expiresAt: new Date(10_000_000),
+          },
+        ],
+        startDate: new Date(0),
+      },
+      skills
+    );
+    expect(step.sp).toBe(250);
+    expect(step.seconds).toBeCloseTo(300 + (125 / 35) * 60, 6);
+  });
+
+  it('splits a step at both a Booster start and its expiry', () => {
+    // Unboosted 200 s (83.333 SP), boosted 200 s (116.667 SP), unboosted for
+    // the 50 SP remainder.
+    const [step] = computeSchedule(
+      L1,
+      {
+        attributes: attrs(20, 10),
+        boosters: [
+          {
+            bonus: { intelligence: 10 },
+            startsAt: new Date(200_000),
+            expiresAt: new Date(400_000),
+          },
+        ],
+        startDate: new Date(0),
+      },
+      skills
+    );
+    expect(step.seconds).toBeCloseTo(520, 6);
+  });
+
+  it('combines two back-to-back Boosters into the same coverage as one continuous Booster', () => {
+    const steps: PlanStep[] = [
+      { skillTypeID: 100, level: 1 },
+      { skillTypeID: 100, level: 2 },
+    ];
+    const continuous = computeSchedule(
+      steps,
+      {
+        attributes: attrs(20, 10),
+        boosters: [{ bonus: { intelligence: 10 }, expiresAt: new Date(600_000) }],
+        startDate: new Date(0),
+      },
+      skills
+    );
+    const backToBack = computeSchedule(
+      steps,
+      {
+        attributes: attrs(20, 10),
+        boosters: [
+          { bonus: { intelligence: 10 }, expiresAt: new Date(300_000) },
+          {
+            bonus: { intelligence: 10 },
+            startsAt: new Date(300_000),
+            expiresAt: new Date(600_000),
+          },
+        ],
+        startDate: new Date(0),
+      },
+      skills
+    );
+    expect(backToBack).toEqual(continuous);
+  });
+
+  it('never applies a Booster whose startsAt is at or after its own expiry', () => {
+    const [step] = computeSchedule(
+      L1,
+      {
+        attributes: attrs(20, 10),
+        boosters: [
+          {
+            bonus: { intelligence: 10 },
+            startsAt: new Date(400_000),
+            expiresAt: new Date(200_000),
+          },
+        ],
+        startDate: new Date(0),
+      },
+      skills
+    );
+    expect(step.seconds).toBeCloseTo(600, 6); // unboosted rate 25 -> 250 SP -> 600 s
+  });
+
   it('requires startDate when boosters are provided', () => {
     expect(() =>
       computeSchedule(

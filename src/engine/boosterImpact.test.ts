@@ -83,6 +83,22 @@ describe('boostedStepIndices', () => {
     expect(boostedStepIndices(steps([1, 2, 1]), skills, boosters, START)).toEqual(new Set([0, 1]));
   });
 
+  it('marks only steps that end after a Booster with a future startsAt begins', () => {
+    // Steps start at 0, 100, 200 and each run 100s. A Booster starting at 250
+    // only reaches step 2 (which ends at 300, after 250) — not steps 0 or 1.
+    const boosters: Booster[] = [
+      { bonus: { intelligence: 10 }, startsAt: after(250), expiresAt: after(1000) },
+    ];
+    expect(boostedStepIndices(steps([1, 1, 1]), skills, boosters, START)).toEqual(new Set([2]));
+  });
+
+  it('excludes a step ending exactly at a Booster startsAt', () => {
+    const boosters: Booster[] = [
+      { bonus: { intelligence: 10 }, startsAt: after(200), expiresAt: after(1000) },
+    ];
+    expect(boostedStepIndices(steps([1, 1]), skills, boosters, START)).toEqual(new Set());
+  });
+
   it('returns nothing when there are no Boosters', () => {
     expect(boostedStepIndices(steps([1, 2]), skills, [], START)).toEqual(new Set());
   });
