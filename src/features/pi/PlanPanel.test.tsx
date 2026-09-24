@@ -408,6 +408,27 @@ describe('PlanPanel', () => {
       `/market/browser?type=${BROADCAST_NODE}&hub=amarr`
     );
   });
+
+  it('still links a row whose own unit price is unknown at this hub', async () => {
+    const withoutTarget = { ...fullPrices };
+    delete withoutTarget[BROADCAST_NODE];
+    loadPlanPrices.mockResolvedValue({
+      prices: withoutTarget,
+      unpriced: [BROADCAST_NODE],
+      failed: false,
+      fetchedAt: new Date(),
+    });
+
+    renderPanel();
+    const table = await screen.findByRole('table', { name: /Production chain for Broadcast Node/ });
+    const row = within(table).getByText('Broadcast Node').closest('tr');
+    if (!row) throw new Error('row not found');
+    expect(row.querySelector('td[data-label="Hub price"]')).toHaveTextContent('—');
+    expect(within(row).getByRole('link', { name: 'Broadcast Node' })).toHaveAttribute(
+      'href',
+      `/market/browser?type=${BROADCAST_NODE}&hub=jita`
+    );
+  });
 });
 
 describe('planet ceiling', () => {

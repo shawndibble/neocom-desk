@@ -90,13 +90,12 @@ export function resolveAgainstCatalogue<T>(
  * than resetting to the device's Location Mode default. A caller arriving
  * with neither (e.g. Skills' implant chips, #405) gets just the typeId, same
  * as opening `/market?type=…` fresh.
- */
-/**
- * `forcedHubId`, when given, wins over whatever region/hub the current URL
- * already carries (issue #1463): a caller pricing at a hub of its own — e.g.
- * a Planetary Industry plan's saved trade hub — must not have that silently
- * swapped for the Market Browser's current location, which can show a
- * different price than the one already on screen.
+ *
+ * `forcedHubId`, when given, wins over that URL-preserving behaviour
+ * entirely (#1463): a caller pricing at a hub of its own — e.g. a Planetary
+ * Industry plan's saved trade hub — must not have that silently swapped for
+ * the Market Browser's current location, which can show a different price
+ * than the one already on screen.
  */
 export function marketLinkParams(
   typeId: number,
