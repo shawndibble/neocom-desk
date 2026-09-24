@@ -26,8 +26,14 @@ const T0 = 1_700_000_000_000;
 const HOUR_MS = 3_600_000;
 
 describe('projectionWording', () => {
-  // A refuel falsifies the first; a reset run falsifies the other two.
-  it.each(['structureFuelLow', 'planetaryExtractionDone', 'planetaryExtractorExpiring'] as const)(
+  // A refuel falsifies the first two; a reset run falsifies the planetary
+  // pair; topping up the queue in the EVE client falsifies the last.
+  it.each([
+    'structureFuelLow',
+    'planetaryExtractionDone',
+    'planetaryExtractorExpiring',
+    'skillQueueEnding',
+  ] as const)(
     'hedges %s, which an ordinary in-game action can falsify before it fires',
     (eventId) => {
       expect(projectionWording(eventId)).toEqual('hedge');
@@ -155,6 +161,123 @@ describe('projectSkillQueue', () => {
       finishMs: T0 + 10 * HOUR_MS,
     };
     expect(rows[0].occurrenceKey).toEqual(occurrenceKey(fire, T0 + 999_999));
+  });
+
+  it('also projects skillQueueEnding for the last entry, at finishMs - endingLeadMs, alongside characterNotTraining', () => {
+    const finishMs = T0 + 20 * HOUR_MS;
+    const entries = [
+      {
+        skillId: 3300,
+        finishedLevel: 4,
+        queuePosition: 0,
+        finishMs,
+        endingLeadMs: 6 * HOUR_MS,
+      },
+    ];
+    const rows = projectSkillQueue(
+      7,
+      'Kestrel',
+      entries,
+      new Map([[3300, 'Gunnery']]),
+      skillQueueCopy.push,
+      T0
+    );
+    expect(rows.map((r) => r.eventId).sort()).toEqual(['characterNotTraining', 'skillQueueEnding']);
+    const ending = rows.find((r) => r.eventId === 'skillQueueEnding');
+    expect(ending?.fireAt).toEqual(finishMs - 6 * HOUR_MS);
+    expect(ending?.title).toBeTruthy();
+    expect(ending?.body).toContain('Kestrel');
+  });
+
+  it('produces no skillQueueEnding row when the last entry carries no endingLeadMs (not yet baked, or a pre-#1410 baseline)', () => {
+    const entries = [
+      { skillId: 3300, finishedLevel: 4, queuePosition: 0, finishMs: T0 + 5 * HOUR_MS },
+    ];
+    const rows = projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0);
+    expect(rows.map((r) => r.eventId)).toEqual(['characterNotTraining']);
+  });
+
+  it('excludes a skillQueueEnding fireAt exactly at nowMs (already due) and includes one ms later', () => {
+    const lead = HOUR_MS;
+    const dueNow = {
+      skillId: 1,
+      finishedLevel: 1,
+      queuePosition: 0,
+      finishMs: T0 + lead,
+      endingLeadMs: lead,
+    };
+    expect(
+      projectSkillQueue(7, 'Kestrel', [dueNow], new Map(), skillQueueCopy.push, T0).find(
+        (r) => r.eventId === 'skillQueueEnding'
+      )
+    ).toBeUndefined();
+
+    const oneMsLater = { ...dueNow, finishMs: T0 + lead + 1 };
+    const rows = projectSkillQueue(7, 'Kestrel', [oneMsLater], new Map(), skillQueueCopy.push, T0);
+    expect(rows.find((r) => r.eventId === 'skillQueueEnding')?.fireAt).toEqual(T0 + 1);
+  });
+
+  it('includes a skillQueueEnding fireAt exactly at the horizon edge and excludes one ms beyond it', () => {
+    const lead = HOUR_MS;
+    const atEdge = {
+      skillId: 1,
+      finishedLevel: 1,
+      queuePosition: 0,
+      finishMs: T0 + PROJECTION_HORIZON_MS + lead,
+      endingLeadMs: lead,
+    };
+    const rows = projectSkillQueue(7, 'Kestrel', [atEdge], new Map(), skillQueueCopy.push, T0);
+    expect(rows.find((r) => r.eventId === 'skillQueueEnding')?.fireAt).toEqual(
+      T0 + PROJECTION_HORIZON_MS
+    );
+
+    const beyond = { ...atEdge, finishMs: atEdge.finishMs + 1 };
+    expect(
+      projectSkillQueue(7, 'Kestrel', [beyond], new Map(), skillQueueCopy.push, T0).find(
+        (r) => r.eventId === 'skillQueueEnding'
+      )
+    ).toBeUndefined();
+  });
+
+  it('agrees with the Foreground Poller on skillQueueEnding keys, which include the threshold crossed', () => {
+    const finishMs = T0 + 20 * HOUR_MS;
+    const endingLeadMs = 6 * HOUR_MS;
+    const entries = [{ skillId: 3300, finishedLevel: 4, queuePosition: 0, finishMs, endingLeadMs }];
+    const rows = projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0);
+    const ending = rows.find((r) => r.eventId === 'skillQueueEnding');
+    const fire: NotificationFire = {
+      eventId: 'skillQueueEnding',
+      characterId: 7,
+      skillId: 3300,
+      level: 4,
+      finishMs,
+      thresholdMs: endingLeadMs,
+    };
+    expect(ending?.occurrenceKey).toEqual(occurrenceKey(fire, T0 + 999_999));
+    // A different lead time is a different occurrence (the re-arm case) —
+    // the key must not collide just because finishMs is unchanged.
+    expect(ending?.occurrenceKey).not.toEqual(
+      occurrenceKey({ ...fire, thresholdMs: 12 * HOUR_MS }, T0 + 999_999)
+    );
+  });
+
+  it('renders skillQueueEnding push copy under its declared hedge wording without throwing', () => {
+    // `skillQueueCopy.push` calls `assertProjectionWording('skillQueueEnding',
+    // 'hedge')` internally and throws if that ever drifts from
+    // `projectionWording`'s own mapping — this exercises that path for real,
+    // not just the wording table above.
+    const entries = [
+      {
+        skillId: 3300,
+        finishedLevel: 4,
+        queuePosition: 0,
+        finishMs: T0 + 5 * HOUR_MS,
+        endingLeadMs: HOUR_MS,
+      },
+    ];
+    expect(() =>
+      projectSkillQueue(7, 'Kestrel', entries, new Map(), skillQueueCopy.push, T0)
+    ).not.toThrow();
   });
 });
 

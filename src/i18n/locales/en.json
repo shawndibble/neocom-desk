@@ -2978,6 +2978,10 @@
         "title": "Structure fuel low",
         "body": "{{character}}: {{structure}} has less than {{days}} days of fuel remaining."
       },
+      "skillQueueEnding": {
+        "title": "Skill queue ending soon",
+        "body": "{{character}}'s skill queue will run dry in under {{hours}} hours."
+      },
       "priceAlertTriggered": {
         "title": "Price alert",
         "aboveBody": "{{item}} reached {{price}} ISK, at or above your {{target}} ISK target.",
@@ -3669,6 +3673,7 @@
       "event": {
         "skillLevelComplete": "Skill Level Complete",
         "characterNotTraining": "Character Not Training",
+        "skillQueueEnding": "Skill Queue Ending",
         "spExtractionReady": "SP Extraction Ready",
         "industryJobComplete": "Industry Job Complete",
         "newMail": "New Mail",
@@ -3695,6 +3700,9 @@
       "extractorExpiringLeadTimeLabel": "Warn this far before an extractor expires:",
       "extractorExpiringLeadTimeOption_one": "{{count}} hour",
       "extractorExpiringLeadTimeOption_other": "{{count}} hours",
+      "skillQueueEndingLeadTimeLabel": "Warn this far before the skill queue runs dry:",
+      "skillQueueEndingLeadTimeOption_one": "{{count}} hour",
+      "skillQueueEndingLeadTimeOption_other": "{{count}} hours",
       "structureFuelLowThresholdLabel": "Warn when fuel remaining drops below:",
       "structureFuelLowThresholdOption_one": "{{count}} day",
       "structureFuelLowThresholdOption_other": "{{count}} days",

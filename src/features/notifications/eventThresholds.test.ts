@@ -1,21 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
   THRESHOLD_FIELDS,
   THRESHOLD_KEYS,
   defaultedThresholds,
   isCharacterEventThresholds,
   setThresholds,
 } from './eventThresholds';
+import { ENDING_SOON_MS } from '@/features/skills/queueStatus';
 
 describe('THRESHOLD_FIELDS', () => {
   it('lists every stored threshold key, in storage order', () => {
     expect(THRESHOLD_KEYS).toEqual([
       'structureFuelLowDays',
       'extractorExpiringLeadHours',
+      'skillQueueEndingLeadHours',
       'corpWalletBalanceFloorIsk',
       'corpWalletTransactionCeilingIsk',
       'walletBalanceChangedThresholdIsk',
     ]);
+  });
+
+  it('defaults skillQueueEndingLeadHours to the roster’s own ENDING_SOON_MS display constant, so the two never silently drift apart', () => {
+    expect(DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS * 3_600_000).toBe(ENDING_SOON_MS);
   });
 
   it('keys each field by its own key', () => {
@@ -37,6 +44,7 @@ describe('defaultedThresholds', () => {
     expect(defaultedThresholds({})).toEqual({
       structureFuelLowDays: 7,
       extractorExpiringLeadHours: 6,
+      skillQueueEndingLeadHours: 24,
       corpWalletBalanceFloorIsk: 50_000_000,
       corpWalletTransactionCeilingIsk: 100_000_000,
       walletBalanceChangedThresholdIsk: 1_000_000,

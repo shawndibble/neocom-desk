@@ -25,6 +25,21 @@ export interface SkillQueueEntrySnapshot {
   queuePosition: number;
   /** Epoch ms this level finishes, or null when the queue carries no date (paused/stalled). */
   finishMs: number | null;
+  /**
+   * The Character's `skillQueueEndingLeadHours` threshold, in ms, as it stood
+   * when this poll ran (issue #1410) — baked in per entry at
+   * `pollDomains.ts`'s `skillQueueDomain.load()` time, the same
+   * `StructureFuelEntrySnapshot.thresholdMs` pattern `diffStructureFuelLow`
+   * and `diffPlanetaryExtractorExpiring` use, since `DomainDiff` itself is
+   * synchronous and cannot read the character's preference.
+   *
+   * Optional so a snapshot persisted before this field existed
+   * (`pollerState.ts`) still validates, on `ColonyExtractorSnapshot.installTimeMs`'s
+   * precedent: `diffSkillQueueEnding` reads an entry lacking it as "no
+   * threshold recorded", the same not-previously-observed treatment that
+   * gets a fresh baseline to fire once rather than never.
+   */
+  endingLeadMs?: number;
 }
 
 export interface SkillQueueSnapshot {
@@ -32,15 +47,26 @@ export interface SkillQueueSnapshot {
   nowMs: number;
 }
 
-export type SkillQueueNotificationEventId = 'skillLevelComplete' | 'characterNotTraining';
+export type SkillQueueNotificationEventId =
+  'skillLevelComplete' | 'characterNotTraining' | 'skillQueueEnding';
 
 export interface NotificationFire {
   eventId: SkillQueueNotificationEventId;
   characterId: number;
   skillId: number | null;
   level: number | null;
-  /** The completed entry's `finish_date` (issue #348: Occurrence Key input), null for `characterNotTraining`. */
+  /**
+   * The completed entry's `finish_date` (issue #348: Occurrence Key input)
+   * for `skillLevelComplete`, the tail entry's `finish_date` for
+   * `skillQueueEnding` (issue #1410), null for `characterNotTraining`.
+   */
   finishMs: number | null;
+  /**
+   * The Character's configured lead time, in ms, that `skillQueueEnding`
+   * crossed (issue #1410) — absent for `skillLevelComplete`/
+   * `characterNotTraining`, which carry no threshold of their own.
+   */
+  thresholdMs?: number;
 }
 
 function orderedByQueuePosition(
@@ -128,6 +154,85 @@ export function diffCharacterNotTraining(
   if (headStatus(prev) === 'notTraining') return [];
   return [
     { eventId: 'characterNotTraining', characterId, skillId: null, level: null, finishMs: null },
+  ];
+}
+
+/**
+ * The queue's last queued item — the one whose finish decides when training
+ * stops — or `undefined` when there is none to warn about. Not literally
+ * `entries[entries.length - 1]` by queue position: a paused or stalled head
+ * (`headStatus` reading `'notTraining'`) leaves nothing actually counting
+ * down, which is `characterNotTraining`'s state to own, not this one's — and
+ * a completed-but-unpruned row at the front (the same shape
+ * `diffSkillLevelComplete` handles) must not be mistaken for the tail either.
+ */
+function skillQueueTail(snapshot: SkillQueueSnapshot): SkillQueueEntrySnapshot | undefined {
+  if (headStatus(snapshot) !== 'training') return undefined;
+  return orderedByQueuePosition(snapshot.entries)
+    .filter((entry) => isActive(entry, snapshot.nowMs))
+    .reduce<SkillQueueEntrySnapshot | undefined>(
+      (latest, entry) => (!latest || entry.queuePosition > latest.queuePosition ? entry : latest),
+      undefined
+    );
+}
+
+/**
+ * Fires once the skill queue's tail entry — the last queued item, the one
+ * that decides when training stops — will finish within the Character's
+ * configured lead time (issue #1410), so a pilot can top up the queue before
+ * it goes idle: ESI has no write endpoint, so nothing but the in-game client
+ * can add to it. A paused or empty queue fires nothing here — that is
+ * `characterNotTraining`'s state to report, never this event's
+ * (`skillQueueTail` returns `undefined` for both).
+ *
+ * Window-crossing, on `diffPlanetaryExtractorExpiring`'s precedent rather
+ * than `diffSkillLevelComplete`'s "newly in the past" shape: `remaining <=
+ * thresholdMs` stays true for as long as the tail holds that little time
+ * left, so an edge-trigger is required or every later poll would re-fire.
+ *
+ * "Is it inside the window now" is judged against `tail.endingLeadMs` — the
+ * setting in force *this* poll. "Was it already inside" is judged against
+ * **`prevTail.endingLeadMs`** — the setting in force when `prev` was
+ * captured — not `tail.endingLeadMs` again, so a Character who raises or
+ * lowers the lead time takes effect on the very next poll in both
+ * directions, exactly as `diffStructureFuelLow` documents in full.
+ *
+ * A tail's identity for "observed before" is its own `finishMs`, fixed once
+ * queued: a tail with no counterpart in `prev` (a new pin — here, the queue
+ * growing, shrinking, or the head completing and handing the tail role to
+ * whatever was behind it) is treated as not-previously-inside, so one first
+ * observed already inside the window still fires once, and a tail that moved
+ * outside the window and later back inside fires again. `prev === undefined`
+ * fires nothing, this module's rule throughout.
+ */
+export function diffSkillQueueEnding(
+  characterId: number,
+  prev: SkillQueueSnapshot | undefined,
+  next: SkillQueueSnapshot
+): NotificationFire[] {
+  if (!prev) return [];
+  const tail = skillQueueTail(next);
+  if (!tail || tail.finishMs === null || tail.endingLeadMs === undefined) return [];
+  const finishMs = tail.finishMs;
+  const remainingNow = finishMs - next.nowMs;
+  if (remainingNow > tail.endingLeadMs) return [];
+
+  const prevTail = skillQueueTail(prev);
+  const observedBefore = prevTail !== undefined && prevTail.finishMs === finishMs;
+  if (observedBefore && prevTail.endingLeadMs !== undefined) {
+    const remainingPrev = finishMs - prev.nowMs;
+    if (remainingPrev <= prevTail.endingLeadMs) return [];
+  }
+
+  return [
+    {
+      eventId: 'skillQueueEnding',
+      characterId,
+      skillId: tail.skillId,
+      level: tail.finishedLevel,
+      finishMs,
+      thresholdMs: tail.endingLeadMs,
+    },
   ];
 }
 
@@ -1533,6 +1638,7 @@ export const SKILL_QUEUE_NOTIFICATION_DIFFS: Record<
 > = {
   skillLevelComplete: diffSkillLevelComplete,
   characterNotTraining: diffCharacterNotTraining,
+  skillQueueEnding: diffSkillQueueEnding,
 };
 
 /** Runs every registered diff whose event is enabled, for one character's skill-queue poll. */
