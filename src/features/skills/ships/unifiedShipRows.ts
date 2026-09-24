@@ -22,10 +22,12 @@ export interface MergedShipEntries {
 
 /**
  * `masteryTiers`: a ship's 5 tier bundles (`masteries.json`'s own shape),
- * all-empty when there's none. `fitEntries`: `null` when no fit is attached.
- * A skill named by more than one source takes the max target level across
- * them; its tag is the highest tier naming it, assuming (not enforcing)
- * CCP's own Mastery levels are non-decreasing tier to tier.
+ * all-empty when there's none. Each bundle is cumulative — tier V's includes
+ * every skill named by tiers I-IV, often unchanged — so a skill's tag is the
+ * *earliest* tier at which it first reaches its max level across all tiers,
+ * not the last tier it happens to appear in (that degenerates to tier V for
+ * almost every skill). `fitEntries`: `null` when no fit is attached. A skill
+ * named by more than one source takes the max target level across them.
  */
 export function mergeShipEntries(
   masteryTiers: readonly (readonly SkillPrereq[])[],
@@ -34,10 +36,17 @@ export function mergeShipEntries(
   const highestMasteryTier = new Map<number, number>();
   const levelBySkill = new Map<number, number>();
 
+  masteryTiers.forEach((bundle) => {
+    for (const { skillTypeID, level } of bundle) {
+      levelBySkill.set(skillTypeID, Math.max(levelBySkill.get(skillTypeID) ?? 0, level));
+    }
+  });
+
   masteryTiers.forEach((bundle, tier) => {
     for (const { skillTypeID, level } of bundle) {
-      highestMasteryTier.set(skillTypeID, tier);
-      levelBySkill.set(skillTypeID, Math.max(levelBySkill.get(skillTypeID) ?? 0, level));
+      if (level === levelBySkill.get(skillTypeID) && !highestMasteryTier.has(skillTypeID)) {
+        highestMasteryTier.set(skillTypeID, tier);
+      }
     }
   });
 
