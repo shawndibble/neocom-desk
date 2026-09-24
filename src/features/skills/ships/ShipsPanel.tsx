@@ -38,7 +38,12 @@ import { TargetPlanPicker } from '../TargetPlanPicker';
 import { buildShipsWithMastery, type ShipOption } from './shipCatalog';
 import { scheduleEntries } from './scheduleEntries';
 import { buildFitCheckRows } from './fitCheckRows';
-import { mergeShipEntries, tagUnifiedRows, type UnifiedShipRow } from './unifiedShipRows';
+import {
+  masteryRowSortValue,
+  mergeShipEntries,
+  tagUnifiedRows,
+  type UnifiedShipRow,
+} from './unifiedShipRows';
 
 const SEARCH_DEBOUNCE_MS = 250;
 const SEARCH_LIMIT = 20;
@@ -207,12 +212,10 @@ export function ShipsPanel({
       if (hideCompleted && row.status === 'trained') return false;
       return true;
     });
-    // Trained rows have no orderable time left, so `sortRows` sinks them last.
-    return sortRows(
-      filtered,
-      { sortValue: (r) => (r.status === 'trained' ? undefined : r.seconds) },
-      'asc'
-    );
+    // Grouped by Mastery tier (I first), training time ascending within a
+    // tier; trained rows have no orderable time left, so `sortRows` sinks
+    // them last.
+    return sortRows(filtered, { sortValue: masteryRowSortValue }, 'asc');
   }, [rows, showMastery, showFit, hideCompleted]);
 
   const untrained = visibleRows.filter((row) => row.status !== 'trained');
