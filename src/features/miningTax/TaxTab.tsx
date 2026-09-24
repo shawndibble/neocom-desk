@@ -748,6 +748,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                   checked={selection.has(dr.key)}
                   onClick={(e) => e.stopPropagation()}
                   onChange={() => toggleRowSelected(dr.key)}
+                  className="size-4 shrink-0 cursor-pointer accent-accent"
                 />
               ) : null,
           } satisfies DataTableColumn<DisplayRow>,

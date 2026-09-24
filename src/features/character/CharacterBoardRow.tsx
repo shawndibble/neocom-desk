@@ -110,7 +110,7 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
       <button
         type="button"
         onClick={() => onSelectEvent(Number(item.sourceId))}
-        className="flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left transition-colors hover:bg-panel-2"
+        className="flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left transition-colors hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
       >
         {body}
       </button>

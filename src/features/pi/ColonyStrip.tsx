@@ -63,7 +63,7 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
       // what pressing it does.
       aria-label={t('piAdvisor.detailsLabel', { name })}
       aria-haspopup="dialog"
-      className="group grid w-full grid-cols-[1fr_4.5rem_5rem] items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2 text-left last:border-b-0 hover:bg-panel-2 sm:grid-cols-[1fr_6.5rem_4.5rem_5rem_auto]"
+      className="group grid w-full grid-cols-[1fr_4.5rem_5rem] items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2 text-left last:border-b-0 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:grid-cols-[1fr_6.5rem_4.5rem_5rem_auto]"
     >
       <span className="min-w-0 truncate text-xs">
         {name}{' '}

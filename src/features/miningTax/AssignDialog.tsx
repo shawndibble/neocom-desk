@@ -342,6 +342,7 @@ export function AssignDialog({
             type="checkbox"
             checked={rememberSystem}
             onChange={(e) => setRememberSystem(e.target.checked)}
+            className="size-4 shrink-0 cursor-pointer accent-accent"
           />
           {t('miningTax.rememberSystemLabel', {
             system: systemName,
@@ -366,6 +367,7 @@ export function AssignDialog({
                   id={`line-${line.typeId}`}
                   checked={includedTypeIds.has(line.typeId)}
                   onChange={() => toggleLine(line.typeId)}
+                  className="size-4 shrink-0 cursor-pointer accent-accent"
                 />
                 <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                 <label htmlFor={`line-${line.typeId}`} className="w-40 shrink-0 truncate">
@@ -442,6 +444,7 @@ export function AssignDialog({
             type="checkbox"
             checked={markPaid}
             onChange={(e) => setMarkPaid(e.target.checked)}
+            className="size-4 shrink-0 cursor-pointer accent-accent"
           />
           {t('miningTax.markPaidLabel')}
         </label>

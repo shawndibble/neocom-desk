@@ -182,6 +182,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                         type="checkbox"
                         checked={on}
                         onChange={() => toggle(r.assignment.id)}
+                        className="size-4 shrink-0 cursor-pointer accent-accent"
                         aria-label={t('miningTax.settleUpIncludeLabel', {
                           date: r.assignment.date,
                         })}

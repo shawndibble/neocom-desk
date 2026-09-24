@@ -98,6 +98,7 @@ export function BulkDismissDialog({
                     aria-label={t('miningTax.bulkDismissIncludeLabel', {
                       date: dr.row.entry.date,
                     })}
+                    className="size-4 shrink-0 cursor-pointer accent-accent"
                   />
                   <span className="w-20 shrink-0 tabular-nums">{dr.row.entry.date}</span>
                   <span className="min-w-0 flex-1 truncate text-text-dim">
