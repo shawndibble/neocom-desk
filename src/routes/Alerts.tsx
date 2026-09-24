@@ -17,7 +17,7 @@
  * Not to be merged with Settings' notification panel: that is *preferences*
  * (what may fire), this is the *record* (what did).
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -79,6 +79,14 @@ const FILTERABLE_SEVERITIES: readonly DeadlineSeverity[] = DEADLINE_SEVERITIES.f
 const ALL_CHARACTERS = 'all';
 
 /**
+ * Sentinel for `focusAfterRemoval`'s candidate list — the panel heading, made
+ * a one-off focus target (`tabIndex={-1}`) once nothing else is left to land
+ * on. Never collides with a real group/entry key, which are all Dexie ids or
+ * `alertGroupLabel` output.
+ */
+const PANEL_HEADING_FOCUS = '__panel-heading__';
+
+/**
  * `AlertsFilter` kept in the URL (ADR 0015) so a reload — or a link shared
  * with another pilot — reopens the same view. `severities` defaults to the
  * empty set, unlike `enumSetParam`'s own "all selected" default, to match
@@ -104,6 +112,44 @@ export function Alerts() {
   const prefsHydrated = useNotificationPreferences((state) => state.hydrated);
   const [filter, setFilter] = useUrlParams(ALERTS_FILTER_PARAMS);
   const [expandedKeys, setExpandedKeys] = useState<ReadonlySet<string>>(() => new Set());
+
+  // Focus anchors for `focusAfterRemoval` below. Dismiss/mute/dismiss-all all
+  // unmount the row the click came from (WCAG 2.4.3) — these track the still
+  // -mounted rows a click can land focus on instead of letting it fall to
+  // `document.body`. Plain mutable maps, not state: they never drive a
+  // render, only get read inside a click handler for the elements already on
+  // screen at that moment.
+  const panelRef = useRef<HTMLElement>(null);
+  const groupRefs = useRef(new Map<string, HTMLButtonElement>());
+  const entryRefs = useRef(new Map<string, HTMLButtonElement>());
+
+  /**
+   * Focuses the first candidate that is still mounted, in order — the caller
+   * lists "next row", "previous row", then `PANEL_HEADING_FOCUS` as the last
+   * resort. Safe to call synchronously from a dismiss/mute handler: the
+   * candidates named here are rows other than the one just acted on, so they
+   * are still in the DOM even though the click's own row hasn't unmounted
+   * yet (that happens once Dexie's write round-trips back through
+   * `useLiveQuery`).
+   */
+  function focusAfterRemoval(candidates: readonly string[]) {
+    for (const key of candidates) {
+      if (key === PANEL_HEADING_FOCUS) {
+        const heading = panelRef.current?.querySelector<HTMLHeadingElement>('h2');
+        if (heading) {
+          heading.tabIndex = -1;
+          heading.focus();
+          return;
+        }
+        continue;
+      }
+      const el = groupRefs.current.get(key) ?? entryRefs.current.get(key);
+      if (el) {
+        el.focus();
+        return;
+      }
+    }
+  }
 
   useEffect(() => {
     void hydrateNotificationPreferences();
@@ -193,7 +239,15 @@ export function Alerts() {
               <IconButton
                 icon={<Icon.DismissAll />}
                 label={t('alerts.dismissAll')}
-                onClick={() => void dismissFeedEntriesAndSync(liveEntries)}
+                onClick={() => {
+                  // Every unmuted group is about to empty out; only a muted
+                  // group shown via the chip can still be there afterwards.
+                  const survivor = visible.find((group) => group.muted);
+                  focusAfterRemoval(
+                    survivor ? [survivor.key, PANEL_HEADING_FOCUS] : [PANEL_HEADING_FOCUS]
+                  );
+                  void dismissFeedEntriesAndSync(liveEntries);
+                }}
               />
             )}
           </>
@@ -283,6 +337,7 @@ export function Alerts() {
       </FilterBar>
 
       <Panel
+        ref={panelRef}
         title={t('alerts.byType')}
         actions={<span className="text-[0.6875rem] text-text-dim">{t('alerts.deviceWide')}</span>}
       >
@@ -294,24 +349,65 @@ export function Alerts() {
           />
         ) : (
           <ul className="-mx-3 divide-y divide-line">
-            {visible.map((group) => (
-              <AlertGroupRow
-                key={group.key}
-                group={group}
-                expanded={expandedKeys.has(group.key)}
-                onToggle={() => toggleExpanded(group.key)}
-                onDismissGroup={() => void dismissFeedEntriesAndSync(group.entries)}
-                onToggleMute={() =>
-                  void setFeedMutedForCharacters(group.characterIds, group.target, !group.muted)
-                }
-                nameById={nameById}
-                // One Character on the device means every fire belongs to
-                // them, and the name on each row is width the body copy could
-                // have had.
-                showCharacter={characters.length > 1}
-                onDismissEntry={(entry) => void dismissFeedEntriesAndSync([entry])}
-              />
-            ))}
+            {visible.map((group, groupIndex) => {
+              // Group-level "next row, else previous row, else panel
+              // heading": shared by dismiss-group, mute-group (when muting
+              // hides it), and by dismiss-entry once an entry was the last
+              // one in its group.
+              const groupCandidates = [
+                visible[groupIndex + 1]?.key,
+                visible[groupIndex - 1]?.key,
+                PANEL_HEADING_FOCUS,
+              ].filter((key): key is string => key !== undefined);
+
+              return (
+                <AlertGroupRow
+                  key={group.key}
+                  group={group}
+                  expanded={expandedKeys.has(group.key)}
+                  onToggle={() => toggleExpanded(group.key)}
+                  onDismissGroup={() => {
+                    focusAfterRemoval(groupCandidates);
+                    void dismissFeedEntriesAndSync(group.entries);
+                  }}
+                  onToggleMute={() => {
+                    // Only about to disappear when muting turns it on and the
+                    // "muted types" chip isn't showing it — unmuting, or
+                    // muting while the chip is selected, leaves this same row
+                    // (and its focused button) mounted right where it is.
+                    if (!group.muted && !filter.showMuted) focusAfterRemoval(groupCandidates);
+                    void setFeedMutedForCharacters(group.characterIds, group.target, !group.muted);
+                  }}
+                  nameById={nameById}
+                  // One Character on the device means every fire belongs to
+                  // them, and the name on each row is width the body copy
+                  // could have had.
+                  showCharacter={characters.length > 1}
+                  onDismissEntry={(entry) => {
+                    const entryIndex = group.entries.findIndex((e) => e.id === entry.id);
+                    const entryCandidates = [
+                      group.entries[entryIndex + 1]?.id,
+                      group.entries[entryIndex - 1]?.id,
+                    ].filter((id): id is string => id !== undefined);
+                    // No sibling entry survives: this was the group's last
+                    // one, so the group itself is about to go too — fall
+                    // through to the group-level candidates.
+                    focusAfterRemoval(
+                      entryCandidates.length > 0 ? entryCandidates : groupCandidates
+                    );
+                    void dismissFeedEntriesAndSync([entry]);
+                  }}
+                  toggleRef={(el) => {
+                    if (el) groupRefs.current.set(group.key, el);
+                    else groupRefs.current.delete(group.key);
+                  }}
+                  entryDismissRef={(entryId, el) => {
+                    if (el) entryRefs.current.set(entryId, el);
+                    else entryRefs.current.delete(entryId);
+                  }}
+                />
+              );
+            })}
           </ul>
         )}
       </Panel>

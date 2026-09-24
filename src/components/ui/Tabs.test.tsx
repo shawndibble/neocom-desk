@@ -55,4 +55,33 @@ describe('Tabs', () => {
     await userEvent.keyboard('{ArrowLeft}');
     expect(onChange).toHaveBeenLastCalledWith('history');
   });
+
+  /**
+   * `activation="manual"` is for a caller whose `onChange` navigates to
+   * another route (Industry's plan/group pages) rather than swapping content
+   * this component keeps mounted. An arrow key there must only move the
+   * roving tab stop — calling `onChange` on every arrow press would unmount
+   * this whole tablist mid-keypress and strand focus on `document.body`.
+   */
+  describe('activation="manual"', () => {
+    it('moves focus without selecting on arrow keys, then selects on Enter', async () => {
+      const onChange = vi.fn();
+      render(<Tabs tabs={tabs} value="open" onChange={onChange} activation="manual" />);
+
+      screen.getByRole('tab', { name: 'Open' }).focus();
+      await userEvent.keyboard('{ArrowRight}');
+      expect(onChange).not.toHaveBeenCalled();
+      expect(screen.getByRole('tab', { name: 'History' })).toHaveFocus();
+
+      await userEvent.keyboard('{Enter}');
+      expect(onChange).toHaveBeenCalledWith('history');
+    });
+
+    it('still selects immediately on click', async () => {
+      const onChange = vi.fn();
+      render(<Tabs tabs={tabs} value="open" onChange={onChange} activation="manual" />);
+      await userEvent.click(screen.getByRole('tab', { name: 'History' }));
+      expect(onChange).toHaveBeenCalledWith('history');
+    });
+  });
 });

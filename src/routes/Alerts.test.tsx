@@ -466,6 +466,44 @@ describe('Alerts', () => {
       expect(screen.queryByText(/alerts? .* types .* characters/)).not.toBeInTheDocument();
     });
   });
+
+  describe('focus after dismiss', () => {
+    it('moves focus to the next row when a group is dismissed', async () => {
+      await db.notificationFeed.bulkPut([
+        entry({ id: 'a', eventId: 'newMail', title: 'New Mail' }),
+        entry({ id: 'b', eventId: 'skillComplete', title: 'Skill' }),
+      ]);
+      renderPage();
+
+      const rows = await screen.findAllByRole('listitem');
+      expect(rows).toHaveLength(2);
+      const [firstRow, secondRow] = rows;
+      const nextToggle = within(secondRow).getByRole('button', { expanded: false });
+
+      await userEvent.click(within(firstRow).getByRole('button', { name: /^Dismiss every/ }));
+
+      expect(document.activeElement).toBe(nextToggle);
+    });
+
+    it('falls back to the panel heading once the last group is dismissed', async () => {
+      await db.notificationFeed.put(entry({ id: 'a' }));
+      renderPage();
+
+      const row = (await screen.findByText('New Mail')).closest('li') as HTMLElement;
+      await userEvent.click(within(row).getByRole('button', { name: /^Dismiss every/ }));
+
+      expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'By type' }));
+    });
+
+    it('falls back to the panel heading once every live alert is dismissed via "Dismiss all"', async () => {
+      await db.notificationFeed.put(entry({ id: 'a' }));
+      renderPage();
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Dismiss all' }));
+
+      expect(document.activeElement).toBe(screen.getByRole('heading', { name: 'By type' }));
+    });
+  });
 });
 
 describe('Alerts URL state', () => {

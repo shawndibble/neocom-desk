@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, Modal, TextInput } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
@@ -58,6 +58,20 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
   const [contractId, setContractId] = useState('');
   const [copied, setCopied] = useState<CopyTarget | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Next/Back unmount the whole step-1/step-2 block, so the just-clicked
+  // button vanishes with it — this lands focus on the new step instead of
+  // `document.body` (WCAG 2.4.3). Skipped on the dialog's own first render:
+  // `Modal` already places initial focus when it opens.
+  const stepRef = useRef<HTMLDivElement>(null);
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    stepRef.current?.focus();
+  }, [step]);
 
   const included = useMemo(
     () => rows.filter((r) => !excluded.has(r.assignment.id)),
@@ -166,7 +180,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
         </div>
 
         {step === 1 && (
-          <>
+          <div ref={stepRef} tabIndex={-1} className="space-y-3">
             <ul className="divide-y divide-line rounded-xs border border-line bg-panel-2">
               {rows.map((r) => {
                 const on = !excluded.has(r.assignment.id);
@@ -228,11 +242,11 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                 {t('filters.cancel')}
               </Button>
             </div>
-          </>
+          </div>
         )}
 
         {step === 2 && (
-          <>
+          <div ref={stepRef} tabIndex={-1} className="space-y-3">
             <div className="space-y-1 rounded-xs border border-line bg-panel-2 p-3">
               <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('miningTax.settleUpAmountLabel')}
@@ -328,7 +342,7 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                 {t('miningTax.settleUpBack')}
               </Button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </Modal>

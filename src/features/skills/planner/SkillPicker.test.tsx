@@ -143,6 +143,23 @@ describe('SkillPicker', () => {
     expect(input).toHaveValue('');
   });
 
+  it('returns focus to the search box and announces the pick once the level button unmounts', async () => {
+    const user = userEvent.setup();
+    render(
+      <SkillPicker skills={SKILLS} catalog={CATALOG} trainedSkills={NO_TRAINED} onAdd={vi.fn()} />
+    );
+
+    const input = screen.getByRole('searchbox');
+    await user.type(input, 'frigate');
+    const firstItem = (await screen.findAllByRole('listitem'))[0];
+    if (!firstItem) throw new Error('expected at least one result');
+    await user.click(within(firstItem).getByRole('button', { name: /^Frigate/ }));
+    await user.click(screen.getByRole('button', { name: 'Level III' }));
+
+    expect(input).toHaveFocus();
+    expect(screen.getByRole('status')).toHaveTextContent('Added Frigate Level III');
+  });
+
   it('matches description text, not just name', async () => {
     const user = userEvent.setup();
     render(

@@ -203,6 +203,7 @@
     "searchPlaceholder": "Search skills…",
     "filterByGroup": "Filter by skill group",
     "level": "Level {{level}}",
+    "addedAnnouncement": "Added {{skill}} {{level}}",
     "remapBudget": "Remaps: {{bonus}} bonus now",
     "remapBudgetYearlyReady": "· yearly ready",
     "remapBudgetYearlyFrom": "· yearly from {{date}}",
