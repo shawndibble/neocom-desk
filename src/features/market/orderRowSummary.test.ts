@@ -61,6 +61,7 @@ describe('orderRowSummary', () => {
       rivalPrice: 450,
       gapIsk: 50,
       sellersUnderMe: null,
+      suggestedPrice: 449.9,
       match: null,
     });
   });
@@ -81,7 +82,7 @@ describe('orderRowSummary', () => {
     });
   });
 
-  it('says matching still pays when the rival price clears the floor', () => {
+  it('says undercutting still pays when the suggested price clears the floor', () => {
     const row: OpenOrderRow = {
       ...BASE_ROW,
       problem: 'undercutStation',
@@ -90,10 +91,14 @@ describe('orderRowSummary', () => {
       station: { bestPrice: 450, beatsMe: true, gapIsk: 50, gapPct: 10 },
       floor: { relist: 400, fill: 390 },
     };
-    expect(orderRowSummary(row)).toMatchObject({ match: { kind: 'profit', amount: 50 } });
+    // undercutPrice(450) = 449.90, one legal tick under the rival, not the tie 450 used to be.
+    const summary = orderRowSummary(row);
+    if (summary?.kind !== 'undercut') throw new Error('expected an undercut summary');
+    expect(summary.match?.kind).toBe('profit');
+    expect(summary.match?.amount).toBeCloseTo(49.9, 6);
   });
 
-  it('says matching loses when the rival price is under the floor', () => {
+  it('says undercutting loses when the suggested price is under the floor', () => {
     const row: OpenOrderRow = {
       ...BASE_ROW,
       problem: 'undercutStation',
@@ -102,7 +107,10 @@ describe('orderRowSummary', () => {
       station: { bestPrice: 450, beatsMe: true, gapIsk: 50, gapPct: 10 },
       floor: { relist: 480, fill: 470 },
     };
-    expect(orderRowSummary(row)).toMatchObject({ match: { kind: 'loss', amount: 30 } });
+    const summary = orderRowSummary(row);
+    if (summary?.kind !== 'undercut') throw new Error('expected an undercut summary');
+    expect(summary.match?.kind).toBe('loss');
+    expect(summary.match?.amount).toBeCloseTo(30.1, 6);
   });
 
   it('never claims a match outcome for a buy order, where the floor has no meaning', () => {
@@ -120,6 +128,7 @@ describe('orderRowSummary', () => {
       rivalPrice: 520,
       gapIsk: 20,
       sellersUnderMe: null,
+      suggestedPrice: 520.1,
     });
   });
 

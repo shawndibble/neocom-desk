@@ -16,13 +16,16 @@
  */
 import type { OpenOrderRow } from './openOrdersModel';
 import { orderRowSummary } from './orderRowSummary';
+import { roundPriceUp } from '@/engine/market/priceTick';
 
 export type OrderVerdictKind = 'letGo' | 'matchThem' | 'raisePrice' | 'leaveItAlone';
 
 export interface OrderVerdict {
   kind: OrderVerdictKind;
-  /** ISK a unit at stake in the call — the loss from following the rival, or the margin left after matching. Null where the verdict carries no single figure. */
+  /** ISK a unit at stake in the call — the loss from following the rival, or the margin left after undercutting. Null where the verdict carries no single figure. */
   amount: number | null;
+  /** The suggested LEGAL price behind this call — one tick under the rival for `matchThem`/`letGo`, the rounded-up floor for `raisePrice`. Null for `leaveItAlone`, which suggests no price at all. */
+  price: number | null;
 }
 
 export function orderVerdict(row: OpenOrderRow): OrderVerdict | null {
@@ -30,17 +33,21 @@ export function orderVerdict(row: OpenOrderRow): OrderVerdict | null {
   if (row.isBuyOrder || !row.floor) return null;
 
   if (row.problem === 'belowFloor') {
-    return { kind: 'raisePrice', amount: row.floor.relist - row.price };
+    return {
+      kind: 'raisePrice',
+      amount: row.floor.relist - row.price,
+      price: roundPriceUp(row.floor.relist),
+    };
   }
 
   const summary = orderRowSummary(row);
   if (summary?.kind === 'undercut' && summary.match) {
     return summary.match.kind === 'loss'
-      ? { kind: 'letGo', amount: summary.match.amount }
-      : { kind: 'matchThem', amount: summary.match.amount };
+      ? { kind: 'letGo', amount: summary.match.amount, price: summary.suggestedPrice }
+      : { kind: 'matchThem', amount: summary.match.amount, price: summary.suggestedPrice };
   }
 
-  if (row.problem === 'healthy') return { kind: 'leaveItAlone', amount: null };
+  if (row.problem === 'healthy') return { kind: 'leaveItAlone', amount: null, price: null };
 
   // Expiring, outbid, or an undercut with no rival price in hand: the badge's
   // own advice is the honest answer, so say nothing here.

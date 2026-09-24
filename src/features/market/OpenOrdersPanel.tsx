@@ -83,6 +83,7 @@ import type { OrderProblem } from '@/engine/market/orderProblems';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
 import { stationPriceKey } from './stationPriceKey';
+import { roundPriceUp } from '@/engine/market/priceTick';
 import type { HubBuyPrice } from './orderExits';
 import { OrderBadgeLegend } from './OrderBadgeLegend';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
@@ -681,8 +682,14 @@ export function OpenOrdersPanel({
       header: t('market.orders.floorLabel'),
       align: 'right',
       className: 'tabular-nums',
+      // Sorted by the EXACT break-even, unaffected by the rounded-up figure
+      // the cell itself renders (issue #1421) — no copy button here, no room
+      // in the row (see `OrderDetailModal.tsx` for the copyable version).
       sortValue: (row) => row.floor?.relist,
-      render: (row) => (row.floor ? formatIskAuto(row.floor.relist) : t('common.unknown')),
+      render: (row) =>
+        row.floor
+          ? formatIskAuto(roundPriceUp(row.floor.relist) ?? row.floor.relist)
+          : t('common.unknown'),
     },
     {
       id: 'remaining',
