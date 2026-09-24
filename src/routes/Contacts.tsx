@@ -375,7 +375,7 @@ function AcrossCharactersPanel({ lists, names, filter }: AcrossCharactersPanelPr
       align: 'center',
       // The names go in the tooltip rather than the cell: with a dozen alts
       // the cell would be the widest thing on the page, and the count is what
-      // a reader scans for.
+      // a reader scans for. The count takes focus so a keyboard can open it.
       render: (row) => (
         <Tooltip
           content={[
@@ -389,7 +389,13 @@ function AcrossCharactersPanel({ lists, names, filter }: AcrossCharactersPanelPr
             .join(' · ')}
           openOnTap
         >
-          <span className={cx('tabular-nums', row.missing.length > 0 && 'text-warning')}>
+          <span
+            tabIndex={0}
+            className={cx(
+              'tabular-nums focus-visible:outline-2 focus-visible:outline-accent',
+              row.missing.length > 0 && 'text-warning'
+            )}
+          >
             {t('contacts.acrossCharactersCount', {
               count: row.held.length,
               total: effectiveLists.length,

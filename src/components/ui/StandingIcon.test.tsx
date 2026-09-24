@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import '@/i18n';
 import { StandingIcon } from './StandingIcon';
 import { standingTier } from './standingTier';
@@ -41,6 +41,18 @@ describe('StandingIcon', () => {
     expect(
       screen.getByRole('img', { name: 'Your contact: Terrible standing (-10)' })
     ).toBeInTheDocument();
+  });
+
+  // WCAG 2.1.1: the number lives only in the tooltip for a sighted reader,
+  // so a keyboard has to be able to open it the way a pointer does.
+  it('takes keyboard focus and reveals its tooltip there', () => {
+    render(<StandingIcon value={5} />);
+    const tag = screen.getByRole('img', { name: 'Good standing (5)' });
+    expect(tag).toHaveAttribute('tabindex', '0');
+    fireEvent.focus(tag);
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Good standing (5)');
+    expect(tag).toHaveAttribute('aria-describedby', tooltip.id);
   });
 
   // DESIGN.md §7: colour is never the only signal. The client separates

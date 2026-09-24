@@ -51,7 +51,10 @@ export function SkillGateMarker({ verdict, nameForSkill, nameForCharacter }: Ski
       <span
         role="img"
         aria-label={`${t('industry.skillGateTooltipTitle')}: ${label}`}
-        className="inline-flex shrink-0 items-center gap-1 text-warning"
+        // The shortfall rows and the best character live only in the tooltip,
+        // so a keyboard has to be able to open it (WCAG 2.1.1).
+        tabIndex={0}
+        className="inline-flex shrink-0 items-center gap-1 text-warning focus-visible:outline-2 focus-visible:outline-accent"
       >
         <Icon.SkillLocked size={Icon.ICON_SIZE.sm} />
         <span className="text-[0.6875rem] whitespace-nowrap">{label}</span>
