@@ -6,14 +6,18 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import type { SkillType } from '@/sde/types';
 import type { Attributes, Implants, TrainedSkill } from '@/engine/types';
-import type { SkillPlanRecord } from '@/db';
+import { db, type SkillPlanRecord } from '@/db';
 import type { CachedResult } from '@/features/skills/data';
 import type { CharacterAttributes, SkillQueueEntry } from '@/esi/endpoints';
+import { ESI_REGISTRY } from '@/esi/registry';
 import { buildUnlockIndex } from '@/engine/skillUnlocks';
 import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { SkillCatalog } from '../skillMap';
 import type { RemapAvailability } from './remapAvailability';
 import { PlanEditor } from './PlanEditor';
+
+vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
 const loadCharacterSkillQueue =
   vi.fn<(characterId: number) => Promise<CachedResult<SkillQueueEntry[]> | null>>();
@@ -1247,6 +1251,56 @@ describe('PlanEditor what-if implants', () => {
     );
 
     expect(screen.getByTestId('location-probe')).toHaveTextContent('/market/browser?group=532');
+  });
+});
+
+describe('PlanEditor Character details assumption note (issue #1526)', () => {
+  const IMPLANTS_SCOPE = ESI_REGISTRY.getCharacterImplants.scope;
+
+  async function seedGrant(scopes: readonly string[]): Promise<void> {
+    await db.tokens.put({
+      characterId: 1,
+      accessToken: 'access',
+      refreshToken: 'refresh',
+      expiresAt: Date.now() + 60_000,
+      scopes: [...scopes],
+    });
+  }
+
+  beforeEach(() => {
+    useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
+  });
+
+  afterEach(async () => {
+    await db.tokens.clear();
+  });
+
+  it('shows the note when reading Current implants without the Character details scope', async () => {
+    await seedGrant([]);
+    renderEditor(vi.fn(), { implants: FITTED });
+
+    expect(await screen.findByText('Assumes no implants')).toBeInTheDocument();
+  });
+
+  it('hides the note once Character details is granted', async () => {
+    await seedGrant([IMPLANTS_SCOPE]);
+    renderEditor(vi.fn(), { implants: FITTED });
+
+    await waitFor(() => {
+      expect(screen.queryByText('Assumes no implants')).not.toBeInTheDocument();
+    });
+  });
+
+  it('hides the note under What-If None — a deliberate choice, not a permission gap', async () => {
+    await seedGrant([]);
+    const user = userEvent.setup();
+    renderEditor(vi.fn(), { implants: FITTED });
+    await openTools(user);
+    await chooseWhatIf(user, 'None');
+
+    await waitFor(() => {
+      expect(screen.queryByText('Assumes no implants')).not.toBeInTheDocument();
+    });
   });
 });
 

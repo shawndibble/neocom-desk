@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -7,9 +7,14 @@ import type { Appraisal } from '@/engine/market/appraisal';
 import { ZERO_STANDINGS } from '@/engine/market/standings';
 import { configureClipboard } from '@/lib/clipboard';
 import { TRADE_HUBS } from '@/market/hubs';
+import { db } from '@/db';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { ESI_REGISTRY } from '@/esi/registry';
 import { AppraisalPanel } from './AppraisalPanel';
 import type { AppraisalController } from './useAppraisal';
 import type { AppraisalOutcome, HubComparisonRow } from './appraisalData';
+
+vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
 function controller(overrides: Partial<AppraisalController> = {}): AppraisalController {
   return {
@@ -212,6 +217,57 @@ describe('AppraisalPanel', () => {
       const strip = screen.getByText('You receive, selling now').closest('.flex-wrap');
       expect(strip).not.toBeNull();
       expect(strip).not.toHaveClass('overflow-x-auto');
+    });
+
+    describe('Character details assumption note (issue #1526)', () => {
+      const STANDINGS_SCOPE = ESI_REGISTRY.getCharacterStandings.scope;
+
+      async function seedGrant(scopes: readonly string[]): Promise<void> {
+        await db.tokens.put({
+          characterId: 7,
+          accessToken: 'access',
+          refreshToken: 'refresh',
+          expiresAt: Date.now() + 60_000,
+          scopes: [...scopes],
+        });
+      }
+
+      beforeEach(() => {
+        useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
+      });
+
+      afterEach(async () => {
+        await db.tokens.clear();
+      });
+
+      it('shows the note when the broker fee is quoted without the Character details scope', async () => {
+        await seedGrant([]);
+        renderPanel({ controller: controller({ result: netOutcome() }) });
+
+        expect(await screen.findByText('Assumes base standings')).toBeInTheDocument();
+      });
+
+      it('hides the note once Character details is granted', async () => {
+        await seedGrant([STANDINGS_SCOPE]);
+        renderPanel({ controller: controller({ result: netOutcome() }) });
+
+        await waitFor(() => {
+          expect(screen.queryByText('Assumes base standings')).not.toBeInTheDocument();
+        });
+      });
+
+      it('hides the note while there is no net figure to annotate', async () => {
+        await seedGrant([]);
+        renderPanel({
+          controller: controller({
+            result: netOutcome({ accountingLevel: null, brokerRelationsLevel: null }),
+          }),
+        });
+
+        await waitFor(() => {
+          expect(screen.queryByText('Assumes base standings')).not.toBeInTheDocument();
+        });
+      });
     });
   });
 
