@@ -27,9 +27,10 @@ interface ImplantSetPickerProps {
   onChange: (implantSet: FittingImplantSet | undefined) => void;
 }
 
-function emptySet(): FittingImplantSet {
-  return { implants: [], boosters: [] };
-}
+/** Stable identity: a fresh `{implants: [], boosters: []}` every render would
+ * re-fire the name-resolve effect below every render whenever no set is
+ * carried yet — the common case for a freshly-loaded Fitting. */
+const EMPTY_SET: FittingImplantSet = { implants: [], boosters: [] };
 
 interface SlotListProps {
   heading: string;
@@ -37,7 +38,8 @@ interface SlotListProps {
   max: number;
   names: Map<number, string>;
   onAdd: (name: string) => void;
-  onRemove: (typeId: number) => void;
+  /** By position, not type id — a set may legally carry the same id twice. */
+  onRemove: (index: number) => void;
   error: string | null;
 }
 
@@ -55,24 +57,28 @@ function SlotList({ heading, typeIds, max, names, onAdd, onRemove, error }: Slot
         <p className="text-sm text-text-dim">{t('fittings.implants.empty')}</p>
       ) : (
         <ul className="space-y-1">
-          {typeIds.map((typeId) => (
-            <li key={typeId} className="flex items-center gap-2 rounded-xs bg-panel-2 p-1.5">
-              <TypeIcon typeId={typeId} size={32} width={20} height={20} />
-              <span className="flex-1 truncate text-sm">
-                {names.get(typeId) ?? `Type #${typeId}`}
-              </span>
-              <Button
-                size="sm"
-                variant="ghost"
-                aria-label={t('fittings.implants.remove', {
-                  name: names.get(typeId) ?? `Type #${typeId}`,
-                })}
-                onClick={() => onRemove(typeId)}
+          {typeIds.map((typeId, index) => {
+            const name = names.get(typeId) ?? t('fittings.implants.unknownType', { typeId });
+            return (
+              <li
+                // Duplicate ids are legal (the picker enforces no uniqueness
+                // beyond the slot count), so the id alone isn't a stable key.
+                key={`${typeId}-${index}`}
+                className="flex items-center gap-2 rounded-xs bg-panel-2 p-1.5"
               >
-                <Icon.Close size={Icon.ICON_SIZE.sm} />
-              </Button>
-            </li>
-          ))}
+                <TypeIcon typeId={typeId} size={32} width={20} height={20} />
+                <span className="flex-1 truncate text-sm">{name}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={t('fittings.implants.remove', { name })}
+                  onClick={() => onRemove(index)}
+                >
+                  <Icon.Close size={Icon.ICON_SIZE.sm} />
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       )}
       <form
@@ -108,7 +114,22 @@ export function ImplantSetPicker({ open, onClose, implantSet, onChange }: Implan
   const [implantError, setImplantError] = useState<string | null>(null);
   const [boosterError, setBoosterError] = useState<string | null>(null);
 
-  const set = implantSet ?? emptySet();
+  // Edited locally rather than read straight off the `implantSet` prop:
+  // `onChange` round-trips through an async encode + `?f=` write before the
+  // parent's prop reflects it, so two quick adds reading that prop would
+  // both see the same stale list and the second would silently overwrite the
+  // first. Re-seeded from the prop only when the modal transitions to open —
+  // never while it stays open, so the workspace's own async round trip
+  // doesn't stomp on an edit still in flight.
+  const [localSet, setLocalSet] = useState<FittingImplantSet>(implantSet ?? EMPTY_SET);
+  // React's own "adjust state during render" pattern (not an effect, not a
+  // ref: https://react.dev/learn/you-might-not-need-an-effect) for "reset
+  // when a prop changes" — here, when `open` flips false -> true.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) setLocalSet(implantSet ?? EMPTY_SET);
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -117,8 +138,13 @@ export function ImplantSetPicker({ open, onClose, implantSet, onChange }: Implan
 
   useEffect(() => {
     if (!open) return;
-    void loadTypeNames([...set.implants, ...set.boosters]).then(setNames);
-  }, [open, set.implants, set.boosters]);
+    void loadTypeNames([...localSet.implants, ...localSet.boosters]).then(setNames);
+  }, [open, localSet.implants, localSet.boosters]);
+
+  function commit(next: FittingImplantSet) {
+    setLocalSet(next);
+    onChange(next);
+  }
 
   function addTo(kind: 'implants' | 'boosters', rawName: string) {
     const entry = nameMap.get(rawName.toLowerCase());
@@ -128,13 +154,11 @@ export function ImplantSetPicker({ open, onClose, implantSet, onChange }: Implan
       return;
     }
     setError(null);
-    const list = kind === 'implants' ? set.implants : set.boosters;
-    onChange({ ...set, [kind]: [...list, entry.typeID] });
+    commit({ ...localSet, [kind]: [...localSet[kind], entry.typeID] });
   }
 
-  function removeFrom(kind: 'implants' | 'boosters', typeId: number) {
-    const list = kind === 'implants' ? set.implants : set.boosters;
-    onChange({ ...set, [kind]: list.filter((id) => id !== typeId) });
+  function removeFrom(kind: 'implants' | 'boosters', index: number) {
+    commit({ ...localSet, [kind]: localSet[kind].filter((_, i) => i !== index) });
   }
 
   return (
@@ -142,20 +166,20 @@ export function ImplantSetPicker({ open, onClose, implantSet, onChange }: Implan
       <div className="space-y-4 p-3">
         <SlotList
           heading={t('fittings.implants.implantsHeading')}
-          typeIds={set.implants}
+          typeIds={localSet.implants}
           max={MAX_IMPLANTS}
           names={names}
           onAdd={(name) => addTo('implants', name)}
-          onRemove={(typeId) => removeFrom('implants', typeId)}
+          onRemove={(index) => removeFrom('implants', index)}
           error={implantError}
         />
         <SlotList
           heading={t('fittings.implants.boostersHeading')}
-          typeIds={set.boosters}
+          typeIds={localSet.boosters}
           max={MAX_BOOSTERS}
           names={names}
           onAdd={(name) => addTo('boosters', name)}
-          onRemove={(typeId) => removeFrom('boosters', typeId)}
+          onRemove={(index) => removeFrom('boosters', index)}
           error={boosterError}
         />
       </div>

@@ -88,6 +88,13 @@ export function useFittingWorkspace(): FittingWorkspace {
   // where a *previous* paste's stale unresolved list must not linger next to
   // the unrelated fitting that URL change just loaded.
   const ownWriteRef = useRef(false);
+  // Set by `setImplantSet` right before its own write, same idea as
+  // `ownWriteRef` but narrower: a picker edit must not reset `basisOverride`
+  // (it's editing the *same* Fitting the toggle already applies to), but a
+  // fresh EFT paste — which also sets `ownWriteRef` — is a genuinely
+  // different Fitting and must still drop a stale override from whatever
+  // was open before it.
+  const implantEditRef = useRef(false);
 
   // Decode whenever the URL's `f` changes — a fresh load's own write below, a
   // pasted link, or Back/Forward. A stale decode from a param that changed
@@ -100,6 +107,10 @@ export function useFittingWorkspace(): FittingWorkspace {
     } else {
       setUnresolved([]);
       setTooLargeToShare(false);
+    }
+    if (implantEditRef.current) {
+      implantEditRef.current = false;
+    } else {
       setBasisOverride(null);
     }
     if (shareCode === null) {
@@ -176,10 +187,13 @@ export function useFittingWorkspace(): FittingWorkspace {
       const encoded = await encodeFittingShare(fittingToShareInput(updated));
       setTooLargeToShare(!encoded.ok);
       if (encoded.ok) {
-        // Same "mine" bookkeeping as `loadFromEftText` — this write must not
-        // reset `unresolved`/`tooLargeToShare`/`basisOverride` the way an
-        // externally-arriving `?f=` change does.
-        if (encoded.payload !== shareCode) ownWriteRef.current = true;
+        // Same "mine" bookkeeping as `loadFromEftText`, plus `implantEditRef`
+        // so this write also spares `basisOverride` — this is the same
+        // Fitting the toggle already applies to, just carrying a new set.
+        if (encoded.payload !== shareCode) {
+          ownWriteRef.current = true;
+          implantEditRef.current = true;
+        }
         setShareCode(encoded.payload);
       } else {
         // Same "still shown" trick as `loadFromEftText`'s own too-large branch.

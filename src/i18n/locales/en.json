@@ -154,6 +154,7 @@
       "implantsHeading": "Implants",
       "boostersHeading": "Boosters",
       "empty": "None",
+      "unknownType": "Type #{{typeId}}",
       "addPlaceholder": "Item name",
       "add": "Add",
       "remove": "Remove {{name}}",
