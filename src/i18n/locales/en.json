@@ -3693,6 +3693,60 @@
     "hint": "That address does not match anything in Neocom Desk. The link may be wrong, or it may have pointed at something that has since moved.",
     "home": "Go to Neocom Desk"
   },
+  "permissions": {
+    "wallet": {
+      "label": "Wallet",
+      "caption": "Your wallet balance, transactions and journal."
+    },
+    "marketOrders": {
+      "label": "Market orders",
+      "caption": "Your open and historical market orders."
+    },
+    "contracts": {
+      "label": "Contracts",
+      "caption": "Your contracts — courier, item exchange and auction."
+    },
+    "assets": {
+      "label": "Assets",
+      "caption": "Your asset list across every station and structure."
+    },
+    "industry": {
+      "label": "Industry",
+      "caption": "Your blueprints and industry jobs."
+    },
+    "mining": {
+      "label": "Mining",
+      "caption": "Your mining ledger."
+    },
+    "planets": {
+      "label": "Planets",
+      "caption": "Your planetary colonies."
+    },
+    "mail": {
+      "label": "Mail",
+      "caption": "Reading, organizing and sending your EVE mail."
+    },
+    "calendar": {
+      "label": "Calendar",
+      "caption": "Your calendar events, and responding to them."
+    },
+    "notifications": {
+      "label": "EVE notifications",
+      "caption": "Your EVE notifications feed."
+    },
+    "characterDetails": {
+      "label": "Character details",
+      "caption": "Implants, clones, location, contacts, standings and loyalty."
+    },
+    "corp": {
+      "label": "Corporation",
+      "caption": "Everything on the Corporation pages — wallet, members, structures, assets and moon extractions."
+    },
+    "structureMarkets": {
+      "label": "Structure markets",
+      "caption": "A player structure's own market, when you dock there."
+    }
+  },
   "settings": {
     "title": "Settings",
     "tabs": {
