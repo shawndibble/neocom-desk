@@ -1314,7 +1314,17 @@ export function Market() {
         </div>
       )}
 
-      {compareCount > 0 && <CompareDrawer location={orderBookLocation} refreshTick={refreshTick} />}
+      {compareCount > 0 && (
+        <CompareDrawer
+          location={orderBookLocation}
+          refreshTick={refreshTick}
+          blueprintCatalog={blueprintCatalog}
+          onRequestBlueprintCatalog={ensureBlueprintCatalog}
+          onAddToQuickbar={handleAddToQuickbar}
+          quickbarAvailable={activeCharacterId !== null}
+          onShowInfo={handleShowInfo}
+        />
+      )}
 
       {infoModalItem && (
         <ItemDetailModal
