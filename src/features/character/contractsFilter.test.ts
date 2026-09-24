@@ -6,6 +6,7 @@ import {
   contractStatusOptions,
   contractTypeOptions,
   activeContractsFilterCount,
+  isContractsFilterActive,
   type ContractsFilter,
 } from './contractsFilter';
 
@@ -128,5 +129,23 @@ describe('activeContractsFilterCount', () => {
     expect(
       activeContractsFilterCount({ status: 'outstanding', type: 'courier', text: 'trader' })
     ).toBe(2);
+  });
+});
+
+describe('isContractsFilterActive', () => {
+  it('is false for the identity filter', () => {
+    expect(isContractsFilterActive(EMPTY_CONTRACTS_FILTER)).toBe(false);
+  });
+
+  it('is false for whitespace-only text, which filterContracts ignores', () => {
+    expect(isContractsFilterActive({ ...EMPTY_CONTRACTS_FILTER, text: '   ' })).toBe(false);
+  });
+
+  it('is true when any of text, status or type is set', () => {
+    expect(isContractsFilterActive({ ...EMPTY_CONTRACTS_FILTER, text: 'rifter' })).toBe(true);
+    expect(isContractsFilterActive({ ...EMPTY_CONTRACTS_FILTER, status: 'outstanding' })).toBe(
+      true
+    );
+    expect(isContractsFilterActive({ ...EMPTY_CONTRACTS_FILTER, type: 'courier' })).toBe(true);
   });
 });
