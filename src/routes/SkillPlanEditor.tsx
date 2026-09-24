@@ -39,6 +39,8 @@ export function SkillPlanEditor() {
     remapInfo,
     queueEntries,
     queueFetchedAt,
+    totalSp,
+    unallocatedSp,
   } = usePlanEditorData(activeCharacterId);
   const isDesktop = useIsDesktop();
   // The page header's actions slot, as a live DOM node: PlanEditor portals
@@ -142,6 +144,8 @@ export function SkillPlanEditor() {
           remapInfo={remapInfo}
           queueEntries={queueEntries}
           queueFetchedAt={queueFetchedAt}
+          totalSp={totalSp}
+          unallocatedSp={unallocatedSp}
           listPane={
             <PlanListPane
               activeCharacterId={activeCharacterId}
