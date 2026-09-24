@@ -126,10 +126,13 @@ export function Modal({ open, id, onClose, title, children, placement = 'center'
               index.css: a native dialog does not lock the page behind it, so
               on a phone a scroll that starts over the sheet would otherwise
               chain straight into the page underneath. */}
+            {/* A sheet's content may end in a sticky action footer
+              (FilterSheet); the scroll padding keeps a control focused near
+              the bottom from scrolling in underneath it (WCAG 2.4.11). */}
             <div
               ref={bodyRef}
               tabIndex={-1}
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none"
+              className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-3 outline-none${placement === 'sheet' ? ' scroll-pb-16' : ''}`}
             >
               {children}
             </div>

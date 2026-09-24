@@ -65,6 +65,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale } from '@/lib/fontScale';
 import { useTimeFormat } from '@/lib/timeFormat';
 import { useMobileTabs } from '@/lib/mobileTabs';
+import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 
 // Wire authenticated ESI calls to stored tokens once, at module load. Wrapped
 // (tokenProvider.ts) so a dead refresh grant is reported centrally instead of
@@ -187,6 +188,13 @@ export function App() {
   useEffect(() => {
     void hydrateMobileTabs();
   }, [hydrateMobileTabs]);
+
+  // The shortcut listener in `Layout` reads the off switch on every route; a
+  // pilot who turned them off must not get a live "c" on a cold load.
+  const hydrateSingleKeyShortcuts = useSingleKeyShortcuts((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateSingleKeyShortcuts();
+  }, [hydrateSingleKeyShortcuts]);
 
   // `esi` publishes auth failures; the store is subscribed here so `esi` keeps
   // no dependency on `src/stores` (docs/ARCHITECTURE.md §2).

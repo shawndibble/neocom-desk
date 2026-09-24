@@ -39,9 +39,18 @@ export function BootScreen() {
       <h1 className="text-sm font-semibold tracking-widest uppercase">{t('app.name')}</h1>
       <Spinner label={t('common.loading')} />
       <p className="text-xs text-text-dim">{t('common.loadingEllipsis')}</p>
+      {/* Mounted empty from the start so the hint is *announced* when it
+          lands: a live region inserted together with its text is not
+          reliably read out, and the spinner's own status never changes. */}
+      <p
+        role="status"
+        data-testid="boot-stall-status"
+        className="max-w-prose text-xs text-text-dim empty:hidden"
+      >
+        {stalled ? t('boot.stalledHint') : null}
+      </p>
       {stalled && (
         <>
-          <p className="max-w-prose text-xs text-text-dim">{t('boot.stalledHint')}</p>
           {/* Disabled once tapped: recovery waits on the service worker before
               it reloads, and that pause is silent — otherwise it reads as a
               dead button and invites a second tap, which starts a second flow. */}

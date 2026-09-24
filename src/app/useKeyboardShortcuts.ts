@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { OVERLAY_SELECTOR, SHORTCUTS } from '@/lib/shortcuts';
+import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -13,11 +14,18 @@ function isTypingTarget(target: EventTarget | null): boolean {
  * route gets it. Escape has no `run` in `lib/shortcuts.ts` — the native
  * `<dialog>` already closes on it (`components/ui/Modal.tsx`), and a second
  * handler here would race that behaviour rather than add to it.
+ *
+ * Every dispatched shortcut is a single unmodified key, so the Settings off
+ * switch (`lib/singleKeyShortcuts.ts`, WCAG 2.1.4) simply leaves the listener
+ * unattached.
  */
 export function useKeyboardShortcuts(): void {
   const navigate = useNavigate();
+  const enabled = useSingleKeyShortcuts((state) => state.value);
 
   useEffect(() => {
+    if (!enabled) return;
+
     function onKeyDown(event: KeyboardEvent) {
       // Shift stays out of this list: `?` is typed with it. Opt-in below.
       if (event.ctrlKey || event.metaKey || event.altKey) return;
@@ -44,5 +52,5 @@ export function useKeyboardShortcuts(): void {
 
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [navigate]);
+  }, [navigate, enabled]);
 }
