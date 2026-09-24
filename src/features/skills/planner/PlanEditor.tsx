@@ -491,7 +491,7 @@ export function PlanEditor({
 
   // The in-game queue trains first, so the plan starts when it ends and every
   // queued level counts as trained by then. One instant feeds the schedule,
-  // Optimize Remaps' Booster origin and the header badge, so they agree.
+  // Optimize Remaps' Booster origin, so the savings figure and the total agree.
   const [loadedAtMs] = useState(() => Date.now());
   const queueProjection = useMemo(
     () => projectQueueEnd(trainedSkills, queueEntries, loadedAtMs),
