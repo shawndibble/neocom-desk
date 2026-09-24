@@ -37,6 +37,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { formatIsk, formatIskCompact, parseIskAmount } from '@/lib/isk';
+import { ItemContextMenu } from './ItemContextMenu';
 import { hasQuickbarTarget, type QuickbarTarget } from './quickbar';
 import type { QuickbarItem } from '@/db';
 
@@ -121,9 +122,19 @@ interface QuickbarRowProps {
   onSelect: (typeId: number) => void;
   onRemove: (typeId: number) => void;
   onSetTarget: (typeId: number, target: QuickbarTarget) => void;
+  menu: QuickbarMenuProps;
 }
 
-function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget }: QuickbarRowProps) {
+/** What the shared item context menu needs, wired by the route like the tree's. */
+interface QuickbarMenuProps {
+  onAddToQuickbar: (typeId: number, itemName: string) => void;
+  quickbarAvailable: boolean;
+  onShowInfo: (typeId: number, itemName: string) => void;
+  blueprintTypeIdFor: (typeId: number) => number | null | undefined;
+  onRequestBlueprintCatalog: () => void;
+}
+
+function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget, menu }: QuickbarRowProps) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.typeId,
@@ -149,22 +160,35 @@ function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget }: Quickb
       >
         <Icon.DragHandle />
       </button>
-      <button
-        type="button"
-        onClick={() => onSelect(item.typeId)}
-        aria-current={selected ? 'true' : undefined}
-        className={`flex flex-1 items-center gap-1.5 truncate text-left hover:text-accent ${
-          selected ? 'text-accent' : 'text-text-dim'
-        }`}
+      <ItemContextMenu
+        typeId={item.typeId}
+        itemName={item.name}
+        blueprintTypeID={menu.blueprintTypeIdFor(item.typeId)}
+        onAddToQuickbar={menu.onAddToQuickbar}
+        quickbarAvailable={menu.quickbarAvailable}
+        onShowInfo={menu.onShowInfo}
+        onOpenChange={(open) => {
+          if (open) menu.onRequestBlueprintCatalog();
+        }}
       >
-        <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
-        <span className="truncate">{item.name}</span>
-        {hasTarget && (
-          <span className="shrink-0 text-text-faint">
-            {(item.targetDirection === 'above' ? '≥ ' : '≤ ') + formatIskCompact(item.targetPrice!)}
-          </span>
-        )}
-      </button>
+        <button
+          type="button"
+          onClick={() => onSelect(item.typeId)}
+          aria-current={selected ? 'true' : undefined}
+          className={`flex flex-1 items-center gap-1.5 truncate text-left hover:text-accent ${
+            selected ? 'text-accent' : 'text-text-dim'
+          }`}
+        >
+          <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
+          <span className="truncate">{item.name}</span>
+          {hasTarget && (
+            <span className="shrink-0 text-text-faint">
+              {(item.targetDirection === 'above' ? '≥ ' : '≤ ') +
+                formatIskCompact(item.targetPrice!)}
+            </span>
+          )}
+        </button>
+      </ItemContextMenu>
       <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
         <PopoverTrigger asChild>
           <IconButton
@@ -202,6 +226,11 @@ export interface QuickbarListProps {
   onReorder: (activeTypeId: number, overTypeId: number) => void;
   onSetTarget: (typeId: number, target: QuickbarTarget) => void;
   onViewInAppraisal: () => void;
+  onAddToQuickbar: QuickbarMenuProps['onAddToQuickbar'];
+  quickbarAvailable: boolean;
+  onShowInfo: QuickbarMenuProps['onShowInfo'];
+  blueprintTypeIdFor: QuickbarMenuProps['blueprintTypeIdFor'];
+  onRequestBlueprintCatalog: () => void;
 }
 
 export function QuickbarList({
@@ -212,7 +241,19 @@ export function QuickbarList({
   onReorder,
   onSetTarget,
   onViewInAppraisal,
+  onAddToQuickbar,
+  quickbarAvailable,
+  onShowInfo,
+  blueprintTypeIdFor,
+  onRequestBlueprintCatalog,
 }: QuickbarListProps) {
+  const menu: QuickbarMenuProps = {
+    onAddToQuickbar,
+    quickbarAvailable,
+    onShowInfo,
+    blueprintTypeIdFor,
+    onRequestBlueprintCatalog,
+  };
   const { t } = useTranslation();
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -255,6 +296,7 @@ export function QuickbarList({
                   onSelect={onSelect}
                   onRemove={onRemove}
                   onSetTarget={onSetTarget}
+                  menu={menu}
                 />
               ))}
             </ul>

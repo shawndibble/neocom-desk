@@ -11,6 +11,19 @@
 import { useRef, useState } from 'react';
 import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 
+/**
+ * The blueprint that produces `typeId`, in the shape `ItemContextMenu`'s
+ * `blueprintTypeID` wants: undefined while the catalog hasn't loaded, null once
+ * it has and nothing produces the item.
+ */
+export function blueprintTypeIdFor(
+  catalog: BlueprintCatalog | null,
+  typeId: number
+): number | null | undefined {
+  if (catalog === null) return undefined;
+  return catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null;
+}
+
 export interface BlueprintCatalogController {
   blueprintCatalog: BlueprintCatalog | null;
   ensureBlueprintCatalog: () => void;
