@@ -57,7 +57,9 @@ test('exports the computed queue to the clipboard', async ({ page, context }) =>
 test('optimize remaps shows attribute segments and savings', async ({ page }) => {
   await addCaldariCruiserToNewPlan(page);
 
-  await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
+  // No manual remap count any more — CHARACTER_ATTRIBUTES has no bonus
+  // remaps and no cooldown, so the live budget already reads 1 (the yearly
+  // remap, ready).
   await page.getByRole('button', { name: 'Optimize' }).click();
   await page.getByRole('menuitem', { name: 'Place remaps only' }).click();
 
@@ -74,7 +76,9 @@ test('"Optimize for me" reorders and places remaps in one preview; Accept applie
 }) => {
   await addCaldariCruiserToNewPlan(page);
 
-  await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
+  // No manual remap count any more — CHARACTER_ATTRIBUTES has no bonus
+  // remaps and no cooldown, so the live budget already reads 1 (the yearly
+  // remap, ready).
   await page.getByRole('button', { name: 'Optimize' }).click();
   await page.getByRole('menuitem', { name: 'Optimize for me' }).click();
 
@@ -187,10 +191,10 @@ test('the plan summary and tools stay in view while the entries queue scrolls (#
   // when the capped list does. The entry list has its own cap, so what makes
   // the page taller than the viewport here is the sidebar itself (attributes,
   // What-If Implants, Booster) — the real case the sticky exists for. Firing
-  // the remaps optimizer is incidental setup at this point (its result now
-  // opens its own Modal rather than growing the sidebar), kept only so the
-  // guard below isn't the only thing exercising the click.
-  await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
+  // Optimize remaps is incidental setup at this point (its result now opens
+  // its own Modal rather than growing the sidebar), kept only so the guard
+  // below isn't the only thing exercising the click. No manual remap count
+  // any more — the fixture's live budget already reads 1.
   await page.getByRole('button', { name: 'Optimize' }).click();
   await page.getByRole('menuitem', { name: 'Place remaps only' }).click();
   await expect(page.getByText(/^Remapping saves|^No remap improves/)).toBeVisible();

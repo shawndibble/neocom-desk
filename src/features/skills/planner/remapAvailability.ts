@@ -1,8 +1,7 @@
 /**
  * Remaps Available (CONTEXT.md): bonus remaps (new characters get several)
  * plus the yearly remap when off cooldown, read from ESI's attributes
- * endpoint. This is a prefill/hint only — the user may override the plan's
- * remapCount freely.
+ * endpoint. `remapBudget` below is what the optimizer plans against.
  */
 import { MAX_SUPPORTED_REMAPS } from '@/engine/optimizer';
 import type { CharacterAttributes } from '@/esi/endpoints';
@@ -63,4 +62,35 @@ export function timedRemapFrom(info: RemapAvailability | null, planStart: Date):
   // `info.bonus < MAX_SUPPORTED_REMAPS` already, from the guard above, so
   // `bonus + 1` never needs its own cap.
   return { remapCount: info.bonus + 1, notBeforeSeconds: Math.max(0, notBeforeSeconds) };
+}
+
+export interface RemapBudget {
+  /** Requested count, before capping — see `remapBudget` below. */
+  count: number;
+  /** `count` capped at MAX_SUPPORTED_REMAPS — what an optimizer call should actually request. */
+  evaluatedCount: number;
+  /** The on-cooldown yearly remap's timed-placement constraint (`timedRemapFrom`), or null. */
+  timed: TimedRemap | null;
+}
+
+/**
+ * The optimizer's whole remap budget in one place: EVE's live count when
+ * `info` is readable, else `stored` (`plan.remapCount`) — an offline/no-scope
+ * fallback only, never shown as live. Callers compare `count` against
+ * `evaluatedCount` for an over-cap distinction (as `evaluateOptimizationBadge`
+ * already does for the header's own badge) rather than this carrying a
+ * redundant `overCap` boolean of its own.
+ */
+export function remapBudget(
+  info: RemapAvailability | null,
+  stored: number,
+  planStart: Date
+): RemapBudget {
+  const timed = info ? timedRemapFrom(info, planStart) : null;
+  // `timed` is only non-null while the yearly remap is on cooldown, in which
+  // case `info.available` excludes it — so `timed.remapCount` (which counts
+  // it) is always the larger of the two; no need to compare.
+  const count = info ? (timed ? timed.remapCount : info.available) : stored;
+  const evaluatedCount = Math.min(count, MAX_SUPPORTED_REMAPS);
+  return { count, evaluatedCount, timed };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { remapAvailability, timedRemapFrom } from './remapAvailability';
+import { remapAvailability, remapBudget, timedRemapFrom } from './remapAvailability';
 
 const NOW = new Date('2026-08-29T12:00:00Z');
 
@@ -95,5 +95,50 @@ describe('timedRemapFrom', () => {
     );
     const laterStart = new Date('2026-08-29T14:00:00Z');
     expect(timedRemapFrom(info, laterStart)).toEqual({ remapCount: 1, notBeforeSeconds: 0 });
+  });
+});
+
+describe('remapBudget', () => {
+  const PLAN_START = new Date('2026-08-29T12:00:00Z');
+
+  it('reports the live ESI count — ready yearly + bonus remaps', () => {
+    const info = remapAvailability({ bonus_remaps: 1 }, NOW);
+    const budget = remapBudget(info, 0, PLAN_START);
+    expect(budget).toEqual({ count: 2, evaluatedCount: 2, timed: null });
+  });
+
+  it('surfaces the timed-placement constraint for an on-cooldown yearly remap', () => {
+    const info = remapAvailability(
+      { bonus_remaps: 0, accrued_remap_cooldown_date: '2026-08-30T12:00:00Z' },
+      NOW
+    );
+    const budget = remapBudget(info, 0, PLAN_START);
+    expect(budget).toEqual({
+      count: 1,
+      evaluatedCount: 1,
+      timed: { remapCount: 1, notBeforeSeconds: 86400 },
+    });
+  });
+
+  it('falls back to the stored count when there is no ESI data', () => {
+    expect(remapBudget(null, 1, PLAN_START)).toEqual({
+      count: 1,
+      evaluatedCount: 1,
+      timed: null,
+    });
+  });
+
+  it('caps the evaluated count at MAX_SUPPORTED_REMAPS, leaving count (the requested figure) uncapped', () => {
+    const info = remapAvailability({ bonus_remaps: 3 }, NOW);
+    const budget = remapBudget(info, 0, PLAN_START);
+    expect(budget).toEqual({ count: 4, evaluatedCount: 2, timed: null });
+  });
+
+  it('caps the stored fallback too, when ESI data is absent', () => {
+    expect(remapBudget(null, 5, PLAN_START)).toEqual({
+      count: 5,
+      evaluatedCount: 2,
+      timed: null,
+    });
   });
 });
