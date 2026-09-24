@@ -12,7 +12,7 @@
  * `engine/corp/board.ts`. This file renders them and does no time arithmetic of
  * its own beyond formatting.
  */
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -20,6 +20,11 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  IconButton,
   Tooltip,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -144,47 +149,106 @@ function Countdown({ item }: { item: CorpBoardItem }) {
   );
 }
 
+interface BoardRowAction {
+  key: string;
+  label: string;
+  onSelect: () => void;
+}
+
 /**
- * Right-click menu for one row (issue #419): copy the subject, and — only for
- * a job, the one kind with a market-relevant item of its own (see
- * `CorpBoardItem.typeId`) — check its product in the Market Browser and show
- * its item info. `ContextMenuTrigger asChild` clones the `<li>` itself rather
- * than wrapping it, the same way `VariationsTable.tsx` triggers off a `<tr>`
- * — a wrapper element would break `<ul>` semantics and the row's own layout.
+ * Actions shared by the right-click menu and visible button below, so they
+ * can't drift. Job rows add market-item (typeId) actions; other kinds only
+ * get copy name.
  */
-function BoardRowMenu({
-  item,
-  onShowInfo,
-  children,
-}: {
-  item: CorpBoardItem;
-  onShowInfo: (typeId: number, itemName: string) => void;
-  children: ReactElement;
-}) {
+function useBoardRowActions(
+  item: CorpBoardItem,
+  onShowInfo: (typeId: number, itemName: string) => void
+): BoardRowAction[] {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const typeId = item.typeId;
 
+  const actions: BoardRowAction[] = [
+    {
+      key: 'copyName',
+      label: t('corp.board.contextMenu.copyName'),
+      onSelect: () => void writeToClipboard(item.subject),
+    },
+  ];
+  if (typeId !== null) {
+    actions.push(
+      {
+        key: 'showInfo',
+        label: t('corp.board.contextMenu.showInfo'),
+        onSelect: () => onShowInfo(typeId, item.subject),
+      },
+      {
+        key: 'viewInMarket',
+        label: t('corp.board.contextMenu.viewInMarket'),
+        onSelect: () => navigate(marketItemUrl(typeId, location.search)),
+      }
+    );
+  }
+  return actions;
+}
+
+/** One `BoardRowAction` rendered into either menu family's item component. */
+function renderBoardRowAction(
+  action: BoardRowAction,
+  MenuItem: (props: { onSelect: () => void; children: ReactNode }) => ReactElement
+) {
+  return (
+    <MenuItem key={action.key} onSelect={action.onSelect}>
+      {action.label}
+    </MenuItem>
+  );
+}
+
+/**
+ * Right-click surface for one row. `ContextMenuTrigger asChild` clones the
+ * `<li>` itself rather than wrapping it, the same way `VariationsTable.tsx`
+ * triggers off a `<tr>` — a wrapper element would break `<ul>` semantics and
+ * the row's own layout.
+ */
+function BoardRowMenu({
+  actions,
+  children,
+}: {
+  actions: BoardRowAction[];
+  children: ReactElement;
+}) {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onSelect={() => void writeToClipboard(item.subject)}>
-          {t('corp.board.contextMenu.copyName')}
-        </ContextMenuItem>
-        {typeId !== null && (
-          <>
-            <ContextMenuItem onSelect={() => onShowInfo(typeId, item.subject)}>
-              {t('corp.board.contextMenu.showInfo')}
-            </ContextMenuItem>
-            <ContextMenuItem onSelect={() => navigate(marketItemUrl(typeId, location.search))}>
-              {t('corp.board.contextMenu.viewInMarket')}
-            </ContextMenuItem>
-          </>
-        )}
+        {actions.map((action) => renderBoardRowAction(action, ContextMenuItem))}
       </ContextMenuContent>
     </ContextMenu>
+  );
+}
+
+/**
+ * Visible trigger for the row's actions (WCAG 2.1.1) — the row's only
+ * keyboard-focusable element. `variant="plain"` drops the hairline border so
+ * it doesn't compete with the countdown for attention.
+ */
+function BoardRowMoreActions({ subject, actions }: { subject: string; actions: BoardRowAction[] }) {
+  const { t } = useTranslation();
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <IconButton
+          icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
+          label={t('corp.board.moreActionsLabel', { name: subject })}
+          variant="plain"
+          size="sm"
+        />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {actions.map((action) => renderBoardRowAction(action, DropdownMenuItem))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
@@ -205,8 +269,9 @@ export function CorpBoardRow({
   onShowInfo: (typeId: number, itemName: string) => void;
 }) {
   const { t } = useTranslation();
+  const actions = useBoardRowActions(item, onShowInfo);
   return (
-    <BoardRowMenu item={item} onShowInfo={onShowInfo}>
+    <BoardRowMenu actions={actions}>
       <li className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 last:border-b-0">
         <Countdown item={item} />
         <div className="min-w-0 flex-1">
@@ -220,6 +285,7 @@ export function CorpBoardRow({
           would crowd the one thing the row exists to show.
         */}
         <span className="sr-only">{t(SEVERITY_LABEL[item.severity])}</span>
+        <BoardRowMoreActions subject={item.subject} actions={actions} />
       </li>
     </BoardRowMenu>
   );
