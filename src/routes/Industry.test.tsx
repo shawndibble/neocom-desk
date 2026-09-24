@@ -189,6 +189,16 @@ describe('Industry: tabs are paths (issue #1300)', () => {
     expect(screen.getByRole('tab', { name: 'Records' })).toHaveAttribute('aria-selected', 'true');
   });
 
+  it("shows the plan's own runs in the Runs column", async () => {
+    await db.buildPlans.add(seedPlan({ runs: 7 }));
+    window.history.pushState({}, '', '/industry/plans');
+    render(<App />);
+
+    const row = (await screen.findByText('Rifter run')).closest('li');
+    expect(row).not.toBeNull();
+    expect(within(row as HTMLElement).getByText('7')).toBeInTheDocument();
+  });
+
   it('opens the tab its path names', async () => {
     window.history.pushState({}, '', '/industry/records');
     render(<App />);
