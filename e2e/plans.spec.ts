@@ -97,8 +97,9 @@ test('the plan summary and tools stay in view while the entries queue scrolls (#
   // enough entries to actually overflow that cap, which is measured against
   // the live viewport height (#237), not a flat constant.
   await addCaldariCruiserToNewPlan(page);
-  await page.getByRole('button', { name: 'Import from clipboard' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Import from clipboard' });
+  await page.getByRole('button', { name: 'Import' }).click();
+  await page.getByRole('menuitem', { name: 'From text or file…' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Import plan' });
   await dialog
     .getByLabel(/paste an eft fit or a skill plan/i)
     .fill(
@@ -139,8 +140,8 @@ test('the plan summary and tools stay in view while the entries queue scrolls (#
     expect(overflowed).toBe(true);
   }).toPass();
 
-  // Closing the dialog returns focus to the "Import from clipboard" button in
-  // the sidebar, and the browser scrolls that button into view. Once the
+  // Closing the dialog returns focus to the "Import" button in
+  // the page header, and the browser scrolls that button into view. Once the
   // sidebar is taller than the viewport that button is below the fold, so the
   // page lands scrolled and every coordinate measured afterwards is off by
   // however far it went. Establish the precondition rather than assuming it:

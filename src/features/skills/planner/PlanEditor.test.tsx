@@ -199,6 +199,12 @@ const FITTED: Implants = { perception: 4, memory: 3 };
  * every test here runs below `lg` unless it opts in — which is where the
  * tools pane is a collapsed disclosure.
  */
+/** Import > From skill queue: the header's Import menu, then its queue item. */
+async function importFromQueue(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Import' }));
+  await user.click(screen.getByRole('menuitem', { name: 'From skill queue' }));
+}
+
 async function openTools(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /plan tools/i }));
 }
@@ -293,7 +299,7 @@ describe('PlanEditor tools pane', () => {
 
     // Import/Export: plan-level file operations, now icon buttons portaled
     // into the route's page header rather than a tools-pane section.
-    for (const name of ['Import from skill queue', 'Import from clipboard', 'Export']) {
+    for (const name of ['Import', 'Export']) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument();
       expect(within(actions).queryByRole('button', { name })).toBeNull();
     }
@@ -315,22 +321,31 @@ describe('PlanEditor tools pane', () => {
     }
   });
 
-  it('renders Import/Export as icon-only controls (portaled to the page header)', () => {
+  it('renders Import/Export as labelled menu buttons (portaled to the page header)', () => {
     renderEditor();
 
-    for (const name of ['Import from skill queue', 'Import from clipboard', 'Export']) {
+    for (const name of ['Import', 'Export']) {
       const button = screen.getByRole('button', { name });
-      // Icon-only: the accessible name comes from aria-label, not visible text.
-      expect(button).toHaveAttribute('aria-label', name);
-      expect(button.textContent).toBe('');
+      // A visible text label, not an aria-label standing in for a glyph.
+      expect(button).not.toHaveAttribute('aria-label');
+      expect(button.textContent).toBe(name);
     }
+  });
+
+  it('opens the import dialog, titled "Import plan", from Import > From text or file…', async () => {
+    const user = userEvent.setup();
+    renderEditor();
+
+    await user.click(screen.getByRole('button', { name: 'Import' }));
+    await user.click(screen.getByRole('menuitem', { name: 'From text or file…' }));
+
+    expect(await screen.findByRole('dialog', { name: 'Import plan' })).toBeInTheDocument();
   });
 
   it("doesn't render Import/Export when the caller has no header-actions slot to portal into", () => {
     renderEditor(vi.fn(), { headerActionsContainer: null });
 
-    expect(screen.queryByRole('button', { name: 'Import from skill queue' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Import from clipboard' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Import' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Export' })).toBeNull();
   });
 
@@ -860,7 +875,7 @@ describe('PlanEditor tools pane placement', () => {
     expect(screen.queryByLabelText('What-if implants')).toBeNull();
     // Import/Export portals to the page header, not the tools pane — on
     // screen regardless of the disclosure's state.
-    expect(screen.getByRole('button', { name: 'Import from skill queue' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Import' })).toBeInTheDocument();
   });
 
   it('puts the tools in the sidebar under the plan list at `lg`+, always open', () => {
@@ -1635,7 +1650,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     const { onUpdate } = renderEditor(vi.fn(), { plan: { ...PLAN, entries: [] } });
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
 
     await waitFor(() =>
       expect(onUpdate).toHaveBeenCalledWith({ entries: [{ skillTypeID: 20, targetLevel: 3 }] })
@@ -1650,7 +1665,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
 
     await waitFor(() => expect(screen.getByText(/in-game queue has 1 skill/i)).toBeInTheDocument());
     expect(onUpdate).not.toHaveBeenCalled();
@@ -1663,7 +1678,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
     await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
     await user.click(screen.getByRole('button', { name: 'Append' }));
 
@@ -1683,7 +1698,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     const { onUpdate } = renderEditor(vi.fn(), { plan: { ...PLAN, markers: [1] } });
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
     await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
     await user.click(screen.getByRole('button', { name: 'Replace plan' }));
 
@@ -1702,7 +1717,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const originalPlan = { ...PLAN, markers: [1] };
     const { onUpdate } = renderEditor(vi.fn(), { plan: originalPlan });
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
     await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
     await user.click(screen.getByRole('button', { name: 'Replace plan' }));
 
@@ -1724,7 +1739,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
 
     await waitFor(() =>
       expect(screen.getByText(/in-game skill queue is empty/i)).toBeInTheDocument()
@@ -1739,12 +1754,12 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     renderEditor();
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
     await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
     await user.click(screen.getByRole('button', { name: 'Replace plan' }));
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
     await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
     await user.click(screen.getByRole('button', { name: 'Append' }));
 
@@ -1764,8 +1779,8 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     renderEditor();
 
-    const importButton = screen.getByRole('button', { name: 'Import from skill queue' });
-    await user.click(importButton);
+    const importButton = screen.getByRole('button', { name: 'Import' });
+    await importFromQueue(user);
     expect(importButton).toBeDisabled();
 
     resolveQueue(queueResult([]));
@@ -1782,7 +1797,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     const user = userEvent.setup();
     const { onUpdate, replacePlan } = renderEditor();
 
-    await user.click(screen.getByRole('button', { name: 'Import from skill queue' }));
+    await importFromQueue(user);
 
     // Switched to a different plan while the fetch for plan-1 is still in
     // flight — this component has no key={plan.id} at the route, so the same
