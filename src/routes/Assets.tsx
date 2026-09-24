@@ -52,6 +52,7 @@ import { loadCharacterSolarSystemId } from '@/features/character/location';
 import { loadJumpsAway } from '@/features/character/routeDistance';
 import { useRoutePreference, type RoutePreference } from '@/features/character/routePreference';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
+import { useFocusHeading } from '@/lib/useFocusHeading';
 import type { CharacterAsset } from '@/esi/endpoints';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
@@ -1150,6 +1151,18 @@ export function Assets() {
     if (scrollParentRef.current) scrollParentRef.current.scrollTop = 0;
   }, [wildcard, flatModeActive]);
 
+  // Level-heading focus (issue #1485): a location/container/search-result
+  // link, or Back, unmounts the control the pilot just activated — without
+  // this, focus falls back to the page body with no cue what happened (WCAG
+  // 2.4.3). Keyed on `wildcard` alone (the drill-down path), not
+  // `flatModeActive`: that flips true the instant a search keystroke lands,
+  // which would otherwise yank focus off the search box mid-type.
+  // `levelHeadingRef` is shared by whichever of the three header blocks below
+  // is actually rendered (root list / drilled level); only one exists at a
+  // time.
+  const levelHeadingRef = useRef<HTMLHeadingElement>(null);
+  useFocusHeading(levelHeadingRef, wildcard);
+
   // Jumps-away distances (issue #87): the active character's current solar
   // system, fetched once per page load (not polled) via ESI's location
   // endpoint. Re-fetched whenever the active character changes.
@@ -1692,9 +1705,20 @@ export function Assets() {
                     onClick={() => void navigate(parentHref)}
                   />
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="truncate text-sm font-semibold">
+                    <h2
+                      ref={levelHeadingRef}
+                      tabIndex={-1}
+                      className="truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    >
                       {crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''}
-                    </span>
+                      {currentTotals && (
+                        <span className="sr-only">
+                          {t('assets.levelHeading.itemsSuffix', {
+                            items: t('assets.itemCount', { count: currentTotals.itemCount }),
+                          })}
+                        </span>
+                      )}
+                    </h2>
                     {crumbs.length > 1 && (
                       <span className="flex min-w-0 items-center gap-1 truncate text-[0.6875rem] text-text-dim">
                         {crumbs.slice(0, -1).map((crumb, index) => (
@@ -1740,9 +1764,13 @@ export function Assets() {
                 </div>
               ) : (
                 <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5">
-                  <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  <h2
+                    ref={levelHeadingRef}
+                    tabIndex={-1}
+                    className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
                     {t('assets.section.locationCount', { count: sortedTree.length })}
-                  </span>
+                  </h2>
                   <span className="text-[0.6875rem] tabular-nums text-isk-pos">
                     {t('assets.section.totalValue', { value: formatIsk(totalValue) })}
                   </span>

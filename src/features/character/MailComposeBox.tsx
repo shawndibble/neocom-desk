@@ -93,6 +93,31 @@ export function MailComposeBox({
   const [pickerOpen, setPickerOpen] = useState(false);
   const listboxId = `mail-compose-recipient-listbox-${header.mail_id}`;
 
+  // First-field focus (issue #1485): Forward's recipient search is the real
+  // first field (it sits above Subject); `skipNextPickerOpenRef` stops that
+  // field's own `onFocus` from popping its picker open on this programmatic
+  // focus. Runs once per mount, which a kind/mail switch already is —
+  // Mail.tsx keys this component by `${mail_id}:${kind}`.
+  const recipientSearchRef = useRef<HTMLInputElement>(null);
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const skipNextPickerOpenRef = useRef(false);
+  useEffect(() => {
+    if (kind === 'forward') {
+      skipNextPickerOpenRef.current = true;
+      recipientSearchRef.current?.focus();
+    } else {
+      subjectRef.current?.focus();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only, see comment above
+  }, []);
+  function handleRecipientSearchFocus() {
+    if (skipNextPickerOpenRef.current) {
+      skipNextPickerOpenRef.current = false;
+      return;
+    }
+    setPickerOpen(true);
+  }
+
   // Flips true the moment a pilot makes their own edit (subject, body, a
   // chip). Guards the hydration effect below: `loadDraft` is async, and
   // nothing else stops a slow resolution from landing after typing has
@@ -356,6 +381,7 @@ export function MailComposeBox({
       {kind === 'forward' && (
         <div className="relative">
           <TextInput
+            ref={recipientSearchRef}
             size="sm"
             role="combobox"
             aria-autocomplete="list"
@@ -372,7 +398,7 @@ export function MailComposeBox({
               setPickerOpen(true);
               setHighlight(null);
             }}
-            onFocus={() => setPickerOpen(true)}
+            onFocus={handleRecipientSearchFocus}
             onKeyDown={handlePickerKeyDown}
             className="w-full"
           />
@@ -424,6 +450,7 @@ export function MailComposeBox({
       )}
 
       <TextInput
+        ref={subjectRef}
         size="sm"
         aria-label={t('mail.subjectLabel')}
         placeholder={t('mail.subjectLabel')}
