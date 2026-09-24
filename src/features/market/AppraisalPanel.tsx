@@ -20,6 +20,7 @@ import {
   Button,
   DataTable,
   EmptyState,
+  FilterChip,
   IconButton,
   IskAmount,
   Panel,
@@ -271,11 +272,8 @@ export function AppraisalPanel({
     });
   }
 
-  // The Undercut view (a list price per row that beats every seller at the
-  // hub). Keyed by typeId from the unscaled items, never the Price-Percent
-  // rows: a listing has to beat a real order, not a fraction of one — and
-  // `appraisalNet`'s List Net is built on the same price, so they agree.
-  // ESI cannot place orders, so the column's job ends at the clipboard.
+  // The Undercut view, read from the unscaled items rather than the rows —
+  // see `20260924-124701-appraisal-undercut-lists-one-tick-under-the-hubs.md`.
   const undercuts = useMemo(() => {
     const byType = new Map<number, AppraisalUndercut | null>();
     for (const item of result?.appraisal.items ?? [])
@@ -292,11 +290,11 @@ export function AppraisalPanel({
         const undercut = undercuts.get(row.typeId);
         if (!undercut) return '—';
         return (
-          <span className={undercut.atOrBelowBuy ? 'text-warning' : undefined}>
+          <span>
             <CopyablePrice price={undercut.price} />
             {undercut.atOrBelowBuy && (
               <span
-                className="ml-0.5"
+                className="ml-0.5 text-warning"
                 title={t('market.appraisal.undercutAtOrBelowBuy', {
                   price: formatIskAuto(undercut.price),
                 })}
@@ -600,16 +598,14 @@ export function AppraisalPanel({
                 {/* In the chip row rather than the Panel header: this row
                     wraps, the header does not, and a text button there
                     overflowed the page at phone width. */}
-                <Button
+                <FilterChip
                   size="sm"
-                  variant={undercutShown ? 'primary' : 'ghost'}
-                  aria-pressed={undercutShown}
-                  title={t('market.appraisal.undercutHelp')}
-                  onClick={() => setUndercutShown((shown) => !shown)}
+                  label={t('market.appraisal.undercut')}
+                  selected={undercutShown}
+                  onToggle={() => setUndercutShown((shown) => !shown)}
+                  tooltip={t('market.appraisal.undercutHelp')}
                   className="ml-auto"
-                >
-                  {t('market.appraisal.undercut')}
-                </Button>
+                />
               </div>
 
               {totals.unpricedRows > 0 && (
