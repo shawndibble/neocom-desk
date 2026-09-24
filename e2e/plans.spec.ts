@@ -57,7 +57,9 @@ test('exports the computed queue to the clipboard', async ({ page, context }) =>
 test('optimize remaps shows attribute segments and savings', async ({ page }) => {
   await addCaldariCruiserToNewPlan(page);
 
-  await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
+  // No manual remap count any more — CHARACTER_ATTRIBUTES has no bonus
+  // remaps and no cooldown, so the live budget already reads 1 (the yearly
+  // remap, ready).
   await page.getByRole('button', { name: 'Optimize' }).click();
   await page.getByRole('menuitem', { name: 'Place remaps only' }).click();
 
@@ -74,7 +76,9 @@ test('"Optimize for me" reorders and places remaps in one preview; Accept applie
 }) => {
   await addCaldariCruiserToNewPlan(page);
 
-  await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
+  // No manual remap count any more — CHARACTER_ATTRIBUTES has no bonus
+  // remaps and no cooldown, so the live budget already reads 1 (the yearly
+  // remap, ready).
   await page.getByRole('button', { name: 'Optimize' }).click();
   await page.getByRole('menuitem', { name: 'Optimize for me' }).click();
 
@@ -126,8 +130,9 @@ test('the plan summary and tools stay in view while the entries queue scrolls (#
   // enough entries to actually overflow that cap, which is measured against
   // the live viewport height (#237), not a flat constant.
   await addCaldariCruiserToNewPlan(page);
-  await page.getByRole('button', { name: 'Import from clipboard' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Import from clipboard' });
+  await page.getByRole('button', { name: 'Import' }).click();
+  await page.getByRole('menuitem', { name: 'From text or file…' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Import plan' });
   await dialog
     .getByLabel(/paste an eft fit or a skill plan/i)
     .fill(
@@ -168,8 +173,8 @@ test('the plan summary and tools stay in view while the entries queue scrolls (#
     expect(overflowed).toBe(true);
   }).toPass();
 
-  // Closing the dialog returns focus to the "Import from clipboard" button in
-  // the sidebar, and the browser scrolls that button into view. Once the
+  // Closing the dialog returns focus to the "Import" button in
+  // the page header, and the browser scrolls that button into view. Once the
   // sidebar is taller than the viewport that button is below the fold, so the
   // page lands scrolled and every coordinate measured afterwards is off by
   // however far it went. Establish the precondition rather than assuming it:
@@ -215,10 +220,10 @@ test('the plan summary and tools stay in view while the entries queue scrolls (#
   // when the capped list does. The entry list has its own cap, so what makes
   // the page taller than the viewport here is the sidebar itself (attributes,
   // What-If Implants, Booster) — the real case the sticky exists for. Firing
-  // the remaps optimizer is incidental setup at this point (its result now
-  // opens its own Modal rather than growing the sidebar), kept only so the
-  // guard below isn't the only thing exercising the click.
-  await page.getByRole('spinbutton', { name: 'Remaps available' }).fill('1');
+  // Optimize remaps is incidental setup at this point (its result now opens
+  // its own Modal rather than growing the sidebar), kept only so the guard
+  // below isn't the only thing exercising the click. No manual remap count
+  // any more — the fixture's live budget already reads 1.
   await page.getByRole('button', { name: 'Optimize' }).click();
   await page.getByRole('menuitem', { name: 'Place remaps only' }).click();
   await expect(page.getByText(/^Remapping saves|^No remap improves/)).toBeVisible();

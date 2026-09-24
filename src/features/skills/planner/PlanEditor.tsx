@@ -22,7 +22,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   IconButton,
-  InfoTooltip,
   Modal,
   Panel,
   Select,
@@ -52,7 +51,6 @@ import { exportPlanToClipboard } from '@/engine/clipboardExport';
 import {
   optimizeAtMarkers,
   optimizeForMe,
-  MAX_SUPPORTED_REMAPS,
   placeRemaps,
   sortShortestFirst,
   suggestReorder,
@@ -132,7 +130,7 @@ import { planDrop, promotePrereq } from './planDrop';
 import { RemapMarkerModal } from './RemapMarkerModal';
 import { bandStarts, meaningfulBandStarts } from './bands';
 import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueRows';
-import { timedRemapFrom, type RemapAvailability } from './remapAvailability';
+import { remapBudget, type RemapAvailability } from './remapAvailability';
 import {
   whatIfImplants,
   normalizeWhatIfSelection,
@@ -156,13 +154,7 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 export type PlanPatch = Partial<
   Pick<
     SkillPlanRecord,
-    | 'entries'
-    | 'remapCount'
-    | 'markers'
-    | 'markerAttributes'
-    | 'whatIfImplants'
-    | 'boosters'
-    | 'milestones'
+    'entries' | 'markers' | 'markerAttributes' | 'whatIfImplants' | 'boosters' | 'milestones'
   >
 >;
 
@@ -259,6 +251,8 @@ export function PlanEditor({
   const isDesktop = useIsDesktop();
   const [copyConfirm, setCopyConfirm] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [importMenuOpen, setImportMenuOpen] = useState(false);
+  const openImportDialogAfterMenuRef = useRef(false);
   const [optimizeMenuOpen, setOptimizeMenuOpen] = useState(false);
   // Ties each Optimize menu item's `aria-label` (the mode name) to its hint
   // span via `aria-describedby`, so the "why" still reaches screen readers.
@@ -650,27 +644,17 @@ export function PlanEditor({
     [plan.entries]
   );
 
-  // The yearly remap on cooldown is still usable, just not before it ends
-  // (#1404) — the feature layer raises the count to include it (still
-  // capped) and hands the optimizer the cooldown's offset from plan start so
-  // it never places that one too early. `new Date()` here matches every
-  // other "plan starts now" read in this component (e.g. `scheduleFromNow`);
-  // memoized on `remapInfo` alone so its reference stays stable across
-  // renders the way `plan.remapCount` etc. already are, rather than
-  // invalidating the header badge's own memo below on every render.
-  const timedRemap = useMemo(() => timedRemapFrom(remapInfo, new Date()), [remapInfo]);
-
-  // The plan keeps whatever count the user set (ESI prefills bonus remaps),
-  // raised to include an on-cooldown yearly remap even if the user hasn't
-  // bumped the field themselves. This is the REQUESTED count — uncapped —
-  // so `evaluateOptimizationBadge` can still tell a genuine over-cap request
-  // from one the timed remap alone accounts for.
-  const requestedRemapCount = timedRemap
-    ? Math.max(plan.remapCount, timedRemap.remapCount)
-    : plan.remapCount;
-  // Only the optimizer is capped, and the header badge says so rather than
-  // quietly answering a different question than the one on screen.
-  const remapCount = Math.min(requestedRemapCount, MAX_SUPPORTED_REMAPS);
+  // `new Date()` matches every other "plan starts now" read in this
+  // component (e.g. `scheduleFromNow`). Memoized so its reference stays
+  // stable across renders, not invalidating the header badge's own memo.
+  const budget = useMemo(
+    () => remapBudget(remapInfo, plan.remapCount, new Date()),
+    [remapInfo, plan.remapCount]
+  );
+  // `requestedRemapCount` stays uncapped so `evaluateOptimizationBadge` can
+  // tell a genuine over-cap request from one the timed remap alone accounts
+  // for; `remapCount` is what the optimizer actually gets.
+  const { timed: timedRemap, count: requestedRemapCount, evaluatedCount: remapCount } = budget;
 
   // #112: merge "Your entries" and the computed queue into one row list —
   // one row per entry (own aggregated per-level/cumulative time) plus dimmed
@@ -1573,38 +1557,21 @@ export function PlanEditor({
       title: t('plans.toolsActions'),
       content: (
         <div className="space-y-2">
-          {/* Remaps-available is a control with a value and an explanatory
-              hint, not header adornment — in a panel header the hint wrapped
-              to three lines and squeezed the title to nothing. */}
-          <div className="flex flex-wrap items-center gap-1 text-[0.6875rem] text-text-dim">
-            <label htmlFor="plan-remap-count">{t('plans.remapCount')}</label>
-            <InfoTooltip
-              label={t('plans.remapCountTooltipLabel')}
-              content={t('plans.remapCountTooltip')}
-            />
-            <TextInput
-              id="plan-remap-count"
-              size="md"
-              type="number"
-              min={0}
-              max={5}
-              value={plan.remapCount}
-              onChange={(e) =>
-                onUpdate({ remapCount: Math.min(5, Math.max(0, Number(e.target.value) || 0)) })
-              }
-              className="field-no-spinner w-14 text-center"
-            />
-          </div>
-          {remapInfo && (
-            <p className="text-[0.6875rem] text-text-dim">
-              {remapInfo.yearlyReady
-                ? t('plans.remapFromEveReady', { bonus: remapInfo.bonus })
-                : t('plans.remapFromEveCooldown', {
-                    bonus: remapInfo.bonus,
-                    date: remapInfo.cooldownUntil ? formatLocalDate(remapInfo.cooldownUntil) : '',
-                  })}
-            </p>
-          )}
+          {/* Read-only: the optimizer's whole remap budget comes from EVE
+              now, not a free-typed number the optimizer half ignored. */}
+          <p className="text-[0.6875rem] text-text-dim">
+            {remapInfo
+              ? `${t('plans.remapBudget', { bonus: remapInfo.bonus })} ${
+                  remapInfo.yearlyReady
+                    ? t('plans.remapBudgetYearlyReady')
+                    : t('plans.remapBudgetYearlyFrom', {
+                        date: remapInfo.cooldownUntil
+                          ? formatLocalDate(remapInfo.cooldownUntil)
+                          : '',
+                      })
+                }`
+              : t('plans.remapBudgetFallback', { count: plan.remapCount })}
+          </p>
           <div className="space-y-1.5">
             {/* One Optimize control replacing three stacked buttons: "Optimize
                 for me" leads as the default item, single modes stay below it. */}
@@ -2053,20 +2020,46 @@ export function PlanEditor({
       {headerActionsContainer &&
         createPortal(
           <>
-            <IconButton
-              icon={<Icon.ImportQueue />}
-              label={t('plans.importQueue')}
-              onClick={() => void handleImport()}
-              disabled={queueImporting}
-            />
-            <IconButton
-              icon={<Icon.ImportClipboard />}
-              label={t('plans.importClipboard')}
-              onClick={() => setImportOpen(true)}
-            />
+            <DropdownMenu open={importMenuOpen} onOpenChange={setImportMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" disabled={queueImporting}>
+                  <Icon.ImportClipboard aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+                  {t('plans.import')}
+                  <Icon.Expanded aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                onCloseAutoFocus={() => {
+                  // Open the dialog only once the menu has handed focus back to
+                  // the trigger: the native <dialog> records the focused
+                  // element to restore on close, and that must be the trigger,
+                  // not a menu item that is about to unmount.
+                  if (openImportDialogAfterMenuRef.current) {
+                    openImportDialogAfterMenuRef.current = false;
+                    setImportOpen(true);
+                  }
+                }}
+              >
+                <DropdownMenuItem onSelect={() => void handleImport()}>
+                  {t('plans.importFromQueueItem')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    openImportDialogAfterMenuRef.current = true;
+                  }}
+                >
+                  {t('plans.importFromTextOrFileItem')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <DropdownMenu open={exportMenuOpen} onOpenChange={setExportMenuOpen}>
               <DropdownMenuTrigger asChild>
-                <IconButton icon={<Icon.Export />} label={t('plans.export')} />
+                <Button size="sm">
+                  <Icon.Export aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+                  {t('plans.export')}
+                  <Icon.Expanded aria-hidden="true" size={Icon.ICON_SIZE.sm} />
+                </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem

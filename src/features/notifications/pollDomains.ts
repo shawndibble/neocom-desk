@@ -366,26 +366,38 @@ function defineDomain<TRaw, TSnapshot, TFire extends AnyNotificationFire, TNames
 function isSkillQueueEntrySnapshot(raw: unknown): raw is SkillQueueEntrySnapshot {
   if (typeof raw !== 'object' || raw === null) return false;
   const r = raw as Record<string, unknown>;
-  return (
-    typeof r.skillId === 'number' &&
-    typeof r.finishedLevel === 'number' &&
-    typeof r.queuePosition === 'number' &&
-    (r.finishMs === null || typeof r.finishMs === 'number')
-  );
+  if (
+    typeof r.skillId !== 'number' ||
+    typeof r.finishedLevel !== 'number' ||
+    typeof r.queuePosition !== 'number' ||
+    (r.finishMs !== null && typeof r.finishMs !== 'number')
+  ) {
+    return false;
+  }
+  // Optional in storage as well as on the wire: every snapshot written
+  // before `diffSkillQueueEnding` needed `endingLeadMs` (issue #1410) lacks
+  // the field, and those must stay readable rather than being discarded as a
+  // stale shape on the first poll after an update — the same
+  // `ColonyExtractorSnapshot.installTimeMs` precedent.
+  return r.endingLeadMs === undefined || typeof r.endingLeadMs === 'number';
 }
 
-function toSkillQueueEntrySnapshot(entry: SkillQueueEntry): SkillQueueEntrySnapshot {
+function toSkillQueueEntrySnapshot(
+  entry: SkillQueueEntry,
+  endingLeadMs: number
+): SkillQueueEntrySnapshot {
   const finishMs = entry.finish_date ? Date.parse(entry.finish_date) : NaN;
   return {
     skillId: entry.skill_id,
     finishedLevel: entry.finished_level,
     queuePosition: entry.queue_position,
     finishMs: Number.isFinite(finishMs) ? finishMs : null,
+    endingLeadMs,
   };
 }
 
 export const skillQueueDomain = defineDomain<
-  SkillQueueEntry,
+  SkillQueueEntrySnapshot,
   SkillQueueSnapshot,
   NotificationFire,
   SkillNames
@@ -397,18 +409,26 @@ export const skillQueueDomain = defineDomain<
   load: async (characterId) => {
     const result = await loadCharacterSkillQueueWithStatus(characterId);
     if (result.needsReauth || result.cached === null) return null;
-    return result.cached.data;
+    const endingLeadMs = (await currentThresholds(characterId)).skillQueueEndingLeadHours * HOUR_MS;
+    return result.cached.data.map((entry) => toSkillQueueEntrySnapshot(entry, endingLeadMs));
   },
-  toSnapshot: (entries, nowMs) => ({ entries: entries.map(toSkillQueueEntrySnapshot), nowMs }),
+  toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
+  // The baseline's baked-in `endingLeadMs` stays as the diff needs it (the
+  // setting in force at load time); the Projection instead uses the current
+  // lead time, so a Settings change rebuilt from that baseline (issue #1248,
+  // `projectionRebuild.ts`) projects the new warning time, not the old one —
+  // the same split `colonyDomain.projection` documents in full.
   projection: async (characterId, characterName, snapshot, nowMs) => {
+    const endingLeadMs = (await currentThresholds(characterId)).skillQueueEndingLeadHours * HOUR_MS;
+    const entries = snapshot.entries.map((entry) => ({ ...entry, endingLeadMs }));
     const skillNames = await resolveProjectionNames(
-      snapshot.entries.map((entry) => entry.skillId),
+      entries.map((entry) => entry.skillId),
       universeTypeName
     );
     return projectSkillQueue(
       characterId,
       characterName,
-      snapshot.entries,
+      entries,
       skillNames,
       (fire, character, names) =>
         NOTIFICATION_EVENT_ENTRIES[fire.eventId].projection.push(fire, character, names),

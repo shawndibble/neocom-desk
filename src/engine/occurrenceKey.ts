@@ -95,6 +95,18 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
   switch (fire.eventId) {
     case 'skillLevelComplete':
       return [characterId, fire.eventId, fire.skillId, fire.level, fire.finishMs].join(':');
+    // Keyed on the tail's own finish ms *and* the threshold it crossed
+    // (issue #1410), on `planetaryExtractorExpiring`'s `(expiryTimeMs,
+    // thresholdMs)` precedent: `finishMs` is fixed once queued, so a new tail
+    // (queue grown, shrunk, or the old tail completed) is already a distinct
+    // occurrence on that alone — but `thresholdMs` is also required, because
+    // `diffSkillQueueEnding` can re-fire for the *same* tail after a
+    // lower-then-raised lead time (its own window-crossing rule). Without
+    // `thresholdMs` in the key, that genuinely new fire would compute the
+    // identical key to the first one and get silently dropped as
+    // already-delivered.
+    case 'skillQueueEnding':
+      return [characterId, fire.eventId, fire.finishMs, fire.thresholdMs].join(':');
     // spExtractionReady shares characterNotTraining's reasoning: "ready" is a
     // threshold crossing with no entity id of its own, so two devices agree
     // only by bucketing the day they each independently observed it.
@@ -181,6 +193,8 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
       return Number.isFinite(sentAt) ? sentAt : nowMs;
     }
     case 'characterNotTraining':
+    // falls through: skillQueueEnding's tail finish is a future deadline too, not the moment the queue actually runs dry (same reasoning as planetaryExtractorExpiring).
+    case 'skillQueueEnding':
     case 'spExtractionReady':
     case 'industryJobComplete':
     case 'corpIndustryJobReady':

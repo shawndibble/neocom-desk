@@ -11,7 +11,6 @@ vi.mock('@/features/character/typeNames', () => ({
   }),
 }));
 import type {
-  SkillQueueEntry,
   IndustryJob,
   MailHeader,
   CalendarEventSummary,
@@ -25,6 +24,7 @@ import {
   type CharacterRef,
 } from './foregroundPoller';
 import type {
+  SkillQueueEntrySnapshot,
   SkillQueueSnapshot,
   IndustryJobSnapshot,
   PlanetarySnapshot,
@@ -65,13 +65,14 @@ const WALLET_SCOPE = 'esi-wallet.read_character_wallet.v1';
 const MARKET_ORDERS_SCOPE = 'esi-markets.read_character_orders.v1';
 const NOTIFICATIONS_SCOPE = 'esi-characters.read_notifications.v1';
 
-function queueEntry(overrides: Partial<SkillQueueEntry> = {}): SkillQueueEntry {
+function queueEntry(overrides: Partial<SkillQueueEntrySnapshot> = {}): SkillQueueEntrySnapshot {
   return {
-    skill_id: 100,
-    finished_level: 1,
-    queue_position: 0,
+    skillId: 100,
+    finishedLevel: 1,
+    queuePosition: 0,
+    finishMs: null,
     ...overrides,
-  } as SkillQueueEntry;
+  };
 }
 
 function industryJob(overrides: Partial<IndustryJob> = {}): IndustryJob {
@@ -154,7 +155,13 @@ function contract(overrides: Partial<Contract> = {}): Contract {
  * domain id, so the cases below still name the domain they are about.
  */
 interface DomainOverrides {
-  loadSkillQueue?: (characterId: number) => Promise<SkillQueueEntry[] | null>;
+  // Already-converted snapshot entries, not raw ESI shapes (issue #1410) —
+  // the seam below (`loaders.skillQueue`) replaces the domain's own `load`
+  // outright, so it also bypasses the `currentThresholds` lookup that bakes
+  // `endingLeadMs` in for real; a case that needs one sets it directly on
+  // its fixture, the same way `loadColonyExtractors` fixtures set their own
+  // `thresholdMs`.
+  loadSkillQueue?: (characterId: number) => Promise<SkillQueueEntrySnapshot[] | null>;
   prevState?: () => Promise<SkillQueuePollerState>;
   saveState?: (state: SkillQueuePollerState) => Promise<void>;
   loadIndustryJobs?: (characterId: number) => Promise<IndustryJob[] | null>;
@@ -322,7 +329,11 @@ describe('runForegroundPoll', () => {
   it('skips a character whose events are all individually disabled', async () => {
     const loadSkillQueue = vi.fn(async () => []);
     const deps = baseDeps({
-      eventPrefsFor: async () => ({ skillLevelComplete: false, characterNotTraining: false }),
+      eventPrefsFor: async () => ({
+        skillLevelComplete: false,
+        characterNotTraining: false,
+        skillQueueEnding: false,
+      }),
       loadSkillQueue,
     });
     await runForegroundPoll(deps);
@@ -332,7 +343,7 @@ describe('runForegroundPoll', () => {
   it('persists a snapshot on the first poll but fires nothing (no baseline yet)', async () => {
     let saved: SkillQueuePollerState | null = null;
     const deps = baseDeps({
-      loadSkillQueue: async () => [queueEntry({ finished_level: 3 })],
+      loadSkillQueue: async () => [queueEntry({ finishedLevel: 3 })],
       saveState: async (state) => {
         saved = state;
       },
@@ -416,7 +427,7 @@ describe('runForegroundPoll', () => {
     let saved: SkillQueuePollerState = {};
     const deps = baseDeps({
       characters: async () => [CHAR, charB],
-      loadSkillQueue: async (characterId) => [queueEntry({ skill_id: characterId * 10 })],
+      loadSkillQueue: async (characterId) => [queueEntry({ skillId: characterId * 10 })],
       saveState: async (state) => {
         saved = state;
       },
@@ -1890,6 +1901,7 @@ describe('runForegroundPoll per-event channel columns', () => {
       eventPrefsFor: async () => ({
         skillLevelComplete: { browser: false, feed: false },
         characterNotTraining: { browser: false, feed: false },
+        skillQueueEnding: { browser: false, feed: false },
       }),
     });
     await runForegroundPoll(deps);
@@ -1900,7 +1912,11 @@ describe('runForegroundPoll per-event channel columns', () => {
     const loadSkillQueue = vi.fn(async () => []);
     const deps = firingDeps({
       loadSkillQueue,
-      eventPrefsFor: async () => ({ skillLevelComplete: false, characterNotTraining: false }),
+      eventPrefsFor: async () => ({
+        skillLevelComplete: false,
+        characterNotTraining: false,
+        skillQueueEnding: false,
+      }),
     });
     await runForegroundPoll(deps);
     expect(loadSkillQueue).not.toHaveBeenCalled();

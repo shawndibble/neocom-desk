@@ -104,7 +104,11 @@ export interface SkillPlanRecord {
   characterId: number;
   name: string;
   entries: PlanEntry[];
-  /** Remaps the user is willing to spend when optimizing this plan. */
+  /**
+   * Offline/no-scope fallback only: the optimizer plans against live Remaps
+   * Available (`remapAvailability.ts`'s `remapBudget`) whenever ESI's
+   * attributes are readable. Not user-editable — written once at creation.
+   */
   remapCount: number;
   /**
    * Remap Marker positions in the entry list: position p = "remap before

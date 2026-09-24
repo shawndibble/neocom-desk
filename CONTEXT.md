@@ -155,7 +155,9 @@ here — they go one per file in `docs/context/decisions/`.
   deliberately excluded so characters can't be correlated to one account), so
   the _cause_ can never be distinguished; only this one unified symptom is
   detectable. Distinct from **Skill Level Complete**, which fires per
-  finished queue entry while training continues.
+  finished queue entry while training continues, and from **Skill Queue
+  Ending**, which warns ahead of this state rather than reporting it once
+  reached.
 - **Clock Kind**: Which of the seven sources a **Character Board Item** came
   from. The `/calendar` page's one colour scale names this and nothing else —
   a **nominal** palette (`--color-kind-*`, DESIGN.md §1), unlike every other
@@ -728,7 +730,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   places it lands.
 - **Remap**: In-game reallocation of a character's attributes. The optimizer suggests where in a Skill Plan remaps should be placed.
 - **Remap Marker**: A user-placed row in a Skill Plan marking where the character will remap attributes. Draggable like a plan entry.
-- **Remaps Available**: How many attribute remaps the character can spend: bonus remaps (new characters get several) plus the yearly remap, counted even while it's on cooldown — usable from its cooldown date, not before (`docs/context/decisions/`). Read from the API (bonus_remaps, last_remap_date, cooldown); user may override. Optimizer must support the common single-remap case: train a leading segment on current attributes, then remap at the optimizer-chosen point.
+- **Remaps Available**: How many attribute remaps the character can spend: bonus remaps (new characters get several) plus the yearly remap, counted even while it's on cooldown — usable from its cooldown date, not before (`docs/context/decisions/`). Read from the API (bonus_remaps, last_remap_date, cooldown) and always planned with in full — no user override; a plan without readable ESI attributes falls back to a stored per-plan count instead (`docs/context/decisions/`). Optimizer must support the common single-remap case: train a leading segment on current attributes, then remap at the optimizer-chosen point.
 - **Requested Scopes**: What one authorize round trip asked SSO for, carried on
   its **Pending Login** and read back by `completeLogin`. The baseline the login
   path judges revocation against; the refresh path has none and uses the stored
@@ -793,6 +795,18 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   `docs/context/decisions/` for the rule the rollout follows.
 - **Skill Plan**: An ordered list of skill-level entries a user intends to train. User-editable (drag and drop). Distinct from the in-game **Skill Queue**, which is the game's actual training queue.
 - **Skill Plan schedule**: A **Skill Plan** costed in time — its per-level steps with training seconds, plan total, projected finish, skill count, **Remap Marker** segments, **Booster**-boosted and Alpha-capped steps and effective **Priority (Skill Plan)** — computed in one pass from the plan, the Character's trained skills and attributes, **Clone State**, implants (or **What-If Implants**) and Booster (`engine/skillPlanSchedule.ts`). Every number the plan editor shows about when the plan trains reads from one schedule, so none can disagree. A step is identified by skill and level, not by position.
+- **Skill Queue Ending**: Fires once the in-game **Skill Queue**'s tail entry
+  (its last queued item) will finish within a Character's configured lead
+  time (`skillQueueEndingLeadHours`, default 24h, matching the roster's
+  `endingSoon` display window) — a warning ahead of the queue running dry, so
+  a pilot can queue more before it does, since ESI has no endpoint that can
+  write to it. Distinct from **Character Not Training**, which fires only
+  after the queue has _already_ gone idle or stalled: a paused or
+  already-empty queue is Character Not Training's state to report, and never
+  fires this event instead. See
+  `docs/context/decisions/20260923-230312-skill-queue-ending-notification.md`
+  for why no separate "Skill Plan step completed" event exists alongside it
+  (issue #1410).
 - **Stale-Serve**: showing a cached row whose **Freshness Window** has lapsed while the replacement is fetched behind it, rather than spinning until it lands. Only for a **Published Snapshot**, where a long window encodes a publish cadence; a game constant's long window asserts the value cannot change, so a lapsed one is fetched outright instead. A stale-serve that fails to revalidate must say so on the next read — it is never left standing as a loading state.
 - **Standing (corp)**: The `/corp` overview's top panel: the figures a corp
   manager acts on — clocks due inside a day, Runway, 30-day net — beside the
