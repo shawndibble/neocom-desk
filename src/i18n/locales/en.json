@@ -2571,6 +2571,8 @@
     "searchPlaceholder": "Search issuer or title…",
     "noFilterMatches": "No contracts match your filters.",
     "noFilterMatchesHint": "Clear the search or reset the status/type filters to see every contract.",
+    "noFilterMatchesResetHint": "No contract matches the current search and filters.",
+    "resetFilters": "Reset filters",
     "showAll": "Show all ({{count}} total)",
     "staleTooltip": "Outstanding and past its deadline — lapsed and unclaimed.",
     "fetchTruncatedRetry": "Retry",
