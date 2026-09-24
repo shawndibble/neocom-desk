@@ -50,10 +50,7 @@ export function SoldSplitButton({
 }) {
   const { t } = useTranslation();
   return (
-    <div
-      className="flex items-center gap-1.5 sm:justify-end"
-      onClick={(event) => event.stopPropagation()}
-    >
+    <div className="flex items-center gap-1.5 sm:justify-end">
       <div className="flex">
         <Button size="sm" className="rounded-r-none" onClick={onSold}>
           {t('industry.soldButton')}

@@ -29,7 +29,7 @@ export function RealizedProfitCell({ row, label, skills, standing }: RealizedPro
   if (row.quantitySold === 0) return value;
 
   return (
-    <span className="inline-flex items-center gap-1" onClick={(event) => event.stopPropagation()}>
+    <span className="inline-flex items-center gap-1">
       {value}
       <IconButton
         size="sm"

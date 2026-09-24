@@ -104,8 +104,8 @@ const SOURCE_TAG_CLASS: Record<PriceSource, string> = {
 /**
  * Saved / Daily avg / Live / No price — where a row's ore prices came from on
  * the chosen basis, with a tooltip saying what that means. A button so the
- * tooltip is reachable by keyboard and a tap; the click stops at the tag so it
- * doesn't also open the row's detail modal.
+ * tooltip is reachable by keyboard and a tap; the table keeps the click from
+ * also opening the row's detail modal.
  */
 function PriceSourceTag({ source }: { source: PriceSource }) {
   const { t } = useTranslation();
@@ -113,7 +113,6 @@ function PriceSourceTag({ source }: { source: PriceSource }) {
     <Tooltip content={t(`miningTax.overview.priceSourceHint.${source}`)} openOnTap>
       <button
         type="button"
-        onClick={(event) => event.stopPropagation()}
         className={`cursor-help rounded-xs border px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest uppercase focus-visible:outline-2 focus-visible:outline-accent ${SOURCE_TAG_CLASS[source]}`}
       >
         {t(`miningTax.overview.priceSource.${source}`)}
