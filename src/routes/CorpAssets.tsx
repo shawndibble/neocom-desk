@@ -47,6 +47,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
+import { CorpDenied } from '@/features/corp/CorpDenied';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { loadCorporationId } from '@/features/corp/boardData';
 import {
@@ -894,7 +895,11 @@ export function CorpAssets() {
     return (
       <div className="space-y-4">
         <PageHeader title={t('corp.assets.title')} />
-        <EmptyState title={t('corp.assets.noAccessTitle')} hint={t('corp.assets.noAccessHint')} />
+        <CorpDenied
+          reason={gate.reason}
+          title={t('corp.assets.noAccessTitle')}
+          hint={t('corp.assets.noAccessHint')}
+        />
       </div>
     );
   }

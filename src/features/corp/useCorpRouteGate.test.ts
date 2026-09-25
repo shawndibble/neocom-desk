@@ -31,13 +31,19 @@ describe('useCorpRouteGate — no capability requirement', () => {
   it('is denied when Corp Access is none', () => {
     mockedAccess.mockReturnValue(accessOf('none', {}));
     const { result } = renderHook(() => useCorpRouteGate());
-    expect(result.current).toEqual({ status: 'denied' });
+    expect(result.current).toEqual({ status: 'denied', reason: 'none' });
+  });
+
+  it('is denied with reason not-granted when the Corporation Permission was never granted', () => {
+    mockedAccess.mockReturnValue(accessOf('not-granted', {}));
+    const { result } = renderHook(() => useCorpRouteGate());
+    expect(result.current).toEqual({ status: 'denied', reason: 'not-granted' });
   });
 
   it('is denied when Corp Access is roles-without-grant', () => {
     mockedAccess.mockReturnValue(accessOf('roles-without-grant', { canReadWallet: true }));
     const { result } = renderHook(() => useCorpRouteGate());
-    expect(result.current).toEqual({ status: 'denied' });
+    expect(result.current).toEqual({ status: 'denied', reason: 'roles-without-grant' });
   });
 
   it('is ready with the resolved capabilities once Corp Access is ready', () => {
@@ -59,7 +65,7 @@ describe('useCorpRouteGate — with a capability requirement', () => {
     const { result } = renderHook(() =>
       useCorpRouteGate((capabilities) => capabilities.canReadMembers)
     );
-    expect(result.current).toEqual({ status: 'denied' });
+    expect(result.current).toEqual({ status: 'denied', reason: 'capability' });
   });
 
   it('is ready when the required capability is held', () => {
