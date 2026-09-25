@@ -92,6 +92,18 @@ Notifications → `neocomdesk.com` → Clear & reset (or Allow), then restart th
 app fully. Seen on a real device on 2026-09-25, after an earlier "remove the
 Chrome grant" cleanup left the site blocked.
 
+**Labelled "Chrome" after a reinstall:** notifications work but show as Chrome
+(`pkg=com.android.chrome` in `adb shell dumpsys notification --noredact`), not
+Neocom Desk. Chrome delegates only to an app on its per-origin delegate list
+(`InstalledWebappPermissionManager.getAllDelegateApps`). Uninstalling the app
+wipes that list. Re-adding happens when the TWA opens, but
+`InstalledWebappRegistrar.registerClient` skips any package + origin pair it
+already registered during the current Chrome process. A Chrome that kept
+running across the reinstall never re-adds the app. Fix: force-stop Chrome
+(`adb shell am force-stop --user 0 com.android.chrome`, or Android Settings →
+Apps → Chrome → Force stop), then open the app. Seen and fixed on a real device
+on 2026-09-25.
+
 ### Notification settings button
 
 With delegation, the real switch is the Android app's own notification toggle,
