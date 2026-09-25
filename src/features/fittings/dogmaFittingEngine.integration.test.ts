@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it } from 'vitest';
 import wasmInit, { calculate } from '@eveshipfit/dogma-engine';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
+import { withWeather } from './dogmaFittingEngine';
 import {
   extractDroneLimits,
   extractFittingStats,
@@ -245,6 +246,33 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     );
 
     expect(stats.unknownItemTypeIds).toEqual([]);
+  });
+
+  it('applies an Abyssal weather: its resist penalty grows with the level, its bonus does not', () => {
+    const fitting: Fitting = {
+      name: 'Rifter',
+      shipTypeId: RIFTER,
+      modules: [],
+      drones: [],
+      cargo: [],
+    };
+    const fit = fittingToDogmaFit(fitting, buildAllVProfile(ALL_TEST_SKILL_IDS));
+    const read = (weatherTypeId?: number) => {
+      const withIt = withWeather(fit, weatherTypeId);
+      const calculation = calculate(withIt);
+      return extractFittingStats(withIt.items, calculation.ship.attributes, calculation.items);
+    };
+    const clear = read();
+    // Firestorm (infernal_weather_1 / _3): thermal resist penalty, +50% armor HP.
+    const firestorm1 = read(47390);
+    const firestorm3 = read(47392);
+
+    expect(firestorm1.armor.hp).toBeCloseTo(clear.armor.hp * 1.5, 6);
+    expect(firestorm3.armor.hp).toBeCloseTo(clear.armor.hp * 1.5, 6);
+    expect(firestorm1.armor.thermalResonance).toBeGreaterThan(clear.armor.thermalResonance);
+    expect(firestorm3.armor.thermalResonance).toBeGreaterThan(firestorm1.armor.thermalResonance);
+    // Other damage types untouched.
+    expect(firestorm3.armor.kineticResonance).toBeCloseTo(clear.armor.kineticResonance, 6);
   });
 
   it("reads the hull's own resists, not the Damage Control modifier attributes", () => {

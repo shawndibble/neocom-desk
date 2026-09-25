@@ -12,6 +12,7 @@ import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
 import { useFittingHardpoints } from '@/features/fittings/useFittingHardpoints';
+import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
 import { useFittingEvaluation } from '@/features/fittings/useFittingEvaluation';
 import { fittingToEft } from '@/engine/fittings/eftExport';
 import { FITTING_SLOT_KINDS } from '@/engine/fittings/types';
@@ -185,6 +186,7 @@ export function FittingShared() {
             hardpointsUsed={hardpointsUsed}
           />
           <FittingStatsSections
+            conditions={<AbyssalWeatherPicker />}
             stats={stats}
             statsProgress={statsProgress}
             statsError={statsError}

@@ -10,7 +10,7 @@ type EngineCall = [
   PilotProfile,
   unknown,
   DamageProfile | undefined,
-  { overheated?: boolean }?,
+  { overheated?: boolean; weatherTypeId?: number }?,
 ];
 
 const engine = vi.hoisted(() => ({
@@ -32,6 +32,7 @@ vi.mock('./damageProfiles', () => ({
 }));
 
 const { useFittingEvaluation, evaluateFitting } = await import('./useFittingEvaluation');
+const { useAbyssalWeather } = await import('./abyssalWeatherSelection');
 
 const RIFTER: Fitting = {
   name: 'Rifter',
@@ -129,6 +130,21 @@ describe('useFittingEvaluation', () => {
     expect(baselines).toHaveLength(1);
   });
 
+  it('works everything out inside the picked Abyssal weather, and in normal space without one', async () => {
+    useAbyssalWeather.setState({ weatherTypeId: 47390 });
+    const { result } = render({ fitting: RIFTER });
+    await waitFor(() => expect(result.current.variants).not.toBeNull());
+    await result.current.variants!.compare(addModule(RIFTER, 'medium', 0, 438));
+    await evaluateFitting(SLASHER, CLONE, GURISTAS, 47390);
+    // Main stats, the variant's baseline, the variant, and another Fitting.
+    expect(calls().map((call) => call[4]?.weatherTypeId)).toEqual([47390, 47390, 47390, 47390]);
+
+    useAbyssalWeather.setState({ weatherTypeId: null });
+    engine.computeFittingStats.mockClear();
+    await evaluateFitting(SLASHER, CLONE, GURISTAS, null);
+    expect(calls()[0][4]?.weatherTypeId).toBeUndefined();
+  });
+
   it('reports a failed calculation as an error rather than loading forever', async () => {
     engine.computeFittingStats.mockRejectedValueOnce(new Error('engine failed'));
     const { result } = render({ fitting: RIFTER });
@@ -172,7 +188,7 @@ describe('useFittingEvaluation', () => {
 
 describe('evaluateFitting', () => {
   it('works out another Fitting on the set it carries, under the given Damage Profile', async () => {
-    await evaluateFitting(RIFTER, CLONE, GURISTAS);
+    await evaluateFitting(RIFTER, CLONE, GURISTAS, null);
     const [[fitting, pilot, , damageProfile]] = calls();
     expect(fitting).toBe(RIFTER);
     expect(pilot.implantTypeIds).toEqual([19540]);
@@ -180,7 +196,7 @@ describe('evaluateFitting', () => {
   });
 
   it("uses the pilot's own clone for a Fitting that carries no set", async () => {
-    await evaluateFitting({ ...RIFTER, implantSet: undefined }, CLONE, undefined);
+    await evaluateFitting({ ...RIFTER, implantSet: undefined }, CLONE, undefined, null);
     expect(calls()[0]![1]).toBe(CLONE);
   });
 });

@@ -16,7 +16,9 @@ type MockFit = {
 const calculateMock = vi.fn<(fit: MockFit, options?: { validate?: boolean }) => unknown>();
 const loadSdeMock = vi.fn<(bytes: Uint8Array) => number>();
 
+const beaconMock = vi.fn((typeId: number) => ({ effects: [{ fromBeacon: typeId }] }));
 vi.mock('@eveshipfit/dogma-engine', () => ({
+  beacon: (typeId: number) => beaconMock(typeId),
   default: (init: { module_or_path: ArrayBuffer }) => wasmInitMock(init),
   calculate: (fit: MockFit, options?: { validate?: boolean }) => calculateMock(fit, options),
   load_sde: (bytes: Uint8Array) => loadSdeMock(bytes),
@@ -203,6 +205,26 @@ describe('computeFittingStats', () => {
     expect(stats.cpuTotal).toBe(400);
     expect(stats.cpuUsed).toBe(300);
     expect(stats.applied).toEqual({ weapons: [], droneControlRange: 20000 });
+  });
+
+  it("hands the engine a weather's beacon as what the fit takes in — and nothing without one", async () => {
+    stubNetwork();
+    calculateMock.mockReturnValue({
+      ship: { attributes: new Map() },
+      items: [],
+      character: { attributes: new Map() },
+    });
+    const { computeFittingStats } = await freshModule();
+
+    await computeFittingStats(fitting, profile, undefined, undefined, { weatherTypeId: 47390 });
+    await computeFittingStats(fitting, profile);
+
+    const [[inWeather], [clear]] = calculateMock.mock.calls.slice(-2) as unknown as [
+      { incoming?: unknown }[],
+      { incoming?: unknown }[],
+    ];
+    expect(inWeather.incoming).toEqual({ effects: [{ fromBeacon: 47390 }] });
+    expect(clear.incoming).toBeUndefined();
   });
 
   it('sums calibration cost across fitted rigs and bandwidth across active drones only', async () => {
