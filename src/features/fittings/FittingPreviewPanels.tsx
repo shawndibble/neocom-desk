@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { fieldBaseClassName } from '@/components/ui/controlStyles';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatDuration } from '@/lib/duration';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { ResistTable, type ResistRow } from './FittingStatsSections';
 import { MissingSkillsChip } from './MissingSkillsChip';
+import { IN_GAME_FITTING_DESCRIPTION_MAX } from './saveToEve';
 import { useFittingSkillGaps } from './useFittingSkillGaps';
 
 /** One resource meter: what is used of what the hull has, red-flagged past the limit. */
@@ -227,7 +230,37 @@ export function SkillsPanel({
   );
 }
 
-/** A fitting's own notes, read-only. */
-export function NotesPanel({ text }: { text: string }) {
-  return <p className="text-sm whitespace-pre-wrap">{text}</p>;
+/**
+ * A fitting's notes: editable for a saved one (kept when the field loses
+ * focus), read-only for an In-game one's description.
+ */
+export function NotesPanel({ text, onSave }: { text: string; onSave?: (text: string) => void }) {
+  const { t } = useTranslation();
+  // `null` until the player types: what shows is then the saved text, so a
+  // synced change to the notes is never overwritten by a stale copy.
+  const [draft, setDraft] = useState<string | null>(null);
+  if (draft !== null && draft === text) setDraft(null);
+  if (onSave === undefined) return <p className="text-sm whitespace-pre-wrap">{text}</p>;
+  return (
+    <div className="space-y-1">
+      <label className="block text-xs text-text-dim" htmlFor="fitting-notes">
+        {t('fittings.start.preview.notesLabel')}
+      </label>
+      <textarea
+        id="fitting-notes"
+        value={draft ?? text}
+        rows={5}
+        maxLength={IN_GAME_FITTING_DESCRIPTION_MAX}
+        placeholder={t('fittings.start.preview.notesPlaceholder')}
+        className={`${fieldBaseClassName} w-full p-2 text-sm`}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => {
+          if (draft !== null && draft !== text) onSave(draft);
+        }}
+      />
+      <p className="text-xs text-text-dim">
+        {t('fittings.start.preview.notesHint', { max: IN_GAME_FITTING_DESCRIPTION_MAX })}
+      </p>
+    </div>
+  );
 }

@@ -6,6 +6,7 @@
  */
 import { db, type FittingRecord } from '@/db';
 import { markFittingDeleted, scheduleSync } from '@/sync';
+import { clampFittingDescription } from './saveToEve';
 
 export function loadFittings(characterId: number): Promise<FittingRecord[]> {
   return db.fittings.where('characterId').equals(characterId).toArray();
@@ -16,17 +17,23 @@ export interface FittingInput {
   id?: string;
   name: string;
   code: string;
+  /** Omitted keeps a saved Fitting's existing notes; an empty string clears them. */
+  notes?: string;
 }
 
 export async function saveFitting(
   characterId: number,
   input: FittingInput
 ): Promise<FittingRecord> {
+  // Renaming or re-saving must not drop the notes the record already has.
+  const existing = input.id === undefined ? undefined : await db.fittings.get(input.id);
+  const notes = input.notes ?? existing?.notes ?? '';
   const record: FittingRecord = {
     id: input.id ?? crypto.randomUUID(),
     characterId,
     name: input.name,
     code: input.code,
+    ...(notes === '' ? {} : { notes }),
     updatedAt: Date.now(),
   };
   await db.fittings.put(record);
@@ -36,6 +43,16 @@ export async function saveFitting(
 
 export function renameFitting(fitting: FittingRecord, name: string): Promise<FittingRecord> {
   return saveFitting(fitting.characterId, { id: fitting.id, name, code: fitting.code });
+}
+
+/** Sets a saved Fitting's notes (kept to what EVE will take as a description). */
+export function setFittingNotes(fitting: FittingRecord, notes: string): Promise<FittingRecord> {
+  return saveFitting(fitting.characterId, {
+    id: fitting.id,
+    name: fitting.name,
+    code: fitting.code,
+    notes: clampFittingDescription(notes),
+  });
 }
 
 export async function deleteFitting(fitting: FittingRecord): Promise<void> {
