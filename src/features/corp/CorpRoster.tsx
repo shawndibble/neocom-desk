@@ -117,10 +117,16 @@ export function CorpRosterStats({ rows }: { rows: readonly RosterRow[] }) {
   );
 }
 
-/** A member's roles as one line; null when there are none to print. */
+/**
+ * A member's roles as one line; null when there are none to print. Sorted
+ * because ESI's order is not, and one role set must print and sort one way.
+ */
 function rolesText(roles: readonly string[] | null): string | null {
   if (roles === null || roles.length === 0) return null;
-  return roles.map(corpRoleLabel).join(', ');
+  return roles
+    .map(corpRoleLabel)
+    .sort((a, b) => a.localeCompare(b))
+    .join(', ');
 }
 
 /** Longest silence first — the view's whole point (see the module note). */
@@ -139,15 +145,16 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
         // retitle every card.
         primary: true,
         className: 'truncate',
+        // The name truncates, the tag does not: a long name must not ellipsize it away.
         render: (row) => (
-          <>
-            {label(row.name, row.characterId)}
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate">{label(row.name, row.characterId)}</span>
             {row.isSelf && (
-              <span className="ml-1.5 rounded-xs border border-accent/40 px-1 py-0.5 text-[0.6875rem] text-accent">
+              <span className="shrink-0 rounded-xs border border-line bg-panel-2 px-1 py-0.5 text-[0.6875rem] text-text-dim">
                 {t('corp.members.you')}
               </span>
             )}
-          </>
+          </span>
         ),
         sortValue: (row) => row.name ?? undefined,
       },

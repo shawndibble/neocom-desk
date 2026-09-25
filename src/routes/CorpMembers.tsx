@@ -129,7 +129,11 @@ interface MembersSnapshot {
   roles: ReadonlyMap<number, readonly string[]>;
   labels: MemberLabels;
   diff: RosterDiff;
-  /** Oldest `fetchedAt` across the three reads — the badge speaks for the whole view. */
+  /**
+   * Oldest `fetchedAt` across the roster and tracking reads — the badge speaks
+   * for the whole view. Roles are left out: an off-by-default column's stale
+   * fallback must not age the badge for everyone.
+   */
   fetchedAt: Date | null;
   /** Captured in the loader: `Date.now()` in render is impure. */
   loadedAt: number;
@@ -188,7 +192,7 @@ async function loadMembersSnapshot(
   // explicitly — the summary is the only place they appear.
   const labels = await loadMemberLabels(characterId, members, diff.left);
 
-  const fetchedAts = [roster, tracking, memberRoles]
+  const fetchedAts = [roster, tracking]
     .map((result) => result.cached?.fetchedAt)
     .filter((date): date is Date => date !== undefined);
   const fetchedAt =

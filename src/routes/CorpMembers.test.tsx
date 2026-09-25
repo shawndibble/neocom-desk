@@ -565,7 +565,7 @@ describe('roles column (issue #1766)', () => {
       cached([tracking({ character_id: 1001 }), tracking({ character_id: 1002 })])
     );
     mocked.loadCorporationMemberRoles.mockResolvedValue(
-      cached([{ character_id: 1001, roles: ['Director', 'Junior_Accountant'] }])
+      cached([{ character_id: 1001, roles: ['Junior_Accountant', 'Director'] }])
     );
   });
 
