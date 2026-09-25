@@ -866,6 +866,14 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   layers on top of the chosen sort key rather than replacing it. User-created
   content, not view state: nothing clears a star but the user, except a star
   whose Character has left the device.
+- **Stopped**: A PI program (extraction or production) whose run has ended —
+  the wording used everywhere the extraction/production "program has ended"
+  condition shows up: the Overview PI card, the Colonies attention chip and
+  colony row state, and the Characters table's PI column. Distinct from
+  **Idle**, which names an unfed facility with nothing feeding it (the
+  Advisor's `piAdvisor.summaryChipIdle`) — a Stopped program has nothing left
+  to run, an Idle facility has something to run and no input for it. One word
+  per condition, not shared.
 - **Sustained Extraction Rate**: An extractor program's whole output averaged
   over its whole length, off CCP's decay curve. The one honest
   units-per-hour summary of a program that in fact yields a different amount

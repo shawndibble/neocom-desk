@@ -302,11 +302,13 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     const panel = await colonyPanelFor(/Jita IV/);
     expect(within(panel).getByText('Extractor Control Unit')).toBeInTheDocument();
-    expect(within(panel).getByText('Idle')).toBeInTheDocument();
-    // The summary row's own expiry cell, the extraction card's Status chip,
-    // and its Expires field all read "Expired" for an already-expired
-    // extractor.
-    expect(within(panel).getAllByText('Expired')).toHaveLength(3);
+    // The summary row's own expiry cell names the product alongside the
+    // word, so a stopped row never reads as a bare "—" or "Stopped" alone.
+    expect(within(panel).getByText('Unknown product · Stopped')).toBeInTheDocument();
+    // The attention chip, the extraction card's Status chip, and its Expires
+    // field all read "Stopped" for an already-expired extractor — one word
+    // for the condition, not "Idle"/"Expired" split across surfaces.
+    expect(within(panel).getAllByText('Stopped')).toHaveLength(3);
   });
 
   it('explains the staleness rule in the UI', async () => {
@@ -315,6 +317,15 @@ describe('PlanetaryIndustry', () => {
     expect(
       screen.getByText(/only recalculates a colony's data when it's opened in the EVE client/)
     ).toBeInTheDocument();
+  });
+
+  it('reads a colony with no readable extraction program as unknown, never blank', async () => {
+    // The fixture's one extractor pin carries no install-time baseline, so
+    // `colonyHoursToFull` cannot measure it — the row must still say so
+    // rather than showing nothing, which a pilot could misread as "safe".
+    render(<App />);
+    const panel = await colonyPanelFor(/Jita IV/);
+    expect(within(panel).getByText('Storage full in: unknown')).toBeInTheDocument();
   });
 
   it('shows the empty state when there are no colonies', async () => {
@@ -422,7 +433,7 @@ describe('PlanetaryIndustry', () => {
     // days out, so this is neither idle nor expiring-soon.
     expect(within(panel).getByText('Decayed')).toBeInTheDocument();
     expect(within(panel).queryByText('Healthy')).not.toBeInTheDocument();
-    expect(within(panel).queryByText('Idle')).not.toBeInTheDocument();
+    expect(within(panel).queryByText('Stopped')).not.toBeInTheDocument();
   });
 
   it('leaves a colony one day into its program healthy, not decayed', async () => {

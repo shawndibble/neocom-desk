@@ -1017,6 +1017,54 @@ describe('Characters table view', () => {
     }
   });
 
+  it('the PI column reads "Stopped" once expiry has passed, even off a stale cached attention category', async () => {
+    const roster: RosterEntry[] = [
+      {
+        characterId: 91,
+        name: 'Pilot One',
+        wallet: null,
+        queue: null,
+        correctedTotalSp: 1_000_000,
+        skills: null,
+      },
+    ];
+    const attention: AttentionEntry[] = [
+      {
+        characterId: 91,
+        jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
+        jobCountsFetchedAt: new Date(),
+        // The cached category can lag the clock — it only refreshes on a
+        // roster reload — so this asserts "expired wins" even when the last
+        // computed category was still `expiring-soon`, not `idle`.
+        piAttention: 'expiring-soon',
+        piSoonestExpiryMs: Date.now() - 3_600_000,
+        piFetchedAt: new Date(),
+      },
+    ];
+    const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue(roster);
+    const attentionSpy = vi
+      .spyOn(rosterAttentionModule, 'loadRosterAttention')
+      .mockResolvedValue(attention);
+
+    try {
+      const user = userEvent.setup();
+      renderCharacters();
+      await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+      const table = await screen.findByRole('table');
+      const piHeader = within(table).getByRole('columnheader', { name: 'PI' });
+      const piIndex = within(table).getAllByRole('columnheader').indexOf(piHeader);
+      const pilotRow = within(table).getByText('Pilot One').closest('tr');
+      if (!pilotRow) throw new Error('expected a Pilot One row');
+      const piCell = within(pilotRow).getAllByRole('cell')[piIndex];
+      expect(piCell).toHaveTextContent('Stopped');
+      expect(piCell).not.toHaveTextContent('Expiring soon');
+    } finally {
+      snapshotSpy.mockRestore();
+      attentionSpy.mockRestore();
+    }
+  });
+
   it('the Starred column toggles the pinned star without navigating the row', async () => {
     const user = userEvent.setup();
     renderCharacters();

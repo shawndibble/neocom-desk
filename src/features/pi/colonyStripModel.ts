@@ -27,8 +27,20 @@
  * shorten the pilot's own colony list; a zero would claim it lasts no time at
  * all. Both are worse than saying what is true.
  */
+import type { TFunction } from 'i18next';
 import type { PlanetType } from '@/esi/endpoints';
 import { FAULT_VERBS, type Worklist } from './worklistModel';
+
+/**
+ * Hours under two days read as hours; beyond that a day count is what a
+ * pilot plans in. Shared by `ColonyStrip.tsx`'s row and the Colonies tab's
+ * "Storage full in" figure, so the two format a fill time the same way.
+ */
+export function span(hours: number, t: TFunction): string {
+  return hours < 48
+    ? t('piAdvisor.hoursShort', { count: Math.round(hours) })
+    : t('piAdvisor.daysShort', { count: Math.round(hours / 24) });
+}
 
 export interface ColonyStripColony {
   planetId: number;
@@ -88,7 +100,25 @@ export function colonyStripRows(input: ColonyStripInput): ColonyStripRow[] {
       ...colony,
       faults: faultsBy.get(colony.planetId) ?? 0,
       steps: stepsBy.get(colony.planetId) ?? 0,
-      overflowing: colony.hoursToFull !== null && colony.hoursToFull < input.haulHours,
+      overflowing: fillsBeforeHaul(colony.hoursToFull, input.haulHours),
     }))
     .sort((a, b) => rank(a) - rank(b) || (a.name ?? '').localeCompare(b.name ?? ''));
+}
+
+/** The colony fills before the pilot's own haul cadence brings them back — the one threshold every fill-time surface gates on (see `colonyThroughput.ts` for why). */
+export function fillsBeforeHaul(hoursToFull: number | null, haulHours: number): boolean {
+  return hoursToFull !== null && hoursToFull < haulHours;
+}
+
+export type ColonyFillTimeDisplay =
+  { kind: 'none' } | { kind: 'unknown' } | { kind: 'soon'; hoursToFull: number };
+
+/** Leaner than the Advisor strip's always-visible column: room to spare shows nothing, an unreadable program still reads `unknown` rather than going silent. */
+export function colonyFillTimeDisplay(
+  hoursToFull: number | null,
+  haulHours: number
+): ColonyFillTimeDisplay {
+  if (hoursToFull === null) return { kind: 'unknown' };
+  if (fillsBeforeHaul(hoursToFull, haulHours)) return { kind: 'soon', hoursToFull };
+  return { kind: 'none' };
 }

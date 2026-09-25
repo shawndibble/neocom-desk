@@ -16,6 +16,8 @@ import {
   modulesThatDiffer,
 } from '@/engine/fittings/fittingCompare';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useCompareCodes, MAX_COMPARE_SLOTS } from '@/features/fittings/compareUrl';
@@ -25,6 +27,7 @@ import {
   FittingCompareTable,
   type FittingCompareColumn,
 } from '@/features/fittings/FittingCompareTable';
+import { CompareCanFlyByCharacter } from '@/features/fittings/CompareCanFlyByCharacter';
 import { useCompareCanFly } from '@/features/fittings/useCompareCanFly';
 import { useCompareFittings } from '@/features/fittings/useCompareFittings';
 import { useCompareStats } from '@/features/fittings/useCompareStats';
@@ -50,6 +53,11 @@ export function FittingCompare() {
     failed: profileFailed,
     retry: retryProfile,
   } = usePilotProfile(activeCharacterId);
+  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const characterOptions = useMemo(
+    () => allCharacters.map(({ characterId, name }) => ({ characterId, name })),
+    [allCharacters]
+  );
   const fittings = useMemo(() => slots.map((slot) => slot?.fitting ?? null), [slots]);
   const damageProfiles = useDamageProfiles();
   const targetProfiles = useTargetProfiles();
@@ -146,6 +154,9 @@ export function FittingCompare() {
         )}
         {canFly.failed[index] && (
           <span className="text-text-dim">{t('fittings.compare.canFlyUnknown')}</span>
+        )}
+        {slot.fitting && characterOptions.length > 1 && (
+          <CompareCanFlyByCharacter fitting={slot.fitting} characters={characterOptions} />
         )}
         <IconButton
           icon={<Icon.Close />}
@@ -248,12 +259,11 @@ export function FittingCompare() {
                 />
                 <p className="mt-2 text-xs text-text-dim">{t('fittings.appliedDps.assumptions')}</p>
               </Panel>
-              <Panel title={t('fittings.compare.modulesTitle')}>
-                <FittingCompareModulesSummary
-                  entries={moduleDiffs}
-                  visible={visible.map(statsPosition)}
-                />
-              </Panel>
+              {okSlots.length >= 2 && (
+                <Panel title={t('fittings.compare.modulesTitle')}>
+                  <FittingCompareModulesSummary entries={moduleDiffs} columns={columns} />
+                </Panel>
+              )}
             </>
           )}
         </>

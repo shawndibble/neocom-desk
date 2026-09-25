@@ -171,7 +171,8 @@ function measureExtractors(pins: readonly PlanetPin[]): MeasuredExtractor[] {
   }));
 }
 
-function builtAdvice(
+/** Built straight from one colony's own planet/detail, not a whole system's advice list — no prices, tax rate or system lookup required. */
+export function builtAdvice(
   planet: CharacterPlanet,
   detail: CharacterPlanetDetail | undefined,
   pi: PiData,

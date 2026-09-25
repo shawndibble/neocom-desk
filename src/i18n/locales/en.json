@@ -57,6 +57,7 @@
     "standingsAssumedAction": "Grant Character details"
   },
   "fittings": {
+    "editTitle": "Editor",
     "myFittings": {
       "title": "My Fittings",
       "save": "Save",
@@ -639,10 +640,15 @@
       "canFlyYes": "Can fly",
       "canFlyNo": "Can't fly",
       "canFlyUnknown": "Skills unknown",
+      "canFlyAllCharacters": "All Characters",
+      "canFlyAllCharactersTitle": "Can {{fitting}} be flown?",
+      "canFlyLoading": "Checking skills…",
+      "canFlyCharacterFailed": "Skills unknown",
       "statsTitle": "Stats",
       "modulesTitle": "Modules that differ",
       "noDifferences": "Nothing differs between the compared Fittings.",
       "statColumn": "Stat",
+      "moduleColumn": "Module",
       "best": "(Best)",
       "fixErrorsHint": "Fix the Fitting with the error above to see the comparison.",
       "statsFailed": "Couldn't calculate stats",
@@ -2906,7 +2912,7 @@
     "lastUpdateTooltip": "When CCP last recalculated this colony — only changes when the colony is opened in the EVE client.",
     "attentionLabel": "Status",
     "attention": {
-      "idle": "Idle",
+      "idle": "Stopped",
       "expiring-soon": "Expiring soon",
       "decayed": "Decayed",
       "healthy": "Healthy",
@@ -2935,12 +2941,12 @@
     "state": {
       "active": "Active",
       "expiring-soon": "Expiring soon",
-      "expired": "Expired"
+      "expired": "Stopped"
     },
     "programDataUnavailable": "Program data unavailable",
     "unknownProduct": "Unknown product",
     "unknownSchematic": "Unknown schematic",
-    "expired": "Expired",
+    "expired": "Stopped",
     "expiresIn": "in {{duration}}",
     "extraction": {
       "statusLabel": "Status",
@@ -2955,10 +2961,13 @@
     },
     "colonies": {
       "panelTitle_one": "{{count}} colony",
-      "panelTitle_other": "{{count}} colonies"
+      "panelTitle_other": "{{count}} colonies",
+      "fillTimeSoon": "Storage full in {{span}}",
+      "fillTimeUnknown": "Storage full in: unknown"
     },
     "summary": {
       "expiryLine": "{{product}} · {{duration}}",
+      "stoppedLine": "{{product}} · Stopped",
       "productCount": "{{name}} ×{{count}}"
     },
     "yield": {
@@ -3314,7 +3323,10 @@
     "worklistIncludeRebuilds": "Include rebuilds",
     "worklistTuningNone": "Nothing to tune without tearing a colony down. Switch to “Include rebuilds” to see what these planets would earn rebuilt from scratch.",
     "colonyStripTitle": "Your colonies",
-    "colonyStripMeta": "Load · state · full in, of {{hours}} h",
+    "colonyStripLegendLoad": "Load",
+    "colonyStripLegendState": "State",
+    "colonyStripLegendFull": "Storage full in",
+    "colonyStripLegendFullTooltip": "Compared to your {{hours}} h haul cadence",
     "colonyStripEmpty": "No colony here yet.",
     "colonyStateFaults_one": "{{count}} fault",
     "colonyStateFaults_other": "{{count}} faults",

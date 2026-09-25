@@ -93,6 +93,8 @@ export const ROUTE_REQUIREMENTS = {
   // Fitting vs Fitting compare: same reasoning as `/fittings` above — every
   // compared Fitting's decode, stats and skill-gap check is local/SDE + the
   // pinned dogma engine, no ESI endpoint of its own.
+  // The editor half of `/fittings` (an open Fitting), ungated for the same reason.
+  '/fittings/edit': UNGATED,
   '/fittings/compare': UNGATED,
   // Detail routes off the index (same reasoning as `/skills/plans/:planId`
   // above): each mixes the same blueprints/jobs/skills reads the index does,
