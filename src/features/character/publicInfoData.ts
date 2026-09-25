@@ -88,7 +88,7 @@ export interface PublicEmploymentHistory {
 /**
  * Another Character's corporation history. Cached under the global sentinel
  * (not the looked-up id) so `purgeCharacterCache` never has to know about
- * characters that aren't signed in here — unlike `loadEmploymentHistory`,
+ * characters that aren't signed in here â€” unlike `loadEmploymentHistory`,
  * which is keyed to the active Character.
  */
 export async function loadPublicEmploymentHistory(
