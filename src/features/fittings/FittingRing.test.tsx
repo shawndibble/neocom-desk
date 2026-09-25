@@ -22,7 +22,7 @@ function statsWith(cpuUsed: number): FittingStats {
     cpuTotal: 100,
     powergridUsed: 10,
     powergridTotal: 100,
-    slotLayout: { high: 3, medium: 2, low: 1, rig: 0, subsystem: 5 },
+    slotCounts: { high: 3, medium: 2, low: 1, rig: 0, subsystem: 5 },
   } as FittingStats;
 }
 

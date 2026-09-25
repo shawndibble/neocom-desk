@@ -1,6 +1,9 @@
 import {
+  CHARGE_GROUP_ATTRIBUTES,
   DOGMA_ATTRIBUTE,
   type CapacitorStatus,
+  type FittingItemState,
+  type FittingModuleResult,
   type FittingStats,
   type LayerDefense,
 } from './types';
@@ -71,7 +74,7 @@ export function extractFittingStats(
   itemTypeIds: readonly number[],
   shipAttributes: AttributeMap,
   itemResults: readonly ItemCalculationResult[]
-): Omit<FittingStats, 'calibrationUsed' | 'droneBandwidthUsed'> {
+): Omit<FittingStats, 'calibrationUsed' | 'droneBandwidthUsed' | 'modules'> {
   const cpuTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.cpuOutput);
   const powergridTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.powerOutput);
 
@@ -81,13 +84,6 @@ export function extractFittingStats(
     powergridTotal,
     powergridUsed: powergridTotal - readAttribute(shipAttributes, DOGMA_ATTRIBUTE.powerFree),
     calibrationTotal: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.calibration),
-    slotLayout: {
-      high: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.hiSlots),
-      medium: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.medSlots),
-      low: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.lowSlots),
-      rig: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.rigSlots),
-      subsystem: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.subsystemSlots),
-    },
     droneDps: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.droneDamagePerSecond),
     droneBandwidthTotal: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.droneBandwidth),
     droneCapacity: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.droneCapacity),
@@ -132,5 +128,29 @@ export function extractFittingStats(
       warpSpeed: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.warpSpeed),
     },
     unknownItemTypeIds: itemTypeIds.filter((_, index) => isUnknownItem(itemResults[index])),
+    slotCounts: {
+      high: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.hiSlots),
+      medium: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.medSlots),
+      low: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.lowSlots),
+      rig: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.rigSlots),
+      subsystem: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.subsystemSlots),
+    },
+  };
+}
+
+interface ModuleCalculationResult {
+  attributes: AttributeMap;
+  state: FittingItemState;
+  max_state: FittingItemState;
+}
+
+/** One fitted module's calculation, as the editor's state and charge controls need it. */
+export function extractModuleResult(result: ModuleCalculationResult): FittingModuleResult {
+  return {
+    state: result.state,
+    maxState: result.max_state,
+    chargeGroupIds: CHARGE_GROUP_ATTRIBUTES.map((id) =>
+      readAttribute(result.attributes, id)
+    ).filter((groupId) => groupId > 0),
   };
 }

@@ -4,6 +4,12 @@
  * reload or a pasted URL decodes it back. Stats (dogma engine, lazy) and
  * price (hub order book) are two independent loads off the same `fitting`,
  * which is why price can resolve well before stats do.
+ *
+ * Editing (issue #1533) goes through the same URL: `edit` applies a pure
+ * `fittingEdit.ts` change, shows it at once, and pushes the re-encoded code
+ * as a new history entry so Back/Forward walk the edits. Repeats of one
+ * control inside `COALESCE_MS` (a drone stepper clicked five times) replace
+ * rather than push, so Back skips the in-between counts.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -17,13 +23,17 @@ import {
 } from '@/engine/fittings/eftLoader';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
 import { buildAllVProfile } from '@/engine/fittings/pilotProfile';
-import type { Fitting, FittingStats } from '@/engine/fittings/types';
+import type { Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadTypes, loadFittingSlots, loadSkills } from '@/sde/loadSde';
 import { loadActivePilotProfile } from './fittingPilotProfile';
 import { loadFittingPrice } from './fittingPrice';
-import { computeFittingStats, type DogmaAssetProgress } from './dogmaFittingEngine';
+import {
+  computeFittingStats,
+  isDogmaEngineReady,
+  type DogmaAssetProgress,
+} from './dogmaFittingEngine';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 
 async function hullName(typeId: number): Promise<string> {
@@ -33,18 +43,39 @@ async function hullName(typeId: number): Promise<string> {
 
 export type ShareDecodeError = 'invalid' | 'unsupported-version';
 
+const COALESCE_MS = 1000;
+
+/** A pure change to the open Fitting — one of `src/engine/fittings/fittingEdit.ts`'s. */
+export type FittingChange = (fitting: Fitting) => Fitting;
+
 export interface FittingWorkspace {
   fitting: Fitting | null;
   /** Set when `?f=` carries a payload this build can't read at all. */
   shareError: ShareDecodeError | null;
   /** Parse errors, unknown names and slot overflow from the most recent EFT paste. */
   unresolved: EftUnresolvedItem[];
-  /** Set when a successfully-loaded Fitting was too large to fit a Share Link. */
+  /** Set when the open Fitting was too large to fit a Share Link. */
   tooLargeToShare: boolean;
   loadFromEftText: (text: string) => Promise<void>;
+  /**
+   * Applies a change to the open Fitting and rewrites `?f=`. `coalesceKey`
+   * names the control it came from; a repeat of the same key within a second
+   * replaces the history entry instead of adding one.
+   */
+  edit: (change: FittingChange, coalesceKey?: string) => void;
+  /**
+   * The latest stats. After an edit to the same hull these are the previous
+   * fit's until the new calculation lands, so the bars don't blank on every
+   * click — `statsFitting` says which Fitting they belong to.
+   */
   stats: FittingStats | null;
+  statsFitting: Fitting | null;
   statsProgress: DogmaAssetProgress | null;
   statsError: boolean;
+  /** The ship data (dogma engine) is loaded, so slot and fit checks can run. */
+  engineReady: boolean;
+  /** Skills and implants the stats and fit checks use; null while loading. */
+  profile: PilotProfile | null;
   price: Appraisal | null;
 }
 
@@ -57,19 +88,32 @@ export function useFittingWorkspace(): FittingWorkspace {
   const [unresolved, setUnresolved] = useState<EftUnresolvedItem[]>([]);
   const [tooLargeToShare, setTooLargeToShare] = useState(false);
 
-  const [stats, setStats] = useState<FittingStats | null>(null);
+  const [stats, setStats] = useState<{ fitting: Fitting; stats: FittingStats } | null>(null);
   const [statsProgress, setStatsProgress] = useState<DogmaAssetProgress | null>(null);
   const [statsError, setStatsError] = useState(false);
+  const [engineReady, setEngineReady] = useState(isDogmaEngineReady);
+  const [profile, setProfile] = useState<PilotProfile | null>(null);
 
   const [price, setPrice] = useState<Appraisal | null>(null);
 
-  // Set by `loadFromEftText` right before its own `setShareCode` write, so
-  // the decode effect below can tell "the URL changed because we just wrote
-  // it" (keep the unresolved list that write's own paste just reported) apart
-  // from every other way `shareCode` changes — a pasted link, Back/Forward —
-  // where a *previous* paste's stale unresolved list must not linger next to
-  // the unrelated fitting that URL change just loaded.
-  const ownWriteRef = useRef(false);
+  // Set right before this hook's own `setShareCode` writes, so the decode
+  // effect below can tell "the URL changed because we just wrote it" (keep
+  // the unresolved list that write's own paste just reported) apart from
+  // every other way `shareCode` changes — a pasted link, Back/Forward — where
+  // a *previous* paste's stale unresolved list must not linger next to the
+  // unrelated fitting that URL change just loaded. An edit also records the
+  // Fitting it wrote, so the effect shows that object as-is instead of
+  // decoding its own write back into an identical copy (which would
+  // recalculate stats twice per click).
+  const ownWriteRef = useRef<{ code: string; fitting: Fitting | null } | null>(null);
+
+  // The Fitting the next edit applies to: the latest edit's result even before
+  // its async encode has landed, so two fast clicks don't both start from the
+  // same rendered Fitting and lose one.
+  const latestFittingRef = useRef<Fitting | null>(null);
+  const editSeqRef = useRef(0);
+  // The coalesce key and time of the last edit that wrote the URL.
+  const lastWriteRef = useRef<{ key: string; at: number } | null>(null);
 
   // Decode whenever the URL's `f` changes — a fresh load's own write below, a
   // pasted link, or Back/Forward. A stale decode from a param that changed
@@ -77,13 +121,17 @@ export function useFittingWorkspace(): FittingWorkspace {
   // result.
   useEffect(() => {
     let cancelled = false;
-    if (ownWriteRef.current) {
-      ownWriteRef.current = false;
-    } else {
+    const own = ownWriteRef.current;
+    ownWriteRef.current = null;
+    if (own?.code !== shareCode) {
       setUnresolved([]);
       setTooLargeToShare(false);
+      // Back/Forward or a pasted link ends any coalescing run: the next edit
+      // pushes rather than overwriting the entry just navigated to.
+      lastWriteRef.current = null;
     }
     if (shareCode === null) {
+      latestFittingRef.current = null;
       // Synchronous, not a subscription, so the rule's usual "derive during
       // render instead" advice doesn't apply; matches the house pattern in
       // features/industry/useOpportunities.ts.
@@ -92,18 +140,27 @@ export function useFittingWorkspace(): FittingWorkspace {
       setShareError(null);
       return;
     }
+    if (own?.code === shareCode && own.fitting) {
+      latestFittingRef.current = own.fitting;
+      setShareError(null);
+      setFitting(own.fitting);
+      return;
+    }
     void (async () => {
       const decoded = await decodeFittingShare(shareCode);
       if (cancelled) return;
       if (!decoded.ok) {
         setShareError(decoded.reason);
+        latestFittingRef.current = null;
         setFitting(null);
         return;
       }
       const name = await hullName(decoded.value.hullTypeId);
       if (cancelled) return;
+      const opened = shareToFitting(decoded.value, name);
+      latestFittingRef.current = opened;
       setShareError(null);
-      setFitting(shareToFitting(decoded.value, name));
+      setFitting(opened);
     })();
     return () => {
       cancelled = true;
@@ -128,11 +185,13 @@ export function useFittingWorkspace(): FittingWorkspace {
         // identical re-paste writes the same URL, which `useUrlParam` no-ops
         // and the effect below then never re-runs to consume the flag,
         // wrongly suppressing the *next* external change's reset.
-        if (encoded.payload !== shareCode) ownWriteRef.current = true;
+        if (encoded.payload !== shareCode)
+          ownWriteRef.current = { code: encoded.payload, fitting: null };
         setShareCode(encoded.payload);
       } else {
         // Still shown — a Fitting this large just can't round-trip through a
         // reload or a pasted link until it's edited down.
+        latestFittingRef.current = loaded;
         setShareError(null);
         setFitting(loaded);
       }
@@ -140,31 +199,58 @@ export function useFittingWorkspace(): FittingWorkspace {
     [shareCode, setShareCode]
   );
 
-  // Stats: the active Character's own profile, or All V with no Character at
-  // all (the logged-out Share Link view is #1544's; this covers the same
-  // fallback for the ordinary route rendering before hydration resolves).
+  const edit = useCallback(
+    (change: FittingChange, coalesceKey?: string) => {
+      const current = latestFittingRef.current;
+      if (current === null) return;
+      const next = change(current);
+      latestFittingRef.current = next;
+      setFitting(next);
+
+      const seq = ++editSeqRef.current;
+      void (async () => {
+        const encoded = await encodeFittingShare(fittingToShareInput(next));
+        // A later edit is already on its way; it writes the URL, not this one.
+        if (seq !== editSeqRef.current) return;
+        // Too large for a link: stays open locally, as a too-large paste does,
+        // until an edit brings it back under the limit.
+        setTooLargeToShare(!encoded.ok);
+        if (!encoded.ok) return;
+        // Push or replace is decided against the last edit that actually
+        // wrote, not the last one asked for: a superseded first edit of a run
+        // never wrote, so the one that does must still push, or the pre-edit
+        // entry would be overwritten and Back would skip past it.
+        const now = Date.now();
+        const last = lastWriteRef.current;
+        const coalesce =
+          coalesceKey !== undefined &&
+          last !== null &&
+          last.key === coalesceKey &&
+          now - last.at < COALESCE_MS;
+        lastWriteRef.current = coalesceKey === undefined ? null : { key: coalesceKey, at: now };
+        ownWriteRef.current = { code: encoded.payload, fitting: next };
+        setShareCode(encoded.payload, { push: !coalesce });
+      })();
+    },
+    [setShareCode]
+  );
+
+  // The pilot the stats and fit checks run under: the active Character's own
+  // profile, or All V with no Character at all (the logged-out Share Link
+  // view is #1544's; this covers the same fallback for the ordinary route
+  // rendering before hydration resolves). Loaded once per Character, not once
+  // per edit.
   useEffect(() => {
     let cancelled = false;
-    // Cleared unconditionally, not only when `fitting` becomes null — a
-    // swap from one open Fitting straight to another (a new paste, a pasted
-    // link, Back/Forward) must not keep showing the *previous* fitting's
-    // numbers under the new one's header until the new computation resolves.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new fitting, not a render-time derivation
-    setStatsError(false);
-    setStatsProgress(null);
-    setStats(null);
-    if (fitting === null) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new Character, not a render-time derivation
+    setProfile(null);
     void (async () => {
       try {
-        const profile =
+        const loaded =
           activeCharacterId === null
             ? buildAllVProfile([...(await loadSkills()).map((skill) => skill.typeID)])
             : await loadActivePilotProfile(activeCharacterId);
-        if (cancelled) return;
-        const result = await computeFittingStats(fitting, profile, (progress) => {
-          if (!cancelled) setStatsProgress(progress);
-        });
-        if (!cancelled) setStats(result);
+        if (!cancelled) setProfile(loaded);
       } catch {
         if (!cancelled) setStatsError(true);
       }
@@ -172,17 +258,47 @@ export function useFittingWorkspace(): FittingWorkspace {
     return () => {
       cancelled = true;
     };
-  }, [fitting, activeCharacterId]);
+  }, [activeCharacterId]);
+
+  // A different hull (or none) is a different Fitting: drop the old numbers at
+  // once rather than show them under the new one's header — a swap from one
+  // open Fitting straight to another (a new paste, a pasted link,
+  // Back/Forward). An edit to the same hull keeps them until the
+  // recalculation below lands, so the bars don't blank on every click.
+  const hullTypeId = fitting?.shipTypeId ?? null;
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new hull, not a render-time derivation
+    setStats(null);
+    setStatsProgress(null);
+    setPrice(null);
+  }, [hullTypeId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new calculation, not a render-time derivation
+    setStatsError(false);
+    if (fitting === null || profile === null) return;
+    void (async () => {
+      try {
+        const result = await computeFittingStats(fitting, profile, (progress) => {
+          if (!cancelled) setStatsProgress(progress);
+        });
+        if (cancelled) return;
+        setEngineReady(true);
+        setStats({ fitting, stats: result });
+      } catch {
+        if (!cancelled) setStatsError(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [fitting, profile]);
 
   // Price: independent of the dogma engine, so it can — and should — resolve
   // well before stats do.
   useEffect(() => {
     let cancelled = false;
-    // Same reasoning as the stats effect above: cleared on every `fitting`
-    // change, not only a transition to null, so a swap never shows the
-    // previous fitting's price under the new one's header.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new fitting, not a render-time derivation
-    setPrice(null);
     if (fitting === null) return;
     void (async () => {
       const result = await loadFittingPrice(fitting, DEFAULT_TRADE_HUB);
@@ -199,9 +315,13 @@ export function useFittingWorkspace(): FittingWorkspace {
     unresolved,
     tooLargeToShare,
     loadFromEftText,
-    stats,
+    edit,
+    stats: stats?.stats ?? null,
+    statsFitting: stats?.fitting ?? null,
     statsProgress,
     statsError,
+    engineReady,
+    profile,
     price,
   };
 }

@@ -83,10 +83,6 @@
         "rig": "Rigs",
         "subsystem": "Subsystems"
       },
-      "droneState": {
-        "online": "in bay",
-        "active": "active"
-      },
       "moduleState": {
         "offline": "offline",
         "online": "online",
@@ -104,6 +100,43 @@
       "slotFitted": "{{rack}} {{index}}, {{state}}",
       "slotEmpty": "{{rack}} {{index}}, empty",
       "openStats": "Stats"
+    },
+    "edit": {
+      "stateLabel": "State of {{name}}",
+      "chargeLabel": "Charge in {{name}}",
+      "noCharge": "No charge",
+      "remove": "Remove {{name}}",
+      "emptySlot": "Empty — add to {{rack}}",
+      "addDrones": "Add drones",
+      "inSpace": "In space",
+      "inBay": "In bay",
+      "slotsWaitForShipData": "Empty slots appear once the ship data has downloaded."
+    },
+    "add": {
+      "title": "Add",
+      "titleFor": "Add to {{rack}}",
+      "rack": {
+        "high": "high slot",
+        "medium": "mid slot",
+        "low": "low slot",
+        "rig": "rig slot",
+        "subsystem": "subsystem slot",
+        "drone": "drone bay"
+      },
+      "searchLabel": "Search items to add",
+      "searchPlaceholder": "Search modules, rigs, drones…",
+      "fitsSlot": "Fits this slot",
+      "fitsSlotTooltip": "Only items that go in the slot you picked. Pick an empty slot to use it.",
+      "fitsHull": "Fits this hull",
+      "fitsHullTooltip": "Hides items this ship can't take at all: no hardpoint, the wrong rig size, or restricted to other hulls. Items that only overflow CPU or powergrid still show.",
+      "canFly": "Can fly",
+      "canFlyTooltip": "Only items your character has every required skill for.",
+      "metaLabel": "Meta level",
+      "metaAny": "Any meta level",
+      "waitingForShipData": "Ship data is still downloading. You can search now; adding, and the fits-this-hull and can-fly filters, switch on once it's ready.",
+      "loadingCatalogue": "Loading items…",
+      "noResults": "No matching items.",
+      "missingSkills": "Missing skills"
     },
     "stats": {
       "show": "Show detail",
@@ -1188,7 +1221,7 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Signing in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, corporation roles, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions.",
+    "permissionsHint": "Signing in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, corporation roles, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions. Want to share less from the start? Use Customize permissions, next to the Log in button, to choose exactly what you grant.",
     "writeExceptions": "It also asks for three permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; and replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client. Nothing else in the app writes to EVE.",
     "eyebrow": "Free · Open source · Runs in your browser",
     "heading": "Answers, not API dumps.",
@@ -3924,6 +3957,25 @@
     "structureMarkets": {
       "label": "Structure markets",
       "caption": "A player structure's own market, when you dock there."
+    },
+    "core": {
+      "skills": {
+        "label": "Skills & skill queue",
+        "caption": "Needed everywhere training time, industry time and fees are shown."
+      },
+      "structures": {
+        "label": "Structure lookup",
+        "caption": "Names player structures across the app, and lets you search for one."
+      }
+    },
+    "customize": {
+      "linkLabel": "Customize permissions",
+      "title": "Customize permissions",
+      "optInTag": "Opt-in",
+      "selectAll": "Select all",
+      "selectNone": "Select none",
+      "optionalCount": "Optional · {{count}} of {{total}}",
+      "submit": "Log in with selected permissions"
     }
   },
   "settings": {

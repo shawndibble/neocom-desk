@@ -1,9 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, PageHeader } from '@/components/ui';
+import { Button, Modal, PageHeader, Panel } from '@/components/ui';
+import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useIsPhone } from '@/lib/useIsPhone';
+import { moduleKey } from '@/engine/fittings/skillGaps';
+import type { FittingSlotKind } from '@/engine/fittings/types';
+import type { CandidateRack } from '@/engine/fittings/candidates';
+import { addDrones, addModule, firstFreeSlotIndex } from '@/engine/fittings/fittingEdit';
+import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
+import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
 import { FittingLoadCard } from '@/features/fittings/FittingLoadCard';
-import { FittingRackList } from '@/features/fittings/FittingRackList';
+import { FittingRackList, ModuleRow } from '@/features/fittings/FittingRackList';
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { FittingViewToggle } from '@/features/fittings/FittingViewToggle';
@@ -13,23 +21,27 @@ import {
 } from '@/features/fittings/fittingViewPreference';
 import { MissingSkillsChip } from '@/features/fittings/MissingSkillsChip';
 import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
+import { useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
 import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
-import { useIsPhone } from '@/lib/useIsPhone';
 
 /**
- * The Fittings section: paste EFT to Load a Fitting, then a Ring or List view
- * of what's fitted beside the game's own collapsible stat sections. The
- * Ring | List choice is device-local (default Ring, List on a phone); on a
- * phone the Ring's stats live in a bottom sheet. Editing (#1533), implants
- * (#1535) and everything else the scope decision lists land in their own
- * tickets.
+ * The Fittings section: paste EFT to Load a Fitting (#1532), then edit it in
+ * the List view (#1533) — tap an empty slot to add there, from a docked Add
+ * panel on desktop or a search sheet on phone. The Ring view (#1536) is the
+ * same editor as a game-style ring — its Ring | List choice is device-local
+ * (Ring on desktop, List on a phone) and on a phone the Ring's stats live in a
+ * bottom sheet. Implants (#1535) and everything else the scope decision lists land in
+ * their own tickets.
  */
 export function Fittings() {
   const { t } = useTranslation();
   const workspace = useFittingWorkspace();
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
-
+  const catalogue = useFittingCatalogue();
+  const isDesktop = useIsDesktop();
+  const [target, setTarget] = useState<AddTarget | null>(null);
+  // Phone only: the Add sheet. Opened by an empty slot, or by the search
+  // button — which works before the ship data (and so the empty slots) exists.
+  const [sheetOpen, setSheetOpen] = useState(false);
   const isPhone = useIsPhone();
   const storedView = useFittingViewPreference((state) => state.value);
   const viewHydrated = useFittingViewPreference((state) => state.hydrated);
@@ -40,23 +52,109 @@ export function Fittings() {
   }, [hydrateView]);
   const view = resolveFittingView(storedView, isPhone);
   const [statsOpen, setStatsOpen] = useState(false);
+  // Ring view: the filled slot whose module panel is open.
+  const [moduleSlot, setModuleSlot] = useState<{ slot: FittingSlotKind; slotIndex: number } | null>(
+    null
+  );
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
 
-  const statsSections = workspace.fitting && (
+  const { fitting, stats, edit } = workspace;
+  const slotCounts = stats?.slotCounts ?? null;
+  // Module results only line up with the Fitting they were calculated for.
+  const moduleResults = stats !== null && workspace.statsFitting === fitting ? stats.modules : null;
+
+  function canPlace(rack: CandidateRack): boolean {
+    if (rack === 'drone') return true;
+    if (fitting === null || slotCounts === null) return false;
+    if (target?.kind === 'slot' && target.slot === rack) return true;
+    return firstFreeSlotIndex(fitting, rack, slotCounts[rack]) !== null;
+  }
+
+  function handleAdd(typeId: number, rack: CandidateRack) {
+    if (rack === 'drone') {
+      edit((f) => addDrones(f, typeId, 1), `drone-add-${typeId}`);
+      if (!isDesktop) closeSheet();
+      return;
+    }
+    if (slotCounts === null) return;
+    const count = slotCounts[rack];
+    // Desktop keeps the panel on the rack's next empty slot, so a row of
+    // modules goes in one click each. An item for another rack (fits-this-slot
+    // off) goes in that rack's first free slot and leaves the chosen one be.
+    const onTarget = target?.kind === 'slot' && target.slot === rack;
+    const after: { target: AddTarget | null } = { target };
+    edit((f) => {
+      const slotIndex =
+        onTarget && target.kind === 'slot' ? target.slotIndex : firstFreeSlotIndex(f, rack, count);
+      if (slotIndex === null) return f;
+      const next = addModule(f, rack, slotIndex, typeId);
+      if (onTarget) {
+        const free = firstFreeSlotIndex(next, rack, count);
+        after.target = free === null ? null : { kind: 'slot', slot: rack, slotIndex: free };
+      }
+      return next;
+    });
+    if (isDesktop) setTarget(after.target);
+    else closeSheet();
+  }
+
+  function selectSlot(slot: FittingSlotKind, slotIndex: number) {
+    const filled = fitting?.modules.some((m) => m.slot === slot && m.slotIndex === slotIndex);
+    if (filled) setModuleSlot({ slot, slotIndex });
+    else selectTarget({ kind: 'slot', slot, slotIndex });
+  }
+
+  function selectTarget(next: AddTarget) {
+    setTarget(next);
+    setSheetOpen(true);
+  }
+
+  function closeSheet() {
+    setSheetOpen(false);
+    setTarget(null);
+  }
+
+  const addTitle =
+    target === null
+      ? t('fittings.add.title')
+      : t('fittings.add.titleFor', { rack: t(`fittings.add.rack.${targetRack(target)}`) });
+
+  const addPanel = fitting && (
+    <FittingAddPanel
+      fitting={fitting}
+      catalogue={catalogue}
+      target={target}
+      engineReady={workspace.engineReady}
+      profile={workspace.profile}
+      canPlace={canPlace}
+      onAdd={handleAdd}
+      showGroups={isDesktop}
+    />
+  );
+
+  const openModuleIndex = moduleSlot
+    ? (fitting?.modules.findIndex(
+        (m) => m.slot === moduleSlot.slot && m.slotIndex === moduleSlot.slotIndex
+      ) ?? -1)
+    : -1;
+  const openModule = fitting && openModuleIndex >= 0 ? fitting.modules[openModuleIndex] : null;
+  const statsInSheet = view === 'ring' && isPhone;
+  const statsSections = (
     <FittingStatsSections
-      stats={workspace.stats}
+      stats={stats}
       statsProgress={workspace.statsProgress}
       statsError={workspace.statsError}
       price={workspace.price}
     />
   );
-  const statsInSheet = view === 'ring' && isPhone;
 
   return (
     <div className="space-y-3">
       <PageHeader
         title={t('nav.fittings')}
         actions={
-          workspace.fitting && viewHydrated ? (
+          fitting && viewHydrated ? (
             <FittingViewToggle value={view} onChange={(next) => void setView(next)} />
           ) : undefined
         }
@@ -67,26 +165,39 @@ export function Fittings() {
         shareError={workspace.shareError}
         tooLargeToShare={workspace.tooLargeToShare}
       />
-      {workspace.fitting && viewHydrated && (
+      {fitting && viewHydrated && (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <div className="space-y-3">
+            {!isDesktop && (
+              <Button className="w-full" onClick={() => setSheetOpen(true)}>
+                {t('fittings.add.searchLabel')}
+              </Button>
+            )}
             {gaps && gaps.missing.length > 0 && activeCharacterId !== null && (
               <MissingSkillsChip
                 entries={gaps.missing}
                 characterId={activeCharacterId}
-                fittingName={workspace.fitting.name}
+                fittingName={fitting.name}
               />
             )}
             {view === 'ring' ? (
               <FittingRing
-                fitting={workspace.fitting}
-                stats={workspace.stats}
+                fitting={fitting}
+                stats={stats}
                 unusableModuleKeys={gaps?.unusableModuleKeys}
+                onSlotSelect={selectSlot}
               />
             ) : (
               <FittingRackList
-                fitting={workspace.fitting}
-                stats={workspace.stats}
+                fitting={fitting}
+                stats={stats}
+                moduleResults={moduleResults}
+                catalogue={catalogue}
+                engineReady={workspace.engineReady}
+                profile={workspace.profile}
+                edit={edit}
+                target={target}
+                onSelectTarget={selectTarget}
                 unusableModuleKeys={gaps?.unusableModuleKeys}
               />
             )}
@@ -96,7 +207,10 @@ export function Fittings() {
               </Button>
             )}
           </div>
-          {!statsInSheet && statsSections}
+          <div className="space-y-3">
+            {isDesktop && <Panel title={addTitle}>{addPanel}</Panel>}
+            {!statsInSheet && statsSections}
+          </div>
         </div>
       )}
       {statsInSheet && (
@@ -107,6 +221,37 @@ export function Fittings() {
           placement="sheet"
         >
           {statsSections}
+        </Modal>
+      )}
+      {fitting && (
+        <Modal
+          open={openModule !== null}
+          onClose={() => setModuleSlot(null)}
+          title={t(`fittings.list.rack.${moduleSlot?.slot ?? 'high'}`)}
+          placement={isPhone ? 'sheet' : 'center'}
+        >
+          {openModule && (
+            <ModuleRow
+              module={openModule}
+              result={moduleResults?.[openModuleIndex] ?? null}
+              cantUse={gaps?.unusableModuleKeys.has(moduleKey(openModule)) ?? false}
+              fitting={fitting}
+              catalogue={catalogue}
+              engineReady={workspace.engineReady}
+              profile={workspace.profile}
+              edit={edit}
+            />
+          )}
+        </Modal>
+      )}
+      {!isDesktop && (
+        <Modal
+          open={fitting !== null && sheetOpen}
+          onClose={closeSheet}
+          placement="sheet"
+          title={addTitle}
+        >
+          {addPanel}
         </Modal>
       )}
     </div>

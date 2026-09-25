@@ -69,6 +69,7 @@ beforeEach(async () => {
   vi.stubEnv('VITE_EVE_CLIENT_ID', 'test-client-id');
   sessionStorage.clear();
   await db.characters.clear();
+  await db.settings.clear();
 });
 
 describe('Login', () => {
@@ -310,6 +311,17 @@ describe('Login', () => {
     // inside the test that made it — this was the intermittent
     // "expected 1, got 2" in `builds a PKCE authorize URL` below.
     await waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
+  });
+
+  it('opens the Customize permissions dialog from the link under the login button (#1522)', async () => {
+    const user = userEvent.setup();
+    renderLogin();
+    const [firstLink] = await screen.findAllByRole('button', { name: /customize permissions/i });
+    await user.click(firstLink);
+
+    const dialog = await screen.findByRole('dialog', { name: /customize permissions/i });
+    expect(within(dialog).getByRole('checkbox', { name: 'Wallet' })).toBeChecked();
+    expect(within(dialog).getByRole('checkbox', { name: /skills & skill queue/i })).toBeDisabled();
   });
 
   it('builds a PKCE authorize URL and navigates to EVE SSO', async () => {

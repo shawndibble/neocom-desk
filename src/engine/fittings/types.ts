@@ -103,8 +103,6 @@ export interface FittingStats {
   /** Rig calibration, points. */
   calibrationUsed: number;
   calibrationTotal: number;
-  /** How many slots the hull has in each rack, so the Ring view can draw the empty ones. */
-  slotLayout: Record<FittingSlotKind, number>;
   droneDps: number;
   droneBandwidthUsed: number;
   droneBandwidthTotal: number;
@@ -121,6 +119,20 @@ export interface FittingStats {
   navigation: NavigationStats;
   /** Type ids the pinned data has nothing for; the rest of the fit still calculates. */
   unknownItemTypeIds: number[];
+  /** How many slots each rack has — a ship attribute, so a Tech 3 subsystem's added slots count. */
+  slotCounts: Record<FittingSlotKind, number>;
+  /** Index-parallel to `Fitting.modules`. */
+  modules: FittingModuleResult[];
+}
+
+/** What the engine made of one fitted module. */
+export interface FittingModuleResult {
+  /** The state actually reached — lower than asked when the module can't get there. */
+  state: FittingItemState;
+  /** The highest state this module can reach at all; the state control offers nothing above it. */
+  maxState: FittingItemState;
+  /** Charge groups the module accepts (`chargeGroup1`…); empty when it takes no charge. */
+  chargeGroupIds: number[];
 }
 
 /**
@@ -184,6 +196,10 @@ export const DOGMA_ATTRIBUTE = {
   droneBandwidth: 1271,
   droneCapacity: 283,
   calibration: 1132,
+  // Rack sizes, verified 2026-09-24 by a live run of the pinned engine
+  // (Rifter 3/3/4/3, Loki 0/0/0 + 3 rigs + 5 subsystems before subsystems are
+  // fitted); `rigSlots`/`maxSubSystems` are unpublished, so absent from
+  // public/data/market/attributes.json.
   hiSlots: 14,
   medSlots: 13,
   lowSlots: 12,
@@ -202,4 +218,21 @@ export const DOGMA_ATTRIBUTE = {
 export const ITEM_DOGMA_ATTRIBUTE = {
   calibrationCost: 1153,
   droneBandwidthNeeded: 1272,
+  // "Used with (Charge Group)" and "Charge size" in
+  // public/data/market/attributes.json, and a live run of the pinned engine
+  // against a 200mm AutoCannon II (groups 83 and 372, size 1), 2026-09-24.
+  chargeGroup1: 604,
+  chargeGroup2: 605,
+  chargeGroup3: 606,
+  chargeGroup4: 609,
+  chargeGroup5: 610,
+  chargeSize: 128,
 } as const;
+
+export const CHARGE_GROUP_ATTRIBUTES: readonly number[] = [
+  ITEM_DOGMA_ATTRIBUTE.chargeGroup1,
+  ITEM_DOGMA_ATTRIBUTE.chargeGroup2,
+  ITEM_DOGMA_ATTRIBUTE.chargeGroup3,
+  ITEM_DOGMA_ATTRIBUTE.chargeGroup4,
+  ITEM_DOGMA_ATTRIBUTE.chargeGroup5,
+];

@@ -191,7 +191,7 @@ export function FittingRing({
   onSlotSelect,
 }: FittingRingProps) {
   const { t } = useTranslation();
-  const slots = buildRingSlots(fitting, stats?.slotLayout ?? null);
+  const slots = buildRingSlots(fitting, stats?.slotCounts ?? null);
   const countByRack = new Map<FittingSlotKind, number>();
   for (const slot of slots) countByRack.set(slot.rack, (countByRack.get(slot.rack) ?? 0) + 1);
 
