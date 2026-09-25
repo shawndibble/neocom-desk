@@ -50,6 +50,10 @@ export const MOBILE_TAB_CHOICES = [
   '/mail',
   '/calendar',
   '/contacts',
+  // Last, not the desktop rail's order (it has none there — reached only via
+  // `CharacterFooterLink`'s portrait): this is a fresh call, and last matches
+  // where it already sits at the end of the More sheet today (#1764).
+  '/characters',
 ] as const satisfies readonly AppRoutePath[];
 
 export type MobileTabPath = (typeof MOBILE_TAB_CHOICES)[number];
@@ -81,6 +85,7 @@ export const NAV_LABEL_KEYS: Record<MobileTabPath, string> = {
   '/mail': 'nav.mail',
   '/calendar': 'nav.calendar',
   '/contacts': 'nav.contacts',
+  '/characters': 'nav.characters',
 };
 
 function isMobileTabPath(value: unknown): value is MobileTabPath {

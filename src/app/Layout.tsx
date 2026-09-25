@@ -186,6 +186,11 @@ function NavItem({ to, label, locked, badge, presentation = 'rail', onClick }: N
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const granted = useGrantedScopes();
+  const location = useLocation();
+  // Only `/characters` carries an origin — it is the one destination a
+  // pilot needs to come back *from* (#1764); every other nav item is a
+  // destination in its own right.
+  const originState = to === '/characters' ? { from: location.pathname } : undefined;
   /*
    * Compose this route's snapshot while the pointer is still travelling to the
    * link (`routeWarm.ts`). `focus` covers the keyboard, where tabbing to a link
@@ -215,6 +220,7 @@ function NavItem({ to, label, locked, badge, presentation = 'rail', onClick }: N
   return (
     <NavLink
       to={to}
+      state={originState}
       onClick={onClick}
       onMouseEnter={warm}
       onFocus={warm}
@@ -340,29 +346,34 @@ const CHARACTER_TRIGGER =
   'flex w-full items-center gap-2 p-2 text-left transition-colors hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent';
 
 /**
- * The active Character, as a plain link to `/characters` — the only way to
- * switch or add a Character, rather than a menu opening onto Characters *and*
- * Settings. Settings is now its own ordinary nav item (`NavItem`) sitting
- * just above this on both surfaces, so the trigger no longer needs to carry
- * it. The name *is* the accessible name (`characterTriggerLabel`) once the
- * Character is known, so a real link — not a button — is both simpler and
- * gives middle-click/"open in new tab" for free.
+ * The active Character, as a plain link to `/characters` — the one dedicated
+ * portrait+name entry point (a bar tab can also reach the route, but not this
+ * portrait), rather than a menu onto Characters *and* Settings, which is now
+ * its own ordinary `NavItem` just above this. The name is the accessible name
+ * (`characterTriggerLabel`) once known, so a real link, not a button.
  */
 function CharacterFooterLink({
   activeCharacter,
   size,
   className = '',
   onClick,
+  originPath,
 }: {
   activeCharacter: ActiveCharacter | undefined;
   size?: 'sm';
   className?: string;
   onClick?: () => void;
+  /**
+   * The page to return to once a Character is picked (#1764) — omitted on
+   * the desktop rail, whose own link keeps today's always-Overview behavior.
+   */
+  originPath?: string;
 }) {
   const { t } = useTranslation();
   return (
     <Link
       to="/characters"
+      state={originPath ? { from: originPath } : undefined}
       onClick={onClick}
       aria-label={characterTriggerLabel(activeCharacter, t)}
       className={`${CHARACTER_TRIGGER} ${className}`}
@@ -386,6 +397,8 @@ interface MobileMoreSheetProps {
   locked: ReadonlySet<AppRoutePath>;
   tabs: readonly MobileTabPath[];
   unreadAlerts: number;
+  /** The page open when the sheet was opened — the Character link's return-to-origin (#1764). */
+  currentPath: string;
 }
 
 /**
@@ -408,9 +421,14 @@ function MobileMoreSheet({
   locked,
   tabs,
   unreadAlerts,
+  currentPath,
 }: MobileMoreSheetProps) {
   const { t } = useTranslation();
-  const rows = mobileSheetPaths(tabs);
+  // `/characters` always has its own dedicated row below (the portrait+name
+  // `CharacterFooterLink`) — an ordinary row for it here too, whenever it
+  // isn't chosen for the tab bar, would be a second link to the same
+  // destination rather than the one `mobileSheetPaths`' own invariant intends.
+  const rows = mobileSheetPaths(tabs).filter((path) => path !== '/characters');
 
   return (
     <Modal open={open} id={MORE_SHEET_ID} onClose={onClose} title={t('nav.more')} placement="sheet">
@@ -437,6 +455,7 @@ function MobileMoreSheet({
           size="sm"
           className="min-h-11 rounded-xs"
           onClick={onClose}
+          originPath={currentPath}
         />
       </div>
     </Modal>
@@ -731,6 +750,7 @@ export function Layout() {
           locked={locked}
           tabs={tabs}
           unreadAlerts={unreadAlerts}
+          currentPath={location.pathname}
         />
       )}
     </div>

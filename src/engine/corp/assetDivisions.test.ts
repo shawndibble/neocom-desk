@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   buildCorpAssetTree,
   corpAssetGroupId,
+  corpAssetLocationId,
   HANGAR_DIVISIONS,
   type CorpAssetInput,
 } from './assetDivisions';
@@ -66,7 +67,9 @@ describe('buildCorpAssetTree', () => {
    * The four special flags are not part of the seven-wide division axis
    * (CONTEXT.md round 44) — they only appear as sibling groups when the
    * corporation actually has something in them, and in a fixed order after
-   * the seven divisions.
+   * the seven divisions. `officeFolder` never appears at all: an office is a
+   * pass-through, so a childless office row (as here) simply disappears
+   * rather than surfacing as an empty-content group.
    */
   it('adds the special-flag groups only when they hold something, in a fixed order', () => {
     const empty = buildCorpAssetTree([asset({ itemId: 1, locationFlag: 'CorpSAG1' })]);
@@ -77,11 +80,44 @@ describe('buildCorpAssetTree', () => {
       asset({ itemId: 2, locationFlag: 'OfficeFolder' }),
       asset({ itemId: 3, locationFlag: 'CorpSAG1' }),
     ]);
-    expect(withExtras.map((g) => g.id)).toEqual([
-      ...HANGAR_DIVISIONS,
-      'officeFolder',
-      'assetSafety',
+    expect(withExtras.map((g) => g.id)).toEqual([...HANGAR_DIVISIONS, 'assetSafety']);
+  });
+
+  /**
+   * The bug: an office's contents used to inherit the office's own
+   * `OfficeFolder` flag instead of each child's real `CorpSAGn` division,
+   * lumping everything under one undivided "Office" bucket with no station
+   * name. An office is a pass-through — its own row disappears; each child
+   * lands in its real division, wrapped in a location node named for the
+   * station.
+   */
+  it('treats an office as a pass-through: dividing its contents and naming the station beneath each division', () => {
+    const groups = buildCorpAssetTree([
+      asset({
+        itemId: 100,
+        typeId: 27,
+        locationFlag: 'OfficeFolder',
+        locationType: 'other',
+        locationId: 60003760,
+      }),
+      asset({ itemId: 1, locationFlag: 'CorpSAG1', locationType: 'item', locationId: 100 }),
+      asset({ itemId: 2, locationFlag: 'CorpSAG3', locationType: 'item', locationId: 100 }),
     ]);
+
+    expect(groups.map((g) => g.id)).toEqual([...HANGAR_DIVISIONS]);
+
+    const division1 = groups.find((g) => g.id === 1);
+    expect(division1?.children).toHaveLength(1);
+    const locationNode = division1!.children[0];
+    expect(corpAssetLocationId(locationNode)).toBe(60003760);
+    expect(locationNode).toMatchObject({
+      kind: 'container',
+      itemCount: 1,
+      children: [{ kind: 'item', asset: expect.objectContaining({ item_id: 1 }) }],
+    });
+
+    const division3 = groups.find((g) => g.id === 3);
+    expect(corpAssetLocationId(division3!.children[0])).toBe(60003760);
   });
 
   it('buckets an unrecognised flag under other instead of dropping the asset', () => {

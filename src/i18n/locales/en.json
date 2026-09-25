@@ -287,6 +287,7 @@
       "newTitle": "New fitting from a hull",
       "searchHulls": "Search hulls",
       "searchHullsPlaceholder": "Vexor, Gila, heavy assault…",
+      "searchToBegin": "Search for a hull to begin.",
       "noHulls": "No hull matches that search.",
       "pickAHull": "Pick a hull, then start fitting it. Double-click a hull to start at once.",
       "startFitting": "Start fitting",
@@ -5005,6 +5006,7 @@
       "loadFailedTitle": "Could not load corp assets",
       "loadFailedHint": "The corporation asset read failed and nothing is cached yet. Try refreshing.",
       "searchPlaceholder": "Search items…",
+      "unknownLocation": "Location #{{locationId}}",
       "flag": {
         "officeFolder": "Office",
         "corpDeliveries": "Deliveries",
