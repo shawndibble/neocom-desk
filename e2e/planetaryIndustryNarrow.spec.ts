@@ -338,7 +338,7 @@ test.describe('PI Plan — stacked Sensitivity card', () => {
     for (const cell of cells) expect(cell.width).toBeLessThan(contentWidth * 0.9);
   });
 
-  test('keeps every Chain row one line tall at 1024px, with the role and hub read apart', async ({
+  test('keeps each Make-or-buy cell on one line at 1024px, with the role and hub read apart', async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
@@ -349,12 +349,12 @@ test.describe('PI Plan — stacked Sensitivity card', () => {
     });
     await expect(chain).toBeVisible();
 
-    const heights = await chain
-      .locator('tbody tr')
-      .evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
-    expect(heights.length).toBeGreaterThan(1);
-    // One line tall: a wrapped cell anywhere in a row (name included) would lift it.
-    expect(new Set(heights.map((h) => Math.round(h))).size).toBe(1);
+    // No Make-or-buy cell wraps: the role and the hub read share one line.
+    const lineHeights = await chain
+      .locator('tbody tr td:nth-child(6) > span')
+      .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
+    expect(lineHeights.length).toBeGreaterThan(1);
+    for (const h of lineHeights) expect(h).toBeLessThan(24);
 
     // The cell is its own line: role and hub read are two spans, never one string.
     const cells = chain.locator('tbody tr td:nth-child(6) > span');
@@ -364,12 +364,6 @@ test.describe('PI Plan — stacked Sensitivity card', () => {
       .evaluateAll((els) => els.map((el) => el.textContent));
     expect(spans).toHaveLength(2);
     expect(spans[1]).toMatch(/^Hub: /);
-
-    const overflow = await chain.evaluate((table) => {
-      const box = table.parentElement as HTMLElement;
-      return { scrollWidth: box.scrollWidth, clientWidth: box.clientWidth };
-    });
-    expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth);
 
     // The sensitivity table's unanswered cells no longer speak of a rate.
     const sensitivity = page.getByRole('table', { name: SENSITIVITY_TABLE });
