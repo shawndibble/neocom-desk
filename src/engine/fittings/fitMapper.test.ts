@@ -51,7 +51,21 @@ describe('fittingToDogmaFit', () => {
     });
   });
 
-  it('maps a drone stack into the drone bay with its quantity', () => {
+  it('maps a launched drone stack into the drone bay with its quantity', () => {
+    const dogmaFit = fittingToDogmaFit(
+      fitting({ drones: [{ typeId: 2488, quantity: 5, state: 'active' }] }),
+      emptyProfile
+    );
+
+    expect(dogmaFit.items).toContainEqual({
+      type_id: 2488,
+      slot: { type: 'drone_bay' },
+      quantity: 5,
+      state: 'active',
+    });
+  });
+
+  it('maps a drone stack sitting in the bay to offline, which the engine leaves unlaunched', () => {
     const dogmaFit = fittingToDogmaFit(
       fitting({ drones: [{ typeId: 2488, quantity: 5, state: 'online' }] }),
       emptyProfile
@@ -61,7 +75,7 @@ describe('fittingToDogmaFit', () => {
       type_id: 2488,
       slot: { type: 'drone_bay' },
       quantity: 5,
-      state: 'online',
+      state: 'offline',
     });
   });
 

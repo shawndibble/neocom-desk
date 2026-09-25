@@ -24,6 +24,11 @@ export interface FittingCatalogue {
   variations: VariationData;
 }
 
+/** A type's name from the catalogue, or `#<id>` while it loads or when it has none. */
+export function catalogueTypeName(catalogue: FittingCatalogue | null, typeId: number): string {
+  return catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
+}
+
 function buildCatalogue(
   types: TypeMap,
   rackOf: Record<string, CandidateRack>,

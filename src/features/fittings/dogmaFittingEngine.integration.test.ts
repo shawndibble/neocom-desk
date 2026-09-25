@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it } from 'vitest';
 import wasmInit, { calculate } from '@eveshipfit/dogma-engine';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
-import { extractFittingStats, extractModuleResult } from '@/engine/fittings/stats';
+import { extractFittingStats, extractModuleResult, extractOffense } from '@/engine/fittings/stats';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
 import type { Fitting } from '@/engine/fittings/types';
 
@@ -108,7 +108,7 @@ function vexorNavyIssueFit(): Fitting {
       { slot: 'low', slotIndex: 2, typeId: DRONE_DAMAGE_AMPLIFIER_II, state: 'online' },
       { slot: 'low', slotIndex: 3, typeId: DRONE_DAMAGE_AMPLIFIER_II, state: 'online' },
     ],
-    drones: [{ typeId: WARRIOR_II, quantity: 5, state: 'online' }],
+    drones: [{ typeId: WARRIOR_II, quantity: 5, state: 'active' }],
     cargo: [],
   };
 }
@@ -165,6 +165,22 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(stats.unknownItemTypeIds).toEqual([]);
   });
 
+  it('counts no drone DPS for drones left in the bay', () => {
+    const fitting = vexorNavyIssueFit();
+    fitting.drones = [{ typeId: WARRIOR_II, quantity: 5, state: 'online' }];
+    const profile = buildAllVProfile(ALL_TEST_SKILL_IDS);
+    const dogmaFit = fittingToDogmaFit(fitting, profile);
+
+    const calculation = calculate(dogmaFit);
+    const stats = extractFittingStats(
+      dogmaFit.items.map((item) => item.type_id),
+      calculation.ship.attributes,
+      calculation.items
+    );
+
+    expect(stats.droneDps).toBe(0);
+  });
+
   it('marks a type id the pinned data has nothing for as unknown, without failing the rest of the calculation', () => {
     const fitting = vexorNavyIssueFit();
     fitting.modules.push({ slot: 'rig', slotIndex: 0, typeId: 999_999_999, state: 'online' });
@@ -182,6 +198,48 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     // The rest of the fit still calculated — same as the clean-fit case above.
     expect(stats.cpuTotal).toBeCloseTo(437.5, 6);
     expect(stats.droneDps).toBeCloseTo(124.578, 2);
+  });
+
+  it('breaks Offense into per-weapon rows that sum to the engine total, overheated from its overload state', () => {
+    const fitting = vexorNavyIssueFit();
+    const profile = buildAllVProfile(ALL_TEST_SKILL_IDS);
+    const dogmaFit = fittingToDogmaFit(fitting, profile);
+    const offenseItems = [
+      ...fitting.modules.map((module) => ({
+        typeId: module.typeId,
+        chargeTypeId: module.chargeTypeId,
+        quantity: 1,
+        isDrone: false,
+      })),
+      ...fitting.drones.map((drone) => ({
+        typeId: drone.typeId,
+        quantity: drone.quantity,
+        isDrone: true,
+      })),
+    ];
+
+    const calculation = calculate(dogmaFit);
+    const overheated = calculate({
+      ...dogmaFit,
+      items: dogmaFit.items.map((item) =>
+        item.type_id === NEUTRON_BLASTER_CANNON_II ? { ...item, state: 'overload' as const } : item
+      ),
+    });
+    const offense = extractOffense(offenseItems, calculation.items, overheated.items);
+
+    expect(offense.weapons.map((row) => [row.typeId, row.count])).toEqual([
+      [NEUTRON_BLASTER_CANNON_II, 3],
+      [WARRIOR_II, 5],
+    ]);
+    // The ship's own damagePerSecondWithoutReload covers turrets and drones alike.
+    expect(offense.dps).toBeCloseTo(calculation.ship.attributes.get(-12)!.value, 6);
+    expect(offense.weapons[1].dps).toBeCloseTo(124.578, 2);
+    expect(offense.weapons[0].dps).toBeCloseTo(40.32, 2);
+    expect(offense.weapons[0].volley).toBeCloseTo(317.52, 2);
+    expect(offense.weapons[0].overheated?.dps).toBeCloseTo(46.368, 2);
+    expect(offense.weapons[0].overheated?.volley).toBeCloseTo(365.148, 2);
+    expect(offense.weapons[1].overheated).toBeNull();
+    expect(offense.overheated?.dps).toBeCloseTo(170.946, 2);
   });
 
   it('measures EHP against a damage profile and adapts a Reactive Armor Hardener to it', () => {

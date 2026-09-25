@@ -34,7 +34,7 @@ import {
 } from '@/features/fittings/fittingViewPreference';
 import { MissingSkillsChip } from '@/features/fittings/MissingSkillsChip';
 import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
-import { useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
+import { catalogueTypeName, useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
 import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
 import { useModuleVariations } from '@/features/fittings/useModuleVariations';
 
@@ -184,6 +184,7 @@ export function Fittings() {
       statsProgress={workspace.statsProgress}
       statsError={workspace.statsError}
       price={workspace.price}
+      typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
       damageProfiles={workspace.damageProfiles}
     />
   );
