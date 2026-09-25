@@ -5,6 +5,8 @@ import type { CachedResult } from '@/features/skills/data';
 import { acceleratorBonusOf, type AttributeBaseline } from '@/engine/attributeBaseline';
 import type { CharacterAttributes } from '@/esi/endpoints';
 import type { Implants } from '@/engine/types';
+import { formatLocalDate } from '@/lib/localDate';
+import type { RemapAvailability } from './remapAvailability';
 
 interface AttributesPaneProps {
   /** ESI's attributes read, carrying its own age; null when it could not be read. */
@@ -12,6 +14,8 @@ interface AttributesPaneProps {
   implantBonuses: Implants;
   /** How the base sheet was arrived at — null until ESI has been read at all. */
   attributeBaseline?: AttributeBaseline | null;
+  /** Live remap availability, same source the plan editor costs against; null when unreadable. */
+  remapInfo: RemapAvailability | null;
   className?: string;
 }
 
@@ -31,6 +35,7 @@ export function AttributesPane({
   result,
   implantBonuses,
   attributeBaseline = null,
+  remapInfo,
   className,
 }: AttributesPaneProps) {
   const { t } = useTranslation();
@@ -45,6 +50,19 @@ export function AttributesPane({
         implantBonuses={implantBonuses}
         boosterBonus={acceleratorBonusOf(attributeBaseline)}
       />
+      {/* Same live remap read the plan editor costs against (#1726) — a
+          pilot checking Attributes shouldn't have to open a plan to see it. */}
+      {remapInfo && (
+        <p className="mt-2 text-[0.6875rem] text-text-dim">
+          {`${t('plans.remapBudget', { bonus: remapInfo.bonus })} ${
+            remapInfo.yearlyReady
+              ? t('plans.remapBudgetYearlyReady')
+              : t('plans.remapBudgetYearlyFrom', {
+                  date: remapInfo.cooldownUntil ? formatLocalDate(remapInfo.cooldownUntil) : '',
+                })
+          }`}
+        </p>
+      )}
     </Panel>
   );
 }
