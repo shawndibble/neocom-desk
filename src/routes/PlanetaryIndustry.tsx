@@ -38,6 +38,7 @@ import {
   readCachedSchematicNames,
 } from '@/features/pi/names';
 import { loadTypeNames, readCachedTypeNames } from '@/features/character/typeNames';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import {
   extractorExpiryMs,
   extractorProgramsFromPins,
@@ -81,6 +82,14 @@ import { PI_TABS } from '@/app/pageTabs';
 import { COLONY_SPACES, type ColonySpace } from '@/features/pi/customsRate';
 
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
+
+/** `cached` wins on a shared id — it's always the fresher read (see call sites); `overlay` only fills what it left unresolved. */
+function mergeNames(
+  overlay: ReadonlyMap<number, string>,
+  cached: ReadonlyMap<number, string>
+): ReadonlyMap<number, string> {
+  return overlay.size === 0 ? cached : new Map([...overlay, ...cached]);
+}
 const NO_DETAILS: ReadonlyMap<number, StatusResult<CharacterPlanetDetail>> = new Map();
 const EMPTY_STATUS: ColonyStatus = { idle: false, soonestExpiryMs: null };
 const EMPTY_ROSTER: PiRosterSnapshot = { colonies: [], skipped: [], notLoaded: [], noColonies: [] };
@@ -190,6 +199,14 @@ async function loadActiveColonies(
  * first and the active Character's live-resolved ones last, so a same-id
  * collision (there won't usually be one — this is static game data) resolves
  * to the fresher live read.
+ *
+ * That cache-only rule is specifically about *this function* running
+ * unconditionally on every page open — it says nothing about the
+ * alt-colonies toggle itself. A separate `useEffect` further down in this
+ * component *does* call `loadPlanetName`/`loadTypeNames` for names still
+ * missing after the read above, batched and gated on the toggle being on, so
+ * that a pilot who actually opens the alt view gets resolved names instead
+ * of raw ids without paying the fan-out cost on every visit.
  */
 async function loadPiSnapshot(characterId: number, signal: RouteSnapshotSignal): Promise<Snapshot> {
   const [active, activeCharacterRecord, roster] = await Promise.all([
@@ -962,24 +979,15 @@ export function PlanetaryIndustry() {
   const [publicPlanetNames, setPublicPlanetNames] = useState<ReadonlyMap<number, string>>(NO_NAMES);
   const [publicTypeNames, setPublicTypeNames] = useState<ReadonlyMap<number, string>>(NO_NAMES);
   const planetNames = useMemo(
-    () =>
-      publicPlanetNames.size === 0
-        ? cachedPlanetNames
-        : new Map([...publicPlanetNames, ...cachedPlanetNames]),
+    () => mergeNames(publicPlanetNames, cachedPlanetNames),
     [publicPlanetNames, cachedPlanetNames]
   );
   const pinTypeNames = useMemo(
-    () =>
-      publicTypeNames.size === 0
-        ? cachedPinTypeNames
-        : new Map([...publicTypeNames, ...cachedPinTypeNames]),
+    () => mergeNames(publicTypeNames, cachedPinTypeNames),
     [publicTypeNames, cachedPinTypeNames]
   );
   const productNames = useMemo(
-    () =>
-      publicTypeNames.size === 0
-        ? cachedProductNames
-        : new Map([...publicTypeNames, ...cachedProductNames]),
+    () => mergeNames(publicTypeNames, cachedProductNames),
     [publicTypeNames, cachedProductNames]
   );
 
@@ -1049,8 +1057,11 @@ export function PlanetaryIndustry() {
   // costs nothing once resolved. `loadTypeNames` batches its ids into one
   // `POST /universe/names` (chunked only past ESI's 1000-id cap), per the
   // ticket's guardrail against a lookup fan-out; there is no bulk endpoint
-  // for planet names (`features/pi/names.ts`), so those go out concurrently
-  // instead, same as the active Character's own planet-name read above.
+  // for planet names (`features/pi/names.ts`), so those go out one GET per
+  // id instead, capped at `ESI_FANOUT_CONCURRENCY` in flight — same cap
+  // `typeNames.ts`'s own per-id fallback uses for the same reason: a roster
+  // with many alts each holding several planets is a real fan-out size, not
+  // a hypothetical one.
   useEffect(() => {
     if (!showAltColonies) return;
     const missingTypeIds = new Set<number>();
@@ -1080,19 +1091,18 @@ export function PlanetaryIndustry() {
 
     let cancelled = false;
     void (async () => {
-      const [typeNames, planetNameEntries] = await Promise.all([
+      const resolvedPlanetNames = new Map<number, string>();
+      const [typeNames] = await Promise.all([
         missingTypeIds.size > 0 ? loadTypeNames([...missingTypeIds]) : Promise.resolve(NO_NAMES),
-        Promise.all(missingPlanetIds.map((id) => loadPlanetName(id))),
+        mapWithConcurrencyLimit(missingPlanetIds, ESI_FANOUT_CONCURRENCY, async (id) => {
+          const name = await loadPlanetName(id);
+          if (name) resolvedPlanetNames.set(id, name);
+        }),
       ]);
       if (cancelled) return;
       if (typeNames.size > 0) {
         setPublicTypeNames((prev) => new Map([...prev, ...typeNames]));
       }
-      const resolvedPlanetNames = new Map<number, string>();
-      missingPlanetIds.forEach((id, i) => {
-        const name = planetNameEntries[i];
-        if (name) resolvedPlanetNames.set(id, name);
-      });
       if (resolvedPlanetNames.size > 0) {
         setPublicPlanetNames((prev) => new Map([...prev, ...resolvedPlanetNames]));
       }
