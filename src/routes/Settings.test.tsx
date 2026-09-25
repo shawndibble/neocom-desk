@@ -125,7 +125,9 @@ beforeEach(async () => {
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   useActivityLog.setState({ entries: [] });
-  window.history.pushState({}, '', '/settings');
+  // jsdom's matchMedia never matches, which reads as a phone — and a phone's
+  // bare `/settings` is the section list. Most tests want a section.
+  window.history.pushState({}, '', '/settings/display');
 });
 
 afterEach(() => {
@@ -1759,6 +1761,90 @@ describe('Settings — sections rail', () => {
   });
 });
 
+/** `(min-width: 48rem)` matches (or not), as `md` up does. */
+function stubViewport(desktop: boolean) {
+  vi.stubGlobal(
+    'matchMedia',
+    (media: string) =>
+      ({
+        matches: desktop && media === '(min-width: 48rem)',
+        media,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList
+  );
+}
+
+describe('Settings — phone list', () => {
+  it('lists the sections at /settings, with a one-line summary where there is one', async () => {
+    window.history.pushState({}, '', '/settings');
+    stubViewport(false);
+    render(<App />);
+
+    const nav = await screen.findByRole('navigation', { name: /settings sections/i });
+    expect(window.location.pathname).toBe('/settings');
+    for (const group of ['App', 'Defaults', 'Alerts', 'Data & device']) {
+      expect(within(nav).getByText(group)).toBeInTheDocument();
+    }
+    // Corporation is absent: this character has no corp access.
+    expect(within(nav).queryByRole('link', { name: /corporation/i })).not.toBeInTheDocument();
+    expect(within(nav).getAllByRole('link')).toHaveLength(10);
+    expect(within(nav).getByRole('link', { name: /^display/i })).toHaveTextContent(
+      /default text, my local time/i
+    );
+    expect(within(nav).getByRole('link', { name: /^shortcuts/i })).toHaveTextContent(/on/i);
+    expect(within(nav).getByRole('link', { name: /^industry/i })).toHaveTextContent(/, ME 0, TE 0/);
+    expect(within(nav).getByRole('link', { name: /^market/i })).toHaveTextContent(/jita/i);
+    expect(within(nav).getByRole('link', { name: /^characters/i })).toHaveTextContent(
+      /current character/i
+    );
+    expect(within(nav).getByRole('link', { name: /^faq$/i })).toBeInTheDocument();
+    // Log out lives in Data & storage, not as a row of its own.
+    expect(screen.queryByText(/log out/i)).not.toBeInTheDocument();
+  });
+
+  it('opens a section from its row, and the back link returns to the list', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings');
+    stubViewport(false);
+    render(<App />);
+
+    const nav = await screen.findByRole('navigation', { name: /settings sections/i });
+    await user.click(within(nav).getByRole('link', { name: /^market/i }));
+    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/settings/market');
+
+    const back = screen
+      .getAllByRole('link', { name: /settings/i })
+      .find(
+        (link) => link.getAttribute('href') === '/settings' && /‹/.test(link.textContent ?? '')
+      );
+    await user.click(back!);
+    expect(
+      await screen.findByRole('navigation', { name: /settings sections/i })
+    ).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/settings');
+  });
+
+  it('still lands an old #shortcuts link on Shortcuts rather than the list', async () => {
+    window.history.pushState({}, '', '/settings#shortcuts');
+    stubViewport(false);
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/settings/shortcuts');
+  });
+
+  it('keeps redirecting /settings to Display from md up', async () => {
+    window.history.pushState({}, '', '/settings');
+    stubViewport(true);
+    render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/settings/display'));
+    expect(await screen.findByRole('group', { name: /text size/i })).toBeInTheDocument();
+  });
+});
+
 describe('Settings — This device', () => {
   it('logs out of every character, keeps the settings, and lands on the login page', async () => {
     const user = userEvent.setup();
@@ -1796,7 +1882,10 @@ describe('Settings — This device', () => {
     window.history.pushState({}, '', '/settings/dataAge');
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: /^log out$/i }));
+    // Disabled until the live character count resolves.
+    const logOut = await screen.findByRole('button', { name: /^log out$/i });
+    await waitFor(() => expect(logOut).toBeEnabled());
+    await user.click(logOut);
     const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
     await user.click(within(dialog).getByRole('button', { name: /cancel/i }));
 
@@ -1812,7 +1901,10 @@ describe('Settings — review follow-ups', () => {
     window.history.pushState({}, '', '/settings/dataAge');
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: /^log out$/i }));
+    // Disabled until the live character count resolves.
+    const logOut = await screen.findByRole('button', { name: /^log out$/i });
+    await waitFor(() => expect(logOut).toBeEnabled());
+    await user.click(logOut);
     const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
     await user.click(within(dialog).getByRole('button', { name: /^log out$/i }));
 

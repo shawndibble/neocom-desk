@@ -3,10 +3,14 @@ import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { SETTINGS_TABS } from '@/app/pageTabs';
-import { usePageTab } from '@/lib/usePageTab';
+import { useIsPageIndex, usePageTab } from '@/lib/usePageTab';
 import { tabPath } from '@/lib/pageTabs';
-import { visibleSettingsGroups, type SettingsSectionId } from '@/features/settings/sections';
-import { SettingsNav, SettingsSectionSelect } from '@/features/settings/SettingsNav';
+import {
+  visibleSettingsGroups,
+  type SettingsGroup,
+  type SettingsSectionId,
+} from '@/features/settings/sections';
+import { SettingsBackLink, SettingsIndex, SettingsNav } from '@/features/settings/SettingsNav';
 import { DevicePanel } from '@/features/settings/DevicePanel';
 import {
   Button,
@@ -1138,6 +1142,51 @@ const LEGACY_HASH_SECTIONS = {
   '#corp-access': 'permissions',
 } as const satisfies Record<string, SettingsSectionId>;
 
+/**
+ * One line per section for the phone list, from settings already in memory —
+ * no network. A section with nothing cheap to say (Permissions, Alerts, Data
+ * & storage, Activity Log, FAQ) gets none.
+ */
+function usePhoneSummaries(): Partial<Record<SettingsSectionId, string>> {
+  const { t } = useTranslation();
+  const scale = useFontScale((state) => state.value);
+  const timeFormat = useTimeFormat((state) => state.value);
+  const singleKeyShortcuts = useSingleKeyShortcuts((state) => state.value);
+  const assumedMe = useAssumedMe((state) => state.value);
+  const assumedTe = useAssumedTe((state) => state.value);
+  const facility = useFacilityDefaults((state) => state.value.facility);
+  const hub = useMarketHub((state) => state.value);
+  const characterFilter = useDefaultCharacterFilter((state) => state.value);
+  const darkAfterDays = useDarkThreshold((state) => state.value);
+
+  return {
+    display: t('settings.summary.display', {
+      size: t(FONT_SCALE_LABEL_KEYS[scale]),
+      format: t(`settings.timeFormat.${timeFormat}`),
+    }),
+    shortcuts: t(singleKeyShortcuts ? 'settings.summary.on' : 'settings.summary.off'),
+    industry: t('settings.summary.industry', {
+      facility: FACILITY_PRESETS[facility].name,
+      me: assumedMe,
+      te: assumedTe,
+    }),
+    market: TRADE_HUBS.find((tradeHub) => tradeHub.id === hub)?.name,
+    characters:
+      characterFilter === 'current'
+        ? t('settings.summary.charactersCurrent')
+        : characterFilter === 'all'
+          ? t('settings.summary.charactersAll')
+          : t('settings.summary.charactersSome', { count: characterFilter.length }),
+    corporation: t('settings.summary.corporation', { count: darkAfterDays }),
+  };
+}
+
+/** `/settings` on a phone: the grouped list of sections. */
+function PhoneSettingsIndex({ groups }: { groups: readonly SettingsGroup[] }) {
+  const summaries = usePhoneSummaries();
+  return <SettingsIndex groups={groups} summaries={summaries} />;
+}
+
 export function Settings() {
   const { t } = useTranslation();
   const scale = useFontScale((state) => state.value);
@@ -1148,7 +1197,8 @@ export function Settings() {
   const setSingleKeyShortcuts = useSingleKeyShortcuts((state) => state.setValue);
   const { hash } = useLocation();
   const navigate = useNavigate();
-  const [section, setSection] = usePageTab(SETTINGS_TABS);
+  const [section] = usePageTab(SETTINGS_TABS);
+  const isIndex = useIsPageIndex(SETTINGS_TABS);
   const corpAccess = useCorpAccess();
   const groups = useMemo(
     () => visibleSettingsGroups({ corp: corpAccess.state === 'ready' }),
@@ -1162,12 +1212,19 @@ export function Settings() {
     navigate({ pathname: tabPath(SETTINGS_TABS, target) }, { replace: true });
   }, [hash, navigate]);
 
+  // The index waits out a legacy hash: the effect above is about to move on.
+  if (isIndex) {
+    return (
+      <div className="mx-auto max-w-6xl space-y-4">
+        <PageHeader title={t('settings.title')} />
+        <PhoneSettingsIndex groups={groups} />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader
-        title={t('settings.title')}
-        actions={<SettingsSectionSelect groups={groups} value={section} onChange={setSection} />}
-      />
+      <PageHeader title={t('settings.title')} actions={<SettingsBackLink />} />
       <div className="space-y-4 md:grid md:grid-cols-[11rem_minmax(0,1fr)] md:gap-6 md:space-y-0">
         <SettingsNav groups={groups} value={section} />
         <div className="min-w-0 space-y-4">
