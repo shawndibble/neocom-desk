@@ -50,7 +50,11 @@ for (const size of [
     );
     expect(truncated).toEqual([]);
 
-    const alerts = await page.getByText('Alerts', { exact: true }).first().boundingBox();
+    const alerts = await page
+      .locator('main')
+      .getByText('Alerts', { exact: true })
+      .first()
+      .boundingBox();
     const firstCard = await opens.first().boundingBox();
     expect(alerts!.y).toBeGreaterThan(firstCard!.y);
   });
@@ -67,7 +71,11 @@ for (const width of [1280, 1440]) {
     for (const box of await Promise.all((await opens.all()).map((l) => l.boundingBox()))) {
       cardsRight = Math.max(cardsRight, box!.x + box!.width);
     }
-    const alerts = await page.getByText('Alerts', { exact: true }).first().boundingBox();
+    const alerts = await page
+      .locator('main')
+      .getByText('Alerts', { exact: true })
+      .first()
+      .boundingBox();
     expect(alerts!.x).toBeGreaterThan(cardsRight);
   });
 }
