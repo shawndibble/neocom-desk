@@ -129,9 +129,13 @@ describe('FittingStartScreen', () => {
     const rifter = (
       await within(list).findByRole('heading', { name: 'Rifter' }, { timeout: 5000 })
     ).closest('section') as HTMLElement;
-    expect(await within(rifter).findByText('Kite')).toBeInTheDocument();
-    expect(within(rifter).getByText('PvP Rifter')).toBeInTheDocument();
-    expect(within(list).getByText('Armor Drake')).toBeInTheDocument();
+    // The saved and in-game rows resolve their hull names independently and
+    // asynchronously — the heading can land before either row does.
+    expect(await within(rifter).findByText('Kite', {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(
+      await within(rifter).findByText('PvP Rifter', {}, { timeout: 5000 })
+    ).toBeInTheDocument();
+    expect(await within(list).findByText('Armor Drake', {}, { timeout: 5000 })).toBeInTheDocument();
   });
 
   it('one search covers name and hull across both sources', async () => {

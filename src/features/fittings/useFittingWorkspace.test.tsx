@@ -279,6 +279,36 @@ describe('useFittingWorkspace saving (My Fittings)', () => {
     await waitFor(() => expect(view.result.current.workspace.fitting?.name).toBe(RIFTER.name));
     expect(view.result.current.workspace.savedId).toBeNull();
   });
+
+  it('saveAsNew stores a second record and leaves the one the Fitting was opened from untouched (#1747)', async () => {
+    const view = await renderAt(RIFTER);
+    await act(() => view.result.current.workspace.save());
+    const [original] = await db.fittings.toArray();
+    const originalCode = original!.code;
+
+    act(() => view.result.current.workspace.edit((f) => addModule(f, 'medium', 0, 438)));
+    await waitFor(() => expect(view.result.current.navigationType).toBe('PUSH'));
+
+    await act(() => view.result.current.workspace.saveAsNew('Rifter copy'));
+
+    const rows = await db.fittings.toArray();
+    expect(rows).toHaveLength(2);
+    const kept = rows.find((r) => r.id === original!.id)!;
+    expect(kept.code).toBe(originalCode);
+    const copy = rows.find((r) => r.id !== original!.id)!;
+    expect(copy.name).toBe('Rifter copy');
+    expect(copy.code).not.toBe(kept.code);
+    // Now editing the copy, not the original — on screen too.
+    expect(view.result.current.workspace.savedId).toBe(copy.id);
+    expect(view.result.current.workspace.fitting?.name).toBe('Rifter copy');
+  });
+
+  it('cannot saveAsNew without a Character', async () => {
+    useActiveCharacter.setState({ activeCharacterId: null });
+    const view = await renderAt(RIFTER);
+    await act(() => view.result.current.workspace.saveAsNew('Copy'));
+    expect(await db.fittings.count()).toBe(0);
+  });
 });
 
 describe('useFittingWorkspace — drones on Load', () => {
