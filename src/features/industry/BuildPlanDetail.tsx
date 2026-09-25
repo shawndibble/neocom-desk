@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
   TextInput,
+  Checkbox,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
@@ -1406,12 +1407,10 @@ export function BuildPlanDetail({
                 {activity === 'manufacturing' && (
                   <div className="flex flex-col gap-3 border-t border-line pt-3">
                     <span className="flex items-center gap-2 text-xs">
-                      <input
+                      <Checkbox
                         id="build-plan-include-reactions"
-                        type="checkbox"
                         checked={includeReactions}
                         onChange={(e) => toggleIncludeReactions(e.target.checked)}
-                        className="size-4 shrink-0 cursor-pointer accent-accent"
                       />
                       <label htmlFor="build-plan-include-reactions">
                         {t('industry.includeReactions')}

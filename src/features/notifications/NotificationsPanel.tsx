@@ -50,6 +50,7 @@ import {
   SelectTrigger,
   SelectValue,
   Caret,
+  Checkbox,
 } from '@/components/ui';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
 import { AllCharactersNotificationSection } from './AllCharactersNotificationSection';
@@ -503,15 +504,13 @@ export function NotificationsPanel() {
           </div>
         )}
         <label className="flex items-center gap-2 text-xs font-medium text-text">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={prefsValue.masterEnabled}
             onChange={() =>
               void setDeviceNotificationPrefs(
                 withMasterEnabled(prefsValue, !prefsValue.masterEnabled)
               )
             }
-            className="size-4 shrink-0 cursor-pointer accent-accent"
           />
           {t('settings.notifications.masterSwitchLabel')}
         </label>
@@ -527,8 +526,7 @@ export function NotificationsPanel() {
         */}
         <fieldset disabled={!prefsValue.masterEnabled} className="ml-6 space-y-2">
           <label className="flex items-center gap-2 text-xs text-text">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={isBrowserChannelEnabled(prefsValue) && !browserBlocked}
               disabled={browserBlocked}
               onChange={() =>
@@ -536,7 +534,6 @@ export function NotificationsPanel() {
                   withBrowserEnabled(prefsValue, !isBrowserChannelEnabled(prefsValue))
                 )
               }
-              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
             />
             {t('settings.notifications.browserChannelLabel')}
           </label>
@@ -544,15 +541,13 @@ export function NotificationsPanel() {
             {t('settings.notifications.browserChannelHint')}
           </p>
           <label className="flex items-center gap-2 text-xs text-text">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={isFeedChannelEnabled(prefsValue)}
               onChange={() =>
                 void setDeviceNotificationPrefs(
                   withFeedEnabled(prefsValue, !isFeedChannelEnabled(prefsValue))
                 )
               }
-              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed"
             />
             {t('settings.notifications.feedChannelLabel')}
           </label>
@@ -1033,8 +1028,7 @@ function ChannelCheckbox({
   const { t } = useTranslation();
   const label = t(`settings.notifications.toggleLabel.${channel}`, { event: eventLabel });
   const checkbox = (
-    <input
-      type="checkbox"
+    <Checkbox
       checked={enabled && checked}
       onChange={onToggle}
       // Not `disabled` — same reasoning as MobileOpportunityList (keeps the
@@ -1045,7 +1039,7 @@ function ChannelCheckbox({
       }}
       aria-disabled={enabled ? undefined : true}
       aria-label={label}
-      className={`size-4 shrink-0 accent-accent ${enabled ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+      className={enabled ? undefined : 'cursor-not-allowed! opacity-50'}
     />
   );
   if (enabled) return checkbox;

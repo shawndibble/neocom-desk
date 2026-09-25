@@ -20,6 +20,7 @@ import {
   Tabs,
   TextInput,
   type DataTableColumn,
+  Checkbox,
 } from '@/components/ui';
 import type { LocalSettingStore } from '@/lib/useLocalSetting';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
@@ -959,11 +960,9 @@ function DefaultsPanel() {
 
         <div className="space-y-1.5 border-t border-line pt-3">
           <label className="flex items-center gap-2 text-xs font-semibold">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={includeBlueprintCost}
               onChange={() => void setIncludeBlueprintCost(!includeBlueprintCost)}
-              className="size-4 shrink-0 cursor-pointer accent-accent"
             />
             {t('settings.includeBlueprintCostLabel')}
           </label>
@@ -996,11 +995,9 @@ function DefaultsPanel() {
 
         <div className="space-y-1.5 border-t border-line pt-3">
           <label className="flex items-center gap-2 text-xs font-semibold">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={spExtractionEnabled}
               onChange={() => void setSpExtractionEnabled(!spExtractionEnabled)}
-              className="size-4 shrink-0 cursor-pointer accent-accent"
             />
             {t('settings.spExtractionEnabledLabel')}
           </label>
@@ -1148,11 +1145,9 @@ export function Settings() {
                 would make unreadable constrains itself, here. */}
               <div className="mb-2 max-w-md space-y-1.5">
                 <label className="flex items-center gap-2 text-xs font-semibold">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={singleKeyShortcuts}
                     onChange={() => void setSingleKeyShortcuts(!singleKeyShortcuts)}
-                    className="size-4 shrink-0 cursor-pointer accent-accent"
                   />
                   {t('shortcuts.enabledLabel')}
                 </label>

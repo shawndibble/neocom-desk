@@ -34,6 +34,7 @@ import {
   SelectValue,
   TextInput,
   buttonClassName,
+  Checkbox,
 } from '@/components/ui';
 import { TRADE_HUBS } from '@/market/hubs';
 import type { MarketSourcing } from './marketSourcingPref';
@@ -315,11 +316,10 @@ export function HowYouPlay(props: HowYouPlayProps) {
         */}
         {props.alts && (
           <label className="mt-auto flex items-start gap-2 pt-1 text-xs text-text">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={props.alts.withAlts}
               onChange={props.alts.onToggle}
-              className="mt-0.5 size-4 shrink-0 cursor-pointer accent-accent"
+              className="mt-0.5"
             />
             <span>
               <span className="font-medium">{t('piAdvisor.altColoniesLabel')}</span>

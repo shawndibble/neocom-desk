@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { SelectionState } from './assetSelection';
+import { Checkbox } from '@/components/ui';
 
 interface SelectionCheckboxProps {
   state: SelectionState;
@@ -22,15 +23,14 @@ export function SelectionCheckbox({
   }, [state]);
 
   return (
-    <input
+    <Checkbox
       ref={ref}
-      type="checkbox"
       checked={state === 'checked'}
       disabled={disabled}
       onChange={onToggle}
       onClick={(e) => e.stopPropagation()}
       aria-label={label}
-      className="size-4 shrink-0 cursor-pointer accent-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+      className="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
     />
   );
 }

@@ -34,6 +34,7 @@ import {
   Panel,
   TextInput,
   Tooltip,
+  Checkbox,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { formatIsk } from '@/lib/isk';
@@ -369,12 +370,10 @@ function PlanRow({
         </button>
       )}
       {compareMode && (
-        <input
-          type="checkbox"
+        <Checkbox
           checked={compareSelected}
           onChange={() => onToggleCompareSelected(plan.id)}
           aria-label={t('industry.compareSelectFor', { name: plan.name })}
-          className="size-4 shrink-0 cursor-pointer accent-accent"
         />
       )}
       {renaming ? (
@@ -487,15 +486,13 @@ function GroupHeader({
           collapsed group's members are unreachable without this — it selects
           every member at once rather than making the pilot expand first. */}
       {compareMode && (
-        <input
-          type="checkbox"
+        <Checkbox
           checked={membersSelected === 'all'}
           ref={(el) => {
             if (el) el.indeterminate = membersSelected === 'some';
           }}
           onChange={() => onToggleAllMembers(membersSelected !== 'all')}
           aria-label={t('industry.selectGroupMembers', { name: group.name })}
-          className="size-4 shrink-0 cursor-pointer accent-accent"
         />
       )}
       <IconButton

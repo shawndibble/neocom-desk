@@ -28,6 +28,7 @@ import {
   Spinner,
   StatChip,
   type DataTableColumn,
+  Checkbox,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { formatDuration } from '@/lib/duration';
@@ -246,14 +247,12 @@ export function OpportunitiesPanel({
       header: '',
       className: 'w-8',
       render: (row) => (
-        <input
-          type="checkbox"
+        <Checkbox
           checked={selectedIds.has(row.candidate.id)}
           onChange={() => toggleSelected(row.candidate.id)}
           aria-label={t('industry.opportunitiesSelectFor', {
             name: row.candidate.catalogEntry.productName,
           })}
-          className="size-4 shrink-0 cursor-pointer accent-accent"
         />
       ),
     },
