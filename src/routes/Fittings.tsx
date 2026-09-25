@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FITTING_EDIT_PATH, FITTINGS_PATH } from '@/features/fittings/fittingRoutes';
+import { fittingsRedirect } from '@/features/fittings/fittingRoutes';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { formatIskCompact } from '@/lib/isk';
@@ -97,14 +97,8 @@ const FINE_POINTER_QUERY = '(hover: hover) and (pointer: fine)';
  */
 export function Fittings() {
   const { pathname, search } = useLocation();
-  const hasCode = (new URLSearchParams(search).get('f') ?? '') !== '';
-  const path = pathname.replace(/\/$/, '');
-  // Every Share Link ever copied is `/fittings?f=`; an open Fitting lives at
-  // its own path, and the editor's path with no Fitting is just the library.
-  if (path === FITTINGS_PATH && hasCode)
-    return <Navigate to={{ pathname: FITTING_EDIT_PATH, search }} replace />;
-  if (path === FITTING_EDIT_PATH && !hasCode) return <Navigate to={FITTINGS_PATH} replace />;
-  return <FittingsPage />;
+  const redirectTo = fittingsRedirect(pathname, search);
+  return redirectTo === null ? <FittingsPage /> : <Navigate to={redirectTo} replace />;
 }
 
 function FittingsPage() {
