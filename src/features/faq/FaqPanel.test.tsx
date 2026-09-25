@@ -60,6 +60,8 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.loyaltyLpValue': /ISK-per-LP value/i,
   'sync.fittingDamageProfiles': /fitting damage profiles you made/i,
   'sync.fittingDamageProfileId': /which one fittings are measured against/i,
+  'sync.fittingTargetProfiles': /fitting target profiles you made/i,
+  'sync.fittingTargetProfileId': /which one applied DPS is worked out against/i,
   'sync.skillCloneStates': /Alpha or Omega/i,
   'sync.miningTaxManualMoonOreTypeIds': /ore types you tagged/i,
   'sync.miningTaxManualIgnoredTypeIds': /ore types you tagged/i,

@@ -4,6 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import wasmInit, { calculate } from '@eveshipfit/dogma-engine';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import { extractFittingStats, extractModuleResult, extractOffense } from '@/engine/fittings/stats';
+import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
 import type { Fitting } from '@/engine/fittings/types';
 
@@ -42,6 +43,9 @@ const DRONE_DAMAGE_AMPLIFIER_II = 4405;
 const WARRIOR_II = 2488;
 const RIFTER = 587;
 const REACTIVE_ARMOR_HARDENER = 4403;
+const CARACAL = 621;
+const HEAVY_MISSILE_LAUNCHER_II = 2410;
+const SCOURGE_HEAVY_MISSILE = 209;
 
 const PARTIAL_SKILLS = new Map([
   [3332, 3], // Gallente Cruiser
@@ -275,6 +279,74 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(rah.adaptedResonances?.emResonance).toBeCloseTo(0.4, 4);
     expect(rah.adaptedResonances?.thermalResonance).toBeCloseTo(1, 4);
     expect(extractModuleResult(calculation.items[1])).not.toHaveProperty('adaptedResonances');
+  });
+
+  it('reads applied-DPS inputs: running turrets, loaded launchers, launched drones only', () => {
+    const vexor = vexorNavyIssueFit();
+    vexor.drones = [{ typeId: WARRIOR_II, quantity: 5, state: 'active' }];
+    // Drone Avionics (3437) V adds 5 km a level to the 20 km base.
+    const vexorFit = fittingToDogmaFit(vexor, buildAllVProfile([...ALL_TEST_SKILL_IDS, 3437]));
+    const vexorCalc = calculate(vexorFit);
+    const vexorInputs = extractAppliedDpsInputs(
+      vexorFit.items,
+      vexorCalc.items,
+      vexorCalc.character.attributes
+    );
+    expect(vexorInputs.weapons.map((w) => w.kind)).toEqual(['turret', 'turret', 'turret', 'drone']);
+    const [blaster, , , warriors] = vexorInputs.weapons;
+    expect(blaster).toMatchObject({ optimal: expect.any(Number), falloff: expect.any(Number) });
+    if (blaster.kind !== 'turret' || warriors.kind !== 'drone') throw new Error('unexpected kinds');
+    expect(blaster.dps).toBeGreaterThan(0);
+    expect(blaster.tracking).toBeGreaterThan(0);
+    expect(blaster.optimalSigRadius).toBe(40000);
+    expect(warriors.speed).toBeGreaterThan(0);
+    expect(warriors.optimalSigRadius).toBe(25);
+    // The Warriors' DPS reconciles with the ship-level drone DPS the engine reports.
+    expect(warriors.dps).toBeCloseTo(vexorCalc.ship.attributes.get(-14)?.value ?? 0, 3);
+    // Control range is a character attribute, not a ship one.
+    expect(vexorInputs.droneControlRange).toBe(45000);
+
+    const caracal: Fitting = {
+      name: 'Integration Test Caracal',
+      shipTypeId: CARACAL,
+      modules: [
+        {
+          slot: 'high',
+          slotIndex: 0,
+          typeId: HEAVY_MISSILE_LAUNCHER_II,
+          state: 'active',
+          chargeTypeId: SCOURGE_HEAVY_MISSILE,
+        },
+        {
+          slot: 'high',
+          slotIndex: 1,
+          typeId: HEAVY_MISSILE_LAUNCHER_II,
+          state: 'online',
+          chargeTypeId: SCOURGE_HEAVY_MISSILE,
+        },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const caracalFit = fittingToDogmaFit(caracal, buildPilotProfile(new Map(), []));
+    const caracalCalc = calculate(caracalFit);
+    const caracalInputs = extractAppliedDpsInputs(
+      caracalFit.items,
+      caracalCalc.items,
+      caracalCalc.character.attributes
+    );
+    // Pinned from a direct run of the engine (2026-09-24), no skills.
+    expect(caracalInputs.weapons).toEqual([
+      {
+        kind: 'missile',
+        dps: expect.closeTo(13.07, 2),
+        range: expect.closeTo(4730 * 6.5, 0),
+        explosionRadius: expect.closeTo(140, 3),
+        explosionVelocity: expect.closeTo(85, 3),
+        damageReductionFactor: expect.closeTo(0.682, 3),
+      },
+    ]);
+    expect(caracalInputs.droneControlRange).toBe(20000);
   });
 });
 

@@ -36,6 +36,8 @@ import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
 import { catalogueTypeName, useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
 import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
 import { useModuleVariations } from '@/features/fittings/useModuleVariations';
+import { useOverlayFitting } from '@/features/fittings/useOverlayFitting';
+import { useTargetProfiles } from '@/features/fittings/targetProfiles';
 
 /**
  * The Fittings section: paste EFT to Load a Fitting, then edit it in the List
@@ -175,6 +177,12 @@ export function Fittings() {
     edit((f) => swapModuleType(f, moduleSlot.slot, moduleSlot.slotIndex, typeId));
   }
   const statsInSheet = view === 'ring' && isPhone;
+  const targetProfiles = useTargetProfiles();
+  const overlay = useOverlayFitting({
+    characterId: activeCharacterId,
+    profile: workspace.profile,
+    damageProfile: workspace.damageProfiles.selected,
+  });
   const statsSections = (
     <FittingStatsSections
       stats={stats}
@@ -183,6 +191,8 @@ export function Fittings() {
       price={workspace.price}
       typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
       damageProfiles={workspace.damageProfiles}
+      targetProfiles={targetProfiles}
+      overlay={overlay}
     />
   );
 

@@ -14,6 +14,7 @@ import {
   extractOverheatedStats,
   type OffenseItem,
 } from '@/engine/fittings/stats';
+import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import {
   ITEM_DOGMA_ATTRIBUTE,
   type Fitting,
@@ -232,6 +233,12 @@ export async function computeFittingStats(
     ? extractOverheatedStats(overheatedCalculation.ship.attributes)
     : null;
 
+  const applied = extractAppliedDpsInputs(
+    dogmaFit.items,
+    calculation.items,
+    calculation.character.attributes
+  );
+
   return {
     ...baseStats,
     calibrationUsed,
@@ -239,6 +246,7 @@ export async function computeFittingStats(
     modules,
     offense,
     overheated,
+    applied,
   };
 }
 
