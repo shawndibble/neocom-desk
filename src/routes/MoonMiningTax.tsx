@@ -56,10 +56,7 @@ export function MoonMiningTax() {
       label={t('miningTax.title')}
       value={tab}
       onChange={(id) => setTab(id as typeof tab)}
-      tabs={[
-        { id: 'overview', label: t('miningTax.overviewTab') },
-        { id: 'tax', label: t('miningTax.taxTab') },
-      ]}
+      tabs={MINING_TABS.tabs.map((item) => ({ id: item.id, label: t(item.labelKey) }))}
     />
   );
 
