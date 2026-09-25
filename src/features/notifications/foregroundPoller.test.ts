@@ -305,6 +305,7 @@ function baseDeps(overrides: Partial<PollDependencies> & DomainOverrides = {}): 
     notify: vi.fn(async () => {}),
     recordToFeed: vi.fn(async () => {}),
     alreadyDelivered: vi.fn(async () => false),
+    markDelivered: vi.fn(async () => {}),
     retractFromFeed: vi.fn(async () => {}),
     uploadProjection: vi.fn(async () => {}),
     ...rest,
@@ -1885,6 +1886,38 @@ describe('runForegroundPoll browser suppression against pushed occurrences (issu
     await runForegroundPoll(deps);
     expect(deps.recordToFeed).toHaveBeenCalledTimes(1);
     expect(deps.notify).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks every toasted occurrence as delivered on this device, after notifying', async () => {
+    const order: string[] = [];
+    const deps = firingDeps({
+      notify: vi.fn(async () => {
+        order.push('notify');
+      }),
+      markDelivered: vi.fn(async () => {
+        order.push('mark');
+      }),
+    });
+    await runForegroundPoll(deps);
+    expect(deps.markDelivered).toHaveBeenCalledWith([
+      occurrenceKey(
+        {
+          eventId: 'characterNotTraining',
+          characterId: CHAR.characterId,
+          skillId: null,
+          level: null,
+          finishMs: null,
+        },
+        deps.now()
+      ),
+    ]);
+    expect(order).toEqual(['notify', 'mark']);
+  });
+
+  it('marks nothing when every occurrence was suppressed', async () => {
+    const deps = firingDeps({ alreadyDelivered: async () => true });
+    await runForegroundPoll(deps);
+    expect(deps.markDelivered).not.toHaveBeenCalled();
   });
 });
 

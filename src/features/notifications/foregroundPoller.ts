@@ -36,7 +36,7 @@ import {
   isBrowserChannelEnabled,
   isFeedChannelEnabled,
 } from './preferences';
-import { feedHasOccurrence } from './feed';
+import { feedSuppressesToast, markFeedNotifiedHere } from './feed';
 import { dismissFeedKeysAndSync, recordFeedEntryAndSync } from './feedSync';
 import {
   isEventEnabledFor,
@@ -102,14 +102,17 @@ export interface PollDependencies {
   ) => Promise<void>;
   recordToFeed: (fire: AnyNotificationFire, character: CharacterRef) => Promise<void>;
   /**
-   * Whether a Notification Feed row already exists for this Occurrence Key
-   * (issue #360) — evidence that Web Push, or another device/tab syncing the
-   * feed, already delivered this occurrence. Independent of this device's
-   * feed channel/event preferences: the row can exist purely because push
-   * wrote it, regardless of whether this device would itself record to the
-   * feed for that event.
+   * Whether this device should skip its own notification for this Occurrence
+   * Key (issue #360): it already notified for it (a Web Push, or an earlier
+   * poll's toast), the row was dismissed on any device, or the row is stale
+   * (`feed.rowSuppressesToast`). A row another device synced in is *not*
+   * enough on its own — that device's toast never reached this one.
+   * Independent of this device's feed channel/event preferences: the row can
+   * exist purely because push wrote it.
    */
   alreadyDelivered: (occurrenceKey: string) => Promise<boolean>;
+  /** Records that this device just notified for these Occurrence Keys — what `alreadyDelivered` reads back. */
+  markDelivered: (occurrenceKeys: readonly string[]) => Promise<void>;
   /**
    * Clears Notification Feed rows for occurrences this poll proved never
    * happened (`pollDomains.ts`'s `disproven`). A Scheduled Push fires
@@ -425,6 +428,11 @@ async function runForegroundPollOnce(deps: PollDependencies): Promise<void> {
       const title = group.count > 1 ? groupedTitle(group.title, group.count) : group.title;
       await deps.notify(group.fire, character, { title, body: group.body });
     }
+    // Every browser fire went out, grouped or not. Marked after the feed loop
+    // above wrote their rows, so there is a row to mark.
+    if (browserFires.length > 0) {
+      await deps.markDelivered(browserFires.map((fire) => occurrenceKey(fire, deps.now())));
+    }
   }
 
   // A retraction cannot address a row this poll just wrote: a retracted key
@@ -561,7 +569,8 @@ export function liveDependencies(): PollDependencies {
     permission: () => readNotificationPermission(),
     notify: sendBrowserNotification,
     recordToFeed: recordFeedNotification,
-    alreadyDelivered: feedHasOccurrence,
+    alreadyDelivered: (key) => feedSuppressesToast(key, Date.now()),
+    markDelivered: (keys) => markFeedNotifiedHere(keys, Date.now()),
     retractFromFeed: dismissFeedKeysAndSync,
     uploadProjection: uploadProjectionRows,
   };

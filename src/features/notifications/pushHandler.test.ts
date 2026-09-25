@@ -151,7 +151,7 @@ describe('handlePush', () => {
     expect(options.data).toEqual({ url: '/industry' });
   });
 
-  it('records a feed entry keyed by the Occurrence Key', async () => {
+  it('records a feed entry keyed by the Occurrence Key, marked as notified on this device', async () => {
     const e = env();
     const now = 1_700_000_000_000;
     await handlePush(e, VALID_RAW, now);
@@ -163,6 +163,7 @@ describe('handlePush', () => {
       title: VALID_PAYLOAD.title,
       body: VALID_PAYLOAD.body,
       firedAt: now,
+      notifiedHereAt: now,
     });
   });
 
