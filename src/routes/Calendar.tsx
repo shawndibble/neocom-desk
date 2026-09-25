@@ -429,7 +429,7 @@ export function Calendar() {
                 padded={false}
                 title={t('calendar.map.title')}
                 actions={periodControls}
-                className="w-full min-w-0 shrink-0 md:w-[38rem]"
+                className="w-full min-w-0 md:w-[38rem] xl:shrink-0"
               >
                 <CalendarMap
                   days={days}
