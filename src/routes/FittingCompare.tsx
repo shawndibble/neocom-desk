@@ -1,11 +1,15 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import {
   Button,
   EmptyState,
   IconButton,
+  MenuItem,
   PageHeader,
   Panel,
+  RowActionsMenu,
+  RowMoreActions,
   Spinner,
   Checkbox,
 } from '@/components/ui';
@@ -23,6 +27,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useCompareCodes, MAX_COMPARE_SLOTS } from '@/features/fittings/compareUrl';
 import { FittingComparePicker } from '@/features/fittings/FittingComparePicker';
+import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { FittingCompareModulesSummary } from '@/features/fittings/FittingCompareModulesSummary';
 import {
   FittingCompareTable,
@@ -47,6 +52,7 @@ import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
  */
 export function FittingCompare() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [codes, setCodes] = useCompareCodes();
   const slots = useCompareFittings(codes);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
@@ -159,39 +165,60 @@ export function FittingCompare() {
     // Whole-fit CPU/PG/calibration budget — additional to "Can fly" (a skills check), not a
     // replacement: a fit can fly but not fit (over budget), and the two must read distinctly.
     const overage = fitStats ? firstResourceOverage(fitStats) : null;
+    const name = slot.fitting?.name ?? '';
+    const code = codes[index];
+    // A column's own actions, on right-click or its ⋮ (there is no baseline column to promote).
+    const items = (
+      <>
+        <MenuItem
+          disabled={code === undefined}
+          onSelect={() => code && navigate(fittingEditLocation(code))}
+        >
+          {t('fittings.compare.openInEditor')}
+        </MenuItem>
+        <MenuItem className="text-danger" onSelect={() => removeSlot(index)}>
+          {t('fittings.compare.remove')}
+        </MenuItem>
+      </>
+    );
     return (
-      <div className="flex flex-col items-end gap-1">
-        <span className="max-w-40 truncate font-medium text-text">{slot.fitting?.name}</span>
-        {stats.failed[index] && (
-          <span className="text-danger">{t('fittings.compare.statsFailed')}</span>
-        )}
-        {fitStats && (
-          <span className={overage ? 'text-danger' : 'text-success'}>
-            {overage
-              ? t('fittings.compare.overBy', {
-                  resource: t(`fittings.list.${overage.resource}`),
-                  amount: overage.amount.toFixed(0),
-                })
-              : t('fittings.compare.fitsYes')}
-          </span>
-        )}
-        {flies !== null && flies !== undefined && (
-          <span className={flies ? 'text-success' : 'text-danger'}>
-            {flies ? t('fittings.compare.canFlyYes') : t('fittings.compare.canFlyNo')}
-          </span>
-        )}
-        {canFly.failed[index] && (
-          <span className="text-text-dim">{t('fittings.compare.canFlyUnknown')}</span>
-        )}
-        {slot.fitting && characterOptions.length > 1 && (
-          <CompareCanFlyByCharacter fitting={slot.fitting} characters={characterOptions} />
-        )}
-        <IconButton
-          icon={<Icon.Close />}
-          label={t('fittings.compare.remove')}
-          onClick={() => removeSlot(index)}
-        />
-      </div>
+      <RowActionsMenu name={name} items={items}>
+        <div className="flex flex-col items-end gap-1">
+          <span className="max-w-40 truncate font-medium text-text">{slot.fitting?.name}</span>
+          {stats.failed[index] && (
+            <span className="text-danger">{t('fittings.compare.statsFailed')}</span>
+          )}
+          {fitStats && (
+            <span className={overage ? 'text-danger' : 'text-success'}>
+              {overage
+                ? t('fittings.compare.overBy', {
+                    resource: t(`fittings.list.${overage.resource}`),
+                    amount: overage.amount.toFixed(0),
+                  })
+                : t('fittings.compare.fitsYes')}
+            </span>
+          )}
+          {flies !== null && flies !== undefined && (
+            <span className={flies ? 'text-success' : 'text-danger'}>
+              {flies ? t('fittings.compare.canFlyYes') : t('fittings.compare.canFlyNo')}
+            </span>
+          )}
+          {canFly.failed[index] && (
+            <span className="text-text-dim">{t('fittings.compare.canFlyUnknown')}</span>
+          )}
+          {slot.fitting && characterOptions.length > 1 && (
+            <CompareCanFlyByCharacter fitting={slot.fitting} characters={characterOptions} />
+          )}
+          <div className="flex items-center gap-1">
+            <RowMoreActions />
+            <IconButton
+              icon={<Icon.Close />}
+              label={t('fittings.compare.remove')}
+              onClick={() => removeSlot(index)}
+            />
+          </div>
+        </div>
+      </RowActionsMenu>
     );
   }
 

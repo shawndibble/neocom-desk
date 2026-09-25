@@ -410,14 +410,13 @@ function FittingsPage() {
       });
       return;
     }
-    if (target.kind === 'drones' || slotCounts === null) return;
-    const { rack, typeId } = { rack: payload.rack, typeId: payload.typeId };
-    if (rack !== target.rack) return;
-    fitAt(
-      rack,
-      target.kind === 'slot' ? target.index : firstFreeSlotIndex(fitting!, rack, slotCounts[rack]),
-      typeId
-    );
+    const { rack, typeId } = payload;
+    if (target.kind === 'drones' || rack !== target.rack || fitting === null || slotCounts === null)
+      return;
+    // A rack heading takes it into the rack's first free slot.
+    const slotIndex =
+      target.kind === 'slot' ? target.index : firstFreeSlotIndex(fitting, rack, slotCounts[rack]);
+    fitAt(rack, slotIndex, typeId);
   }
 
   function selectSlot(slot: FittingSlotKind, slotIndex: number) {

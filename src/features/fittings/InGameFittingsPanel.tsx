@@ -6,14 +6,25 @@
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, DataAgeBadge, EmptyState, IconButton, Panel, Spinner } from '@/components/ui';
+import {
+  Button,
+  DataAgeBadge,
+  EmptyState,
+  IconButton,
+  Panel,
+  RowActionsMenu,
+  RowMoreActions,
+  Spinner,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { groupByHull, type MyFittingRow } from '@/engine/fittings/myFittings';
 import type { CharacterFitting } from '@/esi/endpoints';
-import { useInGameFittings } from './useLibraryFittings';
+import { FittingExportNotice } from './FittingExportMenu';
+import { useInGameFittings, type LibraryRow } from './useLibraryFittings';
+import { useLibraryRowActions } from './useLibraryRowActions';
 
 interface InGameFittingsPanelProps {
   characterId: number;
@@ -23,6 +34,13 @@ interface InGameFittingsPanelProps {
 export function InGameFittingsPanel({ characterId, onOpen }: InGameFittingsPanelProps) {
   const { t } = useTranslation();
   const { granted, result, hullNames, loading, error, refresh } = useInGameFittings(characterId);
+
+  const rowActions = useLibraryRowActions({
+    characterId,
+    onOpen: (row) => {
+      if (row.source === 'inGame') onOpen(esiFittingToFitting(row.inGame));
+    },
+  });
 
   const fittings = result?.data ?? [];
   const groups = useMemo(() => {
@@ -78,23 +96,35 @@ export function InGameFittingsPanel({ characterId, onOpen }: InGameFittingsPanel
             <div key={group.hull ?? ''}>
               <p className="mb-1 text-xs font-semibold text-text-dim uppercase">{group.hull}</p>
               <ul className="space-y-1">
-                {group.rows.map((row) => (
-                  <li key={row.id} className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm">{row.name}</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => onOpen(esiFittingToFitting(row.fitting))}
+                {group.rows.map((row) => {
+                  const libraryRow: LibraryRow = { ...row, source: 'inGame', inGame: row.fitting };
+                  return (
+                    <RowActionsMenu
+                      key={row.id}
+                      name={row.name}
+                      items={rowActions.itemsFor(libraryRow)}
                     >
-                      {t('fittings.inGame.openAction')}
-                    </Button>
-                  </li>
-                ))}
+                      <li className="flex items-center justify-between gap-2">
+                        <span className="min-w-0 flex-1 truncate text-sm">{row.name}</span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onOpen(esiFittingToFitting(row.fitting))}
+                        >
+                          {t('fittings.inGame.openAction')}
+                        </Button>
+                        <RowMoreActions />
+                      </li>
+                    </RowActionsMenu>
+                  );
+                })}
               </ul>
             </div>
           ))}
         </div>
       )}
+      <FittingExportNotice notice={rowActions.notice} />
+      {rowActions.dialog}
     </Panel>
   );
 }

@@ -782,7 +782,8 @@
         "warpSpeed": "Warp speed (AU/s)",
         "priceSell": "Price (sell)",
         "priceBuy": "Price (buy)"
-      }
+      },
+      "openInEditor": "Open in the editor"
     },
     "item": {
       "slot": "{{rack}} {{index}}",
@@ -827,6 +828,19 @@
       "loadRanOut_one": "Loaded {{name}} into {{loaded}} of {{count}} module — cargo ran out.",
       "loadRanOut_other": "Loaded {{name}} into {{loaded}} of {{count}} modules — cargo ran out.",
       "loadNone": "Nothing fitted takes {{name}}."
+    },
+    "libraryMenu": {
+      "open": "Open",
+      "compare": "Compare with…",
+      "duplicate": "Duplicate",
+      "copyEft": "Copy EFT",
+      "copyShareLink": "Copy Share Link",
+      "saveToEve": "Save to EVE…",
+      "rename": "Rename…",
+      "delete": "Delete…",
+      "unreadable": "This saved fitting can no longer be read.",
+      "duplicated": "Saved a copy of {{name}} to My Fittings.",
+      "savedToEve": "Saved to EVE."
     }
   },
   "skills": {
@@ -2831,7 +2845,8 @@
       "action": "Back to all locations"
     },
     "nodeBadge_one": "{{count}} item · {{value}} ISK",
-    "nodeBadge_other": "{{count}} items · {{value}} ISK"
+    "nodeBadge_other": "{{count}} items · {{value}} ISK",
+    "openInFittings": "Open in Fittings"
   },
   "mail": {
     "title": "Mail",

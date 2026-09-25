@@ -162,7 +162,7 @@ describe('FittingStartScreen', () => {
 
   it('previews the picked row and Open hands a saved one to openSaved', async () => {
     const workspace = renderScreen();
-    await userEvent.click(await screen.findByRole('button', { name: /Kite/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /^Kite/ }));
     expect(screen.getByText('preview of Kite')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Open fitting' }));
@@ -171,7 +171,7 @@ describe('FittingStartScreen', () => {
 
   it('Open hands an In-game one to openLoaded, mapped', async () => {
     const workspace = renderScreen();
-    await userEvent.click(await screen.findByRole('button', { name: /Armor Drake/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /^Armor Drake/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Open fitting' }));
     expect(workspace.openLoaded).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -180,20 +180,39 @@ describe('FittingStartScreen', () => {
     );
   });
 
+  it('gives each row a menu: Open, and Rename / Delete for a saved one only', async () => {
+    const workspace = renderScreen();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'More actions for Armor Drake' })
+    );
+    expect(await screen.findByRole('menuitem', { name: 'Copy EFT' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Rename…' })).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Kite' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Rename…' }));
+    expect(await screen.findByLabelText('Fitting name')).toHaveValue('Kite');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Kite' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Open' }));
+    expect(workspace.openSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }));
+  });
+
   it('Compare goes to the compare page with the fitting in ?f=', async () => {
     renderScreen();
-    await userEvent.click(await screen.findByRole('button', { name: /Kite/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /^Kite/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Compare' }));
     expect(navigateMock).toHaveBeenCalledWith('/fittings/compare?f=1.abc');
   });
 
   it('keeps edited notes on a saved fitting, and only there', async () => {
     renderScreen();
-    await userEvent.click(await screen.findByRole('button', { name: /Kite/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /^Kite/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Save notes' }));
     await vi.waitFor(async () => expect((await db.fittings.get('r1'))?.notes).toBe('Kite first.'));
 
-    await userEvent.click(screen.getByRole('button', { name: /Armor Drake/ }));
+    await userEvent.click(screen.getByRole('button', { name: /^Armor Drake/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Save notes' }));
     expect(await db.fittings.count()).toBe(1);
   });
@@ -213,7 +232,7 @@ describe('FittingStartScreen', () => {
 
   it('Enter on a row opens it and the arrow keys walk the list', async () => {
     const workspace = renderScreen();
-    await userEvent.click(await screen.findByRole('button', { name: /Armor Drake/ }));
+    await userEvent.click(await screen.findByRole('button', { name: /^Armor Drake/ }));
     await userEvent.keyboard('{ArrowDown}');
     expect(screen.getByText('preview of Kite')).toBeInTheDocument();
     await userEvent.keyboard('{Enter}');
@@ -222,10 +241,10 @@ describe('FittingStartScreen', () => {
 
   it('tags In-game rows as well as saved ones, so a fitting in both shows which is which', async () => {
     renderScreen();
-    const inGameRow = await screen.findByRole('button', { name: /PvP Rifter/ });
+    const inGameRow = await screen.findByRole('button', { name: /^PvP Rifter/ });
     expect(within(inGameRow).getByText('In-game')).toBeInTheDocument();
     expect(
-      within(await screen.findByRole('button', { name: /Kite/ })).getByText('Saved')
+      within(await screen.findByRole('button', { name: /^Kite/ })).getByText('Saved')
     ).toBeInTheDocument();
   });
 
