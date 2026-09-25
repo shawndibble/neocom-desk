@@ -37,7 +37,7 @@ import { InfoTooltip, IskAmount } from '@/components/ui';
 import { formatIsk } from '@/lib/isk';
 import type { BlindSpot } from './blindSpotModel';
 import type { TotalColonyEarnings } from './colonyEarningsModel';
-import type { Worklist } from './worklistModel';
+import { FAULT_VERBS, type Worklist } from './worklistModel';
 
 export interface AdvisorSummaryProps {
   list: Worklist;
@@ -95,10 +95,8 @@ export function AdvisorSummary({ list, earnings, spots, controls }: AdvisorSumma
   const { t } = useTranslation();
   const { tuning, rebuilds } = list;
 
-  // `remove` and `haul` are faults: something is running that nothing feeds,
-  // or the colony has stopped because it filled up. `add` and `swap` are
-  // opportunities — worth doing, but not wrong.
-  const faults = tuning.filter((row) => row.verb === 'remove' || row.verb === 'haul');
+  // `add` and `swap` are opportunities, not faults — see `FAULT_VERBS`.
+  const faults = tuning.filter((row) => FAULT_VERBS.has(row.verb));
   const gains = tuning.length - faults.length;
   const faultPlanets = new Set(faults.map((row) => row.planetId)).size;
   const tuningIsk = tuning.reduce((sum, row) => sum + (row.iskPerHour ?? 0), 0);
@@ -148,6 +146,16 @@ export function AdvisorSummary({ list, earnings, spots, controls }: AdvisorSumma
               </span>
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
+              {faults
+                .filter((row) => row.verb === 'stopped')
+                .map((row) => (
+                  <Chip key={row.key} tone="warn">
+                    {t('piAdvisor.summaryChipStopped', {
+                      name: row.planetName ?? t('pi.planetLabel', { id: row.planetId }),
+                      duration: row.hoursStopped !== undefined ? span(row.hoursStopped, t) : '',
+                    })}
+                  </Chip>
+                ))}
               {faults
                 .filter((row) => row.verb === 'haul')
                 .map((row) => (

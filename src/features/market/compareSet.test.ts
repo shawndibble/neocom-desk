@@ -108,4 +108,31 @@ describe('useCompareSet', () => {
     expect(useCompareSet.getState().view).toBe('attributes');
     expect(useCompareSet.getState().openRequest).toBe(before);
   });
+
+  it('addMany returns the typeIds it actually added, skipping ones already present', () => {
+    useCompareSet.getState().add({ typeId: 34, itemName: 'Tritanium' });
+    const added = useCompareSet.getState().addMany([
+      { typeId: 34, itemName: 'Tritanium' },
+      { typeId: 35, itemName: 'Pyerite' },
+      { typeId: 35, itemName: 'Pyerite' },
+    ]);
+    expect(added).toEqual([35]);
+  });
+
+  it('removeMany removes only the given typeIds, leaving the rest', () => {
+    useCompareSet.getState().addMany([
+      { typeId: 34, itemName: 'Tritanium' },
+      { typeId: 35, itemName: 'Pyerite' },
+      { typeId: 36, itemName: 'Mexallon' },
+    ]);
+    useCompareSet.getState().removeMany([35, 36]);
+    expect(useCompareSet.getState().items).toEqual([{ typeId: 34, itemName: 'Tritanium' }]);
+  });
+
+  it('removeMany resets view/openRequest when it empties the set', () => {
+    useCompareSet.getState().add({ typeId: 34, itemName: 'Tritanium' });
+    useCompareSet.getState().openIn('attributes');
+    useCompareSet.getState().removeMany([34]);
+    expect(useCompareSet.getState()).toMatchObject({ items: [], view: 'prices', openRequest: 0 });
+  });
 });

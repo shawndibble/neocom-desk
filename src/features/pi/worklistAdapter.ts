@@ -166,6 +166,7 @@ export function worklistColonies(input: WorklistAdapterInput): WorklistColony[] 
         })),
         rebuild,
         throughput: throughputOf(colony, pins, pi, haulHours),
+        stopped: colony.stoppedExtraction,
       };
     });
 }

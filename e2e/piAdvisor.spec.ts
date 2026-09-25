@@ -29,8 +29,12 @@ const MICROORGANISMS = 2073;
 /** Barren's P0 — what the storage colony below pulls. */
 const BASE_METALS = 2267;
 
-const INSTALLED_AT = '2026-09-01T00:00:00Z';
-const EXPIRES_AT = '2026-09-15T00:00:00Z';
+const DAY_MS = 86_400_000;
+// Relative to whenever the suite actually runs, not a fixed calendar date —
+// a hardcoded expiry eventually lands in the past and the extractor reads as
+// stopped instead of the active-but-insufficient one this spec is about.
+const INSTALLED_AT = new Date(Date.now() - DAY_MS).toISOString();
+const EXPIRES_AT = new Date(Date.now() + 13 * DAY_MS).toISOString();
 
 const COLONIES = [
   {

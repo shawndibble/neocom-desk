@@ -543,14 +543,35 @@ export function Market() {
   // Variations table, plus the selected item itself, to the Compare Set and
   // opens the drawer on Attributes — see CompareAttributesMatrix.
   const addManyToCompare = useCompareSet((state) => state.addMany);
+  const removeManyFromCompare = useCompareSet((state) => state.removeMany);
   const openCompareIn = useCompareSet((state) => state.openIn);
+  // Issue #1746: the merge can add ~19 rows with no cheap way back out, so
+  // the add is followed by an Undo toast that removes exactly those rows.
+  const [compareUndo, setCompareUndo] = useState<{
+    typeIds: number[];
+    count: number;
+    itemName: string;
+  } | null>(null);
+  useEffect(() => {
+    if (!compareUndo) return;
+    const timer = setTimeout(() => setCompareUndo(null), 8000);
+    return () => clearTimeout(timer);
+  }, [compareUndo]);
   function handleCompareVariations() {
     if (!variationsResult || !selectedItem || selectedTypeId === null) return;
-    addManyToCompare([
+    const added = addManyToCompare([
       { typeId: selectedTypeId, itemName: selectedItem.name },
       ...variationsResult.rows.map((row) => ({ typeId: row.typeId, itemName: row.name })),
     ]);
     openCompareIn('attributes');
+    setCompareUndo(
+      added.length > 0 ? { typeIds: added, count: added.length, itemName: selectedItem.name } : null
+    );
+  }
+  function handleUndoCompareVariations() {
+    if (!compareUndo) return;
+    removeManyFromCompare(compareUndo.typeIds);
+    setCompareUndo(null);
   }
 
   const { blueprintCatalog, ensureBlueprintCatalog } = useBlueprintCatalog();
@@ -1393,7 +1414,37 @@ export function Market() {
           onAddToQuickbar={handleAddToQuickbar}
           quickbarAvailable={activeCharacterId !== null}
           onShowInfo={handleShowInfo}
+          characterId={activeCharacterId}
+          hub={effectiveHub}
+          standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
+          sourceLabel={
+            effectiveLocation.mode === 'hub'
+              ? effectiveHub.systemName
+              : (marketRegions?.find((region) => region.id === orderBookLocation.regionId)?.name ??
+                hubRegionName)
+          }
         />
+      )}
+
+      {compareUndo && (
+        <div
+          role="status"
+          className="bg-panel border-line text-text fixed bottom-32 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-md border px-4 py-2 text-sm shadow-lg md:bottom-16"
+        >
+          <span>
+            {t('market.compareUndo.added', {
+              count: compareUndo.count,
+              name: compareUndo.itemName,
+            })}
+          </span>
+          <button
+            type="button"
+            className="text-accent font-medium underline"
+            onClick={handleUndoCompareVariations}
+          >
+            {t('market.compareUndo.undo')}
+          </button>
+        </div>
       )}
 
       {infoModalItem && (

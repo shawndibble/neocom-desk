@@ -14,6 +14,7 @@ function colony(overrides: Partial<WorklistColony> = {}): WorklistColony {
     conversions: [],
     rebuild: null,
     throughput: null,
+    stopped: null,
     ...overrides,
   };
 }
@@ -195,5 +196,26 @@ describe('buildWorklist', () => {
       colony({ throughput: { hoursToFull: null, haulHours: 168, lostIskPerHour: 0 } }),
     ]);
     expect(list.tuning).toEqual([]);
+  });
+
+  it('puts a colony with a stopped extractor at the top, alongside an earning step', () => {
+    const list = buildWorklist([
+      colony({
+        planetId: 1,
+        name: 'Efa II',
+        stopped: { count: 1, hoursStopped: 5 },
+      }),
+      colony({
+        planetId: 2,
+        name: 'Efa IV',
+        opportunities: [{ label: 'Biocells', marginPerHour: 900_000 }],
+      }),
+    ]);
+    expect(list.tuning[0]).toMatchObject({
+      verb: 'stopped',
+      planetName: 'Efa II',
+      iskPerHour: null,
+      hoursStopped: 5,
+    });
   });
 });
