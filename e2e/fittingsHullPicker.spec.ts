@@ -18,9 +18,10 @@ test.describe('Fittings — hull picker', () => {
       await page.setViewportSize(viewport);
       await signInAndGoto(page, './fittings');
 
-      // A phone's Start screen shows one way in at a time; hulls are the default.
+      // The list renders once the static market catalogue has loaded; the hull
+      // picker is the default way in on the Start screen at every width.
       const list = page.getByTestId('hull-list');
-      await expect(list).toBeVisible();
+      await expect(list).toBeVisible({ timeout: 30_000 });
 
       const overflow = await list.evaluate((el) => ({
         scrollWidth: el.scrollWidth,

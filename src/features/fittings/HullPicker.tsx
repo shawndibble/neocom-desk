@@ -44,6 +44,7 @@ export function HullPicker({ catalogue, onStart }: HullPickerProps) {
         <p className="text-xs text-text-dim">{t('fittings.start.noHulls')}</p>
       ) : (
         <div data-testid="hull-list" className="max-h-[32rem] overflow-y-auto">
+          {/* The height cap lives here, not on the columns box: a capped multi-column box spills extra columns sideways instead of scrolling down. */}
           <div className="columns-1 gap-4 sm:columns-2 xl:columns-3">
             {shown.map((hullClass) => (
               <section key={hullClass.id} className="mb-3 break-inside-avoid">
