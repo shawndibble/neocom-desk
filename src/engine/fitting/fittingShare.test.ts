@@ -3,6 +3,8 @@ import {
   encodeFittingShare,
   decodeFittingShare,
   FITTING_SHARE_VERSION,
+  LEGACY_FITTING_SHARE_VERSION,
+  MAX_FIT_NAME_LENGTH,
   MAX_SLOTS_PER_CATEGORY,
   MAX_DRONE_STACKS,
   MAX_FIGHTERS,
@@ -17,7 +19,10 @@ const emptyModules = { high: [], mid: [], low: [], rig: [], subsystem: [] };
 /** Deflates+base64url's an arbitrary raw body, bypassing `encodeFittingShare`'s
  * own validation — for tests that need to hand-craft a forged decompressed
  * payload rather than encode a real `FittingShareInput`. */
-async function packRawBody(body: string): Promise<string> {
+async function packRawBody(
+  body: string,
+  version: string = LEGACY_FITTING_SHARE_VERSION
+): Promise<string> {
   const bytes = new TextEncoder().encode(body);
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -44,7 +49,7 @@ async function packRawBody(body: string): Promise<string> {
   let binary = '';
   for (const b of compressed) binary += String.fromCharCode(b);
   const b64url = btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  return `${FITTING_SHARE_VERSION}.${b64url}`;
+  return `${version}.${b64url}`;
 }
 
 function minimalInput(): FittingShareInput {
@@ -314,5 +319,67 @@ describe('decodeFittingShare error handling', () => {
     const body = ['1', ';;;;', '', '', `${'z'.repeat(300)}:1`, ''].join('|');
     const decoded = await decodeFittingShare(await packRawBody(body));
     expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+  });
+});
+
+describe('fit name (version 2, #1718)', () => {
+  it('round-trips a fit name, including separators and non-ASCII characters', async () => {
+    const name = 'PvP | Lokis, 100% "Ω" fit';
+    const encoded = await encodeFittingShare({ ...minimalInput(), name });
+    expect(encoded.ok).toBe(true);
+    if (!encoded.ok) return;
+    expect(encoded.payload.startsWith('2.')).toBe(true);
+    const decoded = await decodeFittingShare(encoded.payload);
+    expect(decoded.ok && decoded.value.name).toBe(name);
+  });
+
+  it('decodes a nameless payload with no name', async () => {
+    const encoded = await encodeFittingShare(minimalInput());
+    if (!encoded.ok) throw new Error('encode failed');
+    const decoded = await decodeFittingShare(encoded.payload);
+    expect(decoded.ok && decoded.value.name).toBeUndefined();
+  });
+
+  it('truncates an over-long name on encode', async () => {
+    const encoded = await encodeFittingShare({
+      ...minimalInput(),
+      name: 'x'.repeat(MAX_FIT_NAME_LENGTH + 50),
+    });
+    if (!encoded.ok) throw new Error('encode failed');
+    const decoded = await decodeFittingShare(encoded.payload);
+    expect(decoded.ok && decoded.value.name).toBe('x'.repeat(MAX_FIT_NAME_LENGTH));
+  });
+
+  it('rejects a forged over-long name', async () => {
+    const body = ['1', ';;;;', '', '', '', '', 'x'.repeat(MAX_FIT_NAME_LENGTH + 1)].join('|');
+    const decoded = await decodeFittingShare(await packRawBody(body, FITTING_SHARE_VERSION));
+    expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('rejects a malformed percent-escape in the name', async () => {
+    const body = ['1', ';;;;', '', '', '', '', '%E0%A4%A'].join('|');
+    const decoded = await decodeFittingShare(await packRawBody(body, FITTING_SHARE_VERSION));
+    expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('still decodes a recorded version-1 payload, with no name', async () => {
+    const body = ['1', ';;;;', '', '', '', ''].join('|');
+    const decoded = await decodeFittingShare(await packRawBody(body, '1'));
+    expect(decoded.ok).toBe(true);
+    if (!decoded.ok) return;
+    expect(decoded.value.hullTypeId).toBe(1);
+    expect(decoded.value.name).toBeUndefined();
+  });
+
+  it('rejects a version-2 payload missing the name part, and a version-1 payload with one', async () => {
+    const six = ['1', ';;;;', '', '', '', ''].join('|');
+    expect(await decodeFittingShare(await packRawBody(six, FITTING_SHARE_VERSION))).toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
+    expect(await decodeFittingShare(await packRawBody(six + '|x', '1'))).toEqual({
+      ok: false,
+      reason: 'invalid',
+    });
   });
 });

@@ -277,10 +277,14 @@ export function useFittingWorkspace(): FittingWorkspace {
         setFitting(null);
         return;
       }
-      const name =
-        pending?.code === shareCode ? pending.name : await typeName(decoded.value.hullTypeId);
+      // A name the user typed for this Load beats the one the link carries, which beats the hull name.
+      const pendingName = pending?.code === shareCode ? pending.name : undefined;
+      const fallbackName = pendingName ?? (await typeName(decoded.value.hullTypeId));
       if (cancelled) return;
-      const opened = shareToFitting(decoded.value, name);
+      const opened = shareToFitting(
+        pendingName === undefined ? decoded.value : { ...decoded.value, name: pendingName },
+        fallbackName
+      );
       // The Load's own write has decoded: from here the launch waits for this object's stats.
       const launch = launchPendingRef.current;
       if (launch !== null && 'code' in launch && launch.code === shareCode) {

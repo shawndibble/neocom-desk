@@ -60,7 +60,7 @@ export function useOverlayFitting({
       try {
         const decoded = await decodeFittingShare(record.code);
         if (!decoded.ok || cancelled) return;
-        const fitting = shareToFitting(decoded.value, record.name);
+        const fitting = shareToFitting({ ...decoded.value, name: record.name }, record.name);
         const stats = await evaluateFitting(fitting, profile, damageProfile, weatherTypeId);
         if (!cancelled) setResult({ name: record.name, applied: stats.applied });
       } catch {
