@@ -35,9 +35,13 @@ async function answerAnyType(page: Page) {
   });
 }
 
-const RIFTER_A = ['[Rifter, Tracer Test]', '125mm Gatling AutoCannon I'].join('\n');
-const RIFTER_B = ['[Rifter, Backup Test]', '150mm Light AutoCannon I'].join('\n');
-const RIFTER_C = ['[Rifter, Third Test]', '125mm Gatling AutoCannon I'].join('\n');
+// Three different hulls, not three named variants of one hull: a compare column's header shows
+// the hull's own name (`typeName(hullTypeId)`), never the custom name typed into the EFT header —
+// a Share Link code carries no fit name at all, see `shareMapper.ts`. Distinct hulls give each
+// column genuinely distinguishing text to assert on.
+const FIT_A = ['[Rifter, Fit A]', '125mm Gatling AutoCannon I'].join('\n');
+const FIT_B = ['[Merlin, Fit B]', '125mm Gatling AutoCannon I'].join('\n');
+const FIT_C = ['[Punisher, Fit C]', '125mm Gatling AutoCannon I'].join('\n');
 
 async function addFitting(page: Page, eft: string) {
   await page.getByRole('button', { name: 'Compare with…' }).first().click();
@@ -61,16 +65,16 @@ test.describe('Fitting Compare at 390px', () => {
     // give it the same cold-runner headroom the other narrow specs already use for that gate.
     const STATS_TIMEOUT = { timeout: 20_000 };
 
-    await addFitting(page, RIFTER_A);
-    await expect(page.getByText('Tracer Test')).toBeVisible(STATS_TIMEOUT);
+    await addFitting(page, FIT_A);
+    await expect(page.getByText('Rifter')).toBeVisible(STATS_TIMEOUT);
 
-    await addFitting(page, RIFTER_B);
-    await expect(page.getByText('Tracer Test')).toBeVisible(STATS_TIMEOUT);
-    await expect(page.getByText('Backup Test')).toBeVisible(STATS_TIMEOUT);
+    await addFitting(page, FIT_B);
+    await expect(page.getByText('Rifter')).toBeVisible(STATS_TIMEOUT);
+    await expect(page.getByText('Merlin')).toBeVisible(STATS_TIMEOUT);
     await expect(page.getByText('Show differences only')).toBeVisible();
 
     // A third slot brings phone paging into play (2 of 3 columns shown at a time).
-    await addFitting(page, RIFTER_C);
+    await addFitting(page, FIT_C);
     const prev = page.getByRole('button', { name: 'Previous' });
     const next = page.getByRole('button', { name: 'Next' });
     await expect(prev).toBeVisible(STATS_TIMEOUT);
@@ -78,12 +82,12 @@ test.describe('Fitting Compare at 390px', () => {
     const nextBox = await next.boundingBox();
     expect(nextBox!.height).toBeGreaterThanOrEqual(44);
 
-    await expect(page.getByText('Tracer Test')).toBeVisible(STATS_TIMEOUT);
-    await expect(page.getByText('Third Test')).not.toBeVisible();
+    await expect(page.getByText('Rifter')).toBeVisible(STATS_TIMEOUT);
+    await expect(page.getByText('Punisher')).not.toBeVisible();
 
     await next.click();
-    await expect(page.getByText('Third Test')).toBeVisible();
-    await expect(page.getByText('Tracer Test')).not.toBeVisible();
+    await expect(page.getByText('Punisher')).toBeVisible();
+    await expect(page.getByText('Rifter')).not.toBeVisible();
     expect(await prev.isDisabled()).toBe(false);
 
     // No sideways scroll at 390px — the usual narrow-width regression.
