@@ -4,6 +4,7 @@ import { SecurityValue } from '@/features/character/assetBrowserRows';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
+import { MarketItemLink } from '@/features/market/MarketItemLink';
 import { formatIsk } from '@/lib/isk';
 import { AssignDialog } from './AssignDialog';
 import { STATUS_TONE } from './statusTone';
@@ -129,7 +130,9 @@ export function RowDetailModal({
                 >
                   <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                   <span className="w-40 shrink-0 truncate">
-                    {typeNames.get(line.typeId) ?? `#${line.typeId}`}
+                    <MarketItemLink typeId={line.typeId}>
+                      {typeNames.get(line.typeId) ?? `#${line.typeId}`}
+                    </MarketItemLink>
                   </span>
                   <span className="tabular-nums text-text-dim">
                     {line.quantity.toLocaleString()}
@@ -157,7 +160,9 @@ export function RowDetailModal({
               {assignment.reviewDiff.map((diff) => (
                 <li key={diff.typeId} className="flex items-center justify-between gap-2">
                   <span className="min-w-0 truncate">
-                    {typeNames.get(diff.typeId) ?? `#${diff.typeId}`}
+                    <MarketItemLink typeId={diff.typeId}>
+                      {typeNames.get(diff.typeId) ?? `#${diff.typeId}`}
+                    </MarketItemLink>
                   </span>
                   <span className="shrink-0 tabular-nums">
                     {diff.before.toLocaleString()} → {diff.after.toLocaleString()}
