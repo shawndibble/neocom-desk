@@ -4018,6 +4018,7 @@
     "refresh": "Refresh",
     "searchLabel": "Search items",
     "searchPlaceholder": "Search item name…",
+    "bestMatch": "Best match",
     "searchCapped": "Showing {{limit}} of {{total}} matches — refine your search to see more.",
     "searchTooShort": "Type {{min}}+ characters to search.",
     "noResults": "No items match your search.",
