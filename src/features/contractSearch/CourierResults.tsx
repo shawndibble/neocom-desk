@@ -8,7 +8,7 @@
  * panel owns the snapshot, the mode and the region names; this owns
  * everything that is only true of a haul.
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
@@ -67,7 +67,7 @@ import {
 import { reverseLaneMatches } from '@/engine/contracts/courierReverseLane';
 import { endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { loadCharacterRegionId } from '@/features/contractSearch/characterRegion';
-import { formatIskAuto, formatIskCompact } from '@/lib/isk';
+import { formatIsk, formatIskAuto, formatIskCompact, parseIskAmount } from '@/lib/isk';
 import { formatMagnitude } from '@/lib/magnitude';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
@@ -348,6 +348,67 @@ function MyRegionButton({
   );
 }
 
+/**
+ * An ISK bound — reward floor, collateral ceiling. Typed as text so `1b` and
+ * `500m` work (`parseIskAmount`, the wallet threshold's parser), with the
+ * parsed figure echoed underneath so a run of zeros can be checked. What goes
+ * to `onChange`, and so into the URL, is the plain digit string — the same
+ * shape the bare number field wrote. Text that doesn't parse yet ("1.", "1x")
+ * leaves the committed value alone rather than clearing the filter mid-keystroke.
+ */
+function IskFilterField({
+  label,
+  value,
+  width,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  width: string;
+  onChange: (value: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [text, setText] = useState(value);
+  // The last value this field itself committed: a `value` that differs came
+  // from outside (Clear, a URL change) and replaces what was typed.
+  const committed = useRef(value);
+  useEffect(() => {
+    if (value !== committed.current) {
+      committed.current = value;
+      setText(value);
+    }
+  }, [value]);
+  const parsed = text.trim() === '' ? null : parseIskAmount(text);
+  return (
+    <FilterField label={label}>
+      <div className={`flex flex-col gap-1 ${width}`}>
+        <TextInput
+          type="text"
+          inputMode="decimal"
+          aria-label={label}
+          placeholder={label}
+          className="w-full"
+          value={text}
+          onChange={(event) => {
+            const next = event.target.value;
+            setText(next);
+            const amount = next.trim() === '' ? '' : parseIskAmount(next);
+            if (amount === null) return;
+            const nextValue = String(amount);
+            committed.current = nextValue;
+            onChange(nextValue);
+          }}
+        />
+        {parsed !== null && (
+          <span className="text-[0.6875rem] text-text-dim">
+            {t('contractSearch.iskFilterHint', { amount: formatIsk(parsed) })}
+          </span>
+        )}
+      </div>
+    </FilterField>
+  );
+}
+
 /** A bare numeric bound — reward floor, collateral ceiling, cargo ceiling, deadline floor. */
 function NumericFilterField({
   label,
@@ -527,13 +588,13 @@ function CourierFilterBar({
               ))}
             </div>
           )}
-          <NumericFilterField
+          <IskFilterField
             label={t('contractSearch.minRewardLabel')}
             value={draft.minReward}
             width="w-32"
             onChange={(minReward) => setDraft({ ...draft, minReward })}
           />
-          <NumericFilterField
+          <IskFilterField
             label={t('contractSearch.maxCollateralLabel')}
             value={draft.maxCollateral}
             width="w-32"

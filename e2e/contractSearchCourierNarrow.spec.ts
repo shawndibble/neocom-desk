@@ -365,4 +365,23 @@ test.describe('courier board — 390px width', () => {
       `reverse-lane link is only ${box!.height}px tall at 390px width`
     ).toBeGreaterThanOrEqual(TOUCH_TARGET_PX);
   });
+
+  test('the ISK filters take shorthand and echo the parsed figure (issue #1722)', async ({
+    page,
+  }) => {
+    await stubSyncConfigured(page);
+    await refuseSyncBackend(page);
+
+    await signInAndGoto(page);
+    await seedCourierSnapshot(page, courierSnapshotRows());
+
+    await page.goto('./contracts');
+    await page.getByRole('button', { name: 'Courier' }).click();
+    await page.getByRole('button', { name: /^Filters/ }).click();
+
+    await page.getByRole('textbox', { name: 'Min reward' }).fill('1b');
+    await expect(page.getByText('= 1,000,000,000 ISK')).toBeVisible();
+    await page.getByRole('textbox', { name: 'Max collateral' }).fill('500m');
+    await expect(page.getByText('= 500,000,000 ISK')).toBeVisible();
+  });
 });
