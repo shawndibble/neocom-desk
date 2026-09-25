@@ -985,6 +985,7 @@
     "whatIfNone": "None",
     "whatIfCurrent": "Current",
     "whatIfCustom": "Custom",
+    "whatIfJumpClone": "Jump clone {{label}}",
     "whatIfPerAttribute": "Implant bonus per attribute",
     "whatIfAttributeBonus": "{{attribute}} implant bonus",
     "whatIfMarketLink": "View attribute enhancer implants in Market",
