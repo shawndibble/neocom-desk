@@ -584,17 +584,36 @@ describe('Settings — Notifications (issue #170)', () => {
       );
     });
 
-    it('still offers the settings button when the grant reads granted', async () => {
-      // A grant Chrome made before the app took over can read 'granted' while
-      // the app's own toggle is off.
+    it('drops the notice and the button once the grant reads granted', async () => {
       stubNotification('granted');
       render(<App />);
       await notificationsPanel();
 
+      await waitFor(() =>
+        expect(screen.getByRole('checkbox', { name: 'Device notifications' })).toBeEnabled()
+      );
       expect(
-        await screen.findByRole('button', { name: /open notification settings/i })
-      ).toBeInTheDocument();
+        screen.queryByRole('button', { name: /open notification settings/i })
+      ).not.toBeInTheDocument();
       expect(screen.queryByText(/notifications are off for this app/i)).not.toBeInTheDocument();
+    });
+
+    it('clears the notice when the grant flips to granted while the page is open', async () => {
+      // Back from Android settings: the page never reloads, it only regains focus.
+      stubNotification('denied');
+      render(<App />);
+      await notificationsPanel();
+      expect(await screen.findByText(/notifications are off for this app/i)).toBeInTheDocument();
+
+      stubNotification('granted');
+      act(() => {
+        window.dispatchEvent(new Event('focus'));
+      });
+
+      await waitFor(() =>
+        expect(screen.queryByText(/notifications are off for this app/i)).not.toBeInTheDocument()
+      );
+      expect(screen.getByRole('checkbox', { name: 'Device notifications' })).toBeEnabled();
     });
   });
 

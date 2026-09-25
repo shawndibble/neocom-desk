@@ -477,45 +477,28 @@ export function NotificationsPanel() {
     <Panel title={t('settings.notificationsTitle')}>
       <div className="space-y-3">
         <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
-        {/*
-          Always offered in the Play Store app, not only when 'denied': the
-          app's Android toggle is the real switch there, and a grant Chrome
-          made before the app took over can still read 'granted' while it's
-          off.
-        */}
-        {inPlayStoreApp && (
-          <div
-            className={`flex flex-wrap items-center gap-2 rounded-xs border px-3 py-2 ${
-              browserBlocked ? 'border-warning/60 bg-warning/10' : 'border-line bg-panel-2'
-            }`}
-          >
+        {browserBlocked &&
+          (inPlayStoreApp ? (
+            <div className="space-y-2 rounded-xs border border-warning/60 bg-warning/10 px-3 py-2">
+              <p role="status" className="text-xs text-warning">
+                {t('settings.notifications.blockedNoticePlayApp')}
+              </p>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => assignLocation(androidNotificationSettingsUrl(window.location.href))}
+              >
+                {t('settings.notifications.openAndroidSettings')}
+              </Button>
+            </div>
+          ) : (
             <p
-              role={browserBlocked ? 'status' : undefined}
-              className={`min-w-0 flex-1 text-xs ${browserBlocked ? 'text-warning' : 'text-text-dim'}`}
+              role="status"
+              className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning"
             >
-              {t(
-                browserBlocked
-                  ? 'settings.notifications.blockedNoticePlayApp'
-                  : 'settings.notifications.androidSettingsHint'
-              )}
+              {t('settings.notifications.blockedNotice')}
             </p>
-            <Button
-              size="sm"
-              variant={browserBlocked ? 'primary' : 'ghost'}
-              onClick={() => assignLocation(androidNotificationSettingsUrl(window.location.href))}
-            >
-              {t('settings.notifications.openAndroidSettings')}
-            </Button>
-          </div>
-        )}
-        {browserBlocked && !inPlayStoreApp && (
-          <p
-            role="status"
-            className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning"
-          >
-            {t('settings.notifications.blockedNotice')}
-          </p>
-        )}
+          ))}
         {/*
           `permission` reads 'unsupported' here, not 'default' — a
           non-installed iOS Safari tab has no Notification API to ask at
