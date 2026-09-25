@@ -12,7 +12,11 @@
  * and it names members who have *left*, who by definition no longer appear in
  * tracking.
  *
- * Both keys go through `corpRead.ts`'s corp-scoped wrapper (issue #293), and a
+ * A third read, `/roles`, feeds the roster's optional roles column (issue
+ * #1766). Same scope as `/members`, so the Director reading this page already
+ * holds it.
+ *
+ * Every key goes through `corpRead.ts`'s corp-scoped wrapper (issue #293), and a
  * 403 is the in-game role gate rather than a re-login (`corpAuthFailure.ts`).
  *
  * The name/ship/location resolution below is the other half of this module.
@@ -24,8 +28,10 @@
  * cap bounds how many are in flight, not how many are asked for.
  */
 import {
+  getCorporationMemberRoles,
   getCorporationMembers,
   getCorporationMemberTracking,
+  type CorporationMemberRoles,
   type CorporationMemberTracking,
 } from '@/esi/endpoints';
 import type { StatusResult } from '@/esi/cache';
@@ -40,6 +46,7 @@ import { loadCorpPaginatedWithCacheStatus, loadCorpWithCacheStatus } from './cor
 export const KEYS = {
   members: 'members',
   tracking: 'membertracking',
+  roles: 'roles',
 } as const;
 
 /** Character ids of every member. Paginated; the diff's input. */
@@ -63,6 +70,31 @@ export function loadCorporationMemberTracking(
     KEYS.tracking,
     async () => (await getCorporationMemberTracking(characterId, corporationId)).data
   );
+}
+
+/** Every member's in-game roles, for the roster's optional roles column. */
+export function loadCorporationMemberRoles(
+  characterId: number,
+  corporationId: number
+): Promise<StatusResult<CorporationMemberRoles[]>> {
+  return loadCorpWithCacheStatus(
+    characterId,
+    corporationId,
+    KEYS.roles,
+    async () => (await getCorporationMemberRoles(characterId, corporationId)).data
+  );
+}
+
+/**
+ * Each member's corporation-wide roles, by character id. The `_at_hq` /
+ * `_at_base` / `_at_other` grants are left out for the reason `roles.ts`'s
+ * `corpWideRoles` gives. An omitted array is no roles; a member missing from
+ * the map is unknown.
+ */
+export function toMemberRoles(
+  rows: readonly CorporationMemberRoles[]
+): ReadonlyMap<number, readonly string[]> {
+  return new Map(rows.map((row) => [row.character_id, row.roles ?? []]));
 }
 
 /** ESI's ISO string to epoch ms; null for absent *and* for unparseable. */

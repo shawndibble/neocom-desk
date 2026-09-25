@@ -2956,7 +2956,8 @@
     },
     "altColonies": {
       "toggleLabel": "Show alt colonies",
-      "notLoaded": "Not loaded yet, so their colonies aren't listed: {{names}}. Switch to that character and refresh to cache them.",
+      "notLoaded": "{{name}}: not loaded yet, so their colonies aren't listed. Switch and refresh to cache them.",
+      "switchTo": "Switch to {{name}}",
       "noColonies": "No colonies: {{names}}.",
       "skipped": "Skipped, no planetary access granted: {{names}}."
     }
@@ -4570,6 +4571,11 @@
     "characterDefaultsTitle": "Character defaults",
     "piDefaultsTitle": "Planetary Industry",
     "corpUnavailable": "Corporation defaults appear once the active character can see a corporation.",
+    "updateTitle": "App updates",
+    "updateHint": "Neocom Desk normally updates itself in the background. Update now checks for a new version right away and reloads the app.",
+    "updateAction": "Update now",
+    "updateWorking": "Updating…",
+    "updateFailed": "Could not check for a new version. Check your connection and try again.",
     "deviceTitle": "Log out",
     "deviceCharacters_one": "{{count}} character is logged in on this browser.",
     "deviceCharacters_other": "{{count}} characters are logged in on this browser.",
@@ -4934,7 +4940,7 @@
       "leftName": "Left · {{name}}"
     },
     "members": {
-      "title": "Members",
+      "title": "Corp members",
       "refresh": "Refresh member list",
       "tableLabel": "Corporation members",
       "columnMember": "Member",
@@ -4942,6 +4948,8 @@
       "columnShip": "Ship",
       "columnLocation": "Location",
       "columnJoined": "Joined",
+      "columnRoles": "Roles",
+      "you": "You",
       "never": "Never",
       "total": "Members",
       "dark": "Dark {{days}}d+",
@@ -4968,7 +4976,7 @@
       }
     },
     "assets": {
-      "title": "Assets",
+      "title": "Corp assets",
       "refresh": "Refresh corp assets",
       "empty": "No corporation assets",
       "emptyHint": "EVE reported no assets for this corporation.",
@@ -5045,10 +5053,13 @@
   },
   "publicInfo": {
     "title": "Public info",
-    "tabsLabel": "Character, corporation, and alliance",
+    "tabsLabel": "Character, corporation, alliance, and employment",
     "characterTab": "Character",
     "corporationTab": "Corporation",
     "allianceTab": "Alliance",
+    "employmentTab": "Employment",
+    "employmentEmptyTitle": "No employment history",
+    "employmentEmptyHint": "This character has no public corporation history to show.",
     "securityStatus": "Security status",
     "corporation": "Corporation",
     "alliance": "Alliance",

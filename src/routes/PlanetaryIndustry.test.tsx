@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -664,10 +664,52 @@ describe('PlanetaryIndustry', () => {
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
 
-    const unread = screen.getByText(/Unread Alt/);
+    const unread = screen.getByText(/^Unread Alt:/);
     const empty = screen.getByText(/Empty Alt/);
     expect(unread).not.toBe(empty);
     expect(unread).toHaveTextContent(/not loaded yet/i);
     expect(empty).toHaveTextContent(/No colonies/i);
+  });
+
+  it('switches to an alt straight from the not-loaded list, staying on the page', async () => {
+    await addAlt(92, 'Unread Alt', [PLANETS_SCOPE]);
+    await addAlt(94, 'Other Unread', [PLANETS_SCOPE]);
+
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
+
+    // One row, and one action, per not-loaded character.
+    expect(screen.getByRole('button', { name: 'Switch to Other Unread' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Switch to Unread Alt' }));
+
+    await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(92));
+    expect(window.location.pathname).toContain('/planetary-industry');
+  });
+
+  it('switches to an alt from its colony group header, making its colonies the primary section', async () => {
+    const ALT_ID = 92;
+    const ALT_PLANET_ID = 40000002;
+    await addAlt(ALT_ID, 'Alt Two', [PLANETS_SCOPE]);
+    await db.esiCache.put({
+      characterId: ALT_ID,
+      key: 'planets',
+      value: [{ ...planetsPayload[0], planet_id: ALT_PLANET_ID, owner_id: ALT_ID }],
+      fetchedAt: Date.now(),
+    });
+
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
+    await user.click(screen.getByRole('button', { name: 'Switch to Alt Two' }));
+
+    await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(ALT_ID));
+    // The alt is now the active character, so it no longer has a switch action.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Switch to Alt Two' })).not.toBeInTheDocument()
+    );
+    expect(window.location.pathname).toContain('/planetary-industry');
   });
 });

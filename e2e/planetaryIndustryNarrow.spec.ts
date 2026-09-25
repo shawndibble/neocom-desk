@@ -37,6 +37,7 @@ import { resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { SCOPES } from './support/fixtureData';
 import { piTier } from '../src/engine/pi/chain';
 import type { PiData } from '../src/sde/types';
 
@@ -369,5 +370,64 @@ test.describe('PI Plan — stacked Sensitivity card', () => {
     const sensitivity = page.getByRole('table', { name: SENSITIVITY_TABLE });
     await expect(sensitivity.getByText('Needs yield').first()).toBeVisible();
     await expect(sensitivity.getByText(/needs a rate/i)).toHaveCount(0);
+  });
+});
+
+test.describe('PI Colonies — Switch to an alt (issue #1770)', () => {
+  const ALT_ID = 90000002;
+
+  /** An alt with the planets grant and nothing cached: the "not loaded yet" row. */
+  async function seedNotLoadedAlt(page: Page): Promise<void> {
+    await page.evaluate(
+      async ({ id, scopes }) => {
+        const database = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open('neocom');
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        await new Promise<void>((resolve, reject) => {
+          const tx = database.transaction(['characters', 'tokens'], 'readwrite');
+          tx.objectStore('characters').put({
+            characterId: id,
+            name: 'Alt Hauler',
+            ownerHash: 'OWNERHASH2',
+            addedAt: Date.now(),
+          });
+          tx.objectStore('tokens').put({
+            characterId: id,
+            accessToken: 'alt-access',
+            refreshToken: 'fake-refresh',
+            expiresAt: Date.now() + 3_600_000,
+            scopes,
+          });
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        });
+        database.close();
+      },
+      { id: ALT_ID, scopes: [...SCOPES] }
+    );
+  }
+
+  test('offers a 44px Switch action that stays on the page at 390px', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await signInAndGoto(page, './planetary-industry');
+    await seedNotLoadedAlt(page);
+    // The app reads every signed-in character's ESI feeds; a 404 (not an empty list) keeps the alt's planets uncached, so it stays "not loaded".
+    await page.route(`https://esi.evetech.net/characters/${ALT_ID}/**`, (route) =>
+      route.fulfill({ status: 404, contentType: 'application/json', body: '{}' })
+    );
+    await page.reload();
+
+    await page.getByRole('button', { name: /show alt colonies/i }).click();
+    const action = page.getByRole('button', { name: 'Switch to Alt Hauler' });
+    await expect(action).toBeVisible();
+    expect((await action.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await assertNoOverflow(page);
+
+    await action.click();
+    // The alt is now the primary character: it is no longer a "not loaded" row.
+    await expect(action).toHaveCount(0);
+    expect(new URL(page.url()).pathname).toContain('/planetary-industry');
   });
 });

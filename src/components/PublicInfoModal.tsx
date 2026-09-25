@@ -14,7 +14,7 @@
  * corp) never puts the Alliance tab into `loading`, so it never appears,
  * which is what keeps that case tab-hidden rather than tab-with-an-error.
  */
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Modal, Spinner, Tabs, type TabItem } from '@/components/ui';
 import {
@@ -29,6 +29,8 @@ import { allianceLogoUrl, characterPortraitUrl, corporationLogoUrl } from '@/lib
 import { allianceZkillUrl, characterZkillUrl, corporationZkillUrl } from '@/lib/zkillboard';
 import { usePublicInfoModalStore, type PublicInfoKind } from '@/stores/publicInfoModal';
 
+const LazyEmploymentTab = lazy(() => import('@/features/character/PublicInfoEmploymentTab'));
+
 type TabState<T> =
   { status: 'idle' } | { status: 'loading' } | { status: 'error' } | { status: 'ready'; data: T };
 
@@ -39,7 +41,7 @@ export function PublicInfoModal() {
   const request = usePublicInfoModalStore((state) => state.request);
   const close = usePublicInfoModalStore((state) => state.close);
 
-  const [activeTab, setActiveTab] = useState<PublicInfoKind>('character');
+  const [activeTab, setActiveTab] = useState<PublicInfoKind | 'employment'>('character');
   const [character, setCharacter] = useState<TabState<PublicCharacterInfo>>(IDLE);
   const [corporation, setCorporation] = useState<TabState<PublicCorporationInfo>>(IDLE);
   const [alliance, setAlliance] = useState<TabState<PublicAllianceInfo>>(IDLE);
@@ -97,9 +99,12 @@ export function PublicInfoModal() {
   if (corporation.status !== 'idle')
     tabs.push({ id: 'corporation', label: t('publicInfo.corporationTab') });
   if (alliance.status !== 'idle') tabs.push({ id: 'alliance', label: t('publicInfo.allianceTab') });
+  // Only a character has a corporation history to show.
+  if (request.kind === 'character' && character.status !== 'idle')
+    tabs.push({ id: 'employment', label: t('publicInfo.employmentTab') });
 
   const activeData =
-    activeTab === 'character' ? character : activeTab === 'corporation' ? corporation : alliance;
+    activeTab === 'corporation' ? corporation : activeTab === 'alliance' ? alliance : character;
   const title = activeData.status === 'ready' ? activeData.data.name : t('publicInfo.title');
 
   return (
@@ -109,7 +114,7 @@ export function PublicInfoModal() {
           <Tabs
             tabs={tabs}
             value={activeTab}
-            onChange={(id) => setActiveTab(id as PublicInfoKind)}
+            onChange={(id) => setActiveTab(id as PublicInfoKind | 'employment')}
             label={t('publicInfo.tabsLabel')}
           />
         )}
@@ -133,6 +138,17 @@ export function PublicInfoModal() {
           />
         )}
         {activeTab === 'alliance' && <AllianceTab state={alliance} />}
+        {activeTab === 'employment' && (
+          <Suspense
+            fallback={
+              <div className="flex justify-center py-8">
+                <Spinner label={t('common.loading')} />
+              </div>
+            }
+          >
+            <LazyEmploymentTab characterId={request.id} />
+          </Suspense>
+        )}
       </div>
     </Modal>
   );
