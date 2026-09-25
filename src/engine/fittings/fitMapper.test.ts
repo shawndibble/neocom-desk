@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { fittingToDogmaFit } from './fitMapper';
 import type { Fitting, PilotProfile } from './types';
 
-const emptyProfile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [] };
+const emptyProfile: PilotProfile = {
+  skillLevels: new Map(),
+  implantTypeIds: [],
+  boosterTypeIds: [],
+};
 
 function fitting(overrides: Partial<Fitting> = {}): Fitting {
   return {
@@ -79,6 +83,7 @@ describe('fittingToDogmaFit', () => {
     const dogmaFit = fittingToDogmaFit(fitting(), {
       skillLevels: new Map(),
       implantTypeIds: [19540, 19553],
+      boosterTypeIds: [],
     });
 
     expect(dogmaFit.items).toContainEqual({
@@ -93,12 +98,37 @@ describe('fittingToDogmaFit', () => {
     });
   });
 
+  it("maps the pilot's boosters into booster slots, numbered from 1, with side effects off", () => {
+    const dogmaFit = fittingToDogmaFit(fitting(), {
+      skillLevels: new Map(),
+      implantTypeIds: [],
+      boosterTypeIds: [30006, 30008],
+    });
+
+    expect(dogmaFit.items).toContainEqual({
+      type_id: 30006,
+      slot: { type: 'booster', index: 1 },
+      state: 'online',
+      booster_side_effects: [],
+    });
+    expect(dogmaFit.items).toContainEqual({
+      type_id: 30008,
+      slot: { type: 'booster', index: 2 },
+      state: 'online',
+      booster_side_effects: [],
+    });
+  });
+
   it("maps the pilot's skill levels into the dogma character", () => {
     const skillLevels = new Map([
       [3300, 5],
       [3301, 3],
     ]);
-    const dogmaFit = fittingToDogmaFit(fitting(), { skillLevels, implantTypeIds: [] });
+    const dogmaFit = fittingToDogmaFit(fitting(), {
+      skillLevels,
+      implantTypeIds: [],
+      boosterTypeIds: [],
+    });
 
     expect(dogmaFit.character).toEqual({ skills: skillLevels });
   });

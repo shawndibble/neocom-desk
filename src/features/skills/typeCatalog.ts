@@ -18,20 +18,28 @@ export async function loadSkillNameMap(): Promise<Map<string, TypeCatalogEntry>>
   return map;
 }
 
+let itemNameMapPromise: Promise<Map<string, TypeCatalogEntry>> | null = null;
+
 /**
  * Ship/module/charge names (types.json), with skill names filling any gaps —
  * used for the EFT-fit path (a fit's hull + items are always types.json
  * entries; skills.json is a fallback, never allowed to shadow an item name).
+ * Memoized: the bundled SDE snapshot never changes within a session, so a
+ * repeat caller (e.g. a picker reopened several times) doesn't rebuild the
+ * whole ~13k-entry map from scratch each time.
  */
-export async function loadItemNameMap(): Promise<Map<string, TypeCatalogEntry>> {
-  const [types, skills] = await Promise.all([loadTypes(), loadSkills()]);
-  const map = new Map<string, TypeCatalogEntry>();
-  for (const [id, info] of Object.entries(types)) {
-    map.set(info.name.toLowerCase(), { typeID: Number(id) });
-  }
-  for (const skill of skills) {
-    const key = skill.name.toLowerCase();
-    if (!map.has(key)) map.set(key, { typeID: skill.typeID });
-  }
-  return map;
+export function loadItemNameMap(): Promise<Map<string, TypeCatalogEntry>> {
+  itemNameMapPromise ??= (async () => {
+    const [types, skills] = await Promise.all([loadTypes(), loadSkills()]);
+    const map = new Map<string, TypeCatalogEntry>();
+    for (const [id, info] of Object.entries(types)) {
+      map.set(info.name.toLowerCase(), { typeID: Number(id) });
+    }
+    for (const skill of skills) {
+      const key = skill.name.toLowerCase();
+      if (!map.has(key)) map.set(key, { typeID: skill.typeID });
+    }
+    return map;
+  })();
+  return itemNameMapPromise;
 }

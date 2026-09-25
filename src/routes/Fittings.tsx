@@ -25,13 +25,13 @@ import { useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
 import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
 
 /**
- * The Fittings section: paste EFT to Load a Fitting (#1532), then edit it in
- * the List view (#1533) — tap an empty slot to add there, from a docked Add
- * panel on desktop or a search sheet on phone. The Ring view (#1536) is the
- * same editor as a game-style ring — its Ring | List choice is device-local
- * (Ring on desktop, List on a phone) and on a phone the Ring's stats live in a
- * bottom sheet. Implants (#1535) and everything else the scope decision lists land in
- * their own tickets.
+ * The Fittings section: paste EFT to Load a Fitting, then edit it in the List
+ * view — tap an empty slot to add there, from a docked Add panel on desktop
+ * or a search sheet on phone. The Ring view is the same editor as a
+ * game-style ring — its Ring | List choice is device-local (Ring on desktop,
+ * List on a phone) and on a phone the Ring's stats live in a bottom sheet.
+ * The My clone vs Fitting's implant/booster toggle lives in List view's
+ * header; everything else the scope decision lists lands in its own ticket.
  */
 export function Fittings() {
   const { t } = useTranslation();
@@ -199,6 +199,10 @@ export function Fittings() {
                 target={target}
                 onSelectTarget={selectTarget}
                 unusableModuleKeys={gaps?.unusableModuleKeys}
+                implantBasis={workspace.implantBasis}
+                canUseCloneBasis={workspace.canUseCloneBasis}
+                onImplantBasisChange={workspace.setImplantBasis}
+                onImplantSetChange={workspace.setImplantSet}
               />
             )}
             {statsInSheet && (

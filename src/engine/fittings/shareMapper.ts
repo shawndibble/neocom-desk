@@ -16,12 +16,13 @@
  *   and the editor both only ever set a stack fully active or fully bayed),
  *   which is what the round-trip test below actually needs to hold.
  *
- * Fighters and implant sets are both real fields on the wire shape that the
- * domain `Fitting` has no home for yet — implants come from the pilot's
- * `PilotProfile` for this ticket (`types.ts`'s own comment), and no capital
- * ship fitting exists in the app at all. Dropped in both directions; a
- * fighter bay or an implant set surviving a share round trip is future
- * tickets' scope, not a regression this mapper introduces.
+ * Fighters and implant sets are both real fields on the wire shape.
+ * `implantSet` is threaded straight through both directions, `undefined` and
+ * `{implants: [], boosters: []}` staying distinct the way
+ * `fittingShare.ts`'s own codec keeps them. Fighters have no home on the
+ * domain `Fitting` at all — no capital ship fitting exists in the app —
+ * and stay dropped in both directions; a fighter bay surviving a share round
+ * trip is future tickets' scope, not a regression this mapper introduces.
  *
  * A `Fitting`'s name is deliberately not part of this mapping at all: the
  * share payload never carries it (`fittingShare.ts`'s own header comment), so
@@ -74,6 +75,7 @@ export function fittingToShareInput(fitting: Fitting): FittingShareInput {
     })),
     fighters: [],
     cargo: fitting.cargo.map((item) => ({ typeId: item.typeId, quantity: item.quantity })),
+    ...(fitting.implantSet === undefined ? {} : { implantSet: fitting.implantSet }),
   };
 }
 
@@ -98,5 +100,6 @@ export function shareToFitting(decoded: FittingShareInput, name: string): Fittin
       state: drone.active > 0 ? 'active' : 'online',
     })),
     cargo: decoded.cargo.map((item) => ({ typeId: item.typeId, quantity: item.quantity })),
+    ...(decoded.implantSet === undefined ? {} : { implantSet: decoded.implantSet }),
   };
 }
