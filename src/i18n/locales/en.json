@@ -1418,6 +1418,8 @@
   "characters": {
     "title": "Characters",
     "add": "Add character",
+    "addMenuLabel": "Add character options",
+    "addWithPermissions": "Add with specific permissions…",
     "emptyTitle": "No characters yet",
     "emptyHint": "Log in with EVE Online to add your first character.",
     "portraitAlt": "Portrait of {{name}}",

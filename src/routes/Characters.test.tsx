@@ -38,6 +38,7 @@ import { Characters } from './Characters';
 
 vi.mock('@/app/loginFlow', () => ({
   beginAddCharacterLogin: vi.fn().mockResolvedValue(undefined),
+  beginCustomizedAddCharacterLogin: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/features/character/removeCharacter', async (importOriginal) => ({
@@ -226,11 +227,26 @@ describe('Characters', () => {
   it('add character starts an ADD-A-CHARACTER login, not a re-auth', async () => {
     // Not `beginEveLogin`: that unions with the active Character's grant, and
     // the character arriving here is by definition somebody else (#295).
+    // Exact name, not a substring match: the split button's arrow half is
+    // also named "Add character options", which a loose /add character/i
+    // regex would match too.
     const { beginAddCharacterLogin } = await import('@/app/loginFlow');
     const user = userEvent.setup();
     renderCharacters();
-    await user.click(await screen.findByRole('button', { name: /add character/i }));
+    await user.click(await screen.findByRole('button', { name: 'Add character' }));
     expect(beginAddCharacterLogin).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens the Customize permissions dialog, pre-filled from the remembered selection, from the Add Character split button', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Add character options' }));
+    await user.click(
+      await screen.findByRole('menuitem', { name: 'Add with specific permissions…' })
+    );
+    expect(
+      await screen.findByRole('dialog', { name: 'Customize permissions' })
+    ).toBeInTheDocument();
   });
 
   it('shows an empty state when no characters exist', async () => {
