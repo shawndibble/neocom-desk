@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { fittingToEveXml } from '@/engine/fittings/fittingExport';
+import type { Fitting } from '@/engine/fittings/types';
+import { loadEveFitXmlEntry } from '@/engine/import/eveFitXml';
 import { parseFittingXmlFile, parseFittingXmlText } from './fittingXmlDocument';
 
 const SINGLE_FIT = `<?xml version="1.0"?>
@@ -125,5 +128,51 @@ describe('parseFittingXmlFile', () => {
     const big = new Uint8Array(2 * 1024 * 1024 + 1);
     const result = await parseFittingXmlFile(new File([big], 'huge.xml'));
     expect(result).toEqual({ ok: false, error: { code: 'tooLarge' } });
+  });
+});
+
+describe('fittings XML export round trip', () => {
+  it('reads back what fittingToEveXml writes: modules by slot, drones, cargo and the loaded charges as cargo', () => {
+    const NAMES: Record<number, string> = {
+      587: 'Rifter',
+      2881: '125mm Gatling AutoCannon II',
+      12608: 'Antimatter Charge S',
+      2046: 'Damage Control I',
+      2454: 'Hobgoblin I',
+      28668: 'Nanite Repair Paste',
+    };
+    const fitting: Fitting = {
+      name: 'Round & Trip',
+      shipTypeId: 587,
+      modules: [
+        { slot: 'high', slotIndex: 1, typeId: 2881, state: 'active', chargeTypeId: 12608 },
+        { slot: 'low', slotIndex: 0, typeId: 2046, state: 'active' },
+      ],
+      drones: [{ typeId: 2454, quantity: 3, state: 'online' }],
+      cargo: [{ typeId: 28668, quantity: 50 }],
+    };
+    const parsed = parseFittingXmlText(fittingToEveXml(fitting, (id) => NAMES[id]));
+    if (!parsed.ok) throw new Error('did not parse');
+    const [entry] = parsed.document.entries;
+    expect(entry.name).toBe('Round & Trip');
+    const byName = new Map(
+      Object.entries(NAMES).map(([id, name]) => [name.toLowerCase(), Number(id)])
+    );
+    const loaded = loadEveFitXmlEntry(entry, {
+      get: (name) => (byName.has(name) ? { typeID: byName.get(name)! } : undefined),
+    });
+
+    expect(loaded.unresolved).toEqual([]);
+    expect(loaded.hullTypeId).toBe(587);
+    if (loaded.hullTypeId === null) return;
+    expect(loaded.modules).toEqual([
+      { slot: 'high', slotIndex: 1, typeId: 2881, state: 'active' },
+      { slot: 'low', slotIndex: 0, typeId: 2046, state: 'active' },
+    ]);
+    expect(loaded.drones).toEqual([{ typeId: 2454, quantity: 3, state: 'online' }]);
+    expect(loaded.cargo).toEqual([
+      { typeId: 28668, quantity: 50 },
+      { typeId: 12608, quantity: 1 },
+    ]);
   });
 });

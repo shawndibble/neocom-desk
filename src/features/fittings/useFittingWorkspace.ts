@@ -26,6 +26,7 @@ import { decodeFittingShare, encodeFittingShare } from '@/engine/fitting/fitting
 import { loadEveFitXmlEntry, type FittingXmlDocument } from '@/engine/import/eveFitXml';
 import { toLoadOutcome, type LoadedFitting, type LoadOutcome } from '@/engine/fittings/load';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
+import { launchDrones } from '@/engine/fittings/fittingEdit';
 import { loadFittingFromText } from './loadFittingFromText';
 import { defaultImplantBasis, type ImplantBasis } from '@/engine/fittings/implantBasis';
 import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
@@ -80,6 +81,8 @@ export type FittingChange = (fitting: Fitting) => Fitting;
 
 /** The open Fitting's evaluation (stats, price, Variations) plus everything that opens, edits and saves it. */
 export interface FittingWorkspace extends FittingEvaluation {
+  /** What `statsError` is about: the active Character's skills, or the ship data / calculation. */
+  statsErrorReason: 'skills' | 'shipData';
   fitting: Fitting | null;
   /** Set when `?f=` carries a payload this build can't read at all. */
   shareError: ShareDecodeError | null;
@@ -163,6 +166,14 @@ export function useFittingWorkspace(): FittingWorkspace {
   const editSeqRef = useRef(0);
   // The coalesce key and time of the last edit that wrote the URL.
   const lastWriteRef = useRef<{ key: string; at: number } | null>(null);
+  // A Load whose source says nothing about which drones are out (EFT, DNA,
+  // XML, In-game, a killmail) launches them once its first stats say how many
+  // fit (scope decision `20260925-113331`). A link or
+  // a saved Fitting carries its own counts, and any edit first cancels it.
+  // Bound to the exact Fitting the Load opened — its share code, or the object
+  // itself when it is too large to link — so the Fitting it replaces, still on
+  // screen until the decode lands, can't take the launch instead.
+  const launchPendingRef = useRef<{ code: string } | { fitting: Fitting } | null>(null);
 
   // Decode whenever the URL's `f` changes — a fresh load's own write below, a
   // pasted link, or Back/Forward. A stale decode from a param that changed
@@ -175,6 +186,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     const pending = pendingOpenRef.current;
     pendingOpenRef.current = null;
     if (own?.code !== shareCode) {
+      launchPendingRef.current = null;
       // Anything but an edit or a saved-Fitting open is a different Fitting.
       if (pending?.code !== shareCode) setSavedId(null);
       setLastLoad(null);
@@ -218,6 +230,11 @@ export function useFittingWorkspace(): FittingWorkspace {
         pending?.code === shareCode ? pending.name : await typeName(decoded.value.hullTypeId);
       if (cancelled) return;
       const opened = shareToFitting(decoded.value, name);
+      // The Load's own write has decoded: from here the launch waits for this object's stats.
+      const launch = launchPendingRef.current;
+      if (launch !== null && 'code' in launch && launch.code === shareCode) {
+        launchPendingRef.current = { fitting: opened };
+      }
       latestFittingRef.current = opened;
       setShareError(null);
       setFitting(opened);
@@ -232,9 +249,14 @@ export function useFittingWorkspace(): FittingWorkspace {
   // `?f=`, or — too large to link — keeps it open locally, same as a
   // too-large Load.
   const commitFitting = useCallback(
-    async (loaded: Fitting) => {
+    async (loaded: Fitting, { launchDrones: launch = false }: { launchDrones?: boolean } = {}) => {
       const encoded = await encodeFittingShare(fittingToShareInput(loaded));
       setTooLargeToShare(!encoded.ok);
+      launchPendingRef.current = !launch
+        ? null
+        : encoded.ok
+          ? { code: encoded.payload }
+          : { fitting: loaded };
       if (encoded.ok) {
         // The decode effect above picks this up and sets `fitting`. Only
         // actually flags "mine" when the code is really changing: an
@@ -265,7 +287,7 @@ export function useFittingWorkspace(): FittingWorkspace {
       setLastLoad(outcome);
       if (outcome.kind === 'failed') return;
       setSavedId(null);
-      await commitFitting(outcome.fitting);
+      await commitFitting(outcome.fitting, { launchDrones: true });
     },
     [commitFitting, setShareCode]
   );
@@ -274,7 +296,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     async (loaded: LoadedFitting) => {
       setLastLoad(loaded);
       setSavedId(null);
-      await commitFitting(loaded.fitting);
+      await commitFitting(loaded.fitting, { launchDrones: true });
     },
     [commitFitting]
   );
@@ -288,10 +310,13 @@ export function useFittingWorkspace(): FittingWorkspace {
     [commitFitting]
   );
 
-  const edit = useCallback(
-    (change: FittingChange, coalesceKey?: string) => {
+  // `replace`: write over the current history entry instead of adding one —
+  // for a change the app makes on its own, like a Load's drone launch.
+  const applyEdit = useCallback(
+    (change: FittingChange, coalesceKey?: string, replace = false) => {
       const current = latestFittingRef.current;
       if (current === null) return;
+      if (!replace) launchPendingRef.current = null;
       const next = change(current);
       latestFittingRef.current = next;
       setFitting(next);
@@ -318,10 +343,14 @@ export function useFittingWorkspace(): FittingWorkspace {
           now - last.at < COALESCE_MS;
         lastWriteRef.current = coalesceKey === undefined ? null : { key: coalesceKey, at: now };
         ownWriteRef.current = { code: encoded.payload, fitting: next };
-        setShareCode(encoded.payload, { push: !coalesce });
+        setShareCode(encoded.payload, { push: !coalesce && !replace });
       })();
     },
     [setShareCode]
+  );
+  const edit = useCallback(
+    (change: FittingChange, coalesceKey?: string) => applyEdit(change, coalesceKey),
+    [applyEdit]
   );
 
   const canSave = activeCharacterId !== null && fitting !== null && !tooLargeToShare;
@@ -388,8 +417,33 @@ export function useFittingWorkspace(): FittingWorkspace {
 
   // The pilot the stats and fit checks run under; loaded once per Character,
   // not once per edit. A failed load is reported as a stats error.
-  const { profile, failed: profileFailed } = usePilotProfile(activeCharacterId);
+  const {
+    profile,
+    failed: profileFailed,
+    retry: retryProfile,
+  } = usePilotProfile(activeCharacterId);
   const evaluation = useFittingEvaluation({ fitting, profile, implantBasis });
+
+  const { stats: evaluatedStats, statsFitting } = evaluation;
+  useEffect(() => {
+    const pending = launchPendingRef.current;
+    if (pending === null || fitting === null || evaluatedStats === null) return;
+    // Until the decode lands, the code is written but the old Fitting is still on screen.
+    if (!('fitting' in pending) || pending.fitting !== fitting || statsFitting !== fitting) return;
+    launchPendingRef.current = null;
+    const launched = launchDrones(fitting, {
+      bandwidthTotal: evaluatedStats.droneBandwidthTotal,
+      maxActive: evaluatedStats.maxActiveDrones,
+      bandwidthOf: (typeId) => evaluatedStats.droneBandwidthByType[typeId] ?? 0,
+    });
+    if (launched !== fitting) applyEdit(() => launched, undefined, true);
+  }, [evaluatedStats, statsFitting, fitting, applyEdit]);
+  const retryEvaluation = evaluation.retry;
+  // One retry for whichever failed: the skills load, or the engine and its calculation.
+  const retry = useCallback(() => {
+    if (profileFailed) retryProfile();
+    else retryEvaluation();
+  }, [profileFailed, retryProfile, retryEvaluation]);
 
   return {
     fitting,
@@ -407,6 +461,8 @@ export function useFittingWorkspace(): FittingWorkspace {
     setImplantSet,
     ...evaluation,
     statsError: evaluation.statsError || profileFailed,
+    statsErrorReason: profileFailed ? ('skills' as const) : ('shipData' as const),
+    retry,
     profile,
     savedId,
     canSave,

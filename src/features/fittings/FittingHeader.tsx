@@ -32,8 +32,9 @@ interface FittingHeaderProps {
   context?: ReactNode;
   save: ReactNode;
   /**
-   * Below desktop: identity and Save on the first line, the Fittings menu and
-   * Export folded into one ⋮ menu beside them, what the numbers assume below.
+   * Below desktop, or while the Add slide-out narrows the page: identity and
+   * Save on the first line, the Fittings menu and Export folded into one ⋮
+   * menu beside them, what the numbers assume below.
    */
   compact?: boolean;
 }

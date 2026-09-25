@@ -1,4 +1,5 @@
 import {
+  CHARACTER_DOGMA_ATTRIBUTE,
   CHARGE_GROUP_ATTRIBUTES,
   DOGMA_ATTRIBUTE,
   ITEM_DOGMA_ATTRIBUTE,
@@ -123,6 +124,31 @@ function layerDefense(
 }
 
 /**
+ * What limits the drones in space: how many the pilot controls, and each
+ * drone type's bandwidth (read even for a stack still in the bay, which draws
+ * none yet). `items`/`itemResults` are index-parallel, as `calculate()` takes and returns them.
+ */
+export function extractDroneLimits(
+  items: readonly CalculatedItem[],
+  itemResults: readonly { attributes: AttributeMap }[],
+  characterAttributes: AttributeMap
+): Pick<FittingStats, 'maxActiveDrones' | 'droneBandwidthByType'> {
+  const droneBandwidthByType: Record<number, number> = {};
+  items.forEach((item, index) => {
+    const result = itemResults[index];
+    if (item.slot.type !== 'drone_bay' || !result) return;
+    droneBandwidthByType[item.type_id] = readAttribute(
+      result.attributes,
+      ITEM_DOGMA_ATTRIBUTE.droneBandwidthNeeded
+    );
+  });
+  return {
+    maxActiveDrones: readAttribute(characterAttributes, CHARACTER_DOGMA_ATTRIBUTE.maxActiveDrones),
+    droneBandwidthByType,
+  };
+}
+
+/**
  * A type id the pinned `sde.dat` has nothing for comes back from `calculate`
  * with an empty attribute map rather than failing the whole calculation
  * (verified against a live run of the pinned engine, 2026-09-24) — that's how
@@ -154,7 +180,14 @@ export function extractFittingStats(
   itemResults: readonly ItemCalculationResult[]
 ): Omit<
   FittingStats,
-  'calibrationUsed' | 'droneBandwidthUsed' | 'modules' | 'offense' | 'overheated' | 'applied'
+  | 'calibrationUsed'
+  | 'droneBandwidthUsed'
+  | 'maxActiveDrones'
+  | 'droneBandwidthByType'
+  | 'modules'
+  | 'offense'
+  | 'overheated'
+  | 'applied'
 > {
   const cpuTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.cpuOutput);
   const powergridTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.powerOutput);

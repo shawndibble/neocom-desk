@@ -95,7 +95,7 @@ export function FittingShared() {
   // On the Fitting's own set, under the viewer's own Damage Profile (a
   // local-then-synced setting, so it works with no session too) — the link
   // itself never carries one. A new code clears the stats while it resolves.
-  const { stats, statsProgress, statsError, price, damageProfiles } = useFittingEvaluation({
+  const { stats, statsProgress, statsError, retry, price, damageProfiles } = useFittingEvaluation({
     fitting: readyFitting,
     profile: readyProfile,
     implantBasis: 'fitting',
@@ -185,6 +185,7 @@ export function FittingShared() {
             stats={stats}
             statsProgress={statsProgress}
             statsError={statsError}
+            onRetry={retry}
             price={price}
             typeName={typeName ?? ((typeId) => `#${typeId}`)}
             damageProfiles={damageProfiles}

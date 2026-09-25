@@ -7,7 +7,12 @@ import type { ReactNode } from 'react';
 import { MemoryRouter, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { encodeFittingShare } from '@/engine/fitting/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
-import { addModule, removeModule, setDroneCounts } from '@/engine/fittings/fittingEdit';
+import {
+  addModule,
+  droneGroups,
+  removeModule,
+  setDroneCounts,
+} from '@/engine/fittings/fittingEdit';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { useFittingWorkspace } from './useFittingWorkspace';
 
@@ -19,7 +24,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: async () => TYPES,
   typeName: async (typeId: number) => TYPES[String(typeId)]?.name ?? `Type ${typeId}`,
   loadSkills: async () => [],
-  loadFittingSlots: async () => ({}),
+  loadFittingSlots: async () => ({ '2454': 'drone' }),
 }));
 vi.mock('@/sync', () => ({ scheduleSync: vi.fn(), markFittingDeleted: vi.fn() }));
 vi.mock('./fittingPrice', () => ({ loadFittingPrice: async () => null }));
@@ -27,6 +32,10 @@ vi.mock('./dogmaFittingEngine', () => ({
   isDogmaEngineReady: () => false,
   computeFittingStats: async (fitting: Fitting) =>
     ({
+      // A light drone draws 5 Mbit/s; the hull has room for four, the pilot controls five.
+      droneBandwidthTotal: 20,
+      maxActiveDrones: 5,
+      droneBandwidthByType: { 2454: 5 },
       modules: fitting.modules.map(() => ({
         state: 'online',
         maxState: 'online',
@@ -201,5 +210,47 @@ describe('useFittingWorkspace saving (My Fittings)', () => {
     );
     await waitFor(() => expect(view.result.current.workspace.fitting?.name).toBe(RIFTER.name));
     expect(view.result.current.workspace.savedId).toBeNull();
+  });
+});
+
+describe('useFittingWorkspace — drones on Load', () => {
+  it('launches a pasted fit’s drones once its stats say how many fit, replacing the Load’s own entry', async () => {
+    const view = await renderAt(RIFTER);
+    // A Fitting to go Back to; the Load then replaces the entry after it.
+    const encoded = await encodeFittingShare(
+      fittingToShareInput(addModule(RIFTER, 'medium', 0, 438))
+    );
+    if (!encoded.ok) throw new Error('encode failed');
+    act(() => view.result.current.navigate(`/fittings?f=${encoded.payload}`));
+    await waitFor(() => expect(view.result.current.workspace.fitting?.modules).toHaveLength(2));
+    const loadedOver = view.result.current.location.search;
+
+    await act(() =>
+      view.result.current.workspace.loadFromInput(
+        ['[Rifter, Drones]', '', 'Hobgoblin I x6'].join('\n')
+      )
+    );
+    // Bandwidth for four of the six.
+    await waitFor(() =>
+      expect(droneGroups(view.result.current.workspace.fitting!)).toEqual([
+        { typeId: 2454, inSpace: 4, inBay: 2 },
+      ])
+    );
+    expect(view.result.current.navigationType).toBe('REPLACE');
+
+    // The launch overwrote the Load's own entry rather than adding one, so
+    // Back leaves the Load altogether — no in-bay copy of it to step through.
+    expect(view.result.current.location.search).not.toBe(loadedOver);
+    act(() => view.result.current.navigate(-1));
+    await waitFor(() =>
+      expect(view.result.current.workspace.fitting?.modules).toEqual(RIFTER.modules)
+    );
+    expect(view.result.current.workspace.fitting?.drones).toEqual(RIFTER.drones);
+  });
+
+  it('leaves the drones of a Fitting opened by link where the link put them', async () => {
+    const view = await renderAt(RIFTER);
+    await waitFor(() => expect(view.result.current.workspace.stats).not.toBeNull());
+    expect(view.result.current.workspace.fitting?.drones).toEqual(RIFTER.drones);
   });
 });

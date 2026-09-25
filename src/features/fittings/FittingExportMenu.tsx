@@ -29,7 +29,7 @@ export function FittingExportNotice({ notice }: { notice: string | null }) {
 
 /** Export's menu items, for whichever menu holds them. */
 export function FittingExportItems({
-  actions: { copy, openInAppraisal },
+  actions: { copy, downloadEveXml, openInAppraisal },
   price,
 }: {
   actions: FittingExport;
@@ -49,6 +49,9 @@ export function FittingExportItems({
       </DropdownMenuItem>
       <DropdownMenuItem onSelect={() => void copy('multibuy')}>
         {t('fittings.export.multibuy')}
+      </DropdownMenuItem>
+      <DropdownMenuItem onSelect={() => void downloadEveXml()}>
+        {t('fittings.export.eveXml')}
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <div className="px-2 py-1.5 text-xs text-text-dim">

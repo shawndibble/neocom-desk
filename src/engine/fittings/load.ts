@@ -31,7 +31,7 @@ export interface LoadWarning {
 export type LoadSource = 'text' | 'file' | 'in-game';
 
 /** Why a Load produced no Fitting, beyond its warnings. */
-export type LoadError = 'unrecognised' | 'killmail-not-found' | 'killmail-failed';
+export type LoadError = 'unrecognised' | 'eve-workbench' | 'killmail-not-found' | 'killmail-failed';
 
 /** A Fitting's parts as each loader resolves them, before it has a name. */
 export type LoadParts =
@@ -126,6 +126,7 @@ export async function loadText(
 ): Promise<LoadOutcome | ShareLoad> {
   const input = classifyLoadInput(text);
   if (input.kind === 'unknown') return failed('unrecognised');
+  if (input.kind === 'eveWorkbench') return failed('eve-workbench');
   if (input.kind === 'share') return { kind: 'share', code: input.code };
 
   const { typeByName, slotByTypeId } = await sources.catalog();

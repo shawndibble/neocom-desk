@@ -3,7 +3,12 @@ import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it } from 'vitest';
 import wasmInit, { calculate } from '@eveshipfit/dogma-engine';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
-import { extractFittingStats, extractModuleResult, extractOffense } from '@/engine/fittings/stats';
+import {
+  extractDroneLimits,
+  extractFittingStats,
+  extractModuleResult,
+  extractOffense,
+} from '@/engine/fittings/stats';
 import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
 import type { Fitting } from '@/engine/fittings/types';
@@ -183,6 +188,28 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     );
 
     expect(stats.droneDps).toBe(0);
+  });
+
+  it("reads a bay drone's bandwidth and the pilot's drone count, so a Load can launch them", () => {
+    const fitting = vexorNavyIssueFit();
+    fitting.drones = [{ typeId: WARRIOR_II, quantity: 5, state: 'online' }];
+    const allV = fittingToDogmaFit(fitting, buildAllVProfile(ALL_TEST_SKILL_IDS));
+    const partial = fittingToDogmaFit(fitting, buildPilotProfile(PARTIAL_SKILLS, []));
+    const noDrones = fittingToDogmaFit(fitting, buildPilotProfile(new Map(), []));
+
+    const read = (dogmaFit: ReturnType<typeof fittingToDogmaFit>) => {
+      const calculation = calculate(dogmaFit);
+      return extractDroneLimits(
+        dogmaFit.items,
+        calculation.items,
+        calculation.character.attributes
+      );
+    };
+
+    // A Warrior II is a light drone, 5 Mbit/s; Drones V controls five, Drones III three.
+    expect(read(allV)).toEqual({ maxActiveDrones: 5, droneBandwidthByType: { [WARRIOR_II]: 5 } });
+    expect(read(partial).maxActiveDrones).toBe(3);
+    expect(read(noDrones).maxActiveDrones).toBe(0);
   });
 
   it('marks a type id the pinned data has nothing for as unknown, without failing the rest of the calculation', () => {

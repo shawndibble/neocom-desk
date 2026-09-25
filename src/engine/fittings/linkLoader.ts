@@ -27,6 +27,11 @@ export type LoadInput =
   | { kind: 'dna'; dna: string }
   | { kind: 'share'; code: string }
   | { kind: 'killmail'; killmailId: number; hash?: string }
+  /**
+   * An EVE Workbench fit page. Its API sends no CORS headers, so a browser
+   * can't read the fit from it — Load says how to copy the EFT across instead.
+   */
+  | { kind: 'eveWorkbench' }
   | { kind: 'unknown' };
 
 const DNA = /^\d+(?::\d+_?;\d+)+:*$/;
@@ -59,6 +64,9 @@ export function classifyLoadInput(input: string): LoadInput {
       // This app's own Share Link (a Fitting's Export menu): the code rides in `?f=`.
       const code = url.searchParams.get('f');
       if (code && /\/fittings\/?$/.test(url.pathname)) return { kind: 'share', code };
+      if (/(^|\.)eveworkbench\.com$/i.test(url.hostname) && /^\/fit\//i.test(url.pathname)) {
+        return { kind: 'eveWorkbench' };
+      }
       if (/(^|\.)eveship\.fit$/i.test(url.hostname)) {
         const fit = url.searchParams.get('fit') ?? decodeURIComponent(url.hash.replace(/^#/, ''));
         return classifyPlain(fit);

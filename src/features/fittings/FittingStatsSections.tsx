@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Caret, Tooltip } from '@/components/ui';
+import { Button, Caret, Tooltip } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
 import {
   alignTimeSeconds,
@@ -272,6 +272,10 @@ interface FittingStatsSectionsProps {
   stats: FittingStats | null;
   statsProgress: DogmaAssetProgress | null;
   statsError: boolean;
+  /** What failed, when `statsError`: the pilot's skills, or the ship data / calculation. */
+  statsErrorReason?: 'skills' | 'shipData';
+  /** Tries the failed load again; without it the error has no retry. */
+  onRetry?: () => void;
   price: Appraisal | null;
   /** Names an Offense row's weapon, charge or drone. */
   typeName: (typeId: number) => string;
@@ -296,6 +300,8 @@ export function FittingStatsSections({
   stats,
   statsProgress,
   statsError,
+  statsErrorReason = 'shipData',
+  onRetry,
   price,
   typeName,
   damageProfiles,
@@ -325,8 +331,9 @@ export function FittingStatsSections({
       ? Math.round((statsProgress.loadedBytes / statsProgress.totalBytes) * 100)
       : null;
 
+  // The error is said once, above the sections; each section just says it has nothing.
   const placeholder = statsError ? (
-    <p className="text-xs text-danger">{t('fittings.stats.error')}</p>
+    <p className="text-xs text-text-dim">{t('fittings.stats.unavailable')}</p>
   ) : (
     <p className="text-xs text-text-dim">
       {downloadPct === null
@@ -409,6 +416,23 @@ export function FittingStatsSections({
       {heading && (
         <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2 text-xs text-text-dim">
           {heading}
+        </div>
+      )}
+      {statsError && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2 text-xs text-danger"
+        >
+          <span>
+            {t(
+              statsErrorReason === 'skills' ? 'fittings.stats.errorSkills' : 'fittings.stats.error'
+            )}
+          </span>
+          {onRetry && (
+            <Button size="sm" onClick={onRetry}>
+              {t('fittings.stats.retry')}
+            </Button>
+          )}
         </div>
       )}
 

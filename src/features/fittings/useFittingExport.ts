@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { MARKET_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import { writeToClipboard } from '@/lib/clipboard';
+import { downloadTextFile } from '@/lib/download';
 import type { MarketAppraiseState } from '@/lib/shortcuts';
 import type { Fitting } from '@/engine/fittings/types';
 import { exportFitting, type FittingExportKind } from './fittingExportText';
@@ -39,6 +40,20 @@ export function useFittingExport(fitting: Fitting) {
     }
   }
 
+  /** The game's fittings XML, as a file — the fitting window imports it from disk. */
+  async function downloadEveXml() {
+    try {
+      const text = await exportFitting('eveXml', fitting);
+      if (text === null) return;
+      // Characters a Windows filename can't hold.
+      const filename = `${fitting.name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'fitting'}.xml`;
+      downloadTextFile(filename, text, 'application/xml;charset=utf-8');
+      setNotice(t('fittings.export.downloaded.eveXml'));
+    } catch {
+      setNotice(t('fittings.export.copyFailed'));
+    }
+  }
+
   async function openInAppraisal() {
     const text = await exportFitting('multibuy', fitting);
     if (text === null) return;
@@ -47,7 +62,7 @@ export function useFittingExport(fitting: Fitting) {
     });
   }
 
-  return { notice, copy, openInAppraisal };
+  return { notice, copy, downloadEveXml, openInAppraisal };
 }
 
 export type FittingExport = ReturnType<typeof useFittingExport>;

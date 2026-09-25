@@ -404,6 +404,8 @@ export function Fittings() {
       stats={stats}
       statsProgress={workspace.statsProgress}
       statsError={workspace.statsError}
+      statsErrorReason={workspace.statsErrorReason}
+      onRetry={workspace.retry}
       price={workspace.price}
       typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
       damageProfiles={workspace.damageProfiles}
@@ -453,7 +455,8 @@ export function Fittings() {
         onLibrary={openLibrary}
         onCompare={() => navigate(`/fittings/compare${location.search}`)}
         price={workspace.price}
-        compact={addMode === 'sheet'}
+        // The open slide-out takes 26rem off the page, too little for the one-row header.
+        compact={addMode === 'sheet' || (addMode === 'slideOut' && addOpen)}
         context={
           <>
             <ImplantBasisControl

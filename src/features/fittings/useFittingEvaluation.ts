@@ -16,7 +16,7 @@
  * forgot the Damage Profile). `dogmaFittingEngine.ts` stays the seam to the
  * engine itself (ADR 0016); this module sits above it.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   applyImplantBasis,
   defaultImplantBasis,
@@ -67,6 +67,8 @@ export interface FittingEvaluation {
   statsFitting: Fitting | null;
   statsProgress: DogmaAssetProgress | null;
   statsError: boolean;
+  /** Calculates again after `statsError` — the engine refetches its assets if those failed. */
+  retry: () => void;
   /** The ship data (dogma engine) is loaded, so slot and fit checks can run. */
   engineReady: boolean;
   /** The Damage Profile every evaluation's EHP is measured against, and the pilot's custom ones. */
@@ -146,6 +148,8 @@ export function useFittingEvaluation({
   const [stats, setStats] = useState<{ fitting: Fitting; stats: FittingStats } | null>(null);
   const [statsProgress, setStatsProgress] = useState<DogmaAssetProgress | null>(null);
   const [statsError, setStatsError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
   const [engineReady, setEngineReady] = useState(isDogmaEngineReady);
   const [price, setPrice] = useState<Appraisal | null>(null);
 
@@ -187,7 +191,7 @@ export function useFittingEvaluation({
     return () => {
       cancelled = true;
     };
-  }, [fitting, pilot, damageProfile]);
+  }, [fitting, pilot, damageProfile, attempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -214,6 +218,7 @@ export function useFittingEvaluation({
     statsFitting: stats?.fitting ?? null,
     statsProgress,
     statsError,
+    retry,
     engineReady,
     damageProfiles,
     price,

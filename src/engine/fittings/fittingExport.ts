@@ -95,6 +95,66 @@ export function fittingToChatLink(fitting: Fitting): string {
   return `<url=fitting:${fittingToDna(fitting)}>${headerSafe(fitting.name)}</url>`;
 }
 
+/** How the game's fittings XML names each rack's slots (`hi slot 0`, `med slot 2`…). */
+const XML_RACK: Readonly<Record<FittingSlotKind, string>> = {
+  high: 'hi',
+  medium: 'med',
+  low: 'low',
+  rig: 'rig',
+  subsystem: 'subsystem',
+};
+
+function xmlAttr(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * The game's fittings XML (the fitting window's "Import from file"), as the
+ * game and pyfa write it: one `<hardware>` per module by rack and slot,
+ * `drone bay` stacks, and `cargo`. The format has nowhere to load a charge
+ * into a module, so — as pyfa does — each loaded charge is carried as cargo
+ * instead, one per module loading it, beside any cargo of that type.
+ */
+export function fittingToEveXml(fitting: Fitting, nameFor: ItemNameFor): string {
+  const hardware = (attrs: string) => `    <hardware ${attrs}/>`;
+  const lines = [
+    '<?xml version="1.0" ?>',
+    '<fittings>',
+    `  <fitting name="${xmlAttr(fitting.name)}">`,
+    '    <description value=""/>',
+    `    <shipType value="${xmlAttr(nameFor(fitting.shipTypeId))}"/>`,
+  ];
+  for (const rack of EFT_RACK_ORDER) {
+    const inRack = fitting.modules
+      .filter((m) => m.slot === rack)
+      .sort((a, b) => a.slotIndex - b.slotIndex);
+    for (const module of inRack) {
+      const slot = `${XML_RACK[rack]} slot ${module.slotIndex}`;
+      lines.push(hardware(`slot="${slot}" type="${xmlAttr(nameFor(module.typeId))}"`));
+    }
+  }
+  for (const drone of fitting.drones) {
+    const type = xmlAttr(nameFor(drone.typeId));
+    lines.push(hardware(`qty="${drone.quantity}" slot="drone bay" type="${type}"`));
+  }
+  const cargo = new Map<number, number>();
+  const carry = (typeId: number, quantity: number) =>
+    cargo.set(typeId, (cargo.get(typeId) ?? 0) + quantity);
+  for (const item of fitting.cargo) carry(item.typeId, item.quantity);
+  for (const module of fitting.modules) {
+    if (module.chargeTypeId !== undefined) carry(module.chargeTypeId, 1);
+  }
+  for (const [typeId, quantity] of cargo) {
+    lines.push(hardware(`qty="${quantity}" slot="cargo" type="${xmlAttr(nameFor(typeId))}"`));
+  }
+  lines.push('  </fitting>', '</fittings>', '');
+  return lines.join('\n');
+}
+
 /** One `name<TAB>quantity` line per item — the shape the game's multibuy and Appraisal both read. */
 export function fittingToMultibuy(fitting: Fitting, nameFor: ItemNameFor): string {
   return [...fittingItemCounts(fitting)]

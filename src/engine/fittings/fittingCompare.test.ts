@@ -15,6 +15,8 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     droneDps: 0,
     droneBandwidthUsed: 0,
     droneBandwidthTotal: 0,
+    maxActiveDrones: 0,
+    droneBandwidthByType: {},
     droneCapacity: 0,
     ehp: 1000,
     capacitor: { stable: true, stablePercentage: 50 },

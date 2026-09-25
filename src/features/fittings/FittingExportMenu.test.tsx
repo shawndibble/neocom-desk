@@ -9,6 +9,9 @@ import type { Fitting } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { FittingExportMenu } from './FittingExportMenu';
 
+const download = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/download', () => ({ downloadTextFile: download }));
+
 vi.mock('@/sde/loadSde', () => ({
   loadTypes: async () => ({
     '587': { name: 'Rifter' },
@@ -105,5 +108,20 @@ describe('FittingExportMenu', () => {
     setup(null);
     await userEvent.setup().click(screen.getByRole('button', { name: 'Export' }));
     expect(await screen.findByText('Pricing…')).toBeInTheDocument();
+  });
+});
+
+describe('FittingExportMenu — EVE XML', () => {
+  it('downloads the fit as the game’s fittings XML, named after it', async () => {
+    download.mockClear();
+    setup();
+    await choose('Download EVE XML');
+    await waitFor(() => expect(download).toHaveBeenCalledOnce());
+    const [filename, text, mime] = download.mock.calls[0] as [string, string, string];
+    expect(filename).toBe('Brawler.xml');
+    expect(text).toContain('<shipType value="Rifter"/>');
+    expect(text).toContain('<hardware slot="hi slot 0" type="200mm AutoCannon II"/>');
+    expect(mime).toMatch(/xml/);
+    expect(await screen.findByRole('status')).toHaveTextContent('Fitting XML downloaded');
   });
 });

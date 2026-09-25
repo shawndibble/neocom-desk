@@ -89,6 +89,7 @@
       },
       "loadError": {
         "unrecognised": "That isn't something Load can read. Paste EFT fit text, an in-game fitting link or DNA string, an eveship.fit link, or a zKillboard killmail link.",
+        "eve-workbench": "EVE Workbench links can't be read from here. On the fit's page, open Export, copy the EFT, and paste it in.",
         "killmail-not-found": "That killmail couldn't be found on zKillboard.",
         "killmail-failed": "The killmail couldn't be fetched from ESI. Try again in a moment."
       },
@@ -295,6 +296,7 @@
       "eft": "Copy EFT",
       "chatLink": "Copy in-game link",
       "multibuy": "Copy multibuy list",
+      "eveXml": "Download EVE XML",
       "appraise": "Appraise in Market",
       "tooLarge": "Too large to share as a link.",
       "copyFailed": "Couldn't copy to the clipboard.",
@@ -303,10 +305,16 @@
         "eft": "EFT copied",
         "chatLink": "In-game link copied",
         "multibuy": "Multibuy list copied"
+      },
+      "downloaded": {
+        "eveXml": "Fitting XML downloaded"
       }
     },
     "stats": {
       "error": "Couldn't load ship data for this fit.",
+      "errorSkills": "Couldn't load this Character's skills, so the stats can't be worked out.",
+      "retry": "Try again",
+      "unavailable": "Not available",
       "loadingIndeterminate": "Downloading ship data…",
       "loading": "Downloading ship data… {{pct}}%",
       "damageType": {

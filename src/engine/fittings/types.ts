@@ -152,6 +152,10 @@ export interface FittingStats {
   droneDps: number;
   droneBandwidthUsed: number;
   droneBandwidthTotal: number;
+  /** Drones the pilot can control at once — the Drones skill's count; 0 without it. */
+  maxActiveDrones: number;
+  /** Mbit/s one drone of each type in the Fitting draws, whether launched or not. */
+  droneBandwidthByType: Record<number, number>;
   droneCapacity: number;
   ehp: number;
   capacitor: CapacitorStatus;
@@ -333,6 +337,15 @@ export const DOGMA_ATTRIBUTE = {
  * across whichever items actually draw it (rigs; active/online drones).
  * Verified 2026-09-24 against a live run of the pinned engine.
  */
+/**
+ * Read off the calculation's character result: "Max Active Drones", which
+ * the Drones skill raises by one a level. Verified 2026-09-25 against the
+ * pinned engine (Drones 0/3/5 → absent/3/5).
+ */
+export const CHARACTER_DOGMA_ATTRIBUTE = {
+  maxActiveDrones: 352,
+} as const;
+
 export const ITEM_DOGMA_ATTRIBUTE = {
   calibrationCost: 1153,
   droneBandwidthNeeded: 1272,

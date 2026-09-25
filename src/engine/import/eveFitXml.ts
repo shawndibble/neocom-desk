@@ -42,8 +42,11 @@ export interface FittingXmlDocument {
   entries: FittingXmlEntry[];
 }
 
-const RACK_SLOT = /^(high|med|medium|low|rig|subsystem)\s+slot\s+(\d+)$/i;
+// The game (and pyfa) write "hi slot N" and "med slot N"; the longer
+// spellings are accepted too.
+const RACK_SLOT = /^(hi|high|med|medium|low|rig|subsystem)\s+slot\s+(\d+)$/i;
 const RACK_NAME: Readonly<Record<string, FittingSlotKind>> = {
+  hi: 'high',
   high: 'high',
   med: 'medium',
   medium: 'medium',
@@ -80,7 +83,8 @@ export function loadEveFitXmlEntry(entry: FittingXmlEntry, typeByName: EftTypeLo
       continue;
     }
 
-    if (slotKey === 'cargo hold') {
+    // The game writes "cargo"; "cargo hold" is accepted too.
+    if (slotKey === 'cargo' || slotKey === 'cargo hold') {
       const typeId = resolveTypeId(item.type, typeByName);
       if (typeId === null) {
         unresolved.push({ text: item.type, reason: 'unknown item' });
