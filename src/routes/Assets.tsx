@@ -24,7 +24,8 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { permissionsForEndpoints, type EsiEndpointId } from '@/esi/registry';
+import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { clearStationPin, setAccountStationPin, setCharacterStationPin } from '@/sync';
 import { db, type BuildPlanRecord } from '@/db';
 import { cx } from '@/lib/cx';
@@ -136,6 +137,8 @@ const NO_PRICES: ReadonlyMap<number, number> = new Map();
 const NO_VOLUMES: ReadonlyMap<number, number> = new Map();
 const EMPTY_ITEM_OWNERS: ReadonlyMap<number, number> = new Map();
 const EMPTY_CHARACTER_NAMES: ReadonlyMap<number, string> = new Map();
+/** Stable reference for `useEndpointsGranted` — a fresh array every render would defeat its memo. */
+const LOCATION_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterLocation'];
 const NO_BUILD_PLANS: readonly BuildPlanRecord[] = [];
 
 interface Snapshot {
@@ -1168,6 +1171,9 @@ export function Assets() {
   // system, fetched once per page load (not polled) via ESI's location
   // endpoint. Re-fetched whenever the active character changes.
   const [characterSystemId, setCharacterSystemId] = useState<number | null>(null);
+  // Without the grant every row degrades to "-"; the inline note says why
+  // (issue #1590), matching the Appraisal panel's standings note.
+  const locationGranted = useEndpointsGranted(LOCATION_ENDPOINTS);
   const [characterLocationResolved, setCharacterLocationResolved] = useState(false);
   useEffect(() => {
     if (activeCharacterId === null) return;
@@ -1766,61 +1772,80 @@ export function Assets() {
                   )}
                 </div>
               ) : (
-                <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5">
-                  <h2
-                    ref={levelHeadingRef}
-                    tabIndex={-1}
-                    className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                  >
-                    {t('assets.section.locationCount', { count: sortedTree.length })}
-                  </h2>
-                  <span className="text-[0.6875rem] tabular-nums text-isk-pos">
-                    {t('assets.section.totalValue', { value: formatIsk(totalValue) })}
-                  </span>
-                  {/* flex-wrap (issue #415): on a narrow phone the two Selects no
-                      longer share one row with no priority order — Sort stays put
-                      (it comes first in DOM order) and Route is the one that drops
-                      to its own line when both can't fit beside the label. */}
-                  <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-                    <Select
-                      value={stationSortField}
-                      onValueChange={(value) => void setStationSortField(value as StationSortField)}
+                <>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5">
+                    <h2
+                      ref={levelHeadingRef}
+                      tabIndex={-1}
+                      className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                     >
-                      <SelectTrigger aria-label={t('assets.stationSort.label')} className="w-36">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="name">{t('assets.stationSort.name')}</SelectItem>
-                        <SelectItem value="value">{t('assets.stationSort.value')}</SelectItem>
-                        <SelectItem value="itemCount">
-                          {t('assets.stationSort.itemCount')}
-                        </SelectItem>
-                        <SelectItem value="jumpsAway">
-                          {t('assets.stationSort.jumpsAway')}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Select
-                      value={routePreference}
-                      onValueChange={(value) => void setRoutePreference(value as RoutePreference)}
-                    >
-                      <SelectTrigger
-                        aria-label={t('assets.jumpsAway.routePreference.label')}
-                        className="w-28"
+                      {t('assets.section.locationCount', { count: sortedTree.length })}
+                    </h2>
+                    <span className="text-[0.6875rem] tabular-nums text-isk-pos">
+                      {t('assets.section.totalValue', { value: formatIsk(totalValue) })}
+                    </span>
+                    {/* flex-wrap (issue #415): on a narrow phone the two Selects no
+                        longer share one row with no priority order — Sort stays put
+                        (it comes first in DOM order) and Route is the one that drops
+                        to its own line when both can't fit beside the label. */}
+                    <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                      <Select
+                        value={stationSortField}
+                        onValueChange={(value) =>
+                          void setStationSortField(value as StationSortField)
+                        }
                       >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="shortest">
-                          {t('assets.jumpsAway.routePreference.shortest')}
-                        </SelectItem>
-                        <SelectItem value="safest">
-                          {t('assets.jumpsAway.routePreference.safest')}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                        <SelectTrigger aria-label={t('assets.stationSort.label')} className="w-36">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="name">{t('assets.stationSort.name')}</SelectItem>
+                          <SelectItem value="value">{t('assets.stationSort.value')}</SelectItem>
+                          <SelectItem value="itemCount">
+                            {t('assets.stationSort.itemCount')}
+                          </SelectItem>
+                          <SelectItem value="jumpsAway">
+                            {t('assets.stationSort.jumpsAway')}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={routePreference}
+                        onValueChange={(value) => void setRoutePreference(value as RoutePreference)}
+                      >
+                        <SelectTrigger
+                          aria-label={t('assets.jumpsAway.routePreference.label')}
+                          className="w-28"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="shortest">
+                            {t('assets.jumpsAway.routePreference.shortest')}
+                          </SelectItem>
+                          <SelectItem value="safest">
+                            {t('assets.jumpsAway.routePreference.safest')}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </div>
+                  {locationGranted === false && (
+                    <div className="shrink-0 border-b border-line px-3">
+                      <ReauthBanner
+                        variant="ghost"
+                        title={t('assets.jumpsAway.locationNotGrantedTitle')}
+                        hint={t('assets.jumpsAway.locationNotGrantedHint')}
+                        actionLabel={t('assets.jumpsAway.locationNotGrantedAction')}
+                        onLogin={() =>
+                          void beginEveLogin({
+                            groups: permissionsForEndpoints(LOCATION_ENDPOINTS),
+                          })
+                        }
+                      />
+                    </div>
+                  )}
+                </>
               )}
 
               {/* --- the list --- */}

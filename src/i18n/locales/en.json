@@ -2372,6 +2372,9 @@
         "noLocation": "Character location unavailable.",
         "noRoute": "No route found to this station."
       },
+      "locationNotGrantedTitle": "Jumps away unavailable",
+      "locationNotGrantedHint": "Distances show as \"-\" without this character's current location. Grant Character details to see how far away each station is.",
+      "locationNotGrantedAction": "Grant Character details",
       "routePreference": {
         "label": "Route",
         "shortest": "Shortest",
