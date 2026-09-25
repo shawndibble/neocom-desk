@@ -13,7 +13,7 @@
  *   Safari requires the FCM/permission dance to happen in one, and this is
  *   also the point at which an iOS user must already have installed the PWA.
  */
-import { getMessaging, getToken } from 'firebase/messaging';
+import { deleteToken, getMessaging, getToken } from 'firebase/messaging';
 import { httpsCallable } from 'firebase/functions';
 import { getValidAccessToken } from '@/auth/session';
 import { db } from '@/db';
@@ -80,12 +80,14 @@ export async function registerDeviceForWebPush(
   serviceWorkerRegistration: ServiceWorkerRegistration,
   projectionsByCharacter: ReadonlyMap<number, readonly ProjectionRow[]> = new Map()
 ): Promise<RegisterDeviceResponse | null> {
+  // Checked before `getToken`: a late rebuild on an emptied roster (after
+  // Remove / Log out) must not mint a fresh FCM token just to discard it.
+  const characters = await db.characters.toArray();
+  if (characters.length === 0) return null;
+
   const messaging = getMessaging(getFirebaseApp());
   const fcmToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration });
   if (!fcmToken) return null;
-
-  const characters = await db.characters.toArray();
-  if (characters.length === 0) return null;
 
   // A stale/expired token for one Character must not stop the others from
   // registering — settle each independently rather than Promise.all, which
@@ -127,4 +129,14 @@ export async function registerDeviceForWebPush(
     })),
   });
   return result.data;
+}
+
+/**
+ * Drop this device's FCM token so the backend can no longer push to it — the
+ * counterpart of `registerDeviceForWebPush` for when the last Character
+ * leaves this device (Remove / Log out). Only this device's own registration
+ * is touched; other devices keep theirs.
+ */
+export async function unregisterDeviceForWebPush(): Promise<void> {
+  await deleteToken(getMessaging(getFirebaseApp()));
 }

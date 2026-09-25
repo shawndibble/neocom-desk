@@ -10,6 +10,16 @@ const syncMock = vi.hoisted(() => ({
   signOutOfSync: vi.fn(async () => {}),
 }));
 vi.mock('@/sync', () => syncMock);
+const pushMock = vi.hoisted(() => ({
+  scheduleProjectionRebuild: Object.assign(vi.fn(), { cancel: vi.fn() }),
+  unregisterProjectionRegistration: vi.fn(async () => {}),
+}));
+vi.mock('@/features/notifications/projectionRebuildScheduler', () => ({
+  scheduleProjectionRebuild: pushMock.scheduleProjectionRebuild,
+}));
+vi.mock('@/features/notifications/projectionUpload', () => ({
+  unregisterProjectionRegistration: pushMock.unregisterProjectionRegistration,
+}));
 
 async function seedCharacter(characterId: number): Promise<void> {
   await db.characters.put({
@@ -51,6 +61,15 @@ beforeEach(async () => {
 });
 
 describe('logoutAllCharacters', () => {
+  it('unregisters this device’s push once, and schedules no rebuild, for the whole roster', async () => {
+    await seedCharacter(1);
+    await seedCharacter(2);
+    await logoutAllCharacters(false);
+    expect(pushMock.scheduleProjectionRebuild.cancel).toHaveBeenCalled();
+    expect(pushMock.unregisterProjectionRegistration).toHaveBeenCalledTimes(1);
+    expect(pushMock.scheduleProjectionRebuild).not.toHaveBeenCalled();
+  });
+
   it('removes every character, token and per-character row from this device', async () => {
     await seedCharacter(1);
     await seedCharacter(2);

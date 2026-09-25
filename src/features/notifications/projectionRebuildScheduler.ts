@@ -25,7 +25,7 @@ function logWriteFailure(write: Promise<unknown>): Promise<unknown> {
 export function createCoalescedRebuild(
   rebuild: () => Promise<void>,
   delayMs: number
-): (write: Promise<unknown>) => void {
+): ((write: Promise<unknown>) => void) & { cancel: () => void } {
   let pending: Promise<unknown>[] = [];
   let timer: ReturnType<typeof setTimeout> | undefined;
   // While a flush waits on slow writes, new writes join it instead of
@@ -45,12 +45,22 @@ export function createCoalescedRebuild(
     );
   };
 
-  return (write) => {
+  const schedule = (write: Promise<unknown>) => {
     pending.push(logWriteFailure(write));
     if (draining) return;
     clearTimeout(timer);
     timer = setTimeout(() => void flush(), delayMs);
   };
+
+  // Drops a rebuild that has not started. One already past its timer still
+  // runs; `registerDeviceForWebPush` refuses an empty roster for that case.
+  const cancel = () => {
+    clearTimeout(timer);
+    timer = undefined;
+    if (!draining) pending = [];
+  };
+
+  return Object.assign(schedule, { cancel });
 }
 
 /** The app-wide instance; `rebuildProjection` itself serializes overlapping runs. */

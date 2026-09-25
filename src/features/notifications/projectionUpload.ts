@@ -13,7 +13,11 @@
  * `getToken` call every 5 minutes for no reason.
  */
 import type { ProjectionRow } from '@/engine/projection';
-import { webPushSupport, registerDeviceForWebPush } from '@/sync/deviceRegistration';
+import {
+  webPushSupport,
+  registerDeviceForWebPush,
+  unregisterDeviceForWebPush,
+} from '@/sync/deviceRegistration';
 import { readNotificationPermission } from './permission';
 
 export async function uploadProjectionRows(
@@ -31,5 +35,21 @@ export async function uploadProjectionRows(
     // recordFeedNotification in foregroundPoller.ts: the poll itself must
     // not fail because the Scheduled Push upload did.
     console.error('Scheduled Push projection upload failed', err);
+  }
+}
+
+/**
+ * Drop this device's Scheduled Push registration once no Character is left on
+ * it. Same gate and same silence as `uploadProjectionRows`: a device that
+ * never enabled push has no token to delete.
+ */
+export async function unregisterProjectionRegistration(): Promise<void> {
+  if (webPushSupport() !== 'supported') return;
+  if (readNotificationPermission() !== 'granted') return;
+
+  try {
+    await unregisterDeviceForWebPush();
+  } catch (err) {
+    console.error('Scheduled Push unregistration failed', err);
   }
 }
