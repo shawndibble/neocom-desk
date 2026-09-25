@@ -97,9 +97,9 @@ interface FilterBarProps<T> {
    */
   collapsible?: boolean;
   /**
-   * View controls that sit beside the filter trigger on every surface — a
-   * table's column picker, say. Not part of the draft: they act immediately
-   * and never move into the sheet.
+   * View controls — a table's column picker, say — that sit right before the
+   * filter trigger (or after the inline controls, when there is no trigger).
+   * Not part of the draft: they act immediately and never move into the sheet.
    */
   actions?: ReactNode;
   /** Wrapper class for the row. */
@@ -249,13 +249,15 @@ function CollapsibleFilterRow({
     <div className={cx('flex flex-col gap-2', className)}>
       <div className="flex flex-wrap items-center gap-2">
         {search}
+        {/* Before the trigger, so Tab runs straight from the funnel into the
+            group it just revealed. */}
+        {actions}
         <FilterTrigger
           activeCount={activeCount}
           expanded={open}
           haspopup="true"
           onClick={() => setOpen((was) => !was)}
         />
-        {actions}
       </div>
       {open && (
         <div
@@ -295,6 +297,7 @@ function FilterSheet<T>({
     <>
       <div className={cx('flex flex-wrap items-center gap-2', className)}>
         {search}
+        {actions}
         {/*
           The count rides on the trigger as a number, not as an accent tint:
           "some filter is on" has to survive a viewer who can't tell the two
@@ -314,7 +317,6 @@ function FilterSheet<T>({
             setOpen(true);
           }}
         />
-        {actions}
       </div>
       <Modal
         open={open}

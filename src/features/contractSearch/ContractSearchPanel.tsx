@@ -534,6 +534,9 @@ export function ContractSearchPanel({
    * and never because a name lookup behind it has not answered.
    */
   const modeLoading = active.loading;
+  const modeLoadingLabel = t(
+    mode === 'courier' ? 'contractSearch.loadingCourier' : 'contractSearch.loadingOffers'
+  );
   const modeError = active.error;
   /** Last cycle's rows are on screen and this cycle's are on the way (#963). */
   const revalidating = active.data?.revalidating ?? false;
@@ -968,22 +971,12 @@ export function ContractSearchPanel({
             )}
             {modeLoading && modeRowCount === 0 ? (
               <div className="flex flex-col items-center gap-2 py-16">
-                <Spinner
-                  label={t(
-                    mode === 'courier'
-                      ? 'contractSearch.loadingCourier'
-                      : 'contractSearch.loadingOffers'
-                  )}
-                />
+                <Spinner label={modeLoadingLabel} />
                 {/* Visible copy of the spinner's own label — the first sync is
                     slow enough that a bare arc reads as stuck. Hidden from
                     assistive tech, which already hears the status. */}
                 <p aria-hidden="true" className="text-text-dim">
-                  {t(
-                    mode === 'courier'
-                      ? 'contractSearch.loadingCourier'
-                      : 'contractSearch.loadingOffers'
-                  )}
+                  {modeLoadingLabel}
                 </p>
               </div>
             ) : modeError ? (

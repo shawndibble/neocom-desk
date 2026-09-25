@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -47,7 +47,15 @@ afterEach(() => {
   restoreMatchMedia = undefined;
 });
 
-function Harness({ initial = EMPTY }: { initial?: Filter }) {
+function Harness({
+  initial = EMPTY,
+  collapsible,
+  actions,
+}: {
+  initial?: Filter;
+  collapsible?: boolean;
+  actions?: ReactNode;
+}) {
   const [filter, setFilter] = useState(initial);
   const activeCount = (filter.unreadOnly ? 1 : 0) + (filter.from === '' ? 0 : 1);
   return (
@@ -56,6 +64,8 @@ function Harness({ initial = EMPTY }: { initial?: Filter }) {
         value={filter}
         onChange={setFilter}
         activeCount={activeCount}
+        collapsible={collapsible}
+        actions={actions}
         search={
           <SearchInput
             aria-label="Search"
@@ -87,6 +97,28 @@ function Harness({ initial = EMPTY }: { initial?: Filter }) {
 }
 
 describe('FilterBar', () => {
+  const columns = <button type="button">Columns</button>;
+
+  it('draws actions beside the collapsible trigger, outside the filter group', () => {
+    render(<Harness collapsible actions={columns} />);
+    const picker = screen.getByRole('button', { name: 'Columns' });
+    expect(picker.nextElementSibling).toContainElement(
+      screen.getByRole('button', { name: 'Filters' })
+    );
+  });
+
+  it('keeps actions in the row, not the sheet, when narrow', async () => {
+    useNarrowViewport();
+    const user = userEvent.setup();
+    render(<Harness actions={columns} />);
+    const picker = screen.getByRole('button', { name: 'Columns' });
+    expect(picker.nextElementSibling).toContainElement(
+      screen.getByRole('button', { name: 'Filters' })
+    );
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    expect(screen.getByRole('dialog')).not.toContainElement(picker);
+  });
+
   it('renders the controls inline on a pointer viewport, with no trigger', () => {
     render(<Harness />);
     expect(screen.getByRole('button', { name: 'Unread only' })).toBeInTheDocument();
