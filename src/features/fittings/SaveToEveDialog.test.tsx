@@ -43,6 +43,24 @@ beforeEach(() => {
 });
 
 describe('SaveToEveDialog', () => {
+  it("sends the saved fitting's notes as the description", async () => {
+    saveFittingToEveMock.mockResolvedValue({ ok: true, fittingId: 1, overwriteError: null });
+    render(
+      <SaveToEveDialog
+        open
+        onClose={vi.fn()}
+        characterId={1}
+        fitting={FITTING}
+        description="Kite the frigates."
+        onSaved={vi.fn()}
+      />
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Save' }));
+    expect(saveFittingToEveMock).toHaveBeenCalledWith(
+      expect.objectContaining({ description: 'Kite the frigates.' })
+    );
+  });
+
   it('saves as a new In-game Fitting by default, then closes and reports success', async () => {
     saveFittingToEveMock.mockResolvedValue({ ok: true, fittingId: 1, overwriteError: null });
     const onClose = vi.fn();
