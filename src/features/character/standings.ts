@@ -24,7 +24,8 @@ const STANDINGS_SCOPE = ESI_REGISTRY.getCharacterStandings.scope;
 
 export async function loadCharacterStandings(characterId: number): Promise<CharacterStanding[]> {
   const token = await db.tokens.get(characterId);
-  if (token && !token.scopes.includes(STANDINGS_SCOPE)) return [];
+  // `scopes` post-dates the tokens table (app/useGrantedScopes.ts), so an old row may lack it.
+  if (token && !(token.scopes ?? []).includes(STANDINGS_SCOPE)) return [];
   const result = await loadWithCache(
     characterId,
     KEY,

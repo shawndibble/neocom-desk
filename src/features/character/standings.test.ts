@@ -81,6 +81,16 @@ describe('loadCharacterStandings', () => {
     expect(await loadCharacterStandings(CHAR_ID)).toEqual([]);
   });
 
+  it('treats a legacy token row with no scopes field as lacking the scope, not a crash', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 60_000,
+    } as never);
+    expect(await loadCharacterStandings(CHAR_ID)).toEqual([]);
+  });
+
   it('still fetches when the stored grant includes the scope', async () => {
     await db.tokens.put({
       characterId: CHAR_ID,
