@@ -120,6 +120,8 @@ import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
 import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
+import { androidNotificationSettingsUrl, isPlayStoreApp } from '@/lib/playStoreApp';
+import { assignLocation } from '@/app/navigation';
 
 const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
 
@@ -251,6 +253,10 @@ export function NotificationsPanel() {
   // Enable button would either do nothing or grant a permission that can
   // never deliver anything, so this state shows why instead of the button.
   const installRequired = webPushSupport() === 'requires-install';
+  // In the Play Store app Chrome delegates the grant to the Android app's own
+  // notification toggle (docs/ANDROID-TWA.md), so the blocked notice has to
+  // name that screen — browser site settings can't unblock it.
+  const [inPlayStoreApp] = useState(isPlayStoreApp);
 
   const [search, setSearch] = useUrlParam('search', SEARCH_PARAM);
   const [expandedCharacterIds, setExpandedCharacterIds] = useState<ReadonlySet<number>>(new Set());
@@ -471,7 +477,38 @@ export function NotificationsPanel() {
     <Panel title={t('settings.notificationsTitle')}>
       <div className="space-y-3">
         <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
-        {browserBlocked && (
+        {/*
+          Always offered in the Play Store app, not only when 'denied': the
+          app's Android toggle is the real switch there, and a grant Chrome
+          made before the app took over can still read 'granted' while it's
+          off.
+        */}
+        {inPlayStoreApp && (
+          <div
+            className={`flex flex-wrap items-center gap-2 rounded-xs border px-3 py-2 ${
+              browserBlocked ? 'border-warning/60 bg-warning/10' : 'border-line bg-panel-2'
+            }`}
+          >
+            <p
+              role={browserBlocked ? 'status' : undefined}
+              className={`min-w-0 flex-1 text-xs ${browserBlocked ? 'text-warning' : 'text-text-dim'}`}
+            >
+              {t(
+                browserBlocked
+                  ? 'settings.notifications.blockedNoticePlayApp'
+                  : 'settings.notifications.androidSettingsHint'
+              )}
+            </p>
+            <Button
+              size="sm"
+              variant={browserBlocked ? 'primary' : 'ghost'}
+              onClick={() => assignLocation(androidNotificationSettingsUrl(window.location.href))}
+            >
+              {t('settings.notifications.openAndroidSettings')}
+            </Button>
+          </div>
+        )}
+        {browserBlocked && !inPlayStoreApp && (
           <p
             role="status"
             className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning"

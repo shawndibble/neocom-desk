@@ -10,8 +10,8 @@ web manifest.
 Bubblewrap writes into `twa/` (the keystore, the generated Gradle project,
 build output) is gitignored and must never be committed.
 
-> `twa-manifest.json` matches the last build sent to Play (version code 2,
-> the first with `monochromeIconUrl`). Keystore alias is `android`. Keep
+> `twa-manifest.json` matches the last build sent to Play (version code 3,
+> the first with the notification settings activity). Keystore alias is `android`. Keep
 > `signingKey.path` as `./android.keystore` here; a local build may point it
 > at wherever the keystore actually lives. Play rejects an upload whose
 > `appVersionCode` isn't above the one Play Console shows.
@@ -44,14 +44,17 @@ npm i -g @bubblewrap/cli          # needs JDK 17 + Android SDK; it offers to dow
 cd twa                            # twa-manifest.json is already here
 # put android.keystore here (from the secret store), then:
 bubblewrap update --skipVersionUpgrade   # generates the Gradle project from twa-manifest.json
+node ../scripts/twa/patch-android.mjs    # re-adds NotificationSettingsActivity (see Notifications)
 bubblewrap build                  # -> app-release-bundle.aab (Play upload) and app-release-signed.apk
 bubblewrap fingerprint list       # prints the SHA-256 to paste into assetlinks.json
 ```
 
 Later releases: `bubblewrap update` (bumps `appVersionCode` and regenerates the
 Gradle project from `twa-manifest.json`; `bubblewrap merge` first if the web
-manifest changed), then `bubblewrap build` and upload the `.aab` to Play
-Console. Commit the bumped `twa-manifest.json`.
+manifest changed), then `patch-android.mjs`, then `bubblewrap build` and upload
+the `.aab` to Play Console. Commit the bumped `twa-manifest.json`. Don't edit
+`twa-manifest.json` between the patch and the build: `build` sees the changed
+checksum, offers to regenerate, and regenerating drops the patch.
 
 Automation notes: `bubblewrap build` is interactive only for the keystore
 password — supply it via `BUBBLEWRAP_KEYSTORE_PASSWORD` and
@@ -79,6 +82,24 @@ as Chrome:
 After shipping a build that turns delegation on, a user who already allowed
 notifications while Chrome owned them must toggle notifications off and on in
 the app so the device registers again through the shell.
+
+### Notification settings button
+
+With delegation, the real switch is the Android app's own notification toggle,
+and a page can't re-prompt once it's off. Chrome also won't open Android
+settings screens from a page. So the shell carries one activity that isn't in
+Bubblewrap's template, `scripts/twa/NotificationSettingsActivity.java`: a
+BROWSABLE activity on `neocomdesk://notification-settings` that opens this
+app's notification settings and finishes. `scripts/twa/patch-android.mjs`
+copies it in and adds its manifest entry; `bubblewrap update` wipes both, so
+run the patch after every update.
+
+The Settings → Notifications panel shows an "Open notification settings"
+button only in the Play Store app (`isPlayStoreApp`), via
+`androidNotificationSettingsUrl` in `src/lib/playStoreApp.ts`. A shell older
+than version code 3 has no such activity, so Chrome follows the intent's
+fallback URL back to the same page. Check the activity on a device with
+`adb shell am start -a android.intent.action.VIEW -d neocomdesk://notification-settings com.neocomdesk.app`.
 
 ## How the app knows it is the Play Store app
 
