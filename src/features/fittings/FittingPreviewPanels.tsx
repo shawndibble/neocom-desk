@@ -29,6 +29,7 @@ function Meter({
         aria-valuemin={0}
         aria-valuemax={total}
         aria-valuenow={Math.min(used, total)}
+        aria-valuetext={`${formatCompactNumber(used)} / ${formatCompactNumber(total)}${unit ? ` ${unit}` : ''}${over ? ' (over)' : ''}`}
         className="h-1.5 bg-line"
       >
         <div

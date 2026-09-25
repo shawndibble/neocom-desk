@@ -136,6 +136,28 @@ interface FittingRingProps {
   hardpointsUsed?: HardpointCounts | null;
   /** The panel header's controls — the page's "+ Add module". */
   actions?: ReactNode;
+  /** No panel of its own, for a host that already frames it (the Start screen's preview). */
+  bare?: boolean;
+}
+
+function RingFrame({
+  bare,
+  title,
+  actions,
+  children,
+}: {
+  bare: boolean;
+  title: string;
+  actions: ReactNode;
+  children: ReactNode;
+}) {
+  return bare ? (
+    <>{children}</>
+  ) : (
+    <Panel title={title} actions={actions}>
+      {children}
+    </Panel>
+  );
 }
 
 function pct(value: number): string {
@@ -672,6 +694,7 @@ export function FittingRing({
   moduleActions,
   hardpointsUsed,
   actions,
+  bare = false,
 }: FittingRingProps) {
   const { t } = useTranslation();
   const layout = stats?.slotCounts ?? null;
@@ -774,7 +797,7 @@ export function FittingRing({
   const disc = RING_INNER_RADIUS;
 
   return (
-    <Panel title={t('fittings.ring.title')} actions={actions}>
+    <RingFrame bare={bare} title={t('fittings.ring.title')} actions={actions}>
       <div className="space-y-3">
         <div className="relative mx-auto aspect-square w-full" style={{ maxWidth: RING_MAX_WIDTH }}>
           <div
@@ -970,6 +993,6 @@ export function FittingRing({
           </div>
         )}
       </div>
-    </Panel>
+    </RingFrame>
   );
 }

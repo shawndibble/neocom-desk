@@ -165,6 +165,7 @@ export function FittingPreview({
                     moduleResults={stats?.modules ?? null}
                     typeName={typeName}
                     compact
+                    bare
                   />
                 )}
               </div>
