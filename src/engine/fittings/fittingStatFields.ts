@@ -16,11 +16,16 @@ export type FittingStatKey =
   | 'powergridTotal'
   | 'calibrationUsed'
   | 'calibrationTotal'
+  | 'weaponDps'
+  | 'weaponVolley'
   | 'droneDps'
   | 'droneBandwidthUsed'
   | 'droneBandwidthTotal'
   | 'droneCapacity'
   | 'ehp'
+  | 'shieldRepair'
+  | 'armorRepair'
+  | 'hullRepair'
   | 'capacitorCapacity'
   | 'capacitorRechargeTime'
   | 'shieldHp'
@@ -64,11 +69,16 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
   { key: 'powergridTotal', digits: 1, value: (s) => s.powergridTotal },
   { key: 'calibrationUsed', digits: 0, value: (s) => s.calibrationUsed },
   { key: 'calibrationTotal', digits: 0, value: (s) => s.calibrationTotal },
+  { key: 'weaponDps', digits: 1, value: (s) => s.offense.dps },
+  { key: 'weaponVolley', digits: 0, value: (s) => s.offense.volley },
   { key: 'droneDps', digits: 1, value: (s) => s.droneDps },
   { key: 'droneBandwidthUsed', digits: 0, value: (s) => s.droneBandwidthUsed },
   { key: 'droneBandwidthTotal', digits: 0, value: (s) => s.droneBandwidthTotal },
   { key: 'droneCapacity', digits: 0, value: (s) => s.droneCapacity },
   { key: 'ehp', digits: 0, value: (s) => s.ehp },
+  { key: 'shieldRepair', digits: 1, value: (s) => s.repair.shield },
+  { key: 'armorRepair', digits: 1, value: (s) => s.repair.armor },
+  { key: 'hullRepair', digits: 1, value: (s) => s.repair.hull },
   { key: 'capacitorCapacity', digits: 0, value: (s) => s.capacitorCapacity },
   { key: 'capacitorRechargeTime', digits: 0, value: (s) => s.capacitorRechargeTime / 1000 },
   { key: 'shieldHp', digits: 0, value: (s) => s.shield.hp },

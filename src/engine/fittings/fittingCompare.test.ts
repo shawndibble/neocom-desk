@@ -106,6 +106,27 @@ describe('compareFittingStats', () => {
     expect(row.bestIndices).toEqual([]);
   });
 
+  it('compares turret/missile DPS and volley, higher is best', () => {
+    const table = compareFittingStats([
+      stats({ offense: { weapons: [], dps: 250.04, volley: 1200, overheated: null } }),
+      stats({ offense: { weapons: [], dps: 310.26, volley: 900, overheated: null } }),
+    ]);
+    const dps = table.rows.find((row) => row.key === 'weaponDps')!;
+    expect(dps.values).toEqual([250, 310.3]);
+    expect(dps.bestIndices).toEqual([1]);
+    const volley = table.rows.find((row) => row.key === 'weaponVolley')!;
+    expect(volley.bestIndices).toEqual([0]);
+  });
+
+  it('compares local repair per layer, higher is best', () => {
+    const table = compareFittingStats([
+      stats({ repair: { shield: 0, armor: 42.5, hull: 0 } }),
+      stats({ repair: { shield: 0, armor: 30, hull: 0 } }),
+    ]);
+    expect(table.rows.find((row) => row.key === 'armorRepair')!.bestIndices).toEqual([0]);
+    expect(table.rows.find((row) => row.key === 'shieldRepair')!.differs).toBe(false);
+  });
+
   it('handles a three-way tie for best with all indices', () => {
     const table = compareFittingStats([
       stats({ ehp: 500 }),

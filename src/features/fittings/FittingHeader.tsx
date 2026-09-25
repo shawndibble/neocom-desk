@@ -22,7 +22,7 @@ interface FittingHeaderProps {
   onLibrary: (tab: LibraryTab) => void;
   /** What its numbers are worked out under — implants, missing skills. */
   context?: ReactNode;
-  /** View toggle, Export, Save — right-aligned after the Fittings menu. */
+  /** View toggle, Compare, Export, Save — right-aligned after the Fittings menu. */
   actions: ReactNode;
 }
 

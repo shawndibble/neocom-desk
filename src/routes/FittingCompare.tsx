@@ -34,8 +34,8 @@ export function FittingCompare() {
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const profile = usePilotProfile(activeCharacterId);
   const fittings = useMemo(() => slots.map((slot) => slot?.fitting ?? null), [slots]);
-  const statsList = useCompareStats(fittings, profile);
-  const canFly = useCompareCanFly(fittings, profile);
+  const stats = useCompareStats(fittings, profile);
+  const canFly = useCompareCanFly(fittings, profile).values;
   const isPhone = useIsPhone();
   const [page, setPage] = useState(0);
   const [differencesOnly, setDifferencesOnly] = useState(true);
@@ -56,16 +56,19 @@ export function FittingCompare() {
   }
 
   const anyError = slots.some((slot) => slot?.shareError);
+  const anyStatsFailed = stats.failed.some(Boolean);
   const validFittings = fittings.filter((f) => f !== null);
   const statsReady =
     count > 0 &&
     !anyError &&
     slots.every((slot) => slot !== null) &&
-    statsList.every((s) => s !== null);
+    stats.values.every((s) => s !== null);
+  // One Fitting has nothing to differ from, so show all its stats rather than an empty table.
+  const showDifferencesOnly = differencesOnly && count >= 2;
 
   const table = useMemo(
-    () => (statsReady ? compareFittingStats(statsList as readonly FittingStats[]) : null),
-    [statsReady, statsList]
+    () => (statsReady ? compareFittingStats(stats.values as readonly FittingStats[]) : null),
+    [statsReady, stats.values]
   );
   const moduleDiffs = useMemo(
     () => (statsReady ? modulesThatDiffer(validFittings) : []),
@@ -87,7 +90,6 @@ export function FittingCompare() {
         <div className="flex flex-col items-end gap-1">
           <span className="text-danger">{t(`fittings.load.shareError.${slot.shareError}`)}</span>
           <IconButton
-            size="sm"
             icon={<Icon.Close />}
             label={t('fittings.compare.remove')}
             onClick={() => removeSlot(index)}
@@ -99,13 +101,15 @@ export function FittingCompare() {
     return (
       <div className="flex flex-col items-end gap-1">
         <span className="max-w-40 truncate font-medium text-text">{slot.fitting?.name}</span>
+        {stats.failed[index] && (
+          <span className="text-danger">{t('fittings.compare.statsFailed')}</span>
+        )}
         {flies !== null && flies !== undefined && (
           <span className={flies ? 'text-success' : 'text-danger'}>
             {flies ? t('fittings.compare.canFlyYes') : t('fittings.compare.canFlyNo')}
           </span>
         )}
         <IconButton
-          size="sm"
           icon={<Icon.Close />}
           label={t('fittings.compare.remove')}
           onClick={() => removeSlot(index)}
@@ -168,7 +172,7 @@ export function FittingCompare() {
           <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
             <input
               type="checkbox"
-              checked={differencesOnly}
+              checked={showDifferencesOnly}
               disabled={count < 2}
               onChange={() => setDifferencesOnly((v) => !v)}
               className="size-4 shrink-0 cursor-pointer accent-accent disabled:opacity-50"
@@ -181,7 +185,9 @@ export function FittingCompare() {
               <p className="text-xs text-text-dim">
                 {anyError
                   ? t('fittings.compare.fixErrorsHint')
-                  : t('fittings.stats.loadingIndeterminate')}
+                  : anyStatsFailed
+                    ? t('fittings.compare.statsFailedHint')
+                    : t('fittings.stats.loadingIndeterminate')}
               </p>
             </Panel>
           ) : (
@@ -190,7 +196,7 @@ export function FittingCompare() {
                 <FittingCompareTable
                   rows={table!.rows}
                   columns={columns}
-                  differencesOnly={differencesOnly}
+                  differencesOnly={showDifferencesOnly}
                 />
               </Panel>
               <Panel title={t('fittings.compare.modulesTitle')}>
