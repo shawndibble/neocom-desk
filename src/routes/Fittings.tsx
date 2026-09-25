@@ -7,13 +7,19 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import type { FittingSlotKind } from '@/engine/fittings/types';
 import type { CandidateRack } from '@/engine/fittings/candidates';
-import { addDrones, addModule, firstFreeSlotIndex } from '@/engine/fittings/fittingEdit';
+import {
+  addDrones,
+  addModule,
+  firstFreeSlotIndex,
+  swapModuleType,
+} from '@/engine/fittings/fittingEdit';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
 import { FittingLoadCard } from '@/features/fittings/FittingLoadCard';
 import { FittingRackList, ModuleRow } from '@/features/fittings/FittingRackList';
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
+import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPanel';
 import { FittingViewToggle } from '@/features/fittings/FittingViewToggle';
 import {
   resolveFittingView,
@@ -23,6 +29,7 @@ import { MissingSkillsChip } from '@/features/fittings/MissingSkillsChip';
 import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
 import { useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
 import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
+import { useModuleVariations } from '@/features/fittings/useModuleVariations';
 
 /**
  * The Fittings section: paste EFT to Load a Fitting (#1532), then edit it in
@@ -139,6 +146,19 @@ export function Fittings() {
       ) ?? -1)
     : -1;
   const openModule = fitting && openModuleIndex >= 0 ? fitting.modules[openModuleIndex] : null;
+  const { rows: variationRows } = useModuleVariations({
+    fitting,
+    slot: moduleSlot?.slot ?? 'high',
+    slotIndex: moduleSlot?.slotIndex ?? 0,
+    typeId: openModule?.typeId ?? 0,
+    catalogue,
+    engineReady: workspace.engineReady,
+    profile: workspace.profile,
+  });
+  function swapVariation(typeId: number) {
+    if (!moduleSlot) return;
+    edit((f) => swapModuleType(f, moduleSlot.slot, moduleSlot.slotIndex, typeId));
+  }
   const statsInSheet = view === 'ring' && isPhone;
   const statsSections = (
     <FittingStatsSections
@@ -199,6 +219,7 @@ export function Fittings() {
                 target={target}
                 onSelectTarget={selectTarget}
                 unusableModuleKeys={gaps?.unusableModuleKeys}
+                onOpenVariations={(slot, slotIndex) => setModuleSlot({ slot, slotIndex })}
               />
             )}
             {statsInSheet && (
@@ -228,19 +249,27 @@ export function Fittings() {
           open={openModule !== null}
           onClose={() => setModuleSlot(null)}
           title={t(`fittings.list.rack.${moduleSlot?.slot ?? 'high'}`)}
-          placement={isPhone ? 'sheet' : 'center'}
+          placement={isPhone ? 'sheet' : 'wide'}
         >
           {openModule && (
-            <ModuleRow
-              module={openModule}
-              result={moduleResults?.[openModuleIndex] ?? null}
-              cantUse={gaps?.unusableModuleKeys.has(moduleKey(openModule)) ?? false}
-              fitting={fitting}
-              catalogue={catalogue}
-              engineReady={workspace.engineReady}
-              profile={workspace.profile}
-              edit={edit}
-            />
+            <div className="space-y-3">
+              <ModuleRow
+                module={openModule}
+                result={moduleResults?.[openModuleIndex] ?? null}
+                cantUse={gaps?.unusableModuleKeys.has(moduleKey(openModule)) ?? false}
+                fitting={fitting}
+                catalogue={catalogue}
+                engineReady={workspace.engineReady}
+                profile={workspace.profile}
+                edit={edit}
+              />
+              <div>
+                <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  {t('fittings.variations.title')}
+                </p>
+                <FittingVariationsPanel rows={variationRows} onSelect={swapVariation} />
+              </div>
+            </div>
           )}
         </Modal>
       )}

@@ -6,7 +6,7 @@
  */
 import type { PlanEntry } from '@/engine/types';
 import type { RequiredSkill } from '@/engine/import/fitToSkills';
-import type { Fitting, FittingModule } from './types';
+import type { Fitting, FittingModule, FittingStats } from './types';
 
 export interface SkillGaps {
   /** `moduleKey` of every module the pilot lacks a required skill level for. */
@@ -34,6 +34,15 @@ export function fittingRequirementTypeIds(fitting: Fitting): number[] {
 export function resourceOverage(used: number | null, total: number | null): number {
   if (used === null || total === null) return 0;
   return used > total ? used - total : 0;
+}
+
+/** Whole-fit CPU/PG/calibration budget only — deliberately not hull/rack rules, which `candidates.ts`'s `fitsHull` already owns and deliberately excludes resource overflow from. */
+export function fitsResourceBudget(stats: FittingStats): boolean {
+  return (
+    resourceOverage(stats.cpuUsed, stats.cpuTotal) === 0 &&
+    resourceOverage(stats.powergridUsed, stats.powergridTotal) === 0 &&
+    resourceOverage(stats.calibrationUsed, stats.calibrationTotal) === 0
+  );
 }
 
 export function computeSkillGaps(

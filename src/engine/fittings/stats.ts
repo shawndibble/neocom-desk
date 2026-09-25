@@ -20,6 +20,11 @@ function readAttribute(attributes: AttributeMap, attributeId: number): number {
   return attributes.get(attributeId)?.value ?? 0;
 }
 
+/** A resist bar's percentage from the engine's raw resonance (0-1, lower is tougher). */
+export function resistPct(resonance: number): number {
+  return (1 - resonance) * 100;
+}
+
 function capacitorStatus(shipAttributes: AttributeMap): CapacitorStatus {
   const depletesInSeconds = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorDepletesIn);
   if (depletesInSeconds < 0) {
