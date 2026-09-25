@@ -36,7 +36,7 @@ export type LoadInput =
 
 const DNA = /^\d+(?::\d+_?;\d+)+:*$/;
 const DNA_IN_TEXT = /fitting:(\d+(?::\d+_?;\d+)+:*)/i;
-const EFT_HEADER = /^\s*\[[^\]\n]+,[^\]\n]*\]/;
+const EFT_HEADER = /^\s*\[[^\]\n]+\]/;
 const ZKILL = /zkillboard\.com\/kill\/(\d+)/i;
 const ESI_KILL = /\/killmails\/(\d+)\/([0-9a-f]{40})/i;
 

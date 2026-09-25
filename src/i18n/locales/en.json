@@ -359,6 +359,7 @@
     },
     "header": {
       "menu": "Fittings",
+      "rename": "Rename fitting",
       "newFromHull": "New from a hull…",
       "import": "Import…",
       "libraryTitle": "Open a fitting",
