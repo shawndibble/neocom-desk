@@ -17,6 +17,10 @@ function FittingRackList(props: Pick<RackListProps, 'fitting' | 'stats' | 'unusa
       edit={() => {}}
       target={null}
       onSelectTarget={() => {}}
+      implantBasis="clone"
+      canUseCloneBasis={true}
+      onImplantBasisChange={() => {}}
+      onImplantSetChange={() => {}}
       {...props}
     />
   );

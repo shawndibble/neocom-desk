@@ -27,6 +27,11 @@ describe('buildPilotProfile', () => {
     const profile = buildPilotProfile(new Map(), []);
     expect(profile.implantTypeIds).toEqual([]);
   });
+
+  it('carries no boosters — ESI exposes no active-booster read', () => {
+    const profile = buildPilotProfile(new Map(), [19540]);
+    expect(profile.boosterTypeIds).toEqual([]);
+  });
 });
 
 describe('buildAllVProfile', () => {
@@ -42,5 +47,10 @@ describe('buildAllVProfile', () => {
   it('carries no implants — the logged-out share view has no clone', () => {
     const profile = buildAllVProfile([3300]);
     expect(profile.implantTypeIds).toEqual([]);
+  });
+
+  it('carries no boosters', () => {
+    const profile = buildAllVProfile([3300]);
+    expect(profile.boosterTypeIds).toEqual([]);
   });
 });

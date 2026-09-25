@@ -20,9 +20,12 @@ import {
   type PilotProfile,
 } from '@/engine/fittings/types';
 import { moduleKey } from '@/engine/fittings/skillGaps';
+import type { ImplantBasis } from '@/engine/fittings/implantBasis';
+import type { FittingImplantSet } from '@/engine/fittings/types';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { checkCharges } from './dogmaFittingEngine';
 import type { AddTarget } from './addTarget';
+import { ImplantBasisControl } from './ImplantBasisControl';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
 
@@ -279,6 +282,10 @@ interface FittingRackListProps extends EditContext {
   onSelectTarget: (target: AddTarget) => void;
   /** `moduleKey`s the active Character lacks the skills for. */
   unusableModuleKeys?: ReadonlySet<string>;
+  implantBasis: ImplantBasis;
+  canUseCloneBasis: boolean;
+  onImplantBasisChange: (basis: ImplantBasis) => void;
+  onImplantSetChange: (implantSet: FittingImplantSet | undefined) => void;
 }
 
 /**
@@ -299,6 +306,10 @@ export function FittingRackList({
   target,
   onSelectTarget,
   unusableModuleKeys,
+  implantBasis,
+  canUseCloneBasis,
+  onImplantBasisChange,
+  onImplantSetChange,
 }: FittingRackListProps) {
   const { t } = useTranslation();
   const context = { fitting, catalogue, engineReady, profile, edit };
@@ -311,7 +322,18 @@ export function FittingRackList({
   const slotCounts = stats?.slotCounts ?? null;
 
   return (
-    <Panel title={t('fittings.list.title')}>
+    <Panel
+      title={t('fittings.list.title')}
+      actions={
+        <ImplantBasisControl
+          basis={implantBasis}
+          canUseCloneBasis={canUseCloneBasis}
+          onBasisChange={onImplantBasisChange}
+          implantSet={fitting.implantSet}
+          onImplantSetChange={onImplantSetChange}
+        />
+      }
+    >
       <div className="space-y-3">
         <div className="space-y-1.5">
           <ResourceBar

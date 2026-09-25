@@ -25,12 +25,18 @@ import { useCustomizePermissionsSelection } from './customizeSelection';
 interface CustomizePermissionsDialogProps {
   open: boolean;
   onClose: () => void;
+  /** The dialog reads differently at each entry point (Login's "log in", Characters' "add"); defaults to Login's own wording. */
+  title?: string;
 }
 
 /** The Core Grant's two user-facing rows — see the module doc for why these are hand-written rather than derived from `CORE_GRANT`. */
 const CORE_ROWS = ['skills', 'structures'] as const;
 
-export function CustomizePermissionsDialog({ open, onClose }: CustomizePermissionsDialogProps) {
+export function CustomizePermissionsDialog({
+  open,
+  onClose,
+  title,
+}: CustomizePermissionsDialogProps) {
   const { t } = useTranslation();
   const stored = useCustomizePermissionsSelection((state) => state.value);
   const hydrated = useCustomizePermissionsSelection((state) => state.hydrated);
@@ -94,7 +100,7 @@ export function CustomizePermissionsDialog({ open, onClose }: CustomizePermissio
     <Modal
       open={open}
       onClose={handleClose}
-      title={t('permissions.customize.title')}
+      title={title ?? t('permissions.customize.title')}
       placement="wide"
     >
       <div className="space-y-4 text-sm">

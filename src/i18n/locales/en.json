@@ -213,6 +213,24 @@
       "priceUnpriced_one": "{{count}} item has no price at this hub",
       "priceUnpriced_other": "{{count}} items have no price at this hub",
       "priceLoading": "Pricing…"
+    },
+    "implants": {
+      "basis": {
+        "label": "Implants from",
+        "clone": "My clone",
+        "fitting": "Fitting's"
+      },
+      "editSet": "Edit set",
+      "modalTitle": "Implants & boosters",
+      "implantsHeading": "Implants",
+      "boostersHeading": "Boosters",
+      "empty": "None",
+      "unknownType": "Type #{{typeId}}",
+      "addPlaceholder": "Item name",
+      "add": "Add",
+      "remove": "Remove {{name}}",
+      "notFound": "No item found with that exact name.",
+      "full": "This set is already full."
     }
   },
   "skills": {
@@ -1451,6 +1469,7 @@
     "add": "Add character",
     "addMenuLabel": "Add character options",
     "addWithPermissions": "Add with specific permissions…",
+    "customizePermissionsTitle": "Customize permissions",
     "emptyTitle": "No characters yet",
     "emptyHint": "Log in with EVE Online to add your first character.",
     "portraitAlt": "Portrait of {{name}}",

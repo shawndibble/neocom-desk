@@ -10,6 +10,11 @@
  * as a new history entry so Back/Forward walk the edits. Repeats of one
  * control inside `COALESCE_MS` (a drone stepper clicked five times) replace
  * rather than push, so Back skips the in-between counts.
+ *
+ * The implant/booster basis toggle ("My clone" vs "Fitting's") rides on the
+ * same `edit()` path — an implant-set edit is just another Fitting change —
+ * but only affects the profile `computeFittingStats` sees; `profile` itself
+ * (exposed to fit checks/candidates) always stays the active Character's own.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { db } from '@/db';
@@ -25,7 +30,17 @@ import {
 } from '@/engine/fittings/eftLoader';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
 import { buildAllVProfile } from '@/engine/fittings/pilotProfile';
-import type { Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
+import {
+  applyImplantBasis,
+  defaultImplantBasis,
+  type ImplantBasis,
+} from '@/engine/fittings/implantBasis';
+import type {
+  Fitting,
+  FittingImplantSet,
+  FittingStats,
+  PilotProfile,
+} from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadTypes, loadFittingSlots, loadSkills } from '@/sde/loadSde';
@@ -65,6 +80,13 @@ export interface FittingWorkspace {
    * replaces the history entry instead of adding one.
    */
   edit: (change: FittingChange, coalesceKey?: string) => void;
+  /** "My clone" vs "Fitting's" — the basis the open Fitting's stats read implants/boosters from. */
+  implantBasis: ImplantBasis;
+  /** `false` with no active Character: there is no clone to label "My clone", so the basis is always "fitting". */
+  canUseCloneBasis: boolean;
+  setImplantBasis: (basis: ImplantBasis) => void;
+  /** Edits the set the open Fitting carries via `edit()`. `undefined` removes it. */
+  setImplantSet: (implantSet: FittingImplantSet | undefined) => void;
   /**
    * The latest stats. After an edit to the same hull these are the previous
    * fit's until the new calculation lands, so the bars don't blank on every
@@ -107,6 +129,9 @@ export function useFittingWorkspace(): FittingWorkspace {
   const [statsError, setStatsError] = useState(false);
   const [engineReady, setEngineReady] = useState(isDogmaEngineReady);
   const [profile, setProfile] = useState<PilotProfile | null>(null);
+  // User's explicit toggle pick, layered over `defaultImplantBasis`'s
+  // per-Fitting default; `null` means "no override yet, use the default".
+  const [basisOverride, setBasisOverride] = useState<ImplantBasis | null>(null);
 
   const [price, setPrice] = useState<Appraisal | null>(null);
 
@@ -151,6 +176,12 @@ export function useFittingWorkspace(): FittingWorkspace {
       // Back/Forward or a pasted link ends any coalescing run: the next edit
       // pushes rather than overwriting the entry just navigated to.
       lastWriteRef.current = null;
+    }
+    // `own.fitting` is only set by `edit()` (a paste's own write carries
+    // `fitting: null`) — an edit keeps the toggle's override, everything else
+    // (a paste, Back/Forward) is a genuinely different Fitting.
+    if (!(own?.code === shareCode && own.fitting)) {
+      setBasisOverride(null);
     }
     if (shareCode === null) {
       latestFittingRef.current = null;
@@ -304,6 +335,23 @@ export function useFittingWorkspace(): FittingWorkspace {
     [setShareCode]
   );
 
+  // No active Character means no clone to label "My clone" — the basis is
+  // always "fitting" (the scope decision's "Share links open ... at All V").
+  const canUseCloneBasis = activeCharacterId !== null;
+  const implantBasis: ImplantBasis =
+    fitting === null
+      ? 'clone'
+      : !canUseCloneBasis
+        ? 'fitting'
+        : (basisOverride ?? defaultImplantBasis(fitting));
+
+  const setImplantSet = useCallback(
+    (implantSet: FittingImplantSet | undefined) => {
+      edit((f) => ({ ...f, implantSet }), 'implant-set');
+    },
+    [edit]
+  );
+
   // The pilot the stats and fit checks run under: the active Character's own
   // profile, or All V with no Character at all (the logged-out Share Link
   // view is #1544's; this covers the same fallback for the ordinary route
@@ -349,7 +397,11 @@ export function useFittingWorkspace(): FittingWorkspace {
     if (fitting === null || profile === null) return;
     void (async () => {
       try {
-        const result = await computeFittingStats(fitting, profile, (progress) => {
+        // Swaps in the Fitting's own carried implants/boosters where the
+        // resolved basis is "fitting" — `profile` (exposed as-is to fit
+        // checks/candidates, which only care about skills) stays untouched.
+        const effectiveProfile = applyImplantBasis(profile, fitting, implantBasis);
+        const result = await computeFittingStats(fitting, effectiveProfile, (progress) => {
           if (!cancelled) setStatsProgress(progress);
         });
         if (cancelled) return;
@@ -362,7 +414,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     return () => {
       cancelled = true;
     };
-  }, [fitting, profile]);
+  }, [fitting, profile, implantBasis]);
 
   // Price: independent of the dogma engine, so it can — and should — resolve
   // well before stats do.
@@ -385,6 +437,10 @@ export function useFittingWorkspace(): FittingWorkspace {
     tooLargeToShare,
     loadFromEftText,
     edit,
+    implantBasis,
+    canUseCloneBasis,
+    setImplantBasis: setBasisOverride,
+    setImplantSet,
     stats: stats?.stats ?? null,
     statsFitting: stats?.fitting ?? null,
     statsProgress,

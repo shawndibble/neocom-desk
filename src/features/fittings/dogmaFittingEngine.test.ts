@@ -62,7 +62,7 @@ const fitting: Fitting = {
   drones: [],
   cargo: [],
 };
-const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [] };
+const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] };
 
 describe('loadDogmaEngine', () => {
   beforeEach(() => {
