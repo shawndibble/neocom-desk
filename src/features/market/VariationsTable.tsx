@@ -21,6 +21,16 @@ import { variationsCsvColumns } from './variationsCsv';
 /** Structural, not i18next's TFunction, so this stays easy to pass around without fighting its generics. */
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
+/** Tech I/II/III rank in that order; every other meta group (Faction, Storyline, Officer, …) sorts after them, alphabetically among themselves — not plain alphabetical, which would put "Faction" ahead of "T1". */
+const KNOWN_TIER_RANK: Record<string, number> = { T1: 0, T2: 1, T3: 2 };
+
+/** `null` (a sibling-fallback row with no meta-group classification) sinks to the end like any other undefined sort value. */
+function tierSortValue(tier: string | null): string | undefined {
+  if (tier === null) return undefined;
+  const rank = KNOWN_TIER_RANK[tier] ?? 99;
+  return `${String(rank).padStart(2, '0')}${tier}`;
+}
+
 export interface VariationsTableProps {
   rows: readonly VariationRow[];
   totalCount: number;
@@ -117,6 +127,7 @@ export function VariationsTable({
       id: 'tier',
       header: t('market.variations.tier'),
       className: 'text-text-dim',
+      sortValue: (row) => tierSortValue(row.tier),
       render: (row) => row.tier ?? '—',
     },
     {

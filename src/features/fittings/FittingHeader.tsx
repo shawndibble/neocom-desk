@@ -55,11 +55,11 @@ export function FittingHeader({
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => onLibrary('mine')}>
-              {t('fittings.myFittings.title')}
+              {t('fittings.header.myFittings')}
             </DropdownMenuItem>
             {hasCharacter && (
               <DropdownMenuItem onSelect={() => onLibrary('ingame')}>
-                {t('fittings.start.tabInGame')}
+                {t('fittings.header.inGame')}
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
@@ -68,7 +68,10 @@ export function FittingHeader({
           <TypeIcon typeId={fitting.shipTypeId} size={64} width={36} height={36} />
           <div className="min-w-0">
             <h1 className="truncate text-base font-semibold">{fitting.name}</h1>
-            <p className="truncate text-xs text-text-dim">{hullName}</p>
+            {/* A Fitting started from a bare hull is named after it; don't say it twice. */}
+            {hullName !== fitting.name && (
+              <p className="truncate text-xs text-text-dim">{hullName}</p>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">{actions}</div>

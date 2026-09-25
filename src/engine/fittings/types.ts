@@ -5,6 +5,7 @@
  * requirement); `src/features/fittings/dogmaFittingEngine.ts` is the only
  * place that talks to the vendor package, and maps these shapes onto its own.
  */
+import type { AppliedDpsInputs } from './appliedDps';
 
 export type FittingSlotKind = 'high' | 'medium' | 'low' | 'rig' | 'subsystem';
 
@@ -175,6 +176,8 @@ export interface FittingStats {
    * can overheat set to overload; null when no module can (nothing to show).
    */
   overheated: OverheatedStats | null;
+  /** What applied DPS against a Target Profile is worked out from (`appliedDps.ts`). */
+  applied: AppliedDpsInputs;
 }
 
 /** One Offense row: every firing copy of a weapon (same charge) or one drone type. */

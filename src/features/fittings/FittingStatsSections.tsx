@@ -13,6 +13,9 @@ import type { Appraisal } from '@/engine/market/appraisal';
 import type { DogmaAssetProgress } from './dogmaFittingEngine';
 import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
 import { DamageProfilePicker } from './DamageProfilePicker';
+import { AppliedDpsPanel } from './AppliedDpsPanel';
+import type { TargetProfiles } from './targetProfiles';
+import type { OverlayFitting } from './useOverlayFitting';
 
 const DMG_RESIST_CLASS = {
   em: 'bg-dmg-em',
@@ -156,6 +159,7 @@ const REPAIR_LAYERS: readonly (keyof LocalRepair)[] = ['shield', 'armor', 'hull'
 const SECTIONS = [
   'capacitor',
   'offense',
+  'appliedDps',
   'defense',
   'targeting',
   'navigation',
@@ -173,6 +177,9 @@ interface FittingStatsSectionsProps {
   /** Names an Offense row's weapon, charge or drone. */
   typeName: (typeId: number) => string;
   damageProfiles: DamageProfiles;
+  targetProfiles: TargetProfiles;
+  /** A saved Fitting to overlay on the applied-DPS graphs; absent without a Character. */
+  overlay?: OverlayFitting;
 }
 
 export function FittingStatsSections({
@@ -182,6 +189,8 @@ export function FittingStatsSections({
   price,
   typeName,
   damageProfiles,
+  targetProfiles,
+  overlay,
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
   const profileName = useDamageProfileName()(damageProfiles.selected);
@@ -293,6 +302,20 @@ export function FittingStatsSections({
           ) : (
             <p className="text-xs text-text-dim">{t('fittings.stats.offenseNone')}</p>
           )
+        ) : (
+          placeholder
+        )
+      )}
+
+      {section(
+        'appliedDps',
+        undefined,
+        stats ? (
+          <AppliedDpsPanel
+            applied={stats.applied}
+            targetProfiles={targetProfiles}
+            overlay={overlay}
+          />
         ) : (
           placeholder
         )

@@ -19,6 +19,8 @@ interface FittingLibraryProps {
   /** Remounts In-game Fittings so it refetches after a Save to EVE. */
   inGameKey: number;
   onStartHull: (hull: HullEntry) => void;
+  /** Called once any of the ways in here has opened a Fitting. */
+  onOpened?: () => void;
   /**
    * `page`: the Start screen with nothing open — the hull picker beside Import
    * and the fitting lists. `tabs`: one section at a time, for a phone's Start
@@ -40,6 +42,7 @@ export function FittingLibrary({
   characterId,
   inGameKey,
   onStartHull,
+  onOpened,
   layout,
   initialTab = 'new',
 }: FittingLibraryProps) {
@@ -55,7 +58,15 @@ export function FittingLibrary({
   }, []);
 
   const sections: Record<LibraryTab, ReactNode> = {
-    new: <HullPicker catalogue={catalogue} onStart={onStartHull} />,
+    new: (
+      <HullPicker
+        catalogue={catalogue}
+        onStart={(hull) => {
+          onStartHull(hull);
+          onOpened?.();
+        }}
+      />
+    ),
     import: (
       <FittingLoadCard
         onLoad={workspace.loadFromInput}
@@ -65,16 +76,30 @@ export function FittingLibrary({
         loadError={workspace.loadError}
         tooLargeToShare={workspace.tooLargeToShare}
         onLoadFittingXmlDocument={workspace.loadFittingXmlDocument}
-        onOpenFittingXmlEntry={workspace.openFittingXmlEntry}
+        onOpenFittingXmlEntry={async (item) => {
+          await workspace.openFittingXmlEntry(item);
+          onOpened?.();
+        }}
       />
     ),
-    mine: <MyFittingsPanel characterId={characterId} onOpen={workspace.openSaved} />,
+    mine: (
+      <MyFittingsPanel
+        characterId={characterId}
+        onOpen={(record) => {
+          workspace.openSaved(record);
+          onOpened?.();
+        }}
+      />
+    ),
     ingame:
       characterId === null ? null : (
         <InGameFittingsPanel
           key={inGameKey}
           characterId={characterId}
-          onOpen={(loaded) => void workspace.openFitting(loaded)}
+          onOpen={(loaded) => {
+            void workspace.openFitting(loaded);
+            onOpened?.();
+          }}
         />
       ),
   };

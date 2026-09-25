@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   buttonClassName,
+  ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -37,6 +38,12 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
+import { useColumnVisibility } from '@/lib/columnVisibility';
+import {
+  LOYALTY_STORE_OFFERS_COLUMN_IDS,
+  loyaltyStoreOffersColumnsStore,
+  type LoyaltyStoreOffersColumnId,
+} from './loyaltyStoreColumns';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, textParam } from '@/lib/urlState';
 import { formatIsk } from '@/lib/isk';
@@ -102,6 +109,8 @@ function OfferDetail({
       id: 'name',
       header: t('loyaltyStore.materialColName'),
       primary: true,
+      sortValue: (material) =>
+        catalog ? nameForType(catalog, material.typeID) : `#${material.typeID}`,
       render: (material) =>
         catalog ? nameForType(catalog, material.typeID) : `#${material.typeID}`,
     },
@@ -110,6 +119,7 @@ function OfferDetail({
       header: t('loyaltyStore.materialColNeeded'),
       align: 'right',
       className: 'tabular-nums text-text-dim',
+      sortValue: (material) => material.quantity,
       render: (material) => material.quantity.toLocaleString(),
     },
     {
@@ -117,6 +127,7 @@ function OfferDetail({
       header: t('loyaltyStore.materialColOwned'),
       align: 'right',
       className: 'tabular-nums text-text-dim',
+      sortValue: (material) => material.ownedQuantity,
       render: (material) => material.ownedQuantity.toLocaleString(),
     },
     {
@@ -124,6 +135,7 @@ function OfferDetail({
       header: t('loyaltyStore.materialColBuyCost'),
       align: 'right',
       className: 'tabular-nums text-text',
+      sortValue: (material) => material.lineCost,
       render: (material) => <IskAmount value={material.lineCost} revealOn="tap" decimals={0} />,
     },
   ];
@@ -341,6 +353,11 @@ export function LoyaltyStore() {
     toggleUseOwnMaterials,
   } = useLoyaltyStoreOffers(corporationId);
 
+  const offersColumnVisibility = useColumnVisibility(
+    loyaltyStoreOffersColumnsStore,
+    LOYALTY_STORE_OFFERS_COLUMN_IDS
+  );
+
   const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
   const { search, affordableOnly, blueprintsOnly } = filterParams;
   const [selectedOfferId, setSelectedOfferId] = useState<number | null>(null);
@@ -413,6 +430,35 @@ export function LoyaltyStore() {
     );
   }
 
+  // The identity column (never hidden) plus the optional columns the picker
+  // controls, in table order — `LOYALTY_STORE_OFFERS_COLUMN_IDS`' own order.
+  const optionalOfferColumns: Record<
+    LoyaltyStoreOffersColumnId,
+    DataTableColumn<LoyaltyOfferRow>
+  > = {
+    profit: {
+      id: 'profit',
+      header: t('loyaltyStore.colProfit'),
+      align: 'right',
+      sortValue: (row) => row.profit.profit ?? undefined,
+      cellClassName: (row) => iskPerLpTone(row.profit.profit),
+      render: (row) =>
+        row.profit.profit === null ? (
+          '—'
+        ) : (
+          <IskAmount value={row.profit.profit} revealOn="longPress" decimals={0} />
+        ),
+    },
+    iskPerLp: {
+      id: 'iskPerLp',
+      header: t('loyaltyStore.colIskPerLp'),
+      align: 'right',
+      headerClassName: 'whitespace-nowrap',
+      sortValue: (row) => row.profit.iskPerLp ?? undefined,
+      cellClassName: (row) => `font-semibold tabular-nums ${iskPerLpTone(row.profit.iskPerLp)}`,
+      render: (row) => (row.profit.iskPerLp === null ? '—' : row.profit.iskPerLp.toFixed(1)),
+    },
+  };
   const columns: DataTableColumn<LoyaltyOfferRow>[] = [
     {
       id: 'item',
@@ -439,34 +485,18 @@ export function LoyaltyStore() {
         </span>
       ),
     },
-    {
-      id: 'profit',
-      header: t('loyaltyStore.colProfit'),
-      align: 'right',
-      sortValue: (row) => row.profit.profit ?? undefined,
-      cellClassName: (row) => iskPerLpTone(row.profit.profit),
-      render: (row) =>
-        row.profit.profit === null ? (
-          '—'
-        ) : (
-          <IskAmount value={row.profit.profit} revealOn="longPress" decimals={0} />
-        ),
-    },
-    {
-      id: 'iskPerLp',
-      header: t('loyaltyStore.colIskPerLp'),
-      align: 'right',
-      headerClassName: 'whitespace-nowrap',
-      sortValue: (row) => row.profit.iskPerLp ?? undefined,
-      cellClassName: (row) => `font-semibold tabular-nums ${iskPerLpTone(row.profit.iskPerLp)}`,
-      render: (row) => (row.profit.iskPerLp === null ? '—' : row.profit.iskPerLp.toFixed(1)),
-    },
+    ...LOYALTY_STORE_OFFERS_COLUMN_IDS.filter(offersColumnVisibility.isVisible).map(
+      (id) => optionalOfferColumns[id]
+    ),
   ];
-  const offersSortProps = useUrlSort(
-    'sort',
-    OFFERS_SORT,
-    columns.map((column) => column.id)
-  );
+  // The full catalog, not just `columns`' currently-visible ids: a sort
+  // picked while a column was shown should still resolve once the picker
+  // hides it, ready to take effect again the moment it's shown back
+  // (`resolveSort` only rejects a `columnId` the catalog has never heard of).
+  const offersSortProps = useUrlSort('sort', OFFERS_SORT, [
+    'item',
+    ...LOYALTY_STORE_OFFERS_COLUMN_IDS,
+  ]);
 
   const list = (
     <Panel
@@ -568,6 +598,18 @@ export function LoyaltyStore() {
             value={search}
             onChange={(e) => setFilterParams({ search: e.target.value })}
             className="min-w-40 flex-1"
+          />
+        }
+        actions={
+          <ColumnPickerMenu
+            available={LOYALTY_STORE_OFFERS_COLUMN_IDS}
+            visible={offersColumnVisibility.visible}
+            columnsById={optionalOfferColumns}
+            onToggle={offersColumnVisibility.toggle}
+            buttonLabel={t('common.columnsButton')}
+            menuTitle={t('common.columnsMenuTitle')}
+            onReset={offersColumnVisibility.reset}
+            resetLabel={t('common.resetColumns')}
           />
         }
       >

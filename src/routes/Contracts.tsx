@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import {
   Button,
+  ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -22,6 +23,12 @@ import {
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
+import { useColumnVisibility } from '@/lib/columnVisibility';
+import {
+  CONTRACTS_HISTORY_COLUMN_IDS,
+  contractsHistoryColumnsStore,
+  type ContractsHistoryColumnId,
+} from './contractsColumns';
 import { beginEveLogin } from '@/app/loginFlow';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { loadContracts } from '@/features/character/contracts';
@@ -146,6 +153,8 @@ interface ContractsFilterBarProps {
   onChange: (filter: ContractsFilter) => void;
   statusOptions: Contract['status'][];
   typeOptions: Contract['type'][];
+  /** The History table's column picker, drawn beside the filter trigger. */
+  actions?: ReactNode;
 }
 
 /** Search plus status/type filter chips above the contracts table (issue #417). */
@@ -154,6 +163,7 @@ function ContractsFilterBar({
   onChange,
   statusOptions,
   typeOptions,
+  actions,
 }: ContractsFilterBarProps) {
   const { t } = useTranslation();
   return (
@@ -161,6 +171,7 @@ function ContractsFilterBar({
       value={filter}
       onChange={onChange}
       activeCount={activeContractsFilterCount(filter)}
+      actions={actions}
       className="border-b border-line px-3 py-2"
       search={
         <SearchInput
@@ -241,6 +252,11 @@ export function Contracts() {
     { cacheKey: 'contracts' }
   );
 
+  const historyColumnVisibility = useColumnVisibility(
+    contractsHistoryColumnsStore,
+    CONTRACTS_HISTORY_COLUMN_IDS
+  );
+
   const contractsResult = data?.contractsResult ?? null;
   const contractsNeedsReauth = data?.contractsNeedsReauth ?? false;
   const contractsTruncated = data?.contractsTruncated ?? false;
@@ -309,23 +325,14 @@ export function Contracts() {
     [t]
   );
 
-  const columns = useMemo<DataTableColumn<Contract>[]>(
-    () => [
-      {
-        id: 'type',
-        header: t('contracts.type'),
-        sortValue: (contract) => contract.title || t(CONTRACT_TYPE_KEY[contract.type]),
-        render: (contract) => (
-          <button
-            type="button"
-            onClick={() => setSelectedContract(contract)}
-            className="text-left font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-          >
-            {contract.title || t(CONTRACT_TYPE_KEY[contract.type])}
-          </button>
-        ),
-      },
-      {
+  // The identity column (never hidden — it opens the detail modal) plus the
+  // optional columns the picker controls, in table order —
+  // `CONTRACTS_HISTORY_COLUMN_IDS`' own order.
+  const optionalHistoryColumns = useMemo<
+    Record<ContractsHistoryColumnId, DataTableColumn<Contract>>
+  >(
+    () => ({
+      status: {
         id: 'status',
         header: t('contracts.status'),
         className: 'font-semibold',
@@ -345,7 +352,7 @@ export function Contracts() {
           );
         },
       },
-      {
+      issuer: {
         id: 'issuer',
         header: t('contracts.issuer'),
         sortValue: (contract) => issuerNames.get(contract.issuer_id) ?? `#${contract.issuer_id}`,
@@ -362,7 +369,7 @@ export function Contracts() {
           </span>
         ),
       },
-      {
+      price: {
         id: 'price',
         header: t('contracts.price'),
         align: 'right',
@@ -377,21 +384,46 @@ export function Contracts() {
             t('common.unknown')
           ),
       },
-      {
+      expires: {
         id: 'expires',
         header: t('contracts.expires'),
         className: 'whitespace-nowrap text-text-dim',
         sortValue: (contract) => new Date(contract.date_expired).getTime(),
         render: (contract) => formatTimestamp(new Date(contract.date_expired), timeZone),
       },
-    ],
+    }),
     [t, issuerNames, timeZone, standingIndex, issuerAffiliations]
   );
-  const historySortProps = useUrlSort(
-    'history.sort',
-    HISTORY_SORT,
-    columns.map((column) => column.id)
+  const columns = useMemo<DataTableColumn<Contract>[]>(
+    () => [
+      {
+        id: 'type',
+        header: t('contracts.type'),
+        sortValue: (contract) => contract.title || t(CONTRACT_TYPE_KEY[contract.type]),
+        render: (contract) => (
+          <button
+            type="button"
+            onClick={() => setSelectedContract(contract)}
+            className="text-left font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            {contract.title || t(CONTRACT_TYPE_KEY[contract.type])}
+          </button>
+        ),
+      },
+      ...CONTRACTS_HISTORY_COLUMN_IDS.filter(historyColumnVisibility.isVisible).map(
+        (id) => optionalHistoryColumns[id]
+      ),
+    ],
+    [t, optionalHistoryColumns, historyColumnVisibility.isVisible]
   );
+  // The full catalog, not just `columns`' currently-visible ids: a sort
+  // picked while a column was shown should still resolve once the picker
+  // hides it, ready to take effect again the moment it's shown back
+  // (`resolveSort` only rejects a `columnId` the catalog has never heard of).
+  const historySortProps = useUrlSort('history.sort', HISTORY_SORT, [
+    'type',
+    ...CONTRACTS_HISTORY_COLUMN_IDS,
+  ]);
 
   const contracts = useMemo(
     () =>
@@ -547,6 +579,18 @@ export function Contracts() {
             onChange={setFilter}
             statusOptions={statusOptions}
             typeOptions={typeOptions}
+            actions={
+              <ColumnPickerMenu
+                available={CONTRACTS_HISTORY_COLUMN_IDS}
+                visible={historyColumnVisibility.visible}
+                columnsById={optionalHistoryColumns}
+                onToggle={historyColumnVisibility.toggle}
+                buttonLabel={t('common.columnsButton')}
+                menuTitle={t('common.columnsMenuTitle')}
+                onReset={historyColumnVisibility.reset}
+                resetLabel={t('common.resetColumns')}
+              />
+            }
           />
           {filteredContracts.length === 0 ? (
             // Zero matches with no active filter can't happen today (an empty

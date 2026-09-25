@@ -93,6 +93,7 @@ export function EmploymentHistory() {
       {
         id: 'corporation',
         header: t('employmentHistory.corporation'),
+        sortValue: (row) => corpNames.get(row.corporationId) ?? `#${row.corporationId}`,
         render: (row) => {
           const name = corpNames.get(row.corporationId) ?? `#${row.corporationId}`;
           // Only the row that is both ongoing and matches the character's
@@ -116,6 +117,7 @@ export function EmploymentHistory() {
         id: 'started',
         header: t('employmentHistory.started'),
         className: 'whitespace-nowrap text-text-dim',
+        sortValue: (row) => row.startDate,
         render: (row) => new Date(row.startDate).toLocaleDateString(),
       },
       {
@@ -123,6 +125,7 @@ export function EmploymentHistory() {
         header: t('employmentHistory.duration'),
         align: 'right',
         className: 'tabular-nums',
+        sortValue: (row) => row.tenureSeconds,
         render: (row) => formatDuration(row.tenureSeconds),
       },
     ],
@@ -206,6 +209,10 @@ export function EmploymentHistory() {
               rowKey={(row) => row.recordId}
               rowClassName={(row) => (row.ongoing ? 'bg-success/5' : undefined)}
               rowContextMenu={historyRowContextMenu}
+              // Rows already arrive most-recent-first; match it so the
+              // header shows this as the active sort rather than none.
+              defaultSort={{ columnId: 'started', direction: 'desc' }}
+              mobileSort
             />
           </>
         )}

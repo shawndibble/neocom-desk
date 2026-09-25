@@ -22,6 +22,7 @@ import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
 import { FittingExportMenu } from '@/features/fittings/FittingExportMenu';
 import { FittingHeader } from '@/features/fittings/FittingHeader';
 import { FittingKpiStrip } from '@/features/fittings/FittingKpiStrip';
+import { LoadWarnings } from '@/features/fittings/FittingLoadCard';
 import { FittingLibrary, type LibraryTab } from '@/features/fittings/FittingLibrary';
 import { SaveToEveDialog } from '@/features/fittings/SaveToEveDialog';
 import { FittingRackList, ModuleRow, RackSlots } from '@/features/fittings/FittingRackList';
@@ -39,6 +40,8 @@ import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
 import { catalogueTypeName, useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
 import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
 import { useModuleVariations } from '@/features/fittings/useModuleVariations';
+import { useOverlayFitting } from '@/features/fittings/useOverlayFitting';
+import { useTargetProfiles } from '@/features/fittings/targetProfiles';
 import { useMediaQuery } from '@/lib/useMediaQuery';
 
 /**
@@ -108,6 +111,16 @@ export function Fittings() {
   const { fitting, stats, edit } = workspace;
   if (library !== null && fitting !== libraryOver) {
     setLibrary(null);
+    closeAdd();
+  }
+  // The Add panel's open state and target belong to one layout tier and one
+  // hull: a resize into another tier, or a different hull, starts it closed
+  // rather than popping a stale sheet or slide-out aimed at an old slot.
+  const hullTypeId = fitting?.shipTypeId ?? null;
+  const [addScope, setAddScope] = useState({ mode: addMode, hull: hullTypeId });
+  if (addScope.mode !== addMode || addScope.hull !== hullTypeId) {
+    setAddScope({ mode: addMode, hull: hullTypeId });
+    closeAdd();
   }
   const slotCounts = stats?.slotCounts ?? null;
   // Module results only line up with the Fitting they were calculated for.
@@ -209,6 +222,12 @@ export function Fittings() {
     if (!moduleSlot) return;
     edit((f) => swapModuleType(f, moduleSlot.slot, moduleSlot.slotIndex, typeId));
   }
+  const targetProfiles = useTargetProfiles();
+  const overlay = useOverlayFitting({
+    characterId: activeCharacterId,
+    profile: workspace.profile,
+    damageProfile: workspace.damageProfiles.selected,
+  });
 
   const renderLibrary = (layout: 'page' | 'tabs', initialTab?: LibraryTab) => (
     <FittingLibrary
@@ -217,6 +236,9 @@ export function Fittings() {
       characterId={activeCharacterId}
       inGameKey={inGameFittingsKey}
       onStartHull={(hull) => void workspace.openFitting(newFitting(hull.typeId, hull.name))}
+      // Reopening the Fitting already open changes nothing to close on, so
+      // an explicit open closes the dialog itself.
+      onOpened={() => setLibrary(null)}
       layout={layout}
       initialTab={initialTab}
     />
@@ -226,7 +248,8 @@ export function Fittings() {
     return (
       <div className="space-y-3">
         <PageHeader title={t('nav.fittings')} />
-        {renderLibrary(isPhone ? 'tabs' : 'page')}
+        {/* A broken share link's message is on the Import tab; start there. */}
+        {renderLibrary(isPhone ? 'tabs' : 'page', workspace.shareError ? 'import' : undefined)}
       </div>
     );
   }
@@ -286,6 +309,8 @@ export function Fittings() {
       price={workspace.price}
       typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
       damageProfiles={workspace.damageProfiles}
+      targetProfiles={targetProfiles}
+      overlay={overlay}
     />
   );
 
@@ -360,6 +385,14 @@ export function Fittings() {
           <p role="alert" className="px-3 pb-2 text-xs text-warning">
             {t('fittings.load.tooLargeToShare')}
           </p>
+        )}
+        {(workspace.unresolved.length > 0 || workspace.fitXmlUnresolved.length > 0) && (
+          <div className="space-y-2 px-3 pb-2">
+            <LoadWarnings
+              unresolved={workspace.unresolved}
+              fitXmlUnresolved={workspace.fitXmlUnresolved}
+            />
+          </div>
         )}
         <FittingKpiStrip stats={stats} price={workspace.price} />
       </section>

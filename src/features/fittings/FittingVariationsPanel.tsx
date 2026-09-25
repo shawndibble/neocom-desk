@@ -75,6 +75,7 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
       id: 'name',
       header: t('fittings.variations.name'),
       primary: true,
+      sortValue: (row) => row.name,
       render: (row) => (
         <span className="flex items-center gap-1.5 font-medium">
           <TypeIcon typeId={row.typeId} size={32} className="h-4 w-4 shrink-0" />
@@ -92,6 +93,8 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
     {
       id: 'fits',
       header: t('fittings.variations.fits'),
+      // Still loading (null) sinks to the end rather than sorting as false.
+      sortValue: (row) => (row.fits === null ? undefined : row.fits ? 1 : 0),
       render: (row) => (
         <BoolCell
           value={row.fits}
@@ -104,6 +107,8 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
     {
       id: 'canFly',
       header: t('fittings.variations.canFly'),
+      // Still loading (null) sinks to the end rather than sorting as false.
+      sortValue: (row) => (row.canFly === null ? undefined : row.canFly ? 1 : 0),
       render: (row) => (
         <BoolCell
           value={row.canFly}
@@ -135,6 +140,7 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
       rowKey={(row) => row.typeId}
       label={t('fittings.variations.title')}
       density="compact"
+      mobileSort
       onRowClick={(row) => onSelect(row.typeId)}
     />
   );

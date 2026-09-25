@@ -441,6 +441,7 @@ export function BuildGroupPanel({
         id: 'material',
         header: t('industry.material'),
         primary: true,
+        sortValue: (material) => nameForType(catalog, material.typeID),
         render: (material) => (
           <span className="truncate">{nameForType(catalog, material.typeID)}</span>
         ),
@@ -450,6 +451,7 @@ export function BuildGroupPanel({
         header: t('industry.quantity'),
         align: 'right',
         className: 'tabular-nums text-text-dim',
+        sortValue: (material) => material.quantity,
         render: (material) => material.quantity.toLocaleString(),
       },
       {
@@ -457,6 +459,8 @@ export function BuildGroupPanel({
         header: t('industry.volume'),
         align: 'right',
         className: 'tabular-nums',
+        sortValue: (material) =>
+          rowVolume(material, (typeID) => volumeForType(catalog, typeID)) ?? undefined,
         render: (material) => {
           const volume = rowVolume(material, (typeID) => volumeForType(catalog, typeID));
           return <span>{volume === null ? t('common.unknown') : formatVolume(volume)}</span>;
@@ -503,6 +507,7 @@ export function BuildGroupPanel({
         header: t('industry.stillToBuyColumn'),
         align: 'right',
         className: 'tabular-nums',
+        sortValue: (material) => material.buyToShow,
         render: (material) => (
           <span className="flex flex-col items-start gap-0.5 sm:items-end">
             <span className={material.buyToShow === 0 ? 'text-success' : 'font-semibold'}>
@@ -876,6 +881,7 @@ export function BuildGroupPanel({
                 rowKey={(material) => material.typeID}
                 label={t('industry.groupMaterials')}
                 density="compact"
+                mobileSort
               />
             </div>
           ) : null}

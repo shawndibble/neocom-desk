@@ -160,6 +160,7 @@ export function ContractDetailModal({
     {
       id: 'name',
       header: t('contracts.detailItemName'),
+      sortValue: (item) => items.typeNames.get(item.type_id) ?? `#${item.type_id}`,
       render: (item) => (
         <MarketItemLink typeId={item.type_id}>
           <span className="flex items-center gap-1.5">
@@ -180,6 +181,7 @@ export function ContractDetailModal({
       header: t('contracts.detailQuantity'),
       align: 'right',
       className: 'tabular-nums',
+      sortValue: (item) => item.quantity,
       render: (item) => item.quantity.toLocaleString(),
     },
   ];

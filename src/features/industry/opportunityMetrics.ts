@@ -16,6 +16,14 @@ export const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
   unknown: 'default',
 };
 
+/** Sort rank for `OrderDepthLevel` — an enum, not an alphabetical string. */
+export const ORDER_DEPTH_RANK: Record<OrderDepthLevel, number> = {
+  deep: 3,
+  moderate: 2,
+  thin: 1,
+  unknown: 0,
+};
+
 export function unitCount(row: OpportunityRow): number {
   const quantity = row.candidate.catalogEntry.blueprint.products[0]?.quantity ?? 1;
   return quantity * row.candidate.blueprint.runs;

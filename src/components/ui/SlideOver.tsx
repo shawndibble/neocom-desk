@@ -54,7 +54,7 @@ export function SlideOver({
           onInteractOutside={(event) => event.preventDefault()}
           aria-describedby={undefined}
           className={cx(
-            'fixed top-0 bottom-0 z-40 flex w-full max-w-[25rem] flex-col border-line-bright bg-panel shadow-2xl',
+            'fixed top-0 bottom-0 z-40 flex w-full max-w-[25rem] flex-col border-line-bright bg-panel shadow-lg shadow-black/50',
             SIDE_CLASS[side],
             className
           )}

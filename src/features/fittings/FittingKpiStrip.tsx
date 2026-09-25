@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { FittingStats } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
+import { formatIskCompact } from '@/lib/isk';
 
 interface FittingKpiStripProps {
   stats: FittingStats | null;
@@ -51,7 +52,7 @@ export function FittingKpiStrip({ stats, price }: FittingKpiStripProps) {
     },
     {
       label: t('fittings.kpi.price'),
-      value: price ? t('fittings.kpi.isk', { value: (price.totals.sell / 1e6).toFixed(1) }) : null,
+      value: price ? t('fittings.kpi.isk', { value: formatIskCompact(price.totals.sell) }) : null,
     },
   ];
   return (

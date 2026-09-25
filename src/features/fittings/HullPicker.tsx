@@ -61,7 +61,7 @@ export function HullPicker({ catalogue, onStart }: HullPickerProps) {
                         title={hull.group}
                         onClick={() => setSelected(hull)}
                         onDoubleClick={() => onStart(hull)}
-                        className={`flex min-h-9 w-full items-center border-l-2 px-2 text-left text-sm hover:bg-panel-2 ${isSelected ? 'border-accent bg-panel-2 text-accent' : 'border-transparent'}`}
+                        className={`flex min-h-11 w-full md:min-h-9 items-center border-l-2 px-2 text-left text-sm hover:bg-panel-2 ${isSelected ? 'border-accent bg-panel-2 text-accent' : 'border-transparent'}`}
                       >
                         {hull.name}
                       </button>
