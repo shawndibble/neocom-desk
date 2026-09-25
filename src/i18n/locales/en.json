@@ -478,6 +478,7 @@
       "fits": "Fits",
       "fitsYes": "Fits",
       "fitsNo": "Doesn't fit",
+      "stillOverBy": "Still over by {{amount}} {{resource}}",
       "canFly": "Can fly",
       "canFlyYes": "Can fly",
       "canFlyNo": "Can't fly",
