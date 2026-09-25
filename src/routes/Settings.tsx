@@ -12,6 +12,7 @@ import {
 } from '@/features/settings/sections';
 import { SettingsBackLink, SettingsIndex, SettingsNav } from '@/features/settings/SettingsNav';
 import { DevicePanel } from '@/features/settings/DevicePanel';
+import { UpdatePanel } from '@/features/settings/UpdatePanel';
 import {
   Button,
   DataTable,
@@ -1328,6 +1329,7 @@ export function Settings() {
               <ExportPanel />
               <ImportPanel />
               <DataAttributionPanel />
+              <UpdatePanel />
               <DevicePanel />
             </>
           )}

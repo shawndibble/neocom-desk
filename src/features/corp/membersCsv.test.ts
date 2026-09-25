@@ -20,6 +20,8 @@ function row(overrides: Partial<RosterRow> = {}): RosterRow {
     locationName: 'Jita IV - Moon 4',
     locationId: 60003760,
     startMs: 2000,
+    roles: null,
+    isSelf: false,
     ...overrides,
   };
 }
