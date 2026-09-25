@@ -4464,7 +4464,7 @@
       "data": "Data & storage",
       "device": "This device",
       "activity": "Activity Log",
-      "faq": "FAQ & credits"
+      "faq": "FAQ"
     },
     "groups": {
       "app": "App",
@@ -4487,6 +4487,7 @@
     "deviceLogoutHint": "Removes every character's login and locally stored data from this browser. Sync settings and everything already synced stay, and come back when you log a character in again.",
     "deviceLogoutHintLocalOnly": "Removes every character's login and locally stored data from this browser. Sync is not set up here, so plans and other data stored only on this browser are deleted too.",
     "deviceLogoutAction": "Log out",
+    "deviceLogoutFailed": "Could not log out. Try again, or reload the page.",
     "deviceLogoutConfirmTitle": "Log out of all characters?",
     "deviceLogoutConfirm_one": "This removes {{count}} character's login and local data from this browser. You will be taken to the login page.",
     "deviceLogoutConfirm_other": "This removes {{count}} characters' logins and local data from this browser. You will be taken to the login page.",
@@ -4678,7 +4679,6 @@
       "importSummary": "Added {{added}} character(s); skipped {{skipped}} already on this device.",
       "importReloading": "Reloading to pick up the imported data…"
     },
-    "defaultsTitle": "Defaults",
     "defaultsSyncHint": "Kept across your devices — set these once, on whichever one you have to hand.",
     "corpDefaultsTitle": "Corporation",
     "timeFormatLabel": "Time format",

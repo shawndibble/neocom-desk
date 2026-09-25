@@ -16,15 +16,20 @@ export function DevicePanel() {
   const count = useLiveQuery(() => db.characters.count());
   const [confirming, setConfirming] = useState(false);
   const [working, setWorking] = useState(false);
+  const [failed, setFailed] = useState(false);
   const syncConfigured = isSyncConfigured();
 
   async function confirmLogout() {
     setWorking(true);
+    setFailed(false);
     try {
       await logoutAllCharacters(syncConfigured);
+      setConfirming(false);
+    } catch {
+      // Stay in the dialog so the pilot can see it and try again.
+      setFailed(true);
     } finally {
       setWorking(false);
-      setConfirming(false);
     }
   }
 
@@ -63,6 +68,11 @@ export function DevicePanel() {
         <p className="text-xs text-text-dim">
           {t('settings.deviceLogoutConfirm', { count: loggedIn })}
         </p>
+        {failed && (
+          <p role="alert" className="mt-2 text-xs text-danger">
+            {t('settings.deviceLogoutFailed')}
+          </p>
+        )}
         <div className="mt-3 flex justify-end gap-2">
           <Button size="sm" disabled={working} onClick={() => setConfirming(false)}>
             {t('characters.cancel')}

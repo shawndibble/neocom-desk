@@ -1156,8 +1156,10 @@ export function Settings() {
   );
 
   useEffect(() => {
+    // `hasOwn`: a hash like `#constructor` must not resolve to an inherited member.
+    if (!Object.hasOwn(LEGACY_HASH_SECTIONS, hash)) return;
     const target = LEGACY_HASH_SECTIONS[hash as keyof typeof LEGACY_HASH_SECTIONS];
-    if (target) navigate({ pathname: tabPath(SETTINGS_TABS, target) }, { replace: true });
+    navigate({ pathname: tabPath(SETTINGS_TABS, target) }, { replace: true });
   }, [hash, navigate]);
 
   return (
@@ -1263,17 +1265,13 @@ export function Settings() {
               <DataPanel />
               <ExportPanel />
               <ImportPanel />
+              <DataAttributionPanel />
             </>
           )}
           {section === 'device' && <DevicePanel />}
           {section === 'activity' && <ActivityLogPanel />}
           {/* `/settings/faq` is the link to hand someone who asks what the app stores. */}
-          {section === 'faq' && (
-            <>
-              <FaqPanel />
-              <DataAttributionPanel />
-            </>
-          )}
+          {section === 'faq' && <FaqPanel />}
         </div>
       </div>
     </div>

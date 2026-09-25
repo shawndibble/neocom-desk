@@ -786,7 +786,7 @@ describe('Settings — Notifications (issue #170)', () => {
   it('opens the FAQ tab and shows what the app stores', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await openTab(user, /^faq & credits$/i);
+    await openTab(user, /^faq$/i);
 
     expect(await screen.findByRole('heading', { name: /what we store/i })).toBeInTheDocument();
     // The groups, not just the panel title: the tab is worth nothing if it
@@ -809,9 +809,10 @@ describe('Settings — Notifications (issue #170)', () => {
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    expect(
-      await within(settingsNav()).findByRole('link', { name: /^faq & credits$/i })
-    ).toHaveAttribute('aria-current', 'page');
+    expect(await within(settingsNav()).findByRole('link', { name: /^faq$/i })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
     expect(await screen.findByRole('heading', { name: /what we store/i })).toBeInTheDocument();
   });
 
@@ -1330,9 +1331,10 @@ describe('Settings defaults', () => {
     window.history.pushState({}, '', '/settings/faq');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
-    expect(
-      await within(settingsNav()).findByRole('link', { name: /faq & credits/i })
-    ).toHaveAttribute('aria-current', 'page');
+    expect(await within(settingsNav()).findByRole('link', { name: /faq/i })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
 
     // The real `?` shortcut, pressed from a section that is not Shortcuts. It
     // navigates to /settings/shortcuts, so it lands correctly regardless of
@@ -1621,7 +1623,7 @@ describe('Settings — sections rail', () => {
       'Data & storage',
       'This device',
       'Activity Log',
-      'FAQ & credits',
+      'FAQ',
     ]);
     for (const group of ['App', 'Defaults', 'Alerts', 'Data & device']) {
       expect(within(nav).getByText(group)).toBeInTheDocument();
@@ -1707,5 +1709,37 @@ describe('Settings — This device', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(await db.characters.count()).toBe(1);
+  });
+});
+
+describe('Settings — review follow-ups', () => {
+  it('keeps the dialog open and says so when logging out fails', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(db.characters, 'delete').mockRejectedValueOnce(new Error('disk full'));
+    window.history.pushState({}, '', '/settings/device');
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: /^log out$/i }));
+    const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
+    await user.click(within(dialog).getByRole('button', { name: /^log out$/i }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/could not log out/i);
+    expect(await db.characters.count()).toBe(1);
+  });
+
+  it('ignores a hash that only names an inherited object member', async () => {
+    window.history.pushState({}, '', '/settings/market#constructor');
+    render(<App />);
+
+    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/settings/market');
+  });
+
+  it('puts the CCP data credit at the foot of Data & storage', async () => {
+    window.history.pushState({}, '', '/settings/dataAge');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: /data credit/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /clear cached esi data/i })).toBeInTheDocument();
   });
 });
