@@ -24,10 +24,13 @@ import * as Icon from '@/components/ui/icons';
 import {
   BUILT_IN_DAMAGE_PROFILES,
   isValidDamageProfile,
-  newCustomDamageProfileId,
   type CustomDamageProfile,
 } from '@/engine/fittings/damageProfile';
-import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
+import {
+  newCustomDamageProfileId,
+  useDamageProfileName,
+  type DamageProfiles,
+} from './damageProfiles';
 
 const DAMAGE_TYPES = ['em', 'thermal', 'kinetic', 'explosive'] as const;
 

@@ -157,6 +157,7 @@ export function Fittings() {
     catalogue,
     engineReady: workspace.engineReady,
     profile: workspace.profile,
+    damageProfile: workspace.damageProfiles.selected,
   });
   function swapVariation(typeId: number) {
     if (!moduleSlot) return;

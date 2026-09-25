@@ -3,7 +3,6 @@ import {
   BUILT_IN_DAMAGE_PROFILES,
   UNIFORM_DAMAGE_PROFILE_ID,
   isValidDamageProfile,
-  newCustomDamageProfileId,
   parseCustomDamageProfiles,
   parseSelectedDamageProfileId,
   resolveDamageProfile,
@@ -102,11 +101,5 @@ describe('parseSelectedDamageProfileId', () => {
   it('keeps a string, defaults anything else to uniform', () => {
     expect(parseSelectedDamageProfileId('custom:abc')).toBe('custom:abc');
     expect(parseSelectedDamageProfileId(3)).toBe(UNIFORM_DAMAGE_PROFILE_ID);
-  });
-});
-
-describe('newCustomDamageProfileId', () => {
-  it('is custom-prefixed so it can never collide with a built-in', () => {
-    expect(newCustomDamageProfileId().startsWith('custom:')).toBe(true);
   });
 });

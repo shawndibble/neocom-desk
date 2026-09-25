@@ -234,6 +234,13 @@ describe('extractModuleResult', () => {
     });
   });
 
+  it('leaves adaptedResonances off a Reactive Armor Hardener that is not running', () => {
+    const attributes = new Map([[ITEM_DOGMA_ATTRIBUTE.resistanceShiftAmount, { value: 6 }]]);
+    expect(
+      extractModuleResult({ attributes, state: 'online', max_state: 'overload' })
+    ).not.toHaveProperty('adaptedResonances');
+  });
+
   it('leaves adaptedResonances off a module that is not a Reactive Armor Hardener', () => {
     const attributes = new Map([[DOGMA_ATTRIBUTE.armorEmResonance, { value: 0.85 }]]);
     expect(

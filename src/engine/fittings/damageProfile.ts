@@ -12,6 +12,8 @@ export interface NamedDamageProfile extends DamageProfile {
   id: string;
 }
 
+export const CUSTOM_DAMAGE_PROFILE_ID_PREFIX = 'custom:';
+
 /** A pilot-authored profile; synced across devices as `sync.fittingDamageProfiles`. */
 export interface CustomDamageProfile extends NamedDamageProfile {
   name: string;
@@ -95,7 +97,8 @@ export function parseCustomDamageProfiles(raw: unknown): CustomDamageProfile[] {
   for (const entry of raw) {
     if (!isRecord(entry)) continue;
     const { id, name, em, thermal, kinetic, explosive } = entry;
-    if (typeof id !== 'string' || !id.startsWith('custom:') || seen.has(id)) continue;
+    if (typeof id !== 'string' || !id.startsWith(CUSTOM_DAMAGE_PROFILE_ID_PREFIX) || seen.has(id))
+      continue;
     if (typeof name !== 'string' || name.trim() === '') continue;
     const profile = { id, name, em, thermal, kinetic, explosive } as CustomDamageProfile;
     if (!isValidDamageProfile(profile)) continue;
@@ -107,8 +110,4 @@ export function parseCustomDamageProfiles(raw: unknown): CustomDamageProfile[] {
 
 export function parseSelectedDamageProfileId(raw: unknown): string {
   return typeof raw === 'string' ? raw : UNIFORM_DAMAGE_PROFILE_ID;
-}
-
-export function newCustomDamageProfileId(): string {
-  return `custom:${crypto.randomUUID()}`;
 }

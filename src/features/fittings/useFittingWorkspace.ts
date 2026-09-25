@@ -208,6 +208,7 @@ export function useFittingWorkspace(): FittingWorkspace {
   const [price, setPrice] = useState<Appraisal | null>(null);
   const damageProfiles = useDamageProfiles();
   const damageProfile = damageProfiles.selected;
+  const damageProfilesHydrated = damageProfiles.hydrated;
 
   // Set right before this hook's own `setShareCode` writes, so the decode
   // effect below can tell "the URL changed because we just wrote it" (keep
@@ -555,7 +556,9 @@ export function useFittingWorkspace(): FittingWorkspace {
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new calculation, not a render-time derivation
     setStatsError(false);
-    if (fitting === null || profile === null) return;
+    // Waits for the stored Damage Profile, so a pilot who picked Guristas
+    // doesn't get a uniform calculation thrown away a moment later.
+    if (fitting === null || profile === null || !damageProfilesHydrated) return;
     void (async () => {
       try {
         // Swaps in the Fitting's own carried implants/boosters where the
@@ -580,7 +583,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     return () => {
       cancelled = true;
     };
-  }, [fitting, profile, implantBasis, damageProfile]);
+  }, [fitting, profile, implantBasis, damageProfile, damageProfilesHydrated]);
 
   // Price: independent of the dogma engine, so it can — and should — resolve
   // well before stats do.

@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  CUSTOM_DAMAGE_PROFILE_ID_PREFIX,
   UNIFORM_DAMAGE_PROFILE_ID,
   builtInDamageProfileKey,
   parseCustomDamageProfiles,
@@ -44,7 +45,13 @@ export function useDamageProfileName(): (profile: NamedDamageProfile) => string 
   };
 }
 
+export function newCustomDamageProfileId(): string {
+  return `${CUSTOM_DAMAGE_PROFILE_ID_PREFIX}${crypto.randomUUID()}`;
+}
+
 export interface DamageProfiles {
+  /** Both stores have been read, so `selected` is the stored choice rather than the pre-read default. */
+  hydrated: boolean;
   custom: CustomDamageProfile[];
   /** The profile stats are measured against — uniform when the stored id names nothing. */
   selected: NamedDamageProfile;
@@ -58,9 +65,11 @@ export function useDamageProfiles(): DamageProfiles {
   const custom = useCustomDamageProfiles((s) => s.value);
   const setCustom = useCustomDamageProfiles((s) => s.setValue);
   const hydrateCustom = useCustomDamageProfiles((s) => s.hydrate);
+  const customHydrated = useCustomDamageProfiles((s) => s.hydrated);
   const selectedId = useSelectedDamageProfileId((s) => s.value);
   const select = useSelectedDamageProfileId((s) => s.setValue);
   const hydrateSelected = useSelectedDamageProfileId((s) => s.hydrate);
+  const selectedHydrated = useSelectedDamageProfileId((s) => s.hydrated);
 
   useEffect(() => {
     void hydrateCustom();
@@ -71,27 +80,34 @@ export function useDamageProfiles(): DamageProfiles {
   // would recalculate the fit on every render.
   const selected = useMemo(() => resolveDamageProfile(selectedId, custom), [selectedId, custom]);
 
+  // Both writes rewrite the whole list, so they read the store's current
+  // value at write time rather than this render's — never a stale or
+  // not-yet-hydrated `[]` that would wipe every other profile on every device.
   const saveCustom = useCallback(
     (profile: CustomDamageProfile) => {
-      const exists = custom.some((p) => p.id === profile.id);
+      const current = useCustomDamageProfiles.getState().value;
+      const exists = current.some((p) => p.id === profile.id);
       void setCustom(
-        exists ? custom.map((p) => (p.id === profile.id ? profile : p)) : [...custom, profile]
+        exists ? current.map((p) => (p.id === profile.id ? profile : p)) : [...current, profile]
       );
     },
-    [custom, setCustom]
+    [setCustom]
   );
 
   const deleteCustom = useCallback(
     (id: string) => {
-      void setCustom(custom.filter((p) => p.id !== id));
+      void setCustom(useCustomDamageProfiles.getState().value.filter((p) => p.id !== id));
       // A deleted selection already resolves to uniform; say so in storage
       // too, so another device doesn't keep a dangling id.
-      if (selectedId === id) void select(UNIFORM_DAMAGE_PROFILE_ID);
+      if (useSelectedDamageProfileId.getState().value === id) {
+        void select(UNIFORM_DAMAGE_PROFILE_ID);
+      }
     },
-    [custom, setCustom, selectedId, select]
+    [setCustom, select]
   );
 
   return {
+    hydrated: customHydrated && selectedHydrated,
     custom,
     selected,
     select: (id) => void select(id),

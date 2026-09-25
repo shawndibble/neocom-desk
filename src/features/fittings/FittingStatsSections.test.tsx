@@ -55,6 +55,7 @@ const guristas = BUILT_IN_DAMAGE_PROFILES.find((p) => p.id === 'builtin:guristas
 
 function damageProfiles(overrides: Partial<DamageProfiles> = {}): DamageProfiles {
   return {
+    hydrated: true,
     custom: [],
     selected: guristas,
     select: vi.fn(),

@@ -174,7 +174,10 @@ interface ModuleCalculationResult {
  * adapted it to.
  */
 export function extractModuleResult(result: ModuleCalculationResult): FittingModuleResult {
-  const isReactiveArmorHardener =
+  // Only a running RAH adapts; an online or offline one sits at its base
+  // resists, and labelling those "adapted" would be wrong.
+  const isAdaptingHardener =
+    (result.state === 'active' || result.state === 'overload') &&
     readAttribute(result.attributes, ITEM_DOGMA_ATTRIBUTE.resistanceShiftAmount) > 0;
   return {
     state: result.state,
@@ -182,7 +185,7 @@ export function extractModuleResult(result: ModuleCalculationResult): FittingMod
     chargeGroupIds: CHARGE_GROUP_ATTRIBUTES.map((id) =>
       readAttribute(result.attributes, id)
     ).filter((groupId) => groupId > 0),
-    ...(isReactiveArmorHardener
+    ...(isAdaptingHardener
       ? {
           adaptedResonances: resonances(
             result.attributes,
