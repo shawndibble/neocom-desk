@@ -47,6 +47,7 @@ import {
   pinRole,
 } from '@/features/pi/adapters';
 import {
+  altGroupSummary,
   ATTENTION_TONE as COLONY_ATTENTION_TONE,
   colonyAttention,
   colonyStatus,
@@ -759,11 +760,30 @@ function ColonyRow({
   );
 }
 
-/** A character sub-heading above its colony rows — only rendered once more than one character's colonies are on screen (the alt-colonies toggle is on). */
-function CharacterGroupHeader({ name, onSwitch }: { name: string; onSwitch?: () => void }) {
+/**
+ * A character sub-heading above its colony rows — only rendered once more
+ * than one character's colonies are on screen (the alt-colonies toggle is
+ * on). `summary` is the alt-only one-line status ("1 stopped · next 59m",
+ * from `altGroupSummary`) — never passed for the active Character's own
+ * heading, which has no group of alts to summarise.
+ */
+function CharacterGroupHeader({
+  name,
+  summary,
+  onSwitch,
+}: {
+  name: string;
+  summary?: string;
+  onSwitch?: () => void;
+}) {
   return (
     <div className="flex items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-      <span className="min-w-0 truncate">{name}</span>
+      <div className="flex min-w-0 items-baseline gap-2">
+        <span className="truncate">{name}</span>
+        {summary && (
+          <span className="shrink-0 font-normal normal-case tracking-normal">{summary}</span>
+        )}
+      </div>
       {onSwitch && <SwitchToButton name={name} onSwitch={onSwitch} />}
     </div>
   );
@@ -928,12 +948,40 @@ export function PlanetaryIndustry() {
   const planetsResult = data?.planetsResult ?? null;
   const planetsNeedsReauth = data?.planetsNeedsReauth ?? false;
   const details = data?.details ?? NO_DETAILS;
-  const planetNames = data?.planetNames ?? NO_NAMES;
-  const pinTypeNames = data?.pinTypeNames ?? NO_NAMES;
-  const productNames = data?.productNames ?? NO_NAMES;
+  const cachedPlanetNames = data?.planetNames ?? NO_NAMES;
+  const cachedPinTypeNames = data?.pinTypeNames ?? NO_NAMES;
+  const cachedProductNames = data?.productNames ?? NO_NAMES;
   const schematicNames = data?.schematicNames ?? NO_NAMES;
   const loadedAt = data?.loadedAt ?? 0;
   const roster = data?.roster ?? EMPTY_ROSTER;
+
+  // Public-lookup overlay for (b): ids the cache-only roster names above
+  // couldn't resolve, filled in once the toggle turns on — see the effect
+  // below. Spread first, so an id the cache-only read above already has
+  // (a fresher live read, for the active Character) always wins.
+  const [publicPlanetNames, setPublicPlanetNames] = useState<ReadonlyMap<number, string>>(NO_NAMES);
+  const [publicTypeNames, setPublicTypeNames] = useState<ReadonlyMap<number, string>>(NO_NAMES);
+  const planetNames = useMemo(
+    () =>
+      publicPlanetNames.size === 0
+        ? cachedPlanetNames
+        : new Map([...publicPlanetNames, ...cachedPlanetNames]),
+    [publicPlanetNames, cachedPlanetNames]
+  );
+  const pinTypeNames = useMemo(
+    () =>
+      publicTypeNames.size === 0
+        ? cachedPinTypeNames
+        : new Map([...publicTypeNames, ...cachedPinTypeNames]),
+    [publicTypeNames, cachedPinTypeNames]
+  );
+  const productNames = useMemo(
+    () =>
+      publicTypeNames.size === 0
+        ? cachedProductNames
+        : new Map([...publicTypeNames, ...cachedProductNames]),
+    [publicTypeNames, cachedProductNames]
+  );
 
   const planets = useMemo(() => planetsResult?.data ?? [], [planetsResult]);
 
@@ -989,8 +1037,70 @@ export function PlanetaryIndustry() {
         loadedAt,
         expiringWindowMs
       ),
+      summary: altGroupSummary(group.colonies.map((entry) => entry.status)),
     }));
   }, [roster.colonies, loadedAt, expiringWindowMs]);
+
+  // (b): resolve any planet/type name the cache-only reads above left
+  // unresolved, through the public, globally-cached name lookups —
+  // `loadPlanetName`/`loadTypeNames` — rather than leaving a raw id. Gated on
+  // `showAltColonies` so this never fires on a page open the toggle is off
+  // for, and only asks for ids nothing above already has, so re-toggling
+  // costs nothing once resolved. `loadTypeNames` batches its ids into one
+  // `POST /universe/names` (chunked only past ESI's 1000-id cap), per the
+  // ticket's guardrail against a lookup fan-out; there is no bulk endpoint
+  // for planet names (`features/pi/names.ts`), so those go out concurrently
+  // instead, same as the active Character's own planet-name read above.
+  useEffect(() => {
+    if (!showAltColonies) return;
+    const missingTypeIds = new Set<number>();
+    for (const colony of roster.colonies) {
+      for (const pin of colony.detail?.pins ?? []) {
+        if (!pinTypeNames.has(pin.type_id) && !productNames.has(pin.type_id)) {
+          missingTypeIds.add(pin.type_id);
+        }
+        const productId = pin.extractor_details?.product_type_id;
+        if (
+          productId !== undefined &&
+          !pinTypeNames.has(productId) &&
+          !productNames.has(productId)
+        ) {
+          missingTypeIds.add(productId);
+        }
+      }
+    }
+    const missingPlanetIds = [
+      ...new Set(
+        roster.colonies
+          .map((colony) => colony.planet.planet_id)
+          .filter((id) => !planetNames.has(id))
+      ),
+    ];
+    if (missingTypeIds.size === 0 && missingPlanetIds.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      const [typeNames, planetNameEntries] = await Promise.all([
+        missingTypeIds.size > 0 ? loadTypeNames([...missingTypeIds]) : Promise.resolve(NO_NAMES),
+        Promise.all(missingPlanetIds.map((id) => loadPlanetName(id))),
+      ]);
+      if (cancelled) return;
+      if (typeNames.size > 0) {
+        setPublicTypeNames((prev) => new Map([...prev, ...typeNames]));
+      }
+      const resolvedPlanetNames = new Map<number, string>();
+      missingPlanetIds.forEach((id, i) => {
+        const name = planetNameEntries[i];
+        if (name) resolvedPlanetNames.set(id, name);
+      });
+      if (resolvedPlanetNames.size > 0) {
+        setPublicPlanetNames((prev) => new Map([...prev, ...resolvedPlanetNames]));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showAltColonies, roster.colonies, pinTypeNames, productNames, planetNames]);
 
   // Every other Character with something the toggle would surface — a
   // colony row, or a reason it has none ("skipped"/"not loaded"/"no
@@ -1163,33 +1273,51 @@ export function PlanetaryIndustry() {
                 )}
 
                 {showAltColonies &&
-                  altGroups.map((group) => (
-                    <div key={group.characterId}>
-                      <CharacterGroupHeader
-                        name={group.characterName}
-                        onSwitch={() => void setActiveCharacter(group.characterId)}
-                      />
-                      {group.colonies.map(({ colony, status }) => {
-                        const key = `${group.characterId}:${colony.planet.planet_id}`;
-                        return (
-                          <ColonyRow
-                            key={key}
-                            characterId={group.characterId}
-                            planet={colony.planet}
-                            detail={colony.detail}
-                            status={status}
-                            expanded={expandedKeys.has(key)}
-                            onToggle={() => toggleExpandedKey(key)}
-                            planetNames={planetNames}
-                            pinTypeNames={pinTypeNames}
-                            productNames={productNames}
-                            schematicNames={schematicNames}
-                            loadedAt={loadedAt}
-                          />
-                        );
-                      })}
-                    </div>
-                  ))}
+                  altGroups.map((group) => {
+                    const summaryParts: string[] = [];
+                    if (group.summary.stoppedCount > 0) {
+                      summaryParts.push(
+                        t('pi.altColonies.summaryStopped', { count: group.summary.stoppedCount })
+                      );
+                    }
+                    if (group.summary.nextExpiryMs !== null) {
+                      summaryParts.push(
+                        t('pi.altColonies.summaryNext', {
+                          duration: formatDuration(
+                            Math.max(0, group.summary.nextExpiryMs - loadedAt) / 1000
+                          ),
+                        })
+                      );
+                    }
+                    return (
+                      <div key={group.characterId}>
+                        <CharacterGroupHeader
+                          name={group.characterName}
+                          summary={summaryParts.length > 0 ? summaryParts.join(' · ') : undefined}
+                          onSwitch={() => void setActiveCharacter(group.characterId)}
+                        />
+                        {group.colonies.map(({ colony, status }) => {
+                          const key = `${group.characterId}:${colony.planet.planet_id}`;
+                          return (
+                            <ColonyRow
+                              key={key}
+                              characterId={group.characterId}
+                              planet={colony.planet}
+                              detail={colony.detail}
+                              status={status}
+                              expanded={expandedKeys.has(key)}
+                              onToggle={() => toggleExpandedKey(key)}
+                              planetNames={planetNames}
+                              pinTypeNames={pinTypeNames}
+                              productNames={productNames}
+                              schematicNames={schematicNames}
+                              loadedAt={loadedAt}
+                            />
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
 
                 {showAltColonies &&
                   (roster.notLoaded.length > 0 ||

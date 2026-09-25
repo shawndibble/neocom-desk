@@ -6,8 +6,9 @@ import {
   colonyStatus,
   colonyAttention,
   sortColoniesByAttention,
+  altGroupSummary,
 } from './colonyStatus';
-import type { ExtractorYieldProgram } from './types';
+import type { ExtractorYieldProgram, ColonyStatus } from './types';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -223,5 +224,37 @@ describe('colonyAttention decayed', () => {
     expect(colonyAttention({ idle: false, soonestExpiryMs: NOW + HOUR, decayed: true }, NOW)).toBe(
       'expiring-soon'
     );
+  });
+});
+
+describe('altGroupSummary', () => {
+  it('reports no stopped colonies and no next expiry for an empty group', () => {
+    expect(altGroupSummary([])).toEqual({ stoppedCount: 0, nextExpiryMs: null });
+  });
+
+  it('counts idle colonies as stopped and ignores their expiry as "next"', () => {
+    const idle: ColonyStatus = { idle: true, soonestExpiryMs: NOW - HOUR };
+    const active: ColonyStatus = { idle: false, soonestExpiryMs: NOW + 48 * HOUR };
+    expect(altGroupSummary([idle, active])).toEqual({
+      stoppedCount: 1,
+      nextExpiryMs: NOW + 48 * HOUR,
+    });
+  });
+
+  it('picks the soonest expiry across every non-stopped colony, not the first', () => {
+    const soonest: ColonyStatus = { idle: false, soonestExpiryMs: NOW + HOUR };
+    const later: ColonyStatus = { idle: false, soonestExpiryMs: NOW + 48 * HOUR };
+    expect(altGroupSummary([later, soonest]).nextExpiryMs).toBe(NOW + HOUR);
+  });
+
+  it('reports no next expiry when every colony has already stopped', () => {
+    const idleA: ColonyStatus = { idle: true, soonestExpiryMs: NOW - HOUR };
+    const idleB: ColonyStatus = { idle: true, soonestExpiryMs: NOW - 2 * HOUR };
+    expect(altGroupSummary([idleA, idleB])).toEqual({ stoppedCount: 2, nextExpiryMs: null });
+  });
+
+  it('leaves next expiry null for a non-stopped colony with no extractor at all', () => {
+    const noExtractor: ColonyStatus = { idle: false, soonestExpiryMs: null };
+    expect(altGroupSummary([noExtractor])).toEqual({ stoppedCount: 0, nextExpiryMs: null });
   });
 });
