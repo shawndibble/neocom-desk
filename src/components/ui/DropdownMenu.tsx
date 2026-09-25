@@ -54,6 +54,24 @@ export function DropdownMenuCheckboxItem({
   );
 }
 
+export const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
+
+/** One of a set of choices, the current one ticked — as `ContextMenuRadioItem` marks its own. */
+export function DropdownMenuRadioItem({
+  className,
+  children,
+  ...props
+}: ComponentProps<typeof DropdownMenuPrimitive.RadioItem>) {
+  return (
+    <DropdownMenuPrimitive.RadioItem className={cx(menuItemClassName, className)} {...props}>
+      <span aria-hidden="true" className="inline-block w-3 text-center">
+        <DropdownMenuPrimitive.ItemIndicator>✓</DropdownMenuPrimitive.ItemIndicator>
+      </span>
+      {children}
+    </DropdownMenuPrimitive.RadioItem>
+  );
+}
+
 export function DropdownMenuSeparator({
   className,
   ...props

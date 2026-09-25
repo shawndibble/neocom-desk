@@ -44,6 +44,13 @@ interface TooltipProps {
    * action, and touch-and-hold stays the way to read the tooltip.
    */
   openOnTap?: boolean;
+  /**
+   * Off for a trigger whose touch-and-hold belongs to something else — a
+   * context menu, which Radix opens on a long-press: both would open at once.
+   * Touch then has no way to the bubble, so what it says must be reachable
+   * another way (the menu itself, a label). Hover and focus still show it.
+   */
+  holdToReveal?: boolean;
   /** Extra classes merged onto the trigger element, e.g. `w-full` so a full-width trigger stays full-width. */
   className?: string;
 }
@@ -70,7 +77,13 @@ interface TooltipProps {
  * something dismisses it: a tap outside, a scroll, Escape, or another tap on
  * an `openOnTap` trigger.
  */
-export function Tooltip({ content, children, openOnTap = false, className = '' }: TooltipProps) {
+export function Tooltip({
+  content,
+  children,
+  openOnTap = false,
+  holdToReveal = true,
+  className = '',
+}: TooltipProps) {
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
   // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
   // A `<dialog>` opened with `showModal()` sits in the browser's top layer,
@@ -116,7 +129,7 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
     touchDragged.current = event.touches.length > 1;
     const touch = event.touches.length === 1 ? event.touches[0] : undefined;
     touchOrigin.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
-    if (!openOnTap && !touchDragged.current) {
+    if (!openOnTap && holdToReveal && !touchDragged.current) {
       longPressTimer.current = setTimeout(() => setTouchOpen(true), TOUCH_LONG_PRESS_MS);
     }
   }

@@ -188,7 +188,8 @@
         "online": "online",
         "active": "active",
         "overload": "overloaded"
-      }
+      },
+      "cargoHold": "Cargo hold (m³)"
     },
     "view": {
       "label": "Fitting view",
@@ -261,7 +262,8 @@
         "low": "low slot",
         "rig": "rig slot",
         "subsystem": "subsystem slot",
-        "drone": "drone bay"
+        "drone": "drone bay",
+        "cargo": "cargo hold"
       },
       "searchLabel": "Search items to add",
       "searchPlaceholder": "Search modules, rigs, drones…",
@@ -281,7 +283,8 @@
       "tab": {
         "modules": "Modules",
         "charges": "Charges",
-        "drones": "Drones"
+        "drones": "Drones",
+        "cargo": "Cargo"
       },
       "tabsLabel": "What to add",
       "addingTo": "Adding to {{slot}} {{index}}",
@@ -289,8 +292,13 @@
       "checkingHull": "Checking what fits this ship…",
       "noChargeTakers": "Nothing fitted takes charges.",
       "loaded": "loaded",
-      "dragHint": "Click an item to fit it, or drag it onto a slot on the Ring.",
-      "chargeTaker": "{{count}}× {{name}}"
+      "dragHint": "Click an item to fit it, or drag it onto a slot on the Ring or a rack in the List.",
+      "chargeTaker": "{{count}}× {{name}}",
+      "cargoSearchLabel": "Search items to put in the cargo hold",
+      "cargoSearchPlaceholder": "Search any item — ammo, paste, filaments…",
+      "cargoHint": "Search for anything to carry: ammo, nanite paste, cap boosters, filaments, a depot.",
+      "cargoAddCount_one": "+{{count}}",
+      "cargoAddCount_other": "+{{count}}"
     },
     "start": {
       "newTitle": "New fitting from a hull",
@@ -775,6 +783,50 @@
         "priceSell": "Price (sell)",
         "priceBuy": "Price (buy)"
       }
+    },
+    "item": {
+      "slot": "{{rack}} {{index}}",
+      "state": "State",
+      "loadCharge": "Load charge from cargo",
+      "noCargoCharge": "No charge in cargo fits this",
+      "loadThisOne": "Into this module",
+      "loadAllCompatible": "Into every module that takes it",
+      "sameChargeEverywhere": "Load {{name}} into all compatible",
+      "copyToAllOfType": "Copy to all of this type",
+      "swapVariant": "Swap for meta variant",
+      "copyModule": "Copy module",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "moveTo": "Move to slot",
+      "removeAllOfType": "Remove all of this type",
+      "addModule": "Add module",
+      "browse": "Browse…",
+      "paste": "Paste {{name}}",
+      "pasteNone": "Paste module (copy one first)",
+      "fillRack": "Fill rack with {{name}}",
+      "fillRackNone": "Fill rack with last used (none yet)",
+      "launchAll": "Launch all",
+      "moveToBay": "Move to bay",
+      "recallAll": "Recall all drones",
+      "noneTakes": "Nothing fitted takes this",
+      "loadAllCompatibleCount_one": "Load into all compatible ({{count}} module)",
+      "loadAllCompatibleCount_other": "Load into all compatible ({{count}} modules)",
+      "loadInto": "Load into…",
+      "changeQuantity": "Change quantity…",
+      "quantityTitle": "Quantity of {{name}}",
+      "quantityConfirm": "Set quantity",
+      "fitFirstFree": "Fit to first free slot",
+      "addToBay": "Add to drone bay",
+      "addCargo": "Add cargo",
+      "cargoHold": "{{used}} / {{total}} m³",
+      "dragToMove": "Drag {{name}} to another slot",
+      "dragToLaunch": "Drag {{name}} onto Drones to launch it",
+      "dragToLoad": "Drag {{name}} onto a module that takes it",
+      "loaded_one": "Loaded {{name}} into {{count}} module.",
+      "loaded_other": "Loaded {{name}} into {{count}} modules.",
+      "loadRanOut_one": "Loaded {{name}} into {{loaded}} of {{count}} module — cargo ran out.",
+      "loadRanOut_other": "Loaded {{name}} into {{loaded}} of {{count}} modules — cargo ran out.",
+      "loadNone": "Nothing fitted takes {{name}}."
     }
   },
   "skills": {

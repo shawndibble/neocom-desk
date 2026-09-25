@@ -1,9 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import type { ComponentProps } from 'react';
+import { act, createEvent, fireEvent, render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { FittingRing } from './FittingRing';
 import { FITTING_DRAG_TYPE, useFittingDrag, type FittingDragPayload } from './fittingDrag';
+import { FittingItemActionsProvider, type FittingItemActions } from './fittingItemActions';
+import { fakeItemActions } from './__fixtures__/itemActions';
 import { resolveFittingView } from './fittingViewPreference';
 
 /** A drop carrying this app's marker, with `payload` as the drag in progress. */
@@ -222,77 +226,6 @@ describe('FittingRing', () => {
     expect(screen.getByLabelText('Scourge Heavy Missile ×1,535 (1.5K)')).toHaveTextContent('1.5K');
   });
 
-  it('opens a fitted tile’s right-click menu: reachable states, unload, info, variations, remove', async () => {
-    const actions = {
-      setState: vi.fn(),
-      unloadCharge: vi.fn(),
-      showInfo: vi.fn(),
-      openVariations: vi.fn(),
-      remove: vi.fn(),
-    };
-    render(
-      <FittingRing
-        fitting={fitting}
-        stats={statsWith(10)}
-        typeName={(typeId) => ({ 10: 'Autocannon', 20: 'EMP S' })[typeId] ?? '?'}
-        moduleResults={[
-          { state: 'active', maxState: 'overload', chargeGroupIds: [] },
-          { state: 'online', maxState: 'online', chargeGroupIds: [] },
-        ]}
-        moduleActions={actions}
-      />
-    );
-    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
-    const menu = await screen.findByRole('menu');
-    expect(
-      within(menu)
-        .getAllByRole('menuitemradio')
-        .map((item) => item.textContent?.replace('✓', ''))
-    ).toEqual(['Offline', 'Online', 'Active', 'Overloaded']);
-    expect(within(menu).getByRole('menuitemradio', { name: 'Active' })).toHaveAttribute(
-      'aria-checked',
-      'true'
-    );
-    fireEvent.click(within(menu).getByRole('menuitemradio', { name: 'Overloaded' }));
-    expect(actions.setState).toHaveBeenCalledWith('high', 0, 'overload');
-
-    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Unload EMP S' }));
-    expect(actions.unloadCharge).toHaveBeenCalledWith('high', 0);
-
-    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
-    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove Autocannon' }));
-    expect(actions.remove).toHaveBeenCalledWith('high', 0);
-  });
-
-  it('offers a passive module only the states it can reach, and no menu on an empty slot', async () => {
-    render(
-      <FittingRing
-        fitting={fitting}
-        stats={statsWith(10)}
-        moduleResults={[
-          { state: 'active', maxState: 'overload', chargeGroupIds: [] },
-          { state: 'online', maxState: 'online', chargeGroupIds: [] },
-        ]}
-        moduleActions={{
-          setState: vi.fn(),
-          unloadCharge: vi.fn(),
-          showInfo: vi.fn(),
-          openVariations: vi.fn(),
-          remove: vi.fn(),
-        }}
-      />
-    );
-    fireEvent.contextMenu(screen.getByLabelText('Low slots 1, online'));
-    const menu = await screen.findByRole('menu');
-    expect(
-      within(menu)
-        .getAllByRole('menuitemradio')
-        .map((item) => item.textContent?.replace('✓', ''))
-    ).toEqual(['Offline', 'Online']);
-    expect(within(menu).queryByRole('menuitem', { name: /^Unload/ })).toBeNull();
-  });
-
   it('marks the hull’s hardpoints on the rim, used ones filled, each kind with its numbers on hover', async () => {
     const { container } = render(
       <FittingRing
@@ -330,6 +263,79 @@ describe('FittingRing', () => {
       screen.getByText('Turret hardpoints: 2 of 1 used — 1 more than the hull has')
     ).toBeTruthy();
   });
+});
+
+describe('FittingRing with the editor’s item actions', () => {
+  const results = [
+    { state: 'active' as const, maxState: 'overload' as const, chargeGroupIds: [] },
+    { state: 'online' as const, maxState: 'online' as const, chargeGroupIds: [] },
+  ];
+  const names = { 10: 'Autocannon', 11: 'Damage Control', 20: 'EMP S', 21: 'Fusion S' };
+
+  function renderRing(
+    actions: FittingItemActions,
+    props: Partial<ComponentProps<typeof FittingRing>> = {}
+  ) {
+    return render(
+      <MemoryRouter>
+        <FittingItemActionsProvider value={actions}>
+          <FittingRing
+            fitting={fitting}
+            stats={statsWith(10)}
+            typeName={(typeId) => names[typeId as keyof typeof names] ?? '?'}
+            moduleResults={results}
+            {...props}
+          />
+        </FittingItemActionsProvider>
+      </MemoryRouter>
+    );
+  }
+
+  it('opens a fitted tile’s menu: its reachable states, unload, remove', async () => {
+    const actions = fakeItemActions({ names });
+    renderRing(actions);
+    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'State' }));
+    const states = await screen.findAllByRole('menuitemradio');
+    expect(states.map((item) => item.textContent?.replace('✓', ''))).toEqual([
+      'Offline',
+      'Online',
+      'Active',
+      'Overloaded',
+    ]);
+    expect(screen.getByRole('menuitemradio', { name: 'Active' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    );
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Overloaded' }));
+    expect(actions.setState).toHaveBeenCalledWith('high', 0, 'overload');
+
+    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Unload EMP S' }));
+    expect(actions.unloadCharge).toHaveBeenCalledWith('high', 0);
+
+    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove Autocannon' }));
+    expect(actions.remove).toHaveBeenCalledWith('high', 0);
+  });
+
+  it('loads a module’s charge into every compatible module from its menu', async () => {
+    const actions = fakeItemActions({ names });
+    renderRing(actions);
+    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Load EMP S into all compatible' })
+    );
+    expect(actions.charges.load).toHaveBeenCalledWith(20, { fromCargo: false });
+  });
+
+  it('offers a passive module only the states it can reach', async () => {
+    renderRing(fakeItemActions({ names }));
+    fireEvent.contextMenu(screen.getByLabelText('Low slots 1, online'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'State' }));
+    const states = await screen.findAllByRole('menuitemradio');
+    expect(states.map((item) => item.textContent?.replace('✓', ''))).toEqual(['Offline', 'Online']);
+  });
 
   it('gives a subsystem’s menu no states — a subsystem can’t be put offline', async () => {
     const t3: Fitting = {
@@ -339,23 +345,89 @@ describe('FittingRing', () => {
         { slot: 'subsystem', slotIndex: 0, typeId: 30, state: 'online' },
       ],
     };
-    render(
-      <FittingRing
-        fitting={t3}
-        stats={statsWith(10)}
-        moduleActions={{
-          setState: vi.fn(),
-          unloadCharge: vi.fn(),
-          showInfo: vi.fn(),
-          openVariations: vi.fn(),
-          remove: vi.fn(),
-        }}
-      />
-    );
+    renderRing(fakeItemActions({ names }), { fitting: t3, moduleResults: null });
     fireEvent.contextMenu(screen.getByLabelText(/^Subsystems 1, /));
     const menu = await screen.findByRole('menu');
-    expect(within(menu).queryAllByRole('menuitemradio')).toHaveLength(0);
-    expect(within(menu).getByRole('menuitem', { name: /^Remove/ })).toBeTruthy();
+    expect(within(menu).queryByRole('menuitem', { name: 'State' })).toBeNull();
+    expect(within(menu).getByRole('menuitem', { name: 'Remove #30' })).toBeTruthy();
+  });
+
+  it('removes a focused module with Delete', () => {
+    const actions = fakeItemActions({ names });
+    renderRing(actions);
+    fireEvent.keyDown(screen.getByLabelText('High slots 1, active'), { key: 'Delete' });
+    expect(actions.remove).toHaveBeenCalledWith('high', 0);
+  });
+
+  it('gives an empty slot recent modules, paste and fill-rack', async () => {
+    const actions = fakeItemActions({ names }, { recentFor: () => [10], clipboardFor: () => 10 });
+    renderRing(actions);
+    fireEvent.contextMenu(screen.getByLabelText('High slots 2, empty'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Paste Autocannon' }));
+    expect(actions.addModule).toHaveBeenCalledWith('high', 1, 10);
+
+    fireEvent.contextMenu(screen.getByLabelText('High slots 2, empty'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Fill rack with Autocannon' }));
+    expect(actions.fillRack).toHaveBeenCalledWith('high', 10);
+  });
+
+  it('is one tab stop, the arrow keys walking the slots in ring order', () => {
+    renderRing(fakeItemActions({ names }));
+    const first = screen.getByLabelText('High slots 1, active');
+    const second = screen.getByLabelText('High slots 2, empty');
+    expect(first).toHaveAttribute('tabindex', '0');
+    expect(second).toHaveAttribute('tabindex', '-1');
+    first.focus();
+    fireEvent.keyDown(first, { key: 'ArrowRight' });
+    expect(second).toHaveFocus();
+    expect(second).toHaveAttribute('tabindex', '0');
+    fireEvent.keyDown(second, { key: 'ArrowLeft' });
+    expect(first).toHaveFocus();
+  });
+
+  it('lights the modules a charge drag would load, and loads through the page on a drop — Alt for one', () => {
+    const actions = fakeItemActions({ names, takes: { 21: ['high-0'] } });
+    renderRing(actions);
+    const payload: FittingDragPayload = {
+      kind: 'charge',
+      typeId: 21,
+      fromCargo: true,
+      targets: ['high-0'],
+    };
+    act(() => useFittingDrag.setState({ payload }));
+    expect(screen.getByLabelText('Low slots 1, online').className).toContain('opacity-35');
+    expect(screen.getByLabelText('High slots 1, active').className).not.toContain('opacity-35');
+
+    fireEvent.drop(screen.getByLabelText('Low slots 1, online'), dropWith(payload));
+    expect(actions.drop).not.toHaveBeenCalled();
+
+    // jsdom has no DragEvent, so the drop can't carry altKey on its own.
+    const target = screen.getByLabelText('High slots 1, active');
+    const altDrop = createEvent.drop(target, dropWith(payload));
+    Object.defineProperty(altDrop, 'altKey', { value: true });
+    fireEvent(target, altDrop);
+    expect(actions.drop).toHaveBeenCalledWith(
+      payload,
+      { kind: 'slot', rack: 'high', index: 0, filled: true },
+      true
+    );
+  });
+
+  it('opens a cargo tile’s actions on a click, and loads it into every module that takes it', async () => {
+    const actions = fakeItemActions({ names, takes: { 21: ['high-0'] } });
+    renderRing(actions, { fitting: { ...fitting, cargo: [{ typeId: 21, quantity: 200 }] } });
+    fireEvent.click(screen.getByLabelText('Fusion S ×200'));
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Load into all compatible (1 module)' })
+    );
+    expect(actions.charges.load).toHaveBeenCalledWith(21, { fromCargo: true });
+  });
+
+  it('offers Add cargo, even with the hold empty', () => {
+    const actions = fakeItemActions({ names });
+    renderRing(actions);
+    fireEvent.click(screen.getByRole('button', { name: 'Add cargo' }));
+    expect(actions.openAddCargo).toHaveBeenCalled();
   });
 });
 

@@ -101,6 +101,26 @@ describe('Tooltip touch support', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('One-line explanation.');
   });
 
+  it('leaves touch-and-hold alone under holdToReveal={false}, for a context menu that wants it', () => {
+    vi.useFakeTimers();
+    render(
+      <Tooltip content="One-line explanation." holdToReveal={false}>
+        <button type="button">Trigger</button>
+      </Tooltip>
+    );
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+
+    fireEvent.touchStart(trigger);
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+
+    // Focus still shows it.
+    fireEvent.focus(trigger);
+    expect(screen.getByRole('tooltip')).toHaveTextContent('One-line explanation.');
+  });
+
   it('does not reveal the tooltip on a quick tap, and does not block the trigger tap action', () => {
     vi.useFakeTimers();
     const onClick = vi.fn();

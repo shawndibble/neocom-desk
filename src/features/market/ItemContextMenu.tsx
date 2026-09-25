@@ -58,6 +58,41 @@ export type ItemMenuFor = (typeId: number, trigger: ReactElement) => ReactElemen
 /** Everything the menu's entries need — the props minus the trigger wiring. */
 type ItemMenuProps = Omit<ItemContextMenuProps, 'children' | 'onOpenChange'>;
 
+/** The item menu's "Show info" — also reused as-is by menus that aren't item menus (the Fittings editor's). */
+export function ShowInfoMenuItem({
+  typeId,
+  itemName,
+  onShowInfo,
+}: {
+  typeId: number;
+  itemName: string;
+  onShowInfo: (typeId: number, itemName: string) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <MenuItem onSelect={() => onShowInfo(typeId, itemName)}>
+      {t('market.contextMenu.showInfo')}
+    </MenuItem>
+  );
+}
+
+/** The item menu's "View in Market", keeping the page's region or hub; reused as `ShowInfoMenuItem` is. */
+export function ViewInMarketMenuItem({ typeId }: { typeId: number }) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
+  return (
+    <MenuItem
+      onSelect={() => {
+        const params = marketLinkParams(typeId, location.search);
+        navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
+      }}
+    >
+      {t('market.contextMenu.viewInMarket')}
+    </MenuItem>
+  );
+}
+
 /**
  * The item menu's entries, shared by `ItemContextMenu` (right-click, and the
  * row's `RowMoreActions` button it publishes to) and `ItemMoreActions` (a
@@ -96,7 +131,6 @@ function useItemMenuItems(
 ): ReactNode {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const location = useLocation();
   const addToCompare = useCompareSet((state) => state.add);
   const piPlannable = usePiPlannable(typeId);
 
@@ -120,9 +154,7 @@ function useItemMenuItems(
         {t('market.contextMenu.addToQuickbar')}
       </MenuItem>
       <PriceAlertMenuItem typeId={typeId} available={quickbarAvailable} onSelect={onAlertRequest} />
-      <MenuItem onSelect={() => onShowInfo(typeId, itemName)}>
-        {t('market.contextMenu.showInfo')}
-      </MenuItem>
+      <ShowInfoMenuItem typeId={typeId} itemName={itemName} onShowInfo={onShowInfo} />
       <MenuItem onSelect={() => addToCompare({ typeId, itemName })}>
         {t('market.contextMenu.addToCompare')}
       </MenuItem>
@@ -131,14 +163,7 @@ function useItemMenuItems(
           {t('market.contextMenu.compareVariations')}
         </MenuItem>
       )}
-      <MenuItem
-        onSelect={() => {
-          const params = marketLinkParams(typeId, location.search);
-          navigate(`/market/browser?${new URLSearchParams(params).toString()}`);
-        }}
-      >
-        {t('market.contextMenu.viewInMarket')}
-      </MenuItem>
+      <ViewInMarketMenuItem typeId={typeId} />
       <MenuItem onSelect={() => void writeToClipboard(itemName)}>
         {t('market.contextMenu.copyName')}
       </MenuItem>

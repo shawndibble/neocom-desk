@@ -16,6 +16,9 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
+  ContextMenuSeparator,
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
@@ -25,6 +28,9 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -63,6 +69,30 @@ export function MenuSubContent(props: ComponentProps<typeof ContextMenuSubConten
     <DropdownMenuSubContent {...props} />
   ) : (
     <ContextMenuSubContent {...props} />
+  );
+}
+
+export function MenuSeparator(props: ComponentProps<typeof ContextMenuSeparator>) {
+  return useContext(MenuKindContext) === 'dropdown' ? (
+    <DropdownMenuSeparator {...props} />
+  ) : (
+    <ContextMenuSeparator {...props} />
+  );
+}
+
+export function MenuRadioGroup(props: ComponentProps<typeof ContextMenuRadioGroup>) {
+  return useContext(MenuKindContext) === 'dropdown' ? (
+    <DropdownMenuRadioGroup {...props} />
+  ) : (
+    <ContextMenuRadioGroup {...props} />
+  );
+}
+
+export function MenuRadioItem(props: ComponentProps<typeof ContextMenuRadioItem>) {
+  return useContext(MenuKindContext) === 'dropdown' ? (
+    <DropdownMenuRadioItem {...props} />
+  ) : (
+    <ContextMenuRadioItem {...props} />
   );
 }
 
