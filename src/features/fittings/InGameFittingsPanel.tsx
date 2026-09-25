@@ -6,17 +6,9 @@
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  DataAgeBadge,
-  EmptyState,
-  IconButton,
-  Panel,
-  ReauthBanner,
-  Spinner,
-} from '@/components/ui';
+import { Button, DataAgeBadge, EmptyState, IconButton, Panel, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { beginEveLogin } from '@/app/loginFlow';
+import { GrantBanner } from '@/app/GrantNote';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import {
   esiFittingToFitting,
@@ -133,11 +125,12 @@ export function InGameFittingsPanel({ characterId, onOpen }: InGameFittingsPanel
           <Spinner label={t('common.loading')} />
         </div>
       ) : granted === false ? (
-        <ReauthBanner
+        <GrantBanner
+          characterId={characterId}
+          endpoints={['getCharacterFittings']}
           title={t('fittings.inGame.reauthTitle')}
           hint={t('fittings.inGame.reauthHint')}
           actionLabel={t('fittings.inGame.reauthAction')}
-          onLogin={() => void beginEveLogin({ groups: ['fittings'] })}
         />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />

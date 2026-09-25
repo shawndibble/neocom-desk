@@ -11,14 +11,12 @@ import {
   IconButton,
   IskAmount,
   Panel,
-  ReauthBanner,
   SearchInput,
   Spinner,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { GrantBanner } from '@/app/GrantNote';
 import { loadOrderHistory } from '@/features/character/orders';
 import { ItemContextMenu } from './ItemContextMenu';
 import { OrderHistoryList } from './OrderHistoryList';
@@ -355,13 +353,12 @@ export function OrderHistoryPanel({
     >
       {historyNeedsReauth ? (
         <div className="px-3 py-2">
-          <ReauthBanner
+          <GrantBanner
+            characterId={activeCharacterId}
+            endpoints={['getCharacterOrderHistory']}
             title={t('orders.reauthTitle')}
             hint={t('orders.reauthHint')}
             actionLabel={t('orders.reauthAction')}
-            onLogin={() =>
-              void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterOrderHistory']) })
-            }
           />
         </div>
       ) : !historyResult || history.length === 0 ? (

@@ -15,7 +15,6 @@ import {
   IskAmount,
   PageHeader,
   Panel,
-  ReauthBanner,
   SearchInput,
   Spinner,
   Tabs,
@@ -29,8 +28,7 @@ import {
   contractsHistoryColumnsStore,
   type ContractsHistoryColumnId,
 } from './contractsColumns';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { GrantBanner } from '@/app/GrantNote';
 import { loadContracts } from '@/features/character/contracts';
 import { ContractContextMenu } from '@/features/character/ContractContextMenu';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
@@ -547,13 +545,12 @@ export function Contracts() {
           <Spinner label={t('common.loading')} />
         </div>
       ) : contractsNeedsReauth ? (
-        <ReauthBanner
+        <GrantBanner
+          characterId={activeCharacterId}
+          endpoints={['getCharacterContracts']}
           title={t('contracts.reauthTitle')}
           hint={t('contracts.reauthHint')}
           actionLabel={t('contracts.reauthAction')}
-          onLogin={() =>
-            void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterContracts']) })
-          }
         />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />

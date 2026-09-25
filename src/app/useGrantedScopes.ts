@@ -63,25 +63,26 @@ export function useEndpointsGranted(endpoints: readonly EsiEndpointId[]): boolea
 }
 
 /**
- * Which of `characterIds` hold a grant missing any scope `endpoints` declares
- * — the per-Character twin of `useEndpointsGranted`, for a page that values
- * each Character's figures under that Character's own modifiers (issue
- * #1588). `undefined` until the tokens have loaded. Only the ids leave the
- * query, so no `TokenRecord` reaches React state (ADR 0001).
+ * Whether `characterId`'s stored grant is known to lack a scope `endpoints`
+ * declares — the per-Character twin of `useEndpointsGranted`, for a figure
+ * priced under a Character that need not be the active one (issues #1588,
+ * #1589). `false` while unknown, for no Character, and once granted: the
+ * answer a Grant note shows on. Only the answer leaves the query, so no
+ * `TokenRecord` reaches React state (ADR 0001).
  */
-export function useCharactersLackingEndpoints(
-  characterIds: readonly number[],
+export function useCharacterLacksEndpoints(
+  characterId: number | null,
   endpoints: readonly EsiEndpointId[]
-): readonly number[] | undefined {
-  // Keyed by value: callers rebuild both arrays every render.
-  const idsKey = characterIds.join(',');
+): boolean {
+  // Keyed by value: callers may rebuild the array every render.
   const endpointsKey = endpoints.join(',');
-  return useLiveQuery(async () => {
-    const required = requiredScopesForEndpoints(endpoints);
-    const tokens = await db.tokens.bulkGet([...characterIds]);
-    return characterIds.filter((_, i) => {
-      const held = new Set(tokens[i]?.scopes ?? []);
-      return required.some((scope) => !held.has(scope));
-    });
-  }, [idsKey, endpointsKey]);
+  const answer = useLiveQuery(async () => {
+    if (characterId === null) return undefined;
+    const held = new Set((await db.tokens.get(characterId))?.scopes ?? []);
+    const lacks = requiredScopesForEndpoints(endpoints).some((scope) => !held.has(scope));
+    return { characterId, lacks };
+  }, [characterId, endpointsKey]);
+  // Checked against `characterId`: right after it changes the query still
+  // holds the previous Character's answer for a frame.
+  return answer?.characterId === characterId && answer.lacks;
 }

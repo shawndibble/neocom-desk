@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { beginEveLogin } from '@/app/loginFlow';
 import { OpenOrdersPanel } from './OpenOrdersPanel';
 import { loadAllCharactersOpenOrders, type OpenOrdersSnapshot } from './openOrdersData';
 import { loadOrderCostBases, type ProductionRunBasis } from './orderCostBasis';
@@ -188,6 +189,35 @@ beforeEach(() => {
 });
 
 describe('OpenOrdersPanel', () => {
+  it("grants for the lapsed Character's own grant, not the active one's, and names them", async () => {
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [EXPIRING_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+        {
+          characterId: 2,
+          characterName: 'Bravo',
+          orders: [],
+          fetchedAt: 0,
+          fromCache: false,
+          needsReauth: true,
+        },
+      ])
+    );
+    const user = userEvent.setup();
+    renderPanel();
+
+    expect(await screen.findByText('Bravo — Log in again to see your orders')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Log in again with EVE Online' }));
+    expect(beginEveLogin).toHaveBeenCalledWith({ characterId: 2, groups: ['marketOrders'] });
+  });
+
   it('carries the item context menu on order rows and asks for the blueprint catalog on open', async () => {
     mockedLoadAll.mockResolvedValue(
       snapshot([

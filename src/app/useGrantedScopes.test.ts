@@ -3,7 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_REGISTRY } from '@/esi/registry';
-import { useCharactersLackingEndpoints, useEndpointsGranted } from './useGrantedScopes';
+import { useEndpointsGranted } from './useGrantedScopes';
 
 const CHARACTER_ID = 42;
 const OTHER_SCOPE = ESI_REGISTRY.getCharacterAssets.scope;
@@ -46,44 +46,5 @@ describe('useEndpointsGranted', () => {
   it('treats a character with no stored token as granting nothing', async () => {
     const { result } = renderHook(() => useEndpointsGranted(['getCharacterImplants']));
     await waitFor(() => expect(result.current).toBe(false));
-  });
-});
-
-describe('useCharactersLackingEndpoints', () => {
-  const ALT_ID = 43;
-
-  it('lists only the characters whose own grant misses the endpoint’s scope', async () => {
-    await seedGrant([IMPLANTS_SCOPE]);
-    await seedGrant([OTHER_SCOPE], ALT_ID);
-    const { result } = renderHook(() =>
-      useCharactersLackingEndpoints([CHARACTER_ID, ALT_ID], ['getCharacterImplants'])
-    );
-    await waitFor(() => expect(result.current).toEqual([ALT_ID]));
-  });
-
-  it('checks each character’s own grant, not the active Character’s', async () => {
-    await seedGrant([OTHER_SCOPE]);
-    await seedGrant([IMPLANTS_SCOPE], ALT_ID);
-    const { result } = renderHook(() =>
-      useCharactersLackingEndpoints([ALT_ID], ['getCharacterImplants'])
-    );
-    await waitFor(() => expect(result.current).toEqual([]));
-  });
-
-  it('treats a character with no stored token as lacking the scope', async () => {
-    const { result } = renderHook(() =>
-      useCharactersLackingEndpoints([ALT_ID], ['getCharacterImplants'])
-    );
-    await waitFor(() => expect(result.current).toEqual([ALT_ID]));
-  });
-
-  it('drops a character once its grant gains the scope', async () => {
-    await seedGrant([OTHER_SCOPE], ALT_ID);
-    const { result } = renderHook(() =>
-      useCharactersLackingEndpoints([ALT_ID], ['getCharacterImplants'])
-    );
-    await waitFor(() => expect(result.current).toEqual([ALT_ID]));
-    await seedGrant([IMPLANTS_SCOPE], ALT_ID);
-    await waitFor(() => expect(result.current).toEqual([]));
   });
 });

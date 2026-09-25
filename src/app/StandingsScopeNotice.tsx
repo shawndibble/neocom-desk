@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, ReauthBanner } from '@/components/ui';
-import { permissionsForEndpoints, type EsiEndpointId } from '@/esi/registry';
+import { Button } from '@/components/ui';
+import type { EsiEndpointId } from '@/esi/registry';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { beginEveLogin } from './loginFlow';
-import { useEndpointsGranted } from './useGrantedScopes';
+import { GrantBanner } from './GrantNote';
+import { useCharacterLacksEndpoints } from './useGrantedScopes';
 
-/** Stable reference for `useEndpointsGranted` — a fresh array every render would defeat its memo. */
 const STANDINGS_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterStandings'];
 
 const dismissKey = (characterId: number) => `standingsScopeNoticeDismissed:${characterId}`;
@@ -42,22 +41,25 @@ function writeDismissed(characterId: number): void {
  */
 export function StandingsScopeNotice() {
   const { t } = useTranslation();
-  const granted = useEndpointsGranted(STANDINGS_ENDPOINTS);
-  const characterId = useActiveCharacter((state) => state.activeCharacterId);
+  const characterId = useActiveCharacter((state) =>
+    state.hydrated ? state.activeCharacterId : null
+  );
+  const lacks = useCharacterLacksEndpoints(characterId, STANDINGS_ENDPOINTS);
   // Remembers which Character was dismissed this session, so the write to
   // storage is not needed to hide it immediately.
   const [dismissedNow, setDismissedNow] = useState<number | null>(null);
 
-  if (granted !== false || characterId === null) return null;
+  if (!lacks || characterId === null) return null;
   if (dismissedNow === characterId || readDismissed(characterId)) return null;
 
   return (
     <div role="status" className="mb-4 rounded-xs border border-warning/40 bg-panel px-3 py-1">
-      <ReauthBanner
+      <GrantBanner
+        characterId={characterId}
+        endpoints={STANDINGS_ENDPOINTS}
         title={t('reauth.standingsTitle')}
         hint={t('reauth.standingsHint')}
         actionLabel={t('reauth.standingsAction')}
-        onLogin={() => void beginEveLogin({ groups: permissionsForEndpoints(STANDINGS_ENDPOINTS) })}
         // Renders above a route that may have its own primary button
         // (docs/DESIGN.md §5, one per view).
         variant="ghost"

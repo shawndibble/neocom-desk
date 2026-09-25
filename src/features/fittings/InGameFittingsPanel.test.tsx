@@ -40,7 +40,7 @@ describe('InGameFittingsPanel', () => {
 
     expect(await screen.findByText('Allow fittings access')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Log in again with EVE Online' }));
-    expect(loginMock).toHaveBeenCalledWith({ groups: ['fittings'] });
+    expect(loginMock).toHaveBeenCalledWith({ characterId: 1, groups: ['fittings'] });
     // Never calls ESI for a Character it already knows lacks the scope
     // (avoids tripping the app-wide 403 auth-failure notice).
     expect(loadInGameFittingsMock).not.toHaveBeenCalled();

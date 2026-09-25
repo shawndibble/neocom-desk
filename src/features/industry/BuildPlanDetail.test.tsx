@@ -57,8 +57,7 @@ vi.mock('@/features/character/systemSecurity', () => ({
 const implantsGrant = vi.hoisted(() => ({ lacking: new Set<number>() }));
 vi.mock('@/app/useGrantedScopes', () => ({
   useGrantedScopes: () => ['esi-search.search_structures.v1'],
-  useCharactersLackingEndpoints: (ids: readonly number[]) =>
-    ids.filter((id) => implantsGrant.lacking.has(id)),
+  useCharacterLacksEndpoints: (id: number | null) => id !== null && implantsGrant.lacking.has(id),
 }));
 
 const BLUEPRINT: BlueprintType = {

@@ -14,14 +14,12 @@ import {
   EmptyState,
   IconButton,
   Panel,
-  ReauthBanner,
   Spinner,
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { GrantBanner } from '@/app/GrantNote';
 import { db } from '@/db';
 import { loadTypes } from '@/sde/loadSde';
 import type { TypeMap } from '@/sde/types';
@@ -888,17 +886,15 @@ export function ActiveJobsPanel({
       {hasFanOutNotices && (
         <div className="mb-2 space-y-2">
           {jobsFanOutReauth.map((entry) => (
-            <ReauthBanner
+            <GrantBanner
               key={entry.characterId}
+              characterId={entry.characterId}
+              characterName={entry.characterName}
+              endpoints={['getCharacterIndustryJobs']}
               variant="ghost"
-              title={`${entry.characterName} — ${t('industry.jobsReauthTitle')}`}
+              title={t('industry.jobsReauthTitle')}
               hint={t('industry.jobsReauthHint')}
               actionLabel={t('industry.jobsReauthAction')}
-              onLogin={() =>
-                void beginEveLogin({
-                  groups: permissionsForEndpoints(['getCharacterIndustryJobs']),
-                })
-              }
             />
           ))}
           {jobsFanOutSkipped.map((s) => (
@@ -913,13 +909,12 @@ export function ActiveJobsPanel({
           <Spinner size="sm" label={t('common.loading')} />
         </div>
       ) : blockingNeedsReauth ? (
-        <ReauthBanner
+        <GrantBanner
+          characterId={characterId}
+          endpoints={['getCharacterIndustryJobs']}
           title={t('industry.jobsReauthTitle')}
           hint={t('industry.jobsReauthHint')}
           actionLabel={t('industry.jobsReauthAction')}
-          onLogin={() =>
-            void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterIndustryJobs']) })
-          }
         />
       ) : jobs.length === 0 ? (
         // Only the "no data at all" case reaches here — `noneActive` has

@@ -9,10 +9,11 @@ import { assignLocation } from './navigation';
 export interface EveLoginOptions {
   /**
    * The Character this login is *for*. Defaults to the active one, which is
-   * what every re-auth entry point means: a `ReauthBanner`, the
-   * `AuthFailureNotice`, a `ScopeGate` — all of them are pressed while looking
-   * at one Character's data. Pass it explicitly only where the Character is not
-   * the active one.
+   * what the shell-level entry points mean: the `AuthFailureNotice`, a
+   * `ScopeGate` — both pressed while looking at the active Character's data.
+   * Per-page Grant CTAs go through `grantAction.ts`'s `beginGrant`, which
+   * always names the Character, since in a multi-Character view it is often
+   * not the active one.
    */
   characterId?: number;
   /** Opt-in scope groups to add to the request, e.g. `['corp']`. */
@@ -64,16 +65,17 @@ async function requestedScopes(
  * Re-auth, or grant a scope group, **for a known Character** — the second of
  * the two branches incremental auth splits login into (issue #295).
  *
- * Every caller is pressed from a Character context: a `ReauthBanner`, the
- * `AuthFailureNotice`, a `ScopeGate`, the Settings Corporation Permission row, the corp
- * grant prompt. So the request unions with that Character's stored grant, and
+ * Every caller is pressed from a Character context: a page's Grant CTA
+ * (`grantAction.ts`'s `beginGrant`), the `AuthFailureNotice`, a `ScopeGate`,
+ * the Settings Permissions rows, the corp grant prompt. So the request unions with that Character's stored grant, and
  * asking for less would quietly throw away a grant they already made — EVE
  * issues a token carrying exactly what was requested, so the loss is real.
  * Here `previous vs granted` stays meaningful and a genuine revocation is
  * still detected.
  *
  * The Character defaults to the active one, because that is what "re-authorize"
- * means at every one of those call sites. With no active Character there is
+ * means at the shell-level call sites (`AuthFailureNotice`, `ScopeGate`);
+ * `beginGrant` always names it instead. With no active Character there is
  * nothing to union with and this is the base set — the same conservative answer
  * as an unreadable Dexie.
  */

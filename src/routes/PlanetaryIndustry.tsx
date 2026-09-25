@@ -11,15 +11,13 @@ import {
   InfoTooltip,
   PageHeader,
   Panel,
-  ReauthBanner,
   Spinner,
   StatChip,
   Tabs,
   type StatChipTone,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { GrantBanner } from '@/app/GrantNote';
 import { db } from '@/db';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { PlanPanel } from '@/features/pi/PlanPanel';
@@ -1073,13 +1071,12 @@ export function PlanetaryIndustry() {
             log in next" is exactly what the alt-colonies toggle is for.
           */}
           {planetsNeedsReauth && (
-            <ReauthBanner
+            <GrantBanner
+              characterId={activeCharacterId}
+              endpoints={['getCharacterPlanets']}
               title={t('pi.reauthTitle')}
               hint={t('pi.reauthHint')}
               actionLabel={t('pi.reauthAction')}
-              onLogin={() =>
-                void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterPlanets']) })
-              }
             />
           )}
           {!planetsNeedsReauth && error && (
