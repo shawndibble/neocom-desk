@@ -67,10 +67,10 @@ for (const width of [1280, 1440]) {
     const opens = page.getByRole('link', { name: 'Open' });
     await expect(opens.first()).toBeVisible();
 
-    let cardsRight = 0;
-    for (const box of await Promise.all((await opens.all()).map((l) => l.boundingBox()))) {
-      cardsRight = Math.max(cardsRight, box!.x + box!.width);
-    }
+    // The first row's second card is the rightmost domain card; later Open
+    // links include the Alerts panel's own, which would defeat the comparison.
+    const rightCard = await opens.nth(1).boundingBox();
+    const cardsRight = rightCard!.x + rightCard!.width;
     const alerts = await page
       .locator('main')
       .getByText('Alerts', { exact: true })
