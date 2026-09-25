@@ -5,6 +5,11 @@
  * object reference. `compute` must be a stable, module-level function (not a
  * closure recreated every render), or this cache defeats itself.
  *
+ * `context` is an optional second cache key (e.g. the Damage Profile stats are
+ * measured under): a change to it recomputes like a change to `profile`. While
+ * that recompute is in flight the Fitting's previous value stays in `values`
+ * rather than blanking, so a table doesn't flash to a spinner on every switch.
+ *
  * A compute that throws or resolves `null` is reported as failed, so the
  * caller can tell "still working" from "gave up" instead of waiting on it
  * forever. A failure is kept only until the next change to the compared
@@ -21,12 +26,15 @@ export interface CompareAsyncResult<T> {
   failed: readonly boolean[];
 }
 
-type CacheEntry<T> = { profile: PilotProfile; value: T } | { profile: PilotProfile; failed: true };
+type CacheEntry<T> = { profile: PilotProfile; context: unknown } & (
+  { value: T } | { failed: true }
+);
 
 export function useCompareAsync<T>(
   fittings: readonly (Fitting | null)[],
   profile: PilotProfile | null,
-  compute: (fitting: Fitting, profile: PilotProfile) => Promise<T | null>
+  compute: (fitting: Fitting, profile: PilotProfile, context?: unknown) => Promise<T | null>,
+  context?: unknown
 ): CompareAsyncResult<T> {
   const cacheRef = useRef(new Map<Fitting, CacheEntry<T>>());
   const [result, setResult] = useState<CompareAsyncResult<T>>(() => ({
@@ -40,12 +48,16 @@ export function useCompareAsync<T>(
     const read = (fitting: Fitting | null): CacheEntry<T> | null => {
       if (fitting === null) return null;
       const entry = cache.get(fitting);
-      return entry && entry.profile === profile ? entry : null;
+      return entry && entry.profile === profile && entry.context === context ? entry : null;
     };
     const snapshot = (): CompareAsyncResult<T> => {
       const entries = fittings.map(read);
       return {
-        values: entries.map((entry) => (entry && 'value' in entry ? entry.value : null)),
+        // A stale entry (older profile/context) still shows until its recompute lands.
+        values: fittings.map((fitting, i) => {
+          const entry = entries[i] ?? (fitting === null ? undefined : cache.get(fitting));
+          return entry && 'value' in entry ? entry.value : null;
+        }),
         failed: entries.map((entry) => entry !== null && 'failed' in entry),
       };
     };
@@ -60,7 +72,7 @@ export function useCompareAsync<T>(
       const results = await Promise.all(
         missing.map(async (fitting) => {
           try {
-            return [fitting, await compute(fitting, profile)] as const;
+            return [fitting, await compute(fitting, profile, context)] as const;
           } catch {
             return [fitting, null] as const;
           }
@@ -68,14 +80,17 @@ export function useCompareAsync<T>(
       );
       if (cancelled) return;
       for (const [fitting, value] of results) {
-        cache.set(fitting, value === null ? { profile, failed: true } : { profile, value });
+        cache.set(
+          fitting,
+          value === null ? { profile, context, failed: true } : { profile, context, value }
+        );
       }
       setResult(snapshot());
     })();
     return () => {
       cancelled = true;
     };
-  }, [fittings, profile, compute]);
+  }, [fittings, profile, compute, context]);
 
   return result;
 }

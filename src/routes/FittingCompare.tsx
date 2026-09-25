@@ -28,6 +28,8 @@ import {
 import { useCompareCanFly } from '@/features/fittings/useCompareCanFly';
 import { useCompareFittings } from '@/features/fittings/useCompareFittings';
 import { useCompareStats } from '@/features/fittings/useCompareStats';
+import { DamageProfilePicker } from '@/features/fittings/DamageProfilePicker';
+import { useDamageProfiles } from '@/features/fittings/damageProfiles';
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
 
 /**
@@ -46,7 +48,12 @@ export function FittingCompare() {
     retry: retryProfile,
   } = usePilotProfile(activeCharacterId);
   const fittings = useMemo(() => slots.map((slot) => slot?.fitting ?? null), [slots]);
-  const stats = useCompareStats(fittings, profile);
+  const damageProfiles = useDamageProfiles();
+  const stats = useCompareStats(
+    fittings,
+    profile,
+    damageProfiles.hydrated ? damageProfiles.selected : null
+  );
   const canFly = useCompareCanFly(fittings, profile);
   const isPhone = useIsPhone();
   const [page, setPage] = useState(0);
@@ -165,6 +172,8 @@ export function FittingCompare() {
           </Button>
         }
       />
+
+      <DamageProfilePicker damageProfiles={damageProfiles} />
 
       {count === 0 ? (
         <EmptyState

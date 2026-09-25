@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 import { useCompareAsync } from './useCompareAsync';
@@ -44,5 +44,38 @@ describe('useCompareAsync', () => {
     const fittings = [good];
     const { result } = renderHook(() => useCompareAsync(fittings, null, compute));
     expect(result.current).toEqual({ values: [null], failed: [false] });
+  });
+
+  it('recomputes on a context change and keeps the old value showing meanwhile', async () => {
+    const seen: unknown[] = [];
+    let release: () => void = () => {};
+    const slow = async (fitting: Fitting, _p: PilotProfile, ctx?: unknown) => {
+      seen.push(ctx);
+      if (ctx === 'b') await new Promise<void>((resolve) => (release = resolve));
+      return `${fitting.name}-${String(ctx)}`;
+    };
+    const fittings = [good];
+    const { result, rerender } = renderHook(
+      ({ ctx }) => useCompareAsync(fittings, profile, slow, ctx),
+      { initialProps: { ctx: 'a' } }
+    );
+    await waitFor(() => expect(result.current.values[0]).toBe('good-a'));
+    rerender({ ctx: 'b' });
+    expect(result.current.values[0]).toBe('good-a');
+    release();
+    await waitFor(() => expect(result.current.values[0]).toBe('good-b'));
+    expect(seen).toEqual(['a', 'b']);
+  });
+
+  it('does not recompute an unchanged Fitting when a slot is added', async () => {
+    const spy = vi.fn(compute);
+    const { result, rerender } = renderHook(
+      ({ fittings }) => useCompareAsync(fittings, profile, spy, 'a'),
+      { initialProps: { fittings: [good] as (Fitting | null)[] } }
+    );
+    await waitFor(() => expect(result.current.values[0]).toBe('good'));
+    rerender({ fittings: [good, empty] });
+    await waitFor(() => expect(result.current.failed[1]).toBe(true));
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 });
