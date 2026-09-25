@@ -1,101 +1,8 @@
-import { resistPct } from './stats';
+import { NUMERIC_FIELDS, round, type StatChangeKey } from './fittingStatFields';
 import type { FittingStats } from './types';
 
-/** Every numeric stat the variations panel can report changed. */
-export type FittingStatKey =
-  | 'cpuUsed'
-  | 'cpuTotal'
-  | 'powergridUsed'
-  | 'powergridTotal'
-  | 'calibrationUsed'
-  | 'calibrationTotal'
-  | 'droneDps'
-  | 'droneBandwidthUsed'
-  | 'droneBandwidthTotal'
-  | 'droneCapacity'
-  | 'ehp'
-  | 'capacitorCapacity'
-  | 'capacitorRechargeTime'
-  | 'shieldHp'
-  | 'shieldEmResonance'
-  | 'shieldThermalResonance'
-  | 'shieldKineticResonance'
-  | 'shieldExplosiveResonance'
-  | 'armorHp'
-  | 'armorEmResonance'
-  | 'armorThermalResonance'
-  | 'armorKineticResonance'
-  | 'armorExplosiveResonance'
-  | 'hullHp'
-  | 'hullEmResonance'
-  | 'hullThermalResonance'
-  | 'hullKineticResonance'
-  | 'hullExplosiveResonance'
-  | 'maxTargetRange'
-  | 'maxLockedTargets'
-  | 'scanResolution'
-  | 'signatureRadius'
-  | 'maxVelocity'
-  | 'agility'
-  | 'mass'
-  | 'warpSpeed';
-
-/** `capacitor` is a discriminated union (`CapacitorStatus`), handled separately from the plain-numeric fields below — see `capacitorChange`. */
-export type StatChangeKey = FittingStatKey | 'capacitor';
-
-/** Displayed value and rounding for one stat — matches `FittingStatsSections`' own `toFixed` calls, so a change invisible on screen never counts as "changed" here. */
-interface NumericField {
-  key: FittingStatKey;
-  digits: number;
-  value: (stats: FittingStats) => number;
-}
-
-const NUMERIC_FIELDS: readonly NumericField[] = [
-  { key: 'cpuUsed', digits: 1, value: (s) => s.cpuUsed },
-  { key: 'cpuTotal', digits: 1, value: (s) => s.cpuTotal },
-  { key: 'powergridUsed', digits: 1, value: (s) => s.powergridUsed },
-  { key: 'powergridTotal', digits: 1, value: (s) => s.powergridTotal },
-  { key: 'calibrationUsed', digits: 0, value: (s) => s.calibrationUsed },
-  { key: 'calibrationTotal', digits: 0, value: (s) => s.calibrationTotal },
-  { key: 'droneDps', digits: 1, value: (s) => s.droneDps },
-  { key: 'droneBandwidthUsed', digits: 0, value: (s) => s.droneBandwidthUsed },
-  { key: 'droneBandwidthTotal', digits: 0, value: (s) => s.droneBandwidthTotal },
-  { key: 'droneCapacity', digits: 0, value: (s) => s.droneCapacity },
-  { key: 'ehp', digits: 0, value: (s) => s.ehp },
-  { key: 'capacitorCapacity', digits: 0, value: (s) => s.capacitorCapacity },
-  { key: 'capacitorRechargeTime', digits: 0, value: (s) => s.capacitorRechargeTime / 1000 },
-  { key: 'shieldHp', digits: 0, value: (s) => s.shield.hp },
-  { key: 'shieldEmResonance', digits: 0, value: (s) => resistPct(s.shield.emResonance) },
-  { key: 'shieldThermalResonance', digits: 0, value: (s) => resistPct(s.shield.thermalResonance) },
-  { key: 'shieldKineticResonance', digits: 0, value: (s) => resistPct(s.shield.kineticResonance) },
-  {
-    key: 'shieldExplosiveResonance',
-    digits: 0,
-    value: (s) => resistPct(s.shield.explosiveResonance),
-  },
-  { key: 'armorHp', digits: 0, value: (s) => s.armor.hp },
-  { key: 'armorEmResonance', digits: 0, value: (s) => resistPct(s.armor.emResonance) },
-  { key: 'armorThermalResonance', digits: 0, value: (s) => resistPct(s.armor.thermalResonance) },
-  { key: 'armorKineticResonance', digits: 0, value: (s) => resistPct(s.armor.kineticResonance) },
-  {
-    key: 'armorExplosiveResonance',
-    digits: 0,
-    value: (s) => resistPct(s.armor.explosiveResonance),
-  },
-  { key: 'hullHp', digits: 0, value: (s) => s.hull.hp },
-  { key: 'hullEmResonance', digits: 0, value: (s) => resistPct(s.hull.emResonance) },
-  { key: 'hullThermalResonance', digits: 0, value: (s) => resistPct(s.hull.thermalResonance) },
-  { key: 'hullKineticResonance', digits: 0, value: (s) => resistPct(s.hull.kineticResonance) },
-  { key: 'hullExplosiveResonance', digits: 0, value: (s) => resistPct(s.hull.explosiveResonance) },
-  { key: 'maxTargetRange', digits: 1, value: (s) => s.targeting.maxTargetRange / 1000 },
-  { key: 'maxLockedTargets', digits: 0, value: (s) => s.targeting.maxLockedTargets },
-  { key: 'scanResolution', digits: 0, value: (s) => s.targeting.scanResolution },
-  { key: 'signatureRadius', digits: 0, value: (s) => s.targeting.signatureRadius },
-  { key: 'maxVelocity', digits: 0, value: (s) => s.navigation.maxVelocity },
-  { key: 'agility', digits: 3, value: (s) => s.navigation.agility },
-  { key: 'mass', digits: 0, value: (s) => s.navigation.mass / 1000 },
-  { key: 'warpSpeed', digits: 1, value: (s) => s.navigation.warpSpeed },
-];
+export type { FittingStatKey, StatChangeKey } from './fittingStatFields';
+export { STAT_DIGITS } from './fittingStatFields';
 
 export interface StatChange {
   key: StatChangeKey;
@@ -106,17 +13,6 @@ export interface StatChange {
 export interface FittingStatsDelta {
   changes: StatChange[];
   count: number;
-}
-
-/** Same rounding `diffFittingStats` compares at — for a UI formatting a `StatChange`'s before/after/delta consistently with the count it's part of. */
-export const STAT_DIGITS: Readonly<Record<StatChangeKey, number>> = {
-  ...Object.fromEntries(NUMERIC_FIELDS.map((field) => [field.key, field.digits])),
-  capacitor: 0,
-} as Readonly<Record<StatChangeKey, number>>;
-
-function round(value: number, digits: number): number {
-  const factor = 10 ** digits;
-  return Math.round(value * factor) / factor;
 }
 
 /**

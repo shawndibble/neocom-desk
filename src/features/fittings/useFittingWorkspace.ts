@@ -23,27 +23,15 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useUrlParam } from '@/lib/useUrlState';
 import { nullableTextParam } from '@/lib/urlState';
 import { decodeFittingShare, encodeFittingShare } from '@/engine/fitting/fittingShare';
-import {
-  loadEftFitting,
-  eftResultToFitting,
-  type EftLoadResult,
-  type EftSlotLookup,
-  type EftUnresolvedItem,
-} from '@/engine/fittings/eftLoader';
+import type { EftUnresolvedItem } from '@/engine/fittings/eftLoader';
 import {
   loadEveFitXmlEntry,
   fitXmlEntryResultToFitting,
   type FitXmlUnresolvedItem,
   type FittingXmlDocument,
 } from '@/engine/import/eveFitXml';
-import {
-  classifyLoadInput,
-  killmailVictimToLoadResult,
-  loadDnaFitting,
-} from '@/engine/fittings/linkLoader';
-import { getKillmail } from '@/esi/endpoints';
-import { fetchKillmailHash } from '@/lib/zkillboard';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
+import { loadFittingFromText, type LoadError } from './loadFittingFromText';
 import { buildAllVProfile } from '@/engine/fittings/pilotProfile';
 import {
   applyImplantBasis,
@@ -58,7 +46,7 @@ import type {
 } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
-import { loadTypes, loadFittingSlots, loadSkills } from '@/sde/loadSde';
+import { loadTypes, loadSkills, typeName } from '@/sde/loadSde';
 import { loadActivePilotProfile } from './fittingPilotProfile';
 import { loadFittingPrice } from './fittingPrice';
 import {
@@ -68,33 +56,8 @@ import {
 } from './dogmaFittingEngine';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 
-/** Why a Load produced no Fitting, beyond the per-line `unresolved` list. */
-export type LoadError = 'unrecognised' | 'killmail-not-found' | 'killmail-failed';
-
-/** Fetches a killmail's victim and reads its fit; the hash is looked up when the link had none. */
-async function loadKillmailFitting(
-  killmailId: number,
-  hash: string | undefined,
-  slotByTypeId: EftSlotLookup
-): Promise<EftLoadResult | LoadError> {
-  const resolvedHash = hash ?? (await fetchKillmailHash(killmailId));
-  if (resolvedHash === null) return 'killmail-not-found';
-  try {
-    const { data } = await getKillmail(killmailId, resolvedHash);
-    return data === null
-      ? 'killmail-failed'
-      : killmailVictimToLoadResult(data.victim, slotByTypeId);
-  } catch {
-    return 'killmail-failed';
-  }
-}
-
-async function hullName(typeId: number): Promise<string> {
-  const types = await loadTypes();
-  return types[String(typeId)]?.name ?? `Type ${typeId}`;
-}
-
 export type ShareDecodeError = 'invalid' | 'unsupported-version';
+export type { LoadError };
 
 /** One `<fitting>` entry from a Loaded EVE fittings-XML file, resolved but not yet opened. */
 export interface FittingXmlListItem {
@@ -279,7 +242,7 @@ export function useFittingWorkspace(): FittingWorkspace {
         return;
       }
       const name =
-        pending?.code === shareCode ? pending.name : await hullName(decoded.value.hullTypeId);
+        pending?.code === shareCode ? pending.name : await typeName(decoded.value.hullTypeId);
       if (cancelled) return;
       const opened = shareToFitting(decoded.value, name);
       latestFittingRef.current = opened;
@@ -321,34 +284,15 @@ export function useFittingWorkspace(): FittingWorkspace {
     async (text: string) => {
       setLoadError(null);
       setFitXmlUnresolved([]);
-      const input = classifyLoadInput(text);
-      if (input.kind === 'unknown') {
-        setUnresolved([]);
-        setLoadError('unrecognised');
+      const result = await loadFittingFromText(text);
+      setUnresolved(result.unresolved);
+      if (result.error !== null) {
+        setLoadError(result.error);
         return;
       }
-      const [typeByName, slotByTypeId] = await Promise.all([loadItemNameMap(), loadFittingSlots()]);
-      let result: EftLoadResult;
-      if (input.kind === 'eft') {
-        result = loadEftFitting(input.text, typeByName, slotByTypeId);
-      } else if (input.kind === 'dna') {
-        result = loadDnaFitting(input.dna, slotByTypeId);
-      } else {
-        const loaded = await loadKillmailFitting(input.killmailId, input.hash, slotByTypeId);
-        if (typeof loaded === 'string') {
-          setUnresolved([]);
-          setLoadError(loaded);
-          return;
-        }
-        result = loaded;
-      }
-      setUnresolved(result.unresolved);
-      if (result.hullTypeId === null) return;
+      if (result.fitting === null) return;
       setSavedId(null);
-
-      const name = await hullName(result.hullTypeId);
-      const loaded = eftResultToFitting(result, name);
-      await commitFitting(loaded);
+      await commitFitting(result.fitting);
     },
     [commitFitting]
   );
