@@ -6,10 +6,34 @@
  * on a cold CI runner — so this spec asserts on the List view and the Load
  * control only, not on any stat figure.
  */
+import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 
 const PHONE = { width: 390, height: 844 };
+
+/**
+ * The Fitting's skill gaps read each fitted type's requirements from
+ * `/universe/types/{id}`, which the shared ESI mock only carries a few
+ * fixture types for — answer for any id, with no skill requirements.
+ */
+async function answerAnyType(page: Page) {
+  await page.route(/\/universe\/types\/\d+$/, async (route) => {
+    const typeId = Number(/\/universe\/types\/(\d+)$/.exec(route.request().url())![1]);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        type_id: typeId,
+        name: `Type ${typeId}`,
+        description: '',
+        group_id: 46,
+        published: true,
+        dogma_attributes: [],
+      }),
+    });
+  });
+}
 
 const RIFTER_EFT = [
   '[Rifter, Tracer Test]',
@@ -23,26 +47,11 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     page,
   }) => {
     await signInAndGoto(page, './fittings');
-    // The Fitting's skill gaps read each fitted type's requirements from
-    // `/universe/types/{id}`, which the shared ESI mock only carries a few
-    // fixture types for — answer for any id, with no skill requirements.
-    await page.route(/\/universe\/types\/\d+$/, async (route) => {
-      const typeId = Number(/\/universe\/types\/(\d+)$/.exec(route.request().url())![1]);
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          type_id: typeId,
-          name: `Type ${typeId}`,
-          description: '',
-          group_id: 46,
-          published: true,
-          dogma_attributes: [],
-        }),
-      });
-    });
+    await answerAnyType(page);
     await page.setViewportSize(PHONE);
 
+    // A phone's Start screen shows one way in at a time; Load is under Import.
+    await page.getByRole('tab', { name: 'Import' }).click();
     await page.getByLabel('Link or text').fill(RIFTER_EFT);
     const loadButton = page.getByRole('button', { name: 'Load', exact: true });
     const box = await loadButton.boundingBox();
@@ -52,8 +61,8 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await loadButton.click();
 
     await expect(page.getByRole('heading', { name: 'List' })).toBeVisible();
-    await expect(page.getByText('High slots')).toBeVisible();
-    await expect(page.getByText('Mid slots')).toBeVisible();
+    await expect(page.getByText('High slots', { exact: true })).toBeVisible();
+    await expect(page.getByText('Mid slots', { exact: true })).toBeVisible();
 
     // No sideways scroll at 390px — the usual narrow-width regression.
     const doc = await page.evaluate(() => ({
@@ -67,23 +76,11 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     page,
   }) => {
     await signInAndGoto(page, './fittings');
-    await page.route(/\/universe\/types\/\d+$/, async (route) => {
-      const typeId = Number(/\/universe\/types\/(\d+)$/.exec(route.request().url())![1]);
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          type_id: typeId,
-          name: `Type ${typeId}`,
-          description: '',
-          group_id: 46,
-          published: true,
-          dogma_attributes: [],
-        }),
-      });
-    });
+    await answerAnyType(page);
     await page.setViewportSize(PHONE);
 
+    // A phone's Start screen shows one way in at a time; Load is under Import.
+    await page.getByRole('tab', { name: 'Import' }).click();
     await page.getByLabel('Link or text').fill(RIFTER_EFT);
     await page.getByRole('button', { name: 'Load', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'List' })).toBeVisible();
@@ -108,6 +105,26 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
 
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Ring' })).toBeVisible();
+    const doc = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
+  });
+
+  test('starts a new Fitting from a hull on the Start screen', async ({ page }) => {
+    await signInAndGoto(page, './fittings');
+    await answerAnyType(page);
+    await page.setViewportSize(PHONE);
+
+    await page.getByRole('searchbox', { name: 'Search hulls' }).fill('Rifter');
+    await page.getByRole('button', { name: 'Rifter', exact: true }).click();
+    const start = page.getByRole('button', { name: 'Start fitting' });
+    expect((await start.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await start.click();
+
+    await expect(page.getByRole('heading', { level: 1, name: 'Rifter' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'List' })).toBeVisible();
     const doc = await page.evaluate(() => ({
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,

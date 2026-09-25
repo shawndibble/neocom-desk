@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, NativeSelect, Panel, TextInput, TypeIcon } from '@/components/ui';
 import { AddRow, Close } from '@/components/ui/icons';
@@ -20,12 +20,9 @@ import {
   type PilotProfile,
 } from '@/engine/fittings/types';
 import { moduleKey } from '@/engine/fittings/skillGaps';
-import type { ImplantBasis } from '@/engine/fittings/implantBasis';
-import type { FittingImplantSet } from '@/engine/fittings/types';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { checkCharges } from './dogmaFittingEngine';
 import type { AddTarget } from './addTarget';
-import { ImplantBasisControl } from './ImplantBasisControl';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
 
@@ -371,10 +368,8 @@ interface FittingRackListProps extends EditContext {
   /** `moduleKey`s the active Character lacks the skills for. */
   unusableModuleKeys?: ReadonlySet<string>;
   onOpenVariations?: (slot: FittingSlotKind, slotIndex: number) => void;
-  implantBasis: ImplantBasis;
-  canUseCloneBasis: boolean;
-  onImplantBasisChange: (basis: ImplantBasis) => void;
-  onImplantSetChange: (implantSet: FittingImplantSet | undefined) => void;
+  /** The panel header's controls — the page's "+ Add module". */
+  actions?: ReactNode;
 }
 
 /**
@@ -396,28 +391,14 @@ export function FittingRackList({
   onSelectTarget,
   unusableModuleKeys,
   onOpenVariations,
-  implantBasis,
-  canUseCloneBasis,
-  onImplantBasisChange,
-  onImplantSetChange,
+  actions,
 }: FittingRackListProps) {
   const { t } = useTranslation();
   const context = { fitting, catalogue, engineReady, profile, edit };
   const drones = droneGroups(fitting);
 
   return (
-    <Panel
-      title={t('fittings.list.title')}
-      actions={
-        <ImplantBasisControl
-          basis={implantBasis}
-          canUseCloneBasis={canUseCloneBasis}
-          onBasisChange={onImplantBasisChange}
-          implantSet={fitting.implantSet}
-          onImplantSetChange={onImplantSetChange}
-        />
-      }
-    >
+    <Panel title={t('fittings.list.title')} actions={actions}>
       <div className="space-y-3">
         <div className="space-y-1.5">
           <ResourceBar

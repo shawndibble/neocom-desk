@@ -5,6 +5,7 @@ import {
   droneGroups,
   firstFreeSlotIndex,
   moveModule,
+  newFitting,
   removeModule,
   setDroneCounts,
   setModuleCharge,
@@ -45,6 +46,18 @@ describe('addModule', () => {
   it('does not mutate its input', () => {
     addModule(base, 'medium', 0, 438);
     expect(base.modules).toHaveLength(2);
+  });
+});
+
+describe('newFitting', () => {
+  it('is the bare hull, named after it', () => {
+    expect(newFitting(17843, 'Vexor Navy Issue')).toEqual({
+      name: 'Vexor Navy Issue',
+      shipTypeId: 17843,
+      modules: [],
+      drones: [],
+      cargo: [],
+    });
   });
 });
 

@@ -42,6 +42,11 @@ function updateModule(
   };
 }
 
+/** A bare hull — the start of a Fitting built from scratch, named after the hull. */
+export function newFitting(shipTypeId: number, name: string): Fitting {
+  return { name, shipTypeId, modules: [], drones: [], cargo: [] };
+}
+
 /**
  * Fits `typeId` at `slot`/`slotIndex`, replacing (and unloading) whatever was
  * there. Asks for `'active'`: the engine lowers a requested state to what the
