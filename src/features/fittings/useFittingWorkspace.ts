@@ -72,6 +72,8 @@ export interface FittingWorkspace {
   /** Set when the open Fitting was too large to fit a Share Link. */
   tooLargeToShare: boolean;
   loadFromEftText: (text: string) => Promise<void>;
+  /** Opens an already-built Fitting (In-game Fittings, issue #1539) the same way a successful EFT paste does. */
+  openFitting: (fitting: Fitting) => Promise<void>;
   /**
    * Applies a change to the open Fitting and rewrites `?f=`. `coalesceKey`
    * names the control it came from; a repeat of the same key within a second
@@ -198,6 +200,32 @@ export function useFittingWorkspace(): FittingWorkspace {
     };
   }, [shareCode]);
 
+  // Shared tail for "a Fitting is now open, whether it arrived by paste, by
+  // In-game Fittings, or by URL": re-encodes it as a Share Link and writes
+  // `?f=`, or — too large to link — keeps it open locally, same as a
+  // too-large paste.
+  const commitFitting = useCallback(
+    async (loaded: Fitting) => {
+      const encoded = await encodeFittingShare(fittingToShareInput(loaded));
+      setTooLargeToShare(!encoded.ok);
+      if (encoded.ok) {
+        // The decode effect above picks this up and sets `fitting`. Only
+        // actually flags "mine" when the code is really changing: an
+        // identical re-load writes the same URL, which `useUrlParam` no-ops
+        // and the effect below then never re-runs to consume the flag,
+        // wrongly suppressing the *next* external change's reset.
+        if (encoded.payload !== shareCode)
+          ownWriteRef.current = { code: encoded.payload, fitting: null };
+        setShareCode(encoded.payload);
+      } else {
+        latestFittingRef.current = loaded;
+        setShareError(null);
+        setFitting(loaded);
+      }
+    },
+    [shareCode, setShareCode]
+  );
+
   const loadFromEftText = useCallback(
     async (text: string) => {
       const [typeByName, slotByTypeId] = await Promise.all([loadItemNameMap(), loadFittingSlots()]);
@@ -207,27 +235,17 @@ export function useFittingWorkspace(): FittingWorkspace {
 
       const name = await hullName(result.hullTypeId);
       const loaded = eftResultToFitting(result, name);
-      const encoded = await encodeFittingShare(fittingToShareInput(loaded));
-      setTooLargeToShare(!encoded.ok);
-      if (encoded.ok) {
-        // The decode effect above picks this up and sets `fitting` — one path
-        // for "a Fitting is now open", whether it arrived by paste or by URL.
-        // Only actually flags "mine" when the code is really changing: an
-        // identical re-paste writes the same URL, which `useUrlParam` no-ops
-        // and the effect below then never re-runs to consume the flag,
-        // wrongly suppressing the *next* external change's reset.
-        if (encoded.payload !== shareCode)
-          ownWriteRef.current = { code: encoded.payload, fitting: null };
-        setShareCode(encoded.payload);
-      } else {
-        // Still shown — a Fitting this large just can't round-trip through a
-        // reload or a pasted link until it's edited down.
-        latestFittingRef.current = loaded;
-        setShareError(null);
-        setFitting(loaded);
-      }
+      await commitFitting(loaded);
     },
-    [shareCode, setShareCode]
+    [commitFitting]
+  );
+
+  const openFitting = useCallback(
+    async (loaded: Fitting) => {
+      setUnresolved([]);
+      await commitFitting(loaded);
+    },
+    [commitFitting]
   );
 
   const edit = useCallback(
@@ -367,6 +385,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     unresolved,
     tooLargeToShare,
     loadFromEftText,
+    openFitting,
     edit,
     implantBasis,
     canUseCloneBasis,

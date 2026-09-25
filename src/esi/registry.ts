@@ -62,6 +62,7 @@ export const SCOPE_GROUPS = [
   'calendar',
   'notifications',
   'characterDetails',
+  'fittings',
   'corp',
   'structureMarkets',
 ] as const;
@@ -136,6 +137,11 @@ export const PERMISSIONS: Record<ScopeGroup, PermissionMeta> = {
   characterDetails: {
     labelKey: 'permissions.characterDetails.label',
     captionKey: 'permissions.characterDetails.caption',
+    defaultOn: true,
+  },
+  fittings: {
+    labelKey: 'permissions.fittings.label',
+    captionKey: 'permissions.fittings.caption',
     defaultOn: true,
   },
   corp: {
@@ -329,6 +335,29 @@ export const ESI_REGISTRY = {
     route: '/characters/{character_id}/mining/',
     scope: 'esi-industry.read_character_mining.v1',
     group: 'mining',
+  },
+
+  /**
+   * Base grant (issue #1539, scope decision `20260924-150509`): In-game
+   * Fittings are read through the ESI cache, same as any other single-route
+   * D3 view. `postCharacterFitting`'s write scope joins the Base Grant here
+   * too — the third write exception to the read-only-by-design scope list,
+   * after mail organizing and calendar RSVP — but the wrapper itself isn't
+   * called by any feature until Save to EVE (#1540).
+   */
+  getCharacterFittings: {
+    route: '/characters/{character_id}/fittings',
+    scope: 'esi-fittings.read_fittings.v1',
+    group: 'fittings',
+  },
+  // Trailing slash to stay a distinct route template from the GET above
+  // (registry.test.ts requires unique routes) — same disambiguator
+  // `postCharacterMail`/`getCharacterMailHeaders` already use for ESI's own
+  // shared GET+POST `/mail` path.
+  postCharacterFitting: {
+    route: '/characters/{character_id}/fittings/',
+    scope: 'esi-fittings.write_fittings.v1',
+    group: 'fittings',
   },
 
   getCharacterPublicInfo: {

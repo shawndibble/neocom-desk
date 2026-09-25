@@ -77,6 +77,8 @@ describe('SCOPES (Base Grant)', () => {
         'esi-characters.read_notifications.v1',
         'esi-search.search_structures.v1',
         'esi-industry.read_character_mining.v1',
+        'esi-fittings.read_fittings.v1',
+        'esi-fittings.write_fittings.v1',
       ].sort()
     );
   });
