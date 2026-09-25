@@ -168,11 +168,8 @@ describe('useFittingWorkspace loading a Loaded fittings-XML file (#1542)', () =>
     );
     await waitFor(() => expect(view.result.current.workspace.unresolved).not.toEqual([]));
 
-    // Loading a fully-resolvable Fitting from a Loaded fittings-XML file must
-    // clear that stale EFT banner, not just leave its own list empty. A
-    // drone-bay entry (the previous Fitting had none) is the signal that this
-    // really is the newly-opened Fitting, not the still-open previous one —
-    // the share-code round trip renames every opened Fitting after its hull.
+    // A drone-bay entry (the previous Fitting had none) proves this is the
+    // newly-opened Fitting, not the still-open previous one.
     const items = await view.result.current.workspace.loadFittingXmlDocument({
       entries: [
         {

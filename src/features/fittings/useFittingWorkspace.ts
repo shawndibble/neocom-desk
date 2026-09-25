@@ -66,19 +66,24 @@ async function hullName(typeId: number): Promise<string> {
 
 export type ShareDecodeError = 'invalid' | 'unsupported-version';
 
-/**
- * One `<fitting>` entry from a Loaded EVE fittings-XML file, resolved but not
- * yet opened — the row shape the multi-fit picker list shows (#1542).
- * `fitting` is `null` for an entry whose hull didn't resolve; that row shows
- * `unresolved`'s reason instead of an Open control, and the rest of the
- * file's entries still load normally.
- */
+/** One `<fitting>` entry from a Loaded EVE fittings-XML file, resolved but not yet opened. */
 export interface FittingXmlListItem {
   name: string;
   hullTypeId: number | null;
   hullName: string | null;
+  /** Set only when `fitting` is `null` — why this entry's hull didn't resolve. */
+  hullError: string | null;
   unresolved: FitXmlUnresolvedItem[];
   fitting: Fitting | null;
+}
+
+export type FittingXmlOpenAction = { kind: 'open'; item: FittingXmlListItem } | { kind: 'list' };
+
+/** A single-fit export opens directly; anything else — a multi-fit file, or a single entry whose hull didn't resolve — needs the picker list instead. */
+export function resolveFittingXmlOpenAction(items: FittingXmlListItem[]): FittingXmlOpenAction {
+  return items.length === 1 && items[0]!.fitting !== null
+    ? { kind: 'open', item: items[0]! }
+    : { kind: 'list' };
 }
 
 const COALESCE_MS = 1000;
@@ -305,13 +310,15 @@ export function useFittingWorkspace(): FittingWorkspace {
       return document.entries.map((entry) => {
         const result = loadEveFitXmlEntry(entry, typeByName);
         const hullTypeId = result.hullTypeId;
-        const hullName =
+        const resolvedHullName =
           hullTypeId === null ? null : (types[String(hullTypeId)]?.name ?? `Type ${hullTypeId}`);
-        const name = entry.name.trim() !== '' ? entry.name : (hullName ?? entry.shipTypeName);
+        const name =
+          entry.name.trim() !== '' ? entry.name : (resolvedHullName ?? entry.shipTypeName);
         return {
           name,
           hullTypeId,
-          hullName,
+          hullName: resolvedHullName,
+          hullError: hullTypeId === null ? result.unresolved[0]!.reason : null,
           unresolved: result.unresolved,
           fitting: hullTypeId === null ? null : fitXmlEntryResultToFitting(result, name),
         };

@@ -43,10 +43,7 @@ function readHardware(fittingEl: Element): FittingXmlHardware[] {
     if (!slot || !type) continue;
     const qtyAttr = el.getAttribute('qty');
     const qty = qtyAttr ? Number(qtyAttr) : undefined;
-    // A malformed/negative/fractional count reads as "not stated" — the same
-    // "unknown gracefully becomes absent" stance planXmlDocument.ts's own
-    // attribute parsing takes — rather than propagating a stack size that
-    // could never occur in game.
+    // Bad qty (NaN/<=0/non-integer) reads as absent — same stance as planXmlDocument.ts.
     hardware.push({
       slot,
       type,
@@ -89,7 +86,7 @@ export function parseFittingXmlText(text: string): FittingXmlDocumentResult {
   return { ok: true, document: { entries } };
 }
 
-/** Parses a picked/dropped fittings-XML file. Never throws. */
+/** Parses a picked fittings-XML file. Never throws. */
 export async function parseFittingXmlFile(file: File): Promise<FittingXmlDocumentResult> {
   if (file.size > MAX_BYTES) {
     return { ok: false, error: { code: 'tooLarge' } };

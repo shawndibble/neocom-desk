@@ -15,7 +15,7 @@
  * `chargeTypeId` instead of read as a second module.
  */
 import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
-import type { EftTypeLookup } from '@/engine/fittings/eftLoader';
+import { resolveTypeId, type EftTypeLookup } from '@/engine/fittings/eftLoader';
 import {
   FITTING_SLOT_KINDS,
   type Fitting,
@@ -66,10 +66,6 @@ const RACK_NAME: Readonly<Record<string, FittingSlotKind>> = {
   rig: 'rig',
   subsystem: 'subsystem',
 };
-
-function resolveTypeId(name: string, typeByName: EftTypeLookup): number | null {
-  return typeByName.get(name.toLowerCase())?.typeID ?? null;
-}
 
 /** Parses one `<fitting>` entry's hull and hardware into a `Fitting`'s parts. Never throws. */
 export function loadEveFitXmlEntry(
@@ -126,8 +122,7 @@ export function loadEveFitXmlEntry(
 
     const existing = moduleBySlotKey.get(slotKey);
     if (existing) {
-      // A second hardware hit for a rack slot already holding a module is its
-      // loaded charge, not a second module — matches the export's own order.
+      // Charge for an already-seen slot, not a second module.
       existing.chargeTypeId = typeId;
       continue;
     }
@@ -143,9 +138,9 @@ export function loadEveFitXmlEntry(
     modules.push(module);
   }
 
-  // Deterministic order: FITTING_SLOT_KINDS' canonical order, slot index
-  // ascending within each — matches eftLoader.ts and the List view's own
-  // rack order, regardless of the export's own hardware element order.
+  // Sorted regardless of the export's own hardware order: FITTING_SLOT_KINDS'
+  // canonical order, slot index ascending within each, matching eftLoader.ts
+  // and the List view's own rack order.
   modules.sort(
     (a, b) =>
       FITTING_SLOT_KINDS.indexOf(a.slot) - FITTING_SLOT_KINDS.indexOf(b.slot) ||
@@ -155,7 +150,7 @@ export function loadEveFitXmlEntry(
   return { hullTypeId, modules, drones, cargo, unresolved };
 }
 
-/** Assembles a `Fitting` from a successful `FitXmlEntryResult`, plus the name the export carried. */
+/** Assembles a `Fitting` from a resolved result. */
 export function fitXmlEntryResultToFitting(
   result: Extract<FitXmlEntryResult, { hullTypeId: number }>,
   name: string

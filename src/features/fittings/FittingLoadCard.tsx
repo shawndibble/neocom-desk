@@ -5,7 +5,11 @@ import { fieldBaseClassName } from '@/components/ui/controlStyles';
 import type { EftUnresolvedItem } from '@/engine/fittings/eftLoader';
 import type { FitXmlUnresolvedItem, FittingXmlDocument } from '@/engine/import/eveFitXml';
 import { parseFittingXmlFile, type FittingXmlDocumentErrorCode } from './fittingXmlDocument';
-import type { FittingXmlListItem, ShareDecodeError } from './useFittingWorkspace';
+import {
+  resolveFittingXmlOpenAction,
+  type FittingXmlListItem,
+  type ShareDecodeError,
+} from './useFittingWorkspace';
 
 interface FittingLoadCardProps {
   onLoad: (text: string) => Promise<void>;
@@ -54,15 +58,9 @@ export function FittingLoadCard({
         return;
       }
       const items = await onLoadFittingXmlDocument(parsed.document);
-      // A single-fit export (the export always wraps in <fittings>, even for
-      // one fit) opens straight away; only a multi-fit doctrine folder needs
-      // the picker below.
-      if (items.length === 1) {
-        if (items[0].fitting) {
-          await onOpenFittingXmlEntry(items[0]);
-        } else {
-          setXmlList(items);
-        }
+      const action = resolveFittingXmlOpenAction(items);
+      if (action.kind === 'open') {
+        await onOpenFittingXmlEntry(action.item);
       } else {
         setXmlList(items);
       }
@@ -189,9 +187,7 @@ export function FittingLoadCard({
                       <div className="text-sm text-text-dim">
                         <p className="truncate">{item.name}</p>
                         <p className="text-xs text-danger">
-                          {t('fittings.load.xml.listError', {
-                            reason: item.unresolved[0]?.reason ?? 'unknown ship',
-                          })}
+                          {t('fittings.load.xml.listError', { reason: item.hullError })}
                         </p>
                       </div>
                     )}

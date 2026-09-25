@@ -26,6 +26,7 @@ const RESOLVED: FittingXmlListItem = {
   name: '[Rifter, Solo PVP]',
   hullTypeId: 587,
   hullName: 'Rifter',
+  hullError: null,
   unresolved: [],
   fitting: { name: '[Rifter, Solo PVP]', shipTypeId: 587, modules: [], drones: [], cargo: [] },
 };
@@ -34,6 +35,7 @@ const UNRESOLVED: FittingXmlListItem = {
   name: '[Not A Ship, Broken]',
   hullTypeId: null,
   hullName: null,
+  hullError: 'unknown ship',
   unresolved: [{ text: 'Not A Ship', reason: 'unknown ship' }],
   fitting: null,
 };
