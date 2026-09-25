@@ -120,6 +120,13 @@ jobs:
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      # A Pages deploy replaces the whole site, so a tab still on the last
+      # build asked for route chunks that now 404. Carries recently retired
+      # `assets/*` over from the live site (scripts/lib/assetRetention.mjs).
+      # After the build, so they are never precached. Never blocks a deploy:
+      # without it the site ships exactly as it did before this step.
+      - run: node scripts/keep-old-assets.mjs https://neocomdesk.com
+        continue-on-error: true
       - uses: actions/configure-pages@v5
       # Named per attempt, and deploy-pages told which to read. Artifacts
       # persist across attempts within a run, so a re-run of this job used to
