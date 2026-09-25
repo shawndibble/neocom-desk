@@ -66,7 +66,7 @@ export type EftLoadResult =
  */
 const HAS_QUANTITY_SUFFIX = /^.*\S\s+x\d+$/i;
 
-function resolveTypeId(name: string, typeByName: EftTypeLookup): number | null {
+export function resolveTypeId(name: string, typeByName: EftTypeLookup): number | null {
   return typeByName.get(name.toLowerCase())?.typeID ?? null;
 }
 

@@ -31,6 +31,12 @@ import {
   type EftUnresolvedItem,
 } from '@/engine/fittings/eftLoader';
 import {
+  loadEveFitXmlEntry,
+  fitXmlEntryResultToFitting,
+  type FitXmlUnresolvedItem,
+  type FittingXmlDocument,
+} from '@/engine/import/eveFitXml';
+import {
   classifyLoadInput,
   killmailVictimToLoadResult,
   loadDnaFitting,
@@ -90,6 +96,26 @@ async function hullName(typeId: number): Promise<string> {
 
 export type ShareDecodeError = 'invalid' | 'unsupported-version';
 
+/** One `<fitting>` entry from a Loaded EVE fittings-XML file, resolved but not yet opened. */
+export interface FittingXmlListItem {
+  name: string;
+  hullTypeId: number | null;
+  hullName: string | null;
+  /** Set only when `fitting` is `null` — why this entry's hull didn't resolve. */
+  hullError: string | null;
+  unresolved: FitXmlUnresolvedItem[];
+  fitting: Fitting | null;
+}
+
+export type FittingXmlOpenAction = { kind: 'open'; item: FittingXmlListItem } | { kind: 'list' };
+
+/** A single-fit export opens directly; anything else — a multi-fit file, or a single entry whose hull didn't resolve — needs the picker list instead. */
+export function resolveFittingXmlOpenAction(items: FittingXmlListItem[]): FittingXmlOpenAction {
+  return items.length === 1 && items[0]!.fitting !== null
+    ? { kind: 'open', item: items[0]! }
+    : { kind: 'list' };
+}
+
 const COALESCE_MS = 1000;
 
 /** A pure change to the open Fitting — one of `src/engine/fittings/fittingEdit.ts`'s. */
@@ -101,12 +127,18 @@ export interface FittingWorkspace {
   shareError: ShareDecodeError | null;
   /** Parse errors, unknown names and slot overflow from the most recent EFT paste. */
   unresolved: EftUnresolvedItem[];
+  /** Unresolved items from the most recently opened Loaded EVE-XML Fitting. */
+  fitXmlUnresolved: FitXmlUnresolvedItem[];
   /** Set when the open Fitting was too large to fit a Share Link. */
   tooLargeToShare: boolean;
   /** Why the last Load produced no Fitting; null after a Load that did. */
   loadError: LoadError | null;
   /** Loads EFT text, a DNA string / chat link, an eveship.fit link, or a killmail link. */
   loadFromInput: (text: string) => Promise<void>;
+  /** Resolves a Loaded fittings-XML document's entries for the picker list — opens nothing itself. */
+  loadFittingXmlDocument: (document: FittingXmlDocument) => Promise<FittingXmlListItem[]>;
+  /** Opens one resolved entry from that list as the active Fitting; a no-op for an unresolved (`fitting: null`) row. */
+  openFittingXmlEntry: (item: FittingXmlListItem) => Promise<void>;
   /** Opens an already-built Fitting (In-game Fittings, issue #1539) the same way a successful Load does. */
   openFitting: (fitting: Fitting) => Promise<void>;
   /**
@@ -156,6 +188,7 @@ export function useFittingWorkspace(): FittingWorkspace {
   const [fitting, setFitting] = useState<Fitting | null>(null);
   const [shareError, setShareError] = useState<ShareDecodeError | null>(null);
   const [unresolved, setUnresolved] = useState<EftUnresolvedItem[]>([]);
+  const [fitXmlUnresolved, setFitXmlUnresolved] = useState<FitXmlUnresolvedItem[]>([]);
   const [tooLargeToShare, setTooLargeToShare] = useState(false);
   const [loadError, setLoadError] = useState<LoadError | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
@@ -208,6 +241,7 @@ export function useFittingWorkspace(): FittingWorkspace {
       // Anything but an edit or a saved-Fitting open is a different Fitting.
       if (pending?.code !== shareCode) setSavedId(null);
       setUnresolved([]);
+      setFitXmlUnresolved([]);
       setTooLargeToShare(false);
       // Back/Forward or a pasted link ends any coalescing run: the next edit
       // pushes rather than overwriting the entry just navigated to.
@@ -286,6 +320,7 @@ export function useFittingWorkspace(): FittingWorkspace {
   const loadFromInput = useCallback(
     async (text: string) => {
       setLoadError(null);
+      setFitXmlUnresolved([]);
       const input = classifyLoadInput(text);
       if (input.kind === 'unknown') {
         setUnresolved([]);
@@ -321,8 +356,50 @@ export function useFittingWorkspace(): FittingWorkspace {
   const openFitting = useCallback(
     async (loaded: Fitting) => {
       setUnresolved([]);
+      setFitXmlUnresolved([]);
       setSavedId(null);
       await commitFitting(loaded);
+    },
+    [commitFitting]
+  );
+
+  /**
+   * Resolves a Loaded fittings-XML document's `<fitting>` entries against the
+   * type catalog — display data for the picker list, nothing opened yet. A
+   * hull that doesn't resolve becomes a `fitting: null` row rather than
+   * dropping the entry, so a malformed fit in a multi-fit file surfaces its
+   * own reason without taking the rest of the file down with it.
+   */
+  const loadFittingXmlDocument = useCallback(
+    async (document: FittingXmlDocument): Promise<FittingXmlListItem[]> => {
+      const [typeByName, types] = await Promise.all([loadItemNameMap(), loadTypes()]);
+      return document.entries.map((entry) => {
+        const result = loadEveFitXmlEntry(entry, typeByName);
+        const hullTypeId = result.hullTypeId;
+        const resolvedHullName =
+          hullTypeId === null ? null : (types[String(hullTypeId)]?.name ?? `Type ${hullTypeId}`);
+        const name =
+          entry.name.trim() !== '' ? entry.name : (resolvedHullName ?? entry.shipTypeName);
+        return {
+          name,
+          hullTypeId,
+          hullName: resolvedHullName,
+          hullError: hullTypeId === null ? result.unresolved[0]!.reason : null,
+          unresolved: result.unresolved,
+          fitting: hullTypeId === null ? null : fitXmlEntryResultToFitting(result, name),
+        };
+      });
+    },
+    []
+  );
+
+  const openFittingXmlEntry = useCallback(
+    async (item: FittingXmlListItem) => {
+      if (item.fitting === null) return;
+      setUnresolved([]);
+      setFitXmlUnresolved(item.unresolved);
+      setSavedId(null);
+      await commitFitting(item.fitting);
     },
     [commitFitting]
   );
@@ -507,9 +584,12 @@ export function useFittingWorkspace(): FittingWorkspace {
     fitting,
     shareError,
     unresolved,
+    fitXmlUnresolved,
     tooLargeToShare,
     loadError,
     loadFromInput,
+    loadFittingXmlDocument,
+    openFittingXmlEntry,
     openFitting,
     edit,
     implantBasis,

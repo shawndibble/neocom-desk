@@ -204,9 +204,12 @@ export function Fittings() {
       <FittingLoadCard
         onLoad={workspace.loadFromInput}
         unresolved={workspace.unresolved}
+        fitXmlUnresolved={workspace.fitXmlUnresolved}
         shareError={workspace.shareError}
         loadError={workspace.loadError}
         tooLargeToShare={workspace.tooLargeToShare}
+        onLoadFittingXmlDocument={workspace.loadFittingXmlDocument}
+        onOpenFittingXmlEntry={workspace.openFittingXmlEntry}
       />
       {activeCharacterId !== null && (
         <InGameFittingsPanel
