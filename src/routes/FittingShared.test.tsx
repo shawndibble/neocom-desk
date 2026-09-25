@@ -18,6 +18,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadTypes: async () => ({
     '587': { name: 'Rifter', groupID: 25, volume: 0 },
     '484': { name: '125mm Gatling AutoCannon I', groupID: 55, volume: 5 },
+    '34': { name: 'Tritanium', groupID: 18, volume: 0.01 },
   }),
   loadSkills: sde.loadSkills,
 }));
@@ -130,5 +131,18 @@ describe('FittingShared', () => {
     renderAt(`/share/fitting?f=${encodeURIComponent(encoded.payload)}`);
 
     expect(await screen.findByText('Could not load this fitting')).toBeInTheDocument();
+  });
+
+  it('names the hull above the Ring and lists cargo in the module list', async () => {
+    const encoded = await encodeFittingShare(
+      fittingToShareInput({ ...RIFTER, cargo: [{ typeId: 34, quantity: 500 }] })
+    );
+    expect(encoded.ok).toBe(true);
+    if (!encoded.ok) return;
+
+    renderAt(`/share/fitting?f=${encodeURIComponent(encoded.payload)}`);
+
+    expect(await screen.findByRole('heading', { level: 2, name: 'Rifter' })).toBeInTheDocument();
+    expect(await screen.findByText('Tritanium x500')).toBeInTheDocument();
   });
 });
