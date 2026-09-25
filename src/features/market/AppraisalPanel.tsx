@@ -620,6 +620,12 @@ export function AppraisalPanel({
                 {loading && <Spinner label={t('common.loading')} size="sm" />}
               </div>
 
+              {net && pricePercent !== 100 && (
+                <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                  {t('market.appraisal.netAlwaysAt100Note')}
+                </p>
+              )}
+
               {net && (
                 <AssumesBaseStandingsNote
                   className="border-b border-line px-3"
