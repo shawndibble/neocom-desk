@@ -75,7 +75,10 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, enumParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
-import { useCourierFilterPref } from '@/features/contractSearch/courierFilterPref';
+import {
+  useCourierFilterPref,
+  type StoredCourierFilter,
+} from '@/features/contractSearch/courierFilterPref';
 
 /** Rows shown before "show all" — the same cap the item results use. */
 const ROW_CAP = 50;
@@ -639,6 +642,66 @@ const REMEMBERED_FILTER_URL_KEYS = [
   'courier.minDays',
 ] as const;
 
+/** Every `StoredCourierFilter` field, restated as `CourierUiFilter` keys — `routeQuery` is the one field the UI filter has and storage doesn't. */
+const STORED_FILTER_KEYS: readonly (keyof StoredCourierFilter)[] = [
+  'originRegionId',
+  'destinationRegionId',
+  'destinationSpace',
+  'hideUncompletable',
+  'overRate',
+  'minReward',
+  'maxCollateral',
+  'maxVolume',
+  'minDays',
+];
+const FILTER_KEYS: readonly (keyof CourierUiFilter)[] = ['routeQuery', ...STORED_FILTER_KEYS];
+
+/**
+ * `FilterBar`'s pointer-width surface commits the *whole* filter object on
+ * every single-field edit (`src/components/ui/FilterBar.tsx`: "every edit in
+ * the pointer-width box lands here immediately"), not a per-field patch. Read
+ * naively, that whole object would carry an untouched field's *displayed*
+ * value — which, since `uiFilter` blends the URL with the remembered default,
+ * is not the same as either source's own value — back into both the URL and
+ * storage on an edit to some other field entirely. That is exactly the
+ * decision `20260922-221531` forbids in both directions: a remembered default
+ * would get mirrored into the URL, and a URL-only value would get written
+ * back into storage.
+ *
+ * This reconstructs "what actually changed" by diffing `next` against the
+ * previously *displayed* filter, then replays only that change onto each
+ * target's own baseline — the raw URL filter for the URL write, the
+ * remembered filter for the storage write — so an untouched field's value
+ * always comes from wherever it already lived, never from the blend.
+ */
+/**
+ * `===` except for two arrays, compared by contents rather than reference —
+ * `destinationSpace` is rebuilt as a fresh array (`[...set]`, `.filter()`,
+ * `[...arr, kind]`) every time it is touched at all, including a render
+ * where its *contents* end up unchanged, so reference equality alone would
+ * read every one of those as "changed" and carry it across regardless of
+ * `carryOnlyChanges`'s point.
+ */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((value) => b.includes(value));
+  }
+  return a === b;
+}
+
+function carryOnlyChanges<Base extends object, Display extends Base>(
+  base: Base,
+  displayed: Display,
+  next: Display,
+  keys: readonly (keyof Base)[]
+): Base {
+  const patched = { ...base };
+  for (const key of keys) {
+    if (!sameValue(displayed[key], next[key])) patched[key] = next[key];
+  }
+  return patched;
+}
+
 /**
  * Jumps for every filtered row, recomputed when the rows or the preference
  * change.
@@ -843,39 +906,58 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
     return (key: (typeof REMEMBERED_FILTER_URL_KEYS)[number]) => present.has(key);
   }, [location.search]);
 
+  /**
+   * The filter exactly as the URL states it — no remembered fallback. This is
+   * `uiFilter` below's own write-back baseline: replaying only a real edit
+   * onto *this*, rather than onto the blended `uiFilter`, is what stops an
+   * untouched remembered field from being written into the URL the next time
+   * some other field changes (`carryOnlyChanges`'s own comment).
+   */
+  const rawUrlFilter = useMemo<CourierUiFilter>(
+    () => ({
+      routeQuery: params['courier.q'],
+      originRegionId: params['courier.origin'],
+      destinationRegionId: params['courier.dest'],
+      destinationSpace: [...params['courier.space']],
+      hideUncompletable: params['courier.hideRisky'],
+      overRate: params['courier.overRate'],
+      minReward: params['courier.minReward'],
+      maxCollateral: params['courier.maxCollateral'],
+      maxVolume: params['courier.maxVolume'],
+      minDays: params['courier.minDays'],
+    }),
+    [params]
+  );
+
   const uiFilter = useMemo<CourierUiFilter>(
     () => ({
       // Free text is never remembered — see `courierFilterPref.ts`'s header.
-      routeQuery: params['courier.q'],
+      routeQuery: rawUrlFilter.routeQuery,
       originRegionId: urlHasField('courier.origin')
-        ? params['courier.origin']
+        ? rawUrlFilter.originRegionId
         : rememberedFilter.originRegionId,
       destinationRegionId: urlHasField('courier.dest')
-        ? params['courier.dest']
+        ? rawUrlFilter.destinationRegionId
         : rememberedFilter.destinationRegionId,
       destinationSpace: urlHasField('courier.space')
-        ? [...params['courier.space']]
+        ? rawUrlFilter.destinationSpace
         : rememberedFilter.destinationSpace,
       hideUncompletable: urlHasField('courier.hideRisky')
-        ? params['courier.hideRisky']
+        ? rawUrlFilter.hideUncompletable
         : rememberedFilter.hideUncompletable,
-      overRate: urlHasField('courier.overRate')
-        ? params['courier.overRate']
-        : rememberedFilter.overRate,
+      overRate: urlHasField('courier.overRate') ? rawUrlFilter.overRate : rememberedFilter.overRate,
       minReward: urlHasField('courier.minReward')
-        ? params['courier.minReward']
+        ? rawUrlFilter.minReward
         : rememberedFilter.minReward,
       maxCollateral: urlHasField('courier.maxCollateral')
-        ? params['courier.maxCollateral']
+        ? rawUrlFilter.maxCollateral
         : rememberedFilter.maxCollateral,
       maxVolume: urlHasField('courier.maxVolume')
-        ? params['courier.maxVolume']
+        ? rawUrlFilter.maxVolume
         : rememberedFilter.maxVolume,
-      minDays: urlHasField('courier.minDays')
-        ? params['courier.minDays']
-        : rememberedFilter.minDays,
+      minDays: urlHasField('courier.minDays') ? rawUrlFilter.minDays : rememberedFilter.minDays,
     }),
-    [params, urlHasField, rememberedFilter]
+    [rawUrlFilter, urlHasField, rememberedFilter]
   );
   const preference = params['courier.pref'];
   const showAll = params['courier.all'];
@@ -1107,32 +1189,27 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   }, [selectedRow, rows, filter, narrowToCompletable, narrowToOverRate]);
 
   function changeFilter(next: CourierUiFilter) {
+    // Replayed onto each target's own baseline, not onto `next`/`uiFilter`
+    // directly — see `carryOnlyChanges`'s comment for why: `next` carries
+    // every field's *displayed* value, blended from two sources, and only the
+    // field(s) this particular edit actually touched belong to either write.
+    const urlNext = carryOnlyChanges(rawUrlFilter, uiFilter, next, FILTER_KEYS);
     setParams({
-      'courier.q': next.routeQuery,
-      'courier.origin': next.originRegionId,
-      'courier.dest': next.destinationRegionId,
-      'courier.space': new Set(next.destinationSpace),
-      'courier.hideRisky': next.hideUncompletable,
-      'courier.overRate': next.overRate,
-      'courier.minReward': next.minReward,
-      'courier.maxCollateral': next.maxCollateral,
-      'courier.maxVolume': next.maxVolume,
-      'courier.minDays': next.minDays,
+      'courier.q': urlNext.routeQuery,
+      'courier.origin': urlNext.originRegionId,
+      'courier.dest': urlNext.destinationRegionId,
+      'courier.space': new Set(urlNext.destinationSpace),
+      'courier.hideRisky': urlNext.hideUncompletable,
+      'courier.overRate': urlNext.overRate,
+      'courier.minReward': urlNext.minReward,
+      'courier.maxCollateral': urlNext.maxCollateral,
+      'courier.maxVolume': urlNext.maxVolume,
+      'courier.minDays': urlNext.minDays,
       'courier.all': false,
     });
-    // Every actual filter change updates the remembered default too — never a
-    // URL read, only a change the hauler made (decision `20260922-221531`).
-    void setRememberedFilter({
-      originRegionId: next.originRegionId,
-      destinationRegionId: next.destinationRegionId,
-      destinationSpace: next.destinationSpace,
-      hideUncompletable: next.hideUncompletable,
-      overRate: next.overRate,
-      minReward: next.minReward,
-      maxCollateral: next.maxCollateral,
-      maxVolume: next.maxVolume,
-      minDays: next.minDays,
-    });
+
+    const storedNext = carryOnlyChanges(rememberedFilter, uiFilter, next, STORED_FILTER_KEYS);
+    void setRememberedFilter(storedNext);
   }
 
   /**
