@@ -36,6 +36,14 @@ export default tseslint.config(
     files: ['**/*.{ts,tsx}'],
     ignores: ['src/components/ui/**'],
     rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='search']",
+          message: 'Use SearchInput from src/components/ui instead of a raw <input type="search">.',
+        },
+      ],
       'no-restricted-imports': [
         'error',
         {
