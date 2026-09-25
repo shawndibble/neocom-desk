@@ -168,6 +168,26 @@ describe('BuildPlanList: compare mode (#453)', () => {
     plan({ id: 'c', name: 'Rokh' }),
   ];
 
+  it('draws its heading and actions inside the panel header bar (#1625)', () => {
+    render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={EMPTY_CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+      />
+    );
+    const header = screen.getByRole('banner');
+    expect(within(header).getByRole('heading', { level: 2 })).toBeInTheDocument();
+    expect(within(header).getByRole('button', { name: 'Compare' })).toBeInTheDocument();
+  });
+
   it('shows no checkboxes and a "Compare" toggle when compare mode is off', () => {
     render(
       <BuildPlanList

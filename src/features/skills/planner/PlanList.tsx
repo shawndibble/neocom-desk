@@ -15,7 +15,6 @@ export interface PlanRowStats {
 interface PlanListProps {
   plans: readonly SkillPlanRecord[];
   onOpen: (id: string) => void;
-  onCreate: () => void;
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
@@ -108,28 +107,12 @@ function PlanRow({
 }
 
 /** Skill Plan CRUD list: create, open (navigates to the editor), duplicate, delete (confirm), rename inline. */
-export function PlanList({
-  plans,
-  onOpen,
-  onCreate,
-  onDuplicate,
-  onDelete,
-  onRename,
-  stats,
-}: PlanListProps) {
+export function PlanList({ plans, onOpen, onDuplicate, onDelete, onRename, stats }: PlanListProps) {
   const { t } = useTranslation();
   const [deletingPlan, setDeletingPlan] = useState<SkillPlanRecord | null>(null);
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('plans.title')}
-        </h2>
-        <Button variant="primary" size="sm" onClick={onCreate}>
-          {t('plans.create')}
-        </Button>
-      </div>
       {plans.length === 0 ? (
         <EmptyState title={t('plans.emptyTitle')} hint={t('plans.emptyHint')} className="py-6" />
       ) : (
