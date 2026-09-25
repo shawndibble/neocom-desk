@@ -1,5 +1,5 @@
-import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { BUILT_IN_DAMAGE_PROFILES } from '@/engine/fittings/damageProfile';
@@ -10,6 +10,13 @@ import type { DamageProfiles } from './damageProfiles';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
 import { FittingStatsSections } from './FittingStatsSections';
+import { db } from '@/db';
+import { useStatsSectionsPreference } from './statsSectionsPreference';
+
+beforeEach(async () => {
+  await db.settings.clear();
+  useStatsSectionsPreference.setState({ value: {}, hydrated: false });
+});
 import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
 
 function layer(hp: number, ehp: number) {
@@ -485,5 +492,29 @@ describe('FittingStatsSections — a failed calculation', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       "Couldn't load this Character's skills, so the stats can't be worked out."
     );
+  });
+});
+
+describe('FittingStatsSections — remembered layout', () => {
+  it('keeps a section the pilot collapsed collapsed after the stats are shown again', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderSections(stats());
+    const toggle = () => screen.getByRole('button', { name: 'Defense' });
+    expect(toggle()).toHaveAttribute('aria-expanded', 'true');
+
+    await user.click(toggle());
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false');
+    unmount();
+
+    // A fresh load reads the choice back from storage, not from memory.
+    useStatsSectionsPreference.setState({ value: {}, hydrated: false });
+    renderSections(stats());
+    await waitFor(() => expect(toggle()).toHaveAttribute('aria-expanded', 'false'));
+    // Sections the pilot never touched keep their defaults.
+    expect(screen.getByRole('button', { name: 'Offense' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Price' })).toHaveAttribute('aria-expanded', 'false');
   });
 });

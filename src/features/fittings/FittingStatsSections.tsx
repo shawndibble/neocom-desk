@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Caret, Tooltip } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
@@ -20,6 +20,12 @@ import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
 import { DamageProfilePicker } from './DamageProfilePicker';
 import { AppliedDpsPanel } from './AppliedDpsPanel';
 import { Facts, Overheated } from './StatFacts';
+import { useIsPhone } from '@/lib/useIsPhone';
+import {
+  isSectionExpanded,
+  useStatsSectionsPreference,
+  withSectionExpanded,
+} from './statsSectionsPreference';
 import { CapacitorFacts, TankFacts } from './FittingTankStats';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
@@ -145,18 +151,17 @@ function DamageFigures({
   );
 }
 
-const SECTIONS = [
-  'offense',
-  'appliedDps',
-  'defense',
-  'capacitor',
-  'targeting',
-  'navigation',
-  'drones',
-  'fitting',
-  'price',
-] as const;
-type Section = (typeof SECTIONS)[number];
+/** Stable ids — the remembered layout (`statsSectionsPreference.ts`) is keyed on them. */
+type Section =
+  | 'offense'
+  | 'appliedDps'
+  | 'defense'
+  | 'capacitor'
+  | 'targeting'
+  | 'navigation'
+  | 'drones'
+  | 'fitting'
+  | 'price';
 
 /** Open at first: what a pilot reads on every fit. The rest is a click away, as in the game window. */
 const OPEN_BY_DEFAULT: ReadonlySet<Section> = new Set([
@@ -284,14 +289,30 @@ export function FittingStatsSections({
   const adaptedHardeners = (stats?.modules ?? []).flatMap((module) =>
     module.adaptedResonances ? [module.adaptedResonances] : []
   );
-  const [expanded, setExpanded] = useState<Record<Section, boolean>>(
-    () =>
-      Object.fromEntries(
-        SECTIONS.map((section) => [section, OPEN_BY_DEFAULT.has(section)])
-      ) as Record<Section, boolean>
-  );
+  // Which sections are open is the pilot's own layout, kept on this device
+  // (`statsSectionsPreference.ts`); an untouched one opens as OPEN_BY_DEFAULT
+  // says on desktop and starts collapsed on a phone.
+  const isPhone = useIsPhone();
+  const storedSections = useStatsSectionsPreference((state) => state.value);
+  const hydrateSections = useStatsSectionsPreference((state) => state.hydrate);
+  const setSections = useStatsSectionsPreference((state) => state.setValue);
+  useEffect(() => {
+    void hydrateSections();
+  }, [hydrateSections]);
+  const isExpanded = (section: Section) =>
+    isSectionExpanded(storedSections, section, {
+      isPhone,
+      openByDefault: OPEN_BY_DEFAULT.has(section),
+    });
   const toggle = (section: Section) =>
-    setExpanded((prev) => ({ ...prev, [section]: !prev[section] }));
+    // From the store's current value, never this render's possibly stale copy.
+    void setSections(
+      withSectionExpanded(
+        useStatsSectionsPreference.getState().value,
+        section,
+        !isExpanded(section)
+      )
+    );
 
   const downloadPct =
     statsProgress?.totalBytes && statsProgress.totalBytes > 0
@@ -319,7 +340,7 @@ export function FittingStatsSections({
         title={t(`fittings.stats.section.${id}`)}
         meta={meta}
         warning={warning}
-        expanded={expanded[id]}
+        expanded={isExpanded(id)}
         onToggle={() => toggle(id)}
       >
         {body}
