@@ -446,6 +446,41 @@ describe('FittingStatsSections — Applied DPS', () => {
     });
   });
 
+  it('gives a custom target profile resists', async () => {
+    const user = userEvent.setup();
+    const saveCustom = vi.fn();
+    renderSections(armed(), damageProfiles(), targetProfiles({ saveCustom }));
+
+    await user.click(screen.getByRole('button', { name: 'Manage targets' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'New profile' }));
+    await user.type(within(dialog).getByLabelText('Name'), 'Guristas cruiser');
+    await user.type(within(dialog).getByLabelText('Kinetic resist (%)'), '50');
+    await user.type(within(dialog).getByLabelText('Thermal resist (%)'), '40');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(saveCustom).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Guristas cruiser',
+        resists: { em: 0, thermal: 0.4, kinetic: 0.5, explosive: 0 },
+      })
+    );
+  });
+
+  it('refuses a resist over 100%', async () => {
+    const user = userEvent.setup();
+    const saveCustom = vi.fn();
+    renderSections(armed(), damageProfiles(), targetProfiles({ saveCustom }));
+
+    await user.click(screen.getByRole('button', { name: 'Manage targets' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'New profile' }));
+    await user.type(within(dialog).getByLabelText('Name'), 'Wall');
+    await user.type(within(dialog).getByLabelText('EM resist (%)'), '120');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+    expect(saveCustom).not.toHaveBeenCalled();
+  });
+
   it('refuses a zero signature radius', async () => {
     const user = userEvent.setup();
     const saveCustom = vi.fn();

@@ -640,8 +640,15 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
         explosionRadius: expect.closeTo(140, 3),
         explosionVelocity: expect.closeTo(85, 3),
         damageReductionFactor: expect.closeTo(0.682, 3),
+        // Scourge is all kinetic.
+        damage: { em: 0, thermal: 0, kinetic: 1, explosive: 0 },
       },
     ]);
+    // Antimatter splits thermal and kinetic; Warriors are all explosive.
+    expect(blaster.damage?.thermal).toBeGreaterThan(0);
+    expect(blaster.damage?.kinetic).toBeGreaterThan(0);
+    expect(blaster.damage?.em).toBe(0);
+    expect(warriors.damage).toEqual({ em: 0, thermal: 0, kinetic: 0, explosive: 1 });
     expect(caracalInputs.droneControlRange).toBe(20000);
   });
 });

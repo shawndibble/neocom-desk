@@ -11,7 +11,7 @@
  * DPS without reload, on the turret/launcher item itself (0 unless it's
  * running) and per single drone on a drone stack.
  */
-import type { AppliedDpsInputs, AppliedWeapon } from './appliedDps';
+import type { AppliedDpsInputs, AppliedWeapon, DamageSplit } from './appliedDps';
 
 export const APPLIED_DPS_ATTRIBUTE = {
   dps: -12,
@@ -27,6 +27,13 @@ export const APPLIED_DPS_ATTRIBUTE = {
   damageReductionFactor: 1353,
   /** On the character, not the ship; absent when no skills are passed. */
   droneControlRange: 458,
+  // Damage per type (plain SDE `emDamage` & co., looked up by name in the
+  // pinned `sde.dat` 2026-09-25): on a turret's or launcher's charge, and on
+  // a drone itself.
+  emDamage: 114,
+  explosiveDamage: 116,
+  kineticDamage: 117,
+  thermalDamage: 118,
 } as const;
 
 /** The base drone control range with no skills trained. */
@@ -61,6 +68,25 @@ function trackingOf(attributes: AttributeMap) {
   };
 }
 
+/** The damage split by type, as shares; nothing when the item carries no damage at all. */
+function damageSplit(attributes: AttributeMap | undefined): { damage?: DamageSplit } {
+  if (!attributes) return {};
+  const em = read(attributes, APPLIED_DPS_ATTRIBUTE.emDamage);
+  const thermal = read(attributes, APPLIED_DPS_ATTRIBUTE.thermalDamage);
+  const kinetic = read(attributes, APPLIED_DPS_ATTRIBUTE.kineticDamage);
+  const explosive = read(attributes, APPLIED_DPS_ATTRIBUTE.explosiveDamage);
+  const total = em + thermal + kinetic + explosive;
+  if (total <= 0) return {};
+  return {
+    damage: {
+      em: em / total,
+      thermal: thermal / total,
+      kinetic: kinetic / total,
+      explosive: explosive / total,
+    },
+  };
+}
+
 function moduleWeapon(result: ItemResultLike): AppliedWeapon | null {
   if (result.state !== 'active' && result.state !== 'overload') return null;
   const dps = read(result.attributes, APPLIED_DPS_ATTRIBUTE.dps);
@@ -76,10 +102,11 @@ function moduleWeapon(result: ItemResultLike): AppliedWeapon | null {
       explosionRadius: read(charge, APPLIED_DPS_ATTRIBUTE.explosionRadius),
       explosionVelocity: read(charge, APPLIED_DPS_ATTRIBUTE.explosionVelocity),
       damageReductionFactor: read(charge, APPLIED_DPS_ATTRIBUTE.damageReductionFactor),
+      ...damageSplit(charge),
     };
   }
   if (read(result.attributes, APPLIED_DPS_ATTRIBUTE.tracking) > 0) {
-    return { kind: 'turret', dps, ...trackingOf(result.attributes) };
+    return { kind: 'turret', dps, ...trackingOf(result.attributes), ...damageSplit(charge) };
   }
   // Smartbombs, a launcher with nothing loaded, …: nothing to apply.
   return null;
@@ -109,6 +136,7 @@ export function extractAppliedDpsInputs(
         dps: perDrone * (item.quantity ?? 1),
         speed: read(result.attributes, APPLIED_DPS_ATTRIBUTE.maxVelocity),
         ...trackingOf(result.attributes),
+        ...damageSplit(result.attributes),
       });
       return;
     }

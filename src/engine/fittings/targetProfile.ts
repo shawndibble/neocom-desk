@@ -1,15 +1,45 @@
 /**
- * Target Profiles (CONTEXT.md): the signature radius and speed of an
- * imagined target a Fitting's applied DPS is worked out against. Pure; the
+ * Target Profiles (CONTEXT.md): the signature radius, speed and resists of
+ * an imagined target a Fitting's applied DPS is worked out against. Pure; the
  * synced-setting stores live in `features/fittings/targetProfiles.ts`.
  * Mirrors `damageProfile.ts` — same id scheme, same strict parse.
+ *
+ * Resists came later: a profile saved before them has none, and reads as a
+ * target that resists nothing — the same numbers it gave then.
  */
+
+/** A target's resist to each damage type, as a share (0–1) of that damage it shrugs off. */
+export interface TargetResists {
+  em: number;
+  thermal: number;
+  kinetic: number;
+  explosive: number;
+}
+
+export const NO_RESISTS: TargetResists = { em: 0, thermal: 0, kinetic: 0, explosive: 0 };
 
 export interface TargetProfile {
   /** Metres. */
   signatureRadius: number;
   /** Metres per second — assumed to be fully transversal to the shooter. */
   velocity: number;
+  /** Absent: resists nothing. */
+  resists?: TargetResists;
+}
+
+/** The profile's resists, none when it carries none. */
+export function targetResists(profile: TargetProfile): TargetResists {
+  return profile.resists ?? NO_RESISTS;
+}
+
+const RESIST_TYPES = ['em', 'thermal', 'kinetic', 'explosive'] as const;
+
+function isValidResists(resists: unknown): resists is TargetResists {
+  if (typeof resists !== 'object' || resists === null) return false;
+  return RESIST_TYPES.every((type) => {
+    const value = (resists as Record<string, unknown>)[type];
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1;
+  });
 }
 
 /** A profile the picker offers. Built-in ids are `builtin:*`, custom ones `custom:*`, so they never collide. */
@@ -53,16 +83,20 @@ export function builtInTargetProfileKey(id: string): string | null {
   return id.startsWith('builtin:') ? id.slice('builtin:'.length) : null;
 }
 
-/** A finite, positive signature (applied damage divides by it) and a finite, non-negative speed. */
+/**
+ * A finite, positive signature (applied damage divides by it), a finite,
+ * non-negative speed, and — when there are resists — each a share from 0 to 1.
+ */
 export function isValidTargetProfile(profile: TargetProfile): boolean {
-  const { signatureRadius, velocity } = profile;
+  const { signatureRadius, velocity, resists } = profile;
   return (
     typeof signatureRadius === 'number' &&
     Number.isFinite(signatureRadius) &&
     signatureRadius > 0 &&
     typeof velocity === 'number' &&
     Number.isFinite(velocity) &&
-    velocity >= 0
+    velocity >= 0 &&
+    (resists === undefined || isValidResists(resists))
   );
 }
 
@@ -89,11 +123,17 @@ export function parseCustomTargetProfiles(raw: unknown): CustomTargetProfile[] {
   const out: CustomTargetProfile[] = [];
   for (const entry of raw) {
     if (!isRecord(entry)) continue;
-    const { id, name, signatureRadius, velocity } = entry;
+    const { id, name, signatureRadius, velocity, resists } = entry;
     if (typeof id !== 'string' || !id.startsWith(CUSTOM_TARGET_PROFILE_ID_PREFIX) || seen.has(id))
       continue;
     if (typeof name !== 'string' || name.trim() === '') continue;
-    const profile = { id, name, signatureRadius, velocity } as CustomTargetProfile;
+    const profile = {
+      id,
+      name,
+      signatureRadius,
+      velocity,
+      ...(resists === undefined ? {} : { resists }),
+    } as CustomTargetProfile;
     if (!isValidTargetProfile(profile)) continue;
     seen.add(id);
     out.push(profile);

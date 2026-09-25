@@ -711,12 +711,15 @@
       "save": "Save",
       "cancel": "Cancel",
       "errorName": "Give the profile a name.",
-      "errorValues": "Enter a signature radius above zero and a speed of zero or more.",
+      "errorValues": "Enter a signature radius above zero, a speed of zero or more, and resists from 0 to 100%.",
       "builtin": {
         "frigate": "NPC frigate",
         "cruiser": "NPC cruiser",
         "battleship": "NPC battleship"
-      }
+      },
+      "resistsLabel": "Resists (%)",
+      "resistLabel": "{{type}} resist (%)",
+      "resistSummary": " · resists {{resists}}%"
     },
     "appliedDps": {
       "summary": "Raw DPS {{raw}} · applied {{applied}} at {{km}} km",

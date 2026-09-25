@@ -891,7 +891,7 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   on it. The four System Labels are the Mail page's folder filter: a
   multi-select toggle group, so any subset of them can be shown at once (see
   `docs/context/decisions/`, 2026-09-07).
-- **Target Profile**: The signature radius and speed of an imagined target that a **Fitting**'s applied damage is worked out against — built-in NPC classes or one the pilot defines. Changes applied DPS and its graphs, never raw DPS. Distinct from a **Damage Profile**, which is about what shoots at the Fitting.
+- **Target Profile**: The signature radius, speed and (optionally) resist to each damage type of an imagined target that a **Fitting**'s applied damage is worked out against — built-in NPC classes or one the pilot defines. Changes applied DPS and its graphs, never raw DPS. A profile with no resists resists nothing. Distinct from a **Damage Profile**, which is about what shoots at the Fitting.
 - **Throughput** (planetary): a **second budget, independent of the Pin
   Budget** — whether the colony's links can carry the material flow and
   whether a buffer cycle fits in the Launchpad and Storage Facility. This, not

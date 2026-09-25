@@ -13,8 +13,16 @@
  * - Drones: nothing past drone control range; a mobile drone at least as
  *   fast as its target is assumed to keep up and always hit (Pyfa's "auto"
  *   mode), one slower than it — or a sentry — tracks like a turret on the ship.
+ * - Then the target's resists: each damage type the weapon deals is taken
+ *   down by the target's resist to it.
  */
-import type { TargetProfile } from './targetProfile';
+import { targetResists, type TargetProfile, type TargetResists } from './targetProfile';
+
+/** A weapon's damage split by type, as shares summing to 1. */
+export type DamageSplit = TargetResists;
+
+/** A weapon whose damage types aren't known counts as an even split. */
+const EVEN_SPLIT: DamageSplit = { em: 0.25, thermal: 0.25, kinetic: 0.25, explosive: 0.25 };
 
 interface TrackingWeapon {
   /** Raw DPS, no reload. */
@@ -29,22 +37,29 @@ interface TrackingWeapon {
   optimalSigRadius: number;
 }
 
-export type AppliedWeapon =
-  | ({ kind: 'turret' } & TrackingWeapon)
-  | {
-      kind: 'missile';
-      dps: number;
-      /** Metres — flight speed × flight time. */
-      range: number;
-      explosionRadius: number;
-      explosionVelocity: number;
-      damageReductionFactor: number;
-    }
-  | ({
-      kind: 'drone';
-      /** m/s; 0 for a sentry. */
-      speed: number;
-    } & TrackingWeapon);
+interface DamageTyped {
+  /** How its damage splits by type — what the target's resists bite on. Absent: an even split. */
+  damage?: DamageSplit;
+}
+
+export type AppliedWeapon = DamageTyped &
+  (
+    | ({ kind: 'turret' } & TrackingWeapon)
+    | {
+        kind: 'missile';
+        dps: number;
+        /** Metres — flight speed × flight time. */
+        range: number;
+        explosionRadius: number;
+        explosionVelocity: number;
+        damageReductionFactor: number;
+      }
+    | ({
+        kind: 'drone';
+        /** m/s; 0 for a sentry. */
+        speed: number;
+      } & TrackingWeapon)
+  );
 
 /** Everything applied DPS needs from one calculated Fitting. */
 export interface AppliedDpsInputs {
@@ -120,14 +135,28 @@ function weaponAppliedDps(
   }
 }
 
-/** Applied DPS against `target` at `distance` metres. */
+/** The share of a weapon's damage that gets through the target's resists. */
+function throughResists(split: DamageSplit, resists: TargetResists): number {
+  return (
+    split.em * (1 - resists.em) +
+    split.thermal * (1 - resists.thermal) +
+    split.kinetic * (1 - resists.kinetic) +
+    split.explosive * (1 - resists.explosive)
+  );
+}
+
+/** Applied DPS against `target` at `distance` metres, after its resists. */
 export function appliedDps(
   inputs: AppliedDpsInputs,
   target: TargetProfile,
   distance: number
 ): number {
+  const resists = targetResists(target);
   return inputs.weapons.reduce(
-    (sum, weapon) => sum + weaponAppliedDps(weapon, target, distance, inputs.droneControlRange),
+    (sum, weapon) =>
+      sum +
+      weaponAppliedDps(weapon, target, distance, inputs.droneControlRange) *
+        throughResists(weapon.damage ?? EVEN_SPLIT, resists),
     0
   );
 }
