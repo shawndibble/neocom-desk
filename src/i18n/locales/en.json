@@ -2955,7 +2955,9 @@
     },
     "colonies": {
       "panelTitle_one": "{{count}} colony",
-      "panelTitle_other": "{{count}} colonies"
+      "panelTitle_other": "{{count}} colonies",
+      "fillTimeSoon": "Storage full in {{span}}",
+      "fillTimeUnknown": "Storage full in: unknown"
     },
     "summary": {
       "expiryLine": "{{product}} · {{duration}}",
@@ -3310,7 +3312,10 @@
     "worklistIncludeRebuilds": "Include rebuilds",
     "worklistTuningNone": "Nothing to tune without tearing a colony down. Switch to “Include rebuilds” to see what these planets would earn rebuilt from scratch.",
     "colonyStripTitle": "Your colonies",
-    "colonyStripMeta": "Load · state · full in, of {{hours}} h",
+    "colonyStripLegendLoad": "Load",
+    "colonyStripLegendState": "State",
+    "colonyStripLegendFull": "Storage full in",
+    "colonyStripLegendFullTooltip": "Compared to your {{hours}} h haul cadence",
     "colonyStripEmpty": "No colony here yet.",
     "colonyStateFaults_one": "{{count}} fault",
     "colonyStateFaults_other": "{{count}} faults",
