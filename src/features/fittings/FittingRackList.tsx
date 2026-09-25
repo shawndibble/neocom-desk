@@ -19,7 +19,8 @@ import {
   type FittingStats,
   type PilotProfile,
 } from '@/engine/fittings/types';
-import { moduleKey, resourceOverage } from '@/engine/fittings/skillGaps';
+import { moduleKey } from '@/engine/fittings/skillGaps';
+import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { checkCharges } from './dogmaFittingEngine';
 import type { AddTarget } from './addTarget';
 import type { FittingCatalogue } from './useFittingCatalogue';
@@ -44,17 +45,9 @@ interface ResourceBarProps {
  */
 function ResourceBar({ label, used, total }: ResourceBarProps) {
   const { t } = useTranslation();
+  const { overage, overBudget, flashKey } = useOverBudgetFlash(used, total);
   const known = used !== null && total !== null;
   const pct = known && total > 0 ? Math.min(100, (used / total) * 100) : 0;
-  const overage = resourceOverage(used, total);
-  const overBudget = overage > 0;
-
-  const [wasOver, setWasOver] = useState(false);
-  const [flashKey, setFlashKey] = useState(0);
-  if (known && overBudget !== wasOver) {
-    setWasOver(overBudget);
-    if (overBudget) setFlashKey((key) => key + 1);
-  }
 
   return (
     <div>
@@ -94,7 +87,7 @@ function typeName(catalogue: FittingCatalogue | null, typeId: number): string {
   return catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
 }
 
-interface EditContext {
+export interface EditContext {
   fitting: Fitting;
   catalogue: FittingCatalogue | null;
   engineReady: boolean;
@@ -102,7 +95,7 @@ interface EditContext {
   edit: (change: FittingChange, coalesceKey?: string) => void;
 }
 
-interface ModuleRowProps extends EditContext {
+export interface ModuleRowProps extends EditContext {
   module: FittingModule;
   /** This module's own calculation — null while it's being worked out. */
   result: FittingModuleResult | null;
@@ -110,7 +103,7 @@ interface ModuleRowProps extends EditContext {
   cantUse: boolean;
 }
 
-function ModuleRow({
+export function ModuleRow({
   module,
   result,
   cantUse,
