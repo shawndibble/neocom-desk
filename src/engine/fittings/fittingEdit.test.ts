@@ -13,6 +13,7 @@ import {
   firstFreeSlotIndex,
   loadChargeIntoAll,
   moveModule,
+  reachableModuleStates,
   newFitting,
   removeModule,
   setCargoQuantity,
@@ -457,5 +458,21 @@ describe('launchDrones', () => {
   it('returns the same Fitting when nothing can launch', () => {
     const fit = carrying([{ typeId: 2185, quantity: 2, state: 'online' }]);
     expect(launchDrones(fit, { bandwidthTotal: 5, maxActive: 5, bandwidthOf })).toBe(fit);
+  });
+});
+
+describe('reachableModuleStates', () => {
+  it('offers every state up to the highest the module can reach', () => {
+    expect(reachableModuleStates('overload', 'active')).toEqual([
+      'offline',
+      'online',
+      'active',
+      'overload',
+    ]);
+    expect(reachableModuleStates('online', 'online')).toEqual(['offline', 'online']);
+  });
+
+  it('keeps the state it is in, even past what it can reach, so a control can show it', () => {
+    expect(reachableModuleStates('online', 'active')).toEqual(['offline', 'online', 'active']);
   });
 });

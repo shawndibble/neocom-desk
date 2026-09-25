@@ -23,6 +23,9 @@ import {
   loadChargeIntoAll,
   moveModule,
   newFitting,
+  removeModule,
+  setModuleCharge,
+  setModuleState,
   swapModuleType,
   type DroneBay,
 } from '@/engine/fittings/fittingEdit';
@@ -50,7 +53,10 @@ import {
   useFittingViewPreference,
   type FittingView,
 } from '@/features/fittings/fittingViewPreference';
+import { AlphaCloneChip } from '@/features/fittings/AlphaCloneChip';
 import { MissingSkillsChip } from '@/features/fittings/MissingSkillsChip';
+import { useFittingAlpha } from '@/features/fittings/useFittingAlpha';
+import { useFittingHardpoints } from '@/features/fittings/useFittingHardpoints';
 import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
 import {
   catalogueTypeName,
@@ -69,6 +75,9 @@ import { useMediaQuery } from '@/lib/useMediaQuery';
  * 22-26rem of stats, with gaps and page padding.
  */
 const THREE_COLUMN_QUERY = '(min-width: 100rem)';
+
+/** A mouse or trackpad: where a Ring tile's right-click menu doesn't fight the tooltip's touch-and-hold. */
+const FINE_POINTER_QUERY = '(hover: hover) and (pointer: fine)';
 
 /**
  * The Fittings section (scope decision `20260924-215855`).
@@ -92,6 +101,7 @@ export function Fittings() {
   const isDesktop = useIsDesktop();
   const isPhone = useIsPhone();
   const threeColumns = useMediaQuery(THREE_COLUMN_QUERY);
+  const finePointer = useMediaQuery(FINE_POINTER_QUERY);
   const addMode: 'docked' | 'slideOut' | 'sheet' = threeColumns
     ? 'docked'
     : isDesktop
@@ -131,6 +141,8 @@ export function Fittings() {
     [activeCharacterId]
   )?.name;
   const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
+  const alpha = useFittingAlpha(workspace.fitting);
+  const hardpointsUsed = useFittingHardpoints(workspace.fitting);
   const [saveToEveOpen, setSaveToEveOpen] = useState(false);
   // The item whose info (the Market's item detail) is open — a List name click.
   const [infoItem, setInfoItem] = useState<{ typeId: number; name: string } | null>(null);
@@ -346,6 +358,19 @@ export function Fittings() {
           }
           compact={isPhone}
           onRackOpen={setRackSheet}
+          hardpointsUsed={hardpointsUsed}
+          moduleActions={
+            finePointer
+              ? {
+                  setState: (rack, index, state) =>
+                    edit((f) => setModuleState(f, rack, index, state)),
+                  unloadCharge: (rack, index) => edit((f) => setModuleCharge(f, rack, index, null)),
+                  showInfo,
+                  openVariations: (rack, index) => openModuleDialog(rack, index, true),
+                  remove: (rack, index) => edit((f) => removeModule(f, rack, index)),
+                }
+              : undefined
+          }
           selectedSlot={
             target?.kind === 'slot' ? { rack: target.slot, index: target.slotIndex } : null
           }
@@ -469,6 +494,7 @@ export function Fittings() {
             {workspace.implantBasis === 'clone' && workspace.canUseCloneBasis && (
               <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
             )}
+            <AlphaCloneChip blockers={alpha.blockers} skillName={alpha.skillName} />
             {gaps && gaps.missing.length > 0 && activeCharacterId !== null && (
               <MissingSkillsChip
                 entries={gaps.missing}

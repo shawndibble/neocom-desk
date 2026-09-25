@@ -201,6 +201,10 @@ export function extractFittingStats(
     droneDps: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.droneDamagePerSecond),
     droneBandwidthTotal: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.droneBandwidth),
     droneCapacity: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.droneCapacity),
+    hardpoints: {
+      turrets: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.turretHardpoints),
+      launchers: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.launcherHardpoints),
+    },
     ehp: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.ehp),
     repair: localRepair(shipAttributes),
     capacitor: capacitorStatus(shipAttributes),

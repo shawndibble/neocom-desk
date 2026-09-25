@@ -1,6 +1,18 @@
 import { useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel, Tooltip, TypeIcon } from '@/components/ui';
+import {
+  Button,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+  Panel,
+  Tooltip,
+  TypeIcon,
+} from '@/components/ui';
 import { AddRow, Warn } from '@/components/ui/icons';
 import {
   RING_GAUGES,
@@ -14,6 +26,7 @@ import {
   arcPath,
   buildRingSlots,
   gaugeArc,
+  hardpointPipAngles,
   ringGhostIndices,
   ringPoint,
   ringSlotAngle,
@@ -21,14 +34,17 @@ import {
   type RingRack,
   type RingSlot,
 } from '@/engine/fittings/ringLayout';
-import { cargoGroups } from '@/engine/fittings/fittingEdit';
+import { cargoGroups, reachableModuleStates } from '@/engine/fittings/fittingEdit';
+import type { HardpointKind } from '@/engine/fittings/hardpoints';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
 import type {
   Fitting,
+  FittingItemState,
   FittingModuleResult,
   FittingSlotKind,
   FittingStats,
+  HardpointCounts,
 } from '@/engine/fittings/types';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { typeIconUrl, typeRenderUrl } from '@/lib/eveImages';
@@ -70,6 +86,16 @@ const TONE_STROKE = { accent: 'stroke-accent', dim: 'stroke-text-dim' } as const
 /** Wide enough to be easy to hover without reaching the tiles inside it. */
 const GAUGE_HIT_WIDTH = 22;
 
+/** What a fitted tile's right-click menu does; the page's own edits. */
+export interface RingModuleActions {
+  setState: (rack: FittingSlotKind, index: number, state: FittingItemState) => void;
+  unloadCharge: (rack: FittingSlotKind, index: number) => void;
+  showInfo: (typeId: number, name: string) => void;
+  /** The module dialog, where its variations are. */
+  openVariations: (rack: FittingSlotKind, index: number) => void;
+  remove: (rack: FittingSlotKind, index: number) => void;
+}
+
 interface FittingRingProps {
   fitting: Fitting;
   stats: FittingStats | null;
@@ -100,6 +126,14 @@ interface FittingRingProps {
   droneButton?: ReactNode;
   /** The slot the Add panel is filling, marked on the ring as it is in the List. */
   selectedSlot?: { rack: FittingSlotKind; index: number } | null;
+  /**
+   * A fitted tile's right-click menu. The page passes it only on a fine
+   * pointer: on touch, Radix opens it on long-press, which is the tooltip's
+   * gesture there. The module dialog is the keyboard and touch way to the same.
+   */
+  moduleActions?: RingModuleActions;
+  /** The turrets and launchers the high slots take; null (no pips filled) until known. */
+  hardpointsUsed?: HardpointCounts | null;
   /** The panel header's controls — the page's "+ Add module". */
   actions?: ReactNode;
 }
@@ -192,6 +226,83 @@ function RimGauge({
           strokeWidth={GAUGE_HIT_WIDTH}
         />
         {bands}
+      </g>
+    </Tooltip>
+  );
+}
+
+/**
+ * A kind's hardpoints in words — the tooltip, and the text a screen reader
+ * gets for the pips (which are a picture) — naming any overfit, so it isn't
+ * told by colour alone.
+ */
+function hardpointLabel(
+  t: ReturnType<typeof useTranslation>['t'],
+  kind: HardpointKind,
+  used: number | null,
+  total: number
+): string {
+  if (used === null) return t(`fittings.ring.hardpoints.${kind}Loading`, { total });
+  const label = t(`fittings.ring.hardpoints.${kind}`, { used, total });
+  return used > total ? t('fittings.ring.hardpoints.over', { label, count: used - total }) : label;
+}
+
+/** A pip's radius, and the band a pointer hovers to read a kind's numbers. */
+const PIP_RADIUS = 5;
+const PIP_HIT_WIDTH = 22;
+
+/**
+ * One kind of hardpoint on the rim's top gap: a pip each, filled where the
+ * high slots take one, red past what the hull has.
+ */
+function HardpointPips({
+  kind,
+  total,
+  used,
+  compact,
+}: {
+  kind: HardpointKind;
+  total: number;
+  /** Null until every high-slot type is known: then nothing shows as taken. */
+  used: number | null;
+  compact: boolean;
+}) {
+  const { t } = useTranslation();
+  const taken = used ?? 0;
+  const angles = hardpointPipAngles(kind, Math.max(total, taken));
+  if (angles.length === 0) return null;
+  const c = RING_VIEW / 2;
+  const pips = angles.map((angle, index) => {
+    const p = ringPoint(angle, RING_GAUGE_RADIUS);
+    const fill =
+      index >= total
+        ? 'fill-danger stroke-danger'
+        : index < taken
+          ? 'fill-accent stroke-accent'
+          : 'fill-bg stroke-line-bright';
+    return (
+      <circle
+        key={index}
+        cx={c + p.x}
+        cy={c + p.y}
+        r={PIP_RADIUS}
+        className={fill}
+        strokeWidth={1.5}
+      />
+    );
+  });
+  if (compact) return <g data-hardpoints={kind}>{pips}</g>;
+  const first = angles[0];
+  const last = angles[angles.length - 1];
+  return (
+    <Tooltip content={hardpointLabel(t, kind, used, total)}>
+      <g data-hardpoints={kind} className="pointer-events-auto">
+        <path
+          d={arcPath(Math.min(first, last) - 2, Math.max(first, last) + 2, RING_GAUGE_RADIUS, c, c)}
+          className="fill-none stroke-transparent"
+          strokeWidth={PIP_HIT_WIDTH}
+        />
+        {pips}
       </g>
     </Tooltip>
   );
@@ -307,6 +418,9 @@ interface SlotTileProps extends DropHandlers {
   reachedState?: FittingModuleResult['state'];
   /** Whether this is the slot being filled; undefined when nothing can be. */
   selected?: boolean;
+  /** The highest state the module can reach, for its menu; every state until known. */
+  maxState?: FittingItemState;
+  actions?: RingModuleActions;
   /** Where the tile sits; its frame turns with the ring by `angle`, the icon stays upright. */
   position: CSSProperties;
   angle: number;
@@ -320,6 +434,8 @@ function SlotTile({
   cantUse,
   reachedState,
   selected,
+  maxState,
+  actions,
   position,
   angle,
   compact,
@@ -398,58 +514,109 @@ function SlotTile({
     endFittingDrag();
   }
 
-  return (
-    <Tooltip content={tooltip} openOnTap={compact}>
-      <button
-        type="button"
-        aria-label={label}
-        aria-pressed={pressed}
-        className={`absolute border bg-bg ${border} ${interactive ? 'cursor-pointer hover:border-accent' : ''} ${draggable ? 'active:cursor-grabbing' : ''}`}
-        style={{ ...position, transform: `rotate(${angle.toFixed(1)}deg)` }}
-        onClick={interactive ? () => onSelect(slot.rack, slot.index) : undefined}
-        draggable={draggable}
-        onDragStart={
-          draggable
-            ? (event) =>
-                startFittingDrag(event, { kind: 'slot', rack: slot.rack, index: slot.index })
-            : undefined
-        }
-        onDragEnd={draggable ? endFittingDrag : undefined}
-        onDragOver={handleDragOver}
-        // Moving onto the tile's own icon fires dragleave on the tile; only leaving it counts.
-        onDragLeave={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(false);
-        }}
-        onDrop={handleDrop}
+  const tile = (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={pressed}
+      className={`absolute border bg-bg ${border} ${interactive ? 'cursor-pointer hover:border-accent' : ''} ${draggable ? 'active:cursor-grabbing' : ''}`}
+      style={{ ...position, transform: `rotate(${angle.toFixed(1)}deg)` }}
+      onClick={interactive ? () => onSelect(slot.rack, slot.index) : undefined}
+      draggable={draggable}
+      onDragStart={
+        draggable
+          ? (event) => startFittingDrag(event, { kind: 'slot', rack: slot.rack, index: slot.index })
+          : undefined
+      }
+      onDragEnd={draggable ? endFittingDrag : undefined}
+      onDragOver={handleDragOver}
+      // Moving onto the tile's own icon fires dragleave on the tile; only leaving it counts.
+      onDragLeave={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(false);
+      }}
+      onDrop={handleDrop}
+    >
+      {/* Counter-turned so the module reads upright wherever its tile sits, as in the game. */}
+      <span
+        className="absolute inset-0 flex items-center justify-center"
+        style={{ transform: `rotate(${(-angle).toFixed(1)}deg)` }}
       >
-        {/* Counter-turned so the module reads upright wherever its tile sits, as in the game. */}
-        <span
-          className="absolute inset-0 flex items-center justify-center"
-          style={{ transform: `rotate(${(-angle).toFixed(1)}deg)` }}
-        >
-          {module ? (
-            <TypeIcon
-              typeId={module.typeId}
-              size={64}
-              className={`h-[88%] w-[88%] ${shownState === 'offline' ? 'opacity-35 grayscale' : ''}`}
-            />
-          ) : (
-            <AddRow aria-hidden className="text-text-dim" />
-          )}
-          {module?.chargeTypeId !== undefined && (
-            <span className="absolute right-0 bottom-0 h-[38%] w-[38%] border border-line bg-panel">
-              <TypeIcon typeId={module.chargeTypeId} size={32} className="h-full w-full" />
-            </span>
-          )}
-          {/* A corner flag, small enough to leave the module readable under it. */}
-          {cantUse && (
-            <span className="absolute top-0 right-0 flex h-[34%] w-[34%] bg-danger p-px text-bg">
-              <Warn aria-hidden className="h-full w-full" />
-            </span>
-          )}
-        </span>
-      </button>
-    </Tooltip>
+        {module ? (
+          <TypeIcon
+            typeId={module.typeId}
+            size={64}
+            className={`h-[88%] w-[88%] ${shownState === 'offline' ? 'opacity-35 grayscale' : ''}`}
+          />
+        ) : (
+          <AddRow aria-hidden className="text-text-dim" />
+        )}
+        {module?.chargeTypeId !== undefined && (
+          <span className="absolute right-0 bottom-0 h-[38%] w-[38%] border border-line bg-panel">
+            <TypeIcon typeId={module.chargeTypeId} size={32} className="h-full w-full" />
+          </span>
+        )}
+        {/* A corner flag, small enough to leave the module readable under it. */}
+        {cantUse && (
+          <span className="absolute top-0 right-0 flex h-[34%] w-[34%] bg-danger p-px text-bg">
+            <Warn aria-hidden className="h-full w-full" />
+          </span>
+        )}
+      </span>
+    </button>
+  );
+
+  if (compact || module === undefined || actions === undefined || shownState === undefined) {
+    return (
+      <Tooltip content={tooltip} openOnTap={compact}>
+        {tile}
+      </Tooltip>
+    );
+  }
+  const { rack } = slot;
+  const slotIndex = slot.index;
+  const name = nameOf(module.typeId);
+  // A subsystem can't be put offline, so its menu has no states to pick.
+  const hasStates = rack !== 'subsystem';
+  return (
+    <ContextMenu>
+      <Tooltip content={tooltip}>
+        <ContextMenuTrigger asChild>{tile}</ContextMenuTrigger>
+      </Tooltip>
+      <ContextMenuContent>
+        {hasStates && (
+          <>
+            <ContextMenuRadioGroup
+              value={shownState}
+              onValueChange={(value) =>
+                actions.setState(rack, slotIndex, value as FittingItemState)
+              }
+            >
+              {reachableModuleStates(maxState ?? 'overload', shownState).map((option) => (
+                <ContextMenuRadioItem key={option} value={option}>
+                  {t(`fittings.ring.menu.state.${option}`)}
+                </ContextMenuRadioItem>
+              ))}
+            </ContextMenuRadioGroup>
+            <ContextMenuSeparator />
+          </>
+        )}
+        {module.chargeTypeId !== undefined && (
+          <ContextMenuItem onSelect={() => actions.unloadCharge(rack, slotIndex)}>
+            {t('fittings.ring.menu.unload', { name: nameOf(module.chargeTypeId) })}
+          </ContextMenuItem>
+        )}
+        <ContextMenuItem onSelect={() => actions.showInfo(module.typeId, name)}>
+          {t('fittings.ring.menu.info')}
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => actions.openVariations(rack, slotIndex)}>
+          {t('fittings.ring.menu.variations')}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem className="text-danger" onSelect={() => actions.remove(rack, slotIndex)}>
+          {t('fittings.ring.menu.remove', { name })}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
@@ -502,6 +669,8 @@ export function FittingRing({
   onRackOpen,
   droneButton,
   selectedSlot,
+  moduleActions,
+  hardpointsUsed,
   actions,
 }: FittingRingProps) {
   const { t } = useTranslation();
@@ -564,10 +733,10 @@ export function FittingRing({
     selectedSlot === undefined
       ? undefined
       : selectedSlot?.rack === slot.rack && selectedSlot.index === slot.index;
-  const reachedState = (slot: RingSlot) => {
-    if (!slot.module || !moduleResults) return undefined;
-    return moduleResults[fitting.modules.indexOf(slot.module)]?.state;
-  };
+  const resultOf = (slot: RingSlot) =>
+    slot.module && moduleResults ? moduleResults[fitting.modules.indexOf(slot.module)] : undefined;
+  const maxStateOf = (slot: RingSlot) => resultOf(slot)?.maxState;
+  const reachedState = (slot: RingSlot) => resultOf(slot)?.state;
 
   function tilePosition(angle: number): CSSProperties {
     const p = ringPoint(angle, RING_SLOT_RADIUS);
@@ -650,6 +819,22 @@ export function FittingRing({
             {gauges.map((gauge) => (
               <RimGauge key={gauge} gauge={gauge} budget={budgets[gauge]} compact={compact} />
             ))}
+            {stats && (
+              <>
+                <HardpointPips
+                  kind="turret"
+                  total={stats.hardpoints.turrets}
+                  used={hardpointsUsed?.turrets ?? null}
+                  compact={compact}
+                />
+                <HardpointPips
+                  kind="launcher"
+                  total={stats.hardpoints.launchers}
+                  used={hardpointsUsed?.launchers ?? null}
+                  compact={compact}
+                />
+              </>
+            )}
           </svg>
           {ghosts.map(({ rack, index }) => {
             const angle = ringSlotAngle(rack, index);
@@ -671,6 +856,8 @@ export function FittingRing({
                 slot={slot}
                 cantUse={cantUse(slot)}
                 reachedState={reachedState(slot)}
+                maxState={maxStateOf(slot)}
+                actions={moduleActions}
                 selected={isSelected(slot)}
                 position={tilePosition(angle)}
                 angle={angle}
@@ -678,6 +865,17 @@ export function FittingRing({
             );
           })}
         </div>
+
+        {stats && (stats.hardpoints.turrets > 0 || stats.hardpoints.launchers > 0) && (
+          <ul className="sr-only">
+            {(['turret', 'launcher'] as const).map((kind) => {
+              const total = stats.hardpoints[kind === 'turret' ? 'turrets' : 'launchers'];
+              const used = hardpointsUsed?.[kind === 'turret' ? 'turrets' : 'launchers'] ?? null;
+              if (total === 0 && !used) return null;
+              return <li key={kind}>{hardpointLabel(t, kind, used, total)}</li>;
+            })}
+          </ul>
+        )}
 
         {/* Laid out as the rim is: calibration and powergrid on the left, bandwidth and CPU on the right. */}
         {!compact && (
@@ -740,6 +938,8 @@ export function FittingRing({
                     slot={slot}
                     cantUse={cantUse(slot)}
                     reachedState={reachedState(slot)}
+                    maxState={maxStateOf(slot)}
+                    actions={moduleActions}
                     selected={isSelected(slot)}
                     position={{ inset: 0 }}
                     angle={0}

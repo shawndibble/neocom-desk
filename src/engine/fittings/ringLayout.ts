@@ -79,6 +79,23 @@ export const RING_GAUGES = {
 
 export type RingGauge = keyof typeof RING_GAUGES;
 
+/** Degrees between neighbouring hardpoint pips, and from 12 o'clock to the first. */
+const PIP_PITCH_DEG = 3.5;
+const PIP_START_DEG = 4;
+
+/**
+ * Where a hull's hardpoint pips sit on the rim's top gap, between the
+ * calibration and drone bandwidth bands: turrets running out left from
+ * 12 o'clock, launchers out right, the first of each nearest the top.
+ */
+export function hardpointPipAngles(kind: 'turret' | 'launcher', count: number): number[] {
+  const side = kind === 'turret' ? -1 : 1;
+  return Array.from(
+    { length: count },
+    (_, index) => side * (PIP_START_DEG + index * PIP_PITCH_DEG)
+  );
+}
+
 /**
  * Every slot each rack has, fitted or not. `layout` is the hull's slot counts
  * (`null` until the stats load), in which case only slots up to the highest

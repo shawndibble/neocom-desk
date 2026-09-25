@@ -157,6 +157,8 @@ export interface FittingStats {
   /** Mbit/s one drone of each type in the Fitting draws, whether launched or not. */
   droneBandwidthByType: Record<number, number>;
   droneCapacity: number;
+  /** The hull's turret and launcher hardpoints; what the high slots take is `countHardpoints`. */
+  hardpoints: HardpointCounts;
   ehp: number;
   capacitor: CapacitorStatus;
   capacitorCapacity: number;
@@ -316,6 +318,10 @@ export const DOGMA_ATTRIBUTE = {
   mass: 4,
   // The warp speed is base × multiplier: the base (1281) is 1 on every hull,
   // and the hull's own speed — plus any rig's bonus — is in the multiplier.
+  // The hull's hardpoints: every one it has — the engine never subtracts
+  // what is fitted (verified 2026-09-25: a Rifter reads 3 and 2 bare or armed).
+  turretHardpoints: 102,
+  launcherHardpoints: 101,
   baseWarpSpeed: 1281,
   warpSpeedMultiplier: 600,
   droneBandwidth: 1271,
@@ -331,6 +337,12 @@ export const DOGMA_ATTRIBUTE = {
   rigSlots: 1137,
   subsystemSlots: 1367,
 } as const;
+
+/** Turret and launcher hardpoints — a hull's, or those its high slots take. */
+export interface HardpointCounts {
+  turrets: number;
+  launchers: number;
+}
 
 /** What a failed stats calculation was about: the pilot's skills, or the ship data and its calculation. */
 export type StatsErrorReason = 'skills' | 'shipData';

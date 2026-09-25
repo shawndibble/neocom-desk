@@ -532,3 +532,13 @@ describe('extractFittingStats — warp speed', () => {
     expect(extractFittingStats([], ship, []).navigation.warpSpeed).toBe(5);
   });
 });
+
+describe('extractFittingStats — hardpoints', () => {
+  it("reads the hull's turret (102) and launcher (101) hardpoints", () => {
+    const ship = new Map([
+      [102, { value: 3 }],
+      [101, { value: 2 }],
+    ]);
+    expect(extractFittingStats([], ship, []).hardpoints).toEqual({ turrets: 3, launchers: 2 });
+  });
+});

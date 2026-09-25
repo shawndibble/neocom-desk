@@ -256,6 +256,21 @@ export function launchDrones(fitting: Fitting, limits: DroneLaunchLimits): Fitti
   return next;
 }
 
+const MODULE_STATES: readonly FittingItemState[] = ['offline', 'online', 'active', 'overload'];
+
+/**
+ * The states a module's controls offer: each up to the highest it can reach
+ * (`maxState`, from its own calculation), plus the one it is shown in.
+ */
+export function reachableModuleStates(
+  maxState: FittingItemState,
+  shown: FittingItemState
+): FittingItemState[] {
+  const states = MODULE_STATES.slice(0, MODULE_STATES.indexOf(maxState) + 1);
+  if (!states.includes(shown)) states.push(shown);
+  return states;
+}
+
 /** Puts `quantity` more of `typeId` in the bay. */
 export function addDrones(fitting: Fitting, typeId: number, quantity: number): Fitting {
   const current = droneGroups(fitting).find((group) => group.typeId === typeId);
