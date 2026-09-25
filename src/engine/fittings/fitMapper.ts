@@ -42,8 +42,8 @@ export function fittingToDogmaFit(fitting: Fitting, profile: PilotProfile): Fit 
       type_id: drone.typeId,
       slot: { type: 'drone_bay' },
       quantity: drone.quantity,
-      // The engine has no in-bay state for drones: it lifts 'online' to
-      // 'active' and counts the stack as launched. 'offline' is its bay.
+      // Engine treats a drone given 'online' as launched; its in-bay state is
+      // 'offline', so a bay stack ('online' here) goes in as that.
       state: drone.state === 'active' ? 'active' : 'offline',
     })),
     ...fitting.cargo.map((item): FitItem => ({

@@ -211,13 +211,9 @@ export function weaponRowKey(row: Pick<WeaponRow, 'isDrone' | 'typeId' | 'charge
 }
 
 /**
- * The Offense section: one row per weapon (grouped by type and charge) or
- * drone type, with the total as the sum of the rows. `items`/`results` (and
- * `overheatedResults`, the engine's recalculation with every heatable active
- * module overloaded — null when there was none) are index-parallel.
- *
- * Firing is read off the engine's reached state, not the requested one: an
- * online launcher still reports a volley.
+ * Offense rows, total = sum of rows. `items`, `results` and
+ * `overheatedResults` (null when nothing could overheat) are index-parallel.
+ * Firing uses the engine's reached state, since non-firing weapons still report a volley.
  */
 export function extractOffense(
   items: readonly OffenseItem[],

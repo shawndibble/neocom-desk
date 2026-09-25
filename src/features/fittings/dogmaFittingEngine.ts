@@ -189,16 +189,18 @@ export async function computeFittingStats(
   // that can overheat set to overload. Skipped when there is none, so a fit
   // with nothing to overheat costs one calculation and shows no overheated line.
   // Callers that never show heat (the variations diff) opt out of the cost.
-  const heatable = (index: number) =>
-    index < fitting.modules.length &&
-    calculation.items[index]?.max_state === 'overload' &&
-    calculation.items[index]?.state === 'active';
+  const heatable = dogmaFit.items.map(
+    (_, index) =>
+      index < fitting.modules.length &&
+      calculation.items[index]?.max_state === 'overload' &&
+      calculation.items[index]?.state === 'active'
+  );
   const overheatedCalculation =
-    withOverheated && dogmaFit.items.some((_, index) => heatable(index))
+    withOverheated && heatable.includes(true)
       ? calculate({
           ...dogmaFit,
           items: dogmaFit.items.map((item, index) =>
-            heatable(index) ? { ...item, state: 'overload' } : item
+            heatable[index] ? { ...item, state: 'overload' } : item
           ),
         })
       : null;
