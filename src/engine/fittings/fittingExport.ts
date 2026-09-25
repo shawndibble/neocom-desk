@@ -33,9 +33,9 @@ export function fittingItemCounts(fitting: Fitting): Map<number, number> {
 /** EFT lists the racks in this order, low first. */
 const EFT_RACK_ORDER: readonly FittingSlotKind[] = ['low', 'medium', 'high', 'rig', 'subsystem'];
 
-/** The header is `[Hull, Name]`; a `]` or newline in the name would end or split it. */
+/** The name sits inside `[Hull, Name]` and `<url=…>Name</url>`; brackets, angle brackets and newlines would end or split either. */
 function headerSafe(name: string): string {
-  return name.replace(/[\]\r\n]+/g, ' ').trim();
+  return name.replace(/[[\]<>\r\n]+/g, ' ').trim();
 }
 
 export function fittingToEft(fitting: Fitting, nameFor: ItemNameFor): string {

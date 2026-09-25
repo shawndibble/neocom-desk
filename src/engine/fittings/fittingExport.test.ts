@@ -133,6 +133,12 @@ describe('DNA and chat link', () => {
     ]);
   });
 
+  it('keeps a name from closing the link markup early', () => {
+    expect(fittingToChatLink({ ...FITTING, name: 'a</url>b' })).toBe(
+      `<url=fitting:${DNA}>a /url b</url>`
+    );
+  });
+
   it('wraps the DNA in the game link markup under the fitting name', () => {
     expect(fittingToChatLink(FITTING)).toBe(`<url=fitting:${DNA}>Brawler</url>`);
   });

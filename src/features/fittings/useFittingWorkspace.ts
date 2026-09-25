@@ -264,6 +264,12 @@ export function useFittingWorkspace(): FittingWorkspace {
         setLoadError('unrecognised');
         return;
       }
+      if (input.kind === 'share') {
+        // Opens like any other Share Link: the decode effect does the rest.
+        setUnresolved([]);
+        setShareCode(input.code, { push: true });
+        return;
+      }
       const [typeByName, slotByTypeId] = await Promise.all([loadItemNameMap(), loadFittingSlots()]);
       let result: EftLoadResult;
       if (input.kind === 'eft') {
