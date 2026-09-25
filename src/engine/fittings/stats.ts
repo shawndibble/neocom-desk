@@ -331,3 +331,12 @@ export function overheatedOrNull(
   if (overheated === null || overheated === undefined) return null;
   return overheated.toFixed(fractionDigits) === normal.toFixed(fractionDigits) ? null : overheated;
 }
+
+/**
+ * Seconds to align for warp from a standstill — the game's own formula,
+ * ln(4) × inertia modifier × mass (kg) / 1,000,000: the time to reach 75% of
+ * top speed, which is when warp engages.
+ */
+export function alignTimeSeconds(massKg: number, agility: number): number {
+  return (Math.log(4) * agility * massKg) / 1_000_000;
+}

@@ -9,44 +9,64 @@ import {
   DropdownMenuTrigger,
   TypeIcon,
 } from '@/components/ui';
+import { Expanded } from '@/components/ui/icons';
 import type { Fitting } from '@/engine/fittings/types';
 import type { LibraryTab } from './FittingLibrary';
 
 interface FittingHeaderProps {
   fitting: Fitting;
-  hullName: string;
+  /** Under the name: the hull (when the name isn't just the hull) and whether it's saved. */
+  subtitle: string;
   /** In-game Fittings need a Character. */
   hasCharacter: boolean;
   onLibrary: (tab: LibraryTab) => void;
-  /** View toggle, Export, Save — the open Fitting's own controls, right-aligned. */
-  actions: ReactNode;
-  /** What its numbers are worked out under (implants, missing skills), on a row of its own. */
+  /** What its numbers are worked out under — implants, missing skills. */
   context?: ReactNode;
+  /** View toggle, Export, Save — right-aligned after the Fittings menu. */
+  actions: ReactNode;
 }
 
 /**
- * The open Fitting's header (scope decision `20260924-215855`): a Fittings
- * menu for everything that opens a different Fitting (new from a hull,
- * Import, My Fittings, In-game) — which used to be panels stacked above the
- * editor — then what this Fitting is, then its own controls.
+ * The open Fitting's header, one row as in mockup A (scope decision
+ * `20260924-215855`): what the Fitting is, what its numbers assume, then
+ * its controls — a Fittings menu for opening a different one (new from a
+ * hull, Import, My Fittings, In-game), the view, Export and Save. On a
+ * narrow screen the groups wrap onto their own lines.
  */
 export function FittingHeader({
   fitting,
-  hullName,
+  subtitle,
   hasCharacter,
   onLibrary,
-  actions,
   context,
+  actions,
 }: FittingHeaderProps) {
   const { t } = useTranslation();
   return (
-    <div className="space-y-2 px-3 py-2">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xs border border-line bg-panel/85 px-3 py-2 backdrop-blur-sm">
+      <div className="flex min-w-48 items-center gap-3">
+        <TypeIcon
+          typeId={fitting.shipTypeId}
+          size={64}
+          width={44}
+          height={44}
+          className="border border-line"
+        />
+        <div className="min-w-0">
+          <h1 className="truncate text-lg font-semibold">{fitting.name}</h1>
+          {subtitle && <p className="truncate text-xs text-text-dim">{subtitle}</p>}
+        </div>
+      </div>
+      {context && <div className="flex flex-wrap items-center gap-3">{context}</div>}
+      <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button>{t('fittings.header.menu')}</Button>
+            <Button>
+              {t('fittings.header.menu')}
+              <Expanded aria-hidden />
+            </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-56">
+          <DropdownMenuContent align="end" className="min-w-56">
             <DropdownMenuItem onSelect={() => onLibrary('new')}>
               {t('fittings.header.newFromHull')}
             </DropdownMenuItem>
@@ -64,19 +84,8 @@ export function FittingHeader({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        <div className="flex min-w-48 flex-1 items-center gap-2">
-          <TypeIcon typeId={fitting.shipTypeId} size={64} width={36} height={36} />
-          <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold">{fitting.name}</h1>
-            {/* A Fitting started from a bare hull is named after it; don't say it twice. */}
-            {hullName !== fitting.name && (
-              <p className="truncate text-xs text-text-dim">{hullName}</p>
-            )}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        {actions}
       </div>
-      {context && <div className="flex flex-wrap items-start gap-x-4 gap-y-2">{context}</div>}
     </div>
   );
 }

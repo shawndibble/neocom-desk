@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, Popover, PopoverContent, PopoverTrigger } from '@/components/ui';
 import { exceedsAlphaCap } from '@/engine/alphaCap';
 import { romanLevel } from '@/engine/projection';
 import type { PlanEntry } from '@/engine/types';
@@ -51,20 +51,22 @@ export function MissingSkillsChip({ entries, characterId, fittingName }: Missing
   const totalSeconds = rows.reduce((sum, row) => sum + row.seconds, 0);
 
   return (
-    <div className="space-y-2">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="min-h-11 rounded-xs border border-line bg-panel-2 px-3 text-xs font-semibold text-warning"
-      >
-        {t('fittings.missingSkills.chip', {
-          count: rows.length,
-          time: formatDuration(totalSeconds),
-        })}
-      </button>
-      {open && (
-        <div className="space-y-2 rounded-xs border border-line bg-panel p-3">
+    // A popover rather than an inline panel: the chip sits in the Fitting's
+    // one-row header, which an inline list would push apart.
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="min-h-11 rounded-xs border border-line bg-panel-2 px-3 text-xs font-semibold text-warning md:min-h-9"
+        >
+          {t('fittings.missingSkills.chip', {
+            count: rows.length,
+            time: formatDuration(totalSeconds),
+          })}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-3">
+        <div className="space-y-2">
           <ul className="space-y-1 text-xs">
             {rows.map((row) => {
               const skill = catalog.engineSkills.get(row.skillTypeID);
@@ -98,7 +100,7 @@ export function MissingSkillsChip({ entries, characterId, fittingName }: Missing
             </div>
           )}
         </div>
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 }

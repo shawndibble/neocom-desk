@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/db';
+import { formatIskCompact } from '@/lib/isk';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, PageHeader, Panel, SlideOver, Tabs } from '@/components/ui';
@@ -13,6 +16,7 @@ import {
   addDrones,
   addModule,
   firstFreeSlotIndex,
+  loadChargeIntoAll,
   moveModule,
   newFitting,
   swapModuleType,
@@ -21,7 +25,7 @@ import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
 import { FittingExportMenu } from '@/features/fittings/FittingExportMenu';
 import { FittingHeader } from '@/features/fittings/FittingHeader';
-import { FittingKpiStrip } from '@/features/fittings/FittingKpiStrip';
+import { FittingSaveButton } from '@/features/fittings/FittingSaveButton';
 import { LoadWarnings } from '@/features/fittings/FittingLoadCard';
 import { FittingLibrary, type LibraryTab } from '@/features/fittings/FittingLibrary';
 import { SaveToEveDialog } from '@/features/fittings/SaveToEveDialog';
@@ -102,6 +106,10 @@ export function Fittings() {
   const [library, setLibrary] = useState<LibraryTab | null>(null);
   const [libraryOver, setLibraryOver] = useState<Fitting | null>(null);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const characterName = useLiveQuery(
+    () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
+    [activeCharacterId]
+  )?.name;
   const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
   const [saveToEveOpen, setSaveToEveOpen] = useState(false);
   // Bumped on a successful Save to EVE so In-game Fittings remounts and
@@ -198,7 +206,11 @@ export function Fittings() {
       profile={workspace.profile}
       canPlace={canPlace}
       onAdd={handleAdd}
-      showGroups={addMode !== 'sheet'}
+      onClearTarget={() => setTarget(null)}
+      moduleResults={moduleResults}
+      onLoadCharge={(moduleTypeId, chargeTypeId) =>
+        edit((f) => loadChargeIntoAll(f, moduleTypeId, chargeTypeId))
+      }
       dragToRing={isDesktop && view === 'ring'}
     />
   );
@@ -312,94 +324,112 @@ export function Fittings() {
       damageProfiles={workspace.damageProfiles}
       targetProfiles={targetProfiles}
       overlay={overlay}
+      heading={
+        <>
+          <span>
+            {activeCharacterId === null
+              ? t('fittings.stats.headingAllV')
+              : characterName
+                ? t('fittings.stats.headingCharacter', { name: characterName })
+                : null}
+          </span>
+          {workspace.price && (
+            <span className="text-text tabular-nums">
+              {t('fittings.stats.unit.isk', {
+                value: formatIskCompact(workspace.price.totals.sell),
+              })}
+            </span>
+          )}
+        </>
+      }
     />
   );
+
+  // Under the name: the hull, unless the Fitting is simply named after it,
+  // and whether this is a saved Fitting.
+  const hullName = typeName(fitting.shipTypeId);
+  const subtitle = [
+    hullName !== fitting.name ? hullName : null,
+    workspace.savedId !== null ? t('fittings.header.savedInMyFittings') : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     // The open slide-out pushes the page aside rather than covering it, so
     // every Ring slot stays a drop target. (It can't get out of the way
     // mid-drag instead: moving or hiding a drag's source element cancels it.)
     <div className={`space-y-3 ${addOpen && addMode === 'slideOut' ? 'pl-[26rem]' : ''}`}>
-      <section className="border border-line bg-panel">
-        <FittingHeader
-          fitting={fitting}
-          hullName={typeName(fitting.shipTypeId)}
-          hasCharacter={activeCharacterId !== null}
-          onLibrary={openLibrary}
-          context={
-            <>
-              <ImplantBasisControl
-                basis={workspace.implantBasis}
-                canUseCloneBasis={workspace.canUseCloneBasis}
-                onBasisChange={workspace.setImplantBasis}
-                implantSet={fitting.implantSet}
-                onImplantSetChange={workspace.setImplantSet}
-              />
-              {workspace.implantBasis === 'clone' && workspace.canUseCloneBasis && (
-                <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
-              )}
-              {gaps && gaps.missing.length > 0 && activeCharacterId !== null && (
-                <MissingSkillsChip
-                  entries={gaps.missing}
-                  characterId={activeCharacterId}
-                  fittingName={fitting.name}
-                />
-              )}
-            </>
-          }
-          actions={
-            <>
-              {viewHydrated && (
-                <FittingViewToggle value={view} onChange={(next) => void setView(next)} />
-              )}
-              <FittingExportMenu fitting={fitting} price={workspace.price} />
-              <Button
-                disabled={activeCharacterId === null || canSaveToEve !== true}
-                title={
-                  activeCharacterId === null
-                    ? t('fittings.saveToEve.needCharacter')
-                    : canSaveToEve === false
-                      ? t('fittings.saveToEve.needPermission')
-                      : undefined
-                }
-                onClick={() => setSaveToEveOpen(true)}
-              >
-                {t('fittings.saveToEve.action')}
-              </Button>
-              <Button
-                variant="primary"
-                disabled={!workspace.canSave}
-                title={
-                  activeCharacterId === null
-                    ? t('fittings.myFittings.needCharacter')
-                    : workspace.tooLargeToShare
-                      ? t('fittings.myFittings.tooLarge')
-                      : undefined
-                }
-                onClick={() => void workspace.save()}
-              >
-                {workspace.savedId === null
-                  ? t(isPhone ? 'fittings.myFittings.saveShort' : 'fittings.myFittings.save')
-                  : t('fittings.myFittings.update')}
-              </Button>
-            </>
-          }
-        />
-        {workspace.tooLargeToShare && (
-          <p role="alert" className="px-3 pb-2 text-xs text-warning">
-            {t('fittings.load.tooLargeToShare')}
-          </p>
-        )}
-        {(workspace.unresolved.length > 0 || workspace.fitXmlUnresolved.length > 0) && (
-          <div className="space-y-2 px-3 pb-2">
-            <LoadWarnings
-              unresolved={workspace.unresolved}
-              fitXmlUnresolved={workspace.fitXmlUnresolved}
+      <FittingHeader
+        fitting={fitting}
+        subtitle={subtitle}
+        hasCharacter={activeCharacterId !== null}
+        onLibrary={openLibrary}
+        context={
+          <>
+            <ImplantBasisControl
+              basis={workspace.implantBasis}
+              canUseCloneBasis={workspace.canUseCloneBasis}
+              onBasisChange={workspace.setImplantBasis}
+              implantSet={fitting.implantSet}
+              onImplantSetChange={workspace.setImplantSet}
             />
-          </div>
-        )}
-        <FittingKpiStrip stats={stats} price={workspace.price} />
-      </section>
+            {workspace.implantBasis === 'clone' && workspace.canUseCloneBasis && (
+              <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
+            )}
+            {gaps && gaps.missing.length > 0 && activeCharacterId !== null && (
+              <MissingSkillsChip
+                entries={gaps.missing}
+                characterId={activeCharacterId}
+                fittingName={fitting.name}
+              />
+            )}
+          </>
+        }
+        actions={
+          <>
+            {viewHydrated && (
+              <FittingViewToggle value={view} onChange={(next) => void setView(next)} />
+            )}
+            <FittingExportMenu fitting={fitting} price={workspace.price} />
+            <FittingSaveButton
+              onSave={() => void workspace.save()}
+              canSave={workspace.canSave}
+              saveBlockedReason={
+                activeCharacterId === null
+                  ? t('fittings.myFittings.needCharacter')
+                  : workspace.tooLargeToShare
+                    ? t('fittings.myFittings.tooLarge')
+                    : undefined
+              }
+              updating={workspace.savedId !== null}
+              onSaveToEve={() => setSaveToEveOpen(true)}
+              canSaveToEve={activeCharacterId !== null && canSaveToEve === true}
+              saveToEveBlockedReason={
+                activeCharacterId === null
+                  ? t('fittings.saveToEve.needCharacter')
+                  : canSaveToEve === false
+                    ? t('fittings.saveToEve.needPermission')
+                    : undefined
+              }
+              short={isPhone}
+            />
+          </>
+        }
+      />
+      {workspace.tooLargeToShare && (
+        <p role="alert" className="text-xs text-warning">
+          {t('fittings.load.tooLargeToShare')}
+        </p>
+      )}
+      {(workspace.unresolved.length > 0 || workspace.fitXmlUnresolved.length > 0) && (
+        <div className="space-y-2">
+          <LoadWarnings
+            unresolved={workspace.unresolved}
+            fitXmlUnresolved={workspace.fitXmlUnresolved}
+          />
+        </div>
+      )}
 
       {viewHydrated &&
         (addMode === 'sheet' ? (
