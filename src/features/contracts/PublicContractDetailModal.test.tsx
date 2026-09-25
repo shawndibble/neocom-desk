@@ -137,7 +137,7 @@ describe('PublicContractDetailModal — contents', () => {
     showItems([item({ record_id: 1 })]);
     renderModal();
 
-    await user.click(await screen.findByRole('button', { name: 'Copy Contract ID' }));
+    await user.click(await screen.findByRole('button', { name: 'Copy contract ID' }));
 
     expect(writeText).toHaveBeenCalledWith('235091192');
   });

@@ -589,7 +589,7 @@ describe('Contracts row context menu (issue #676)', () => {
     await openContractMenu('Rifter fit');
 
     expect(screen.getByRole('menuitem', { name: 'Copy title' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy Contract ID' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy contract ID' })).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -598,7 +598,7 @@ describe('Contracts row context menu (issue #676)', () => {
     await openContractMenu('Courier');
 
     expect(screen.getByRole('menuitem', { name: 'Copy title' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy Contract ID' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy contract ID' })).toBeInTheDocument();
   });
 
   it('left-click on the title cell still opens the detail modal, unaffected by the context menu', async () => {

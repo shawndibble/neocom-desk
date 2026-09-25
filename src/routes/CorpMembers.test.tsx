@@ -371,30 +371,30 @@ async function openMemberMenu(name: string) {
 }
 
 describe('row context menu (issue #421, AC1)', () => {
-  it('offers Show Info and Copy Character Name', async () => {
+  it('offers Show info and Copy name', async () => {
     await rosterTable();
     await openMemberMenu('Jita Local');
 
-    expect(screen.getByRole('menuitem', { name: 'Show Info' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy Character Name' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
   });
 
-  it('Show Info opens the shared Public Info Modal for the character', async () => {
+  it('Show info opens the shared Public Info Modal for the character', async () => {
     await rosterTable();
     await openMemberMenu('Jita Local');
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Show Info' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Show info' }));
 
     expect(usePublicInfoModalStore.getState().request).toEqual({ kind: 'character', id: 1001 });
   });
 
-  it('Copy Character Name copies the resolved name to the clipboard', async () => {
+  it('Copy name copies the resolved name to the clipboard', async () => {
     const clipboardWriteText = vi.fn<ClipboardWriter>().mockResolvedValue(undefined);
     configureClipboard(clipboardWriteText);
     await rosterTable();
     await openMemberMenu('Jita Local');
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy Character Name' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy name' }));
 
     expect(clipboardWriteText).toHaveBeenCalledWith('Jita Local');
   });
@@ -406,7 +406,7 @@ describe('row context menu (issue #421, AC1)', () => {
     await rosterTable();
     await openMemberMenu('#1001');
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy Character Name' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy name' }));
 
     expect(clipboardWriteText).toHaveBeenCalledWith('#1001');
   });
