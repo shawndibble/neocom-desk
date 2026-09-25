@@ -998,7 +998,7 @@ export function OpenOrdersPanel({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="any">{t('market.orders.filter.none')}</SelectItem>
+                      <SelectItem value="any">{t('market.orders.filter.anyExpiry')}</SelectItem>
                       {EXPIRING_WITHIN_DAY_OPTIONS.map((days) => (
                         <SelectItem key={days} value={String(days)}>
                           {t('market.orders.filter.expiringWithinOption', { count: days })}
@@ -1020,7 +1020,7 @@ export function OpenOrdersPanel({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="any">{t('market.orders.filter.none')}</SelectItem>
+                      <SelectItem value="any">{t('market.orders.filter.anySize')}</SelectItem>
                       {MIN_ISK_TIED_UP_OPTIONS.map((amount) => (
                         <SelectItem key={amount} value={String(amount)}>
                           {t('market.orders.filter.minIskTiedUpOption', {

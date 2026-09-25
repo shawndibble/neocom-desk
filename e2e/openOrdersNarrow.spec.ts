@@ -197,3 +197,22 @@ test.describe('Open Orders — compact phone list (#1429)', () => {
     await expect(page.getByRole('dialog', { name: /Mexallon/ })).toBeVisible();
   });
 });
+
+test.describe('Open Orders — filter selects are distinguishable (#1744)', () => {
+  test('the expiry and ISK-tied-up selects read differently at 390px', async ({ page }) => {
+    await seedOpenOrders(page);
+    await signInAndGoto(page);
+    await page.setViewportSize(PHONE);
+    await page.goto('./market/orders');
+
+    await page.getByRole('button', { name: /^Filters/ }).click();
+    const expiry = page.getByRole('combobox', { name: 'Expires within' });
+    const tied = page.getByRole('combobox', { name: 'ISK tied up over' });
+    await expect(expiry).toHaveText('Any expiry');
+    await expect(tied).toHaveText('Any size');
+    for (const box of [expiry, tied]) {
+      const rect = await box.evaluate((el) => el.getBoundingClientRect());
+      expect(rect.right).toBeLessThanOrEqual(PHONE.width);
+    }
+  });
+});
