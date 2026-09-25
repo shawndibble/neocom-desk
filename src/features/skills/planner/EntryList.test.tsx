@@ -172,7 +172,7 @@ describe('EntryList prereq rows', () => {
     render(<EntryList rows={prereqRows} bandsAt={new Map()} {...defaultProps} />);
     const row = screen.getByText(/^Skill 9\b/).closest('li') as HTMLElement;
     const numeral = within(row).getByText('I', { exact: true });
-    expect(numeral).toHaveClass('shrink-0');
+    expect(numeral.parentElement).toHaveClass('shrink-0');
     const nameEl = within(row).getByText('Skill 9', { exact: true });
     expect(nameEl).toHaveClass('truncate');
     expect(nameEl).not.toContainElement(numeral);
@@ -752,7 +752,7 @@ describe('EntryList one row per level', () => {
   it('keeps the level numeral out of the truncating name span (#1716)', () => {
     render(<EntryList rows={[entryRow(1, [0], [4])]} bandsAt={new Map()} {...defaultProps} />);
     const numeral = screen.getByText('IV', { exact: true });
-    expect(numeral).toHaveClass('shrink-0');
+    expect(numeral.parentElement).toHaveClass('shrink-0');
     const nameEl = screen.getByText('Skill 1', { exact: true });
     expect(nameEl).toHaveClass('truncate');
     expect(nameEl).not.toContainElement(numeral);
