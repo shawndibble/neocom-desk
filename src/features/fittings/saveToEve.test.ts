@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { db, type TokenRecord } from '@/db';
 import { EsiError } from '@/esi/client';
 import type { Fitting } from '@/engine/fittings/types';
 
@@ -19,8 +20,9 @@ const FITTING: Fitting = {
   cargo: [],
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
+  await db.tokens.clear();
 });
 
 describe('saveFittingToEve', () => {
@@ -75,6 +77,42 @@ describe('saveFittingToEve', () => {
     });
     expect(result).toEqual({ ok: false, message: 'ESI is down' });
     expect(deleteCharacterFittingMock).not.toHaveBeenCalled();
+  });
+
+  it('says a Permission is needed when ESI refuses and the grant lacks the write scope', async () => {
+    await db.tokens.put({
+      characterId: 1,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 600_000,
+      scopes: ['esi-fittings.read_fittings.v1'],
+    } as TokenRecord);
+    postCharacterFittingMock.mockRejectedValue(new EsiError(403, 'Forbidden', null));
+    const result = await saveFittingToEve({
+      characterId: 1,
+      fitting: FITTING,
+      name: 'PvP Rifter',
+      description: '',
+    });
+    expect(result).toEqual({ ok: false, message: 'Forbidden', needsPermission: true });
+  });
+
+  it('does not ask for a Permission the grant already holds: a re-login could not fix that refusal', async () => {
+    await db.tokens.put({
+      characterId: 1,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 600_000,
+      scopes: ['esi-fittings.write_fittings.v1'],
+    } as TokenRecord);
+    postCharacterFittingMock.mockRejectedValue(new EsiError(403, 'Forbidden', null));
+    const result = await saveFittingToEve({
+      characterId: 1,
+      fitting: FITTING,
+      name: 'PvP Rifter',
+      description: '',
+    });
+    expect(result).toEqual({ ok: false, message: 'Forbidden' });
   });
 
   it('reports a failed overwrite delete without treating the save itself as failed — the pilot now has both', async () => {
