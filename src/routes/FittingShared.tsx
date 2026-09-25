@@ -226,6 +226,7 @@ export function FittingShared() {
             statsProgress={statsProgress}
             statsError={statsError}
             price={price}
+            typeName={typeName ?? ((typeId) => `#${typeId}`)}
             damageProfiles={damageProfiles}
           />
           <ModuleList fitting={state.fitting} typeName={typeName} />
