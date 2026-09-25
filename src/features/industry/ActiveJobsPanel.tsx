@@ -1014,6 +1014,7 @@ export function ActiveJobsPanel({
                 label={t('industry.jobsTitle')}
                 {...sortProps}
                 density="compact"
+                mobileSort
                 rowClassName={(job) =>
                   toneClass(jobTone(job), { warning: 'bg-warning/10', success: 'bg-success/10' })
                 }
