@@ -1352,36 +1352,6 @@ export function Wallet() {
               meta={walletCharacterFilterMeta}
               actions={balanceResult ? <DataAgeBadge date={balanceResult.fetchedAt} /> : undefined}
             >
-              {journal.length === 0 ? (
-                <EmptyState
-                  title={t('wallet.journalEmptyTitle')}
-                  hint={t('wallet.journalEmptyHint')}
-                  className="py-8"
-                />
-              ) : (
-                <div className="mb-4">
-                  {journalTruncated && (
-                    <p className="px-1 pb-2 text-[0.6875rem] text-warning uppercase">
-                      {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
-                    </p>
-                  )}
-                  {walletBalancePoints.length > 0 && (
-                    <Suspense
-                      fallback={
-                        <div className="flex justify-center py-8">
-                          <Spinner label={t('common.loading')} />
-                        </div>
-                      }
-                    >
-                      <LazyWalletBalanceChart
-                        points={walletBalancePoints}
-                        trend={walletBalanceTrendDirection}
-                        timeZone={timeZone}
-                      />
-                    </Suspense>
-                  )}
-                </div>
-              )}
               <div className="flex flex-wrap gap-x-8 gap-y-4">
                 <div>
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -1425,6 +1395,36 @@ export function Wallet() {
               </div>
               {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
                 <p className="mt-3 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
+              )}
+              {journal.length === 0 ? (
+                <EmptyState
+                  title={t('wallet.journalEmptyTitle')}
+                  hint={t('wallet.journalEmptyHint')}
+                  className="py-8"
+                />
+              ) : (
+                <div className="mt-4">
+                  {journalTruncated && (
+                    <p className="px-1 pb-2 text-[0.6875rem] text-warning uppercase">
+                      {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
+                    </p>
+                  )}
+                  {walletBalancePoints.length > 0 && (
+                    <Suspense
+                      fallback={
+                        <div className="flex justify-center py-8">
+                          <Spinner label={t('common.loading')} />
+                        </div>
+                      }
+                    >
+                      <LazyWalletBalanceChart
+                        points={walletBalancePoints}
+                        trend={walletBalanceTrendDirection}
+                        timeZone={timeZone}
+                      />
+                    </Suspense>
+                  )}
+                </div>
               )}
             </Panel>
           )}
