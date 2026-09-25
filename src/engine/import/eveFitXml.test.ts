@@ -83,6 +83,23 @@ describe('loadEveFitXmlEntry', () => {
     expect(result.unresolved).toEqual([{ text: 'Not A Real Module', reason: 'unknown item' }]);
   });
 
+  it('reports a slot index past the rack size without failing the rest of the fitting', () => {
+    const result = loadEveFitXmlEntry(
+      entry({
+        hardware: [
+          { slot: 'high slot 100', type: '125mm Gatling AutoCannon II' },
+          { slot: 'low slot 0', type: 'Damage Control I' },
+        ],
+      }),
+      typeByName
+    );
+    if (result.hullTypeId === null) throw new Error('expected a hull');
+    expect(result.modules).toEqual([{ slot: 'low', slotIndex: 0, typeId: 2046, state: 'active' }]);
+    expect(result.unresolved).toEqual([
+      { text: '125mm Gatling AutoCannon II', reason: 'too many high slots' },
+    ]);
+  });
+
   it('reports an unrecognized slot string without failing the rest of the fitting', () => {
     const result = loadEveFitXmlEntry(
       entry({

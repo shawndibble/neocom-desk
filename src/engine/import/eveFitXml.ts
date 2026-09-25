@@ -87,13 +87,6 @@ export function loadEveFitXmlEntry(
   const drones: FittingDrone[] = [];
   const cargo: FittingCargoItem[] = [];
   const moduleBySlotKey = new Map<string, FittingModule>();
-  const slotCountByRack: Record<FittingSlotKind, number> = {
-    high: 0,
-    medium: 0,
-    low: 0,
-    rig: 0,
-    subsystem: 0,
-  };
 
   for (const item of entry.hardware) {
     const slotKey = item.slot.trim().toLowerCase();
@@ -141,11 +134,10 @@ export function loadEveFitXmlEntry(
 
     const slot = RACK_NAME[rackMatch[1].toLowerCase()];
     const slotIndex = Number(rackMatch[2]);
-    if (slotCountByRack[slot] >= MAX_SLOTS_PER_CATEGORY) {
+    if (slotIndex >= MAX_SLOTS_PER_CATEGORY) {
       unresolved.push({ text: item.type, reason: `too many ${slot} slots` });
       continue;
     }
-    slotCountByRack[slot] += 1;
     const module: FittingModule = { slot, slotIndex, typeId, state: 'active' };
     moduleBySlotKey.set(slotKey, module);
     modules.push(module);

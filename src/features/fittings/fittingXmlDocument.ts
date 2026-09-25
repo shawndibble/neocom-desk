@@ -43,10 +43,14 @@ function readHardware(fittingEl: Element): FittingXmlHardware[] {
     if (!slot || !type) continue;
     const qtyAttr = el.getAttribute('qty');
     const qty = qtyAttr ? Number(qtyAttr) : undefined;
+    // A malformed/negative/fractional count reads as "not stated" — the same
+    // "unknown gracefully becomes absent" stance planXmlDocument.ts's own
+    // attribute parsing takes — rather than propagating a stack size that
+    // could never occur in game.
     hardware.push({
       slot,
       type,
-      ...(qty !== undefined && Number.isFinite(qty) ? { qty } : {}),
+      ...(qty !== undefined && Number.isInteger(qty) && qty > 0 ? { qty } : {}),
     });
   }
   return hardware;

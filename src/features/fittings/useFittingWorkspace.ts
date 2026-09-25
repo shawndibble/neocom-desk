@@ -282,6 +282,7 @@ export function useFittingWorkspace(): FittingWorkspace {
       const [typeByName, slotByTypeId] = await Promise.all([loadItemNameMap(), loadFittingSlots()]);
       const result = loadEftFitting(text, typeByName, slotByTypeId);
       setUnresolved(result.unresolved);
+      setFitXmlUnresolved([]);
       if (result.hullTypeId === null) return;
 
       const name = await hullName(result.hullTypeId);
@@ -322,6 +323,7 @@ export function useFittingWorkspace(): FittingWorkspace {
   const openFittingXmlEntry = useCallback(
     async (item: FittingXmlListItem) => {
       if (item.fitting === null) return;
+      setUnresolved([]);
       setFitXmlUnresolved(item.unresolved);
       await openFitting(item.fitting);
     },

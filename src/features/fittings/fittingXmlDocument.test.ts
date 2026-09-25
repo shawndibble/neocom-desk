@@ -63,6 +63,26 @@ describe('parseFittingXmlText', () => {
     ]);
   });
 
+  it('reads a zero, negative or fractional qty as absent rather than as a real stack size', () => {
+    const xml = `<?xml version="1.0"?>
+<fittings>
+  <fitting name="a">
+    <shipType value="Rifter" />
+    <hardware slot="cargo hold" type="Nanite Repair Paste" qty="0" />
+    <hardware slot="cargo hold" type="Nanite Repair Paste" qty="-5" />
+    <hardware slot="cargo hold" type="Nanite Repair Paste" qty="2.5" />
+  </fitting>
+</fittings>`;
+    const result = parseFittingXmlText(xml);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.document.entries[0]!.hardware).toEqual([
+      { slot: 'cargo hold', type: 'Nanite Repair Paste' },
+      { slot: 'cargo hold', type: 'Nanite Repair Paste' },
+      { slot: 'cargo hold', type: 'Nanite Repair Paste' },
+    ]);
+  });
+
   it('rejects a file containing a DOCTYPE', () => {
     const withDoctype =
       '<?xml version="1.0"?><!DOCTYPE fittings [<!ENTITY x "y">]><fittings></fittings>';
