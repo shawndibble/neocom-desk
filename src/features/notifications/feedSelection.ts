@@ -14,7 +14,7 @@ import {
   characterEventPrefs,
   characterEveTypePrefs,
   type NotificationPreferencesValue,
-} from './preferences';
+} from './preferencesStore';
 import type { NotificationEventId } from './events';
 import type { NotificationFeedRecord as NotificationFeedEntry } from '@/db';
 

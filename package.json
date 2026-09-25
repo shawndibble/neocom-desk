@@ -6,7 +6,7 @@
   "homepage": "https://neocomdesk.com",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --project tsconfig.build.json && vite build",
+    "build": "tsc --project tsconfig.build.json && vite build && node scripts/check-sw.mjs",
     "preview": "vite preview",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
