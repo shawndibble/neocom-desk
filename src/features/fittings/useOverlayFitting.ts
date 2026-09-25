@@ -84,5 +84,6 @@ export function useOverlayFitting({
     [records]
   );
 
-  return { options, selectedId, select: setSelectedId, result };
+  // A since-deleted saved Fitting reads as no overlay rather than a blank pick.
+  return { options, selectedId: record ? selectedId : null, select: setSelectedId, result };
 }

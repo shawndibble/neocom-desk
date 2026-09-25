@@ -63,6 +63,12 @@ describe('turretHitChance', () => {
     expect(turretHitChance(turret, { signatureRadius: 8, velocity: 100 }, 1000)).toBeCloseTo(0.5);
   });
 
+  it('never hits a moving target with no tracking at all (never NaN)', () => {
+    const inert = { ...turret, tracking: 0, optimalSigRadius: 0 };
+    expect(turretHitChance(inert, { signatureRadius: 40, velocity: 100 }, 1000)).toBe(0);
+    expect(turretHitChance(inert, stationaryBig, 1000)).toBe(1);
+  });
+
   it('is 0 at distance 0 against a moving target and 1 against a still one (never NaN)', () => {
     expect(turretHitChance(turret, { signatureRadius: 40, velocity: 100 }, 0)).toBe(0);
     expect(turretHitChance(turret, stationaryBig, 0)).toBe(1);
@@ -160,7 +166,7 @@ describe('graphs', () => {
     expect(graphMaxRange([inputs([])])).toBe(0);
   });
 
-  it('finds the range a fit applies most at, first peak on a tie, 0 for nothing', () => {
+  it('finds the range a fit applies most at, the far end of a plateau, 0 for nothing', () => {
     expect(
       bestRange([
         { x: 0, dps: 0 },
@@ -168,7 +174,7 @@ describe('graphs', () => {
         { x: 2000, dps: 50 },
         { x: 3000, dps: 10 },
       ])
-    ).toBe(1000);
+    ).toBe(2000);
     expect(bestRange([])).toBe(0);
   });
 

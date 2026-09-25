@@ -67,7 +67,7 @@ export function turretHitChance(
 ): number {
   let trackingTerm = 0;
   if (target.velocity > 0) {
-    if (distance <= 0) return 0;
+    if (distance <= 0 || weapon.tracking <= 0) return 0;
     const angular = target.velocity / distance;
     trackingTerm = (angular * weapon.optimalSigRadius) / (weapon.tracking * target.signatureRadius);
   }
@@ -112,6 +112,7 @@ function weaponAppliedDps(
       return distance > weapon.range ? 0 : weapon.dps * missileApplication(weapon, target);
     case 'drone': {
       if (distance > droneControlRange) return 0;
+      // Pyfa's own threshold for "mobile": a sentry's speed reads 0.
       const keepsUp = weapon.speed > 1 && weapon.speed >= target.velocity;
       const hitChance = keepsUp ? 1 : turretHitChance(weapon, target, distance);
       return weapon.dps * turretDamageMultiplier(hitChance);
@@ -189,10 +190,15 @@ export function graphMaxRange(fits: readonly AppliedDpsInputs[]): number {
   return Math.ceil((reach * 1.1) / RANGE_ROUNDING) * RANGE_ROUNDING;
 }
 
-/** The range a sampled range graph peaks at — the first peak on a tie, 0 for an empty graph. */
+/**
+ * The range a sampled range graph peaks at, 0 for an empty graph. On a tie —
+ * a missile's or a keeping-up drone's flat line — the far end, so a speed
+ * graph worked out there isn't pinned at 0 m, where no turret ever hits a
+ * moving target.
+ */
 export function bestRange(points: readonly AppliedDpsPoint[]): number {
   let best: AppliedDpsPoint | null = null;
-  for (const point of points) if (best === null || point.dps > best.dps) best = point;
+  for (const point of points) if (best === null || point.dps >= best.dps) best = point;
   return best?.x ?? 0;
 }
 
