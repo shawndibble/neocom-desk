@@ -622,7 +622,7 @@ function ColonyRow({
     soonestPin === null || soonestExpiryMs === null
       ? '—'
       : soonestExpiryMs <= loadedAt
-        ? t('pi.expired')
+        ? t('pi.summary.stoppedLine', { product: soonestProductName })
         : t('pi.summary.expiryLine', {
             product: soonestProductName,
             duration: formatDuration((soonestExpiryMs - loadedAt) / 1000),

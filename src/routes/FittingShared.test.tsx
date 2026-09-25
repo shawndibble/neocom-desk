@@ -63,7 +63,7 @@ function renderAt(path: string) {
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/share/fitting" element={<FittingShared />} />
-        <Route path="/fittings" element={<div>fittings editor</div>} />
+        <Route path="/fittings/edit" element={<div>fittings editor</div>} />
       </Routes>
     </MemoryRouter>
   );

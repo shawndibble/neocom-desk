@@ -16,11 +16,13 @@
  * itself (exposed to fit checks/candidates) always stays the active
  * Character's own.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { db } from '@/db';
 import { saveFitting } from './myFittings';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useUrlParam } from '@/lib/useUrlState';
+import { FITTING_EDIT_PATH, fittingEditLocation } from './fittingRoutes';
 import { nullableTextParam } from '@/lib/urlState';
 import { decodeFittingShare, encodeFittingShare } from '@/engine/fitting/fittingShare';
 import { loadEveFitXmlEntry, type FittingXmlDocument } from '@/engine/import/eveFitXml';
@@ -137,7 +139,31 @@ export interface FittingWorkspace extends FittingEvaluation {
 }
 
 export function useFittingWorkspace(): FittingWorkspace {
-  const [shareCode, setShareCode] = useUrlParam('f', nullableTextParam());
+  const [shareCode] = useUrlParam('f', nullableTextParam());
+  const navigate = useNavigate();
+  const location = useLocation();
+  const locationRef = useRef(location);
+  useLayoutEffect(() => {
+    locationRef.current = location;
+  });
+  // Every open or edit writes the Fitting's Share Link to the editor's own
+  // path, so an open from the Start screen is a history entry Back returns
+  // to. `push: false` overwrites the current entry (an edit run coalescing,
+  // a Load's drone launch). Writing the URL already showing is a no-op.
+  const setShareCode = useCallback(
+    (code: string, { push = false }: { push?: boolean } = {}) => {
+      const now = locationRef.current;
+      if (now.pathname === FITTING_EDIT_PATH && new URLSearchParams(now.search).get('f') === code)
+        return;
+      // Only an entry already on the editor's path is ever overwritten: from
+      // anywhere else (the library, a too-large Fitting's `/fittings`) it is a
+      // new place, and replacing would erase the way Back.
+      void navigate(fittingEditLocation(code), {
+        replace: !push && now.pathname === FITTING_EDIT_PATH,
+      });
+    },
+    [navigate]
+  );
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
 
   const [fitting, setFitting] = useState<Fitting | null>(null);
@@ -282,7 +308,7 @@ export function useFittingWorkspace(): FittingWorkspace {
         // wrongly suppressing the *next* external change's reset.
         if (encoded.payload !== shareCode)
           ownWriteRef.current = { code: encoded.payload, fitting: null };
-        setShareCode(encoded.payload);
+        setShareCode(encoded.payload, { push: true });
       } else {
         latestFittingRef.current = loaded;
         setShareError(null);

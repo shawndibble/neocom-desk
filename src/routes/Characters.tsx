@@ -686,17 +686,33 @@ function buildColumns(
       render: (row) => {
         const attention = row.attention?.piAttention;
         if (attention === undefined) return '—';
-        const tone = STAT_CHIP_TONE_TEXT_CLASS[PI_ATTENTION_TONE[attention]];
         const expiryMs = row.attention?.piSoonestExpiryMs;
+        // Once expiry has passed, this always reads "Stopped" — never the
+        // cached `attention` category, which only refreshes on a roster
+        // reload and can still say `expiring-soon` well after the real
+        // clock has passed the expiry it was computed from.
+        if (expiryMs != null && expiryMs <= Date.now()) {
+          const stoppedTone = STAT_CHIP_TONE_TEXT_CLASS[PI_ATTENTION_TONE.idle];
+          return (
+            <Tooltip openOnTap content={formatTimestamp(new Date(expiryMs), timeZone)}>
+              <span
+                tabIndex={0}
+                className={`cursor-help underline decoration-dotted decoration-current/50 underline-offset-2 ${stoppedTone}`}
+              >
+                {t('pi.attention.idle')}
+              </span>
+            </Tooltip>
+          );
+        }
+        const tone = STAT_CHIP_TONE_TEXT_CLASS[PI_ATTENTION_TONE[attention]];
         // Some attention states have nothing currently extracting to count
         // down to (e.g. `decayed` with no program running at all) — those
-        // keep the categorical label; anything with a real expiry gets the
-        // countdown instead, which is strictly more useful than the label.
+        // keep the categorical label; anything with a real, future expiry
+        // gets the countdown instead, which is strictly more useful.
         if (expiryMs == null) {
           return <span className={tone}>{t(`pi.attention.${attention}`)}</span>;
         }
-        const label =
-          expiryMs <= Date.now() ? t('pi.expired') : formatDuration((expiryMs - Date.now()) / 1000);
+        const label = formatDuration((expiryMs - Date.now()) / 1000);
         return (
           <Tooltip openOnTap content={formatTimestamp(new Date(expiryMs), timeZone)}>
             <span
