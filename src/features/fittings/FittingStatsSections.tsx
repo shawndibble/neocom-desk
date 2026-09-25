@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CollapsiblePanel } from '@/components/ui';
+import { resistPct } from '@/engine/fittings/stats';
 import type { FittingStats, LayerDefense } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import type { DogmaAssetProgress } from './dogmaFittingEngine';
@@ -13,10 +14,6 @@ const DMG_RESIST_CLASS = {
 } as const;
 
 type DamageType = keyof typeof DMG_RESIST_CLASS;
-
-function resistPct(resonance: number): number {
-  return (1 - resonance) * 100;
-}
 
 function ResistBar({ type, resonance }: { type: DamageType; resonance: number }) {
   const { t } = useTranslation();
