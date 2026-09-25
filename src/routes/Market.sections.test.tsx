@@ -275,7 +275,7 @@ describe('Market Open Orders tab', () => {
     );
     window.history.pushState({}, '', '/market/orders');
     render(<App />);
-    expect(await screen.findByText(/no open orders cached/i)).toBeInTheDocument();
+    expect(await screen.findByText(/^no open orders$/i)).toBeInTheDocument();
   });
 
   it('shows a re-login prompt (not a silent empty state) when the orders scope was revoked', async () => {
@@ -296,7 +296,7 @@ describe('Market Open Orders tab', () => {
     // side by side (the old code was an if/else: reauth XOR empty/table).
     // See the report for the fix this needs; not something this test file
     // can paper over.
-    expect(screen.queryByText(/no open orders cached/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^no open orders$/i)).not.toBeInTheDocument();
   });
 });
 
@@ -334,7 +334,7 @@ describe('Market History tab', () => {
     window.history.pushState({}, '', '/market/history');
     render(<App />);
     expect(await screen.findByText('Log in again to see your orders')).toBeInTheDocument();
-    expect(screen.queryByText(/no order history cached/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^no order history$/i)).not.toBeInTheDocument();
   });
 });
 
