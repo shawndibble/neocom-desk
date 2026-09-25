@@ -55,20 +55,22 @@ export function newFitting(shipTypeId: number, name: string): Fitting {
  *
  * A charge-taking module doesn't land empty: it copies the charge another
  * fitted module of the same type already has loaded, or — with none fitted
- * yet — the first of `defaultChargeCandidates` (the caller's own
+ * yet — the first of `defaultChargeCandidates()` (the caller's own
  * allowed-charge list, since resolving one needs the dogma engine this pure
- * module never touches). Neither applies, it lands empty, same as before.
+ * module never touches). Lazy, so a sibling copy — the common case — never
+ * pays for a candidate list it won't use. Neither applies, it lands empty,
+ * same as before.
  */
 export function addModule(
   fitting: Fitting,
   slot: FittingSlotKind,
   slotIndex: number,
   typeId: number,
-  defaultChargeCandidates: readonly number[] = []
+  defaultChargeCandidates: () => readonly number[] = () => []
 ): Fitting {
   const chargeTypeId =
     fitting.modules.find((module) => module.typeId === typeId && module.chargeTypeId !== undefined)
-      ?.chargeTypeId ?? defaultChargeCandidates[0];
+      ?.chargeTypeId ?? defaultChargeCandidates()[0];
   const modules = fitting.modules.filter((module) => !isAt(module, slot, slotIndex));
   modules.push({
     slot,
@@ -81,7 +83,7 @@ export function addModule(
   return { ...fitting, modules };
 }
 
-/** Swaps in a sibling variant, keeping state and charge — unlike `addModule`, which discards both for "put something new here". A charge/state the variant can't reach is left for recalculation to lower, same tolerance `ModuleRow` gives a stale charge. */
+/** Swaps in a sibling variant, keeping state and the exact charge that was loaded — unlike `addModule`'s charge, which is a fresh default, not a carry-over. A charge/state the variant can't reach is left for recalculation to lower, same tolerance `ModuleRow` gives a stale charge. */
 export function swapModuleType(
   fitting: Fitting,
   slot: FittingSlotKind,

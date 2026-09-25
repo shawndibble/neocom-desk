@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   addDrones,
   addDronesWithinBay,
@@ -72,17 +72,19 @@ describe('addModule', () => {
   });
 
   it('falls back to the first default-charge candidate when no sibling has one', () => {
-    const next = addModule(base, 'medium', 0, 438, [77, 88]);
+    const next = addModule(base, 'medium', 0, 438, () => [77, 88]);
     expect(next.modules.find((m) => m.slot === 'medium' && m.slotIndex === 0)?.chargeTypeId).toBe(
       77
     );
   });
 
-  it('prefers a sibling copy over the default-charge candidates', () => {
-    const next = addModule(base, 'medium', 0, 2889, [999]);
+  it('prefers a sibling copy over the default-charge candidates, without asking for them', () => {
+    const candidates = vi.fn(() => [999]);
+    const next = addModule(base, 'medium', 0, 2889, candidates);
     expect(next.modules.find((m) => m.slot === 'medium' && m.slotIndex === 0)?.chargeTypeId).toBe(
       185
     );
+    expect(candidates).not.toHaveBeenCalled();
   });
 
   it('stays chargeless with no sibling charge and no candidates', () => {

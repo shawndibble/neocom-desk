@@ -242,7 +242,7 @@ function FittingsPage() {
    * narrowed to what the hull and skills accept, alphabetical to match the
    * Charges tab's own ordering (issue #1728's "first charge listed").
    */
-  function defaultChargeCandidates(rack: FittingSlotKind, typeId: number): number[] {
+  function resolveDefaultChargeCandidates(rack: FittingSlotKind, typeId: number): number[] {
     if (
       fitting === null ||
       !workspace.engineReady ||
@@ -253,7 +253,9 @@ function FittingsPage() {
     }
     const groupIds = chargeGroupIdsFor(fitting.shipTypeId, rack, typeId);
     if (groupIds.length === 0) return [];
-    const candidates = groupIds.flatMap((id) => catalogue.typeIdsByGroup.get(id) ?? []);
+    const candidates = [
+      ...new Set(groupIds.flatMap((id) => catalogue.typeIdsByGroup.get(id) ?? [])),
+    ];
     const accepted = checkCharges(
       fitting.shipTypeId,
       { slot: rack, typeId },
@@ -284,7 +286,9 @@ function FittingsPage() {
       const slotIndex =
         onTarget && target.kind === 'slot' ? target.slotIndex : firstFreeSlotIndex(f, rack, count);
       if (slotIndex === null) return f;
-      const next = addModule(f, rack, slotIndex, typeId, defaultChargeCandidates(rack, typeId));
+      const next = addModule(f, rack, slotIndex, typeId, () =>
+        resolveDefaultChargeCandidates(rack, typeId)
+      );
       if (onTarget) {
         const free = firstFreeSlotIndex(next, rack, count);
         after.target = free === null ? null : { kind: 'slot', slot: rack, slotIndex: free };
@@ -423,7 +427,9 @@ function FittingsPage() {
             isDesktop
               ? (rack, index, typeId) =>
                   edit((f) =>
-                    addModule(f, rack, index, typeId, defaultChargeCandidates(rack, typeId))
+                    addModule(f, rack, index, typeId, () =>
+                      resolveDefaultChargeCandidates(rack, typeId)
+                    )
                   )
               : undefined
           }
