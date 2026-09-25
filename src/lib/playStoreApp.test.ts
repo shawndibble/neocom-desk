@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { PLAY_STORE_PACKAGE, detectPlayStoreApp } from './playStoreApp';
+import {
+  PLAY_STORE_PACKAGE,
+  androidNotificationSettingsUrl,
+  detectPlayStoreApp,
+} from './playStoreApp';
 
 function store(initial: Record<string, string> = {}) {
   const data = new Map(Object.entries(initial));
@@ -44,5 +48,15 @@ describe('detectPlayStoreApp', () => {
     };
     expect(detectPlayStoreApp(`android-app://${PLAY_STORE_PACKAGE}`, broken)).toBe(true);
     expect(detectPlayStoreApp('', broken)).toBe(false);
+  });
+});
+
+describe('androidNotificationSettingsUrl', () => {
+  it('targets the shell activity by scheme and package, falling back to the given page', () => {
+    expect(androidNotificationSettingsUrl('https://neocomdesk.com/settings?tab=a&b=1')).toBe(
+      'intent://notification-settings#Intent;scheme=neocomdesk;' +
+        `package=${PLAY_STORE_PACKAGE};` +
+        'S.browser_fallback_url=https%3A%2F%2Fneocomdesk.com%2Fsettings%3Ftab%3Da%26b%3D1;end'
+    );
   });
 });

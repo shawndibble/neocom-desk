@@ -3,6 +3,20 @@ export const PLAY_STORE_PACKAGE = 'com.neocomdesk.app';
 
 const STORAGE_KEY = 'playStoreApp';
 
+/**
+ * Chrome won't open Android's settings screens from a page, so the shell ships
+ * its own BROWSABLE activity that does (scripts/twa/NotificationSettingsActivity.java).
+ * A shell without it (version code 2 and older) takes Chrome to the fallback,
+ * i.e. back to the page the tap came from.
+ */
+export function androidNotificationSettingsUrl(fallbackUrl: string): string {
+  return (
+    'intent://notification-settings#Intent;scheme=neocomdesk;' +
+    `package=${PLAY_STORE_PACKAGE};` +
+    `S.browser_fallback_url=${encodeURIComponent(fallbackUrl)};end`
+  );
+}
+
 interface FlagStore {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
