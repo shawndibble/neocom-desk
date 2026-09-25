@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
+import { FITTING_EDIT_PATH, FITTINGS_PATH } from '@/features/fittings/fittingRoutes';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { formatIskCompact } from '@/lib/isk';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useTranslation } from 'react-i18next';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Button, Disclosure, Modal, PageHeader, Panel, SlideOver, Tabs } from '@/components/ui';
 import { AddRow } from '@/components/ui/icons';
 import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
@@ -95,6 +96,18 @@ const FINE_POINTER_QUERY = '(hover: hover) and (pointer: fine)';
  * sheet. On a pointer, browser items drag straight onto the Ring.
  */
 export function Fittings() {
+  const { pathname, search } = useLocation();
+  const hasCode = (new URLSearchParams(search).get('f') ?? '') !== '';
+  const path = pathname.replace(/\/$/, '');
+  // Every Share Link ever copied is `/fittings?f=`; an open Fitting lives at
+  // its own path, and the editor's path with no Fitting is just the library.
+  if (path === FITTINGS_PATH && hasCode)
+    return <Navigate to={{ pathname: FITTING_EDIT_PATH, search }} replace />;
+  if (path === FITTING_EDIT_PATH && !hasCode) return <Navigate to={FITTINGS_PATH} replace />;
+  return <FittingsPage />;
+}
+
+function FittingsPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();

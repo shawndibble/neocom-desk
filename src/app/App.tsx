@@ -131,6 +131,7 @@ const ROUTE_ELEMENTS = {
   '/industry/plans/:planId': <IndustryPlanPage />,
   '/industry/groups/:groupId': <IndustryGroupPage />,
   '/fittings': <Fittings />,
+  '/fittings/edit': <Fittings />,
   '/fittings/compare': <FittingCompare />,
   '/market': <Market />,
   '/wallet': <Wallet />,

@@ -125,7 +125,7 @@ export function FittingShared() {
   // A visitor with a Character never gets the All-V view — the same link
   // opens in the editor, under their own pilot (CONTEXT.md **Share Link**).
   if (characterCount > 0) {
-    return <Navigate to={`/fittings?f=${encodeURIComponent(code)}`} replace />;
+    return <Navigate to={`/fittings/edit?f=${encodeURIComponent(code)}`} replace />;
   }
 
   const returnPath = `/fittings?f=${encodeURIComponent(code)}`;
