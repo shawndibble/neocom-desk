@@ -34,6 +34,24 @@ export function ContextMenuItem({
   return <ContextMenuPrimitive.Item className={cx(menuItemClassName, className)} {...props} />;
 }
 
+export const ContextMenuRadioGroup = ContextMenuPrimitive.RadioGroup;
+
+/** One of a set of choices, the current one ticked — as `DropdownMenuCheckboxItem` marks its own. */
+export function ContextMenuRadioItem({
+  className,
+  children,
+  ...props
+}: ComponentProps<typeof ContextMenuPrimitive.RadioItem>) {
+  return (
+    <ContextMenuPrimitive.RadioItem className={cx(menuItemClassName, className)} {...props}>
+      <span aria-hidden="true" className="inline-block w-3 text-center">
+        <ContextMenuPrimitive.ItemIndicator>✓</ContextMenuPrimitive.ItemIndicator>
+      </span>
+      {children}
+    </ContextMenuPrimitive.RadioItem>
+  );
+}
+
 export function ContextMenuSeparator({
   className,
   ...props

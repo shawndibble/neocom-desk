@@ -9,6 +9,7 @@ import {
   droneGroups,
   setDroneCountWithinBay,
   type DroneBay,
+  reachableModuleStates,
   removeModule,
   setCargoQuantity,
   setDroneCounts,
@@ -32,8 +33,6 @@ import { checkCharges } from './dogmaFittingEngine';
 import type { AddTarget } from './addTarget';
 import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
-
-const STATES: readonly FittingItemState[] = ['offline', 'online', 'active', 'overload'];
 
 const RACK_LABEL_CLASS =
   'mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
@@ -157,8 +156,7 @@ export function ModuleRow({
   // asks for "active" everywhere, which a passive module or rig runs online.
   const maxState = result?.maxState ?? 'overload';
   const shownState = result?.state ?? module.state;
-  const states = STATES.slice(0, STATES.indexOf(maxState) + 1);
-  if (!states.includes(shownState)) states.push(shownState);
+  const states = reachableModuleStates(maxState, shownState);
 
   const chargeGroupIds = result?.chargeGroupIds;
   const charges = useMemo(() => {

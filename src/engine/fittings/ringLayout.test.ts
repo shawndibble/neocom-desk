@@ -11,6 +11,7 @@ import {
   arcPath,
   buildRingSlots,
   gaugeArc,
+  hardpointPipAngles,
   ringGhostIndices,
   ringPoint,
   ringSlotAngle,
@@ -187,5 +188,26 @@ describe('arcPath', () => {
 
   it('takes the long way round past half a turn, offset to the centre given', () => {
     expect(arcPath(0, 270, 10, 5, 5)).toBe('M5.0 -5.0A10 10 0 1 1 -5.0 5.0');
+  });
+});
+
+describe('hardpointPipAngles', () => {
+  it('runs turrets out left from 12 o’clock and launchers out right', () => {
+    const turrets = hardpointPipAngles('turret', 3);
+    const launchers = hardpointPipAngles('launcher', 2);
+    expect(turrets).toHaveLength(3);
+    expect(launchers).toHaveLength(2);
+    for (const angle of turrets) expect(angle).toBeLessThan(0);
+    for (const angle of launchers) expect(angle).toBeGreaterThan(0);
+    expect(turrets[0]).toBeGreaterThan(turrets[1]);
+    expect(launchers[0]).toBeLessThan(launchers[1]);
+  });
+
+  it('fits eight of each in the top gap, clear of the calibration and bandwidth bands', () => {
+    const all = [...hardpointPipAngles('turret', 8), ...hardpointPipAngles('launcher', 8)];
+    for (const angle of all) {
+      expect(angle).toBeGreaterThan(RING_GAUGES.calibration.to);
+      expect(angle).toBeLessThan(RING_GAUGES.droneBandwidth.from);
+    }
   });
 });

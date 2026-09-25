@@ -11,6 +11,7 @@ import { resolveFittingShareView } from '@/features/fittings/resolveFittingShare
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
+import { useFittingHardpoints } from '@/features/fittings/useFittingHardpoints';
 import { useFittingEvaluation } from '@/features/fittings/useFittingEvaluation';
 import { fittingToEft } from '@/engine/fittings/eftExport';
 import { FITTING_SLOT_KINDS } from '@/engine/fittings/types';
@@ -100,6 +101,7 @@ export function FittingShared() {
     profile: readyProfile,
     implantBasis: 'fitting',
   });
+  const hardpointsUsed = useFittingHardpoints(readyFitting);
 
   useEffect(() => {
     if (readyFitting === null) return;
@@ -180,6 +182,7 @@ export function FittingShared() {
             fitting={state.fitting}
             stats={stats}
             moduleResults={stats?.modules ?? null}
+            hardpointsUsed={hardpointsUsed}
           />
           <FittingStatsSections
             stats={stats}

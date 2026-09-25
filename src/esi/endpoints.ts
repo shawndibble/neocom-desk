@@ -305,6 +305,8 @@ export interface UniverseType {
   volume?: number;
   /** Absent for types with no dogma (most non-item types). */
   dogma_attributes?: DogmaAttribute[];
+  /** The type's dogma effects — e.g. `turretFitted` (42) / `launcherFitted` (40) on a weapon. */
+  dogma_effects?: { effect_id: number; is_default: boolean }[];
 }
 
 export function getUniverseType(

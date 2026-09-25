@@ -205,6 +205,22 @@
       "gauge": "{{label}}: {{value}} ({{percent}}%)",
       "gaugeOver": "{{label}}: {{value}} ({{percent}}%), over by {{amount}}",
       "gaugeLoading": "{{label}}: calculating…",
+      "menu": {
+        "state": {
+          "offline": "Offline",
+          "online": "Online",
+          "active": "Active",
+          "overload": "Overheat"
+        },
+        "unload": "Unload {{name}}",
+        "info": "Show info",
+        "variations": "Swap for a variation…",
+        "remove": "Remove {{name}}"
+      },
+      "hardpoints": {
+        "turret": "Turret hardpoints: {{used}} of {{total}} used",
+        "launcher": "Launcher hardpoints: {{used}} of {{total}} used"
+      },
       "cargoTile": "{{name}} ×{{quantity}}",
       "rackHint": "Tap a rack to edit its slots",
       "droneCount": "{{inSpace}} launched · {{inBay}} in bay",
@@ -285,6 +301,16 @@
       "moreSave": "More save options",
       "moreActions": "Fitting actions",
       "savedInMyFittings": "Saved in My Fittings"
+    },
+    "alpha": {
+      "ok": "Alpha OK",
+      "omega": "Omega only",
+      "okTooltip": "An Alpha clone can train every skill this fit needs.",
+      "omegaTooltip": "Needs an Omega clone — an Alpha can't train:",
+      "capped": "{{skill}} {{level}} (Alpha max {{max}})",
+      "untrainable": "{{skill}} {{level}} (Alphas can’t train it)",
+      "more_one": "and {{count}} more",
+      "more_other": "and {{count}} more"
     },
     "phoneTabs": {
       "stats": "Stats",

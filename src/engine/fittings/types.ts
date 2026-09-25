@@ -157,6 +157,8 @@ export interface FittingStats {
   /** Mbit/s one drone of each type in the Fitting draws, whether launched or not. */
   droneBandwidthByType: Record<number, number>;
   droneCapacity: number;
+  /** The hull's turret and launcher hardpoints; what the high slots take is `countHardpoints`. */
+  hardpoints: { turrets: number; launchers: number };
   ehp: number;
   capacitor: CapacitorStatus;
   capacitorCapacity: number;
@@ -316,6 +318,10 @@ export const DOGMA_ATTRIBUTE = {
   mass: 4,
   // The warp speed is base × multiplier: the base (1281) is 1 on every hull,
   // and the hull's own speed — plus any rig's bonus — is in the multiplier.
+  // The hull's hardpoints: every one it has — the engine never subtracts
+  // what is fitted (verified 2026-09-25: a Rifter reads 3 and 2 bare or armed).
+  turretHardpoints: 102,
+  launcherHardpoints: 101,
   baseWarpSpeed: 1281,
   warpSpeedMultiplier: 600,
   droneBandwidth: 1271,
