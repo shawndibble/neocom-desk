@@ -12,10 +12,10 @@ import { OverviewTab } from '@/features/miningTax/OverviewTab';
  * module/component name stays `MoonMiningTax`/`miningTax` (decision doc
  * `20260905-215631`), a label/structure change only. The route *path* that
  * doc kept at `/moon-mining` moved again under #1304, to `/mining` with its
- * tabs as path segments (`/mining/tax`, `/mining/overview`) — #1304's own
+ * tabs as path segments (`/mining/overview`, `/mining/tax`) — #1304's own
  * decision doc supersedes only that path call, not the module-naming one.
- * `Tax` (default) is the unchanged rent/tax ledger; `Overview` is the new
- * personal-output stats tab. The two tabs load independent data, so each
+ * `Overview` (default, and first in the bar) is the personal-output stats
+ * tab; `Tax` is the rent/tax ledger. The two tabs load independent data, so each
  * owns its own fetch/refresh lifecycle rather than sharing one snapshot —
  * this shell only resolves the active Character gate they'd otherwise each
  * repeat.
@@ -57,15 +57,15 @@ export function MoonMiningTax() {
       value={tab}
       onChange={(id) => setTab(id as typeof tab)}
       tabs={[
-        { id: 'tax', label: t('miningTax.taxTab') },
         { id: 'overview', label: t('miningTax.overviewTab') },
+        { id: 'tax', label: t('miningTax.taxTab') },
       ]}
     />
   );
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      {tab === 'tax' ? <TaxTab tabBar={tabBar} /> : <OverviewTab tabBar={tabBar} />}
+      {tab === 'overview' ? <OverviewTab tabBar={tabBar} /> : <TaxTab tabBar={tabBar} />}
     </div>
   );
 }

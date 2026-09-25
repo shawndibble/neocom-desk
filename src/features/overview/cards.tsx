@@ -164,7 +164,7 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
     <BoardCard
       title={t('overview.board.miningTax')}
       meta={<SeverityWord severity={miningTaxSeverity(data)} />}
-      to="/mining"
+      to="/mining/tax"
       openLabel={t('overview.board.open')}
       footer={
         data === null
