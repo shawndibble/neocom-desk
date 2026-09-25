@@ -33,7 +33,8 @@ const ZKILL = /zkillboard\.com\/kill\/(\d+)/i;
 const ESI_KILL = /\/killmails\/(\d+)\/([0-9a-f]{40})/i;
 
 function classifyPlain(text: string): LoadInput {
-  const trimmed = text.trim();
+  // eveship.fit may tag the payload with its kind (`dna:587:…`).
+  const trimmed = text.trim().replace(/^dna:(?=\d)/i, '');
   if (EFT_HEADER.test(trimmed)) return { kind: 'eft', text: trimmed };
   if (DNA.test(trimmed)) return { kind: 'dna', dna: trimmed };
   const chat = DNA_IN_TEXT.exec(trimmed);

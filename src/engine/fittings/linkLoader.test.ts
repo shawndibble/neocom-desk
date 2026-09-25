@@ -38,6 +38,13 @@ describe('classifyLoadInput', () => {
     });
   });
 
+  it('tolerates a dna: tag on an eveship.fit link', () => {
+    expect(classifyLoadInput('https://eveship.fit/?fit=dna:587:100;1::')).toEqual({
+      kind: 'dna',
+      dna: '587:100;1::',
+    });
+  });
+
   it('reads EFT out of an eveship.fit link', () => {
     const eft = '[Rifter, x]\n125mm Gatling AutoCannon I';
     const url = `https://eveship.fit/?fit=${encodeURIComponent(eft)}`;
