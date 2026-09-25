@@ -7,7 +7,13 @@ import wasmInit, {
 } from '@eveshipfit/dogma-engine';
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
-import { extractFittingStats, extractModuleResult } from '@/engine/fittings/stats';
+import {
+  extractFittingStats,
+  extractModuleResult,
+  extractOffense,
+  extractOverheatedStats,
+  type OffenseItem,
+} from '@/engine/fittings/stats';
 import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import {
   ITEM_DOGMA_ATTRIBUTE,
@@ -149,7 +155,8 @@ export async function computeFittingStats(
   fitting: Fitting,
   profile: PilotProfile,
   onProgress?: (progress: DogmaAssetProgress) => void,
-  damageProfile?: DamageProfile
+  damageProfile?: DamageProfile,
+  { overheated: withOverheated = true }: { overheated?: boolean } = {}
 ): Promise<FittingStats> {
   await loadDogmaEngine(onProgress);
   const dogmaFit = fittingToDogmaFit(fitting, profile, damageProfile);
@@ -182,13 +189,65 @@ export async function computeFittingStats(
   // `fittingToDogmaFit` puts the modules first, so module i is items[i].
   const modules = fitting.modules.map((_, index) => extractModuleResult(calculation.items[index]));
 
+  // Overheated values come from the engine itself (its overload state), not
+  // a multiplier applied here: the same fit again with every active module
+  // that can overheat set to overload. Skipped when there is none, so a fit
+  // with nothing to overheat costs one calculation and shows no overheated line.
+  // Callers that never show heat (the variations diff) opt out of the cost.
+  const heatable = dogmaFit.items.map(
+    (_, index) =>
+      index < fitting.modules.length &&
+      calculation.items[index]?.max_state === 'overload' &&
+      calculation.items[index]?.state === 'active'
+  );
+  const overheatedCalculation =
+    withOverheated && heatable.includes(true)
+      ? calculate({
+          ...dogmaFit,
+          items: dogmaFit.items.map((item, index) =>
+            heatable[index] ? { ...item, state: 'overload' } : item
+          ),
+        })
+      : null;
+
+  // Drones follow the modules in `dogmaFit.items`.
+  const offenseItems: OffenseItem[] = [
+    ...fitting.modules.map((module) => ({
+      typeId: module.typeId,
+      chargeTypeId: module.chargeTypeId,
+      quantity: 1,
+      isDrone: false,
+    })),
+    ...fitting.drones.map((drone) => ({
+      typeId: drone.typeId,
+      quantity: drone.quantity,
+      isDrone: true,
+    })),
+  ];
+  const offense = extractOffense(
+    offenseItems,
+    calculation.items,
+    overheatedCalculation?.items ?? null
+  );
+  const overheated = overheatedCalculation
+    ? extractOverheatedStats(overheatedCalculation.ship.attributes)
+    : null;
+
   const applied = extractAppliedDpsInputs(
     dogmaFit.items,
     calculation.items,
     calculation.character.attributes
   );
 
-  return { ...baseStats, calibrationUsed, droneBandwidthUsed, modules, applied };
+  return {
+    ...baseStats,
+    calibrationUsed,
+    droneBandwidthUsed,
+    modules,
+    offense,
+    overheated,
+    applied,
+  };
 }
 
 export interface CandidateCheck {
