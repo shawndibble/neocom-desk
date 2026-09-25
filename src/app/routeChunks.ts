@@ -26,12 +26,21 @@ type RouteModule = { default: ComponentType };
  * Route files use named exports, and `lazy()` wants `{ default }`: re-shape
  * the module here rather than giving every route file a default export. The
  * `import()` stays a literal at each call site — that is what Rollup splits on.
+ *
+ * A module of `undefined` means the chunk failed and `main.tsx`'s
+ * `vite:preloadError` handler cancelled the failure to reload the page — Vite's
+ * preload helper then resolves `undefined` instead of rejecting. Stay pending
+ * so the route's Suspense fallback holds until the reload lands, rather than
+ * throwing into its error boundary for a moment first.
  */
-function named<K extends string>(
+export function named<K extends string>(
   importer: () => Promise<Record<K, ComponentType>>,
   key: K
 ): () => Promise<RouteModule> {
-  return () => importer().then((m) => ({ default: m[key] }));
+  return () =>
+    importer().then((m: Record<K, ComponentType> | undefined) =>
+      m ? { default: m[key] } : new Promise<never>(() => {})
+    );
 }
 
 export const loadCharacters = named(() => import('@/routes/Characters'), 'Characters');
