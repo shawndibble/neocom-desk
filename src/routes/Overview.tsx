@@ -502,12 +502,14 @@ export function Overview() {
       />
 
       {/*
-        Two columns: the domain cards, and alerts beside them at full height.
+        Two columns from `xl`: the domain cards, and alerts beside them at full
+        height. Below `xl` the sidebar leaves the cards too little width beside
+        an alerts column (#1680), so alerts stack under them instead.
         `items-start` is deliberately absent — the grid's default `stretch` is
         what gives the cards in one row a common bottom edge, and a pair at
         different heights reads as one of them having failed to load.
       */}
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="grid min-w-0 gap-3 sm:grid-cols-2">
           {/* Every card renders unconditionally, mid-load included. Gating one
               on its own data would make "still loading" and "nothing here"

@@ -27,3 +27,47 @@ test('board card "Open" link meets the 44px touch floor at 390px', async ({ page
   expect(box).not.toBeNull();
   expect(box!.height).toBeGreaterThanOrEqual(44);
 });
+
+// Issue #1680: the cards|alerts split keys off the viewport, not the width the
+// sidebar leaves, so it starts at `xl` — below that the cards take the full row.
+for (const size of [
+  { width: 1024, height: 768 },
+  { width: 1180, height: 900 },
+]) {
+  test(`board cards do not truncate and alerts stack below at ${size.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(size);
+    await signInAndGoto(page, './overview');
+    const opens = page.getByRole('link', { name: 'Open' });
+    await expect(opens.first()).toBeVisible();
+
+    const truncated = await page.locator('main').evaluate((main) =>
+      [...main.querySelectorAll<HTMLElement>('*')]
+        .filter((el) => el.children.length === 0 && el.scrollWidth > el.clientWidth + 1)
+        .filter((el) => getComputedStyle(el).textOverflow === 'ellipsis')
+        .map((el) => el.textContent)
+    );
+    expect(truncated).toEqual([]);
+
+    const alerts = await page.getByText('Alerts', { exact: true }).first().boundingBox();
+    const firstCard = await opens.first().boundingBox();
+    expect(alerts!.y).toBeGreaterThan(firstCard!.y);
+  });
+}
+
+for (const width of [1280, 1440]) {
+  test(`alerts column sits right of the cards at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await signInAndGoto(page, './overview');
+    const opens = page.getByRole('link', { name: 'Open' });
+    await expect(opens.first()).toBeVisible();
+
+    let cardsRight = 0;
+    for (const box of await Promise.all((await opens.all()).map((l) => l.boundingBox()))) {
+      cardsRight = Math.max(cardsRight, box!.x + box!.width);
+    }
+    const alerts = await page.getByText('Alerts', { exact: true }).first().boundingBox();
+    expect(alerts!.x).toBeGreaterThan(cardsRight);
+  });
+}
