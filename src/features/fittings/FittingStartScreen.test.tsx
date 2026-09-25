@@ -129,7 +129,7 @@ describe('FittingStartScreen', () => {
     const rifter = (
       await within(list).findByRole('heading', { name: 'Rifter' }, { timeout: 5000 })
     ).closest('section') as HTMLElement;
-    expect(within(rifter).getByText('Kite')).toBeInTheDocument();
+    expect(await within(rifter).findByText('Kite')).toBeInTheDocument();
     expect(within(rifter).getByText('PvP Rifter')).toBeInTheDocument();
     expect(within(list).getByText('Armor Drake')).toBeInTheDocument();
   });
@@ -189,6 +189,24 @@ describe('FittingStartScreen', () => {
   it('opens Import by itself when a share link is already broken on arrival', async () => {
     renderScreen({ ...makeWorkspace(), shareError: 'invalid' });
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('Enter on a row opens it and the arrow keys walk the list', async () => {
+    const workspace = renderScreen();
+    await userEvent.click(await screen.findByRole('button', { name: /Armor Drake/ }));
+    await userEvent.keyboard('{ArrowDown}');
+    expect(screen.getByText('preview of Kite')).toBeInTheDocument();
+    await userEvent.keyboard('{Enter}');
+    expect(workspace.openSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }));
+  });
+
+  it('tags In-game rows as well as saved ones, so a fitting in both shows which is which', async () => {
+    renderScreen();
+    const inGameRow = await screen.findByRole('button', { name: /PvP Rifter/ });
+    expect(within(inGameRow).getByText('In-game')).toBeInTheDocument();
+    expect(
+      within(await screen.findByRole('button', { name: /Kite/ })).getByText('Saved')
+    ).toBeInTheDocument();
   });
 
   it('opens the hull search from New from hull', async () => {
