@@ -824,6 +824,7 @@
     "emptyHint": "Reconnect to fetch this character's trained skills.",
     "offlineTitle": "Showing cached data",
     "sp": "{{value}} SP",
+    "trainingChip": "Training → {{level}} · {{time}}",
     "levelOfFive": "Level {{level}} of 5",
     "searchPlaceholder": "Search skills…",
     "noResults": "No skills match your search.",

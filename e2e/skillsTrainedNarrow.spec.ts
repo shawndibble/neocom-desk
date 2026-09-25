@@ -14,6 +14,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { CHARACTER_ID, SKILL } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
@@ -103,4 +104,42 @@ test('trained-skill row keeps its 28px pointer height at and above md (1280px)',
   const row = await caldariFrigateRow(page);
   const height = await row.evaluate((el) => el.getBoundingClientRect().height);
   expect(height).toBeCloseTo(28, 0);
+});
+
+/**
+ * The skill in the live queue's training slot carries a "Training → IV · 4d 4h"
+ * chip on its Trained row (#1724). The queue is seeded by a `page.route`
+ * override registered before sign-in — the boot prefetch caches whatever it
+ * first sees (see planQueueImport.spec.ts).
+ */
+test('the in-progress skill shows a Training chip at 390px, and no other row does', async ({
+  page,
+}) => {
+  const day = 86_400_000;
+  await page.route(`**/characters/${CHARACTER_ID}/skillqueue`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          skill_id: SKILL.smallHybridTurret,
+          finished_level: 4,
+          queue_position: 0,
+          start_date: new Date(Date.now() - day).toISOString(),
+          finish_date: new Date(Date.now() + 4 * day + 4 * 3_600_000 + 60_000).toISOString(),
+        },
+      ]),
+    })
+  );
+  await gotoTrainedSkills(page);
+  await page.setViewportSize(PHONE);
+
+  await page.getByRole('button', { name: /^Gunnery/ }).click();
+  const chip = page.getByText(/^Training → IV · 4d 4h$/);
+  await expect(chip).toBeVisible();
+  await expect(page.getByText(/^Training →/)).toHaveCount(1);
+
+  const box = await chip.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x + box!.width).toBeLessThanOrEqual(PHONE.width);
 });

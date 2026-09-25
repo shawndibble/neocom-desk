@@ -36,10 +36,11 @@ import {
   loadUniverseType,
 } from '@/features/skills/data';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
+import { formatCountdown } from '@/lib/duration';
 import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
 import { filterSkillGroups } from '@/features/skills/skillGroupFilter';
-import type { CompletedLevel } from '@/features/skills/queueStatus';
+import { classifySkillQueue, type CompletedLevel } from '@/features/skills/queueStatus';
 import type { CachedResult } from '@/features/skills/data';
 import { stripEveMarkup, typeDescription } from '@/features/skills/typeDisplay';
 import { extractAttributeBonuses, sumAttributeBonuses } from '@/features/skills/dogma';
@@ -79,6 +80,8 @@ interface Snapshot {
    * render stays free of a clock.
    */
   completedLevels: Map<number, CompletedLevel>;
+  /** The level training right now (queue head, still in the future), or null. Null too when the queue was skipped or is paused. */
+  training: { skillTypeID: number; targetLevel: number; secondsRemaining: number } | null;
   /** SP those credited levels add to ESI's total_sp, which is stale by the same amount. */
   completedSp: number;
   /** Older of /skills' and the queue's fetchedAt — the true freshness of the corrected total. */
@@ -99,7 +102,21 @@ async function loadSkillsSnapshot(
     loadCharacterImplants(characterId),
     loadSkillCatalog(),
   ]);
-  const { skillsResult, skillsNeedsReauth, completedLevels, completedSp, fetchedAt } = corrected;
+  const { skillsResult, skillsNeedsReauth, completedLevels, completedSp, fetchedAt, queueResult } =
+    corrected;
+  // `classifySkillQueue`'s own "training" row, the same one the Characters
+  // page reads — not a second definition of "in progress".
+  const trainingRow = classifySkillQueue(queueResult?.data ?? [], Date.now()).find(
+    (row) => row.status === 'training'
+  );
+  const training =
+    trainingRow && trainingRow.secondsRemaining !== null
+      ? {
+          skillTypeID: trainingRow.entry.skill_id,
+          targetLevel: trainingRow.entry.finished_level,
+          secondsRemaining: trainingRow.secondsRemaining,
+        }
+      : null;
 
   // Already superseded: skip the per-implant type lookups, their results would
   // be discarded.
@@ -126,6 +143,7 @@ async function loadSkillsSnapshot(
     skillsResult,
     skillsNeedsReauth,
     attributesResult,
+    training,
     completedLevels,
     completedSp,
     fetchedAt,
@@ -136,6 +154,8 @@ async function loadSkillsSnapshot(
 }
 
 const GROUP_SEARCH_PARAM = textParam();
+
+const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 
 /** Trained skills for the active character: grouped by SDE group, with SP + attributes/implants. */
 export function Skills() {
@@ -151,6 +171,7 @@ export function Skills() {
   const skillsNeedsReauth = data?.skillsNeedsReauth ?? false;
   const attributesResult = data?.attributesResult ?? null;
   const completedLevels = data?.completedLevels ?? null;
+  const training = data?.training ?? null;
   const completedSp = data?.completedSp ?? 0;
   const fetchedAt = data?.fetchedAt ?? null;
   const implantDetails = data?.implantDetails ?? [];
@@ -448,6 +469,14 @@ export function Skills() {
                               }`}
                             >
                               <span className="flex-1 truncate">{skill.name}</span>
+                              {training?.skillTypeID === skill.skillTypeID && (
+                                <span className="shrink-0 rounded-xs border border-line bg-panel-2 px-1.5 text-[0.6875rem] whitespace-nowrap text-accent tabular-nums">
+                                  {t('skills.trainingChip', {
+                                    level: ROMAN[training.targetLevel - 1] ?? training.targetLevel,
+                                    time: formatCountdown(training.secondsRemaining),
+                                  })}
+                                </span>
+                              )}
                               <SkillBar level={skill.level} progress={progress} />
                               <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
                                 {skill.sp === null
