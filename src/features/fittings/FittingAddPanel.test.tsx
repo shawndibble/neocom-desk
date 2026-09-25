@@ -91,6 +91,40 @@ describe('FittingAddPanel', () => {
     expect(onAdd).toHaveBeenCalledWith(2, 'low');
   });
 
+  it('says when Can fly hid the search matches, and one tap shows them', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(
+        ids.map((id) => [id, { fitsHull: true, canFly: id !== 2, fitsResources: true }])
+      );
+    });
+    renderPanel({ target: null });
+
+    await screen.findByRole('button', { name: 'Can fly' });
+    await user.type(screen.getByLabelText('Search items to add'), 'Damage Control II');
+    expect(screen.queryByText('No matching items.')).toBeInTheDocument();
+    await user.click(
+      await screen.findByRole('button', { name: '1 more hidden by Can fly — show it' })
+    );
+    expect(await screen.findByRole('button', { name: /Damage Control II/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /hidden by Can fly/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps the plain no-results wording when nothing matches at all', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(
+        ids.map((id) => [id, { fitsHull: true, canFly: id !== 2, fitsResources: true }])
+      );
+    });
+    renderPanel({ target: null });
+
+    await screen.findByRole('button', { name: 'Can fly' });
+    await user.type(screen.getByLabelText('Search items to add'), 'zzzz');
+    expect(screen.getByText('No matching items.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /hidden by Can fly/ })).not.toBeInTheDocument();
+  });
+
   it('browses only the groups holding something that fits the hull', async () => {
     checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
       return new Map(

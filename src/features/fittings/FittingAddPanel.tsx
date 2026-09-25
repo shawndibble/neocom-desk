@@ -198,6 +198,27 @@ export function FittingAddPanel({
     const include = browseFilter(catalogue, { tab, slotRack, metaGroupId, hullFit, canFlyOnly });
     return browserTree(catalogue.marketTypes, include, catalogue.groupsById);
   }, [catalogue, trimmed, tab, slotRack, metaGroupId, hullFit, canFlyOnly]);
+  // What "Can fly" is hiding for this search/browse: the items that pass every
+  // other filter but not the skills one. Nothing to count once it's off.
+  const hiddenByCanFly = useMemo(() => {
+    if (catalogue === null || hullFit === null || !canFlyOnly) return 0;
+    const base = { tab, slotRack, metaGroupId, hullFit };
+    const shown = browseFilter(catalogue, { ...base, canFlyOnly: true });
+    const all = browseFilter(catalogue, { ...base, canFlyOnly: false });
+    return catalogue.marketTypes.filter(
+      (entry) => all(entry) && !shown(entry) && entry.name.toLowerCase().includes(trimmed)
+    ).length;
+  }, [catalogue, trimmed, tab, slotRack, metaGroupId, hullFit, canFlyOnly]);
+  const hiddenNote =
+    hiddenByCanFly > 0 ? (
+      <button
+        type="button"
+        className="min-h-11 text-left text-xs text-accent underline-offset-2 hover:underline md:min-h-9"
+        onClick={() => setCanFlyOnly(false)}
+      >
+        {t('fittings.add.hiddenByCanFly', { count: hiddenByCanFly })}
+      </button>
+    ) : null;
   // The market roots ("Ship Equipment", …) are a click nobody needs: the
   // browser starts at their categories, as the game's does. A few categories
   // (a chosen slot narrows it this far) start open; a click flips any node.
@@ -362,14 +383,26 @@ export function FittingAddPanel({
             <p className="text-xs text-text-dim">{t('fittings.add.loadingCatalogue')}</p>
           ) : trimmed !== '' ? (
             results.length === 0 ? (
-              <p className="text-xs text-text-dim">{t('fittings.add.noResults')}</p>
+              <>
+                <p className="text-xs text-text-dim">{t('fittings.add.noResults')}</p>
+                {hiddenNote}
+              </>
             ) : (
-              <ul>{results.map(row)}</ul>
+              <>
+                <ul>{results.map(row)}</ul>
+                {hiddenNote}
+              </>
             )
           ) : hullFit !== null && tree.length === 0 ? (
-            <p className="text-xs text-text-dim">{t('fittings.add.noResults')}</p>
+            <>
+              <p className="text-xs text-text-dim">{t('fittings.add.noResults')}</p>
+              {hiddenNote}
+            </>
           ) : (
-            <ul>{top.map((node) => branch(node, 0))}</ul>
+            <>
+              <ul>{top.map((node) => branch(node, 0))}</ul>
+              {hiddenNote}
+            </>
           )}
         </>
       )}
