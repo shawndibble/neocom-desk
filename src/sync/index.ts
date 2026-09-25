@@ -55,6 +55,12 @@ export async function markBuildPlansDeleted(characterId: number, planIds: string
   return markBuildPlansDeleted(characterId, planIds);
 }
 
+/** Fitting analogue of markPlanDeleted — same tombstone semantics (issue #1538). */
+export async function markFittingDeleted(characterId: number, fittingId: string): Promise<void> {
+  const { markFittingDeleted } = await import('./planSync');
+  return markFittingDeleted(characterId, fittingId);
+}
+
 /** Payee analogue of markPlanDeleted — same tombstone semantics (issue #523). */
 export async function markPayeeDeleted(characterId: number, payeeId: string): Promise<void> {
   const { markPayeeDeleted } = await import('./planSync');

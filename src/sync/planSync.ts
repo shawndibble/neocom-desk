@@ -40,6 +40,7 @@ import {
   type SkillPlanRecord,
   type StationPinRecord,
   type PayeeRecord,
+  type FittingRecord,
   type MiningTaxAssignmentRecord,
 } from '@/db';
 import { normalizeMaterialSourcingMap } from '@/engine/industry/sourcing';
@@ -65,6 +66,7 @@ import {
   stationPinTombstonesKey,
   planetRichnessTombstonesKey,
   payeeTombstonesKey,
+  fittingTombstonesKey,
   miningTaxAssignmentTombstonesKey,
   productionOrderWatchTombstonesKey,
   productionRunTombstonesKey,
@@ -92,6 +94,7 @@ import {
   type RemoteStationPinDoc,
   type RemotePlanetRichnessDoc,
   type RemotePayeeDoc,
+  type RemoteFittingDoc,
   type RemoteMiningTaxAssignmentDoc,
   type RemoteProductionOrderWatchDoc,
   type RemoteProductionRunDoc,
@@ -239,6 +242,13 @@ export async function markBuildPlansDeleted(characterId: number, planIds: string
 export async function markPayeeDeleted(characterId: number, payeeId: string): Promise<void> {
   await recordDeletion(characterId, payeeId, payeeTombstonesKey(characterId), () =>
     db.payees.delete(payeeId)
+  );
+}
+
+/** Fitting analogue of markPlanDeleted — same tombstone semantics (issue #1538). */
+export async function markFittingDeleted(characterId: number, fittingId: string): Promise<void> {
+  await recordDeletion(characterId, fittingId, fittingTombstonesKey(characterId), () =>
+    db.fittings.delete(fittingId)
   );
 }
 
@@ -486,6 +496,7 @@ async function handleOwnerHashChange(character: CharacterRecord): Promise<void> 
     await db.productionSaleLinks.where('characterId').equals(character.characterId).delete();
     await db.productionOrderWatches.where('characterId').equals(character.characterId).delete();
     await db.payees.where('characterId').equals(character.characterId).delete();
+    await db.fittings.where('characterId').equals(character.characterId).delete();
     await db.miningTaxAssignments.where('characterId').equals(character.characterId).delete();
     await writeTombstones(planTombstonesKey(character.characterId), []);
     await writeTombstones(buildPlanTombstonesKey(character.characterId), []);
@@ -496,6 +507,7 @@ async function handleOwnerHashChange(character: CharacterRecord): Promise<void> 
     await writeTombstones(productionSaleLinkTombstonesKey(character.characterId), []);
     await writeTombstones(productionOrderWatchTombstonesKey(character.characterId), []);
     await writeTombstones(payeeTombstonesKey(character.characterId), []);
+    await writeTombstones(fittingTombstonesKey(character.characterId), []);
     await writeTombstones(miningTaxAssignmentTombstonesKey(character.characterId), []);
     // The new owner's docs can carry an `updatedAt` below the previous owner's
     // high-water mark, so a surviving cursor would hide them entirely.
@@ -1011,6 +1023,30 @@ const planetRichnessSpec: CollectionSpec<PlanetRichnessRecord, RemotePlanetRichn
   },
 };
 
+const fittingSpec: CollectionSpec<FittingRecord, RemoteFittingDoc> = {
+  name: 'fittings',
+  tombstoneKey: fittingTombstonesKey,
+  loadLocal: (characterId) => db.fittings.where('characterId').equals(characterId).toArray(),
+  toRemoteDoc: (f, ownerHash) => ({
+    id: f.id,
+    characterId: f.characterId,
+    name: f.name,
+    code: f.code,
+    updatedAt: f.updatedAt,
+    ownerHash,
+    deleted: false,
+  }),
+  toLocalRecord: (r) => ({
+    id: r.id,
+    characterId: r.characterId,
+    name: r.name,
+    code: r.code,
+    updatedAt: r.updatedAt,
+  }),
+  bulkPutLocal: (records) => db.fittings.bulkPut(records),
+  bulkDeleteLocal: (ids) => db.fittings.bulkDelete(ids),
+};
+
 const payeeSpec: CollectionSpec<PayeeRecord, RemotePayeeDoc> = {
   name: 'payees',
   tombstoneKey: payeeTombstonesKey,
@@ -1447,6 +1483,7 @@ async function syncCharacter(characterId: number): Promise<void> {
   await syncEditableCollection(productionSaleLinkSpec, ctx);
   await syncEditableCollection(productionOrderWatchSpec, ctx);
   await syncEditableCollection(payeeSpec, ctx);
+  await syncEditableCollection(fittingSpec, ctx);
   await syncEditableCollection(miningTaxAssignmentSpec, ctx);
   await syncFeed(ctx);
 

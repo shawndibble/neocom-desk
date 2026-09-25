@@ -9,7 +9,7 @@
  * `unresolved` rather than being dropped silently, same as `eftLoader.ts`.
  */
 import {
-  FITTING_SLOT_KINDS,
+  sortFittingModules,
   type Fitting,
   type FittingCargoItem,
   type FittingDrone,
@@ -77,19 +77,11 @@ export function esiFittingToFitting(esiFitting: EsiCharacterFitting): {
     unresolved.push({ flag: item.flag, typeId: item.type_id });
   }
 
-  // Same canonical order as eftLoader.ts: FITTING_SLOT_KINDS order, slot index
-  // ascending within each rack.
-  modules.sort(
-    (a, b) =>
-      FITTING_SLOT_KINDS.indexOf(a.slot) - FITTING_SLOT_KINDS.indexOf(b.slot) ||
-      a.slotIndex - b.slotIndex
-  );
-
   return {
     fitting: {
       name: esiFitting.name,
       shipTypeId: esiFitting.ship_type_id,
-      modules,
+      modules: sortFittingModules(modules),
       drones,
       cargo,
     },

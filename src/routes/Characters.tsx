@@ -1148,17 +1148,14 @@ export function Characters() {
               as the wait it explains is actually happening.
             */}
             {characters.length > 0 && (
-              <Tooltip content={t('characters.refreshAllHint')}>
-                <Button
-                  size="md"
-                  onClick={() => void handleRefreshAll()}
-                  aria-disabled={refreshingAll || undefined}
-                  className="aria-disabled:cursor-default aria-disabled:opacity-40"
-                >
-                  {refreshingAll ? <Spinner size="sm" /> : <Icon.Refresh />}
-                  {refreshingAll ? t('characters.refreshingAll') : t('characters.refreshAll')}
-                </Button>
-              </Tooltip>
+              <IconButton
+                label={refreshingAll ? t('characters.refreshingAll') : t('characters.refreshAll')}
+                tooltip={`${t('characters.refreshAll')}. ${t('characters.refreshAllHint')}`}
+                icon={refreshingAll ? <Spinner size="sm" /> : <Icon.Refresh />}
+                onClick={() => void handleRefreshAll()}
+                aria-disabled={refreshingAll || undefined}
+                className="aria-disabled:cursor-default aria-disabled:opacity-40"
+              />
             )}
             {/*
               The add-a-character branch, not a re-auth: SSO decides who comes
@@ -1168,20 +1165,23 @@ export function Characters() {
               adding several alts with one hand-picked grant stays one click each.
             */}
             <div className="flex">
-              <Button
-                variant="primary"
-                size="md"
-                className="rounded-r-none"
-                onClick={() => void beginAddCharacterLogin()}
-              >
-                {t('characters.add')}
-              </Button>
+              <Tooltip content={t('characters.add')}>
+                <Button
+                  variant="primary"
+                  size="md"
+                  className="rounded-r-none"
+                  aria-label={t('characters.add')}
+                  onClick={() => void beginAddCharacterLogin()}
+                >
+                  <Icon.AddCharacter />
+                </Button>
+              </Tooltip>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="primary"
                     size="md"
-                    className="rounded-l-none border-l-0 px-2"
+                    className="rounded-l-none border-l-accent-contrast/30 px-1!"
                     aria-label={t('characters.addMenuLabel')}
                   >
                     <Icon.Expanded aria-hidden="true" />

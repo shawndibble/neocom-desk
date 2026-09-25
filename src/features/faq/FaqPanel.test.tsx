@@ -27,6 +27,7 @@ const COLLECTION_TO_ITEM: Readonly<Record<(typeof REMOTE_COLLECTIONS)[number], s
   stationPins: 'stationPins',
   planetRichness: 'piPicks',
   payees: 'miningTax',
+  fittings: 'fittings',
   miningTaxAssignments: 'miningTax',
   settings: 'settings',
   notificationFeed: 'notificationFeed',

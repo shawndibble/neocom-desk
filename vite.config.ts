@@ -53,6 +53,7 @@ const DOM_TS_TESTS = [
   'src/features/industry/useDetectedOwnedStock.test.ts',
   'src/features/industry/useMarketSnapshot.test.ts',
   'src/features/industry/useRunCountsByPlan.test.ts',
+  'src/features/fittings/useModuleVariations.test.ts',
   'src/features/market/useAppraisal.test.ts',
   'src/features/market/useCompareAttributes.test.ts',
   'src/features/market/useCompareRows.test.ts',

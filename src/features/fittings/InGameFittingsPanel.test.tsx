@@ -73,6 +73,41 @@ describe('InGameFittingsPanel', () => {
     );
   });
 
+  it("opens what it can and surfaces a note for items it can't map (fighter bay, service slot)", async () => {
+    useEndpointsGrantedMock.mockReturnValue(true);
+    loadInGameFittingsMock.mockResolvedValue({
+      cached: {
+        data: [
+          cachedFitting({
+            items: [
+              { flag: 'HiSlot0', quantity: 1, type_id: 484 },
+              { flag: 'FighterBay', quantity: 1, type_id: 99 },
+            ],
+          }),
+        ],
+        fetchedAt: new Date(),
+        fromCache: false,
+        truncated: false,
+      },
+      needsReauth: false,
+    });
+    const onOpen = vi.fn();
+    render(<InGameFittingsPanel characterId={1} onOpen={onOpen} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Open' }));
+
+    expect(onOpen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        modules: [{ slot: 'high', slotIndex: 0, typeId: 484, state: 'active' }],
+      })
+    );
+    expect(
+      await screen.findByText(
+        '1 item from "PvP Rifter" couldn\'t be loaded (fighter bay or service slot).'
+      )
+    ).toBeInTheDocument();
+  });
+
   it('shows an empty state when the Character has no in-game Fittings', async () => {
     useEndpointsGrantedMock.mockReturnValue(true);
     loadInGameFittingsMock.mockResolvedValue({

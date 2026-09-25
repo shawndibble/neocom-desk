@@ -530,6 +530,21 @@ export interface NotificationFeedRecord {
 }
 
 /**
+ * A saved Fitting in My Fittings (issue #1538): just the Share Link payload
+ * and a name — everything else is recomputed from the code on open. Per
+ * Character like every other Editable Data record, so `characterId` rides
+ * along as the sync key.
+ */
+export interface FittingRecord {
+  id: string;
+  characterId: number;
+  name: string;
+  /** The Fitting's share code (`encodeFittingShare`), not a URL. */
+  code: string;
+  updatedAt: number;
+}
+
+/**
  * A Payee (CONTEXT.md, issue #523): who the Moon Mining Tax ledger owes —
  * user-managed, per-character (like `BuildPlanRecord`). The moon/system tag
  * is what lets a future entry auto-suggest this Payee and its rate — "pick
@@ -863,6 +878,7 @@ export const db = new Dexie('neocom') as Dexie & {
   productionSaleLinks: EntityTable<ProductionSaleLinkRecord, 'id'>;
   productionOrderWatches: EntityTable<ProductionOrderWatchRecord, 'id'>;
   payees: EntityTable<PayeeRecord, 'id'>;
+  fittings: EntityTable<FittingRecord, 'id'>;
   miningTaxAssignments: EntityTable<MiningTaxAssignmentRecord, 'id'>;
   orderProblemSamples: EntityTable<OrderProblemSampleRecord, 'orderId'>;
   mailDrafts: EntityTable<MailDraftRecord, 'id'>;
@@ -1178,4 +1194,29 @@ db.version(16).stores({
   mailDrafts: 'id, characterId',
   miningLedgerHistory: 'characterId',
   jitaPriceSnapshots: 'date',
+});
+
+// Adds My Fittings (issue #1538): saved Fitting share codes, synced.
+db.version(17).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: null,
+  orderProblemSamples: 'orderId, characterId',
+  mailDrafts: 'id, characterId',
+  miningLedgerHistory: 'characterId',
+  jitaPriceSnapshots: 'date',
+  fittings: 'id, characterId',
 });

@@ -104,6 +104,8 @@ export interface ModuleRowProps extends EditContext {
   result: FittingModuleResult | null;
   /** The active Character lacks the skills for it. */
   cantUse: boolean;
+  /** List view only — Ring opens the same panel via its own slot click; absent inside that panel's own Modal, which needs no further affordance. */
+  onOpenVariations?: (slot: FittingSlotKind, slotIndex: number) => void;
 }
 
 export function ModuleRow({
@@ -115,6 +117,7 @@ export function ModuleRow({
   engineReady,
   profile,
   edit,
+  onOpenVariations,
 }: ModuleRowProps) {
   const { t } = useTranslation();
   const name = typeName(catalogue, module.typeId);
@@ -146,7 +149,17 @@ export function ModuleRow({
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-xs bg-panel-2 p-1.5">
       <TypeIcon typeId={typeId} size={32} width={24} height={24} />
-      <span className="min-w-0 flex-1 truncate text-xs">{name}</span>
+      {onOpenVariations ? (
+        <button
+          type="button"
+          className="min-w-0 flex-1 truncate text-left text-xs text-accent underline-offset-2 hover:underline"
+          onClick={() => onOpenVariations(slot, slotIndex)}
+        >
+          {name}
+        </button>
+      ) : (
+        <span className="min-w-0 flex-1 truncate text-xs">{name}</span>
+      )}
       {cantUse && (
         <span className="shrink-0 rounded-xs border border-danger px-1 text-[0.6875rem] font-semibold text-danger">
           {t('fittings.list.cantUse')}
@@ -282,6 +295,7 @@ interface FittingRackListProps extends EditContext {
   onSelectTarget: (target: AddTarget) => void;
   /** `moduleKey`s the active Character lacks the skills for. */
   unusableModuleKeys?: ReadonlySet<string>;
+  onOpenVariations?: (slot: FittingSlotKind, slotIndex: number) => void;
   implantBasis: ImplantBasis;
   canUseCloneBasis: boolean;
   onImplantBasisChange: (basis: ImplantBasis) => void;
@@ -306,6 +320,7 @@ export function FittingRackList({
   target,
   onSelectTarget,
   unusableModuleKeys,
+  onOpenVariations,
   implantBasis,
   canUseCloneBasis,
   onImplantBasisChange,
@@ -384,6 +399,7 @@ export function FittingRackList({
                         module={entry.module}
                         result={moduleResults?.[entry.index] ?? null}
                         cantUse={unusableModuleKeys?.has(moduleKey(entry.module)) ?? false}
+                        onOpenVariations={onOpenVariations}
                       />
                     );
                   }

@@ -4,7 +4,7 @@
  * `/fittings` route (`routeScopes.ts`) — Load (EFT paste), stats and editing
  * all work with no grant at all, same reasoning as Clones' `ReauthBanner`.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -18,7 +18,11 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
-import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
+import {
+  esiFittingToFitting,
+  type EsiFittingUnresolvedItem,
+} from '@/engine/fittings/esiFittingMapper';
+import { groupByHull, type MyFittingRow } from '@/engine/fittings/myFittings';
 import type { Fitting } from '@/engine/fittings/types';
 import type { CachedResult } from '@/esi/cache';
 import type { CharacterFitting } from '@/esi/endpoints';
@@ -37,13 +41,26 @@ export function InGameFittingsPanel({ characterId, onOpen }: InGameFittingsPanel
   const [hullNames, setHullNames] = useState<ReadonlyMap<number, string>>(new Map());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  // The most recent Open's dropped items (FighterBay/ServiceSlot — carriers,
+  // structures — this app has no rack for), so a partial Load says so instead
+  // of silently opening short.
+  const [openUnresolved, setOpenUnresolved] = useState<{
+    name: string;
+    items: EsiFittingUnresolvedItem[];
+  } | null>(null);
+
+  // Guards a Character switch mid-fetch: a stale response landing after a
+  // newer request started must not overwrite what that newer request set.
+  const requestIdRef = useRef(0);
 
   async function refresh() {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(false);
     try {
       const { cached } = await loadInGameFittings(characterId);
       const types = await loadTypes();
+      if (requestId !== requestIdRef.current) return;
       const names = new Map<number, string>();
       for (const fitting of cached?.data ?? []) {
         if (!names.has(fitting.ship_type_id)) {
@@ -56,32 +73,39 @@ export function InGameFittingsPanel({ characterId, onOpen }: InGameFittingsPanel
       setResult(cached);
       setHullNames(names);
     } catch {
-      setError(true);
+      if (requestId === requestIdRef.current) setError(true);
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }
 
   useEffect(() => {
+    requestIdRef.current++;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new Character/grant, not a render-time derivation
     setResult(null);
     setError(false);
+    setOpenUnresolved(null);
     if (granted === true) void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh() reads characterId via closure; a Character switch is the only thing that should re-fetch.
   }, [characterId, granted]);
 
-  const fittings = result?.data ?? [];
-  const groupOrder: number[] = [];
-  const groups = new Map<number, CharacterFitting[]>();
-  for (const fitting of fittings) {
-    const list = groups.get(fitting.ship_type_id);
-    if (list) {
-      list.push(fitting);
-    } else {
-      groups.set(fitting.ship_type_id, [fitting]);
-      groupOrder.push(fitting.ship_type_id);
-    }
+  function handleOpen(fitting: CharacterFitting) {
+    const { fitting: mapped, unresolved } = esiFittingToFitting(fitting);
+    setOpenUnresolved(unresolved.length > 0 ? { name: fitting.name, items: unresolved } : null);
+    onOpen(mapped);
   }
+
+  const fittings = result?.data ?? [];
+  const groups = useMemo(() => {
+    const rows: (MyFittingRow & { fitting: CharacterFitting })[] = fittings.map((fitting) => ({
+      id: String(fitting.fitting_id),
+      name: fitting.name,
+      hull: hullNames.get(fitting.ship_type_id) ?? `Type ${fitting.ship_type_id}`,
+      fitting,
+    }));
+    return groupByHull(rows);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `fittings` is a stable derivation of `result`; depending on `result` avoids recomputing on every render.
+  }, [result, hullNames]);
 
   return (
     <Panel
@@ -118,20 +142,22 @@ export function InGameFittingsPanel({ characterId, onOpen }: InGameFittingsPanel
         <EmptyState title={t('fittings.inGame.emptyTitle')} hint={t('fittings.inGame.emptyHint')} />
       ) : (
         <div className="space-y-3">
-          {groupOrder.map((shipTypeId) => (
-            <div key={shipTypeId}>
-              <p className="mb-1 text-xs font-semibold text-text-dim uppercase">
-                {hullNames.get(shipTypeId) ?? `Type ${shipTypeId}`}
-              </p>
+          {openUnresolved && (
+            <p role="alert" className="text-xs text-warning">
+              {t('fittings.inGame.unresolvedNote', {
+                count: openUnresolved.items.length,
+                name: openUnresolved.name,
+              })}
+            </p>
+          )}
+          {groups.map((group) => (
+            <div key={group.hull ?? ''}>
+              <p className="mb-1 text-xs font-semibold text-text-dim uppercase">{group.hull}</p>
               <ul className="space-y-1">
-                {(groups.get(shipTypeId) ?? []).map((fitting) => (
-                  <li key={fitting.fitting_id} className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm">{fitting.name}</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => onOpen(esiFittingToFitting(fitting).fitting)}
-                    >
+                {group.rows.map((row) => (
+                  <li key={row.id} className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm">{row.name}</span>
+                    <Button size="sm" variant="ghost" onClick={() => handleOpen(row.fitting)}>
                       {t('fittings.inGame.openAction')}
                     </Button>
                   </li>

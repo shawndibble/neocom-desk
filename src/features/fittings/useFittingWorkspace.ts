@@ -17,6 +17,8 @@
  * (exposed to fit checks/candidates) always stays the active Character's own.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { db } from '@/db';
+import { saveFitting } from './myFittings';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useUrlParam } from '@/lib/useUrlState';
 import { nullableTextParam } from '@/lib/urlState';
@@ -101,6 +103,17 @@ export interface FittingWorkspace {
   /** Skills and implants the stats and fit checks use; null while loading. */
   profile: PilotProfile | null;
   price: Appraisal | null;
+  /** The saved record the open Fitting came from, so Save updates it. */
+  savedId: string | null;
+  /** Saving needs a Character and a Fitting small enough to have a share code. */
+  canSave: boolean;
+  /**
+   * The explicit "Save to My Fittings": the only thing here that writes
+   * Dexie. Updates the record the Fitting was opened from, else adds one.
+   */
+  save: () => Promise<void>;
+  /** Opens a saved Fitting by its share code, under its saved name. */
+  openSaved: (record: { id: string; name: string; code: string }) => void;
 }
 
 export function useFittingWorkspace(): FittingWorkspace {
@@ -111,6 +124,7 @@ export function useFittingWorkspace(): FittingWorkspace {
   const [shareError, setShareError] = useState<ShareDecodeError | null>(null);
   const [unresolved, setUnresolved] = useState<EftUnresolvedItem[]>([]);
   const [tooLargeToShare, setTooLargeToShare] = useState(false);
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   const [stats, setStats] = useState<{ fitting: Fitting; stats: FittingStats } | null>(null);
   const [statsProgress, setStatsProgress] = useState<DogmaAssetProgress | null>(null);
@@ -133,6 +147,10 @@ export function useFittingWorkspace(): FittingWorkspace {
   // decoding its own write back into an identical copy (which would
   // recalculate stats twice per click).
   const ownWriteRef = useRef<{ code: string; fitting: Fitting | null } | null>(null);
+  // A saved Fitting being opened: the decode effect names the Fitting after
+  // it (the share code carries no name) and keeps `savedId` for it.
+  const savingRef = useRef(false);
+  const pendingOpenRef = useRef<{ code: string; name: string } | null>(null);
 
   // The Fitting the next edit applies to: the latest edit's result even before
   // its async encode has landed, so two fast clicks don't both start from the
@@ -150,7 +168,11 @@ export function useFittingWorkspace(): FittingWorkspace {
     let cancelled = false;
     const own = ownWriteRef.current;
     ownWriteRef.current = null;
+    const pending = pendingOpenRef.current;
+    pendingOpenRef.current = null;
     if (own?.code !== shareCode) {
+      // Anything but an edit or a saved-Fitting open is a different Fitting.
+      if (pending?.code !== shareCode) setSavedId(null);
       setUnresolved([]);
       setTooLargeToShare(false);
       // Back/Forward or a pasted link ends any coalescing run: the next edit
@@ -188,7 +210,8 @@ export function useFittingWorkspace(): FittingWorkspace {
         setFitting(null);
         return;
       }
-      const name = await hullName(decoded.value.hullTypeId);
+      const name =
+        pending?.code === shareCode ? pending.name : await hullName(decoded.value.hullTypeId);
       if (cancelled) return;
       const opened = shareToFitting(decoded.value, name);
       latestFittingRef.current = opened;
@@ -232,6 +255,7 @@ export function useFittingWorkspace(): FittingWorkspace {
       const result = loadEftFitting(text, typeByName, slotByTypeId);
       setUnresolved(result.unresolved);
       if (result.hullTypeId === null) return;
+      setSavedId(null);
 
       const name = await hullName(result.hullTypeId);
       const loaded = eftResultToFitting(result, name);
@@ -243,6 +267,7 @@ export function useFittingWorkspace(): FittingWorkspace {
   const openFitting = useCallback(
     async (loaded: Fitting) => {
       setUnresolved([]);
+      setSavedId(null);
       await commitFitting(loaded);
     },
     [commitFitting]
@@ -280,6 +305,51 @@ export function useFittingWorkspace(): FittingWorkspace {
         ownWriteRef.current = { code: encoded.payload, fitting: next };
         setShareCode(encoded.payload, { push: !coalesce });
       })();
+    },
+    [setShareCode]
+  );
+
+  const canSave = activeCharacterId !== null && fitting !== null && !tooLargeToShare;
+
+  const save = useCallback(async () => {
+    const current = latestFittingRef.current;
+    if (activeCharacterId === null || current === null) return;
+    // Encoded now rather than read from the URL, which lags an edit until its
+    // own async encode lands.
+    if (savingRef.current) return;
+    savingRef.current = true;
+    try {
+      const encoded = await encodeFittingShare(fittingToShareInput(current));
+      if (!encoded.ok) return;
+      // The record may have been deleted from the list since it was opened;
+      // then this is a new save. A live one keeps its name, which the list
+      // may have renamed since the Fitting was opened.
+      const existing = savedId === null ? undefined : await db.fittings.get(savedId);
+      const updating = existing?.characterId === activeCharacterId ? existing : undefined;
+      const record = await saveFitting(activeCharacterId, {
+        ...(updating ? { id: updating.id } : {}),
+        name: updating?.name ?? current.name,
+        code: encoded.payload,
+      });
+      setSavedId(record.id);
+    } finally {
+      savingRef.current = false;
+    }
+  }, [activeCharacterId, savedId]);
+
+  // A saved record belongs to one Character.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new Character, not a render-time derivation
+    setSavedId(null);
+  }, [activeCharacterId]);
+
+  const openSaved = useCallback(
+    (record: { id: string; name: string; code: string }) => {
+      pendingOpenRef.current = { code: record.code, name: record.name };
+      setSavedId(record.id);
+      setUnresolved([]);
+      setTooLargeToShare(false);
+      setShareCode(record.code, { push: true });
     },
     [setShareCode]
   );
@@ -398,5 +468,9 @@ export function useFittingWorkspace(): FittingWorkspace {
     engineReady,
     profile,
     price,
+    savedId,
+    canSave,
+    save,
+    openSaved,
   };
 }

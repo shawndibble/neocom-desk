@@ -25,7 +25,7 @@ import { parseEftFit, type EftItem } from '@/engine/import/eftFit';
 import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
 import type { FittingSlotAssignment } from '@/sde/types';
 import {
-  FITTING_SLOT_KINDS,
+  sortFittingModules,
   type Fitting,
   type FittingCargoItem,
   type FittingDrone,
@@ -150,16 +150,9 @@ export function loadEftFitting(
     }
   }
 
-  // Deterministic order: FITTING_SLOT_KINDS' canonical order, slot index
-  // ascending within each — the same order the List view's racks render in,
-  // regardless of the order sections happened to appear in the pasted text.
-  modules.sort(
-    (a, b) =>
-      FITTING_SLOT_KINDS.indexOf(a.slot) - FITTING_SLOT_KINDS.indexOf(b.slot) ||
-      a.slotIndex - b.slotIndex
-  );
-
-  return { hullTypeId, modules, drones, cargo, unresolved };
+  // Deterministic order regardless of the order sections happened to appear
+  // in the pasted text — the same order the List view's racks render in.
+  return { hullTypeId, modules: sortFittingModules(modules), drones, cargo, unresolved };
 }
 
 /** Assembles a `Fitting` from a successful `EftLoadResult`, plus the name a Share Link can't carry. */

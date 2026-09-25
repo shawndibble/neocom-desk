@@ -59,6 +59,16 @@ export function addModule(
   return { ...fitting, modules };
 }
 
+/** Swaps in a sibling variant, keeping state and charge — unlike `addModule`, which discards both for "put something new here". A charge/state the variant can't reach is left for recalculation to lower, same tolerance `ModuleRow` gives a stale charge. */
+export function swapModuleType(
+  fitting: Fitting,
+  slot: FittingSlotKind,
+  slotIndex: number,
+  typeId: number
+): Fitting {
+  return updateModule(fitting, slot, slotIndex, (module) => ({ ...module, typeId }));
+}
+
 export function removeModule(fitting: Fitting, slot: FittingSlotKind, slotIndex: number): Fitting {
   return {
     ...fitting,

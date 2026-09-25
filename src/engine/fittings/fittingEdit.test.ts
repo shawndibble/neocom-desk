@@ -8,6 +8,7 @@ import {
   setDroneCounts,
   setModuleCharge,
   setModuleState,
+  swapModuleType,
 } from './fittingEdit';
 import type { Fitting } from './types';
 
@@ -69,6 +70,29 @@ describe('setModuleState / setModuleCharge', () => {
     const unloaded = setModuleCharge(base, 'high', 0, null).modules[0];
     expect(unloaded).toEqual({ slot: 'high', slotIndex: 0, typeId: 2889, state: 'active' });
     expect('chargeTypeId' in unloaded).toBe(false);
+  });
+});
+
+describe('swapModuleType', () => {
+  it('changes only the addressed module type, keeping its state and charge', () => {
+    const next = swapModuleType(base, 'high', 0, 3001);
+    expect(next.modules[0]).toEqual({
+      slot: 'high',
+      slotIndex: 0,
+      typeId: 3001,
+      state: 'active',
+      chargeTypeId: 185,
+    });
+    expect(next.modules[1]).toBe(base.modules[1]);
+  });
+
+  it('is a no-op for an empty slot', () => {
+    expect(swapModuleType(base, 'medium', 0, 438).modules).toEqual(base.modules);
+  });
+
+  it('does not mutate its input', () => {
+    swapModuleType(base, 'high', 0, 3001);
+    expect(base.modules[0].typeId).toBe(2889);
   });
 });
 

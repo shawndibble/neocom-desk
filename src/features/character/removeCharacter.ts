@@ -50,6 +50,7 @@ export async function removeCharacter(
   await db.stationPins.where('characterId').equals(characterId).delete();
   await db.planetRichness.where('characterId').equals(characterId).delete();
   await db.payees.where('characterId').equals(characterId).delete();
+  await db.fittings.where('characterId').equals(characterId).delete();
   await db.miningTaxAssignments.where('characterId').equals(characterId).delete();
   await db.orderProblemSamples.where('characterId').equals(characterId).delete();
   await db.mailDrafts.where('characterId').equals(characterId).delete();
