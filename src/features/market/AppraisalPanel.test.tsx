@@ -214,6 +214,16 @@ describe('AppraisalPanel', () => {
       expect(screen.queryByText('You receive, listing')).not.toBeInTheDocument();
     });
 
+    it('notes the net chips are always priced at 100% market when Price % differs (issue #1748)', () => {
+      renderPanel({ controller: controller({ result: netOutcome() }) }); // default pricePercent: 90
+      expect(screen.getByText(/always priced at 100% market/i)).toBeInTheDocument();
+    });
+
+    it('hides the 100%-market note once Price % is already 100 (issue #1748)', () => {
+      renderPanel({ pricePercent: 100, controller: controller({ result: netOutcome() }) });
+      expect(screen.queryByText(/always priced at 100% market/i)).not.toBeInTheDocument();
+    });
+
     it('wraps whole chips in the totals strip rather than scrolling sideways', () => {
       renderPanel({ controller: controller({ result: netOutcome() }) });
       const strip = screen.getByText('You receive, selling now').closest('.flex-wrap');
