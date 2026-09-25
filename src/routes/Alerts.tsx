@@ -23,6 +23,7 @@ import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import {
+  Button,
   EmptyState,
   FilterBar,
   FilterChip,
@@ -45,6 +46,7 @@ import { DEADLINE_SEVERITIES, type DeadlineSeverity } from '@/engine/severity';
 import { AlertGroupRow } from '@/features/notifications/AlertGroupRow';
 import { alertGroupLabel, groupAlertsByType } from '@/features/notifications/alertGroups';
 import {
+  EMPTY_ALERTS_FILTER,
   activeAlertsFilterCount,
   filterAlertGroups,
   type DisplayAlertGroup,
@@ -334,6 +336,13 @@ export function Alerts() {
             title={groups.length === 0 ? t('alerts.empty') : t('alerts.noMatches')}
             hint={groups.length === 0 ? t('alerts.emptyHint') : t('alerts.noMatchesHint')}
             className="py-6"
+            action={
+              groups.length > 0 && activeAlertsFilterCount(filter) > 0 ? (
+                <Button size="sm" onClick={() => setFilter(EMPTY_ALERTS_FILTER)}>
+                  {t('common.resetFilters')}
+                </Button>
+              ) : undefined
+            }
           />
         ) : (
           <ul className="-mx-3 divide-y divide-line">

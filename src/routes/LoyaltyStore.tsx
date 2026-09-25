@@ -513,6 +513,18 @@ export function LoyaltyStore() {
         <EmptyState
           title={rows.length === 0 ? t('loyaltyStore.emptyTitle') : t('loyaltyStore.noMatchTitle')}
           hint={rows.length === 0 ? t('loyaltyStore.emptyHint') : t('loyaltyStore.noMatchHint')}
+          action={
+            rows.length > 0 && (search.trim() !== '' || affordableOnly || blueprintsOnly) ? (
+              <Button
+                size="sm"
+                onClick={() =>
+                  setFilterParams({ search: '', affordableOnly: false, blueprintsOnly: false })
+                }
+              >
+                {t('common.resetFilters')}
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <>

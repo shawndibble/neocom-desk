@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
+  Button,
   ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
@@ -84,6 +85,7 @@ import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import { JournalDescriptionCell } from '@/features/character/JournalDescriptionCell';
 import { journalTransactionLinks } from '@/features/character/journalTransactionLink';
 import {
+  EMPTY_WALLET_JOURNAL_FILTER,
   activeWalletJournalFilterCount,
   EMPTY_JOURNAL_FILTER_PARAMS,
   filterWalletJournal,
@@ -269,6 +271,13 @@ function JournalTable({
           title={t('wallet.journalNoFilterMatches')}
           hint={t('wallet.journalNoFilterMatchesHint')}
           className="py-8"
+          action={
+            activeWalletJournalFilterCount(filter) > 0 || filter.text.trim() !== '' ? (
+              <Button size="sm" onClick={() => onFilterChange(EMPTY_WALLET_JOURNAL_FILTER)}>
+                {t('common.resetFilters')}
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <DataTable

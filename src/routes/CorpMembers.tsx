@@ -397,7 +397,7 @@ function CorpMembersView() {
                     size="sm"
                     onClick={() => setFilterParams({ q: '', dark: false, ship: null, loc: null })}
                   >
-                    {t('corp.members.resetFilters')}
+                    {t('common.resetFilters')}
                   </Button>
                 }
               />

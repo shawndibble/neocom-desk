@@ -36,6 +36,7 @@ import { loadContacts } from '@/features/character/contacts';
 import {
   ALL_CONTACT_TYPES,
   STANDING_CATEGORIES,
+  EMPTY_CONTACTS_FILTER,
   activeContactsFilterCount,
   contactCountsByStanding,
   contactCountsByType,
@@ -907,6 +908,13 @@ export function Contacts() {
               title={t('contacts.noResults')}
               hint={t('contacts.noResultsHint')}
               className="py-8"
+              action={
+                activeContactsFilterCount(filter) > 0 ? (
+                  <Button size="sm" onClick={() => setFilter(EMPTY_CONTACTS_FILTER)}>
+                    {t('common.resetFilters')}
+                  </Button>
+                ) : undefined
+              }
             />
           ) : (
             <DataTable
