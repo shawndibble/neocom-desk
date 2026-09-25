@@ -2956,7 +2956,8 @@
     },
     "altColonies": {
       "toggleLabel": "Show alt colonies",
-      "notLoaded": "Not loaded yet, so their colonies aren't listed: {{names}}. Switch to that character and refresh to cache them.",
+      "notLoaded": "{{name}}: not loaded yet, so their colonies aren't listed. Switch and refresh to cache them.",
+      "switchTo": "Switch to {{name}}",
       "noColonies": "No colonies: {{names}}.",
       "skipped": "Skipped, no planetary access granted: {{names}}."
     }
