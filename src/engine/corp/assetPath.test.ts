@@ -24,11 +24,22 @@ describe('resolveCorpAssetPath', () => {
     });
   });
 
-  it('reports an unknown group id whole, rather than silently redirecting', () => {
+  it('reports an unpopulated flag group id whole, rather than silently redirecting', () => {
     const groups = buildCorpAssetTree([]);
-    const resolved = resolveCorpAssetPath(groups, 'officeFolder', ['extra']);
+    const resolved = resolveCorpAssetPath(groups, 'impounded', ['extra']);
     expect(resolved.group).toBeNull();
-    expect(resolved.unresolved).toEqual(['officeFolder', 'extra']);
+    expect(resolved.unresolved).toEqual(['impounded', 'extra']);
+  });
+
+  /**
+   * An office is a pass-through: its contents live in their real division
+   * now, so 'officeFolder' can never hold real content again. A stale link
+   * into the old grouping lands on the division list, not a phantom 404.
+   */
+  it('falls back to the root listing for a stale officeFolder link rather than reporting unresolved', () => {
+    const groups = buildCorpAssetTree([]);
+    const resolved = resolveCorpAssetPath(groups, 'officeFolder', ['i:10']);
+    expect(resolved).toEqual({ group: null, trail: [], children: [], unresolved: [] });
   });
 
   it('reports an out-of-range division number unresolved rather than silently rooting', () => {

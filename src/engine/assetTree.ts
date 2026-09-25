@@ -131,9 +131,26 @@ function childrenByLocationId(assets: readonly EngineAsset[]): Map<number, Engin
   return map;
 }
 
-/** This node's own quantity/value, not counting its children — 0 for bays, which own nothing themselves. */
-function ownValue(ctx: BuildContext, asset: EngineAsset): number {
-  return asset.quantity * (ctx.priceByTypeId.get(asset.type_id) ?? 0);
+/**
+ * One node's contribution to its parent's totals: its own quantity/value
+ * (0 for a bay, which owns nothing itself) plus whatever is already
+ * aggregated beneath it. Exported so a caller building a grouping level
+ * `assetTree.ts` has no concept of — a corp division's per-office location
+ * wrapper, for instance — can total a handful of sibling nodes the same way
+ * `sumNodes` does, without re-deriving this arithmetic.
+ */
+export function nodeContribution(
+  node: AssetTreeNode,
+  priceByTypeId: ReadonlyMap<number, number>
+): { itemCount: number; estimatedValue: number } {
+  if (node.kind === 'bay')
+    return { itemCount: node.itemCount, estimatedValue: node.estimatedValue };
+  const ownValue = node.asset.quantity * (priceByTypeId.get(node.asset.type_id) ?? 0);
+  if (node.kind === 'item') return { itemCount: node.asset.quantity, estimatedValue: ownValue };
+  return {
+    itemCount: node.asset.quantity + node.itemCount,
+    estimatedValue: ownValue + node.estimatedValue,
+  };
 }
 
 function buildNode(
@@ -197,14 +214,9 @@ function sumNodes(
   let itemCount = 0;
   let estimatedValue = 0;
   for (const node of nodes) {
-    if (node.kind === 'bay') {
-      itemCount += node.itemCount;
-      estimatedValue += node.estimatedValue;
-    } else {
-      itemCount += node.asset.quantity + (node.kind === 'item' ? 0 : node.itemCount);
-      estimatedValue +=
-        ownValue(ctx, node.asset) + (node.kind === 'item' ? 0 : node.estimatedValue);
-    }
+    const contribution = nodeContribution(node, ctx.priceByTypeId);
+    itemCount += contribution.itemCount;
+    estimatedValue += contribution.estimatedValue;
   }
   return { itemCount, estimatedValue };
 }
