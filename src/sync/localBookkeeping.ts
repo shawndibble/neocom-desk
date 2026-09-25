@@ -30,6 +30,8 @@ export const productionSaleLinkTombstonesKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}productionSaleLinkTombstones.${characterId}`;
 export const productionOrderWatchTombstonesKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}productionOrderWatchTombstones.${characterId}`;
+export const fittingTombstonesKey = (characterId: number): string =>
+  `${INTERNAL_PREFIX}fittingTombstones.${characterId}`;
 export const payeeTombstonesKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}payeeTombstones.${characterId}`;
 export const miningTaxAssignmentTombstonesKey = (characterId: number): string =>
@@ -116,6 +118,7 @@ export async function clearCharacterSyncBookkeeping(characterId: number): Promis
     productionSaleLinkTombstonesKey(characterId),
     productionOrderWatchTombstonesKey(characterId),
     payeeTombstonesKey(characterId),
+    fittingTombstonesKey(characterId),
     miningTaxAssignmentTombstonesKey(characterId),
   ]);
   await clearPullCursors(characterId);

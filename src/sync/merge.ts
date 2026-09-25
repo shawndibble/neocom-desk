@@ -22,6 +22,7 @@ import type {
   SkillPlanRecord,
   StationPinRecord,
   PayeeRecord,
+  FittingRecord,
   MiningTaxAssignmentRecord,
   WhatIfImplantSelection,
 } from '@/db';
@@ -72,6 +73,7 @@ export type RemotePlanetRichnessDoc = PlanetRichnessRecord & RemoteDoc;
 
 /** Remote Firestore doc at /characters/{uid}/payees/{id} (issue #523). */
 export type RemotePayeeDoc = PayeeRecord & RemoteDoc;
+export type RemoteFittingDoc = FittingRecord & RemoteDoc;
 
 /** Remote Firestore doc at /characters/{uid}/miningTaxAssignments/{id} (issue #523). */
 export type RemoteMiningTaxAssignmentDoc = MiningTaxAssignmentRecord & RemoteDoc;

@@ -155,6 +155,20 @@
       ]
     },
     {
+      "collectionGroup": "fittings",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "ownerHash",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "miningTaxAssignments",
       "queryScope": "COLLECTION",
       "fields": [
@@ -277,6 +291,23 @@
     },
     {
       "collectionGroup": "payees",
+      "fieldPath": "ownerHash",
+      "ttl": false,
+      "indexes": [
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "fittings",
+      "fieldPath": "*",
+      "ttl": false,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "fittings",
       "fieldPath": "ownerHash",
       "ttl": false,
       "indexes": [

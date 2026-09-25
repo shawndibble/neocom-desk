@@ -49,6 +49,27 @@
     "dismiss": "Dismiss"
   },
   "fittings": {
+    "myFittings": {
+      "title": "My Fittings",
+      "save": "Save to My Fittings",
+      "update": "Update saved Fitting",
+      "saved": "Saved",
+      "needCharacter": "Log in with a Character to save Fittings.",
+      "tooLarge": "This Fitting is too large to save.",
+      "searchLabel": "Search My Fittings",
+      "searchPlaceholder": "Search by name or hull",
+      "empty": "Nothing saved yet. Open a Fitting and choose Save to My Fittings.",
+      "noMatches": "No saved Fitting matches that search.",
+      "unknownHull": "Unknown hull",
+      "open": "Open {{name}}",
+      "rename": "Rename {{name}}",
+      "renameLabel": "Fitting name",
+      "confirmRename": "Rename",
+      "delete": "Delete {{name}}",
+      "deleteConfirm": "Delete \"{{name}}\"? This can't be undone.",
+      "confirmDelete": "Delete",
+      "cancel": "Cancel"
+    },
     "load": {
       "title": "Load",
       "pasteLabel": "Paste EFT fit text",
@@ -4021,6 +4042,7 @@
           "stationPins": "The stations and structures you pinned in Assets.",
           "piPicks": "The resources you chose to pull on each planet in the PI Advisor.",
           "miningTax": "Moon Mining payees and assignments.",
+          "fittings": "The Fittings you saved to My Fittings: name and share code.",
           "miningTaxNote": "The payees you named and the entries you assigned to them, including the ore and ISK figures snapshotted at that moment — that snapshot is the invoice, so it has to travel with it.",
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
