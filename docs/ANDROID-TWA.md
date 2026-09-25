@@ -10,13 +10,15 @@ web manifest.
 Bubblewrap writes into `twa/` (the keystore, the generated Gradle project,
 build output) is gitignored and must never be committed.
 
-> **Gap:** the checked-in `twa-manifest.json` was rebuilt from Bubblewrap's
-> defaults and this repo's values, not recovered from the original build. Before
-> the next release, compare it against the original (if anyone still has it),
-> and set `appVersionCode` above the version code Play Console shows for the
-> live release — the `1` here is a placeholder, and Play rejects an upload
-> whose code isn't higher. `signingKey.alias` is Bubblewrap's default
-> (`android`); match it to the alias in the real keystore.
+> `twa-manifest.json` matches the last build sent to Play (version code 2,
+> the first with `monochromeIconUrl`). Keystore alias is `android`. Keep
+> `signingKey.path` as `./android.keystore` here; a local build may point it
+> at wherever the keystore actually lives. Play rejects an upload whose
+> `appVersionCode` isn't above the one Play Console shows.
+>
+> **`appVersion`, not `appVersionName`:** Bubblewrap 1.25 writes Gradle's
+> `versionName` from `appVersion`. Without it the build ships an empty version
+> name. Bump `appVersion`, `appVersionName` and `appVersionCode` together.
 
 ## What ties the shell to the site
 
