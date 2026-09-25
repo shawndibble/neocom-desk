@@ -126,6 +126,38 @@ describe('estimateCharacterSectionHeight', () => {
     expect(withCorpEvent).toBeGreaterThan(base);
   });
 
+  it('draws the corp events under one group header, with the permission line and hint once', () => {
+    const height = (ids: readonly NotificationEventId[], missing: boolean) =>
+      estimateCharacterSectionHeight(
+        input({
+          expanded: true,
+          visibleEventIds: ids,
+          // Not enabled, so no threshold block muddies the row-by-row count.
+          rowEnabledFor: () => !missing,
+          missingPermissionFor: () => missing,
+        })
+      );
+    const corp = ['corpMemberJoined', 'corpMemberLeft', 'corpIndustryJobReady'] as const;
+
+    // Each further corp event costs one event row. The group header, the
+    // Needs-permission line and the best-effort hint are paid for once.
+    expect(height([corp[0], corp[1]], true) - height([corp[0]], true)).toBe(33);
+    expect(height(corp, true) - height([corp[0], corp[1]], true)).toBe(33);
+
+    // The permission line is the group's, not each row's: three missing
+    // events add one line (41px), not three.
+    expect(height(corp, true) - height(corp, false)).toBe(41);
+  });
+
+  it('a corp group adds a header row that a run of ordinary events does not', () => {
+    const height = (ids: readonly NotificationEventId[]) =>
+      estimateCharacterSectionHeight(input({ expanded: true, visibleEventIds: ids }));
+    const corpOnly = height(['corpMemberJoined']);
+    const ordinaryOnly = height([ORDINARY]);
+    // header 30 + hint 42 on top of the shared event row.
+    expect(corpOnly - ordinaryOnly).toBe(30 + 42);
+  });
+
   it('adds a large block for eve-type family/type rows only when hasEveNotificationScope', () => {
     const withScope = estimateCharacterSectionHeight(
       input({ expanded: true, visibleEventIds: [EVE_NOTIFICATION], hasEveNotificationScope: true })

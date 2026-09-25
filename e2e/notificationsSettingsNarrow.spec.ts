@@ -36,8 +36,8 @@ function characterToggle(page: Page) {
 
 /**
  * The Character's own section, not the "All Characters" master row: that row
- * (`AllCharactersNotificationSection.tsx`) is always open and lists every
- * event too, so an unscoped `getByText`/`getByRole` lookup for an event's own
+ * (`AllCharactersNotificationSection.tsx`) lists every event too once it is
+ * opened, so an unscoped `getByText`/`getByRole` lookup for an event's own
  * label or control matches twice on this page.
  */
 function characterSection(page: Page) {

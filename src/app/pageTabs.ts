@@ -33,7 +33,6 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
  */
 export const SETTINGS_TABS = definePageTabs('/settings', [
   { id: 'display', labelKey: 'settings.tabs.display' },
-  { id: 'mobileTabs', labelKey: 'settings.tabs.mobileTabs' },
   { id: 'shortcuts', labelKey: 'settings.tabs.shortcuts' },
   { id: 'permissions', labelKey: 'settings.tabs.permissions' },
   { id: 'industry', labelKey: 'settings.tabs.industry' },
@@ -42,7 +41,6 @@ export const SETTINGS_TABS = definePageTabs('/settings', [
   { id: 'corporation', labelKey: 'settings.tabs.corporation' },
   { id: 'notifications', labelKey: 'settings.tabs.notifications' },
   { id: 'dataAge', labelKey: 'settings.tabs.data' },
-  { id: 'device', labelKey: 'settings.tabs.device' },
   { id: 'activity', labelKey: 'settings.tabs.activity' },
   { id: 'faq', labelKey: 'settings.tabs.faq' },
 ]);
