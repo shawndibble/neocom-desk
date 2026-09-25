@@ -423,18 +423,18 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(pilotTwoButton).toHaveAttribute('aria-expanded', 'false');
 
     expect(
-      screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Skill Level Complete, device notifications' })
     ).toBeChecked();
     // marketOrderFilled/walletBalanceChanged default feed-on/browser-off
     // (CONTEXT.md round 45) — worth a row, not worth an interruption.
     expect(
-      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, device notifications' })
     ).not.toBeChecked();
     expect(
       screen.getByRole('checkbox', { name: 'Wallet Balance Changed, Overview list' })
     ).toBeChecked();
     expect(
-      screen.getByRole('checkbox', { name: 'Sell Order Filled, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Sell Order Filled, device notifications' })
     ).not.toBeChecked();
     expect(
       screen.getByRole('checkbox', { name: 'Sell Order Filled, Overview list' })
@@ -449,7 +449,7 @@ describe('Settings — Notifications (issue #170)', () => {
     // No expand click: Pilot One is the active character, so its section is
     // already open.
     const mailCheckbox = await screen.findByRole('checkbox', {
-      name: 'New Mail, browser notifications',
+      name: 'New Mail, device notifications',
     });
     await user.click(mailCheckbox);
     expect(mailCheckbox).not.toBeChecked();
@@ -474,7 +474,7 @@ describe('Settings — Notifications (issue #170)', () => {
 
     expect(
       await screen.findByRole('checkbox', {
-        name: 'Planetary Extractor Expiring, browser notifications',
+        name: 'Planetary Extractor Expiring, device notifications',
       })
     ).toBeInTheDocument();
     expect(
@@ -489,31 +489,31 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
-    await screen.findByRole('checkbox', { name: 'Skill Level Complete, browser notifications' });
+    await screen.findByRole('checkbox', { name: 'Skill Level Complete, device notifications' });
 
     // The browser column starts indeterminate: Wallet Balance Changed/Market
     // Order Filled default browser-off while the rest default browser-on
     // (CONTEXT.md round 45). A partial column fills in rather than clears.
     await user.click(
-      screen.getByRole('checkbox', { name: /toggle all browser notifications for pilot one/i })
+      screen.getByRole('checkbox', { name: /toggle all device notifications for pilot one/i })
     );
 
     expect(
-      screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Skill Level Complete, device notifications' })
     ).toBeChecked();
     expect(
-      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, device notifications' })
     ).toBeChecked();
 
     // Now fully enabled, so the next click clears the whole column.
     await user.click(
-      screen.getByRole('checkbox', { name: /toggle all browser notifications for pilot one/i })
+      screen.getByRole('checkbox', { name: /toggle all device notifications for pilot one/i })
     );
     expect(
-      screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Skill Level Complete, device notifications' })
     ).not.toBeChecked();
     expect(
-      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, device notifications' })
     ).not.toBeChecked();
   });
 
@@ -541,9 +541,9 @@ describe('Settings — Notifications (issue #170)', () => {
     ).not.toBeInTheDocument();
     // JS cannot re-request a denied grant, so nothing that would need one is offered.
     expect(
-      screen.queryByRole('button', { name: /turn on browser notifications/i })
+      screen.queryByRole('button', { name: /turn on device notifications/i })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Browser notifications' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Device notifications' })).toBeDisabled();
 
     // ...but the Overview feed works with no grant at all, so its controls stay live.
     expect(screen.getByRole('checkbox', { name: 'Enable notifications' })).toBeEnabled();
@@ -553,7 +553,7 @@ describe('Settings — Notifications (issue #170)', () => {
     // aria-disabled, not native disabled — the row's Tooltip explaining why
     // needs the control to stay in the hover/touch/focus path.
     expect(
-      screen.getByRole('checkbox', { name: 'New Mail, browser notifications' })
+      screen.getByRole('checkbox', { name: 'New Mail, device notifications' })
     ).toHaveAttribute('aria-disabled', 'true');
   });
 
@@ -604,7 +604,7 @@ describe('Settings — Notifications (issue #170)', () => {
     render(<App />);
     await notificationsPanel();
 
-    const enable = await screen.findByRole('button', { name: /turn on browser notifications/i });
+    const enable = await screen.findByRole('button', { name: /turn on device notifications/i });
     expect(requestPermission).not.toHaveBeenCalled();
     // The toggle UI stays put at 'default' — only a denial replaces it.
     expect(screen.getByRole('checkbox', { name: /enable notifications/i })).toBeInTheDocument();
@@ -635,12 +635,12 @@ describe('Settings — Notifications (issue #170)', () => {
     // the document" a couple of hundred ms in rather than on a timeout.
     await waitFor(() =>
       expect(
-        screen.getByRole('checkbox', { name: 'New Mail, browser notifications' })
+        screen.getByRole('checkbox', { name: 'New Mail, device notifications' })
       ).toBeInTheDocument()
     );
     expect(screen.queryByText(/notifications are blocked/i)).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /turn on browser notifications/i })
+      screen.queryByRole('button', { name: /turn on device notifications/i })
     ).not.toBeInTheDocument();
     expect(requestPermission).not.toHaveBeenCalled();
   });
@@ -658,7 +658,7 @@ describe('Settings — Notifications (issue #170)', () => {
     // active character), so every row name now appears twice on the page.
     const pilotTwoSection = within(pilotTwoButton.closest('div')!.parentElement!);
     const mailCheckbox = pilotTwoSection.getByRole('checkbox', {
-      name: 'New Mail, browser notifications',
+      name: 'New Mail, device notifications',
     });
     expect(mailCheckbox).toHaveAttribute('aria-disabled', 'true');
     expect(pilotTwoSection.getByText('Needs the Mail permission')).toBeInTheDocument();
@@ -670,7 +670,7 @@ describe('Settings — Notifications (issue #170)', () => {
 
     expect(
       pilotTwoSection.getByRole('checkbox', {
-        name: 'Skill Level Complete, browser notifications',
+        name: 'Skill Level Complete, device notifications',
       })
     ).not.toBeDisabled();
   });
@@ -689,11 +689,11 @@ describe('Settings — Notifications (issue #170)', () => {
       .getByRole('button', { name: /pilot one/i })
       .closest('div')!.parentElement!;
     expect(
-      within(pilotOneSection).getByRole('checkbox', { name: 'New Mail, browser notifications' })
+      within(pilotOneSection).getByRole('checkbox', { name: 'New Mail, device notifications' })
     ).toBeInTheDocument();
     expect(
       within(pilotOneSection).queryByRole('checkbox', {
-        name: 'Skill Level Complete, browser notifications',
+        name: 'Skill Level Complete, device notifications',
       })
     ).not.toBeInTheDocument();
   });
@@ -712,7 +712,7 @@ describe('Settings — Notifications (issue #170)', () => {
       within(await notificationsPanel()).getByRole('button', { name: /pilot two/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Skill Level Complete, device notifications' })
     ).toBeInTheDocument();
   });
 
@@ -725,11 +725,11 @@ describe('Settings — Notifications (issue #170)', () => {
       .getByRole('button', { name: /pilot one/i })
       .closest('div')!.parentElement!;
     expect(
-      within(pilotOneSection).getByRole('checkbox', { name: 'New Mail, browser notifications' })
+      within(pilotOneSection).getByRole('checkbox', { name: 'New Mail, device notifications' })
     ).toBeInTheDocument();
     expect(
       within(pilotOneSection).queryByRole('checkbox', {
-        name: 'Skill Level Complete, browser notifications',
+        name: 'Skill Level Complete, device notifications',
       })
     ).not.toBeInTheDocument();
   });
@@ -858,8 +858,10 @@ describe('Settings — Notifications (issue #170)', () => {
     // "App" and "List" named neither the pop-up nor the page it lands on.
     // Scoped to the panel: the app's own nav has an "Overview" link, which
     // would satisfy an unscoped query whether or not the caption changed.
-    expect((await panel.findAllByText(/^Browser$/)).length).toBeGreaterThan(0);
+    // "Browser" was wrong in the Play Store app, which has no browser in sight.
+    expect((await panel.findAllByText(/^Device$/)).length).toBeGreaterThan(0);
     expect(panel.getAllByText(/^Overview$/).length).toBeGreaterThan(0);
+    expect(panel.queryByText(/^Browser$/)).not.toBeInTheDocument();
     expect(panel.queryByText(/^App$/)).not.toBeInTheDocument();
     expect(panel.queryByText(/^List$/)).not.toBeInTheDocument();
   });
@@ -872,7 +874,7 @@ describe('Settings — Notifications (issue #170)', () => {
       expect(await panel.findByText('All Characters')).toBeInTheDocument();
       expect(
         panel.getByRole('checkbox', {
-          name: 'Skill Level Complete for every character, browser notifications',
+          name: 'Skill Level Complete for every character, device notifications',
         })
       ).toBeInTheDocument();
     });
@@ -882,7 +884,7 @@ describe('Settings — Notifications (issue #170)', () => {
       await notificationsPanel();
 
       const masterEventCheckbox = (await screen.findByRole('checkbox', {
-        name: 'Skill Level Complete for every character, browser notifications',
+        name: 'Skill Level Complete for every character, device notifications',
       })) as HTMLInputElement;
       // Both Characters default to skillLevelComplete-browser on: agreement.
       expect(masterEventCheckbox.indeterminate).toBe(false);
@@ -913,7 +915,7 @@ describe('Settings — Notifications (issue #170)', () => {
       // beforeEach) — its own New Mail row renders disabled, but the master
       // row is not scope-gated at all (issue #738: "every known Character").
       const newMailMaster = await screen.findByRole('checkbox', {
-        name: 'New Mail for every character, browser notifications',
+        name: 'New Mail for every character, device notifications',
       });
       await user.click(newMailMaster);
 
@@ -932,20 +934,20 @@ describe('Settings — Notifications (issue #170)', () => {
       // the rest default browser-on (CONTEXT.md round 45) — the grid starts
       // partial, so the first click fills every event, every Character, on.
       const selectAllCharacters = await screen.findByRole('checkbox', {
-        name: 'Toggle browser notifications for every character',
+        name: 'Toggle device notifications for every character',
       });
       await user.click(selectAllCharacters);
       expect(
-        screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+        screen.getByRole('checkbox', { name: 'Skill Level Complete, device notifications' })
       ).toBeChecked();
       expect(
-        screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+        screen.getByRole('checkbox', { name: 'Wallet Balance Changed, device notifications' })
       ).toBeChecked();
 
       // Now fully on across the board — the next click clears it.
       await user.click(selectAllCharacters);
       expect(
-        screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+        screen.getByRole('checkbox', { name: 'Skill Level Complete, device notifications' })
       ).not.toBeChecked();
     });
 
@@ -955,12 +957,12 @@ describe('Settings — Notifications (issue #170)', () => {
       await notificationsPanel();
 
       const masterSelectAllBrowser = await screen.findByRole('checkbox', {
-        name: 'Toggle browser notifications for every character',
+        name: 'Toggle device notifications for every character',
       });
       expect(masterSelectAllBrowser).toBeDisabled();
       expect(
         screen.getByRole('checkbox', {
-          name: 'Skill Level Complete for every character, browser notifications',
+          name: 'Skill Level Complete for every character, device notifications',
         })
       ).toBeDisabled();
       // The Overview column is unaffected — only browser is permission-gated.
@@ -976,7 +978,7 @@ describe('Settings — Notifications (issue #170)', () => {
       await notificationsPanel();
 
       const selectAllCharacters = await screen.findByRole('checkbox', {
-        name: 'Toggle browser notifications for every character',
+        name: 'Toggle device notifications for every character',
       });
       await user.click(selectAllCharacters);
       expect(confirmSpy).not.toHaveBeenCalled();
@@ -991,7 +993,7 @@ describe('Settings — Notifications (issue #170)', () => {
     async function renderPanelWithFakeTimers() {
       render(<App />);
       await notificationsPanel();
-      await screen.findByRole('checkbox', { name: 'Skill Level Complete, browser notifications' });
+      await screen.findByRole('checkbox', { name: 'Skill Level Complete, device notifications' });
       // The scheduler is module state: let a rebuild an earlier test's
       // browser click queued (on real timers) land before counting.
       await act(
@@ -1019,7 +1021,7 @@ describe('Settings — Notifications (issue #170)', () => {
 
       // Wallet Balance Changed defaults browser-off (CONTEXT.md round 45).
       await user.click(
-        screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+        screen.getByRole('checkbox', { name: 'Wallet Balance Changed, device notifications' })
       );
       await afterQuietPeriod();
       await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
@@ -1029,7 +1031,7 @@ describe('Settings — Notifications (issue #170)', () => {
       const user = await renderPanelWithFakeTimers();
 
       await user.click(
-        screen.getByRole('checkbox', { name: /toggle all browser notifications for pilot one/i })
+        screen.getByRole('checkbox', { name: /toggle all device notifications for pilot one/i })
       );
       await afterQuietPeriod();
       await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
@@ -1040,7 +1042,7 @@ describe('Settings — Notifications (issue #170)', () => {
 
       await user.click(
         screen.getByRole('checkbox', {
-          name: 'New Mail for every character, browser notifications',
+          name: 'New Mail for every character, device notifications',
         })
       );
       await afterQuietPeriod();
@@ -1054,7 +1056,7 @@ describe('Settings — Notifications (issue #170)', () => {
       await afterQuietPeriod();
       expect(rebuildProjection).not.toHaveBeenCalled();
 
-      await user.click(screen.getByRole('checkbox', { name: 'Browser notifications' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Device notifications' }));
       await afterQuietPeriod();
       await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
 
@@ -1074,12 +1076,12 @@ describe('Settings — Notifications (issue #170)', () => {
         seenAtRebuild = isEventEnabledFor(stored.perCharacter[CHAR_ID] ?? {}, 'newMail', 'browser');
       });
 
-      const newMail = screen.getByRole('checkbox', { name: 'New Mail, browser notifications' });
+      const newMail = screen.getByRole('checkbox', { name: 'New Mail, device notifications' });
       await user.click(newMail);
       await user.click(newMail);
       await user.click(newMail);
       await user.click(
-        screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+        screen.getByRole('checkbox', { name: 'Skill Level Complete, device notifications' })
       );
       await afterQuietPeriod();
 
@@ -1134,7 +1136,7 @@ describe('Settings — Notifications virtualization (issue #740)', () => {
     await panel.findByText('Pilot 000');
 
     const mailCheckbox = await panel.findByRole('checkbox', {
-      name: 'New Mail, browser notifications',
+      name: 'New Mail, device notifications',
     });
     await user.click(mailCheckbox);
     expect(mailCheckbox).not.toBeChecked();
@@ -1153,7 +1155,7 @@ describe('Settings — Notifications virtualization (issue #740)', () => {
     // none of their event checkboxes exist anywhere in the panel.
     expect(panel.queryByText('Pilot 059')).toBeNull(); // outside the mounted window entirely
     expect(
-      panel.queryByRole('checkbox', { name: /Skill Level Complete, browser notifications/ })
+      panel.queryByRole('checkbox', { name: /Skill Level Complete, device notifications/ })
     ).not.toBeNull(); // Pilot 000's own, present since it's expanded
   });
 
