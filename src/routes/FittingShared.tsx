@@ -10,6 +10,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { resolveFittingShareView } from '@/features/fittings/resolveFittingShareView';
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
+import { useDamageProfiles } from '@/features/fittings/damageProfiles';
 import {
   computeFittingStats,
   type DogmaAssetProgress,
@@ -58,6 +59,11 @@ export function FittingShared() {
   const [price, setPrice] = useState<Appraisal | null>(null);
   const [typeName, setTypeName] = useState<TypeName | null>(null);
   const [copied, setCopied] = useState(false);
+  // The viewer's own Damage Profile (a local-then-synced setting, so it works
+  // with no session too) — the link itself never carries one.
+  const damageProfiles = useDamageProfiles();
+  const damageProfile = damageProfiles.selected;
+  const damageProfilesHydrated = damageProfiles.hydrated;
   const [copyFailed, setCopyFailed] = useState(false);
 
   // A different code means old numbers belong to a different Fitting — drop
@@ -106,15 +112,20 @@ export function FittingShared() {
   const readyProfile = state.status === 'ready' ? state.profile : null;
 
   useEffect(() => {
-    if (readyFitting === null || readyProfile === null) return;
+    if (readyFitting === null || readyProfile === null || !damageProfilesHydrated) return;
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new calculation, not a render-time derivation
     setStatsError(false);
     void (async () => {
       try {
-        const result = await computeFittingStats(readyFitting, readyProfile, (progress) => {
-          if (!cancelled) setStatsProgress(progress);
-        });
+        const result = await computeFittingStats(
+          readyFitting,
+          readyProfile,
+          (progress) => {
+            if (!cancelled) setStatsProgress(progress);
+          },
+          damageProfile
+        );
         if (!cancelled) setStats(result);
       } catch {
         if (!cancelled) setStatsError(true);
@@ -123,7 +134,7 @@ export function FittingShared() {
     return () => {
       cancelled = true;
     };
-  }, [readyFitting, readyProfile]);
+  }, [readyFitting, readyProfile, damageProfile, damageProfilesHydrated]);
 
   useEffect(() => {
     if (readyFitting === null) return;
@@ -215,6 +226,7 @@ export function FittingShared() {
             statsProgress={statsProgress}
             statsError={statsError}
             price={price}
+            damageProfiles={damageProfiles}
           />
           <ModuleList fitting={state.fitting} typeName={typeName} />
         </>
