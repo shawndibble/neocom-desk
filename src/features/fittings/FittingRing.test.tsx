@@ -105,7 +105,7 @@ describe('FittingRing', () => {
     // A T3's subsystems get a sheet of their own.
     fireEvent.click(screen.getByRole('button', { name: /^Subsystems\s*0 \/ 5$/ }));
     expect(onRackOpen).toHaveBeenCalledWith('subsystem');
-    // No corner readouts on the overview — the List bars carry those numbers.
+    // No readouts on the overview — the List bars carry those numbers.
     expect(screen.queryByRole('meter', { name: 'CPU' })).toBeNull();
   });
 
@@ -177,6 +177,20 @@ describe('FittingRing', () => {
     );
     expect(screen.getByLabelText('High slots 2, empty')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByLabelText('High slots 3, empty')).toHaveAttribute('aria-pressed', 'false');
+    // A fitted tile opens its module rather than toggling, so it is no pressed button.
+    expect(screen.getByLabelText('High slots 1, active')).not.toHaveAttribute('aria-pressed');
+  });
+
+  it('marks no slot as pressed on the phone overview, whose tiles only explain themselves', () => {
+    render(
+      <FittingRing
+        fitting={fitting}
+        stats={statsWith(10)}
+        compact
+        selectedSlot={{ rack: 'high', index: 1 }}
+      />
+    );
+    expect(screen.getByLabelText('High slots 2, empty')).not.toHaveAttribute('aria-pressed');
   });
 
   it('lists the drones and cargo beneath the ring, with their counts', () => {
@@ -192,7 +206,8 @@ describe('FittingRing', () => {
       />
     );
     expect(screen.getByLabelText('Warrior II: 0 in space, 3 in bay')).toBeTruthy();
-    expect(screen.getByLabelText('Scourge Heavy Missile ×1,535')).toHaveTextContent('1.5K');
+    // The badge's own "1.5K" is part of the name, so it can be spoken to select it.
+    expect(screen.getByLabelText('Scourge Heavy Missile ×1,535 (1.5K)')).toHaveTextContent('1.5K');
   });
 });
 

@@ -532,19 +532,22 @@ export function Fittings() {
           </div>
         ) : (
           <div
-            // Docked: browser | Ring | stats. Otherwise Ring beside stats from
-            // the desktop breakpoint up — the ring is capped and square, so it
-            // fits beside 22rem of stats there (scope decision
-            // `20260925-095734`). The stats hold at 22rem until xl: a track
-            // with a max grows to it before a 1fr one gets anything. Stacked
-            // while the slide-out has pushed the page aside, so the Ring keeps
-            // the width rather than the stats.
+            // Docked: browser | Ring | stats. Otherwise the editor beside the
+            // stats when wide, but stacked while the slide-out has pushed the
+            // page aside, so the editor keeps the width rather than the stats.
+            // The Ring goes beside them from the desktop breakpoint — it is
+            // capped and square, so it fits beside 22rem of stats there (scope
+            // decision `20260925-095734`); the stats hold at 22rem until xl,
+            // since a track with a max grows to it before a 1fr one gets
+            // anything. The List's rows want the width, so it waits for xl.
             className={`grid items-start gap-3 ${
               addMode === 'docked'
                 ? 'grid-cols-[20rem_minmax(0,1fr)_minmax(22rem,26rem)]'
                 : addOpen
                   ? 'grid-cols-1'
-                  : 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]'
+                  : view === 'ring'
+                    ? 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]'
+                    : 'grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]'
             }`}
           >
             {addMode === 'docked' && (

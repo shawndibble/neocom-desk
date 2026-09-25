@@ -357,8 +357,12 @@ function SlotTile({
         .join('\n')
     : t(emptyTooltipKey, { rack: rackLabel, index });
 
+  // Only an empty tile on the full ring is a "fill this slot" target, as the
+  // List's empty-slot buttons are; a fitted one opens its module instead.
+  const pressed = !compact && module === undefined ? selected : undefined;
+
   const border =
-    over || selected
+    over || pressed
       ? 'border-accent ring-2 ring-accent/50'
       : cantUse
         ? 'border-danger'
@@ -393,7 +397,7 @@ function SlotTile({
       <button
         type="button"
         aria-label={label}
-        aria-pressed={selected}
+        aria-pressed={pressed}
         className={`absolute border bg-bg ${border} ${interactive ? 'cursor-pointer hover:border-accent' : ''} ${draggable ? 'active:cursor-grabbing' : ''}`}
         style={{ ...position, transform: `rotate(${angle.toFixed(1)}deg)` }}
         onClick={interactive ? () => onSelect(slot.rack, slot.index) : undefined}
@@ -456,11 +460,13 @@ function HoldTile({
   /** Nothing of it in space — a drone left in the bay. */
   dim?: boolean;
 }) {
+  const shown = formatCompactNumber(count);
   return (
     <Tooltip content={tooltip} openOnTap>
       <button
         type="button"
-        aria-label={tooltip}
+        // The badge's count is visible text, so it belongs in the name (WCAG 2.5.3).
+        aria-label={shown === String(count) ? tooltip : `${tooltip} (${shown})`}
         className="relative h-11 w-11 shrink-0 border border-line-bright bg-bg"
       >
         <TypeIcon
@@ -469,7 +475,7 @@ function HoldTile({
           className={`h-full w-full ${dim ? 'opacity-50' : ''}`}
         />
         <span className="absolute right-0 bottom-0 bg-bg/85 px-0.5 text-[0.625rem] leading-tight font-semibold text-text tabular-nums">
-          {formatCompactNumber(count)}
+          {shown}
         </span>
       </button>
     </Tooltip>
