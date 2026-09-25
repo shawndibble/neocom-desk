@@ -461,6 +461,27 @@ describe('Wallet', () => {
     expect(screen.getByText('Donation')).toBeInTheDocument();
   });
 
+  it('shows no filtered-count summary when no filter is active (issue #1721)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    await screen.findByText('Bounty');
+
+    expect(screen.queryByText(/entries · net/)).toBeNull();
+    expect(screen.queryByText(/entry · net/)).toBeNull();
+  });
+
+  it('shows a filtered-count and net-total summary once a filter narrows the journal (issue #1721)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    await screen.findByText('Bounty');
+
+    await user.type(screen.getByPlaceholderText('Search description…'), 'Donation');
+
+    expect(await screen.findByText('1 entry · net -500.00')).toBeInTheDocument();
+  });
+
   it('shows a filtered-empty message, not the no-data empty state, when the filter matches nothing (issue #413)', async () => {
     const user = userEvent.setup();
     render(<App />);

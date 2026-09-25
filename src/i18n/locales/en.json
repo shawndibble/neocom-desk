@@ -2337,7 +2337,10 @@
     "journalNoFilterMatches": "No journal entries match this filter.",
     "journalNoFilterMatchesHint": "Clear the search or reset the filters above to see every entry.",
     "journalItemBought": "Bought {{quantity}} × {{unitPrice}} = {{total}}",
-    "journalItemSold": "Sold {{quantity}} × {{unitPrice}} = {{total}}"
+    "journalItemSold": "Sold {{quantity}} × {{unitPrice}} = {{total}}",
+    "journalContractLink": "Contract →",
+    "journalFilteredSummary_one": "{{count}} entry · net {{net}}",
+    "journalFilteredSummary_other": "{{count}} entries · net {{net}}"
   },
   "miningTax": {
     "title": "Mining",
