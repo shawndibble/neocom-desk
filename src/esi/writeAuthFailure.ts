@@ -15,25 +15,18 @@
  * question, whether a *held* scope has gone stale; a write has no such
  * fallback, since the next read discovers a revoke on its own.
  */
-import { db } from '@/db';
 import { emitEsiAuthFailure } from './authFailureSignal';
 import { isAuthFailure, EsiError } from './client';
-import { ESI_REGISTRY, isScopeRequired, type EsiEndpointId } from './registry';
+import { grantHoldsEndpointScope } from './grantScope';
+import type { EsiEndpointId } from './registry';
 
 export type WriteAuthOutcome =
   /** Not an auth failure at all; nothing was reported. */
   | 'ignored'
-  /** An auth failure a re-login would not fix (or a dead refresh grant, reported plainly). */
+  /** An auth failure with no Permission to ask for: reported plainly (a dead grant, a 401), or a refusal a re-login would not fix and so not reported. */
   | 'refused'
   /** The grant lacks the endpoint's scope; the shell notice now asks for its Permission. */
   | 'grant-needed';
-
-async function grantLacksScope(characterId: number, endpointId: EsiEndpointId): Promise<boolean> {
-  const spec = ESI_REGISTRY[endpointId];
-  if (!isScopeRequired(spec.scope)) return false;
-  const token = await db.tokens.get(characterId);
-  return !(token?.scopes ?? []).includes(spec.scope);
-}
 
 export async function reportWriteAuthFailure(
   characterId: number,
@@ -41,12 +34,13 @@ export async function reportWriteAuthFailure(
   endpointId: EsiEndpointId
 ): Promise<WriteAuthOutcome> {
   if (!isAuthFailure(err)) return 'ignored';
-  // The refresh grant itself failing has no single scope to blame.
-  if (!(err instanceof EsiError)) {
+  // A refresh grant that failed (an `AuthError`), or a 401: the credential was
+  // not accepted, no single scope is to blame, and a fresh login replaces it.
+  if (!(err instanceof EsiError) || err.status === 401) {
     emitEsiAuthFailure(characterId);
     return 'refused';
   }
-  if (!(await grantLacksScope(characterId, endpointId))) return 'refused';
+  if (await grantHoldsEndpointScope(characterId, endpointId)) return 'refused';
   emitEsiAuthFailure(characterId, endpointId);
   return 'grant-needed';
 }

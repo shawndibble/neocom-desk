@@ -56,10 +56,23 @@ describe('reportWriteAuthFailure', () => {
     expect(reported).not.toHaveBeenCalled();
   });
 
-  it('treats a character with no stored grant as lacking the scope', async () => {
+  it('reports a 401 plainly even when the scope is held: a stale token is what a re-login fixes', async () => {
+    // Unlike a 403, a 401 says the credential itself was not accepted, and a
+    // fresh login replaces it. No Permission is named: the scope is not missing.
+    await seedGrant([SEND_MAIL]);
     const { reported, unsubscribe } = listen();
 
     const outcome = await reportWriteAuthFailure(CHAR_ID, refused(401), 'postCharacterMail');
+    unsubscribe();
+
+    expect(outcome).toBe('refused');
+    expect(reported).toHaveBeenCalledWith(CHAR_ID);
+  });
+
+  it('treats a character with no stored grant as lacking the scope', async () => {
+    const { reported, unsubscribe } = listen();
+
+    const outcome = await reportWriteAuthFailure(CHAR_ID, refused(403), 'postCharacterMail');
     unsubscribe();
 
     expect(outcome).toBe('grant-needed');
