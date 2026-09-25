@@ -10,23 +10,39 @@ interface SavedFittingModalProps {
   onClose: () => void;
 }
 
-export function RenameFittingModal({ record, onClose }: SavedFittingModalProps) {
+interface FittingNameModalProps {
+  open: boolean;
+  /** Prefill; the text resets to it each time the dialog opens for a different key. */
+  name: string;
+  resetKey: string | null;
+  onSubmit: (name: string) => void;
+  onClose: () => void;
+}
+
+/** The rename dialog: My Fittings rows and the editor header share it. */
+export function FittingNameModal({
+  open,
+  name,
+  resetKey,
+  onSubmit,
+  onClose,
+}: FittingNameModalProps) {
   const { t } = useTranslation();
-  // Reset to the record's name each time a different one opens, during render.
-  const [text, setText] = useState(record?.name ?? '');
-  const [forId, setForId] = useState(record?.id ?? null);
-  if ((record?.id ?? null) !== forId) {
-    setForId(record?.id ?? null);
-    setText(record?.name ?? '');
+  // Reset to the given name each time a different one opens, during render.
+  const [text, setText] = useState(name);
+  const [forKey, setForKey] = useState(resetKey);
+  if (resetKey !== forKey) {
+    setForKey(resetKey);
+    setText(name);
   }
   return (
-    <Modal open={record !== null} onClose={onClose} title={t('fittings.myFittings.confirmRename')}>
+    <Modal open={open} onClose={onClose} title={t('fittings.myFittings.confirmRename')}>
       <form
         className="space-y-3"
         onSubmit={(e) => {
           e.preventDefault();
-          const name = text.trim();
-          if (record && name !== '') void renameFitting(record, name);
+          const trimmed = text.trim();
+          if (trimmed !== '') onSubmit(trimmed);
           onClose();
         }}
       >
@@ -47,6 +63,20 @@ export function RenameFittingModal({ record, onClose }: SavedFittingModalProps) 
         </div>
       </form>
     </Modal>
+  );
+}
+
+export function RenameFittingModal({ record, onClose }: SavedFittingModalProps) {
+  return (
+    <FittingNameModal
+      open={record !== null}
+      name={record?.name ?? ''}
+      resetKey={record?.id ?? null}
+      onSubmit={(name) => {
+        if (record) void renameFitting(record, name);
+      }}
+      onClose={onClose}
+    />
   );
 }
 

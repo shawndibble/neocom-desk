@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { db } from '@/db';
-import { saveFitting } from './myFittings';
+import { renameFitting, saveFitting } from './myFittings';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useUrlParam } from '@/lib/useUrlState';
 import { FITTING_EDIT_PATH, fittingEditLocation } from './fittingRoutes';
@@ -141,6 +141,12 @@ export interface FittingWorkspace extends FittingEvaluation {
    * first-time Save.
    */
   saveAsNew: (name: string) => Promise<void>;
+  /**
+   * Renames the open Fitting on screen; a saved one has its My Fittings record
+   * renamed too, so a later Save doesn't put the old name back. Otherwise
+   * independent of Save.
+   */
+  rename: (name: string) => void;
   /** Opens a saved Fitting by its share code, under its saved name. */
   openSaved: (record: { id: string; name: string; code: string }) => void;
 }
@@ -464,6 +470,17 @@ export function useFittingWorkspace(): FittingWorkspace {
     [activeCharacterId, applyEdit]
   );
 
+  const rename = useCallback(
+    (name: string) => {
+      applyEdit((f) => ({ ...f, name }), { history: 'none' });
+      if (savedId === null) return;
+      void db.fittings.get(savedId).then((record) => {
+        if (record) void renameFitting(record, name);
+      });
+    },
+    [applyEdit, savedId]
+  );
+
   // A saved record belongs to one Character; so does a launch's drone count.
   useEffect(() => {
     launchPendingRef.current = null;
@@ -556,6 +573,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     canSave,
     save,
     saveAsNew,
+    rename,
     openSaved,
   };
 }

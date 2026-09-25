@@ -40,6 +40,8 @@ export type LoadParts =
       modules: FittingModule[];
       drones: FittingDrone[];
       cargo: FittingCargoItem[];
+      /** A name the source itself carried (an EFT header's fit name); absent → the hull's. */
+      fitName?: string;
       unresolved: LoadWarning[];
     }
   | { hullTypeId: null; unresolved: LoadWarning[] };
@@ -140,6 +142,8 @@ export async function loadText(
     if (typeof read === 'string') return failed(read);
     parts = read;
   }
-  const name = parts.hullTypeId === null ? '' : await sources.hullName(parts.hullTypeId);
+  const carried = parts.hullTypeId === null ? undefined : parts.fitName?.trim();
+  const name =
+    parts.hullTypeId === null ? '' : carried || (await sources.hullName(parts.hullTypeId));
   return toLoadOutcome(parts, name, 'text');
 }
