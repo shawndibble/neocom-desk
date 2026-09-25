@@ -4,6 +4,7 @@ import type { Fitting, FittingStats, PilotProfile } from '@/engine/fittings/type
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { VariantEvaluator } from './useFittingEvaluation';
 import { useModuleVariations } from './useModuleVariations';
+import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
 
 const checkCandidates = vi.fn();
 vi.mock('./dogmaFittingEngine', () => ({
@@ -61,6 +62,7 @@ const baseStats: FittingStats = {
   offense: { weapons: [], dps: 0, volley: 0, overheated: null },
   repair: { shield: 0, armor: 0, hull: 0 },
   overheated: null,
+  ...neutralExtendedStats(),
 };
 
 const fitting: Fitting = {

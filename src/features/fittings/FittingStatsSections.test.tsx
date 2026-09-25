@@ -10,6 +10,7 @@ import type { DamageProfiles } from './damageProfiles';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
 import { FittingStatsSections } from './FittingStatsSections';
+import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
 
 function layer(hp: number, ehp: number) {
   return {
@@ -58,6 +59,7 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     offense: { weapons: [], dps: 0, volley: 0, overheated: null },
     repair: { shield: 0, armor: 0, hull: 0 },
     overheated: null,
+    ...neutralExtendedStats(),
     ...overrides,
   };
 }

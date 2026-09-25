@@ -11,7 +11,6 @@ import {
 import type {
   DamageFigures as DamageFiguresValue,
   FittingStats,
-  LocalRepair,
   Resonances,
   StatsErrorReason,
 } from '@/engine/fittings/types';
@@ -20,6 +19,8 @@ import type { DogmaAssetProgress } from './dogmaFittingEngine';
 import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
 import { DamageProfilePicker } from './DamageProfilePicker';
 import { AppliedDpsPanel } from './AppliedDpsPanel';
+import { Facts, Overheated } from './StatFacts';
+import { CapacitorFacts, TankFacts } from './FittingTankStats';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
 
@@ -49,42 +50,6 @@ const RESONANCE_KEY = {
 } as const satisfies Record<DamageType, keyof Resonances>;
 
 const MICRO_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
-
-/**
- * An overheated value beside its normal one, in the warning tone — the
- * game marks heat the same way. Renders nothing when `value` is null.
- */
-function Overheated({
-  value,
-  digits,
-  unit = '',
-}: {
-  value: number | null;
-  digits: number;
-  unit?: string;
-}) {
-  const { t } = useTranslation();
-  if (value === null) return null;
-  return (
-    <span className="ml-1 text-warning">
-      {t('fittings.stats.overheated', { value: `${value.toFixed(digits)}${unit}` })}
-    </span>
-  );
-}
-
-/** Label-over-value pairs, two to a row — the compact body most sections use. */
-function Facts({ items }: { items: { label: string; value: ReactNode }[] }) {
-  return (
-    <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs tabular-nums">
-      {items.map((item) => (
-        <div key={item.label} className="min-w-0">
-          <dt className="text-[0.6875rem] text-text-dim">{item.label}</dt>
-          <dd>{item.value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
 
 /** One resist, as the game draws it: the damage type's colour filling the share resisted. */
 function ResistCell({ resonance, tone }: { resonance: number; tone: DamageType }) {
@@ -179,8 +144,6 @@ function DamageFigures({
     </span>
   );
 }
-
-const REPAIR_LAYERS: readonly (keyof LocalRepair)[] = ['shield', 'armor', 'hull'];
 
 const SECTIONS = [
   'offense',
@@ -510,29 +473,13 @@ export function FittingStatsSections({
                   {t('fittings.stats.armorIncludesRah', { profile: profileName })}
                 </p>
               )}
-              <ul className="space-y-1 text-xs text-text-dim">
-                {overheatedEhp !== null && (
-                  <li>
-                    {t('fittings.stats.ehpLine', { value: stats.ehp.toFixed(0) })}
-                    <Overheated value={overheatedEhp} digits={0} />
-                  </li>
-                )}
-                {REPAIR_LAYERS.filter((layer) => stats.repair[layer] > 0).map((layer) => (
-                  <li key={layer}>
-                    {t(`fittings.stats.repair.${layer}`, {
-                      value: stats.repair[layer].toFixed(1),
-                    })}
-                    <Overheated
-                      value={overheatedOrNull(
-                        stats.repair[layer],
-                        stats.overheated?.repair[layer],
-                        1
-                      )}
-                      digits={1}
-                    />
-                  </li>
-                ))}
-              </ul>
+              {overheatedEhp !== null && (
+                <p className="text-xs text-text-dim">
+                  {t('fittings.stats.ehpLine', { value: stats.ehp.toFixed(0) })}
+                  <Overheated value={overheatedEhp} digits={0} />
+                </p>
+              )}
+              <TankFacts stats={stats} typeName={typeName} />
             </>
           ) : (
             placeholder
@@ -551,24 +498,7 @@ export function FittingStatsSections({
                 seconds: stats.capacitor.depletesInSeconds.toFixed(0),
               })
           : undefined,
-        stats ? (
-          <Facts
-            items={[
-              {
-                label: t('fittings.stats.fact.capacity'),
-                value: t('fittings.stats.unit.gj', { value: stats.capacitorCapacity.toFixed(0) }),
-              },
-              {
-                label: t('fittings.stats.fact.recharge'),
-                value: t('fittings.stats.unit.seconds', {
-                  value: (stats.capacitorRechargeTime / 1000).toFixed(0),
-                }),
-              },
-            ]}
-          />
-        ) : (
-          placeholder
-        )
+        stats ? <CapacitorFacts stats={stats} /> : placeholder
       )}
 
       {section(

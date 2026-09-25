@@ -14,7 +14,19 @@ import {
   type OverheatedStats,
   type WeaponRow,
   type Resonances,
+  type AncillaryRepairer,
+  type TankStats,
 } from './types';
+import {
+  capacitorBudget,
+  sustainedRepair,
+  type CapacitorBudget,
+  type CapacitorUser,
+  type RepairLayer,
+  type Repairer,
+} from './tank';
+
+const REPAIR_LAYERS: readonly RepairLayer[] = ['shield', 'armor', 'hull'];
 
 interface AttributeMap {
   get(attributeId: number): { value: number } | undefined;
@@ -188,6 +200,8 @@ export function extractFittingStats(
   | 'offense'
   | 'overheated'
   | 'applied'
+  | 'capacitorBudget'
+  | 'tank'
 > {
   const cpuTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.cpuOutput);
   const powergridTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.powerOutput);
@@ -356,6 +370,137 @@ export function extractOffense(
           volley: sum((row) => row.overheated?.volley ?? row.volley),
         }
       : null,
+  };
+}
+
+/** A module (not a drone, implant or cargo) as `calculate()` was given it, with its charge. */
+interface ModuleItem extends CalculatedItem {
+  charge?: { type_id: number };
+}
+
+interface RunningResult {
+  attributes: AttributeMap;
+  state: FittingItemState;
+}
+
+const MODULE_SLOTS: ReadonlySet<string> = new Set(['high', 'medium', 'low', 'rig', 'subsystem']);
+
+/** The fitted modules that are running (active or overloaded), with their results. */
+function runningModules<I extends CalculatedItem, R extends RunningResult>(
+  items: readonly I[],
+  results: readonly R[]
+): { item: I; result: R }[] {
+  return items.flatMap((item, index) => {
+    const result = results[index];
+    return result && MODULE_SLOTS.has(item.slot.type) && isFiring(result.state)
+      ? [{ item, result }]
+      : [];
+  });
+}
+
+/** Peak recharge against every running module's draw (`tank.ts`'s `capacitorBudget`). */
+export function extractCapacitorBudget(
+  items: readonly CalculatedItem[],
+  results: readonly RunningResult[],
+  shipAttributes: AttributeMap
+): CapacitorBudget {
+  const users: CapacitorUser[] = runningModules(items, results).map(({ result }) => {
+    const read = (id: number) => readAttribute(result.attributes, id);
+    const injectionPerCharge = read(ITEM_DOGMA_ATTRIBUTE.capacitorInjectionAmount);
+    return {
+      capPerSecond: read(ITEM_DOGMA_ATTRIBUTE.capacitorPeakLoad),
+      ...(injectionPerCharge > 0 ? { injectionPerCharge } : {}),
+    };
+  });
+  return capacitorBudget(
+    users,
+    readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakRecharge)
+  );
+}
+
+const REPAIR_RATE_ATTRIBUTE: Record<RepairLayer, number> = {
+  shield: ITEM_DOGMA_ATTRIBUTE.shieldBoostRate,
+  armor: ITEM_DOGMA_ATTRIBUTE.armorRepairRate,
+  hull: ITEM_DOGMA_ATTRIBUTE.hullRepairRate,
+};
+
+/** EHP ÷ HP for a layer — how far the Damage Profile stretches one repaired HP. */
+function ehpPerHp(layer: LayerDefense): number {
+  return layer.hp > 0 ? layer.ehp / layer.hp : 1;
+}
+
+/**
+ * Burst and sustained local tank (`tank.ts`). A module with an optimal range
+ * repairs someone else — the engine gives a remote repairer the same rate
+ * attribute a local one has, and keeps it out of the ship's own total.
+ */
+export function extractTank(
+  items: readonly ModuleItem[],
+  results: readonly RunningResult[],
+  shipAttributes: AttributeMap,
+  layers: Pick<FittingStats, 'shield' | 'armor' | 'hull'>
+): TankStats {
+  const repairers: Repairer[] = [];
+  const ancillary: AncillaryRepairer[] = [];
+  for (const { item, result } of runningModules(items, results)) {
+    const read = (id: number) => readAttribute(result.attributes, id);
+    if (read(ITEM_DOGMA_ATTRIBUTE.maxRange) > 0) continue;
+    for (const layer of REPAIR_LAYERS) {
+      const rate = read(REPAIR_RATE_ATTRIBUTE[layer]);
+      if (rate <= 0) continue;
+      const chargeRate = read(ITEM_DOGMA_ATTRIBUTE.chargeRate) || 1;
+      repairers.push({
+        layer,
+        rate,
+        capPerSecond: read(ITEM_DOGMA_ATTRIBUTE.capacitorPeakLoad),
+        ...(item.charge
+          ? {
+              ancillary: {
+                cycles: Math.floor(read(ITEM_DOGMA_ATTRIBUTE.chargeAmount) / chargeRate + 1e-9),
+                cycleSeconds: read(ITEM_DOGMA_ATTRIBUTE.cycleTime) / 1000,
+                reloadSeconds: read(ITEM_DOGMA_ATTRIBUTE.reloadTime) / 1000,
+              },
+            }
+          : {}),
+      });
+      // The paste multiplier lands on the paste, not the module (a live run:
+      // the module's own `chargedRepairMultiplier` stays unset), so a loaded
+      // charge is what says the multiplier is in the rate.
+      const pasteMultiplier = read(ITEM_DOGMA_ATTRIBUTE.chargedArmorDamageMultiplier);
+      if (pasteMultiplier > 1) {
+        const isLoaded = item.charge !== undefined;
+        ancillary.push({
+          typeId: item.type_id,
+          layer,
+          loaded: isLoaded ? rate : rate * pasteMultiplier,
+          empty: isLoaded ? rate / pasteMultiplier : rate,
+          isLoaded,
+        });
+      }
+    }
+  }
+
+  const { sustained, capFraction } = sustainedRepair(repairers, {
+    peakRecharge: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakRecharge),
+    peakLoad: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakLoad),
+  });
+  const burst = localRepair(shipAttributes);
+  const passiveShield = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.passiveShieldRechargeRate);
+  const passiveEffective = readAttribute(
+    shipAttributes,
+    DOGMA_ATTRIBUTE.passiveShieldEffectiveRechargeRate
+  );
+  const effective = (rates: LocalRepair) =>
+    REPAIR_LAYERS.reduce((sum, layer) => sum + rates[layer] * ehpPerHp(layers[layer]), 0) +
+    passiveEffective;
+  return {
+    burst,
+    sustained,
+    passiveShield,
+    burstEffective: effective(burst),
+    sustainedEffective: effective(sustained),
+    capFraction,
+    ancillary,
   };
 }
 

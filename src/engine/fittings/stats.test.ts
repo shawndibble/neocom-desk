@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   alignTimeSeconds,
   showsDrones,
+  extractCapacitorBudget,
   extractDroneLimits,
+  extractTank,
   extractFittingStats,
   extractModuleResult,
   extractOffense,
@@ -11,7 +13,7 @@ import {
   weaponRowKey,
   type OffenseItem,
 } from './stats';
-import { DOGMA_ATTRIBUTE, ITEM_DOGMA_ATTRIBUTE } from './types';
+import { DOGMA_ATTRIBUTE, ITEM_DOGMA_ATTRIBUTE, type FittingItemState } from './types';
 
 function attrs(
   values: Partial<Record<keyof typeof DOGMA_ATTRIBUTE, number>>
@@ -540,5 +542,164 @@ describe('extractFittingStats — hardpoints', () => {
       [101, { value: 2 }],
     ]);
     expect(extractFittingStats([], ship, []).hardpoints).toEqual({ turrets: 3, launchers: 2 });
+  });
+});
+
+function itemAttrs(
+  values: Partial<Record<keyof typeof ITEM_DOGMA_ATTRIBUTE, number>>
+): Map<number, { value: number }> {
+  const map = new Map<number, { value: number }>();
+  for (const [key, value] of Object.entries(values)) {
+    map.set(ITEM_DOGMA_ATTRIBUTE[key as keyof typeof ITEM_DOGMA_ATTRIBUTE], { value });
+  }
+  return map;
+}
+
+function running(
+  typeId: number,
+  values: Partial<Record<keyof typeof ITEM_DOGMA_ATTRIBUTE, number>>,
+  { chargeTypeId, state = 'active' }: { chargeTypeId?: number; state?: FittingItemState } = {}
+) {
+  return {
+    item: {
+      type_id: typeId,
+      slot: { type: 'medium' },
+      ...(chargeTypeId === undefined ? {} : { charge: { type_id: chargeTypeId } }),
+    },
+    result: { attributes: itemAttrs(values), state },
+  };
+}
+
+describe('extractCapacitorBudget', () => {
+  it("splits the running modules' draw from a cap booster's injection and a nosferatu's take", () => {
+    const modules = [
+      running(1, { capacitorPeakLoad: 20 }),
+      running(2, { capacitorPeakLoad: -400 / 12, capacitorInjectionAmount: 400, cycleTime: 12000 }),
+      running(3, { capacitorPeakLoad: -7.2 }),
+      // Online, not running: draws nothing whatever its figure says.
+      running(4, { capacitorPeakLoad: 50 }, { state: 'online' }),
+    ];
+    const budget = extractCapacitorBudget(
+      modules.map((m) => m.item),
+      modules.map((m) => m.result),
+      attrs({ capacitorPeakRecharge: 35.84 })
+    );
+
+    expect(budget.peakRecharge).toBeCloseTo(35.84, 6);
+    expect(budget.drain).toBeCloseTo(20, 6);
+    expect(budget.boosterInjection).toBeCloseTo(33.333, 3);
+    expect(budget.nosferatuGain).toBeCloseTo(7.2, 6);
+  });
+
+  it('leaves drones, cargo and implants out', () => {
+    const drone = {
+      item: { type_id: 9, slot: { type: 'drone_bay' } },
+      result: { attributes: itemAttrs({ capacitorPeakLoad: 5 }), state: 'active' as const },
+    };
+    const budget = extractCapacitorBudget([drone.item], [drone.result], attrs({}));
+    expect(budget.drain).toBe(0);
+  });
+});
+
+describe('extractTank', () => {
+  const layers = {
+    shield: {
+      hp: 1000,
+      ehp: 2000,
+      emResonance: 1,
+      thermalResonance: 1,
+      kineticResonance: 1,
+      explosiveResonance: 1,
+    },
+    armor: {
+      hp: 1000,
+      ehp: 4000,
+      emResonance: 1,
+      thermalResonance: 1,
+      kineticResonance: 1,
+      explosiveResonance: 1,
+    },
+    hull: {
+      hp: 1000,
+      ehp: 1000,
+      emResonance: 1,
+      thermalResonance: 1,
+      kineticResonance: 1,
+      explosiveResonance: 1,
+    },
+  };
+
+  it('reads burst per layer off the ship and sustained from the local repairers, scaled to EHP/s', () => {
+    const modules = [
+      running(1, { shieldBoostRate: 40, capacitorPeakLoad: 20 }),
+      // A remote armor repairer: it has a range, and what it repairs is someone else's.
+      running(2, { armorRepairRate: 50, capacitorPeakLoad: 10, maxRange: 6000 }),
+    ];
+    const tank = extractTank(
+      modules.map((m) => m.item),
+      modules.map((m) => m.result),
+      attrs({
+        shieldBoostRate: 40,
+        capacitorPeakRecharge: 20,
+        capacitorPeakLoad: 30,
+        passiveShieldRechargeRate: 5,
+        passiveShieldEffectiveRechargeRate: 10,
+      }),
+      layers
+    );
+
+    expect(tank.burst).toEqual({ shield: 40, armor: 0, hull: 0 });
+    // 10 GJ/s go to the remote rep, 10 are left for the booster's 20.
+    expect(tank.capFraction).toBeCloseTo(0.5, 6);
+    expect(tank.sustained.shield).toBeCloseTo(20, 6);
+    expect(tank.passiveShield).toBe(5);
+    // Shield EHP/HP is 2: burst 80 + passive 10; sustained 40 + 10.
+    expect(tank.burstEffective).toBeCloseTo(90, 6);
+    expect(tank.sustainedEffective).toBeCloseTo(50, 6);
+  });
+
+  it('spreads a loaded ancillary armor repairer over its reload and gives its empty rate', () => {
+    const aar = running(
+      33101,
+      {
+        armorRepairRate: 78,
+        capacitorPeakLoad: 0,
+        chargeAmount: 32,
+        chargeRate: 4,
+        cycleTime: 12000,
+        reloadTime: 60000,
+        chargedArmorDamageMultiplier: 3,
+      },
+      { chargeTypeId: 28668 }
+    );
+    const tank = extractTank(
+      [aar.item],
+      [aar.result],
+      attrs({ armorRepairRate: 78, capacitorPeakRecharge: 30 }),
+      layers
+    );
+
+    expect(tank.sustained.armor).toBeCloseTo((78 * 96) / 156, 6);
+    expect(tank.ancillary).toEqual([
+      { typeId: 33101, layer: 'armor', loaded: 78, empty: 26, isLoaded: true },
+    ]);
+  });
+
+  it('gives an empty ancillary armor repairer its loaded rate from its own multiplier', () => {
+    const aar = running(33101, {
+      armorRepairRate: 26,
+      capacitorPeakLoad: 17.8,
+      chargedArmorDamageMultiplier: 3,
+    });
+    const tank = extractTank(
+      [aar.item],
+      [aar.result],
+      attrs({ armorRepairRate: 26, capacitorPeakRecharge: 30, capacitorPeakLoad: 17.8 }),
+      layers
+    );
+    expect(tank.ancillary).toEqual([
+      { typeId: 33101, layer: 'armor', loaded: 78, empty: 26, isLoaded: false },
+    ]);
+    expect(tank.sustained.armor).toBeCloseTo(26, 6);
   });
 });

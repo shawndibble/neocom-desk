@@ -6,6 +6,7 @@
  * place that talks to the vendor package, and maps these shapes onto its own.
  */
 import type { AppliedDpsInputs } from './appliedDps';
+import type { CapacitorBudget } from './tank';
 
 export type FittingSlotKind = 'high' | 'medium' | 'low' | 'rig' | 'subsystem';
 
@@ -177,6 +178,9 @@ export interface FittingStats {
   modules: FittingModuleResult[];
   offense: OffenseStats;
   repair: LocalRepair;
+  /** Peak recharge against what the running modules draw (`tank.ts`). */
+  capacitorBudget: CapacitorBudget;
+  tank: TankStats;
   /**
    * The same fit recalculated by the engine with every active module that
    * can overheat set to overload; null when no module can (nothing to show).
@@ -219,6 +223,41 @@ export interface LocalRepair {
   shield: number;
   armor: number;
   hull: number;
+}
+
+/** An ancillary armor repairer: its rate with paste and without, whichever it is running. */
+export interface AncillaryRepairer {
+  typeId: number;
+  layer: keyof LocalRepair;
+  /** HP/s with paste loaded. */
+  loaded: number;
+  /** HP/s running dry. */
+  empty: number;
+  /** Paste is loaded now. */
+  isLoaded: boolean;
+}
+
+/**
+ * Local tank, burst beside sustained (`tank.ts`): burst is every repairer at
+ * full speed as the engine reports it; sustained is what the capacitor and
+ * ancillary reloads let them average.
+ */
+export interface TankStats {
+  /** HP/s. */
+  burst: LocalRepair;
+  /** HP/s. */
+  sustained: LocalRepair;
+  /** Passive shield regeneration at its peak, HP/s. */
+  passiveShield: number;
+  /**
+   * EHP/s under the Damage Profile — each layer's HP/s scaled by its EHP ÷
+   * HP — with passive shield regeneration included.
+   */
+  burstEffective: number;
+  sustainedEffective: number;
+  /** The share (0–1) of the capacitor-using repairers' draw the capacitor can feed; below 1 the tank is cap-limited. */
+  capFraction: number;
+  ancillary: AncillaryRepairer[];
 }
 
 export interface OverheatedStats {
@@ -281,6 +320,24 @@ export const DOGMA_ATTRIBUTE = {
   armorRepairRate: -45,
   hullRepairRate: -46,
   shieldBoostRate: -47,
+  // Capacitor peaks, GJ/s (same `patches/ids.yaml`; read out of the pinned
+  // `sde.dat` 2026-09-25). Peak recharge is 2.5 × capacity ÷ recharge time
+  // (the default 2.5 times `capacitorCapacity` over `rechargeRate`, checked
+  // by hand against a live run); peak load is every running module's draw,
+  // with a cap booster's injection and a nosferatu's take netted off as
+  // negative draws.
+  capacitorPeakRecharge: -2,
+  capacitorPeakLoad: -4,
+  // Passive shield regeneration at its peak, 2.5 × shield HP ÷ recharge
+  // time — raw HP/s, and EHP/s under the Damage Profile.
+  passiveShieldRechargeRate: -51,
+  passiveShieldEffectiveRechargeRate: -52,
+  // The strongest of the four sensor strengths (a hull has one).
+  scanStrength: -53,
+  // What the ship can lock under its pilot's skills: the patched effect
+  // assigns the character's own limit, and the engine keeps the lower of
+  // it and the hull's. See `lockedTargetLimit` for the base it misses.
+  maxTargetsCharacter: -71,
   // Everything below is a plain SDE attribute (verified 2026-09-24 the same
   // way as the block above, plus a live run of the pinned engine against a
   // Rifter — see git history for the probe): calculate() returns the ship's
@@ -336,6 +393,19 @@ export const DOGMA_ATTRIBUTE = {
   lowSlots: 12,
   rigSlots: 1137,
   subsystemSlots: 1367,
+  // Sensor strengths by type (plain SDE, looked up by name in the pinned
+  // `sde.dat` 2026-09-25): a hull carries one of the four.
+  scanRadarStrength: 208,
+  scanLadarStrength: 209,
+  scanMagnetometricStrength: 210,
+  scanGravimetricStrength: 211,
+  // Holds, m³ (plain SDE, same lookup): the cargo hold is `capacity`.
+  cargoCapacity: 38,
+  fleetHangarCapacity: 912,
+  miningHoldCapacity: 1556,
+  jumpDriveRange: 867,
+  jumpDriveConsumptionAmount: 868,
+  jumpDriveConsumptionType: 866,
 } as const;
 
 /** Turret and launcher hardpoints — a hull's, or those its high slots take. */
@@ -387,6 +457,25 @@ export const ITEM_DOGMA_ATTRIBUTE = {
   // engine, 2026-09-24). Marks the module whose own armor resonances
   // (DOGMA_ATTRIBUTE.armor*Resonance ids, read off the item) are adapted.
   resistanceShiftAmount: 1849,
+  // Per-module capacitor and repair figures (patched ids, `patches/ids.yaml`
+  // as read out of the pinned `sde.dat` 2026-09-25, and a live run): GJ/s the
+  // module draws at full speed (negative for a cap booster or nosferatu), its
+  // cycle in ms, charges it holds, GJ a cap booster's charge injects, and its
+  // own repair rate in HP/s — a remote repairer's is what it hands out.
+  capacitorPeakLoad: -4,
+  cycleTime: -3,
+  chargeAmount: -8,
+  capacitorInjectionAmount: -67,
+  armorRepairRate: -45,
+  hullRepairRate: -46,
+  shieldBoostRate: -47,
+  // The ancillary armor repairer's paste multiplier (3 on a Medium AAR).
+  chargedArmorDamageMultiplier: 1886,
+  // Charges one cycle uses, and the reload, ms (plain SDE).
+  chargeRate: 56,
+  reloadTime: 1795,
+  // Optimal range, metres: only modules that reach another ship carry one.
+  maxRange: 54,
 } as const;
 
 export const CHARGE_GROUP_ATTRIBUTES: readonly number[] = [

@@ -9,6 +9,8 @@ import wasmInit, {
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import {
+  extractCapacitorBudget,
+  extractTank,
   extractDroneLimits,
   extractFittingStats,
   extractModuleResult,
@@ -291,6 +293,12 @@ export async function computeFittingStats(
     offense,
     overheated,
     applied,
+    capacitorBudget: extractCapacitorBudget(
+      dogmaFit.items,
+      calculation.items,
+      calculation.ship.attributes
+    ),
+    tank: extractTank(dogmaFit.items, calculation.items, calculation.ship.attributes, baseStats),
   };
 }
 

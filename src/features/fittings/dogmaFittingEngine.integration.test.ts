@@ -5,6 +5,8 @@ import wasmInit, { calculate } from '@eveshipfit/dogma-engine';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import { withWeather } from './dogmaFittingEngine';
 import {
+  extractCapacitorBudget,
+  extractTank,
   extractDroneLimits,
   extractFittingStats,
   extractModuleResult,
@@ -52,6 +54,18 @@ const REACTIVE_ARMOR_HARDENER = 4403;
 const CARACAL = 621;
 const HEAVY_MISSILE_LAUNCHER_II = 2410;
 const SCOURGE_HEAVY_MISSILE = 209;
+// Looked up by exact name in the pinned `sde.dat`, 2026-09-25.
+const HURRICANE = 24702;
+const MEDIUM_SHIELD_BOOSTER_II = 10850;
+const MEDIUM_CAPACITOR_BOOSTER_II = 2024;
+const CAP_BOOSTER_400 = 11287;
+const CAP_BOOSTER_150 = 11283;
+const MEDIUM_ENERGY_NEUTRALIZER_II = 12267;
+const MEDIUM_ENERGY_NOSFERATU_II = 12259;
+const MEDIUM_REMOTE_ARMOR_REPAIRER_II = 26913;
+const MEDIUM_ANCILLARY_ARMOR_REPAIRER = 33101;
+const NANITE_REPAIR_PASTE = 28668;
+const MEDIUM_ANCILLARY_SHIELD_BOOSTER = 32772;
 
 const PARTIAL_SKILLS = new Map([
   [3332, 3], // Gallente Cruiser
@@ -416,6 +430,103 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(extractModuleResult(calculation.items[1])).not.toHaveProperty('adaptedResonances');
   });
 
+  it('splits the capacitor budget the way the engine nets it, and keeps remote reps out of the local tank', () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Caracal support',
+      shipTypeId: CARACAL,
+      modules: [
+        { slot: 'medium', slotIndex: 0, typeId: MEDIUM_SHIELD_BOOSTER_II, state: 'active' },
+        {
+          slot: 'medium',
+          slotIndex: 1,
+          typeId: MEDIUM_CAPACITOR_BOOSTER_II,
+          state: 'active',
+          chargeTypeId: CAP_BOOSTER_400,
+        },
+        { slot: 'medium', slotIndex: 2, typeId: MEDIUM_ENERGY_NEUTRALIZER_II, state: 'active' },
+        { slot: 'medium', slotIndex: 3, typeId: MEDIUM_ENERGY_NOSFERATU_II, state: 'active' },
+        { slot: 'high', slotIndex: 0, typeId: MEDIUM_REMOTE_ARMOR_REPAIRER_II, state: 'active' },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(SUPPORT_SKILL_IDS));
+    const calculation = calculate(dogmaFit);
+    const ship = calculation.ship.attributes;
+    const read = (id: number) => ship.get(id)?.value ?? 0;
+    const stats = extractFittingStats(dogmaFit.items, ship, calculation.items);
+    const budget = extractCapacitorBudget(dogmaFit.items, calculation.items, ship);
+    const tank = extractTank(dogmaFit.items, calculation.items, ship, stats);
+
+    // Peak recharge is 2.5 × capacity over the recharge time, in seconds.
+    expect(budget.peakRecharge).toBeCloseTo(
+      (2.5 * stats.capacitorCapacity) / (stats.capacitorRechargeTime / 1000),
+      6
+    );
+    // The split adds back up to the engine's own net peak load (-4).
+    expect(budget.drain - budget.boosterInjection - budget.nosferatuGain).toBeCloseTo(read(-4), 6);
+    // A Cap Booster 400 every 12 s; the Medium Energy Nosferatu II's 36 GJ every 5 s.
+    expect(budget.boosterInjection).toBeCloseTo(400 / 12, 6);
+    expect(budget.nosferatuGain).toBeCloseTo(36 / 5, 6);
+    expect(budget.delta).toBeCloseTo(read(-5), 6);
+
+    // The remote armor repairer repairs someone else: the local tank has no armor.
+    expect(tank.burst.armor).toBe(0);
+    expect(tank.burst.shield).toBeGreaterThan(0);
+    // Passive regeneration peaks at 2.5 × shield HP over the shield recharge time.
+    expect(tank.passiveShield).toBeCloseTo((2.5 * stats.shield.hp) / (read(479) / 1000), 6);
+  });
+
+  it('runs an ancillary armor repairer at three times its dry rate on paste, and an ancillary shield booster on charges draws no capacitor', () => {
+    const run = (module: Fitting['modules'][number]) => {
+      const dogmaFit = fittingToDogmaFit(
+        { name: 'AAR', shipTypeId: HURRICANE, modules: [module], drones: [], cargo: [] },
+        buildAllVProfile(SUPPORT_SKILL_IDS)
+      );
+      const calculation = calculate(dogmaFit);
+      const stats = extractFittingStats(
+        dogmaFit.items,
+        calculation.ship.attributes,
+        calculation.items
+      );
+      return {
+        tank: extractTank(dogmaFit.items, calculation.items, calculation.ship.attributes, stats),
+        budget: extractCapacitorBudget(
+          dogmaFit.items,
+          calculation.items,
+          calculation.ship.attributes
+        ),
+      };
+    };
+    const aar = {
+      slot: 'low',
+      slotIndex: 0,
+      typeId: MEDIUM_ANCILLARY_ARMOR_REPAIRER,
+      state: 'active',
+    } as const;
+    const loaded = run({ ...aar, chargeTypeId: NANITE_REPAIR_PASTE });
+    const dry = run(aar);
+
+    expect(loaded.tank.burst.armor).toBeCloseTo(dry.tank.burst.armor * 3, 6);
+    expect(loaded.tank.ancillary).toEqual([
+      expect.objectContaining({ isLoaded: true, loaded: loaded.tank.burst.armor }),
+    ]);
+    expect(loaded.tank.ancillary[0].empty).toBeCloseTo(dry.tank.burst.armor, 6);
+    expect(dry.tank.ancillary[0].loaded).toBeCloseTo(loaded.tank.burst.armor, 6);
+    // 0.32 m³ of paste at 0.01 m³, four a cycle: 8 cycles (9 s each, skills
+    // taking a quarter off 12 s), then 60 s reloading.
+    expect(loaded.tank.sustained.armor).toBeCloseTo((loaded.tank.burst.armor * 72) / 132, 6);
+
+    const asb = {
+      slot: 'medium',
+      slotIndex: 0,
+      typeId: MEDIUM_ANCILLARY_SHIELD_BOOSTER,
+      state: 'active',
+    } as const;
+    expect(run({ ...asb, chargeTypeId: CAP_BOOSTER_150 }).budget.drain).toBe(0);
+    expect(run(asb).budget.drain).toBeGreaterThan(0);
+  });
+
   it('reads applied-DPS inputs: running turrets, loaded launchers, launched drones only', () => {
     const vexor = vexorNavyIssueFit();
     vexor.drones = [{ typeId: WARRIOR_II, quantity: 5, state: 'active' }];
@@ -494,3 +605,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
  * lands in the engine's `character.skills` map correctly.
  */
 const ALL_TEST_SKILL_IDS = [...PARTIAL_SKILLS.keys()];
+
+/** Every skill from 3300 to 3499 — the core ship, weapon, engineering and electronics skills — for the support and tank fits. */
+const SUPPORT_SKILL_IDS = Array.from({ length: 200 }, (_, i) => 3300 + i);

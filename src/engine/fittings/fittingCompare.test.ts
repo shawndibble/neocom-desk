@@ -3,6 +3,7 @@ import { compareFittingStats, modulesThatDiffer, compareWindow } from './fitting
 import { appliedDps, appliedDpsVsRange, bestRange, graphMaxRange } from './appliedDps';
 import type { AppliedDpsInputs } from './appliedDps';
 import type { Fitting, FittingStats } from './types';
+import { neutralExtendedStats } from './__fixtures__/fittingStats';
 
 function stats(overrides: Partial<FittingStats> = {}): FittingStats {
   return {
@@ -61,6 +62,7 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     applied: { weapons: [], droneControlRange: 20000 },
     repair: { shield: 0, armor: 0, hull: 0 },
     overheated: null,
+    ...neutralExtendedStats(),
     ...overrides,
   };
 }
