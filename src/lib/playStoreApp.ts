@@ -8,18 +8,12 @@ interface FlagStore {
   setItem(key: string, value: string): void;
 }
 
-/**
- * A Trusted Web Activity launch reports `android-app://<package>` as the
- * document referrer; a Chrome-installed PWA or a browser tab does not, and
- * `display-mode: standalone` can't tell them apart. The referrer only exists
- * on the first load, so a positive is kept in session storage (per-tab, so it
- * never leaks into a browser tab sharing Chrome's origin storage).
- */
+/** A TWA launch sets the referrer to android-app://<package>; see docs/ANDROID-TWA.md. */
 export function detectPlayStoreApp(referrer: string, store: FlagStore): boolean {
   try {
     if (store.getItem(STORAGE_KEY) === '1') return true;
   } catch {
-    // storage blocked: fall through to the referrer alone
+    // blocked storage: rely on the referrer alone
   }
   const fromApp = referrer.startsWith(`android-app://${PLAY_STORE_PACKAGE}`);
   if (fromApp) {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -6,6 +6,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { SCOPES } from '@/esi/scopes';
 import { assignLocation } from '@/app/navigation';
+import { PLAY_STORE_PACKAGE } from '@/lib/playStoreApp';
 import { Login } from './Login';
 
 vi.mock('@/app/navigation', () => ({ assignLocation: vi.fn() }));
@@ -64,6 +65,8 @@ function renderLogin() {
   );
 }
 
+afterEach(() => vi.restoreAllMocks());
+
 beforeEach(async () => {
   vi.mocked(assignLocation).mockClear();
   vi.stubEnv('VITE_EVE_CLIENT_ID', 'test-client-id');
@@ -74,7 +77,7 @@ beforeEach(async () => {
 
 describe('Login', () => {
   it('shows only logo, name and the sign-in button in the Play Store app', async () => {
-    vi.spyOn(document, 'referrer', 'get').mockReturnValue('android-app://com.neocomdesk.app');
+    vi.spyOn(document, 'referrer', 'get').mockReturnValue(`android-app://${PLAY_STORE_PACKAGE}`);
     renderLogin();
     expect(await screen.findAllByRole('button', { name: /log in with eve online/i })).toHaveLength(
       1
@@ -85,7 +88,6 @@ describe('Login', () => {
     expect(
       screen.getByRole('button', { name: /log in with custom permissions/i })
     ).toBeInTheDocument();
-    vi.restoreAllMocks();
   });
 
   it('shows the app name, hero heading and SSO button', async () => {

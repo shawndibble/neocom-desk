@@ -221,8 +221,7 @@ const PREVIEW = {
 export function Login() {
   const { t } = useTranslation();
   const [pending, setPending] = useState(false);
-  // Read once: the Play Store app is a Trusted Web Activity, and its launch
-  // referrer only exists on the first load.
+  // Read once: a TWA launch referrer only exists on the first load.
   const [inApp] = useState(isPlayStoreApp);
 
   // Wall-clock reads for illustrative "how fresh is this" values in the
