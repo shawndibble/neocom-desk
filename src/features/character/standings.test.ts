@@ -13,6 +13,7 @@ beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 beforeEach(async () => {
   configureEsi({ getToken: vi.fn(async () => 'tok') });
   await db.esiCache.clear();
+  await db.tokens.clear();
   useAuthFailure.getState().dismiss();
 });
 afterEach(() => {
@@ -66,5 +67,43 @@ describe('loadCharacterStandings', () => {
 
     expect(result).toEqual([{ from_id: 1000035, from_type: 'npc_corp', standing: 5 }]);
     expect(useAuthFailure.getState().failure).toBeNull();
+  });
+
+  it('does not call ESI at all when the stored grant lacks the scope', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 60_000,
+      scopes: ['esi-characters.read_contacts.v1'],
+    });
+    // onUnhandledRequest is 'error', so any fetch here fails the test.
+    expect(await loadCharacterStandings(CHAR_ID)).toEqual([]);
+  });
+
+  it('treats a legacy token row with no scopes field as lacking the scope, not a crash', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 60_000,
+    } as never);
+    expect(await loadCharacterStandings(CHAR_ID)).toEqual([]);
+  });
+
+  it('still fetches when the stored grant includes the scope', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 60_000,
+      scopes: ['esi-characters.read_standings.v1'],
+    });
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/standings`, () =>
+        HttpResponse.json([{ from_id: 1000035, from_type: 'npc_corp', standing: 5 }])
+      )
+    );
+    expect(await loadCharacterStandings(CHAR_ID)).toHaveLength(1);
   });
 });
