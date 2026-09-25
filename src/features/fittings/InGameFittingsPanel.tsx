@@ -66,7 +66,8 @@ export function InGameFittingsPanel({ characterId, onOpen }: InGameFittingsPanel
         if (!names.has(fitting.ship_type_id)) {
           names.set(
             fitting.ship_type_id,
-            types[String(fitting.ship_type_id)]?.name ?? `Type ${fitting.ship_type_id}`
+            types[String(fitting.ship_type_id)]?.name ??
+              t('common.unknownType', { id: fitting.ship_type_id })
           );
         }
       }
@@ -100,7 +101,9 @@ export function InGameFittingsPanel({ characterId, onOpen }: InGameFittingsPanel
     const rows: (MyFittingRow & { fitting: CharacterFitting })[] = fittings.map((fitting) => ({
       id: String(fitting.fitting_id),
       name: fitting.name,
-      hull: hullNames.get(fitting.ship_type_id) ?? `Type ${fitting.ship_type_id}`,
+      hull:
+        hullNames.get(fitting.ship_type_id) ??
+        t('common.unknownType', { id: fitting.ship_type_id }),
       fitting,
     }));
     return groupByHull(rows);

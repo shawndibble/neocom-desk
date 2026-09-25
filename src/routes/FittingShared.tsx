@@ -156,13 +156,16 @@ export function FittingShared() {
     void (async () => {
       const types = await loadTypes();
       if (!cancelled) {
-        setTypeName(() => (typeId: number) => types[String(typeId)]?.name ?? `Type ${typeId}`);
+        setTypeName(
+          () => (typeId: number) =>
+            types[String(typeId)]?.name ?? t('common.unknownType', { id: typeId })
+        );
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [readyFitting]);
+  }, [readyFitting, t]);
 
   if (characterCount === undefined) return <BootScreen />;
   // A visitor with a Character never gets the All-V view — the same link
