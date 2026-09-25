@@ -95,9 +95,9 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
       // the description — see `describe`.
       aria-describedby={id}
       aria-haspopup="dialog"
-      className="group grid w-full grid-cols-[1fr_4.5rem_5rem] items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2 text-left last:border-b-0 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:grid-cols-[1fr_6.5rem_4.5rem_5rem_auto]"
+      className="group grid w-full grid-cols-[1fr_4.5rem_5rem] items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2 text-left last:border-b-0 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:grid-cols-[minmax(6rem,1fr)_minmax(1rem,6.5rem)_4.5rem_5rem_auto]"
     >
-      <span className="min-w-0 truncate text-xs">
+      <span data-testid="colony-strip-name" className="min-w-0 truncate text-xs">
         {name}{' '}
         <span className="text-[0.6875rem] text-text-dim">
           {t(`pi.planetType.${row.planetType}`)}
