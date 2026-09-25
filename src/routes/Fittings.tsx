@@ -135,6 +135,9 @@ export function Fittings() {
   }
   const slotCounts = stats?.slotCounts ?? null;
   const dronesShown = fitting !== null && showsDrones(stats, fitting.drones.length);
+  // Removing a droneless hull's last (pasted) drone takes the Drones rack
+  // away, so a browser still aimed at it lets go.
+  if (target?.kind === 'drone' && !dronesShown) setTarget(null);
   // Module results only line up with the Fitting they were calculated for.
   const moduleResults = stats !== null && workspace.statsFitting === fitting ? stats.modules : null;
   const typeName = (typeId: number) => catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;

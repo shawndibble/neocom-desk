@@ -528,6 +528,7 @@
       "chipLabel": "Implants:",
       "popoverTitle": "Implants in these stats",
       "cloneExplain": "The implants in {{name}}'s current clone.",
+      "cloneExplainNoName": "The implants in your current clone.",
       "fittingExplain": "The implant set saved with this Fitting.",
       "modalTitle": "Implants & boosters",
       "implantsHeading": "Implants",

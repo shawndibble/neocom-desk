@@ -167,12 +167,12 @@ export function FittingAddPanel({
 
   // The tab follows the target (a drone target opens Drones), until the pilot picks one.
   const targetTab: BrowserTab = target?.kind === 'drone' ? 'drones' : 'modules';
-  const [pickedTab, setTab] = useState<BrowserTab>(targetTab);
+  const [pickedTab, setPickedTab] = useState<BrowserTab>(targetTab);
   const tab: BrowserTab = pickedTab === 'drones' && !showDrones ? 'modules' : pickedTab;
   const [tabFor, setTabFor] = useState(target);
   if (tabFor !== target) {
     setTabFor(target);
-    if (target !== null) setTab(targetTab);
+    if (target !== null) setPickedTab(targetTab);
   }
 
   const hullFit = useHullFit(catalogue, fitting.shipTypeId, profile, engineReady);
@@ -273,7 +273,7 @@ export function FittingAddPanel({
           ...(showDrones ? [{ id: 'drones', label: t('fittings.add.tab.drones') }] : []),
         ]}
         value={tab}
-        onChange={(id) => setTab(id as BrowserTab)}
+        onChange={(id) => setPickedTab(id as BrowserTab)}
         label={t('fittings.add.tabsLabel')}
       />
 

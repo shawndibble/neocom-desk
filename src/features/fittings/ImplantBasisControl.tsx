@@ -58,7 +58,7 @@ export function ImplantBasisControl({
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button size="sm" className="whitespace-nowrap">
+          <Button className="whitespace-nowrap">
             <span className="text-text-dim">{t('fittings.implants.chipLabel')}</span>
             {t(`fittings.implants.basis.${effective}`)}
             <Expanded aria-hidden />
@@ -77,7 +77,9 @@ export function ImplantBasisControl({
             )}
             <p className="text-xs text-text-dim">
               {effective === 'clone'
-                ? t('fittings.implants.cloneExplain', { name: characterName ?? '' })
+                ? characterName
+                  ? t('fittings.implants.cloneExplain', { name: characterName })
+                  : t('fittings.implants.cloneExplainNoName')
                 : t('fittings.implants.fittingExplain')}
             </p>
             <Button

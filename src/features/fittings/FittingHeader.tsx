@@ -39,6 +39,57 @@ interface FittingHeaderProps {
 }
 
 /**
+ * Below desktop: identity, Save and one ⋮ menu — the Fittings menu's items,
+ * then Export's — on the first line; what the numbers assume below.
+ */
+function CompactFittingHeader({
+  fitting,
+  price,
+  identity,
+  libraryItems,
+  save,
+  context,
+}: {
+  fitting: Fitting;
+  price: Appraisal | null;
+  identity: ReactNode;
+  libraryItems: ReactNode;
+  save: ReactNode;
+  context?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const exportActions = useFittingExport(fitting);
+  return (
+    <div className="space-y-2 rounded-xs border border-line bg-panel/85 p-2 backdrop-blur-sm">
+      <div className="flex items-center gap-2">
+        {identity}
+        {save}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <IconButton icon={<More />} label={t('fittings.header.moreActions')} />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-56">
+            {libraryItems}
+            <DropdownMenuSeparator />
+            <p className="px-2 pt-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('fittings.export.button')}
+            </p>
+            <FittingExportItems actions={exportActions} price={price} />
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      {/* The copy notice ends the second line, so the header doesn't grow and shrink with it. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {context}
+        <span className="ml-auto">
+          <FittingExportNotice notice={exportActions.notice} />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
  * The open Fitting's header, one row as in mockup A (scope decision
  * `20260924-215855`): what the Fitting is, what its numbers assume, then
  * its controls — a Fittings menu for opening a different one (new from a
@@ -56,8 +107,6 @@ export function FittingHeader({
   compact = false,
 }: FittingHeaderProps) {
   const { t } = useTranslation();
-  const exportActions = useFittingExport(fitting);
-
   const identity = (
     <div
       className={`flex min-w-0 flex-1 items-center gap-3 ${compact ? '' : 'md:min-w-48 md:flex-none'}`}
@@ -98,27 +147,14 @@ export function FittingHeader({
 
   if (compact) {
     return (
-      <div className="space-y-2 rounded-xs border border-line bg-panel/85 p-2 backdrop-blur-sm">
-        <div className="flex items-center gap-2">
-          {identity}
-          {save}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <IconButton icon={<More />} label={t('fittings.header.moreActions')} />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-56">
-              {libraryItems}
-              <DropdownMenuSeparator />
-              <p className="px-2 pt-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('fittings.export.button')}
-              </p>
-              <FittingExportItems actions={exportActions} price={price} />
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        <FittingExportNotice notice={exportActions.notice} />
-        {context && <div className="flex flex-wrap items-center gap-2">{context}</div>}
-      </div>
+      <CompactFittingHeader
+        fitting={fitting}
+        price={price}
+        identity={identity}
+        libraryItems={libraryItems}
+        save={save}
+        context={context}
+      />
     );
   }
 
