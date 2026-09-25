@@ -359,6 +359,15 @@ export const ESI_REGISTRY = {
     scope: 'esi-fittings.write_fittings.v1',
     group: 'fittings',
   },
+  // A {fitting_id} segment keeps this route distinct from the two above
+  // (registry.test.ts requires unique routes). Save to EVE (#1540) calls
+  // this only after the replacement POST already succeeded, so a failed
+  // recreate never leaves the pilot without their original.
+  deleteCharacterFitting: {
+    route: '/characters/{character_id}/fittings/{fitting_id}/',
+    scope: 'esi-fittings.write_fittings.v1',
+    group: 'fittings',
+  },
 
   getCharacterPublicInfo: {
     route: '/characters/{character_id}',

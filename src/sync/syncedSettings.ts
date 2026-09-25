@@ -152,9 +152,19 @@
 // itself — see features/skills/targetPlan.ts. Never deleted via
 // deleteSyncedSetting: the choice is only ever replaced, never unset, so the
 // tombstone-expiry edge does not bite it.
+//
+// sync.fittingDamageProfiles + sync.fittingDamageProfileId (issue #1545): the
+// pilot's custom Damage Profiles and which profile (built-in or custom) the
+// Fittings stats measure EHP against. Two keys, not one blob, so picking a
+// profile on one device can't last-write-win over a custom-profile edit made
+// on another — see features/fittings/damageProfiles.ts. Never deleted via
+// deleteSyncedSetting: deleting a custom profile rewrites the array, and the
+// selection is only ever replaced, so the tombstone-expiry edge does not bite.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpDarkAfterDays',
   'sync.defaultCharacterFilter',
+  'sync.fittingDamageProfileId',
+  'sync.fittingDamageProfiles',
   'sync.industryAssumedMe',
   'sync.industryAssumedTe',
   'sync.industryBuildGroups',

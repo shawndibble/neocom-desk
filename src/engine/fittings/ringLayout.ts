@@ -1,7 +1,12 @@
 /**
- * Geometry and slot filling for the Ring view (issue #1536). Pure: the ring's
- * components turn these numbers into SVG and absolutely-positioned buttons.
- * Coordinates are percentages of a square, centre at (50, 50).
+ * Geometry and slot filling for the Ring view — the game's fitting window
+ * (and EVE Workbench's radial) redrawn: one band, square tiles on it, each
+ * rack filling clockwise from its first position. Pure: the ring component
+ * turns these numbers into SVG and absolutely-positioned buttons.
+ *
+ * Angles are degrees clockwise from 12 o'clock; points and lengths are ring
+ * units measured from the ring's centre, in the same space as the band radii
+ * below (the component draws them at 1 unit = 1px at full size and scales).
  */
 import {
   FITTING_SLOT_KINDS,
@@ -18,6 +23,40 @@ export interface RingSlot {
 }
 
 export type SlotLayout = Record<FittingSlotKind, number>;
+
+/** The racks drawn on the ring; subsystems sit in a row beneath it. */
+export type RingRack = 'high' | 'medium' | 'low' | 'rig';
+
+export const RING_RACKS: readonly RingRack[] = ['high', 'medium', 'low', 'rig'];
+
+/** Every position a rack draws — the most slots any hull has in it. */
+export const RING_POSITIONS: Readonly<Record<RingRack, number>> = {
+  high: 8,
+  medium: 8,
+  low: 8,
+  rig: 3,
+};
+
+/** The band's outer and inner edges; tiles centre on the band. */
+export const RING_OUTER_RADIUS = 300;
+export const RING_INNER_RADIUS = 262;
+export const RING_SLOT_RADIUS = (RING_OUTER_RADIUS + RING_INNER_RADIUS) / 2;
+/** A slot tile's side. */
+export const RING_TILE = 44;
+/** Gauge ticks run on the rim, just outside the band. */
+export const RING_TICK_INNER = 305;
+export const RING_TICK_OUTER = 315;
+
+/** Angle between neighbouring tiles of one rack: a tile plus a small gap at the slot radius. */
+const PITCH_DEG = 10.2;
+
+/** Where each rack's positions are centred — matching the game window. */
+const RACK_CENTRE_DEG: Readonly<Record<RingRack, number>> = {
+  high: -8,
+  medium: 88,
+  low: 182,
+  rig: -79,
+};
 
 /**
  * Every slot each rack has, fitted or not. `layout` is the hull's slot counts
@@ -40,45 +79,45 @@ export function buildRingSlots(fitting: Fitting, layout: SlotLayout | null): Rin
   return slots;
 }
 
-/** Degrees clockwise from 12 o'clock at which each ring rack is centred. */
-const RACK_CENTRE_DEG: Partial<Record<FittingSlotKind, number>> = {
-  high: 0,
-  medium: 90,
-  low: 180,
-  rig: 270,
-};
+/** The angle slot `index` of a ring rack sits at. */
+export function ringSlotAngle(rack: RingRack, index: number): number {
+  const first = RACK_CENTRE_DEG[rack] - ((RING_POSITIONS[rack] - 1) / 2) * PITCH_DEG;
+  return first + index * PITCH_DEG;
+}
 
-const RING_RADIUS = 42;
-/** Inward step for every other slot of a crowded rack, so 44px targets never overlap. */
-const ZIGZAG_INSET = 13;
-const RACK_SPAN_DEG = 70;
-const MAX_STEP_DEG = 26;
-const ZIGZAG_FROM = 5;
+/** The positions a rack draws beyond a hull's `slotCount` slots — the faint outlines. */
+export function ringGhostIndices(rack: RingRack, slotCount: number): number[] {
+  const ghosts: number[] = [];
+  for (let index = Math.max(0, slotCount); index < RING_POSITIONS[rack]; index++) {
+    ghosts.push(index);
+  }
+  return ghosts;
+}
 
-/** Where slot `index` of `count` in a ring rack sits. Subsystems aren't on the ring. */
-export function ringSlotPosition(
-  rack: FittingSlotKind,
-  index: number,
-  count: number
-): { x: number; y: number } {
-  const centre = RACK_CENTRE_DEG[rack] ?? 0;
-  const step = count > 1 ? Math.min(MAX_STEP_DEG, RACK_SPAN_DEG / (count - 1)) : 0;
-  const deg = centre + (index - (count - 1) / 2) * step;
-  const radius = count >= ZIGZAG_FROM && index % 2 === 1 ? RING_RADIUS - ZIGZAG_INSET : RING_RADIUS;
-  const rad = (deg * Math.PI) / 180;
-  return { x: 50 + radius * Math.sin(rad), y: 50 - radius * Math.cos(rad) };
+/** The point `radius` out from the centre at `angle`. */
+export function ringPoint(angle: number, radius: number): { x: number; y: number } {
+  const rad = (angle * Math.PI) / 180;
+  return { x: radius * Math.sin(rad), y: -radius * Math.cos(rad) };
 }
 
 /**
- * The point `fraction` (0-1) of the way down a half-circle gauge from the top:
- * the left half for CPU, the right half for powergrid.
+ * A rim gauge's `count` tick angles from `from` to `to`, split into the ones
+ * the used `fraction` fills (from the first tick) and the rest. Over budget
+ * fills them all; an unknown share (NaN) fills none.
  */
-export function arcEndPoint(
-  side: 'left' | 'right',
-  fraction: number,
-  radius: number
-): { x: number; y: number } {
-  const theta = Math.min(1, Math.max(0, fraction)) * Math.PI;
-  const dx = radius * Math.sin(theta);
-  return { x: side === 'left' ? 50 - dx : 50 + dx, y: 50 - radius * Math.cos(theta) };
+export function gaugeTicks(
+  from: number,
+  to: number,
+  count: number,
+  fraction: number
+): { filled: number[]; empty: number[] } {
+  const share = Number.isFinite(fraction) ? Math.min(1, Math.max(0, fraction)) : 0;
+  const filledCount = Math.round(share * count);
+  const filled: number[] = [];
+  const empty: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const angle = count > 1 ? from + ((to - from) * i) / (count - 1) : from;
+    (i < filledCount ? filled : empty).push(angle);
+  }
+  return { filled, empty };
 }

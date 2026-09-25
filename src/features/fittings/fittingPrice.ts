@@ -14,29 +14,13 @@
 import { buildAppraisal, type Appraisal } from '@/engine/market/appraisal';
 import { getHubPrices } from '@/market/prices';
 import type { TradeHub } from '@/market/hubs';
+import { fittingItemCounts } from '@/engine/fittings/fittingExport';
 import type { Fitting } from '@/engine/fittings/types';
 
 const FULL_PRICE_PERCENT = 100;
 
-function countTypeIds(fitting: Fitting): Map<number, number> {
-  const counts = new Map<number, number>();
-  const add = (typeId: number, quantity: number) => {
-    counts.set(typeId, (counts.get(typeId) ?? 0) + quantity);
-  };
-
-  add(fitting.shipTypeId, 1);
-  for (const module of fitting.modules) {
-    add(module.typeId, 1);
-    if (module.chargeTypeId !== undefined) add(module.chargeTypeId, 1);
-  }
-  for (const drone of fitting.drones) add(drone.typeId, drone.quantity);
-  for (const item of fitting.cargo) add(item.typeId, item.quantity);
-
-  return counts;
-}
-
 export async function loadFittingPrice(fitting: Fitting, hub: TradeHub): Promise<Appraisal> {
-  const counts = countTypeIds(fitting);
+  const counts = fittingItemCounts(fitting);
   const typeIds = [...counts.keys()];
   const prices = await getHubPrices(hub, typeIds);
 

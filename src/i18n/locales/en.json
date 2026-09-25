@@ -122,6 +122,26 @@
       "unresolvedNote_one": "{{count}} item from \"{{name}}\" couldn't be loaded (fighter bay or service slot).",
       "unresolvedNote_other": "{{count}} items from \"{{name}}\" couldn't be loaded (fighter bay or service slot)."
     },
+    "saveToEve": {
+      "action": "Save to EVE",
+      "needCharacter": "Log in with a Character to save Fittings to EVE.",
+      "needPermission": "Log in again to allow saving Fittings to EVE.",
+      "title": "Save to EVE",
+      "nameLabel": "Name",
+      "targetLabel": "Save as",
+      "targetNew": "New In-game Fitting",
+      "targetOverwrite": "Replace \"{{name}}\"",
+      "dropsNote": "EVE doesn't keep everything: saving drops each module's online/offline/overheat state, which charge is loaded where, and any implants — there's no place on an in-game Fitting to store them.",
+      "overwriteConfirm": "This deletes \"{{name}}\" from your in-game Fittings and replaces it with this one. This can't be undone.",
+      "saveAction": "Save",
+      "overwriteAction": "Replace",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "errorTitle": "Couldn't save",
+      "overwriteFailedTitle": "Saved, but the old Fitting is still there",
+      "overwriteFailed": "Saved as \"{{name}}\", but EVE wouldn't remove the Fitting it was replacing: {{message}}. Delete it in-game yourself.",
+      "close": "Close"
+    },
     "missingSkills": {
       "chip_one": "Missing {{count}} skill · {{time}}",
       "chip_other": "Missing {{count}} skills · {{time}}"
@@ -158,7 +178,21 @@
       "title": "Ring",
       "slotFitted": "{{rack}} {{index}}, {{state}}",
       "slotEmpty": "{{rack}} {{index}}, empty",
-      "openStats": "Stats"
+      "openStats": "Stats",
+      "tooltipFitted": "{{rack}} {{index}}: {{name}} ({{state}})",
+      "tooltipCharge": "Loaded: {{name}}",
+      "tooltipCantUse": "Can’t use: missing skills",
+      "tooltipEmpty": "{{rack}} {{index}}: empty. Click to add, or drop a module here.",
+      "tooltipEmptyClick": "{{rack}} {{index}}: empty. Tap to add.",
+      "tooltipEmptyCompact": "{{rack}} {{index}}: empty",
+      "readoutCpu": "{{used}} / {{total}} tf",
+      "readoutPowergrid": "{{used}} / {{total}} MW",
+      "readoutCalibration": "{{used}} / {{total}}",
+      "readoutDroneBandwidth": "{{used}} / {{total}} Mbit/s",
+      "rackHint": "Tap a rack to edit its slots",
+      "rackCount": "{{fitted}} / {{total}}",
+      "rackCantUse_one": "{{count}} can’t use",
+      "rackCantUse_other": "{{count}} can’t use"
     },
     "edit": {
       "stateLabel": "State of {{name}}",
@@ -197,6 +231,22 @@
       "noResults": "No matching items.",
       "missingSkills": "Missing skills"
     },
+    "export": {
+      "button": "Export",
+      "shareLink": "Copy Share Link",
+      "eft": "Copy EFT",
+      "chatLink": "Copy in-game link",
+      "multibuy": "Copy multibuy list",
+      "appraise": "Appraise in Market",
+      "tooLarge": "Too large to share as a link.",
+      "copyFailed": "Couldn't copy to the clipboard.",
+      "copied": {
+        "shareLink": "Share Link copied",
+        "eft": "EFT copied",
+        "chatLink": "In-game link copied",
+        "multibuy": "Multibuy list copied"
+      }
+    },
     "stats": {
       "show": "Show detail",
       "hide": "Hide detail",
@@ -228,6 +278,9 @@
       "shield": "Shield",
       "armor": "Armor",
       "hull": "Hull",
+      "layerHeading": "{{layer}} — {{hp}} HP · {{ehp}} EHP",
+      "armorIncludesRah": "Includes the Reactive Armor Hardener, adapted to {{profile}}.",
+      "rahAdapted": "Reactive Armor Hardener — adapted to {{profile}}",
       "maxTargetRange": "Targeting range: {{value}} km",
       "maxLockedTargets": "Max locked targets: {{value}}",
       "scanResolution": "Scan resolution: {{value}} mm",
@@ -307,6 +360,39 @@
         "agility": "Inertia modifier {{value}}",
         "mass": "Mass {{value}} t",
         "warpSpeed": "Warp speed {{value}} AU/s"
+      }
+    },
+    "damageProfile": {
+      "label": "Damage profile",
+      "manage": "Manage profiles",
+      "manageTitle": "Custom damage profiles",
+      "builtInGroup": "Built-in",
+      "customGroup": "Custom",
+      "empty": "No custom profiles yet.",
+      "add": "New profile",
+      "edit": "Edit {{name}}",
+      "delete": "Delete {{name}}",
+      "nameLabel": "Name",
+      "ratioHint": "Only the ratio matters — 1/1/0/0 and 50/50/0/0 are the same profile.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "errorName": "Give the profile a name.",
+      "errorMix": "Enter non-negative numbers, at least one above zero.",
+      "builtin": {
+        "uniform": "Uniform",
+        "em": "EM",
+        "thermal": "Thermal",
+        "kinetic": "Kinetic",
+        "explosive": "Explosive",
+        "angelCartel": "Angel Cartel",
+        "bloodRaiders": "Blood Raiders",
+        "guristas": "Guristas",
+        "rogueDrones": "Rogue Drones",
+        "sansha": "Sansha's Nation",
+        "serpentis": "Serpentis",
+        "mordusLegion": "Mordu's Legion",
+        "triglavian": "Triglavian",
+        "sleepers": "Sleepers"
       }
     },
     "implants": {
@@ -4105,6 +4191,19 @@
     "unresolvedTypeId": "type id {{typeId}}",
     "backToApp": "Open Neocom Desk"
   },
+  "fittingShare": {
+    "title": "Shared fitting",
+    "banner": "Shown at every skill level V, with no clone — log in to see this fit under your own pilot.",
+    "invalidTitle": "This link isn't valid",
+    "invalidHint": "The link may be corrupted, incomplete, or built by a newer version of Neocom Desk. Ask whoever sent it to share it again.",
+    "loadFailedTitle": "Could not load this fitting",
+    "loadFailedHint": "Something went wrong working out its stats. Try again.",
+    "moduleListTitle": "Modules",
+    "openInApp": "Open in Neocom Desk",
+    "copyEft": "Copy EFT",
+    "copied": "Copied",
+    "copyFailed": "Couldn't copy"
+  },
   "notFound": {
     "title": "Page not found",
     "hint": "That address does not match anything in Neocom Desk. The link may be wrong, or it may have pointed at something that has since moved.",
@@ -4215,7 +4314,7 @@
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, and which skill plan you're adding skills to from Fit Check and Market. Nothing else on this page leaves your device."
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, which skill plan you're adding skills to from Fit Check and Market, and the fitting damage profiles you made along with which one fittings are measured against. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",

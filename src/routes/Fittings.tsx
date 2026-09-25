@@ -3,6 +3,7 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button, Modal, PageHeader, Panel } from '@/components/ui';
+import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { moduleKey } from '@/engine/fittings/skillGaps';
@@ -12,14 +13,17 @@ import {
   addDrones,
   addModule,
   firstFreeSlotIndex,
+  moveModule,
   swapModuleType,
 } from '@/engine/fittings/fittingEdit';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
 import { MyFittingsPanel } from '@/features/fittings/MyFittingsPanel';
+import { FittingExportMenu } from '@/features/fittings/FittingExportMenu';
 import { FittingLoadCard } from '@/features/fittings/FittingLoadCard';
 import { InGameFittingsPanel } from '@/features/fittings/InGameFittingsPanel';
-import { FittingRackList, ModuleRow } from '@/features/fittings/FittingRackList';
+import { SaveToEveDialog } from '@/features/fittings/SaveToEveDialog';
+import { FittingRackList, ModuleRow, RackSlots } from '@/features/fittings/FittingRackList';
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPanel';
@@ -64,12 +68,19 @@ export function Fittings() {
   }, [hydrateView]);
   const view = resolveFittingView(storedView, isPhone);
   const [statsOpen, setStatsOpen] = useState(false);
+  // Phone Ring: the rack whose slots sheet is open (scope decision `20260924-205720`).
+  const [rackSheet, setRackSheet] = useState<FittingSlotKind | null>(null);
   // Ring view: the filled slot whose module panel is open.
   const [moduleSlot, setModuleSlot] = useState<{ slot: FittingSlotKind; slotIndex: number } | null>(
     null
   );
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
+  const [saveToEveOpen, setSaveToEveOpen] = useState(false);
+  // Bumped on a successful Save to EVE so InGameFittingsPanel remounts and
+  // refetches, picking up the fitting that just landed (or the overwrite).
+  const [inGameFittingsKey, setInGameFittingsKey] = useState(0);
+  const canSaveToEve = useEndpointsGranted(['postCharacterFitting']);
 
   const { fitting, stats, edit } = workspace;
   const slotCounts = stats?.slotCounts ?? null;
@@ -142,6 +153,7 @@ export function Fittings() {
       canPlace={canPlace}
       onAdd={handleAdd}
       showGroups={isDesktop}
+      dragToRing={isDesktop && view === 'ring'}
     />
   );
 
@@ -159,6 +171,7 @@ export function Fittings() {
     catalogue,
     engineReady: workspace.engineReady,
     profile: workspace.profile,
+    damageProfile: workspace.damageProfiles.selected,
   });
   function swapVariation(typeId: number) {
     if (!moduleSlot) return;
@@ -171,6 +184,7 @@ export function Fittings() {
       statsProgress={workspace.statsProgress}
       statsError={workspace.statsError}
       price={workspace.price}
+      damageProfiles={workspace.damageProfiles}
     />
   );
 
@@ -197,6 +211,20 @@ export function Fittings() {
                   ? t('fittings.myFittings.save')
                   : t('fittings.myFittings.update')}
               </Button>
+              <Button
+                disabled={activeCharacterId === null || canSaveToEve !== true}
+                title={
+                  activeCharacterId === null
+                    ? t('fittings.saveToEve.needCharacter')
+                    : canSaveToEve === false
+                      ? t('fittings.saveToEve.needPermission')
+                      : undefined
+                }
+                onClick={() => setSaveToEveOpen(true)}
+              >
+                {t('fittings.saveToEve.action')}
+              </Button>
+              <FittingExportMenu fitting={fitting} price={workspace.price} />
               {viewHydrated && (
                 <FittingViewToggle value={view} onChange={(next) => void setView(next)} />
               )}
@@ -219,11 +247,21 @@ export function Fittings() {
       />
       {activeCharacterId !== null && (
         <InGameFittingsPanel
+          key={inGameFittingsKey}
           characterId={activeCharacterId}
           onOpen={(loaded) => void workspace.openFitting(loaded)}
         />
       )}
       <MyFittingsPanel characterId={activeCharacterId} onOpen={workspace.openSaved} />
+      {fitting && activeCharacterId !== null && (
+        <SaveToEveDialog
+          open={saveToEveOpen}
+          onClose={() => setSaveToEveOpen(false)}
+          characterId={activeCharacterId}
+          fitting={fitting}
+          onSaved={() => setInGameFittingsKey((key) => key + 1)}
+        />
+      )}
       {fitting && viewHydrated && (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <div className="space-y-3">
@@ -244,7 +282,21 @@ export function Fittings() {
                 fitting={fitting}
                 stats={stats}
                 unusableModuleKeys={gaps?.unusableModuleKeys}
+                typeName={(typeId) => catalogue?.types[String(typeId)]?.name ?? `#${typeId}`}
                 onSlotSelect={selectSlot}
+                // Drag is pointer-only: a touch tablet taps a slot and picks instead.
+                onDropType={
+                  isDesktop
+                    ? (rack, index, typeId) => edit((f) => addModule(f, rack, index, typeId))
+                    : undefined
+                }
+                onMoveModule={
+                  isDesktop
+                    ? (rack, from, to) => edit((f) => moveModule(f, rack, from, to))
+                    : undefined
+                }
+                compact={isPhone}
+                onRackOpen={setRackSheet}
               />
             ) : (
               <FittingRackList
@@ -313,6 +365,35 @@ export function Fittings() {
                 <FittingVariationsPanel rows={variationRows} onSelect={swapVariation} />
               </div>
             </div>
+          )}
+        </Modal>
+      )}
+      {fitting && isPhone && (
+        <Modal
+          open={rackSheet !== null}
+          onClose={() => setRackSheet(null)}
+          title={t(`fittings.list.rack.${rackSheet ?? 'high'}`)}
+          placement="sheet"
+        >
+          {rackSheet && (
+            <RackSlots
+              rack={rackSheet}
+              hideLabel
+              fitting={fitting}
+              catalogue={catalogue}
+              engineReady={workspace.engineReady}
+              profile={workspace.profile}
+              edit={edit}
+              stats={stats}
+              moduleResults={moduleResults}
+              target={target}
+              onSelectTarget={(next) => {
+                // One sheet at a time: the Add sheet takes over from the rack's.
+                setRackSheet(null);
+                selectTarget(next);
+              }}
+              unusableModuleKeys={gaps?.unusableModuleKeys}
+            />
           )}
         </Modal>
       )}

@@ -2,9 +2,11 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CollapsiblePanel } from '@/components/ui';
 import { resistPct } from '@/engine/fittings/stats';
-import type { FittingStats, LayerDefense } from '@/engine/fittings/types';
+import type { FittingStats, LayerDefense, Resonances } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import type { DogmaAssetProgress } from './dogmaFittingEngine';
+import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
+import { DamageProfilePicker } from './DamageProfilePicker';
 
 const DMG_RESIST_CLASS = {
   em: 'bg-dmg-em',
@@ -32,16 +34,39 @@ function ResistBar({ type, resonance }: { type: DamageType; resonance: number })
   );
 }
 
-function LayerCard({ title, layer }: { title: string; layer: LayerDefense }) {
+function ResistBars({ resonances }: { resonances: Resonances }) {
+  return (
+    <>
+      <ResistBar type="em" resonance={resonances.emResonance} />
+      <ResistBar type="thermal" resonance={resonances.thermalResonance} />
+      <ResistBar type="kinetic" resonance={resonances.kineticResonance} />
+      <ResistBar type="explosive" resonance={resonances.explosiveResonance} />
+    </>
+  );
+}
+
+function LayerCard({
+  title,
+  layer,
+  note,
+}: {
+  title: string;
+  layer: LayerDefense;
+  /** Under the bars — the armor card's "includes the adapted RAH" line. */
+  note?: string;
+}) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-1 rounded-xs bg-panel-2 p-2">
       <p className="text-xs font-semibold text-text-dim">
-        {title} — {layer.hp.toFixed(0)} HP
+        {t('fittings.stats.layerHeading', {
+          layer: title,
+          hp: layer.hp.toFixed(0),
+          ehp: layer.ehp.toFixed(0),
+        })}
       </p>
-      <ResistBar type="em" resonance={layer.emResonance} />
-      <ResistBar type="thermal" resonance={layer.thermalResonance} />
-      <ResistBar type="kinetic" resonance={layer.kineticResonance} />
-      <ResistBar type="explosive" resonance={layer.explosiveResonance} />
+      <ResistBars resonances={layer} />
+      {note && <p className="text-xs text-text-dim">{note}</p>}
     </div>
   );
 }
@@ -63,6 +88,7 @@ interface FittingStatsSectionsProps {
   statsProgress: DogmaAssetProgress | null;
   statsError: boolean;
   price: Appraisal | null;
+  damageProfiles: DamageProfiles;
 }
 
 export function FittingStatsSections({
@@ -70,8 +96,15 @@ export function FittingStatsSections({
   statsProgress,
   statsError,
   price,
+  damageProfiles,
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
+  const profileName = useDamageProfileName()(damageProfiles.selected);
+  // A RAH's resists move with the profile (the engine adapts it), so the
+  // armor bars do too — label that, and show the RAH's own adapted resists.
+  const adaptedHardeners = (stats?.modules ?? []).flatMap((module) =>
+    module.adaptedResonances ? [module.adaptedResonances] : []
+  );
   const [expanded, setExpanded] = useState<Record<Section, boolean>>(
     () => Object.fromEntries(SECTIONS.map((section) => [section, true])) as Record<Section, boolean>
   );
@@ -145,15 +178,36 @@ export function FittingStatsSections({
       {section(
         'defense',
         stats ? t('fittings.stats.defenseEhp', { value: stats.ehp.toFixed(0) }) : undefined,
-        stats ? (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <LayerCard title={t('fittings.stats.shield')} layer={stats.shield} />
-            <LayerCard title={t('fittings.stats.armor')} layer={stats.armor} />
-            <LayerCard title={t('fittings.stats.hull')} layer={stats.hull} />
-          </div>
-        ) : (
-          placeholder
-        )
+        <div className="space-y-2">
+          <DamageProfilePicker damageProfiles={damageProfiles} />
+          {stats ? (
+            <>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <LayerCard title={t('fittings.stats.shield')} layer={stats.shield} />
+                <LayerCard
+                  title={t('fittings.stats.armor')}
+                  layer={stats.armor}
+                  note={
+                    adaptedHardeners.length > 0
+                      ? t('fittings.stats.armorIncludesRah', { profile: profileName })
+                      : undefined
+                  }
+                />
+                <LayerCard title={t('fittings.stats.hull')} layer={stats.hull} />
+              </div>
+              {adaptedHardeners.map((resonances, index) => (
+                <div key={index} className="space-y-1 rounded-xs bg-panel-2 p-2">
+                  <p className="text-xs font-semibold text-text-dim">
+                    {t('fittings.stats.rahAdapted', { profile: profileName })}
+                  </p>
+                  <ResistBars resonances={resonances} />
+                </div>
+              ))}
+            </>
+          ) : (
+            placeholder
+          )}
+        </div>
       )}
 
       {section(

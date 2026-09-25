@@ -76,6 +76,7 @@ describe('extractFittingStats', () => {
     expect(stats.droneDps).toBe(0);
     expect(stats.shield).toEqual({
       hp: 0,
+      ehp: 0,
       emResonance: 0,
       thermalResonance: 0,
       kineticResonance: 0,
@@ -94,11 +95,14 @@ describe('extractFittingStats', () => {
     expect(stats.capacitorRechargeTime).toBe(125000);
   });
 
-  it("reads each layer's hp and four resonances", () => {
+  it("reads each layer's hp, EHP and four resonances", () => {
     const stats = extractFittingStats(
       [],
       attrs({
         shieldCapacity: 450,
+        shieldEhp: 562.5,
+        armorEhp: 810,
+        hullEhp: 350,
         shieldEmResonance: 1,
         shieldExplosiveResonance: 0.5,
         shieldKineticResonance: 0.6,
@@ -119,6 +123,7 @@ describe('extractFittingStats', () => {
 
     expect(stats.shield).toEqual({
       hp: 450,
+      ehp: 562.5,
       emResonance: 1,
       explosiveResonance: 0.5,
       kineticResonance: 0.6,
@@ -126,6 +131,7 @@ describe('extractFittingStats', () => {
     });
     expect(stats.armor).toEqual({
       hp: 405,
+      ehp: 810,
       emResonance: 0.4,
       explosiveResonance: 0.9,
       kineticResonance: 0.75,
@@ -133,6 +139,7 @@ describe('extractFittingStats', () => {
     });
     expect(stats.hull).toEqual({
       hp: 350,
+      ehp: 350,
       emResonance: 1,
       explosiveResonance: 1,
       kineticResonance: 1,
@@ -207,6 +214,38 @@ describe('extractModuleResult', () => {
       maxState: 'overload',
       chargeGroupIds: [83, 372],
     });
+  });
+
+  it("reads a Reactive Armor Hardener's own adapted resonances", () => {
+    const attributes = new Map([
+      [ITEM_DOGMA_ATTRIBUTE.resistanceShiftAmount, { value: 6 }],
+      [DOGMA_ATTRIBUTE.armorEmResonance, { value: 0.4 }],
+      [DOGMA_ATTRIBUTE.armorThermalResonance, { value: 1 }],
+      [DOGMA_ATTRIBUTE.armorKineticResonance, { value: 1 }],
+      [DOGMA_ATTRIBUTE.armorExplosiveResonance, { value: 1 }],
+    ]);
+    expect(
+      extractModuleResult({ attributes, state: 'active', max_state: 'overload' }).adaptedResonances
+    ).toEqual({
+      emResonance: 0.4,
+      thermalResonance: 1,
+      kineticResonance: 1,
+      explosiveResonance: 1,
+    });
+  });
+
+  it('leaves adaptedResonances off a Reactive Armor Hardener that is not running', () => {
+    const attributes = new Map([[ITEM_DOGMA_ATTRIBUTE.resistanceShiftAmount, { value: 6 }]]);
+    expect(
+      extractModuleResult({ attributes, state: 'online', max_state: 'overload' })
+    ).not.toHaveProperty('adaptedResonances');
+  });
+
+  it('leaves adaptedResonances off a module that is not a Reactive Armor Hardener', () => {
+    const attributes = new Map([[DOGMA_ATTRIBUTE.armorEmResonance, { value: 0.85 }]]);
+    expect(
+      extractModuleResult({ attributes, state: 'active', max_state: 'active' })
+    ).not.toHaveProperty('adaptedResonances');
   });
 
   it('gives a module that takes no charge an empty charge group list', () => {

@@ -20,6 +20,7 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     capacitorRechargeTime: 120000,
     shield: {
       hp: 500,
+      ehp: 1000,
       emResonance: 0.5,
       thermalResonance: 0.5,
       kineticResonance: 0.5,
@@ -27,6 +28,7 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     },
     armor: {
       hp: 500,
+      ehp: 1000,
       emResonance: 0.5,
       thermalResonance: 0.5,
       kineticResonance: 0.5,
@@ -34,6 +36,7 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     },
     hull: {
       hp: 500,
+      ehp: 1000,
       emResonance: 0.5,
       thermalResonance: 0.5,
       kineticResonance: 0.5,

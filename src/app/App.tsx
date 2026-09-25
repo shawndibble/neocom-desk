@@ -78,11 +78,12 @@ const EmploymentHistory = lazy(routeChunks.loadEmploymentHistory);
 const Settings = lazy(routeChunks.loadSettings);
 const Styleguide = lazy(routeChunks.loadStyleguide);
 const AppraisalShared = lazy(routeChunks.loadAppraisalShared);
+const FittingShared = lazy(routeChunks.loadFittingShared);
 const ErrorProbe = lazy(routeChunks.loadErrorProbe);
 
 /**
  * Suspense fallback for the lazy routes outside `Layout` (`/styleguide`,
- * `/share/appraisal`, `/error`). Feature routes suspend inside `Layout`'s own
+ * `/share/appraisal`, `/share/fitting`, `/error`). Feature routes suspend inside `Layout`'s own
  * boundary instead, so the shell stays up. Not `BootScreen`: that one reports
  * a boot stall after ten seconds, and a slow chunk is not a stalled boot.
  */
@@ -295,6 +296,10 @@ export function App() {
               sits outside RequireCharacter/ScopeGate the same way /styleguide
               does. routeScopes.test.ts asserts this exemption is deliberate. */}
             <Route path="/share/appraisal" element={<AppraisalShared />} />
+            {/* Same exemption, for a Fitting's own Share Link (#1544) — a
+              visitor with a Character never sees it: FittingShared redirects
+              straight into the editor instead. */}
+            <Route path="/share/fitting" element={<FittingShared />} />
             {/* Undisclosed Sentry probe — see routes/ErrorProbe.tsx. */}
             <Route path="/error" element={<ErrorProbe />} />
             <Route path="*" element={<NotFound />} />

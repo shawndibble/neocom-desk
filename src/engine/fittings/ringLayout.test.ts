@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { arcEndPoint, buildRingSlots, ringSlotPosition } from './ringLayout';
+import {
+  RING_POSITIONS,
+  RING_SLOT_RADIUS,
+  RING_TILE,
+  buildRingSlots,
+  gaugeTicks,
+  ringGhostIndices,
+  ringPoint,
+  ringSlotAngle,
+} from './ringLayout';
 import type { Fitting } from './types';
 
 const fitting: Fitting = {
@@ -44,30 +53,87 @@ describe('buildRingSlots', () => {
   });
 });
 
-describe('ringSlotPosition', () => {
-  it('puts high on top, mid right, low bottom, rigs left', () => {
-    const high = ringSlotPosition('high', 1, 3);
-    const mid = ringSlotPosition('medium', 1, 3);
-    const low = ringSlotPosition('low', 1, 3);
-    const rig = ringSlotPosition('rig', 1, 3);
-    expect(high.y).toBeLessThan(50);
-    expect(mid.x).toBeGreaterThan(50);
-    expect(low.y).toBeGreaterThan(50);
-    expect(rig.x).toBeLessThan(50);
+describe('ringSlotAngle', () => {
+  const angles = (rack: 'high' | 'medium' | 'low' | 'rig') =>
+    Array.from({ length: RING_POSITIONS[rack] }, (_, index) => ringSlotAngle(rack, index));
+
+  it('fills each rack clockwise from its first position', () => {
+    for (const rack of ['high', 'medium', 'low', 'rig'] as const) {
+      const list = angles(rack);
+      for (let i = 1; i < list.length; i++) expect(list[i]).toBeGreaterThan(list[i - 1]);
+    }
   });
 
-  it('zig-zags crowded racks so neighbours stay apart', () => {
-    const a = ringSlotPosition('high', 3, 8);
-    const b = ringSlotPosition('high', 4, 8);
-    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(12);
+  it('puts highs across the top, mids down the right, lows along the bottom, rigs upper-left', () => {
+    for (const a of angles('high')) expect(Math.abs(a)).toBeLessThan(50);
+    for (const a of angles('medium')) {
+      expect(a).toBeGreaterThan(45);
+      expect(a).toBeLessThan(135);
+    }
+    for (const a of angles('low')) {
+      expect(a).toBeGreaterThan(135);
+      expect(a).toBeLessThan(225);
+    }
+    for (const a of angles('rig')) {
+      expect(a).toBeGreaterThan(-100);
+      expect(a).toBeLessThan(-55);
+    }
+  });
+
+  it('never lets two racks overlap', () => {
+    const order = [angles('rig'), angles('high'), angles('medium'), angles('low')];
+    for (let i = 1; i < order.length; i++) {
+      expect(Math.min(...order[i])).toBeGreaterThan(Math.max(...order[i - 1]));
+    }
+    // Lows wrap round to the rigs through the bottom-left.
+    expect(Math.min(...angles('rig')) + 360).toBeGreaterThan(Math.max(...angles('low')));
+  });
+
+  it('keeps neighbouring tiles apart on the ring', () => {
+    const a = ringPoint(ringSlotAngle('high', 3), RING_SLOT_RADIUS);
+    const b = ringPoint(ringSlotAngle('high', 4), RING_SLOT_RADIUS);
+    expect(Math.hypot(a.x - b.x, a.y - b.y)).toBeGreaterThan(RING_TILE);
   });
 });
 
-describe('arcEndPoint', () => {
-  it('starts at the top and ends at the bottom of a half circle', () => {
-    expect(arcEndPoint('left', 0, 30)).toEqual({ x: 50, y: 20 });
-    const end = arcEndPoint('right', 1, 30);
-    expect(end.x).toBeCloseTo(50, 6);
-    expect(end.y).toBeCloseTo(80, 6);
+describe('ringGhostIndices', () => {
+  it('lists the positions a rack has beyond the hull’s own slots', () => {
+    expect(ringGhostIndices('high', 5)).toEqual([5, 6, 7]);
+    expect(ringGhostIndices('rig', 3)).toEqual([]);
+    expect(ringGhostIndices('medium', 0)).toHaveLength(8);
+  });
+
+  it('has none past a rack a hull overfills', () => {
+    expect(ringGhostIndices('rig', 4)).toEqual([]);
+  });
+});
+
+describe('ringPoint', () => {
+  it('measures clockwise from 12 o’clock around the centre', () => {
+    const top = ringPoint(0, 10);
+    expect(top.x).toBeCloseTo(0, 6);
+    expect(top.y).toBeCloseTo(-10, 6);
+    const right = ringPoint(90, 10);
+    expect(right.x).toBeCloseTo(10, 6);
+    expect(right.y).toBeCloseTo(0, 6);
+  });
+});
+
+describe('gaugeTicks', () => {
+  it('spreads the ticks from the first angle to the last', () => {
+    const { filled, empty } = gaugeTicks(100, 140, 5, 0);
+    expect(filled).toEqual([]);
+    expect(empty).toEqual([100, 110, 120, 130, 140]);
+  });
+
+  it('fills the share used, from the first tick', () => {
+    const { filled, empty } = gaugeTicks(0, 40, 5, 0.6);
+    expect(filled).toEqual([0, 10, 20]);
+    expect(empty).toEqual([30, 40]);
+  });
+
+  it('fills every tick when over budget, and none for an unknown share', () => {
+    expect(gaugeTicks(0, 40, 5, 1.4).empty).toEqual([]);
+    expect(gaugeTicks(0, 40, 5, Number.NaN).filled).toEqual([]);
   });
 });

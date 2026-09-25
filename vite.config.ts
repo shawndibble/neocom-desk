@@ -63,6 +63,7 @@ const DOM_TS_TESTS = [
   // sessionStorage / localStorage
   'src/app/loginFlow.test.ts',
   'src/auth/session.test.ts',
+  'src/auth/loginReturnTo.test.ts',
   'src/sync/deviceId.test.ts',
   // document / window
   'src/lib/download.test.ts',

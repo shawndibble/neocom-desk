@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { db } from '@/db';
 import { saveFitting } from './myFittings';
+import { useDamageProfiles, type DamageProfiles } from './damageProfiles';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useUrlParam } from '@/lib/useUrlState';
 import { nullableTextParam } from '@/lib/urlState';
@@ -130,6 +131,8 @@ export interface FittingWorkspace {
   engineReady: boolean;
   /** Skills and implants the stats and fit checks use; null while loading. */
   profile: PilotProfile | null;
+  /** The Damage Profile the stats' EHP is measured against, and the pilot's custom ones (synced). */
+  damageProfiles: DamageProfiles;
   price: Appraisal | null;
   /** The saved record the open Fitting came from, so Save updates it. */
   savedId: string | null;
@@ -166,6 +169,9 @@ export function useFittingWorkspace(): FittingWorkspace {
   const [basisOverride, setBasisOverride] = useState<ImplantBasis | null>(null);
 
   const [price, setPrice] = useState<Appraisal | null>(null);
+  const damageProfiles = useDamageProfiles();
+  const damageProfile = damageProfiles.selected;
+  const damageProfilesHydrated = damageProfiles.hydrated;
 
   // Set right before this hook's own `setShareCode` writes, so the decode
   // effect below can tell "the URL changed because we just wrote it" (keep
@@ -285,6 +291,12 @@ export function useFittingWorkspace(): FittingWorkspace {
       setLoadError(null);
       setFitXmlUnresolved([]);
       const result = await loadFittingFromText(text);
+      if (result.shareCode !== null) {
+        // Opens like any other Share Link: the decode effect does the rest.
+        setUnresolved([]);
+        setShareCode(result.shareCode, { push: true });
+        return;
+      }
       setUnresolved(result.unresolved);
       if (result.error !== null) {
         setLoadError(result.error);
@@ -294,7 +306,7 @@ export function useFittingWorkspace(): FittingWorkspace {
       setSavedId(null);
       await commitFitting(result.fitting);
     },
-    [commitFitting]
+    [commitFitting, setShareCode]
   );
 
   const openFitting = useCallback(
@@ -488,16 +500,23 @@ export function useFittingWorkspace(): FittingWorkspace {
     let cancelled = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new calculation, not a render-time derivation
     setStatsError(false);
-    if (fitting === null || profile === null) return;
+    // Waits for the stored Damage Profile, so a pilot who picked Guristas
+    // doesn't get a uniform calculation thrown away a moment later.
+    if (fitting === null || profile === null || !damageProfilesHydrated) return;
     void (async () => {
       try {
         // Swaps in the Fitting's own carried implants/boosters where the
         // resolved basis is "fitting" — `profile` (exposed as-is to fit
         // checks/candidates, which only care about skills) stays untouched.
         const effectiveProfile = applyImplantBasis(profile, fitting, implantBasis);
-        const result = await computeFittingStats(fitting, effectiveProfile, (progress) => {
-          if (!cancelled) setStatsProgress(progress);
-        });
+        const result = await computeFittingStats(
+          fitting,
+          effectiveProfile,
+          (progress) => {
+            if (!cancelled) setStatsProgress(progress);
+          },
+          damageProfile
+        );
         if (cancelled) return;
         setEngineReady(true);
         setStats({ fitting, stats: result });
@@ -508,7 +527,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     return () => {
       cancelled = true;
     };
-  }, [fitting, profile, implantBasis]);
+  }, [fitting, profile, implantBasis, damageProfile, damageProfilesHydrated]);
 
   // Price: independent of the dogma engine, so it can — and should — resolve
   // well before stats do.
@@ -546,6 +565,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     statsError,
     engineReady,
     profile,
+    damageProfiles,
     price,
     savedId,
     canSave,
