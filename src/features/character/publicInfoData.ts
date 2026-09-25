@@ -14,12 +14,14 @@ import {
   getCharacterPublicInfo,
   getCorporationPublicInfo,
   getAlliancePublicInfo,
+  getCharacterCorporationHistory,
   type CharacterPublicInfo,
   type CorporationPublicInfo,
   type AlliancePublicInfo,
 } from '@/esi/endpoints';
 import { loadWithCache, GLOBAL_CACHE_CHARACTER_ID, STALE_AFTER } from '@/esi/cache';
 import { resolveNames } from './names';
+import { deriveEmploymentHistoryRows, type EmploymentHistoryRow } from './employmentHistory';
 
 export interface PublicCharacterInfo extends CharacterPublicInfo {
   character_id: number;
@@ -75,4 +77,31 @@ export async function loadPublicAllianceInfo(
     { staleAfterMs: STALE_AFTER.static }
   );
   return result ? { ...result.data, alliance_id: allianceId } : null;
+}
+
+export interface PublicEmploymentHistory {
+  rows: EmploymentHistoryRow[];
+  /** Corporation id -> name; `resolveNames` falls back to `#id`. */
+  names: Map<number, string>;
+}
+
+/**
+ * Another Character's corporation history. Cached under the global sentinel
+ * (not the looked-up id) so `purgeCharacterCache` never has to know about
+ * characters that aren't signed in here — unlike `loadEmploymentHistory`,
+ * which is keyed to the active Character.
+ */
+export async function loadPublicEmploymentHistory(
+  characterId: number
+): Promise<PublicEmploymentHistory | null> {
+  const result = await loadWithCache(
+    GLOBAL_CACHE_CHARACTER_ID,
+    `public-employment:${characterId}`,
+    async () => (await getCharacterCorporationHistory(characterId)).data,
+    { staleAfterMs: STALE_AFTER.static }
+  );
+  if (!result) return null;
+  const rows = deriveEmploymentHistoryRows(result.data, Date.now());
+  const names = await resolveNames([...new Set(rows.map((r) => r.corporationId))]);
+  return { rows, names };
 }

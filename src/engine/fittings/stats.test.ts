@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   alignTimeSeconds,
+  showsDrones,
+  extractDroneLimits,
   extractFittingStats,
   extractModuleResult,
   extractOffense,
@@ -68,13 +70,53 @@ describe('extractFittingStats', () => {
   });
 
   it('collects the type ids of items the engine returned empty attributes for', () => {
-    const stats = extractFittingStats([4405, 999999999, 2488], attrs({}), [
-      { attributes: new Map([[1, { value: 1 }]]) },
-      { attributes: new Map() },
-      { attributes: new Map([[2, { value: 1 }]]) },
-    ]);
+    const stats = extractFittingStats(
+      [
+        { type_id: 4405, slot: { type: 'low' } },
+        { type_id: 999999999, slot: { type: 'rig' } },
+        { type_id: 2488, slot: { type: 'drone_bay' } },
+      ],
+      attrs({}),
+      [
+        { attributes: new Map([[1, { value: 1 }]]) },
+        { attributes: new Map() },
+        { attributes: new Map([[2, { value: 1 }]]) },
+      ]
+    );
 
     expect(stats.unknownItemTypeIds).toEqual([999999999]);
+  });
+
+  it('never counts cargo as unknown, since the engine calculates nothing for it', () => {
+    const stats = extractFittingStats([{ type_id: 209, slot: { type: 'cargo' } }], attrs({}), [
+      { attributes: new Map() },
+    ]);
+
+    expect(stats.unknownItemTypeIds).toEqual([]);
+  });
+
+  it("reads hull resists from the ship's own resonance ids (EM 113, thermal 110, kinetic 109, explosive 111)", () => {
+    // Literal ids, not DOGMA_ATTRIBUTE: a fixture built from the constants
+    // under test would agree with a wrong constant.
+    const ship = new Map([
+      [113, { value: 0.67 }],
+      [110, { value: 0.6 }],
+      [109, { value: 0.5 }],
+      [111, { value: 0.4 }],
+      [974, { value: 1 }],
+      [975, { value: 1 }],
+      [976, { value: 1 }],
+      [977, { value: 1 }],
+    ]);
+
+    const stats = extractFittingStats([], ship, []);
+
+    expect(stats.hull).toMatchObject({
+      emResonance: 0.67,
+      thermalResonance: 0.6,
+      kineticResonance: 0.5,
+      explosiveResonance: 0.4,
+    });
   });
 
   it('treats every attribute as 0 when the ship result carries none at all', () => {
@@ -167,7 +209,8 @@ describe('extractFittingStats', () => {
         maxVelocity: 391.4625,
         agility: 3.2,
         mass: 1067000,
-        warpSpeed: 3,
+        baseWarpSpeed: 1,
+        warpSpeedMultiplier: 3,
       }),
       []
     );
@@ -430,5 +473,72 @@ describe('alignTimeSeconds', () => {
   it('is zero for a massless or inertia-free ship rather than NaN', () => {
     expect(alignTimeSeconds(0, 0.5)).toBe(0);
     expect(alignTimeSeconds(1_000_000, 0)).toBe(0);
+  });
+});
+
+describe('showsDrones', () => {
+  const corax = { droneCapacity: 0, droneBandwidthTotal: 0 };
+  const tristan = { droneCapacity: 40, droneBandwidthTotal: 25 };
+
+  it('is true for a hull with a drone bay or drone bandwidth', () => {
+    expect(showsDrones(tristan, 0)).toBe(true);
+    expect(showsDrones({ droneCapacity: 25, droneBandwidthTotal: 0 }, 0)).toBe(true);
+  });
+
+  it('is false for a hull with neither', () => {
+    expect(showsDrones(corax, 0)).toBe(false);
+  });
+
+  it('stays true while drones are fitted, so a pasted fit’s drones can still be removed', () => {
+    expect(showsDrones(corax, 2)).toBe(true);
+  });
+
+  it('waits for the ship data before offering drones, rather than flashing them', () => {
+    expect(showsDrones(null, 0)).toBe(false);
+    expect(showsDrones(null, 1)).toBe(true);
+  });
+});
+
+describe('extractDroneLimits', () => {
+  it("reads the pilot's max active drones and each drone type's bandwidth, launched or not", () => {
+    const limits = extractDroneLimits(
+      [
+        { type_id: 2454, slot: { type: 'drone_bay' } },
+        { type_id: 3001, slot: { type: 'high' } },
+        { type_id: 2185, slot: { type: 'drone_bay' } },
+      ],
+      [
+        { attributes: new Map([[1272, { value: 5 }]]) },
+        { attributes: new Map([[1272, { value: 99 }]]) },
+        { attributes: new Map([[1272, { value: 10 }]]) },
+      ],
+      new Map([[352, { value: 5 }]])
+    );
+    expect(limits).toEqual({ maxActiveDrones: 5, droneBandwidthByType: { 2454: 5, 2185: 10 } });
+  });
+
+  it('allows no drones in space when the character has no Drones skill', () => {
+    expect(extractDroneLimits([], [], new Map()).maxActiveDrones).toBe(0);
+  });
+});
+
+describe('extractFittingStats — warp speed', () => {
+  it('is base warp speed (1281) times the hull’s warp speed multiplier (600), in AU/s', () => {
+    // Literal ids: a Rifter's base is 1 and its multiplier 5 — the base alone is 1 on every hull.
+    const ship = new Map([
+      [1281, { value: 1 }],
+      [600, { value: 5 }],
+    ]);
+    expect(extractFittingStats([], ship, []).navigation.warpSpeed).toBe(5);
+  });
+});
+
+describe('extractFittingStats — hardpoints', () => {
+  it("reads the hull's turret (102) and launcher (101) hardpoints", () => {
+    const ship = new Map([
+      [102, { value: 3 }],
+      [101, { value: 2 }],
+    ]);
+    expect(extractFittingStats([], ship, []).hardpoints).toEqual({ turrets: 3, launchers: 2 });
   });
 });

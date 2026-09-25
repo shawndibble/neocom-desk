@@ -1,4 +1,5 @@
 import {
+  CHARACTER_DOGMA_ATTRIBUTE,
   CHARGE_GROUP_ATTRIBUTES,
   DOGMA_ATTRIBUTE,
   ITEM_DOGMA_ATTRIBUTE,
@@ -21,6 +22,12 @@ interface AttributeMap {
 
 interface ItemCalculationResult {
   attributes: { size: number };
+}
+
+/** An item as `calculate()` was given it — the engine's own `FitItem` fields this seam reads. */
+interface CalculatedItem {
+  type_id: number;
+  slot: { type: string };
 }
 
 function readAttribute(attributes: AttributeMap, attributeId: number): number {
@@ -117,20 +124,49 @@ function layerDefense(
 }
 
 /**
+ * What limits the drones in space: how many the pilot controls, and each
+ * drone type's bandwidth (read even for a stack still in the bay, which draws
+ * none yet). `items`/`itemResults` are index-parallel, as `calculate()` takes and returns them.
+ */
+export function extractDroneLimits(
+  items: readonly CalculatedItem[],
+  itemResults: readonly { attributes: AttributeMap }[],
+  characterAttributes: AttributeMap
+): Pick<FittingStats, 'maxActiveDrones' | 'droneBandwidthByType'> {
+  const droneBandwidthByType: Record<number, number> = {};
+  items.forEach((item, index) => {
+    const result = itemResults[index];
+    if (item.slot.type !== 'drone_bay' || !result) return;
+    droneBandwidthByType[item.type_id] = readAttribute(
+      result.attributes,
+      ITEM_DOGMA_ATTRIBUTE.droneBandwidthNeeded
+    );
+  });
+  return {
+    maxActiveDrones: readAttribute(characterAttributes, CHARACTER_DOGMA_ATTRIBUTE.maxActiveDrones),
+    droneBandwidthByType,
+  };
+}
+
+/**
  * A type id the pinned `sde.dat` has nothing for comes back from `calculate`
  * with an empty attribute map rather than failing the whole calculation
  * (verified against a live run of the pinned engine, 2026-09-24) — that's how
  * this seam tells an unresolvable item apart from a genuinely inert one,
  * which still carries its base SDE attributes.
+ *
+ * Cargo is never unknown: the engine calculates nothing for a cargo item, so
+ * every one — a missile stack the launchers already fire, say — comes back
+ * empty however well the data knows it.
  */
-function isUnknownItem(result: ItemCalculationResult): boolean {
-  return result.attributes.size === 0;
+function isUnknownItem(item: CalculatedItem, result: ItemCalculationResult): boolean {
+  return item.slot.type !== 'cargo' && result.attributes.size === 0;
 }
 
 /**
  * Reads the stats this ticket's fitting stats card needs off a calculation
- * (ADR 0016's seam). `itemTypeIds`/`itemResults` must be the same
- * index-parallel arrays `calculate()` was given and returned.
+ * (ADR 0016's seam). `items`/`itemResults` must be the same index-parallel
+ * arrays `calculate()` was given and returned.
  *
  * Leaves out `calibrationUsed`/`droneBandwidthUsed`: unlike everything here,
  * those are summed from *item*-level attributes on whichever items actually
@@ -139,12 +175,19 @@ function isUnknownItem(result: ItemCalculationResult): boolean {
  * has `dogmaFit.items`' slot types to know which items those are.
  */
 export function extractFittingStats(
-  itemTypeIds: readonly number[],
+  items: readonly CalculatedItem[],
   shipAttributes: AttributeMap,
   itemResults: readonly ItemCalculationResult[]
 ): Omit<
   FittingStats,
-  'calibrationUsed' | 'droneBandwidthUsed' | 'modules' | 'offense' | 'overheated' | 'applied'
+  | 'calibrationUsed'
+  | 'droneBandwidthUsed'
+  | 'maxActiveDrones'
+  | 'droneBandwidthByType'
+  | 'modules'
+  | 'offense'
+  | 'overheated'
+  | 'applied'
 > {
   const cpuTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.cpuOutput);
   const powergridTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.powerOutput);
@@ -158,6 +201,10 @@ export function extractFittingStats(
     droneDps: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.droneDamagePerSecond),
     droneBandwidthTotal: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.droneBandwidth),
     droneCapacity: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.droneCapacity),
+    hardpoints: {
+      turrets: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.turretHardpoints),
+      launchers: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.launcherHardpoints),
+    },
     ehp: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.ehp),
     repair: localRepair(shipAttributes),
     capacitor: capacitorStatus(shipAttributes),
@@ -174,9 +221,13 @@ export function extractFittingStats(
       maxVelocity: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.maxVelocity),
       agility: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.agility),
       mass: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.mass),
-      warpSpeed: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.warpSpeed),
+      warpSpeed:
+        readAttribute(shipAttributes, DOGMA_ATTRIBUTE.baseWarpSpeed) *
+        readAttribute(shipAttributes, DOGMA_ATTRIBUTE.warpSpeedMultiplier),
     },
-    unknownItemTypeIds: itemTypeIds.filter((_, index) => isUnknownItem(itemResults[index])),
+    unknownItemTypeIds: items
+      .filter((item, index) => isUnknownItem(item, itemResults[index]))
+      .map((item) => item.type_id),
     slotCounts: {
       high: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.hiSlots),
       medium: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.medSlots),
@@ -339,4 +390,18 @@ export function overheatedOrNull(
  */
 export function alignTimeSeconds(massKg: number, agility: number): number {
   return (Math.log(4) * agility * massKg) / 1_000_000;
+}
+
+/**
+ * Whether the editor shows drones at all: a hull with no drone bay and no
+ * bandwidth (a Corax) has nothing to put them in. Drones already in the
+ * Fitting (a pasted fit) keep it showing, so they can be removed; before the
+ * ship data, only those do.
+ */
+export function showsDrones(
+  stats: Pick<FittingStats, 'droneCapacity' | 'droneBandwidthTotal'> | null,
+  fittedDrones: number
+): boolean {
+  if (fittedDrones > 0) return true;
+  return stats !== null && (stats.droneCapacity > 0 || stats.droneBandwidthTotal > 0);
 }

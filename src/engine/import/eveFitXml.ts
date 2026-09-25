@@ -1,7 +1,7 @@
 /**
  * Turns one `<fitting>` entry from EVE's fittings-XML export (the in-game
  * fitting window's "Export Fitting", one per doctrine fit) into a domain
- * `Fitting` — the "Load EVE XML" counterpart to `engine/fittings/eftLoader.ts`'s
+ * `Fitting`'s `LoadParts` — the "Load EVE XML" counterpart to `engine/fittings/eftLoader.ts`'s
  * "Load EFT". `FittingXmlDocument`/`FittingXmlEntry`/`FittingXmlHardware` are
  * the plain, engine-safe intermediate shape a DOM-touching reader (features
  * layer) produces; no `Document`/`Element` type crosses into this module,
@@ -16,9 +16,9 @@
  */
 import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
 import { resolveTypeId, type EftTypeLookup } from '@/engine/fittings/eftLoader';
+import type { LoadParts, LoadWarning } from '@/engine/fittings/load';
 import {
   FITTING_SLOT_KINDS,
-  type Fitting,
   type FittingCargoItem,
   type FittingDrone,
   type FittingModule,
@@ -42,23 +42,11 @@ export interface FittingXmlDocument {
   entries: FittingXmlEntry[];
 }
 
-export interface FitXmlUnresolvedItem {
-  text: string;
-  reason: string;
-}
-
-export type FitXmlEntryResult =
-  | {
-      hullTypeId: number;
-      modules: FittingModule[];
-      drones: FittingDrone[];
-      cargo: FittingCargoItem[];
-      unresolved: FitXmlUnresolvedItem[];
-    }
-  | { hullTypeId: null; unresolved: FitXmlUnresolvedItem[] };
-
-const RACK_SLOT = /^(high|med|medium|low|rig|subsystem)\s+slot\s+(\d+)$/i;
+// The game (and pyfa) write "hi slot N" and "med slot N"; the longer
+// spellings are accepted too.
+const RACK_SLOT = /^(hi|high|med|medium|low|rig|subsystem)\s+slot\s+(\d+)$/i;
 const RACK_NAME: Readonly<Record<string, FittingSlotKind>> = {
+  hi: 'high',
   high: 'high',
   med: 'medium',
   medium: 'medium',
@@ -68,11 +56,8 @@ const RACK_NAME: Readonly<Record<string, FittingSlotKind>> = {
 };
 
 /** Parses one `<fitting>` entry's hull and hardware into a `Fitting`'s parts. Never throws. */
-export function loadEveFitXmlEntry(
-  entry: FittingXmlEntry,
-  typeByName: EftTypeLookup
-): FitXmlEntryResult {
-  const unresolved: FitXmlUnresolvedItem[] = [];
+export function loadEveFitXmlEntry(entry: FittingXmlEntry, typeByName: EftTypeLookup): LoadParts {
+  const unresolved: LoadWarning[] = [];
   const hullTypeId = resolveTypeId(entry.shipTypeName, typeByName);
   if (hullTypeId === null) {
     unresolved.push({ text: entry.shipTypeName, reason: 'unknown ship' });
@@ -98,7 +83,8 @@ export function loadEveFitXmlEntry(
       continue;
     }
 
-    if (slotKey === 'cargo hold') {
+    // The game writes "cargo"; "cargo hold" is accepted too.
+    if (slotKey === 'cargo' || slotKey === 'cargo hold') {
       const typeId = resolveTypeId(item.type, typeByName);
       if (typeId === null) {
         unresolved.push({ text: item.type, reason: 'unknown item' });
@@ -148,18 +134,4 @@ export function loadEveFitXmlEntry(
   );
 
   return { hullTypeId, modules, drones, cargo, unresolved };
-}
-
-/** Assembles a `Fitting` from a resolved result. */
-export function fitXmlEntryResultToFitting(
-  result: Extract<FitXmlEntryResult, { hullTypeId: number }>,
-  name: string
-): Fitting {
-  return {
-    name,
-    shipTypeId: result.hullTypeId,
-    modules: result.modules,
-    drones: result.drones,
-    cargo: result.cargo,
-  };
 }

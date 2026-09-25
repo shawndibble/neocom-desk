@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
+  Button,
   ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
@@ -14,7 +15,6 @@ import {
   InfoTooltip,
   PageHeader,
   Panel,
-  ReauthBanner,
   SearchInput,
   Select,
   SelectContent,
@@ -27,8 +27,7 @@ import {
   type DataTableSort,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { GrantBanner } from '@/app/GrantNote';
 import { db } from '@/db';
 import {
   loadWalletBalanceWithStatus,
@@ -86,6 +85,7 @@ import { walletJournalCsvColumns } from '@/features/character/walletJournalCsv';
 import { JournalDescriptionCell } from '@/features/character/JournalDescriptionCell';
 import { journalTransactionLinks } from '@/features/character/journalTransactionLink';
 import {
+  EMPTY_WALLET_JOURNAL_FILTER,
   activeWalletJournalFilterCount,
   EMPTY_JOURNAL_FILTER_PARAMS,
   filterWalletJournal,
@@ -271,6 +271,13 @@ function JournalTable({
           title={t('wallet.journalNoFilterMatches')}
           hint={t('wallet.journalNoFilterMatchesHint')}
           className="py-8"
+          action={
+            activeWalletJournalFilterCount(filter) > 0 || filter.text.trim() !== '' ? (
+              <Button size="sm" onClick={() => onFilterChange(EMPTY_WALLET_JOURNAL_FILTER)}>
+                {t('common.resetFilters')}
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <DataTable
@@ -1352,51 +1359,18 @@ export function Wallet() {
               meta={walletCharacterFilterMeta}
               actions={balanceResult ? <DataAgeBadge date={balanceResult.fetchedAt} /> : undefined}
             >
-              {journal.length === 0 ? (
-                <EmptyState
-                  title={t('wallet.journalEmptyTitle')}
-                  hint={t('wallet.journalEmptyHint')}
-                  className="py-8"
-                />
-              ) : (
-                <div className="mb-4">
-                  {journalTruncated && (
-                    <p className="px-1 pb-2 text-[0.6875rem] text-warning uppercase">
-                      {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
-                    </p>
-                  )}
-                  {walletBalancePoints.length > 0 && (
-                    <Suspense
-                      fallback={
-                        <div className="flex justify-center py-8">
-                          <Spinner label={t('common.loading')} />
-                        </div>
-                      }
-                    >
-                      <LazyWalletBalanceChart
-                        points={walletBalancePoints}
-                        trend={walletBalanceTrendDirection}
-                        timeZone={timeZone}
-                      />
-                    </Suspense>
-                  )}
-                </div>
-              )}
               <div className="flex flex-wrap gap-x-8 gap-y-4">
                 <div>
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {t('wallet.isk')}
                   </p>
                   {balanceNeedsReauth ? (
-                    <ReauthBanner
+                    <GrantBanner
+                      characterId={activeCharacterId}
+                      endpoints={['getCharacterWallet']}
                       title={t('wallet.reauthTitle')}
                       hint={t('wallet.reauthHint')}
                       actionLabel={t('wallet.reauthAction')}
-                      onLogin={() =>
-                        void beginEveLogin({
-                          groups: permissionsForEndpoints(['getCharacterWallet']),
-                        })
-                      }
                     />
                   ) : balanceResult ? (
                     <p
@@ -1426,6 +1400,36 @@ export function Wallet() {
               {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
                 <p className="mt-3 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
               )}
+              {journal.length === 0 ? (
+                <EmptyState
+                  title={t('wallet.journalEmptyTitle')}
+                  hint={t('wallet.journalEmptyHint')}
+                  className="py-8"
+                />
+              ) : (
+                <div className="mt-4">
+                  {journalTruncated && (
+                    <p className="px-1 pb-2 text-[0.6875rem] text-warning uppercase">
+                      {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
+                    </p>
+                  )}
+                  {walletBalancePoints.length > 0 && (
+                    <Suspense
+                      fallback={
+                        <div className="flex justify-center py-8">
+                          <Spinner label={t('common.loading')} />
+                        </div>
+                      }
+                    >
+                      <LazyWalletBalanceChart
+                        points={walletBalancePoints}
+                        trend={walletBalanceTrendDirection}
+                        timeZone={timeZone}
+                      />
+                    </Suspense>
+                  )}
+                </div>
+              )}
             </Panel>
           )}
 
@@ -1436,15 +1440,12 @@ export function Wallet() {
           >
             {loyaltyNeedsReauth ? (
               <div className="p-3">
-                <ReauthBanner
+                <GrantBanner
+                  characterId={activeCharacterId}
+                  endpoints={['getCharacterLoyaltyPoints']}
                   title={t('loyalty.reauthTitle')}
                   hint={t('loyalty.reauthHint')}
                   actionLabel={t('loyalty.reauthAction')}
-                  onLogin={() =>
-                    void beginEveLogin({
-                      groups: permissionsForEndpoints(['getCharacterLoyaltyPoints']),
-                    })
-                  }
                 />
               </div>
             ) : !loyaltyResult || otherLoyalty.length === 0 ? (

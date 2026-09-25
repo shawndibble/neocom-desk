@@ -177,3 +177,14 @@ describe('orderRowSummary', () => {
     expect(orderRowSummary(row)).toEqual({ kind: 'best' });
   });
 });
+
+describe('orderRowSummary — buy orders (#1733)', () => {
+  it('calls a healthy buy order the top bid where it sits, not the cheapest', () => {
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      isBuyOrder: true,
+      station: { bestPrice: 480, beatsMe: false, gapIsk: 20, gapPct: 4 },
+    };
+    expect(orderRowSummary(row)).toEqual({ kind: 'topBid' });
+  });
+});

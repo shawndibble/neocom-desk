@@ -152,7 +152,13 @@ export interface FittingStats {
   droneDps: number;
   droneBandwidthUsed: number;
   droneBandwidthTotal: number;
+  /** Drones the pilot can control at once — the Drones skill's count; 0 without it. */
+  maxActiveDrones: number;
+  /** Mbit/s one drone of each type in the Fitting draws, whether launched or not. */
+  droneBandwidthByType: Record<number, number>;
   droneCapacity: number;
+  /** The hull's turret and launcher hardpoints; what the high slots take is `countHardpoints`. */
+  hardpoints: HardpointCounts;
   ehp: number;
   capacitor: CapacitorStatus;
   capacitorCapacity: number;
@@ -296,10 +302,13 @@ export const DOGMA_ATTRIBUTE = {
   armorExplosiveResonance: 268,
   armorKineticResonance: 269,
   armorThermalResonance: 270,
-  hullEmResonance: 974,
-  hullExplosiveResonance: 975,
-  hullKineticResonance: 976,
-  hullThermalResonance: 977,
+  // The ship's own structure resists (`emDamageResonance` and siblings). Not
+  // 974-977 (`hullEmDamageResonance`…): those are the modifiers a Damage
+  // Control carries, and a ship reads them as their default of 1.
+  hullEmResonance: 113,
+  hullExplosiveResonance: 111,
+  hullKineticResonance: 109,
+  hullThermalResonance: 110,
   maxTargetRange: 76,
   maxLockedTargets: 192,
   scanResolution: 564,
@@ -307,7 +316,14 @@ export const DOGMA_ATTRIBUTE = {
   maxVelocity: 37,
   agility: 70,
   mass: 4,
-  warpSpeed: 1281,
+  // The warp speed is base × multiplier: the base (1281) is 1 on every hull,
+  // and the hull's own speed — plus any rig's bonus — is in the multiplier.
+  // The hull's hardpoints: every one it has — the engine never subtracts
+  // what is fitted (verified 2026-09-25: a Rifter reads 3 and 2 bare or armed).
+  turretHardpoints: 102,
+  launcherHardpoints: 101,
+  baseWarpSpeed: 1281,
+  warpSpeedMultiplier: 600,
   droneBandwidth: 1271,
   droneCapacity: 283,
   calibration: 1132,
@@ -320,6 +336,24 @@ export const DOGMA_ATTRIBUTE = {
   lowSlots: 12,
   rigSlots: 1137,
   subsystemSlots: 1367,
+} as const;
+
+/** Turret and launcher hardpoints — a hull's, or those its high slots take. */
+export interface HardpointCounts {
+  turrets: number;
+  launchers: number;
+}
+
+/** What a failed stats calculation was about: the pilot's skills, or the ship data and its calculation. */
+export type StatsErrorReason = 'skills' | 'shipData';
+
+/**
+ * Read off the calculation's character result: "Max Active Drones", which
+ * the Drones skill raises by one a level. Verified 2026-09-25 against the
+ * pinned engine (Drones 0/3/5 → absent/3/5).
+ */
+export const CHARACTER_DOGMA_ATTRIBUTE = {
+  maxActiveDrones: 352,
 } as const;
 
 /**

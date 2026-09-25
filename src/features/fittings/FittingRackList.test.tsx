@@ -1,13 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import '@/i18n';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
-import { FittingRackList as EditableRackList } from './FittingRackList';
+import { DroneSection, FittingRackList as EditableRackList } from './FittingRackList';
 
 type RackListProps = Parameters<typeof EditableRackList>[0];
 
 /** The read-only props these tests care about; the editing ones get inert defaults. */
-function FittingRackList(props: Pick<RackListProps, 'fitting' | 'stats' | 'unusableModuleKeys'>) {
+function FittingRackList(
+  props: Pick<RackListProps, 'fitting' | 'stats' | 'unusableModuleKeys'> &
+    Partial<Pick<RackListProps, 'moduleResults' | 'edit'>>
+) {
   return (
     <EditableRackList
       moduleResults={null}
@@ -69,5 +72,150 @@ describe('FittingRackList', () => {
       />
     );
     expect(screen.getAllByText("Can't use")).toHaveLength(1);
+  });
+
+  it('has no Drones section or bandwidth bar on a hull without a drone bay', () => {
+    const noBay = { ...statsWith(10), droneCapacity: 0, droneBandwidthTotal: 0 };
+    const { rerender } = render(<FittingRackList fitting={fitting} stats={noBay} />);
+    expect(screen.queryByText('Drones')).toBeNull();
+    expect(screen.queryByRole('meter', { name: 'Drone bandwidth' })).toBeNull();
+
+    rerender(
+      <FittingRackList
+        fitting={fitting}
+        stats={{ ...noBay, droneCapacity: 25, droneBandwidthTotal: 25 }}
+      />
+    );
+    expect(screen.getByText('Drones')).toBeTruthy();
+    expect(screen.getByRole('meter', { name: 'Drone bandwidth' })).toBeTruthy();
+  });
+
+  it('shows the state a passive module actually reaches, and offers nothing above it', () => {
+    // A pasted fit asks for "active" everywhere; the engine runs a passive low online.
+    const pasted: Fitting = {
+      ...fitting,
+      modules: fitting.modules.map((module) => ({ ...module, state: 'active' })),
+    };
+    render(
+      <FittingRackList
+        fitting={pasted}
+        stats={statsWith(10)}
+        moduleResults={[
+          { state: 'active', maxState: 'overload', chargeGroupIds: [] },
+          { state: 'online', maxState: 'online', chargeGroupIds: [] },
+        ]}
+      />
+    );
+    const passive = screen.getByLabelText('State of #11') as HTMLSelectElement;
+    expect(passive.value).toBe('online');
+    expect([...passive.options].map((option) => option.value)).toEqual(['offline', 'online']);
+  });
+
+  it('lists the cargo, edits a quantity and removes a type', () => {
+    const edits: Fitting[] = [];
+    const carrying: Fitting = { ...fitting, cargo: [{ typeId: 209, quantity: 1535 }] };
+    render(
+      <FittingRackList
+        fitting={carrying}
+        stats={statsWith(10)}
+        edit={(apply) => edits.push(apply(carrying))}
+      />
+    );
+    expect(screen.getByText('Cargo')).toBeTruthy();
+    const quantity = screen.getByLabelText('Quantity') as HTMLInputElement;
+    expect(quantity.value).toBe('1535');
+
+    fireEvent.change(quantity, { target: { value: '400' } });
+    expect(edits.at(-1)?.cargo).toEqual([{ typeId: 209, quantity: 400 }]);
+    // Emptying the box on the way to a new number keeps the row.
+    fireEvent.change(quantity, { target: { value: '0' } });
+    expect(edits).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove #209' }));
+    expect(edits.at(-1)?.cargo).toEqual([]);
+  });
+
+  it('shows a type pasted as two cargo stacks as one row, and edits it as one', () => {
+    const edits: Fitting[] = [];
+    const split: Fitting = {
+      ...fitting,
+      cargo: [
+        { typeId: 209, quantity: 100 },
+        { typeId: 209, quantity: 50 },
+      ],
+    };
+    render(
+      <FittingRackList
+        fitting={split}
+        stats={statsWith(10)}
+        edit={(apply) => edits.push(apply(split))}
+      />
+    );
+    const quantity = screen.getByLabelText('Quantity') as HTMLInputElement;
+    expect(quantity.value).toBe('150');
+    fireEvent.change(quantity, { target: { value: '400' } });
+    expect(edits.at(-1)?.cargo).toEqual([{ typeId: 209, quantity: 400 }]);
+  });
+
+  it('has no Cargo section when nothing is carried', () => {
+    render(<FittingRackList fitting={fitting} stats={statsWith(10)} />);
+    expect(screen.queryByText('Cargo')).toBeNull();
+  });
+
+  it("keeps a pasted fit's drones on such a hull, so they can be removed", () => {
+    const noBay = { ...statsWith(10), droneCapacity: 0, droneBandwidthTotal: 0 };
+    render(
+      <FittingRackList
+        fitting={{ ...fitting, drones: [{ typeId: 2486, quantity: 2, state: 'active' }] }}
+        stats={noBay}
+      />
+    );
+    expect(screen.getByText('Drones')).toBeTruthy();
+    // The two modules' removes, and the drones'.
+    expect(screen.getAllByRole('button', { name: /^Remove/ })).toHaveLength(3);
+  });
+});
+
+describe('DroneSection', () => {
+  const withDrones: Fitting = {
+    ...fitting,
+    drones: [
+      { typeId: 2486, quantity: 2, state: 'active' },
+      { typeId: 2486, quantity: 3, state: 'online' },
+    ],
+  };
+  const stats = { ...statsWith(10), droneCapacity: 25, droneBandwidthTotal: 25 };
+
+  it('carries its own bandwidth and bay bars on the Ring, and the launched and bay counts', () => {
+    render(
+      <DroneSection
+        fitting={withDrones}
+        catalogue={null}
+        stats={stats}
+        edit={() => {}}
+        target={null}
+        onSelectTarget={() => {}}
+        variant="panel"
+      />
+    );
+    expect(screen.getByRole('meter', { name: 'Drone bandwidth' })).toBeTruthy();
+    expect(screen.getByRole('meter', { name: 'Drone bay (m³)' })).toBeTruthy();
+    expect(screen.getByLabelText('In space')).toHaveValue(2);
+    expect(screen.getByLabelText('In bay')).toHaveValue(3);
+    expect(screen.queryByText('Drones')).toBeNull();
+  });
+
+  it('is nothing on a hull without a drone bay', () => {
+    const { container } = render(
+      <DroneSection
+        fitting={fitting}
+        catalogue={null}
+        stats={{ ...stats, droneCapacity: 0, droneBandwidthTotal: 0 }}
+        edit={() => {}}
+        target={null}
+        onSelectTarget={() => {}}
+      />
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 });

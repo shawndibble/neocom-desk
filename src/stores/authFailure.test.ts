@@ -66,6 +66,17 @@ describe('subscribeToEsiAuthFailures', () => {
     unsubscribe();
   });
 
+  it('keeps the endpoint that failed, so the notice can ask for its Permission', () => {
+    const unsubscribe = subscribeToEsiAuthFailures();
+    emitEsiAuthFailure(42, 'postCharacterMail');
+    expect(useAuthFailure.getState().failure).toMatchObject({
+      kind: 'request',
+      characterId: 42,
+      endpointId: 'postCharacterMail',
+    });
+    unsubscribe();
+  });
+
   it('stops receiving after unsubscribe', () => {
     subscribeToEsiAuthFailures()();
     useAuthFailure.setState({ failure: null });

@@ -15,6 +15,7 @@ import {
   Panel,
   Spinner,
   type DataTableColumn,
+  Checkbox,
 } from '@/components/ui';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
@@ -23,8 +24,7 @@ import {
 } from '@/features/character/characterFilterValue';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import * as Icon from '@/components/ui/icons';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { beginGrant } from '@/app/grantAction';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
@@ -744,12 +744,10 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             className: 'w-8 px-2',
             render: (dr: DisplayRow) =>
               isSelectableRow(dr) ? (
-                <input
-                  type="checkbox"
+                <Checkbox
                   aria-label={t('miningTax.selectForBulkAction')}
                   checked={selection.has(dr.key)}
                   onChange={() => toggleRowSelected(dr.key)}
-                  className="size-4 shrink-0 cursor-pointer accent-accent"
                 />
               ) : null,
           } satisfies DataTableColumn<DisplayRow>,
@@ -904,12 +902,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                     </span>
                     <Button
                       size="sm"
-                      onClick={() =>
-                        void beginEveLogin({
-                          characterId: c.characterId,
-                          groups: permissionsForEndpoints(['getCharacterMining']),
-                        })
-                      }
+                      onClick={() => void beginGrant(c.characterId, ['getCharacterMining'])}
                     >
                       {t('miningTax.reauthAction')}
                     </Button>
@@ -1094,9 +1087,24 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                         {t('miningTax.unassignedMined')}
                       </span>
                     </p>
+                    {allPayees.length === 0 && (
+                      <p className="mt-2 text-xs text-text-dim">
+                        {t('miningTax.unassignedNoPayeesPrompt')}
+                      </p>
+                    )}
                     <div className="mt-2">
-                      <Button size="sm" className="w-full" onClick={assignNext}>
-                        {t('miningTax.assignNextAction')}
+                      <Button
+                        size="sm"
+                        className="w-full"
+                        onClick={
+                          allPayees.length === 0 && payeeManagerDefaultCharacterId !== null
+                            ? () => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)
+                            : assignNext
+                        }
+                      >
+                        {allPayees.length === 0 && payeeManagerDefaultCharacterId !== null
+                          ? t('miningTax.addPayee')
+                          : t('miningTax.assignNextAction')}
                       </Button>
                     </div>
                   </Panel>
@@ -1313,6 +1321,11 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           onMarkPaid={() => void handleMarkPaidFromDetail()}
           onResolve={() => void handleResolveFromDetail()}
           onUndo={() => void handleUndoFromDetail()}
+          onAddPayee={
+            payeeManagerDefaultCharacterId !== null
+              ? () => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)
+              : undefined
+          }
           onJoin={() => {
             setJoinTarget(detailTarget);
             setDetailTarget(null);

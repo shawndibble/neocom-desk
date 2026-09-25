@@ -204,14 +204,49 @@ export async function dismissFeedEntries(ids: readonly string[]): Promise<void> 
 }
 
 /**
- * Whether an Occurrence Key already has a feed row — the Foreground Poller's
- * dedup check against a Scheduled Push (or another device) that already
- * delivered this exact occurrence (issue #360). A thin read, but exported so
+ * How old a feed row can be before this device stops raising a notification
+ * for it. Past this, the occurrence is old news the Alerts page already
+ * shows — a device coming back after days away should not toast it again.
+ */
+export const TOAST_STALE_AFTER_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Whether an existing feed row means this device should not raise its own
+ * notification for the same occurrence (issue #360's dedup, narrowed to the
+ * device). A row by itself is not enough: another device's row syncs in, but
+ * that device's toast never reached this one — and events with no Scheduled
+ * Push (a market undercut) have no other way to. So only three things
+ * suppress: this device already notified for it, it was dismissed anywhere,
+ * or it is older than {@link TOAST_STALE_AFTER_MS}.
+ */
+export function rowSuppressesToast(row: NotificationFeedEntry | undefined, now: number): boolean {
+  if (row === undefined) return false;
+  if (row.notifiedHereAt !== undefined || row.dismissedAt !== undefined) return true;
+  return now - row.firedAt > TOAST_STALE_AFTER_MS;
+}
+
+/**
+ * {@link rowSuppressesToast} for one Occurrence Key. Exported so
  * `foregroundPoller.ts` never has to know the row's id *is* the Occurrence
  * Key to look one up.
  */
-export async function feedHasOccurrence(occurrenceKey: string): Promise<boolean> {
-  return (await db.notificationFeed.get(occurrenceKey)) !== undefined;
+export async function feedSuppressesToast(occurrenceKey: string, now: number): Promise<boolean> {
+  return rowSuppressesToast(await db.notificationFeed.get(occurrenceKey), now);
+}
+
+/**
+ * Stamps `notifiedHereAt` on the rows this device just raised a notification
+ * for. Only touches rows that exist: with the feed channel off there is no
+ * row, and the poller's own baseline already stops a re-fire.
+ */
+export async function markFeedNotifiedHere(
+  occurrenceKeys: readonly string[],
+  at: number
+): Promise<void> {
+  await db.notificationFeed
+    .where('id')
+    .anyOf([...occurrenceKeys])
+    .modify({ notifiedHereAt: at });
 }
 
 /** Every feed row for one Character (`removeCharacter.ts`'s local cleanup). */

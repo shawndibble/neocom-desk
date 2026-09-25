@@ -12,14 +12,7 @@
  */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Button,
-  EmptyState,
-  Modal,
-  ReauthBanner,
-  Spinner,
-  type ButtonVariant,
-} from '@/components/ui';
+import { Button, EmptyState, Modal, Spinner, type ButtonVariant } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { KIND_FILL, KIND_TEXT } from '@/components/ui/kindTone';
 import { loadCalendarEvent, respondToCalendarEvent } from '@/features/character/calendar';
@@ -27,8 +20,7 @@ import { RESPONSE_BADGE_TONE, RESPONSE_ICON, RESPONSE_KEY } from './calendarResp
 import { stripEveMarkup } from '@/features/skills/typeDisplay';
 import { buildIcsFile, googleCalendarUrl, type CalendarExportEvent } from '@/lib/calendarExport';
 import { downloadTextFile } from '@/lib/download';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { GrantBanner } from '@/app/GrantNote';
 import { formatCalendarTimestamp } from '@/lib/timestamp';
 import type { CachedResult } from '@/esi/cache';
 import type {
@@ -150,13 +142,12 @@ export function EventDetailModal({
         </div>
       ) : state.status === 'needs-reauth' ? (
         // No Try again: retrying can't fix an expired or revoked grant.
-        <ReauthBanner
+        <GrantBanner
+          characterId={characterId}
+          endpoints={['getCharacterCalendarEvent']}
           title={t('calendar.detailReauthTitle')}
           hint={t('calendar.detailReauthHint')}
           actionLabel={t('calendar.reauthAction')}
-          onLogin={() =>
-            void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterCalendarEvent']) })
-          }
         />
       ) : state.status === 'failed' ? (
         <EmptyState

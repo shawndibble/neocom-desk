@@ -220,7 +220,32 @@ describe('markMailReadOnEsi', () => {
 
     try {
       await markMailReadOnEsi(CHAR_ID, 7);
-      expect(reported).toHaveBeenCalledWith(CHAR_ID);
+      // Names the endpoint, so the notice can ask for its Permission.
+      expect(reported).toHaveBeenCalledWith(CHAR_ID, 'putCharacterMail');
+    } finally {
+      unsubscribe();
+    }
+  });
+
+  it('stays quiet on a 403 when the grant already holds organize_mail: a re-login could not fix it', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 600_000,
+      scopes: ['esi-mail.organize_mail.v1'],
+    });
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`, () =>
+        HttpResponse.json({ error: 'forbidden' }, { status: 403 })
+      )
+    );
+    const reported = vi.fn();
+    const unsubscribe = onEsiAuthFailure(reported);
+
+    try {
+      await markMailReadOnEsi(CHAR_ID, 7);
+      expect(reported).not.toHaveBeenCalled();
     } finally {
       unsubscribe();
     }
@@ -350,7 +375,7 @@ describe('sendMail', () => {
 
     try {
       await expect(sendMail(CHAR_ID, RECIPIENTS, 'RE: Hi', 'On my way')).rejects.toThrow();
-      expect(reported).toHaveBeenCalledWith(CHAR_ID);
+      expect(reported).toHaveBeenCalledWith(CHAR_ID, 'postCharacterMail');
     } finally {
       unsubscribe();
     }

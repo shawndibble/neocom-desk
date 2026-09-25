@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type SkillPlanRecord } from '@/db';
-import { Panel, Spinner } from '@/components/ui';
+import { Button, Panel, Spinner } from '@/components/ui';
 import { markPlanDeleted, scheduleSync } from '@/sync';
 import { isSyncConfigured } from '@/app/syncStatus';
 import {
@@ -151,7 +151,15 @@ export function PlanListPane({
   }
 
   return (
-    <Panel className={className}>
+    <Panel
+      className={className}
+      title={t('plans.title')}
+      actions={
+        <Button variant="primary" size="sm" onClick={() => void handleCreate()}>
+          {t('plans.create')}
+        </Button>
+      }
+    >
       {showImplantsNote && (
         <div className="border-b border-line px-3 empty:hidden">
           <ImplantsAssumedNote
@@ -187,7 +195,6 @@ export function PlanListPane({
             plans={plans}
             stats={stats}
             onOpen={(id) => navigate(`/skills/plans/${id}`)}
-            onCreate={() => void handleCreate()}
             onDuplicate={(id) => void handleDuplicate(id)}
             onDelete={(id) => void handleDelete(id)}
             onRename={(id, name) => void handleRename(id, name)}

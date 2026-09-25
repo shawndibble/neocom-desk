@@ -6,6 +6,7 @@ import { db } from '@/db';
 import { Button, ReauthBanner } from '@/components/ui';
 import { useAuthFailure } from '@/stores/authFailure';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { permissionsForEndpoints } from '@/esi/registry';
 import { beginEveLogin } from './loginFlow';
 
 /**
@@ -75,7 +76,16 @@ export function AuthFailureNotice() {
             : t('reauth.staleGrantHint')
         }
         actionLabel={t('reauth.staleGrantAction')}
-        onLogin={() => void beginEveLogin()}
+        // The Permission behind the refused request, when it is known. A
+        // refusal for a scope the grant never held (a mail send on a token that
+        // predates `send_mail`) is only fixed by asking for it; a stale grant
+        // is unaffected, since the stored scopes are unioned in regardless.
+        onLogin={() =>
+          void beginEveLogin({
+            characterId: failure.characterId,
+            groups: failure.endpointId ? permissionsForEndpoints([failure.endpointId]) : [],
+          })
+        }
         // Renders above a route that may have its own primary button
         // (docs/DESIGN.md §5, one per view).
         variant="ghost"

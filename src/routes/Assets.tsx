@@ -12,7 +12,6 @@ import {
   IskAmount,
   PageHeader,
   Panel,
-  ReauthBanner,
   SearchInput,
   Select,
   SelectContent,
@@ -20,12 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
+  StatChip,
   TextInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints, type EsiEndpointId } from '@/esi/registry';
-import { useEndpointsGranted } from '@/app/useGrantedScopes';
+import type { EsiEndpointId } from '@/esi/registry';
+import { GrantBanner, GrantNote } from '@/app/GrantNote';
 import { clearStationPin, setAccountStationPin, setCharacterStationPin } from '@/sync';
 import { db, type BuildPlanRecord } from '@/db';
 import { cx } from '@/lib/cx';
@@ -137,7 +136,6 @@ const NO_PRICES: ReadonlyMap<number, number> = new Map();
 const NO_VOLUMES: ReadonlyMap<number, number> = new Map();
 const EMPTY_ITEM_OWNERS: ReadonlyMap<number, number> = new Map();
 const EMPTY_CHARACTER_NAMES: ReadonlyMap<number, string> = new Map();
-/** Stable reference for `useEndpointsGranted` — a fresh array every render would defeat its memo. */
 const LOCATION_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterLocation'];
 const NO_BUILD_PLANS: readonly BuildPlanRecord[] = [];
 
@@ -968,6 +966,16 @@ export function Assets() {
   );
 
   const totalValue = useMemo(() => totalEstimatedValue(sortedTree), [sortedTree]);
+  // Root location list only: drilled-in views keep their own node totals, and
+  // flat search/all-items mode sums matches rather than the tree. Hidden with no
+  // assets (the empty state covers it).
+  const showTotalValueChip = !flatModeActive && pathStationId === null && sortedTree.length > 0;
+  // A Character filter narrowing below every Character means the figure is not
+  // the whole portfolio — flag it so it is never mistaken for one.
+  const totalValueFiltered =
+    crossCharacterCandidates.length > 1 &&
+    resolvedCrossCharacterFilter !== 'all' &&
+    [...resolvedCrossCharacterFilter].length < crossCharacterCandidates.length;
 
   const resolved = useMemo(
     () => resolveAssetPath(sortedTree, pathStationId, pathSegments),
@@ -1171,9 +1179,6 @@ export function Assets() {
   // system, fetched once per page load (not polled) via ESI's location
   // endpoint. Re-fetched whenever the active character changes.
   const [characterSystemId, setCharacterSystemId] = useState<number | null>(null);
-  // Without the grant every row degrades to "-"; the inline note says why
-  // (issue #1590), matching the Appraisal panel's standings note.
-  const locationGranted = useEndpointsGranted(LOCATION_ENDPOINTS);
   const [characterLocationResolved, setCharacterLocationResolved] = useState(false);
   useEffect(() => {
     if (activeCharacterId === null) return;
@@ -1539,6 +1544,17 @@ export function Assets() {
         meta={
           <>
             {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
+            {showTotalValueChip && (
+              <StatChip
+                label={t('assets.section.totalValueLabel')}
+                value={
+                  totalValueFiltered
+                    ? t('assets.section.totalValueFiltered', { value: formatIsk(totalValue) })
+                    : formatIsk(totalValue)
+                }
+                tone="success"
+              />
+            )}
             {crossCharacterFilterMeta}
             {otherCharacterIds.length > 0 && crossCharacterLoading && (
               <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
@@ -1623,13 +1639,12 @@ export function Assets() {
           <Spinner label={t('common.loading')} />
         </div>
       ) : assetsNeedsReauth ? (
-        <ReauthBanner
+        <GrantBanner
+          characterId={activeCharacterId}
+          endpoints={['getCharacterAssets']}
           title={t('assets.reauthTitle')}
           hint={t('assets.reauthHint')}
           actionLabel={t('assets.reauthAction')}
-          onLogin={() =>
-            void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterAssets']) })
-          }
         />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
@@ -1781,9 +1796,6 @@ export function Assets() {
                     >
                       {t('assets.section.locationCount', { count: sortedTree.length })}
                     </h2>
-                    <span className="text-[0.6875rem] tabular-nums text-isk-pos">
-                      {t('assets.section.totalValue', { value: formatIsk(totalValue) })}
-                    </span>
                     {/* flex-wrap (issue #415): on a narrow phone the two Selects no
                         longer share one row with no priority order — Sort stays put
                         (it comes first in DOM order) and Route is the one that drops
@@ -1830,21 +1842,16 @@ export function Assets() {
                       </Select>
                     </div>
                   </div>
-                  {locationGranted === false && (
-                    <div className="shrink-0 border-b border-line px-3">
-                      <ReauthBanner
-                        variant="ghost"
-                        title={t('assets.jumpsAway.locationNotGrantedTitle')}
-                        hint={t('assets.jumpsAway.locationNotGrantedHint')}
-                        actionLabel={t('assets.jumpsAway.locationNotGrantedAction')}
-                        onLogin={() =>
-                          void beginEveLogin({
-                            groups: permissionsForEndpoints(LOCATION_ENDPOINTS),
-                          })
-                        }
-                      />
-                    </div>
-                  )}
+                  {/* Without the grant every row degrades to "-"; the note
+                      says why (issue #1590). */}
+                  <GrantNote
+                    className="shrink-0 border-b border-line px-3"
+                    characterId={activeCharacterId}
+                    endpoints={LOCATION_ENDPOINTS}
+                    title={t('assets.jumpsAway.locationNotGrantedTitle')}
+                    hint={t('assets.jumpsAway.locationNotGrantedHint')}
+                    actionLabel={t('assets.jumpsAway.locationNotGrantedAction')}
+                  />
                 </>
               )}
 

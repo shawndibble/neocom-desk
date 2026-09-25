@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { isTabRedirectPath, pageKeyFor, routePatternFor, tabbedPagePathFor } from './pageTabs';
 
 describe('routePatternFor', () => {
@@ -93,5 +93,18 @@ describe('a tabbed page with its own nested detail route (Wallet’s Loyalty Sto
     expect(pageKeyFor('/wallet/loyalty/98000001')).toBe('/wallet/loyalty/98000001');
     expect(isTabRedirectPath('/wallet/loyalty/98000001')).toBe(false);
     expect(tabbedPagePathFor('/wallet/loyalty/98000001')).toBeNull();
+  });
+});
+
+describe('Settings index state', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('is a page view of its own on a phone, and a redirect from md up', () => {
+    vi.stubGlobal('window', { matchMedia: (media: string) => ({ media, matches: false }) });
+    expect(isTabRedirectPath('/settings')).toBe(false);
+    expect(tabbedPagePathFor('/settings')).toBe('/settings');
+    expect(isTabRedirectPath('/settings/nope')).toBe(true);
+    vi.stubGlobal('window', { matchMedia: (media: string) => ({ media, matches: true }) });
+    expect(isTabRedirectPath('/settings')).toBe(true);
   });
 });

@@ -15,7 +15,6 @@ import {
   IskAmount,
   PageHeader,
   Panel,
-  ReauthBanner,
   SearchInput,
   Spinner,
   Tabs,
@@ -29,8 +28,7 @@ import {
   contractsHistoryColumnsStore,
   type ContractsHistoryColumnId,
 } from './contractsColumns';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { GrantBanner } from '@/app/GrantNote';
 import { loadContracts } from '@/features/character/contracts';
 import { ContractContextMenu } from '@/features/character/ContractContextMenu';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
@@ -90,7 +88,7 @@ interface Snapshot {
 }
 
 const STATUS_TONE: Record<Contract['status'], string> = {
-  outstanding: 'text-accent',
+  outstanding: 'text-text',
   in_progress: 'text-warning',
   finished_issuer: 'text-success',
   finished_contractor: 'text-success',
@@ -404,7 +402,7 @@ export function Contracts() {
           <button
             type="button"
             onClick={() => setSelectedContract(contract)}
-            className="text-left font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="flex min-h-11 w-full items-center text-left font-medium text-accent hover:underline md:block md:min-h-0 md:w-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             {contract.title || t(CONTRACT_TYPE_KEY[contract.type])}
           </button>
@@ -547,13 +545,12 @@ export function Contracts() {
           <Spinner label={t('common.loading')} />
         </div>
       ) : contractsNeedsReauth ? (
-        <ReauthBanner
+        <GrantBanner
+          characterId={activeCharacterId}
+          endpoints={['getCharacterContracts']}
           title={t('contracts.reauthTitle')}
           hint={t('contracts.reauthHint')}
           actionLabel={t('contracts.reauthAction')}
-          onLogin={() =>
-            void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterContracts']) })
-          }
         />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
@@ -602,7 +599,7 @@ export function Contracts() {
                 className="py-8"
                 action={
                   <Button size="sm" onClick={() => setFilter(EMPTY_CONTRACTS_FILTER)}>
-                    {t('contracts.resetFilters')}
+                    {t('common.resetFilters')}
                   </Button>
                 }
               />

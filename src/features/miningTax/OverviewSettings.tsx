@@ -7,7 +7,15 @@
  */
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Popover, PopoverContent, PopoverTrigger, TextInput } from '@/components/ui';
+import {
+  Modal,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  TextInput,
+  Checkbox,
+  Radio,
+} from '@/components/ui';
 import { MINING_YIELD_RANGES, type MiningYieldRange } from '@/engine/miningTax/yieldRange';
 import { basisSide, isNowBasis, type PriceBasis } from '@/engine/miningTax/priceBasis';
 import {
@@ -82,10 +90,9 @@ export function PriceBasisOptions({ value, onChange }: PriceBasisOptionsProps) {
           key={choice}
           className={`flex min-h-11 cursor-pointer items-start gap-2.5 rounded-xs border px-2.5 py-2 md:min-h-0 ${current === choice ? 'border-accent-dim bg-bg' : 'border-transparent hover:bg-panel-2'}`}
         >
-          <input
-            type="radio"
+          <Radio
             name="mining-price-basis"
-            className="mt-0.5 size-4 shrink-0 cursor-pointer accent-accent"
+            className="mt-0.5"
             checked={current === choice}
             onChange={() => pick(choice)}
           />
@@ -122,12 +129,7 @@ export function ShowRefiningToggle({ value, onChange }: ShowRefiningToggleProps)
     // the same markup) — not a custom switch.
     <div className="space-y-1.5">
       <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
-        <input
-          type="checkbox"
-          checked={value}
-          onChange={() => onChange(!value)}
-          className="size-4 shrink-0 cursor-pointer accent-accent"
-        />
+        <Checkbox checked={value} onChange={() => onChange(!value)} />
         {t('miningTax.overview.showRefiningLabel')}
       </label>
       <p className="text-xs text-text-dim">{t('miningTax.overview.showRefiningHint')}</p>

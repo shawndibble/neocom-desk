@@ -31,6 +31,15 @@ interface PanelProps {
    * so a `meta` holding more than one thing carries its own `flex-wrap`.
    */
   meta?: ReactNode;
+  /**
+   * On a phone, lets `meta` drop to a second line under the title instead of
+   * squeezing it: the title stays whole and the left-hand group wraps below
+   * `md`. For a header whose `meta` is long enough to crowd the name out —
+   * Active Jobs' "N running · N done" plus next-finish line. The caller's
+   * `meta` carries `max-md:basis-full` to claim the second line. From `md` up
+   * the row is exactly as before.
+   */
+  wrapMeta?: boolean;
   children: ReactNode;
   /**
    * Lets `actions` take the header's free width instead of hugging the right
@@ -80,6 +89,7 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
     actionsFill = false,
     leading,
     meta,
+    wrapMeta = false,
     children,
     padded = true,
     fill = false,
@@ -106,7 +116,9 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
         >
           {/* An empty left group would still cost the header's gap before filling actions. */}
           {(!actionsFill || leading || title || meta) && (
-            <div className="flex min-w-0 items-center gap-2">
+            <div
+              className={`flex min-w-0 items-center gap-2 ${wrapMeta ? 'max-md:flex-wrap' : ''}`}
+            >
               {leading}
               {title && (
                 <h2
@@ -114,8 +126,10 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
                   tabIndex={headingRef ? -1 : undefined}
                   className={`text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase ${
                     headingRef
-                      ? 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
-                      : ''
+                      ? 'whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
+                      : wrapMeta
+                        ? 'max-md:shrink-0 max-md:whitespace-nowrap md:min-w-0 md:truncate'
+                        : 'min-w-0 truncate'
                   }`}
                 >
                   {title}
@@ -125,7 +139,9 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
             </div>
           )}
           {actions && (
-            <div className={`flex items-center gap-1 ${actionsFill ? 'min-w-0 flex-1' : ''}`}>
+            <div
+              className={`flex items-center gap-1 ${actionsFill ? 'min-w-0 flex-1' : 'shrink-0'}`}
+            >
               {actions}
             </div>
           )}

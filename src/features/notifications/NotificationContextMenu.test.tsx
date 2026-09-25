@@ -61,7 +61,7 @@ describe('NotificationContextMenu', () => {
     fireEvent.contextMenu(screen.getByRole('button', { name: 'New mail' }));
 
     expect(
-      await screen.findByRole('menuitem', { name: 'Turn off browser notifications' })
+      await screen.findByRole('menuitem', { name: 'Turn off device notifications' })
     ).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Hide in feed' })).toBeInTheDocument();
   });
@@ -69,9 +69,7 @@ describe('NotificationContextMenu', () => {
   it('toggles the browser channel for the row event without syncing', async () => {
     renderMenu(entry());
     fireEvent.contextMenu(screen.getByRole('button', { name: 'New mail' }));
-    fireEvent.click(
-      await screen.findByRole('menuitem', { name: 'Turn off browser notifications' })
-    );
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Turn off device notifications' }));
 
     await waitFor(() =>
       expect(useNotificationPreferences.getState().value.perCharacter[CHARACTER_ID]).toEqual({
@@ -105,10 +103,10 @@ describe('NotificationContextMenu', () => {
 
     // MoonminingExtractionFinished defaults browser-off (EVE_TYPE_DEFAULT), unlike newMail.
     expect(
-      await screen.findByRole('menuitem', { name: 'Turn on browser notifications' })
+      await screen.findByRole('menuitem', { name: 'Turn on device notifications' })
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Turn on browser notifications' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Turn on device notifications' }));
 
     await waitFor(() =>
       expect(

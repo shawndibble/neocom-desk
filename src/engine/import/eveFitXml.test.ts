@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadEveFitXmlEntry, fitXmlEntryResultToFitting, type FittingXmlEntry } from './eveFitXml';
+import { loadEveFitXmlEntry, type FittingXmlEntry } from './eveFitXml';
 import type { EftTypeLookup } from '@/engine/fittings/eftLoader';
 
 const TYPES: Record<string, number> = {
@@ -51,6 +51,28 @@ describe('loadEveFitXmlEntry', () => {
     expect(result.drones).toEqual([{ typeId: 2454, quantity: 3, state: 'online' }]);
     expect(result.cargo).toEqual([{ typeId: 28668, quantity: 50 }]);
     expect(result.unresolved).toEqual([]);
+  });
+
+  it("reads the game's own slot names — 'hi slot N', 'med slot N' and 'cargo' — as pyfa writes them too", () => {
+    const result = loadEveFitXmlEntry(
+      entry({
+        hardware: [
+          { slot: 'hi slot 0', type: '125mm Gatling AutoCannon II' },
+          { slot: 'med slot 1', type: 'Damage Control I' },
+          { slot: 'cargo', type: 'Nanite Repair Paste', qty: 50 },
+        ],
+      }),
+      typeByName
+    );
+
+    expect(result.unresolved).toEqual([]);
+    expect(result.hullTypeId).toBe(587);
+    if (result.hullTypeId === null) return;
+    expect(result.modules).toEqual([
+      { slot: 'high', slotIndex: 0, typeId: 2881, state: 'active' },
+      { slot: 'medium', slotIndex: 1, typeId: 2046, state: 'active' },
+    ]);
+    expect(result.cargo).toEqual([{ typeId: 28668, quantity: 50 }]);
   });
 
   it('defaults a missing qty to 1 for drones and cargo', () => {
@@ -115,22 +137,5 @@ describe('loadEveFitXmlEntry', () => {
     expect(result.unresolved).toEqual([
       { text: 'Damage Control I', reason: 'unknown slot: implant' },
     ]);
-  });
-});
-
-describe('fitXmlEntryResultToFitting', () => {
-  it('assembles a Fitting from a resolved result', () => {
-    const result = loadEveFitXmlEntry(
-      entry({ hardware: [{ slot: 'low slot 0', type: 'Damage Control I' }] }),
-      typeByName
-    );
-    if (result.hullTypeId === null) throw new Error('expected a hull');
-    expect(fitXmlEntryResultToFitting(result, '[Rifter, My Fit]')).toEqual({
-      name: '[Rifter, My Fit]',
-      shipTypeId: 587,
-      modules: [{ slot: 'low', slotIndex: 0, typeId: 2046, state: 'active' }],
-      drones: [],
-      cargo: [],
-    });
   });
 });

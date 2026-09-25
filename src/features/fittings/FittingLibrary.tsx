@@ -8,17 +8,19 @@ import { HullPicker } from './HullPicker';
 import { InGameFittingsPanel } from './InGameFittingsPanel';
 import { MyFittingsPanel } from './MyFittingsPanel';
 import type { FittingCatalogue } from './useFittingCatalogue';
-import type { FittingWorkspace } from './useFittingWorkspace';
+import type { FittingLibrarySource } from './useFittingPicker';
 
 export type LibraryTab = 'new' | 'import' | 'mine' | 'ingame';
 
 interface FittingLibraryProps {
-  workspace: FittingWorkspace;
+  /** The open workspace, or the Compare picker's stand-in that returns a Share Link code. */
+  workspace: FittingLibrarySource;
   catalogue: FittingCatalogue | null;
   characterId: number | null;
   /** Remounts In-game Fittings so it refetches after a Save to EVE. */
   inGameKey: number;
-  onStartHull: (hull: HullEntry) => void;
+  /** Omitted where a Fitting can't be started from a hull (Compare with...): the New tab is left out. */
+  onStartHull?: (hull: HullEntry) => void;
   /** Called once any of the ways in here has opened a Fitting. */
   onOpened?: () => void;
   /**
@@ -58,7 +60,7 @@ export function FittingLibrary({
   }, []);
 
   const sections: Record<LibraryTab, ReactNode> = {
-    new: (
+    new: onStartHull && (
       <HullPicker
         catalogue={catalogue}
         onStart={(hull) => {
@@ -70,14 +72,12 @@ export function FittingLibrary({
     import: (
       <FittingLoadCard
         onLoad={workspace.loadFromInput}
-        unresolved={workspace.unresolved}
-        fitXmlUnresolved={workspace.fitXmlUnresolved}
+        lastLoad={workspace.lastLoad}
         shareError={workspace.shareError}
-        loadError={workspace.loadError}
         tooLargeToShare={workspace.tooLargeToShare}
         onLoadFittingXmlDocument={workspace.loadFittingXmlDocument}
-        onOpenFittingXmlEntry={async (item) => {
-          await workspace.openFittingXmlEntry(item);
+        onOpenLoaded={async (loaded) => {
+          await workspace.openLoaded(loaded);
           onOpened?.();
         }}
       />
@@ -97,7 +97,7 @@ export function FittingLibrary({
           key={inGameKey}
           characterId={characterId}
           onOpen={(loaded) => {
-            void workspace.openFitting(loaded);
+            void workspace.openLoaded(loaded);
             onOpened?.();
           }}
         />
@@ -118,7 +118,7 @@ export function FittingLibrary({
   }
 
   const tabs = [
-    { id: 'new', label: t('fittings.start.tabNew') },
+    ...(onStartHull ? [{ id: 'new', label: t('fittings.start.tabNew') }] : []),
     { id: 'import', label: t('fittings.start.tabImport') },
     { id: 'mine', label: t('fittings.myFittings.title') },
     ...(characterId === null ? [] : [{ id: 'ingame', label: t('fittings.start.tabInGame') }]),

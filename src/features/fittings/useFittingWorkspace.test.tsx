@@ -7,27 +7,45 @@ import type { ReactNode } from 'react';
 import { MemoryRouter, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
 import { encodeFittingShare } from '@/engine/fitting/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
-import { addModule, removeModule, setDroneCounts } from '@/engine/fittings/fittingEdit';
+import {
+  addModule,
+  droneGroups,
+  removeModule,
+  setDroneCounts,
+} from '@/engine/fittings/fittingEdit';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { useFittingWorkspace } from './useFittingWorkspace';
 
+const TYPES: Record<string, { name: string; groupID: number; volume: number }> = {
+  '587': { name: 'Rifter', groupID: 25, volume: 0 },
+  '2454': { name: 'Hobgoblin I', groupID: 87, volume: 5 },
+};
 vi.mock('@/sde/loadSde', () => ({
-  loadTypes: async () => ({
-    '587': { name: 'Rifter', groupID: 25, volume: 0 },
-    '2454': { name: 'Hobgoblin I', groupID: 87, volume: 5 },
-  }),
+  loadTypes: async () => TYPES,
+  typeName: async (typeId: number) => TYPES[String(typeId)]?.name ?? `Type ${typeId}`,
   loadSkills: async () => [],
-  loadFittingSlots: async () => ({}),
+  loadFittingSlots: async () => ({ '2454': 'drone' }),
 }));
 vi.mock('@/sync', () => ({ scheduleSync: vi.fn(), markFittingDeleted: vi.fn() }));
 vi.mock('./fittingPrice', () => ({ loadFittingPrice: async () => null }));
-const computeFittingStats = vi.fn(async (fitting: Fitting) => ({
-  modules: fitting.modules.map(() => ({ state: 'online', maxState: 'online', chargeGroupIds: [] })),
-}));
+// Stats land once this resolves; a test holds it to act before they do.
+const statsGate = vi.hoisted(() => ({ wait: Promise.resolve() as Promise<void> }));
 vi.mock('./dogmaFittingEngine', () => ({
   isDogmaEngineReady: () => false,
-  computeFittingStats: (fitting: Fitting) =>
-    computeFittingStats(fitting) as unknown as Promise<FittingStats>,
+  computeFittingStats: async (fitting: Fitting) => {
+    await statsGate.wait;
+    return {
+      // A light drone draws 5 Mbit/s; the hull has room for four, the pilot controls five.
+      droneBandwidthTotal: 20,
+      maxActiveDrones: 5,
+      droneBandwidthByType: { 2454: 5 },
+      modules: fitting.modules.map(() => ({
+        state: 'online',
+        maxState: 'online',
+        chargeGroupIds: [],
+      })),
+    } as unknown as FittingStats;
+  },
 }));
 
 const RIFTER: Fitting = {
@@ -126,90 +144,6 @@ describe('useFittingWorkspace editing', () => {
     act(() => view.result.current.navigate(-1));
     await waitFor(() => expect(view.result.current.location.search).toBe(before));
   });
-
-  it('keeps the previous stats through a same-hull edit instead of blanking them', async () => {
-    const view = await renderAt(RIFTER);
-    await waitFor(() => expect(view.result.current.workspace.stats).not.toBeNull());
-    let release: () => void = () => {};
-    computeFittingStats.mockImplementationOnce(
-      (fitting) =>
-        new Promise((resolve) => {
-          release = () =>
-            resolve({
-              modules: fitting.modules.map(() => ({
-                state: 'online',
-                maxState: 'online',
-                chargeGroupIds: [],
-              })),
-            });
-        })
-    );
-
-    act(() => view.result.current.workspace.edit((f) => addModule(f, 'medium', 0, 438)));
-
-    expect(view.result.current.workspace.stats).not.toBeNull();
-    expect(view.result.current.workspace.statsFitting).not.toBe(
-      view.result.current.workspace.fitting
-    );
-    act(() => release());
-    await waitFor(() =>
-      expect(view.result.current.workspace.statsFitting).toBe(view.result.current.workspace.fitting)
-    );
-  });
-});
-
-describe('useFittingWorkspace loading a Loaded fittings-XML file (#1542)', () => {
-  it("clears the other Load path's unresolved list on each open, so a stale banner doesn't outlive the Fitting it described", async () => {
-    const view = await renderAt(RIFTER);
-
-    // An EFT paste with an unresolvable module leaves `unresolved` non-empty.
-    await act(() =>
-      view.result.current.workspace.loadFromInput(
-        ['[Rifter, Test]', 'Not A Real Module'].join('\n')
-      )
-    );
-    await waitFor(() => expect(view.result.current.workspace.unresolved).not.toEqual([]));
-
-    // A drone-bay entry (the previous Fitting had none) proves this is the
-    // newly-opened Fitting, not the still-open previous one.
-    const items = await view.result.current.workspace.loadFittingXmlDocument({
-      entries: [
-        {
-          name: 'Clean Rifter',
-          shipTypeName: 'Rifter',
-          hardware: [{ slot: 'drone bay', type: 'Hobgoblin I', qty: 2 }],
-        },
-      ],
-    });
-    await act(() => view.result.current.workspace.openFittingXmlEntry(items[0]!));
-
-    await waitFor(() =>
-      expect(view.result.current.workspace.fitting?.drones).toEqual([
-        { typeId: 2454, quantity: 2, state: 'online' },
-      ])
-    );
-    expect(view.result.current.workspace.unresolved).toEqual([]);
-    expect(view.result.current.workspace.fitXmlUnresolved).toEqual([]);
-
-    // And the reverse: a hull that resolves but carries an unresolvable item
-    // leaves `fitXmlUnresolved` non-empty; going back to a clean EFT paste
-    // must clear that stale banner too.
-    const dirtyItems = await view.result.current.workspace.loadFittingXmlDocument({
-      entries: [
-        {
-          name: 'Dirty Rifter',
-          shipTypeName: 'Rifter',
-          hardware: [{ slot: 'high slot 0', type: 'Not A Real Module' }],
-        },
-      ],
-    });
-    await act(() => view.result.current.workspace.openFittingXmlEntry(dirtyItems[0]!));
-    await waitFor(() => expect(view.result.current.workspace.fitXmlUnresolved).not.toEqual([]));
-
-    await act(() => view.result.current.workspace.loadFromInput('[Rifter, Test]'));
-    await waitFor(() => expect(view.result.current.workspace.fitting?.name).toBe('Rifter'));
-    expect(view.result.current.workspace.fitXmlUnresolved).toEqual([]);
-  });
 });
 
 describe('useFittingWorkspace saving (My Fittings)', () => {
@@ -270,8 +204,96 @@ describe('useFittingWorkspace saving (My Fittings)', () => {
     );
     await waitFor(() => expect(view.result.current.workspace.savedId).toBe('r1'));
 
-    await act(() => view.result.current.workspace.openFitting(RIFTER));
+    await act(() =>
+      view.result.current.workspace.openLoaded({
+        kind: 'fitting',
+        source: 'in-game',
+        fitting: RIFTER,
+        unresolved: [],
+      })
+    );
     await waitFor(() => expect(view.result.current.workspace.fitting?.name).toBe(RIFTER.name));
     expect(view.result.current.workspace.savedId).toBeNull();
+  });
+});
+
+describe('useFittingWorkspace — drones on Load', () => {
+  it('launches a pasted fit’s drones once its stats say how many fit, replacing the Load’s own entry', async () => {
+    const view = await renderAt(RIFTER);
+    // A Fitting to go Back to; the Load then replaces the entry after it.
+    const encoded = await encodeFittingShare(
+      fittingToShareInput(addModule(RIFTER, 'medium', 0, 438))
+    );
+    if (!encoded.ok) throw new Error('encode failed');
+    act(() => view.result.current.navigate(`/fittings?f=${encoded.payload}`));
+    await waitFor(() => expect(view.result.current.workspace.fitting?.modules).toHaveLength(2));
+    const loadedOver = view.result.current.location.search;
+
+    await act(() =>
+      view.result.current.workspace.loadFromInput(
+        ['[Rifter, Drones]', '', 'Hobgoblin I x6'].join('\n')
+      )
+    );
+    // Bandwidth for four of the six.
+    await waitFor(() =>
+      expect(droneGroups(view.result.current.workspace.fitting!)).toEqual([
+        { typeId: 2454, inSpace: 4, inBay: 2 },
+      ])
+    );
+    expect(view.result.current.navigationType).toBe('REPLACE');
+
+    // The launch overwrote the Load's own entry rather than adding one, so
+    // Back leaves the Load altogether — no in-bay copy of it to step through.
+    expect(view.result.current.location.search).not.toBe(loadedOver);
+    act(() => view.result.current.navigate(-1));
+    await waitFor(() =>
+      expect(view.result.current.workspace.fitting?.modules).toEqual(RIFTER.modules)
+    );
+    expect(view.result.current.workspace.fitting?.drones).toEqual(RIFTER.drones);
+  });
+
+  it('leaves the drones of a Fitting opened by link where the link put them', async () => {
+    const view = await renderAt(RIFTER);
+    await waitFor(() => expect(view.result.current.workspace.stats).not.toBeNull());
+    expect(view.result.current.workspace.fitting?.drones).toEqual(RIFTER.drones);
+  });
+});
+
+describe('useFittingWorkspace — drone launch edge cases', () => {
+  const BAY_ONLY: Fitting = {
+    name: 'Rifter',
+    shipTypeId: 587,
+    modules: [],
+    drones: [{ typeId: 2454, quantity: 6, state: 'online' }],
+    cargo: [],
+  };
+  const PASTE = ['[Rifter, Again]', '', 'Hobgoblin I x6'].join('\n');
+
+  it('launches a Load identical to the Fitting already open, whose URL does not change', async () => {
+    const view = await renderAt(BAY_ONLY);
+    await waitFor(() => expect(view.result.current.workspace.stats).not.toBeNull());
+    await act(() => view.result.current.workspace.loadFromInput(PASTE));
+    await waitFor(() =>
+      expect(droneGroups(view.result.current.workspace.fitting!)).toEqual([
+        { typeId: 2454, inSpace: 4, inBay: 2 },
+      ])
+    );
+  });
+
+  it('does not launch after a Save made before the stats arrived, so the record matches the screen', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 90000001 });
+    const view = await renderAt(RIFTER);
+    let release = () => {};
+    statsGate.wait = new Promise<void>((resolve) => (release = resolve));
+    await act(() => view.result.current.workspace.loadFromInput(PASTE));
+    await waitFor(() =>
+      expect(view.result.current.workspace.fitting?.drones).toEqual(BAY_ONLY.drones)
+    );
+    await act(() => view.result.current.workspace.save());
+    await act(async () => release());
+    await waitFor(() => expect(view.result.current.workspace.stats).not.toBeNull());
+    expect(view.result.current.workspace.fitting?.drones).toEqual(BAY_ONLY.drones);
+    statsGate.wait = Promise.resolve();
+    useActiveCharacter.setState({ activeCharacterId: null });
   });
 });

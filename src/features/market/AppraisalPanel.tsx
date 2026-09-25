@@ -661,6 +661,7 @@ export function AppraisalPanel({
                 // row to six, and hiding a column buys the same height at the
                 // cost of a figure.
                 stackColumns={2}
+                mobileSort
               />
             </>
           )}

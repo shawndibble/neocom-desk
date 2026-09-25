@@ -1,19 +1,30 @@
 import { describe, expect, it } from 'vitest';
 import {
   addDrones,
+  addDronesWithinBay,
   addModule,
+  cargoGroups,
+  launchDrones,
+  droneBayUsed,
+  droneCountMax,
+  droneRoom,
   droneGroups,
+  droneTotals,
   firstFreeSlotIndex,
   loadChargeIntoAll,
   moveModule,
+  reachableModuleStates,
   newFitting,
   removeModule,
+  setCargoQuantity,
+  setDroneCountWithinBay,
   setDroneCounts,
   setModuleCharge,
   setModuleState,
   swapModuleType,
 } from './fittingEdit';
 import type { Fitting } from './types';
+import type { DroneBay } from './fittingEdit';
 
 const base: Fitting = {
   name: 'Rifter',
@@ -211,5 +222,257 @@ describe('drones', () => {
       { typeId: 2486, quantity: 5, state: 'online' },
     ]);
     expect(droneGroups(addDrones(base, 2454, 1))).toEqual([{ typeId: 2454, inSpace: 2, inBay: 1 }]);
+  });
+});
+
+describe('drone bay volume', () => {
+  // Hobgoblin 5 m3, Hammerhead 10 m3; a 50 m3 bay.
+  const VOLUME: Record<number, number> = { 2454: 5, 2185: 10 };
+  const volumeOf = (typeId: number) => VOLUME[typeId] ?? 0;
+  const bay = (capacity: number): DroneBay => ({ capacity, volumeOf });
+  const fit: Fitting = {
+    name: 'Drones',
+    shipTypeId: 1,
+    modules: [],
+    drones: [
+      { typeId: 2454, quantity: 2, state: 'active' },
+      { typeId: 2454, quantity: 1, state: 'online' },
+      { typeId: 2185, quantity: 2, state: 'online' },
+    ],
+    cargo: [],
+  };
+
+  it('counts drones in space and in the bay alike — both come out of the bay', () => {
+    expect(droneBayUsed(fit, volumeOf)).toBe(35);
+  });
+
+  it('says how many more of a type fit beside everything else', () => {
+    // 35 of 50 m3 used: three more Hobgoblins, one more Hammerhead.
+    expect(droneRoom(fit, 2454, bay(50))).toBe(3);
+    expect(droneRoom(fit, 2185, bay(50))).toBe(1);
+  });
+
+  it('is zero, never negative, when nothing more fits — even over the cap already', () => {
+    expect(droneRoom(fit, 2185, bay(40))).toBe(0);
+    expect(droneRoom(fit, 2454, bay(10))).toBe(0);
+  });
+
+  it('does not cap a type whose volume is unknown, or a bay not known yet', () => {
+    expect(droneRoom(fit, 999, bay(50))).toBe(Infinity);
+    expect(droneRoom(fit, 2454, null)).toBe(Infinity);
+  });
+});
+
+describe('addDronesWithinBay', () => {
+  const volumeOf = (typeId: number) => ({ 2454: 5, 2185: 10 })[typeId] ?? 0;
+  const empty: Fitting = { name: 'D', shipTypeId: 1, modules: [], drones: [], cargo: [] };
+
+  it('adds as many as asked while they fit', () => {
+    expect(droneGroups(addDronesWithinBay(empty, 2454, 3, { capacity: 50, volumeOf }))).toEqual([
+      { typeId: 2454, inSpace: 0, inBay: 3 },
+    ]);
+  });
+
+  it('stops at what the bay holds', () => {
+    const full = addDronesWithinBay(empty, 2185, 9, { capacity: 20, volumeOf });
+    expect(droneGroups(full)).toEqual([{ typeId: 2185, inSpace: 0, inBay: 2 }]);
+    // Nothing more fits: the same Fitting back, so no empty edit is recorded.
+    expect(addDronesWithinBay(full, 2454, 1, { capacity: 20, volumeOf })).toBe(full);
+  });
+});
+
+describe('setDroneCountWithinBay', () => {
+  const volumeOf = (typeId: number) => ({ 2454: 5, 2185: 10 })[typeId] ?? 0;
+  const fit: Fitting = {
+    name: 'D',
+    shipTypeId: 1,
+    modules: [],
+    drones: [
+      { typeId: 2454, quantity: 2, state: 'active' },
+      { typeId: 2454, quantity: 1, state: 'online' },
+    ],
+    cargo: [],
+  };
+
+  it('sets one count, keeping the other', () => {
+    expect(
+      droneGroups(setDroneCountWithinBay(fit, 2454, { inBay: 3 }, { capacity: 50, volumeOf }))
+    ).toEqual([{ typeId: 2454, inSpace: 2, inBay: 3 }]);
+  });
+
+  it('raises a count no further than the bay holds', () => {
+    // 25 m3: five Hobgoblins, two of them in space — three in the bay at most.
+    expect(
+      droneGroups(setDroneCountWithinBay(fit, 2454, { inBay: 50 }, { capacity: 25, volumeOf }))
+    ).toEqual([{ typeId: 2454, inSpace: 2, inBay: 3 }]);
+  });
+
+  it('always lets a count come down, even on a fit already over the cap', () => {
+    // 15 m3 of Hobgoblins in a 10 m3 bay: lowering still works, raising doesn't.
+    const small = { capacity: 10, volumeOf };
+    expect(droneGroups(setDroneCountWithinBay(fit, 2454, { inSpace: 1 }, small))).toEqual([
+      { typeId: 2454, inSpace: 1, inBay: 1 },
+    ]);
+    expect(droneGroups(setDroneCountWithinBay(fit, 2454, { inBay: 4 }, small))).toEqual([
+      { typeId: 2454, inSpace: 2, inBay: 1 },
+    ]);
+  });
+
+  it('does not cap before the bay is known', () => {
+    expect(droneGroups(setDroneCountWithinBay(fit, 2454, { inBay: 40 }, null))).toEqual([
+      { typeId: 2454, inSpace: 2, inBay: 40 },
+    ]);
+  });
+
+  it('gives the highest each count box may go', () => {
+    expect(droneCountMax(fit, 2454, 'inBay', { capacity: 25, volumeOf })).toBe(3);
+    expect(droneCountMax(fit, 2454, 'inSpace', { capacity: 25, volumeOf })).toBe(4);
+    // Over the cap already: the box may stay where it is, not climb.
+    expect(droneCountMax(fit, 2454, 'inBay', { capacity: 10, volumeOf })).toBe(1);
+  });
+});
+
+describe('droneTotals', () => {
+  it('adds up launched and bay drones across every type', () => {
+    const fit: Fitting = {
+      name: 'D',
+      shipTypeId: 1,
+      modules: [],
+      drones: [
+        { typeId: 2454, quantity: 2, state: 'active' },
+        { typeId: 2454, quantity: 1, state: 'online' },
+        { typeId: 2185, quantity: 3, state: 'online' },
+      ],
+      cargo: [],
+    };
+    expect(droneTotals(fit)).toEqual({ inSpace: 2, inBay: 4 });
+  });
+});
+
+describe('setCargoQuantity', () => {
+  const withCargo: Fitting = {
+    ...base,
+    cargo: [
+      { typeId: 209, quantity: 1500 },
+      { typeId: 3001, quantity: 1 },
+    ],
+  };
+
+  it('sets a cargo type’s quantity in place, whole numbers only', () => {
+    const next = setCargoQuantity(withCargo, 209, 250.7);
+    expect(next.cargo).toEqual([
+      { typeId: 209, quantity: 250 },
+      { typeId: 3001, quantity: 1 },
+    ]);
+    expect(withCargo.cargo[0].quantity).toBe(1500);
+  });
+
+  it('removes the type at zero or below', () => {
+    expect(setCargoQuantity(withCargo, 209, 0).cargo).toEqual([{ typeId: 3001, quantity: 1 }]);
+    expect(setCargoQuantity(withCargo, 3001, -4).cargo).toEqual([{ typeId: 209, quantity: 1500 }]);
+  });
+
+  it('folds several stacks of one type into its first', () => {
+    const split: Fitting = {
+      ...base,
+      cargo: [
+        { typeId: 209, quantity: 100 },
+        { typeId: 3001, quantity: 1 },
+        { typeId: 209, quantity: 50 },
+      ],
+    };
+    expect(setCargoQuantity(split, 209, 400).cargo).toEqual([
+      { typeId: 209, quantity: 400 },
+      { typeId: 3001, quantity: 1 },
+    ]);
+  });
+});
+
+describe('cargoGroups', () => {
+  it('lists each cargo type once, first-seen order, with every stack of it added up', () => {
+    const split: Fitting = {
+      ...base,
+      cargo: [
+        { typeId: 209, quantity: 100 },
+        { typeId: 3001, quantity: 1 },
+        { typeId: 209, quantity: 50 },
+      ],
+    };
+    expect(cargoGroups(split)).toEqual([
+      { typeId: 209, quantity: 150 },
+      { typeId: 3001, quantity: 1 },
+    ]);
+  });
+});
+
+describe('launchDrones', () => {
+  const bandwidth: Record<number, number> = { 2185: 10, 2454: 5 };
+  const bandwidthOf = (typeId: number) => bandwidth[typeId] ?? 0;
+  const carrying = (drones: Fitting['drones']): Fitting => ({ ...base, drones });
+
+  it('launches from the bay in listed order until the bandwidth runs out', () => {
+    const fit = carrying([
+      { typeId: 2185, quantity: 3, state: 'online' },
+      { typeId: 2454, quantity: 5, state: 'online' },
+    ]);
+    expect(
+      droneGroups(launchDrones(fit, { bandwidthTotal: 25, maxActive: 5, bandwidthOf }))
+    ).toEqual([
+      { typeId: 2185, inSpace: 2, inBay: 1 },
+      { typeId: 2454, inSpace: 1, inBay: 4 },
+    ]);
+  });
+
+  it('stops at the pilot’s max active drones, and launches none without the skill', () => {
+    const fit = carrying([{ typeId: 2454, quantity: 8, state: 'online' }]);
+    expect(
+      droneTotals(launchDrones(fit, { bandwidthTotal: 125, maxActive: 5, bandwidthOf }))
+    ).toEqual({
+      inSpace: 5,
+      inBay: 3,
+    });
+    expect(launchDrones(fit, { bandwidthTotal: 125, maxActive: 0, bandwidthOf })).toBe(fit);
+  });
+
+  it('counts drones already in space against both limits', () => {
+    const fit = carrying([
+      { typeId: 2185, quantity: 1, state: 'active' },
+      { typeId: 2185, quantity: 2, state: 'online' },
+    ]);
+    expect(
+      droneGroups(launchDrones(fit, { bandwidthTotal: 20, maxActive: 5, bandwidthOf }))
+    ).toEqual([{ typeId: 2185, inSpace: 2, inBay: 1 }]);
+  });
+
+  it('keeps a drone of unknown (infinite) bandwidth in the bay', () => {
+    const fit = carrying([{ typeId: 9999, quantity: 3, state: 'online' }]);
+    expect(
+      launchDrones(fit, {
+        bandwidthTotal: 125,
+        maxActive: 5,
+        bandwidthOf: () => Number.POSITIVE_INFINITY,
+      })
+    ).toBe(fit);
+  });
+
+  it('returns the same Fitting when nothing can launch', () => {
+    const fit = carrying([{ typeId: 2185, quantity: 2, state: 'online' }]);
+    expect(launchDrones(fit, { bandwidthTotal: 5, maxActive: 5, bandwidthOf })).toBe(fit);
+  });
+});
+
+describe('reachableModuleStates', () => {
+  it('offers every state up to the highest the module can reach', () => {
+    expect(reachableModuleStates('overload', 'active')).toEqual([
+      'offline',
+      'online',
+      'active',
+      'overload',
+    ]);
+    expect(reachableModuleStates('online', 'online')).toEqual(['offline', 'online']);
+  });
+
+  it('keeps the state it is in, even past what it can reach, so a control can show it', () => {
+    expect(reachableModuleStates('online', 'active')).toEqual(['offline', 'online', 'active']);
   });
 });

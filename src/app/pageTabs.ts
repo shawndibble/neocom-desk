@@ -9,6 +9,7 @@
  */
 import {
   definePageTabs,
+  isIndexPath,
   isWithinPage,
   tabFromPathname,
   tabPath,
@@ -23,13 +24,33 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'across', labelKey: 'contacts.tabAcrossCharacters' },
 ]);
 
-export const SETTINGS_TABS = definePageTabs('/settings', [
-  { id: 'general', labelKey: 'settings.tabs.general' },
-  { id: 'notifications', labelKey: 'settings.tabs.notifications' },
-  { id: 'dataAge', labelKey: 'settings.tabs.data' },
-  { id: 'activity', labelKey: 'settings.tabs.activity' },
-  { id: 'faq', labelKey: 'settings.tabs.faq' },
-]);
+/**
+ * Settings has no tab bar: each entry is a section in the page's own left rail
+ * (`features/settings/sections.ts` groups them and decides which the rail
+ * shows). It is still registered here because a section is a path
+ * (`/settings/industry`), which is what deep links, Back and analytics want.
+ * `notifications`, `dataAge`, `activity` and `faq` keep the ids they had as
+ * tabs so existing links land where they always did.
+ */
+export const SETTINGS_TABS = definePageTabs(
+  '/settings',
+  [
+    { id: 'display', labelKey: 'settings.tabs.display' },
+    { id: 'shortcuts', labelKey: 'settings.tabs.shortcuts' },
+    { id: 'permissions', labelKey: 'settings.tabs.permissions' },
+    { id: 'industry', labelKey: 'settings.tabs.industry' },
+    { id: 'market', labelKey: 'settings.tabs.market' },
+    { id: 'characters', labelKey: 'settings.tabs.characters' },
+    { id: 'corporation', labelKey: 'settings.tabs.corporation' },
+    { id: 'notifications', labelKey: 'settings.tabs.notifications' },
+    { id: 'dataAge', labelKey: 'settings.tabs.data' },
+    { id: 'activity', labelKey: 'settings.tabs.activity' },
+    { id: 'faq', labelKey: 'settings.tabs.faq' },
+  ],
+  undefined,
+  // A phone lists the sections at `/settings`; `md` up has the rail and lands on Display.
+  { hiddenFrom: '(min-width: 48rem)' }
+);
 
 export const PI_TABS = definePageTabs('/planetary-industry', [
   { id: 'colonies', labelKey: 'piPlan.coloniesTab' },
@@ -134,7 +155,7 @@ export function pageKeyFor(pathname: string): string {
  */
 export function isTabRedirectPath(pathname: string): boolean {
   const page = tabbedPageFor(pathname);
-  return page !== null && tabFromPathname(page, pathname) === null;
+  return page !== null && tabFromPathname(page, pathname) === null && !isIndexPath(page, pathname);
 }
 
 /**

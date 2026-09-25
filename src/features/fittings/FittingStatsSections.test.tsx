@@ -33,6 +33,9 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     droneDps: 0,
     droneBandwidthUsed: 0,
     droneBandwidthTotal: 0,
+    maxActiveDrones: 0,
+    droneBandwidthByType: {},
+    hardpoints: { turrets: 0, launchers: 0 },
     droneCapacity: 0,
     ehp: 4619,
     capacitor: { stable: true, stablePercentage: 60 },
@@ -446,5 +449,39 @@ describe('FittingStatsSections — Applied DPS', () => {
 
     expect(saveCustom).not.toHaveBeenCalled();
     expect(within(dialog).getByRole('alert')).toHaveTextContent('signature radius above zero');
+  });
+});
+
+describe('FittingStatsSections — a failed calculation', () => {
+  function renderFailed(reason: 'skills' | 'shipData', onRetry = vi.fn()) {
+    render(
+      <FittingStatsSections
+        stats={null}
+        statsProgress={null}
+        statsError
+        statsErrorReason={reason}
+        onRetry={onRetry}
+        price={null}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={typeName}
+      />
+    );
+    return onRetry;
+  }
+
+  it('says once what failed, and retries on request', async () => {
+    const onRetry = renderFailed('shipData');
+    expect(screen.getAllByRole('alert')).toHaveLength(1);
+    expect(screen.getByRole('alert')).toHaveTextContent("Couldn't load ship data for this fit.");
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it('names the Character’s skills when those are what failed', () => {
+    renderFailed('skills');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      "Couldn't load this Character's skills, so the stats can't be worked out."
+    );
   });
 });

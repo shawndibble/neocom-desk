@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import '@/i18n';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { FittingRing } from './FittingRing';
@@ -30,6 +30,7 @@ function statsWith(cpuUsed: number): FittingStats {
     powergridUsed: 10,
     powergridTotal: 100,
     slotCounts: { high: 3, medium: 2, low: 1, rig: 0, subsystem: 5 },
+    hardpoints: { turrets: 0, launchers: 0 },
   } as FittingStats;
 }
 
@@ -105,7 +106,7 @@ describe('FittingRing', () => {
     // A T3's subsystems get a sheet of their own.
     fireEvent.click(screen.getByRole('button', { name: /^Subsystems\s*0 \/ 5$/ }));
     expect(onRackOpen).toHaveBeenCalledWith('subsystem');
-    // No corner readouts on the overview — the List bars carry those numbers.
+    // No readouts on the overview — the List bars carry those numbers.
     expect(screen.queryByRole('meter', { name: 'CPU' })).toBeNull();
   });
 
@@ -127,6 +128,234 @@ describe('FittingRing', () => {
     expect(screen.getByText('Over by 12.5')).toBeTruthy();
     expect(container.querySelectorAll('.flash-danger')).toHaveLength(1);
     expect(container.querySelector('path.stroke-danger')).not.toBeNull();
+  });
+
+  it('draws CPU and powergrid as their own rim bands, each naming its numbers on hover', async () => {
+    const { container } = render(<FittingRing fitting={fitting} stats={statsWith(25)} />);
+    const cpu = container.querySelector('[data-gauge="cpu"]')!;
+    const powergrid = container.querySelector('[data-gauge="powergrid"]')!;
+    expect(cpu).not.toBeNull();
+    expect(powergrid).not.toBeNull();
+    // Told apart by form, not only by side: powergrid's band is dashed.
+    expect(powergrid.querySelector('path[stroke-dasharray]')).not.toBeNull();
+    expect(cpu.querySelector('path[stroke-dasharray]')).toBeNull();
+
+    fireEvent.pointerMove(cpu, { pointerType: 'mouse' });
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('CPU: 25.0 / 100.0 tf (25%)');
+  });
+
+  it('keeps the gauges out of the accessibility tree — the readouts carry their numbers', () => {
+    const { container } = render(<FittingRing fitting={fitting} stats={statsWith(25)} />);
+    expect(container.querySelector('[data-gauge="cpu"]')!.closest('svg')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+    expect(screen.getByRole('meter', { name: 'CPU' })).toBeTruthy();
+  });
+
+  it('draws plain gauges on the phone overview, with no thin tap target to reveal them', () => {
+    const { container } = render(<FittingRing fitting={fitting} stats={statsWith(25)} compact />);
+    const cpu = container.querySelector('[data-gauge="cpu"]')!;
+    expect(cpu).not.toHaveAttribute('data-state');
+    expect(cpu).not.toHaveClass('pointer-events-auto');
+  });
+
+  it('says how far over budget in the band’s tooltip', async () => {
+    const { container } = render(<FittingRing fitting={fitting} stats={statsWith(112.5)} />);
+    fireEvent.pointerMove(container.querySelector('[data-gauge="cpu"]')!, {
+      pointerType: 'mouse',
+    });
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'CPU: 112.5 / 100.0 tf (113%), over by 12.5'
+    );
+  });
+
+  it('names the state a module actually reached, not the one a paste asked for', () => {
+    render(
+      <FittingRing
+        fitting={fitting}
+        stats={statsWith(10)}
+        moduleResults={[
+          { state: 'active', maxState: 'overload', chargeGroupIds: [] },
+          { state: 'online', maxState: 'online', chargeGroupIds: [] },
+        ]}
+      />
+    );
+    expect(screen.getByLabelText('Low slots 1, online')).toBeTruthy();
+  });
+
+  it('marks the slot the Add panel is filling', () => {
+    render(
+      <FittingRing
+        fitting={fitting}
+        stats={statsWith(10)}
+        selectedSlot={{ rack: 'high', index: 1 }}
+      />
+    );
+    expect(screen.getByLabelText('High slots 2, empty')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('High slots 3, empty')).toHaveAttribute('aria-pressed', 'false');
+    // A fitted tile opens its module rather than toggling, so it is no pressed button.
+    expect(screen.getByLabelText('High slots 1, active')).not.toHaveAttribute('aria-pressed');
+  });
+
+  it('marks no slot as pressed on the phone overview, whose tiles only explain themselves', () => {
+    render(
+      <FittingRing
+        fitting={fitting}
+        stats={statsWith(10)}
+        compact
+        selectedSlot={{ rack: 'high', index: 1 }}
+      />
+    );
+    expect(screen.getByLabelText('High slots 2, empty')).not.toHaveAttribute('aria-pressed');
+  });
+
+  it('lists the cargo beneath the ring, with its counts', () => {
+    render(
+      <FittingRing
+        fitting={{ ...fitting, cargo: [{ typeId: 209, quantity: 1535 }] }}
+        stats={statsWith(10)}
+        typeName={(typeId) => (typeId === 209 ? 'Scourge Heavy Missile' : '')}
+      />
+    );
+    // The badge's own "1.5K" is part of the name, so it can be spoken to select it.
+    expect(screen.getByLabelText('Scourge Heavy Missile ×1,535 (1.5K)')).toHaveTextContent('1.5K');
+  });
+
+  it('opens a fitted tile’s right-click menu: reachable states, unload, info, variations, remove', async () => {
+    const actions = {
+      setState: vi.fn(),
+      unloadCharge: vi.fn(),
+      showInfo: vi.fn(),
+      openVariations: vi.fn(),
+      remove: vi.fn(),
+    };
+    render(
+      <FittingRing
+        fitting={fitting}
+        stats={statsWith(10)}
+        typeName={(typeId) => ({ 10: 'Autocannon', 20: 'EMP S' })[typeId] ?? '?'}
+        moduleResults={[
+          { state: 'active', maxState: 'overload', chargeGroupIds: [] },
+          { state: 'online', maxState: 'online', chargeGroupIds: [] },
+        ]}
+        moduleActions={actions}
+      />
+    );
+    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
+    const menu = await screen.findByRole('menu');
+    expect(
+      within(menu)
+        .getAllByRole('menuitemradio')
+        .map((item) => item.textContent?.replace('✓', ''))
+    ).toEqual(['Offline', 'Online', 'Active', 'Overloaded']);
+    expect(within(menu).getByRole('menuitemradio', { name: 'Active' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    );
+    fireEvent.click(within(menu).getByRole('menuitemradio', { name: 'Overloaded' }));
+    expect(actions.setState).toHaveBeenCalledWith('high', 0, 'overload');
+
+    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Unload EMP S' }));
+    expect(actions.unloadCharge).toHaveBeenCalledWith('high', 0);
+
+    fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Remove Autocannon' }));
+    expect(actions.remove).toHaveBeenCalledWith('high', 0);
+  });
+
+  it('offers a passive module only the states it can reach, and no menu on an empty slot', async () => {
+    render(
+      <FittingRing
+        fitting={fitting}
+        stats={statsWith(10)}
+        moduleResults={[
+          { state: 'active', maxState: 'overload', chargeGroupIds: [] },
+          { state: 'online', maxState: 'online', chargeGroupIds: [] },
+        ]}
+        moduleActions={{
+          setState: vi.fn(),
+          unloadCharge: vi.fn(),
+          showInfo: vi.fn(),
+          openVariations: vi.fn(),
+          remove: vi.fn(),
+        }}
+      />
+    );
+    fireEvent.contextMenu(screen.getByLabelText('Low slots 1, online'));
+    const menu = await screen.findByRole('menu');
+    expect(
+      within(menu)
+        .getAllByRole('menuitemradio')
+        .map((item) => item.textContent?.replace('✓', ''))
+    ).toEqual(['Offline', 'Online']);
+    expect(within(menu).queryByRole('menuitem', { name: /^Unload/ })).toBeNull();
+  });
+
+  it('marks the hull’s hardpoints on the rim, used ones filled, each kind with its numbers on hover', async () => {
+    const { container } = render(
+      <FittingRing
+        fitting={fitting}
+        stats={{ ...statsWith(10), hardpoints: { turrets: 3, launchers: 2 } }}
+        hardpointsUsed={{ turrets: 2, launchers: 0 }}
+      />
+    );
+    const turrets = container.querySelector('[data-hardpoints="turret"]')!;
+    expect(turrets.querySelectorAll('circle')).toHaveLength(3);
+    expect(turrets.querySelectorAll('circle.fill-accent')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-hardpoints="launcher"] circle')).toHaveLength(2);
+    // The same numbers as text, for a screen reader or a keyboard — the rim is a picture.
+    expect(screen.getByText('Turret hardpoints: 2 of 3 used')).toBeTruthy();
+    expect(screen.getByText('Launcher hardpoints: 0 of 2 used')).toBeTruthy();
+
+    fireEvent.pointerMove(turrets, { pointerType: 'mouse' });
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Turret hardpoints: 2 of 3 used');
+  });
+
+  it('draws no hardpoints for a hull without them, and flags a rack fitted past them', () => {
+    const { container } = render(
+      <FittingRing
+        fitting={fitting}
+        stats={{ ...statsWith(10), hardpoints: { turrets: 1, launchers: 0 } }}
+        hardpointsUsed={{ turrets: 2, launchers: 0 }}
+      />
+    );
+    expect(container.querySelector('[data-hardpoints="launcher"]')).toBeNull();
+    expect(
+      container.querySelectorAll('[data-hardpoints="turret"] circle.fill-danger')
+    ).toHaveLength(1);
+    // Not by colour alone.
+    expect(
+      screen.getByText('Turret hardpoints: 2 of 1 used — 1 more than the hull has')
+    ).toBeTruthy();
+  });
+
+  it('gives a subsystem’s menu no states — a subsystem can’t be put offline', async () => {
+    const t3: Fitting = {
+      ...fitting,
+      modules: [
+        ...fitting.modules,
+        { slot: 'subsystem', slotIndex: 0, typeId: 30, state: 'online' },
+      ],
+    };
+    render(
+      <FittingRing
+        fitting={t3}
+        stats={statsWith(10)}
+        moduleActions={{
+          setState: vi.fn(),
+          unloadCharge: vi.fn(),
+          showInfo: vi.fn(),
+          openVariations: vi.fn(),
+          remove: vi.fn(),
+        }}
+      />
+    );
+    fireEvent.contextMenu(screen.getByLabelText(/^Subsystems 1, /));
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).queryAllByRole('menuitemradio')).toHaveLength(0);
+    expect(within(menu).getByRole('menuitem', { name: /^Remove/ })).toBeTruthy();
   });
 });
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, FilterChip, Modal, TextInput } from '@/components/ui';
+import { Button, FilterChip, Modal, TextInput, Checkbox } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { MiningTaxAssignmentRecord, MiningTaxPaymentMethod } from '@/db';
@@ -197,11 +197,10 @@ export function SettleUpDialog({ open, onClose, rows, systemNames, onPaid }: Set
                         tappableRowClassName
                       )}
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={on}
                         onChange={() => toggle(r.assignment.id)}
-                        className="size-4 shrink-0 cursor-pointer accent-accent"
+
                         aria-label={t('miningTax.settleUpIncludeLabel', {
                           date: r.assignment.date,
                         })}

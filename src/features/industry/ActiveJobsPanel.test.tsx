@@ -924,6 +924,44 @@ describe('ActiveJobsPanel: table columns', () => {
     const resorted = within(container.querySelector('tbody')!).getAllByRole('row');
     expect(within(resorted[0]).getByText('Widget Beta')).toBeInTheDocument();
   });
+
+  it('offers a phone sort bar that re-sorts the jobs like the header buttons', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+
+    const job = (id: number, runs: number, endMin: number) => ({
+      job_id: id,
+      activity_id: 1,
+      blueprint_type_id: id === 1 ? 100 : 200,
+      product_type_id: id === 1 ? 100 : 200,
+      facility_id: 60003760,
+      station_id: 60003760,
+      runs,
+      start_date: new Date(NOW.getTime() - 60 * 60_000).toISOString(),
+      end_date: new Date(NOW.getTime() + endMin * 60_000).toISOString(),
+      status: 'active',
+    });
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([job(1, 250, 60), job(2, 3, 180)])));
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const { container } = render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    await expandJobs(user);
+    const first = () => within(container.querySelector('tbody')!).getAllByRole('row')[0];
+    expect(within(first()).getByText('Widget Alpha')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Sort by' }), 'runs:asc');
+    expect(within(first()).getByText('Widget Beta')).toBeInTheDocument();
+  });
 });
 
 describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
@@ -1149,6 +1187,38 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
   });
 
+  it("grants a lapsed alt's own grant, not the active Character's, and names them", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    await seedSecondCharacter();
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_B}/industry/jobs`, () =>
+        HttpResponse.json({ error: 'token is not valid for scope' }, { status: 403 })
+      )
+    );
+    const { beginEveLogin } = await import('@/app/loginFlow');
+    vi.mocked(beginEveLogin).mockClear();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'This character' }));
+    await user.click(await screen.findByRole('button', { name: 'All characters' }));
+
+    expect(await screen.findByText('Pilot Two — Log in again to see jobs')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Log in again with EVE Online' }));
+    expect(beginEveLogin).toHaveBeenCalledWith({ characterId: CHAR_B, groups: ['industry'] });
+  });
+
   it('clears the spinner when the cross-character fan-out itself fails, rather than spinning forever', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(NOW);
@@ -1230,7 +1300,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     // Solo: only Pilot One counts (3 open manufacturing).
     await screen.findByRole('button', { name: 'This character' });
     await waitFor(() => {
-      expect(container.querySelector('.cursor-help')!.textContent).toBe('Free slots3/1/1');
+      expect(container.querySelector('.cursor-help')!.textContent).toBe('Free slotsMfg3/Sci1/Rxn1');
     });
 
     await user.click(screen.getByRole('button', { name: 'This character' }));
@@ -1239,7 +1309,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     // Both: 4+2=6 max, 2 running -> 4 open. Science/reaction stay at the
     // untrained 1/1 for both characters (base slot only), summed to 2/2.
     await waitFor(() => {
-      expect(container.querySelector('.cursor-help')!.textContent).toBe('Free slots4/2/2');
+      expect(container.querySelector('.cursor-help')!.textContent).toBe('Free slotsMfg4/Sci2/Rxn2');
     });
   });
 });
@@ -1304,7 +1374,7 @@ describe('ActiveJobsPanel: open job-slot header (issue #679)', () => {
     expect(summaryEls[2]).toHaveClass('text-warning');
 
     const summaryTrigger = container.querySelector('.cursor-help')!;
-    expect(summaryTrigger.textContent).toBe('Free slots1/1/1');
+    expect(summaryTrigger.textContent).toBe('Free slotsMfg1/Sci1/Rxn1');
     fireEvent.focus(summaryTrigger);
     // Numerator is jobs *used* (max - open), not open — 3 running of 4
     // manufacturing, 0 of 1 science, 1 of 2 reaction.
@@ -1332,7 +1402,7 @@ describe('ActiveJobsPanel: open job-slot header (issue #679)', () => {
 
     await screen.findByText('None');
     const summaryTrigger = container.querySelector('.cursor-help')!;
-    expect(summaryTrigger.textContent).toBe('Free slots—/—/—');
+    expect(summaryTrigger.textContent).toBe('Free slotsMfg—/Sci—/Rxn—');
     fireEvent.focus(summaryTrigger);
     expect(screen.getByRole('tooltip')).toHaveTextContent('Mfg — · Sci — · Rxn —');
   });

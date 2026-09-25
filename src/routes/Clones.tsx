@@ -7,7 +7,6 @@ import {
   EmptyState,
   IconButton,
   Panel,
-  ReauthBanner,
   Spinner,
   StatChip,
   Tooltip,
@@ -15,8 +14,7 @@ import {
   type StatChipTone,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { GrantBanner } from '@/app/GrantNote';
 import { CharacterHeader } from '@/features/character/CharacterHeader';
 import { loadCharacterClones, loadImplantDescriptions } from '@/features/character/clones';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
@@ -274,13 +272,12 @@ export function Clones() {
           </div>
         ) : clonesNeedsReauth ? (
           <div className="p-3">
-            <ReauthBanner
+            <GrantBanner
+              characterId={activeCharacterId}
+              endpoints={['getCharacterClones']}
               title={t('clones.reauthTitle')}
               hint={t('clones.reauthHint')}
               actionLabel={t('clones.reauthAction')}
-              onLogin={() =>
-                void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterClones']) })
-              }
             />
           </div>
         ) : error ? (

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal } from '@/components/ui';
+import { Button, Modal, Checkbox } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
@@ -91,14 +91,12 @@ export function BulkDismissDialog({
                     tappableRowClassName
                   )}
                 >
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={on}
                     onChange={() => toggle(dr.key)}
                     aria-label={t('miningTax.bulkDismissIncludeLabel', {
                       date: dr.row.entry.date,
                     })}
-                    className="size-4 shrink-0 cursor-pointer accent-accent"
                   />
                   <span className="w-20 shrink-0 tabular-nums">{dr.row.entry.date}</span>
                   <span className="min-w-0 flex-1 truncate text-text-dim">

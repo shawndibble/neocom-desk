@@ -9,6 +9,7 @@ import {
   SelectValue,
   TextInput,
   TypeIcon,
+  Checkbox,
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { OreLine } from '@/engine/miningTax/types';
@@ -43,6 +44,8 @@ interface AssignDialogProps {
   onCancel: () => void;
   /** Status-specific buttons (Dismiss / Mark as paid / Resolve) rendered alongside Assign and Cancel — RowDetailModal owns these, since which one applies depends on the row's status, not on this form. */
   extraActions?: ReactNode;
+  /** Opens the Payee manager from the no-Payees state. The dialog stays mounted underneath, so the form appears in place once a Payee exists. */
+  onAddPayee?: () => void;
 }
 
 /** Rounds to the cent — what the editable ISK fields below prefill and display, since a raw float in a number input reads as noise. */
@@ -134,6 +137,7 @@ export function AssignDialog({
   onAssigned,
   onCancel,
   extraActions,
+  onAddPayee,
 }: AssignDialogProps) {
   const { t } = useTranslation();
   const isEditing = assignment !== null;
@@ -304,7 +308,16 @@ export function AssignDialog({
     taxOwed >= 0;
 
   if (payees.length === 0) {
-    return <p className="text-xs text-text-dim">{t('miningTax.noPayeesHint')}</p>;
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-text-dim">{t('miningTax.noPayeesHint')}</p>
+        {onAddPayee && (
+          <Button size="sm" onClick={onAddPayee}>
+            {t('miningTax.addPayee')}
+          </Button>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -338,11 +351,9 @@ export function AssignDialog({
 
       {offerRememberSystem && (
         <label className="flex items-center gap-2 text-xs text-text-dim">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={rememberSystem}
             onChange={(e) => setRememberSystem(e.target.checked)}
-            className="size-4 shrink-0 cursor-pointer accent-accent"
           />
           {t('miningTax.rememberSystemLabel', {
             system: systemName,
@@ -362,12 +373,10 @@ export function AssignDialog({
                 key={line.typeId}
                 className="flex items-center gap-1.5 py-1 text-sm first:pt-0 last:pb-0"
               >
-                <input
-                  type="checkbox"
+                <Checkbox
                   id={`line-${line.typeId}`}
                   checked={includedTypeIds.has(line.typeId)}
                   onChange={() => toggleLine(line.typeId)}
-                  className="size-4 shrink-0 cursor-pointer accent-accent"
                 />
                 <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                 <label htmlFor={`line-${line.typeId}`} className="w-40 shrink-0 truncate">
@@ -440,12 +449,7 @@ export function AssignDialog({
 
       {!isEditing && (
         <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={markPaid}
-            onChange={(e) => setMarkPaid(e.target.checked)}
-            className="size-4 shrink-0 cursor-pointer accent-accent"
-          />
+          <Checkbox checked={markPaid} onChange={(e) => setMarkPaid(e.target.checked)} />
           {t('miningTax.markPaidLabel')}
         </label>
       )}

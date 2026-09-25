@@ -235,6 +235,19 @@ describe('Contacts', () => {
     expect(screen.getByText('Widen the filters above to see contacts.')).toBeInTheDocument();
   });
 
+  it('offers Reset filters when the filters leave no contacts, and restores the list', async () => {
+    render(<App />);
+    await screen.findByText('Good Friend');
+    openFilters();
+
+    const chips = screen.getByRole('group', { name: 'Standing' });
+    for (const chip of within(chips).getAllByRole('button')) fireEvent.click(chip);
+    await screen.findByText('No contacts match the selected filters');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+    expect(await screen.findByText('Good Friend')).toBeInTheDocument();
+  });
+
   it('searches contacts by name', async () => {
     render(<App />);
     await screen.findByText('Good Friend');
@@ -421,7 +434,7 @@ describe('Contacts', () => {
         const row = table.getByText('Good Friend').closest('tr');
         if (!row) throw new Error('expected a Good Friend row');
         fireEvent.contextMenu(row);
-        await user.click(screen.getByRole('menuitem', { name: 'Copy Contact ID' }));
+        await user.click(screen.getByRole('menuitem', { name: 'Copy contact ID' }));
         fireEvent.contextMenu(row);
         await user.click(screen.getByRole('menuitem', { name: 'Copy name' }));
 
@@ -515,16 +528,16 @@ describe('Contacts row context menu (issue #403)', () => {
     return row;
   }
 
-  it('offers Copy Name, Copy Contact ID, and Show Info as the only entry point to the modal', async () => {
+  it('offers Copy Name, Copy contact ID, and Show info as the only entry point to the modal', async () => {
     render(<App />);
     await openContactMenu('Good Friend');
 
     expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy Contact ID' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy contact ID' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
   });
 
-  it('Show Info opens the shared Public Info Modal, tabbed to the contact type', async () => {
+  it('Show info opens the shared Public Info Modal, tabbed to the contact type', async () => {
     const user = userEvent.setup();
     server.use(
       http.get(`${ESI}/characters/1001`, () =>

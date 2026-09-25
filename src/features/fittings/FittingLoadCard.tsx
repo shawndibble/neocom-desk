@@ -2,25 +2,22 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
 import { fieldBaseClassName } from '@/components/ui/controlStyles';
-import type { EftUnresolvedItem } from '@/engine/fittings/eftLoader';
-import type { FitXmlUnresolvedItem, FittingXmlDocument } from '@/engine/import/eveFitXml';
+import type { LoadedFitting, LoadOutcome } from '@/engine/fittings/load';
+import type { FittingXmlDocument } from '@/engine/import/eveFitXml';
 import { parseFittingXmlFile, type FittingXmlDocumentErrorCode } from './fittingXmlDocument';
 import {
   resolveFittingXmlOpenAction,
   type FittingXmlListItem,
-  type LoadError,
   type ShareDecodeError,
 } from './useFittingWorkspace';
 
 interface FittingLoadCardProps {
   onLoad: (text: string) => Promise<void>;
-  unresolved: EftUnresolvedItem[];
-  fitXmlUnresolved: FitXmlUnresolvedItem[];
+  lastLoad: LoadOutcome | null;
   shareError: ShareDecodeError | null;
-  loadError: LoadError | null;
   tooLargeToShare: boolean;
   onLoadFittingXmlDocument: (document: FittingXmlDocument) => Promise<FittingXmlListItem[]>;
-  onOpenFittingXmlEntry: (item: FittingXmlListItem) => Promise<void>;
+  onOpenLoaded: (loaded: LoadedFitting) => Promise<void>;
 }
 
 function WarningList({ title, lines }: { title: string; lines: string[] }) {
@@ -37,53 +34,43 @@ function WarningList({ title, lines }: { title: string; lines: string[] }) {
 }
 
 /**
- * What the last Load couldn't place: EFT lines, and a fittings file's
- * unresolved items. Shown in this card, and above the editor once the Load
- * has opened its Fitting — this card is gone by then.
+ * What the last Load couldn't place: pasted lines, a fittings file's items,
+ * an In-game Fitting's unsupported slots. Shown in this card, and above the
+ * editor once the Load has opened its Fitting — this card is gone by then.
  */
-export function LoadWarnings({
-  unresolved,
-  fitXmlUnresolved,
-}: {
-  unresolved: EftUnresolvedItem[];
-  fitXmlUnresolved: FitXmlUnresolvedItem[];
-}) {
+export function LoadWarnings({ load }: { load: LoadOutcome | null }) {
   const { t } = useTranslation();
+  if (load === null || load.unresolved.length === 0) return null;
+  const count = load.unresolved.length;
+  const title =
+    load.source === 'text'
+      ? t('fittings.load.unresolvedTitle', { count })
+      : load.source === 'file'
+        ? t('fittings.load.xml.unresolvedTitle', { count })
+        : t('fittings.load.inGame.unresolvedTitle', { count });
   return (
-    <>
-      {unresolved.length > 0 && (
-        <WarningList
-          title={t('fittings.load.unresolvedTitle', { count: unresolved.length })}
-          lines={unresolved.map((item) =>
-            t('fittings.load.unresolvedLine', {
+    <WarningList
+      title={title}
+      lines={load.unresolved.map((item) =>
+        item.line === undefined
+          ? t('fittings.load.unresolvedItem', { text: item.text, reason: item.reason })
+          : t('fittings.load.unresolvedLine', {
               line: item.line,
               text: item.text,
               reason: item.reason,
             })
-          )}
-        />
       )}
-      {fitXmlUnresolved.length > 0 && (
-        <WarningList
-          title={t('fittings.load.xml.unresolvedTitle', { count: fitXmlUnresolved.length })}
-          lines={fitXmlUnresolved.map((item) =>
-            t('fittings.load.xml.unresolvedLine', { text: item.text, reason: item.reason })
-          )}
-        />
-      )}
-    </>
+    />
   );
 }
 
 export function FittingLoadCard({
   onLoad,
-  unresolved,
-  fitXmlUnresolved,
+  lastLoad,
   shareError,
-  loadError,
   tooLargeToShare,
   onLoadFittingXmlDocument,
-  onOpenFittingXmlEntry,
+  onOpenLoaded,
 }: FittingLoadCardProps) {
   const { t } = useTranslation();
   const [text, setText] = useState('');
@@ -115,7 +102,7 @@ export function FittingLoadCard({
       const items = await onLoadFittingXmlDocument(parsed.document);
       const action = resolveFittingXmlOpenAction(items);
       if (action.kind === 'open') {
-        await onOpenFittingXmlEntry(action.item);
+        await onOpenLoaded(action.loaded);
       } else {
         setXmlList(items);
       }
@@ -123,6 +110,8 @@ export function FittingLoadCard({
       setXmlLoading(false);
     }
   }
+
+  const loadError = lastLoad?.kind === 'failed' ? lastLoad.error : null;
 
   return (
     <Panel title={t('fittings.load.title')}>
@@ -162,7 +151,7 @@ export function FittingLoadCard({
             {t('fittings.load.tooLargeToShare')}
           </p>
         )}
-        <LoadWarnings unresolved={unresolved} fitXmlUnresolved={[]} />
+        <LoadWarnings load={lastLoad} />
 
         <div className="space-y-2 border-t border-line pt-3">
           <label className="block text-xs text-text-dim" htmlFor="fitting-load-xml-file">
@@ -190,8 +179,6 @@ export function FittingLoadCard({
             </p>
           )}
 
-          <LoadWarnings unresolved={[]} fitXmlUnresolved={fitXmlUnresolved} />
-
           {xmlList && (
             <div className="rounded-xs border border-line bg-panel-2 p-2">
               <p className="mb-1 text-xs font-semibold text-text-dim uppercase">
@@ -199,22 +186,22 @@ export function FittingLoadCard({
               </p>
               <p className="mb-2 text-xs text-text-dim">{t('fittings.load.xml.listNotSaved')}</p>
               <ul className="divide-y divide-line">
-                {xmlList.map((item, index) => (
+                {xmlList.map(({ name, hullName, load }, index) => (
                   <li key={index} className="py-1">
-                    {item.fitting ? (
+                    {load.kind === 'fitting' ? (
                       <button
                         type="button"
                         className="min-h-11 w-full truncate text-left text-sm text-text hover:text-accent"
-                        aria-label={t('fittings.load.xml.open', { name: item.name })}
-                        onClick={() => void onOpenFittingXmlEntry(item)}
+                        aria-label={t('fittings.load.xml.open', { name })}
+                        onClick={() => void onOpenLoaded(load)}
                       >
-                        {item.hullName ? `${item.hullName} — ${item.name}` : item.name}
+                        {hullName ? `${hullName} — ${name}` : name}
                       </button>
                     ) : (
                       <div className="text-sm text-text-dim">
-                        <p className="truncate">{item.name}</p>
+                        <p className="truncate">{name}</p>
                         <p className="text-xs text-danger">
-                          {t('fittings.load.xml.listError', { reason: item.hullError })}
+                          {t('fittings.load.xml.listError', { reason: load.unresolved[0]?.reason })}
                         </p>
                       </div>
                     )}

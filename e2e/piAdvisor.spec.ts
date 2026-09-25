@@ -12,6 +12,7 @@
  * That produces a removal step, which is the row a pilot should see first, and
  * it exercises the ranked list rather than the empty state.
  */
+import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
@@ -150,6 +151,26 @@ const PLANETS: Record<number, { name: string; type_id: number }> = {
   [STORAGE_PLANET_ID]: { name: 'Efa VI', type_id: BARREN_TYPE_ID },
 };
 
+async function clearEsiCache(page: Page) {
+  await page.evaluate(
+    async () =>
+      new Promise((resolve) => {
+        // Only the cache table. Deleting the database would take the tokens
+        // with it and land the spec on the login screen.
+        const open = indexedDB.open('neocom');
+        open.onsuccess = () => {
+          const database = open.result;
+          if (!database.objectStoreNames.contains('esiCache')) return resolve(null);
+          const tx = database.transaction('esiCache', 'readwrite');
+          tx.objectStore('esiCache').clear();
+          tx.oncomplete = () => resolve(null);
+          tx.onerror = () => resolve(null);
+        };
+        open.onerror = () => resolve(null);
+      })
+  );
+}
+
 test.beforeEach(async ({ page }) => {
   await signInAndGoto(page);
 
@@ -215,23 +236,7 @@ test.beforeEach(async ({ page }) => {
   // that at boot, so the empty answer is already in the ESI cache by the time
   // the route above is registered. Drop the cached rows and reload, so the
   // colony below is what the tab actually reads.
-  await page.evaluate(
-    async () =>
-      new Promise((resolve) => {
-        // Only the cache table. Deleting the database would take the tokens
-        // with it and land the spec on the login screen.
-        const open = indexedDB.open('neocom');
-        open.onsuccess = () => {
-          const database = open.result;
-          if (!database.objectStoreNames.contains('esiCache')) return resolve(null);
-          const tx = database.transaction('esiCache', 'readwrite');
-          tx.objectStore('esiCache').clear();
-          tx.oncomplete = () => resolve(null);
-          tx.onerror = () => resolve(null);
-        };
-        open.onerror = () => resolve(null);
-      })
-  );
+  await clearEsiCache(page);
 
   await page.goto('/planetary-industry/advisor');
 });
@@ -266,4 +271,58 @@ test('says what it cannot answer rather than leaving a silent gap', async ({ pag
 test('captures the reworked tab', async ({ page }) => {
   await page.getByText('Do this, best first').waitFor();
   await page.screenshot({ path: 'e2e-output/pi-advisor.png', fullPage: true });
+});
+
+/**
+ * The colony strip's name cell used to collapse to 0px at 1024px, where the
+ * panel is narrow and the fixed columns take all of it. It has a floor now.
+ */
+test.describe('colony strip name cell', () => {
+  const NAME_FLOOR_PX = 96; // 6rem
+
+  async function expectNamesKeepTheirFloor(page: Page) {
+    const names = page.getByTestId('colony-strip-name');
+    await expect(names).toHaveCount(COLONIES.length);
+    for (const name of await names.all()) {
+      await expect(name).toBeVisible();
+      const box = await name.boundingBox();
+      expect(box?.width ?? 0).toBeGreaterThanOrEqual(NAME_FLOOR_PX - 0.5);
+      const row = await name.locator('xpath=ancestor::button[1]').boundingBox();
+      // No horizontal overflow: the row's cells stay inside the row.
+      const cells = await name.locator('xpath=..').locator('> *').all();
+      for (const cell of cells) {
+        const cellBox = await cell.boundingBox();
+        if (!cellBox || !row) continue;
+        expect(cellBox.x + cellBox.width).toBeLessThanOrEqual(row.x + row.width + 0.5);
+      }
+    }
+  }
+
+  for (const width of [768, 1024, 1280, 1440]) {
+    test(`keeps the planet name visible at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 768 });
+      await page.getByText('Your colonies').waitFor();
+      await expectNamesKeepTheirFloor(page);
+    });
+  }
+
+  test('truncates a long name without dropping below the floor', async ({ page }) => {
+    PLANETS[PLANET_ID] = {
+      name: 'Some Very Long System Name VII Extended',
+      type_id: TEMPERATE_TYPE_ID,
+    };
+    try {
+      await page.setViewportSize({ width: 1024, height: 768 });
+      await clearEsiCache(page);
+      await page.reload();
+      await page.getByText('Your colonies').waitFor();
+      await expectNamesKeepTheirFloor(page);
+      const overflow = await page
+        .getByTestId('colony-strip-name')
+        .evaluateAll((els) => els.some((el) => el.scrollWidth > el.clientWidth));
+      expect(overflow).toBe(true);
+    } finally {
+      PLANETS[PLANET_ID] = { name: 'Efa II', type_id: TEMPERATE_TYPE_ID };
+    }
+  });
 });

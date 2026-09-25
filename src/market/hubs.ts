@@ -24,6 +24,16 @@ export interface TradeHub {
   stationId: number;
   systemId: number;
   regionId: number;
+  /**
+   * The hub station's NPC owner and that owner's faction, for broker-fee
+   * standings. Stored rather than fetched: `GET /corporations/{id}` omits
+   * `faction_id` for NPC corps (only militias carry it), so the live lookup
+   * could never find the faction, and it cost one request per hub on every
+   * cold page load. Owners from `/universe/stations/{id}`, factions from the
+   * SDE's `crpNPCCorporations.factionID`, read 2026-09-25.
+   */
+  ownerCorporationId: number;
+  ownerFactionId: number;
 }
 
 export const TRADE_HUBS: readonly TradeHub[] = [
@@ -35,6 +45,8 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     stationId: 60003760,
     systemId: 30000142,
     regionId: 10000002, // The Forge
+    ownerCorporationId: 1000035, // Caldari Navy
+    ownerFactionId: 500001, // Caldari State
   },
   {
     id: 'amarr',
@@ -44,6 +56,8 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     stationId: 60008494,
     systemId: 30002187,
     regionId: 10000043, // Domain
+    ownerCorporationId: 1000086, // Emperor Family
+    ownerFactionId: 500003, // Amarr Empire
   },
   {
     id: 'dodixie',
@@ -53,6 +67,8 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     stationId: 60011866,
     systemId: 30002659,
     regionId: 10000032, // Sinq Laison
+    ownerCorporationId: 1000120, // Federation Navy
+    ownerFactionId: 500004, // Gallente Federation
   },
   {
     id: 'rens',
@@ -62,6 +78,8 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     stationId: 60004588,
     systemId: 30002510,
     regionId: 10000030, // Heimatar
+    ownerCorporationId: 1000049, // Brutor Tribe
+    ownerFactionId: 500002, // Minmatar Republic
   },
   {
     id: 'hek',
@@ -71,6 +89,8 @@ export const TRADE_HUBS: readonly TradeHub[] = [
     stationId: 60005686,
     systemId: 30002053,
     regionId: 10000042, // Metropolis
+    ownerCorporationId: 1000057, // Boundless Creation
+    ownerFactionId: 500002, // Minmatar Republic
   },
 ] as const;
 

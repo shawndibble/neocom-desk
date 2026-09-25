@@ -268,6 +268,35 @@ describe('LoyaltyStore filters', () => {
     await user.type(screen.getByPlaceholderText('Search offers'), 'plex');
     await waitFor(() => expect(probe.search).toContain('search=plex'));
   });
+
+  it('offers Reset filters when the filters hide every offer, and restores the list', async () => {
+    useDesktopViewport();
+    useLoyaltyStoreOffers.mockReturnValue({
+      corpName: 'Federal Navy Academy',
+      offersFetchedAt: null,
+      offersFromCache: false,
+      rows: [ITEM_ROW],
+      catalog: null,
+      playerLp: 12_000,
+      hub: TRADE_HUBS[0]!,
+      ready: true,
+      useOwnMaterialsFor: new Set<number>(),
+      toggleUseOwnMaterials: () => {},
+    });
+    const user = userEvent.setup();
+    renderStore();
+
+    await user.type(screen.getByPlaceholderText('Search offers'), 'zzz-no-such-offer');
+    expect(await screen.findByText('No offers match these filters')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+    expect(await screen.findByText(ITEM_ROW.itemName)).toBeInTheDocument();
+  });
+
+  it('offers no Reset filters when the corporation has no offers at all', () => {
+    renderStore();
+    expect(screen.queryByRole('button', { name: 'Reset filters' })).not.toBeInTheDocument();
+  });
 });
 
 describe('LoyaltyStore selected offer (issue #1490)', () => {

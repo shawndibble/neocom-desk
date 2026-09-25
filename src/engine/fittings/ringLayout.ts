@@ -37,26 +37,64 @@ export const RING_POSITIONS: Readonly<Record<RingRack, number>> = {
   rig: 3,
 };
 
+/** The square box the ring is drawn in, ring units; its centre is the ring's. */
+export const RING_VIEW = 648;
 /** The band's outer and inner edges; tiles centre on the band. */
 export const RING_OUTER_RADIUS = 300;
-export const RING_INNER_RADIUS = 262;
+export const RING_INNER_RADIUS = 240;
 export const RING_SLOT_RADIUS = (RING_OUTER_RADIUS + RING_INNER_RADIUS) / 2;
 /** A slot tile's side. */
-export const RING_TILE = 44;
-/** Gauge ticks run on the rim, just outside the band. */
-export const RING_TICK_INNER = 305;
-export const RING_TICK_OUTER = 315;
+export const RING_TILE = 48;
+/** The resource gauges run on the rim, just outside the band. */
+export const RING_GAUGE_RADIUS = 312;
 
 /** Angle between neighbouring tiles of one rack: a tile plus a small gap at the slot radius. */
-const PITCH_DEG = 10.2;
+const PITCH_DEG = 12;
 
-/** Where each rack's positions are centred — matching the game window. */
+/**
+ * Where each rack's positions are centred — the game window's order, turned
+ * a little anticlockwise as it is: highs from ten o'clock over the top, mids
+ * down the right, lows round the bottom, rigs on the left. The four sit an
+ * even ~11° apart.
+ */
 const RACK_CENTRE_DEG: Readonly<Record<RingRack, number>> = {
-  high: -8,
-  medium: 88,
-  low: 182,
-  rig: -79,
+  high: -15,
+  medium: 90,
+  low: 195,
+  rig: -90,
 };
+
+/**
+ * The rim gauges, degrees clockwise from 12 o'clock, each filling from `from`
+ * towards `to`. CPU and powergrid — the two a fit most often runs out of —
+ * rise either side of the bottom, apart, so neither reads as the other;
+ * calibration sits by the rigs that draw it, drone bandwidth opposite.
+ */
+export const RING_GAUGES = {
+  cpu: { from: 172, to: 100 },
+  powergrid: { from: 188, to: 260 },
+  calibration: { from: -80, to: -30 },
+  droneBandwidth: { from: 30, to: 80 },
+} as const;
+
+export type RingGauge = keyof typeof RING_GAUGES;
+
+/** Degrees between neighbouring hardpoint pips, and from 12 o'clock to the first. */
+const PIP_PITCH_DEG = 3.5;
+const PIP_START_DEG = 4;
+
+/**
+ * Where a hull's hardpoint pips sit on the rim's top gap, between the
+ * calibration and drone bandwidth bands: turrets running out left from
+ * 12 o'clock, launchers out right, the first of each nearest the top.
+ */
+export function hardpointPipAngles(kind: 'turret' | 'launcher', count: number): number[] {
+  const side = kind === 'turret' ? -1 : 1;
+  return Array.from(
+    { length: count },
+    (_, index) => side * (PIP_START_DEG + index * PIP_PITCH_DEG)
+  );
+}
 
 /**
  * Every slot each rack has, fitted or not. `layout` is the hull's slot counts
@@ -101,23 +139,37 @@ export function ringPoint(angle: number, radius: number): { x: number; y: number
 }
 
 /**
- * A rim gauge's `count` tick angles from `from` to `to`, split into the ones
- * the used `fraction` fills (from the first tick) and the rest. Over budget
- * fills them all; an unknown share (NaN) fills none.
+ * A rim gauge from `from` to `to`, split at the used `fraction` into the
+ * filled stretch (from `from`) and the empty rest, each `[start, end]` or
+ * null when there is none. Over budget fills it all; an unknown share (NaN)
+ * fills none.
  */
-export function gaugeTicks(
+export function gaugeArc(
   from: number,
   to: number,
-  count: number,
   fraction: number
-): { filled: number[]; empty: number[] } {
+): { filled: [number, number] | null; empty: [number, number] | null } {
   const share = Number.isFinite(fraction) ? Math.min(1, Math.max(0, fraction)) : 0;
-  const filledCount = Math.round(share * count);
-  const filled: number[] = [];
-  const empty: number[] = [];
-  for (let i = 0; i < count; i++) {
-    const angle = count > 1 ? from + ((to - from) * i) / (count - 1) : from;
-    (i < filledCount ? filled : empty).push(angle);
-  }
-  return { filled, empty };
+  const split = from + (to - from) * share;
+  return {
+    filled: share > 0 ? [from, split] : null,
+    empty: share < 1 ? [split, to] : null,
+  };
+}
+
+function coordinate(value: number): string {
+  // No "-0.0" from a sine that is zero bar rounding.
+  return (Math.abs(value) < 0.05 ? 0 : value).toFixed(1);
+}
+
+/**
+ * An SVG path along the circle of `radius` about (`cx`, `cy`) from angle
+ * `from` to `to` — clockwise when `to` is the larger, anticlockwise otherwise.
+ */
+export function arcPath(from: number, to: number, radius: number, cx: number, cy: number): string {
+  const a = ringPoint(from, radius);
+  const b = ringPoint(to, radius);
+  const largeArc = Math.abs(to - from) > 180 ? 1 : 0;
+  const sweep = to > from ? 1 : 0;
+  return `M${coordinate(cx + a.x)} ${coordinate(cy + a.y)}A${radius} ${radius} 0 ${largeArc} ${sweep} ${coordinate(cx + b.x)} ${coordinate(cy + b.y)}`;
 }

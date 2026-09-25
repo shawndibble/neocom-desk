@@ -16,7 +16,9 @@ type MockFit = {
 const calculateMock = vi.fn<(fit: MockFit, options?: { validate?: boolean }) => unknown>();
 const loadSdeMock = vi.fn<(bytes: Uint8Array) => number>();
 
+const beaconMock = vi.fn((typeId: number) => ({ effects: [{ fromBeacon: typeId }] }));
 vi.mock('@eveshipfit/dogma-engine', () => ({
+  beacon: (typeId: number) => beaconMock(typeId),
   default: (init: { module_or_path: ArrayBuffer }) => wasmInitMock(init),
   calculate: (fit: MockFit, options?: { validate?: boolean }) => calculateMock(fit, options),
   load_sde: (bytes: Uint8Array) => loadSdeMock(bytes),
@@ -89,6 +91,36 @@ describe('loadDogmaEngine', () => {
     expect(loadSdeMock).toHaveBeenCalledTimes(1);
     const [sdeArg] = loadSdeMock.mock.calls[0];
     expect(sdeArg).toEqual(SDE_BYTES);
+  });
+
+  it("rejects a 200 that is the app's HTML fallback page, and never caches it", async () => {
+    const { fetchMock, cache } = stubNetwork();
+    fetchMock.mockImplementation(
+      async () =>
+        new Response('<!doctype html><title>Neocom Desk</title>', {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        })
+    );
+    const { loadDogmaEngine } = await freshModule();
+
+    await expect(loadDogmaEngine()).rejects.toThrow(/esf_dogma_engine_bg\.wasm|sde\.dat/);
+    expect(cache.put).not.toHaveBeenCalled();
+    expect(wasmInitMock).not.toHaveBeenCalled();
+  });
+
+  it('refetches over a cached HTML page left by an earlier, poisoned load', async () => {
+    const { fetchMock, store } = stubNetwork();
+    const html = () =>
+      new Response('<!doctype html>', { status: 200, headers: { 'content-type': 'text/html' } });
+    store.set('/vendor/dogma/esf_dogma_engine_bg.wasm', html());
+    store.set('/vendor/dogma/sde.dat', html());
+    const { loadDogmaEngine } = await freshModule();
+
+    await loadDogmaEngine();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(new Uint8Array(wasmInitMock.mock.calls[0][0].module_or_path)).toEqual(WASM_BYTES);
   });
 
   it('reports combined progress across both downloads as bytes stream in', async () => {
@@ -173,6 +205,40 @@ describe('computeFittingStats', () => {
     expect(stats.cpuTotal).toBe(400);
     expect(stats.cpuUsed).toBe(300);
     expect(stats.applied).toEqual({ weapons: [], droneControlRange: 20000 });
+  });
+
+  it('adds the weather to what a fit already takes in, rather than replacing it', async () => {
+    const { withWeather } = await freshModule();
+    const fit = {
+      name: 'x',
+      ship: { type_id: 1 },
+      items: [],
+      incoming: { effects: [{ fromFleet: true }], buffs: [{ id: 10 }] },
+    } as unknown as Parameters<typeof withWeather>[0];
+    expect(withWeather(fit, 47390).incoming).toEqual({
+      effects: [{ fromFleet: true }, { fromBeacon: 47390 }],
+      buffs: [{ id: 10 }],
+    });
+  });
+
+  it("hands the engine a weather's beacon as what the fit takes in — and nothing without one", async () => {
+    stubNetwork();
+    calculateMock.mockReturnValue({
+      ship: { attributes: new Map() },
+      items: [],
+      character: { attributes: new Map() },
+    });
+    const { computeFittingStats } = await freshModule();
+
+    await computeFittingStats(fitting, profile, undefined, undefined, { weatherTypeId: 47390 });
+    await computeFittingStats(fitting, profile);
+
+    const [[inWeather], [clear]] = calculateMock.mock.calls.slice(-2) as unknown as [
+      { incoming?: unknown }[],
+      { incoming?: unknown }[],
+    ];
+    expect(inWeather.incoming).toEqual({ effects: [{ fromBeacon: 47390 }], buffs: [] });
+    expect(clear.incoming).toBeUndefined();
   });
 
   it('sums calibration cost across fitted rigs and bandwidth across active drones only', async () => {
@@ -371,6 +437,10 @@ describe('fit checks', () => {
         ...(typeId === 2 ? [{ target: { type: 'item', index: 0 }, rule: { type: 'skill' } }] : []),
         // No launcher hardpoint: the engine reports it against the ship.
         ...(typeId === 4 ? [{ target: { type: 'ship' }, rule: { type: 'slots' } }] : []),
+        // More powergrid than the bare hull has: also reported against the ship.
+        ...(typeId === 5
+          ? [{ target: { type: 'ship' }, rule: { type: 'resource', resource: 'powergrid' } }]
+          : []),
       ];
       return { ship: { attributes: new Map() }, items: [], violations };
     });
@@ -379,12 +449,13 @@ describe('fit checks', () => {
     expect(isDogmaEngineReady()).toBe(true);
     calculateMock.mockClear();
 
-    const result = checkCandidates(587, 'low', [1, 2, 3, 4], profile);
+    const result = checkCandidates(587, 'low', [1, 2, 3, 4, 5], profile);
 
-    expect(result.get(1)).toEqual({ fitsHull: false, canFly: true });
-    expect(result.get(2)).toEqual({ fitsHull: true, canFly: false });
-    expect(result.get(3)).toEqual({ fitsHull: true, canFly: true });
-    expect(result.get(4)).toEqual({ fitsHull: false, canFly: true });
+    expect(result.get(1)).toEqual({ fitsHull: false, canFly: true, fitsResources: true });
+    expect(result.get(2)).toEqual({ fitsHull: true, canFly: false, fitsResources: true });
+    expect(result.get(3)).toEqual({ fitsHull: true, canFly: true, fitsResources: true });
+    expect(result.get(4)).toEqual({ fitsHull: false, canFly: true, fitsResources: true });
+    expect(result.get(5)).toEqual({ fitsHull: true, canFly: true, fitsResources: false });
     expect(calculateMock.mock.calls[0][0].items[0].slot).toEqual({ type: 'low', index: 0 });
     expect(calculateMock.mock.calls[0][1]).toEqual({ validate: true });
 

@@ -10,7 +10,7 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal } from '@/components/ui';
+import { Button, Modal, Checkbox } from '@/components/ui';
 import { fieldBaseClassName } from '@/components/ui/controlStyles';
 import { readFromClipboard } from '@/lib/clipboard';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
@@ -157,11 +157,9 @@ export function FitImportDialog({ catalog, onApply, onClose }: FitImportDialogPr
             )}
 
             <label className="flex items-center gap-2 text-text-dim">
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={includeCharges}
                 onChange={(e) => toggleCharges(e.target.checked)}
-                className="size-4 shrink-0 cursor-pointer accent-accent"
               />
               {t('industry.fitImportIncludeCharges')}
             </label>

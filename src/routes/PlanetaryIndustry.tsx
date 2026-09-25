@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useExpiringWindowHours, useExpiringWindowMs } from '@/features/pi/expiringWindow';
 import {
+  Button,
   Caret,
   DataAgeBadge,
   EmptyState,
@@ -11,16 +12,15 @@ import {
   InfoTooltip,
   PageHeader,
   Panel,
-  ReauthBanner,
   Spinner,
   StatChip,
   Tabs,
   type StatChipTone,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { GrantBanner } from '@/app/GrantNote';
 import { db } from '@/db';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { PlanPanel } from '@/features/pi/PlanPanel';
 import { AdvisorPanel } from '@/features/pi/AdvisorPanel';
@@ -760,11 +760,22 @@ function ColonyRow({
 }
 
 /** A character sub-heading above its colony rows — only rendered once more than one character's colonies are on screen (the alt-colonies toggle is on). */
-function CharacterGroupHeader({ name }: { name: string }) {
+function CharacterGroupHeader({ name, onSwitch }: { name: string; onSwitch?: () => void }) {
   return (
-    <div className="border-b border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-      {name}
+    <div className="flex items-center justify-between gap-2 border-b border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+      <span className="min-w-0 truncate">{name}</span>
+      {onSwitch && <SwitchToButton name={name} onSwitch={onSwitch} />}
     </div>
+  );
+}
+
+/** Makes an alt the active Character in place; unlike Characters' switch, it stays on this route. */
+function SwitchToButton({ name, onSwitch }: { name: string; onSwitch: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <Button size="sm" className="min-h-11 shrink-0 md:min-h-0" onClick={onSwitch}>
+      {t('pi.altColonies.switchTo', { name })}
+    </Button>
   );
 }
 
@@ -863,6 +874,7 @@ export function PlanetaryIndustry() {
     undefined,
     { cacheKey: 'planetary-industry' }
   );
+  const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
   // Multi-open accordion: any number of colonies' drilldowns can be on
   // screen at once. Keyed by `${characterId}:${planetId}`, not the planet id
   // alone — two characters can each hold a colony on the same planet.
@@ -1073,13 +1085,12 @@ export function PlanetaryIndustry() {
             log in next" is exactly what the alt-colonies toggle is for.
           */}
           {planetsNeedsReauth && (
-            <ReauthBanner
+            <GrantBanner
+              characterId={activeCharacterId}
+              endpoints={['getCharacterPlanets']}
               title={t('pi.reauthTitle')}
               hint={t('pi.reauthHint')}
               actionLabel={t('pi.reauthAction')}
-              onLogin={() =>
-                void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterPlanets']) })
-              }
             />
           )}
           {!planetsNeedsReauth && error && (
@@ -1154,7 +1165,10 @@ export function PlanetaryIndustry() {
                 {showAltColonies &&
                   altGroups.map((group) => (
                     <div key={group.characterId}>
-                      <CharacterGroupHeader name={group.characterName} />
+                      <CharacterGroupHeader
+                        name={group.characterName}
+                        onSwitch={() => void setActiveCharacter(group.characterId)}
+                      />
                       {group.colonies.map(({ colony, status }) => {
                         const key = `${group.characterId}:${colony.planet.planet_id}`;
                         return (
@@ -1182,13 +1196,18 @@ export function PlanetaryIndustry() {
                     roster.noColonies.length > 0 ||
                     roster.skipped.length > 0) && (
                     <ul className="space-y-1 border-t border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-                      {roster.notLoaded.length > 0 && (
-                        <li>
-                          {t('pi.altColonies.notLoaded', {
-                            names: characterNames(roster.notLoaded),
-                          })}
+                      {roster.notLoaded.map((character) => (
+                        <li
+                          key={character.characterId}
+                          className="flex items-center justify-between gap-2"
+                        >
+                          <span>{t('pi.altColonies.notLoaded', { name: character.name })}</span>
+                          <SwitchToButton
+                            name={character.name}
+                            onSwitch={() => void setActiveCharacter(character.characterId)}
+                          />
                         </li>
-                      )}
+                      ))}
                       {roster.noColonies.length > 0 && (
                         <li>
                           {t('pi.altColonies.noColonies', {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, onTestFinished, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -21,6 +21,8 @@ import { isEventEnabledFor } from '@/features/notifications/eventSelection';
 import { rebuildProjection } from '@/features/notifications/projectionRebuild';
 import { PROJECTION_REBUILD_DELAY_MS } from '@/features/notifications/projectionRebuildScheduler';
 import { App } from '@/app/App';
+import { PLAY_STORE_PACKAGE, androidNotificationSettingsUrl } from '@/lib/playStoreApp';
+import { assignLocation } from '@/app/navigation';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeFormat, DEFAULT_TIME_FORMAT, TIME_FORMAT_SETTING_KEY } from '@/lib/timeFormat';
 import { useMarketHub } from '@/features/market/hub';
@@ -51,6 +53,8 @@ vi.mock('virtual:pwa-register/react', () => ({
   }),
 }));
 
+vi.mock('@/app/navigation', () => ({ assignLocation: vi.fn() }));
+
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
   loadTypes: vi.fn(async () => ({})),
@@ -75,10 +79,15 @@ function stubNotification(permission: NotificationPermission) {
   return requestPermission;
 }
 
-/** Switches Settings' own tab bar (General / Notifications / Data / Activity Log) — not app navigation. */
+/** Settings' own left rail, as opposed to the app's — both carry links named "Market", "Characters"... */
+function settingsNav(): HTMLElement {
+  return screen.getByRole('navigation', { name: /settings sections/i });
+}
+
+/** Opens one of Settings' sections from its rail. */
 async function openTab(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
   await screen.findByRole('heading', { level: 1, name: /settings/i });
-  await user.click(screen.getByRole('tab', { name }));
+  await user.click(within(settingsNav()).getByRole('link', { name }));
 }
 
 // Rendered through <App /> rather than in isolation: /settings has a nav
@@ -116,7 +125,9 @@ beforeEach(async () => {
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   useActivityLog.setState({ entries: [] });
-  window.history.pushState({}, '', '/settings');
+  // jsdom's matchMedia never matches, which reads as a phone — and a phone's
+  // bare `/settings` is the section list. Most tests want a section.
+  window.history.pushState({}, '', '/settings/display');
 });
 
 afterEach(() => {
@@ -148,6 +159,7 @@ describe('Settings', () => {
   });
 
   it('lists the keyboard shortcuts, so they are discoverable (issue #25)', async () => {
+    window.history.pushState({}, '', '/settings/shortcuts');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -160,6 +172,7 @@ describe('Settings', () => {
 
   it('turns the single-key shortcuts off, persists it, and says so in the list (issue #1494)', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/shortcuts');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -290,6 +303,7 @@ describe('Settings', () => {
       value: { total_sp: 1 },
       fetchedAt: 1,
     });
+    window.history.pushState({}, '', '/settings/dataAge');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -302,7 +316,7 @@ describe('Settings', () => {
   it('Data Age tab shows an empty state when nothing has succeeded yet', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await openTab(user, /^data$/i);
+    await openTab(user, /^data & storage$/i);
 
     expect(screen.getByRole('heading', { name: /data age/i })).toBeInTheDocument();
     expect(screen.getByText(/nothing fetched yet/i)).toBeInTheDocument();
@@ -311,7 +325,7 @@ describe('Settings', () => {
   it('Data Age tab lists only the latest successful fetch per endpoint/character, skipping failures (issue #32)', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await openTab(user, /^data$/i);
+    await openTab(user, /^data & storage$/i);
 
     act(() => {
       const log = useActivityLog.getState();
@@ -367,16 +381,24 @@ const CHAR_2_ID = 92;
  * rather than the whole document.
  */
 async function notificationsPanel(): Promise<HTMLElement> {
-  // Notifications is a tab of its own now, so every query below has to open it
+  // Notifications is a section of its own, so every query below has to open it
   // first — `fireEvent` rather than `userEvent` so this stays callable from the
   // tests that never set up a `user`.
   await screen.findByRole('heading', { level: 1, name: /settings/i });
-  const tab = screen.getByRole('tab', { name: /^notifications$/i });
-  if (tab.getAttribute('aria-selected') !== 'true') fireEvent.click(tab);
+  const link = within(settingsNav()).getByRole('link', { name: /^notifications$/i });
+  if (link.getAttribute('aria-current') !== 'page') fireEvent.click(link);
   const heading = await screen.findByRole('heading', { name: /^notifications$/i });
   const section = heading.closest('section');
   if (!section) throw new Error('Notifications panel has no section wrapper');
   return section as HTMLElement;
+}
+
+/** The All Characters section starts collapsed, like a Character's own; open it and return the panel. */
+async function openAllCharacters(): Promise<HTMLElement> {
+  const panel = await notificationsPanel();
+  const toggle = await within(panel).findByRole('button', { name: /^all characters$/i });
+  if (toggle.getAttribute('aria-expanded') !== 'true') fireEvent.click(toggle);
+  return panel;
 }
 
 describe('Settings — Notifications (issue #170)', () => {
@@ -419,18 +441,18 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(pilotTwoButton).toHaveAttribute('aria-expanded', 'false');
 
     expect(
-      screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Skill Level Complete, device notifications' })
     ).toBeChecked();
     // marketOrderFilled/walletBalanceChanged default feed-on/browser-off
     // (CONTEXT.md round 45) — worth a row, not worth an interruption.
     expect(
-      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, device notifications' })
     ).not.toBeChecked();
     expect(
       screen.getByRole('checkbox', { name: 'Wallet Balance Changed, Overview list' })
     ).toBeChecked();
     expect(
-      screen.getByRole('checkbox', { name: 'Sell Order Filled, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Sell Order Filled, device notifications' })
     ).not.toBeChecked();
     expect(
       screen.getByRole('checkbox', { name: 'Sell Order Filled, Overview list' })
@@ -445,7 +467,7 @@ describe('Settings — Notifications (issue #170)', () => {
     // No expand click: Pilot One is the active character, so its section is
     // already open.
     const mailCheckbox = await screen.findByRole('checkbox', {
-      name: 'New Mail, browser notifications',
+      name: 'New Mail, device notifications',
     });
     await user.click(mailCheckbox);
     expect(mailCheckbox).not.toBeChecked();
@@ -470,7 +492,7 @@ describe('Settings — Notifications (issue #170)', () => {
 
     expect(
       await screen.findByRole('checkbox', {
-        name: 'Planetary Extractor Expiring, browser notifications',
+        name: 'Planetary Extractor Expiring, device notifications',
       })
     ).toBeInTheDocument();
     expect(
@@ -485,31 +507,31 @@ describe('Settings — Notifications (issue #170)', () => {
     const user = userEvent.setup();
     render(<App />);
     await notificationsPanel();
-    await screen.findByRole('checkbox', { name: 'Skill Level Complete, browser notifications' });
+    await screen.findByRole('checkbox', { name: 'Skill Level Complete, device notifications' });
 
     // The browser column starts indeterminate: Wallet Balance Changed/Market
     // Order Filled default browser-off while the rest default browser-on
     // (CONTEXT.md round 45). A partial column fills in rather than clears.
     await user.click(
-      screen.getByRole('checkbox', { name: /toggle all browser notifications for pilot one/i })
+      screen.getByRole('checkbox', { name: /toggle all device notifications for pilot one/i })
     );
 
     expect(
-      screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Skill Level Complete, device notifications' })
     ).toBeChecked();
     expect(
-      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, device notifications' })
     ).toBeChecked();
 
     // Now fully enabled, so the next click clears the whole column.
     await user.click(
-      screen.getByRole('checkbox', { name: /toggle all browser notifications for pilot one/i })
+      screen.getByRole('checkbox', { name: /toggle all device notifications for pilot one/i })
     );
     expect(
-      screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Skill Level Complete, device notifications' })
     ).not.toBeChecked();
     expect(
-      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Wallet Balance Changed, device notifications' })
     ).not.toBeChecked();
   });
 
@@ -531,11 +553,15 @@ describe('Settings — Notifications (issue #170)', () => {
     await notificationsPanel();
 
     expect(await screen.findByText(/notifications are blocked/i)).toBeInTheDocument();
+    // Android settings exist only behind the Play Store app's shell.
+    expect(
+      screen.queryByRole('button', { name: /open notification settings/i })
+    ).not.toBeInTheDocument();
     // JS cannot re-request a denied grant, so nothing that would need one is offered.
     expect(
-      screen.queryByRole('button', { name: /turn on browser notifications/i })
+      screen.queryByRole('button', { name: /turn on device notifications/i })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: 'Browser notifications' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Device notifications' })).toBeDisabled();
 
     // ...but the Overview feed works with no grant at all, so its controls stay live.
     expect(screen.getByRole('checkbox', { name: 'Enable notifications' })).toBeEnabled();
@@ -545,8 +571,68 @@ describe('Settings — Notifications (issue #170)', () => {
     // aria-disabled, not native disabled — the row's Tooltip explaining why
     // needs the control to stay in the hover/touch/focus path.
     expect(
-      screen.getByRole('checkbox', { name: 'New Mail, browser notifications' })
+      screen.getByRole('checkbox', { name: 'New Mail, device notifications' })
     ).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  describe('in the Play Store app', () => {
+    // In the TWA, Chrome delegates the grant to the Android app's own
+    // notification toggle, so the fix lives in Android settings, not site settings.
+    beforeEach(() => {
+      vi.spyOn(document, 'referrer', 'get').mockReturnValue(`android-app://${PLAY_STORE_PACKAGE}`);
+      vi.mocked(assignLocation).mockClear();
+      onTestFinished(() => {
+        vi.restoreAllMocks();
+        window.sessionStorage.clear();
+      });
+    });
+
+    it('opens Android notification settings from the blocked notice, never naming site settings', async () => {
+      stubNotification('denied');
+      const user = userEvent.setup();
+      render(<App />);
+      await notificationsPanel();
+
+      expect(await screen.findByText(/notifications are off for this app/i)).toBeInTheDocument();
+      expect(screen.queryByText(/site settings/i)).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /open notification settings/i }));
+      expect(assignLocation).toHaveBeenCalledWith(
+        androidNotificationSettingsUrl(window.location.href)
+      );
+    });
+
+    it('drops the notice and the button once the grant reads granted', async () => {
+      stubNotification('granted');
+      render(<App />);
+      await notificationsPanel();
+
+      await waitFor(() =>
+        expect(screen.getByRole('checkbox', { name: 'Device notifications' })).toBeEnabled()
+      );
+      expect(
+        screen.queryByRole('button', { name: /open notification settings/i })
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/notifications are off for this app/i)).not.toBeInTheDocument();
+    });
+
+    it('clears the notice when the grant flips to granted while the page is open', async () => {
+      // Back from Android settings: the page never reloads, it only regains focus.
+      stubNotification('denied');
+      render(<App />);
+      await notificationsPanel();
+      expect(await screen.findByText(/notifications are off for this app/i)).toBeInTheDocument();
+
+      stubNotification('granted');
+      act(() => {
+        window.dispatchEvent(new Event('focus'));
+      });
+
+      await waitFor(() =>
+        expect(screen.queryByText(/notifications are off for this app/i)).not.toBeInTheDocument()
+      );
+      expect(screen.getByRole('checkbox', { name: 'Device notifications' })).toBeEnabled();
+    });
   });
 
   it('offers an Enable button that makes the browser request, and no request without it', async () => {
@@ -555,7 +641,7 @@ describe('Settings — Notifications (issue #170)', () => {
     render(<App />);
     await notificationsPanel();
 
-    const enable = await screen.findByRole('button', { name: /turn on browser notifications/i });
+    const enable = await screen.findByRole('button', { name: /turn on device notifications/i });
     expect(requestPermission).not.toHaveBeenCalled();
     // The toggle UI stays put at 'default' — only a denial replaces it.
     expect(screen.getByRole('checkbox', { name: /enable notifications/i })).toBeInTheDocument();
@@ -586,12 +672,12 @@ describe('Settings — Notifications (issue #170)', () => {
     // the document" a couple of hundred ms in rather than on a timeout.
     await waitFor(() =>
       expect(
-        screen.getByRole('checkbox', { name: 'New Mail, browser notifications' })
+        screen.getByRole('checkbox', { name: 'New Mail, device notifications' })
       ).toBeInTheDocument()
     );
     expect(screen.queryByText(/notifications are blocked/i)).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /turn on browser notifications/i })
+      screen.queryByRole('button', { name: /turn on device notifications/i })
     ).not.toBeInTheDocument();
     expect(requestPermission).not.toHaveBeenCalled();
   });
@@ -609,7 +695,7 @@ describe('Settings — Notifications (issue #170)', () => {
     // active character), so every row name now appears twice on the page.
     const pilotTwoSection = within(pilotTwoButton.closest('div')!.parentElement!);
     const mailCheckbox = pilotTwoSection.getByRole('checkbox', {
-      name: 'New Mail, browser notifications',
+      name: 'New Mail, device notifications',
     });
     expect(mailCheckbox).toHaveAttribute('aria-disabled', 'true');
     expect(pilotTwoSection.getByText('Needs the Mail permission')).toBeInTheDocument();
@@ -621,9 +707,92 @@ describe('Settings — Notifications (issue #170)', () => {
 
     expect(
       pilotTwoSection.getByRole('checkbox', {
-        name: 'Skill Level Complete, browser notifications',
+        name: 'Skill Level Complete, device notifications',
       })
     ).not.toBeDisabled();
+  });
+
+  it("orders a character's events: ordinary ones, Quickbar price alerts, then Corp notifications, then EVE notifications last", async () => {
+    render(<App />);
+    const pilotOneButton = await within(await notificationsPanel()).findByRole('button', {
+      name: /pilot one/i,
+    });
+    const text = pilotOneButton.closest('div')!.parentElement!.textContent ?? '';
+    const at = (label: string) => {
+      const index = text.indexOf(label);
+      expect(index, label).toBeGreaterThanOrEqual(0);
+      return index;
+    };
+
+    expect(at('Wallet Balance Changed')).toBeLessThan(at('Quickbar Price Alert'));
+    expect(at('Quickbar Price Alert')).toBeLessThan(at('Corp notifications'));
+    expect(at('Corp notifications')).toBeLessThan(at('Structure Fuel Low'));
+    expect(at('Member Joined')).toBeLessThan(at('EVE Notifications'));
+    expect(at('Corp notifications')).toBeLessThan(at('EVE Notifications'));
+  });
+
+  it('asks for the Corporation permission once, on the Corp notifications header, not on every corp row', async () => {
+    const corpScopes = new Set(
+      NOTIFICATION_EVENTS.filter((event) => event.corpCapability !== undefined).map(
+        (event) => event.scope
+      )
+    );
+    await db.tokens.put({
+      characterId: CHAR_2_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 1000 * 60 * 60,
+      scopes: ALL_NOTIFICATION_SCOPES.filter((scope) => !corpScopes.has(scope)),
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    const pilotTwoButton = await within(await notificationsPanel()).findByRole('button', {
+      name: /pilot two/i,
+    });
+    await user.click(pilotTwoButton);
+    const pilotTwoSection = within(pilotTwoButton.closest('div')!.parentElement!);
+
+    expect(pilotTwoSection.getAllByText(/^Needs the .* permission$/)).toHaveLength(1);
+    expect(
+      pilotTwoSection.getAllByRole('button', {
+        name: /^Grant the .* permission for Corp notifications$/,
+      })
+    ).toHaveLength(1);
+    // The rows themselves are still listed, and still disabled.
+    expect(
+      pilotTwoSection.getByRole('checkbox', { name: 'Member Joined, device notifications' })
+    ).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it("lets the All Characters section collapse and expand like a character's own", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const panel = within(await notificationsPanel());
+    const toggle = await panel.findByRole('button', { name: /^all characters$/i });
+
+    // Collapsed to start, with the select-all column still in its header.
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      panel.queryByRole('checkbox', {
+        name: 'Skill Level Complete for every character, device notifications',
+      })
+    ).not.toBeInTheDocument();
+    expect(
+      panel.getByRole('checkbox', { name: 'Toggle device notifications for every character' })
+    ).toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      panel.getByRole('checkbox', {
+        name: 'Skill Level Complete for every character, device notifications',
+      })
+    ).toBeInTheDocument();
+    // One header in the All Characters section, one in Pilot One's (the active, open one).
+    expect(panel.getAllByText('Corp notifications')).toHaveLength(2);
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('search filters rows by event-type name across every character section', async () => {
@@ -640,11 +809,11 @@ describe('Settings — Notifications (issue #170)', () => {
       .getByRole('button', { name: /pilot one/i })
       .closest('div')!.parentElement!;
     expect(
-      within(pilotOneSection).getByRole('checkbox', { name: 'New Mail, browser notifications' })
+      within(pilotOneSection).getByRole('checkbox', { name: 'New Mail, device notifications' })
     ).toBeInTheDocument();
     expect(
       within(pilotOneSection).queryByRole('checkbox', {
-        name: 'Skill Level Complete, browser notifications',
+        name: 'Skill Level Complete, device notifications',
       })
     ).not.toBeInTheDocument();
   });
@@ -663,7 +832,7 @@ describe('Settings — Notifications (issue #170)', () => {
       within(await notificationsPanel()).getByRole('button', { name: /pilot two/i })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+      screen.getByRole('checkbox', { name: 'Skill Level Complete, device notifications' })
     ).toBeInTheDocument();
   });
 
@@ -676,11 +845,11 @@ describe('Settings — Notifications (issue #170)', () => {
       .getByRole('button', { name: /pilot one/i })
       .closest('div')!.parentElement!;
     expect(
-      within(pilotOneSection).getByRole('checkbox', { name: 'New Mail, browser notifications' })
+      within(pilotOneSection).getByRole('checkbox', { name: 'New Mail, device notifications' })
     ).toBeInTheDocument();
     expect(
       within(pilotOneSection).queryByRole('checkbox', {
-        name: 'Skill Level Complete, browser notifications',
+        name: 'Skill Level Complete, device notifications',
       })
     ).not.toBeInTheDocument();
   });
@@ -699,11 +868,11 @@ describe('Settings — Notifications (issue #170)', () => {
     // The feed links to /settings/notifications directly (ADR 0015: tab is a path segment).
     window.history.pushState({}, '', '/settings/notifications');
     render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    expect(await screen.findByRole('tab', { name: /^notifications$/i })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
+    expect(
+      await within(settingsNav()).findByRole('link', { name: /^notifications$/i })
+    ).toHaveAttribute('aria-current', 'page');
     expect(await screen.findByRole('heading', { name: /^notifications$/i })).toBeInTheDocument();
   });
 
@@ -731,10 +900,11 @@ describe('Settings — Notifications (issue #170)', () => {
     // The link to hand someone who asks what the app stores, from outside the app.
     window.history.pushState({}, '', '/settings/faq');
     render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    expect(await screen.findByRole('tab', { name: /^faq$/i })).toHaveAttribute(
-      'aria-selected',
-      'true'
+    expect(await within(settingsNav()).findByRole('link', { name: /^faq$/i })).toHaveAttribute(
+      'aria-current',
+      'page'
     );
     expect(await screen.findByRole('heading', { name: /what we store/i })).toBeInTheDocument();
   });
@@ -809,8 +979,10 @@ describe('Settings — Notifications (issue #170)', () => {
     // "App" and "List" named neither the pop-up nor the page it lands on.
     // Scoped to the panel: the app's own nav has an "Overview" link, which
     // would satisfy an unscoped query whether or not the caption changed.
-    expect((await panel.findAllByText(/^Browser$/)).length).toBeGreaterThan(0);
+    // "Browser" was wrong in the Play Store app, which has no browser in sight.
+    expect((await panel.findAllByText(/^Device$/)).length).toBeGreaterThan(0);
     expect(panel.getAllByText(/^Overview$/).length).toBeGreaterThan(0);
+    expect(panel.queryByText(/^Browser$/)).not.toBeInTheDocument();
     expect(panel.queryByText(/^App$/)).not.toBeInTheDocument();
     expect(panel.queryByText(/^List$/)).not.toBeInTheDocument();
   });
@@ -818,22 +990,22 @@ describe('Settings — Notifications (issue #170)', () => {
   describe('All Characters master row (issue #738)', () => {
     it('shows a master row above the character list, with the same per-event checkboxes', async () => {
       render(<App />);
-      const panel = within(await notificationsPanel());
+      const panel = within(await openAllCharacters());
 
       expect(await panel.findByText('All Characters')).toBeInTheDocument();
       expect(
         panel.getByRole('checkbox', {
-          name: 'Skill Level Complete for every character, browser notifications',
+          name: 'Skill Level Complete for every character, device notifications',
         })
       ).toBeInTheDocument();
     });
 
     it('is checked when known Characters agree, indeterminate once they disagree', async () => {
       render(<App />);
-      await notificationsPanel();
+      await openAllCharacters();
 
       const masterEventCheckbox = (await screen.findByRole('checkbox', {
-        name: 'Skill Level Complete for every character, browser notifications',
+        name: 'Skill Level Complete for every character, device notifications',
       })) as HTMLInputElement;
       // Both Characters default to skillLevelComplete-browser on: agreement.
       expect(masterEventCheckbox.indeterminate).toBe(false);
@@ -858,13 +1030,13 @@ describe('Settings — Notifications (issue #170)', () => {
     it("toggling one event's master checkbox writes that value to every known Character, even one whose own row is scope-disabled for it", async () => {
       const user = userEvent.setup();
       render(<App />);
-      await notificationsPanel();
+      await openAllCharacters();
 
       // Pilot Two has every notification scope except New Mail's (outer
       // beforeEach) — its own New Mail row renders disabled, but the master
       // row is not scope-gated at all (issue #738: "every known Character").
       const newMailMaster = await screen.findByRole('checkbox', {
-        name: 'New Mail for every character, browser notifications',
+        name: 'New Mail for every character, device notifications',
       });
       await user.click(newMailMaster);
 
@@ -877,41 +1049,41 @@ describe('Settings — Notifications (issue #170)', () => {
     it("the top select-all row broadcasts every event to every Character, same cascade as a Character's own select-all", async () => {
       const user = userEvent.setup();
       render(<App />);
-      await notificationsPanel();
+      await openAllCharacters();
 
       // Wallet Balance Changed/Market Order Filled default browser-off while
       // the rest default browser-on (CONTEXT.md round 45) — the grid starts
       // partial, so the first click fills every event, every Character, on.
       const selectAllCharacters = await screen.findByRole('checkbox', {
-        name: 'Toggle browser notifications for every character',
+        name: 'Toggle device notifications for every character',
       });
       await user.click(selectAllCharacters);
       expect(
-        screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+        screen.getByRole('checkbox', { name: 'Skill Level Complete, device notifications' })
       ).toBeChecked();
       expect(
-        screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+        screen.getByRole('checkbox', { name: 'Wallet Balance Changed, device notifications' })
       ).toBeChecked();
 
       // Now fully on across the board — the next click clears it.
       await user.click(selectAllCharacters);
       expect(
-        screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+        screen.getByRole('checkbox', { name: 'Skill Level Complete, device notifications' })
       ).not.toBeChecked();
     });
 
     it("disables its browser column when the browser permission is denied, matching a Character's own row", async () => {
       stubNotification('denied');
       render(<App />);
-      await notificationsPanel();
+      await openAllCharacters();
 
       const masterSelectAllBrowser = await screen.findByRole('checkbox', {
-        name: 'Toggle browser notifications for every character',
+        name: 'Toggle device notifications for every character',
       });
       expect(masterSelectAllBrowser).toBeDisabled();
       expect(
         screen.getByRole('checkbox', {
-          name: 'Skill Level Complete for every character, browser notifications',
+          name: 'Skill Level Complete for every character, device notifications',
         })
       ).toBeDisabled();
       // The Overview column is unaffected — only browser is permission-gated.
@@ -924,10 +1096,10 @@ describe('Settings — Notifications (issue #170)', () => {
       const user = userEvent.setup();
       const confirmSpy = vi.spyOn(window, 'confirm');
       render(<App />);
-      await notificationsPanel();
+      await openAllCharacters();
 
       const selectAllCharacters = await screen.findByRole('checkbox', {
-        name: 'Toggle browser notifications for every character',
+        name: 'Toggle device notifications for every character',
       });
       await user.click(selectAllCharacters);
       expect(confirmSpy).not.toHaveBeenCalled();
@@ -942,7 +1114,7 @@ describe('Settings — Notifications (issue #170)', () => {
     async function renderPanelWithFakeTimers() {
       render(<App />);
       await notificationsPanel();
-      await screen.findByRole('checkbox', { name: 'Skill Level Complete, browser notifications' });
+      await screen.findByRole('checkbox', { name: 'Skill Level Complete, device notifications' });
       // The scheduler is module state: let a rebuild an earlier test's
       // browser click queued (on real timers) land before counting.
       await act(
@@ -970,7 +1142,7 @@ describe('Settings — Notifications (issue #170)', () => {
 
       // Wallet Balance Changed defaults browser-off (CONTEXT.md round 45).
       await user.click(
-        screen.getByRole('checkbox', { name: 'Wallet Balance Changed, browser notifications' })
+        screen.getByRole('checkbox', { name: 'Wallet Balance Changed, device notifications' })
       );
       await afterQuietPeriod();
       await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
@@ -980,7 +1152,7 @@ describe('Settings — Notifications (issue #170)', () => {
       const user = await renderPanelWithFakeTimers();
 
       await user.click(
-        screen.getByRole('checkbox', { name: /toggle all browser notifications for pilot one/i })
+        screen.getByRole('checkbox', { name: /toggle all device notifications for pilot one/i })
       );
       await afterQuietPeriod();
       await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
@@ -988,10 +1160,11 @@ describe('Settings — Notifications (issue #170)', () => {
 
     it('an All Characters browser broadcast rebuilds once', async () => {
       const user = await renderPanelWithFakeTimers();
+      await openAllCharacters();
 
       await user.click(
         screen.getByRole('checkbox', {
-          name: 'New Mail for every character, browser notifications',
+          name: 'New Mail for every character, device notifications',
         })
       );
       await afterQuietPeriod();
@@ -1005,7 +1178,7 @@ describe('Settings — Notifications (issue #170)', () => {
       await afterQuietPeriod();
       expect(rebuildProjection).not.toHaveBeenCalled();
 
-      await user.click(screen.getByRole('checkbox', { name: 'Browser notifications' }));
+      await user.click(screen.getByRole('checkbox', { name: 'Device notifications' }));
       await afterQuietPeriod();
       await waitFor(() => expect(rebuildProjection).toHaveBeenCalledTimes(1));
 
@@ -1025,12 +1198,12 @@ describe('Settings — Notifications (issue #170)', () => {
         seenAtRebuild = isEventEnabledFor(stored.perCharacter[CHAR_ID] ?? {}, 'newMail', 'browser');
       });
 
-      const newMail = screen.getByRole('checkbox', { name: 'New Mail, browser notifications' });
+      const newMail = screen.getByRole('checkbox', { name: 'New Mail, device notifications' });
       await user.click(newMail);
       await user.click(newMail);
       await user.click(newMail);
       await user.click(
-        screen.getByRole('checkbox', { name: 'Skill Level Complete, browser notifications' })
+        screen.getByRole('checkbox', { name: 'Skill Level Complete, device notifications' })
       );
       await afterQuietPeriod();
 
@@ -1085,7 +1258,7 @@ describe('Settings — Notifications virtualization (issue #740)', () => {
     await panel.findByText('Pilot 000');
 
     const mailCheckbox = await panel.findByRole('checkbox', {
-      name: 'New Mail, browser notifications',
+      name: 'New Mail, device notifications',
     });
     await user.click(mailCheckbox);
     expect(mailCheckbox).not.toBeChecked();
@@ -1104,7 +1277,7 @@ describe('Settings — Notifications virtualization (issue #740)', () => {
     // none of their event checkboxes exist anywhere in the panel.
     expect(panel.queryByText('Pilot 059')).toBeNull(); // outside the mounted window entirely
     expect(
-      panel.queryByRole('checkbox', { name: /Skill Level Complete, browser notifications/ })
+      panel.queryByRole('checkbox', { name: /Skill Level Complete, device notifications/ })
     ).not.toBeNull(); // Pilot 000's own, present since it's expanded
   });
 
@@ -1137,6 +1310,7 @@ describe('Settings defaults', () => {
   });
 
   it('surfaces the trade hub that Market Browser already writes', async () => {
+    window.history.pushState({}, '', '/settings/market');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1150,6 +1324,7 @@ describe('Settings defaults', () => {
 
   it('clamps the assumed ME into the range the engine accepts', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1166,6 +1341,7 @@ describe('Settings defaults', () => {
 
   it('clamps the assumed TE into the range the engine accepts', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1182,6 +1358,7 @@ describe('Settings defaults', () => {
 
   it('shows the stored assumed TE on a cold load, not the default', async () => {
     await db.settings.put({ key: ASSUMED_TE_SETTING_KEY, value: 4 });
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1189,6 +1366,7 @@ describe('Settings defaults', () => {
   });
 
   it('hides rig and tax for an NPC station, which fits neither', async () => {
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1203,6 +1381,7 @@ describe('Settings defaults', () => {
     // /settings is deep-linkable and mounts none of the pages that hydrate
     // these stores, so it has to hydrate them itself.
     await db.settings.put({ key: ASSUMED_ME_SETTING_KEY, value: 7 });
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1217,6 +1396,7 @@ describe('Settings defaults', () => {
       key: FACILITY_DEFAULTS_SETTING_KEY,
       value: { facility: 'azbel', rigLevel: 't2', facilityTaxPct: 5 },
     });
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1232,6 +1412,7 @@ describe('Settings defaults', () => {
       value: { facility: 'azbel', rigFit: ['meT1', 'teT1', 'none'], facilityTaxPct: 2 },
       hydrated: true,
     });
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1239,25 +1420,26 @@ describe('Settings defaults', () => {
     expect(screen.getByLabelText(/facility tax/i)).toHaveValue(2);
   });
 
-  it('shows the shortcut list for #shortcuts, even from another tab', async () => {
+  it('shows the shortcut list from the ? shortcut, even from another section', async () => {
     const user = userEvent.setup();
     window.history.pushState({}, '', '/settings/faq');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
-    expect(await screen.findByRole('tab', { name: /faq/i })).toHaveAttribute(
-      'aria-selected',
-      'true'
+    expect(await within(settingsNav()).findByRole('link', { name: /faq/i })).toHaveAttribute(
+      'aria-current',
+      'page'
     );
 
-    // The real `?` shortcut, pressed from a tab that is not General. It
-    // navigates to /settings/general#shortcuts, so both the tab and the
-    // anchor land correctly regardless of which tab was showing before.
+    // The real `?` shortcut, pressed from a section that is not Shortcuts. It
+    // navigates to /settings/shortcuts, so it lands correctly regardless of
+    // which section was showing before.
     await user.keyboard('{Shift>}?{/Shift}');
 
     expect(await screen.findByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
   });
 
   it('offers a reaction location default, which nothing could set before', async () => {
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1273,6 +1455,7 @@ describe('Settings defaults', () => {
 
   it('offers no refinery as the manufacturing default, since reactions have their own', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1292,6 +1475,7 @@ describe('Settings defaults', () => {
 
   it('only offers refineries as a reaction location', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1307,6 +1491,7 @@ describe('Settings defaults', () => {
 
   it('persists a reaction location tax', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1324,6 +1509,7 @@ describe('Settings defaults', () => {
       key: REACTION_FACILITY_DEFAULTS_SETTING_KEY,
       value: { facility: 'tatara', rigFit: ['meT2', 'none', 'none'], facilityTaxPct: 4 },
     });
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1334,6 +1520,7 @@ describe('Settings defaults', () => {
   });
 
   it('offers the PI expiring-soon window, defaulting to 24 hours', async () => {
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1342,15 +1529,21 @@ describe('Settings defaults', () => {
   });
 
   it('hides the corp inactivity policy from a character with no corp access', async () => {
+    window.history.pushState({}, '', '/settings/corporation');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
     // Hide rather than lock, the same rule the corp nav follows — a setting
-    // for a page you cannot open is noise.
+    // for a page you cannot open is noise. The URL still resolves, to a note.
+    expect(await screen.findByText(/appear once the active character/i)).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: /members go dark/i })).not.toBeInTheDocument();
+    expect(
+      within(settingsNav()).queryByRole('link', { name: /^corporation$/i })
+    ).not.toBeInTheDocument();
   });
 
   it('offers the default character filter, defaulting to "This character" (issue #607)', async () => {
+    window.history.pushState({}, '', '/settings/characters');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1359,6 +1552,7 @@ describe('Settings defaults', () => {
 
   it('persists a switch to "All characters"', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/characters');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1380,7 +1574,7 @@ describe('Reset saved view preferences', () => {
     // snapshot's `pathname` never advances to the tab it redirected to.
     // Starting already on the tab path sidesteps that, and must happen
     // before the snapshot is taken.
-    window.history.pushState({}, '', '/settings/general');
+    window.history.pushState({}, '', '/settings/dataAge');
 
     const reloadSpy = vi.fn();
     vi.stubGlobal('location', { ...window.location, reload: reloadSpy });
@@ -1412,6 +1606,7 @@ describe('Reset saved view preferences', () => {
 describe('Settings — phone tab bar', () => {
   it("writes the pilot's four, device-local and in the rail's order", async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/display');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1434,6 +1629,7 @@ describe('Settings — phone tab bar', () => {
 
   it('holds the old bar until a replacement is picked, so it is never short', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/display');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1447,6 +1643,7 @@ describe('Settings — phone tab bar', () => {
 
   it('goes inert at four rather than guessing which tab a fifth pick replaces', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/display');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1460,6 +1657,9 @@ describe('Settings — phone tab bar', () => {
       'aria-pressed',
       'false'
     );
+    // The click above left the pointer on the chip; leave and re-enter so the
+    // tooltip sees a fresh pointer move rather than depending on timing.
+    await user.unhover(wallet);
     await user.hover(wallet);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(/the bar holds four/i);
 
@@ -1471,6 +1671,7 @@ describe('Settings — phone tab bar', () => {
   });
 
   it('puts the default four back', async () => {
+    window.history.pushState({}, '', '/settings/display');
     await db.settings.put({
       key: MOBILE_TABS_KEY,
       value: ['/mail', '/wallet', '/overview', '/assets'],
@@ -1492,5 +1693,238 @@ describe('Settings — phone tab bar', () => {
     await waitFor(async () => {
       expect((await db.settings.get(MOBILE_TABS_KEY))?.value).toEqual([...DEFAULT_MOBILE_TABS]);
     });
+  });
+});
+
+describe('Settings — sections rail', () => {
+  it('files every section under a group heading, with no tab bar', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    const nav = settingsNav();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((link) => link.textContent)
+    ).toEqual([
+      'Display',
+      'Shortcuts',
+      'Permissions',
+      'Industry',
+      'Market',
+      'Characters',
+      // Corporation is absent: this character has no corp access.
+      'Notifications',
+      'Data & storage',
+      'Activity Log',
+      'FAQ',
+    ]);
+    for (const group of ['App', 'Defaults', 'Alerts', 'Data & device']) {
+      expect(within(nav).getByText(group)).toBeInTheDocument();
+    }
+  });
+
+  it('opens a section from its link and marks it current', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await openTab(user, /^market$/i);
+
+    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toBeInTheDocument();
+    expect(within(settingsNav()).getByRole('link', { name: /^market$/i })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    expect(window.location.pathname).toBe('/settings/market');
+  });
+
+  it('carries an old /settings/general#shortcuts link on to the Shortcuts section', async () => {
+    window.history.pushState({}, '', '/settings/general#shortcuts');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/settings/shortcuts');
+  });
+
+  it('carries an old #corp-access link on to the Permissions section', async () => {
+    window.history.pushState({}, '', '/settings/general#corp-access');
+    render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/settings/permissions'));
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    await waitFor(() =>
+      expect(within(settingsNav()).getByRole('link', { name: /^permissions$/i })).toHaveAttribute(
+        'aria-current',
+        'page'
+      )
+    );
+  });
+});
+
+/** `(min-width: 48rem)` matches (or not), as `md` up does. */
+function stubViewport(desktop: boolean) {
+  vi.stubGlobal(
+    'matchMedia',
+    (media: string) =>
+      ({
+        matches: desktop && media === '(min-width: 48rem)',
+        media,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }) as unknown as MediaQueryList
+  );
+}
+
+describe('Settings — phone list', () => {
+  it('lists the sections at /settings, with a one-line summary where there is one', async () => {
+    window.history.pushState({}, '', '/settings');
+    stubViewport(false);
+    render(<App />);
+
+    const nav = await screen.findByRole('navigation', { name: /settings sections/i });
+    expect(window.location.pathname).toBe('/settings');
+    for (const group of ['App', 'Defaults', 'Alerts', 'Data & device']) {
+      expect(within(nav).getByText(group)).toBeInTheDocument();
+    }
+    // Corporation is absent: this character has no corp access.
+    expect(within(nav).queryByRole('link', { name: /corporation/i })).not.toBeInTheDocument();
+    expect(within(nav).getAllByRole('link')).toHaveLength(10);
+    expect(within(nav).getByRole('link', { name: /^display/i })).toHaveTextContent(
+      /default text, my local time/i
+    );
+    expect(within(nav).getByRole('link', { name: /^shortcuts/i })).toHaveTextContent(/on/i);
+    expect(within(nav).getByRole('link', { name: /^industry/i })).toHaveTextContent(/, ME 0, TE 0/);
+    expect(within(nav).getByRole('link', { name: /^market/i })).toHaveTextContent(/jita/i);
+    expect(within(nav).getByRole('link', { name: /^characters/i })).toHaveTextContent(
+      /current character/i
+    );
+    expect(within(nav).getByRole('link', { name: /^faq$/i })).toBeInTheDocument();
+    // Log out lives in Data & storage, not as a row of its own.
+    expect(screen.queryByText(/log out/i)).not.toBeInTheDocument();
+  });
+
+  it('opens a section from its row, and the back link returns to the list', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings');
+    stubViewport(false);
+    render(<App />);
+
+    const nav = await screen.findByRole('navigation', { name: /settings sections/i });
+    await user.click(within(nav).getByRole('link', { name: /^market/i }));
+    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/settings/market');
+
+    const back = screen
+      .getAllByRole('link', { name: /settings/i })
+      .find(
+        (link) => link.getAttribute('href') === '/settings' && /‹/.test(link.textContent ?? '')
+      );
+    await user.click(back!);
+    expect(
+      await screen.findByRole('navigation', { name: /settings sections/i })
+    ).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/settings');
+  });
+
+  it('still lands an old #shortcuts link on Shortcuts rather than the list', async () => {
+    window.history.pushState({}, '', '/settings#shortcuts');
+    stubViewport(false);
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/settings/shortcuts');
+  });
+
+  it('keeps redirecting /settings to Display from md up', async () => {
+    window.history.pushState({}, '', '/settings');
+    stubViewport(true);
+    render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/settings/display'));
+    expect(await screen.findByRole('group', { name: /text size/i })).toBeInTheDocument();
+  });
+});
+
+describe('Settings — This device', () => {
+  it('logs out of every character, keeps the settings, and lands on the login page', async () => {
+    const user = userEvent.setup();
+    await db.characters.put({ characterId: 92, name: 'Pilot Two', ownerHash: 'oh2', addedAt: 2 });
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 1000,
+      scopes: [],
+    });
+    await db.settings.put({ key: ASSUMED_ME_SETTING_KEY, value: 7 });
+    window.history.pushState({}, '', '/settings/dataAge');
+    render(<App />);
+
+    expect(
+      await screen.findByText(/2 characters are logged in on this browser/i)
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^log out$/i }));
+    const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
+    expect(within(dialog).getByText(/removes 2 characters' logins/i)).toBeInTheDocument();
+    // Nothing happens until the dialog is confirmed.
+    expect(await db.characters.count()).toBe(2);
+
+    await user.click(within(dialog).getByRole('button', { name: /^log out$/i }));
+
+    await waitFor(() => expect(window.location.pathname).toBe('/login'));
+    expect(await db.characters.count()).toBe(0);
+    expect(await db.tokens.count()).toBe(0);
+    expect((await db.settings.get(ASSUMED_ME_SETTING_KEY))?.value).toBe(7);
+  });
+
+  it('leaves everything in place when the dialog is cancelled', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/dataAge');
+    render(<App />);
+
+    // Disabled until the live character count resolves.
+    const logOut = await screen.findByRole('button', { name: /^log out$/i });
+    await waitFor(() => expect(logOut).toBeEnabled());
+    await user.click(logOut);
+    const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
+    await user.click(within(dialog).getByRole('button', { name: /cancel/i }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(await db.characters.count()).toBe(1);
+  });
+});
+
+describe('Settings — review follow-ups', () => {
+  it('keeps the dialog open and says so when logging out fails', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(db.characters, 'delete').mockRejectedValueOnce(new Error('disk full'));
+    window.history.pushState({}, '', '/settings/dataAge');
+    render(<App />);
+
+    // Disabled until the live character count resolves.
+    const logOut = await screen.findByRole('button', { name: /^log out$/i });
+    await waitFor(() => expect(logOut).toBeEnabled());
+    await user.click(logOut);
+    const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
+    await user.click(within(dialog).getByRole('button', { name: /^log out$/i }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/could not log out/i);
+    expect(await db.characters.count()).toBe(1);
+  });
+
+  it('ignores a hash that only names an inherited object member', async () => {
+    window.history.pushState({}, '', '/settings/market#constructor');
+    render(<App />);
+
+    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/settings/market');
+  });
+
+  it('puts the CCP data credit at the foot of Data & storage', async () => {
+    window.history.pushState({}, '', '/settings/dataAge');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: /data credit/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /clear cached esi data/i })).toBeInTheDocument();
   });
 });

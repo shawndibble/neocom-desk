@@ -509,9 +509,9 @@ function SeverityWord({ severity }: { severity: DeadlineSeverity | null }) {
   // footer reading "Checking…" is a claim the card cannot yet make.
   if (severity === null) return null;
   return (
-    <span className="flex items-center gap-1 text-[0.6875rem] tracking-widest uppercase">
+    <span className="flex min-w-0 items-center gap-1 text-[0.6875rem] tracking-widest whitespace-nowrap uppercase">
       <SeverityIcon severity={severity} />
-      <span className="text-text-dim">{t(SEVERITY_LABEL[severity])}</span>
+      <span className="truncate text-text-dim">{t(SEVERITY_LABEL[severity])}</span>
     </span>
   );
 }

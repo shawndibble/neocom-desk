@@ -463,6 +463,19 @@ describe('Wallet', () => {
     expect(screen.queryByText(/reconnect to fetch/i)).not.toBeInTheDocument();
   });
 
+  it('offers Reset filters on the filtered-empty journal, and restores every entry', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    await screen.findByText('Bounty');
+
+    await user.type(screen.getByPlaceholderText('Search description…'), 'nothing matches this');
+    await screen.findByText('No journal entries match this filter.');
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+    expect(await screen.findByText('Bounty')).toBeInTheDocument();
+  });
+
   it('shows the empty state when there is no data at all', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/wallet`, () => HttpResponse.error())

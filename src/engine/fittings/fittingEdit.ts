@@ -12,6 +12,7 @@
 import {
   FITTING_SLOT_KINDS,
   type Fitting,
+  type FittingCargoItem,
   type FittingDrone,
   type FittingItemState,
   type FittingModule,
@@ -207,6 +208,69 @@ export function setDroneCounts(
   return { ...fitting, drones };
 }
 
+/** What a pilot can have in space at once: the hull's bandwidth, and the Drones skill's count. */
+export interface DroneLaunchLimits {
+  /** Mbit/s the hull has. */
+  bandwidthTotal: number;
+  /** Drones the pilot can control at once (0 without the Drones skill). */
+  maxActive: number;
+  /** Mbit/s one drone of a type draws. */
+  bandwidthOf: (typeId: number) => number;
+}
+
+/**
+ * Launches drones from the bay, in the order the Fitting lists them, as far
+ * as bandwidth and the pilot's drone count allow — counting any already in
+ * space against both. The same Fitting back when none can launch.
+ */
+export function launchDrones(fitting: Fitting, limits: DroneLaunchLimits): Fitting {
+  const groups = droneGroups(fitting);
+  // Only drones already out draw bandwidth — and skipping the rest keeps an
+  // unknown (infinite) one in the bay from turning the sum into NaN.
+  let bandwidthLeft =
+    limits.bandwidthTotal -
+    groups.reduce(
+      (sum, group) =>
+        group.inSpace > 0 ? sum + group.inSpace * limits.bandwidthOf(group.typeId) : sum,
+      0
+    );
+  let countLeft = limits.maxActive - groups.reduce((sum, group) => sum + group.inSpace, 0);
+  let next = fitting;
+  for (const group of groups) {
+    if (countLeft <= 0) break;
+    const each = limits.bandwidthOf(group.typeId);
+    const byBandwidth = !Number.isFinite(each)
+      ? 0
+      : each > 0
+        ? Math.floor(bandwidthLeft / each)
+        : Number.POSITIVE_INFINITY;
+    const launched = Math.max(0, Math.min(group.inBay, countLeft, byBandwidth));
+    if (launched === 0) continue;
+    next = setDroneCounts(next, group.typeId, {
+      inSpace: group.inSpace + launched,
+      inBay: group.inBay - launched,
+    });
+    bandwidthLeft -= launched * each;
+    countLeft -= launched;
+  }
+  return next;
+}
+
+const MODULE_STATES: readonly FittingItemState[] = ['offline', 'online', 'active', 'overload'];
+
+/**
+ * The states a module's controls offer: each up to the highest it can reach
+ * (`maxState`, from its own calculation), plus the one it is shown in.
+ */
+export function reachableModuleStates(
+  maxState: FittingItemState,
+  shown: FittingItemState
+): FittingItemState[] {
+  const states = MODULE_STATES.slice(0, MODULE_STATES.indexOf(maxState) + 1);
+  if (!states.includes(shown)) states.push(shown);
+  return states;
+}
+
 /** Puts `quantity` more of `typeId` in the bay. */
 export function addDrones(fitting: Fitting, typeId: number, quantity: number): Fitting {
   const current = droneGroups(fitting).find((group) => group.typeId === typeId);
@@ -214,4 +278,118 @@ export function addDrones(fitting: Fitting, typeId: number, quantity: number): F
     inSpace: current?.inSpace ?? 0,
     inBay: (current?.inBay ?? 0) + quantity,
   });
+}
+
+/**
+ * Sets how many of `typeId` the cargo holds, as one stack where the type
+ * first appeared; zero or less removes it.
+ */
+export function setCargoQuantity(fitting: Fitting, typeId: number, quantity: number): Fitting {
+  const whole = wholeCount(quantity);
+  const cargo: FittingCargoItem[] = [];
+  let placed = false;
+  for (const item of fitting.cargo) {
+    if (item.typeId !== typeId) {
+      cargo.push(item);
+    } else if (!placed) {
+      if (whole > 0) cargo.push({ typeId, quantity: whole });
+      placed = true;
+    }
+  }
+  return { ...fitting, cargo };
+}
+
+/**
+ * One entry per cargo type, first-seen order, however many stacks it arrived
+ * as (a paste can list a type twice) — what the editor shows and edits.
+ */
+export function cargoGroups(fitting: Fitting): FittingCargoItem[] {
+  const groups = new Map<number, number>();
+  for (const item of fitting.cargo) {
+    groups.set(item.typeId, (groups.get(item.typeId) ?? 0) + item.quantity);
+  }
+  return [...groups].map(([typeId, quantity]) => ({ typeId, quantity }));
+}
+
+/**
+ * m3 of the drone bay the Fitting's drones take. A drone in space came out
+ * of the bay and goes back into it, so it counts the same as one sitting there.
+ */
+export function droneBayUsed(fitting: Fitting, volumeOf: (typeId: number) => number): number {
+  return fitting.drones.reduce((sum, drone) => sum + volumeOf(drone.typeId) * drone.quantity, 0);
+}
+
+/** A drone bay: its size, and how big each drone is. */
+export interface DroneBay {
+  /** m3. */
+  capacity: number;
+  /** m3 of one drone of a type; 0 when unknown. */
+  volumeOf: (typeId: number) => number;
+}
+
+/**
+ * How many more of `typeId` fit the bay beside what it already holds —
+ * never below zero, even on a fit already over the cap. `Infinity` when the
+ * type's volume or the bay (`null`, before the ship data) is unknown, so a
+ * missing figure never blocks an edit.
+ */
+export function droneRoom(fitting: Fitting, typeId: number, bay: DroneBay | null): number {
+  if (bay === null) return Infinity;
+  const volume = bay.volumeOf(typeId);
+  if (volume <= 0) return Infinity;
+  const free = bay.capacity - droneBayUsed(fitting, bay.volumeOf);
+  // A hair of tolerance, so 50 m3 of 5 m3 drones counts as ten, not 9.999….
+  return Math.max(0, Math.floor(free / volume + 1e-9));
+}
+
+/**
+ * `addDrones`, stopping at what the bay holds. Returns the same Fitting when
+ * none fit, so the caller's edit history gets no empty step.
+ */
+export function addDronesWithinBay(
+  fitting: Fitting,
+  typeId: number,
+  quantity: number,
+  bay: DroneBay | null
+): Fitting {
+  const adding = Math.min(quantity, droneRoom(fitting, typeId, bay));
+  return adding >= 1 ? addDrones(fitting, typeId, adding) : fitting;
+}
+
+/** The highest one of a type's two counts may go: where it is now, plus the room left. */
+export function droneCountMax(
+  fitting: Fitting,
+  typeId: number,
+  which: 'inSpace' | 'inBay',
+  bay: DroneBay | null
+): number {
+  const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
+  return (group?.[which] ?? 0) + droneRoom(fitting, typeId, bay);
+}
+
+/**
+ * Sets one of a type's two counts (the List's boxes), keeping the other. A
+ * count may always come down; going up, it stops at what the bay holds.
+ */
+export function setDroneCountWithinBay(
+  fitting: Fitting,
+  typeId: number,
+  counts: Partial<{ inSpace: number; inBay: number }>,
+  bay: DroneBay | null
+): Fitting {
+  const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
+  const cap = (which: 'inSpace' | 'inBay') => {
+    const asked = counts[which];
+    if (asked === undefined) return group?.[which] ?? 0;
+    return Math.min(asked, droneCountMax(fitting, typeId, which, bay));
+  };
+  return setDroneCounts(fitting, typeId, { inSpace: cap('inSpace'), inBay: cap('inBay') });
+}
+
+/** Drones launched and drones in the bay, every type together. */
+export function droneTotals(fitting: Fitting): { inSpace: number; inBay: number } {
+  return droneGroups(fitting).reduce(
+    (sum, group) => ({ inSpace: sum.inSpace + group.inSpace, inBay: sum.inBay + group.inBay }),
+    { inSpace: 0, inBay: 0 }
+  );
 }

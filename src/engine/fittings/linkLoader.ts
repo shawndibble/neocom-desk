@@ -4,14 +4,16 @@
  * victim's fit). All of it is pure — fetching a killmail lives with the
  * caller; here a killmail is already an ESI `victim` object.
  *
- * Every loader returns an `EftLoadResult`, so `eftResultToFitting` and the
- * "lines that weren't recognised" list carry over unchanged. Like the EFT
+ * Every loader returns `LoadParts` (`load.ts`), the same as the EFT loader,
+ * so `toLoadOutcome` and the "lines that weren't recognised" list carry over
+ * unchanged. Like the EFT
  * loader, a rack comes from `FittingSlotMap`, never from position: DNA has no
  * slot information at all, and a killmail's flag says which slot but not
  * whether the item is a module or the charge loaded in it.
  */
 import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
-import type { EftLoadResult, EftSlotLookup, EftUnresolvedItem } from './eftLoader';
+import type { EftSlotLookup } from './eftLoader';
+import type { LoadParts, LoadWarning } from './load';
 import {
   FITTING_SLOT_KINDS,
   type FittingCargoItem,
@@ -25,6 +27,11 @@ export type LoadInput =
   | { kind: 'dna'; dna: string }
   | { kind: 'share'; code: string }
   | { kind: 'killmail'; killmailId: number; hash?: string }
+  /**
+   * An EVE Workbench fit page. Its API sends no CORS headers, so a browser
+   * can't read the fit from it — Load says how to copy the EFT across instead.
+   */
+  | { kind: 'eveWorkbench' }
   | { kind: 'unknown' };
 
 const DNA = /^\d+(?::\d+_?;\d+)+:*$/;
@@ -57,6 +64,9 @@ export function classifyLoadInput(input: string): LoadInput {
       // This app's own Share Link (a Fitting's Export menu): the code rides in `?f=`.
       const code = url.searchParams.get('f');
       if (code && /\/fittings\/?$/.test(url.pathname)) return { kind: 'share', code };
+      if (/(^|\.)eveworkbench\.com$/i.test(url.hostname) && /^\/fit\//i.test(url.pathname)) {
+        return { kind: 'eveWorkbench' };
+      }
       if (/(^|\.)eveship\.fit$/i.test(url.hostname)) {
         const fit = url.searchParams.get('fit') ?? decodeURIComponent(url.hash.replace(/^#/, ''));
         return classifyPlain(fit);
@@ -69,7 +79,7 @@ export function classifyLoadInput(input: string): LoadInput {
   return classifyPlain(text);
 }
 
-function unresolved(text: string, reason: string): EftUnresolvedItem {
+function unresolved(text: string, reason: string): LoadWarning {
   return { line: 1, text, reason };
 }
 
@@ -82,14 +92,14 @@ function sortModules(modules: FittingModule[]): void {
 }
 
 /** DNA is `hullId:typeId;qty:typeId;qty::`, with no slot information. */
-export function loadDnaFitting(dna: string, slotByTypeId: EftSlotLookup): EftLoadResult {
+export function loadDnaFitting(dna: string, slotByTypeId: EftSlotLookup): LoadParts {
   const [hull, ...entries] = dna.split(':').filter((part) => part !== '');
   const hullTypeId = Number(hull);
   if (!Number.isInteger(hullTypeId)) {
     return { hullTypeId: null, unresolved: [unresolved(dna, 'unknown ship')] };
   }
 
-  const problems: EftUnresolvedItem[] = [];
+  const problems: LoadWarning[] = [];
   const modules: FittingModule[] = [];
   const drones: FittingDrone[] = [];
   const cargo: FittingCargoItem[] = [];
@@ -178,7 +188,7 @@ function mergeCargo(items: FittingCargoItem[]): FittingCargoItem[] {
 export function killmailVictimToLoadResult(
   victim: KillmailVictim,
   slotByTypeId: EftSlotLookup
-): EftLoadResult {
+): LoadParts {
   const modules: FittingModule[] = [];
   const drones: FittingDrone[] = [];
   const cargo: FittingCargoItem[] = [];

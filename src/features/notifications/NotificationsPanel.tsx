@@ -50,8 +50,10 @@ import {
   SelectTrigger,
   SelectValue,
   Caret,
+  Checkbox,
 } from '@/components/ui';
 import { SelectionCheckbox } from '@/features/character/SelectionCheckbox';
+import { layoutNotificationEvents } from './notificationLayout';
 import { AllCharactersNotificationSection } from './AllCharactersNotificationSection';
 import { CHANNEL_COLUMNS, ChannelColumnHeadings } from './ChannelColumns';
 import { ScheduledPush, ICON_SIZE } from '@/components/ui/icons';
@@ -60,7 +62,6 @@ import {
   NOTIFICATION_EVENTS,
   NOTIFICATION_EVENT_IDS,
   eventLabelKey,
-  isCorpEventId,
   missingEventPermission,
   type NotificationEventDef,
   type NotificationEventId,
@@ -119,6 +120,8 @@ import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
 import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
+import { androidNotificationSettingsUrl, isPlayStoreApp } from '@/lib/playStoreApp';
+import { assignLocation } from '@/app/navigation';
 
 const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
 
@@ -250,9 +253,16 @@ export function NotificationsPanel() {
   // Enable button would either do nothing or grant a permission that can
   // never deliver anything, so this state shows why instead of the button.
   const installRequired = webPushSupport() === 'requires-install';
+  // In the Play Store app Chrome delegates the grant to the Android app's own
+  // notification toggle (docs/ANDROID-TWA.md), so the blocked notice has to
+  // name that screen — browser site settings can't unblock it.
+  const [inPlayStoreApp] = useState(isPlayStoreApp);
 
   const [search, setSearch] = useUrlParam('search', SEARCH_PARAM);
   const [expandedCharacterIds, setExpandedCharacterIds] = useState<ReadonlySet<number>>(new Set());
+  // Collapsed to start, like every Character but the active one: the header's
+  // select-all column keeps the broadcast one click away.
+  const [allCharactersExpanded, setAllCharactersExpanded] = useState(false);
 
   /**
    * The active Character's section starts open: with several Characters
@@ -470,14 +480,28 @@ export function NotificationsPanel() {
     <Panel title={t('settings.notificationsTitle')}>
       <div className="space-y-3">
         <p className="text-xs text-text-dim">{t('settings.notifications.hint')}</p>
-        {browserBlocked && (
-          <p
-            role="status"
-            className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning"
-          >
-            {t('settings.notifications.blockedNotice')}
-          </p>
-        )}
+        {browserBlocked &&
+          (inPlayStoreApp ? (
+            <div className="space-y-2 rounded-xs border border-warning/60 bg-warning/10 px-3 py-2">
+              <p role="status" className="text-xs text-warning">
+                {t('settings.notifications.blockedNoticePlayApp')}
+              </p>
+              <Button
+                size="sm"
+                variant="primary"
+                onClick={() => assignLocation(androidNotificationSettingsUrl(window.location.href))}
+              >
+                {t('settings.notifications.openAndroidSettings')}
+              </Button>
+            </div>
+          ) : (
+            <p
+              role="status"
+              className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning"
+            >
+              {t('settings.notifications.blockedNotice')}
+            </p>
+          ))}
         {/*
           `permission` reads 'unsupported' here, not 'default' — a
           non-installed iOS Safari tab has no Notification API to ask at
@@ -503,15 +527,13 @@ export function NotificationsPanel() {
           </div>
         )}
         <label className="flex items-center gap-2 text-xs font-medium text-text">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={prefsValue.masterEnabled}
             onChange={() =>
               void setDeviceNotificationPrefs(
                 withMasterEnabled(prefsValue, !prefsValue.masterEnabled)
               )
             }
-            className="size-4 shrink-0 cursor-pointer accent-accent"
           />
           {t('settings.notifications.masterSwitchLabel')}
         </label>
@@ -527,8 +549,7 @@ export function NotificationsPanel() {
         */}
         <fieldset disabled={!prefsValue.masterEnabled} className="ml-6 space-y-2">
           <label className="flex items-center gap-2 text-xs text-text">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={isBrowserChannelEnabled(prefsValue) && !browserBlocked}
               disabled={browserBlocked}
               onChange={() =>
@@ -536,7 +557,6 @@ export function NotificationsPanel() {
                   withBrowserEnabled(prefsValue, !isBrowserChannelEnabled(prefsValue))
                 )
               }
-              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
             />
             {t('settings.notifications.browserChannelLabel')}
           </label>
@@ -544,15 +564,13 @@ export function NotificationsPanel() {
             {t('settings.notifications.browserChannelHint')}
           </p>
           <label className="flex items-center gap-2 text-xs text-text">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={isFeedChannelEnabled(prefsValue)}
               onChange={() =>
                 void setDeviceNotificationPrefs(
                   withFeedEnabled(prefsValue, !isFeedChannelEnabled(prefsValue))
                 )
               }
-              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed"
             />
             {t('settings.notifications.feedChannelLabel')}
           </label>
@@ -569,6 +587,8 @@ export function NotificationsPanel() {
               characterIds={allCharacterIds}
               prefsValue={prefsValue}
               browserBlocked={browserBlocked}
+              expanded={allCharactersExpanded}
+              onToggleExpanded={() => setAllCharactersExpanded((open) => !open)}
             />
             <SearchInput
               value={search}
@@ -693,6 +713,223 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
   // over a `prefsValue` prop — see this component's props doc for why.
   const currentValue = () => useNotificationPreferences.getState().value;
 
+  const layout = layoutNotificationEvents(visibleEventIds);
+  const corpGroupLabel = t('settings.notifications.corpGroup');
+  const togglableCorpEventIds = layout.corp.filter(
+    (eventId) => characterEventRowState(eventId, grantedScopes, characterCapabilities).rowEnabled
+  );
+  // Every corp event rides the one opt-in Corporation Permission, so any
+  // missing one names the group's.
+  const corpMissingPermission =
+    layout.corp
+      .map(
+        (eventId) =>
+          characterEventRowState(eventId, grantedScopes, characterCapabilities).missingPermission
+      )
+      .find((permission) => permission !== null) ?? null;
+
+  /** One event's row and everything hanging off it. `grouped`: a corp event, whose Permission line and honesty note belong to its group header. */
+  const renderEvent = (eventId: NotificationEventId, grouped: boolean) => {
+    const def = eventDef(eventId);
+    const { hasScope, capabilityMissing, rowEnabled, missingPermission } = characterEventRowState(
+      eventId,
+      grantedScopes,
+      characterCapabilities
+    );
+    const eventLabel = t(def.labelKey);
+    const permissionLabel =
+      missingPermission === null ? undefined : t(PERMISSIONS[missingPermission].labelKey);
+    const entry = eventEntry(eventId);
+    return (
+      <li key={eventId}>
+        <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs hover:bg-panel-2">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className={rowEnabled ? 'text-text' : 'text-text-dim'}>{eventLabel}</span>
+            {PUSH_BADGED_EVENT_IDS.has(eventId) && <ScheduledPushBadge />}
+          </span>
+          <div className={CHANNEL_COLUMNS}>
+            {NOTIFICATION_CHANNELS.map((channel) => (
+              <ChannelCheckbox
+                key={channel}
+                channel={channel}
+                eventLabel={eventLabel}
+                enabled={rowEnabled && !(channel === 'browser' && browserBlocked)}
+                disabledReason={!hasScope ? 'scope' : capabilityMissing ? 'capability' : null}
+                missingPermissionLabel={permissionLabel}
+                checked={isEventEnabledFor(prefs, eventId, channel)}
+                onToggle={() =>
+                  void toggleEventChannelPref(
+                    character.characterId,
+                    currentValue(),
+                    eventId,
+                    channel
+                  )
+                }
+              />
+            ))}
+          </div>
+        </div>
+        {/*
+                    A declined Permission (issue #1525): the row stays
+                    listed but disabled, says which Permission it needs,
+                    and Grant asks for that one Permission for this
+                    Character — rather than hiding the alert (hides the
+                    reason) or leaving it on but never firing (looks like
+                    a bug). Granting updates the stored token, which
+                    re-enables the row through `grantedScopes`.
+                  */}
+        {!grouped && missingPermission !== null && (
+          <p className="flex items-center gap-2 border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
+            <span>
+              {t('settings.notifications.needsPermission', {
+                permission: permissionLabel,
+              })}
+            </span>
+            <Button
+              size="sm"
+              aria-label={t('settings.notifications.grantPermissionLabel', {
+                permission: permissionLabel,
+                event: eventLabel,
+              })}
+              onClick={() =>
+                void beginEveLogin({
+                  characterId: character.characterId,
+                  groups: [missingPermission],
+                })
+              }
+            >
+              {t('settings.notifications.grantPermission')}
+            </Button>
+          </p>
+        )}
+        {/*
+                    The event's own delivery caveat, shown whatever the
+                    Character's grants (extractor lead time, issues
+                    #310/#358: bounded by the 72-hour Projection Horizon,
+                    not by scopes, so it is true before authorization too).
+                  */}
+        {entry.rowHintKey !== null && (
+          <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
+            {t(entry.rowHintKey)}
+          </p>
+        )}
+        {/*
+                    The event's inline threshold controls (issue #299 and
+                    after), derived from its Event Entry. Persisted per
+                    Character (`preferences.ts`); the poller re-reads them
+                    each tick and a change rebuilds the Projection at once
+                    (issue #1259).
+                  */}
+        {entry.thresholds !== null && rowEnabled && (
+          <ThresholdControls
+            characterId={character.characterId}
+            thresholds={entry.thresholds}
+            values={thresholds}
+            onChange={(key, amount) =>
+              void updatePrefs(
+                character.characterId,
+                withCharacterEventThreshold(currentValue(), character.characterId, key, amount)
+              )
+            }
+          />
+        )}
+        {/*
+                    Per-type opt-out underneath the single
+                    eveNotification event (issue #274, AC3).
+                    Enumerated from the closed allow-list,
+                    grouped by Notification Family (issue #352),
+                    rather than discovered from the feed, so
+                    every type is toggle-able immediately rather
+                    than only after it has fired once.
+                  */}
+        {eventId === 'eveNotification' && hasScope && (
+          <div className="border-t border-line bg-panel/60 pl-3">
+            <p className="px-3 py-1.5 text-[0.6875rem] text-text-dim">
+              {t('settings.notifications.eveTypesHint')}
+            </p>
+            {NOTIFICATION_FAMILIES.map((family) => {
+              const familyTypes = eveTypesByFamily(family);
+              if (familyTypes.length === 0) return null;
+              const familyLabel = t(`settings.notifications.family.${family}`);
+              return (
+                <div key={family}>
+                  <div className="flex items-center justify-between gap-3 border-t border-line/60 bg-panel/40 px-3 py-1">
+                    <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {familyLabel}
+                    </span>
+                    <div className={CHANNEL_COLUMNS}>
+                      {NOTIFICATION_CHANNELS.map((channel) => (
+                        <SelectionCheckbox
+                          key={channel}
+                          state={selectionStateForEveTypes(familyTypes, eveTypePrefs, channel)}
+                          onToggle={() =>
+                            void toggleAllEveTypesChannelPref(
+                              character.characterId,
+                              currentValue(),
+                              familyTypes,
+                              channel
+                            )
+                          }
+                          label={t(`settings.notifications.selectAllFamily.${channel}`, {
+                            family: familyLabel,
+                          })}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <ul className="divide-y divide-line/60">
+                    {familyTypes.map((type) => {
+                      // ESI's own `CamelCase` identifier is what
+                      // used to label these rows. It named the
+                      // type without saying what it was.
+                      const typeLabel = eveTypeLabel(t, type);
+                      return (
+                        <li
+                          key={type}
+                          className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs hover:bg-panel-2"
+                        >
+                          {/* `title` for the same reason
+                                        `DataAgePanel` uses one: the
+                                        label truncates on a narrow
+                                        screen, and now that it says
+                                        something, the cut-off half
+                                        is worth recovering. */}
+                          <span className="truncate text-text-dim" title={typeLabel}>
+                            {typeLabel}
+                          </span>
+                          <div className={CHANNEL_COLUMNS}>
+                            {NOTIFICATION_CHANNELS.map((channel) => (
+                              <ChannelCheckbox
+                                key={channel}
+                                channel={channel}
+                                eventLabel={typeLabel}
+                                enabled={!(channel === 'browser' && browserBlocked)}
+                                disabledReason={null}
+                                checked={isEveTypeEnabledFor(eveTypePrefs, type, channel)}
+                                onToggle={() =>
+                                  void toggleEveTypeChannelPref(
+                                    character.characterId,
+                                    currentValue(),
+                                    type,
+                                    channel
+                                  )
+                                }
+                              />
+                            ))}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </li>
+    );
+  };
+
   return (
     <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
       {/* Select-all is a sibling of the expand toggle, not nested inside its
@@ -748,228 +985,75 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
         <div className="bg-panel-2">
           <ChannelColumnHeadings />
           <ul className="divide-y divide-line">
-            {visibleEventIds.map((eventId) => {
-              const def = eventDef(eventId);
-              const { hasScope, capabilityMissing, rowEnabled, missingPermission } =
-                characterEventRowState(eventId, grantedScopes, characterCapabilities);
-              const eventLabel = t(def.labelKey);
-              const permissionLabel =
-                missingPermission === null ? undefined : t(PERMISSIONS[missingPermission].labelKey);
-              const entry = eventEntry(eventId);
-              return (
-                <li key={eventId}>
-                  <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs hover:bg-panel-2">
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <span className={rowEnabled ? 'text-text' : 'text-text-dim'}>
-                        {eventLabel}
-                      </span>
-                      {PUSH_BADGED_EVENT_IDS.has(eventId) && <ScheduledPushBadge />}
-                    </span>
-                    <div className={CHANNEL_COLUMNS}>
-                      {NOTIFICATION_CHANNELS.map((channel) => (
-                        <ChannelCheckbox
-                          key={channel}
-                          channel={channel}
-                          eventLabel={eventLabel}
-                          enabled={rowEnabled && !(channel === 'browser' && browserBlocked)}
-                          disabledReason={
-                            !hasScope ? 'scope' : capabilityMissing ? 'capability' : null
-                          }
-                          missingPermissionLabel={permissionLabel}
-                          checked={isEventEnabledFor(prefs, eventId, channel)}
-                          onToggle={() =>
-                            void toggleEventChannelPref(
-                              character.characterId,
-                              currentValue(),
-                              eventId,
-                              channel
-                            )
-                          }
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  {/*
-                    A declined Permission (issue #1525): the row stays
-                    listed but disabled, says which Permission it needs,
-                    and Grant asks for that one Permission for this
-                    Character — rather than hiding the alert (hides the
-                    reason) or leaving it on but never firing (looks like
-                    a bug). Granting updates the stored token, which
-                    re-enables the row through `grantedScopes`.
-                  */}
-                  {missingPermission !== null && (
-                    <p className="flex items-center gap-2 border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
-                      <span>
-                        {t('settings.notifications.needsPermission', {
-                          permission: permissionLabel,
-                        })}
-                      </span>
-                      <Button
-                        size="sm"
-                        aria-label={t('settings.notifications.grantPermissionLabel', {
-                          permission: permissionLabel,
-                          event: eventLabel,
-                        })}
-                        onClick={() =>
-                          void beginEveLogin({
-                            characterId: character.characterId,
-                            groups: [missingPermission],
-                          })
-                        }
-                      >
-                        {t('settings.notifications.grantPermission')}
-                      </Button>
-                    </p>
-                  )}
-                  {/*
-                    The event's own delivery caveat, shown whatever the
-                    Character's grants (extractor lead time, issues
-                    #310/#358: bounded by the 72-hour Projection Horizon,
-                    not by scopes, so it is true before authorization too).
-                  */}
-                  {entry.rowHintKey !== null && (
-                    <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
-                      {t(entry.rowHintKey)}
-                    </p>
-                  )}
-                  {/*
-                    The event's inline threshold controls (issue #299 and
-                    after), derived from its Event Entry. Persisted per
-                    Character (`preferences.ts`); the poller re-reads them
-                    each tick and a change rebuilds the Projection at once
-                    (issue #1259).
-                  */}
-                  {entry.thresholds !== null && rowEnabled && (
-                    <ThresholdControls
-                      characterId={character.characterId}
-                      thresholds={entry.thresholds}
-                      values={thresholds}
-                      onChange={(key, amount) =>
-                        void updatePrefs(
-                          character.characterId,
-                          withCharacterEventThreshold(
-                            currentValue(),
+            {layout.ordinary.map((eventId) => renderEvent(eventId, false))}
+            {layout.corp.length > 0 && (
+              <li>
+                {/*
+                  One group for the corp events, headed like an EVE family:
+                  a label, then a select-all per channel. They share one
+                  Needs-permission line (all five ride the same opt-in
+                  Corporation Permission) and the one honesty note (issue
+                  #299): best-effort, no server push. Both used to repeat on
+                  every row.
+                */}
+                <div className="flex items-center justify-between gap-3 bg-panel/40 px-3 py-1">
+                  <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {corpGroupLabel}
+                  </span>
+                  <div className={CHANNEL_COLUMNS}>
+                    {NOTIFICATION_CHANNELS.map((channel) => (
+                      <SelectionCheckbox
+                        key={channel}
+                        state={selectionStateForEvents(togglableCorpEventIds, prefs, channel)}
+                        disabled={togglableCorpEventIds.length === 0}
+                        onToggle={() =>
+                          void toggleAllEventsChannelPref(
                             character.characterId,
-                            key,
-                            amount
+                            currentValue(),
+                            togglableCorpEventIds,
+                            channel
                           )
-                        )
-                      }
-                    />
-                  )}
-                  {/*
-                    The honesty requirement (issue #299): these
-                    five events are best-effort, no server push.
-                    Attached per row, not once per section, so
-                    it survives a search that narrows a
-                    character's section to a single corp row.
-                  */}
-                  {isCorpEventId(eventId) && (
-                    <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
-                      {t('settings.notifications.corpEventBestEffortHint')}
-                    </p>
-                  )}
-                  {/*
-                    Per-type opt-out underneath the single
-                    eveNotification event (issue #274, AC3).
-                    Enumerated from the closed allow-list,
-                    grouped by Notification Family (issue #352),
-                    rather than discovered from the feed, so
-                    every type is toggle-able immediately rather
-                    than only after it has fired once.
-                  */}
-                  {eventId === 'eveNotification' && hasScope && (
-                    <div className="border-t border-line bg-panel/60 pl-3">
-                      <p className="px-3 py-1.5 text-[0.6875rem] text-text-dim">
-                        {t('settings.notifications.eveTypesHint')}
-                      </p>
-                      {NOTIFICATION_FAMILIES.map((family) => {
-                        const familyTypes = eveTypesByFamily(family);
-                        if (familyTypes.length === 0) return null;
-                        const familyLabel = t(`settings.notifications.family.${family}`);
-                        return (
-                          <div key={family}>
-                            <div className="flex items-center justify-between gap-3 border-t border-line/60 bg-panel/40 px-3 py-1">
-                              <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                                {familyLabel}
-                              </span>
-                              <div className={CHANNEL_COLUMNS}>
-                                {NOTIFICATION_CHANNELS.map((channel) => (
-                                  <SelectionCheckbox
-                                    key={channel}
-                                    state={selectionStateForEveTypes(
-                                      familyTypes,
-                                      eveTypePrefs,
-                                      channel
-                                    )}
-                                    onToggle={() =>
-                                      void toggleAllEveTypesChannelPref(
-                                        character.characterId,
-                                        currentValue(),
-                                        familyTypes,
-                                        channel
-                                      )
-                                    }
-                                    label={t(`settings.notifications.selectAllFamily.${channel}`, {
-                                      family: familyLabel,
-                                    })}
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                            <ul className="divide-y divide-line/60">
-                              {familyTypes.map((type) => {
-                                // ESI's own `CamelCase` identifier is what
-                                // used to label these rows. It named the
-                                // type without saying what it was.
-                                const typeLabel = eveTypeLabel(t, type);
-                                return (
-                                  <li
-                                    key={type}
-                                    className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs hover:bg-panel-2"
-                                  >
-                                    {/* `title` for the same reason
-                                        `DataAgePanel` uses one: the
-                                        label truncates on a narrow
-                                        screen, and now that it says
-                                        something, the cut-off half
-                                        is worth recovering. */}
-                                    <span className="truncate text-text-dim" title={typeLabel}>
-                                      {typeLabel}
-                                    </span>
-                                    <div className={CHANNEL_COLUMNS}>
-                                      {NOTIFICATION_CHANNELS.map((channel) => (
-                                        <ChannelCheckbox
-                                          key={channel}
-                                          channel={channel}
-                                          eventLabel={typeLabel}
-                                          enabled={!(channel === 'browser' && browserBlocked)}
-                                          disabledReason={null}
-                                          checked={isEveTypeEnabledFor(eveTypePrefs, type, channel)}
-                                          onToggle={() =>
-                                            void toggleEveTypeChannelPref(
-                                              character.characterId,
-                                              currentValue(),
-                                              type,
-                                              channel
-                                            )
-                                          }
-                                        />
-                                      ))}
-                                    </div>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </div>
-                        );
+                        }
+                        label={t(`settings.notifications.selectAllFamily.${channel}`, {
+                          family: corpGroupLabel,
+                        })}
+                      />
+                    ))}
+                  </div>
+                </div>
+                {corpMissingPermission !== null && (
+                  <p className="flex items-center gap-2 border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
+                    <span>
+                      {t('settings.notifications.needsPermission', {
+                        permission: t(PERMISSIONS[corpMissingPermission].labelKey),
                       })}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
+                    </span>
+                    <Button
+                      size="sm"
+                      aria-label={t('settings.notifications.grantPermissionLabel', {
+                        permission: t(PERMISSIONS[corpMissingPermission].labelKey),
+                        event: corpGroupLabel,
+                      })}
+                      onClick={() =>
+                        void beginEveLogin({
+                          characterId: character.characterId,
+                          groups: [corpMissingPermission],
+                        })
+                      }
+                    >
+                      {t('settings.notifications.grantPermission')}
+                    </Button>
+                  </p>
+                )}
+                <p className="border-t border-line bg-panel/60 px-6 py-1.5 text-[0.6875rem] text-text-dim">
+                  {t('settings.notifications.corpEventBestEffortHint')}
+                </p>
+                <ul className="divide-y divide-line border-t border-line pl-3">
+                  {layout.corp.map((eventId) => renderEvent(eventId, true))}
+                </ul>
+              </li>
+            )}
+            {layout.eve !== null && renderEvent(layout.eve, false)}
           </ul>
         </div>
       )}
@@ -1033,8 +1117,7 @@ function ChannelCheckbox({
   const { t } = useTranslation();
   const label = t(`settings.notifications.toggleLabel.${channel}`, { event: eventLabel });
   const checkbox = (
-    <input
-      type="checkbox"
+    <Checkbox
       checked={enabled && checked}
       onChange={onToggle}
       // Not `disabled` — same reasoning as MobileOpportunityList (keeps the
@@ -1045,7 +1128,7 @@ function ChannelCheckbox({
       }}
       aria-disabled={enabled ? undefined : true}
       aria-label={label}
-      className={`size-4 shrink-0 accent-accent ${enabled ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
+      className={enabled ? undefined : 'cursor-not-allowed! opacity-50'}
     />
   );
   if (enabled) return checkbox;

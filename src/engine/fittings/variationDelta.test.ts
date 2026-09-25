@@ -23,6 +23,9 @@ const base: FittingStats = {
   droneDps: 50,
   droneBandwidthUsed: 25,
   droneBandwidthTotal: 50,
+  maxActiveDrones: 0,
+  droneBandwidthByType: {},
+  hardpoints: { turrets: 0, launchers: 0 },
   droneCapacity: 75,
   ehp: 20000,
   capacitor: { stable: true, stablePercentage: 62 },
@@ -62,6 +65,13 @@ describe('diffFittingStats', () => {
     const delta = diffFittingStats(base, after);
     expect(delta.count).toBe(1);
     expect(delta.changes).toEqual([{ key: 'ehp', before: 20000, after: 24000 }]);
+  });
+
+  it('reports a total DPS change (e.g. a turret variation)', () => {
+    const after: FittingStats = { ...base, offense: { ...base.offense, dps: 120 } };
+    expect(diffFittingStats(base, after).changes).toEqual([
+      { key: 'totalDps', before: 0, after: 120 },
+    ]);
   });
 
   it('ignores a change below the field own display precision', () => {

@@ -46,6 +46,7 @@
     "staleGrantHint": "EVE turned down a request for this character's data. If you removed this app's access in EVE's third-party application list, log in again to restore it.",
     "staleGrantHintNamed": "EVE turned down a request for {{character}}'s data. If you removed this app's access in EVE's third-party application list, log in again to restore it.",
     "staleGrantAction": "Log in again with EVE Online",
+    "titleFor": "{{character}} — {{title}}",
     "standingsTitle": "Broker fees are assuming 0 standings",
     "standingsHint": "This character logged in before the app asked to read standings, so every NPC-station broker fee is calculated as if you had none. Log in again to share them and get accurate fees.",
     "standingsAction": "Log in to share standings",
@@ -53,15 +54,13 @@
     "implantsAssumedTitle": "Assumes no implants",
     "implantsAssumedAction": "Grant Character details",
     "standingsAssumedTitle": "Assumes base standings",
-    "standingsAssumedTitleFor": "{{character}} — Assumes base standings",
     "standingsAssumedAction": "Grant Character details"
   },
   "fittings": {
     "myFittings": {
       "title": "My Fittings",
-      "save": "Save to My Fittings",
-      "saveShort": "Save",
-      "update": "Update saved Fitting",
+      "save": "Save",
+      "update": "Update",
       "saved": "Saved",
       "needCharacter": "Log in with a Character to save Fittings.",
       "tooLarge": "This Fitting is too large to save.",
@@ -90,6 +89,7 @@
       },
       "loadError": {
         "unrecognised": "That isn't something Load can read. Paste EFT fit text, an in-game fitting link or DNA string, an eveship.fit link, or a zKillboard killmail link.",
+        "eve-workbench": "EVE Workbench links can't be read from here. On the fit's page, open Export, copy the EFT, and paste it in.",
         "killmail-not-found": "That killmail couldn't be found on zKillboard.",
         "killmail-failed": "The killmail couldn't be fetched from ESI. Try again in a moment."
       },
@@ -97,6 +97,7 @@
       "unresolvedTitle_one": "{{count}} line wasn't recognized",
       "unresolvedTitle_other": "{{count}} lines weren't recognized",
       "unresolvedLine": "Line {{line}}: \"{{text}}\" — {{reason}}",
+      "unresolvedItem": "\"{{text}}\" — {{reason}}",
       "xml": {
         "browseLabel": "Load a fittings file (EVE XML)",
         "browse": "Browse",
@@ -112,8 +113,11 @@
         "listError": "Not recognized: {{reason}}",
         "open": "Open {{name}}",
         "unresolvedTitle_one": "{{count}} item in this Fitting wasn't recognized",
-        "unresolvedTitle_other": "{{count}} items in this Fitting weren't recognized",
-        "unresolvedLine": "\"{{text}}\" — {{reason}}"
+        "unresolvedTitle_other": "{{count}} items in this Fitting weren't recognized"
+      },
+      "inGame": {
+        "unresolvedTitle_one": "{{count}} item couldn't be loaded (fighter bay or service slot)",
+        "unresolvedTitle_other": "{{count}} items couldn't be loaded (fighter bay or service slot)"
       }
     },
     "inGame": {
@@ -124,9 +128,7 @@
       "reauthAction": "Log in again with EVE Online",
       "emptyTitle": "No in-game Fittings",
       "emptyHint": "Fittings saved on this Character in EVE will show up here.",
-      "openAction": "Open",
-      "unresolvedNote_one": "{{count}} item from \"{{name}}\" couldn't be loaded (fighter bay or service slot).",
-      "unresolvedNote_other": "{{count}} items from \"{{name}}\" couldn't be loaded (fighter bay or service slot)."
+      "openAction": "Open"
     },
     "saveToEve": {
       "action": "Save to EVE",
@@ -144,6 +146,9 @@
       "saving": "Saving…",
       "cancel": "Cancel",
       "errorTitle": "Couldn't save",
+      "grantTitle": "Saving to EVE needs the Fittings permission",
+      "grantHint": "This character logged in without it. Grant it, then save again.",
+      "grantAction": "Grant Fittings permission",
       "overwriteFailedTitle": "Saved, but the old Fitting is still there",
       "overwriteFailed": "Saved as \"{{name}}\", but EVE wouldn't remove the Fitting it was replacing: {{message}}. Delete it in-game yourself.",
       "close": "Close"
@@ -158,9 +163,12 @@
       "powergrid": "Powergrid",
       "calibration": "Calibration",
       "droneBandwidth": "Drone bandwidth",
+      "droneBay": "Drone bay (m³)",
       "overBy": "Over by {{amount}}",
       "cantUse": "Can't use",
+      "variationsFor": "Variations of {{name}}",
       "drones": "Drones",
+      "cargo": "Cargo",
       "rack": {
         "high": "High slots",
         "medium": "Mid slots",
@@ -194,7 +202,32 @@
       "readoutPowergrid": "{{used}} / {{total}} MW",
       "readoutCalibration": "{{used}} / {{total}}",
       "readoutDroneBandwidth": "{{used}} / {{total}} Mbit/s",
+      "gauge": "{{label}}: {{value}} ({{percent}}%)",
+      "gaugeOver": "{{label}}: {{value}} ({{percent}}%), over by {{amount}}",
+      "gaugeLoading": "{{label}}: calculating…",
+      "menu": {
+        "state": {
+          "offline": "Offline",
+          "online": "Online",
+          "active": "Active",
+          "overload": "Overloaded"
+        },
+        "unload": "Unload {{name}}",
+        "info": "Show info",
+        "variations": "Swap for a variation…",
+        "remove": "Remove {{name}}"
+      },
+      "hardpoints": {
+        "turret": "Turret hardpoints: {{used}} of {{total}} used",
+        "launcher": "Launcher hardpoints: {{used}} of {{total}} used",
+        "turretLoading": "Turret hardpoints: {{total}}",
+        "launcherLoading": "Launcher hardpoints: {{total}}",
+        "over_one": "{{label}} — {{count}} more than the hull has",
+        "over_other": "{{label}} — {{count}} more than the hull has"
+      },
+      "cargoTile": "{{name}} ×{{quantity}}",
       "rackHint": "Tap a rack to edit its slots",
+      "droneCount": "{{inSpace}} launched · {{inBay}} in bay",
       "rackCount": "{{fitted}} / {{total}}",
       "rackCantUse_one": "{{count}} can’t use",
       "rackCantUse_other": "{{count}} can’t use"
@@ -205,9 +238,11 @@
       "noCharge": "No charge",
       "remove": "Remove {{name}}",
       "emptySlot": "Empty — add to {{rack}}",
+      "dronesHint": "Launched drones count toward DPS and bandwidth; the rest wait in the bay.",
       "addDrones": "Add drones",
       "inSpace": "In space",
       "inBay": "In bay",
+      "quantity": "Quantity",
       "slotsWaitForShipData": "Empty slots appear once the ship data has downloaded."
     },
     "add": {
@@ -269,10 +304,40 @@
       "myFittings": "My Fittings…",
       "inGame": "In-game Fittings…",
       "moreSave": "More save options",
+      "moreActions": "Fitting actions",
       "savedInMyFittings": "Saved in My Fittings"
     },
+    "alpha": {
+      "ok": "Alpha OK",
+      "omega": "Omega only",
+      "okTooltip": "By skill caps: an Alpha clone can train every skill this fit needs.",
+      "omegaTooltip": "By skill caps, this needs an Omega clone — an Alpha can't train:",
+      "capped": "{{skill}} {{level}} (Alpha max {{max}})",
+      "untrainable": "{{skill}} {{level}} (Alphas can’t train it)",
+      "more_one": "and {{count}} more",
+      "more_other": "and {{count}} more"
+    },
+    "weather": {
+      "label": "Abyssal weather",
+      "none": "Normal space",
+      "option": "{{kind}} {{level}}",
+      "kind": {
+        "dark": "Dark",
+        "electrical": "Electrical",
+        "exotic": "Exotic",
+        "firestorm": "Firestorm",
+        "gamma": "Gamma"
+      },
+      "effect": {
+        "dark": "Velocity +50% · turret optimal and falloff −{{penalty}}%",
+        "electrical": "Capacitor recharge time −50% · EM resists −{{penalty}}%",
+        "exotic": "Scan resolution +50% · kinetic resists −{{penalty}}%",
+        "firestorm": "Armor HP +50% · thermal resists −{{penalty}}%",
+        "gamma": "Shield HP +50% · explosive resists −{{penalty}}%"
+      },
+      "in": "in {{weather}}"
+    },
     "phoneTabs": {
-      "fitting": "Fitting",
       "stats": "Stats",
       "label": "Fitting sections"
     },
@@ -282,6 +347,7 @@
       "eft": "Copy EFT",
       "chatLink": "Copy in-game link",
       "multibuy": "Copy multibuy list",
+      "eveXml": "Download EVE XML",
       "appraise": "Appraise in Market",
       "tooLarge": "Too large to share as a link.",
       "copyFailed": "Couldn't copy to the clipboard.",
@@ -290,10 +356,17 @@
         "eft": "EFT copied",
         "chatLink": "In-game link copied",
         "multibuy": "Multibuy list copied"
-      }
+      },
+      "downloaded": {
+        "eveXml": "Fitting XML downloaded"
+      },
+      "downloadFailed": "Couldn't make the file."
     },
     "stats": {
       "error": "Couldn't load ship data for this fit.",
+      "errorSkills": "Couldn't load this Character's skills, so the stats can't be worked out.",
+      "retry": "Try again",
+      "unavailable": "Not available",
       "loadingIndeterminate": "Downloading ship data…",
       "loading": "Downloading ship data… {{pct}}%",
       "damageType": {
@@ -336,6 +409,9 @@
       "maxVelocityMeta": "{{value}} m/s",
       "unknownItems_one": "{{count}} item has no data in this build",
       "unknownItems_other": "{{count}} items have no data in this build",
+      "unknownItemCount": "{{name}} ×{{count}}",
+      "unknownItemsMore_one": "…and {{count}} more",
+      "unknownItemsMore_other": "…and {{count}} more",
       "priceBuy": "Buy orders: {{value}} ISK",
       "priceSell": "Sell orders: {{value}} ISK",
       "priceUnpriced_one": "{{count}} item has no price at this hub",
@@ -392,6 +468,7 @@
     },
     "variations": {
       "title": "Variations",
+      "swapTitle": "Swap for a variation",
       "name": "Variant",
       "changes": "Whole-fitting change",
       "changedCount_one": "{{count}} stat changes",
@@ -413,11 +490,16 @@
         "powergridTotal": "Powergrid total {{value}} MW",
         "calibrationUsed": "Calibration used {{value}}",
         "calibrationTotal": "Calibration total {{value}}",
+        "totalDps": "Total DPS {{value}}",
+        "totalVolley": "Total volley {{value}}",
         "droneDps": "Drone DPS {{value}}",
         "droneBandwidthUsed": "Drone bandwidth used {{value}} Mbit/s",
         "droneBandwidthTotal": "Drone bandwidth total {{value}} Mbit/s",
         "droneCapacity": "Drone bay capacity {{value}} m3",
         "ehp": "EHP {{value}}",
+        "shieldRepair": "Shield boost {{value}} HP/s",
+        "armorRepair": "Armor repair {{value}} HP/s",
+        "hullRepair": "Hull repair {{value}} HP/s",
         "capacitorCapacity": "Capacitor capacity {{value}} GJ",
         "capacitorRechargeTime": "Capacitor recharge {{value}}s",
         "capacitorStable": "Capacitor stable at {{pct}}%",
@@ -525,7 +607,12 @@
         "clone": "My clone",
         "fitting": "Fitting's"
       },
-      "editSet": "Edit set",
+      "editSet": "Edit Fitting's set",
+      "chipLabel": "Implants:",
+      "popoverTitle": "Implants in these stats",
+      "cloneExplain": "The implants in {{name}}'s current clone.",
+      "cloneExplainNoName": "The implants in your current clone.",
+      "fittingExplain": "The implant set saved with this Fitting.",
       "modalTitle": "Implants & boosters",
       "implantsHeading": "Implants",
       "boostersHeading": "Boosters",
@@ -537,6 +624,84 @@
       "notFound": "No item found with that exact name.",
       "full": "This set is already full.",
       "assumesNoImplantsHint": "My clone stats are calculated without this character's fitted implants. Grant Character details for accurate stats."
+    },
+    "compare": {
+      "entryButton": "Compare",
+      "title": "Compare Fittings",
+      "addFitting": "Compare with…",
+      "remove": "Remove",
+      "emptyTitle": "Nothing to compare yet",
+      "emptyHint": "Add a Fitting to start comparing.",
+      "differencesOnly": "Show differences only",
+      "pagePrev": "Previous",
+      "pageNext": "Next",
+      "canFlyYes": "Can fly",
+      "canFlyNo": "Can't fly",
+      "canFlyUnknown": "Skills unknown",
+      "statsTitle": "Stats",
+      "modulesTitle": "Modules that differ",
+      "noDifferences": "Nothing differs between the compared Fittings.",
+      "statColumn": "Stat",
+      "best": "(Best)",
+      "fixErrorsHint": "Fix the Fitting with the error above to see the comparison.",
+      "statsFailed": "Couldn't calculate stats",
+      "statsFailedHint": "A Fitting's stats couldn't be calculated. Remove it to see the comparison.",
+      "profileFailed": "Couldn't load your pilot's skills and implants, so the comparison can't be calculated.",
+      "profileRetry": "Try again",
+      "picker": {
+        "title": "Compare with…"
+      },
+      "modules": {
+        "none": "Every module is shared across the compared Fittings."
+      },
+      "stat": {
+        "cpuUsed": "CPU used",
+        "cpuTotal": "CPU total",
+        "powergridUsed": "Powergrid used",
+        "powergridTotal": "Powergrid total",
+        "calibrationUsed": "Calibration used",
+        "calibrationTotal": "Calibration total",
+        "totalDps": "Total DPS",
+        "appliedDps": "Applied DPS",
+        "bestRange": "Best range (km)",
+        "totalVolley": "Total volley",
+        "droneDps": "Drone DPS",
+        "droneBandwidthUsed": "Drone bandwidth used",
+        "droneBandwidthTotal": "Drone bandwidth total",
+        "droneCapacity": "Drone bay capacity",
+        "ehp": "EHP",
+        "shieldRepair": "Shield boost (HP/s)",
+        "armorRepair": "Armor repair (HP/s)",
+        "hullRepair": "Hull repair (HP/s)",
+        "capacitor": "Capacitor",
+        "capacitorStable": "{{pct}}% stable",
+        "capacitorUnstable": "Depletes in {{seconds}}s",
+        "capacitorCapacity": "Capacitor capacity",
+        "capacitorRechargeTime": "Capacitor recharge (s)",
+        "shieldHp": "Shield HP",
+        "shieldEmResonance": "Shield EM resist %",
+        "shieldThermalResonance": "Shield thermal resist %",
+        "shieldKineticResonance": "Shield kinetic resist %",
+        "shieldExplosiveResonance": "Shield explosive resist %",
+        "armorHp": "Armor HP",
+        "armorEmResonance": "Armor EM resist %",
+        "armorThermalResonance": "Armor thermal resist %",
+        "armorKineticResonance": "Armor kinetic resist %",
+        "armorExplosiveResonance": "Armor explosive resist %",
+        "hullHp": "Hull HP",
+        "hullEmResonance": "Hull EM resist %",
+        "hullThermalResonance": "Hull thermal resist %",
+        "hullKineticResonance": "Hull kinetic resist %",
+        "hullExplosiveResonance": "Hull explosive resist %",
+        "maxTargetRange": "Targeting range (km)",
+        "maxLockedTargets": "Max locked targets",
+        "scanResolution": "Scan resolution",
+        "signatureRadius": "Signature radius (m)",
+        "maxVelocity": "Max velocity (m/s)",
+        "agility": "Inertia modifier",
+        "mass": "Mass (t)",
+        "warpSpeed": "Warp speed (AU/s)"
+      }
     }
   },
   "skills": {
@@ -557,8 +722,8 @@
       "pastePlaceholder": "[Vexor, PvE Ratting]\nDrone Damage Amplifier II\n...",
       "checkButton": "Check Fit",
       "notEftFit": "That doesn't look like an EFT fit — paste one starting with [Ship Name, Fit Name].",
-      "addAllToPlan": "Add All to Plan",
-      "createPlanAndAdd": "Create Plan & Add",
+      "addAllToPlan": "Add all to Skill Plan",
+      "createPlanAndAdd": "Create Skill Plan and add",
       "add": "Add",
       "trained": "Trained"
     },
@@ -1296,7 +1461,6 @@
     "jobsFilterStatus": "Status",
     "jobsFilterWithCount": "{{label}} ({{count}})",
     "jobsFilteredEmptyTitle": "No jobs match these filters",
-    "jobsResetFilters": "Reset filters",
     "jobsColBlueprint": "Blueprint",
     "jobsColActivity": "Activity",
     "jobsColRuns": "Runs",
@@ -1972,9 +2136,11 @@
     "retention": "This device keeps the last 300 alerts, and syncs 30 days of them between your devices."
   },
   "common": {
+    "unknownType": "Type {{id}}",
     "columnsButton": "Columns",
     "columnsMenuTitle": "Columns",
     "resetColumns": "Reset to default",
+    "resetFilters": "Reset filters",
     "close": "Close",
     "save": "Save",
     "cancel": "Cancel",
@@ -2123,6 +2289,7 @@
     "payeePlaceholder": "Choose a Payee…",
     "rememberSystemLabel": "Remember {{system}} for {{payee}}",
     "noPayeesHint": "Add a Payee first, from Manage Payees, before assigning this entry.",
+    "unassignedNoPayeesPrompt": "Add a Payee (the moon's landlord) before assigning this ore.",
     "oreLinesLabel": "Ore to assign",
     "splitHint": "Uncheck a line to leave it for a different Payee.",
     "taxPctLabel": "Tax %",
@@ -2488,7 +2655,8 @@
       "allLocations_other": "All locations · {{count}}",
       "locationCount_one": "{{count}} location",
       "locationCount_other": "{{count}} locations",
-      "totalValue": "Total Assets Value: {{value}}"
+      "totalValueLabel": "Total value",
+      "totalValueFiltered": "{{value}} (filtered)"
     },
     "unresolved": {
       "heading_one": "Location unresolved · {{count}}",
@@ -2790,7 +2958,8 @@
     },
     "altColonies": {
       "toggleLabel": "Show alt colonies",
-      "notLoaded": "Not loaded yet, so their colonies aren't listed: {{names}}. Switch to that character and refresh to cache them.",
+      "notLoaded": "{{name}}: not loaded yet, so their colonies aren't listed. Switch and refresh to cache them.",
+      "switchTo": "Switch to {{name}}",
       "noColonies": "No colonies: {{names}}.",
       "skipped": "Skipped, no planetary access granted: {{names}}."
     }
@@ -2872,8 +3041,8 @@
     "tierChip": "P{{tier}}",
     "roleMake": "Make",
     "roleBuy": "Buy",
-    "readMake": "Make wins",
-    "readBuy": "Buy wins",
+    "readMake": "Hub: make",
+    "readBuy": "Hub: buy",
     "readUnknown": "Unpriced",
     "readTooltip": "What the hub says about this tier on its own: whether processing it is worth more than its inputs cost. Before customs, and independent of the floor you picked — the customs rate is what can flip the whole chain.",
     "sensitivityTitle": "Margin by sourcing floor and customs rate",
@@ -2881,7 +3050,7 @@
     "sensitivityHint": "Which floor wins is a function of the rate, not a fixed answer: at 0% supplying your own P0 wins, and from 10% up buying P1 does.",
     "floorColumn": "Floor",
     "rateColumn": "{{percent}}",
-    "cellNeedsRate": "Needs a rate",
+    "cellNeedsRate": "Needs yield",
     "cellNotPriceable": "No price",
     "bestFloor": "Best at this rate",
     "planetsTaxed": "Planets taxed across",
@@ -3174,7 +3343,7 @@
     "emptyHint": "Reconnect to fetch this character's contracts.",
     "status": "Status",
     "type": "Type",
-    "price": "Price",
+    "price": "Price / reward",
     "expires": "Expires",
     "issuer": "Issuer",
     "exportCsv": "Export CSV",
@@ -3182,7 +3351,6 @@
     "noFilterMatches": "No contracts match your filters.",
     "noFilterMatchesHint": "Clear the search or reset the status/type filters to see every contract.",
     "noFilterMatchesResetHint": "No contract matches the current search and filters.",
-    "resetFilters": "Reset filters",
     "showAll": "Show all ({{count}} total)",
     "staleTooltip": "Outstanding and past its deadline — lapsed and unclaimed.",
     "fetchTruncatedRetry": "Retry",
@@ -3236,7 +3404,7 @@
     "typeFilterLabel": "Contract type",
     "contextMenu": {
       "copyTitle": "Copy title",
-      "copyContractId": "Copy Contract ID"
+      "copyContractId": "Copy contract ID"
     }
   },
   "contractDetail": {
@@ -3410,7 +3578,7 @@
     "reauthAction": "Log in again with EVE Online",
     "contextMenu": {
       "copyName": "Copy name",
-      "copyContactId": "Copy Contact ID",
+      "copyContactId": "Copy contact ID",
       "showInfo": "Show info"
     }
   },
@@ -3489,7 +3657,7 @@
     "stateExpired": "Expired",
     "stateCancelled": "Cancelled",
     "filled": "Filled",
-    "viewInMarket": "View in market",
+    "viewInMarket": "View in Market",
     "sortBy": "Sort by {{column}}",
     "sortedAsc": "{{column}}, sorted ascending",
     "sortedDesc": "{{column}}, sorted descending",
@@ -3525,8 +3693,8 @@
     },
     "groupedTitle": "{{title}} x{{count}}",
     "contextMenu": {
-      "browserOn": "Turn off browser notifications",
-      "browserOff": "Turn on browser notifications",
+      "browserOn": "Turn off device notifications",
+      "browserOff": "Turn on device notifications",
       "hideInFeed": "Hide in feed"
     },
     "eveTypeName": {
@@ -3876,8 +4044,8 @@
       "resultTitle": "Appraisal",
       "atPercent": "{{pricePercent}}%",
       "exportCsv": "Export appraisal as CSV",
-      "share": "Copy shareable link",
-      "shareCopied": "Link copied",
+      "share": "Copy Share Link",
+      "shareCopied": "Share Link copied",
       "shareTooLarge": "Too large to share as a link — use Export CSV instead.",
       "columnsButton": "Columns",
       "columnsMenuTitle": "Columns",
@@ -4048,6 +4216,9 @@
         "best": "Best price",
         "bestHelp": "Nobody is cheaper where this order sits, and it sells for more than it cost you.",
         "bestAction": "Nothing. This one is doing fine.",
+        "topBid": "Top bid",
+        "topBidHelp": "This is a buy order and nobody bids higher where it sits, so sellers come to you first.",
+        "topBidAction": "Nothing. This one is doing fine.",
         "noCostBasis": "No cost basis",
         "noCostBasisHelp": "Nothing is linked to this order and your wallet buys don't cover it, so we can't work out your lowest safe price.",
         "noCostBasisAction": "Link the build that made this, or let your wallet cover every unit. A build needs a build plan on the Industry page first."
@@ -4068,7 +4239,8 @@
         "expiringUnknown": "{{units}} still unsold",
         "outbid": "A rival bids {{price}} ISK, {{gap}} over you",
         "noCostBasis": "Link a build or buy with this character and we can work out your lowest safe price",
-        "best": "Nobody is cheaper where this order sits"
+        "best": "Nobody is cheaper where this order sits",
+        "topBid": "Nobody bids higher where this order sits"
       },
       "groupSummaryIsk": "{{isk}} ISK listed",
       "groupSummaryWorst": "worst -{{pct}}%",
@@ -4096,7 +4268,7 @@
         "outbid": "Outbid buy order",
         "outbidHint": "Someone bids higher on your buy order, so sellers go to them first.",
         "healthy": "Healthy",
-        "healthyHint": "Nothing wrong here. Nobody is cheaper, and they sell for more than they cost."
+        "healthyHint": "Nothing wrong here. Nobody beats your price."
       },
       "floorLabel": "Never sell below",
       "floorHelp": "Change an order's price and you pay the broker fee all over again (discounted by your Relist Discount), so this is the lowest price worth editing to. Leave the order alone and it sells, the fee is already paid, so you break even a little lower.",
@@ -4119,6 +4291,8 @@
       "sellsOutHelp": "Units left divided by the item's average daily volume in the region, shared by your place in the queue.",
       "sellsOutUnknown": "Can't tell yet",
       "sellsOutNoSales": "Nothing has sold in the last 30 days",
+      "fillsIn": "Fills in",
+      "fillsInHelp": "Units left to buy divided by the item's average daily volume in the region, shared by your place in the queue.",
       "sellsOutPastExpiry": "Runs past the day this order expires",
       "expiresIn": "Expires in",
       "details": "Details",
@@ -4170,6 +4344,7 @@
       "statOrderExpires": "Order expires",
       "statExpiresCaption": "{{date}} · listed {{listed}}",
       "statIfSellsAsListed": "If it sells as listed",
+      "statIfFillsAsListed": "If it fills as listed",
       "statPerUnitAfterFees": "a unit, after fees",
       "exitsTitle": "Is there a better exit?",
       "exitShortHold": "Hold",
@@ -4237,6 +4412,7 @@
       "scopeClear": "Nobody cheaper here",
       "quickAnswer": "Quick answer",
       "whoIsCheaper": "Who is cheaper, and where",
+      "whoBidsHigher": "Who bids higher, and where",
       "floorWorking": "Where that price comes from",
       "outbidAt": "Outbid at {{price}}",
       "copyPrice": "Copy {{price}}",
@@ -4360,12 +4536,60 @@
   "settings": {
     "title": "Settings",
     "tabs": {
-      "general": "General",
+      "display": "Display",
+      "shortcuts": "Shortcuts",
+      "permissions": "Permissions",
+      "industry": "Industry",
+      "market": "Market",
+      "characters": "Characters",
+      "corporation": "Corporation",
       "notifications": "Notifications",
-      "data": "Data",
+      "data": "Data & storage",
       "activity": "Activity Log",
       "faq": "FAQ"
     },
+    "groups": {
+      "app": "App",
+      "defaults": "Defaults",
+      "alerts": "Alerts",
+      "data": "Data & device"
+    },
+    "navLabel": "Settings sections",
+    "backToList": "Settings",
+    "summary": {
+      "display": "{{size}} text, {{format}}",
+      "on": "On",
+      "off": "Off",
+      "industry": "{{facility}}, ME {{me}}, TE {{te}}",
+      "charactersCurrent": "Current character",
+      "charactersAll": "All characters",
+      "charactersSome_one": "{{count}} character",
+      "charactersSome_other": "{{count}} characters",
+      "corporation_one": "Dark after {{count}} day",
+      "corporation_other": "Dark after {{count}} days"
+    },
+    "industryDefaultsTitle": "Industry defaults",
+    "marketDefaultsTitle": "Market defaults",
+    "characterDefaultsTitle": "Character defaults",
+    "piDefaultsTitle": "Planetary Industry",
+    "corpUnavailable": "Corporation defaults appear once the active character can see a corporation.",
+    "updateTitle": "App updates",
+    "updateHint": "Neocom Desk normally updates itself in the background. Update now checks for a new version right away and reloads the app.",
+    "updateAction": "Update now",
+    "updateWorking": "Updating…",
+    "updateFailed": "Could not check for a new version. Check your connection and try again.",
+    "deviceTitle": "Log out",
+    "deviceCharacters_one": "{{count}} character is logged in on this browser.",
+    "deviceCharacters_other": "{{count}} characters are logged in on this browser.",
+    "deviceCharactersNone": "No characters are logged in on this browser.",
+    "deviceLogoutLabel": "Log out of all characters",
+    "deviceLogoutHint": "Removes every character's login and locally stored data from this browser. Sync settings and everything already synced stay, and come back when you log a character in again.",
+    "deviceLogoutHintLocalOnly": "Removes every character's login and locally stored data from this browser. Sync is not set up here, so plans and other data stored only on this browser are deleted too.",
+    "deviceLogoutAction": "Log out",
+    "deviceLogoutFailed": "Could not log out. Try again, or reload the page.",
+    "deviceLogoutConfirmTitle": "Log out of all characters?",
+    "deviceLogoutConfirm_one": "This removes {{count}} character's login and local data from this browser. You will be taken to the login page.",
+    "deviceLogoutConfirm_other": "This removes {{count}} characters' logins and local data from this browser. You will be taken to the login page.",
     "faq": {
       "storeTitle": "What we store",
       "storeIntro": "Neocom Desk keeps as little as possible on a server. The short version: we store the things you make in the app, and none of what we read from EVE on your behalf.",
@@ -4423,11 +4647,13 @@
     "fontScaleExtraLarge": "Extra large",
     "notificationsTitle": "Notifications",
     "notifications": {
-      "hint": "Pick what each character is told about, and how. Browser raises a pop-up from your operating system; Overview adds a row to the Overview page inside the app. These choices stay on this device.",
+      "hint": "Pick what each character is told about, and how. Device raises a pop-up from your phone or computer; Overview adds a row to the Overview page inside the app. These choices stay on this device.",
       "blockedNotice": "Notifications are blocked — enable them in your browser's site settings, then return here.",
+      "blockedNoticePlayApp": "Notifications are off for this app.",
+      "openAndroidSettings": "Open notification settings",
       "installRequiredNotice": "On iPhone and iPad, notifications only work once Neocom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
       "enableHint": "This device hasn't granted notification permission yet.",
-      "enableButton": "Turn on browser notifications",
+      "enableButton": "Turn on device notifications",
       "masterSwitchLabel": "Enable notifications",
       "searchPlaceholder": "Search events or characters",
       "noResults": "No matching events or characters",
@@ -4464,6 +4690,7 @@
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled for notifications — open the app at least that often to keep it current. The Planetary Industry page always shows the real expiry.",
       "marketOrderUndercutStationOnlyHint": "Only checks your order's own station, and only while the app is open — it does not compare prices across the wider system or region.",
+      "corpGroup": "Corp notifications",
       "corpEventBestEffortHint": "Best-effort: fires only while the app is open. Not a substitute for in-game alerts.",
       "scheduledPushBadge": "Arrives even with the app closed — the backend schedules this one up to 72 hours ahead. Needs notification permission, and on iPhone and iPad the app installed to the home screen. Every other event needs the app open.",
       "extractorExpiringLeadTimeLabel": "Warn this far before an extractor expires:",
@@ -4480,38 +4707,38 @@
       "corpWalletTransactionCeilingLabel": "Transaction ceiling (ISK):",
       "walletBalanceChangedThresholdLabel": "Notify on changes of at least:",
       "walletBalanceChangedThresholdHint": "Accepts shorthand: 10.5m, 10,500,000, or 10500000 (b = billion, m = million, t = thousand).",
-      "browserChannelLabel": "Browser notifications",
+      "browserChannelLabel": "Device notifications",
       "browserChannelHint": "Pop-ups from your operating system. Needs permission. Events with a known future time can arrive up to 72 hours ahead even with the app closed, once installed on iPhone and iPad; the rest need the app open.",
       "feedChannelLabel": "Overview notifications",
       "feedChannelHint": "A dismissible list on the Overview page. Works on every device.",
       "column": {
-        "browser": "Browser",
+        "browser": "Device",
         "feed": "Overview"
       },
       "selectAll": {
-        "browser": "Toggle all browser notifications for {{character}}",
+        "browser": "Toggle all device notifications for {{character}}",
         "feed": "Toggle all Overview notifications for {{character}}"
       },
       "toggleLabel": {
-        "browser": "{{event}}, browser notifications",
+        "browser": "{{event}}, device notifications",
         "feed": "{{event}}, Overview list"
       },
       "allCharactersLabel": "All Characters",
       "allCharactersHint": "Apply a setting to every character at once. This is a one-time broadcast, not a saved default — a character added later starts from its own defaults, and any character can still be edited independently afterward.",
       "selectAllCharacters": {
-        "browser": "Toggle browser notifications for every character",
+        "browser": "Toggle device notifications for every character",
         "feed": "Toggle Overview notifications for every character"
       },
       "toggleAllCharactersLabel": {
-        "browser": "{{event}} for every character, browser notifications",
+        "browser": "{{event}} for every character, device notifications",
         "feed": "{{event}} for every character, Overview list"
       },
       "selectAllCharactersFamily": {
-        "browser": "Toggle all browser notifications for {{family}} for every character",
+        "browser": "Toggle all device notifications for {{family}} for every character",
         "feed": "Toggle all Overview notifications for {{family}} for every character"
       },
       "columnEvent": "Event",
-      "eveTypesHint": "EVE’s own in-game notifications, grouped by family. These default to the Overview page only, except the attack and loss alerts, which also raise a browser pop-up — flip any of them per column.",
+      "eveTypesHint": "EVE’s own in-game notifications, grouped by family. These default to the Overview page only, except the attack and loss alerts, which also raise a device pop-up — flip any of them per column.",
       "family": {
         "structures": "Structures",
         "war": "War",
@@ -4521,11 +4748,11 @@
         "pi": "PI"
       },
       "selectAllFamily": {
-        "browser": "Toggle all browser notifications for {{family}}",
+        "browser": "Toggle all device notifications for {{family}}",
         "feed": "Toggle all Overview notifications for {{family}}"
       },
       "columnHint": {
-        "browser": "A pop-up from your browser, outside the app.",
+        "browser": "A pop-up from your phone or computer, outside the app.",
         "feed": "A row on the Overview page, inside the app."
       }
     },
@@ -4552,7 +4779,6 @@
       "importSummary": "Added {{added}} character(s); skipped {{skipped}} already on this device.",
       "importReloading": "Reloading to pick up the imported data…"
     },
-    "defaultsTitle": "Defaults",
     "defaultsSyncHint": "Kept across your devices — set these once, on whichever one you have to hand.",
     "corpDefaultsTitle": "Corporation",
     "timeFormatLabel": "Time format",
@@ -4716,7 +4942,7 @@
       "leftName": "Left · {{name}}"
     },
     "members": {
-      "title": "Members",
+      "title": "Corp members",
       "refresh": "Refresh member list",
       "tableLabel": "Corporation members",
       "columnMember": "Member",
@@ -4724,6 +4950,8 @@
       "columnShip": "Ship",
       "columnLocation": "Location",
       "columnJoined": "Joined",
+      "columnRoles": "Roles",
+      "you": "You",
       "never": "Never",
       "total": "Members",
       "dark": "Dark {{days}}d+",
@@ -4736,7 +4964,6 @@
       "emptyHint": "EVE reported no tracking rows for this corporation.",
       "noFilterMatches": "No members match your search or filters.",
       "noFilterMatchesHint": "Clear the search or reset the dark-only, ship and location filters to see every member.",
-      "resetFilters": "Reset filters",
       "noAccessTitle": "Member tracking needs Director",
       "noAccessHint": "EVE only opens the member list and its last-login dates to a Director. No other corporation role can see them, and granting access here will not change that.",
       "searchPlaceholder": "Search name, ship, location…",
@@ -4746,12 +4973,12 @@
       "locationFilterAll": "Any location",
       "exportCsv": "Export CSV",
       "contextMenu": {
-        "showInfo": "Show Info",
-        "copyName": "Copy Character Name"
+        "showInfo": "Show info",
+        "copyName": "Copy name"
       }
     },
     "assets": {
-      "title": "Assets",
+      "title": "Corp assets",
       "refresh": "Refresh corp assets",
       "empty": "No corporation assets",
       "emptyHint": "EVE reported no assets for this corporation.",
@@ -4828,10 +5055,13 @@
   },
   "publicInfo": {
     "title": "Public info",
-    "tabsLabel": "Character, corporation, and alliance",
+    "tabsLabel": "Character, corporation, alliance, and employment",
     "characterTab": "Character",
     "corporationTab": "Corporation",
     "allianceTab": "Alliance",
+    "employmentTab": "Employment",
+    "employmentEmptyTitle": "No employment history",
+    "employmentEmptyHint": "This character has no public corporation history to show.",
     "securityStatus": "Security status",
     "corporation": "Corporation",
     "alliance": "Alliance",

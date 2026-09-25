@@ -49,6 +49,8 @@ export {
   ContextMenuTrigger,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuRadioGroup,
+  ContextMenuRadioItem,
   ContextMenuSeparator,
   ContextMenuSub,
   ContextMenuSubTrigger,
@@ -92,6 +94,8 @@ export {
   SelectSeparator,
 } from './Select';
 export { NativeSelect } from './NativeSelect';
+export { Checkbox } from './Checkbox';
+export { Radio } from './Radio';
 export { TextInput } from './TextInput';
 export { SearchInput } from './SearchInput';
 export type { ControlSize } from './controlStyles';

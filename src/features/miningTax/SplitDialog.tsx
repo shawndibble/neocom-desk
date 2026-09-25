@@ -10,6 +10,7 @@ import {
   SelectValue,
   TextInput,
   TypeIcon,
+  Radio,
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
@@ -249,22 +250,18 @@ export function SplitDialog({
               {t('miningTax.splitCollectorLabel')}
             </legend>
             <label className="flex items-center gap-2 text-xs">
-              <input
-                type="radio"
+              <Radio
                 name="split-collector"
                 checked={collector === 'original'}
                 onChange={() => setCollector('original')}
-                className="size-4 shrink-0 cursor-pointer accent-accent"
               />
               {t('miningTax.splitCollectorKeeps', { payee: originalPayeeName })}
             </label>
             <label className="flex items-center gap-2 text-xs">
-              <input
-                type="radio"
+              <Radio
                 name="split-collector"
                 checked={collector === 'new'}
                 onChange={() => setCollector('new')}
-                className="size-4 shrink-0 cursor-pointer accent-accent"
               />
               {t('miningTax.splitCollectorNew', {
                 payee: newPayeeName || t('miningTax.splitNewSideLabel'),

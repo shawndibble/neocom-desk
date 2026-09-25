@@ -501,6 +501,15 @@ export interface NotificationFeedRecord {
    */
   syncedAt?: number;
   /**
+   * Epoch ms *this device* raised an OS notification for this row — a
+   * Foreground Poller toast or a Web Push. Local bookkeeping, like `syncedAt`:
+   * `toRemoteFeedDoc` never uploads it, and `mergeFeedRecord` keeps it across
+   * a sync pull. Absent on a row another device synced in, which is what lets
+   * this device still raise its own notification for an occurrence it
+   * observed itself (`features/notifications/feed.rowSuppressesToast`).
+   */
+  notifiedHereAt?: number;
+  /**
    * The row this fire was *about*, where its event lands on a table that can
    * show it (`features/notifications/domainCopy`'s `subjectOf`, routed by
    * `notificationOptions`'s `SUBJECT_URLS`).

@@ -53,8 +53,10 @@ describe('esiFittingToFitting', () => {
     expect(fitting.cargo).toEqual([{ typeId: 12608, quantity: 100 }]);
   });
 
-  it('carries the fitting name and hull straight through', () => {
-    const { fitting } = esiFittingToFitting(esiFitting({ name: 'PvP Rifter', ship_type_id: 587 }));
+  it('opens as an In-game Load, carrying the fitting name and hull straight through', () => {
+    const loaded = esiFittingToFitting(esiFitting({ name: 'PvP Rifter', ship_type_id: 587 }));
+    expect(loaded).toMatchObject({ kind: 'fitting', source: 'in-game' });
+    const { fitting } = loaded;
     expect(fitting.name).toBe('PvP Rifter');
     expect(fitting.shipTypeId).toBe(587);
   });
@@ -71,9 +73,9 @@ describe('esiFittingToFitting', () => {
     );
     expect(fitting.modules).toEqual([]);
     expect(unresolved).toEqual([
-      { flag: 'FighterBay', typeId: 1 },
-      { flag: 'ServiceSlot0', typeId: 2 },
-      { flag: 'Invalid', typeId: 3 },
+      { text: 'FighterBay', reason: 'unsupported slot' },
+      { text: 'ServiceSlot0', reason: 'unsupported slot' },
+      { text: 'Invalid', reason: 'unsupported slot' },
     ]);
   });
 });

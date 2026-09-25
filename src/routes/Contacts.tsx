@@ -12,7 +12,6 @@ import {
   IconButton,
   PageHeader,
   Panel,
-  ReauthBanner,
   SearchInput,
   Spinner,
   StandingIcon,
@@ -32,12 +31,12 @@ import {
   type ContactsAcrossColumnId,
   type ContactsCharacterColumnId,
 } from './contactsColumns';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { GrantBanner } from '@/app/GrantNote';
 import { loadContacts } from '@/features/character/contacts';
 import {
   ALL_CONTACT_TYPES,
   STANDING_CATEGORIES,
+  EMPTY_CONTACTS_FILTER,
   activeContactsFilterCount,
   contactCountsByStanding,
   contactCountsByType,
@@ -881,13 +880,12 @@ export function Contacts() {
           isColumnVisible={acrossColumnVisibility.isVisible}
         />
       ) : contactsNeedsReauth ? (
-        <ReauthBanner
+        <GrantBanner
+          characterId={activeCharacterId}
+          endpoints={['getCharacterContacts']}
           title={t('contacts.reauthTitle')}
           hint={t('contacts.reauthHint')}
           actionLabel={t('contacts.reauthAction')}
-          onLogin={() =>
-            void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterContacts']) })
-          }
         />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
@@ -910,6 +908,13 @@ export function Contacts() {
               title={t('contacts.noResults')}
               hint={t('contacts.noResultsHint')}
               className="py-8"
+              action={
+                activeContactsFilterCount(filter) > 0 ? (
+                  <Button size="sm" onClick={() => setFilter(EMPTY_CONTACTS_FILTER)}>
+                    {t('common.resetFilters')}
+                  </Button>
+                ) : undefined
+              }
             />
           ) : (
             <DataTable

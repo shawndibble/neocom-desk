@@ -1,11 +1,15 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useAuthFailure } from '@/stores/authFailure';
 import { AuthFailureNotice, AuthFailureRedirect } from './AuthFailureNotice';
+import { beginEveLogin } from './loginFlow';
+
+vi.mock('./loginFlow', () => ({ beginEveLogin: vi.fn(async () => {}) }));
 
 const CHARACTER_ID = 12;
 
@@ -60,6 +64,30 @@ describe('AuthFailureRedirect', () => {
 });
 
 describe('AuthFailureNotice', () => {
+  beforeEach(() => {
+    vi.mocked(beginEveLogin).mockClear();
+  });
+
+  it('asks for the Permission the failed request needed, not just a plain re-login', async () => {
+    // A mail send refused for a scope the grant never held: a plain re-login
+    // re-requests the same scopes, comes back identical and fails again.
+    useAuthFailure.getState().reportRequestFailure(CHARACTER_ID, 'postCharacterMail');
+    render(<AuthFailureNotice />);
+
+    await userEvent.click(screen.getByRole('button', { name: /log in again/i }));
+
+    expect(beginEveLogin).toHaveBeenCalledWith({ characterId: CHARACTER_ID, groups: ['mail'] });
+  });
+
+  it('asks for no Permission when the failure names no endpoint', async () => {
+    useAuthFailure.getState().reportRequestFailure(CHARACTER_ID);
+    render(<AuthFailureNotice />);
+
+    await userEvent.click(screen.getByRole('button', { name: /log in again/i }));
+
+    expect(beginEveLogin).toHaveBeenCalledWith({ characterId: CHARACTER_ID, groups: [] });
+  });
+
   it('names the active character so the pilot knows which one to re-auth', async () => {
     await db.characters.put({
       characterId: CHARACTER_ID,

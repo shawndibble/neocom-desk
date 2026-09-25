@@ -1,14 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { httpsCallable } from 'firebase/functions';
-import { getToken } from 'firebase/messaging';
+import { deleteToken, getToken } from 'firebase/messaging';
 import { getValidAccessToken } from '@/auth/session';
 import { db } from '@/db';
-import { webPushSupport, registerDeviceForWebPush } from './deviceRegistration';
+import {
+  webPushSupport,
+  registerDeviceForWebPush,
+  unregisterDeviceForWebPush,
+} from './deviceRegistration';
 import { getDeviceId } from './deviceId';
 
 vi.mock('firebase/messaging', () => ({
   getMessaging: vi.fn(() => ({})),
   getToken: vi.fn(),
+  deleteToken: vi.fn(),
 }));
 vi.mock('firebase/functions', () => ({
   httpsCallable: vi.fn(),
@@ -122,6 +127,25 @@ describe('registerDeviceForWebPush', () => {
     expect(call).not.toHaveBeenCalled();
   });
 
+  it('does not mint an FCM token for a device holding no Characters', async () => {
+    vi.mocked(getToken).mockResolvedValue('fcm-token');
+    vi.spyOn(db.characters, 'toArray').mockResolvedValue([]);
+    await registerDeviceForWebPush('vapid-key', registration);
+    expect(getToken).not.toHaveBeenCalled();
+  });
+
+  it('drops a token minted while the roster emptied', async () => {
+    vi.mocked(getToken).mockResolvedValue('fcm-token');
+    vi.mocked(deleteToken).mockResolvedValue(true);
+    vi.spyOn(db.characters, 'toArray')
+      .mockResolvedValueOnce([{ characterId: 1, name: 'P', ownerHash: 'h', addedAt: 1 }])
+      .mockResolvedValueOnce([]);
+    const result = await registerDeviceForWebPush('vapid-key', registration);
+    expect(result).toBeNull();
+    expect(deleteToken).toHaveBeenCalledTimes(1);
+    expect(call).not.toHaveBeenCalled();
+  });
+
   it('batches every stored Character’s access token into one callable call', async () => {
     vi.mocked(getToken).mockResolvedValue('fcm-token');
     vi.spyOn(db.characters, 'toArray').mockResolvedValue([
@@ -224,6 +248,15 @@ describe('registerDeviceForWebPush', () => {
     const result = await registerDeviceForWebPush('vapid-key', registration);
 
     expect(result).toBeNull();
+    expect(call).not.toHaveBeenCalled();
+  });
+});
+
+describe('unregisterDeviceForWebPush', () => {
+  it('deletes this device’s FCM token', async () => {
+    vi.mocked(deleteToken).mockResolvedValue(true);
+    await unregisterDeviceForWebPush();
+    expect(deleteToken).toHaveBeenCalledTimes(1);
     expect(call).not.toHaveBeenCalled();
   });
 });

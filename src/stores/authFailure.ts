@@ -8,6 +8,7 @@
 // from pinning on forever for a failure re-authing cannot fix.
 import { create } from 'zustand';
 import { onEsiAuthFailure } from '@/esi/authFailureSignal';
+import type { EsiEndpointId } from '@/esi/registry';
 
 /**
  * - `token`: the refresh grant failed before any request. Nothing in the app
@@ -20,12 +21,14 @@ export type AuthFailureKind = 'token' | 'request';
 export interface AuthFailure {
   characterId: number;
   kind: AuthFailureKind;
+  /** For a `request` failure, the endpoint refused — when the reporter knew it. */
+  endpointId?: EsiEndpointId;
 }
 
 interface AuthFailureState {
   failure: AuthFailure | null;
   reportTokenFailure: (characterId: number) => void;
-  reportRequestFailure: (characterId: number) => void;
+  reportRequestFailure: (characterId: number, endpointId?: EsiEndpointId) => void;
   dismiss: () => void;
   /**
    * Drop a stale failure — on character switch, or once the grant works again.
@@ -46,9 +49,9 @@ export const useAuthFailure = create<AuthFailureState>((set, get) => ({
   reportTokenFailure: (characterId) => {
     set({ failure: { characterId, kind: 'token' } });
   },
-  reportRequestFailure: (characterId) => {
+  reportRequestFailure: (characterId, endpointId) => {
     if (!outranks('request', get().failure)) return;
-    set({ failure: { characterId, kind: 'request' } });
+    set({ failure: { characterId, kind: 'request', endpointId } });
   },
   dismiss: () => {
     set({ failure: null });
@@ -66,8 +69,8 @@ export const useAuthFailure = create<AuthFailureState>((set, get) => ({
  * Wired here, once from the shell, so `esi` need not know this store exists.
  */
 export function subscribeToEsiAuthFailures(): () => void {
-  return onEsiAuthFailure((characterId) => {
-    useAuthFailure.getState().reportRequestFailure(characterId);
+  return onEsiAuthFailure((characterId, endpointId) => {
+    useAuthFailure.getState().reportRequestFailure(characterId, endpointId);
   });
 }
 

@@ -3,7 +3,13 @@ import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it } from 'vitest';
 import wasmInit, { calculate } from '@eveshipfit/dogma-engine';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
-import { extractFittingStats, extractModuleResult, extractOffense } from '@/engine/fittings/stats';
+import { withWeather } from './dogmaFittingEngine';
+import {
+  extractDroneLimits,
+  extractFittingStats,
+  extractModuleResult,
+  extractOffense,
+} from '@/engine/fittings/stats';
 import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
 import type { Fitting } from '@/engine/fittings/types';
@@ -134,7 +140,7 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
 
     const calculation = calculate(dogmaFit);
     const stats = extractFittingStats(
-      dogmaFit.items.map((item) => item.type_id),
+      dogmaFit.items,
       calculation.ship.attributes,
       calculation.items
     );
@@ -155,7 +161,7 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
 
     const calculation = calculate(dogmaFit);
     const stats = extractFittingStats(
-      dogmaFit.items.map((item) => item.type_id),
+      dogmaFit.items,
       calculation.ship.attributes,
       calculation.items
     );
@@ -177,12 +183,34 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
 
     const calculation = calculate(dogmaFit);
     const stats = extractFittingStats(
-      dogmaFit.items.map((item) => item.type_id),
+      dogmaFit.items,
       calculation.ship.attributes,
       calculation.items
     );
 
     expect(stats.droneDps).toBe(0);
+  });
+
+  it("reads a bay drone's bandwidth and the pilot's drone count, so a Load can launch them", () => {
+    const fitting = vexorNavyIssueFit();
+    fitting.drones = [{ typeId: WARRIOR_II, quantity: 5, state: 'online' }];
+    const allV = fittingToDogmaFit(fitting, buildAllVProfile(ALL_TEST_SKILL_IDS));
+    const partial = fittingToDogmaFit(fitting, buildPilotProfile(PARTIAL_SKILLS, []));
+    const noDrones = fittingToDogmaFit(fitting, buildPilotProfile(new Map(), []));
+
+    const read = (dogmaFit: ReturnType<typeof fittingToDogmaFit>) => {
+      const calculation = calculate(dogmaFit);
+      return extractDroneLimits(
+        dogmaFit.items,
+        calculation.items,
+        calculation.character.attributes
+      );
+    };
+
+    // A Warrior II is a light drone, 5 Mbit/s; Drones V controls five, Drones III three.
+    expect(read(allV)).toEqual({ maxActiveDrones: 5, droneBandwidthByType: { [WARRIOR_II]: 5 } });
+    expect(read(partial).maxActiveDrones).toBe(3);
+    expect(read(noDrones).maxActiveDrones).toBe(0);
   });
 
   it('marks a type id the pinned data has nothing for as unknown, without failing the rest of the calculation', () => {
@@ -193,7 +221,7 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
 
     const calculation = calculate(dogmaFit);
     const stats = extractFittingStats(
-      dogmaFit.items.map((item) => item.type_id),
+      dogmaFit.items,
       calculation.ship.attributes,
       calculation.items
     );
@@ -202,6 +230,113 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     // The rest of the fit still calculated — same as the clean-fit case above.
     expect(stats.cpuTotal).toBeCloseTo(437.5, 6);
     expect(stats.droneDps).toBeCloseTo(124.578, 2);
+  });
+
+  it('never marks cargo as unknown — the engine calculates nothing for it, known or not', () => {
+    const fitting = vexorNavyIssueFit();
+    fitting.cargo = [{ typeId: ANTIMATTER_CHARGE_M, quantity: 1000 }];
+    const profile = buildAllVProfile(ALL_TEST_SKILL_IDS);
+    const dogmaFit = fittingToDogmaFit(fitting, profile);
+
+    const calculation = calculate(dogmaFit);
+    const stats = extractFittingStats(
+      dogmaFit.items,
+      calculation.ship.attributes,
+      calculation.items
+    );
+
+    expect(stats.unknownItemTypeIds).toEqual([]);
+  });
+
+  it('applies an Abyssal weather: its resist penalty grows with the level, its bonus does not', () => {
+    const fitting: Fitting = {
+      name: 'Rifter',
+      shipTypeId: RIFTER,
+      modules: [],
+      drones: [],
+      cargo: [],
+    };
+    const fit = fittingToDogmaFit(fitting, buildAllVProfile(ALL_TEST_SKILL_IDS));
+    const read = (weatherTypeId?: number) => {
+      const withIt = withWeather(fit, weatherTypeId);
+      const calculation = calculate(withIt);
+      return extractFittingStats(withIt.items, calculation.ship.attributes, calculation.items);
+    };
+    const clear = read();
+    // Firestorm (infernal_weather_1 / _3): thermal resist penalty, +50% armor HP.
+    const firestorm1 = read(47390);
+    const firestorm3 = read(47392);
+
+    expect(firestorm1.armor.hp).toBeCloseTo(clear.armor.hp * 1.5, 6);
+    expect(firestorm3.armor.hp).toBeCloseTo(clear.armor.hp * 1.5, 6);
+    expect(firestorm1.armor.thermalResonance).toBeGreaterThan(clear.armor.thermalResonance);
+    expect(firestorm3.armor.thermalResonance).toBeGreaterThan(firestorm1.armor.thermalResonance);
+    // Other damage types untouched.
+    expect(firestorm3.armor.kineticResonance).toBeCloseTo(clear.armor.kineticResonance, 6);
+  });
+
+  it('gives every weather the bonus and the level-scaled penalty the picker names', () => {
+    // A Rifter with a loaded 200mm AutoCannon II (2889, EMP S 12608), so Dark's range penalty shows.
+    const fitting: Fitting = {
+      name: 'Rifter',
+      shipTypeId: RIFTER,
+      modules: [{ slot: 'high', slotIndex: 0, typeId: 2889, state: 'active', chargeTypeId: 12608 }],
+      drones: [],
+      cargo: [],
+    };
+    const fit = fittingToDogmaFit(fitting, buildAllVProfile(ALL_TEST_SKILL_IDS));
+    const read = (weatherTypeId?: number) => {
+      const withIt = withWeather(fit, weatherTypeId);
+      const calculation = calculate(withIt);
+      return {
+        stats: extractFittingStats(withIt.items, calculation.ship.attributes, calculation.items),
+        optimal: calculation.items[0].attributes.get(54)!.value,
+      };
+    };
+    const clear = read();
+    const ratio = (weatherTypeId: number, pick: (r: ReturnType<typeof read>) => number) =>
+      pick(read(weatherTypeId)) / pick(clear);
+
+    // Dark: +50% velocity; turret optimal −30% at 1, −70% at 3.
+    expect(ratio(47378, (r) => r.stats.navigation.maxVelocity)).toBeCloseTo(1.5, 6);
+    expect(ratio(47378, (r) => r.optimal)).toBeCloseTo(0.7, 6);
+    expect(ratio(47380, (r) => r.optimal)).toBeCloseTo(0.3, 6);
+    // Electrical: recharge time halved; EM resonance ×1.3 at 1, ×1.7 at 3 (resists −30 / −70%).
+    expect(ratio(47381, (r) => r.stats.capacitorRechargeTime)).toBeCloseTo(0.5, 6);
+    expect(ratio(47381, (r) => r.stats.armor.emResonance)).toBeCloseTo(1.3, 6);
+    expect(ratio(47383, (r) => r.stats.armor.emResonance)).toBeCloseTo(1.7, 6);
+    // Exotic: +50% scan resolution; kinetic resists down.
+    expect(ratio(47384, (r) => r.stats.targeting.scanResolution)).toBeCloseTo(1.5, 6);
+    expect(ratio(47384, (r) => r.stats.armor.kineticResonance)).toBeCloseTo(1.3, 6);
+    // Gamma: +50% shield HP; explosive resists down.
+    expect(ratio(47387, (r) => r.stats.shield.hp)).toBeCloseTo(1.5, 6);
+    expect(ratio(47387, (r) => r.stats.shield.explosiveResonance)).toBeCloseTo(1.3, 6);
+  });
+
+  it("reads the hull's own resists, not the Damage Control modifier attributes", () => {
+    // A bare Rifter: every hull since 2021 has a flat 33% structure resist.
+    const fitting: Fitting = {
+      name: 'Bare Rifter',
+      shipTypeId: RIFTER,
+      modules: [],
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(ALL_TEST_SKILL_IDS));
+
+    const calculation = calculate(dogmaFit);
+    const stats = extractFittingStats(
+      dogmaFit.items,
+      calculation.ship.attributes,
+      calculation.items
+    );
+
+    expect(stats.hull.emResonance).toBeCloseTo(0.67, 4);
+    expect(stats.hull.thermalResonance).toBeCloseTo(0.67, 4);
+    expect(stats.hull.kineticResonance).toBeCloseTo(0.67, 4);
+    expect(stats.hull.explosiveResonance).toBeCloseTo(0.67, 4);
+    // A frigate warps at 5 AU/s; the base-speed attribute alone reads 1 on every hull.
+    expect(stats.navigation.warpSpeed).toBeCloseTo(5, 6);
   });
 
   it('breaks Offense into per-weapon rows that sum to the engine total, overheated from its overload state', () => {
@@ -263,7 +398,7 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
 
     const calculation = calculate(dogmaFit);
     const stats = extractFittingStats(
-      dogmaFit.items.map((item) => item.type_id),
+      dogmaFit.items,
       calculation.ship.attributes,
       calculation.items
     );

@@ -28,6 +28,7 @@ import {
   StatChip,
   nextDataTableSort,
   sortRows,
+  Checkbox,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { SkillGateVerdict } from '@/engine/industry/skillGate';
@@ -198,14 +199,12 @@ export function MobileOpportunityList({
               className="relative flex flex-col gap-1.5 border-b border-line py-2.5 last:border-b-0"
             >
               <div className="absolute top-1 right-2 flex size-11 items-center justify-center md:size-4">
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={selectedIds.has(row.candidate.id)}
                   onChange={() => onToggleSelected(row.candidate.id)}
                   aria-label={t('industry.opportunitiesSelectFor', {
                     name: row.candidate.catalogEntry.productName,
                   })}
-                  className="size-4 shrink-0 cursor-pointer accent-accent"
                 />
               </div>
 

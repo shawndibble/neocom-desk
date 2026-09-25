@@ -531,6 +531,7 @@ function CorpAssetsView() {
     <div className="space-y-4">
       <PageHeader
         title={t('corp.assets.title')}
+        subNav={<CorpSubNav flush />}
         meta={
           data?.fetchedAt ? (
             <DataAgeBadge date={data.fetchedAt} note={t('corp.dataAgeNote')} />
@@ -559,7 +560,6 @@ function CorpAssetsView() {
           </div>
         }
       />
-      <CorpSubNav />
 
       {snapshot.loading && data === null ? (
         <Spinner />

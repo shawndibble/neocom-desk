@@ -121,3 +121,52 @@ describe('usePageTab', () => {
     expect(screen.getByLabelText('q')).toHaveValue('hi');
   });
 });
+
+describe('TabRoute with an index state', () => {
+  const INDEXED = definePageTabs(
+    '/idx',
+    [
+      { id: 'one', labelKey: 'one' },
+      { id: 'two', labelKey: 'two' },
+    ],
+    undefined,
+    { hiddenFrom: '(min-width: 48rem)' }
+  );
+
+  function renderIndexed(wide: boolean) {
+    vi.stubGlobal('matchMedia', (media: string) => ({
+      media,
+      matches: wide,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    return render(
+      <MemoryRouter initialEntries={['/idx']}>
+        <Routes>
+          <Route
+            path="/idx/*"
+            element={
+              <TabRoute page={INDEXED}>
+                <span>content</span>
+              </TabRoute>
+            }
+          />
+        </Routes>
+        <Probe />
+      </MemoryRouter>
+    );
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('keeps the bare path below the breakpoint', () => {
+    renderIndexed(false);
+    expect(probe()).toBe('/idx|POP');
+    expect(screen.getByText('content')).toBeInTheDocument();
+  });
+
+  it('still redirects to the default tab from the breakpoint up', () => {
+    renderIndexed(true);
+    expect(probe()).toBe('/idx/one|REPLACE');
+  });
+});

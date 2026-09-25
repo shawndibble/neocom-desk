@@ -1,10 +1,17 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, IconButton, NativeSelect, Panel, TextInput, TypeIcon } from '@/components/ui';
-import { AddRow, Close } from '@/components/ui/icons';
+import { AddRow, Close, Compare } from '@/components/ui/icons';
 import {
+  cargoGroups,
+  droneBayUsed,
+  droneCountMax,
   droneGroups,
+  setDroneCountWithinBay,
+  type DroneBay,
+  reachableModuleStates,
   removeModule,
+  setCargoQuantity,
   setDroneCounts,
   setModuleCharge,
   setModuleState,
@@ -20,13 +27,12 @@ import {
   type PilotProfile,
 } from '@/engine/fittings/types';
 import { moduleKey } from '@/engine/fittings/skillGaps';
+import { showsDrones } from '@/engine/fittings/stats';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { checkCharges } from './dogmaFittingEngine';
 import type { AddTarget } from './addTarget';
-import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
+import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
-
-const STATES: readonly FittingItemState[] = ['offline', 'online', 'active', 'overload'];
 
 const RACK_LABEL_CLASS =
   'mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
@@ -99,6 +105,33 @@ export interface ModuleRowProps extends EditContext {
   cantUse: boolean;
   /** List view only — Ring opens the same panel via its own slot click; absent inside that panel's own Modal, which needs no further affordance. */
   onOpenVariations?: (slot: FittingSlotKind, slotIndex: number) => void;
+  /** The name opens the item's info (the Market's item detail). */
+  onShowInfo?: ShowInfo;
+}
+
+/** Opens an item's info — the Market's item detail — by type and name. */
+export type ShowInfo = (typeId: number, name: string) => void;
+
+/** A fitted item's name: the way into its info, when there is one. */
+function SlotName({
+  typeId,
+  name,
+  onShowInfo,
+}: {
+  typeId: number;
+  name: string;
+  onShowInfo?: ShowInfo;
+}) {
+  if (!onShowInfo) return <span className={SLOT_NAME_CLASS}>{name}</span>;
+  return (
+    <button
+      type="button"
+      className={`${SLOT_NAME_CLASS} cursor-pointer text-accent underline-offset-2 hover:underline`}
+      onClick={() => onShowInfo(typeId, name)}
+    >
+      {name}
+    </button>
+  );
 }
 
 export function ModuleRow({
@@ -111,6 +144,7 @@ export function ModuleRow({
   profile,
   edit,
   onOpenVariations,
+  onShowInfo,
 }: ModuleRowProps) {
   const { t } = useTranslation();
   const name = catalogueTypeName(catalogue, module.typeId);
@@ -118,10 +152,11 @@ export function ModuleRow({
   const shipTypeId = fitting.shipTypeId;
 
   // Offer only states the module can reach — every state until its own
-  // calculation says otherwise — plus whatever it's set to now.
+  // calculation says otherwise — and show the one it reached: a pasted fit
+  // asks for "active" everywhere, which a passive module or rig runs online.
   const maxState = result?.maxState ?? 'overload';
-  const states = STATES.slice(0, STATES.indexOf(maxState) + 1);
-  if (!states.includes(module.state)) states.push(module.state);
+  const shownState = result?.state ?? module.state;
+  const states = reachableModuleStates(maxState, shownState);
 
   const chargeGroupIds = result?.chargeGroupIds;
   const charges = useMemo(() => {
@@ -140,28 +175,26 @@ export function ModuleRow({
   const loadedListed = loadedCharge === undefined || charges.some((c) => c.id === loadedCharge);
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xs bg-panel-2 p-1.5">
-      <TypeIcon typeId={typeId} size={32} width={24} height={24} />
-      {onOpenVariations ? (
-        <button
-          type="button"
-          className="min-w-0 flex-1 truncate text-left text-xs text-accent underline-offset-2 hover:underline"
-          onClick={() => onOpenVariations(slot, slotIndex)}
-        >
-          {name}
-        </button>
-      ) : (
-        <span className="min-w-0 flex-1 truncate text-xs">{name}</span>
-      )}
-      {cantUse && (
-        <span className="shrink-0 rounded-xs border border-danger px-1 text-[0.6875rem] font-semibold text-danger">
-          {t('fittings.list.cantUse')}
-        </span>
-      )}
+    <SlotCard
+      identity={
+        <>
+          <TypeIcon typeId={typeId} size={32} width={24} height={24} />
+          <SlotName typeId={typeId} name={name} onShowInfo={onShowInfo} />
+          {cantUse && (
+            <span className="shrink-0 rounded-xs border border-danger px-1 text-[0.6875rem] font-semibold text-danger">
+              {t('fittings.list.cantUse')}
+            </span>
+          )}
+        </>
+      }
+      removeLabel={t('fittings.edit.remove', { name })}
+      onRemove={() => edit((f) => removeModule(f, slot, slotIndex))}
+    >
       <NativeSelect
         size="sm"
+        className="w-28 shrink-0"
         aria-label={t('fittings.edit.stateLabel', { name })}
-        value={module.state}
+        value={shownState}
         onChange={(event) =>
           edit((f) => setModuleState(f, slot, slotIndex, event.target.value as FittingItemState))
         }
@@ -175,6 +208,7 @@ export function ModuleRow({
       {(charges.length > 0 || loadedCharge !== undefined) && (
         <NativeSelect
           size="sm"
+          className="min-w-0 flex-1 @min-[34rem]:w-56 @min-[34rem]:flex-none"
           aria-label={t('fittings.edit.chargeLabel', { name })}
           value={loadedCharge ?? ''}
           onChange={(event) =>
@@ -199,42 +233,79 @@ export function ModuleRow({
           ))}
         </NativeSelect>
       )}
-      <IconButton
-        icon={<Close />}
-        size="sm"
-        tone="danger"
-        label={t('fittings.edit.remove', { name })}
-        onClick={() => edit((f) => removeModule(f, slot, slotIndex))}
-      />
+      {onOpenVariations && (
+        <IconButton
+          icon={<Compare />}
+          variant="plain"
+          label={t('fittings.list.variationsFor', { name })}
+          tooltip={t('fittings.variations.title')}
+          onClick={() => onOpenVariations(slot, slotIndex)}
+        />
+      )}
+    </SlotCard>
+  );
+}
+
+const SLOT_NAME_CLASS =
+  'line-clamp-2 min-w-0 flex-1 text-left text-sm break-words @min-[34rem]:truncate @min-[34rem]:text-xs';
+
+/**
+ * A fitted module's or drone's card. In a narrow column (a phone) the name
+ * gets the first line to itself — two lines if it needs them — with remove
+ * in the top-right corner as on the app's other cards, and the controls
+ * below; with room, it is one line, remove last.
+ */
+function SlotCard({
+  identity,
+  removeLabel,
+  onRemove,
+  children,
+}: {
+  identity: ReactNode;
+  removeLabel: string;
+  onRemove: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="@container rounded-xs bg-panel-2">
+      <div className="relative flex flex-wrap items-center gap-x-2 gap-y-1.5 p-1.5 @min-[34rem]:flex-nowrap">
+        <div className="flex min-h-9 min-w-0 basis-full items-center gap-2 pr-11 @min-[34rem]:min-h-0 @min-[34rem]:flex-1 @min-[34rem]:basis-0 @min-[34rem]:pr-0">
+          {identity}
+        </div>
+        <div className="flex min-w-0 basis-full items-center gap-2 @min-[34rem]:basis-auto">
+          {children}
+        </div>
+        <IconButton
+          icon={<Close />}
+          tone="danger"
+          variant="plain"
+          label={removeLabel}
+          onClick={onRemove}
+          className="absolute top-0 right-0 @min-[34rem]:static"
+        />
+      </div>
     </div>
   );
 }
 
-/** Sets one of a drone type's two counts, keeping the other as the Fitting has it now. */
-function withDroneCount(
-  fitting: Fitting,
-  typeId: number,
-  counts: Partial<{ inSpace: number; inBay: number }>
-): Fitting {
-  const current = droneGroups(fitting).find((group) => group.typeId === typeId);
-  return setDroneCounts(fitting, typeId, {
-    inSpace: counts.inSpace ?? current?.inSpace ?? 0,
-    inBay: counts.inBay ?? current?.inBay ?? 0,
-  });
-}
-
 /**
- * A drone count box. Keeps what's being typed as a local draft, so the box
- * can be emptied on the way to a new number instead of snapping back; each
- * complete number is committed as it's typed.
+ * A drone or cargo count box. Keeps what's being typed as a local draft, so
+ * the box can be emptied on the way to a new number instead of snapping back;
+ * each complete number is committed as it's typed — capped at `max` when
+ * given (for drones, what the bay holds), a number over it showing as the cap.
+ * With `min`, a number below it stays a draft rather than being committed.
  */
-function DroneCountInput({
+function CountInput({
   label,
   value,
+  max = Number.POSITIVE_INFINITY,
+  min = 0,
   onCommit,
 }: {
   label: string;
   value: number;
+  max?: number;
+  min?: number;
   onCommit: (count: number) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
@@ -243,14 +314,20 @@ function DroneCountInput({
       {label}
       <TextInput
         type="number"
-        min={0}
+        min={min}
+        max={Number.isFinite(max) ? max : undefined}
         size="sm"
         className="w-16"
         value={draft ?? String(value)}
         onChange={(event) => {
           const raw = event.target.value;
-          setDraft(raw);
-          if (raw !== '' && Number.isFinite(Number(raw))) onCommit(Number(raw));
+          if (raw === '' || !Number.isFinite(Number(raw)) || Number(raw) < min) {
+            setDraft(raw);
+            return;
+          }
+          const count = Math.min(Number(raw), max);
+          setDraft(count === Number(raw) ? raw : String(count));
+          onCommit(count);
         }}
         onBlur={() => setDraft(null)}
       />
@@ -288,6 +365,7 @@ interface RackSlotsProps extends EditContext {
   onSelectTarget: (target: AddTarget) => void;
   unusableModuleKeys?: ReadonlySet<string>;
   onOpenVariations?: (slot: FittingSlotKind, slotIndex: number) => void;
+  onShowInfo?: ShowInfo;
   /** Hides the rack's own heading — a rack sheet titles it already. */
   hideLabel?: boolean;
 }
@@ -304,6 +382,7 @@ export function RackSlots({
   onSelectTarget,
   unusableModuleKeys,
   onOpenVariations,
+  onShowInfo,
   hideLabel = false,
   ...context
 }: RackSlotsProps) {
@@ -334,6 +413,7 @@ export function RackSlots({
                 result={moduleResults?.[entry.index] ?? null}
                 cantUse={unusableModuleKeys?.has(moduleKey(entry.module)) ?? false}
                 onOpenVariations={onOpenVariations}
+                onShowInfo={onShowInfo}
               />
             );
           }
@@ -355,6 +435,117 @@ export function RackSlots({
   );
 }
 
+interface DroneSectionProps {
+  fitting: Fitting;
+  catalogue: FittingCatalogue | null;
+  stats: FittingStats | null;
+  edit: EditContext['edit'];
+  target: AddTarget | null;
+  onSelectTarget: (target: AddTarget) => void;
+  onShowInfo?: ShowInfo;
+  /**
+   * `list`: a section of the List, headed "Drones" under the List's own
+   * resource bars. `panel`: the Ring's drone panel or the phone's sheet —
+   * titled already, so no heading, and carrying its own bandwidth and bay bars.
+   */
+  variant?: 'list' | 'panel';
+}
+
+/**
+ * The Fitting's drones: each type with how many are launched (these count
+ * toward DPS) and how many wait in the bay, capped at what the bay holds, and
+ * a way to add more. The List's Drones section, the Ring's drone panel, and
+ * the phone Ring's Drones sheet. Nothing on a hull that takes no drones.
+ */
+export function DroneSection({
+  fitting,
+  catalogue,
+  stats,
+  edit,
+  target,
+  onSelectTarget,
+  onShowInfo,
+  variant = 'list',
+}: DroneSectionProps) {
+  const { t } = useTranslation();
+  const drones = droneGroups(fitting);
+  const droneVolume = (typeId: number) => catalogueVolume(catalogue, typeId);
+  // Before the ship data the bay's size is unknown, so nothing is capped yet.
+  const bay: DroneBay | null =
+    stats === null ? null : { capacity: stats.droneCapacity, volumeOf: droneVolume };
+  if (!showsDrones(stats, drones.length)) return null;
+  return (
+    <div className="space-y-1.5">
+      {variant === 'list' && <p className={RACK_LABEL_CLASS}>{t('fittings.list.drones')}</p>}
+      {variant === 'panel' && (
+        <div className="space-y-1.5">
+          <ResourceBar
+            label={t('fittings.list.droneBandwidth')}
+            used={stats?.droneBandwidthUsed ?? null}
+            total={stats?.droneBandwidthTotal ?? null}
+          />
+          <ResourceBar
+            label={t('fittings.list.droneBay')}
+            used={catalogue === null ? null : droneBayUsed(fitting, droneVolume)}
+            total={stats?.droneCapacity ?? null}
+          />
+        </div>
+      )}
+      {drones.length > 0 && (
+        <p className="text-xs text-text-dim">{t('fittings.edit.dronesHint')}</p>
+      )}
+      <div className="space-y-1.5">
+        {drones.map((group) => {
+          const name = catalogueTypeName(catalogue, group.typeId);
+          return (
+            <SlotCard
+              key={group.typeId}
+              identity={
+                <>
+                  <TypeIcon typeId={group.typeId} size={32} width={24} height={24} />
+                  <SlotName typeId={group.typeId} name={name} onShowInfo={onShowInfo} />
+                </>
+              }
+              removeLabel={t('fittings.edit.remove', { name })}
+              onRemove={() =>
+                edit((f) => setDroneCounts(f, group.typeId, { inSpace: 0, inBay: 0 }))
+              }
+            >
+              <CountInput
+                label={t('fittings.edit.inSpace')}
+                value={group.inSpace}
+                max={droneCountMax(fitting, group.typeId, 'inSpace', bay)}
+                onCommit={(inSpace) =>
+                  edit(
+                    (f) => setDroneCountWithinBay(f, group.typeId, { inSpace }, bay),
+                    `drone-space-${group.typeId}`
+                  )
+                }
+              />
+              <CountInput
+                label={t('fittings.edit.inBay')}
+                value={group.inBay}
+                max={droneCountMax(fitting, group.typeId, 'inBay', bay)}
+                onCommit={(inBay) =>
+                  edit(
+                    (f) => setDroneCountWithinBay(f, group.typeId, { inBay }, bay),
+                    `drone-bay-${group.typeId}`
+                  )
+                }
+              />
+            </SlotCard>
+          );
+        })}
+        <AddSlotButton
+          label={t('fittings.edit.addDrones')}
+          selected={target?.kind === 'drone'}
+          onClick={() => onSelectTarget({ kind: 'drone' })}
+        />
+      </div>
+    </div>
+  );
+}
+
 interface FittingRackListProps extends EditContext {
   stats: FittingStats | null;
   /** Index-parallel to `fitting.modules`; null while the open fit's own calculation is pending. */
@@ -364,6 +555,7 @@ interface FittingRackListProps extends EditContext {
   /** `moduleKey`s the active Character lacks the skills for. */
   unusableModuleKeys?: ReadonlySet<string>;
   onOpenVariations?: (slot: FittingSlotKind, slotIndex: number) => void;
+  onShowInfo?: ShowInfo;
   /** The panel header's controls — the page's "+ Add module". */
   actions?: ReactNode;
 }
@@ -387,11 +579,15 @@ export function FittingRackList({
   onSelectTarget,
   unusableModuleKeys,
   onOpenVariations,
+  onShowInfo,
   actions,
 }: FittingRackListProps) {
   const { t } = useTranslation();
   const context = { fitting, catalogue, engineReady, profile, edit };
   const drones = droneGroups(fitting);
+  const dronesShown = showsDrones(stats, drones.length);
+  const droneVolume = (typeId: number) => catalogueVolume(catalogue, typeId);
+  const cargo = cargoGroups(fitting);
 
   return (
     <Panel title={t('fittings.list.title')} actions={actions}>
@@ -412,11 +608,20 @@ export function FittingRackList({
             used={stats?.calibrationUsed ?? null}
             total={stats?.calibrationTotal ?? null}
           />
-          <ResourceBar
-            label={t('fittings.list.droneBandwidth')}
-            used={stats?.droneBandwidthUsed ?? null}
-            total={stats?.droneBandwidthTotal ?? null}
-          />
+          {dronesShown && (
+            <ResourceBar
+              label={t('fittings.list.droneBandwidth')}
+              used={stats?.droneBandwidthUsed ?? null}
+              total={stats?.droneBandwidthTotal ?? null}
+            />
+          )}
+          {dronesShown && (
+            <ResourceBar
+              label={t('fittings.list.droneBay')}
+              used={catalogue === null ? null : droneBayUsed(fitting, droneVolume)}
+              total={stats?.droneCapacity ?? null}
+            />
+          )}
         </div>
 
         {!engineReady && (
@@ -434,60 +639,56 @@ export function FittingRackList({
             onSelectTarget={onSelectTarget}
             unusableModuleKeys={unusableModuleKeys}
             onOpenVariations={onOpenVariations}
+            onShowInfo={onShowInfo}
           />
         ))}
 
-        <div>
-          <p className={RACK_LABEL_CLASS}>{t('fittings.list.drones')}</p>
-          <div className="space-y-1.5">
-            {drones.map((group) => {
-              const name = catalogueTypeName(catalogue, group.typeId);
-              return (
-                <div
-                  key={group.typeId}
-                  className="flex flex-wrap items-center gap-2 rounded-xs bg-panel-2 p-1.5"
-                >
-                  <TypeIcon typeId={group.typeId} size={32} width={24} height={24} />
-                  <span className="min-w-0 flex-1 truncate text-xs">{name}</span>
-                  <DroneCountInput
-                    label={t('fittings.edit.inSpace')}
-                    value={group.inSpace}
-                    onCommit={(inSpace) =>
-                      edit(
-                        (f) => withDroneCount(f, group.typeId, { inSpace }),
-                        `drone-space-${group.typeId}`
-                      )
+        <DroneSection
+          fitting={fitting}
+          catalogue={catalogue}
+          stats={stats}
+          edit={edit}
+          target={target}
+          onSelectTarget={onSelectTarget}
+          onShowInfo={onShowInfo}
+        />
+
+        {/* What a pasted fit carries besides its slots and drones: ammo, filaments, a depot. */}
+        {cargo.length > 0 && (
+          <div>
+            <p className={RACK_LABEL_CLASS}>{t('fittings.list.cargo')}</p>
+            <div className="space-y-1.5">
+              {cargo.map((item) => {
+                const name = catalogueTypeName(catalogue, item.typeId);
+                return (
+                  <SlotCard
+                    key={item.typeId}
+                    identity={
+                      <>
+                        <TypeIcon typeId={item.typeId} size={32} width={24} height={24} />
+                        <SlotName typeId={item.typeId} name={name} onShowInfo={onShowInfo} />
+                      </>
                     }
-                  />
-                  <DroneCountInput
-                    label={t('fittings.edit.inBay')}
-                    value={group.inBay}
-                    onCommit={(inBay) =>
-                      edit(
-                        (f) => withDroneCount(f, group.typeId, { inBay }),
-                        `drone-bay-${group.typeId}`
-                      )
-                    }
-                  />
-                  <IconButton
-                    icon={<Close />}
-                    size="sm"
-                    tone="danger"
-                    label={t('fittings.edit.remove', { name })}
-                    onClick={() =>
-                      edit((f) => setDroneCounts(f, group.typeId, { inSpace: 0, inBay: 0 }))
-                    }
-                  />
-                </div>
-              );
-            })}
-            <AddSlotButton
-              label={t('fittings.edit.addDrones')}
-              selected={target?.kind === 'drone'}
-              onClick={() => onSelectTarget({ kind: 'drone' })}
-            />
+                    removeLabel={t('fittings.edit.remove', { name })}
+                    onRemove={() => edit((f) => setCargoQuantity(f, item.typeId, 0))}
+                  >
+                    <CountInput
+                      label={t('fittings.edit.quantity')}
+                      value={item.quantity}
+                      min={1}
+                      onCommit={(quantity) =>
+                        edit(
+                          (f) => setCargoQuantity(f, item.typeId, quantity),
+                          `cargo-${item.typeId}`
+                        )
+                      }
+                    />
+                  </SlotCard>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </Panel>
   );

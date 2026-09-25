@@ -120,6 +120,23 @@ jobs:
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
           SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      # A Pages deploy replaces the whole site, so a tab still on the last
+      # build asked for route chunks that now 404. Carries recently retired
+      # `assets/*` over from the live site (scripts/lib/assetRetention.mjs).
+      # After the build, so they are never precached. Never blocks a deploy:
+      # without it the site ships exactly as it did before this step.
+      # The retirement history rides the Actions cache rather than being read
+      # back off the site, whose CDN can serve it 10 minutes stale — longer
+      # than the gap between deploys. Saved only once the deploy lands, so it
+      # never records a build that did not go live.
+      - uses: actions/cache/restore@v4
+        continue-on-error: true
+        with:
+          path: .cache/asset-history.json
+          key: asset-history-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: asset-history-
+      - run: node scripts/keep-old-assets.mjs https://neocomdesk.com .cache/asset-history.json
+        continue-on-error: true
       - uses: actions/configure-pages@v5
       # Named per attempt, and deploy-pages told which to read. Artifacts
       # persist across attempts within a run, so a re-run of this job used to
@@ -139,6 +156,11 @@ jobs:
         id: deployment
         with:
           artifact_name: github-pages-${{ github.run_attempt }}
+      - uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: .cache/asset-history.json
+          key: asset-history-${{ github.run_id }}-${{ github.run_attempt }}
 
   e2e-shard:
     if: github.event_name == 'pull_request'

@@ -374,11 +374,11 @@ export function PlanChainTable({ rows, productName, hubId }: PlanChainTableProps
         // Ordinal, not alphabetical — the make/buy role this row is filling.
         sortValue: (row) => (row.role === 'make' ? 1 : 0),
         render: (row) => (
-          <span className="flex items-center gap-1.5">
+          <span className="flex items-center gap-1.5 whitespace-nowrap">
             <span className={row.role === 'make' ? 'text-accent' : 'text-text-dim'}>
               {row.role === 'make' ? t('piPlan.roleMake') : t('piPlan.roleBuy')}
             </span>
-            <span className="text-text-dim">
+            <span className="text-xs text-text-dim">
               {row.read === null
                 ? t('piPlan.readUnknown')
                 : row.read === 'make'

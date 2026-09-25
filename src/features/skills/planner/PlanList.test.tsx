@@ -22,7 +22,6 @@ describe('PlanList delete confirmation (#408: names the plan)', () => {
       <PlanList
         plans={[plan('1', 'Titan pilot')]}
         onOpen={noop}
-        onCreate={noop}
         onDuplicate={noop}
         onDelete={noop}
         onRename={noop}
@@ -38,7 +37,6 @@ describe('PlanList delete confirmation (#408: names the plan)', () => {
       <PlanList
         plans={[plan('1', 'Alpha'), plan('2', 'Beta')]}
         onOpen={noop}
-        onCreate={noop}
         onDuplicate={noop}
         onDelete={onDelete}
         onRename={noop}
@@ -54,7 +52,6 @@ describe('PlanList delete confirmation (#408: names the plan)', () => {
 describe('PlanList row stats (#1416)', () => {
   const props = {
     onOpen: noop,
-    onCreate: noop,
     onDuplicate: noop,
     onDelete: noop,
     onRename: noop,

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Button, Modal, Panel } from '@/components/ui';
-import { fieldBaseClassName } from '@/components/ui/controlStyles';
+import { Button, IconButton, Modal, Panel, SearchInput, TextInput } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
 import { db, type FittingRecord } from '@/db';
 import { decodeFittingShare } from '@/engine/fitting/fittingShare';
 import { filterMyFittings, groupByHull, type MyFittingRow } from '@/engine/fittings/myFittings';
@@ -17,6 +17,7 @@ interface MyFittingsPanelProps {
 
 /** Each saved code's hull name; null when the code no longer decodes. */
 function useHullNames(records: readonly FittingRecord[] | undefined): Map<string, string | null> {
+  const { t } = useTranslation();
   const [hulls, setHulls] = useState<Map<string, string | null>>(new Map());
   useEffect(() => {
     if (!records) return;
@@ -29,7 +30,8 @@ function useHullNames(records: readonly FittingRecord[] | undefined): Map<string
         next.set(
           record.id,
           decoded.ok
-            ? (types[String(decoded.value.hullTypeId)]?.name ?? `Type ${decoded.value.hullTypeId}`)
+            ? (types[String(decoded.value.hullTypeId)]?.name ??
+                t('common.unknownType', { id: decoded.value.hullTypeId }))
             : null
         );
       }
@@ -38,7 +40,7 @@ function useHullNames(records: readonly FittingRecord[] | undefined): Map<string
     return () => {
       cancelled = true;
     };
-  }, [records]);
+  }, [records, t]);
   return hulls;
 }
 
@@ -82,13 +84,11 @@ export function MyFittingsPanel({ characterId, onOpen }: MyFittingsPanelProps) {
           <p className="text-xs text-text-dim">{t('fittings.myFittings.empty')}</p>
         ) : (
           <>
-            <input
-              type="search"
+            <SearchInput
               aria-label={t('fittings.myFittings.searchLabel')}
               placeholder={t('fittings.myFittings.searchPlaceholder')}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className={`${fieldBaseClassName} w-full p-2 text-sm`}
             />
             {groups.length === 0 && hulls.size > 0 && (
               <p className="text-xs text-text-dim">{t('fittings.myFittings.noMatches')}</p>
@@ -109,24 +109,24 @@ export function MyFittingsPanel({ characterId, onOpen }: MyFittingsPanelProps) {
                       >
                         {row.name}
                       </button>
-                      <Button
+                      <IconButton
                         size="sm"
-                        aria-label={t('fittings.myFittings.rename', { name: row.name })}
+                        icon={<Icon.Rename />}
+                        label={t('fittings.myFittings.rename', { name: row.name })}
+                        tooltip={t('fittings.myFittings.confirmRename')}
                         onClick={() => {
                           setRenaming(row.record);
                           setRenameText(row.name);
                         }}
-                      >
-                        {t('fittings.myFittings.confirmRename')}
-                      </Button>
-                      <Button
+                      />
+                      <IconButton
                         size="sm"
-                        variant="danger"
-                        aria-label={t('fittings.myFittings.delete', { name: row.name })}
+                        tone="danger"
+                        icon={<Icon.Close />}
+                        label={t('fittings.myFittings.delete', { name: row.name })}
+                        tooltip={t('fittings.myFittings.confirmDelete')}
                         onClick={() => setDeleting(row.record)}
-                      >
-                        {t('fittings.myFittings.confirmDelete')}
-                      </Button>
+                      />
                     </li>
                   ))}
                 </ul>
@@ -153,11 +153,11 @@ export function MyFittingsPanel({ characterId, onOpen }: MyFittingsPanelProps) {
           <label className="block text-xs text-text-dim" htmlFor="my-fitting-rename">
             {t('fittings.myFittings.renameLabel')}
           </label>
-          <input
+          <TextInput
             id="my-fitting-rename"
+            className="w-full"
             value={renameText}
             onChange={(e) => setRenameText(e.target.value)}
-            className={`${fieldBaseClassName} w-full p-2 text-sm`}
           />
           <div className="flex justify-end gap-2">
             <Button onClick={() => setRenaming(null)}>{t('fittings.myFittings.cancel')}</Button>

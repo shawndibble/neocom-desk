@@ -7,11 +7,14 @@
  * Player-structure orders never carry standings — `lookupNpcStation`
  * returning `null` (a known player structure) or `undefined` (the snapshot
  * itself could not be read, so this location's kind is unknown) both fall
- * back to zero without spending a request.
+ * back to zero without spending a request. A Trade Hub skips all of it and
+ * reads its stored owner and faction (`src/market/hubs.ts`), so the pages that
+ * resolve every hub up front (`useTradeHubStandings`) never fan out to ESI.
  */
 import { lookupNpcStation } from '@/sde/npcStations';
 import { loadStationOwner } from '@/features/character/stations';
 import { loadPublicCorporationInfo } from '@/features/character/publicInfoData';
+import { TRADE_HUBS } from '@/market/hubs';
 import {
   resolveOwnerStandings,
   ZERO_STANDINGS,
@@ -23,6 +26,9 @@ export async function resolveLocationStandings(
   locationId: number,
   standings: readonly CharacterStandingEntry[]
 ): Promise<ResolvedStandings> {
+  const hub = TRADE_HUBS.find((h) => h.stationId === locationId);
+  if (hub) return resolveOwnerStandings(hub.ownerCorporationId, hub.ownerFactionId, standings);
+
   const snapshot = await lookupNpcStation(locationId);
   if (snapshot === null || snapshot === undefined) return ZERO_STANDINGS;
 

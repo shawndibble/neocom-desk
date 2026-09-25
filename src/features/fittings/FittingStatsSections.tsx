@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Caret } from '@/components/ui';
+import { Button, Caret, Tooltip } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
 import {
   alignTimeSeconds,
@@ -13,6 +13,7 @@ import type {
   FittingStats,
   LocalRepair,
   Resonances,
+  StatsErrorReason,
 } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import type { DogmaAssetProgress } from './dogmaFittingEngine';
@@ -242,10 +243,40 @@ function StatSection({
   );
 }
 
+/** Lines the "no data" tooltip lists before it sums up the rest — a tooltip is no place for a long list. */
+const UNKNOWN_ITEMS_SHOWN = 10;
+
+/**
+ * The items with no data in this build, one per line — "Name ×2" where the
+ * Fitting has several, so the lines add up to the count beside them.
+ */
+function unknownItemsList(
+  typeIds: readonly number[],
+  typeName: (typeId: number) => string,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
+  const counts = new Map<number, number>();
+  for (const typeId of typeIds) counts.set(typeId, (counts.get(typeId) ?? 0) + 1);
+  const lines = [...counts].map(([typeId, count]) =>
+    count > 1
+      ? t('fittings.stats.unknownItemCount', { name: typeName(typeId), count })
+      : typeName(typeId)
+  );
+  if (lines.length <= UNKNOWN_ITEMS_SHOWN) return lines.join('\n');
+  return [
+    ...lines.slice(0, UNKNOWN_ITEMS_SHOWN),
+    t('fittings.stats.unknownItemsMore', { count: lines.length - UNKNOWN_ITEMS_SHOWN }),
+  ].join('\n');
+}
+
 interface FittingStatsSectionsProps {
   stats: FittingStats | null;
   statsProgress: DogmaAssetProgress | null;
   statsError: boolean;
+  /** What failed, when `statsError`: the pilot's skills, or the ship data / calculation. */
+  statsErrorReason?: StatsErrorReason;
+  /** Tries the failed load again; without it the error has no retry. */
+  onRetry?: () => void;
   price: Appraisal | null;
   /** Names an Offense row's weapon, charge or drone. */
   typeName: (typeId: number) => string;
@@ -255,6 +286,10 @@ interface FittingStatsSectionsProps {
   overlay?: OverlayFitting;
   /** A line above the sections — whose skills the numbers are worked out under. */
   heading?: ReactNode;
+  /** Controls for the conditions every section is worked out in (the Abyssal weather), under the heading. */
+  conditions?: ReactNode;
+  /** The hull takes drones (`showsDrones`) — else there is no Drones section. */
+  showDrones?: boolean;
 }
 
 /**
@@ -268,12 +303,16 @@ export function FittingStatsSections({
   stats,
   statsProgress,
   statsError,
+  statsErrorReason = 'shipData',
+  onRetry,
   price,
   typeName,
   damageProfiles,
   targetProfiles,
   overlay,
   heading,
+  conditions,
+  showDrones = true,
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
   const profileName = useDamageProfileName()(damageProfiles.selected);
@@ -296,8 +335,9 @@ export function FittingStatsSections({
       ? Math.round((statsProgress.loadedBytes / statsProgress.totalBytes) * 100)
       : null;
 
+  // The error is said once, above the sections; each section just says it has nothing.
   const placeholder = statsError ? (
-    <p className="text-xs text-danger">{t('fittings.stats.error')}</p>
+    <p className="text-xs text-text-dim">{t('fittings.stats.unavailable')}</p>
   ) : (
     <p className="text-xs text-text-dim">
       {downloadPct === null
@@ -380,6 +420,24 @@ export function FittingStatsSections({
       {heading && (
         <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2 text-xs text-text-dim">
           {heading}
+        </div>
+      )}
+      {conditions && <div className="border-b border-line px-3 py-2">{conditions}</div>}
+      {statsError && (
+        <div
+          role="alert"
+          className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2 text-xs text-danger"
+        >
+          <span>
+            {t(
+              statsErrorReason === 'skills' ? 'fittings.stats.errorSkills' : 'fittings.stats.error'
+            )}
+          </span>
+          {onRetry && (
+            <Button size="sm" onClick={onRetry}>
+              {t('fittings.stats.retry')}
+            </Button>
+          )}
         </div>
       )}
 
@@ -609,35 +667,36 @@ export function FittingStatsSections({
         )
       )}
 
-      {section(
-        'drones',
-        stats ? t('fittings.stats.weaponDps', { value: stats.droneDps.toFixed(1) }) : undefined,
-        stats ? (
-          <Facts
-            items={[
-              {
-                label: t('fittings.stats.fact.droneDps'),
-                value: stats.droneDps.toFixed(1),
-              },
-              {
-                label: t('fittings.stats.fact.bandwidth'),
-                value: t('fittings.stats.unit.bandwidth', {
-                  used: stats.droneBandwidthUsed.toFixed(0),
-                  total: stats.droneBandwidthTotal.toFixed(0),
-                }),
-              },
-              {
-                label: t('fittings.stats.fact.droneBay'),
-                value: t('fittings.stats.unit.cubicMetres', {
-                  value: stats.droneCapacity.toFixed(0),
-                }),
-              },
-            ]}
-          />
-        ) : (
-          placeholder
-        )
-      )}
+      {showDrones &&
+        section(
+          'drones',
+          stats ? t('fittings.stats.weaponDps', { value: stats.droneDps.toFixed(1) }) : undefined,
+          stats ? (
+            <Facts
+              items={[
+                {
+                  label: t('fittings.stats.fact.droneDps'),
+                  value: stats.droneDps.toFixed(1),
+                },
+                {
+                  label: t('fittings.stats.fact.bandwidth'),
+                  value: t('fittings.stats.unit.bandwidth', {
+                    used: stats.droneBandwidthUsed.toFixed(0),
+                    total: stats.droneBandwidthTotal.toFixed(0),
+                  }),
+                },
+                {
+                  label: t('fittings.stats.fact.droneBay'),
+                  value: t('fittings.stats.unit.cubicMetres', {
+                    value: stats.droneCapacity.toFixed(0),
+                  }),
+                },
+              ]}
+            />
+          ) : (
+            placeholder
+          )
+        )}
 
       {section(
         'fitting',
@@ -676,7 +735,18 @@ export function FittingStatsSections({
             />
             {stats.unknownItemTypeIds.length > 0 && (
               <p className="text-xs text-warning">
-                {t('fittings.stats.unknownItems', { count: stats.unknownItemTypeIds.length })}
+                {/* Which items, one per line — on hover, focus or a tap. */}
+                <Tooltip
+                  openOnTap
+                  content={unknownItemsList(stats.unknownItemTypeIds, typeName, t)}
+                >
+                  <button
+                    type="button"
+                    className="cursor-help underline decoration-dotted underline-offset-2"
+                  >
+                    {t('fittings.stats.unknownItems', { count: stats.unknownItemTypeIds.length })}
+                  </button>
+                </Tooltip>
               </p>
             )}
           </>
