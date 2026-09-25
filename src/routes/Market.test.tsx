@@ -1416,9 +1416,9 @@ describe('Market Browser order row context menu (issue #6)', () => {
     const [, sellRow] = within(sellTable).getAllByRole('row');
 
     await user.click(sellRow);
-    // No plan yet -> "Create Plan & Add", not "Add to Skill Plan" (matches
+    // No plan yet -> "Create Skill Plan and add", not "Add to Skill Plan" (matches
     // FitCheck/Mastery's shared Target Plan contract).
-    const addButton = await screen.findByRole('button', { name: 'Create Plan & Add' });
+    const addButton = await screen.findByRole('button', { name: 'Create Skill Plan and add' });
     await user.click(addButton);
 
     // The bug: nothing in the row visibly changed after a successful click,
