@@ -79,3 +79,27 @@ describe('PlanList row stats (#1416)', () => {
     expect(screen.queryByText(/finishes|Nothing to train/)).not.toBeInTheDocument();
   });
 });
+
+describe('PlanList copy to character (#1729)', () => {
+  const props = { onOpen: noop, onDuplicate: noop, onDelete: noop, onRename: noop };
+
+  it('hides the action when the account has no other character', () => {
+    render(<PlanList {...props} plans={[plan('1', 'Alpha')]} onCopyToCharacter={noop} />);
+    expect(screen.queryByRole('button', { name: /copy to character/i })).toBeNull();
+  });
+
+  it('copies the plan to the chosen character', () => {
+    const onCopy = vi.fn();
+    render(
+      <PlanList
+        {...props}
+        plans={[plan('1', 'Alpha'), plan('2', 'Beta')]}
+        otherCharacters={[{ characterId: 9, name: 'Alt One' }]}
+        onCopyToCharacter={onCopy}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /copy to character.* beta/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Alt One' }));
+    expect(onCopy).toHaveBeenCalledWith('2', 9);
+  });
+});
