@@ -196,6 +196,7 @@
       "readoutCalibration": "{{used}} / {{total}}",
       "readoutDroneBandwidth": "{{used}} / {{total}} Mbit/s",
       "rackHint": "Tap a rack to edit its slots",
+      "droneCount": "{{inSpace}} launched · {{inBay}} in bay",
       "rackCount": "{{fitted}} / {{total}}",
       "rackCantUse_one": "{{count}} can’t use",
       "rackCantUse_other": "{{count}} can’t use"
@@ -206,6 +207,7 @@
       "noCharge": "No charge",
       "remove": "Remove {{name}}",
       "emptySlot": "Empty — add to {{rack}}",
+      "dronesHint": "Launched drones count toward DPS and bandwidth; the rest wait in the bay.",
       "addDrones": "Add drones",
       "inSpace": "In space",
       "inBay": "In bay",
@@ -395,6 +397,7 @@
     },
     "variations": {
       "title": "Variations",
+      "swapTitle": "Swap for a variation",
       "name": "Variant",
       "changes": "Whole-fitting change",
       "changedCount_one": "{{count}} stat changes",

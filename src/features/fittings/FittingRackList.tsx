@@ -430,6 +430,117 @@ export function RackSlots({
   );
 }
 
+interface DroneSectionProps {
+  fitting: Fitting;
+  catalogue: FittingCatalogue | null;
+  stats: FittingStats | null;
+  edit: EditContext['edit'];
+  target: AddTarget | null;
+  onSelectTarget: (target: AddTarget) => void;
+  onShowInfo?: ShowInfo;
+  /**
+   * `list`: a section of the List, headed "Drones" under the List's own
+   * resource bars. `panel`: the Ring's drone panel or the phone's sheet —
+   * titled already, so no heading, and carrying its own bandwidth and bay bars.
+   */
+  variant?: 'list' | 'panel';
+}
+
+/**
+ * The Fitting's drones: each type with how many are launched (these count
+ * toward DPS) and how many wait in the bay, capped at what the bay holds, and
+ * a way to add more. The List's Drones section, the Ring's drone panel, and
+ * the phone Ring's Drones sheet. Nothing on a hull that takes no drones.
+ */
+export function DroneSection({
+  fitting,
+  catalogue,
+  stats,
+  edit,
+  target,
+  onSelectTarget,
+  onShowInfo,
+  variant = 'list',
+}: DroneSectionProps) {
+  const { t } = useTranslation();
+  const drones = droneGroups(fitting);
+  const droneVolume = (typeId: number) => catalogueVolume(catalogue, typeId);
+  // Before the ship data the bay's size is unknown, so nothing is capped yet.
+  const bay: DroneBay | null =
+    stats === null ? null : { capacity: stats.droneCapacity, volumeOf: droneVolume };
+  if (!showsDrones(stats, drones.length)) return null;
+  return (
+    <div className="space-y-1.5">
+      {variant === 'list' && <p className={RACK_LABEL_CLASS}>{t('fittings.list.drones')}</p>}
+      {variant === 'panel' && (
+        <div className="space-y-1.5">
+          <ResourceBar
+            label={t('fittings.list.droneBandwidth')}
+            used={stats?.droneBandwidthUsed ?? null}
+            total={stats?.droneBandwidthTotal ?? null}
+          />
+          <ResourceBar
+            label={t('fittings.list.droneBay')}
+            used={catalogue === null ? null : droneBayUsed(fitting, droneVolume)}
+            total={stats?.droneCapacity ?? null}
+          />
+        </div>
+      )}
+      {drones.length > 0 && (
+        <p className="text-xs text-text-dim">{t('fittings.edit.dronesHint')}</p>
+      )}
+      <div className="space-y-1.5">
+        {drones.map((group) => {
+          const name = catalogueTypeName(catalogue, group.typeId);
+          return (
+            <SlotCard
+              key={group.typeId}
+              identity={
+                <>
+                  <TypeIcon typeId={group.typeId} size={32} width={24} height={24} />
+                  <SlotName typeId={group.typeId} name={name} onShowInfo={onShowInfo} />
+                </>
+              }
+              removeLabel={t('fittings.edit.remove', { name })}
+              onRemove={() =>
+                edit((f) => setDroneCounts(f, group.typeId, { inSpace: 0, inBay: 0 }))
+              }
+            >
+              <DroneCountInput
+                label={t('fittings.edit.inSpace')}
+                value={group.inSpace}
+                max={droneCountMax(fitting, group.typeId, 'inSpace', bay)}
+                onCommit={(inSpace) =>
+                  edit(
+                    (f) => setDroneCountWithinBay(f, group.typeId, { inSpace }, bay),
+                    `drone-space-${group.typeId}`
+                  )
+                }
+              />
+              <DroneCountInput
+                label={t('fittings.edit.inBay')}
+                value={group.inBay}
+                max={droneCountMax(fitting, group.typeId, 'inBay', bay)}
+                onCommit={(inBay) =>
+                  edit(
+                    (f) => setDroneCountWithinBay(f, group.typeId, { inBay }, bay),
+                    `drone-bay-${group.typeId}`
+                  )
+                }
+              />
+            </SlotCard>
+          );
+        })}
+        <AddSlotButton
+          label={t('fittings.edit.addDrones')}
+          selected={target?.kind === 'drone'}
+          onClick={() => onSelectTarget({ kind: 'drone' })}
+        />
+      </div>
+    </div>
+  );
+}
+
 interface FittingRackListProps extends EditContext {
   stats: FittingStats | null;
   /** Index-parallel to `fitting.modules`; null while the open fit's own calculation is pending. */
@@ -471,9 +582,6 @@ export function FittingRackList({
   const drones = droneGroups(fitting);
   const dronesShown = showsDrones(stats, drones.length);
   const droneVolume = (typeId: number) => catalogueVolume(catalogue, typeId);
-  // Before the ship data the bay's size is unknown, so nothing is capped yet.
-  const bay: DroneBay | null =
-    stats === null ? null : { capacity: stats.droneCapacity, volumeOf: droneVolume };
 
   return (
     <Panel title={t('fittings.list.title')} actions={actions}>
@@ -529,59 +637,15 @@ export function FittingRackList({
           />
         ))}
 
-        {dronesShown && (
-          <div>
-            <p className={RACK_LABEL_CLASS}>{t('fittings.list.drones')}</p>
-            <div className="space-y-1.5">
-              {drones.map((group) => {
-                const name = catalogueTypeName(catalogue, group.typeId);
-                return (
-                  <SlotCard
-                    key={group.typeId}
-                    identity={
-                      <>
-                        <TypeIcon typeId={group.typeId} size={32} width={24} height={24} />
-                        <SlotName typeId={group.typeId} name={name} onShowInfo={onShowInfo} />
-                      </>
-                    }
-                    removeLabel={t('fittings.edit.remove', { name })}
-                    onRemove={() =>
-                      edit((f) => setDroneCounts(f, group.typeId, { inSpace: 0, inBay: 0 }))
-                    }
-                  >
-                    <DroneCountInput
-                      label={t('fittings.edit.inSpace')}
-                      value={group.inSpace}
-                      max={droneCountMax(fitting, group.typeId, 'inSpace', bay)}
-                      onCommit={(inSpace) =>
-                        edit(
-                          (f) => setDroneCountWithinBay(f, group.typeId, { inSpace }, bay),
-                          `drone-space-${group.typeId}`
-                        )
-                      }
-                    />
-                    <DroneCountInput
-                      label={t('fittings.edit.inBay')}
-                      value={group.inBay}
-                      max={droneCountMax(fitting, group.typeId, 'inBay', bay)}
-                      onCommit={(inBay) =>
-                        edit(
-                          (f) => setDroneCountWithinBay(f, group.typeId, { inBay }, bay),
-                          `drone-bay-${group.typeId}`
-                        )
-                      }
-                    />
-                  </SlotCard>
-                );
-              })}
-              <AddSlotButton
-                label={t('fittings.edit.addDrones')}
-                selected={target?.kind === 'drone'}
-                onClick={() => onSelectTarget({ kind: 'drone' })}
-              />
-            </div>
-          </div>
-        )}
+        <DroneSection
+          fitting={fitting}
+          catalogue={catalogue}
+          stats={stats}
+          edit={edit}
+          target={target}
+          onSelectTarget={onSelectTarget}
+          onShowInfo={onShowInfo}
+        />
       </div>
     </Panel>
   );

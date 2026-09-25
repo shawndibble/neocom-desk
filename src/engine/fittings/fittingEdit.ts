@@ -290,3 +290,11 @@ export function setDroneCountWithinBay(
   };
   return setDroneCounts(fitting, typeId, { inSpace: cap('inSpace'), inBay: cap('inBay') });
 }
+
+/** Drones launched and drones in the bay, every type together. */
+export function droneTotals(fitting: Fitting): { inSpace: number; inBay: number } {
+  return droneGroups(fitting).reduce(
+    (sum, group) => ({ inSpace: sum.inSpace + group.inSpace, inBay: sum.inBay + group.inBay }),
+    { inSpace: 0, inBay: 0 }
+  );
+}
