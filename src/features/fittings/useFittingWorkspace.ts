@@ -33,7 +33,6 @@ import {
 } from '@/engine/import/eveFitXml';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
 import { loadFittingFromText, type LoadError } from './loadFittingFromText';
-import { buildAllVProfile } from '@/engine/fittings/pilotProfile';
 import {
   applyImplantBasis,
   defaultImplantBasis,
@@ -47,8 +46,8 @@ import type {
 } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
-import { loadTypes, loadSkills, typeName } from '@/sde/loadSde';
-import { loadActivePilotProfile } from './fittingPilotProfile';
+import { loadTypes, typeName } from '@/sde/loadSde';
+import { usePilotProfile } from './fittingPilotProfile';
 import { loadFittingPrice } from './fittingPrice';
 import {
   computeFittingStats,
@@ -163,7 +162,6 @@ export function useFittingWorkspace(): FittingWorkspace {
   const [statsProgress, setStatsProgress] = useState<DogmaAssetProgress | null>(null);
   const [statsError, setStatsError] = useState(false);
   const [engineReady, setEngineReady] = useState(isDogmaEngineReady);
-  const [profile, setProfile] = useState<PilotProfile | null>(null);
   // User's explicit toggle pick, layered over `defaultImplantBasis`'s
   // per-Fitting default; `null` means "no override yet, use the default".
   const [basisOverride, setBasisOverride] = useState<ImplantBasis | null>(null);
@@ -458,30 +456,9 @@ export function useFittingWorkspace(): FittingWorkspace {
     [edit]
   );
 
-  // The pilot the stats and fit checks run under: the active Character's own
-  // profile, or All V with no Character at all (the logged-out Share Link
-  // view is #1544's; this covers the same fallback for the ordinary route
-  // rendering before hydration resolves). Loaded once per Character, not once
-  // per edit.
-  useEffect(() => {
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new Character, not a render-time derivation
-    setProfile(null);
-    void (async () => {
-      try {
-        const loaded =
-          activeCharacterId === null
-            ? buildAllVProfile([...(await loadSkills()).map((skill) => skill.typeID)])
-            : await loadActivePilotProfile(activeCharacterId);
-        if (!cancelled) setProfile(loaded);
-      } catch {
-        if (!cancelled) setStatsError(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeCharacterId]);
+  // The pilot the stats and fit checks run under; loaded once per Character,
+  // not once per edit. A failed load is reported as a stats error.
+  const { profile, failed: profileFailed } = usePilotProfile(activeCharacterId);
 
   // A different hull (or none) is a different Fitting: drop the old numbers at
   // once rather than show them under the new one's header — a swap from one
@@ -562,7 +539,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     stats: stats?.stats ?? null,
     statsFitting: stats?.fitting ?? null,
     statsProgress,
-    statsError,
+    statsError: statsError || profileFailed,
     engineReady,
     profile,
     damageProfiles,

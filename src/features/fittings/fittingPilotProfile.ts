@@ -5,7 +5,7 @@
  * **Fitting** entry. The logged-out Share Link view (#1544) instead uses
  * `buildAllVProfile`; this is only for the normal, Character-present route.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { loadCorrectedSkills } from '@/features/skills/correctedSkills';
 import { loadCharacterImplants } from '@/features/skills/data';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
@@ -20,17 +20,29 @@ export async function loadActivePilotProfile(characterId: number): Promise<Pilot
   return buildPilotProfile(corrected.effective, implants?.data ?? []);
 }
 
+export interface PilotProfileState {
+  profile: PilotProfile | null;
+  /** The load threw — `profile` stays `null`, so callers can tell "gave up" from "still loading". */
+  failed: boolean;
+  /** Tries the load again (a passing network or SDE error shouldn't stick for the life of the page). */
+  retry: () => void;
+}
+
 /**
  * The pilot a Fitting's stats and fit checks run under: the active
- * Character's own profile, or All V with no Character. `useFittingWorkspace`
- * has its own copy of this fallback for the single-Fitting editor.
+ * Character's own profile, or All V with no Character. Shared by the
+ * single-Fitting editor and the compare page, so a load failure is reported
+ * the same way on both.
  */
-export function usePilotProfile(characterId: number | null): PilotProfile | null {
+export function usePilotProfile(characterId: number | null): PilotProfileState {
   const [profile, setProfile] = useState<PilotProfile | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new Character, not a render-time derivation
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new Character or a retry, not a render-time derivation
     setProfile(null);
+    setFailed(false);
     void (async () => {
       try {
         const loaded =
@@ -39,12 +51,13 @@ export function usePilotProfile(characterId: number | null): PilotProfile | null
             : await loadActivePilotProfile(characterId);
         if (!cancelled) setProfile(loaded);
       } catch {
-        // Left `null` on failure — no unhandled rejection, same as before.
+        if (!cancelled) setFailed(true);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [characterId]);
-  return profile;
+  }, [characterId, attempt]);
+  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  return { profile, failed, retry };
 }
