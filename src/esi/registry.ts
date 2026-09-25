@@ -417,6 +417,10 @@ export const ESI_REGISTRY = {
     route: '/alliances/{alliance_id}',
     scope: PUBLIC,
   },
+  getKillmail: {
+    route: '/killmails/{killmail_id}/{killmail_hash}',
+    scope: PUBLIC,
+  },
   getUniverseType: {
     route: '/universe/types/{type_id}',
     scope: PUBLIC,
