@@ -33,8 +33,10 @@ import {
   type RosterDiff,
 } from '@/engine/corp/members';
 import { useDarkThreshold } from './darkThreshold';
+import { corpRoleLabel } from './roles';
 import {
   CORP_ROSTER_COLUMN_IDS,
+  CORP_ROSTER_DEFAULT_COLUMNS,
   useVisibleCorpRosterColumns,
   type CorpRosterColumnId,
 } from './corpRosterColumns';
@@ -50,6 +52,10 @@ export interface RosterRow {
   locationName: string | null;
   locationId: number | null;
   startMs: number | null;
+  /** Corporation-wide roles; null when the `/roles` read had nothing for this member. */
+  roles: readonly string[] | null;
+  /** The active Character's own row (issue #1766). */
+  isSelf: boolean;
 }
 
 export function CorpRosterSummary({
@@ -111,6 +117,12 @@ export function CorpRosterStats({ rows }: { rows: readonly RosterRow[] }) {
   );
 }
 
+/** A member's roles as one line; null when there are none to print. */
+function rolesText(roles: readonly string[] | null): string | null {
+  if (roles === null || roles.length === 0) return null;
+  return roles.map(corpRoleLabel).join(', ');
+}
+
 /** Longest silence first — the view's whole point (see the module note). */
 const ROSTER_SORT = { columnId: 'lastSeen', direction: 'desc' } as const;
 
@@ -127,7 +139,16 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
         // retitle every card.
         primary: true,
         className: 'truncate',
-        render: (row) => label(row.name, row.characterId),
+        render: (row) => (
+          <>
+            {label(row.name, row.characterId)}
+            {row.isSelf && (
+              <span className="ml-1.5 rounded-xs border border-accent/40 px-1 py-0.5 text-[0.6875rem] text-accent">
+                {t('corp.members.you')}
+              </span>
+            )}
+          </>
+        ),
         sortValue: (row) => row.name ?? undefined,
       },
       {
@@ -170,6 +191,13 @@ function useRosterColumns(): DataTableColumn<RosterRow>[] {
         render: (row) => (row.startMs === null ? DASH : new Date(row.startMs).toLocaleDateString()),
         sortValue: (row) => row.startMs ?? undefined,
       },
+      {
+        id: 'roles',
+        header: t('corp.members.columnRoles'),
+        className: 'truncate',
+        render: (row) => rolesText(row.roles) ?? DASH,
+        sortValue: (row) => rolesText(row.roles) ?? undefined,
+      },
     ],
     [t]
   );
@@ -184,7 +212,7 @@ export function CorpRosterColumnPicker() {
   const columns = useRosterColumns();
   const { visible, toggle, reset } = useColumnVisibility(
     useVisibleCorpRosterColumns,
-    CORP_ROSTER_COLUMN_IDS
+    CORP_ROSTER_DEFAULT_COLUMNS
   );
   const columnsById = useMemo(
     () =>
@@ -218,7 +246,10 @@ export function CorpRosterTable({
 }) {
   const { t } = useTranslation();
   const columns = useRosterColumns();
-  const { isVisible } = useColumnVisibility(useVisibleCorpRosterColumns, CORP_ROSTER_COLUMN_IDS);
+  const { isVisible } = useColumnVisibility(
+    useVisibleCorpRosterColumns,
+    CORP_ROSTER_DEFAULT_COLUMNS
+  );
   const shownColumns = useMemo(
     () =>
       columns.filter(

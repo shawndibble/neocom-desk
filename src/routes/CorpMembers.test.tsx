@@ -20,7 +20,7 @@ import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { db } from '@/db';
 import {
-  CORP_ROSTER_COLUMN_IDS,
+  CORP_ROSTER_DEFAULT_COLUMNS,
   useVisibleCorpRosterColumns,
 } from '@/features/corp/corpRosterColumns';
 import { CorpMembers } from './CorpMembers';
@@ -33,6 +33,7 @@ vi.mock('@/features/corp/boardData', async (importOriginal) => ({
 vi.mock('@/features/corp/members', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/features/corp/members')>()),
   loadCorporationMemberIds: vi.fn(),
+  loadCorporationMemberRoles: vi.fn(),
   loadCorporationMemberTracking: vi.fn(),
   loadMemberLabels: vi.fn(),
 }));
@@ -138,7 +139,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   // The column picker test hides a column; that must not leak into the next test.
   await db.settings.clear();
-  useVisibleCorpRosterColumns.setState({ value: CORP_ROSTER_COLUMN_IDS, hydrated: false });
+  useVisibleCorpRosterColumns.setState({ value: CORP_ROSTER_DEFAULT_COLUMNS, hydrated: false });
   vi.setSystemTime(NOW);
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
   usePublicInfoModalStore.setState({ request: null });
@@ -148,6 +149,7 @@ beforeEach(async () => {
   mocked.loadCorporationMemberTracking.mockResolvedValue(
     cached([tracking({ character_id: 1001 })])
   );
+  mocked.loadCorporationMemberRoles.mockResolvedValue(cached([]));
   mocked.loadMemberLabels.mockResolvedValue(labels());
   mocked.readPreviousRoster.mockResolvedValue(undefined);
   mockedAccess.mockReturnValue(accessOf('ready', { canReadMembers: true }));
@@ -554,6 +556,59 @@ describe('column picker', () => {
 
     expect(within(table).queryByRole('columnheader', { name: 'Ship' })).not.toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: 'Member' })).toBeInTheDocument();
+  });
+});
+
+describe('roles column (issue #1766)', () => {
+  beforeEach(() => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 }), tracking({ character_id: 1002 })])
+    );
+    mocked.loadCorporationMemberRoles.mockResolvedValue(
+      cached([{ character_id: 1001, roles: ['Director', 'Junior_Accountant'] }])
+    );
+  });
+
+  it('is hidden until the pilot turns it on', async () => {
+    const table = await rosterTable();
+    expect(within(table).queryByRole('columnheader', { name: 'Roles' })).not.toBeInTheDocument();
+  });
+
+  it("shows each member's in-game roles once toggled on", async () => {
+    const user = userEvent.setup();
+    const table = await rosterTable();
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Roles' }));
+    await user.keyboard('{Escape}');
+
+    expect(within(table).getByRole('columnheader', { name: 'Roles' })).toBeInTheDocument();
+    expect(within(table).getByText('Jita Local').closest('tr')).toHaveTextContent(
+      'Director, Junior Accountant'
+    );
+  });
+
+  it('turns the column back off on reset', async () => {
+    const user = userEvent.setup();
+    const table = await rosterTable();
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Roles' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Reset to default' }));
+    await user.keyboard('{Escape}');
+
+    expect(within(table).queryByRole('columnheader', { name: 'Roles' })).not.toBeInTheDocument();
+  });
+});
+
+describe('"you" tag (issue #1766)', () => {
+  it("marks the active character's own row, and only that row", async () => {
+    useActiveCharacter.setState({ activeCharacterId: 1001, hydrated: true });
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([tracking({ character_id: 1001 }), tracking({ character_id: 1002 })])
+    );
+    const table = await rosterTable();
+
+    expect(within(table).getByText('Jita Local').closest('tr')).toHaveTextContent('You');
+    expect(within(table).getByText('Silent Ren').closest('tr')).not.toHaveTextContent('You');
   });
 });
 

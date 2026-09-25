@@ -40,6 +40,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import {
   CorpRosterColumnPicker,
@@ -54,9 +55,11 @@ import { loadCorporationId } from '@/features/corp/boardData';
 import {
   EMPTY_MEMBER_LABELS,
   loadCorporationMemberIds,
+  loadCorporationMemberRoles,
   loadCorporationMemberTracking,
   loadMemberLabels,
   toMemberActivity,
+  toMemberRoles,
   type MemberLabels,
 } from '@/features/corp/members';
 import { readPreviousRoster, recordRoster } from '@/features/corp/rosterState';
@@ -122,9 +125,11 @@ function rosterOptions(
 interface MembersSnapshot {
   corporationId: number | null;
   members: MemberActivity[];
+  /** Corporation-wide roles by member, for the optional roles column (issue #1766). */
+  roles: ReadonlyMap<number, readonly string[]>;
   labels: MemberLabels;
   diff: RosterDiff;
-  /** Oldest `fetchedAt` across the two reads — the badge speaks for the whole view. */
+  /** Oldest `fetchedAt` across the three reads — the badge speaks for the whole view. */
   fetchedAt: Date | null;
   /** Captured in the loader: `Date.now()` in render is impure. */
   loadedAt: number;
@@ -133,6 +138,7 @@ interface MembersSnapshot {
 const EMPTY_SNAPSHOT: MembersSnapshot = {
   corporationId: null,
   members: [],
+  roles: new Map(),
   labels: EMPTY_MEMBER_LABELS,
   diff: EMPTY_ROSTER_DIFF,
   fetchedAt: null,
@@ -151,9 +157,12 @@ async function loadMembersSnapshot(
     return { ...EMPTY_SNAPSHOT, corporationId, loadedAt };
   }
 
-  const [roster, tracking] = await Promise.all([
+  // Roles only fill a column that is off by default, so a failed read costs
+  // that column its contents — an empty map, a dash per cell — and nothing else.
+  const [roster, tracking, memberRoles] = await Promise.all([
     loadCorporationMemberIds(characterId, corporationId),
     loadCorporationMemberTracking(characterId, corporationId),
+    loadCorporationMemberRoles(characterId, corporationId),
   ]);
 
   const memberIds = roster.cached?.data ?? null;
@@ -174,11 +183,12 @@ async function loadMembersSnapshot(
   }
 
   const members = toMemberActivity(tracking.cached?.data ?? []);
+  const roles = toMemberRoles(memberRoles.cached?.data ?? []);
   // Members who left are in neither read any more, so their names are asked for
   // explicitly — the summary is the only place they appear.
   const labels = await loadMemberLabels(characterId, members, diff.left);
 
-  const fetchedAts = [roster, tracking]
+  const fetchedAts = [roster, tracking, memberRoles]
     .map((result) => result.cached?.fetchedAt)
     .filter((date): date is Date => date !== undefined);
   const fetchedAt =
@@ -186,7 +196,7 @@ async function loadMembersSnapshot(
       ? null
       : fetchedAts.reduce((oldest, date) => (date < oldest ? date : oldest));
 
-  return { corporationId, members, labels, diff, fetchedAt, loadedAt };
+  return { corporationId, members, roles, labels, diff, fetchedAt, loadedAt };
 }
 
 /** Mounted only once Corp Access is `ready` — see the `/corp` loader note. */
@@ -206,6 +216,7 @@ function CorpMembersView() {
     cacheKey: 'corp-members',
   });
   const data = snapshot.data;
+  const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
 
   const rows = useMemo<RosterRow[]>(() => {
     if (data === null) return [];
@@ -220,8 +231,10 @@ function CorpMembersView() {
       locationName:
         member.locationId === null ? null : (data.labels.locations.get(member.locationId) ?? null),
       startMs: member.startMs,
+      roles: data.roles.get(member.characterId) ?? null,
+      isSelf: member.characterId === activeCharacterId,
     }));
-  }, [data, darkAfterDays]);
+  }, [data, darkAfterDays, activeCharacterId]);
 
   // Search + dark-only/ship/location filters (issue #421, AC2/AC3):
   // AND-composed, same stacking rule as Mail's search-and-label filters

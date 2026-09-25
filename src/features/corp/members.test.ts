@@ -8,9 +8,11 @@ import { ESI_FANOUT_CONCURRENCY } from '@/lib/concurrency';
 import {
   KEYS,
   loadCorporationMemberIds,
+  loadCorporationMemberRoles,
   loadCorporationMemberTracking,
   loadMemberLabels,
   toMemberActivity,
+  toMemberRoles,
 } from './members';
 
 /**
@@ -98,6 +100,51 @@ describe('loadCorporationMemberTracking', () => {
     const result = await loadCorporationMemberTracking(CHAR_ID, CORP_ID);
 
     expect(result.needsReauth).toBe(false);
+  });
+});
+
+describe('loadCorporationMemberRoles', () => {
+  const ROLES = [{ character_id: 1001, roles: ['Director'] }];
+
+  it('caches the member roles under a corp-scoped key', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/corporations/${CORP_ID}/roles`, () => HttpResponse.json(ROLES))
+    );
+
+    const result = await loadCorporationMemberRoles(CHAR_ID, CORP_ID);
+
+    expect(result.cached?.data).toEqual(ROLES);
+    expect((await db.esiCache.get([CHAR_ID, corpCacheKey(CORP_ID, KEYS.roles)]))?.value).toEqual(
+      ROLES
+    );
+  });
+
+  it('treats a 403 as the in-game role gate, not a re-login prompt', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/corporations/${CORP_ID}/roles`, () =>
+        HttpResponse.json({ error: 'Forbidden' }, { status: 403 })
+      )
+    );
+
+    const result = await loadCorporationMemberRoles(CHAR_ID, CORP_ID);
+
+    expect(result.needsReauth).toBe(false);
+  });
+});
+
+describe('toMemberRoles', () => {
+  it('keys each member to their corporation-wide roles', () => {
+    const roles = toMemberRoles([
+      { character_id: 1001, roles: ['Director'], roles_at_hq: ['Hangar_Take_1'] },
+      { character_id: 1002, roles: ['Accountant', 'Trader'] },
+    ]);
+    expect(roles.get(1001)).toEqual(['Director']);
+    expect(roles.get(1002)).toEqual(['Accountant', 'Trader']);
+  });
+
+  /** ESI omits the array rather than sending `[]` — `roles.ts`'s note. */
+  it('reads an omitted roles array as no roles, not unknown', () => {
+    expect(toMemberRoles([{ character_id: 1003 }]).get(1003)).toEqual([]);
   });
 });
 
