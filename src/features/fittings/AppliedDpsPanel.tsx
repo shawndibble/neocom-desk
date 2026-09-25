@@ -70,10 +70,13 @@ function OverlayPicker({ overlay }: { overlay: OverlayFitting }) {
 
 export function AppliedDpsPanel({
   applied,
+  chargelessWeaponCount,
   targetProfiles,
   overlay,
 }: {
   applied: AppliedDpsInputs;
+  /** Active turrets/launchers with no charge loaded — why `applied.weapons` may be empty. */
+  chargelessWeaponCount: number;
   targetProfiles: TargetProfiles;
   /** Absent where there's no Character to have saved Fittings (the Share Link view). */
   overlay?: OverlayFitting;
@@ -127,6 +130,10 @@ export function AppliedDpsPanel({
             />
           </Suspense>
         </>
+      ) : chargelessWeaponCount > 0 ? (
+        <p className="text-xs text-text-dim">
+          {t('fittings.appliedDps.noCharge', { count: chargelessWeaponCount })}
+        </p>
       ) : (
         <p className="text-xs text-text-dim">{t('fittings.appliedDps.noWeapons')}</p>
       )}

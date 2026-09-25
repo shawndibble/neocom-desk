@@ -287,6 +287,11 @@ function isFiring(state: FittingItemState): boolean {
   return state === 'active' || state === 'overload';
 }
 
+/** Whether a module type has a charge slot at all (a turret or launcher), regardless of whether one is loaded. */
+function acceptsCharge(attributes: AttributeMap): boolean {
+  return CHARGE_GROUP_ATTRIBUTES.some((id) => readAttribute(attributes, id) > 0);
+}
+
 function damageFigures(attributes: AttributeMap, quantity: number): DamageFigures {
   return {
     dps: readAttribute(attributes, ITEM_DOGMA_ATTRIBUTE.damagePerSecond) * quantity,
@@ -310,11 +315,15 @@ export function extractOffense(
   overheatedResults: readonly ModuleCalculationResult[] | null
 ): OffenseStats {
   const rows = new Map<string, WeaponRow>();
+  let chargelessWeaponCount = 0;
   items.forEach((item, index) => {
     const result = results[index];
     if (!result || !isFiring(result.state)) return;
     const figures = damageFigures(result.attributes, item.quantity);
-    if (figures.dps === 0 && figures.volley === 0) return;
+    if (figures.dps === 0 && figures.volley === 0) {
+      if (!item.isDrone && acceptsCharge(result.attributes)) chargelessWeaponCount += 1;
+      return;
+    }
 
     const heated =
       !item.isDrone && result.max_state === 'overload' ? overheatedResults?.[index] : undefined;
@@ -356,6 +365,7 @@ export function extractOffense(
           volley: sum((row) => row.overheated?.volley ?? row.volley),
         }
       : null,
+    chargelessWeaponCount,
   };
 }
 

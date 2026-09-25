@@ -40,7 +40,7 @@ function statsWith(overrides: Partial<FittingStats>): FittingStats {
     hull: layer(2000),
     navigation: { maxVelocity: 1118, agility: 0.5, mass: 1, warpSpeed: 3 },
     targeting: { maxTargetRange: 1, maxLockedTargets: 1, scanResolution: 1, signatureRadius: 212 },
-    offense: { weapons: [], dps: 0, volley: 0, overheated: null },
+    offense: { weapons: [], dps: 0, volley: 0, overheated: null, chargelessWeaponCount: 0 },
     ...overrides,
   } as unknown as FittingStats;
 }
@@ -67,6 +67,7 @@ describe('OffensePanel', () => {
             dps: 482,
             volley: 2300,
             overheated: { dps: 551, volley: 2600 },
+            chargelessWeaponCount: 0,
           },
         })}
       />

@@ -55,7 +55,7 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     applied: { weapons: [], droneControlRange: 20000 },
     slotCounts: { high: 3, medium: 3, low: 4, rig: 3, subsystem: 0 },
     modules: [],
-    offense: { weapons: [], dps: 0, volley: 0, overheated: null },
+    offense: { weapons: [], dps: 0, volley: 0, overheated: null, chargelessWeaponCount: 0 },
     repair: { shield: 0, armor: 0, hull: 0 },
     overheated: null,
     ...overrides,
@@ -90,6 +90,7 @@ function heatedStats(): FittingStats {
       dps: 173.7,
       volley: 784,
       overheated: { dps: 181.7, volley: 830 },
+      chargelessWeaponCount: 0,
     },
     repair: { shield: 0, armor: 63.2, hull: 0 },
     overheated: {
@@ -183,6 +184,18 @@ describe('FittingStatsSections offense', () => {
     renderSections(stats());
 
     expect(within(sectionBody('Offense')).getByText('Nothing is firing.')).toBeInTheDocument();
+  });
+
+  it('blames the missing charge, not activation, when weapons are active but empty', () => {
+    renderSections(
+      stats({
+        offense: { weapons: [], dps: 0, volley: 0, overheated: null, chargelessWeaponCount: 3 },
+      })
+    );
+    const offense = within(sectionBody('Offense'));
+
+    expect(offense.getByText(/3 weapons have no charge loaded/)).toBeInTheDocument();
+    expect(offense.queryByText('Nothing is firing.')).not.toBeInTheDocument();
   });
 });
 
@@ -384,6 +397,20 @@ describe('FittingStatsSections — Applied DPS', () => {
 
     expect(screen.getByText(/No weapons are running/)).toBeInTheDocument();
     expect(screen.queryByText(/^Raw DPS/)).not.toBeInTheDocument();
+  });
+
+  it('blames the missing charge, not activation, when weapons are active but empty', () => {
+    renderSections(
+      stats({
+        applied: { weapons: [], droneControlRange: 20000 },
+        offense: { weapons: [], dps: 0, volley: 0, overheated: null, chargelessWeaponCount: 3 },
+      }),
+      damageProfiles()
+    );
+
+    const appliedDps = within(sectionBody('Applied DPS'));
+    expect(appliedDps.getByText(/3 weapons have no charge loaded/)).toBeInTheDocument();
+    expect(appliedDps.queryByText(/No weapons are running/)).not.toBeInTheDocument();
   });
 
   it('overlays a second fitting as a dashed line, named in the key and the tables', async () => {
