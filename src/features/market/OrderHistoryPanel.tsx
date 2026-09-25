@@ -1,7 +1,8 @@
-import { useCallback, useMemo, type ReactElement } from 'react';
+import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
+  ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -28,6 +29,7 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
+import { useColumnVisibility } from '@/lib/columnVisibility';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { orderHistoryCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrderHistory } from '@/esi/endpoints';
@@ -40,6 +42,11 @@ import {
   HISTORY_FILTER_PARAMS,
   type HistoryFilter,
 } from './orderHistoryFilter';
+import {
+  ORDER_HISTORY_COLUMN_IDS,
+  useVisibleOrderHistoryColumns,
+  type OrderHistoryColumnId,
+} from './orderHistoryColumns';
 
 const HISTORY_SORT = { columnId: 'issued', direction: 'desc' } as const;
 
@@ -74,10 +81,12 @@ async function loadOrderHistorySnapshot(
 interface HistoryFilterBarProps {
   filter: HistoryFilter;
   onChange: (filter: HistoryFilter) => void;
+  /** The column picker — omitted on a phone, where `OrderHistoryList` renders instead and ignores it. */
+  actions?: ReactNode;
 }
 
 /** Search plus buy/sell/state filter chips above the order history table. */
-function HistoryFilterBar({ filter, onChange }: HistoryFilterBarProps) {
+function HistoryFilterBar({ filter, onChange, actions }: HistoryFilterBarProps) {
   const { t } = useTranslation();
   return (
     <FilterBar
@@ -85,6 +94,7 @@ function HistoryFilterBar({ filter, onChange }: HistoryFilterBarProps) {
       onChange={onChange}
       activeCount={activeHistoryFilterCount(filter)}
       className="border-b border-line px-3 py-2"
+      actions={actions}
       search={
         <SearchInput
           value={filter.text}
@@ -239,6 +249,28 @@ export function OrderHistoryPanel({
     columns.map((column) => column.id)
   );
 
+  const {
+    visible: visibleColumnIds,
+    isVisible: isColumnVisible,
+    toggle: toggleColumn,
+    reset: resetColumns,
+  } = useColumnVisibility(useVisibleOrderHistoryColumns, ORDER_HISTORY_COLUMN_IDS);
+  // `item` is not in `ORDER_HISTORY_COLUMN_IDS` — the row's identity, never optional.
+  const tableColumns = useMemo(
+    () =>
+      columns.filter(
+        (column) => column.id === 'item' || isColumnVisible(column.id as OrderHistoryColumnId)
+      ),
+    [columns, isColumnVisible]
+  );
+  const columnsById = useMemo(
+    () =>
+      Object.fromEntries(
+        columns.filter((column) => column.id !== 'item').map((column) => [column.id, column])
+      ) as Record<OrderHistoryColumnId, DataTableColumn<MarketOrderHistory>>,
+    [columns]
+  );
+
   /** Same menu the Appraisal ledger carries — an order-history row names an item like any other. */
   function rowContextMenu(order: MarketOrderHistory, tr: ReactElement) {
     const itemName = nameFor(order.type_id);
@@ -350,7 +382,24 @@ export function OrderHistoryPanel({
               {t('common.incompleteTitle')}
             </p>
           )}
-          <HistoryFilterBar filter={filter} onChange={setFilter} />
+          <HistoryFilterBar
+            filter={filter}
+            onChange={setFilter}
+            actions={
+              !isPhone && (
+                <ColumnPickerMenu
+                  available={ORDER_HISTORY_COLUMN_IDS}
+                  visible={visibleColumnIds}
+                  columnsById={columnsById}
+                  onToggle={toggleColumn}
+                  buttonLabel={t('common.columnsButton')}
+                  menuTitle={t('common.columnsMenuTitle')}
+                  onReset={resetColumns}
+                  resetLabel={t('common.resetColumns')}
+                />
+              )
+            }
+          />
           {filteredHistory.length === 0 ? (
             <EmptyState
               title={t('orders.noResults')}
@@ -366,7 +415,7 @@ export function OrderHistoryPanel({
             />
           ) : (
             <DataTable
-              columns={columns}
+              columns={tableColumns}
               rows={filteredHistory}
               rowKey={(order) => order.order_id}
               label={t('orders.historyTab')}

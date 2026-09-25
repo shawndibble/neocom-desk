@@ -269,7 +269,6 @@ function BrowserFilterBar({
       value={value}
       onChange={onChange}
       activeCount={activeCount}
-      collapsible
       search={leading}
       className={className}
     >

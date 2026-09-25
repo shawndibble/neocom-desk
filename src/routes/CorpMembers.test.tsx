@@ -18,6 +18,11 @@ import * as rosterState from '@/features/corp/rosterState';
 import * as download from '@/lib/download';
 import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
+import { db } from '@/db';
+import {
+  CORP_ROSTER_COLUMN_IDS,
+  useVisibleCorpRosterColumns,
+} from '@/features/corp/corpRosterColumns';
 import { CorpMembers } from './CorpMembers';
 
 vi.mock('@/features/corp/useCorpAccess', () => ({ useCorpAccess: vi.fn() }));
@@ -109,6 +114,16 @@ function renderMembers(initialEntry = '/corp/members') {
   );
 }
 
+/** Opens the funnel: the dark-only chip and the other filters sit behind it. */
+async function openFilters(user = userEvent.setup()) {
+  await user.click(screen.getByRole('button', { name: /^Filters/ }));
+}
+
+/** The dark-only chip, by its own name — the stat strip's "About" tooltip also mentions it. */
+function darkToggle(): HTMLElement {
+  return screen.getByRole('button', { name: /^Dark 30d\+/ });
+}
+
 function currentLocation(): string {
   return screen.getByTestId('location').textContent ?? '';
 }
@@ -119,8 +134,11 @@ async function rosterTable(): Promise<HTMLElement> {
   return waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
+  // The column picker test hides a column; that must not leak into the next test.
+  await db.settings.clear();
+  useVisibleCorpRosterColumns.setState({ value: CORP_ROSTER_COLUMN_IDS, hydrated: false });
   vi.setSystemTime(NOW);
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
   usePublicInfoModalStore.setState({ request: null });
@@ -422,7 +440,8 @@ describe('roster search (issue #421, AC2)', () => {
       ])
     );
     await rosterTable();
-    await userEvent.setup().click(screen.getByRole('button', { name: /Dark 30d\+/ }));
+    await openFilters();
+    await userEvent.setup().click(darkToggle());
     expect(screen.queryByText('Jita Local')).not.toBeInTheDocument();
     expect(screen.getByText('Silent Ren')).toBeInTheDocument();
 
@@ -447,7 +466,8 @@ describe('dark-only toggle (issue #421, AC3)', () => {
     expect(within(table).getByText('Jita Local')).toBeInTheDocument();
     expect(within(table).getByText('Silent Ren')).toBeInTheDocument();
 
-    const toggle = screen.getByRole('button', { name: /Dark 30d\+/ });
+    await openFilters();
+    const toggle = darkToggle();
     await userEvent.setup().click(toggle);
 
     expect(screen.queryByText('Jita Local')).not.toBeInTheDocument();
@@ -456,6 +476,84 @@ describe('dark-only toggle (issue #421, AC3)', () => {
 
     await userEvent.setup().click(toggle);
     expect(screen.getByText('Jita Local')).toBeInTheDocument();
+  });
+});
+
+describe('ship and location filters', () => {
+  beforeEach(() => {
+    mocked.loadCorporationMemberTracking.mockResolvedValue(
+      cached([
+        tracking({ character_id: 1001 }),
+        tracking({ character_id: 1002, ship_type_id: 11377, location_id: 30000142 }),
+      ])
+    );
+    mocked.loadMemberLabels.mockResolvedValue(
+      labels({
+        ships: new Map([
+          [587, 'Rifter'],
+          [11377, 'Nemesis'],
+        ]),
+        locations: new Map([
+          [60003760, 'Jita IV - Moon 4'],
+          [30000142, 'Jita'],
+        ]),
+      })
+    );
+  });
+
+  it('narrows the roster to one ship, offering only ships members fly', async () => {
+    const user = userEvent.setup();
+    const table = await rosterTable();
+    await openFilters(user);
+    await user.click(screen.getByRole('combobox', { name: 'Ship' }));
+    expect(screen.getAllByRole('option')).toHaveLength(3);
+    expect(screen.getByRole('option', { name: 'Rifter' })).toBeInTheDocument();
+    await user.click(screen.getByRole('option', { name: 'Nemesis' }));
+
+    expect(within(table).getByText('Silent Ren')).toBeInTheDocument();
+    expect(within(table).queryByText('Jita Local')).not.toBeInTheDocument();
+    expect(currentLocation()).toBe('/corp/members?ship=11377');
+  });
+
+  it('applies a location from the URL on arrival and counts it on the funnel', async () => {
+    renderMembers('/corp/members?loc=60003760');
+    const table = await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
+    expect(within(table).getByText('Jita Local')).toBeInTheDocument();
+    expect(within(table).queryByText('Silent Ren')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Filters/ })).toHaveAccessibleName(
+      'Filters (1 active)'
+    );
+  });
+});
+
+describe('filtered to zero', () => {
+  it('says the filters hid everyone, not that EVE sent nothing, and resets them', async () => {
+    const user = userEvent.setup();
+    renderMembers('/corp/members?q=nobody-by-this-name');
+    expect(await screen.findByText('No members match your search or filters.')).toBeInTheDocument();
+    expect(screen.queryByText('No member activity')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+    expect(await screen.findByRole('table', { name: 'Corporation members' })).toBeInTheDocument();
+    // Text params reach the URL once typing pauses, so the cleared `q` lands a beat later.
+    await waitFor(() => expect(currentLocation()).toBe('/corp/members'));
+    expect(screen.getByPlaceholderText('Search name, ship, location…')).toHaveValue('');
+  });
+});
+
+describe('column picker', () => {
+  it('hides an optional column but never the member name', async () => {
+    const user = userEvent.setup();
+    const table = await rosterTable();
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'Member' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Ship' }));
+    // The open menu hides the page from the accessibility tree; close it first.
+    await user.keyboard('{Escape}');
+
+    expect(within(table).queryByRole('columnheader', { name: 'Ship' })).not.toBeInTheDocument();
+    expect(within(table).getByRole('columnheader', { name: 'Member' })).toBeInTheDocument();
   });
 });
 
@@ -522,10 +620,11 @@ describe('filters and sort in the URL (issue #1306)', () => {
     renderMembers('/corp/members?q=ren&dark=1&sort=member:asc');
     const table = await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
     expect(screen.getByPlaceholderText('Search name, ship, location…')).toHaveValue('ren');
-    expect(screen.getByRole('button', { name: /Dark 30d\+/ })).toHaveAttribute(
-      'aria-pressed',
-      'true'
+    expect(screen.getByRole('button', { name: /^Filters/ })).toHaveAccessibleName(
+      'Filters (1 active)'
     );
+    await openFilters();
+    expect(darkToggle()).toHaveAttribute('aria-pressed', 'true');
     expect(within(table).getByRole('columnheader', { name: 'Member' })).toHaveAttribute(
       'aria-sort',
       'ascending'
@@ -545,7 +644,8 @@ describe('filters and sort in the URL (issue #1306)', () => {
   it('writes the dark-only toggle, and removes it again when switched off', async () => {
     const user = userEvent.setup();
     await rosterTable();
-    const toggle = screen.getByRole('button', { name: /Dark 30d\+/ });
+    await openFilters(user);
+    const toggle = darkToggle();
     await user.click(toggle);
     expect(currentLocation()).toBe('/corp/members?dark=1');
     await user.click(toggle);
@@ -562,10 +662,8 @@ describe('filters and sort in the URL (issue #1306)', () => {
   it('falls back to the defaults on garbage values', async () => {
     renderMembers('/corp/members?dark=maybe&sort=bogus:asc');
     const table = await waitFor(() => screen.getByRole('table', { name: 'Corporation members' }));
-    expect(screen.getByRole('button', { name: /Dark 30d\+/ })).toHaveAttribute(
-      'aria-pressed',
-      'false'
-    );
+    await openFilters();
+    expect(darkToggle()).toHaveAttribute('aria-pressed', 'false');
     expect(within(table).getByRole('columnheader', { name: 'Last seen' })).toHaveAttribute(
       'aria-sort',
       'descending'

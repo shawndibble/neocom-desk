@@ -19,8 +19,8 @@ const EMPTY: Filter = { text: '', unreadOnly: false, from: '' };
 
 /**
  * jsdom's stub never matches (`vitest.setup.ts`), which `useIsNarrow` reads as
- * a pointer viewport — so the inline row is what every route test sees by
- * default. Narrow has to be asked for.
+ * a pointer viewport — so the funnel box under the row is what every route
+ * test sees by default. Narrow has to be asked for.
  */
 let restoreMatchMedia: (() => void) | undefined;
 
@@ -47,15 +47,7 @@ afterEach(() => {
   restoreMatchMedia = undefined;
 });
 
-function Harness({
-  initial = EMPTY,
-  collapsible,
-  actions,
-}: {
-  initial?: Filter;
-  collapsible?: boolean;
-  actions?: ReactNode;
-}) {
+function Harness({ initial = EMPTY, actions }: { initial?: Filter; actions?: ReactNode }) {
   const [filter, setFilter] = useState(initial);
   const activeCount = (filter.unreadOnly ? 1 : 0) + (filter.from === '' ? 0 : 1);
   return (
@@ -64,7 +56,6 @@ function Harness({
         value={filter}
         onChange={setFilter}
         activeCount={activeCount}
-        collapsible={collapsible}
         actions={actions}
         search={
           <SearchInput
@@ -99,8 +90,8 @@ function Harness({
 describe('FilterBar', () => {
   const columns = <button type="button">Columns</button>;
 
-  it('draws actions beside the collapsible trigger, outside the filter group', () => {
-    render(<Harness collapsible actions={columns} />);
+  it('draws actions beside the trigger, outside the filter group', () => {
+    render(<Harness actions={columns} />);
     const picker = screen.getByRole('button', { name: 'Columns' });
     expect(picker.nextElementSibling).toContainElement(
       screen.getByRole('button', { name: 'Filters' })
@@ -119,15 +110,19 @@ describe('FilterBar', () => {
     expect(screen.getByRole('dialog')).not.toContainElement(picker);
   });
 
-  it('renders the controls inline on a pointer viewport, with no trigger', () => {
-    render(<Harness />);
-    expect(screen.getByRole('button', { name: 'Unread only' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Filters/ })).not.toBeInTheDocument();
-  });
-
-  it('commits an inline edit immediately', async () => {
+  it('hides the controls behind a trigger on a pointer viewport too', async () => {
     const user = userEvent.setup();
     render(<Harness />);
+    expect(screen.queryByRole('button', { name: 'Unread only' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    expect(screen.getByRole('button', { name: 'Unread only' })).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('commits a pointer-viewport edit immediately, with no Apply step', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
     await user.click(screen.getByRole('button', { name: 'Unread only' }));
     expect(screen.getByText('unread:true from:')).toBeInTheDocument();
   });
@@ -189,15 +184,19 @@ describe('FilterBar', () => {
     expect(screen.getByRole('button', { name: 'Filters (2 active)' })).toBeInTheDocument();
   });
 
-  it('captions each field in the sheet only', async () => {
+  it('leaves fields uncaptioned in the pointer-width box', async () => {
+    const user = userEvent.setup();
     render(<Harness />);
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    expect(screen.getByRole('textbox', { name: 'From' })).toBeInTheDocument();
     expect(screen.queryByText('From')).not.toBeInTheDocument();
+  });
 
-    restoreMatchMedia?.();
+  it('captions each field in the sheet', async () => {
     useNarrowViewport();
     const user = userEvent.setup();
     render(<Harness />);
-    await user.click(screen.getAllByRole('button', { name: 'Filters' })[0]!);
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
     expect(screen.getByText('From')).toBeInTheDocument();
   });
 });

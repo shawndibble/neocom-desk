@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   FilterBar,
+  FilterChip,
   FilterField,
   IconButton,
   IskAmount,
@@ -95,7 +96,14 @@ import {
   type SortDirection,
 } from '@/features/character/groups';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { enumParam, optionalSortParam, textParam } from '@/lib/urlState';
+import {
+  boolParam,
+  enumParam,
+  nullableTextParam,
+  optionalEnumParam,
+  optionalSortParam,
+  textParam,
+} from '@/lib/urlState';
 import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
 
 const UNGROUPED_VALUE = '__ungrouped__';
@@ -129,17 +137,46 @@ const DENSITY_LABEL_KEYS = {
 
 const SORT_KEYS: readonly CharacterSortKey[] = ['name', 'skillPoints', 'wallet'];
 const SORT_DIRECTIONS: readonly SortDirection[] = ['asc', 'desc'];
+/** `unknown` left out: it means "no cached queue yet", not a state anyone filters for. */
+const QUEUE_FILTER_STATES: readonly QueueState[] = ['training', 'endingSoon', 'paused', 'idle'];
+/** Radix `SelectItem` can't take `''`, so "any corporation" needs a sentinel. */
+const ALL_CORPS_VALUE = '__all__';
 
 /**
  * The filter bar, in the URL (ADR 0015) as one group: the bar hands back sort
- * key and direction together, and the search box shares the group so a
- * pending keystroke flushes with a sort change instead of being dropped.
+ * and filters together, and the search box shares the group so a pending
+ * keystroke flushes with a sort change instead of being dropped.
  */
 const FILTER_PARAMS = {
   q: textParam(),
   sort: enumParam(SORT_KEYS, 'name'),
   dir: enumParam(SORT_DIRECTIONS, 'asc'),
+  queue: optionalEnumParam(QUEUE_FILTER_STATES),
+  corp: nullableTextParam(),
+  starred: boolParam(),
+  alerts: boolParam(),
 };
+
+/** Everything behind the funnel — the search box stays out, it commits on its own. */
+interface RosterFilter {
+  sortKey: CharacterSortKey;
+  sortDirection: SortDirection;
+  queue: QueueState | null;
+  corp: string | null;
+  starredOnly: boolean;
+  alertsOnly: boolean;
+}
+
+/** Sort is left out: it reorders, it never hides anyone, so it isn't a "filter on". */
+function activeRosterFilterCount(filter: RosterFilter): number {
+  return [
+    filter.queue !== null,
+    filter.corp !== null,
+    filter.starredOnly,
+    filter.alertsOnly,
+  ].filter(Boolean).length;
+}
+
 /**
  * Table view's header-click sort — one key for every group section's table,
  * so a column sort reads the same across the whole roster. Unsorted (the
@@ -763,6 +800,14 @@ export function Characters() {
 
   const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
   const { q: search, sort: sortKey, dir: sortDirection } = filterParams;
+  const rosterFilter: RosterFilter = {
+    sortKey,
+    sortDirection,
+    queue: filterParams.queue,
+    corp: filterParams.corp,
+    starredOnly: filterParams.starred,
+    alertsOnly: filterParams.alerts,
+  };
   const [tableSortParam, setTableSort] = useUrlParam('table.sort', TABLE_SORT);
   const [stats, setStats] = useState<Map<number, CharacterSortStats>>(new Map());
   const [queueById, setQueueById] = useState<Map<number, QueueInfo>>(new Map());
@@ -819,14 +864,24 @@ export function Characters() {
       : null;
 
   const query = search.trim().toLowerCase();
-  function matchesSearch(characterId: number): boolean {
-    if (!query) return true;
-    const character = charactersById.get(characterId);
+  const narrowing = query.length > 0 || activeRosterFilterCount(rosterFilter) > 0;
+  /** Search and funnel filters as one test, so card view, table view and the "nothing matches" state can't disagree. */
+  function matchesFilters(characterId: number): boolean {
     const corpName = publicInfo[characterId]?.corporationName ?? '';
-    return (
-      (character?.name.toLowerCase().includes(query) ?? false) ||
-      corpName.toLowerCase().includes(query)
-    );
+    if (query) {
+      const character = charactersById.get(characterId);
+      const hit =
+        (character?.name.toLowerCase().includes(query) ?? false) ||
+        corpName.toLowerCase().includes(query);
+      if (!hit) return false;
+    }
+    if (rosterFilter.queue !== null && queueById.get(characterId)?.state !== rosterFilter.queue) {
+      return false;
+    }
+    if (rosterFilter.corp !== null && corpName !== rosterFilter.corp) return false;
+    if (rosterFilter.starredOnly && !isCharacterStarred(starred, characterId)) return false;
+    if (rosterFilter.alertsOnly && (alertCounts.get(characterId) ?? 0) === 0) return false;
+    return true;
   }
 
   useEffect(() => {
@@ -1042,7 +1097,7 @@ export function Characters() {
     // would be noise once any other section still has results. The one case
     // worth telling the user about, the whole roster coming up empty, is
     // handled once, above every section, by the caller.
-    const filteredIds = characterIds.filter((characterId) => matchesSearch(characterId));
+    const filteredIds = characterIds.filter((characterId) => matchesFilters(characterId));
     if (filteredIds.length === 0) return null;
 
     // Starred first, then the chosen sort key — a layer on top of the sort,
@@ -1129,7 +1184,18 @@ export function Characters() {
 
   const allIds = characters.map((character) => character.characterId);
   const ungroupedIds = ungroupedCharacterIds(groupsValue.groups, allIds);
-  const noSearchMatches = query.length > 0 && !allIds.some((id) => matchesSearch(id));
+  const noMatches = narrowing && !allIds.some((id) => matchesFilters(id));
+  // Only corps the roster actually has, plus a pasted-link value that isn't
+  // one of them — dropping it would blank the trigger while the badge still
+  // counts it, a filter the pilot can neither see nor clear.
+  const corpOptions = [
+    ...new Set(
+      [
+        ...allIds.map((id) => publicInfo[id]?.corporationName),
+        rosterFilter.corp ?? undefined,
+      ].filter((name): name is string => !!name)
+    ),
+  ].sort((a, b) => a.localeCompare(b));
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -1203,8 +1269,18 @@ export function Characters() {
       ) : (
         <>
           <FilterBar
-            value={{ sortKey, sortDirection }}
-            onChange={(next) => setFilterParams({ sort: next.sortKey, dir: next.sortDirection })}
+            value={rosterFilter}
+            onChange={(next) =>
+              setFilterParams({
+                sort: next.sortKey,
+                dir: next.sortDirection,
+                queue: next.queue,
+                corp: next.corp,
+                starred: next.starredOnly,
+                alerts: next.alertsOnly,
+              })
+            }
+            activeCount={activeRosterFilterCount(rosterFilter)}
             search={
               <SearchInput
                 value={search}
@@ -1213,9 +1289,78 @@ export function Characters() {
                 className="min-w-40 flex-1"
               />
             }
+            // Card view has no columns to pick, so the button only exists
+            // alongside the table it acts on.
+            actions={
+              viewMode === 'table' ? (
+                <ColumnPickerMenu
+                  available={availableColumnIds}
+                  visible={activeColumnIds}
+                  columnsById={columnsById}
+                  onToggle={handleToggleColumn}
+                  buttonLabel={t('characters.columnsButton')}
+                  menuTitle={t('characters.columnsMenuTitle')}
+                />
+              ) : undefined
+            }
           >
             {(draft, setDraft) => (
               <>
+                <div
+                  role="group"
+                  aria-label={t('characters.filterQueueLabel')}
+                  className="flex flex-wrap gap-2"
+                >
+                  {QUEUE_FILTER_STATES.map((state) => (
+                    <FilterChip
+                      key={state}
+                      label={t(`characters.queueStates.${state}`)}
+                      selected={draft.queue === state}
+                      onToggle={() =>
+                        setDraft({ ...draft, queue: draft.queue === state ? null : state })
+                      }
+                    />
+                  ))}
+                </div>
+                {/* One corp has nothing to narrow to — unless a link already set one, which must stay visible to be cleared. */}
+                {(corpOptions.length > 1 || draft.corp !== null) && (
+                  <FilterField label={t('characters.filterCorpLabel')}>
+                    <Select
+                      value={draft.corp ?? ALL_CORPS_VALUE}
+                      onValueChange={(value) =>
+                        setDraft({ ...draft, corp: value === ALL_CORPS_VALUE ? null : value })
+                      }
+                    >
+                      <SelectTrigger
+                        size="md"
+                        aria-label={t('characters.filterCorpLabel')}
+                        className="w-48"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ALL_CORPS_VALUE}>
+                          {t('characters.allCorporations')}
+                        </SelectItem>
+                        {corpOptions.map((name) => (
+                          <SelectItem key={name} value={name}>
+                            {name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FilterField>
+                )}
+                <FilterChip
+                  label={t('characters.filterStarredOnly')}
+                  selected={draft.starredOnly}
+                  onToggle={() => setDraft({ ...draft, starredOnly: !draft.starredOnly })}
+                />
+                <FilterChip
+                  label={t('characters.filterHasAlerts')}
+                  selected={draft.alertsOnly}
+                  onToggle={() => setDraft({ ...draft, alertsOnly: !draft.alertsOnly })}
+                />
                 <FilterField label={t('characters.sortBy')}>
                   <Select
                     value={draft.sortKey}
@@ -1311,20 +1456,10 @@ export function Characters() {
                   onClick={() => void setViewMode('table')}
                 />
               </div>
-              {viewMode === 'table' && (
-                <ColumnPickerMenu
-                  available={availableColumnIds}
-                  visible={activeColumnIds}
-                  columnsById={columnsById}
-                  onToggle={handleToggleColumn}
-                  buttonLabel={t('characters.columnsButton')}
-                  menuTitle={t('characters.columnsMenuTitle')}
-                />
-              )}
             </div>
           </div>
 
-          {noSearchMatches ? (
+          {noMatches ? (
             <EmptyState
               title={t('characters.noSearchMatches')}
               hint={t('characters.noSearchMatchesHint')}

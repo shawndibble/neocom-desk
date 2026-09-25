@@ -124,6 +124,7 @@ export function TransactionsPanel({
         header: t('wallet.date'),
         className: 'whitespace-nowrap text-text-dim',
         render: (txn) => formatTimestamp(new Date(txn.date), timeZone),
+        sortValue: (txn) => txn.date,
       },
       {
         id: 'item',
@@ -135,11 +136,13 @@ export function TransactionsPanel({
             {typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`}
           </MarketItemLink>
         ),
+        sortValue: (txn) => nameFor(txn.type_id),
       },
       {
         id: 'side',
         header: t('wallet.side'),
         render: (txn) => (txn.is_buy ? t('wallet.buy') : t('wallet.sell')),
+        sortValue: (txn) => (txn.is_buy ? 0 : 1),
       },
       {
         id: 'quantity',
@@ -147,6 +150,7 @@ export function TransactionsPanel({
         align: 'right',
         className: 'tabular-nums',
         render: (txn) => txn.quantity.toLocaleString(),
+        sortValue: (txn) => txn.quantity,
       },
       {
         id: 'unitPrice',
@@ -154,6 +158,7 @@ export function TransactionsPanel({
         align: 'right',
         className: 'tabular-nums',
         render: (txn) => formatIsk(txn.unit_price, 2),
+        sortValue: (txn) => txn.unit_price,
       },
       {
         id: 'total',
@@ -162,9 +167,10 @@ export function TransactionsPanel({
         className: 'tabular-nums',
         cellClassName: (txn) => iskToneClass(transactionTotal(txn)),
         render: (txn) => formatIsk(transactionTotal(txn), 2),
+        sortValue: (txn) => transactionTotal(txn),
       },
     ],
-    [t, typeNames, timeZone]
+    [t, typeNames, timeZone, nameFor]
   );
 
   /** Same menu the Appraisal ledger carries — a transaction row names an item like any other. */
@@ -279,6 +285,9 @@ export function TransactionsPanel({
               highlightRowKey={highlightId}
               rowContextMenu={rowContextMenu}
               rowMoreActions
+              // `transactions` already arrives newest-first (the `sort` above) —
+              // matches that so a header click is the first thing that reorders it.
+              defaultSort={{ columnId: 'date', direction: 'desc' }}
             />
           )}
         </>

@@ -154,17 +154,20 @@ function ActivityLogPanel() {
         id: 'endpoint',
         header: t('activityLog.columnEndpoint'),
         className: 'font-mono text-[0.6875rem] text-text-dim',
+        sortValue: (entry) => ENDPOINT_ROUTES[entry.endpointId],
         render: (entry) => ENDPOINT_ROUTES[entry.endpointId],
       },
       {
         id: 'character',
         header: t('activityLog.columnCharacter'),
+        sortValue: (entry) => characterCell(entry.characterId, characterNames, t),
         render: (entry) => characterCell(entry.characterId, characterNames, t),
       },
       {
         id: 'time',
         header: t('activityLog.columnTime'),
         className: 'whitespace-nowrap text-text-dim',
+        sortValue: (entry) => entry.timestamp,
         // Full date, not just time-of-day: a session that crosses midnight
         // otherwise makes two entries on different days read as minutes apart.
         render: (entry) => formatTimestamp(new Date(entry.timestamp), timeZone),
@@ -174,6 +177,7 @@ function ActivityLogPanel() {
         header: t('activityLog.columnOutcome'),
         className: 'font-semibold',
         cellClassName: (entry) => OUTCOME_TONE[entry.outcome],
+        sortValue: (entry) => t(OUTCOME_LABEL_KEYS[entry.outcome]),
         render: (entry) => t(OUTCOME_LABEL_KEYS[entry.outcome]),
       },
     ],
@@ -201,6 +205,7 @@ function ActivityLogPanel() {
             rowKey={(entry) => entry.id}
             label={t('activityLog.title')}
             density="compact"
+            mobileSort
           />
         )}
       </div>
@@ -241,17 +246,20 @@ function DataAgePanel() {
         id: 'endpoint',
         header: t('dataAge.columnEndpoint'),
         className: 'font-mono text-[0.6875rem] text-text-dim',
+        sortValue: (entry) => ENDPOINT_ROUTES[entry.endpointId],
         render: (entry) => ENDPOINT_ROUTES[entry.endpointId],
       },
       {
         id: 'character',
         header: t('dataAge.columnCharacter'),
+        sortValue: (entry) => characterCell(entry.characterId, characterNames, t),
         render: (entry) => characterCell(entry.characterId, characterNames, t),
       },
       {
         id: 'updated',
         header: t('dataAge.columnUpdated'),
         className: 'whitespace-nowrap text-text-dim',
+        sortValue: (entry) => entry.timestamp,
         render: (entry) => (
           <span title={formatTimestamp(new Date(entry.timestamp), timeZone)}>
             {formatAge(Date.now() - entry.timestamp, t)}
@@ -275,6 +283,7 @@ function DataAgePanel() {
             rowKey={(entry) => entry.id}
             label={t('dataAge.title')}
             density="compact"
+            mobileSort
           />
         )}
       </div>

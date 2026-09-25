@@ -407,6 +407,7 @@ export function MaterialsTable({
       {
         id: 'material',
         header: t('industry.material'),
+        sortValue: (material) => nameFor(material.typeID),
         render: (material) => {
           const advice = makeOrBuy?.get(material.typeID);
           const name = nameFor(material.typeID);
@@ -538,6 +539,7 @@ export function MaterialsTable({
         header: t('industry.quantity'),
         align: 'right',
         className: 'tabular-nums',
+        sortValue: (material) => material.quantity,
         // The requirement, and — once the player says they own some — what is
         // actually left to get. That subtraction is the number a shopping list
         // is really made of, and doing it in your head down a column of six
@@ -561,6 +563,10 @@ export function MaterialsTable({
         header: t('industry.volume'),
         align: 'right',
         className: 'tabular-nums',
+        // A built row has no volume at this typeID (see below), so it sinks
+        // to the end rather than sorting as zero.
+        sortValue: (material) =>
+          material.subBuilds.length > 0 ? undefined : (rowVolume(material, volumeFor) ?? undefined),
         render: (material) => {
           // A built row's own volume is never hauled at this typeID — its
           // inputs carry that volume in their own rows further down this
@@ -763,6 +769,10 @@ export function MaterialsTable({
         header: t('industry.lineTotal'),
         align: 'right',
         className: 'tabular-nums',
+        // null for a built row (no purchase total) and an unpriced one alike
+        // — both sink to the end rather than sorting as zero.
+        sortValue: (material) =>
+          materialRowState(material, sourcing, pricesReady).lineCost ?? undefined,
         render: (material) => {
           // A built row puts no purchase total here: its ingredients have
           // rows of their own in this flat list, so a rolled-up figure would
@@ -837,6 +847,7 @@ export function MaterialsTable({
         // Five figures broke to a 5-line stack at 390px; pair two per line,
         // same fix as AppraisalPanel's result table.
         stackColumns={2}
+        mobileSort
       />
     </div>
   );

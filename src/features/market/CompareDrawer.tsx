@@ -170,6 +170,7 @@ export function CompareDrawer({
       {
         id: 'item',
         header: t('market.compare.columnItem'),
+        sortValue: (row) => row.itemName,
         // The menu wraps only this cell, not the row (unlike sibling surfaces):
         // the row also holds a Remove button, which must not open it.
         render: (row) => (

@@ -53,10 +53,26 @@ test('collapses the filters behind a trigger at 390px and commits on Apply', asy
   expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
 });
 
-test('keeps the filters in the row on a pointer viewport', async ({ page }) => {
+test('keeps the filters behind the funnel, on the search row, on a pointer viewport', async ({
+  page,
+}) => {
   await page.setViewportSize(DESKTOP);
   await page.goto('/styleguide');
 
+  const search = page.getByRole('searchbox', { name: 'Search entries' });
+  const trigger = page.getByRole('button', { name: /^Filters/ });
+  await expect(trigger).toBeVisible();
+  await expect(page.getByRole('combobox', { name: 'Ref type' })).toHaveCount(0);
+
+  // One line: the trigger's vertical centre sits within the search box.
+  const searchBox = (await search.boundingBox())!;
+  const triggerBox = (await trigger.boundingBox())!;
+  const triggerMid = triggerBox.y + triggerBox.height / 2;
+  expect(triggerMid).toBeGreaterThanOrEqual(searchBox.y);
+  expect(triggerMid).toBeLessThanOrEqual(searchBox.y + searchBox.height);
+
+  // A box under the row, not a sheet: no dialog, controls commit directly.
+  await trigger.click();
   await expect(page.getByRole('combobox', { name: 'Ref type' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /^Filters/ })).toHaveCount(0);
+  await expect(page.getByRole('dialog', { name: 'Filters' })).toHaveCount(0);
 });
