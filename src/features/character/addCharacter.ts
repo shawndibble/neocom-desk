@@ -38,7 +38,7 @@ import { backfillAccountWideData, scheduleSync } from '@/sync';
 export async function addCharacter(params: {
   code: string;
   state: string;
-}): Promise<CharacterRecord> {
+}): Promise<{ character: CharacterRecord; firstEver: boolean }> {
   // Which Characters this device knew *before* the login. The id being signed
   // in is not known until `completeLogin` decodes the token, and by then it
   // has already written the record — so "is this one new?" has to be answered
@@ -46,7 +46,10 @@ export async function addCharacter(params: {
   const knownBefore = new Set(await db.characters.toCollection().primaryKeys());
 
   const character = await completeLogin(params);
-  if (knownBefore.has(character.characterId)) return character;
+  // Nothing known before means this is the whole roster now: one Character,
+  // nothing to choose between (issue #1771).
+  const firstEver = knownBefore.size === 0;
+  if (knownBefore.has(character.characterId)) return { character, firstEver };
 
   try {
     if (await backfillAccountWideData(character.characterId)) {
@@ -56,5 +59,5 @@ export async function addCharacter(params: {
     // See "a backfill that throws" above: the session is already established
     // and is worth more than the rows this would have copied.
   }
-  return character;
+  return { character, firstEver };
 }
