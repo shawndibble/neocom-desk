@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, TextInput } from '@/components/ui';
+import { Button, Modal, TextInput, Checkbox, Radio } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import type { PayeeRecord } from '@/db';
 import { cx } from '@/lib/cx';
@@ -145,10 +145,9 @@ export function LinkPaymentDialog({
                     on && 'border-l border-accent'
                   )}
                 >
-                  <input
-                    type="radio"
+                  <Radio
                     name="link-payment"
-                    className="mt-0.5 size-4 shrink-0 cursor-pointer accent-accent"
+                    className="mt-0.5"
                     checked={on}
                     onChange={() => pick(payment.key)}
                   />
@@ -190,11 +189,10 @@ export function LinkPaymentDialog({
                           tappableRowClassName
                         )}
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={on}
                           onChange={() => toggle(m.assignment.id)}
-                          className="size-4 shrink-0 cursor-pointer accent-accent"
+
                           aria-label={t('miningTax.linkPaymentIncludeLabel', {
                             date: m.assignment.date,
                           })}

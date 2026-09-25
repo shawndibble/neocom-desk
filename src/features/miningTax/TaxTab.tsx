@@ -15,6 +15,7 @@ import {
   Panel,
   Spinner,
   type DataTableColumn,
+  Checkbox,
 } from '@/components/ui';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import {
@@ -744,12 +745,10 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             className: 'w-8 px-2',
             render: (dr: DisplayRow) =>
               isSelectableRow(dr) ? (
-                <input
-                  type="checkbox"
+                <Checkbox
                   aria-label={t('miningTax.selectForBulkAction')}
                   checked={selection.has(dr.key)}
                   onChange={() => toggleRowSelected(dr.key)}
-                  className="size-4 shrink-0 cursor-pointer accent-accent"
                 />
               ) : null,
           } satisfies DataTableColumn<DisplayRow>,

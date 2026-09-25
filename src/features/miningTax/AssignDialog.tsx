@@ -9,6 +9,7 @@ import {
   SelectValue,
   TextInput,
   TypeIcon,
+  Checkbox,
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import type { OreLine } from '@/engine/miningTax/types';
@@ -338,11 +339,9 @@ export function AssignDialog({
 
       {offerRememberSystem && (
         <label className="flex items-center gap-2 text-xs text-text-dim">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={rememberSystem}
             onChange={(e) => setRememberSystem(e.target.checked)}
-            className="size-4 shrink-0 cursor-pointer accent-accent"
           />
           {t('miningTax.rememberSystemLabel', {
             system: systemName,
@@ -362,12 +361,10 @@ export function AssignDialog({
                 key={line.typeId}
                 className="flex items-center gap-1.5 py-1 text-sm first:pt-0 last:pb-0"
               >
-                <input
-                  type="checkbox"
+                <Checkbox
                   id={`line-${line.typeId}`}
                   checked={includedTypeIds.has(line.typeId)}
                   onChange={() => toggleLine(line.typeId)}
-                  className="size-4 shrink-0 cursor-pointer accent-accent"
                 />
                 <TypeIcon typeId={line.typeId} size={32} className="h-4 w-4 shrink-0" />
                 <label htmlFor={`line-${line.typeId}`} className="w-40 shrink-0 truncate">
@@ -440,12 +437,7 @@ export function AssignDialog({
 
       {!isEditing && (
         <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={markPaid}
-            onChange={(e) => setMarkPaid(e.target.checked)}
-            className="size-4 shrink-0 cursor-pointer accent-accent"
-          />
+          <Checkbox checked={markPaid} onChange={(e) => setMarkPaid(e.target.checked)} />
           {t('miningTax.markPaidLabel')}
         </label>
       )}

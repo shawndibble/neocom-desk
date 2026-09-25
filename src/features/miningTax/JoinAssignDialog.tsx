@@ -10,6 +10,7 @@ import {
   SelectValue,
   TextInput,
   TypeIcon,
+  Checkbox,
 } from '@/components/ui';
 import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { AlreadyAssignedError, joinAssignments, type JoinMemberInput } from './assignments';
@@ -180,11 +181,10 @@ export function JoinAssignDialog({
               {candidates.map((candidate) => (
                 <li key={candidateKey(candidate)} className="py-1">
                   <label className="flex cursor-pointer items-center gap-2">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={selectedKeys.has(candidateKey(candidate))}
                       onChange={() => toggle(candidateKey(candidate))}
-                      className="size-4 shrink-0 cursor-pointer accent-accent"
+
                       aria-label={t('miningTax.joinIncludeLabel', {
                         date: candidate.row.entry.date,
                       })}

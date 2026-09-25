@@ -19,6 +19,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Checkbox,
 } from '@/components/ui';
 import { FACILITY_PRESETS, type FacilityKind } from '@/engine/industry/types';
 import type { BuildPlanRecord } from '@/db';
@@ -151,12 +152,10 @@ export function RetargetGroupDialog({ group, plans, onApply, onClose }: Retarget
           <ul className="max-h-64 divide-y divide-line overflow-y-auto">
             {plans.map((plan) => (
               <li key={plan.id} className="flex items-center gap-2 px-1 py-1.5">
-                <input
-                  type="checkbox"
+                <Checkbox
                   id={`retarget-plan-${plan.id}`}
                   checked={checked.has(plan.id)}
                   onChange={() => toggle(plan.id)}
-                  className="size-4 shrink-0 cursor-pointer accent-accent"
                 />
                 <label htmlFor={`retarget-plan-${plan.id}`} className="flex flex-1 flex-col">
                   <span>{plan.name}</span>

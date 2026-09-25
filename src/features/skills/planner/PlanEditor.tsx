@@ -32,6 +32,7 @@ import {
   TextInput,
   Tooltip,
   iconButtonClassName,
+  Checkbox,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
@@ -1713,12 +1714,10 @@ export function PlanEditor({
           )}
 
           <label className="flex items-center gap-1.5">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={cloneState === 'alpha'}
               disabled={!cloneStatesHydrated}
               onChange={(e) => setCloneState(e.target.checked ? 'alpha' : 'omega')}
-              className="size-4 shrink-0 cursor-pointer accent-accent disabled:cursor-not-allowed disabled:opacity-50"
             />
             {t('plans.alphaClone')}
           </label>

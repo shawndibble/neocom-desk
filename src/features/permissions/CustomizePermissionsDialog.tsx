@@ -17,7 +17,7 @@
  */
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal } from '@/components/ui';
+import { Button, Modal, Checkbox } from '@/components/ui';
 import { beginCustomizedAddCharacterLogin } from '@/app/loginFlow';
 import { PERMISSIONS, SCOPE_GROUPS, type ScopeGroup } from '@/esi/registry';
 import { useCustomizePermissionsSelection } from './customizeSelection';
@@ -199,14 +199,13 @@ function CaptionedCheckbox({
   const captionId = `${domId}-caption`;
   return (
     <>
-      <input
-        type="checkbox"
+      <Checkbox
         checked={checked}
         disabled={disabled}
         onChange={onChange}
         aria-label={label}
         aria-describedby={captionId}
-        className="mt-0.5 size-4 shrink-0 accent-accent disabled:cursor-default"
+        className="mt-0.5 disabled:cursor-default! disabled:opacity-100!"
       />
       <span className="block min-w-0">
         <span className="flex items-center gap-1.5 font-semibold">

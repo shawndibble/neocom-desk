@@ -17,7 +17,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, IconButton, TextInput } from '@/components/ui';
+import { Button, IconButton, TextInput, Checkbox } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { PlanBooster } from '@/db';
@@ -136,12 +136,7 @@ function BoosterRow({
     <div className="space-y-2 border-l border-line pl-2">
       <div className="flex items-center justify-between gap-2">
         <label className="flex items-center gap-1.5">
-          <input
-            type="checkbox"
-            checked={row.enabled}
-            onChange={(e) => patch({ enabled: e.target.checked })}
-            className="size-4 shrink-0 cursor-pointer accent-accent"
-          />
+          <Checkbox checked={row.enabled} onChange={(e) => patch({ enabled: e.target.checked })} />
           {t('plans.booster')}
         </label>
         <IconButton

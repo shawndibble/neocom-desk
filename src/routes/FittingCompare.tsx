@@ -1,6 +1,14 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, IconButton, PageHeader, Panel, Spinner } from '@/components/ui';
+import {
+  Button,
+  EmptyState,
+  IconButton,
+  PageHeader,
+  Panel,
+  Spinner,
+  Checkbox,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
   compareFittingStats,
@@ -173,12 +181,10 @@ export function FittingCompare() {
           )}
 
           <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
-            <input
-              type="checkbox"
+            <Checkbox
               checked={showDifferencesOnly}
               disabled={count < 2}
               onChange={() => setDifferencesOnly((v) => !v)}
-              className="size-4 shrink-0 cursor-pointer accent-accent disabled:opacity-50"
             />
             {t('fittings.compare.differencesOnly')}
           </label>

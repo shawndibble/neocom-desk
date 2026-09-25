@@ -43,6 +43,16 @@ export default tseslint.config(
             "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='search']",
           message: 'Use SearchInput from src/components/ui instead of a raw <input type="search">.',
         },
+        {
+          selector:
+            "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='checkbox']",
+          message: 'Use Checkbox from src/components/ui instead of a raw <input type="checkbox">.',
+        },
+        {
+          selector:
+            "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='radio']",
+          message: 'Use Radio from src/components/ui instead of a raw <input type="radio">.',
+        },
       ],
       'no-restricted-imports': [
         'error',
