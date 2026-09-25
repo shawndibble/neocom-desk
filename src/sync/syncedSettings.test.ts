@@ -8,6 +8,8 @@ import { isAllowedSyncedSettingKey, SYNCED_SETTING_KEYS } from './syncedSettings
 const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.corpDarkAfterDays',
   'sync.defaultCharacterFilter',
+  'sync.fittingDamageProfileId',
+  'sync.fittingDamageProfiles',
   'sync.industryAssumedMe',
   'sync.industryAssumedTe',
   'sync.industryBuildGroups',

@@ -132,4 +132,22 @@ describe('fittingToDogmaFit', () => {
 
     expect(dogmaFit.character).toEqual({ skills: skillLevels });
   });
+
+  it('leaves the environment off entirely with no damage profile', () => {
+    expect(fittingToDogmaFit(fitting(), emptyProfile)).not.toHaveProperty('environment');
+  });
+
+  it('measures EHP against a damage profile and adapts the RAH to it', () => {
+    const dogmaFit = fittingToDogmaFit(fitting(), emptyProfile, {
+      em: 0,
+      thermal: 1828,
+      kinetic: 7413,
+      explosive: 0,
+    });
+
+    expect(dogmaFit.environment).toEqual({
+      damage_profile: { em: 0, thermal: 1828, kinetic: 7413, explosive: 0 },
+      reactive_armor: 'damage_profile',
+    });
+  });
 });

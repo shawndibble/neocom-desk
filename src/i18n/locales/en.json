@@ -264,6 +264,9 @@
       "shield": "Shield",
       "armor": "Armor",
       "hull": "Hull",
+      "layerHeading": "{{layer}} — {{hp}} HP · {{ehp}} EHP",
+      "armorIncludesRah": "Includes the Reactive Armor Hardener, adapted to {{profile}}.",
+      "rahAdapted": "Reactive Armor Hardener — adapted to {{profile}}",
       "maxTargetRange": "Targeting range: {{value}} km",
       "maxLockedTargets": "Max locked targets: {{value}}",
       "scanResolution": "Scan resolution: {{value}} mm",
@@ -343,6 +346,39 @@
         "agility": "Inertia modifier {{value}}",
         "mass": "Mass {{value}} t",
         "warpSpeed": "Warp speed {{value}} AU/s"
+      }
+    },
+    "damageProfile": {
+      "label": "Damage profile",
+      "manage": "Manage profiles",
+      "manageTitle": "Custom damage profiles",
+      "builtInGroup": "Built-in",
+      "customGroup": "Custom",
+      "empty": "No custom profiles yet.",
+      "add": "New profile",
+      "edit": "Edit {{name}}",
+      "delete": "Delete {{name}}",
+      "nameLabel": "Name",
+      "ratioHint": "Only the ratio matters — 1/1/0/0 and 50/50/0/0 are the same profile.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "errorName": "Give the profile a name.",
+      "errorMix": "Enter non-negative numbers, at least one above zero.",
+      "builtin": {
+        "uniform": "Uniform",
+        "em": "EM",
+        "thermal": "Thermal",
+        "kinetic": "Kinetic",
+        "explosive": "Explosive",
+        "angelCartel": "Angel Cartel",
+        "bloodRaiders": "Blood Raiders",
+        "guristas": "Guristas",
+        "rogueDrones": "Rogue Drones",
+        "sansha": "Sansha's Nation",
+        "serpentis": "Serpentis",
+        "mordusLegion": "Mordu's Legion",
+        "triglavian": "Triglavian",
+        "sleepers": "Sleepers"
       }
     },
     "implants": {
@@ -4195,7 +4231,7 @@
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, and which skill plan you're adding skills to from Fit Check and Market. Nothing else on this page leaves your device."
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, which skill plan you're adding skills to from Fit Check and Market, and the fitting damage profiles you made along with which one fittings are measured against. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",
