@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { SETTINGS_TABS } from '@/app/pageTabs';
 import { usePageTab } from '@/lib/usePageTab';
+import { tabPath } from '@/lib/pageTabs';
+import { visibleSettingsGroups, type SettingsSectionId } from '@/features/settings/sections';
+import { SettingsNav } from '@/features/settings/SettingsNav';
+import { DevicePanel } from '@/features/settings/DevicePanel';
 import {
   Button,
   DataTable,
@@ -17,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
-  Tabs,
   TextInput,
   type DataTableColumn,
   Checkbox,
@@ -762,20 +765,23 @@ function FacilityDefaultsFields({
     </div>
   );
 }
-
 /**
  * What a page assumes when the pilot has not said otherwise. Every control
- * here defaults to exactly what the app did before it was settable, so an
- * existing pilot's numbers do not move until they ask them to.
+ * in the Defaults panels below defaults to exactly what the app did before it
+ * was settable, so an existing pilot's numbers do not move until they ask
+ * them to.
  *
  * All of them sync (`lib/useSyncedSetting.ts`): these answer for the pilot,
- * not for the machine. The text-scale control above them deliberately does
- * not — that one answers for the screen.
+ * not for the machine. The text-scale control does not — that one answers for
+ * the screen.
+ *
+ * One panel per Settings section (Industry, Market, Characters), each gating
+ * on its own stores: a control that rendered its default first would not
+ * merely flicker, a press landing in that window would write the default over
+ * what is on disk.
  */
-function DefaultsPanel() {
+function IndustryDefaultsPanel() {
   const { t } = useTranslation();
-  const hub = useMarketHub((state) => state.value);
-  const setHub = useMarketHub((state) => state.setValue);
   const assumedMe = useAssumedMe((state) => state.value);
   const setAssumedMe = useAssumedMe((state) => state.setValue);
   const assumedTe = useAssumedTe((state) => state.value);
@@ -786,18 +792,9 @@ function DefaultsPanel() {
   const setFacilityDefaults = useFacilityDefaults((state) => state.setValue);
   const reactionFacilityDefaults = useReactionFacilityDefaults((state) => state.value);
   const setReactionFacilityDefaults = useReactionFacilityDefaults((state) => state.setValue);
-  const expiringHours = useExpiringWindowHours((state) => state.value);
-  const setExpiringHours = useExpiringWindowHours((state) => state.setValue);
-  const defaultCharacterFilter = useDefaultCharacterFilter((state) => state.value);
-  const setDefaultCharacterFilter = useDefaultCharacterFilter((state) => state.setValue);
-  const spExtractionEnabled = useSpExtractionMonitoringEnabled((state) => state.value);
-  const setSpExtractionEnabled = useSpExtractionMonitoringEnabled((state) => state.setValue);
-  const spExtractionThreshold = useSpExtractionThresholdSp((state) => state.value);
-  const setSpExtractionThreshold = useSpExtractionThresholdSp((state) => state.setValue);
 
   // Each on its own line, never `a() && b()`: `&&` short-circuits, which would
   // make every hook after the first false one a conditional call.
-  const hubHydrated = useHydratedStore(useMarketHub);
   const assumedMeHydrated = useHydratedStore(useAssumedMe);
   const assumedTeHydrated = useHydratedStore(useAssumedTe);
   const includeBlueprintCostHydrated = useHydratedStore(useIncludeBlueprintCost);
@@ -808,68 +805,27 @@ function DefaultsPanel() {
   useEffect(() => {
     void hydrateActivityFacilityDefaults();
   }, []);
-  const expiringHydrated = useHydratedStore(useExpiringWindowHours);
-  const defaultCharacterFilterHydrated = useHydratedStore(useDefaultCharacterFilter);
-  const spExtractionEnabledHydrated = useHydratedStore(useSpExtractionMonitoringEnabled);
-  const spExtractionThresholdHydrated = useHydratedStore(useSpExtractionThresholdSp);
   const ready =
-    hubHydrated &&
     assumedMeHydrated &&
     assumedTeHydrated &&
     includeBlueprintCostHydrated &&
     facilityHydrated &&
-    reactionFacilityHydrated &&
-    expiringHydrated &&
-    defaultCharacterFilterHydrated &&
-    spExtractionEnabledHydrated &&
-    spExtractionThresholdHydrated;
+    reactionFacilityHydrated;
 
   const facilityPreset = FACILITY_PRESETS[facilityDefaults.facility];
 
-  // Only for the picker's "This character" preview and quick-select — the
-  // stored default itself keeps meaning "whichever Character I'm on" even on
-  // a device with none active right now (`CharacterFilterControl` already
-  // omits that quick-select when this is null).
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
-  const characterFilterCandidates = useMemo(
-    () => (allCharacters ?? []).map((c) => ({ characterId: c.characterId, characterName: c.name })),
-    [allCharacters]
-  );
-
-  // Nothing until every row holds its real value. A control that rendered its
-  // default first would not merely flicker: a press landing in that window
-  // writes the default over what is on disk.
   if (!ready) {
     return (
-      <Panel title={t('settings.defaultsTitle')}>
+      <Panel title={t('settings.industryDefaultsTitle')}>
         <Spinner />
       </Panel>
     );
   }
 
   return (
-    <Panel title={t('settings.defaultsTitle')}>
+    <Panel title={t('settings.industryDefaultsTitle')}>
       <div className="max-w-md space-y-4">
         <p className="text-xs text-text-dim">{t('settings.defaultsSyncHint')}</p>
-        <div className="space-y-1.5">
-          <label htmlFor="settings-hub" className="block text-xs font-semibold">
-            {t('settings.tradeHubLabel')}
-          </label>
-          <p className="text-xs text-text-dim">{t('settings.tradeHubHint')}</p>
-          <Select value={hub} onValueChange={(value) => void setHub(value as TradeHub['id'])}>
-            <SelectTrigger id="settings-hub" aria-label={t('settings.tradeHubLabel')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TRADE_HUBS.map((tradeHub) => (
-                <SelectItem key={tradeHub.id} value={tradeHub.id}>
-                  {tradeHub.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
 
         <FacilityDefaultsFields
           idPrefix="settings"
@@ -968,8 +924,22 @@ function DefaultsPanel() {
           </label>
           <p className="text-xs text-text-dim">{t('settings.includeBlueprintCostHint')}</p>
         </div>
+      </div>
+    </Panel>
+  );
+}
 
-        <div className="border-t border-line pt-3">
+/** Beside the Industry defaults because Planetary Industry is an industry page; its own panel because its one control has nothing to do with a build. */
+function PiDefaultsPanel() {
+  const { t } = useTranslation();
+  const expiringHours = useExpiringWindowHours((state) => state.value);
+  const setExpiringHours = useExpiringWindowHours((state) => state.setValue);
+  const hydrated = useHydratedStore(useExpiringWindowHours);
+
+  return (
+    <Panel title={t('settings.piDefaultsTitle')}>
+      {hydrated ? (
+        <div className="max-w-md space-y-4">
           <ChipRow
             label={t('settings.piExpiringLabel')}
             hint={t('settings.piExpiringHint')}
@@ -979,8 +949,89 @@ function DefaultsPanel() {
             labelFor={(hours) => t('settings.hours', { count: hours })}
           />
         </div>
+      ) : (
+        <Spinner />
+      )}
+    </Panel>
+  );
+}
 
-        <div className="space-y-1.5 border-t border-line pt-3">
+function MarketDefaultsPanel() {
+  const { t } = useTranslation();
+  const hub = useMarketHub((state) => state.value);
+  const setHub = useMarketHub((state) => state.setValue);
+  const hydrated = useHydratedStore(useMarketHub);
+
+  return (
+    <Panel title={t('settings.marketDefaultsTitle')}>
+      {hydrated ? (
+        <div className="max-w-md space-y-4">
+          <p className="text-xs text-text-dim">{t('settings.defaultsSyncHint')}</p>
+          <div className="space-y-1.5">
+            <label htmlFor="settings-hub" className="block text-xs font-semibold">
+              {t('settings.tradeHubLabel')}
+            </label>
+            <p className="text-xs text-text-dim">{t('settings.tradeHubHint')}</p>
+            <Select value={hub} onValueChange={(value) => void setHub(value as TradeHub['id'])}>
+              <SelectTrigger id="settings-hub" aria-label={t('settings.tradeHubLabel')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {TRADE_HUBS.map((tradeHub) => (
+                  <SelectItem key={tradeHub.id} value={tradeHub.id}>
+                    {tradeHub.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      ) : (
+        <Spinner />
+      )}
+    </Panel>
+  );
+}
+
+function CharacterDefaultsPanel() {
+  const { t } = useTranslation();
+  const defaultCharacterFilter = useDefaultCharacterFilter((state) => state.value);
+  const setDefaultCharacterFilter = useDefaultCharacterFilter((state) => state.setValue);
+  const spExtractionEnabled = useSpExtractionMonitoringEnabled((state) => state.value);
+  const setSpExtractionEnabled = useSpExtractionMonitoringEnabled((state) => state.setValue);
+  const spExtractionThreshold = useSpExtractionThresholdSp((state) => state.value);
+  const setSpExtractionThreshold = useSpExtractionThresholdSp((state) => state.setValue);
+
+  const defaultCharacterFilterHydrated = useHydratedStore(useDefaultCharacterFilter);
+  const spExtractionEnabledHydrated = useHydratedStore(useSpExtractionMonitoringEnabled);
+  const spExtractionThresholdHydrated = useHydratedStore(useSpExtractionThresholdSp);
+  const ready =
+    defaultCharacterFilterHydrated && spExtractionEnabledHydrated && spExtractionThresholdHydrated;
+
+  // Only for the picker's "This character" preview and quick-select — the
+  // stored default itself keeps meaning "whichever Character I'm on" even on
+  // a device with none active right now (`CharacterFilterControl` already
+  // omits that quick-select when this is null).
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
+  const characterFilterCandidates = useMemo(
+    () => (allCharacters ?? []).map((c) => ({ characterId: c.characterId, characterName: c.name })),
+    [allCharacters]
+  );
+
+  if (!ready) {
+    return (
+      <Panel title={t('settings.characterDefaultsTitle')}>
+        <Spinner />
+      </Panel>
+    );
+  }
+
+  return (
+    <Panel title={t('settings.characterDefaultsTitle')}>
+      <div className="max-w-md space-y-4">
+        <p className="text-xs text-text-dim">{t('settings.defaultsSyncHint')}</p>
+        <div className="space-y-1.5">
           <span className="block text-xs font-semibold">
             {t('settings.defaultCharacterFilterLabel')}
           </span>
@@ -1030,10 +1081,10 @@ function DefaultsPanel() {
 }
 
 /**
- * The corp roster's inactivity policy. Rendered only for a Character who can
- * actually reach the corp section — a setting for a page you cannot open is
- * noise, and this follows the same hide-rather-than-lock rule the corp nav
- * itself uses.
+ * The corp roster's inactivity policy. The rail lists it only for a Character
+ * who can actually reach the corp section — a setting for a page you cannot
+ * open is noise, and this follows the same hide-rather-than-lock rule the corp
+ * nav itself uses.
  */
 function CorpDefaultsPanel() {
   const { t } = useTranslation();
@@ -1042,7 +1093,21 @@ function CorpDefaultsPanel() {
   const setDarkAfterDays = useDarkThreshold((state) => state.setValue);
   const hydrated = useHydratedStore(useDarkThreshold);
 
-  if (access.state !== 'ready' || !hydrated) return null;
+  // Reachable by URL even when the rail hides it, so say why it is empty.
+  if (access.state !== 'ready') {
+    return (
+      <Panel title={t('settings.corpDefaultsTitle')}>
+        <p className="text-xs text-text-dim">{t('settings.corpUnavailable')}</p>
+      </Panel>
+    );
+  }
+  if (!hydrated) {
+    return (
+      <Panel title={t('settings.corpDefaultsTitle')}>
+        <Spinner />
+      </Panel>
+    );
+  }
 
   return (
     <Panel title={t('settings.corpDefaultsTitle')}>
@@ -1061,6 +1126,18 @@ function CorpDefaultsPanel() {
   );
 }
 
+/**
+ * Links that predate the sectioned page: the `?` shortcut and the corp prompt
+ * pointed at an anchor on the old General tab. A bookmark of either still
+ * lands on the default section (`TabRoute` drops an unknown segment but keeps
+ * the hash), and this is what carries it on to where the anchor's content now
+ * lives.
+ */
+const LEGACY_HASH_SECTIONS = {
+  '#shortcuts': 'shortcuts',
+  '#corp-access': 'permissions',
+} as const satisfies Record<string, SettingsSectionId>;
+
 export function Settings() {
   const { t } = useTranslation();
   const scale = useFontScale((state) => state.value);
@@ -1070,73 +1147,66 @@ export function Settings() {
   const singleKeyShortcuts = useSingleKeyShortcuts((state) => state.value);
   const setSingleKeyShortcuts = useSingleKeyShortcuts((state) => state.setValue);
   const { hash } = useLocation();
-  const [tab, setTab] = usePageTab(SETTINGS_TABS);
+  const navigate = useNavigate();
+  const [section, setSection] = usePageTab(SETTINGS_TABS);
+  const corpAccess = useCorpAccess();
+  const groups = useMemo(
+    () => visibleSettingsGroups({ corp: corpAccess.state === 'ready' }),
+    [corpAccess.state]
+  );
 
-  // react-router does not act on a URL hash by itself, so a deep link from
-  // elsewhere in the app would land at the top of a long page with no sign of
-  // what it came for. Selecting the tab above is the whole answer for a
-  // section that *is* a tab; an anchor within one still needs scrolling to,
-  // which is a DOM call and so genuinely belongs in an effect.
   useEffect(() => {
-    if (!hash) return;
-    document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
-  }, [hash, tab]);
+    const target = LEGACY_HASH_SECTIONS[hash as keyof typeof LEGACY_HASH_SECTIONS];
+    if (target) navigate({ pathname: tabPath(SETTINGS_TABS, target) }, { replace: true });
+  }, [hash, navigate]);
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <PageHeader title={t('settings.title')} />
-      <Tabs
-        label={t('settings.title')}
-        value={tab}
-        onChange={(id) => setTab(id as typeof tab)}
-        tabs={SETTINGS_TABS.tabs.map((item) => ({ id: item.id, label: t(item.labelKey) }))}
-      />
-      {tab === 'general' && (
-        <div className="space-y-4">
-          <Panel title={t('settings.displayTitle')}>
-            <div className="space-y-2">
-              <p className="text-xs text-text-dim">{t('settings.fontScaleHint')}</p>
-              <div
-                role="group"
-                aria-label={t('settings.fontScaleLabel')}
-                className="flex flex-wrap gap-2"
-              >
-                {FONT_SCALE_STEPS.map((step) => (
-                  <FilterChip
-                    key={step}
-                    label={t(FONT_SCALE_LABEL_KEYS[step])}
-                    selected={scale === step}
-                    onToggle={() => void setScale(step)}
+      <div className="space-y-4 md:grid md:grid-cols-[11rem_minmax(0,1fr)] md:gap-6 md:space-y-0">
+        <SettingsNav groups={groups} value={section} onChange={setSection} />
+        <div className="min-w-0 space-y-4">
+          {section === 'display' && (
+            <Panel title={t('settings.displayTitle')}>
+              <div className="space-y-2">
+                <p className="text-xs text-text-dim">{t('settings.fontScaleHint')}</p>
+                <div
+                  role="group"
+                  aria-label={t('settings.fontScaleLabel')}
+                  className="flex flex-wrap gap-2"
+                >
+                  {FONT_SCALE_STEPS.map((step) => (
+                    <FilterChip
+                      key={step}
+                      label={t(FONT_SCALE_LABEL_KEYS[step])}
+                      selected={scale === step}
+                      onToggle={() => void setScale(step)}
+                    />
+                  ))}
+                </div>
+                {/*
+                  EVE runs on UTC and so does every timer other players quote,
+                  which is why one column already rendered it before this was
+                  settable. The Calendar grids are deliberately excluded — they
+                  bucket events into local-day cells, so converting only the
+                  rendered string would file a late-evening event under the wrong
+                  day.
+                */}
+                <div className="border-t border-line pt-3">
+                  <ChipRow
+                    label={t('settings.timeFormatLabel')}
+                    hint={t('settings.timeFormatHint')}
+                    options={TIME_FORMATS}
+                    selected={timeFormat}
+                    onSelect={(format) => void setTimeFormat(format)}
+                    labelFor={(format) => t(`settings.timeFormat.${format}`)}
                   />
-                ))}
+                </div>
               </div>
-              {/*
-                EVE runs on UTC and so does every timer other players quote,
-                which is why one column already rendered it before this was
-                settable. The Calendar grids are deliberately excluded — they
-                bucket events into local-day cells, so converting only the
-                rendered string would file a late-evening event under the wrong
-                day.
-              */}
-              <div className="border-t border-line pt-3">
-                <ChipRow
-                  label={t('settings.timeFormatLabel')}
-                  hint={t('settings.timeFormatHint')}
-                  options={TIME_FORMATS}
-                  selected={timeFormat}
-                  onSelect={(format) => void setTimeFormat(format)}
-                  labelFor={(format) => t(`settings.timeFormat.${format}`)}
-                />
-              </div>
-            </div>
-          </Panel>
-          <MobileTabsPanel />
-          <DefaultsPanel />
-          <CorpDefaultsPanel />
-          {/* Anchor for the `?` shortcut, which navigates to
-              `/settings/general#shortcuts` (lib/shortcuts.ts). The scroll
-              effect above finds this id. */}
-          <div id="shortcuts" className="scroll-mt-4">
+            </Panel>
+          )}
+          {section === 'mobileTabs' && <MobileTabsPanel />}
+          {section === 'shortcuts' && (
             <Panel title={t('shortcuts.title')}>
               {/* `max-w-md` inside the full-width page frame: a description and its
                 key are a pair, and at the page's own width `justify-between` threw
@@ -1168,33 +1238,44 @@ export function Settings() {
                 ))}
               </dl>
             </Panel>
-          </div>
+          )}
           {/*
-            `#corp-access` is the older deep-link anchor, kept so existing links
-            still land here: with corp UI hidden rather than locked, the
-            Corporation row is the only way in for a Character that dismissed
-            the one-time prompt. It sits on the whole section rather than that
-            row, which is not rendered for a Character with no Corp Role.
+            The Corporation row in here is the only way in to corp access for a
+            Character that dismissed the one-time prompt (corp UI is hidden
+            rather than locked), which is why `#corp-access` keeps redirecting
+            to this section.
           */}
-          <div id="corp-access" className="scroll-mt-4">
-            <PermissionsPanel />
-          </div>
-          <DataPanel />
-          <DataAttributionPanel />
+          {section === 'permissions' && <PermissionsPanel />}
+          {section === 'industry' && (
+            <>
+              <IndustryDefaultsPanel />
+              <PiDefaultsPanel />
+            </>
+          )}
+          {section === 'market' && <MarketDefaultsPanel />}
+          {section === 'characters' && <CharacterDefaultsPanel />}
+          {section === 'corporation' && <CorpDefaultsPanel />}
+          {/* The Overview feed's "Settings" link targets `/settings/notifications` directly. */}
+          {section === 'notifications' && <NotificationsPanel />}
+          {section === 'dataAge' && (
+            <>
+              <DataAgePanel />
+              <DataPanel />
+              <ExportPanel />
+              <ImportPanel />
+            </>
+          )}
+          {section === 'device' && <DevicePanel />}
+          {section === 'activity' && <ActivityLogPanel />}
+          {/* `/settings/faq` is the link to hand someone who asks what the app stores. */}
+          {section === 'faq' && (
+            <>
+              <FaqPanel />
+              <DataAttributionPanel />
+            </>
+          )}
         </div>
-      )}
-      {/* The Overview feed's "Settings" link targets `/settings/notifications` directly now. */}
-      {tab === 'notifications' && <NotificationsPanel />}
-      {tab === 'dataAge' && (
-        <div className="space-y-4">
-          <DataAgePanel />
-          <ExportPanel />
-          <ImportPanel />
-        </div>
-      )}
-      {tab === 'activity' && <ActivityLogPanel />}
-      {/* `/settings/faq` is the link to hand someone who asks what the app stores. */}
-      {tab === 'faq' && <FaqPanel />}
+      </div>
     </div>
   );
 }

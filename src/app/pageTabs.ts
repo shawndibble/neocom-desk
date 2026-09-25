@@ -23,10 +23,26 @@ export const CONTACTS_TABS = definePageTabs('/contacts', [
   { id: 'across', labelKey: 'contacts.tabAcrossCharacters' },
 ]);
 
+/**
+ * Settings has no tab bar: each entry is a section in the page's own left rail
+ * (`features/settings/sections.ts` groups them and decides which the rail
+ * shows). It is still registered here because a section is a path
+ * (`/settings/industry`), which is what deep links, Back and analytics want.
+ * `notifications`, `dataAge`, `activity` and `faq` keep the ids they had as
+ * tabs so existing links land where they always did.
+ */
 export const SETTINGS_TABS = definePageTabs('/settings', [
-  { id: 'general', labelKey: 'settings.tabs.general' },
+  { id: 'display', labelKey: 'settings.tabs.display' },
+  { id: 'mobileTabs', labelKey: 'settings.tabs.mobileTabs' },
+  { id: 'shortcuts', labelKey: 'settings.tabs.shortcuts' },
+  { id: 'permissions', labelKey: 'settings.tabs.permissions' },
+  { id: 'industry', labelKey: 'settings.tabs.industry' },
+  { id: 'market', labelKey: 'settings.tabs.market' },
+  { id: 'characters', labelKey: 'settings.tabs.characters' },
+  { id: 'corporation', labelKey: 'settings.tabs.corporation' },
   { id: 'notifications', labelKey: 'settings.tabs.notifications' },
   { id: 'dataAge', labelKey: 'settings.tabs.data' },
+  { id: 'device', labelKey: 'settings.tabs.device' },
   { id: 'activity', labelKey: 'settings.tabs.activity' },
   { id: 'faq', labelKey: 'settings.tabs.faq' },
 ]);
