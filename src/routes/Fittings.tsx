@@ -4,6 +4,7 @@ import { db } from '@/db';
 import { formatIskCompact } from '@/lib/isk';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useTranslation } from 'react-i18next';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button, Modal, PageHeader, Panel, SlideOver, Tabs } from '@/components/ui';
 import { AddRow } from '@/components/ui/icons';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
@@ -71,6 +72,8 @@ const THREE_COLUMN_QUERY = '(min-width: 100rem)';
  */
 export function Fittings() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const location = useLocation();
   const workspace = useFittingWorkspace();
   const catalogue = useFittingCatalogue();
   const isDesktop = useIsDesktop();
@@ -391,6 +394,9 @@ export function Fittings() {
             {viewHydrated && (
               <FittingViewToggle value={view} onChange={(next) => void setView(next)} />
             )}
+            <Button onClick={() => navigate(`/fittings/compare${location.search}`)}>
+              {t('fittings.compare.entryButton')}
+            </Button>
             <FittingExportMenu fitting={fitting} price={workspace.price} />
             <FittingSaveButton
               onSave={() => void workspace.save()}

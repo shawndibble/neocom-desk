@@ -64,6 +64,13 @@ describe('diffFittingStats', () => {
     expect(delta.changes).toEqual([{ key: 'ehp', before: 20000, after: 24000 }]);
   });
 
+  it('reports a total DPS change (e.g. a turret variation)', () => {
+    const after: FittingStats = { ...base, offense: { ...base.offense, dps: 120 } };
+    expect(diffFittingStats(base, after).changes).toEqual([
+      { key: 'totalDps', before: 0, after: 120 },
+    ]);
+  });
+
   it('ignores a change below the field own display precision', () => {
     const after: FittingStats = { ...base, cpuUsed: base.cpuUsed + 0.001 };
     expect(diffFittingStats(base, after)).toEqual({ changes: [], count: 0 });
