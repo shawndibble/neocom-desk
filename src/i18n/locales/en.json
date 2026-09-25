@@ -122,6 +122,26 @@
       "unresolvedNote_one": "{{count}} item from \"{{name}}\" couldn't be loaded (fighter bay or service slot).",
       "unresolvedNote_other": "{{count}} items from \"{{name}}\" couldn't be loaded (fighter bay or service slot)."
     },
+    "saveToEve": {
+      "action": "Save to EVE",
+      "needCharacter": "Log in with a Character to save Fittings to EVE.",
+      "needPermission": "Log in again to allow saving Fittings to EVE.",
+      "title": "Save to EVE",
+      "nameLabel": "Name",
+      "targetLabel": "Save as",
+      "targetNew": "New In-game Fitting",
+      "targetOverwrite": "Replace \"{{name}}\"",
+      "dropsNote": "EVE doesn't keep everything: saving drops each module's online/offline/overheat state, which charge is loaded where, and any implants — there's no place on an in-game Fitting to store them.",
+      "overwriteConfirm": "This deletes \"{{name}}\" from your in-game Fittings and replaces it with this one. This can't be undone.",
+      "saveAction": "Save",
+      "overwriteAction": "Replace",
+      "saving": "Saving…",
+      "cancel": "Cancel",
+      "errorTitle": "Couldn't save",
+      "overwriteFailedTitle": "Saved, but the old Fitting is still there",
+      "overwriteFailed": "Saved as \"{{name}}\", but EVE wouldn't remove the Fitting it was replacing: {{message}}. Delete it in-game yourself.",
+      "close": "Close"
+    },
     "missingSkills": {
       "chip_one": "Missing {{count}} skill · {{time}}",
       "chip_other": "Missing {{count}} skills · {{time}}"
@@ -196,6 +216,22 @@
       "loadingCatalogue": "Loading items…",
       "noResults": "No matching items.",
       "missingSkills": "Missing skills"
+    },
+    "export": {
+      "button": "Export",
+      "shareLink": "Copy Share Link",
+      "eft": "Copy EFT",
+      "chatLink": "Copy in-game link",
+      "multibuy": "Copy multibuy list",
+      "appraise": "Appraise in Market",
+      "tooLarge": "Too large to share as a link.",
+      "copyFailed": "Couldn't copy to the clipboard.",
+      "copied": {
+        "shareLink": "Share Link copied",
+        "eft": "EFT copied",
+        "chatLink": "In-game link copied",
+        "multibuy": "Multibuy list copied"
+      }
     },
     "stats": {
       "show": "Show detail",

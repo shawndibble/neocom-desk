@@ -71,7 +71,7 @@ export interface EsiFetchOptions {
   etag?: string;
   signal?: AbortSignal;
   /** HTTP method; defaults to GET. */
-  method?: 'GET' | 'POST' | 'PUT';
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   /** JSON-serialized as the request body when `method` is 'POST' or 'PUT'. */
   body?: unknown;
   /**

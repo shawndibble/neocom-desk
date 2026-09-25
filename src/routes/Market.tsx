@@ -74,7 +74,7 @@ import {
 } from '@/engine/market/orderBook';
 import { ALL_REGIONS } from '@/engine/market/locationMode';
 import type { RegionOrder } from '@/esi/endpoints';
-import type { MarketFocusSearchState } from '@/lib/shortcuts';
+import type { MarketAppraiseState, MarketFocusSearchState } from '@/lib/shortcuts';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -648,6 +648,15 @@ export function Market() {
   // Held here rather than inside `AppraisalPanel` so a pasted list survives a
   // trip to the Browser tab, and so the header's refresh button can drive it.
   const appraisal = useAppraisal(effectiveHub, pricePercent, activeCharacterId);
+  // A Fitting's Export menu lands here with its multibuy list to appraise.
+  // Keyed on the navigation itself so a re-render never re-submits it.
+  const handledAppraiseKey = useRef<string | null>(null);
+  useEffect(() => {
+    const text = (location.state as Partial<MarketAppraiseState> | null)?.appraiseText;
+    if (!text || handledAppraiseKey.current === location.key) return;
+    handledAppraiseKey.current = location.key;
+    appraisal.appraiseText(text);
+  }, [location.key, location.state, appraisal]);
   // Feeds the net-of-fees chips' broker fee — resolved once per character,
   // same as every other configurable-Trade-Hub broker-fee surface.
   const tradeHubStandings = useTradeHubStandings(activeCharacterId);
