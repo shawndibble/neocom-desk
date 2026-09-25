@@ -68,6 +68,7 @@ import {
 } from '@/features/corp/wallet';
 import { CorpTransactionsPanel } from '@/features/corp/CorpTransactionsPanel';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
+import { signedIsk } from '@/features/market/signedIsk';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -92,6 +93,7 @@ import {
   filterWalletJournal,
   JOURNAL_FIELD_TO_PARAM,
   JOURNAL_FILTER_PARAMS,
+  journalNetTotal,
   journalRefTypes,
   type WalletJournalFilter,
 } from '@/features/character/walletJournalFilter';
@@ -248,6 +250,9 @@ function JournalTable({
       ),
     [journalColumns, isVisible]
   );
+  // A filter with no criteria active still runs (it's the identity filter), so
+  // "is a filter active" is asked separately here rather than read off the result.
+  const filterIsActive = activeWalletJournalFilterCount(filter) > 0 || filter.text.trim() !== '';
   return (
     <>
       <JournalFilterBar
@@ -267,13 +272,21 @@ function JournalTable({
           />
         }
       />
+      {filterIsActive && filteredJournal.length > 0 && (
+        <p className="border-b border-line px-3 py-2 text-xs text-text-dim">
+          {t('wallet.journalFilteredSummary', {
+            count: filteredJournal.length,
+            net: signedIsk(journalNetTotal(filteredJournal), 2),
+          })}
+        </p>
+      )}
       {filteredJournal.length === 0 ? (
         <EmptyState
           title={t('wallet.journalNoFilterMatches')}
           hint={t('wallet.journalNoFilterMatchesHint')}
           className="py-8"
           action={
-            activeWalletJournalFilterCount(filter) > 0 || filter.text.trim() !== '' ? (
+            filterIsActive ? (
               <Button size="sm" onClick={() => onFilterChange(EMPTY_WALLET_JOURNAL_FILTER)}>
                 {t('common.resetFilters')}
               </Button>
@@ -1010,7 +1023,7 @@ export function Wallet() {
           const transaction = linkFor(entry);
           return (
             <JournalDescriptionCell
-              description={entry.description}
+              entry={entry}
               transaction={transaction}
               itemName={transaction ? nameFor(transaction.type_id) : ''}
             />
