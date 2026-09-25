@@ -42,6 +42,11 @@ function updateModule(
   };
 }
 
+/** A bare hull — the start of a Fitting built from scratch, named after the hull. */
+export function newFitting(shipTypeId: number, name: string): Fitting {
+  return { name, shipTypeId, modules: [], drones: [], cargo: [] };
+}
+
 /**
  * Fits `typeId` at `slot`/`slotIndex`, replacing (and unloading) whatever was
  * there. Asks for `'active'`: the engine lowers a requested state to what the
@@ -122,6 +127,20 @@ export function setModuleCharge(
     };
     return chargeTypeId === null ? unloaded : { ...unloaded, chargeTypeId };
   });
+}
+
+/** Loads `chargeTypeId` into every fitted module of `moduleTypeId` — the browser's Charges tab. */
+export function loadChargeIntoAll(
+  fitting: Fitting,
+  moduleTypeId: number,
+  chargeTypeId: number
+): Fitting {
+  return {
+    ...fitting,
+    modules: fitting.modules.map((module) =>
+      module.typeId === moduleTypeId ? { ...module, chargeTypeId } : module
+    ),
+  };
 }
 
 /** The lowest position in a rack of `slotCount` slots nothing occupies, or null when it's full. */

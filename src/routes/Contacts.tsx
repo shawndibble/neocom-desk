@@ -1,8 +1,9 @@
-import { useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -22,6 +23,15 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { ICON_SIZE } from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
+import { useColumnVisibility } from '@/lib/columnVisibility';
+import {
+  CONTACTS_ACROSS_COLUMN_IDS,
+  CONTACTS_CHARACTER_COLUMN_IDS,
+  contactsAcrossColumnsStore,
+  contactsCharacterColumnsStore,
+  type ContactsAcrossColumnId,
+  type ContactsCharacterColumnId,
+} from './contactsColumns';
 import { beginEveLogin } from '@/app/loginFlow';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { loadContacts } from '@/features/character/contacts';
@@ -58,7 +68,7 @@ import {
 } from '@/features/character/contactAffiliation';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { usePageTab } from '@/lib/usePageTab';
-import { useUrlParam, useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, enumSetParam, textParam } from '@/lib/urlState';
 import { CONTACTS_TABS } from '@/app/pageTabs';
 
@@ -187,24 +197,61 @@ function toggled<T>(set: ReadonlySet<T>, member: T): Set<T> {
   return next;
 }
 
+/**
+ * `ContactsFilter` plus the Across tab's own criterion, so the sheet's draft
+ * (issue #1282) can hold "Only disagreements" the same way it holds every
+ * other chip — committed on Apply below `md`, immediately in the pointer-width
+ * box. Local to this bar: `ContactsFilter` itself stays the Character tab's
+ * type, with no across-only field grafted on for one consumer.
+ */
+type ContactsBarValue = ContactsFilter & { disagreementsOnly: boolean };
+
 interface ContactsFilterBarProps {
   filter: ContactsFilter;
   onChange: (filter: ContactsFilter) => void;
   counts: ContactCounts;
+  view: 'character' | 'across';
+  disagreementsOnly: boolean;
+  onDisagreementsOnlyChange: (value: boolean) => void;
+  disagreementCount: number;
+  /** The active tab's column picker, drawn beside the filter trigger. */
+  actions?: ReactNode;
 }
 
 /**
  * Search plus a chip per contact type and per standing category. Both groups
  * show every member with its count, zeros included — so "you have no alliance
- * contacts" is on screen rather than inferred from a missing chip.
+ * contacts" is on screen rather than inferred from a missing chip. Shared by
+ * both tabs (issue #1282's picker is per-tab, in `actions`); the Across tab
+ * adds its own "disagreements only" chip, since that criterion means nothing
+ * on the Character tab.
  */
-function ContactsFilterBar({ filter, onChange, counts }: ContactsFilterBarProps) {
+function ContactsFilterBar({
+  filter,
+  onChange,
+  counts,
+  view,
+  disagreementsOnly,
+  onDisagreementsOnlyChange,
+  disagreementCount,
+  actions,
+}: ContactsFilterBarProps) {
   const { t } = useTranslation();
+  const activeCount =
+    activeContactsFilterCount(filter) + (view === 'across' && disagreementsOnly ? 1 : 0);
+  const value: ContactsBarValue = { ...filter, disagreementsOnly };
+  const handleChange = (next: ContactsBarValue) => {
+    const { disagreementsOnly: nextDisagreementsOnly, ...nextFilter } = next;
+    onChange(nextFilter);
+    if (nextDisagreementsOnly !== disagreementsOnly)
+      onDisagreementsOnlyChange(nextDisagreementsOnly);
+  };
   return (
     <FilterBar
-      value={filter}
-      onChange={onChange}
-      activeCount={activeContactsFilterCount(filter)}
+      value={value}
+      onChange={handleChange}
+      activeCount={activeCount}
+      actions={actions}
       search={
         <SearchInput
           value={filter.text}
@@ -249,6 +296,14 @@ function ContactsFilterBar({ filter, onChange, counts }: ContactsFilterBarProps)
               />
             ))}
           </div>
+          {view === 'across' && (
+            <FilterChip
+              label={t('contacts.acrossDisagreementsOnly')}
+              selected={draft.disagreementsOnly}
+              onToggle={() => setDraft({ ...draft, disagreementsOnly: !draft.disagreementsOnly })}
+              count={disagreementCount}
+            />
+          )}
         </>
       )}
     </FilterBar>
@@ -294,22 +349,30 @@ function AffiliationLine({
 }
 
 /**
- * The filter bar, in the URL (ADR 0015) as one group: the bar hands back the
- * whole filter on every change, so its three keys are written together.
+ * The filter bar, in the URL (ADR 0015) as one group — including the Across
+ * tab's own "disagreements only" (issue #1282): two separate `useUrlParams`
+ * groups writing in the same tick would each start from the URL as last
+ * rendered and the second would drop the first (see `useUrlState.ts`'s own
+ * doc comment), so every key `ContactsFilterBar` can change belongs here.
  */
 const FILTER_PARAMS = {
   q: textParam(),
   types: enumSetParam(ALL_CONTACT_TYPES),
   standing: enumSetParam(STANDING_CATEGORIES),
+  'across.disagree': boolParam(),
 };
 const CHARACTER_SORT = { columnId: 'standing', direction: 'desc' } as const;
 const ACROSS_SORT = { columnId: 'held', direction: 'asc' } as const;
-const DISAGREEMENTS_ONLY = boolParam();
 
 interface AcrossCharactersPanelProps {
   lists: readonly CharacterContactList[];
   names: ReadonlyMap<number, string>;
   filter: ContactsFilter;
+  /** Lifted to `Contacts` (issue #1282): its chip now lives in the shared `FilterBar`. */
+  disagreementsOnly: boolean;
+  /** Reports the count up on every change, so the lifted chip can badge it — the `ContractSearchPanel`/`onStatusChange` pattern. */
+  onDisagreementCountChange: (count: number) => void;
+  isColumnVisible: (id: ContactsAcrossColumnId) => boolean;
 }
 
 /**
@@ -321,18 +384,25 @@ interface AcrossCharactersPanelProps {
  * fetches for opening a tab. The button fetches them on demand, and the hint
  * below the table says which of the two is on screen.
  */
-function AcrossCharactersPanel({ lists, names, filter }: AcrossCharactersPanelProps) {
+function AcrossCharactersPanel({
+  lists,
+  names,
+  filter,
+  disagreementsOnly,
+  onDisagreementCountChange,
+  isColumnVisible,
+}: AcrossCharactersPanelProps) {
   const { t } = useTranslation();
   const [fetched, setFetched] = useState<readonly CharacterContactList[] | null>(null);
   const [fetching, setFetching] = useState(false);
-  const [disagreementsOnly, setDisagreementsOnly] = useUrlParam(
-    'across.disagree',
-    DISAGREEMENTS_ONLY
-  );
 
   const effectiveLists = fetched ?? lists;
   const rows = useMemo(() => mergeContactsAcrossCharacters(effectiveLists), [effectiveLists]);
   const disagreementCount = useMemo(() => rows.filter((row) => row.disagrees).length, [rows]);
+  useEffect(
+    () => onDisagreementCountChange(disagreementCount),
+    [disagreementCount, onDisagreementCountChange]
+  );
 
   const text = filter.text.trim().toLowerCase();
   const visibleRows = useMemo(
@@ -355,21 +425,17 @@ function AcrossCharactersPanel({ lists, names, filter }: AcrossCharactersPanelPr
     }
   }
 
-  const columns: DataTableColumn<AcrossCharactersRow>[] = [
-    {
-      id: 'name',
-      header: t('contacts.name'),
-      render: (row) => entityName(names, row.contactId),
-      sortValue: (row) => entityName(names, row.contactId),
-    },
-    {
+  // The identity column (never hidden) plus the optional columns the picker
+  // controls, in table order — `CONTACTS_ACROSS_COLUMN_IDS`' own order.
+  const optionalColumns: Record<ContactsAcrossColumnId, DataTableColumn<AcrossCharactersRow>> = {
+    type: {
       id: 'type',
       header: t('contacts.type'),
       className: 'text-text-dim',
       render: (row) => t(CONTACT_TYPE_KEY[row.contactType]),
       sortValue: (row) => t(CONTACT_TYPE_KEY[row.contactType]),
     },
-    {
+    held: {
       id: 'held',
       header: t('contacts.acrossCharacters'),
       headerTooltip: t('contacts.acrossCharactersHeaderTooltip'),
@@ -406,7 +472,7 @@ function AcrossCharactersPanel({ lists, names, filter }: AcrossCharactersPanelPr
       ),
       sortValue: (row) => row.held.length,
     },
-    {
+    standings: {
       id: 'standings',
       header: t('contacts.acrossStandings'),
       align: 'center',
@@ -422,12 +488,21 @@ function AcrossCharactersPanel({ lists, names, filter }: AcrossCharactersPanelPr
       // Worst first on a descending click, which is the direction trouble is in.
       sortValue: (row) => row.standings[0],
     },
+  };
+  const columns: DataTableColumn<AcrossCharactersRow>[] = [
+    {
+      id: 'name',
+      header: t('contacts.name'),
+      render: (row) => entityName(names, row.contactId),
+      sortValue: (row) => entityName(names, row.contactId),
+    },
+    ...CONTACTS_ACROSS_COLUMN_IDS.filter(isColumnVisible).map((id) => optionalColumns[id]),
   ];
-  const sortProps = useUrlSort(
-    'across.sort',
-    ACROSS_SORT,
-    columns.map((column) => column.id)
-  );
+  // The full catalog, not just `columns`' currently-visible ids: a sort
+  // picked while a column was shown should still resolve once the picker
+  // hides it, ready to take effect again the moment it's shown back
+  // (`resolveSort` only rejects a `columnId` the catalog has never heard of).
+  const sortProps = useUrlSort('across.sort', ACROSS_SORT, ['name', ...CONTACTS_ACROSS_COLUMN_IDS]);
 
   if (rows.length === 0) {
     return (
@@ -438,12 +513,6 @@ function AcrossCharactersPanel({ lists, names, filter }: AcrossCharactersPanelPr
   return (
     <Panel padded={false}>
       <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-        <FilterChip
-          label={t('contacts.acrossDisagreementsOnly')}
-          selected={disagreementsOnly}
-          onToggle={() => setDisagreementsOnly(!disagreementsOnly)}
-          count={disagreementCount}
-        />
         <Button
           variant="ghost"
           size="sm"
@@ -500,6 +569,21 @@ export function Contacts() {
   const setFilter = (next: ContactsFilter) =>
     setFilterParams({ q: next.text, types: next.types, standing: next.standings });
   const [tab, setTab] = usePageTab(CONTACTS_TABS);
+
+  // Lifted out of `AcrossCharactersPanel` (issue #1282): its chip now lives in
+  // the shared `ContactsFilterBar`, which neither tab's panel owns.
+  const disagreementsOnly = filterParams['across.disagree'];
+  const setDisagreementsOnly = (next: boolean) => setFilterParams({ 'across.disagree': next });
+  const [disagreementCount, setDisagreementCount] = useState(0);
+
+  const characterColumnVisibility = useColumnVisibility(
+    contactsCharacterColumnsStore,
+    CONTACTS_CHARACTER_COLUMN_IDS
+  );
+  const acrossColumnVisibility = useColumnVisibility(
+    contactsAcrossColumnsStore,
+    CONTACTS_ACROSS_COLUMN_IDS
+  );
 
   const contactsResult = data?.contactsResult ?? null;
   const contactsNeedsReauth = data?.contactsNeedsReauth ?? false;
@@ -564,15 +648,13 @@ export function Contacts() {
     );
   }
 
-  const columns = useMemo<DataTableColumn<CharacterContact>[]>(
-    () => [
-      {
-        id: 'name',
-        header: t('contacts.name'),
-        render: (contact) => contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`,
-        sortValue: (contact) => contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`,
-      },
-      {
+  // The identity column (never hidden) plus the optional columns the picker
+  // controls, in table order — `CONTACTS_CHARACTER_COLUMN_IDS`' own order.
+  const optionalCharacterColumns = useMemo<
+    Record<ContactsCharacterColumnId, DataTableColumn<CharacterContact>>
+  >(
+    () => ({
+      type: {
         id: 'type',
         header: t('contacts.type'),
         className: 'text-text-dim',
@@ -581,7 +663,7 @@ export function Contacts() {
         // "Player" would sort under C and "Corp" under C too, by accident.
         sortValue: (contact) => t(CONTACT_TYPE_KEY[contact.contact_type]),
       },
-      {
+      affiliation: {
         id: 'affiliation',
         header: t('contacts.affiliation'),
         headerTooltip: t('contacts.affiliationHeaderTooltip'),
@@ -618,7 +700,7 @@ export function Contacts() {
             : entityName(contactNames, row.corporationId);
         },
       },
-      {
+      standing: {
         id: 'standing',
         header: t('contacts.standing'),
         align: 'center',
@@ -628,7 +710,7 @@ export function Contacts() {
         render: (contact) => <StandingIcon value={contact.standing} />,
         sortValue: (contact) => contact.standing,
       },
-      {
+      flags: {
         id: 'flags',
         header: t('contacts.flags'),
         align: 'center',
@@ -655,21 +737,83 @@ export function Contacts() {
             </span>
           );
         },
+        // Icon-only, but blocked/watched is a real two-level rank (issue
+        // #1282) — blocked outranks watched, and a plain contact has neither
+        // so it sinks (`undefined`) rather than sorting as "0".
+        sortValue: (contact) => {
+          const blocked = contact.is_blocked === true;
+          const watched = contact.is_watched === true;
+          if (!blocked && !watched) return undefined;
+          return (blocked ? 2 : 0) + (watched ? 1 : 0);
+        },
       },
-    ],
+    }),
     [t, contactNames, affiliationRows]
   );
-  const characterSortProps = useUrlSort(
-    'sort',
-    CHARACTER_SORT,
-    columns.map((column) => column.id)
+  const columns = useMemo<DataTableColumn<CharacterContact>[]>(
+    () => [
+      {
+        id: 'name',
+        header: t('contacts.name'),
+        render: (contact) => contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`,
+        sortValue: (contact) => contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`,
+      },
+      ...CONTACTS_CHARACTER_COLUMN_IDS.filter(characterColumnVisibility.isVisible).map(
+        (id) => optionalCharacterColumns[id]
+      ),
+    ],
+    [t, contactNames, optionalCharacterColumns, characterColumnVisibility.isVisible]
   );
+  // The full catalog, not just `columns`' currently-visible ids — see the
+  // Across table's own `sortProps` for why.
+  const characterSortProps = useUrlSort('sort', CHARACTER_SORT, [
+    'name',
+    ...CONTACTS_CHARACTER_COLUMN_IDS,
+  ]);
 
   // `/contacts/across` with a single Character falls back to this Character's
   // view — but only once the snapshot says so: before it loads the list is
   // empty for everyone, and a reload of the across tab must not bounce.
   const view =
     tab === 'across' && (data === undefined || acrossLists.length > 1) ? 'across' : 'character';
+
+  // Labels only, for the picker's menu — the real columns (with their
+  // `render`) are built inside `AcrossCharactersPanel`, which alone has the
+  // fetch state (`effectiveLists.length`) one of them needs. `ColumnPickerMenu`
+  // never calls `render`, so the stub here can't drift into what's on screen.
+  const acrossColumnsById: Record<ContactsAcrossColumnId, DataTableColumn<AcrossCharactersRow>> = {
+    type: { id: 'type', header: t('contacts.type'), render: () => null },
+    held: { id: 'held', header: t('contacts.acrossCharacters'), render: () => null },
+    standings: { id: 'standings', header: t('contacts.acrossStandings'), render: () => null },
+  };
+
+  // One `ColumnPickerMenu` in the shared `FilterBar`, controlling whichever
+  // tab's table is showing (issue #1282) — each tab keeps its own visibility
+  // setting, so switching tabs never carries one's hidden columns onto the other's.
+  const columnPickerActions =
+    view === 'across' ? (
+      <ColumnPickerMenu
+        available={CONTACTS_ACROSS_COLUMN_IDS}
+        visible={acrossColumnVisibility.visible}
+        columnsById={acrossColumnsById}
+        onToggle={acrossColumnVisibility.toggle}
+        buttonLabel={t('common.columnsButton')}
+        menuTitle={t('common.columnsMenuTitle')}
+        onReset={acrossColumnVisibility.reset}
+        resetLabel={t('common.resetColumns')}
+      />
+    ) : (
+      <ColumnPickerMenu
+        available={CONTACTS_CHARACTER_COLUMN_IDS}
+        visible={characterColumnVisibility.visible}
+        columnsById={optionalCharacterColumns}
+        onToggle={characterColumnVisibility.toggle}
+        buttonLabel={t('common.columnsButton')}
+        menuTitle={t('common.columnsMenuTitle')}
+        onReset={characterColumnVisibility.reset}
+        resetLabel={t('common.resetColumns')}
+      />
+    );
 
   if (!hydrated) {
     return (
@@ -711,7 +855,16 @@ export function Contacts() {
           not — a row there carries several standings — so that tab ignores
           them and says so with a chip of its own. */}
       {lastGoodCounts && (
-        <ContactsFilterBar filter={filter} onChange={setFilter} counts={lastGoodCounts} />
+        <ContactsFilterBar
+          filter={filter}
+          onChange={setFilter}
+          counts={lastGoodCounts}
+          view={view}
+          disagreementsOnly={disagreementsOnly}
+          onDisagreementsOnlyChange={setDisagreementsOnly}
+          disagreementCount={disagreementCount}
+          actions={columnPickerActions}
+        />
       )}
 
       {loading && !data ? (
@@ -719,7 +872,14 @@ export function Contacts() {
           <Spinner label={t('common.loading')} />
         </div>
       ) : view === 'across' ? (
-        <AcrossCharactersPanel lists={acrossLists} names={contactNames} filter={filter} />
+        <AcrossCharactersPanel
+          lists={acrossLists}
+          names={contactNames}
+          filter={filter}
+          disagreementsOnly={disagreementsOnly}
+          onDisagreementCountChange={setDisagreementCount}
+          isColumnVisible={acrossColumnVisibility.isVisible}
+        />
       ) : contactsNeedsReauth ? (
         <ReauthBanner
           title={t('contacts.reauthTitle')}

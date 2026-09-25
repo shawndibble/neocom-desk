@@ -1,10 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { BUILT_IN_DAMAGE_PROFILES } from '@/engine/fittings/damageProfile';
 import type { FittingStats } from '@/engine/fittings/types';
+import { BUILT_IN_TARGET_PROFILES } from '@/engine/fittings/targetProfile';
+import type { AppliedWeapon } from '@/engine/fittings/appliedDps';
 import type { DamageProfiles } from './damageProfiles';
+import type { TargetProfiles } from './targetProfiles';
+import type { OverlayFitting } from './useOverlayFitting';
 import { FittingStatsSections } from './FittingStatsSections';
 
 function layer(hp: number, ehp: number) {
@@ -45,6 +49,7 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     },
     navigation: { maxVelocity: 350, agility: 3.2, mass: 1000000, warpSpeed: 5 },
     unknownItemTypeIds: [],
+    applied: { weapons: [], droneControlRange: 20000 },
     slotCounts: { high: 3, medium: 3, low: 4, rig: 3, subsystem: 0 },
     modules: [],
     offense: { weapons: [], dps: 0, volley: 0, overheated: null },
@@ -109,14 +114,34 @@ function damageProfiles(overrides: Partial<DamageProfiles> = {}): DamageProfiles
   };
 }
 
-function renderSections(fittingStats: FittingStats, profiles: DamageProfiles = damageProfiles()) {
-  render(
+const [frigate, cruiser] = BUILT_IN_TARGET_PROFILES;
+
+function targetProfiles(overrides: Partial<TargetProfiles> = {}): TargetProfiles {
+  return {
+    custom: [],
+    selected: cruiser,
+    select: vi.fn(),
+    saveCustom: vi.fn(),
+    deleteCustom: vi.fn(),
+    ...overrides,
+  };
+}
+
+function renderSections(
+  fittingStats: FittingStats,
+  profiles: DamageProfiles = damageProfiles(),
+  targets: TargetProfiles = targetProfiles(),
+  overlay?: OverlayFitting
+) {
+  return render(
     <FittingStatsSections
       stats={fittingStats}
       statsProgress={null}
       statsError={false}
       price={null}
       damageProfiles={profiles}
+      targetProfiles={targets}
+      overlay={overlay}
       typeName={typeName}
     />
   );
@@ -166,9 +191,10 @@ describe('FittingStatsSections overheated lines elsewhere', () => {
     expect(defense.getByText('17400 overheated')).toBeInTheDocument();
     expect(defense.getByText('Armor repair: 63.2 HP/s')).toBeInTheDocument();
     expect(defense.getByText('81.8 overheated')).toBeInTheDocument();
-    // Only the shield EM resist moves under heat.
-    expect(defense.getAllByText(/% overheated$/)).toHaveLength(1);
-    expect(defense.getByText('60% overheated')).toBeInTheDocument();
+    // Only the shield moves under heat, so one overheated row, under it.
+    const hotRows = defense.getAllByRole('row', { name: /^Overheated/ });
+    expect(hotRows).toHaveLength(1);
+    expect(within(hotRows[0]).getByText('60%')).toBeInTheDocument();
     expect(within(sectionBody('Navigation')).queryByText(/overheated/)).toBeNull();
   });
 
@@ -183,9 +209,15 @@ describe('FittingStatsSections — Defense', () => {
   it('shows each layer with its raw HP and its EHP under the profile', () => {
     renderSections(stats(), damageProfiles());
 
-    expect(screen.getByText('Shield — 450 HP · 514 EHP')).toBeInTheDocument();
-    expect(screen.getByText('Armor — 405 HP · 3234 EHP')).toBeInTheDocument();
-    expect(screen.getByText('Hull — 350 HP · 871 EHP')).toBeInTheDocument();
+    for (const [layer, hp, ehp] of [
+      ['Shield', '450 HP', '514'],
+      ['Armor', '405 HP', '3234'],
+      ['Hull', '350 HP', '871'],
+    ]) {
+      const row = within(screen.getByRole('row', { name: new RegExp(`^${layer}`) }));
+      expect(row.getByText(hp)).toBeInTheDocument();
+      expect(row.getByText(ehp)).toBeInTheDocument();
+    }
     expect(screen.getByText('4619 EHP')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Damage profile' })).toHaveTextContent('Guristas');
   });
@@ -210,7 +242,9 @@ describe('FittingStatsSections — Defense', () => {
       damageProfiles()
     );
 
-    expect(screen.getByText('Reactive Armor Hardener — adapted to Guristas')).toBeInTheDocument();
+    const rah = within(screen.getByRole('row', { name: /^Reactive Armor Hardener/ }));
+    expect(rah.getByText('Guristas')).toBeInTheDocument();
+    expect(rah.getByText('30%')).toBeInTheDocument();
     expect(
       screen.getByText('Includes the Reactive Armor Hardener, adapted to Guristas.')
     ).toBeInTheDocument();
@@ -284,5 +318,133 @@ describe('FittingStatsSections — custom damage profiles', () => {
 
     await user.click(within(dialog).getByRole('button', { name: 'Delete Mine' }));
     expect(deleteCustom).toHaveBeenCalledWith('custom:a');
+  });
+});
+
+const blaster: AppliedWeapon = {
+  kind: 'turret',
+  dps: 100,
+  optimal: 3600,
+  falloff: 10000,
+  tracking: 5.196,
+  optimalSigRadius: 40000,
+};
+
+function armed(weapons: AppliedWeapon[] = [blaster]) {
+  return stats({ applied: { weapons, droneControlRange: 20000 } });
+}
+
+describe('FittingStatsSections — Applied DPS', () => {
+  // The graphs are lazy; load recharts once up front so the first findBy
+  // doesn't spend its whole timeout on the import.
+  beforeAll(async () => {
+    await import('./AppliedDpsChart');
+  }, 60000);
+
+  it('moves applied DPS with the target profile, never raw DPS', () => {
+    const { rerender } = renderSections(armed(), damageProfiles(), targetProfiles());
+    const summary = () => screen.getByText(/^Raw DPS/).textContent ?? '';
+    const againstCruiser = summary();
+    expect(againstCruiser).toMatch(/^Raw DPS 100\.0 · applied/);
+    expect(screen.getByRole('combobox', { name: 'Target profile' })).toHaveTextContent(
+      'NPC cruiser'
+    );
+
+    rerender(
+      <FittingStatsSections
+        stats={armed()}
+        statsProgress={null}
+        statsError={false}
+        price={null}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles({ selected: frigate })}
+        typeName={typeName}
+      />
+    );
+    expect(summary()).toMatch(/^Raw DPS 100\.0 · applied/);
+    expect(summary()).not.toBe(againstCruiser);
+    expect(screen.getByText(/Our own calculation/)).toBeInTheDocument();
+  });
+
+  it('draws both graphs, with an accessible table for each', async () => {
+    renderSections(armed(), damageProfiles());
+
+    expect(await screen.findByRole('table', { name: 'Applied DPS vs range' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('table', { name: /^Applied DPS vs target speed, at [\d.]+ km$/ })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Applied DPS vs range' })).toBeInTheDocument();
+  });
+
+  it('says so when nothing is firing', () => {
+    renderSections(armed([]), damageProfiles());
+
+    expect(screen.getByText(/No weapons are running/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Raw DPS/)).not.toBeInTheDocument();
+  });
+
+  it('overlays a second fitting as a dashed line, named in the key and the tables', async () => {
+    const user = userEvent.setup();
+    const select = vi.fn();
+    const overlay: OverlayFitting = {
+      options: [{ id: 'f1', name: 'Kiting Vexor' }],
+      selectedId: 'f1',
+      select,
+      result: {
+        name: 'Kiting Vexor',
+        applied: { weapons: [{ ...blaster, dps: 80 }], droneControlRange: 20000 },
+      },
+    };
+    const { container } = renderSections(armed(), damageProfiles(), targetProfiles(), overlay);
+
+    const rangeTable = await screen.findByRole('table', { name: 'Applied DPS vs range' });
+    expect(
+      within(rangeTable).getByRole('columnheader', { name: 'Kiting Vexor' })
+    ).toBeInTheDocument();
+    expect(container.querySelector('svg line[stroke-dasharray="4 3"]')).not.toBeNull();
+
+    await user.click(screen.getByRole('combobox', { name: 'Compare with' }));
+    await user.click(await screen.findByRole('option', { name: 'No overlay' }));
+    expect(select).toHaveBeenCalledWith(null);
+  });
+
+  it('creates a custom target profile from its manage dialog', async () => {
+    const user = userEvent.setup();
+    const saveCustom = vi.fn();
+    renderSections(armed(), damageProfiles(), targetProfiles({ saveCustom }));
+
+    await user.click(screen.getByRole('button', { name: 'Manage targets' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'New profile' }));
+    await user.type(within(dialog).getByLabelText('Name'), 'Kiting frig');
+    await user.clear(within(dialog).getByLabelText('Signature radius (m)'));
+    await user.type(within(dialog).getByLabelText('Signature radius (m)'), '30');
+    await user.clear(within(dialog).getByLabelText('Speed (m/s)'));
+    await user.type(within(dialog).getByLabelText('Speed (m/s)'), '2500');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(saveCustom).toHaveBeenCalledWith({
+      id: expect.stringMatching(/^custom:/),
+      name: 'Kiting frig',
+      signatureRadius: 30,
+      velocity: 2500,
+    });
+  });
+
+  it('refuses a zero signature radius', async () => {
+    const user = userEvent.setup();
+    const saveCustom = vi.fn();
+    renderSections(armed(), damageProfiles(), targetProfiles({ saveCustom }));
+
+    await user.click(screen.getByRole('button', { name: 'Manage targets' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'New profile' }));
+    await user.type(within(dialog).getByLabelText('Name'), 'Nothing');
+    await user.clear(within(dialog).getByLabelText('Signature radius (m)'));
+    await user.type(within(dialog).getByLabelText('Signature radius (m)'), '0');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(saveCustom).not.toHaveBeenCalled();
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('signature radius above zero');
   });
 });

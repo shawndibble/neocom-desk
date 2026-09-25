@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type DragEvent } from 'react';
+import { useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel, Tooltip, TypeIcon } from '@/components/ui';
 import { AddRow, Warn } from '@/components/ui/icons';
@@ -66,6 +66,8 @@ interface FittingRingProps {
    */
   compact?: boolean;
   onRackOpen?: (rack: FittingSlotKind) => void;
+  /** The panel header's controls — the page's "+ Add module". */
+  actions?: ReactNode;
 }
 
 function pct(value: number, total: number): string {
@@ -366,6 +368,7 @@ export function FittingRing({
   onMoveModule,
   compact = false,
   onRackOpen,
+  actions,
 }: FittingRingProps) {
   const { t } = useTranslation();
   const layout = stats?.slotCounts ?? null;
@@ -430,7 +433,7 @@ export function FittingRing({
   const corner = '@min-[40.625rem]:absolute';
 
   return (
-    <Panel title={t('fittings.ring.title')}>
+    <Panel title={t('fittings.ring.title')} actions={actions}>
       <div className="@container space-y-3">
         <div className="relative">
           <div

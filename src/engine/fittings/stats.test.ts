@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  alignTimeSeconds,
   extractFittingStats,
   extractModuleResult,
   extractOffense,
@@ -417,5 +418,17 @@ describe('overheatedOrNull', () => {
     expect(overheatedOrNull(63.2, 81.8, 1)).toBe(81.8);
     expect(overheatedOrNull(63.21, 63.24, 1)).toBeNull();
     expect(overheatedOrNull(63.2, null, 1)).toBeNull();
+  });
+});
+
+describe('alignTimeSeconds', () => {
+  it('is the game’s align time: ln 4 × inertia × mass in millions of kg', () => {
+    // A 14,700 t cruiser at 0.51 inertia aligns in about 10.4 s.
+    expect(alignTimeSeconds(14_700_000, 0.51)).toBeCloseTo(10.393, 3);
+  });
+
+  it('is zero for a massless or inertia-free ship rather than NaN', () => {
+    expect(alignTimeSeconds(0, 0.5)).toBe(0);
+    expect(alignTimeSeconds(1_000_000, 0)).toBe(0);
   });
 });

@@ -79,10 +79,9 @@ function renderPage(initialEntry = '/alerts') {
 /**
  * Opens the filter controls.
  *
- * `FilterBar` is `collapsible`, so at jsdom's reported width every control but
- * the search box sits behind one funnel trigger — the same as on a phone. A
- * test reaching straight for a chip would be asserting on a layout no reader
- * ever sees.
+ * `FilterBar` always renders the funnel trigger, at every width — every
+ * control but the search box sits behind it. A test reaching straight for a
+ * chip would be asserting on a layout no reader ever sees.
  */
 async function openFilters(): Promise<void> {
   await userEvent.click(await screen.findByRole('button', { name: /^filters/i }));

@@ -24,6 +24,7 @@ import {
 } from '@/components/ui';
 import { db } from '@/db';
 import { iskToneClass } from '@/features/character/format';
+import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { MarketWideTreeMap } from '@/sde/types';
@@ -35,6 +36,7 @@ import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from '
 import type { MarketWideResultRow } from './marketWideOpportunities';
 import { useMarketWideOpportunities } from './useMarketWideOpportunities';
 import { SkillGateMarker } from './SkillGateMarker';
+import { ORDER_DEPTH_RANK } from './opportunityMetrics';
 import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { boolParam } from '@/lib/urlState';
 
@@ -163,6 +165,7 @@ export function MarketWideOpportunitiesPanel({
     {
       id: 'orderDepth',
       header: t('industry.opportunitiesOrderDepthLabel'),
+      sortValue: (row) => ORDER_DEPTH_RANK[row.orderDepth],
       render: (row) => (
         <StatChip
           label={t('industry.opportunitiesOrderDepthLabel')}
@@ -266,6 +269,7 @@ export function MarketWideOpportunitiesPanel({
         />
       ) : (
         <div className="flex flex-col gap-2">
+          <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
           {gatedCount > 0 && (
             <div className="flex justify-end">
               <FilterChip
@@ -284,6 +288,7 @@ export function MarketWideOpportunitiesPanel({
               rowKey={(row) => row.productTypeID}
               rowContextMenu={rowContextMenu}
               label={t('industry.marketOpportunitiesTitle')}
+              mobileSort
               {...sortProps}
             />
           </div>

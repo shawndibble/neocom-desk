@@ -39,6 +39,7 @@ vi.mock('@/features/market/appraisalData', () => ({
     appraisal: { rows: [], totals: { buy: 0, sell: 0, spread: 0, unpricedRows: 0 } },
     unmatched: [],
     implantBonusPct: 0,
+    refinesOreOrIce: false,
     accountingLevel: null,
     brokerRelationsLevel: null,
   })),
@@ -161,6 +162,7 @@ describe('Market Appraisal tab navigation', () => {
       },
       unmatched: [],
       implantBonusPct: 0,
+      refinesOreOrIce: false,
       accountingLevel: null,
       brokerRelationsLevel: null,
     });

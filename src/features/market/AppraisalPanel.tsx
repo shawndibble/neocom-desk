@@ -24,7 +24,6 @@ import {
   IconButton,
   IskAmount,
   Panel,
-  ReauthBanner,
   Spinner,
   StatChip,
   TextInput,
@@ -34,9 +33,8 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { Caret } from '@/components/ui/Disclosure';
 import { fieldBaseClassName } from '@/components/ui/controlStyles';
-import { beginEveLogin } from '@/app/loginFlow';
-import { useEndpointsGranted } from '@/app/useGrantedScopes';
-import { permissionsForEndpoints, type EsiEndpointId } from '@/esi/registry';
+import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
+import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import {
   appraisalNet,
   lpBeatsMarket,
@@ -102,9 +100,6 @@ function totalCell(value: number | null, revealOn: IskRevealGesture): ReactNode 
   return <IskAmount value={value} revealOn={revealOn} decimals={0} />;
 }
 
-/** Stable reference for `useEndpointsGranted` — a fresh array every render would defeat its memo. */
-const STANDINGS_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterStandings'];
-
 /** Bolds a total only when it actually won a real comparison — never on a row with nothing to compare against. */
 function comparisonCell(total: ReactNode, highlighted: boolean, suffix?: ReactElement | false) {
   return (
@@ -130,7 +125,6 @@ export function AppraisalPanel({
 }: AppraisalPanelProps) {
   const { t } = useTranslation();
   const { text, setText, result, compare, loading, failed } = controller;
-  const standingsGranted = useEndpointsGranted(STANDINGS_ENDPOINTS);
   const [compareExpanded, setCompareExpanded] = useState(defaultCompareExpanded);
   const [shareCopied, setShareCopied] = useState(false);
   const [sellListCopied, setSellListCopied] = useState(false);
@@ -229,6 +223,7 @@ export function AppraisalPanel({
   const totals = result?.appraisal.totals;
   const unmatched = result?.unmatched ?? [];
   const implantBonusPct = result?.implantBonusPct ?? 0;
+  const refinesOreOrIce = result?.refinesOreOrIce ?? false;
   const accountingLevel = result?.accountingLevel ?? null;
   const brokerRelationsLevel = result?.brokerRelationsLevel ?? null;
   // Null while skills are loading, or with no active Character — falls back
@@ -625,17 +620,16 @@ export function AppraisalPanel({
                 {loading && <Spinner label={t('common.loading')} size="sm" />}
               </div>
 
-              {net && standingsGranted === false && (
-                <div className="border-b border-line px-3">
-                  <ReauthBanner
-                    variant="ghost"
-                    title={t('market.appraisal.assumesBaseStandingsTitle')}
-                    hint={t('market.appraisal.assumesBaseStandingsHint')}
-                    actionLabel={t('market.appraisal.assumesBaseStandingsAction')}
-                    onLogin={() =>
-                      void beginEveLogin({ groups: permissionsForEndpoints(STANDINGS_ENDPOINTS) })
-                    }
-                  />
+              {net && (
+                <AssumesBaseStandingsNote
+                  className="border-b border-line px-3"
+                  hint={t('market.appraisal.assumesBaseStandingsHint')}
+                />
+              )}
+
+              {hasRefine && refinesOreOrIce && (
+                <div className="border-b border-line px-3 empty:hidden">
+                  <ImplantsAssumedNote hint={t('market.appraisal.refineAssumesNoImplantsHint')} />
                 </div>
               )}
 

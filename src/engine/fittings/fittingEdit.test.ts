@@ -4,7 +4,9 @@ import {
   addModule,
   droneGroups,
   firstFreeSlotIndex,
+  loadChargeIntoAll,
   moveModule,
+  newFitting,
   removeModule,
   setDroneCounts,
   setModuleCharge,
@@ -45,6 +47,34 @@ describe('addModule', () => {
   it('does not mutate its input', () => {
     addModule(base, 'medium', 0, 438);
     expect(base.modules).toHaveLength(2);
+  });
+});
+
+describe('newFitting', () => {
+  it('is the bare hull, named after it', () => {
+    expect(newFitting(17843, 'Vexor Navy Issue')).toEqual({
+      name: 'Vexor Navy Issue',
+      shipTypeId: 17843,
+      modules: [],
+      drones: [],
+      cargo: [],
+    });
+  });
+});
+
+describe('loadChargeIntoAll', () => {
+  it('loads the charge into every fitted module of that type, and leaves the rest', () => {
+    const two = addModule(base, 'high', 1, 2889);
+    const next = loadChargeIntoAll(two, 2889, 186);
+    expect(next.modules.filter((m) => m.typeId === 2889).map((m) => m.chargeTypeId)).toEqual([
+      186, 186,
+    ]);
+    expect(next.modules.find((m) => m.slot === 'low')!.chargeTypeId).toBeUndefined();
+  });
+
+  it('keeps each module’s state', () => {
+    const next = loadChargeIntoAll(base, 2889, 186);
+    expect(next.modules[0].state).toBe('active');
   });
 });
 

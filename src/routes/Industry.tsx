@@ -11,6 +11,7 @@ import {
   type BlueprintCatalogEntry,
 } from '@/features/industry/blueprintCatalog';
 import { findOwnedBlueprint } from '@/features/industry/data';
+import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { useTradeHubStandings } from '@/features/market/useTradeHubStandings';
@@ -554,6 +555,9 @@ export function Industry() {
             )
           ) : (
             <Panel>
+              {(plans?.length ?? 0) > 0 && (
+                <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
+              )}
               <BuildPlanList
                 plans={plans}
                 catalog={catalog}

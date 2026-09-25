@@ -210,12 +210,18 @@ export function ResultsSummary({
 
   const saleColumns = useMemo<DataTableColumn<OwnedStockSaleLine>[]>(
     () => [
-      { id: 'material', header: t('industry.material'), render: (row) => nameFor(row.typeID) },
+      {
+        id: 'material',
+        header: t('industry.material'),
+        sortValue: (row) => nameFor(row.typeID),
+        render: (row) => nameFor(row.typeID),
+      },
       {
         id: 'owned',
         header: t('industry.useOrSell.ownedUnits'),
         align: 'right',
         className: 'tabular-nums',
+        sortValue: (row) => row.quantity,
         render: (row) => row.quantity.toLocaleString(),
       },
       {
@@ -223,6 +229,7 @@ export function ResultsSummary({
         header: t('industry.unitPrice'),
         align: 'right',
         className: 'tabular-nums',
+        sortValue: (row) => row.unitPrice,
         render: (row) => formatIsk(row.unitPrice),
       },
       {
@@ -230,6 +237,7 @@ export function ResultsSummary({
         header: t('industry.useOrSell.netColumn'),
         align: 'right',
         className: 'tabular-nums',
+        sortValue: (row) => row.net,
         render: (row) => formatIsk(row.net),
       },
       ...(itemActionsFor
@@ -514,6 +522,7 @@ export function ResultsSummary({
                   label={t('industry.useOrSell.perMaterial')}
                   density="compact"
                   rowContextMenu={itemMenuFor && ((row, tr) => itemMenuFor(row.typeID, tr))}
+                  mobileSort
                 />
               </div>
             </Disclosure>

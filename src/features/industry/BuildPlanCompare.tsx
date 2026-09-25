@@ -16,6 +16,7 @@ import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { formatDuration } from '@/lib/duration';
 import { iskToneClass } from '@/features/character/format';
+import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { formatPercent } from './format';
@@ -218,6 +219,7 @@ export function BuildPlanCompare({
         </Button>
       }
     >
+      <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
       <div className="overflow-x-auto">
         <DataTable
           columns={columns}

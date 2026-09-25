@@ -1,10 +1,8 @@
 /**
- * The Fitting editor's Add panel (issue #1533) narrows the market catalogue
- * in two passes: the cheap, static one here (search text, which rack an item
- * takes, market group, meta group) runs on every keystroke and needs no ship
- * data; the engine's own fit check (`dogmaFittingEngine.ts`'s
- * `checkCandidates`) then runs only on the few results that survive, and
- * `classifyRuleBreaks` turns what it reports into the two chips it drives.
+ * The Fitting editor's module browser narrows the market catalogue to what
+ * fits the open hull (`useHullFit`, from the engine's own fit check) and
+ * groups it by market group (`browserTree`); `classifyRuleBreaks` turns
+ * what that check reports into "fits this hull" and "can fly".
  */
 
 import type { FittingSlotKind } from './types';
@@ -18,58 +16,76 @@ export interface CandidateEntry {
   marketGroupId: number;
 }
 
-export interface CandidateSearchOptions {
-  query: string;
-  /** Only items taking this rack ("fits this slot"); null = any fittable item. */
-  rack: CandidateRack | null;
-  /** Which rack each type id takes; a type absent here isn't fittable at all. */
-  rackOf: Readonly<Record<string, CandidateRack>>;
-  /** Only items in these market groups; null = anywhere. */
-  groupIds: ReadonlySet<number> | null;
-  /** Only this meta group (Tech I, Tech II, Faction, …); null = any. */
-  metaGroupId: number | null;
-  metaGroupOf: (typeId: number) => number | null;
-}
-
 export const CANDIDATE_LIMIT = 100;
 
-export function searchCandidates<T extends CandidateEntry>(
-  entries: readonly T[],
-  options: CandidateSearchOptions,
-  limit = CANDIDATE_LIMIT
-): T[] {
-  const query = options.query.trim().toLowerCase();
-  const matches = entries.filter((entry) => {
-    const rack = options.rackOf[String(entry.typeId)];
-    if (rack === undefined) return false;
-    if (options.rack !== null && rack !== options.rack) return false;
-    if (options.groupIds !== null && !options.groupIds.has(entry.marketGroupId)) return false;
-    if (options.metaGroupId !== null && options.metaGroupOf(entry.typeId) !== options.metaGroupId)
-      return false;
-    return query === '' || entry.name.toLowerCase().includes(query);
-  });
-  matches.sort((a, b) => a.name.localeCompare(b.name));
-  return matches.slice(0, limit);
+export interface BrowserGroupNode {
+  id: number;
+  name: string;
+  parentId: number | null;
+  hasTypes: boolean;
 }
 
-/** The market groups the browser's tree shows: those holding an item of `rack` (any fittable item for null), plus ancestors. */
-export function groupsHoldingRack(
-  entries: readonly CandidateEntry[],
-  rack: CandidateRack | null,
-  rackOf: Readonly<Record<string, CandidateRack>>,
-  parentOf: ReadonlyMap<number, number | null>
-): Set<number> {
-  const groups = new Set<number>();
+export interface BrowserNode<T extends CandidateEntry> {
+  id: number;
+  /** The group's name — or a run of names ("Hull & Armor · Armor Plates") where single-child groups were merged. */
+  label: string;
+  /** Items passing `include` anywhere under this node. */
+  count: number;
+  children: BrowserNode<T>[];
+  /** Items directly in this group. */
+  items: T[];
+}
+
+/**
+ * The module browser's tree (mockup A, the game's own fitting browser): the
+ * market-group hierarchy cut down to the groups holding an item that passes
+ * `include` — fits the hull, the chosen slot, the filters. A group left with
+ * a single child and no items of its own merges into that child, so no
+ * level is a lone click-through. Items whose group isn't known drop.
+ */
+export function browserTree<T extends CandidateEntry>(
+  entries: readonly T[],
+  include: (entry: T) => boolean,
+  groupsById: ReadonlyMap<number, BrowserGroupNode>
+): BrowserNode<T>[] {
+  const nodes = new Map<number, BrowserNode<T>>();
+  const roots: BrowserNode<T>[] = [];
+  const nodeFor = (id: number): BrowserNode<T> | null => {
+    const existing = nodes.get(id);
+    if (existing) return existing;
+    const group = groupsById.get(id);
+    if (!group) return null;
+    const node: BrowserNode<T> = { id, label: group.name, count: 0, children: [], items: [] };
+    nodes.set(id, node);
+    const parent = group.parentId === null ? null : nodeFor(group.parentId);
+    if (parent) parent.children.push(node);
+    else roots.push(node);
+    return node;
+  };
+
   for (const entry of entries) {
-    const entryRack = rackOf[String(entry.typeId)];
-    if (entryRack === undefined || (rack !== null && entryRack !== rack)) continue;
-    let groupId: number | null | undefined = entry.marketGroupId;
-    while (groupId !== null && groupId !== undefined && !groups.has(groupId)) {
-      groups.add(groupId);
-      groupId = parentOf.get(groupId);
+    if (!groupsById.has(entry.marketGroupId) || !include(entry)) continue;
+    nodeFor(entry.marketGroupId)!.items.push(entry);
+    let id: number | null = entry.marketGroupId;
+    while (id !== null) {
+      nodes.get(id)!.count += 1;
+      id = groupsById.get(id)?.parentId ?? null;
     }
   }
-  return groups;
+
+  const finish = (node: BrowserNode<T>): BrowserNode<T> => {
+    let current = node;
+    while (current.items.length === 0 && current.children.length === 1) {
+      const child = current.children[0];
+      current = { ...child, label: `${current.label} · ${child.label}` };
+    }
+    return {
+      ...current,
+      items: [...current.items].sort((a, b) => a.name.localeCompare(b.name)),
+      children: current.children.map(finish).sort((a, b) => a.label.localeCompare(b.label)),
+    };
+  };
+  return roots.map(finish).sort((a, b) => a.label.localeCompare(b.label));
 }
 
 /**

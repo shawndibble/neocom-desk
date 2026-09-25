@@ -4,6 +4,7 @@ import type { Implants } from '@/engine/types';
 import {
   DEFAULT_WHAT_IF_SELECTION,
   normalizeWhatIfSelection,
+  readsLoadedImplants,
   setWhatIfBonus,
   toCustomSelection,
   whatIfImplants,
@@ -245,5 +246,18 @@ describe('normalizeWhatIfSelection', () => {
     expect(normalizeWhatIfSelection({ kind: 'custom' })).toEqual(DEFAULT_WHAT_IF_SELECTION);
     expect(normalizeWhatIfSelection('+3')).toEqual(DEFAULT_WHAT_IF_SELECTION);
     expect(normalizeWhatIfSelection(null)).toEqual(DEFAULT_WHAT_IF_SELECTION);
+  });
+});
+
+describe('readsLoadedImplants', () => {
+  it('is true for Current and for a plan that never picked a What-If', () => {
+    expect(readsLoadedImplants(preset('current'))).toBe(true);
+    expect(readsLoadedImplants(undefined)).toBe(true);
+  });
+
+  it('is false for any explicit override — the pilot’s own call, not a permission gap', () => {
+    expect(readsLoadedImplants(preset('none'))).toBe(false);
+    expect(readsLoadedImplants(preset('+3'))).toBe(false);
+    expect(readsLoadedImplants(custom({ intelligence: 3 } as Implants))).toBe(false);
   });
 });

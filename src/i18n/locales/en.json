@@ -49,12 +49,18 @@
     "standingsTitle": "Broker fees are assuming 0 standings",
     "standingsHint": "This character logged in before the app asked to read standings, so every NPC-station broker fee is calculated as if you had none. Log in again to share them and get accurate fees.",
     "standingsAction": "Log in to share standings",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "implantsAssumedTitle": "Assumes no implants",
+    "implantsAssumedAction": "Grant Character details",
+    "standingsAssumedTitle": "Assumes base standings",
+    "standingsAssumedTitleFor": "{{character}} — Assumes base standings",
+    "standingsAssumedAction": "Grant Character details"
   },
   "fittings": {
     "myFittings": {
       "title": "My Fittings",
       "save": "Save to My Fittings",
+      "saveShort": "Save",
       "update": "Update saved Fitting",
       "saved": "Saved",
       "needCharacter": "Log in with a Character to save Fittings.",
@@ -178,7 +184,6 @@
       "title": "Ring",
       "slotFitted": "{{rack}} {{index}}, {{state}}",
       "slotEmpty": "{{rack}} {{index}}, empty",
-      "openStats": "Stats",
       "tooltipFitted": "{{rack}} {{index}}: {{name}} ({{state}})",
       "tooltipCharge": "Loaded: {{name}}",
       "tooltipCantUse": "Can’t use: missing skills",
@@ -220,8 +225,6 @@
       "searchPlaceholder": "Search modules, rigs, drones…",
       "fitsSlot": "Fits this slot",
       "fitsSlotTooltip": "Only items that go in the slot you picked. Pick an empty slot to use it.",
-      "fitsHull": "Fits this hull",
-      "fitsHullTooltip": "Hides items this ship can't take at all: no hardpoint, the wrong rig size, or restricted to other hulls. Items that only overflow CPU or powergrid still show.",
       "canFly": "Can fly",
       "canFlyTooltip": "Only items your character has every required skill for.",
       "metaLabel": "Meta level",
@@ -229,7 +232,48 @@
       "waitingForShipData": "Ship data is still downloading. You can search now; adding, and the fits-this-hull and can-fly filters, switch on once it's ready.",
       "loadingCatalogue": "Loading items…",
       "noResults": "No matching items.",
-      "missingSkills": "Missing skills"
+      "missingSkills": "Missing skills",
+      "openButton": "Add module",
+      "tab": {
+        "modules": "Modules",
+        "charges": "Charges",
+        "drones": "Drones"
+      },
+      "tabsLabel": "What to add",
+      "addingTo": "Adding to {{slot}} {{index}}",
+      "clearTarget": "Clear the chosen slot",
+      "checkingHull": "Checking what fits this ship…",
+      "noChargeTakers": "Nothing fitted takes charges.",
+      "loaded": "loaded",
+      "dragHint": "Click an item to fit it, or drag it onto a slot on the Ring.",
+      "chargeTaker": "{{count}}× {{name}}"
+    },
+    "start": {
+      "newTitle": "New fitting from a hull",
+      "searchHulls": "Search hulls",
+      "searchHullsPlaceholder": "Vexor, Gila, heavy assault…",
+      "noHulls": "No hull matches that search.",
+      "pickAHull": "Pick a hull, then start fitting it. Double-click a hull to start at once.",
+      "startFitting": "Start fitting",
+      "tabNew": "New",
+      "tabImport": "Import",
+      "tabInGame": "In-game",
+      "tabsLabel": "Ways to open a fitting"
+    },
+    "header": {
+      "menu": "Fittings",
+      "newFromHull": "New from a hull…",
+      "import": "Import…",
+      "libraryTitle": "Open a fitting",
+      "myFittings": "My Fittings…",
+      "inGame": "In-game Fittings…",
+      "moreSave": "More save options",
+      "savedInMyFittings": "Saved in My Fittings"
+    },
+    "phoneTabs": {
+      "fitting": "Fitting",
+      "stats": "Stats",
+      "label": "Fitting sections"
     },
     "export": {
       "button": "Export",
@@ -248,8 +292,6 @@
       }
     },
     "stats": {
-      "show": "Show detail",
-      "hide": "Hide detail",
       "error": "Couldn't load ship data for this fit.",
       "loadingIndeterminate": "Downloading ship data…",
       "loading": "Downloading ship data… {{pct}}%",
@@ -262,6 +304,7 @@
       "section": {
         "capacitor": "Capacitor",
         "offense": "Offense",
+        "appliedDps": "Applied DPS",
         "defense": "Defense",
         "targeting": "Targeting",
         "navigation": "Navigation",
@@ -271,8 +314,6 @@
       },
       "capacitorStable": "Stable at {{pct}}%",
       "capacitorDepletes": "Depletes in {{seconds}}s",
-      "capacitorCapacity": "Capacity: {{value}} GJ",
-      "capacitorRecharge": "Recharge time: {{seconds}}s",
       "weaponRow": "{{count}}× {{name}}",
       "weaponDps": "{{value}} DPS",
       "weaponVolley": "{{value}} volley",
@@ -290,32 +331,63 @@
       "shield": "Shield",
       "armor": "Armor",
       "hull": "Hull",
-      "layerHeading": "{{layer}} — {{hp}} HP · {{ehp}} EHP",
       "armorIncludesRah": "Includes the Reactive Armor Hardener, adapted to {{profile}}.",
-      "rahAdapted": "Reactive Armor Hardener — adapted to {{profile}}",
-      "maxTargetRange": "Targeting range: {{value}} km",
-      "maxLockedTargets": "Max locked targets: {{value}}",
-      "scanResolution": "Scan resolution: {{value}} mm",
-      "signatureRadius": "Signature radius: {{value}} m",
       "maxVelocityMeta": "{{value}} m/s",
-      "maxVelocity": "Max velocity: {{value}} m/s",
-      "agility": "Inertia modifier: {{value}}",
-      "mass": "Mass: {{value}} t",
-      "warpSpeed": "Warp speed: {{value}} AU/s",
-      "droneDps": "Drone DPS: {{value}}",
-      "droneBandwidthLine": "Bandwidth: {{used}} / {{total}} Mbit/s",
-      "droneCapacity": "Bay capacity: {{value}} m3",
-      "cpuLine": "CPU: {{used}} / {{total}} tf",
-      "powergridLine": "Powergrid: {{used}} / {{total}} MW",
-      "calibrationLine": "Calibration: {{used}} / {{total}}",
       "unknownItems_one": "{{count}} item has no data in this build",
       "unknownItems_other": "{{count}} items have no data in this build",
-      "priceSellMeta": "Sells for {{value}} ISK",
       "priceBuy": "Buy orders: {{value}} ISK",
       "priceSell": "Sell orders: {{value}} ISK",
       "priceUnpriced_one": "{{count}} item has no price at this hub",
       "priceUnpriced_other": "{{count}} items have no price at this hub",
-      "priceLoading": "Pricing…"
+      "priceLoading": "Pricing…",
+      "damageTypeShort": {
+        "em": "EM",
+        "thermal": "Therm",
+        "kinetic": "Kin",
+        "explosive": "Exp"
+      },
+      "ehpColumn": "EHP",
+      "incomplete": "incomplete",
+      "headingCharacter": "Stats as {{name}}, own skills",
+      "headingAllV": "Stats at all skills V",
+      "layerHp": "{{hp}} HP",
+      "overheatedRow": "Overheated",
+      "rahRow": "Reactive Armor Hardener",
+      "fittingMeta": "CPU {{cpu}}% · PG {{pg}}%",
+      "fact": {
+        "capacity": "Capacity",
+        "align": "Align time",
+        "recharge": "Recharge",
+        "targetRange": "Lock range",
+        "lockedTargets": "Max targets",
+        "scanResolution": "Scan resolution",
+        "signature": "Signature",
+        "maxVelocity": "Max velocity",
+        "agility": "Inertia modifier",
+        "mass": "Mass",
+        "warpSpeed": "Warp speed",
+        "droneDps": "Drone DPS",
+        "bandwidth": "Bandwidth",
+        "droneBay": "Drone bay",
+        "cpu": "CPU",
+        "powergrid": "Powergrid",
+        "calibration": "Calibration",
+        "sell": "Sell",
+        "buy": "Buy"
+      },
+      "unit": {
+        "gj": "{{value}} GJ",
+        "seconds": "{{value}} s",
+        "km": "{{value}} km",
+        "mm": "{{value}} mm",
+        "metres": "{{value}} m",
+        "tonnes": "{{value}} t",
+        "auPerSecond": "{{value}} AU/s",
+        "bandwidth": "{{used}} / {{total}} Mbit/s",
+        "cubicMetres": "{{value}} m³",
+        "usedOfTotal": "{{used}} / {{total}}",
+        "isk": "{{value}} ISK"
+      }
     },
     "variations": {
       "title": "Variations",
@@ -407,6 +479,45 @@
         "sleepers": "Sleepers"
       }
     },
+    "targetProfile": {
+      "label": "Target profile",
+      "manage": "Manage targets",
+      "manageTitle": "Custom target profiles",
+      "builtInGroup": "Built-in",
+      "customGroup": "Custom",
+      "empty": "No custom profiles yet.",
+      "add": "New profile",
+      "edit": "Edit {{name}}",
+      "delete": "Delete {{name}}",
+      "nameLabel": "Name",
+      "signatureLabel": "Signature radius (m)",
+      "velocityLabel": "Speed (m/s)",
+      "summary": "{{signature}} m sig · {{velocity}} m/s",
+      "save": "Save",
+      "cancel": "Cancel",
+      "errorName": "Give the profile a name.",
+      "errorValues": "Enter a signature radius above zero and a speed of zero or more.",
+      "builtin": {
+        "frigate": "NPC frigate",
+        "cruiser": "NPC cruiser",
+        "battleship": "NPC battleship"
+      }
+    },
+    "appliedDps": {
+      "summary": "Raw DPS {{raw}} · applied {{applied}} at {{km}} km",
+      "assumptions": "Our own calculation, not the engine's: your ship stationary, the target moving fully transversal at the profile's speed. Drones only apply inside drone control range.",
+      "noWeapons": "No weapons are running — set a turret or launcher active, or launch drones.",
+      "loading": "Loading graphs…",
+      "overlayLabel": "Compare with",
+      "overlayNone": "No overlay",
+      "thisFitting": "This fitting",
+      "vsRange": "Applied DPS vs range",
+      "vsSpeed": "Applied DPS vs target speed, at {{km}} km",
+      "rangeHeader": "Range",
+      "speedHeader": "Target speed",
+      "km": "{{value}} km",
+      "speed": "{{value}} m/s"
+    },
     "implants": {
       "basis": {
         "label": "Implants from",
@@ -423,7 +534,8 @@
       "add": "Add",
       "remove": "Remove {{name}}",
       "notFound": "No item found with that exact name.",
-      "full": "This set is already full."
+      "full": "This set is already full.",
+      "assumesNoImplantsHint": "My clone stats are calculated without this character's fitted implants. Grant Character details for accurate stats."
     },
     "compare": {
       "entryButton": "Compare",
@@ -706,9 +818,7 @@
     "whatIfPerAttribute": "Implant bonus per attribute",
     "whatIfAttributeBonus": "{{attribute}} implant bonus",
     "whatIfMarketLink": "View attribute enhancer implants in Market",
-    "assumesNoImplantsTitle": "Assumes no implants",
     "assumesNoImplantsHint": "Training time is calculated without this character's fitted implants. Grant Character details for an accurate estimate.",
-    "assumesNoImplantsAction": "Grant Character details",
     "booster": "Booster",
     "boosterAdd": "Add accelerator",
     "boosterRemove": "Remove accelerator",
@@ -1091,6 +1201,7 @@
     "subBuildSummary": "Building {{count}} of this plan's own material(s) here: {{total}}, already reflected in the totals above — anything those jobs build in turn is inside that figure.",
     "subBuildSummaryComparison": "Buying them ready-made instead would cost {{planned}}.",
     "subBuildTimeNote": "The sub-jobs add {{time}} of job time before the main run can start.",
+    "assumesNoImplantsHint": "Job time is calculated without this character's fitted implants, so a manufacturing time implant isn't counted. Grant Character details for an accurate estimate.",
     "buildRecipe": {
       "action": "Build it",
       "actionFor": "Build it: {{material}}",
@@ -1518,7 +1629,9 @@
     "skillGateBestOn": "Best on {{character}}",
     "skillGateFilterChip": "Hide skill-gated",
     "skillGateFilterChipCount_one": "{{count}} row hidden",
-    "skillGateFilterChipCount_other": "{{count}} rows hidden"
+    "skillGateFilterChipCount_other": "{{count}} rows hidden",
+    "assumesBaseStandingsHint": "Broker fees in these profit figures are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
+    "productionLogAssumesBaseStandingsHint": "Broker fees on watched sell orders are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings."
   },
   "login": {
     "button": "Log in with EVE Online",
@@ -1778,8 +1891,13 @@
     "cancel": "Cancel",
     "ok": "OK",
     "searchPlaceholder": "Search by name or corporation",
-    "noSearchMatches": "No characters match this search.",
-    "noSearchMatchesHint": "Clear the search to see every character.",
+    "noSearchMatches": "No characters match this search or filter.",
+    "noSearchMatchesHint": "Clear the search and filters to see every character.",
+    "filterQueueLabel": "Queue state",
+    "filterCorpLabel": "Corporation",
+    "allCorporations": "All corporations",
+    "filterStarredOnly": "Starred only",
+    "filterHasAlerts": "Has alerts",
     "viewModeLabel": "View",
     "viewCards": "Cards",
     "viewTable": "Table",
@@ -1922,6 +2040,9 @@
     "retention": "This device keeps the last 300 alerts, and syncs 30 days of them between your devices."
   },
   "common": {
+    "columnsButton": "Columns",
+    "columnsMenuTitle": "Columns",
+    "resetColumns": "Reset to default",
     "close": "Close",
     "save": "Save",
     "cancel": "Cancel",
@@ -2309,6 +2430,7 @@
       "compareChartTitle": "Raw vs. refined value by type",
       "compareChartTitleRawOnly": "Value by ore type",
       "refiningHiddenNote": "Refining hidden. Raw value only.",
+      "refineAssumesNoImplantsHint": "{{character}}'s refine value is calculated without their fitted implants, so a refining implant isn't counted. Grant Character details for an accurate estimate.",
       "dateColumn": "Date",
       "typeColumn": "Type",
       "totalColumn": "Total",
@@ -2393,6 +2515,9 @@
         "noLocation": "Character location unavailable.",
         "noRoute": "No route found to this station."
       },
+      "locationNotGrantedTitle": "Jumps away unavailable",
+      "locationNotGrantedHint": "Distances show as \"-\" without this character's current location. Grant Character details to see how far away each station is.",
+      "locationNotGrantedAction": "Grant Character details",
       "routePreference": {
         "label": "Route",
         "shortest": "Shortest",
@@ -3408,7 +3533,8 @@
     "unpriceable": "Can't be priced at this hub — a material or the product has no listed sell price.",
     "unpriceableRequiredItem": "Can't be priced at this hub — a required item has no listed sell price.",
     "viewInMarket": "View in Market",
-    "planInIndustry": "Plan in Industry"
+    "planInIndustry": "Plan in Industry",
+    "assumesBaseStandingsHint": "Broker fees on sell-order profits are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings."
   },
   "orders": {
     "openTab": "Open",
@@ -3842,12 +3968,11 @@
       "instantNetHelp": "Selling into buy orders here, after {{tax}}% sales tax. No broker fee: filling an order lists nothing. Always at 100% of market.",
       "listNet": "You receive, listing",
       "listNetHelp": "Listing one price step under the cheapest seller here, after {{tax}}% sales tax and a {{broker}}% broker fee, 100 ISK minimum per row. Always at 100% of market.",
-      "assumesBaseStandingsTitle": "Assumes base standings",
       "assumesBaseStandingsHint": "The broker fee above is calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
-      "assumesBaseStandingsAction": "Grant Character details",
       "refineTotal": "Refine total",
       "refineTotalHelp": "What refining the list with the active Character's own reprocessing skills would fetch, sold into buy orders at this hub. Assumes an NPC station's 50% base rate and no ore-specialisation skill — neither is modelled — so a trained miner's real yield runs higher than shown.",
       "refineImplantHint": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
+      "refineAssumesNoImplantsHint": "Refine value is calculated without this character's fitted implants, so a refining implant isn't counted. Grant Character details for an accurate estimate.",
       "refinePartialHint": "At least one material has no price at this hub, so this total is a floor rather than the full value.",
       "refineUnpriced_one": "{{count}} refine value has an unpriced material, so it is a floor rather than the full total.",
       "refineUnpriced_other": "{{count}} refine values have an unpriced material, so they are floors rather than the full total.",
@@ -4135,6 +4260,7 @@
       "exitReprocess": "Reprocess and sell the materials, {{price}} a unit",
       "exitReprocessAssumption": "Assumes a {{rate}}% station and no station tax, valued against the buy orders here.",
       "exitReprocessImplant": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
+      "exitReprocessAssumesNoImplants": "Calculated without {{character}}'s fitted implants, so a refining implant isn't counted. Grant Character details for an accurate estimate.",
       "exitReprocessPartial": "At least one material has no buy order here, so this total is a floor.",
       "exitReprocessLeftOver_one": "{{count}} unit is short of a full refining batch and returns nothing.",
       "exitReprocessLeftOver_other": "{{count}} units are short of a full refining batch and return nothing.",
@@ -4182,7 +4308,8 @@
       "floorWorking": "Where that price comes from",
       "outbidAt": "Outbid at {{price}}",
       "copyPrice": "Copy {{price}}",
-      "priceCopied": "Copied to clipboard"
+      "priceCopied": "Copied to clipboard",
+      "assumesBaseStandingsHint": "Floor prices on this character's sell orders are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings."
     },
     "emptySellBlueprintHint": "Copies of this blueprint are traded on contract, not on the market.",
     "searchBpcContracts": "Search BPC contracts"
@@ -4326,7 +4453,7 @@
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, which skill plan you're adding skills to from Fit Check and Market, and the fitting damage profiles you made along with which one fittings are measured against. Nothing else on this page leaves your device."
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, which skill plan you're adding skills to from Fit Check and Market, the fitting damage profiles you made along with which one fittings are measured against, and the fitting target profiles you made along with which one applied DPS is worked out against. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",
@@ -4675,9 +4802,16 @@
       "left_other": "{{count}} left: {{names}}",
       "empty": "No member activity",
       "emptyHint": "EVE reported no tracking rows for this corporation.",
+      "noFilterMatches": "No members match your search or filters.",
+      "noFilterMatchesHint": "Clear the search or reset the dark-only, ship and location filters to see every member.",
+      "resetFilters": "Reset filters",
       "noAccessTitle": "Member tracking needs Director",
       "noAccessHint": "EVE only opens the member list and its last-login dates to a Director. No other corporation role can see them, and granting access here will not change that.",
       "searchPlaceholder": "Search name, ship, location…",
+      "shipFilterLabel": "Ship",
+      "shipFilterAll": "Any ship",
+      "locationFilterLabel": "Location",
+      "locationFilterAll": "Any location",
       "exportCsv": "Export CSV",
       "contextMenu": {
         "showInfo": "Show Info",

@@ -362,7 +362,7 @@ describe('appraisePaste', () => {
         truncated: false,
       });
 
-      const { appraisal, implantBonusPct } = await appraisePaste(
+      const { appraisal, implantBonusPct, refinesOreOrIce } = await appraisePaste(
         'Damage Control II\t1',
         DEFAULT_TRADE_HUB,
         100,
@@ -372,6 +372,27 @@ describe('appraisePaste', () => {
       // Untrained Scrapmetal Processing, no implant: 0.5 x 1.0 -> floor(100*0.5) = 50.
       expect(appraisal.rows[0].refineTotal).toBeCloseTo(50 * 5.41, 6);
       expect(implantBonusPct).toBe(0);
+      expect(refinesOreOrIce).toBe(false);
+    });
+
+    it('flags an ore paste as implant-eligible even with no implant read, so the page can say it assumed none (issue #1588)', async () => {
+      const SIMPLE_ORE_PROCESSING = 60377;
+      server.use(aggregates(PRICED));
+      mockedLoadReprocessing.mockResolvedValue({
+        '1230': { ...VELDSPAR_ENTRY, specialisationSkillID: SIMPLE_ORE_PROCESSING },
+      });
+      mockedLoadCorrectedSkills.mockResolvedValue(skillsFixture([]));
+      mockedLoadCharacterImplants.mockResolvedValue(null);
+
+      const { implantBonusPct, refinesOreOrIce } = await appraisePaste(
+        'Veldspar\t1000',
+        DEFAULT_TRADE_HUB,
+        100,
+        1
+      );
+
+      expect(implantBonusPct).toBe(0);
+      expect(refinesOreOrIce).toBe(true);
     });
   });
 

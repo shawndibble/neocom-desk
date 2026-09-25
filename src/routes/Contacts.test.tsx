@@ -10,6 +10,7 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { configureClipboard } from '@/lib/clipboard';
+import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { App } from '@/app/App';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -66,6 +67,32 @@ const affiliationPayload = [
   { character_id: CHAR_ID, corporation_id: 2001, alliance_id: 3001 },
 ];
 
+/** Every filter now sits behind the funnel (FilterBar, issue #1282). */
+function openFilters() {
+  fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
+}
+
+let restoreMatchMedia: (() => void) | undefined;
+
+/** Below `md`, `FilterBar` opens a sheet whose edits are a draft until Apply. */
+function useNarrowViewport(): void {
+  const real = window.matchMedia;
+  window.matchMedia = (media: string) =>
+    ({
+      media,
+      matches: media === NARROW_QUERY,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList;
+  restoreMatchMedia = () => {
+    window.matchMedia = real;
+  };
+}
+
 const server = setupServer(
   http.get(`${ESI}/characters/${CHAR_ID}/contacts`, () => HttpResponse.json(contactsPayload)),
   http.post(`${ESI}/characters/affiliation`, () => HttpResponse.json(affiliationPayload)),
@@ -84,7 +111,11 @@ const server = setupServer(
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  restoreMatchMedia?.();
+  restoreMatchMedia = undefined;
+});
 beforeEach(async () => {
   await db.characters.clear();
   await db.tokens.clear();
@@ -183,6 +214,7 @@ describe('Contacts', () => {
   it('filters by standing category', async () => {
     render(<App />);
     await screen.findByText('Good Friend');
+    openFilters();
 
     const badChip = screen.getByRole('button', { name: /Bad/ });
     fireEvent.click(badChip);
@@ -194,6 +226,7 @@ describe('Contacts', () => {
   it('points at the filters when they leave no contacts', async () => {
     render(<App />);
     await screen.findByText('Good Friend');
+    openFilters();
 
     const chips = screen.getByRole('group', { name: 'Standing' });
     for (const chip of within(chips).getAllByRole('button')) fireEvent.click(chip);
@@ -218,6 +251,7 @@ describe('Contacts', () => {
   it('filters by contact type', async () => {
     render(<App />);
     await screen.findByText('Good Friend');
+    openFilters();
 
     const types = screen.getByRole('group', { name: 'Type' });
     fireEvent.click(within(types).getByRole('button', { name: /Player/ }));
@@ -229,6 +263,7 @@ describe('Contacts', () => {
   it('counts every contact type on its chip, zeros included', async () => {
     render(<App />);
     await screen.findByText('Good Friend');
+    openFilters();
 
     const types = within(screen.getByRole('group', { name: 'Type' }));
     expect(types.getByRole('button', { name: /Player/ })).toHaveTextContent('2');
@@ -266,6 +301,7 @@ describe('Contacts', () => {
       await screen.findByRole('table', { name: /across/i });
       expect(window.location.pathname).toBe('/contacts/across');
 
+      openFilters();
       fireEvent.click(screen.getByRole('button', { name: /Only disagreements/ }));
       expect(window.location.search).toBe('?across.disagree=1');
     });
@@ -324,11 +360,34 @@ describe('Contacts', () => {
       fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
       await screen.findByRole('table', { name: /across/i });
 
+      openFilters();
       fireEvent.click(screen.getByRole('button', { name: /Only disagreements/ }));
 
       const table = within(screen.getByRole('table', { name: /across/i }));
       expect(table.queryByText('2 of 2')).not.toBeInTheDocument();
       expect(table.getAllByText('1 of 2').length).toBe(4);
+    });
+
+    it('leaves "Only disagreements" undone when the narrow-viewport sheet is cancelled', async () => {
+      useNarrowViewport();
+      await addSecondCharacter();
+      await cacheSecondCharacterContacts([contactsPayload[0]]);
+      render(<App />);
+      await screen.findByText('Good Friend');
+      fireEvent.click(screen.getByRole('tab', { name: 'Across characters' }));
+      await screen.findByRole('table', { name: /across/i });
+
+      fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
+      const sheet = await screen.findByRole('dialog');
+      fireEvent.click(within(sheet).getByRole('button', { name: /Only disagreements/ }));
+      fireEvent.click(within(sheet).getByRole('button', { name: 'Cancel' }));
+
+      // Cancelled: this is a draft like every other control in the sheet
+      // (issue #1282), so the URL never saw the toggle and every contact
+      // still shows, disagreement or not.
+      expect(window.location.search).not.toContain('across.disagree');
+      const table = within(screen.getByRole('table', { name: /across/i }));
+      expect(table.getAllByText('2 of 2').length).toBe(1);
     });
 
     it('shows every standing a contact was given, not one of them', async () => {
@@ -492,6 +551,7 @@ describe('Contacts standing filter chips (issue #403)', () => {
   it('stay visible through a manual refresh instead of disappearing', async () => {
     render(<App />);
     await screen.findByText('Good Friend');
+    openFilters();
 
     let resolveRefresh!: () => void;
     const refreshGate = new Promise<void>((resolve) => {
@@ -538,18 +598,23 @@ describe('Contacts standing filter chips (issue #403)', () => {
 
     render(<App />);
     await screen.findByText('Good Friend');
+    openFilters();
     expect(screen.getByRole('group', { name: 'Standing' })).toBeInTheDocument();
 
     await act(async () => {
       await useActiveCharacter.getState().setActiveCharacter(CHAR_ID_2);
     });
 
-    // The second character's contacts are still loading — the first
-    // character's stale chip counts must not linger under the new character.
+    // The second character's contacts are still loading — the whole bar
+    // (and with it the funnel this test just opened) unmounts along with the
+    // first character's stale chip counts, rather than let them linger under
+    // the new character.
     expect(screen.queryByRole('group', { name: 'Standing' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Filters/ })).not.toBeInTheDocument();
 
     resolveSecondContacts();
     expect(await screen.findByText('Second Pilot Friend')).toBeInTheDocument();
+    openFilters();
     expect(screen.getByRole('group', { name: 'Standing' })).toBeInTheDocument();
   });
 });
