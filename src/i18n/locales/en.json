@@ -59,9 +59,8 @@
   "fittings": {
     "myFittings": {
       "title": "My Fittings",
-      "save": "Save to My Fittings",
-      "saveShort": "Save",
-      "update": "Update saved Fitting",
+      "save": "Save",
+      "update": "Update",
       "saved": "Saved",
       "needCharacter": "Log in with a Character to save Fittings.",
       "tooLarge": "This Fitting is too large to save.",
@@ -158,8 +157,11 @@
       "powergrid": "Powergrid",
       "calibration": "Calibration",
       "droneBandwidth": "Drone bandwidth",
+      "droneBay": "Drone bay (m³)",
       "overBy": "Over by {{amount}}",
       "cantUse": "Can't use",
+      "showInfo": "Show info for {{name}}",
+      "variationsFor": "Variations of {{name}}",
       "drones": "Drones",
       "rack": {
         "high": "High slots",

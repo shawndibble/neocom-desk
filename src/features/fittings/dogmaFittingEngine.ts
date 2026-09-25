@@ -255,6 +255,8 @@ export interface CandidateCheck {
   fitsHull: boolean;
   /** The pilot has every skill it needs. */
   canFly: boolean;
+  /** Fits the bare hull's CPU, powergrid and calibration (with the pilot's skills) — else it never could. */
+  fitsResources: boolean;
 }
 
 function assertReady(): void {

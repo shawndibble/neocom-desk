@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Caret } from '@/components/ui';
+import { Caret, Tooltip } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
 import {
   alignTimeSeconds,
@@ -680,7 +680,18 @@ export function FittingStatsSections({
             />
             {stats.unknownItemTypeIds.length > 0 && (
               <p className="text-xs text-warning">
-                {t('fittings.stats.unknownItems', { count: stats.unknownItemTypeIds.length })}
+                {/* Which items, one per line — on hover, focus or a tap. */}
+                <Tooltip
+                  openOnTap
+                  content={[...new Set(stats.unknownItemTypeIds)].map(typeName).join('\n')}
+                >
+                  <button
+                    type="button"
+                    className="cursor-help underline decoration-dotted underline-offset-2"
+                  >
+                    {t('fittings.stats.unknownItems', { count: stats.unknownItemTypeIds.length })}
+                  </button>
+                </Tooltip>
               </p>
             )}
           </>

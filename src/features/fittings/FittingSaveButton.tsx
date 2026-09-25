@@ -19,8 +19,6 @@ interface FittingSaveButtonProps {
   onSaveToEve: () => void;
   canSaveToEve: boolean;
   saveToEveBlockedReason?: string;
-  /** A phone says just "Save". */
-  short: boolean;
 }
 
 /**
@@ -36,7 +34,6 @@ export function FittingSaveButton({
   onSaveToEve,
   canSaveToEve,
   saveToEveBlockedReason,
-  short,
 }: FittingSaveButtonProps) {
   const { t } = useTranslation();
   return (
@@ -48,9 +45,7 @@ export function FittingSaveButton({
         onClick={onSave}
         className="rounded-r-none"
       >
-        {updating
-          ? t('fittings.myFittings.update')
-          : t(short ? 'fittings.myFittings.saveShort' : 'fittings.myFittings.save')}
+        {updating ? t('fittings.myFittings.update') : t('fittings.myFittings.save')}
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

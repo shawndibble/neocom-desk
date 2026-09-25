@@ -15,9 +15,10 @@ import { showsDrones } from '@/engine/fittings/stats';
 import type { Fitting, FittingSlotKind } from '@/engine/fittings/types';
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import {
-  addDrones,
+  addDronesWithinBay,
   addModule,
   firstFreeSlotIndex,
+  maxDroneCount,
   loadChargeIntoAll,
   moveModule,
   newFitting,
@@ -30,11 +31,11 @@ import { FittingSaveButton } from '@/features/fittings/FittingSaveButton';
 import { LoadWarnings } from '@/features/fittings/FittingLoadCard';
 import { FittingLibrary, type LibraryTab } from '@/features/fittings/FittingLibrary';
 import { SaveToEveDialog } from '@/features/fittings/SaveToEveDialog';
+import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { FittingRackList, ModuleRow, RackSlots } from '@/features/fittings/FittingRackList';
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPanel';
-import { FittingViewToggle } from '@/features/fittings/FittingViewToggle';
 import { ImplantBasisControl } from '@/features/fittings/ImplantBasisControl';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import {
@@ -117,6 +118,9 @@ export function Fittings() {
   )?.name;
   const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
   const [saveToEveOpen, setSaveToEveOpen] = useState(false);
+  // The item whose info (the Market's item detail) is open — a List name click.
+  const [infoItem, setInfoItem] = useState<{ typeId: number; name: string } | null>(null);
+  const showInfo = (typeId: number, name: string) => setInfoItem({ typeId, name });
   // Bumped on a successful Save to EVE so In-game Fittings remounts and
   // refetches, picking up the fitting that just landed (or the overwrite).
   const [inGameFittingsKey, setInGameFittingsKey] = useState(0);
@@ -150,8 +154,17 @@ export function Fittings() {
     setLibrary(tab);
   }
 
-  function canPlace(rack: CandidateRack): boolean {
-    if (rack === 'drone') return dronesShown;
+  const droneVolume = (typeId: number) => catalogue?.types[String(typeId)]?.volume ?? 0;
+
+  function canPlace(rack: CandidateRack, typeId: number): boolean {
+    if (rack === 'drone') {
+      if (!dronesShown || fitting === null || stats === null) return false;
+      // Room for one more of this drone beside what the bay already holds.
+      const held = fitting.drones
+        .filter((drone) => drone.typeId === typeId)
+        .reduce((sum, drone) => sum + drone.quantity, 0);
+      return maxDroneCount(fitting, typeId, stats.droneCapacity, droneVolume) > held;
+    }
     if (fitting === null || slotCounts === null) return false;
     if (target?.kind === 'slot' && target.slot === rack) return true;
     return firstFreeSlotIndex(fitting, rack, slotCounts[rack]) !== null;
@@ -159,7 +172,9 @@ export function Fittings() {
 
   function handleAdd(typeId: number, rack: CandidateRack) {
     if (rack === 'drone') {
-      edit((f) => addDrones(f, typeId, 1), `drone-add-${typeId}`);
+      if (stats === null) return;
+      const capacity = stats.droneCapacity;
+      edit((f) => addDronesWithinBay(f, typeId, 1, capacity, droneVolume), `drone-add-${typeId}`);
       if (addMode === 'sheet') closeAdd();
       return;
     }
@@ -320,6 +335,7 @@ export function Fittings() {
         onSelectTarget={selectTarget}
         unusableModuleKeys={gaps?.unusableModuleKeys}
         onOpenVariations={(slot, slotIndex) => setModuleSlot({ slot, slotIndex })}
+        onShowInfo={showInfo}
         actions={addButton}
       />
     );
@@ -400,11 +416,6 @@ export function Fittings() {
             )}
           </>
         }
-        view={
-          viewHydrated && addMode !== 'sheet' ? (
-            <FittingViewToggle value={view} onChange={(next) => void setView(next)} />
-          ) : undefined
-        }
         save={
           <FittingSaveButton
             onSave={() => void workspace.save()}
@@ -426,7 +437,6 @@ export function Fittings() {
                   ? t('fittings.saveToEve.needPermission')
                   : undefined
             }
-            short={isPhone}
           />
         }
       />
@@ -487,7 +497,19 @@ export function Fittings() {
                 {addPanel}
               </Panel>
             )}
-            {editor}
+            {/* Ring | List as the app's own tabs over the column they switch. */}
+            <div className="min-w-0 space-y-3">
+              <Tabs
+                tabs={[
+                  { id: 'ring', label: t('fittings.view.ring') },
+                  { id: 'list', label: t('fittings.view.list') },
+                ]}
+                value={view}
+                onChange={(id) => void setView(id as FittingView)}
+                label={t('fittings.view.label')}
+              />
+              {editor}
+            </div>
             {statsSections}
           </div>
         ))}
@@ -526,6 +548,7 @@ export function Fittings() {
               engineReady={workspace.engineReady}
               profile={workspace.profile}
               edit={edit}
+              onShowInfo={showInfo}
             />
             <div>
               <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
@@ -561,9 +584,17 @@ export function Fittings() {
                 selectTarget(next);
               }}
               unusableModuleKeys={gaps?.unusableModuleKeys}
+              onShowInfo={showInfo}
             />
           )}
         </Modal>
+      )}
+      {infoItem && (
+        <ItemDetailModal
+          typeId={infoItem.typeId}
+          itemName={infoItem.name}
+          onClose={() => setInfoItem(null)}
+        />
       )}
       {addMode === 'sheet' && (
         <Modal open={addOpen} onClose={closeAdd} placement="sheet" title={addTitle}>

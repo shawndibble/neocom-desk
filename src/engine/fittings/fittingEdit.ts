@@ -215,3 +215,50 @@ export function addDrones(fitting: Fitting, typeId: number, quantity: number): F
     inBay: (current?.inBay ?? 0) + quantity,
   });
 }
+
+/**
+ * m3 of the drone bay the Fitting's drones take. A drone in space came out
+ * of the bay and goes back into it, so it counts the same as one sitting there.
+ */
+export function droneBayUsed(fitting: Fitting, volumeOf: (typeId: number) => number): number {
+  return fitting.drones.reduce((sum, drone) => sum + volumeOf(drone.typeId) * drone.quantity, 0);
+}
+
+/**
+ * The most of `typeId` (in space and in the bay together) that fits a bay of
+ * `capacity` m3 beside the Fitting's other drones. `Infinity` when the type's
+ * volume is unknown, so a missing figure never blocks adding.
+ */
+export function maxDroneCount(
+  fitting: Fitting,
+  typeId: number,
+  capacity: number,
+  volumeOf: (typeId: number) => number
+): number {
+  const volume = volumeOf(typeId);
+  if (volume <= 0) return Infinity;
+  const others = droneBayUsed(
+    { ...fitting, drones: fitting.drones.filter((drone) => drone.typeId !== typeId) },
+    volumeOf
+  );
+  // A hair of tolerance, so 50 m3 of 5 m3 drones counts as ten, not 9.999….
+  return Math.max(0, Math.floor((capacity - others) / volume + 1e-9));
+}
+
+/**
+ * `addDrones`, stopping at what the bay holds. Returns the same Fitting when
+ * none fit, so the caller's edit history gets no empty step.
+ */
+export function addDronesWithinBay(
+  fitting: Fitting,
+  typeId: number,
+  quantity: number,
+  capacity: number,
+  volumeOf: (typeId: number) => number
+): Fitting {
+  const current = droneGroups(fitting).find((group) => group.typeId === typeId);
+  const held = (current?.inSpace ?? 0) + (current?.inBay ?? 0);
+  const room = maxDroneCount(fitting, typeId, capacity, volumeOf) - held;
+  const adding = Math.min(quantity, room);
+  return adding >= 1 ? addDrones(fitting, typeId, adding) : fitting;
+}

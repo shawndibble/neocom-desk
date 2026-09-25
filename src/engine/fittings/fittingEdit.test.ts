@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   addDrones,
+  addDronesWithinBay,
   addModule,
+  droneBayUsed,
   droneGroups,
+  maxDroneCount,
   firstFreeSlotIndex,
   loadChargeIntoAll,
   moveModule,
@@ -211,5 +214,60 @@ describe('drones', () => {
       { typeId: 2486, quantity: 5, state: 'online' },
     ]);
     expect(droneGroups(addDrones(base, 2454, 1))).toEqual([{ typeId: 2454, inSpace: 2, inBay: 1 }]);
+  });
+});
+
+describe('drone bay volume', () => {
+  // Hobgoblin 5 m3, Hammerhead 10 m3; a 50 m3 bay.
+  const VOLUME: Record<number, number> = { 2454: 5, 2185: 10 };
+  const volumeOf = (typeId: number) => VOLUME[typeId] ?? 0;
+  const fit: Fitting = {
+    name: 'Drones',
+    shipTypeId: 1,
+    modules: [],
+    drones: [
+      { typeId: 2454, quantity: 2, state: 'active' },
+      { typeId: 2454, quantity: 1, state: 'online' },
+      { typeId: 2185, quantity: 2, state: 'online' },
+    ],
+    cargo: [],
+  };
+
+  it('counts drones in space and in the bay alike — both come out of the bay', () => {
+    expect(droneBayUsed(fit, volumeOf)).toBe(35);
+  });
+
+  it('caps a type at what fits beside every other type', () => {
+    // 20 m3 of Hammerheads leaves 30 m3: six Hobgoblins in all.
+    expect(maxDroneCount(fit, 2454, 50, volumeOf)).toBe(6);
+    // 15 m3 of Hobgoblins leaves 35 m3: three Hammerheads.
+    expect(maxDroneCount(fit, 2185, 50, volumeOf)).toBe(3);
+  });
+
+  it('is zero for a drone bigger than the room left, and never negative', () => {
+    expect(maxDroneCount(fit, 2185, 20, volumeOf)).toBe(0);
+    expect(maxDroneCount(fit, 2454, 10, volumeOf)).toBe(0);
+  });
+
+  it('does not cap a type whose volume is unknown', () => {
+    expect(maxDroneCount(fit, 999, 50, volumeOf)).toBe(Infinity);
+  });
+});
+
+describe('addDronesWithinBay', () => {
+  const volumeOf = (typeId: number) => ({ 2454: 5, 2185: 10 })[typeId] ?? 0;
+  const empty: Fitting = { name: 'D', shipTypeId: 1, modules: [], drones: [], cargo: [] };
+
+  it('adds as many as asked while they fit', () => {
+    expect(droneGroups(addDronesWithinBay(empty, 2454, 3, 50, volumeOf))).toEqual([
+      { typeId: 2454, inSpace: 0, inBay: 3 },
+    ]);
+  });
+
+  it('stops at what the bay holds', () => {
+    const full = addDronesWithinBay(empty, 2185, 9, 20, volumeOf);
+    expect(droneGroups(full)).toEqual([{ typeId: 2185, inSpace: 0, inBay: 2 }]);
+    // Nothing more fits: the same Fitting back, so no empty edit is recorded.
+    expect(addDronesWithinBay(full, 2454, 1, 20, volumeOf)).toBe(full);
   });
 });
