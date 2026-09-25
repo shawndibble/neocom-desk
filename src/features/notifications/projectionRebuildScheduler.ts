@@ -53,7 +53,7 @@ export function createCoalescedRebuild(
   };
 
   // Drops a rebuild that has not started. One already past its timer still
-  // runs; `registerDeviceForWebPush` refuses an empty roster for that case.
+  // runs; `registerDeviceForWebPush` re-checks the roster around `getToken`.
   const cancel = () => {
     clearTimeout(timer);
     timer = undefined;

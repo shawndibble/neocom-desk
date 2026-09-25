@@ -89,6 +89,13 @@ export async function registerDeviceForWebPush(
   const fcmToken = await getToken(messaging, { vapidKey, serviceWorkerRegistration });
   if (!fcmToken) return null;
 
+  // The roster can empty while `getToken` awaits (Remove / Log out ran its
+  // `deleteToken` before this token existed): drop the token just minted.
+  if ((await db.characters.toArray()).length === 0) {
+    await deleteToken(messaging).catch(() => {});
+    return null;
+  }
+
   // A stale/expired token for one Character must not stop the others from
   // registering — settle each independently rather than Promise.all, which
   // would reject (and register nobody) on the first failure. Mirrors the

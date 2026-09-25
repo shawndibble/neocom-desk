@@ -134,6 +134,18 @@ describe('registerDeviceForWebPush', () => {
     expect(getToken).not.toHaveBeenCalled();
   });
 
+  it('drops a token minted while the roster emptied', async () => {
+    vi.mocked(getToken).mockResolvedValue('fcm-token');
+    vi.mocked(deleteToken).mockResolvedValue(true);
+    vi.spyOn(db.characters, 'toArray')
+      .mockResolvedValueOnce([{ characterId: 1, name: 'P', ownerHash: 'h', addedAt: 1 }])
+      .mockResolvedValueOnce([]);
+    const result = await registerDeviceForWebPush('vapid-key', registration);
+    expect(result).toBeNull();
+    expect(deleteToken).toHaveBeenCalledTimes(1);
+    expect(call).not.toHaveBeenCalled();
+  });
+
   it('batches every stored Character’s access token into one callable call', async () => {
     vi.mocked(getToken).mockResolvedValue('fcm-token');
     vi.spyOn(db.characters, 'toArray').mockResolvedValue([
