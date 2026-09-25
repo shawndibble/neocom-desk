@@ -95,13 +95,33 @@ export interface PilotProfile {
 export type CapacitorStatus =
   { stable: true; stablePercentage: number } | { stable: false; depletesInSeconds: number };
 
-/** One layer's raw HP and its four resonances (0-1; a resist bar shows `1 - resonance`). */
-export interface LayerDefense {
-  hp: number;
+/**
+ * The incoming damage mix EHP is measured against (a Damage Profile,
+ * CONTEXT.md) — relative weights, not fractions; only the ratio matters. Our
+ * own shape rather than the engine's (ADR 0016: nothing here imports it).
+ */
+export interface DamageProfile {
+  em: number;
+  thermal: number;
+  kinetic: number;
+  explosive: number;
+}
+
+/** Four resonances (0-1; a resist bar shows `1 - resonance`). */
+export interface Resonances {
   emResonance: number;
   thermalResonance: number;
   kineticResonance: number;
   explosiveResonance: number;
+}
+
+/**
+ * One layer's raw HP, its four resonances, and its EHP under the Damage
+ * Profile the stats were calculated with — only `ehp` moves with the profile.
+ */
+export interface LayerDefense extends Resonances {
+  hp: number;
+  ehp: number;
 }
 
 export interface TargetingStats {
@@ -209,6 +229,11 @@ export interface FittingModuleResult {
   maxState: FittingItemState;
   /** Charge groups the module accepts (`chargeGroup1`…); empty when it takes no charge. */
   chargeGroupIds: number[];
+  /**
+   * A Reactive Armor Hardener's own resonances, as the engine adapted them to
+   * the calculation's Damage Profile; absent on every other module.
+   */
+  adaptedResonances?: Resonances;
 }
 
 /**
@@ -233,6 +258,12 @@ export const DOGMA_ATTRIBUTE = {
   powerOutput: 11,
   powerFree: -10,
   ehp: -43,
+  // Per-layer EHP under the calculation's damage profile, mapped by a live
+  // run of the pinned engine against a Rifter under all-EM vs uniform
+  // (2026-09-24): shield EHP = HP / EM resonance, and so on.
+  shieldEhp: -30,
+  armorEhp: -28,
+  hullEhp: -29,
   droneDamagePerSecond: -14,
   capacitorStablePercentage: -72,
   capacitorDepletesIn: -7,
@@ -314,6 +345,11 @@ export const ITEM_DOGMA_ATTRIBUTE = {
   // an online (not firing) launcher still reports its volley.
   damagePerSecond: -12,
   damageVolley: -21,
+  // "resistanceShiftAmount" — only the Reactive Armor Hardener family carries
+  // it (6 on a RAH, absent on a Damage Control II; live run of the pinned
+  // engine, 2026-09-24). Marks the module whose own armor resonances
+  // (DOGMA_ATTRIBUTE.armor*Resonance ids, read off the item) are adapted.
+  resistanceShiftAmount: 1849,
 } as const;
 
 export const CHARGE_GROUP_ATTRIBUTES: readonly number[] = [

@@ -7,9 +7,12 @@ import type {
   FittingStats,
   LayerDefense,
   LocalRepair,
+  Resonances,
 } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import type { DogmaAssetProgress } from './dogmaFittingEngine';
+import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
+import { DamageProfilePicker } from './DamageProfilePicker';
 
 const DMG_RESIST_CLASS = {
   em: 'bg-dmg-em',
@@ -27,7 +30,7 @@ const RESONANCE_KEY = {
   thermal: 'thermalResonance',
   kinetic: 'kineticResonance',
   explosive: 'explosiveResonance',
-} as const satisfies Record<DamageType, keyof LayerDefense>;
+} as const satisfies Record<DamageType, keyof Resonances>;
 
 /**
  * An overheated value beside its normal one, in the warning tone — the
@@ -82,28 +85,51 @@ function ResistBar({
   );
 }
 
-function LayerCard({
-  title,
-  layer,
+function ResistBars({
+  resonances,
   overheated,
 }: {
-  title: string;
-  layer: LayerDefense;
-  overheated: LayerDefense | undefined;
+  resonances: Resonances;
+  overheated?: Resonances;
 }) {
   return (
-    <div className="space-y-1 rounded-xs bg-panel-2 p-2">
-      <p className="text-xs font-semibold text-text-dim">
-        {title} — {layer.hp.toFixed(0)} HP
-      </p>
+    <>
       {RESIST_TYPES.map((type) => (
         <ResistBar
           key={type}
           type={type}
-          resonance={layer[RESONANCE_KEY[type]]}
+          resonance={resonances[RESONANCE_KEY[type]]}
           overheatedResonance={overheated?.[RESONANCE_KEY[type]]}
         />
       ))}
+    </>
+  );
+}
+
+function LayerCard({
+  title,
+  layer,
+  overheated,
+  note,
+}: {
+  title: string;
+  layer: LayerDefense;
+  overheated: LayerDefense | undefined;
+  /** Under the bars — the armor card's "includes the adapted RAH" line. */
+  note?: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-1 rounded-xs bg-panel-2 p-2">
+      <p className="text-xs font-semibold text-text-dim">
+        {t('fittings.stats.layerHeading', {
+          layer: title,
+          hp: layer.hp.toFixed(0),
+          ehp: layer.ehp.toFixed(0),
+        })}
+      </p>
+      <ResistBars resonances={layer} overheated={overheated} />
+      {note && <p className="text-xs text-text-dim">{note}</p>}
     </div>
   );
 }
@@ -146,6 +172,7 @@ interface FittingStatsSectionsProps {
   price: Appraisal | null;
   /** Names an Offense row's weapon, charge or drone. */
   typeName: (typeId: number) => string;
+  damageProfiles: DamageProfiles;
 }
 
 export function FittingStatsSections({
@@ -154,8 +181,15 @@ export function FittingStatsSections({
   statsError,
   price,
   typeName,
+  damageProfiles,
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
+  const profileName = useDamageProfileName()(damageProfiles.selected);
+  // A RAH's resists move with the profile (the engine adapts it), so the
+  // armor bars do too — label that, and show the RAH's own adapted resists.
+  const adaptedHardeners = (stats?.modules ?? []).flatMap((module) =>
+    module.adaptedResonances ? [module.adaptedResonances] : []
+  );
   const [expanded, setExpanded] = useState<Record<Section, boolean>>(
     () => Object.fromEntries(SECTIONS.map((section) => [section, true])) as Record<Section, boolean>
   );
@@ -267,43 +301,68 @@ export function FittingStatsSections({
       {section(
         'defense',
         stats ? t('fittings.stats.defenseEhp', { value: stats.ehp.toFixed(0) }) : undefined,
-        stats ? (
-          <div className="space-y-2">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {(['shield', 'armor', 'hull'] as const).map((layer) => (
+        <div className="space-y-2">
+          <DamageProfilePicker damageProfiles={damageProfiles} />
+          {stats ? (
+            <>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <LayerCard
-                  key={layer}
-                  title={t(`fittings.stats.${layer}`)}
-                  layer={stats[layer]}
-                  overheated={stats.overheated?.[layer]}
+                  title={t('fittings.stats.shield')}
+                  layer={stats.shield}
+                  overheated={stats.overheated?.shield}
                 />
+                <LayerCard
+                  title={t('fittings.stats.armor')}
+                  layer={stats.armor}
+                  overheated={stats.overheated?.armor}
+                  note={
+                    adaptedHardeners.length > 0
+                      ? t('fittings.stats.armorIncludesRah', { profile: profileName })
+                      : undefined
+                  }
+                />
+                <LayerCard
+                  title={t('fittings.stats.hull')}
+                  layer={stats.hull}
+                  overheated={stats.overheated?.hull}
+                />
+              </div>
+              {adaptedHardeners.map((resonances, index) => (
+                <div key={index} className="space-y-1 rounded-xs bg-panel-2 p-2">
+                  <p className="text-xs font-semibold text-text-dim">
+                    {t('fittings.stats.rahAdapted', { profile: profileName })}
+                  </p>
+                  <ResistBars resonances={resonances} />
+                </div>
               ))}
-            </div>
-            <ul className="space-y-1 text-xs text-text-dim">
-              {overheatedEhp !== null && (
-                <li>
-                  {t('fittings.stats.ehpLine', { value: stats.ehp.toFixed(0) })}
-                  <Overheated value={overheatedEhp} digits={0} />
-                </li>
-              )}
-              {REPAIR_LAYERS.filter((layer) => stats.repair[layer] > 0).map((layer) => (
-                <li key={layer}>
-                  {t(`fittings.stats.repair.${layer}`, { value: stats.repair[layer].toFixed(1) })}
-                  <Overheated
-                    value={overheatedOrNull(
-                      stats.repair[layer],
-                      stats.overheated?.repair[layer],
-                      1
-                    )}
-                    digits={1}
-                  />
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : (
-          placeholder
-        )
+              <ul className="space-y-1 text-xs text-text-dim">
+                {overheatedEhp !== null && (
+                  <li>
+                    {t('fittings.stats.ehpLine', { value: stats.ehp.toFixed(0) })}
+                    <Overheated value={overheatedEhp} digits={0} />
+                  </li>
+                )}
+                {REPAIR_LAYERS.filter((layer) => stats.repair[layer] > 0).map((layer) => (
+                  <li key={layer}>
+                    {t(`fittings.stats.repair.${layer}`, {
+                      value: stats.repair[layer].toFixed(1),
+                    })}
+                    <Overheated
+                      value={overheatedOrNull(
+                        stats.repair[layer],
+                        stats.overheated?.repair[layer],
+                        1
+                      )}
+                      digits={1}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            placeholder
+          )}
+        </div>
       )}
 
       {section(

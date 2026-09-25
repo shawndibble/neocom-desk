@@ -58,6 +58,8 @@ const SETTING_KEY_TO_PHRASE: Readonly<Record<string, RegExp>> = {
   'sync.spExtractionThresholdSp': /SP threshold you set/i,
   'sync.industryIncludeBlueprintCost': /blueprint cost counts toward Industry profit/i,
   'sync.loyaltyLpValue': /ISK-per-LP value/i,
+  'sync.fittingDamageProfiles': /fitting damage profiles you made/i,
+  'sync.fittingDamageProfileId': /which one fittings are measured against/i,
   'sync.skillCloneStates': /Alpha or Omega/i,
   'sync.miningTaxManualMoonOreTypeIds': /ore types you tagged/i,
   'sync.miningTaxManualIgnoredTypeIds': /ore types you tagged/i,

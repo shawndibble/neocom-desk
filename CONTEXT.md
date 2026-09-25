@@ -245,7 +245,7 @@ here — they go one per file in `docs/context/decisions/`.
   display, or pay it — see `docs/context/decisions/` (mail reply and
   forward): a rejected send surfaces ESI's own error text and points the
   pilot at the in-game client instead.
-- **Damage Profile**: The mix of EM, Thermal, Kinetic and Explosive damage a **Fitting**'s tank is measured against — uniform, one pure type, a common NPC faction's average, or one the pilot defines. Changes EHP, never raw HP or resists. Distinct from a **Target Profile**, which is about what the Fitting shoots at.
+- **Damage Profile**: The mix of EM, Thermal, Kinetic and Explosive damage a **Fitting**'s tank is measured against — uniform, one pure type, a common NPC faction's average, or one the pilot defines. Changes EHP, never raw HP or resists — except that a running Reactive Armor Hardener adapts its own (and so the armor layer's) resists to it, shown labelled as adapted. Distinct from a **Target Profile**, which is about what the Fitting shoots at.
 - **Dark**: A member with no login for the corp's inactivity span or more —
   the pilot's own setting (14/30/60/90 days), defaulting to
   `DARK_AFTER_DAYS` (30). `engine/corp/members.ts` still owns the default and

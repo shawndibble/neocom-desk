@@ -333,6 +333,7 @@ describe('computeFittingStats overheated values', () => {
       { ...fitting, modules: [{ slot: 'high', slotIndex: 0, typeId: 3186, state: 'active' }] },
       profile,
       undefined,
+      undefined,
       { overheated: false }
     );
 

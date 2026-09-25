@@ -19,6 +19,7 @@ vi.mock('@/market/prices', () => ({
 function layer(hp: number) {
   return {
     hp,
+    ehp: hp * 1.5,
     emResonance: 0.8,
     thermalResonance: 0.7,
     kineticResonance: 0.6,

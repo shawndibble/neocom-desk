@@ -12,7 +12,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { swapModuleType } from '@/engine/fittings/fittingEdit';
 import { fitsResourceBudget } from '@/engine/fittings/skillGaps';
-import type { Fitting, FittingSlotKind, FittingStats, PilotProfile } from '@/engine/fittings/types';
+import type {
+  DamageProfile,
+  Fitting,
+  FittingSlotKind,
+  FittingStats,
+  PilotProfile,
+} from '@/engine/fittings/types';
 import { diffFittingStats, type FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import {
   buildVariationIndex,
@@ -24,20 +30,34 @@ import { getHubPrices } from '@/market/prices';
 import { checkCandidates, computeFittingStats } from './dogmaFittingEngine';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 
-/** Keyed by Fitting then PilotProfile (both stable references across re-renders) so switching which module's panel is open doesn't repeat the whole-fit `calculate()` call. Evicted on failure so a transient error doesn't wedge every future attempt. */
-const baselineCache = new WeakMap<Fitting, WeakMap<PilotProfile, Promise<FittingStats>>>();
+/** Keyed by Fitting, PilotProfile, then Damage Profile (all stable references across re-renders) so switching which module's panel is open doesn't repeat the whole-fit `calculate()` call. Evicted on failure so a transient error doesn't wedge every future attempt. */
+const baselineCache = new WeakMap<
+  Fitting,
+  WeakMap<PilotProfile, Map<DamageProfile | undefined, Promise<FittingStats>>>
+>();
 
-function getBaselineStats(fitting: Fitting, profile: PilotProfile): Promise<FittingStats> {
+function getBaselineStats(
+  fitting: Fitting,
+  profile: PilotProfile,
+  damageProfile: DamageProfile | undefined
+): Promise<FittingStats> {
   let byProfile = baselineCache.get(fitting);
   if (!byProfile) {
     byProfile = new WeakMap();
     baselineCache.set(fitting, byProfile);
   }
-  const cached = byProfile.get(profile);
+  let byDamageProfile = byProfile.get(profile);
+  if (!byDamageProfile) {
+    byDamageProfile = new Map();
+    byProfile.set(profile, byDamageProfile);
+  }
+  const cached = byDamageProfile.get(damageProfile);
   if (cached) return cached;
-  const promise = computeFittingStats(fitting, profile, undefined, { overheated: false });
-  byProfile.set(profile, promise);
-  promise.catch(() => byProfile?.delete(profile));
+  const promise = computeFittingStats(fitting, profile, undefined, damageProfile, {
+    overheated: false,
+  });
+  byDamageProfile.set(damageProfile, promise);
+  promise.catch(() => byDamageProfile?.delete(damageProfile));
   return promise;
 }
 
@@ -61,6 +81,8 @@ interface UseModuleVariationsParams {
   catalogue: FittingCatalogue | null;
   engineReady: boolean;
   profile: PilotProfile | null;
+  /** The Damage Profile the Defense section measures EHP against, so the EHP deltas agree with it. */
+  damageProfile?: DamageProfile;
 }
 
 interface ComputedEntry {
@@ -77,6 +99,7 @@ export function useModuleVariations({
   catalogue,
   engineReady,
   profile,
+  damageProfile,
 }: UseModuleVariationsParams): { rows: VariationRow[]; loading: boolean } {
   // Split from `members` below: the index walks every variation-grouped type
   // in the SDE, so it's worth keeping across a module switch that doesn't
@@ -96,6 +119,7 @@ export function useModuleVariations({
   const [computed, setComputed] = useState<{
     fitting: Fitting;
     profile: PilotProfile;
+    damageProfile: DamageProfile | undefined;
     slot: FittingSlotKind;
     slotIndex: number;
     byTypeId: ReadonlyMap<number, ComputedEntry>;
@@ -113,7 +137,7 @@ export function useModuleVariations({
       // A run stale by the time it lands (fitting/profile/slot changed
       // meanwhile) is simply dropped — the effect that superseded it already
       // has its own in-flight computation.
-      const before = await getBaselineStats(fitting, profile).catch(() => null);
+      const before = await getBaselineStats(fitting, profile, damageProfile).catch(() => null);
       if (cancelled || before === null) return;
 
       const typeIds = members.map((member) => member.typeId);
@@ -125,7 +149,7 @@ export function useModuleVariations({
       const settled = await Promise.allSettled(
         members.map(async (member): Promise<[number, ComputedEntry]> => {
           const swapped = swapModuleType(fitting, slot, slotIndex, member.typeId);
-          const after = await computeFittingStats(swapped, profile, undefined, {
+          const after = await computeFittingStats(swapped, profile, undefined, damageProfile, {
             overheated: false,
           });
           const check = candidateChecks.get(member.typeId);
@@ -143,12 +167,19 @@ export function useModuleVariations({
       const entries = settled.flatMap((result) =>
         result.status === 'fulfilled' ? [result.value] : []
       );
-      setComputed({ fitting, profile, slot, slotIndex, byTypeId: new Map(entries) });
+      setComputed({
+        fitting,
+        profile,
+        damageProfile,
+        slot,
+        slotIndex,
+        byTypeId: new Map(entries),
+      });
     })();
     return () => {
       cancelled = true;
     };
-  }, [fitting, profile, engineReady, members, slot, slotIndex]);
+  }, [fitting, profile, damageProfile, engineReady, members, slot, slotIndex]);
 
   useEffect(() => {
     if (members.length === 0) return;
@@ -175,6 +206,7 @@ export function useModuleVariations({
     computed &&
     computed.fitting === fitting &&
     computed.profile === profile &&
+    computed.damageProfile === damageProfile &&
     computed.slot === slot &&
     computed.slotIndex === slotIndex
       ? computed

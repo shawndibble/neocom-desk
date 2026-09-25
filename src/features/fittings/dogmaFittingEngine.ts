@@ -20,6 +20,7 @@ import {
   type FittingSlotKind,
   type FittingStats,
   type PilotProfile,
+  type DamageProfile,
 } from '@/engine/fittings/types';
 
 /**
@@ -144,17 +145,20 @@ export function loadDogmaEngine(
 }
 
 /**
- * Works out a Fitting's stats under a pilot's skills and implants. Loads the
- * engine first if this is the first call anywhere in the session.
+ * Works out a Fitting's stats under a pilot's skills and implants, with EHP
+ * measured against `damageProfile` (the engine's uniform default without
+ * one). Loads the engine first if this is the first call anywhere in the
+ * session.
  */
 export async function computeFittingStats(
   fitting: Fitting,
   profile: PilotProfile,
   onProgress?: (progress: DogmaAssetProgress) => void,
+  damageProfile?: DamageProfile,
   { overheated: withOverheated = true }: { overheated?: boolean } = {}
 ): Promise<FittingStats> {
   await loadDogmaEngine(onProgress);
-  const dogmaFit = fittingToDogmaFit(fitting, profile);
+  const dogmaFit = fittingToDogmaFit(fitting, profile, damageProfile);
   const calculation = calculate(dogmaFit);
   const baseStats = extractFittingStats(
     dogmaFit.items.map((item) => item.type_id),

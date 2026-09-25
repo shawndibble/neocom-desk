@@ -1,5 +1,5 @@
 import type { Fit, FitItem, Slot } from '@eveshipfit/dogma-engine';
-import type { Fitting, FittingModule, PilotProfile } from './types';
+import type { DamageProfile, Fitting, FittingModule, PilotProfile } from './types';
 
 /** EVE numbers implant/booster slots starting at 1, not 0 (dogma-engine's own `Slot` doc). */
 const SLOT_INDEX_START = 1;
@@ -34,8 +34,18 @@ function slottedItem(
  * `@eveshipfit/dogma-engine` expects (ADR 0016). Pure — only `Fit`'s type is
  * imported, never the engine itself; `dogmaFittingEngine.ts` is what actually
  * calls it.
+ *
+ * With a `damageProfile`, EHP is measured against it and any Reactive Armor
+ * Hardener adapts to it; without one the engine's own default (uniform, RAH
+ * not adapted) applies. The key is left off rather than set to `undefined` —
+ * the engine rejects an explicit `environment: undefined` (live run,
+ * 2026-09-24).
  */
-export function fittingToDogmaFit(fitting: Fitting, profile: PilotProfile): Fit {
+export function fittingToDogmaFit(
+  fitting: Fitting,
+  profile: PilotProfile,
+  damageProfile?: DamageProfile
+): Fit {
   const items: FitItem[] = [
     ...fitting.modules.map(moduleToFitItem),
     ...fitting.drones.map((drone): FitItem => ({
@@ -65,5 +75,18 @@ export function fittingToDogmaFit(fitting: Fitting, profile: PilotProfile): Fit 
     ship: { type_id: fitting.shipTypeId },
     items,
     character: { skills: profile.skillLevels },
+    ...(damageProfile
+      ? {
+          environment: {
+            damage_profile: {
+              em: damageProfile.em,
+              thermal: damageProfile.thermal,
+              kinetic: damageProfile.kinetic,
+              explosive: damageProfile.explosive,
+            },
+            reactive_armor: 'damage_profile' as const,
+          },
+        }
+      : {}),
   };
 }

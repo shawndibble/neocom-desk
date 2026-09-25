@@ -12,6 +12,7 @@ import {
   type OffenseStats,
   type OverheatedStats,
   type WeaponRow,
+  type Resonances,
 } from './types';
 
 interface AttributeMap {
@@ -33,6 +34,7 @@ function defenseLayers(
     shield: layerDefense(
       shipAttributes,
       DOGMA_ATTRIBUTE.shieldCapacity,
+      DOGMA_ATTRIBUTE.shieldEhp,
       DOGMA_ATTRIBUTE.shieldEmResonance,
       DOGMA_ATTRIBUTE.shieldThermalResonance,
       DOGMA_ATTRIBUTE.shieldKineticResonance,
@@ -41,6 +43,7 @@ function defenseLayers(
     armor: layerDefense(
       shipAttributes,
       DOGMA_ATTRIBUTE.armorHp,
+      DOGMA_ATTRIBUTE.armorEhp,
       DOGMA_ATTRIBUTE.armorEmResonance,
       DOGMA_ATTRIBUTE.armorThermalResonance,
       DOGMA_ATTRIBUTE.armorKineticResonance,
@@ -49,6 +52,7 @@ function defenseLayers(
     hull: layerDefense(
       shipAttributes,
       DOGMA_ATTRIBUTE.hullHp,
+      DOGMA_ATTRIBUTE.hullEhp,
       DOGMA_ATTRIBUTE.hullEmResonance,
       DOGMA_ATTRIBUTE.hullThermalResonance,
       DOGMA_ATTRIBUTE.hullKineticResonance,
@@ -81,9 +85,25 @@ function localRepair(shipAttributes: AttributeMap): LocalRepair {
   };
 }
 
+function resonances(
+  attributes: AttributeMap,
+  emAttr: number,
+  thermalAttr: number,
+  kineticAttr: number,
+  explosiveAttr: number
+): Resonances {
+  return {
+    emResonance: readAttribute(attributes, emAttr),
+    thermalResonance: readAttribute(attributes, thermalAttr),
+    kineticResonance: readAttribute(attributes, kineticAttr),
+    explosiveResonance: readAttribute(attributes, explosiveAttr),
+  };
+}
+
 function layerDefense(
   shipAttributes: AttributeMap,
   hpAttr: number,
+  ehpAttr: number,
   emAttr: number,
   thermalAttr: number,
   kineticAttr: number,
@@ -91,10 +111,8 @@ function layerDefense(
 ): LayerDefense {
   return {
     hp: readAttribute(shipAttributes, hpAttr),
-    emResonance: readAttribute(shipAttributes, emAttr),
-    thermalResonance: readAttribute(shipAttributes, thermalAttr),
-    kineticResonance: readAttribute(shipAttributes, kineticAttr),
-    explosiveResonance: readAttribute(shipAttributes, explosiveAttr),
+    ehp: readAttribute(shipAttributes, ehpAttr),
+    ...resonances(shipAttributes, emAttr, thermalAttr, kineticAttr, explosiveAttr),
   };
 }
 
@@ -175,14 +193,34 @@ interface ModuleCalculationResult {
   max_state: FittingItemState;
 }
 
-/** One fitted module's calculation, as the editor's state and charge controls need it. */
+/**
+ * One fitted module's calculation, as the editor's state and charge controls
+ * need it — plus, for a Reactive Armor Hardener, the resonances the engine
+ * adapted it to.
+ */
 export function extractModuleResult(result: ModuleCalculationResult): FittingModuleResult {
+  // Only a running RAH adapts; an online or offline one sits at its base
+  // resists, and labelling those "adapted" would be wrong.
+  const isAdaptingHardener =
+    (result.state === 'active' || result.state === 'overload') &&
+    readAttribute(result.attributes, ITEM_DOGMA_ATTRIBUTE.resistanceShiftAmount) > 0;
   return {
     state: result.state,
     maxState: result.max_state,
     chargeGroupIds: CHARGE_GROUP_ATTRIBUTES.map((id) =>
       readAttribute(result.attributes, id)
     ).filter((groupId) => groupId > 0),
+    ...(isAdaptingHardener
+      ? {
+          adaptedResonances: resonances(
+            result.attributes,
+            DOGMA_ATTRIBUTE.armorEmResonance,
+            DOGMA_ATTRIBUTE.armorThermalResonance,
+            DOGMA_ATTRIBUTE.armorKineticResonance,
+            DOGMA_ATTRIBUTE.armorExplosiveResonance
+          ),
+        }
+      : {}),
   };
 }
 
