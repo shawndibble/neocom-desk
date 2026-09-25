@@ -19,6 +19,7 @@ import {
   Spinner,
 } from '@/components/ui';
 import { AuthFailureNotice } from './AuthFailureNotice';
+import { StandingsScopeNotice } from './StandingsScopeNotice';
 import { useGrantedScopes, useLockedRoutes } from './useGrantedScopes';
 import { warmRoute } from './routeWarm';
 import { preloadRouteChunk } from './routeChunks';
@@ -649,6 +650,7 @@ export function Layout() {
 
       <main className="min-w-0 flex-1 px-2 py-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-4 md:pb-4">
         <AuthFailureNotice />
+        <StandingsScopeNotice />
         <SyncErrorBanner />
         {/*
           Deliberately not `key={location.pathname}`, which would replay a CSS

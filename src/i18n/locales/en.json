@@ -46,6 +46,9 @@
     "staleGrantHint": "EVE turned down a request for this character's data. If you removed this app's access in EVE's third-party application list, log in again to restore it.",
     "staleGrantHintNamed": "EVE turned down a request for {{character}}'s data. If you removed this app's access in EVE's third-party application list, log in again to restore it.",
     "staleGrantAction": "Log in again with EVE Online",
+    "standingsTitle": "Broker fees are assuming 0 standings",
+    "standingsHint": "This character logged in before the app asked to read standings, so every NPC-station broker fee is calculated as if you had none. Log in again to share them and get accurate fees.",
+    "standingsAction": "Log in to share standings",
     "dismiss": "Dismiss"
   },
   "fittings": {
@@ -88,6 +91,18 @@
       "unresolvedTitle_one": "{{count}} line wasn't recognized",
       "unresolvedTitle_other": "{{count}} lines weren't recognized",
       "unresolvedLine": "Line {{line}}: \"{{text}}\" — {{reason}}"
+    },
+    "inGame": {
+      "title": "In-game Fittings",
+      "refresh": "Refresh",
+      "reauthTitle": "Allow fittings access",
+      "reauthHint": "Log in again to see this Character's in-game Fittings.",
+      "reauthAction": "Log in again with EVE Online",
+      "emptyTitle": "No in-game Fittings",
+      "emptyHint": "Fittings saved on this Character in EVE will show up here.",
+      "openAction": "Open",
+      "unresolvedNote_one": "{{count}} item from \"{{name}}\" couldn't be loaded (fighter bay or service slot).",
+      "unresolvedNote_other": "{{count}} items from \"{{name}}\" couldn't be loaded (fighter bay or service slot)."
     },
     "missingSkills": {
       "chip_one": "Missing {{count}} skill · {{time}}",
@@ -1338,8 +1353,8 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Signing in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, corporation roles, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions. Want to share less from the start? Use Log in with custom permissions, next to the Log in button, to choose exactly what you grant.",
-    "writeExceptions": "It also asks for three permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; and replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client. Nothing else in the app writes to EVE.",
+    "permissionsHint": "Signing in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, corporation roles, your in-game fittings, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions. Want to share less from the start? Use Log in with custom permissions, next to the Log in button, to choose exactly what you grant.",
+    "writeExceptions": "It also asks for four permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client; and saving a Fitting to EVE creates or replaces your in-game fitting there, the same as fitting it in the client. Nothing else in the app writes to EVE.",
     "eyebrow": "Free · Open source · Runs in your browser",
     "heading": "Answers, not API dumps.",
     "previewLabel": "Example — signed-in view",
@@ -1501,8 +1516,8 @@
     "trustHeading": "It reads. It writes only when you act.",
     "trust": {
       "readOnly": {
-        "name": "Three writes, and nothing else",
-        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, and a reply or forward you write goes out through your account. Nothing else in the app writes to EVE."
+        "name": "Four writes, and nothing else",
+        "desc": "Opening a mail flags it as read in EVE, answering a calendar invite sends your response, a reply or forward you write goes out through your account, and saving a Fitting to EVE recreates it on the game's side. Nothing else in the app writes to EVE."
       },
       "token": {
         "name": "Your refresh token stays in this browser",
@@ -4068,6 +4083,10 @@
     "characterDetails": {
       "label": "Character details",
       "caption": "Implants, clones, location, contacts, standings and loyalty."
+    },
+    "fittings": {
+      "label": "Fittings",
+      "caption": "Your in-game Fittings, and saving Fittings to EVE."
     },
     "corp": {
       "label": "Corporation",

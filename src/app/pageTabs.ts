@@ -38,8 +38,8 @@ export const PI_TABS = definePageTabs('/planetary-industry', [
 ]);
 
 export const MINING_TABS = definePageTabs('/mining', [
-  { id: 'tax', labelKey: 'miningTax.taxTab' },
   { id: 'overview', labelKey: 'miningTax.overviewTab' },
+  { id: 'tax', labelKey: 'miningTax.taxTab' },
 ]);
 
 export const WALLET_TABS = definePageTabs('/wallet', [
