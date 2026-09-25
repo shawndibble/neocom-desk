@@ -10,6 +10,10 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { DEFAULT_TIME_FORMAT, TIME_FORMAT_SETTING_KEY, useTimeFormat } from '@/lib/timeFormat';
+import {
+  DEFAULT_CONTRACT_SEARCH_MODE,
+  useContractSearchMode,
+} from '@/features/contractSearch/contractSearchModePref';
 import { formatTimestamp } from '@/lib/timestamp';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { App } from '@/app/App';
@@ -132,6 +136,10 @@ beforeEach(async () => {
   // preference set by one test leaves the rest rendering UTC, and a leaked
   // `hydrated: true` makes App's `hydrate()` early-return.
   useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: false });
+  // Same reset, same reason: a mode picked in one case (issue #1719) must not
+  // survive into the next as a remembered default that overrides a bare
+  // `/contracts` visit's own "lands on Items" assertion.
+  useContractSearchMode.setState({ value: DEFAULT_CONTRACT_SEARCH_MODE, hydrated: false });
 
   await db.characters.put({ characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh', addedAt: 1 });
   await db.tokens.put({
@@ -625,6 +633,31 @@ describe('Contracts tab strip (issue #908)', () => {
     expect(screen.getByRole('tab', { name: 'Search' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.queryByRole('table', { name: 'Contracts' })).not.toBeInTheDocument();
     expect(window.location.pathname).toBe('/contracts/search/items');
+  });
+
+  it('remembers the last-used Courier mode across a fresh visit (issue #1719)', async () => {
+    useContractSearchMode.setState({ value: 'courier', hydrated: true });
+    window.history.pushState({}, '', '/contracts');
+    render(<App />);
+    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    await waitFor(() => expect(window.location.pathname).toBe('/contracts/search/courier'));
+  });
+
+  it('still lands on Items when the remembered mode is Items itself', async () => {
+    useContractSearchMode.setState({ value: 'items', hydrated: true });
+    window.history.pushState({}, '', '/contracts');
+    render(<App />);
+    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/contracts/search/items');
+  });
+
+  it('leaves the History tab alone regardless of the remembered Search mode', async () => {
+    useContractSearchMode.setState({ value: 'courier', hydrated: true });
+    // beforeEach above already deep-links to History; restated for clarity.
+    window.history.pushState({}, '', '/contracts/history');
+    render(<App />);
+    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/contracts/history');
   });
 
   it('swaps the public search for the contracts table when History is picked', async () => {

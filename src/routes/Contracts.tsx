@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -67,6 +67,7 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import { contractsCsvColumns } from '@/features/character/contractsCsv';
 import type { CharacterAffiliation, Contract } from '@/esi/endpoints';
 import { usePageTab } from '@/lib/usePageTab';
+import { useContractSearchMode } from '@/features/contractSearch/contractSearchModePref';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, optionalEnumParam, textParam } from '@/lib/urlState';
 import { CONTRACTS_TABS } from '@/app/pageTabs';
@@ -315,7 +316,35 @@ export function Contracts() {
     (next: 'search' | 'history') => setTabId(next === 'history' ? 'history' : `search/${mode}`),
     [setTabId, mode]
   );
-  const setMode = useCallback((next: ContractMode) => setTabId(`search/${next}`), [setTabId]);
+  const rememberedMode = useContractSearchMode((state) => state.value);
+  const rememberedModeHydrated = useContractSearchMode((state) => state.hydrated);
+  const hydrateRememberedMode = useContractSearchMode((state) => state.hydrate);
+  const setRememberedMode = useContractSearchMode((state) => state.setValue);
+  useEffect(() => {
+    void hydrateRememberedMode();
+  }, [hydrateRememberedMode]);
+  const setMode = useCallback(
+    (next: ContractMode) => {
+      setTabId(`search/${next}`);
+      void setRememberedMode(next);
+    },
+    [setTabId, setRememberedMode]
+  );
+  /**
+   * A bare `/contracts` visit always redirects to `CONTRACTS_TABS`' hardcoded
+   * `search/items` (issue #1719) — the route/tab itself stays unpersisted
+   * (decision `20260912-141100`), so this only steps in once, right after
+   * that redirect, to swap for the last-used mode. Guarded to run exactly
+   * once per mount: every later `search/items` landing is the pilot's own
+   * choice (via `setMode` or the tab switcher), not the generic default, and
+   * must not be overridden.
+   */
+  const appliedRememberedMode = useRef(false);
+  useEffect(() => {
+    if (appliedRememberedMode.current || !rememberedModeHydrated) return;
+    appliedRememberedMode.current = true;
+    if (tabId === 'search/items' && rememberedMode === 'courier') setTabId('search/courier');
+  }, [rememberedModeHydrated, rememberedMode, tabId, setTabId]);
   const pageTabs = useMemo(
     () => [
       { id: 'search' as const, label: t('contracts.searchTab') },

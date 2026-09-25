@@ -9,6 +9,7 @@
  * everything that is only true of a haul.
  */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
@@ -49,6 +50,7 @@ import {
   paysFarAboveGoingRate,
 } from '@/engine/contracts/courierGoingRate';
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
+import { OVER_RATE_FILTERS, type OverRateFilter } from '@/features/contractSearch/overRateFilter';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import {
   completableCourierRoutes,
@@ -73,6 +75,7 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, enumParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
+import { useCourierFilterPref } from '@/features/contractSearch/courierFilterPref';
 
 /** Rows shown before "show all" — the same cap the item results use. */
 const ROW_CAP = 50;
@@ -121,15 +124,6 @@ function offeredSpaceKinds(rows: readonly CourierRouteRow[]): SpaceKind[] {
 function narrowsSpace(selected: readonly SpaceKind[], offered: readonly SpaceKind[]): boolean {
   return offered.some((kind) => !selected.includes(kind));
 }
-
-/**
- * Both directions, because the flag reads two ways: a hauler avoiding the
- * documented bait wants these gone, and one who has read the conditions and
- * judged them for themselves wants only these. Neither reading is the app's to
- * make, so it offers both and defaults to neither.
- */
-const OVER_RATE_FILTERS = ['all', 'only', 'hide'] as const;
-type OverRateFilter = (typeof OVER_RATE_FILTERS)[number];
 
 /** A blank or unparseable field is "no restriction", never `NaN` — which would silently exclude every row. */
 function parseNumeric(value: string): number | null {
@@ -626,6 +620,26 @@ const COURIER_FILTER_PARAMS = {
 const COURIER_SORT = { columnId: 'iskPerJump', direction: 'desc' } as const;
 
 /**
+ * The remembered-filter fields' own URL keys (`courierFilterPref.ts`), so
+ * "was this given in the URL on this load" can be asked per field — a parsed
+ * value equal to its codec default is ambiguous between "not given" and "the
+ * reader chose the default", and only the raw query string can tell the two
+ * apart (see `courierFilterPref.ts`'s header for why that distinction is the
+ * whole point).
+ */
+const REMEMBERED_FILTER_URL_KEYS = [
+  'courier.origin',
+  'courier.dest',
+  'courier.space',
+  'courier.hideRisky',
+  'courier.overRate',
+  'courier.minReward',
+  'courier.maxCollateral',
+  'courier.maxVolume',
+  'courier.minDays',
+] as const;
+
+/**
  * Jumps for every filtered row, recomputed when the rows or the preference
  * change.
  *
@@ -811,20 +825,57 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const [params, setParams] = useUrlParams(COURIER_FILTER_PARAMS);
+
+  // The remembered filter (issue #1719): consulted only for a field the URL
+  // itself leaves unset on this load, never mirrored back into it (decision
+  // `20260922-221531` / ADR 0015) — see `courierFilterPref.ts`.
+  const rememberedFilter = useCourierFilterPref((state) => state.value);
+  const setRememberedFilter = useCourierFilterPref((state) => state.setValue);
+  const hydrateRememberedFilter = useCourierFilterPref((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateRememberedFilter();
+  }, [hydrateRememberedFilter]);
+
+  const location = useLocation();
+  const urlHasField = useMemo(() => {
+    const raw = new URLSearchParams(location.search);
+    const present = new Set(REMEMBERED_FILTER_URL_KEYS.filter((key) => raw.has(key)));
+    return (key: (typeof REMEMBERED_FILTER_URL_KEYS)[number]) => present.has(key);
+  }, [location.search]);
+
   const uiFilter = useMemo<CourierUiFilter>(
     () => ({
+      // Free text is never remembered — see `courierFilterPref.ts`'s header.
       routeQuery: params['courier.q'],
-      originRegionId: params['courier.origin'],
-      destinationRegionId: params['courier.dest'],
-      destinationSpace: [...params['courier.space']],
-      hideUncompletable: params['courier.hideRisky'],
-      overRate: params['courier.overRate'],
-      minReward: params['courier.minReward'],
-      maxCollateral: params['courier.maxCollateral'],
-      maxVolume: params['courier.maxVolume'],
-      minDays: params['courier.minDays'],
+      originRegionId: urlHasField('courier.origin')
+        ? params['courier.origin']
+        : rememberedFilter.originRegionId,
+      destinationRegionId: urlHasField('courier.dest')
+        ? params['courier.dest']
+        : rememberedFilter.destinationRegionId,
+      destinationSpace: urlHasField('courier.space')
+        ? [...params['courier.space']]
+        : rememberedFilter.destinationSpace,
+      hideUncompletable: urlHasField('courier.hideRisky')
+        ? params['courier.hideRisky']
+        : rememberedFilter.hideUncompletable,
+      overRate: urlHasField('courier.overRate')
+        ? params['courier.overRate']
+        : rememberedFilter.overRate,
+      minReward: urlHasField('courier.minReward')
+        ? params['courier.minReward']
+        : rememberedFilter.minReward,
+      maxCollateral: urlHasField('courier.maxCollateral')
+        ? params['courier.maxCollateral']
+        : rememberedFilter.maxCollateral,
+      maxVolume: urlHasField('courier.maxVolume')
+        ? params['courier.maxVolume']
+        : rememberedFilter.maxVolume,
+      minDays: urlHasField('courier.minDays')
+        ? params['courier.minDays']
+        : rememberedFilter.minDays,
     }),
-    [params]
+    [params, urlHasField, rememberedFilter]
   );
   const preference = params['courier.pref'];
   const showAll = params['courier.all'];
@@ -1068,6 +1119,19 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
       'courier.maxVolume': next.maxVolume,
       'courier.minDays': next.minDays,
       'courier.all': false,
+    });
+    // Every actual filter change updates the remembered default too — never a
+    // URL read, only a change the hauler made (decision `20260922-221531`).
+    void setRememberedFilter({
+      originRegionId: next.originRegionId,
+      destinationRegionId: next.destinationRegionId,
+      destinationSpace: next.destinationSpace,
+      hideUncompletable: next.hideUncompletable,
+      overRate: next.overRate,
+      minReward: next.minReward,
+      maxCollateral: next.maxCollateral,
+      maxVolume: next.maxVolume,
+      minDays: next.minDays,
     });
   }
 

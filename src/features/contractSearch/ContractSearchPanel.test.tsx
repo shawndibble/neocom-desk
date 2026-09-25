@@ -7,6 +7,10 @@ import '@/i18n';
 import { db } from '@/db';
 import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharacter';
 import { DEFAULT_TIME_FORMAT, useTimeFormat } from '@/lib/timeFormat';
+import {
+  useCourierFilterPref,
+  DEFAULT_COURIER_FILTER,
+} from '@/features/contractSearch/courierFilterPref';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { clearJumpGraphIndex } from '@/sde/jumpGraph';
 import { loadMarketTypes, loadSolarSystemJumps } from '@/sde/loadMarketSde';
@@ -273,6 +277,9 @@ beforeEach(async () => {
   await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: CHAR_ID });
   useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
   useTimeFormat.setState({ value: DEFAULT_TIME_FORMAT, hydrated: true });
+  // Same reset, same reason: a Courier filter one case sets (issue #1719)
+  // must not leak into the next as a remembered default.
+  useCourierFilterPref.setState({ value: DEFAULT_COURIER_FILTER, hydrated: true });
   loadPublicContractOffers.mockReset();
   loadPublicContractOffers.mockResolvedValue(
     cachedSnapshot([TRIT_FORGE, TRIT_DOMAIN, PYERITE_AUCTION])
