@@ -705,6 +705,7 @@ function FittingsPage() {
           onClose={() => setSaveToEveOpen(false)}
           characterId={activeCharacterId}
           fitting={fitting}
+          description={savedRecord?.notes ?? ''}
           onSaved={() => setInGameFittingsKey((key) => key + 1)}
         />
       )}

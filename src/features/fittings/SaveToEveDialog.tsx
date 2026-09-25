@@ -32,6 +32,8 @@ interface SaveToEveDialogProps {
   onClose: () => void;
   characterId: number;
   fitting: Fitting;
+  /** The saved Fitting's notes, sent as the description; empty when it has none. */
+  description?: string;
   /** Called once the save itself succeeds (whether or not the overwrite delete also did) — the caller refreshes its In-game Fittings list. */
   onSaved: () => void;
 }
@@ -41,6 +43,7 @@ export function SaveToEveDialog({
   onClose,
   characterId,
   fitting,
+  description = '',
   onSaved,
 }: SaveToEveDialogProps) {
   const { t } = useTranslation();
@@ -90,7 +93,7 @@ export function SaveToEveDialog({
         characterId,
         fitting,
         name: trimmed,
-        description: '',
+        description,
         overwriteFittingId: overwriteTarget?.fitting_id,
       });
       if (!result.ok) {
