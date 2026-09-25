@@ -769,7 +769,7 @@ function CharacterGroupHeader({ name, onSwitch }: { name: string; onSwitch?: () 
   );
 }
 
-/** Makes an alt the active Character in place � unlike Characters' switch, it stays on this route. */
+/** Makes an alt the active Character in place; unlike Characters' switch, it stays on this route. */
 function SwitchToButton({ name, onSwitch }: { name: string; onSwitch: () => void }) {
   const { t } = useTranslation();
   return (

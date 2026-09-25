@@ -687,4 +687,29 @@ describe('PlanetaryIndustry', () => {
     await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(92));
     expect(window.location.pathname).toContain('/planetary-industry');
   });
+
+  it('switches to an alt from its colony group header, making its colonies the primary section', async () => {
+    const ALT_ID = 92;
+    const ALT_PLANET_ID = 40000002;
+    await addAlt(ALT_ID, 'Alt Two', [PLANETS_SCOPE]);
+    await db.esiCache.put({
+      characterId: ALT_ID,
+      key: 'planets',
+      value: [{ ...planetsPayload[0], planet_id: ALT_PLANET_ID, owner_id: ALT_ID }],
+      fetchedAt: Date.now(),
+    });
+
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
+    await user.click(screen.getByRole('button', { name: 'Switch to Alt Two' }));
+
+    await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(ALT_ID));
+    // The alt is now the active character, so it no longer has a switch action.
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Switch to Alt Two' })).not.toBeInTheDocument()
+    );
+    expect(window.location.pathname).toContain('/planetary-industry');
+  });
 });
