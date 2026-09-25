@@ -2,18 +2,19 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TypeIcon } from '@/components/ui';
+import type { FittingCompareColumn } from './FittingCompareTable';
 import type { ModuleDiffEntry } from '@/engine/fittings/fittingCompare';
 import { typeName } from '@/sde/loadSde';
 
 export interface FittingCompareModulesSummaryProps {
   entries: readonly ModuleDiffEntry[];
-  /** Which columns to render, as positions in `entry.counts` (null: stats failed, shown as a dash) — matches the table's own phone window. */
-  visible: readonly (number | null)[];
+  /** The stats table's own columns (`statsIndex` = position in `entry.counts`; null: stats failed, shown as a dash), so the phone window matches. */
+  columns: readonly FittingCompareColumn[];
 }
 
 export function FittingCompareModulesSummary({
   entries,
-  visible,
+  columns,
 }: FittingCompareModulesSummaryProps) {
   const { t } = useTranslation();
   const [names, setNames] = useState<ReadonlyMap<number, string>>(new Map());
@@ -39,20 +40,36 @@ export function FittingCompareModulesSummary({
   }
 
   return (
-    <ul className="space-y-1 text-xs">
-      {entries.map((entry) => (
-        <li key={entry.typeId} className="flex items-center gap-2">
-          <TypeIcon typeId={entry.typeId} size={32} className="h-4 w-4 shrink-0" />
-          <span className="min-w-0 flex-1 truncate">
-            {names.get(entry.typeId) ?? t('common.unknownType', { id: entry.typeId })}
-          </span>
-          <span className="flex shrink-0 gap-3 tabular-nums text-text-dim">
-            {visible.map((position, column) => (
-              <span key={column}>{position === null ? '—' : (entry.counts[position] ?? 0)}</span>
+    <table className="w-full border-collapse text-xs">
+      <thead>
+        <tr>
+          <th className="p-2 text-left text-text-dim">{t('fittings.compare.moduleColumn')}</th>
+          {columns.map((column) => (
+            <th key={column.index} className="p-2 text-right text-text">
+              {column.header}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {entries.map((entry) => (
+          <tr key={entry.typeId} className="border-t border-line">
+            <td className="p-2">
+              <span className="flex items-center gap-2">
+                <TypeIcon typeId={entry.typeId} size={32} className="h-4 w-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">
+                  {names.get(entry.typeId) ?? t('common.unknownType', { id: entry.typeId })}
+                </span>
+              </span>
+            </td>
+            {columns.map((column) => (
+              <td key={column.index} className="p-2 text-right tabular-nums text-text-dim">
+                {column.statsIndex === null ? '—' : (entry.counts[column.statsIndex] ?? 0)}
+              </td>
             ))}
-          </span>
-        </li>
-      ))}
-    </ul>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

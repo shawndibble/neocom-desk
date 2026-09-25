@@ -259,12 +259,11 @@ export function FittingCompare() {
                 />
                 <p className="mt-2 text-xs text-text-dim">{t('fittings.appliedDps.assumptions')}</p>
               </Panel>
-              <Panel title={t('fittings.compare.modulesTitle')}>
-                <FittingCompareModulesSummary
-                  entries={moduleDiffs}
-                  visible={visible.map(statsPosition)}
-                />
-              </Panel>
+              {okSlots.length >= 2 && (
+                <Panel title={t('fittings.compare.modulesTitle')}>
+                  <FittingCompareModulesSummary entries={moduleDiffs} columns={columns} />
+                </Panel>
+              )}
             </>
           )}
         </>
