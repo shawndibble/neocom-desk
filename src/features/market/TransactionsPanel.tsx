@@ -14,6 +14,16 @@ import * as Icon from '@/components/ui/icons';
 import { loadWalletTransactions } from '@/features/character/wallet';
 import { ItemContextMenu } from './ItemContextMenu';
 import { TransactionsDayList } from './TransactionsDayList';
+import { TransactionsSummaryStrip } from './TransactionsSummaryStrip';
+import { TransactionsFilterBar } from '@/features/corp/CorpTransactionsPanel';
+import {
+  EMPTY_TRANSACTION_FILTER_PARAMS,
+  filterWalletTransactions,
+  TRANSACTION_FIELD_TO_PARAM,
+  TRANSACTION_FILTER_PARAMS,
+  type WalletTransactionFilter,
+} from '@/features/character/walletTransactionFilter';
+import { useUrlFilter } from '@/lib/useUrlState';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { MarketItemLink } from './MarketItemLink';
 import type { CachedResult } from '@/esi/cache';
@@ -62,8 +72,10 @@ async function loadTransactionsSnapshot(
  * Market's Transactions tab: a character's recent buy/sell fills. Personal
  * only, and now for a reason of its own rather than for want of an endpoint:
  * the corporation's fills live on the corp side of `/wallet`, beside the corp
- * journal they reconcile against (issue #570). This panel has no filter bar
- * and that one does — matching them up is a separate call.
+ * journal they reconcile against (issue #570). Desktop carries the same
+ * search / side / date filter bar as that panel, plus the Sold / Bought / Net
+ * strip over the rows left (issue #1738); the phone day list keeps its own
+ * strip and no filter bar.
  */
 interface TransactionsPanelProps {
   /** Switches the History tab to its other view; the picker lives in this panel's header. */
@@ -106,6 +118,21 @@ export function TransactionsPanel({
     () => [...(transactionsResult?.data ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
     [transactionsResult]
   );
+
+  // One filter bar on this tab, so the scope key never changes and the
+  // filter never needs `useUrlFilter`'s scope-reset.
+  const [filter, setFilter] = useUrlFilter<WalletTransactionFilter>(
+    'transactions',
+    TRANSACTION_FILTER_PARAMS,
+    TRANSACTION_FIELD_TO_PARAM,
+    EMPTY_TRANSACTION_FILTER_PARAMS
+  );
+  const filteredTransactions = useMemo(
+    () => filterWalletTransactions(transactions, filter, nameFor),
+    [transactions, filter, nameFor]
+  );
+  // The phone has no filter bar, so it lists and exports everything.
+  const exportedTransactions = isPhone ? transactions : filteredTransactions;
 
   /**
    * The alert names the *item*; the table is keyed by transaction. Resolving
@@ -237,11 +264,11 @@ export function TransactionsPanel({
                   size={isPhone ? 'md' : 'sm'}
                   icon={<Icon.Download />}
                   label={t('wallet.exportCsvTransactions')}
-                  disabled={transactions.length === 0}
+                  disabled={exportedTransactions.length === 0}
                   onClick={() =>
                     downloadCsv(
                       'wallet-transactions',
-                      transactions,
+                      exportedTransactions,
                       walletTransactionsCsvColumns(t, (id) => typeNames.get(id) ?? `Type #${id}`),
                       new Date(),
                       transactionsTruncated
@@ -277,18 +304,32 @@ export function TransactionsPanel({
               rowContextMenu={rowContextMenu}
             />
           ) : (
-            <DataTable
-              label={t('wallet.transactionsTab')}
-              columns={columns}
-              rows={transactions}
-              rowKey={(txn) => txn.transaction_id}
-              highlightRowKey={highlightId}
-              rowContextMenu={rowContextMenu}
-              rowMoreActions
-              // `transactions` already arrives newest-first (the `sort` above) —
-              // matches that so a header click is the first thing that reorders it.
-              defaultSort={{ columnId: 'date', direction: 'desc' }}
-            />
+            <>
+              <TransactionsFilterBar filter={filter} onChange={setFilter} />
+              {filteredTransactions.length === 0 ? (
+                <EmptyState
+                  title={t('wallet.transactionsNoFilterMatches')}
+                  hint={t('wallet.transactionsNoFilterMatchesHint')}
+                  className="py-8"
+                />
+              ) : (
+                <>
+                  <TransactionsSummaryStrip transactions={filteredTransactions} className="mb-3" />
+                  <DataTable
+                    label={t('wallet.transactionsTab')}
+                    columns={columns}
+                    rows={filteredTransactions}
+                    rowKey={(txn) => txn.transaction_id}
+                    highlightRowKey={highlightId}
+                    rowContextMenu={rowContextMenu}
+                    rowMoreActions
+                    // `transactions` already arrives newest-first (the `sort` above) —
+                    // matches that so a header click is the first thing that reorders it.
+                    defaultSort={{ columnId: 'date', direction: 'desc' }}
+                  />
+                </>
+              )}
+            </>
           )}
         </>
       )}

@@ -2,15 +2,16 @@ import { Fragment, useMemo, useRef, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { RowMoreActions } from '@/components/ui';
 import { cx } from '@/lib/cx';
-import { clampIskZero, formatIsk } from '@/lib/isk';
-import { formatDateOnly } from '@/lib/timestamp';
+import { formatIsk } from '@/lib/isk';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useScrollToRowKey } from '@/lib/useScrollToRowKey';
 import { iskToneClass } from '@/features/character/format';
 import { transactionTotal } from '@/features/character/walletTransactionsCsv';
 import type { WalletTransaction } from '@/esi/endpoints';
 import { MarketItemLink } from './MarketItemLink';
-import { groupTransactionsByDay, summarizeTransactions } from './transactionDays';
+import { groupTransactionsByDay } from './transactionDays';
+import { signedIsk } from './signedIsk';
+import { TransactionsSummaryStrip } from './TransactionsSummaryStrip';
 
 interface TransactionsDayListProps {
   /** Newest first — the caller's order is the reading order. */
@@ -22,15 +23,6 @@ interface TransactionsDayListProps {
   highlightId: number | null;
   /** Wraps a row, e.g. the item context menu. Same contract as `DataTable`'s. */
   rowContextMenu?: (txn: WalletTransaction, row: ReactElement) => ReactElement;
-}
-
-/**
- * A signed ISK figure. `formatIsk` prints the minus but not the plus, and
- * colour alone must not carry the sign (DESIGN.md §1, ISK deltas).
- */
-function signedIsk(value: number, decimals: number): string {
-  const text = formatIsk(value, decimals);
-  return clampIskZero(value, decimals) > 0 ? `+${text}` : text;
 }
 
 /**
@@ -56,7 +48,6 @@ export function TransactionsDayList({
     () => groupTransactionsByDay(transactions, timeZone),
     [transactions, timeZone]
   );
-  const summary = useMemo(() => summarizeTransactions(transactions), [transactions]);
 
   const dayLabel = (date: string) =>
     new Date(date).toLocaleDateString(undefined, {
@@ -70,36 +61,7 @@ export function TransactionsDayList({
 
   return (
     <div ref={listRef}>
-      <section
-        aria-label={t('wallet.transactionsSummaryLabel')}
-        className="mx-3 mt-3 flex flex-col gap-2 rounded-xs border border-line bg-panel p-3"
-      >
-        {summary.oldest && summary.newest && (
-          <p className="text-xs text-text-dim">
-            {t('wallet.transactionsRange', {
-              from: formatDateOnly(new Date(summary.oldest), timeZone),
-              to: formatDateOnly(new Date(summary.newest), timeZone),
-            })}
-          </p>
-        )}
-        <dl className="grid grid-cols-3 gap-3 tabular-nums">
-          <SummaryFigure
-            label={t('wallet.sold')}
-            value={signedIsk(summary.sold, 0)}
-            className={summary.sold > 0 ? 'text-isk-pos' : 'text-text'}
-          />
-          <SummaryFigure
-            label={t('wallet.bought')}
-            value={signedIsk(-summary.bought, 0)}
-            className={summary.bought > 0 ? 'text-isk-neg' : 'text-text'}
-          />
-          <SummaryFigure
-            label={t('wallet.net')}
-            value={signedIsk(summary.net, 0)}
-            className={cx('items-end', iskToneClass(summary.net))}
-          />
-        </dl>
-      </section>
+      <TransactionsSummaryStrip transactions={transactions} />
       <section aria-label={label} className="mt-2">
         {days.map((day, dayIndex) => (
           <Fragment key={`${day.dayKey}-${dayIndex}`}>
@@ -155,25 +117,6 @@ export function TransactionsDayList({
           </Fragment>
         ))}
       </section>
-    </div>
-  );
-}
-
-function SummaryFigure({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value: string;
-  className: string;
-}) {
-  return (
-    <div className={cx('flex flex-col gap-0.5', className)}>
-      <dt className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </dt>
-      <dd className="text-sm font-semibold">{value}</dd>
     </div>
   );
 }
