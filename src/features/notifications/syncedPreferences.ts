@@ -27,7 +27,7 @@ import {
   type EveTypeEnabledMap,
 } from './eventSelection';
 import type { NotificationEventId } from './events';
-import type { NotificationPreferencesValue } from './preferences';
+import type { NotificationPreferencesValue } from './preferencesStore';
 import { setThresholds, type CharacterEventThresholds } from './eventThresholds';
 import { recordByCharacterId } from './recordByCharacterId';
 
