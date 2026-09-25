@@ -132,12 +132,15 @@ function Cell({ label, children }: { label: string; children: ReactNode }) {
     // This is a wrap floor, not a width. Both cells still `flex-1`, so at 390
     // they take about 159px each and only a long skill name truncates.
     //
-    // From `md` the floor is each cell's own content instead (`basis-auto`):
-    // there the three values need nearly the whole row at 1024px, and a
-    // 160px floor let one shrink a pixel under its text and truncate — the
-    // wallet's ten-figure balance, in a font a hair wider than this one. Sized
-    // to content, a value that doesn't fit wraps to the next line whole.
-    <span className="flex min-w-0 flex-1 basis-32 flex-col gap-0.5 sm:basis-40 md:basis-auto">
+    // From `sm` the floor is each cell's own content instead (`basis-auto`):
+    // there the three values need nearly the whole row (about 600px from
+    // `sm` with no sidebar, about 775px at 1024 with one), and a fixed 160px
+    // floor let one shrink a pixel under its text and truncate — the wallet's
+    // ten-figure balance, in a font a hair wider than this one. Sized to
+    // content, a value that doesn't fit wraps to the next line whole. The
+    // cost is a strip whose line count follows the text: a long skill name
+    // pushes the wallet down rather than cutting the name short.
+    <span className="flex min-w-0 flex-1 basis-32 flex-col gap-0.5 sm:basis-auto">
       <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">{label}</span>
       {children}
     </span>

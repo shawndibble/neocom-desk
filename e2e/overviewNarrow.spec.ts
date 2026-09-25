@@ -23,9 +23,10 @@ test('board card "Open" link meets the 44px touch floor at 390px', async ({ page
   const openLink = page.getByRole('link', { name: 'Open' }).first();
   await expect(openLink).toBeVisible();
 
-  const box = await openLink.boundingBox();
-  expect(box).not.toBeNull();
-  expect(box!.height).toBeGreaterThanOrEqual(44);
+  // Polled: a card remounted as the board's reads land measures as a null box.
+  await expect
+    .poll(async () => (await openLink.boundingBox())?.height ?? 0)
+    .toBeGreaterThanOrEqual(44);
 });
 
 // Issue #1680: the cards|alerts split keys off the viewport, not the width the
@@ -58,20 +59,38 @@ for (const size of [
     const firstCard = await opens.first().boundingBox();
     expect(alerts!.y).toBeGreaterThan(firstCard!.y);
   });
+}
 
-  // The summary strip's three values need nearly all of its row at 1024px, so
-  // a font a hair wider than this machine's (CI's) used to push one under its
-  // cell and truncate the wallet's ten-figure balance. The row now wraps
-  // before any value truncates; widening every glyph a little stands in for
-  // that other font, so this holds on any machine rather than by font luck.
+// The summary strip's three values need nearly all of its row from `sm` up
+// (about 600px at 700 with no sidebar, 775px at 1024 with one), so a font a
+// hair wider than this machine's (CI's) used to push one under its cell and
+// truncate the wallet's ten-figure balance. The row now wraps before any value
+// truncates; widening every glyph a little stands in for that other font, so
+// this holds on any machine rather than by font luck.
+for (const size of [
+  { width: 700, height: 900 },
+  { width: 1024, height: 768 },
+  { width: 1180, height: 900 },
+]) {
   test(`summary strip wraps rather than truncating a value, even in a wider font, at ${size.width}px`, async ({
     page,
   }) => {
     await page.setViewportSize(size);
     await signInAndGoto(page, './overview');
-    await page.addStyleTag({ content: 'main * { letter-spacing: 0.04em !important; }' });
+    // Labels keep their own wide tracking; only the values are widened.
+    await page.addStyleTag({
+      content: 'main section *:not(.uppercase) { letter-spacing: 0.04em !important; }',
+    });
     const strip = page.locator('main section').first();
+    // Wallet and training arrive from separate reads — wait for both, or the
+    // check below could pass against a strip that is still half empty.
     await expect(strip.getByText(/ISK$/)).toBeVisible();
+    const trainingCell = strip.locator('span.flex-col', {
+      has: page.getByText('Training now', { exact: true }),
+    });
+    await expect(
+      trainingCell.getByRole('link').or(trainingCell.getByText('Nothing in training'))
+    ).toBeVisible();
 
     const truncated = await strip.evaluate((section) =>
       [...section.querySelectorAll<HTMLElement>('*')]
