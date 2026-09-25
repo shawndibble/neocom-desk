@@ -60,6 +60,7 @@
     "myFittings": {
       "title": "My Fittings",
       "save": "Save to My Fittings",
+      "saveShort": "Save",
       "update": "Update saved Fitting",
       "saved": "Saved",
       "needCharacter": "Log in with a Character to save Fittings.",
@@ -183,7 +184,6 @@
       "title": "Ring",
       "slotFitted": "{{rack}} {{index}}, {{state}}",
       "slotEmpty": "{{rack}} {{index}}, empty",
-      "openStats": "Stats",
       "tooltipFitted": "{{rack}} {{index}}: {{name}} ({{state}})",
       "tooltipCharge": "Loaded: {{name}}",
       "tooltipCantUse": "Can’t use: missing skills",
@@ -234,7 +234,45 @@
       "waitingForShipData": "Ship data is still downloading. You can search now; adding, and the fits-this-hull and can-fly filters, switch on once it's ready.",
       "loadingCatalogue": "Loading items…",
       "noResults": "No matching items.",
-      "missingSkills": "Missing skills"
+      "missingSkills": "Missing skills",
+      "openButton": "Add module"
+    },
+    "start": {
+      "newTitle": "New fitting from a hull",
+      "searchHulls": "Search hulls",
+      "searchHullsPlaceholder": "Vexor, Gila, heavy assault…",
+      "noHulls": "No hull matches that search.",
+      "pickAHull": "Pick a hull, then start fitting it. Double-click a hull to start at once.",
+      "startFitting": "Start fitting",
+      "tabNew": "New",
+      "tabImport": "Import",
+      "tabInGame": "In-game",
+      "tabsLabel": "Ways to open a fitting"
+    },
+    "header": {
+      "menu": "Fittings",
+      "newFromHull": "New from a hull…",
+      "import": "Import…",
+      "libraryTitle": "Open a fitting",
+      "myFittings": "My Fittings…",
+      "inGame": "In-game Fittings…"
+    },
+    "kpi": {
+      "dps": "DPS",
+      "ehp": "EHP",
+      "capacitor": "Capacitor",
+      "speed": "Speed",
+      "lockRange": "Lock range",
+      "signature": "Signature",
+      "price": "Jita sell",
+      "km": "{{value}} km",
+      "metres": "{{value}} m",
+      "isk": "{{value}} ISK"
+    },
+    "phoneTabs": {
+      "fitting": "Fitting",
+      "stats": "Stats",
+      "label": "Fitting sections"
     },
     "export": {
       "button": "Export",

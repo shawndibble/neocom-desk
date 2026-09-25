@@ -23,6 +23,58 @@ interface FittingLoadCardProps {
   onOpenFittingXmlEntry: (item: FittingXmlListItem) => Promise<void>;
 }
 
+function WarningList({ title, lines }: { title: string; lines: string[] }) {
+  return (
+    <div className="rounded-xs border border-line bg-panel-2 p-2">
+      <p className="mb-1 text-xs font-semibold text-text-dim uppercase">{title}</p>
+      <ul className="space-y-1 text-xs text-text-dim">
+        {lines.map((line, index) => (
+          <li key={index}>{line}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * What the last Load couldn't place: EFT lines, and a fittings file's
+ * unresolved items. Shown in this card, and above the editor once the Load
+ * has opened its Fitting — this card is gone by then.
+ */
+export function LoadWarnings({
+  unresolved,
+  fitXmlUnresolved,
+}: {
+  unresolved: EftUnresolvedItem[];
+  fitXmlUnresolved: FitXmlUnresolvedItem[];
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      {unresolved.length > 0 && (
+        <WarningList
+          title={t('fittings.load.unresolvedTitle', { count: unresolved.length })}
+          lines={unresolved.map((item) =>
+            t('fittings.load.unresolvedLine', {
+              line: item.line,
+              text: item.text,
+              reason: item.reason,
+            })
+          )}
+        />
+      )}
+      {fitXmlUnresolved.length > 0 && (
+        <WarningList
+          title={t('fittings.load.xml.unresolvedTitle', { count: fitXmlUnresolved.length })}
+          lines={fitXmlUnresolved.map((item) =>
+            t('fittings.load.xml.unresolvedLine', { text: item.text, reason: item.reason })
+          )}
+        />
+      )}
+    </>
+  );
+}
+
 export function FittingLoadCard({
   onLoad,
   unresolved,
@@ -110,24 +162,7 @@ export function FittingLoadCard({
             {t('fittings.load.tooLargeToShare')}
           </p>
         )}
-        {unresolved.length > 0 && (
-          <div className="rounded-xs border border-line bg-panel-2 p-2">
-            <p className="mb-1 text-xs font-semibold text-text-dim uppercase">
-              {t('fittings.load.unresolvedTitle', { count: unresolved.length })}
-            </p>
-            <ul className="space-y-1 text-xs text-text-dim">
-              {unresolved.map((item, index) => (
-                <li key={index}>
-                  {t('fittings.load.unresolvedLine', {
-                    line: item.line,
-                    text: item.text,
-                    reason: item.reason,
-                  })}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <LoadWarnings unresolved={unresolved} fitXmlUnresolved={[]} />
 
         <div className="space-y-2 border-t border-line pt-3">
           <label className="block text-xs text-text-dim" htmlFor="fitting-load-xml-file">
@@ -155,23 +190,7 @@ export function FittingLoadCard({
             </p>
           )}
 
-          {fitXmlUnresolved.length > 0 && (
-            <div className="rounded-xs border border-line bg-panel-2 p-2">
-              <p className="mb-1 text-xs font-semibold text-text-dim uppercase">
-                {t('fittings.load.xml.unresolvedTitle', { count: fitXmlUnresolved.length })}
-              </p>
-              <ul className="space-y-1 text-xs text-text-dim">
-                {fitXmlUnresolved.map((item, index) => (
-                  <li key={index}>
-                    {t('fittings.load.xml.unresolvedLine', {
-                      text: item.text,
-                      reason: item.reason,
-                    })}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <LoadWarnings unresolved={[]} fitXmlUnresolved={fitXmlUnresolved} />
 
           {xmlList && (
             <div className="rounded-xs border border-line bg-panel-2 p-2">

@@ -21,6 +21,7 @@ export { SkillBar } from './SkillBar';
 export { StandingIcon } from './StandingIcon';
 export { standingTier, type StandingTier } from './standingTier';
 export { Modal } from './Modal';
+export { SlideOver } from './SlideOver';
 export type { ModalPlacement } from './Modal';
 export { DataTable, DataTableDenseCell } from './DataTable';
 export type {
