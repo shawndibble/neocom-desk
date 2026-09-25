@@ -40,6 +40,7 @@ function colony(overrides: Partial<BuiltColonyAdvice> = {}): BuiltColonyAdvice {
     },
     extractors: [{ pinId: 1, productTypeId: MICROORGANISMS, ratePerHour: 21_201, expiryMs: null }],
     extractedPerHour: [{ typeId: MICROORGANISMS, unitsPerHour: 21_201 }],
+    stoppedExtraction: null,
     production: [{ schematicId: BACTERIA_SCHEMATIC, count: 8 }],
     linkCount: 12,
     hasUnverifiedExtractors: false,

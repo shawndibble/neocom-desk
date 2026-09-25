@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useState } from 'react';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -257,6 +257,12 @@ async function builtCard(planet = 'Ashab III') {
 }
 
 beforeEach(() => {
+  // Only `Date` is faked (not timers) — real `setTimeout`/RAF stay intact for
+  // userEvent and `findBy*` waits. Pinned mid-program so the fixture's
+  // extractor reads as active rather than expiring out from under the suite
+  // as real CI run dates march forward past its hardcoded `expiry_time`.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(INSTALL + 3 * DAY_MS));
   // A module-scoped store outlives the test that set it, and buying changes
   // what every card says. Back to the shipped default each time.
   useMarketSourcing.setState({ value: 'none', hydrated: true });
@@ -316,6 +322,10 @@ beforeEach(() => {
   loadPlanetInfo.mockImplementation(async (planetId: number) => PLANET_INFO[planetId] ?? null);
   loadSchematicName.mockResolvedValue('Reactive Metals');
   loadTypeNames.mockResolvedValue(new Map([[BASE_METALS, 'Base Metals']]));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('AdvisorPanel', () => {

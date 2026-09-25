@@ -560,10 +560,15 @@ function ColonyRow({
   // time into `unknown` rather than silence, same as `colonyThroughput.ts`.
   const fillTimeDisplay = useMemo(() => {
     const hoursToFull = pi
-      ? colonyHoursToFull(builtAdvice(planet, detail ?? undefined, pi, null), pins, pi, haulHours)
+      ? colonyHoursToFull(
+          builtAdvice(planet, detail ?? undefined, pi, null, loadedAt),
+          pins,
+          pi,
+          haulHours
+        )
       : null;
     return colonyFillTimeDisplay(hoursToFull, haulHours);
-  }, [pi, planet, detail, pins, haulHours]);
+  }, [pi, planet, detail, pins, haulHours, loadedAt]);
 
   // Keyed by pin so a card can find its own program without re-parsing ESI
   // timestamps per render. Only programs with a complete install-time

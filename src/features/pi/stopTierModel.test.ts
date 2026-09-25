@@ -53,6 +53,7 @@ function colony(overrides: Partial<BuiltColonyAdvice> = {}): BuiltColonyAdvice {
       { typeId: MICROORGANISMS, unitsPerHour: 6_000 },
       { typeId: AQUEOUS_LIQUIDS, unitsPerHour: 6_000 },
     ],
+    stoppedExtraction: null,
     production: [],
     linkCount: 3,
     hasUnverifiedExtractors: false,
