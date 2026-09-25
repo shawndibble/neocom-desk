@@ -2796,11 +2796,16 @@
       "skillTraining": "Skill queue",
       "industryJob": "Industry jobs",
       "planetExtraction": "Planets",
+      "moonChunk": "Moon chunks",
       "contractExpiry": "Contracts",
       "orderExpiry": "Market orders",
       "skillPlan": "Skill plan"
     },
     "detail": {
+      "moonChunk": {
+        "arrival": "arrives",
+        "decay": "decays if not fractured"
+      },
       "industryJob": {
         "active": "in progress",
         "ready": "ready to deliver"

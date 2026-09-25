@@ -11,6 +11,7 @@ import {
   toCalendarEventSources,
   toContractExpirySources,
   toIndustryJobSources,
+  toMoonChunkSources,
   toOrderExpirySources,
   toPlanetExtractionSources,
   toSkillPlanSources,
@@ -209,6 +210,35 @@ describe('toPlanetExtractionSources', () => {
     expect(
       toPlanetExtractionSources([{ planetName: 'Hek IV', pins: [pin({ expiry_time: undefined })] }])
     ).toEqual([]);
+  });
+});
+
+describe('toMoonChunkSources', () => {
+  const ARRIVES = Date.parse('2026-09-08T02:00:00Z');
+  const DECAYS = Date.parse('2026-09-08T14:00:00Z');
+  const drill = (overrides = {}) => ({
+    structureId: 1001,
+    subject: 'Nakugard - Home',
+    chunkArrivalMs: ARRIVES,
+    naturalDecayMs: DECAYS,
+    ...overrides,
+  });
+
+  it('counts down to the arrival while the chunk is still coming', () => {
+    const [source] = toMoonChunkSources([drill()], ARRIVES - 1);
+    expect(source).toMatchObject({ id: '1001', subject: 'Nakugard - Home', detail: 'arrival' });
+    expect(source.deadlineMs).toBe(ARRIVES);
+  });
+
+  it('counts down to the natural decay once the chunk has arrived', () => {
+    const [source] = toMoonChunkSources([drill()], ARRIVES);
+    expect(source).toMatchObject({ detail: 'decay' });
+    expect(source.deadlineMs).toBe(DECAYS);
+  });
+
+  it('keeps drills on different refineries distinct', () => {
+    const sources = toMoonChunkSources([drill(), drill({ structureId: 1002 })], ARRIVES - 1);
+    expect(sources.map((source) => source.id)).toEqual(['1001', '1002']);
   });
 });
 

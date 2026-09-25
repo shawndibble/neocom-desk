@@ -1,6 +1,6 @@
 /**
  * The Calendar page's event-type filter: an icon in the page toolbar that
- * opens a multi-select list of the seven clocks.
+ * opens a multi-select list of the eight clocks.
  *
  * **In `PageHeader` `actions`, not in a `FilterBar` row.** The mobile-filter
  * decision puts a page's filters behind a funnel *beside its search box* below
@@ -115,7 +115,11 @@ export function CalendarKindFilterMenu({
         <p className="px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('calendar.filter.title')}
         </p>
-        {CHARACTER_BOARD_ITEM_KINDS.map((kind) => (
+        {CHARACTER_BOARD_ITEM_KINDS.filter(
+          // A source the Character was never allowed to ask about gets no row,
+          // rather than an "Unavailable" hinting at corp access they lack.
+          (kind) => kind !== 'moonChunk' || readable.has(kind)
+        ).map((kind) => (
           <DropdownMenuCheckboxItem
             key={kind}
             checked={!hiddenSet.has(kind)}

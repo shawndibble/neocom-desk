@@ -85,7 +85,8 @@ export const ROUTE_WARMERS = {
   '/calendar': {
     cacheKey: 'calendar',
     // Every read `loadCalendarBoard` fans out to; the board is a union of six
-    // sources, not just the calendar itself.
+    // sources, not just the calendar itself. The corp moon-chunk read is not
+    // listed: it gates itself on roles and scopes inside the loader.
     endpoints: [
       'getCharacterCalendar',
       'getCharacterSkillQueue',
