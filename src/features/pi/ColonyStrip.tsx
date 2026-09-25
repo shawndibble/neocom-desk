@@ -10,14 +10,11 @@
  */
 import { useId } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { ColonyStripRow } from './colonyStripModel';
+import { span, type ColonyStripRow } from './colonyStripModel';
 
-/** Hours under two days read as hours; beyond that a day count is what a pilot plans in. */
-function span(hours: number, t: ReturnType<typeof useTranslation>['t']): string {
-  return hours < 48
-    ? t('piAdvisor.hoursShort', { count: Math.round(hours) })
-    : t('piAdvisor.daysShort', { count: Math.round(hours / 24) });
-}
+/** Shared by `Row` and `Legend`, so a column-width change can't drift the two out of alignment. */
+const ROW_GRID =
+  'grid-cols-[1fr_4.5rem_5rem] sm:grid-cols-[minmax(6rem,1fr)_minmax(0.5rem,6.5rem)_4.5rem_5rem_auto] items-center gap-x-3 sm:gap-x-2';
 
 /**
  * What the row shows, as sentences for a screen reader: the row's name is the
@@ -95,7 +92,7 @@ function Row({ row, onOpen }: { row: ColonyStripRow; onOpen: () => void }) {
       // the description — see `describe`.
       aria-describedby={id}
       aria-haspopup="dialog"
-      className="group grid w-full grid-cols-[1fr_4.5rem_5rem] items-center gap-x-3 gap-y-1 border-b border-line px-3 py-2 text-left last:border-b-0 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:gap-x-2 sm:grid-cols-[minmax(6rem,1fr)_minmax(0.5rem,6.5rem)_4.5rem_5rem_auto]"
+      className={`group grid w-full ${ROW_GRID} gap-y-1 border-b border-line px-3 py-2 text-left last:border-b-0 hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`}
     >
       <span data-testid="colony-strip-name" className="min-w-0 truncate text-xs">
         {name}{' '}
@@ -175,6 +172,26 @@ function LockedRow({ level, total, atMax }: { level: number; total: number; atMa
   );
 }
 
+/** Three column headers, not one abbreviated sentence — shares `Row`'s own grid so each label sits over the column it names. */
+function Legend({ haulHours }: { haulHours: number }) {
+  const { t } = useTranslation();
+  return (
+    <div
+      aria-hidden="true"
+      className={`grid ${ROW_GRID} border-b border-line px-3 py-1.5 text-[0.625rem] font-semibold text-text-dim uppercase`}
+    >
+      <span className="hidden sm:inline">{t('piAdvisor.colonyStripLegendLoad')}</span>
+      <span className="col-start-2 sm:col-start-3">{t('piAdvisor.colonyStripLegendState')}</span>
+      <span
+        className="col-start-3 text-right sm:col-start-4"
+        title={t('piAdvisor.colonyStripLegendFullTooltip', { hours: Math.round(haulHours) })}
+      >
+        {t('piAdvisor.colonyStripLegendFull')}
+      </span>
+    </div>
+  );
+}
+
 export interface ColonyStripProps {
   rows: readonly ColonyStripRow[];
   onOpenPlanet: (planetId: number) => void;
@@ -186,15 +203,18 @@ export interface ColonyStripProps {
    * at a pilot who already has level V is worse than silence.
    */
   locked: { level: number; total: number; atMax: boolean } | null;
+  /** The pilot's own haul window, in hours — shown in the legend's tooltip. */
+  haulHours: number;
 }
 
-export function ColonyStrip({ rows, onOpenPlanet, locked }: ColonyStripProps) {
+export function ColonyStrip({ rows, onOpenPlanet, locked, haulHours }: ColonyStripProps) {
   const { t } = useTranslation();
   if (rows.length === 0 && !locked) {
     return <p className="px-3 py-4 text-xs text-text-dim">{t('piAdvisor.colonyStripEmpty')}</p>;
   }
   return (
     <div className="flex flex-col">
+      <Legend haulHours={haulHours} />
       {rows.map((row) => (
         <Row key={row.planetId} row={row} onOpen={() => onOpenPlanet(row.planetId)} />
       ))}

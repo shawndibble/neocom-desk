@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { colonyStripRows, type ColonyStripColony } from './colonyStripModel';
+import {
+  colonyStripRows,
+  colonyFillTimeDisplay,
+  fillsBeforeHaul,
+  type ColonyStripColony,
+} from './colonyStripModel';
 import type { Worklist, WorklistRow } from './worklistModel';
 
 function colony(over: Partial<ColonyStripColony> & { planetId: number }): ColonyStripColony {
@@ -91,5 +96,46 @@ describe('colonyStripRows', () => {
     });
     expect(rows.find((entry) => entry.planetId === 1)?.overflowing).toBe(true);
     expect(rows.find((entry) => entry.planetId === 2)?.overflowing).toBe(false);
+  });
+});
+
+describe('fillsBeforeHaul', () => {
+  it('flags a colony shorter than the haul window', () => {
+    expect(fillsBeforeHaul(19, 24)).toBe(true);
+  });
+
+  it('does not flag a colony that outlasts the haul window', () => {
+    expect(fillsBeforeHaul(200, 24)).toBe(false);
+  });
+
+  it('does not flag an equal window — strictly shorter, not shorter-or-equal', () => {
+    expect(fillsBeforeHaul(24, 24)).toBe(false);
+  });
+
+  it('never flags an unreadable colony', () => {
+    expect(fillsBeforeHaul(null, 24)).toBe(false);
+  });
+
+  it('does not flag a rare hauler whose long cadence still outruns the colony', () => {
+    // A 200 h colony is not shorter than a 168 h (weekly) haul window.
+    expect(fillsBeforeHaul(200, 168)).toBe(false);
+  });
+});
+
+describe('colonyFillTimeDisplay', () => {
+  it('reads unknown for an unreadable program, never a blank or a zero', () => {
+    expect(colonyFillTimeDisplay(null, 24)).toEqual({ kind: 'unknown' });
+  });
+
+  it('surfaces the figure when the colony fills before the haul window', () => {
+    expect(colonyFillTimeDisplay(19, 24)).toEqual({ kind: 'soon', hoursToFull: 19 });
+  });
+
+  it('shows nothing for a colony with room to spare', () => {
+    expect(colonyFillTimeDisplay(200, 24)).toEqual({ kind: 'none' });
+  });
+
+  it('does not flag a rare hauler on a long cadence for an ordinary fill time', () => {
+    expect(colonyFillTimeDisplay(200, 168)).toEqual({ kind: 'none' });
   });
 });

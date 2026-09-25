@@ -24,6 +24,10 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 import { PlanPanel } from '@/features/pi/PlanPanel';
 import { AdvisorPanel } from '@/features/pi/AdvisorPanel';
+import { builtAdvice } from '@/features/pi/advisorModel';
+import { colonyHoursToFull } from '@/features/pi/colonyThroughput';
+import { colonyFillTimeDisplay, span as fillTimeSpan } from '@/features/pi/colonyStripModel';
+import { cadenceHours, useCadence } from '@/features/pi/cadencePref';
 import { useShowAltColonies } from '@/features/pi/showAltColoniesPref';
 import {
   loadPiRosterSnapshot,
@@ -78,6 +82,8 @@ import {
 } from '@/lib/urlState';
 import { PI_TABS } from '@/app/pageTabs';
 import { COLONY_SPACES, type ColonySpace } from '@/features/pi/customsRate';
+import { loadPi } from '@/sde/loadSde';
+import type { PiData } from '@/sde/types';
 
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
 const NO_DETAILS: ReadonlyMap<number, StatusResult<CharacterPlanetDetail>> = new Map();
@@ -102,6 +108,8 @@ interface Snapshot extends ActiveColonies {
   activeCharacterName: string | null;
   /** Every OTHER Character's colonies, read cache-only — see `features/pi/roster.ts`. */
   roster: PiRosterSnapshot;
+  /** For each row's "Storage full in" figure. Null on a failed load — that figure is optional, so it must not take the rest of the tab down. */
+  pi: PiData | null;
 }
 
 async function loadActiveColonies(
@@ -191,10 +199,14 @@ async function loadActiveColonies(
  * to the fresher live read.
  */
 async function loadPiSnapshot(characterId: number, signal: RouteSnapshotSignal): Promise<Snapshot> {
-  const [active, activeCharacterRecord, roster] = await Promise.all([
+  const [active, activeCharacterRecord, roster, pi] = await Promise.all([
     loadActiveColonies(characterId, signal),
     db.characters.get(characterId),
     loadPiRosterSnapshot(characterId),
+    // Cached after first load, so this is free beyond what the Advisor tab
+    // already pays. Caught, not awaited bare: an optional figure must not
+    // take the rest of the tab's real colony data down with it.
+    loadPi().catch(() => null),
   ]);
   const activeCharacterName = activeCharacterRecord?.name ?? null;
 
@@ -228,6 +240,7 @@ async function loadPiSnapshot(characterId: number, signal: RouteSnapshotSignal):
     schematicNames: new Map([...rosterSchematicNames, ...active.schematicNames]),
     planetNames: new Map([...rosterPlanetNames, ...active.planetNames]),
     roster,
+    pi,
   };
 }
 
@@ -469,6 +482,10 @@ interface ColonyRowProps {
   productNames: ReadonlyMap<number, string>;
   schematicNames: ReadonlyMap<number, string>;
   loadedAt: number;
+  /** Null while the SDE hasn't loaded yet — the row shows no fill-time figure until it has. */
+  pi: PiData | null;
+  /** The pilot's own haul window, in hours — same store the Advisor strip gates on. */
+  haulHours: number;
 }
 
 /**
@@ -499,6 +516,8 @@ function ColonyRow({
   productNames,
   schematicNames,
   loadedAt,
+  pi,
+  haulHours,
 }: ColonyRowProps) {
   const { t } = useTranslation();
   const expiringWindowMs = useExpiringWindowMs();
@@ -517,6 +536,16 @@ function ColonyRow({
   // array reference every render even when the underlying data hasn't
   // changed, which would defeat every memo below.
   const pins = useMemo(() => detail?.pins ?? [], [detail]);
+
+  // `pi` null (still loading, or its load failed) reads the same as any
+  // other unreadable program — `colonyFillTimeDisplay` turns a null fill
+  // time into `unknown` rather than silence, same as `colonyThroughput.ts`.
+  const fillTimeDisplay = useMemo(() => {
+    const hoursToFull = pi
+      ? colonyHoursToFull(builtAdvice(planet, detail ?? undefined, pi, null), pins, pi, haulHours)
+      : null;
+    return colonyFillTimeDisplay(hoursToFull, haulHours);
+  }, [pi, planet, detail, pins, haulHours]);
 
   // Keyed by pin so a card can find its own program without re-parsing ESI
   // timestamps per render. Only programs with a complete install-time
@@ -630,6 +659,21 @@ function ColonyRow({
               {expiryLabel}
             </span>
           </div>
+          {fillTimeDisplay.kind !== 'none' && (
+            <div className="flex w-full items-center sm:contents">
+              <span
+                className={`min-w-0 flex-1 truncate text-xs tabular-nums sm:w-44 sm:shrink-0 sm:flex-none ${
+                  fillTimeDisplay.kind === 'soon' ? 'text-warning' : 'text-text-dim'
+                }`}
+              >
+                {fillTimeDisplay.kind === 'soon'
+                  ? t('pi.colonies.fillTimeSoon', {
+                      span: fillTimeSpan(fillTimeDisplay.hoursToFull, t),
+                    })
+                  : t('pi.colonies.fillTimeUnknown')}
+              </span>
+            </div>
+          )}
           <div className="flex w-full items-center gap-3 sm:contents">
             <span className="min-w-0 flex-1 truncate text-xs text-text-dim sm:w-40 sm:shrink-0 sm:flex-none">
               {productLabel}
@@ -857,6 +901,10 @@ export function PlanetaryIndustry() {
     void hydrateExpiringWindow();
   }, [hydrateExpiringWindow]);
   const [tab, setTab] = usePageTab(PI_TABS);
+  // Same store the Advisor tab reads (`AdvisorPanel.tsx`) — one haul cadence
+  // for the whole app, so the two tabs' "Storage full in" figures can never
+  // gate on different windows.
+  const { haulHours } = cadenceHours(useCadence((state) => state.value));
   const [
     {
       type: plannedTypeId,
@@ -934,6 +982,7 @@ export function PlanetaryIndustry() {
   const schematicNames = data?.schematicNames ?? NO_NAMES;
   const loadedAt = data?.loadedAt ?? 0;
   const roster = data?.roster ?? EMPTY_ROSTER;
+  const pi = data?.pi ?? null;
 
   const planets = useMemo(() => planetsResult?.data ?? [], [planetsResult]);
 
@@ -1156,6 +1205,8 @@ export function PlanetaryIndustry() {
                           productNames={productNames}
                           schematicNames={schematicNames}
                           loadedAt={loadedAt}
+                          pi={pi}
+                          haulHours={haulHours}
                         />
                       );
                     })}
@@ -1185,6 +1236,8 @@ export function PlanetaryIndustry() {
                             productNames={productNames}
                             schematicNames={schematicNames}
                             loadedAt={loadedAt}
+                            pi={pi}
+                            haulHours={haulHours}
                           />
                         );
                       })}

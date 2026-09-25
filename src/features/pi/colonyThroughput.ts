@@ -239,3 +239,27 @@ export function colonyThroughputCheck(input: ColonyThroughputInput): ColonyThrou
     peak: checkThroughput(peakChain, pi, shared),
   };
 }
+
+/**
+ * The single reading every surface that shows a fill time reads from — the
+ * Advisor strip's row and the Colonies tab both call this, never their own
+ * arithmetic, so the two can't disagree about when a colony fills (#958).
+ */
+export function colonyHoursToFull(
+  colony: BuiltColonyAdvice,
+  pins: readonly PlanetPin[],
+  pi: PiData,
+  haulHours: number
+): number | null {
+  if (colony.extractedPerHour.length === 0) return null;
+  const check = colonyThroughputCheck({
+    colony,
+    pins,
+    pi,
+    // Never guessed — CONTEXT.md round 51. The buffer half is what this row
+    // is about, and it is answered.
+    linkCapacityPerHour: null,
+    bufferHours: haulHours,
+  });
+  return check.peak.hoursToFull;
+}

@@ -21,7 +21,7 @@ import type { PlanetAdvice } from './advisorModel';
 import { colonyPlan } from './colonyPlan';
 import type { IdleFacilityPlan } from './colonyActionModel';
 import { colonyStopTierAdvice } from './stopTierModel';
-import { colonyThroughputCheck } from './colonyThroughput';
+import { colonyHoursToFull } from './colonyThroughput';
 import type { WorklistColony, WorklistIdle, WorklistThroughput } from './worklistModel';
 
 export interface WorklistAdapterInput {
@@ -88,17 +88,7 @@ export function idleStepFor(
   return { pinCount, freed, enables };
 }
 
-/**
- * How long this colony lasts before it fills, measured at a fresh program's
- * peak rather than its whole-program mean.
- *
- * The peak is the honest figure for a buffer question: a program fills a
- * Launchpad fastest on its first day, and a check at the mean passes layouts
- * that stall immediately (#958). `lostIskPerHour` is left at zero — what
- * standing still costs depends on earnings this adapter is not given, and a
- * fabricated figure would rank the row on a number nobody derived. The row
- * still leads the list, because its band does that, not its value.
- */
+/** `lostIskPerHour` stays zero — earnings aren't given here, and a fabricated figure would rank the row on a number nobody derived. */
 function throughputOf(
   colony: Extract<PlanetAdvice, { kind: 'built' }>['colony'],
   pins: readonly PlanetPin[],
@@ -106,16 +96,11 @@ function throughputOf(
   haulHours: number
 ): WorklistThroughput | null {
   if (colony.extractedPerHour.length === 0) return null;
-  const check = colonyThroughputCheck({
-    colony,
-    pins,
-    pi,
-    // Never guessed — CONTEXT.md round 51. The buffer half is what this row
-    // is about, and it is answered.
-    linkCapacityPerHour: null,
-    bufferHours: haulHours,
-  });
-  return { hoursToFull: check.peak.hoursToFull, haulHours, lostIskPerHour: 0 };
+  return {
+    hoursToFull: colonyHoursToFull(colony, pins, pi, haulHours),
+    haulHours,
+    lostIskPerHour: 0,
+  };
 }
 
 export function worklistColonies(input: WorklistAdapterInput): WorklistColony[] {

@@ -1338,18 +1338,13 @@ export function AdvisorPanel({
           <BlindSpots spots={spots} />
         </Panel>
 
-        <Panel
-          title={t('piAdvisor.colonyStripTitle')}
-          padded={false}
-          // `actions`, not `meta`: this is the row legend, and it has to sit
-          // over the columns it names rather than trailing the title.
-          actions={
-            <span className="text-[0.625rem] text-text-dim">
-              {t('piAdvisor.colonyStripMeta', { hours: Math.round(haulHours) })}
-            </span>
-          }
-        >
-          <ColonyStrip rows={stripRows} onOpenPlanet={setOpenPlanetId} locked={lockedSlot} />
+        <Panel title={t('piAdvisor.colonyStripTitle')} padded={false}>
+          <ColonyStrip
+            rows={stripRows}
+            onOpenPlanet={setOpenPlanetId}
+            locked={lockedSlot}
+            haulHours={haulHours}
+          />
         </Panel>
       </div>
 
