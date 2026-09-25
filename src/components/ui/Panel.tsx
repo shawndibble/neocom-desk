@@ -114,8 +114,8 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
                   tabIndex={headingRef ? -1 : undefined}
                   className={`text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase ${
                     headingRef
-                      ? 'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
-                      : ''
+                      ? 'whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
+                      : 'min-w-0 truncate'
                   }`}
                 >
                   {title}
@@ -125,7 +125,9 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
             </div>
           )}
           {actions && (
-            <div className={`flex items-center gap-1 ${actionsFill ? 'min-w-0 flex-1' : ''}`}>
+            <div
+              className={`flex items-center gap-1 ${actionsFill ? 'min-w-0 flex-1' : 'shrink-0'}`}
+            >
               {actions}
             </div>
           )}

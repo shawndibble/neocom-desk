@@ -57,7 +57,7 @@ export function BoardCard({ title, meta, to, openLabel, children, footer }: Boar
         // never meant to grow (issue #1070).
         <Link
           to={to}
-          className="flex min-h-11 items-center gap-1 rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
+          className="flex min-h-11 items-center gap-1 rounded-xs whitespace-nowrap text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
         >
           {openLabel}
           <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
@@ -123,7 +123,9 @@ export function NumberTile({ label, value, severity, to }: NumberTileProps) {
         {!zero && <SeverityIcon severity={severity} />}
         <span className={zero ? 'text-text' : SEVERITY_TEXT[severity]}>{value}</span>
       </span>
-      <span className="text-[0.6875rem] tracking-widest text-text-dim uppercase">{label}</span>
+      <span className="truncate text-[0.6875rem] tracking-widest text-text-dim uppercase">
+        {label}
+      </span>
     </>
   );
   const className =
