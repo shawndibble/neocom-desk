@@ -18,8 +18,8 @@ function formatValue(row: CompareRow, index: number, t: Translate): string {
       ? t('fittings.compare.stat.capacitorStable', { pct: value.toFixed(0) })
       : t('fittings.compare.stat.capacitorUnstable', { seconds: (-value).toFixed(0) });
   }
-  const digits = STAT_DIGITS[row.key];
-  return row.values[index]!.toFixed(digits);
+  if (row.key === 'appliedDps' || row.key === 'bestRange') return row.values[index]!.toFixed(1);
+  return row.values[index]!.toFixed(STAT_DIGITS[row.key]);
 }
 
 export interface FittingCompareColumn {
