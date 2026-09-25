@@ -120,8 +120,7 @@ describe('DroneSection', () => {
         edit={() => {}}
         target={null}
         onSelectTarget={() => {}}
-        budget
-        hideLabel
+        variant="panel"
       />
     );
     expect(screen.getByRole('meter', { name: 'Drone bandwidth' })).toBeTruthy();

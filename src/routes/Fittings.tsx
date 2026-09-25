@@ -18,6 +18,7 @@ import {
   addDronesWithinBay,
   addModule,
   droneRoom,
+  droneTotals,
   firstFreeSlotIndex,
   loadChargeIntoAll,
   moveModule,
@@ -155,11 +156,6 @@ export function Fittings() {
   }
   const slotCounts = stats?.slotCounts ?? null;
   const dronesShown = fitting !== null && showsDrones(stats, fitting.drones.length);
-  const droneCounts = { inSpace: 0, inBay: 0 };
-  for (const drone of fitting?.drones ?? []) {
-    if (drone.state === 'active') droneCounts.inSpace += drone.quantity;
-    else droneCounts.inBay += drone.quantity;
-  }
   // Removing a droneless hull's last (pasted) drone takes the Drones rack
   // away, so a browser still aimed at it lets go.
   if (target?.kind === 'drone' && !dronesShown) setTarget(null);
@@ -218,8 +214,23 @@ export function Fittings() {
 
   function selectSlot(slot: FittingSlotKind, slotIndex: number) {
     const filled = fitting?.modules.some((m) => m.slot === slot && m.slotIndex === slotIndex);
-    if (filled) setModuleSlot({ slot, slotIndex });
+    if (filled) openModuleDialog(slot, slotIndex, false);
     else selectTarget({ kind: 'slot', slot, slotIndex });
+  }
+
+  /**
+   * Opens a fitted module's dialog. A slot tap leads with its state and ammo,
+   * variations folded; the List's Variations button opens them unfolded.
+   */
+  function openModuleDialog(slot: FittingSlotKind, slotIndex: number, withVariations: boolean) {
+    setModuleSlot({ slot, slotIndex });
+    setVariationsOpen(withVariations);
+  }
+
+  /** From a phone sheet (a rack's or the drones'): one sheet at a time, so the Add sheet takes over. */
+  function selectTargetFromSheet(next: AddTarget) {
+    setRackSheet(null);
+    selectTarget(next);
   }
 
   function selectTarget(next: AddTarget | null) {
@@ -347,7 +358,7 @@ export function Fittings() {
               >
                 <span>{t('fittings.list.drones')}</span>
                 <span className="text-xs font-normal text-text-dim tabular-nums">
-                  {t('fittings.ring.droneCount', droneCounts)}
+                  {t('fittings.ring.droneCount', droneTotals(fitting))}
                 </span>
               </Button>
             ) : undefined
@@ -364,8 +375,7 @@ export function Fittings() {
               target={target}
               onSelectTarget={selectTarget}
               onShowInfo={showInfo}
-              budget
-              hideLabel
+              variant="panel"
             />
           </Panel>
         )}
@@ -382,7 +392,7 @@ export function Fittings() {
         target={target}
         onSelectTarget={selectTarget}
         unusableModuleKeys={gaps?.unusableModuleKeys}
-        onOpenVariations={(slot, slotIndex) => setModuleSlot({ slot, slotIndex })}
+        onOpenVariations={(slot, slotIndex) => openModuleDialog(slot, slotIndex, true)}
         onShowInfo={showInfo}
         actions={addButton}
       />
@@ -634,14 +644,9 @@ export function Fittings() {
               stats={stats}
               edit={edit}
               target={target}
-              onSelectTarget={(next) => {
-                // One sheet at a time: the Add sheet takes over.
-                setRackSheet(null);
-                selectTarget(next);
-              }}
+              onSelectTarget={selectTargetFromSheet}
               onShowInfo={showInfo}
-              budget
-              hideLabel
+              variant="panel"
             />
           )}
           {rackSheet && rackSheet !== 'drone' && (
@@ -656,13 +661,13 @@ export function Fittings() {
               stats={stats}
               moduleResults={moduleResults}
               target={target}
-              onSelectTarget={(next) => {
-                // One sheet at a time: the Add sheet takes over from the rack's.
-                setRackSheet(null);
-                selectTarget(next);
-              }}
+              onSelectTarget={selectTargetFromSheet}
               unusableModuleKeys={gaps?.unusableModuleKeys}
               onShowInfo={showInfo}
+              onOpenVariations={(slot, slotIndex) => {
+                setRackSheet(null);
+                openModuleDialog(slot, slotIndex, true);
+              }}
             />
           )}
         </Modal>

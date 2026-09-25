@@ -438,10 +438,12 @@ interface DroneSectionProps {
   target: AddTarget | null;
   onSelectTarget: (target: AddTarget) => void;
   onShowInfo?: ShowInfo;
-  /** Its own bandwidth and bay bars — the Ring's drone panel, where no List bars sit above. */
-  budget?: boolean;
-  /** Hides the heading — a panel or sheet titles it already. */
-  hideLabel?: boolean;
+  /**
+   * `list`: a section of the List, headed "Drones" under the List's own
+   * resource bars. `panel`: the Ring's drone panel or the phone's sheet —
+   * titled already, so no heading, and carrying its own bandwidth and bay bars.
+   */
+  variant?: 'list' | 'panel';
 }
 
 /**
@@ -458,8 +460,7 @@ export function DroneSection({
   target,
   onSelectTarget,
   onShowInfo,
-  budget = false,
-  hideLabel = false,
+  variant = 'list',
 }: DroneSectionProps) {
   const { t } = useTranslation();
   const drones = droneGroups(fitting);
@@ -470,8 +471,8 @@ export function DroneSection({
   if (!showsDrones(stats, drones.length)) return null;
   return (
     <div className="space-y-1.5">
-      {!hideLabel && <p className={RACK_LABEL_CLASS}>{t('fittings.list.drones')}</p>}
-      {budget && (
+      {variant === 'list' && <p className={RACK_LABEL_CLASS}>{t('fittings.list.drones')}</p>}
+      {variant === 'panel' && (
         <div className="space-y-1.5">
           <ResourceBar
             label={t('fittings.list.droneBandwidth')}

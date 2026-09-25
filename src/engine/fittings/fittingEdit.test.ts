@@ -7,6 +7,7 @@ import {
   droneCountMax,
   droneRoom,
   droneGroups,
+  droneTotals,
   firstFreeSlotIndex,
   loadChargeIntoAll,
   moveModule,
@@ -324,5 +325,22 @@ describe('setDroneCountWithinBay', () => {
     expect(droneCountMax(fit, 2454, 'inSpace', { capacity: 25, volumeOf })).toBe(4);
     // Over the cap already: the box may stay where it is, not climb.
     expect(droneCountMax(fit, 2454, 'inBay', { capacity: 10, volumeOf })).toBe(1);
+  });
+});
+
+describe('droneTotals', () => {
+  it('adds up launched and bay drones across every type', () => {
+    const fit: Fitting = {
+      name: 'D',
+      shipTypeId: 1,
+      modules: [],
+      drones: [
+        { typeId: 2454, quantity: 2, state: 'active' },
+        { typeId: 2454, quantity: 1, state: 'online' },
+        { typeId: 2185, quantity: 3, state: 'online' },
+      ],
+      cargo: [],
+    };
+    expect(droneTotals(fit)).toEqual({ inSpace: 2, inBay: 4 });
   });
 });
