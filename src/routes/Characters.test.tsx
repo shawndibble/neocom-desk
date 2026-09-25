@@ -344,6 +344,8 @@ describe('Characters', () => {
       return screen.getAllByRole('button', { name: /^Select /i })[0]?.textContent ?? '';
     }
 
+    // Sort lives behind the funnel with the filters; the box stays open after.
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
     await user.click(screen.getByRole('button', { name: 'Reverse sort direction' }));
     await waitFor(() => expect(firstCardName()).toContain('Pilot Two'));
 
@@ -558,7 +560,7 @@ describe('Characters', () => {
     await user.type(search, 'no such pilot');
     expect(screen.queryByText('Pilot One')).not.toBeInTheDocument();
     expect(screen.queryByText('Pilot Two')).not.toBeInTheDocument();
-    expect(screen.getByText('No characters match this search.')).toBeInTheDocument();
+    expect(screen.getByText('No characters match this search or filter.')).toBeInTheDocument();
   });
 
   it('drops a character from its group once the character no longer exists', async () => {
@@ -661,11 +663,44 @@ describe('Characters URL state', () => {
     renderCharacters();
     await screen.findByText('Pilot One');
 
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
     await user.click(screen.getByRole('button', { name: 'Reverse sort direction' }));
     await waitFor(() => expect(locationSearch()).toBe('?dir=desc'));
 
     await user.click(screen.getByRole('button', { name: 'Reverse sort direction' }));
     await waitFor(() => expect(locationSearch()).toBe(''));
+  });
+
+  it('the Starred only filter narrows the wall, badges the funnel, and round-trips through the URL', async () => {
+    await useStarredCharacters.getState().setValue([92]);
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    await user.click(screen.getByRole('button', { name: 'Starred only' }));
+
+    await waitFor(() => expect(locationSearch()).toBe('?starred=1'));
+    expect(screen.queryByText('Pilot One')).not.toBeInTheDocument();
+    expect(screen.getByText('Pilot Two')).toBeInTheDocument();
+    // Sort never counts: only filters that hide someone do.
+    expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Starred only' }));
+    await waitFor(() => expect(locationSearch()).toBe(''));
+    expect(screen.getByText('Pilot One')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filters' })).toBeInTheDocument();
+  });
+
+  it('applies funnel filters carried in the URL and explains an emptied wall', async () => {
+    // Nobody has alerts in this fixture, so the filter alone empties the wall
+    // — the "nothing matches" state must fire without any search text.
+    renderCharacters('/characters?alerts=1');
+    expect(
+      await screen.findByText('No characters match this search or filter.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Pilot One')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filters (1 active)' })).toBeInTheDocument();
   });
 
   it('falls back to the default sort for unreadable values', async () => {
@@ -712,6 +747,16 @@ describe('Characters table view', () => {
     expect(within(table).getByRole('columnheader', { name: /name/i })).toBeInTheDocument();
     expect(within(table).getByText('Pilot One')).toBeInTheDocument();
     expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
+  });
+
+  it('offers the Columns picker in table view only', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+    expect(screen.queryByRole('button', { name: 'Columns' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Table' }));
+    expect(await screen.findByRole('button', { name: 'Columns' })).toBeInTheDocument();
   });
 
   it('clicking a table row selects that character and navigates to /overview, same as a card', async () => {

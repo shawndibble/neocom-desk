@@ -17,9 +17,10 @@
  * "what did we buy last Tuesday" is a question worth a control, and the
  * character view answers a much smaller list.
  */
-import { useMemo, type ReactElement } from 'react';
+import { useMemo, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
   DateRangeFields,
@@ -56,6 +57,12 @@ import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import type { CachedResult } from '@/esi/cache';
 import type { CorporationWalletTransaction } from '@/esi/endpoints';
+import { useColumnVisibility } from '@/lib/columnVisibility';
+import {
+  CORP_TRANSACTIONS_COLUMN_IDS,
+  useVisibleCorpTransactionsColumns,
+  type CorpTransactionsColumnId,
+} from './corpTransactionsColumns';
 
 interface CorpTransactionsPanelProps {
   /** `null` means the read never came back and no cache stood in for it. */
@@ -91,9 +98,12 @@ const SIDE_LABEL: Record<TransactionSide, string> = {
 function TransactionsFilterBar({
   filter,
   onChange,
+  actions,
 }: {
   filter: WalletTransactionFilter;
   onChange: (filter: WalletTransactionFilter) => void;
+  /** The column picker, inline between the search box and the funnel. */
+  actions?: ReactNode;
 }) {
   const { t } = useTranslation();
   return (
@@ -110,6 +120,7 @@ function TransactionsFilterBar({
           className="min-w-48 flex-1"
         />
       }
+      actions={actions}
     >
       {(draft, setDraft) => (
         <>
@@ -237,6 +248,28 @@ export function CorpTransactionsPanel({
     [t, nameFor]
   );
 
+  const { visible, isVisible, toggle, reset } = useColumnVisibility(
+    useVisibleCorpTransactionsColumns,
+    CORP_TRANSACTIONS_COLUMN_IDS
+  );
+  const columnsById = useMemo(
+    () =>
+      Object.fromEntries(columns.map((column) => [column.id, column])) as Record<
+        CorpTransactionsColumnId,
+        DataTableColumn<CorporationWalletTransaction>
+      >,
+    [columns]
+  );
+  // Filtered only at the table's input: the route validates `?txn.sort=`
+  // against every id, so a sort on a hidden column survives until it returns.
+  const shownColumns = useMemo(
+    () =>
+      columns.filter(
+        (column) => column.id === 'item' || isVisible(column.id as CorpTransactionsColumnId)
+      ),
+    [columns, isVisible]
+  );
+
   return (
     <Panel
       padded={false}
@@ -301,7 +334,22 @@ export function CorpTransactionsPanel({
               {t('common.incompleteTitle')} — {t('wallet.transactionsTruncatedHint')}
             </p>
           )}
-          <TransactionsFilterBar filter={filter} onChange={onFilterChange} />
+          <TransactionsFilterBar
+            filter={filter}
+            onChange={onFilterChange}
+            actions={
+              <ColumnPickerMenu
+                available={CORP_TRANSACTIONS_COLUMN_IDS}
+                visible={visible}
+                columnsById={columnsById}
+                onToggle={toggle}
+                onReset={reset}
+                buttonLabel={t('common.columnsButton')}
+                menuTitle={t('common.columnsMenuTitle')}
+                resetLabel={t('common.resetColumns')}
+              />
+            }
+          />
           {filteredTransactions.length === 0 ? (
             <EmptyState
               title={t('wallet.transactionsNoFilterMatches')}
@@ -311,7 +359,7 @@ export function CorpTransactionsPanel({
           ) : (
             <DataTable
               label={t('wallet.transactionsTab')}
-              columns={columns}
+              columns={shownColumns}
               rows={filteredTransactions}
               rowKey={(txn) => txn.transaction_id}
               sort={sort}

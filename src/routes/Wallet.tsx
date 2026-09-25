@@ -1,8 +1,9 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
+  ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
   DateRangeFields,
@@ -102,6 +103,12 @@ import type {
   WalletTransactionCommon,
 } from '@/esi/endpoints';
 import { walletBalanceHistory, walletBalanceTrend } from '@/engine/wallet/balanceHistory';
+import { useColumnVisibility } from '@/lib/columnVisibility';
+import {
+  useVisibleWalletJournalColumns,
+  WALLET_JOURNAL_COLUMN_IDS,
+  type WalletJournalColumnId,
+} from './walletJournalColumns';
 
 /** Newest first — the one order both the table (`defaultSort`) and CSV exports agree on. */
 function byDateDesc(a: WalletJournalEntry, b: WalletJournalEntry): number {
@@ -121,6 +128,8 @@ interface JournalFilterBarProps {
   filter: WalletJournalFilter;
   onChange: (filter: WalletJournalFilter) => void;
   refTypeOptions: string[];
+  /** The column picker, inline between the search box and the funnel. */
+  actions?: ReactNode;
 }
 
 /** The ref-type / date-range / text filter row above a journal table (issue #413). */
@@ -131,7 +140,7 @@ interface JournalFilterBarProps {
  */
 const ALL_REF_TYPES = '__all';
 
-function JournalFilterBar({ filter, onChange, refTypeOptions }: JournalFilterBarProps) {
+function JournalFilterBar({ filter, onChange, refTypeOptions, actions }: JournalFilterBarProps) {
   const { t } = useTranslation();
   return (
     <FilterBar
@@ -147,6 +156,7 @@ function JournalFilterBar({ filter, onChange, refTypeOptions }: JournalFilterBar
           className="min-w-48 flex-1"
         />
       }
+      actions={actions}
     >
       {(draft, setDraft) => (
         <>
@@ -214,9 +224,48 @@ function JournalTable({
   onSortChange,
 }: JournalTableProps) {
   const { t } = useTranslation();
+  // One store for both journals, so hiding a column on one hides it on the other.
+  const { visible, isVisible, toggle, reset } = useColumnVisibility(
+    useVisibleWalletJournalColumns,
+    WALLET_JOURNAL_COLUMN_IDS
+  );
+  const columnsById = useMemo(
+    () =>
+      Object.fromEntries(journalColumns.map((column) => [column.id, column])) as Record<
+        WalletJournalColumnId,
+        DataTableColumn<WalletJournalEntry>
+      >,
+    [journalColumns]
+  );
+  // Filtered here, not where the columns are built: the route's `useUrlSort`
+  // validates `?journal.sort=` against the full id list, so a sort on a hidden
+  // column survives until the column comes back.
+  const shownColumns = useMemo(
+    () =>
+      journalColumns.filter(
+        (column) => column.id === 'refType' || isVisible(column.id as WalletJournalColumnId)
+      ),
+    [journalColumns, isVisible]
+  );
   return (
     <>
-      <JournalFilterBar filter={filter} onChange={onFilterChange} refTypeOptions={refTypeOptions} />
+      <JournalFilterBar
+        filter={filter}
+        onChange={onFilterChange}
+        refTypeOptions={refTypeOptions}
+        actions={
+          <ColumnPickerMenu
+            available={WALLET_JOURNAL_COLUMN_IDS}
+            visible={visible}
+            columnsById={columnsById}
+            onToggle={toggle}
+            onReset={reset}
+            buttonLabel={t('common.columnsButton')}
+            menuTitle={t('common.columnsMenuTitle')}
+            resetLabel={t('common.resetColumns')}
+          />
+        }
+      />
       {filteredJournal.length === 0 ? (
         <EmptyState
           title={t('wallet.journalNoFilterMatches')}
@@ -226,7 +275,7 @@ function JournalTable({
       ) : (
         <DataTable
           label={label}
-          columns={journalColumns}
+          columns={shownColumns}
           rows={filteredJournal}
           rowKey={(entry) => entry.id}
           highlightRowKey={highlightRowKey}

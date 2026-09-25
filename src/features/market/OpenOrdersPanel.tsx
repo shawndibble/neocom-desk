@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   Caret,
+  ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
   EmptyState,
@@ -23,6 +24,7 @@ import {
   Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
+import { useColumnVisibility } from '@/lib/columnVisibility';
 import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { permissionsForEndpoints } from '@/esi/registry';
@@ -94,6 +96,11 @@ import { OrderBadgeLegend } from './OrderBadgeLegend';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { OrderDetailModal } from './OrderDetailModal';
 import type { ReprocessingInput } from './orderExits';
+import {
+  OPEN_ORDER_COLUMN_IDS,
+  useVisibleOpenOrderColumns,
+  type OpenOrderColumnId,
+} from './openOrdersColumns';
 
 /** Healthy orders start collapsed (CONTEXT.md redesign) — the `showHealthy` toggle is the way back, not the funnel filter. */
 const DEFAULT_FILTER: OpenOrdersFilter = { ...EMPTY_OPEN_ORDERS_FILTER, hideHealthy: true };
@@ -244,6 +251,14 @@ export function OpenOrdersPanel({
   const hubPricesCache = useLazyRowCache<number, Record<string, number | null>>();
   /** Price history for the modal's "sells out in" chip, keyed by region+item. */
   const historyCache = useLazyRowCache<string, PriceHistoryResult>();
+
+  /** One column-visibility setting shared by every per-problem-group table below. */
+  const {
+    visible: visibleColumnIds,
+    isVisible: isColumnVisible,
+    toggle: toggleColumn,
+    reset: resetColumns,
+  } = useColumnVisibility(useVisibleOpenOrderColumns, OPEN_ORDER_COLUMN_IDS);
 
   const snapshot = data;
 
@@ -678,6 +693,7 @@ export function OpenOrdersPanel({
           id: 'where',
           header: t('market.location'),
           className: 'text-text-dim',
+          sortValue: (row) => row.stationName ?? undefined,
           render: (row) => (
             <span className="flex flex-col gap-0.5">
               <span>
@@ -772,7 +788,25 @@ export function OpenOrdersPanel({
   // while some filtered-out row elsewhere still has one, and the column
   // must track what's actually visible, not the character's full order set.
   const hasFloorData = groupingRows.some((row) => row.floor !== null);
-  const visibleColumns = columns.filter((column) => column.id !== 'floor' || hasFloorData);
+  // `floor` only ever offers itself as a picker toggle once there is data
+  // behind it — same rule Appraisal's Refine/LP columns follow — so a
+  // checked-but-invisible toggle never appears in the menu.
+  const availableColumns = OPEN_ORDER_COLUMN_IDS.filter((id) => id !== 'floor' || hasFloorData);
+  const visibleColumns = columns.filter(
+    (column) =>
+      (column.id !== 'floor' || hasFloorData) &&
+      (column.id === 'item' ||
+        column.id === 'details' ||
+        isColumnVisible(column.id as OpenOrderColumnId))
+  );
+  // Only for `ColumnPickerMenu`'s labels — built from the same definitions
+  // `columns` already carries, not a second copy of them. Empty on a phone
+  // (`columns` is `[]` there), which is fine: the picker itself only renders
+  // at `!isPhone` below.
+  const columnsById = Object.fromEntries(columns.map((column) => [column.id, column])) as Record<
+    OpenOrderColumnId,
+    DataTableColumn<OpenOrderRow>
+  >;
 
   return (
     <Panel
@@ -843,6 +877,23 @@ export function OpenOrdersPanel({
               // The active chips stay outside the funnel box, where they can
               // be seen and dropped.
               activeCount={visibleChips.length}
+              actions={
+                // `OpenOrdersList` (below, on a phone) ignores column
+                // visibility entirely, so the picker would have nothing to
+                // act on there — and `columnsById` is empty on a phone besides.
+                !isPhone && (
+                  <ColumnPickerMenu
+                    available={availableColumns}
+                    visible={visibleColumnIds}
+                    columnsById={columnsById}
+                    onToggle={toggleColumn}
+                    buttonLabel={t('common.columnsButton')}
+                    menuTitle={t('common.columnsMenuTitle')}
+                    onReset={resetColumns}
+                    resetLabel={t('common.resetColumns')}
+                  />
+                )
+              }
               search={
                 <SearchInput
                   value={filter.text}

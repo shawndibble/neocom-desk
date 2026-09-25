@@ -113,6 +113,15 @@ async function runsTable() {
   return screen.findByRole('table', { name: 'All production runs' });
 }
 
+/**
+ * `FilterBar` always renders the funnel trigger, at every width — the date
+ * range filter sits behind it rather than inline. Opens it so a test can
+ * reach the "From"/"To" fields.
+ */
+async function openFilters() {
+  await userEvent.click(await screen.findByRole('button', { name: /^filters/i }));
+}
+
 beforeEach(async () => {
   await db.productionRuns.clear();
   await db.productionSaleLinks.clear();
@@ -435,6 +444,7 @@ describe('ProductionLogPanel', () => {
     expect(within(table).getByText('42')).toBeInTheDocument();
 
     const user = userEvent.setup();
+    await openFilters();
     await user.type(screen.getByLabelText('From'), '2026-08-01');
 
     expect(within(await runsTable()).queryByText('7')).not.toBeInTheDocument();
@@ -486,6 +496,7 @@ describe('ProductionLogPanel', () => {
     ).toBeInTheDocument();
 
     const user = userEvent.setup();
+    await openFilters();
     await user.type(screen.getByLabelText('From'), '2026-08-01');
 
     await waitFor(() => {
@@ -511,6 +522,7 @@ describe('ProductionLogPanel', () => {
       { wrapper: MemoryRouter }
     );
     const user = userEvent.setup();
+    await openFilters();
     await user.type(await screen.findByLabelText('From'), '2026-08-01');
 
     expect(screen.getByText('No production runs in this period')).toBeInTheDocument();

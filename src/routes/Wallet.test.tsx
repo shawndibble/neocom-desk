@@ -428,6 +428,7 @@ describe('Wallet', () => {
     await user.click(await screen.findByRole('tab', { name: 'Journal' }));
     await screen.findByText('Bounty');
 
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
     await user.click(screen.getByRole('combobox', { name: 'Ref type' }));
     await user.click(await screen.findByRole('option', { name: 'Bounty prize' }));
 
@@ -652,6 +653,7 @@ describe('Wallet', () => {
       expect(await within(table).findByText('Tritanium')).toBeInTheDocument();
       expect(within(table).getByText('Pyerite')).toBeInTheDocument();
 
+      await user.click(screen.getByRole('button', { name: /^Filters/ }));
       await user.click(screen.getByRole('combobox', { name: 'Side' }));
       await user.click(await screen.findByRole('option', { name: 'Sell' }));
 

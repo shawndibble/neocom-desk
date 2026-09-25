@@ -325,6 +325,7 @@ export function PlanChainTable({ rows, productName, hubId }: PlanChainTableProps
         // Titles the card below `sm`: the tier chip carries the hierarchy that
         // indentation carries on desktop, so no depth gutter is spent at 390px.
         primary: true,
+        sortValue: (row) => row.name,
         // Plan hub isn't in the URL, so it must be carried explicitly to
         // match this row's own unit-price cell — see MarketItemLink's hubId.
         render: (row) => (
@@ -336,6 +337,7 @@ export function PlanChainTable({ rows, productName, hubId }: PlanChainTableProps
       {
         id: 'tier',
         header: t('piPlan.column.tier'),
+        sortValue: (row) => row.tier,
         render: (row) => (
           <span className="rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
             {t('piPlan.tierChip', { tier: row.tier })}
@@ -369,6 +371,8 @@ export function PlanChainTable({ rows, productName, hubId }: PlanChainTableProps
       {
         id: 'read',
         header: t('piPlan.column.read'),
+        // Ordinal, not alphabetical — the make/buy role this row is filling.
+        sortValue: (row) => (row.role === 'make' ? 1 : 0),
         render: (row) => (
           <span className="flex items-center gap-1.5">
             <span className={row.role === 'make' ? 'text-accent' : 'text-text-dim'}>
@@ -414,6 +418,7 @@ export function PlanChainTable({ rows, productName, hubId }: PlanChainTableProps
         rows={rows}
         rowKey={(row) => row.typeId}
         density="compact"
+        mobileSort
       />
     </Panel>
   );

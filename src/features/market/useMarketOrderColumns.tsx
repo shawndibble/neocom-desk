@@ -26,6 +26,20 @@ import type { RegionOrder } from '@/esi/endpoints';
 import { formatIsk } from '@/lib/isk';
 import { rangeLabel } from '@/features/market/orderBookCsv';
 
+/**
+ * Ordinal rank for an order's `range`: station, then solarsystem, then a
+ * jump count (ranked by the number itself), then region last of all —
+ * alphabetical order would put "region" before "station". `undefined` for a
+ * value this app doesn't recognise, so it sinks like any other unknown.
+ */
+function rangeRank(range: string): number | undefined {
+  if (range === 'station') return 0;
+  if (range === 'solarsystem') return 1;
+  if (range === 'region') return Number.MAX_SAFE_INTEGER;
+  const jumps = Number(range);
+  return Number.isFinite(jumps) ? 2 + jumps : undefined;
+}
+
 export interface UseMarketOrderColumnsArgs {
   t: TFunction;
   npcStationMap: ReadonlyMap<number, NpcStationLookup>;
@@ -114,6 +128,8 @@ export function useMarketOrderColumns({
       location: {
         id: 'location',
         header: t('market.location'),
+        sortValue: (o) =>
+          resolveOrderLocation(o, npcStationMap, solarSystemMap).stationName ?? undefined,
         render: (o) => (
           <LocationCell order={o} npcStations={npcStationMap} solarSystems={solarSystemMap} t={t} />
         ),
@@ -150,6 +166,9 @@ export function useMarketOrderColumns({
         id: 'range',
         header: t('market.range'),
         className: 'text-text-dim',
+        // Station < solarsystem < N jumps < region, in that order — not
+        // alphabetical, which would put "region" ahead of "station".
+        sortValue: (o) => rangeRank(o.range),
         render: (o) => rangeLabel(o.range, t),
       },
       minVolume: {

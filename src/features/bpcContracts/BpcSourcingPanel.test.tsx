@@ -289,7 +289,7 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/industry/sourcing');
 });
 
-/** The bar is `collapsible`, so its controls live behind the funnel at pointer width. */
+/** Every `FilterBar` keeps its controls behind the funnel, so open it first. */
 async function openFilters(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /^Filters/ }));
 }

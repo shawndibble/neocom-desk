@@ -267,8 +267,14 @@ describe('MaterialsTable sourcing', () => {
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
 
-    await user.tab();
-    expect(document.activeElement).toBe(ownedInput('Tritanium'));
+    // A few stops ahead of it now: the phone-only sort picker `mobileSort`
+    // always renders (real CSS hides it at this width; jsdom doesn't), plus
+    // one header sort button per sortable column.
+    const target = ownedInput('Tritanium');
+    for (let i = 0; i < 10 && document.activeElement !== target; i++) {
+      await user.tab();
+    }
+    expect(document.activeElement).toBe(target);
     await user.keyboard('250');
     // Tab out: blur is what commits.
     await user.tab();
@@ -1028,7 +1034,10 @@ describe('MaterialsTable build-here control', () => {
     });
 
     let reached = false;
-    for (let i = 0; i < 6 && !reached; i++) {
+    // Ahead of every row now: the phone-only sort picker `mobileSort` always
+    // renders (real CSS hides it at this width; jsdom doesn't) plus one
+    // header sort button per sortable column.
+    for (let i = 0; i < 12 && !reached; i++) {
       await user.tab();
       reached = document.activeElement === control;
     }
