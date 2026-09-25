@@ -25,6 +25,7 @@ export function useHullFit(
   engineReady: boolean
 ): ReadonlyMap<number, CandidateCheck> | null {
   const [result, setResult] = useState<{
+    catalogue: FittingCatalogue;
     shipTypeId: number;
     profile: PilotProfile;
     checks: ReadonlyMap<number, CandidateCheck>;
@@ -36,7 +37,9 @@ export function useHullFit(
     for (const entry of catalogue.marketTypes) {
       const rack = catalogue.rackOf[String(entry.typeId)];
       if (rack === undefined) continue;
-      byRack.set(rack, [...(byRack.get(rack) ?? []), entry.typeId]);
+      const ids = byRack.get(rack) ?? [];
+      ids.push(entry.typeId);
+      byRack.set(rack, ids);
     }
     const jobs: [CandidateRack, number[]][] = [];
     for (const [rack, ids] of byRack) {
@@ -57,7 +60,7 @@ export function useHullFit(
         }
       }
       if (next < jobs.length) timer = setTimeout(slice, 0);
-      else setResult({ shipTypeId, profile, checks });
+      else setResult({ catalogue, shipTypeId, profile, checks });
     };
     timer = setTimeout(slice, 0);
     return () => {
@@ -66,7 +69,10 @@ export function useHullFit(
     };
   }, [catalogue, shipTypeId, profile, engineReady]);
 
-  return result !== null && result.shipTypeId === shipTypeId && result.profile === profile
+  return result !== null &&
+    result.catalogue === catalogue &&
+    result.shipTypeId === shipTypeId &&
+    result.profile === profile
     ? result.checks
     : null;
 }

@@ -2,7 +2,12 @@ import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Caret } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
-import { overheatedOrNull, resistPct, weaponRowKey } from '@/engine/fittings/stats';
+import {
+  alignTimeSeconds,
+  overheatedOrNull,
+  resistPct,
+  weaponRowKey,
+} from '@/engine/fittings/stats';
 import type {
   DamageFigures as DamageFiguresValue,
   FittingStats,
@@ -202,12 +207,15 @@ const OPEN_BY_DEFAULT: ReadonlySet<Section> = new Set([
 function StatSection({
   title,
   meta,
+  warning,
   expanded,
   onToggle,
   children,
 }: {
   title: string;
   meta: string | undefined;
+  /** Shown on the row itself, so a warning inside a collapsed section isn't missed. */
+  warning?: string;
   expanded: boolean;
   onToggle: () => void;
   children: ReactNode;
@@ -226,6 +234,7 @@ function StatSection({
             {title}
           </button>
         </h3>
+        {warning && <span className="shrink-0 text-xs text-warning">{warning}</span>}
         {meta && <span className="shrink-0 text-sm tabular-nums">{meta}</span>}
       </div>
       {expanded && <div className="space-y-2 px-3 pb-3">{children}</div>}
@@ -300,12 +309,13 @@ export function FittingStatsSections({
   const overheatedEhp = stats ? overheatedOrNull(stats.ehp, stats.overheated?.ehp, 0) : null;
   const pctOf = (used: number, total: number) => (total > 0 ? (used / total) * 100 : 0);
 
-  function section(id: Section, meta: string | undefined, body: ReactNode) {
+  function section(id: Section, meta: string | undefined, body: ReactNode, warning?: string) {
     return (
       <StatSection
         key={id}
         title={t(`fittings.stats.section.${id}`)}
         meta={meta}
+        warning={warning}
         expanded={expanded[id]}
         onToggle={() => toggle(id)}
       >
@@ -569,6 +579,14 @@ export function FittingStatsSections({
                 ),
               },
               {
+                label: t('fittings.stats.fact.align'),
+                value: t('fittings.stats.unit.seconds', {
+                  value: alignTimeSeconds(stats.navigation.mass, stats.navigation.agility).toFixed(
+                    1
+                  ),
+                }),
+              },
+              {
                 label: t('fittings.stats.fact.agility'),
                 value: stats.navigation.agility.toFixed(3),
               },
@@ -664,7 +682,8 @@ export function FittingStatsSections({
           </>
         ) : (
           placeholder
-        )
+        ),
+        stats && stats.unknownItemTypeIds.length > 0 ? t('fittings.stats.incomplete') : undefined
       )}
 
       {section(
@@ -698,7 +717,8 @@ export function FittingStatsSections({
           </>
         ) : (
           <p className="text-xs text-text-dim">{t('fittings.stats.priceLoading')}</p>
-        )
+        ),
+        price && price.totals.unpricedRows > 0 ? t('fittings.stats.incomplete') : undefined
       )}
     </div>
   );

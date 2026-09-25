@@ -244,7 +244,9 @@
       "clearTarget": "Clear the chosen slot",
       "checkingHull": "Checking what fits this ship…",
       "noChargeTakers": "Nothing fitted takes charges.",
-      "loaded": "loaded"
+      "loaded": "loaded",
+      "dragHint": "Click an item to fit it, or drag it onto a slot on the Ring.",
+      "chargeTaker": "{{count}}× {{name}}"
     },
     "start": {
       "newTitle": "New fitting from a hull",
@@ -345,6 +347,7 @@
         "explosive": "Exp"
       },
       "ehpColumn": "EHP",
+      "incomplete": "incomplete",
       "headingCharacter": "Stats as {{name}}, own skills",
       "headingAllV": "Stats at all skills V",
       "layerHp": "{{hp}} HP",
@@ -353,6 +356,7 @@
       "fittingMeta": "CPU {{cpu}}% · PG {{pg}}%",
       "fact": {
         "capacity": "Capacity",
+        "align": "Align time",
         "recharge": "Recharge",
         "targetRange": "Lock range",
         "lockedTargets": "Max targets",

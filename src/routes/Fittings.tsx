@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
+import { formatIskCompact } from '@/lib/isk';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, PageHeader, Panel, SlideOver, Tabs } from '@/components/ui';
@@ -324,11 +325,22 @@ export function Fittings() {
       targetProfiles={targetProfiles}
       overlay={overlay}
       heading={
-        <span>
-          {characterName
-            ? t('fittings.stats.headingCharacter', { name: characterName })
-            : t('fittings.stats.headingAllV')}
-        </span>
+        <>
+          <span>
+            {activeCharacterId === null
+              ? t('fittings.stats.headingAllV')
+              : characterName
+                ? t('fittings.stats.headingCharacter', { name: characterName })
+                : null}
+          </span>
+          {workspace.price && (
+            <span className="text-text tabular-nums">
+              {t('fittings.stats.unit.isk', {
+                value: formatIskCompact(workspace.price.totals.sell),
+              })}
+            </span>
+          )}
+        </>
       }
     />
   );

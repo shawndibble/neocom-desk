@@ -119,7 +119,7 @@ function ItemRow({ entry, rack, check, placeable, draggable, onAdd }: ItemRowPro
         type="button"
         disabled={!placeable}
         onClick={() => onAdd(entry.typeId, rack)}
-        className="flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs hover:bg-panel-2 disabled:opacity-40 md:min-h-8"
+        className="flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs hover:bg-panel-2 disabled:opacity-40 md:min-h-9"
       >
         <TypeIcon typeId={entry.typeId} size={32} width={24} height={24} />
         <span className="min-w-0 flex-1 truncate">{entry.name}</span>
@@ -158,7 +158,7 @@ export function FittingAddPanel({
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [fitsSlot, setFitsSlot] = useState(true);
-  const [canFlyOnly, setCanFlyOnly] = useState(false);
+  const [canFlyOnly, setCanFlyOnly] = useState(true);
   const [metaGroupId, setMetaGroupId] = useState<number | null>(null);
   const [toggled, setToggled] = useState<ReadonlySet<number>>(new Set());
 
@@ -176,13 +176,15 @@ export function FittingAddPanel({
 
   const trimmed = query.trim().toLowerCase();
   const results = useMemo(() => {
-    if (catalogue === null || trimmed === '') return [];
+    // Once the ship data is in, a search waits for the hull check as browsing
+    // does, rather than briefly offering structure modules and the like.
+    if (catalogue === null || trimmed === '' || (engineReady && hullFit === null)) return [];
     const include = browseFilter(catalogue, { tab, slotRack, metaGroupId, hullFit, canFlyOnly });
     return catalogue.marketTypes
       .filter((entry) => include(entry) && entry.name.toLowerCase().includes(trimmed))
       .sort((a, b) => a.name.localeCompare(b.name))
       .slice(0, CANDIDATE_LIMIT);
-  }, [catalogue, trimmed, tab, slotRack, metaGroupId, hullFit, canFlyOnly]);
+  }, [catalogue, trimmed, engineReady, tab, slotRack, metaGroupId, hullFit, canFlyOnly]);
   // Browsing needs the hull check: without it the tree would be every
   // fittable item in the game, structure modules and all.
   const tree = useMemo(() => {
@@ -190,9 +192,17 @@ export function FittingAddPanel({
     const include = browseFilter(catalogue, { tab, slotRack, metaGroupId, hullFit, canFlyOnly });
     return browserTree(catalogue.marketTypes, include, catalogue.groupsById);
   }, [catalogue, trimmed, tab, slotRack, metaGroupId, hullFit, canFlyOnly]);
-  // Top-level branches start open, the rest closed; a click flips either.
+  // The market roots ("Ship Equipment", …) are a click nobody needs: the
+  // browser starts at their categories, as the game's does. A few categories
+  // (a chosen slot narrows it this far) start open; a click flips any node.
+  const top = tree
+    .flatMap((node) =>
+      node.items.length === 0 && node.children.length > 0 ? node.children : [node]
+    )
+    .sort((a, b) => a.label.localeCompare(b.label));
+  const openTop = top.length <= 4;
   const isOpen = (node: BrowserNode<CandidateEntry>, depth: number) =>
-    (depth === 0) !== toggled.has(node.id);
+    (depth === 0 && openTop) !== toggled.has(node.id);
   const toggle = (id: number) =>
     setToggled((prev) => {
       const next = new Set(prev);
@@ -209,7 +219,7 @@ export function FittingAddPanel({
           type="button"
           aria-expanded={open}
           onClick={() => toggle(node.id)}
-          className={`flex min-h-11 w-full items-center gap-2 px-1 text-left text-xs hover:bg-panel-2 md:min-h-8 ${depth === 0 ? 'font-semibold' : ''}`}
+          className={`flex min-h-11 w-full items-center gap-2 px-1 text-left text-xs hover:bg-panel-2 md:min-h-9 ${depth === 0 ? 'font-semibold' : ''}`}
         >
           <Caret expanded={open} />
           <span className="min-w-0 flex-1 truncate">{node.label}</span>
@@ -338,6 +348,9 @@ export function FittingAddPanel({
           {engineReady && hullFit === null && (
             <p className="text-xs text-text-dim">{t('fittings.add.checkingHull')}</p>
           )}
+          {dragToRing && tab === 'modules' && hullFit !== null && (
+            <p className="text-xs text-text-dim">{t('fittings.add.dragHint')}</p>
+          )}
 
           {catalogue === null ? (
             <p className="text-xs text-text-dim">{t('fittings.add.loadingCatalogue')}</p>
@@ -350,7 +363,7 @@ export function FittingAddPanel({
           ) : hullFit !== null && tree.length === 0 ? (
             <p className="text-xs text-text-dim">{t('fittings.add.noResults')}</p>
           ) : (
-            <ul>{tree.map((node) => branch(node, 0))}</ul>
+            <ul>{top.map((node) => branch(node, 0))}</ul>
           )}
         </>
       )}
@@ -446,7 +459,7 @@ function ChargesTab({
           <h3 className="flex items-center gap-2 text-xs font-semibold">
             <TypeIcon typeId={weapon.typeId} size={32} width={20} height={20} />
             <span className="min-w-0 flex-1 truncate">
-              {t('fittings.stats.weaponRow', { count: weapon.count, name: name(weapon.typeId) })}
+              {t('fittings.add.chargeTaker', { count: weapon.count, name: name(weapon.typeId) })}
             </span>
           </h3>
           <ul>
@@ -459,7 +472,7 @@ function ChargesTab({
                     aria-pressed={loaded}
                     disabled={!onLoadCharge}
                     onClick={() => onLoadCharge?.(weapon.typeId, chargeTypeId)}
-                    className={`flex min-h-11 w-full items-center gap-2 border-l-2 px-2 text-left text-xs hover:bg-panel-2 md:min-h-8 ${loaded ? 'border-accent text-accent' : 'border-transparent'}`}
+                    className={`flex min-h-11 w-full items-center gap-2 border-l-2 px-2 text-left text-xs hover:bg-panel-2 md:min-h-9 ${loaded ? 'border-accent text-accent' : 'border-transparent'}`}
                   >
                     <TypeIcon typeId={chargeTypeId} size={32} width={20} height={20} />
                     <span className="min-w-0 flex-1 truncate">{name(chargeTypeId)}</span>

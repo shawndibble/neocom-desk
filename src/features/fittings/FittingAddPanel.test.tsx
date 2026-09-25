@@ -74,7 +74,11 @@ describe('FittingAddPanel', () => {
     });
     const { onAdd } = renderPanel();
 
-    // The hull check runs in the background; browsing waits for it.
+    // The hull check runs in the background; browsing waits for it. "Can fly"
+    // starts on, hiding Damage Control II (no skills for it) until it's off.
+    const canFly = await screen.findByRole('button', { name: 'Can fly' });
+    expect(screen.queryByRole('button', { name: /Damage Control II/ })).not.toBeInTheDocument();
+    await user.click(canFly);
     const dc2 = await screen.findByRole('button', { name: /Damage Control II/ });
     expect(screen.queryByRole('button', { name: /Afterburner/ })).not.toBeInTheDocument();
     // Damage Control I doesn't fit the hull.
