@@ -321,7 +321,7 @@ export function useFittingWorkspace(): FittingWorkspace {
       const loaded = eftResultToFitting(result, name);
       await commitFitting(loaded);
     },
-    [commitFitting]
+    [commitFitting, setShareCode]
   );
 
   const openFitting = useCallback(
