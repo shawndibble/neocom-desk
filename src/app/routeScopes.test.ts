@@ -137,6 +137,7 @@ describe('every route must declare its scope requirement', () => {
       '/error',
       '/login',
       '/share/appraisal',
+      '/share/fitting',
       '/styleguide',
     ]);
   });
