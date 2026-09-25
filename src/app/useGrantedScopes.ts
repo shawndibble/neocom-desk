@@ -73,7 +73,9 @@ export function useCharactersLackingEndpoints(
   characterIds: readonly number[],
   endpoints: readonly EsiEndpointId[]
 ): readonly number[] | undefined {
+  // Keyed by value: callers rebuild both arrays every render.
   const idsKey = characterIds.join(',');
+  const endpointsKey = endpoints.join(',');
   return useLiveQuery(async () => {
     const required = requiredScopesForEndpoints(endpoints);
     const tokens = await db.tokens.bulkGet([...characterIds]);
@@ -81,6 +83,5 @@ export function useCharactersLackingEndpoints(
       const held = new Set(tokens[i]?.scopes ?? []);
       return required.some((scope) => !held.has(scope));
     });
-    // `idsKey` stands in for `characterIds`, which callers rebuild every render.
-  }, [idsKey, endpoints]);
+  }, [idsKey, endpointsKey]);
 }

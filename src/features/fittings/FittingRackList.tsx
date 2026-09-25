@@ -417,7 +417,7 @@ export function FittingRackList({
     >
       <div className="space-y-3">
         {implantBasis === 'clone' && canUseCloneBasis && (
-          <ImplantsAssumedNote hint={t('fittings.implants.assumesNoneHint')} />
+          <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
         )}
         <div className="space-y-1.5">
           <ResourceBar

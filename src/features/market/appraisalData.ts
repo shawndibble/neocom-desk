@@ -47,7 +47,10 @@ import {
   type AppraisalUnmatched,
 } from '@/engine/market/appraisalMatch';
 import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
-import { appliedRefiningImplantPct } from '@/engine/industry/characterModifiers';
+import {
+  appliedRefiningImplantPct,
+  refiningImplantApplies,
+} from '@/engine/industry/characterModifiers';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import { findLpOfferMatches, toLpOfferInputs } from '@/features/market/appraisalLpAcquisition';
@@ -201,7 +204,7 @@ export async function appraisePaste(
           })
         : undefined;
     if (refine && reprocessing && modifiers) {
-      if (reprocessing.specialisationSkillID !== undefined) refinesOreOrIce = true;
+      if (refiningImplantApplies(reprocessing.specialisationSkillID)) refinesOreOrIce = true;
       if (appliedRefiningImplantPct(modifiers, reprocessing.specialisationSkillID) > 0) {
         implantApplied = true;
       }

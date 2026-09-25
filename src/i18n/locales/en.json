@@ -426,7 +426,7 @@
       "remove": "Remove {{name}}",
       "notFound": "No item found with that exact name.",
       "full": "This set is already full.",
-      "assumesNoneHint": "My clone stats are calculated without this character's fitted implants. Grant Character details for accurate stats."
+      "assumesNoImplantsHint": "My clone stats are calculated without this character's fitted implants. Grant Character details for accurate stats."
     }
   },
   "skills": {
