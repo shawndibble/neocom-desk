@@ -82,7 +82,7 @@ export async function loadMoreMailHeaders(
     await writeCached(characterId, KEYS.headers, headers, Date.now());
     return { headers, hasMore };
   } catch (err) {
-    if (isAuthFailure(err)) emitEsiAuthFailure(characterId);
+    if (isAuthFailure(err)) emitEsiAuthFailure(characterId, 'getCharacterMailHeaders');
     return { headers: [...currentHeaders], hasMore: true };
   }
 }
@@ -144,7 +144,7 @@ export async function markMailReadOnEsi(characterId: number, mailId: number): Pr
   try {
     await putCharacterMail(characterId, mailId, { read: true });
   } catch (err) {
-    if (isAuthFailure(err)) emitEsiAuthFailure(characterId);
+    if (isAuthFailure(err)) emitEsiAuthFailure(characterId, 'putCharacterMail');
     return;
   }
   const headers = await readCached<MailHeader[]>(characterId, KEYS.headers);
@@ -183,7 +183,7 @@ export async function sendMail(
     if (result.data === null) throw new Error('ESI did not answer with a mail id.');
     mailId = result.data;
   } catch (err) {
-    if (isAuthFailure(err)) emitEsiAuthFailure(characterId);
+    if (isAuthFailure(err)) emitEsiAuthFailure(characterId, 'postCharacterMail');
     throw err;
   }
   await db.esiCache.delete([characterId, KEYS.headers]);
