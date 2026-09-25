@@ -274,14 +274,11 @@ export function Fittings() {
     : -1;
   const openModule = fitting && openModuleIndex >= 0 ? fitting.modules[openModuleIndex] : null;
   const { rows: variationRows } = useModuleVariations({
-    fitting,
+    variants: workspace.variants,
     slot: moduleSlot?.slot ?? 'high',
     slotIndex: moduleSlot?.slotIndex ?? 0,
     typeId: openModule?.typeId ?? 0,
     catalogue,
-    engineReady: workspace.engineReady,
-    profile: workspace.profile,
-    damageProfile: workspace.damageProfiles.selected,
   });
   function swapVariation(typeId: number) {
     if (!moduleSlot) return;
@@ -503,14 +500,9 @@ export function Fittings() {
           {t('fittings.load.tooLargeToShare')}
         </p>
       )}
-      {(workspace.unresolved.length > 0 || workspace.fitXmlUnresolved.length > 0) && (
-        <div className="space-y-2">
-          <LoadWarnings
-            unresolved={workspace.unresolved}
-            fitXmlUnresolved={workspace.fitXmlUnresolved}
-          />
-        </div>
-      )}
+      {/* Only a Load that opened a Fitting describes this one; a failed Load's
+          warnings stay with the Load card that reported them. */}
+      {workspace.lastLoad?.kind === 'fitting' && <LoadWarnings load={workspace.lastLoad} />}
 
       {viewHydrated &&
         (addMode === 'sheet' ? (

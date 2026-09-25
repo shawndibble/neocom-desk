@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadEveFitXmlEntry, fitXmlEntryResultToFitting, type FittingXmlEntry } from './eveFitXml';
+import { loadEveFitXmlEntry, type FittingXmlEntry } from './eveFitXml';
 import type { EftTypeLookup } from '@/engine/fittings/eftLoader';
 
 const TYPES: Record<string, number> = {
@@ -115,22 +115,5 @@ describe('loadEveFitXmlEntry', () => {
     expect(result.unresolved).toEqual([
       { text: 'Damage Control I', reason: 'unknown slot: implant' },
     ]);
-  });
-});
-
-describe('fitXmlEntryResultToFitting', () => {
-  it('assembles a Fitting from a resolved result', () => {
-    const result = loadEveFitXmlEntry(
-      entry({ hardware: [{ slot: 'low slot 0', type: 'Damage Control I' }] }),
-      typeByName
-    );
-    if (result.hullTypeId === null) throw new Error('expected a hull');
-    expect(fitXmlEntryResultToFitting(result, '[Rifter, My Fit]')).toEqual({
-      name: '[Rifter, My Fit]',
-      shipTypeId: 587,
-      modules: [{ slot: 'low', slotIndex: 0, typeId: 2046, state: 'active' }],
-      drones: [],
-      cargo: [],
-    });
   });
 });

@@ -1,9 +1,8 @@
 /**
  * Orchestrates the Fittings page (issue #1532): the open Fitting lives in the
  * `?f=` Share Link (CONTEXT.md **Share Link**) — every load rewrites it, a
- * reload or a pasted URL decodes it back. Stats (dogma engine, lazy) and
- * price (hub order book) are two independent loads off the same `fitting`,
- * which is why price can resolve well before stats do.
+ * reload or a pasted URL decodes it back. Its stats and price come from
+ * `useFittingEvaluation`, under the active Character's pilot.
  *
  * Editing (issue #1533) goes through the same URL: `edit` applies a pure
  * `fittingEdit.ts` change, shows it at once, and pushes the re-encoded code
@@ -13,76 +12,50 @@
  *
  * The implant/booster basis toggle ("My clone" vs "Fitting's") rides on the
  * same `edit()` path — an implant-set edit is just another Fitting change —
- * but only affects the profile `computeFittingStats` sees; `profile` itself
- * (exposed to fit checks/candidates) always stays the active Character's own.
+ * and is resolved here, per Fitting; the evaluation applies it. `profile`
+ * itself (exposed to fit checks/candidates) always stays the active
+ * Character's own.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { db } from '@/db';
 import { saveFitting } from './myFittings';
-import { useDamageProfiles, type DamageProfiles } from './damageProfiles';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useUrlParam } from '@/lib/useUrlState';
 import { nullableTextParam } from '@/lib/urlState';
 import { decodeFittingShare, encodeFittingShare } from '@/engine/fitting/fittingShare';
-import type { EftUnresolvedItem } from '@/engine/fittings/eftLoader';
-import {
-  loadEveFitXmlEntry,
-  fitXmlEntryResultToFitting,
-  type FitXmlUnresolvedItem,
-  type FittingXmlDocument,
-} from '@/engine/import/eveFitXml';
+import { loadEveFitXmlEntry, type FittingXmlDocument } from '@/engine/import/eveFitXml';
+import { toLoadOutcome, type LoadedFitting, type LoadOutcome } from '@/engine/fittings/load';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
-import { loadFittingFromText, type LoadError } from './loadFittingFromText';
-import {
-  applyImplantBasis,
-  defaultImplantBasis,
-  type ImplantBasis,
-} from '@/engine/fittings/implantBasis';
-import type {
-  Fitting,
-  FittingImplantSet,
-  FittingStats,
-  PilotProfile,
-} from '@/engine/fittings/types';
-import type { Appraisal } from '@/engine/market/appraisal';
+import { loadFittingFromText } from './loadFittingFromText';
+import { defaultImplantBasis, type ImplantBasis } from '@/engine/fittings/implantBasis';
+import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadTypes, typeName } from '@/sde/loadSde';
 import { usePilotProfile } from './fittingPilotProfile';
-import { loadFittingPrice } from './fittingPrice';
-import {
-  computeFittingStats,
-  isDogmaEngineReady,
-  type DogmaAssetProgress,
-} from './dogmaFittingEngine';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { useFittingEvaluation, type FittingEvaluation } from './useFittingEvaluation';
 
 export type ShareDecodeError = 'invalid' | 'unsupported-version';
-export type { LoadError };
 
 /** One `<fitting>` entry from a Loaded EVE fittings-XML file, resolved but not yet opened. */
 export interface FittingXmlListItem {
   name: string;
-  hullTypeId: number | null;
   hullName: string | null;
-  /** Set only when `fitting` is `null` — why this entry's hull didn't resolve. */
-  hullError: string | null;
-  unresolved: FitXmlUnresolvedItem[];
-  fitting: Fitting | null;
+  /** What opening it would Load; a `failed` one (its hull didn't resolve) can't be opened. */
+  load: LoadOutcome;
 }
 
-export type FittingXmlOpenAction = { kind: 'open'; item: FittingXmlListItem } | { kind: 'list' };
+export type FittingXmlOpenAction = { kind: 'open'; loaded: LoadedFitting } | { kind: 'list' };
 
 /** A single-fit export opens directly; anything else — a multi-fit file, or a single entry whose hull didn't resolve — needs the picker list instead. */
 export function resolveFittingXmlOpenAction(items: FittingXmlListItem[]): FittingXmlOpenAction {
-  return items.length === 1 && items[0]!.fitting !== null
-    ? { kind: 'open', item: items[0]! }
-    : { kind: 'list' };
+  const only = items.length === 1 ? items[0]!.load : null;
+  return only?.kind === 'fitting' ? { kind: 'open', loaded: only } : { kind: 'list' };
 }
 
 /**
  * Resolves a Loaded fittings-XML document's `<fitting>` entries against the
  * type catalog — display data for the picker list, nothing opened yet. A
- * hull that doesn't resolve becomes a `fitting: null` row rather than
+ * hull that doesn't resolve becomes a `failed` row rather than
  * dropping the entry, so a malformed fit in a multi-fit file surfaces its
  * own reason without taking the rest of the file down with it.
  */
@@ -96,14 +69,7 @@ export async function resolveFittingXmlDocument(
     const resolvedHullName =
       hullTypeId === null ? null : (types[String(hullTypeId)]?.name ?? `Type ${hullTypeId}`);
     const name = entry.name.trim() !== '' ? entry.name : (resolvedHullName ?? entry.shipTypeName);
-    return {
-      name,
-      hullTypeId,
-      hullName: resolvedHullName,
-      hullError: hullTypeId === null ? result.unresolved[0]!.reason : null,
-      unresolved: result.unresolved,
-      fitting: hullTypeId === null ? null : fitXmlEntryResultToFitting(result, name),
-    };
+    return { name, hullName: resolvedHullName, load: toLoadOutcome(result, name, 'file') };
   });
 }
 
@@ -112,25 +78,27 @@ const COALESCE_MS = 1000;
 /** A pure change to the open Fitting — one of `src/engine/fittings/fittingEdit.ts`'s. */
 export type FittingChange = (fitting: Fitting) => Fitting;
 
-export interface FittingWorkspace {
+/** The open Fitting's evaluation (stats, price, Variations) plus everything that opens, edits and saves it. */
+export interface FittingWorkspace extends FittingEvaluation {
   fitting: Fitting | null;
   /** Set when `?f=` carries a payload this build can't read at all. */
   shareError: ShareDecodeError | null;
-  /** Parse errors, unknown names and slot overflow from the most recent EFT paste. */
-  unresolved: EftUnresolvedItem[];
-  /** Unresolved items from the most recently opened Loaded EVE-XML Fitting. */
-  fitXmlUnresolved: FitXmlUnresolvedItem[];
+  /**
+   * The most recent Load's outcome — its warnings, or why it failed —
+   * replaced whole by every open, so no earlier Load's warnings outlive it.
+   * Null after an open that wasn't a Load (a new hull, a saved Fitting, a
+   * Share Link, Back/Forward).
+   */
+  lastLoad: LoadOutcome | null;
   /** Set when the open Fitting was too large to fit a Share Link. */
   tooLargeToShare: boolean;
-  /** Why the last Load produced no Fitting; null after a Load that did. */
-  loadError: LoadError | null;
   /** Loads EFT text, a DNA string / chat link, an eveship.fit link, or a killmail link. */
   loadFromInput: (text: string) => Promise<void>;
   /** Resolves a Loaded fittings-XML document's entries for the picker list — opens nothing itself. */
   loadFittingXmlDocument: (document: FittingXmlDocument) => Promise<FittingXmlListItem[]>;
-  /** Opens one resolved entry from that list as the active Fitting; a no-op for an unresolved (`fitting: null`) row. */
-  openFittingXmlEntry: (item: FittingXmlListItem) => Promise<void>;
-  /** Opens an already-built Fitting (In-game Fittings, issue #1539) the same way a successful Load does. */
+  /** Opens a Loaded Fitting (a fittings-file entry, an In-game Fitting) as the active one. */
+  openLoaded: (loaded: LoadedFitting) => Promise<void>;
+  /** Opens a Fitting that wasn't Loaded (a new one from a hull). */
   openFitting: (fitting: Fitting) => Promise<void>;
   /**
    * Applies a change to the open Fitting and rewrites `?f=`. `coalesceKey`
@@ -145,22 +113,8 @@ export interface FittingWorkspace {
   setImplantBasis: (basis: ImplantBasis) => void;
   /** Edits the set the open Fitting carries via `edit()`. `undefined` removes it. */
   setImplantSet: (implantSet: FittingImplantSet | undefined) => void;
-  /**
-   * The latest stats. After an edit to the same hull these are the previous
-   * fit's until the new calculation lands, so the bars don't blank on every
-   * click — `statsFitting` says which Fitting they belong to.
-   */
-  stats: FittingStats | null;
-  statsFitting: Fitting | null;
-  statsProgress: DogmaAssetProgress | null;
-  statsError: boolean;
-  /** The ship data (dogma engine) is loaded, so slot and fit checks can run. */
-  engineReady: boolean;
-  /** Skills and implants the stats and fit checks use; null while loading. */
+  /** The active Character's own skills and clone, for fit checks; null while loading. */
   profile: PilotProfile | null;
-  /** The Damage Profile the stats' EHP is measured against, and the pilot's custom ones (synced). */
-  damageProfiles: DamageProfiles;
-  price: Appraisal | null;
   /** The saved record the open Fitting came from, so Save updates it. */
   savedId: string | null;
   /** Saving needs a Character and a Fitting small enough to have a share code. */
@@ -180,31 +134,19 @@ export function useFittingWorkspace(): FittingWorkspace {
 
   const [fitting, setFitting] = useState<Fitting | null>(null);
   const [shareError, setShareError] = useState<ShareDecodeError | null>(null);
-  const [unresolved, setUnresolved] = useState<EftUnresolvedItem[]>([]);
-  const [fitXmlUnresolved, setFitXmlUnresolved] = useState<FitXmlUnresolvedItem[]>([]);
+  const [lastLoad, setLastLoad] = useState<LoadOutcome | null>(null);
   const [tooLargeToShare, setTooLargeToShare] = useState(false);
-  const [loadError, setLoadError] = useState<LoadError | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
 
-  const [stats, setStats] = useState<{ fitting: Fitting; stats: FittingStats } | null>(null);
-  const [statsProgress, setStatsProgress] = useState<DogmaAssetProgress | null>(null);
-  const [statsError, setStatsError] = useState(false);
-  const [engineReady, setEngineReady] = useState(isDogmaEngineReady);
   // User's explicit toggle pick, layered over `defaultImplantBasis`'s
   // per-Fitting default; `null` means "no override yet, use the default".
   const [basisOverride, setBasisOverride] = useState<ImplantBasis | null>(null);
 
-  const [price, setPrice] = useState<Appraisal | null>(null);
-  const damageProfiles = useDamageProfiles();
-  const damageProfile = damageProfiles.selected;
-  const damageProfilesHydrated = damageProfiles.hydrated;
-
   // Set right before this hook's own `setShareCode` writes, so the decode
   // effect below can tell "the URL changed because we just wrote it" (keep
-  // the unresolved list that write's own paste just reported) apart from
-  // every other way `shareCode` changes — a pasted link, Back/Forward — where
-  // a *previous* paste's stale unresolved list must not linger next to the
-  // unrelated fitting that URL change just loaded. An edit also records the
+  // the `lastLoad` that write's own Load just reported) apart from every
+  // other way `shareCode` changes — a pasted link, Back/Forward — which opens
+  // a different Fitting that no Load reported on. An edit also records the
   // Fitting it wrote, so the effect shows that object as-is instead of
   // decoding its own write back into an identical copy (which would
   // recalculate stats twice per click).
@@ -235,8 +177,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     if (own?.code !== shareCode) {
       // Anything but an edit or a saved-Fitting open is a different Fitting.
       if (pending?.code !== shareCode) setSavedId(null);
-      setUnresolved([]);
-      setFitXmlUnresolved([]);
+      setLastLoad(null);
       setTooLargeToShare(false);
       // Back/Forward or a pasted link ends any coalescing run: the next edit
       // pushes rather than overwriting the entry just navigated to.
@@ -314,44 +255,35 @@ export function useFittingWorkspace(): FittingWorkspace {
 
   const loadFromInput = useCallback(
     async (text: string) => {
-      setLoadError(null);
-      setFitXmlUnresolved([]);
-      const result = await loadFittingFromText(text);
-      if (result.shareCode !== null) {
+      const outcome = await loadFittingFromText(text);
+      if (outcome.kind === 'share') {
         // Opens like any other Share Link: the decode effect does the rest.
-        setUnresolved([]);
-        setShareCode(result.shareCode, { push: true });
+        setLastLoad(null);
+        setShareCode(outcome.code, { push: true });
         return;
       }
-      setUnresolved(result.unresolved);
-      if (result.error !== null) {
-        setLoadError(result.error);
-        return;
-      }
-      if (result.fitting === null) return;
+      setLastLoad(outcome);
+      if (outcome.kind === 'failed') return;
       setSavedId(null);
-      await commitFitting(result.fitting);
+      await commitFitting(outcome.fitting);
     },
     [commitFitting, setShareCode]
   );
 
-  const openFitting = useCallback(
-    async (loaded: Fitting) => {
-      setUnresolved([]);
-      setFitXmlUnresolved([]);
+  const openLoaded = useCallback(
+    async (loaded: LoadedFitting) => {
+      setLastLoad(loaded);
       setSavedId(null);
-      await commitFitting(loaded);
+      await commitFitting(loaded.fitting);
     },
     [commitFitting]
   );
 
-  const openFittingXmlEntry = useCallback(
-    async (item: FittingXmlListItem) => {
-      if (item.fitting === null) return;
-      setUnresolved([]);
-      setFitXmlUnresolved(item.unresolved);
+  const openFitting = useCallback(
+    async (opened: Fitting) => {
+      setLastLoad(null);
       setSavedId(null);
-      await commitFitting(item.fitting);
+      await commitFitting(opened);
     },
     [commitFitting]
   );
@@ -430,7 +362,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     (record: { id: string; name: string; code: string }) => {
       pendingOpenRef.current = { code: record.code, name: record.name };
       setSavedId(record.id);
-      setUnresolved([]);
+      setLastLoad(null);
       setTooLargeToShare(false);
       setShareCode(record.code, { push: true });
     },
@@ -457,91 +389,25 @@ export function useFittingWorkspace(): FittingWorkspace {
   // The pilot the stats and fit checks run under; loaded once per Character,
   // not once per edit. A failed load is reported as a stats error.
   const { profile, failed: profileFailed } = usePilotProfile(activeCharacterId);
-
-  // A different hull (or none) is a different Fitting: drop the old numbers at
-  // once rather than show them under the new one's header — a swap from one
-  // open Fitting straight to another (a new paste, a pasted link,
-  // Back/Forward). An edit to the same hull keeps them until the
-  // recalculation below lands, so the bars don't blank on every click.
-  const hullTypeId = fitting?.shipTypeId ?? null;
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new hull, not a render-time derivation
-    setStats(null);
-    setStatsProgress(null);
-    setPrice(null);
-  }, [hullTypeId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new calculation, not a render-time derivation
-    setStatsError(false);
-    // Waits for the stored Damage Profile, so a pilot who picked Guristas
-    // doesn't get a uniform calculation thrown away a moment later.
-    if (fitting === null || profile === null || !damageProfilesHydrated) return;
-    void (async () => {
-      try {
-        // Swaps in the Fitting's own carried implants/boosters where the
-        // resolved basis is "fitting" — `profile` (exposed as-is to fit
-        // checks/candidates, which only care about skills) stays untouched.
-        const effectiveProfile = applyImplantBasis(profile, fitting, implantBasis);
-        const result = await computeFittingStats(
-          fitting,
-          effectiveProfile,
-          (progress) => {
-            if (!cancelled) setStatsProgress(progress);
-          },
-          damageProfile
-        );
-        if (cancelled) return;
-        setEngineReady(true);
-        setStats({ fitting, stats: result });
-      } catch {
-        if (!cancelled) setStatsError(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [fitting, profile, implantBasis, damageProfile, damageProfilesHydrated]);
-
-  // Price: independent of the dogma engine, so it can — and should — resolve
-  // well before stats do.
-  useEffect(() => {
-    let cancelled = false;
-    if (fitting === null) return;
-    void (async () => {
-      const result = await loadFittingPrice(fitting, DEFAULT_TRADE_HUB);
-      if (!cancelled) setPrice(result);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [fitting]);
+  const evaluation = useFittingEvaluation({ fitting, profile, implantBasis });
 
   return {
     fitting,
     shareError,
-    unresolved,
-    fitXmlUnresolved,
+    lastLoad,
     tooLargeToShare,
-    loadError,
     loadFromInput,
     loadFittingXmlDocument: resolveFittingXmlDocument,
-    openFittingXmlEntry,
+    openLoaded,
     openFitting,
     edit,
     implantBasis,
     canUseCloneBasis,
     setImplantBasis: setBasisOverride,
     setImplantSet,
-    stats: stats?.stats ?? null,
-    statsFitting: stats?.fitting ?? null,
-    statsProgress,
-    statsError: statsError || profileFailed,
-    engineReady,
+    ...evaluation,
+    statsError: evaluation.statsError || profileFailed,
     profile,
-    damageProfiles,
-    price,
     savedId,
     canSave,
     save,

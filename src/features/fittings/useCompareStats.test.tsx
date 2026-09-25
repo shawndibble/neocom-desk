@@ -11,6 +11,10 @@ vi.mock('./dogmaFittingEngine', () => ({
   computeFittingStats: (f: Fitting, p: PilotProfile, progress: unknown, damage?: DamageProfile) =>
     computeFittingStats(f, p, progress, damage),
 }));
+const damage = vi.hoisted(() => ({ hydrated: false, selected: null as unknown }));
+vi.mock('./damageProfiles', () => ({
+  useDamageProfiles: () => ({ hydrated: damage.hydrated, selected: damage.selected }),
+}));
 
 const profile = { skillLevels: new Map() } as unknown as PilotProfile;
 const fit = { name: 'a' } as unknown as Fitting;
@@ -20,15 +24,17 @@ const kinProfile: DamageProfile = { em: 0.25, thermal: 0.25, kinetic: 0.25, expl
 beforeEach(() => computeFittingStats.mockClear());
 
 describe('useCompareStats', () => {
-  it('waits for a Damage Profile, then recomputes when it changes', async () => {
+  it('waits for the stored Damage Profile, then recomputes when it changes', async () => {
     const fittings = [fit];
-    const { result, rerender } = renderHook(({ dp }) => useCompareStats(fittings, profile, dp), {
-      initialProps: { dp: null as DamageProfile | null },
-    });
+    damage.hydrated = false;
+    damage.selected = emProfile;
+    const { result, rerender } = renderHook(() => useCompareStats(fittings, profile));
     expect(computeFittingStats).not.toHaveBeenCalled();
-    rerender({ dp: emProfile });
+    damage.hydrated = true;
+    rerender();
     await waitFor(() => expect(result.current.values[0]).toEqual({ tag: 1 }));
-    rerender({ dp: kinProfile });
+    damage.selected = kinProfile;
+    rerender();
     await waitFor(() => expect(result.current.values[0]).toEqual({ tag: 0.25 }));
   });
 });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseAppraisalPaste } from '@/engine/market/appraisalPaste';
 import { classifyLoadInput, loadDnaFitting } from './linkLoader';
-import { eftResultToFitting, loadEftFitting, type EftSlotLookup } from './eftLoader';
+import { loadEftFitting, type EftSlotLookup } from './eftLoader';
 import {
   fittingItemCounts,
   fittingToChatLink,
@@ -93,12 +93,11 @@ describe('fittingToEft', () => {
     expect(loaded.hullTypeId).toBe(587);
     if (loaded.hullTypeId === null) return;
     expect(loaded.unresolved).toEqual([]);
-    const fitting = eftResultToFitting(loaded, 'x');
-    expect(fitting.modules.map((m) => [m.slot, m.typeId, m.chargeTypeId])).toEqual(
+    expect(loaded.modules.map((m) => [m.slot, m.typeId, m.chargeTypeId])).toEqual(
       FITTING.modules.map((m) => [m.slot, m.typeId, m.chargeTypeId])
     );
-    expect(fitting.drones).toEqual(FITTING.drones);
-    expect(fitting.cargo).toEqual(FITTING.cargo);
+    expect(loaded.drones).toEqual(FITTING.drones);
+    expect(loaded.cargo).toEqual(FITTING.cargo);
   });
 
   it('keeps a hostile name from breaking the header', () => {

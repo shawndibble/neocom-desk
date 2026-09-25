@@ -1,6 +1,6 @@
 /**
- * Turns a parsed EFT fit (`engine/import/eftFit.ts`) into a domain `Fitting`
- * (issue #1531) — the "Load EFT" half of #1532. `parseEftFit` only reads the
+ * Turns a parsed EFT fit (`engine/import/eftFit.ts`) into a `Fitting`'s
+ * `LoadParts` (issue #1531, `load.ts`) — the "Load EFT" half of #1532. `parseEftFit` only reads the
  * paste's text structure (names, an optional loaded charge, section blank
  * lines it deliberately doesn't track); this is where a name becomes a
  * typeId and a typeId becomes a rack.
@@ -24,20 +24,14 @@
 import { parseEftFit, type EftItem } from '@/engine/import/eftFit';
 import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
 import type { FittingSlotAssignment } from '@/sde/types';
+import type { LoadParts, LoadWarning } from './load';
 import {
   sortFittingModules,
-  type Fitting,
   type FittingCargoItem,
   type FittingDrone,
   type FittingModule,
   type FittingSlotKind,
 } from './types';
-
-export interface EftUnresolvedItem {
-  line: number;
-  text: string;
-  reason: string;
-}
 
 /** A `TypeCatalog` value, matching `features/skills/typeCatalog.ts`'s shape. */
 export interface EftTypeLookup {
@@ -45,16 +39,6 @@ export interface EftTypeLookup {
 }
 
 export type EftSlotLookup = Readonly<Record<string, FittingSlotAssignment>>;
-
-export type EftLoadResult =
-  | {
-      hullTypeId: number;
-      modules: FittingModule[];
-      drones: FittingDrone[];
-      cargo: FittingCargoItem[];
-      unresolved: EftUnresolvedItem[];
-    }
-  | { hullTypeId: null; unresolved: EftUnresolvedItem[] };
 
 /**
  * Same shape as `eftFit.ts`'s own `QUANTITY_SUFFIX` — duplicated rather than
@@ -74,10 +58,10 @@ export function loadEftFitting(
   text: string,
   typeByName: EftTypeLookup,
   slotByTypeId: EftSlotLookup
-): EftLoadResult {
+): LoadParts {
   const fit = parseEftFit(text);
   const lines = text.split(/\r\n|\r|\n/);
-  const unresolved: EftUnresolvedItem[] = fit.errors.map((e) => ({
+  const unresolved: LoadWarning[] = fit.errors.map((e) => ({
     line: e.line,
     text: e.text,
     reason: e.reason,
@@ -153,18 +137,4 @@ export function loadEftFitting(
   // Deterministic order regardless of the order sections happened to appear
   // in the pasted text — the same order the List view's racks render in.
   return { hullTypeId, modules: sortFittingModules(modules), drones, cargo, unresolved };
-}
-
-/** Assembles a `Fitting` from a successful `EftLoadResult`, plus the name a Share Link can't carry. */
-export function eftResultToFitting(
-  result: Extract<EftLoadResult, { hullTypeId: number }>,
-  name: string
-): Fitting {
-  return {
-    name,
-    shipTypeId: result.hullTypeId,
-    modules: result.modules,
-    drones: result.drones,
-    cargo: result.cargo,
-  };
 }

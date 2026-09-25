@@ -49,11 +49,7 @@ export function FittingCompare() {
   } = usePilotProfile(activeCharacterId);
   const fittings = useMemo(() => slots.map((slot) => slot?.fitting ?? null), [slots]);
   const damageProfiles = useDamageProfiles();
-  const stats = useCompareStats(
-    fittings,
-    profile,
-    damageProfiles.hydrated ? damageProfiles.selected : null
-  );
+  const stats = useCompareStats(fittings, profile);
   const canFly = useCompareCanFly(fittings, profile);
   const isPhone = useIsPhone();
   const [page, setPage] = useState(0);

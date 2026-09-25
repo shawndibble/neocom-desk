@@ -33,13 +33,13 @@ describe('defaultImplantBasis', () => {
 
 describe('applyImplantBasis', () => {
   it('returns the clone profile unchanged on "clone" basis', () => {
-    expect(applyImplantBasis(cloneProfile, fitting(), 'clone')).toEqual(cloneProfile);
+    expect(applyImplantBasis(cloneProfile, undefined, 'clone')).toEqual(cloneProfile);
   });
 
   it('swaps in the Fitting\'s carried implants and boosters on "fitting" basis', () => {
     const result = applyImplantBasis(
       cloneProfile,
-      fitting({ implantSet: { implants: [19151], boosters: [30006] } }),
+      { implants: [19151], boosters: [30006] },
       'fitting'
     );
     expect(result.implantTypeIds).toEqual([19151]);
@@ -48,7 +48,7 @@ describe('applyImplantBasis', () => {
   });
 
   it('reads as no implants/boosters on "fitting" basis when the Fitting carries no set', () => {
-    const result = applyImplantBasis(cloneProfile, fitting(), 'fitting');
+    const result = applyImplantBasis(cloneProfile, undefined, 'fitting');
     expect(result.implantTypeIds).toEqual([]);
     expect(result.boosterTypeIds).toEqual([]);
   });

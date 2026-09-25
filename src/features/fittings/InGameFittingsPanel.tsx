@@ -10,12 +10,9 @@ import { Button, DataAgeBadge, EmptyState, IconButton, Panel, Spinner } from '@/
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
-import {
-  esiFittingToFitting,
-  type EsiFittingUnresolvedItem,
-} from '@/engine/fittings/esiFittingMapper';
+import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
+import type { LoadedFitting } from '@/engine/fittings/load';
 import { groupByHull, type MyFittingRow } from '@/engine/fittings/myFittings';
-import type { Fitting } from '@/engine/fittings/types';
 import type { CachedResult } from '@/esi/cache';
 import type { CharacterFitting } from '@/esi/endpoints';
 import { loadTypes } from '@/sde/loadSde';
@@ -23,7 +20,7 @@ import { loadInGameFittings } from './inGameFittings';
 
 interface InGameFittingsPanelProps {
   characterId: number;
-  onOpen: (fitting: Fitting) => void;
+  onOpen: (loaded: LoadedFitting) => void;
 }
 
 export function InGameFittingsPanel({ characterId, onOpen }: InGameFittingsPanelProps) {
@@ -33,13 +30,6 @@ export function InGameFittingsPanel({ characterId, onOpen }: InGameFittingsPanel
   const [hullNames, setHullNames] = useState<ReadonlyMap<number, string>>(new Map());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  // The most recent Open's dropped items (FighterBay/ServiceSlot — carriers,
-  // structures — this app has no rack for), so a partial Load says so instead
-  // of silently opening short.
-  const [openUnresolved, setOpenUnresolved] = useState<{
-    name: string;
-    items: EsiFittingUnresolvedItem[];
-  } | null>(null);
 
   // Guards a Character switch mid-fetch: a stale response landing after a
   // newer request started must not overwrite what that newer request set.
@@ -77,16 +67,9 @@ export function InGameFittingsPanel({ characterId, onOpen }: InGameFittingsPanel
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new Character/grant, not a render-time derivation
     setResult(null);
     setError(false);
-    setOpenUnresolved(null);
     if (granted === true) void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh() reads characterId via closure; a Character switch is the only thing that should re-fetch.
   }, [characterId, granted]);
-
-  function handleOpen(fitting: CharacterFitting) {
-    const { fitting: mapped, unresolved } = esiFittingToFitting(fitting);
-    setOpenUnresolved(unresolved.length > 0 ? { name: fitting.name, items: unresolved } : null);
-    onOpen(mapped);
-  }
 
   const fittings = result?.data ?? [];
   const groups = useMemo(() => {
@@ -138,14 +121,6 @@ export function InGameFittingsPanel({ characterId, onOpen }: InGameFittingsPanel
         <EmptyState title={t('fittings.inGame.emptyTitle')} hint={t('fittings.inGame.emptyHint')} />
       ) : (
         <div className="space-y-3">
-          {openUnresolved && (
-            <p role="alert" className="text-xs text-warning">
-              {t('fittings.inGame.unresolvedNote', {
-                count: openUnresolved.items.length,
-                name: openUnresolved.name,
-              })}
-            </p>
-          )}
           {groups.map((group) => (
             <div key={group.hull ?? ''}>
               <p className="mb-1 text-xs font-semibold text-text-dim uppercase">{group.hull}</p>
@@ -153,7 +128,11 @@ export function InGameFittingsPanel({ characterId, onOpen }: InGameFittingsPanel
                 {group.rows.map((row) => (
                   <li key={row.id} className="flex items-center justify-between gap-2">
                     <span className="truncate text-sm">{row.name}</span>
-                    <Button size="sm" variant="ghost" onClick={() => handleOpen(row.fitting)}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => onOpen(esiFittingToFitting(row.fitting))}
+                    >
                       {t('fittings.inGame.openAction')}
                     </Button>
                   </li>

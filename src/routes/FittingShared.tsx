@@ -10,19 +10,12 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { resolveFittingShareView } from '@/features/fittings/resolveFittingShareView';
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
-import { useDamageProfiles } from '@/features/fittings/damageProfiles';
 import { useTargetProfiles } from '@/features/fittings/targetProfiles';
-import {
-  computeFittingStats,
-  type DogmaAssetProgress,
-} from '@/features/fittings/dogmaFittingEngine';
-import { loadFittingPrice } from '@/features/fittings/fittingPrice';
+import { useFittingEvaluation } from '@/features/fittings/useFittingEvaluation';
 import { fittingToEft } from '@/engine/fittings/eftExport';
 import { FITTING_SLOT_KINDS } from '@/engine/fittings/types';
-import type { Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
-import type { Appraisal } from '@/engine/market/appraisal';
+import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 import { loadTypes } from '@/sde/loadSde';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 
 type LoadState =
   | { status: 'loading' }
@@ -54,28 +47,14 @@ export function FittingShared() {
   const characterCount = useLiveQuery(() => db.characters.count());
 
   const [state, setState] = useState<LoadState>({ status: 'loading' });
-  const [stats, setStats] = useState<FittingStats | null>(null);
-  const [statsProgress, setStatsProgress] = useState<DogmaAssetProgress | null>(null);
-  const [statsError, setStatsError] = useState(false);
-  const [price, setPrice] = useState<Appraisal | null>(null);
   const [typeName, setTypeName] = useState<TypeName | null>(null);
   const [copied, setCopied] = useState(false);
-  // The viewer's own Damage Profile (a local-then-synced setting, so it works
-  // with no session too) — the link itself never carries one.
-  const damageProfiles = useDamageProfiles();
   const targetProfiles = useTargetProfiles();
-  const damageProfile = damageProfiles.selected;
-  const damageProfilesHydrated = damageProfiles.hydrated;
   const [copyFailed, setCopyFailed] = useState(false);
 
-  // A different code means old numbers belong to a different Fitting — drop
-  // them at once rather than show them under the new one's header while the
-  // new decode/stats are still in flight.
+  // A different code means the old names belong to a different Fitting.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new code, not a render-time derivation
-    setStats(null);
-    setStatsProgress(null);
-    setPrice(null);
     setTypeName(null);
   }, [code]);
 
@@ -113,42 +92,14 @@ export function FittingShared() {
   const readyFitting = state.status === 'ready' ? state.fitting : null;
   const readyProfile = state.status === 'ready' ? state.profile : null;
 
-  useEffect(() => {
-    if (readyFitting === null || readyProfile === null || !damageProfilesHydrated) return;
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new calculation, not a render-time derivation
-    setStatsError(false);
-    void (async () => {
-      try {
-        const result = await computeFittingStats(
-          readyFitting,
-          readyProfile,
-          (progress) => {
-            if (!cancelled) setStatsProgress(progress);
-          },
-          damageProfile
-        );
-        if (!cancelled) setStats(result);
-      } catch {
-        if (!cancelled) setStatsError(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [readyFitting, readyProfile, damageProfile, damageProfilesHydrated]);
-
-  useEffect(() => {
-    if (readyFitting === null) return;
-    let cancelled = false;
-    void (async () => {
-      const result = await loadFittingPrice(readyFitting, DEFAULT_TRADE_HUB);
-      if (!cancelled) setPrice(result);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [readyFitting]);
+  // On the Fitting's own set, under the viewer's own Damage Profile (a
+  // local-then-synced setting, so it works with no session too) — the link
+  // itself never carries one. A new code clears the stats while it resolves.
+  const { stats, statsProgress, statsError, price, damageProfiles } = useFittingEvaluation({
+    fitting: readyFitting,
+    profile: readyProfile,
+    implantBasis: 'fitting',
+  });
 
   useEffect(() => {
     if (readyFitting === null) return;

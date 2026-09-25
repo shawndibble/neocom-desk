@@ -7,36 +7,26 @@
  */
 import { useCallback, useState } from 'react';
 import { encodeFittingShare } from '@/engine/fitting/fittingShare';
-import type { EftUnresolvedItem } from '@/engine/fittings/eftLoader';
+import type { LoadedFitting, LoadOutcome } from '@/engine/fittings/load';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
-import type { FitXmlUnresolvedItem } from '@/engine/import/eveFitXml';
-import { loadFittingFromText, type LoadError } from './loadFittingFromText';
-import {
-  resolveFittingXmlDocument,
-  type FittingWorkspace,
-  type FittingXmlListItem,
-} from './useFittingWorkspace';
+import { loadFittingFromText } from './loadFittingFromText';
+import { resolveFittingXmlDocument, type FittingWorkspace } from './useFittingWorkspace';
 
 /** The slice of the workspace `FittingLibrary` drives; the picker supplies its own. */
 export type FittingLibrarySource = Pick<
   FittingWorkspace,
-  | 'unresolved'
-  | 'fitXmlUnresolved'
+  | 'lastLoad'
   | 'shareError'
-  | 'loadError'
   | 'tooLargeToShare'
   | 'loadFromInput'
   | 'loadFittingXmlDocument'
-  | 'openFittingXmlEntry'
-  | 'openFitting'
+  | 'openLoaded'
   | 'openSaved'
 >;
 
 export function useFittingPicker(onPick: (code: string) => void): FittingLibrarySource {
-  const [unresolved, setUnresolved] = useState<EftUnresolvedItem[]>([]);
-  const [fitXmlUnresolved, setFitXmlUnresolved] = useState<FitXmlUnresolvedItem[]>([]);
-  const [loadError, setLoadError] = useState<LoadError | null>(null);
+  const [lastLoad, setLastLoad] = useState<LoadOutcome | null>(null);
   const [tooLargeToShare, setTooLargeToShare] = useState(false);
 
   /** Picks a Fitting if it fits a Share Link; otherwise flags it too large. */
@@ -51,40 +41,24 @@ export function useFittingPicker(onPick: (code: string) => void): FittingLibrary
 
   const loadFromInput = useCallback(
     async (text: string) => {
-      setLoadError(null);
-      setFitXmlUnresolved([]);
       setTooLargeToShare(false);
-      const result = await loadFittingFromText(text);
-      if (result.shareCode !== null) {
-        setUnresolved([]);
-        onPick(result.shareCode);
+      const outcome = await loadFittingFromText(text);
+      if (outcome.kind === 'share') {
+        setLastLoad(null);
+        onPick(outcome.code);
         return;
       }
-      setUnresolved(result.unresolved);
-      if (result.error !== null) {
-        setLoadError(result.error);
-        return;
-      }
-      if (result.fitting !== null) await pickFitting(result.fitting);
+      setLastLoad(outcome);
+      if (outcome.kind === 'fitting') await pickFitting(outcome.fitting);
     },
     [onPick, pickFitting]
   );
 
-  const openFittingXmlEntry = useCallback(
-    async (item: FittingXmlListItem) => {
-      if (item.fitting === null) return;
-      setUnresolved([]);
-      setFitXmlUnresolved(item.unresolved);
+  const openLoaded = useCallback(
+    async (loaded: LoadedFitting) => {
+      setLastLoad(loaded);
       setTooLargeToShare(false);
-      await pickFitting(item.fitting);
-    },
-    [pickFitting]
-  );
-
-  const openFitting = useCallback(
-    async (fitting: Fitting) => {
-      setTooLargeToShare(false);
-      await pickFitting(fitting);
+      await pickFitting(loaded.fitting);
     },
     [pickFitting]
   );
@@ -92,15 +66,12 @@ export function useFittingPicker(onPick: (code: string) => void): FittingLibrary
   const openSaved = useCallback((record: { code: string }) => onPick(record.code), [onPick]);
 
   return {
-    unresolved,
-    fitXmlUnresolved,
+    lastLoad,
     shareError: null,
-    loadError,
     tooLargeToShare,
     loadFromInput,
     loadFittingXmlDocument: resolveFittingXmlDocument,
-    openFittingXmlEntry,
-    openFitting,
+    openLoaded,
     openSaved,
   };
 }
