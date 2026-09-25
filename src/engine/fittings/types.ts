@@ -28,6 +28,19 @@ export interface FittingModule {
   chargeTypeId?: number;
 }
 
+/**
+ * Sorts modules into the List view's own display order — `FITTING_SLOT_KINDS`
+ * order, slot index ascending within each rack — regardless of the order a
+ * loader (EFT paste, In-game Fittings) happened to encounter them in.
+ */
+export function sortFittingModules(modules: FittingModule[]): FittingModule[] {
+  return modules.sort(
+    (a, b) =>
+      FITTING_SLOT_KINDS.indexOf(a.slot) - FITTING_SLOT_KINDS.indexOf(b.slot) ||
+      a.slotIndex - b.slotIndex
+  );
+}
+
 export interface FittingDrone {
   typeId: number;
   /** Stack size, matching how many of this drone type are in the bay. */

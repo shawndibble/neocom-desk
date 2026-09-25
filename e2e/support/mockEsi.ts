@@ -88,6 +88,10 @@ const PREFETCHED_EMPTY = new Set(
     'contacts',
     'contracts',
     'corporationhistory',
+    // Not warmed at boot — the Fittings page's In-game Fittings panel fetches
+    // it on mount (issue #1539) — but every spec that merely visits that page
+    // is happy to see none; a fittings spec should override this route.
+    'fittings',
     'industry/jobs',
     'mail',
     // Trailing slash on purpose: `getCharacterMining` fetches

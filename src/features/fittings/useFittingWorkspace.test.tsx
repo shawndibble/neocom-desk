@@ -201,4 +201,20 @@ describe('useFittingWorkspace saving (My Fittings)', () => {
     await waitFor(() => expect(view.result.current.workspace.fitting?.name).toBe('My kite'));
     expect(view.result.current.workspace.savedId).toBe('r1');
   });
+
+  it('opening an In-game Fitting clears the previous saved id, so Save creates a new record rather than overwriting it (issue #1539)', async () => {
+    const view = await renderAt(RIFTER);
+    const encoded = await encodeFittingShare(
+      fittingToShareInput(addModule(RIFTER, 'medium', 0, 438))
+    );
+    if (!encoded.ok) throw new Error('encode failed');
+    act(() =>
+      view.result.current.workspace.openSaved({ id: 'r1', name: 'My kite', code: encoded.payload })
+    );
+    await waitFor(() => expect(view.result.current.workspace.savedId).toBe('r1'));
+
+    await act(() => view.result.current.workspace.openFitting(RIFTER));
+    await waitFor(() => expect(view.result.current.workspace.fitting?.name).toBe(RIFTER.name));
+    expect(view.result.current.workspace.savedId).toBeNull();
+  });
 });

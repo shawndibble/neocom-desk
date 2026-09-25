@@ -17,6 +17,7 @@ import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
 import { MyFittingsPanel } from '@/features/fittings/MyFittingsPanel';
 import { FittingLoadCard } from '@/features/fittings/FittingLoadCard';
+import { InGameFittingsPanel } from '@/features/fittings/InGameFittingsPanel';
 import { FittingRackList, ModuleRow } from '@/features/fittings/FittingRackList';
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
@@ -207,6 +208,12 @@ export function Fittings() {
         loadError={workspace.loadError}
         tooLargeToShare={workspace.tooLargeToShare}
       />
+      {activeCharacterId !== null && (
+        <InGameFittingsPanel
+          characterId={activeCharacterId}
+          onOpen={(loaded) => void workspace.openFitting(loaded)}
+        />
+      )}
       <MyFittingsPanel characterId={activeCharacterId} onOpen={workspace.openSaved} />
       {fitting && viewHydrated && (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
