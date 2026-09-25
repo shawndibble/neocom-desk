@@ -150,8 +150,10 @@ function Value({
   return (
     <span
       className={cx(
-        'block truncate text-xl font-medium tabular-nums',
-        muted && 'text-text-dim',
+        'block text-xl font-medium tabular-nums',
+        // A muted value is a fixed empty-state sentence ("Nothing on a clock"),
+        // not a long name, so on a phone it wraps rather than clipping.
+        muted ? 'text-text-dim md:truncate' : 'truncate',
         className
       )}
     >

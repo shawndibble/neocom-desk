@@ -79,3 +79,17 @@ for (const width of [1280, 1440]) {
     expect(alerts!.x).toBeGreaterThan(cardsRight);
   });
 }
+
+// Issue #1684: the strip's fixed empty answers used to be single-line
+// truncated to "Nothing on a cl..." at phone width.
+test('summary strip empty answers are not clipped at 390px', async ({ page }) => {
+  await page.setViewportSize(PHONE);
+  await signInAndGoto(page, './overview');
+
+  for (const text of ['Nothing on a clock', 'Nothing in training']) {
+    const value = page.locator('main').getByText(text, { exact: true }).first();
+    await expect(value).toBeVisible();
+    const clipped = await value.evaluate((el) => el.scrollWidth > el.clientWidth);
+    expect(clipped).toBe(false);
+  }
+});
