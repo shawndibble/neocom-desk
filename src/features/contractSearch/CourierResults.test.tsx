@@ -489,8 +489,7 @@ describe('CourierResults on a phone', () => {
     expect(await screen.findByText('62 hauls · 2 lanes')).toBeInTheDocument();
   });
 
-  it('regroups the whole board once "Show all" lifts the row cap', async () => {
-    const user = userEvent.setup();
+  it('groups over every row from the start, with no cap to lift', async () => {
     const many = Array.from({ length: 60 }, (_, index) =>
       laneRow(1_000 + index, 10_000_000, 10_000)
     );
@@ -504,11 +503,10 @@ describe('CourierResults on a phone', () => {
       </MemoryRouter>
     );
 
-    // Grouping runs over the capped page, so the lane first shows its first 50.
-    expect(await laneToggle()).toHaveTextContent('50 hauls');
-    await user.click(screen.getByRole('button', { name: 'Show all (62 total)' }));
-
+    // No pre-grouping cap on phone: the lane's true count shows immediately.
     expect(await laneToggle()).toHaveTextContent('60 hauls');
     expect(screen.getByRole('button', { name: /^Amarr.*→ Jita/ })).toHaveTextContent('2 hauls');
+    // Nothing left to reveal, so the cap-lifting control has no reason to show.
+    expect(screen.queryByRole('button', { name: /^Show all/ })).not.toBeInTheDocument();
   });
 });
