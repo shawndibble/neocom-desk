@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import '@/i18n';
@@ -21,18 +21,15 @@ vi.mock('@/sde/loadSde', () => ({
   }),
   loadSkills: sde.loadSkills,
 }));
-vi.mock('./fittingPrice', () => ({ loadFittingPrice: async () => null }));
-const computeFittingStats = vi.fn(async (fitting: Fitting) => ({
-  modules: fitting.modules.map(() => ({
-    state: 'online',
-    maxState: 'online',
-    chargeGroupIds: [],
-  })),
-}));
-vi.mock('./dogmaFittingEngine', () => ({
+vi.mock('@/features/fittings/fittingPrice', () => ({ loadFittingPrice: async () => null }));
+// No engine in tests: every calculation fails, which the stats sections show
+// as their own error rather than needing a full `FittingStats` here.
+const computeFittingStats = vi.fn(async (): Promise<FittingStats> => {
+  throw new Error('no dogma engine in tests');
+});
+vi.mock('@/features/fittings/dogmaFittingEngine', () => ({
   isDogmaEngineReady: () => false,
-  computeFittingStats: (fitting: Fitting) =>
-    computeFittingStats(fitting) as unknown as Promise<FittingStats>,
+  computeFittingStats: () => computeFittingStats(),
 }));
 
 const RIFTER: Fitting = {
@@ -96,6 +93,7 @@ describe('FittingShared', () => {
       )
     ).toBeInTheDocument();
     expect(await screen.findByText('125mm Gatling AutoCannon I')).toBeInTheDocument();
+    await waitFor(() => expect(computeFittingStats).toHaveBeenCalled());
     expect(screen.getByRole('link', { name: 'Open in Neocom Desk' })).toHaveAttribute(
       'href',
       '/login'

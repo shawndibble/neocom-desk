@@ -1,9 +1,8 @@
 /**
  * Orchestrates the Fittings page (issue #1532): the open Fitting lives in the
  * `?f=` Share Link (CONTEXT.md **Share Link**) — every load rewrites it, a
- * reload or a pasted URL decodes it back. Stats (dogma engine, lazy) and
- * price (hub order book) are two independent loads off the same `fitting`,
- * which is why price can resolve well before stats do.
+ * reload or a pasted URL decodes it back. Its stats and price come from
+ * `useFittingEvaluation`, under the active Character's pilot.
  *
  * Editing (issue #1533) goes through the same URL: `edit` applies a pure
  * `fittingEdit.ts` change, shows it at once, and pushes the re-encoded code
@@ -13,13 +12,13 @@
  *
  * The implant/booster basis toggle ("My clone" vs "Fitting's") rides on the
  * same `edit()` path — an implant-set edit is just another Fitting change —
- * but only affects the profile `computeFittingStats` sees; `profile` itself
- * (exposed to fit checks/candidates) always stays the active Character's own.
+ * and is resolved here, per Fitting; the evaluation applies it. `profile`
+ * itself (exposed to fit checks/candidates) always stays the active
+ * Character's own.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { db } from '@/db';
 import { saveFitting } from './myFittings';
-import { useDamageProfiles, type DamageProfiles } from './damageProfiles';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useUrlParam } from '@/lib/useUrlState';
 import { nullableTextParam } from '@/lib/urlState';
@@ -33,28 +32,12 @@ import {
 } from '@/engine/import/eveFitXml';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
 import { loadFittingFromText, type LoadError } from './loadFittingFromText';
-import {
-  applyImplantBasis,
-  defaultImplantBasis,
-  type ImplantBasis,
-} from '@/engine/fittings/implantBasis';
-import type {
-  Fitting,
-  FittingImplantSet,
-  FittingStats,
-  PilotProfile,
-} from '@/engine/fittings/types';
-import type { Appraisal } from '@/engine/market/appraisal';
+import { defaultImplantBasis, type ImplantBasis } from '@/engine/fittings/implantBasis';
+import type { Fitting, FittingImplantSet, PilotProfile } from '@/engine/fittings/types';
 import { loadItemNameMap } from '@/features/skills/typeCatalog';
 import { loadTypes, typeName } from '@/sde/loadSde';
 import { usePilotProfile } from './fittingPilotProfile';
-import { loadFittingPrice } from './fittingPrice';
-import {
-  computeFittingStats,
-  isDogmaEngineReady,
-  type DogmaAssetProgress,
-} from './dogmaFittingEngine';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { useFittingEvaluation, type FittingEvaluation } from './useFittingEvaluation';
 
 export type ShareDecodeError = 'invalid' | 'unsupported-version';
 export type { LoadError };
@@ -112,7 +95,8 @@ const COALESCE_MS = 1000;
 /** A pure change to the open Fitting — one of `src/engine/fittings/fittingEdit.ts`'s. */
 export type FittingChange = (fitting: Fitting) => Fitting;
 
-export interface FittingWorkspace {
+/** The open Fitting's evaluation (stats, price, Variations) plus everything that opens, edits and saves it. */
+export interface FittingWorkspace extends FittingEvaluation {
   fitting: Fitting | null;
   /** Set when `?f=` carries a payload this build can't read at all. */
   shareError: ShareDecodeError | null;
@@ -145,29 +129,8 @@ export interface FittingWorkspace {
   setImplantBasis: (basis: ImplantBasis) => void;
   /** Edits the set the open Fitting carries via `edit()`. `undefined` removes it. */
   setImplantSet: (implantSet: FittingImplantSet | undefined) => void;
-  /**
-   * The latest stats. After an edit to the same hull these are the previous
-   * fit's until the new calculation lands, so the bars don't blank on every
-   * click — `statsFitting` says which Fitting they belong to.
-   */
-  stats: FittingStats | null;
-  statsFitting: Fitting | null;
-  statsProgress: DogmaAssetProgress | null;
-  statsError: boolean;
-  /** The ship data (dogma engine) is loaded, so slot and fit checks can run. */
-  engineReady: boolean;
   /** The active Character's own skills and clone, for fit checks; null while loading. */
   profile: PilotProfile | null;
-  /**
-   * `profile` under the implant basis: exactly the pilot the stats run
-   * under, so anything evaluating variants of the open Fitting (Variations)
-   * agrees with them. One object until the profile, the Fitting's carried set
-   * or the basis changes.
-   */
-  statsProfile: PilotProfile | null;
-  /** The Damage Profile the stats' EHP is measured against, and the pilot's custom ones (synced). */
-  damageProfiles: DamageProfiles;
-  price: Appraisal | null;
   /** The saved record the open Fitting came from, so Save updates it. */
   savedId: string | null;
   /** Saving needs a Character and a Fitting small enough to have a share code. */
@@ -193,18 +156,9 @@ export function useFittingWorkspace(): FittingWorkspace {
   const [loadError, setLoadError] = useState<LoadError | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
 
-  const [stats, setStats] = useState<{ fitting: Fitting; stats: FittingStats } | null>(null);
-  const [statsProgress, setStatsProgress] = useState<DogmaAssetProgress | null>(null);
-  const [statsError, setStatsError] = useState(false);
-  const [engineReady, setEngineReady] = useState(isDogmaEngineReady);
   // User's explicit toggle pick, layered over `defaultImplantBasis`'s
   // per-Fitting default; `null` means "no override yet, use the default".
   const [basisOverride, setBasisOverride] = useState<ImplantBasis | null>(null);
-
-  const [price, setPrice] = useState<Appraisal | null>(null);
-  const damageProfiles = useDamageProfiles();
-  const damageProfile = damageProfiles.selected;
-  const damageProfilesHydrated = damageProfiles.hydrated;
 
   // Set right before this hook's own `setShareCode` writes, so the decode
   // effect below can tell "the URL changed because we just wrote it" (keep
@@ -464,71 +418,7 @@ export function useFittingWorkspace(): FittingWorkspace {
   // The pilot the stats and fit checks run under; loaded once per Character,
   // not once per edit. A failed load is reported as a stats error.
   const { profile, failed: profileFailed } = usePilotProfile(activeCharacterId);
-  // Swaps in the Fitting's own carried implants/boosters where the resolved
-  // basis is "fitting" — `profile` (exposed as-is to fit checks/candidates,
-  // which only care about skills) stays untouched. Keyed on the carried set,
-  // not the Fitting, so an edit that leaves the set alone keeps the object.
-  const implantSet = fitting?.implantSet;
-  const statsProfile = useMemo(
-    () => (profile === null ? null : applyImplantBasis(profile, implantSet, implantBasis)),
-    [profile, implantSet, implantBasis]
-  );
-
-  // A different hull (or none) is a different Fitting: drop the old numbers at
-  // once rather than show them under the new one's header — a swap from one
-  // open Fitting straight to another (a new paste, a pasted link,
-  // Back/Forward). An edit to the same hull keeps them until the
-  // recalculation below lands, so the bars don't blank on every click.
-  const hullTypeId = fitting?.shipTypeId ?? null;
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new hull, not a render-time derivation
-    setStats(null);
-    setStatsProgress(null);
-    setPrice(null);
-  }, [hullTypeId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new calculation, not a render-time derivation
-    setStatsError(false);
-    // Waits for the stored Damage Profile, so a pilot who picked Guristas
-    // doesn't get a uniform calculation thrown away a moment later.
-    if (fitting === null || statsProfile === null || !damageProfilesHydrated) return;
-    void (async () => {
-      try {
-        const result = await computeFittingStats(
-          fitting,
-          statsProfile,
-          (progress) => {
-            if (!cancelled) setStatsProgress(progress);
-          },
-          damageProfile
-        );
-        if (cancelled) return;
-        setEngineReady(true);
-        setStats({ fitting, stats: result });
-      } catch {
-        if (!cancelled) setStatsError(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [fitting, statsProfile, damageProfile, damageProfilesHydrated]);
-
-  // Price: independent of the dogma engine, so it can — and should — resolve
-  // well before stats do.
-  useEffect(() => {
-    let cancelled = false;
-    if (fitting === null) return;
-    void (async () => {
-      const result = await loadFittingPrice(fitting, DEFAULT_TRADE_HUB);
-      if (!cancelled) setPrice(result);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [fitting]);
+  const evaluation = useFittingEvaluation({ fitting, profile, implantBasis });
 
   return {
     fitting,
@@ -546,15 +436,9 @@ export function useFittingWorkspace(): FittingWorkspace {
     canUseCloneBasis,
     setImplantBasis: setBasisOverride,
     setImplantSet,
-    stats: stats?.stats ?? null,
-    statsFitting: stats?.fitting ?? null,
-    statsProgress,
-    statsError: statsError || profileFailed,
-    engineReady,
+    ...evaluation,
+    statsError: evaluation.statsError || profileFailed,
     profile,
-    statsProfile,
-    damageProfiles,
-    price,
     savedId,
     canSave,
     save,

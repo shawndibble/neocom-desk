@@ -250,14 +250,11 @@ export function Fittings() {
     : -1;
   const openModule = fitting && openModuleIndex >= 0 ? fitting.modules[openModuleIndex] : null;
   const { rows: variationRows } = useModuleVariations({
-    fitting,
+    variants: workspace.variants,
     slot: moduleSlot?.slot ?? 'high',
     slotIndex: moduleSlot?.slotIndex ?? 0,
     typeId: openModule?.typeId ?? 0,
     catalogue,
-    engineReady: workspace.engineReady,
-    profile: workspace.statsProfile,
-    damageProfile: workspace.damageProfiles.selected,
   });
   function swapVariation(typeId: number) {
     if (!moduleSlot) return;

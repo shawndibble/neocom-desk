@@ -2,12 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import type { Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
 import type { FittingCatalogue } from './useFittingCatalogue';
+import type { VariantEvaluator } from './useFittingEvaluation';
 import { useModuleVariations } from './useModuleVariations';
 
-const computeFittingStats = vi.fn();
 const checkCandidates = vi.fn();
 vi.mock('./dogmaFittingEngine', () => ({
-  computeFittingStats: (...args: unknown[]) => computeFittingStats(...args),
   checkCandidates: (...args: unknown[]) => checkCandidates(...args),
 }));
 
@@ -71,6 +70,18 @@ const fitting: Fitting = {
 
 const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] };
 
+/** A variant's stats by the type swapped into slot 0; `compare` pairs them with `baseStats`. */
+function evaluator(afterFor: (typeId: number | undefined) => FittingStats): VariantEvaluator {
+  return {
+    fitting,
+    profile,
+    compare: vi.fn(async (variant: Fitting) => ({
+      before: baseStats,
+      after: afterFor(variant.modules[0]?.typeId),
+    })),
+  };
+}
+
 const catalogue: FittingCatalogue = {
   types: {
     100: { name: 'Root Gun I', groupID: 1 },
@@ -98,28 +109,13 @@ describe('useModuleVariations', () => {
     vi.clearAllMocks();
   });
 
-  /** Baseline call is the unswapped Fitting (module typeId 100); any other call is a swap candidate. */
-  function mockEngineFor(swappedEhp: number) {
-    computeFittingStats.mockImplementation(async (f: Fitting) =>
-      f.modules[0]?.typeId === 100 ? baseStats : { ...baseStats, ehp: swappedEhp }
-    );
-  }
-
   it('lists same-rack siblings only, excluding the currently fitted type, with delta/fits/canFly/price', async () => {
-    mockEngineFor(24000);
+    const variants = evaluator(() => ({ ...baseStats, ehp: 24000 }));
     checkCandidates.mockReturnValue(new Map([[101, { fitsHull: true, canFly: true }]]));
     getHubPrices.mockResolvedValue(new Map([[101, { sellMin: 5_000_000 }]]));
 
     const { result } = renderHook(() =>
-      useModuleVariations({
-        fitting,
-        slot: 'high',
-        slotIndex: 0,
-        typeId: 100,
-        catalogue,
-        engineReady: true,
-        profile,
-      })
+      useModuleVariations({ variants, slot: 'high', slotIndex: 0, typeId: 100, catalogue })
     );
 
     expect(result.current.rows.map((row) => row.typeId)).toEqual([101]);
@@ -136,60 +132,38 @@ describe('useModuleVariations', () => {
   });
 
   it('returns no rows for a type with no siblings, without calling the engine', () => {
+    const variants = evaluator(() => baseStats);
     const { result } = renderHook(() =>
-      useModuleVariations({
-        fitting,
-        slot: 'high',
-        slotIndex: 0,
-        typeId: 999,
-        catalogue,
-        engineReady: true,
-        profile,
-      })
+      useModuleVariations({ variants, slot: 'high', slotIndex: 0, typeId: 999, catalogue })
     );
 
     expect(result.current.rows).toEqual([]);
     expect(result.current.loading).toBe(false);
-    expect(computeFittingStats).not.toHaveBeenCalled();
+    expect(variants.compare).not.toHaveBeenCalled();
   });
 
-  it('recomputes its own baseline against the current profile, not a stale caller-supplied one', async () => {
-    mockEngineFor(24000);
+  it("drops the previous evaluator's rows until the new one's land", async () => {
     checkCandidates.mockReturnValue(new Map([[101, { fitsHull: true, canFly: true }]]));
     getHubPrices.mockResolvedValue(new Map());
 
-    const otherProfile: PilotProfile = {
-      skillLevels: new Map([[1, 5]]),
-      implantTypeIds: [],
-      boosterTypeIds: [],
-    };
     const { result, rerender } = renderHook(
-      (p: PilotProfile) =>
-        useModuleVariations({
-          fitting,
-          slot: 'high',
-          slotIndex: 0,
-          typeId: 100,
-          catalogue,
-          engineReady: true,
-          profile: p,
-        }),
-      { initialProps: profile }
+      (variants: VariantEvaluator) =>
+        useModuleVariations({ variants, slot: 'high', slotIndex: 0, typeId: 100, catalogue }),
+      { initialProps: evaluator(() => ({ ...baseStats, ehp: 24000 })) }
     );
     await waitFor(() => expect(result.current.rows[0].delta).not.toBeNull());
 
-    // A Character switch (new profile object, same Fitting/slot) must not
-    // keep showing the previous Character's fresh results while the new
-    // profile's own computation is still in flight.
-    rerender(otherProfile);
+    // A Character switch (a new evaluator, same Fitting/slot) must not keep
+    // showing the previous Character's results while its own are in flight.
+    rerender(evaluator(() => ({ ...baseStats, ehp: 26000 })));
     expect(result.current.rows[0].delta).toBeNull();
-    await waitFor(() => expect(result.current.rows[0].delta).not.toBeNull());
+    await waitFor(() =>
+      expect(result.current.rows[0].delta?.changes[0]).toMatchObject({ after: 26000 })
+    );
   });
 
   it('keeps the other rows when one variant candidate fails to calculate', async () => {
-    computeFittingStats.mockImplementation(async (f: Fitting) => {
-      const swappedTo = f.modules[0]?.typeId;
-      if (swappedTo === 100) return baseStats;
+    const variants = evaluator((swappedTo) => {
       if (swappedTo === 101) throw new Error('engine calculate() failed for this candidate');
       return { ...baseStats, ehp: 25000 };
     });
@@ -212,13 +186,11 @@ describe('useModuleVariations', () => {
 
     const { result } = renderHook(() =>
       useModuleVariations({
-        fitting,
+        variants,
         slot: 'high',
         slotIndex: 0,
         typeId: 100,
         catalogue: wideCatalogue,
-        engineReady: true,
-        profile,
       })
     );
 

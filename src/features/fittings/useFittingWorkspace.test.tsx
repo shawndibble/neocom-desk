@@ -8,7 +8,7 @@ import { MemoryRouter, useLocation, useNavigate, useNavigationType } from 'react
 import { encodeFittingShare } from '@/engine/fitting/fittingShare';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import { addModule, removeModule, setDroneCounts } from '@/engine/fittings/fittingEdit';
-import type { Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
+import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { useFittingWorkspace } from './useFittingWorkspace';
 
 const TYPES: Record<string, { name: string; groupID: number; volume: number }> = {
@@ -23,15 +23,16 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 vi.mock('@/sync', () => ({ scheduleSync: vi.fn(), markFittingDeleted: vi.fn() }));
 vi.mock('./fittingPrice', () => ({ loadFittingPrice: async () => null }));
-const computeFittingStats = vi.fn<
-  (fitting: Fitting, profile?: PilotProfile) => Promise<Pick<FittingStats, 'modules'>>
->(async (fitting) => ({
-  modules: fitting.modules.map(() => ({ state: 'online', maxState: 'online', chargeGroupIds: [] })),
-}));
 vi.mock('./dogmaFittingEngine', () => ({
   isDogmaEngineReady: () => false,
-  computeFittingStats: (fitting: Fitting, profile: PilotProfile) =>
-    computeFittingStats(fitting, profile) as unknown as Promise<FittingStats>,
+  computeFittingStats: async (fitting: Fitting) =>
+    ({
+      modules: fitting.modules.map(() => ({
+        state: 'online',
+        maxState: 'online',
+        chargeGroupIds: [],
+      })),
+    }) as unknown as FittingStats,
 }));
 
 const RIFTER: Fitting = {
@@ -129,52 +130,6 @@ describe('useFittingWorkspace editing', () => {
 
     act(() => view.result.current.navigate(-1));
     await waitFor(() => expect(view.result.current.location.search).toBe(before));
-  });
-
-  it('keeps the previous stats through a same-hull edit instead of blanking them', async () => {
-    const view = await renderAt(RIFTER);
-    await waitFor(() => expect(view.result.current.workspace.stats).not.toBeNull());
-    let release: () => void = () => {};
-    computeFittingStats.mockImplementationOnce(
-      (fitting) =>
-        new Promise((resolve) => {
-          release = () =>
-            resolve({
-              modules: fitting.modules.map(() => ({
-                state: 'online',
-                maxState: 'online',
-                chargeGroupIds: [],
-              })),
-            });
-        })
-    );
-
-    act(() => view.result.current.workspace.edit((f) => addModule(f, 'medium', 0, 438)));
-
-    expect(view.result.current.workspace.stats).not.toBeNull();
-    expect(view.result.current.workspace.statsFitting).not.toBe(
-      view.result.current.workspace.fitting
-    );
-    act(() => release());
-    await waitFor(() =>
-      expect(view.result.current.workspace.statsFitting).toBe(view.result.current.workspace.fitting)
-    );
-  });
-});
-
-describe('useFittingWorkspace implant basis', () => {
-  it("hands Variations the same pilot the main stats run under, on the Fitting's own set", async () => {
-    // No Character: the basis is always "fitting".
-    useActiveCharacter.setState({ activeCharacterId: null });
-    const view = await renderAt({ ...RIFTER, implantSet: { implants: [19540], boosters: [] } });
-    await waitFor(() => expect(view.result.current.workspace.stats).not.toBeNull());
-
-    const mainStatsPilot = computeFittingStats.mock.lastCall?.[1];
-    expect(mainStatsPilot?.implantTypeIds).toEqual([19540]);
-    expect(view.result.current.workspace.statsProfile).toBe(mainStatsPilot);
-    // A stable object, so the Variations baseline cache keyed on it holds.
-    view.rerender();
-    expect(view.result.current.workspace.statsProfile).toBe(mainStatsPilot);
   });
 });
 

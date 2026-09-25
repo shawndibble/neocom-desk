@@ -2,23 +2,19 @@
  * Per-module variations: a fitted module's T1/T2/faction/deadspace/officer
  * siblings, each with the whole-Fitting delta of swapping it in, CPU/PG/
  * calibration budget, active-Character can-fly, and Jita sell price. Rows
- * settle in async, keyed by fitting/profile/slot so a change mid-computation
+ * settle in async, keyed by evaluator/slot so a change mid-computation
  * never shows stale numbers under a new module or Character.
  *
- * Computes its own "before" baseline rather than trusting a caller-supplied
- * `FittingStats` — the workspace's own `stats` lags `fitting`/`profile` by
- * one recalculation after an edit or Character switch.
+ * Every number comes from the open Fitting's `VariantEvaluator`
+ * (`useFittingEvaluation`), which works out its own "before" baseline under
+ * the same pilot, implant basis and Damage Profile as the main stats rather
+ * than trusting the workspace's `stats`, which lag an edit or Character
+ * switch by one recalculation.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { swapModuleType } from '@/engine/fittings/fittingEdit';
 import { fitsResourceBudget } from '@/engine/fittings/skillGaps';
-import type {
-  DamageProfile,
-  Fitting,
-  FittingSlotKind,
-  FittingStats,
-  PilotProfile,
-} from '@/engine/fittings/types';
+import type { FittingSlotKind } from '@/engine/fittings/types';
 import { diffFittingStats, type FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import {
   buildVariationIndex,
@@ -27,39 +23,9 @@ import {
 } from '@/engine/market/variations';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
-import { checkCandidates, computeFittingStats } from './dogmaFittingEngine';
+import { checkCandidates } from './dogmaFittingEngine';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
-
-/** Keyed by Fitting, PilotProfile, then Damage Profile (all stable references across re-renders) so switching which module's panel is open doesn't repeat the whole-fit `calculate()` call. Evicted on failure so a transient error doesn't wedge every future attempt. */
-const baselineCache = new WeakMap<
-  Fitting,
-  WeakMap<PilotProfile, Map<DamageProfile | undefined, Promise<FittingStats>>>
->();
-
-function getBaselineStats(
-  fitting: Fitting,
-  profile: PilotProfile,
-  damageProfile: DamageProfile | undefined
-): Promise<FittingStats> {
-  let byProfile = baselineCache.get(fitting);
-  if (!byProfile) {
-    byProfile = new WeakMap();
-    baselineCache.set(fitting, byProfile);
-  }
-  let byDamageProfile = byProfile.get(profile);
-  if (!byDamageProfile) {
-    byDamageProfile = new Map();
-    byProfile.set(profile, byDamageProfile);
-  }
-  const cached = byDamageProfile.get(damageProfile);
-  if (cached) return cached;
-  const promise = computeFittingStats(fitting, profile, undefined, damageProfile, {
-    overheated: false,
-  });
-  byDamageProfile.set(damageProfile, promise);
-  promise.catch(() => byDamageProfile?.delete(damageProfile));
-  return promise;
-}
+import type { VariantEvaluator } from './useFittingEvaluation';
 
 export interface VariationRow {
   typeId: number;
@@ -73,16 +39,13 @@ export interface VariationRow {
 }
 
 interface UseModuleVariationsParams {
-  fitting: Fitting | null;
+  /** The open Fitting's evaluator; rows list without numbers while it's null. */
+  variants: VariantEvaluator | null;
   slot: FittingSlotKind;
   slotIndex: number;
   /** The type currently fitted at slot/slotIndex — excluded from its own sibling list. */
   typeId: number;
   catalogue: FittingCatalogue | null;
-  engineReady: boolean;
-  profile: PilotProfile | null;
-  /** The Damage Profile the Defense section measures EHP against, so the EHP deltas agree with it. */
-  damageProfile?: DamageProfile;
 }
 
 interface ComputedEntry {
@@ -92,14 +55,11 @@ interface ComputedEntry {
 }
 
 export function useModuleVariations({
-  fitting,
+  variants,
   slot,
   slotIndex,
   typeId,
   catalogue,
-  engineReady,
-  profile,
-  damageProfile,
 }: UseModuleVariationsParams): { rows: VariationRow[]; loading: boolean } {
   // Split from `members` below: the index walks every variation-grouped type
   // in the SDE, so it's worth keeping across a module switch that doesn't
@@ -117,9 +77,7 @@ export function useModuleVariations({
   }, [variationIndex, catalogue, typeId, slot]);
 
   const [computed, setComputed] = useState<{
-    fitting: Fitting;
-    profile: PilotProfile;
-    damageProfile: DamageProfile | undefined;
+    variants: VariantEvaluator;
     slot: FittingSlotKind;
     slotIndex: number;
     byTypeId: ReadonlyMap<number, ComputedEntry>;
@@ -131,27 +89,24 @@ export function useModuleVariations({
   } | null>(null);
 
   useEffect(() => {
-    if (!fitting || !profile || !engineReady || members.length === 0) return;
+    if (!variants || members.length === 0) return;
     let cancelled = false;
     void (async () => {
-      // A run stale by the time it lands (fitting/profile/slot changed
-      // meanwhile) is simply dropped — the effect that superseded it already
-      // has its own in-flight computation.
-      const before = await getBaselineStats(fitting, profile, damageProfile).catch(() => null);
-      if (cancelled || before === null) return;
-
       const typeIds = members.map((member) => member.typeId);
-      const candidateChecks = checkCandidates(fitting.shipTypeId, slot, typeIds, profile);
+      const candidateChecks = checkCandidates(
+        variants.fitting.shipTypeId,
+        slot,
+        typeIds,
+        variants.profile
+      );
       // `allSettled`, not `all`: one sibling's `calculate()` throwing (stale
       // SDE variation data, a slot mismatch) must not blank every other row
       // — each failure just leaves that row's delta/fits/canFly at null
       // rather than wedging the whole panel on "loading" forever.
       const settled = await Promise.allSettled(
         members.map(async (member): Promise<[number, ComputedEntry]> => {
-          const swapped = swapModuleType(fitting, slot, slotIndex, member.typeId);
-          const after = await computeFittingStats(swapped, profile, undefined, damageProfile, {
-            overheated: false,
-          });
+          const swapped = swapModuleType(variants.fitting, slot, slotIndex, member.typeId);
+          const { before, after } = await variants.compare(swapped);
           const check = candidateChecks.get(member.typeId);
           return [
             member.typeId,
@@ -163,23 +118,19 @@ export function useModuleVariations({
           ];
         })
       );
+      // A run stale by the time it lands (evaluator/slot changed meanwhile)
+      // is simply dropped — the effect that superseded it already has its
+      // own in-flight computation.
       if (cancelled) return;
       const entries = settled.flatMap((result) =>
         result.status === 'fulfilled' ? [result.value] : []
       );
-      setComputed({
-        fitting,
-        profile,
-        damageProfile,
-        slot,
-        slotIndex,
-        byTypeId: new Map(entries),
-      });
+      setComputed({ variants, slot, slotIndex, byTypeId: new Map(entries) });
     })();
     return () => {
       cancelled = true;
     };
-  }, [fitting, profile, damageProfile, engineReady, members, slot, slotIndex]);
+  }, [variants, members, slot, slotIndex]);
 
   useEffect(() => {
     if (members.length === 0) return;
@@ -204,9 +155,7 @@ export function useModuleVariations({
 
   const fresh =
     computed &&
-    computed.fitting === fitting &&
-    computed.profile === profile &&
-    computed.damageProfile === damageProfile &&
+    computed.variants === variants &&
     computed.slot === slot &&
     computed.slotIndex === slotIndex
       ? computed

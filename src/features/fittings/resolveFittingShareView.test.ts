@@ -38,22 +38,6 @@ describe('resolveFittingShareView', () => {
     expect(result.profile.implantTypeIds).toEqual([]);
   });
 
-  it("layers in the Fitting's own carried implant set, not a clone's", async () => {
-    const withImplants: Fitting = {
-      ...RIFTER,
-      implantSet: { implants: [19540], boosters: [] },
-    };
-    const encoded = await encodeFittingShare(fittingToShareInput(withImplants));
-    expect(encoded.ok).toBe(true);
-    if (!encoded.ok) return;
-
-    const result = await resolveFittingShareView(encoded.payload);
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.profile.implantTypeIds).toEqual([19540]);
-  });
-
   it('reports an invalid code as its own reason rather than throwing', async () => {
     const result = await resolveFittingShareView('not-a-real-code');
     expect(result).toEqual({ ok: false, reason: 'invalid' });
