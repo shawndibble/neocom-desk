@@ -198,6 +198,24 @@ describe('Alerts', () => {
     expect(within(screen.getAllByRole('listitem')[0]).getByText('1')).toBeInTheDocument();
   });
 
+  it('offers Reset filters when the filters hide every alert, and restores the list', async () => {
+    await db.notificationFeed.bulkPut([entry({ id: 'a' })]);
+    renderPage();
+    await screen.findByText('New Mail');
+
+    await userEvent.type(screen.getByRole('searchbox'), 'zzz-no-such-alert');
+
+    expect(await screen.findByText('No alerts match these filters')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+    expect(await screen.findByText('New Mail')).toBeInTheDocument();
+  });
+
+  it('offers no Reset filters when there are no alerts at all', async () => {
+    renderPage();
+    await screen.findByRole('heading', { name: 'By type' });
+    expect(screen.queryByRole('button', { name: 'Reset filters' })).not.toBeInTheDocument();
+  });
+
   /*
    * The reason this page can un-mute at all. `NotificationContextMenu` calls
    * its own mute one-way, because the row it was set from is gone the instant

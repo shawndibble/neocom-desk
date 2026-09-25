@@ -599,7 +599,7 @@ export function Contracts() {
                 className="py-8"
                 action={
                   <Button size="sm" onClick={() => setFilter(EMPTY_CONTRACTS_FILTER)}>
-                    {t('contracts.resetFilters')}
+                    {t('common.resetFilters')}
                   </Button>
                 }
               />

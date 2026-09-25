@@ -991,7 +991,7 @@ export function ActiveJobsPanel({
               className="py-4"
               action={
                 <Button size="sm" onClick={resetJobFilters}>
-                  {t('industry.jobsResetFilters')}
+                  {t('common.resetFilters')}
                 </Button>
               }
             />

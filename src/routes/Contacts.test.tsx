@@ -235,6 +235,19 @@ describe('Contacts', () => {
     expect(screen.getByText('Widen the filters above to see contacts.')).toBeInTheDocument();
   });
 
+  it('offers Reset filters when the filters leave no contacts, and restores the list', async () => {
+    render(<App />);
+    await screen.findByText('Good Friend');
+    openFilters();
+
+    const chips = screen.getByRole('group', { name: 'Standing' });
+    for (const chip of within(chips).getAllByRole('button')) fireEvent.click(chip);
+    await screen.findByText('No contacts match the selected filters');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset filters' }));
+    expect(await screen.findByText('Good Friend')).toBeInTheDocument();
+  });
+
   it('searches contacts by name', async () => {
     render(<App />);
     await screen.findByText('Good Friend');
