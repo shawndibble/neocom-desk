@@ -26,6 +26,8 @@ import { decodeFittingShare, encodeFittingShare } from '@/engine/fitting/fitting
 import {
   loadEftFitting,
   eftResultToFitting,
+  type EftLoadResult,
+  type EftSlotLookup,
   type EftUnresolvedItem,
 } from '@/engine/fittings/eftLoader';
 import {
@@ -34,6 +36,13 @@ import {
   type FitXmlUnresolvedItem,
   type FittingXmlDocument,
 } from '@/engine/import/eveFitXml';
+import {
+  classifyLoadInput,
+  killmailVictimToLoadResult,
+  loadDnaFitting,
+} from '@/engine/fittings/linkLoader';
+import { getKillmail } from '@/esi/endpoints';
+import { fetchKillmailHash } from '@/lib/zkillboard';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
 import { buildAllVProfile } from '@/engine/fittings/pilotProfile';
 import {
@@ -58,6 +67,27 @@ import {
   type DogmaAssetProgress,
 } from './dogmaFittingEngine';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+
+/** Why a Load produced no Fitting, beyond the per-line `unresolved` list. */
+export type LoadError = 'unrecognised' | 'killmail-not-found' | 'killmail-failed';
+
+/** Fetches a killmail's victim and reads its fit; the hash is looked up when the link had none. */
+async function loadKillmailFitting(
+  killmailId: number,
+  hash: string | undefined,
+  slotByTypeId: EftSlotLookup
+): Promise<EftLoadResult | LoadError> {
+  const resolvedHash = hash ?? (await fetchKillmailHash(killmailId));
+  if (resolvedHash === null) return 'killmail-not-found';
+  try {
+    const { data } = await getKillmail(killmailId, resolvedHash);
+    return data === null
+      ? 'killmail-failed'
+      : killmailVictimToLoadResult(data.victim, slotByTypeId);
+  } catch {
+    return 'killmail-failed';
+  }
+}
 
 async function hullName(typeId: number): Promise<string> {
   const types = await loadTypes();
@@ -101,11 +131,16 @@ export interface FittingWorkspace {
   fitXmlUnresolved: FitXmlUnresolvedItem[];
   /** Set when the open Fitting was too large to fit a Share Link. */
   tooLargeToShare: boolean;
-  loadFromEftText: (text: string) => Promise<void>;
+  /** Why the last Load produced no Fitting; null after a Load that did. */
+  loadError: LoadError | null;
+  /** Loads EFT text, a DNA string / chat link, an eveship.fit link, or a killmail link. */
+  loadFromInput: (text: string) => Promise<void>;
   /** Resolves a Loaded fittings-XML document's entries for the picker list — opens nothing itself. */
   loadFittingXmlDocument: (document: FittingXmlDocument) => Promise<FittingXmlListItem[]>;
   /** Opens one resolved entry from that list as the active Fitting; a no-op for an unresolved (`fitting: null`) row. */
   openFittingXmlEntry: (item: FittingXmlListItem) => Promise<void>;
+  /** Opens an already-built Fitting (In-game Fittings, issue #1539) the same way a successful Load does. */
+  openFitting: (fitting: Fitting) => Promise<void>;
   /**
    * Applies a change to the open Fitting and rewrites `?f=`. `coalesceKey`
    * names the control it came from; a repeat of the same key within a second
@@ -155,6 +190,7 @@ export function useFittingWorkspace(): FittingWorkspace {
   const [unresolved, setUnresolved] = useState<EftUnresolvedItem[]>([]);
   const [fitXmlUnresolved, setFitXmlUnresolved] = useState<FitXmlUnresolvedItem[]>([]);
   const [tooLargeToShare, setTooLargeToShare] = useState(false);
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
 
   const [stats, setStats] = useState<{ fitting: Fitting; stats: FittingStats } | null>(null);
@@ -255,25 +291,24 @@ export function useFittingWorkspace(): FittingWorkspace {
     };
   }, [shareCode]);
 
-  /** Opens `loaded` as the active Fitting — the shared tail of every Load path (paste, Loaded EVE-XML). */
-  const openFitting = useCallback(
+  // Shared tail for "a Fitting is now open, whether it arrived by Load, by
+  // In-game Fittings, or by URL": re-encodes it as a Share Link and writes
+  // `?f=`, or — too large to link — keeps it open locally, same as a
+  // too-large Load.
+  const commitFitting = useCallback(
     async (loaded: Fitting) => {
-      setSavedId(null);
       const encoded = await encodeFittingShare(fittingToShareInput(loaded));
       setTooLargeToShare(!encoded.ok);
       if (encoded.ok) {
-        // The decode effect above picks this up and sets `fitting` — one path
-        // for "a Fitting is now open", whether it arrived by paste or by URL.
-        // Only actually flags "mine" when the code is really changing: an
-        // identical re-paste writes the same URL, which `useUrlParam` no-ops
+        // The decode effect above picks this up and sets `fitting`. Only
+        // actually flags "mine" when the code is really changing: an
+        // identical re-load writes the same URL, which `useUrlParam` no-ops
         // and the effect below then never re-runs to consume the flag,
         // wrongly suppressing the *next* external change's reset.
         if (encoded.payload !== shareCode)
           ownWriteRef.current = { code: encoded.payload, fitting: null };
         setShareCode(encoded.payload);
       } else {
-        // Still shown — a Fitting this large just can't round-trip through a
-        // reload or a pasted link until it's edited down.
         latestFittingRef.current = loaded;
         setShareError(null);
         setFitting(loaded);
@@ -282,19 +317,50 @@ export function useFittingWorkspace(): FittingWorkspace {
     [shareCode, setShareCode]
   );
 
-  const loadFromEftText = useCallback(
+  const loadFromInput = useCallback(
     async (text: string) => {
-      const [typeByName, slotByTypeId] = await Promise.all([loadItemNameMap(), loadFittingSlots()]);
-      const result = loadEftFitting(text, typeByName, slotByTypeId);
-      setUnresolved(result.unresolved);
+      setLoadError(null);
       setFitXmlUnresolved([]);
+      const input = classifyLoadInput(text);
+      if (input.kind === 'unknown') {
+        setUnresolved([]);
+        setLoadError('unrecognised');
+        return;
+      }
+      const [typeByName, slotByTypeId] = await Promise.all([loadItemNameMap(), loadFittingSlots()]);
+      let result: EftLoadResult;
+      if (input.kind === 'eft') {
+        result = loadEftFitting(input.text, typeByName, slotByTypeId);
+      } else if (input.kind === 'dna') {
+        result = loadDnaFitting(input.dna, slotByTypeId);
+      } else {
+        const loaded = await loadKillmailFitting(input.killmailId, input.hash, slotByTypeId);
+        if (typeof loaded === 'string') {
+          setUnresolved([]);
+          setLoadError(loaded);
+          return;
+        }
+        result = loaded;
+      }
+      setUnresolved(result.unresolved);
       if (result.hullTypeId === null) return;
+      setSavedId(null);
 
       const name = await hullName(result.hullTypeId);
       const loaded = eftResultToFitting(result, name);
-      await openFitting(loaded);
+      await commitFitting(loaded);
     },
-    [openFitting]
+    [commitFitting]
+  );
+
+  const openFitting = useCallback(
+    async (loaded: Fitting) => {
+      setUnresolved([]);
+      setFitXmlUnresolved([]);
+      setSavedId(null);
+      await commitFitting(loaded);
+    },
+    [commitFitting]
   );
 
   /**
@@ -332,9 +398,10 @@ export function useFittingWorkspace(): FittingWorkspace {
       if (item.fitting === null) return;
       setUnresolved([]);
       setFitXmlUnresolved(item.unresolved);
-      await openFitting(item.fitting);
+      setSavedId(null);
+      await commitFitting(item.fitting);
     },
-    [openFitting]
+    [commitFitting]
   );
 
   const edit = useCallback(
@@ -519,9 +586,11 @@ export function useFittingWorkspace(): FittingWorkspace {
     unresolved,
     fitXmlUnresolved,
     tooLargeToShare,
-    loadFromEftText,
+    loadError,
+    loadFromInput,
     loadFittingXmlDocument,
     openFittingXmlEntry,
+    openFitting,
     edit,
     implantBasis,
     canUseCloneBasis,

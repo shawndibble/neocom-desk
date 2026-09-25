@@ -83,9 +83,12 @@ export const ROUTE_REQUIREMENTS = {
   '/overview': UNGATED,
   '/skills/trained': UNGATED,
   '/industry': UNGATED,
-  // Load (EFT paste) and stats are entirely local/SDE + the pinned dogma
-  // engine; nothing here reads a Character-scoped ESI endpoint yet. Saving to
-  // My Fittings or to EVE (#1538/#1540) will need their own scope.
+  // Load (EFT paste), stats and editing are entirely local/SDE + the pinned
+  // dogma engine, so the route itself stays ungated. In-game Fittings (#1539)
+  // reads a Character-scoped ESI endpoint, but gates only its own panel
+  // (`useEndpointsGranted`/`ReauthBanner`) rather than the whole route — same
+  // reasoning as Clones' `getCharacterClones`. Saving to My Fittings or to
+  // EVE (#1538/#1540) will need their own scope too.
   '/fittings': UNGATED,
   // Detail routes off the index (same reasoning as `/skills/plans/:planId`
   // above): each mixes the same blueprints/jobs/skills reads the index does,

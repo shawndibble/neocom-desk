@@ -8,6 +8,7 @@ import { parseFittingXmlFile, type FittingXmlDocumentErrorCode } from './fitting
 import {
   resolveFittingXmlOpenAction,
   type FittingXmlListItem,
+  type LoadError,
   type ShareDecodeError,
 } from './useFittingWorkspace';
 
@@ -16,6 +17,7 @@ interface FittingLoadCardProps {
   unresolved: EftUnresolvedItem[];
   fitXmlUnresolved: FitXmlUnresolvedItem[];
   shareError: ShareDecodeError | null;
+  loadError: LoadError | null;
   tooLargeToShare: boolean;
   onLoadFittingXmlDocument: (document: FittingXmlDocument) => Promise<FittingXmlListItem[]>;
   onOpenFittingXmlEntry: (item: FittingXmlListItem) => Promise<void>;
@@ -26,6 +28,7 @@ export function FittingLoadCard({
   unresolved,
   fitXmlUnresolved,
   shareError,
+  loadError,
   tooLargeToShare,
   onLoadFittingXmlDocument,
   onOpenFittingXmlEntry,
@@ -95,6 +98,11 @@ export function FittingLoadCard({
         {shareError && (
           <p role="alert" className="text-xs text-danger">
             {t(`fittings.load.shareError.${shareError}`)}
+          </p>
+        )}
+        {loadError && (
+          <p role="alert" className="text-xs text-danger">
+            {t(`fittings.load.loadError.${loadError}`)}
           </p>
         )}
         {tooLargeToShare && (

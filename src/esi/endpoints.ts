@@ -10,6 +10,7 @@
  * compile error.
  */
 import { uniqueTransactions } from './uniqueTransactions';
+import type { KillmailVictim } from '@/engine/fittings/linkLoader';
 import { esiFetch, recordEsiActivity, outcomeForError, attachEndpointId } from './client';
 import type { EsiResult } from './client';
 import { fetchAllPagesStatus } from './paginated';
@@ -155,6 +156,62 @@ export function getCharacterWallet(
   });
 }
 
+// --- GET /characters/{character_id}/fittings (esi-fittings.read_fittings.v1) ---
+
+export interface CharacterFittingItem {
+  flag: string;
+  quantity: number;
+  type_id: number;
+}
+
+/** One In-game Fitting (issue #1539) — CONTEXT.md **In-game Fitting**. */
+export interface CharacterFitting {
+  fitting_id: number;
+  name: string;
+  description: string;
+  ship_type_id: number;
+  items: CharacterFittingItem[];
+}
+
+export function getCharacterFittings(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CharacterFitting[]>> {
+  return esiFetch<CharacterFitting[]>(`/characters/${characterId}/fittings`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterFittings',
+  });
+}
+
+// --- POST /characters/{character_id}/fittings/ (esi-fittings.write_fittings.v1) ---
+
+export interface NewCharacterFitting {
+  name: string;
+  description: string;
+  ship_type_id: number;
+  items: CharacterFittingItem[];
+}
+
+/**
+ * Saves a new In-game Fitting. Not called anywhere yet — the Base Grant
+ * write scope lands with the read side (issue #1539); Save to EVE (#1540) is
+ * the first caller.
+ */
+export function postCharacterFitting(
+  characterId: number,
+  fitting: NewCharacterFitting,
+  options: { signal?: AbortSignal } = {}
+): Promise<EsiResult<{ fitting_id: number }>> {
+  return esiFetch<{ fitting_id: number }>(`/characters/${characterId}/fittings/`, {
+    ...options,
+    characterId,
+    method: 'POST',
+    body: fitting,
+    endpointId: 'postCharacterFitting',
+  });
+}
+
 // --- GET /characters/{character_id} (public) ---
 
 export interface CharacterPublicInfo {
@@ -288,6 +345,24 @@ export function getAlliancePublicInfo(
   return esiFetch<AlliancePublicInfo>(`/alliances/${allianceId}`, {
     ...options,
     endpointId: 'getAlliancePublicInfo',
+  });
+}
+
+// --- GET /killmails/{killmail_id}/{killmail_hash} (public) ---
+
+export interface Killmail {
+  killmail_id: number;
+  victim: KillmailVictim;
+}
+
+export function getKillmail(
+  killmailId: number,
+  killmailHash: string,
+  options: EndpointOptions = {}
+): Promise<EsiResult<Killmail>> {
+  return esiFetch<Killmail>(`/killmails/${killmailId}/${killmailHash}`, {
+    ...options,
+    endpointId: 'getKillmail',
   });
 }
 

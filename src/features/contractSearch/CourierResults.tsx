@@ -8,7 +8,7 @@
  * panel owns the snapshot, the mode and the region names; this owns
  * everything that is only true of a haul.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -420,6 +420,8 @@ interface CourierFilterBarProps {
   spaceKinds: readonly SpaceKind[];
   preference: RoutePreferenceKind;
   onPreferenceChange: (preference: RoutePreferenceKind) => void;
+  /** The table's column picker, drawn beside the filter trigger. */
+  actions?: ReactNode;
 }
 
 function CourierFilterBar({
@@ -433,6 +435,7 @@ function CourierFilterBar({
   spaceKinds,
   preference,
   onPreferenceChange,
+  actions,
 }: CourierFilterBarProps) {
   const { t } = useTranslation();
   // Counted off the controls, not off the parsed engine filter, for the same
@@ -460,6 +463,7 @@ function CourierFilterBar({
       // to two rows above the table they exist to narrow — the same call the
       // item bar beside this one now makes for its own six controls.
       collapsible
+      actions={actions}
       className="border-b border-line px-3 py-2"
       search={
         <SearchInput
@@ -1365,6 +1369,16 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
         spaceKinds={spaceKinds}
         preference={preference}
         onPreferenceChange={changePreference}
+        actions={
+          <ColumnPickerMenu
+            available={COURIER_COLUMN_IDS}
+            visible={visibleColumns}
+            columnsById={courierColumnsById}
+            onToggle={toggleColumn}
+            buttonLabel={t('contractSearch.columnsButton')}
+            menuTitle={t('contractSearch.columnsMenuTitle')}
+          />
+        }
       />
       {displayRows.length === 0 ? (
         <EmptyState
@@ -1383,16 +1397,6 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
               {t('contractSearch.jumpsSnapshotUnavailable')}
             </p>
           )}
-          <div className="flex justify-end px-3 pb-2">
-            <ColumnPickerMenu
-              available={COURIER_COLUMN_IDS}
-              visible={visibleColumns}
-              columnsById={courierColumnsById}
-              onToggle={toggleColumn}
-              buttonLabel={t('contractSearch.columnsButton')}
-              menuTitle={t('contractSearch.columnsMenuTitle')}
-            />
-          </div>
           <DataTable
             label={t('contractSearch.courierTitle')}
             columns={columns}

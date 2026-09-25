@@ -164,7 +164,9 @@ describe('useFittingWorkspace loading a Loaded fittings-XML file (#1542)', () =>
 
     // An EFT paste with an unresolvable module leaves `unresolved` non-empty.
     await act(() =>
-      view.result.current.workspace.loadFromEftText(['[Rifter]', 'Not A Real Module'].join('\n'))
+      view.result.current.workspace.loadFromInput(
+        ['[Rifter, Test]', 'Not A Real Module'].join('\n')
+      )
     );
     await waitFor(() => expect(view.result.current.workspace.unresolved).not.toEqual([]));
 
@@ -204,7 +206,7 @@ describe('useFittingWorkspace loading a Loaded fittings-XML file (#1542)', () =>
     await act(() => view.result.current.workspace.openFittingXmlEntry(dirtyItems[0]!));
     await waitFor(() => expect(view.result.current.workspace.fitXmlUnresolved).not.toEqual([]));
 
-    await act(() => view.result.current.workspace.loadFromEftText('[Rifter]'));
+    await act(() => view.result.current.workspace.loadFromInput('[Rifter, Test]'));
     await waitFor(() => expect(view.result.current.workspace.fitting?.name).toBe('Rifter'));
     expect(view.result.current.workspace.fitXmlUnresolved).toEqual([]);
   });
@@ -255,5 +257,21 @@ describe('useFittingWorkspace saving (My Fittings)', () => {
     );
     await waitFor(() => expect(view.result.current.workspace.fitting?.name).toBe('My kite'));
     expect(view.result.current.workspace.savedId).toBe('r1');
+  });
+
+  it('opening an In-game Fitting clears the previous saved id, so Save creates a new record rather than overwriting it (issue #1539)', async () => {
+    const view = await renderAt(RIFTER);
+    const encoded = await encodeFittingShare(
+      fittingToShareInput(addModule(RIFTER, 'medium', 0, 438))
+    );
+    if (!encoded.ok) throw new Error('encode failed');
+    act(() =>
+      view.result.current.workspace.openSaved({ id: 'r1', name: 'My kite', code: encoded.payload })
+    );
+    await waitFor(() => expect(view.result.current.workspace.savedId).toBe('r1'));
+
+    await act(() => view.result.current.workspace.openFitting(RIFTER));
+    await waitFor(() => expect(view.result.current.workspace.fitting?.name).toBe(RIFTER.name));
+    expect(view.result.current.workspace.savedId).toBeNull();
   });
 });

@@ -96,6 +96,12 @@ interface FilterBarProps<T> {
    * editing behaves exactly as it did inline. Only its visibility is new.
    */
   collapsible?: boolean;
+  /**
+   * View controls — a table's column picker, say — that sit right before the
+   * filter trigger (or after the inline controls, when there is no trigger).
+   * Not part of the draft: they act immediately and never move into the sheet.
+   */
+  actions?: ReactNode;
   /** Wrapper class for the row. */
   className?: string;
 }
@@ -126,6 +132,7 @@ export function FilterBar<T>({
   title,
   children,
   collapsible = false,
+  actions,
   className = '',
 }: FilterBarProps<T>) {
   const isNarrow = useIsNarrow();
@@ -136,6 +143,7 @@ export function FilterBar<T>({
         <div className={cx('flex flex-wrap items-center gap-2', className)}>
           {search}
           {children(value, onChange)}
+          {actions}
         </div>
       );
     }
@@ -144,6 +152,7 @@ export function FilterBar<T>({
         search={search}
         activeCount={activeCount}
         title={title}
+        actions={actions}
         className={className}
       >
         {children(value, onChange)}
@@ -158,6 +167,7 @@ export function FilterBar<T>({
       search={search}
       activeCount={activeCount}
       title={title}
+      actions={actions}
       className={className}
     >
       {children}
@@ -222,12 +232,14 @@ function CollapsibleFilterRow({
   search,
   activeCount,
   title,
+  actions,
   children,
   className = '',
 }: {
   search?: ReactNode;
   activeCount: number;
   title?: string;
+  actions?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
@@ -237,6 +249,9 @@ function CollapsibleFilterRow({
     <div className={cx('flex flex-col gap-2', className)}>
       <div className="flex flex-wrap items-center gap-2">
         {search}
+        {/* Before the trigger, so Tab runs straight from the funnel into the
+            group it just revealed. */}
+        {actions}
         <FilterTrigger
           activeCount={activeCount}
           expanded={open}
@@ -270,6 +285,7 @@ function FilterSheet<T>({
   search,
   activeCount = 0,
   title,
+  actions,
   children,
   className = '',
 }: FilterBarProps<T>) {
@@ -281,6 +297,7 @@ function FilterSheet<T>({
     <>
       <div className={cx('flex flex-wrap items-center gap-2', className)}>
         {search}
+        {actions}
         {/*
           The count rides on the trigger as a number, not as an accent tint:
           "some filter is on" has to survive a viewer who can't tell the two

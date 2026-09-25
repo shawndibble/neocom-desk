@@ -48,6 +48,7 @@ function renderCard(onLoadFittingXmlDocument: () => Promise<FittingXmlListItem[]
       unresolved={[]}
       fitXmlUnresolved={[]}
       shareError={null}
+      loadError={null}
       tooLargeToShare={false}
       onLoadFittingXmlDocument={onLoadFittingXmlDocument}
       onOpenFittingXmlEntry={onOpenFittingXmlEntry}
