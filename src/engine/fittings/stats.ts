@@ -249,6 +249,12 @@ interface ModuleCalculationResult {
  * need it — plus, for a Reactive Armor Hardener, the resonances the engine
  * adapted it to.
  */
+function chargeGroupIds(attributes: AttributeMap): number[] {
+  return CHARGE_GROUP_ATTRIBUTES.map((id) => readAttribute(attributes, id)).filter(
+    (groupId) => groupId > 0
+  );
+}
+
 export function extractModuleResult(result: ModuleCalculationResult): FittingModuleResult {
   // Only a running RAH adapts; an online or offline one sits at its base
   // resists, and labelling those "adapted" would be wrong.
@@ -258,9 +264,7 @@ export function extractModuleResult(result: ModuleCalculationResult): FittingMod
   return {
     state: result.state,
     maxState: result.max_state,
-    chargeGroupIds: CHARGE_GROUP_ATTRIBUTES.map((id) =>
-      readAttribute(result.attributes, id)
-    ).filter((groupId) => groupId > 0),
+    chargeGroupIds: chargeGroupIds(result.attributes),
     ...(isAdaptingHardener
       ? {
           adaptedResonances: resonances(
@@ -287,6 +291,16 @@ function isFiring(state: FittingItemState): boolean {
   return state === 'active' || state === 'overload';
 }
 
+/**
+ * Whether a module type has a charge slot at all, regardless of whether one
+ * is loaded — true for turrets/launchers, but also e.g. an Ancillary Shield
+ * Booster or a mining laser. Combine with `chargeTypeId === undefined` to
+ * mean "this slot is empty", not "this slot is a weapon".
+ */
+function acceptsCharge(attributes: AttributeMap): boolean {
+  return chargeGroupIds(attributes).length > 0;
+}
+
 function damageFigures(attributes: AttributeMap, quantity: number): DamageFigures {
   return {
     dps: readAttribute(attributes, ITEM_DOGMA_ATTRIBUTE.damagePerSecond) * quantity,
@@ -310,11 +324,17 @@ export function extractOffense(
   overheatedResults: readonly ModuleCalculationResult[] | null
 ): OffenseStats {
   const rows = new Map<string, WeaponRow>();
+  let chargelessWeaponCount = 0;
   items.forEach((item, index) => {
     const result = results[index];
     if (!result || !isFiring(result.state)) return;
     const figures = damageFigures(result.attributes, item.quantity);
-    if (figures.dps === 0 && figures.volley === 0) return;
+    if (figures.dps === 0 && figures.volley === 0) {
+      if (!item.isDrone && item.chargeTypeId === undefined && acceptsCharge(result.attributes)) {
+        chargelessWeaponCount += 1;
+      }
+      return;
+    }
 
     const heated =
       !item.isDrone && result.max_state === 'overload' ? overheatedResults?.[index] : undefined;
@@ -356,6 +376,7 @@ export function extractOffense(
           volley: sum((row) => row.overheated?.volley ?? row.volley),
         }
       : null,
+    chargelessWeaponCount,
   };
 }
 
