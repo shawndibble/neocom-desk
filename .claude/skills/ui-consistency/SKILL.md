@@ -25,7 +25,9 @@ an interactive skill would put to the user, you decide and record in the ticket.
 
 `$ARGUMENTS`, if present, names the axes or entities to sweep ("icons",
 "context menus", "item"). Otherwise take the least-recently-swept from the
-ledger.
+ledger. The app has had a **full pass** once the ledger's "Axes swept" lists
+all of A–G and every entity in RUBRIC.md's matrix. After that, keep going,
+oldest sweep first; new features bring new drift.
 
 Reference: [RUBRIC.md](RUBRIC.md) — the axes, the canonical pattern each one
 checks against, the greps, the entity matrix, and the kill-tests. Read it in
@@ -49,7 +51,9 @@ The app writes most of them down:
   (accessibility).
 - `src/components/ui/` — the primitives. `controlStyles.ts` is the height
   scale; `icons.tsx` is the icon vocabulary; `RowActions.tsx` is the
-  menu-plus-button pairing; `index.ts` is the full inventory.
+  menu-plus-button pairing; `index.ts` is the barrel. `icons.tsx` and
+  `tabStyles.ts` sit outside it, as do the entity links in `src/features`
+  (RUBRIC.md axis E).
 - `eslint.config.js` — patterns already enforced by lint. A lint-enforced rule
   cannot drift; do not audit it.
 - `CONTEXT.md` — the glossary. A label that names a concept differently from
@@ -138,7 +142,7 @@ Record every drop with where you looked and what you found.
 Spawn a **hostile reviewer** as a fresh sub-agent (Agent tool, `subagent_type:
 "general-purpose"` — never `fork`; the value is the cold read). Its job is to
 kill findings. A reviewer returning "all of these are real" has failed; require
-it to name the one it would cut if only half could ship.
+at least one concrete objection per finding, even on the ones it lets through.
 
 Its prompt carries every finding's full text and evidence (tally, glyph map or
 matrix), the ground truth from step 1, the prior-art results from step 4, the
@@ -158,13 +162,16 @@ Give it this kill-bar, also in its prompt:
 - **Actually different.** The two sites only look alike; they mean different
   things, and matching them would lie to the user.
 - **Already shipped.** It re-checks the code on `origin/main`.
-- **One PR's worth.** A migration touching 40 files across unrelated features
-  must be split by feature area.
-- **Guardable.** Can a lint rule or a test stop it recurring? A fix with no
-  guard regresses by the next feature.
+  Two more checks can only narrow a finding, never kill it:
 
-State in the prompt, explicitly: **being small is not a kill reason.** This
-skill exists to catch small things.
+- **One PR's worth.** A migration touching 40 files across unrelated features
+  is `NARROW`: split it by feature area.
+- **Guardable.** Could a lint rule or a test stop it recurring? If so, the
+  ticket must carry that guard. If not, the finding still ships.
+
+State in the prompt, explicitly: **being small is not a kill reason, and
+neither is having no possible guard.** This skill exists to catch small
+things, and most small things cannot be linted.
 
 Require a verdict per finding on its own line: `SHIP`, `NARROW` (state the
 narrower shape), or `KILL`.
@@ -182,11 +189,13 @@ everywhere else". Not one ticket per site (fifteen one-line PRs), and not one
 ticket per axis (unreviewable). When a pattern spans too many feature areas for
 one PR, split it by area and link the siblings.
 
-Every ticket carries a **guard**, the way `/improve-mobile-ux` tickets carry a
-Narrow spec: an ESLint `no-restricted-imports` / `no-restricted-syntax` rule, a
-unit test on the primitive, or an e2e assertion — whatever stops the next
-feature reintroducing the drift. A ticket whose fix only a human reviewer could
-keep in place is not done being written.
+Where a pattern can be guarded, the ticket carries the **guard**, the way
+`/improve-mobile-ux` tickets carry a Narrow spec. That can be an ESLint
+`no-restricted-imports` / `no-restricted-syntax` rule, a unit test on the
+primitive, or an e2e assertion: whatever stops the next feature bringing the
+drift back. Look for one on every ticket. Where none exists (one dead item
+name, one glyph used for two meanings), say so in the ticket and file it
+anyway.
 
 ## 7. File the tickets
 
@@ -214,7 +223,7 @@ One or two sentences: what reads inconsistently today, and what it becomes.
 
 ## Agent Brief
 
-**Category:** enhancement
+**Category:** enhancement | bug
 **Summary:** one line
 **Axis:** the RUBRIC.md axis (A–G)
 **Canonical pattern:** the DESIGN.md rule or primitive, or the majority usage
@@ -228,7 +237,8 @@ that legitimately stays different and why
 **Acceptance criteria:**
 
 - [ ] every deviating site listed above uses the canonical pattern
-- [ ] guard: the lint rule / test that fails if the drift returns
+- [ ] guard: the lint rule / test that fails if the drift returns (or
+      "none possible" and why)
 - [ ] DESIGN.md states the pattern (when it was derived, not written)
 
 **Out of scope:** adjacent drift noticed but not fixed here
@@ -249,6 +259,8 @@ sections are keyed by topic:
 - **Settled icon map** — glyph → its one meaning. Add every glyph confirmed
   consistent, so no run rebuilds the map from scratch.
 - **Contract already enforced** — patterns guarded by lint or tests.
+- **Justified exceptions** — matrix holes and deviations confirmed
+  deliberate, so no run re-flags them.
 - **Standing kill-tests** — reusable heuristics that kill a class of finding.
 - **Filed findings** — issue number, verdict, one line.
 - **Killed findings** — what, and why. This stops a re-pitch.

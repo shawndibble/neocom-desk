@@ -20,10 +20,11 @@ glyph for a different meaning is a finding.
 
 ## Contract already enforced
 
-- Direct `radix-ui` and `@phosphor-icons/react` imports outside
-  `src/components/ui/` fail lint (`eslint.config.js`).
-- Control heights come from `controlStyles.ts` for every primitive that takes
-  `size` (DESIGN.md §3).
+Patterns guarded by a lint rule or a test, so no run re-sweeps them. The
+built-in lint rule is covered in RUBRIC.md axis B. Add a line here whenever a
+filed ticket lands its guard.
+
+- _none yet_
 
 ## Justified exceptions
 

@@ -23,7 +23,7 @@ usable. In both cases, fix the grep here.
 
 The rules themselves live in `docs/DESIGN.md`. This file cites sections rather
 than restating them. When the two disagree, DESIGN.md wins, and the rubric
-line is stale: fix it in step 8.
+line is stale: fix it in the same PR as the step 8 ledger update.
 
 ---
 
@@ -48,16 +48,23 @@ Look for:
   A Refresh button is `sm` on one `Panel` header and `md` on the next.
 
 ```
-git grep -n -E '\bh-(6|7|8|9|10|11)\b' origin/main -- "${S[@]}"
+git grep -n -E '\b(min-)?h-(6|7|8|9|10|11|\[[^]]+\])\b|\bsize-(6|7|8|9|10|11)\b' origin/main -- "${S[@]}"
 git grep -n -E 'size="(sm|md)"' origin/main -- "${S[@]}"
+git grep -n -E '\bitems-(start|baseline|end)\b' origin/main -- "${S[@]}"
 ```
+
+Heights can also come from padding. A `py-*` on a control-like element with no
+`h-*` sizes itself from its text, and it drifts whenever the font does. Check
+the elements the first grep turns up for this.
 
 For the second grep, group the hits by file. A file with both values in one
 JSX parent is the candidate.
 
 ## B. Primitive reuse (DESIGN.md §4, §4b)
 
-Canonical: the `src/components/ui/` inventory (`index.ts`). A job a primitive
+Canonical: the `src/components/ui/` inventory (`index.ts`, plus `icons.tsx`
+and `tabStyles.ts`, which the barrel does not re-export) and the entity links
+in `src/features` (axis E). A job a primitive
 exists for is done by that primitive.
 
 Look for:
@@ -79,14 +86,17 @@ Look for:
 
 ```
 git grep -n -E '<(button|select|input)\b' origin/main -- "${S[@]}"
-git grep -n -E 'MagnifyingGlass' origin/main -- "${S[@]}"
+git grep -n -E '\bIcon\.Search\b' origin/main -- "${S[@]}"
 git grep -n -E 'border-b-2' origin/main -- "${S[@]}"
 git grep -L 'PageHeader' origin/main -- src/routes ':!*.test.tsx'
 git grep -n -E 'toLocaleString|Intl\.NumberFormat' origin/main -- "${S[@]}"
 ```
 
-Direct `radix-ui` and `@phosphor-icons/react` imports are **lint-enforced**
-(`eslint.config.js`). Do not sweep them.
+Bare `radix-ui` and `@phosphor-icons/react` imports fail lint
+(`eslint.config.js`). The rule matches those exact specifiers only, so a deep
+import (`@phosphor-icons/react/dist/csr/X`) in a feature file still passes.
+Sweep for that one:
+`git grep -n -E "from '(radix-ui|@phosphor-icons/react)/" origin/main -- "${S[@]}"`.
 
 ## C. Icon semantics (DESIGN.md §5)
 
@@ -94,30 +104,44 @@ Canonical: one glyph, one meaning, app-wide. When there is none written down,
 use the settled map in LEDGER.md. Where the ledger is silent, the majority
 usage is the meaning.
 
-Build the glyph map. For every name exported from
-`src/components/ui/icons.tsx`, list each meaning it is used for, with the
-sites. Then look for:
+`icons.tsx` re-exports each Phosphor glyph under a **semantic alias**
+(`export const Refresh = withWeight(ArrowClockwise)`). Surfaces import the
+module whole and render `<Icon.Refresh …>`, or pass `icon={Icon.Refresh}`.
+That gives the map two layers, and drift can happen in each:
 
-- **One glyph, two meanings.** `Trash` for both "delete permanently" and
-  "remove from this list". `X` for both "close" and "clear the field". `Star`
-  for both "favourite" and "required skill".
-- **One meaning, two glyphs.** Refresh drawn with two different arrows. "Open
-  in new tab" drawn as both an arrow-out-of-box and an arrow-up-right. "More
-  actions" drawn as both vertical and horizontal dots. Copy drawn two ways.
-- **A meaning with no icon where its peers have one.** Row actions that carry a
-  leading glyph on one page and none on the next.
+- **One glyph, several aliases.** A Phosphor glyph wrapped under aliases that
+  mean different things. For example, `Copy` wraps both `Duplicate` and
+  `CopyToClipboard`, so the user sees one picture for two actions.
+- **One alias, several meanings.** `Icon.Close` for both "close the dialog"
+  and "clear the field". `Icon.Pin` for both "favourite" and "required".
+- **One meaning, several aliases.** Refresh drawn with two different arrows.
+  "Open externally" drawn two ways. "More actions" drawn as both vertical and
+  horizontal dots.
+- **A meaning with no icon where its peers have one.** Row actions that carry
+  a leading glyph on one page and none on the next.
 - **Status glyphs off their tone.** `SeverityIcon` and `StandingIcon` exist so
-  a warning glyph is always warning-toned. Look for a hand-coloured warning
-  glyph.
+  a warning glyph is always warning-toned. Look for a hand-coloured one.
 - **Emoji or dingbats** used as icons (§5 forbids them).
 - **Sizing.** A glyph sized with a raw pixel number instead of
   `ICON_SIZE.sm/md/lg`.
 
 ```
-git grep -n -o -E '<[A-Z][A-Za-z]+ [^>]*(size=|aria-hidden)' origin/main -- "${S[@]}"
+# glyphs wrapped by more than one alias
+git show origin/main:src/components/ui/icons.tsx | grep -oE '^export const [A-Z]\w+ = withWeight\(\w+\)' \
+  | sed -E 's/export const (\w+) = withWeight\((\w+)\)/\2 \1/' | sort \
+  | awk '{a[$1]=a[$1]" "$2; c[$1]++} END{for(k in c) if(c[k]>1) print k":"a[k]}'
+# every site per alias: read each one and write down what it means there
+for n in $(git show origin/main:src/components/ui/icons.tsx | grep -oE '^export const [A-Z]\w+ = withWeight' | cut -d' ' -f3); do
+  echo "== $n"; git grep -n -E "\bIcon\.$n\b" origin/main -- "${S[@]}"; done
 git grep -n -E 'size=\{?[0-9]+' origin/main -- "${S[@]}"
-git grep -n -P '[\x{2190}-\x{21FF}\x{2600}-\x{27BF}\x{1F300}-\x{1FAFF}]' origin/main -- src ':!*.json'
+git grep -n -P '[\x{2190}-\x{21FF}\x{2600}-\x{27BF}\x{1F300}-\x{1FAFF}]' origin/main -- "${S[@]}" src/i18n | grep -v -E ':\s*(//|\*|/\*)'   # ~15
 ```
+
+When this rubric was written, the first command printed 8 shared glyphs,
+among them `Copy` (Duplicate, CopyToClipboard), `Target` (three aliases) and
+`Check` (Done, Select). Sharing a glyph is not a finding on its own: two
+aliases can name the same meaning in two contexts. It is a finding when a
+user would read the two as different actions.
 
 Once a glyph is confirmed single-meaning across the app, record it in
 LEDGER.md's settled icon map.
@@ -228,12 +252,13 @@ Look for:
   Keep only **action verbs** (buttons, menu items).
 
 ```
-node -e "const f=require('./src/i18n/locales/en.json');const m={};(function w(o,p){for(const k in o){const v=o[k],q=p?p+'.'+k:k;typeof v==='string'?(m[v]=m[v]||[]).push(q):w(v,q)}})(f,'');for(const v in m)if(m[v].length>1)console.log(JSON.stringify(v),m[v].join(' '))"
+git show origin/main:src/i18n/locales/en.json > <scratchpad>/en.json
+node -e "const f=require(process.argv[1]);const m={};(function w(o,p){for(const k in o){const v=o[k],q=p?p+'.'+k:k;typeof v==='string'?(m[v]=m[v]||[]).push(q):w(v,q)}})(f,'');for(const v in m)if(m[v].length>1)console.log(JSON.stringify(v),m[v].join(' '))" <scratchpad>/en.json
 git grep -n -E '>[A-Z][a-z]+( [A-Za-z]+)*<' origin/main -- "${S[@]}"
 ```
 
-Run the `node` one-liner in a worktree synced to `origin/main`, or on a
-`git show origin/main:src/i18n/locales/en.json` copy.
+Read `en.json` from `origin/main` rather than a working tree, which may be
+stale.
 
 ---
 
@@ -267,7 +292,9 @@ as an exception in LEDGER.md, so the next run does not re-flag it.
 Each is a settled decision. A finding that re-proposes one is dead:
 
 - **Readouts at a flat `h-7`.** `StatChip` and `DataAgeBadge` (§3) are
-  deliberately exempt from the control scale.
+  deliberately exempt from the control scale, in their own strip or header
+  `meta`. A readout sitting _inline in a row of controls_, where it visibly
+  mismatches a `Button` beside it, is still a finding under axis A.
 - **State stripes at 2px.** The active tab, a grouped order's severity, the
   selected mail (§3).
 - **The calendar hatch.** `.calendar-map-past` is the one gradient (§6).
@@ -278,5 +305,5 @@ Each is a settled decision. A finding that re-proposes one is dead:
 - **Mobile layout and the touch tier.** These belong to `/improve-mobile-ux`.
 - **Density over whitespace.** A consistency fix that adds padding "to match"
   must match toward the denser site, not the airier one.
-- **Lint-enforced patterns.** Direct `radix-ui` and `@phosphor-icons/react`
-  imports cannot drift.
+- **Lint-enforced patterns.** Bare `radix-ui` and `@phosphor-icons/react`
+  imports (axis B covers the deep-import gap).
