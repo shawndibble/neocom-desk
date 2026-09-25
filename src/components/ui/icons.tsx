@@ -100,6 +100,7 @@ import { Table as TableGlyph } from '@phosphor-icons/react/dist/csr/Table';
 import { Target } from '@phosphor-icons/react/dist/csr/Target';
 import { Tray } from '@phosphor-icons/react/dist/csr/Tray';
 import { UsersFour } from '@phosphor-icons/react/dist/csr/UsersFour';
+import { UserPlus } from '@phosphor-icons/react/dist/csr/UserPlus';
 import { UsersThree } from '@phosphor-icons/react/dist/csr/UsersThree';
 import { Wallet as WalletGlyph } from '@phosphor-icons/react/dist/csr/Wallet';
 import { Warning } from '@phosphor-icons/react/dist/csr/Warning';
@@ -163,6 +164,8 @@ export const Select = withWeight(Check);
 /** Pin — filled when pinned, outline when not (pass `weight="fill"`). */
 export const Pin = withWeight(Star);
 /** Search across every character on the account. */
+/** Signs another character in to the roster. */
+export const AddCharacter = withWeight(UserPlus);
 export const AllCharacters = withWeight(UsersThree);
 /** A container or a ship's bay — anything holding other assets. */
 export const Container = withWeight(Package);
