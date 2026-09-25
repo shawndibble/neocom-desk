@@ -8,6 +8,7 @@ import { setupServer } from 'msw/node';
 import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import { Callback } from './Callback';
 import { assignLocation } from '@/app/navigation';
 
@@ -92,6 +93,7 @@ function renderCallback(search: string) {
           <Route path="/callback" element={<Callback />} />
           <Route path="/characters" element={<div>characters page</div>} />
           <Route path="/login" element={<div>login page</div>} />
+          <Route path="/fittings" element={<div>fittings page</div>} />
         </Routes>
       </MemoryRouter>
     </StrictMode>
@@ -107,6 +109,14 @@ describe('Callback', () => {
     expect(tokenRequests).toBe(1);
     expect(await db.characters.get(CHAR_ID)).toMatchObject({ name: 'CCP Alpha' });
     expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_ID);
+  });
+
+  it('lands on a stashed return-to path instead of /characters (#1544)', async () => {
+    stashLogin('state-1');
+    setLoginReturnTo('/fittings?f=abc123');
+    renderCallback('?code=good-code&state=state-1');
+
+    expect(await screen.findByText('fittings page')).toBeInTheDocument();
   });
 
   it('gives the newly-added Character the account-wide pins the account holds (#432)', async () => {
