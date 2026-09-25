@@ -404,7 +404,7 @@ export function Contracts() {
           <button
             type="button"
             onClick={() => setSelectedContract(contract)}
-            className="text-left font-medium text-accent hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            className="flex min-h-11 w-full items-center text-left font-medium text-accent hover:underline md:block md:min-h-0 md:w-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             {contract.title || t(CONTRACT_TYPE_KEY[contract.type])}
           </button>
