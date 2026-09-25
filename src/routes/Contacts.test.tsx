@@ -421,7 +421,7 @@ describe('Contacts', () => {
         const row = table.getByText('Good Friend').closest('tr');
         if (!row) throw new Error('expected a Good Friend row');
         fireEvent.contextMenu(row);
-        await user.click(screen.getByRole('menuitem', { name: 'Copy Contact ID' }));
+        await user.click(screen.getByRole('menuitem', { name: 'Copy contact ID' }));
         fireEvent.contextMenu(row);
         await user.click(screen.getByRole('menuitem', { name: 'Copy name' }));
 
@@ -515,16 +515,16 @@ describe('Contacts row context menu (issue #403)', () => {
     return row;
   }
 
-  it('offers Copy Name, Copy Contact ID, and Show Info as the only entry point to the modal', async () => {
+  it('offers Copy Name, Copy contact ID, and Show info as the only entry point to the modal', async () => {
     render(<App />);
     await openContactMenu('Good Friend');
 
     expect(screen.getByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
-    expect(screen.getByRole('menuitem', { name: 'Copy Contact ID' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'Copy contact ID' })).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
   });
 
-  it('Show Info opens the shared Public Info Modal, tabbed to the contact type', async () => {
+  it('Show info opens the shared Public Info Modal, tabbed to the contact type', async () => {
     const user = userEvent.setup();
     server.use(
       http.get(`${ESI}/characters/1001`, () =>

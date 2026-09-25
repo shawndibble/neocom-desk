@@ -172,7 +172,7 @@ describe('OrderHistoryPanel — phone', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByText('1 / 3')).toBeInTheDocument();
     expect(screen.getByText('460,800.00')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'View in market' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'View in Market' })).toHaveAttribute(
       'href',
       expect.stringContaining('2048')
     );

@@ -3322,7 +3322,7 @@
     "typeFilterLabel": "Contract type",
     "contextMenu": {
       "copyTitle": "Copy title",
-      "copyContractId": "Copy Contract ID"
+      "copyContractId": "Copy contract ID"
     }
   },
   "contractDetail": {
@@ -3496,7 +3496,7 @@
     "reauthAction": "Log in again with EVE Online",
     "contextMenu": {
       "copyName": "Copy name",
-      "copyContactId": "Copy Contact ID",
+      "copyContactId": "Copy contact ID",
       "showInfo": "Show info"
     }
   },
@@ -3575,7 +3575,7 @@
     "stateExpired": "Expired",
     "stateCancelled": "Cancelled",
     "filled": "Filled",
-    "viewInMarket": "View in market",
+    "viewInMarket": "View in Market",
     "sortBy": "Sort by {{column}}",
     "sortedAsc": "{{column}}, sorted ascending",
     "sortedDesc": "{{column}}, sorted descending",
@@ -4832,8 +4832,8 @@
       "locationFilterAll": "Any location",
       "exportCsv": "Export CSV",
       "contextMenu": {
-        "showInfo": "Show Info",
-        "copyName": "Copy Character Name"
+        "showInfo": "Show info",
+        "copyName": "Copy name"
       }
     },
     "assets": {
