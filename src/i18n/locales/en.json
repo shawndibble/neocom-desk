@@ -3964,6 +3964,11 @@
   },
   "market": {
     "title": "Market",
+    "compareUndo": {
+      "added_one": "Added {{count}} variant of {{name}}",
+      "added_other": "Added {{count}} variants of {{name}}",
+      "undo": "Undo"
+    },
     "locationMode": "Location",
     "modeHub": "Trade Hub",
     "modeRegion": "Region",

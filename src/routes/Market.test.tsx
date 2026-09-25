@@ -797,6 +797,26 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     expect(within(region).getByText('1,200 HP')).toBeInTheDocument();
   });
 
+  it('shows an Undo toast after Variations Compare that removes only the rows that add introduced (issue #1746)', async () => {
+    server.use(destroyerOrdersHandler(new Map()));
+    useCompareSet.setState({ items: [{ typeId: 999999, itemName: 'Pre-existing' }] });
+
+    const user = userEvent.setup();
+    render(<App />);
+    await user.type(await screen.findByRole('searchbox'), 'merlin');
+    await user.click(await screen.findByText('Merlin'));
+    await screen.findByRole('table', { name: 'Variations' });
+
+    await user.click(screen.getByRole('button', { name: 'Compare' }));
+    const toast = await screen.findByRole('status');
+    expect(toast).toHaveTextContent(/Added \d+ variants of Merlin/);
+    expect(useCompareSet.getState().items.length).toBeGreaterThan(2);
+
+    await user.click(within(toast).getByRole('button', { name: 'Undo' }));
+    expect(useCompareSet.getState().items).toEqual([{ typeId: 999999, itemName: 'Pre-existing' }]);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
   it('right-clicks a Variations row to open its item context menu, including Compare Variations (issue #147)', async () => {
     await db.settings.put({ key: ACTIVE_CHARACTER_KEY, value: 1 });
     server.use(destroyerOrdersHandler(new Map()));
