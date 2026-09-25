@@ -1563,6 +1563,9 @@ describe('Settings — phone tab bar', () => {
       'aria-pressed',
       'false'
     );
+    // The click above left the pointer on the chip; leave and re-enter so the
+    // tooltip sees a fresh pointer move rather than depending on timing.
+    await user.unhover(wallet);
     await user.hover(wallet);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(/the bar holds four/i);
 
