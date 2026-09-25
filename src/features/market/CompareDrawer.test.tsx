@@ -11,6 +11,11 @@ import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadSkills } from '@/sde/loadSde';
 import { useCompareSet } from './compareSet';
 import { CompareDrawer } from './CompareDrawer';
+import { loadCharacterModifiers } from '@/features/character/characterModifiers';
+import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { ZERO_STANDINGS } from '@/engine/market/standings';
+import { SKILL_IDS } from '@/engine/industry/types';
+import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 
 vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: vi.fn(),
@@ -21,6 +26,11 @@ vi.mock('@/sde/loadSde', () => ({
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
 
+vi.mock('@/features/character/characterModifiers', () => ({
+  loadCharacterModifiers: vi.fn(),
+}));
+
+const mockedLoadModifiers = vi.mocked(loadCharacterModifiers);
 const mockedLoadDictionary = vi.mocked(loadAttributeDictionary);
 const mockedLoadSkills = vi.mocked(loadSkills);
 
@@ -100,7 +110,7 @@ const drawerHandlers = {
   onShowInfo: vi.fn(),
 };
 
-function renderDrawer() {
+function renderDrawer(characterId: number | null = null) {
   return render(
     <MemoryRouter>
       <CompareDrawer
@@ -116,6 +126,10 @@ function renderDrawer() {
         onAddToQuickbar={vi.fn()}
         quickbarAvailable
         onShowInfo={drawerHandlers.onShowInfo}
+        characterId={characterId}
+        hub={DEFAULT_TRADE_HUB}
+        standing={ZERO_STANDINGS}
+        sourceLabel="Jita"
       />
     </MemoryRouter>
   );
@@ -159,6 +173,51 @@ describe('CompareDrawer', () => {
     const pyeriteRow = within(region).getByText('Pyerite').closest('tr');
     expect(pyeriteRow).not.toBeNull();
     expect(within(pyeriteRow as HTMLElement).getAllByText('—').length).toBeGreaterThan(0);
+  });
+
+  it('names the source of the prices in the header and shows spread % per item', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A, ITEM_B] }));
+    renderDrawer();
+    await user.click(screen.getByRole('button', { name: 'Compare (2)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+
+    expect(within(region).getByText('Prices from Jita')).toBeInTheDocument();
+    // (100 - 80) / 80 = 25%; Pyerite has no orders.
+    expect(await within(region).findByText('25.0%')).toBeInTheDocument();
+    expect(within(region).getByRole('columnheader', { name: /Spread %/ })).toBeInTheDocument();
+    expect(
+      within(region).getByRole('columnheader', { name: /After your fees/ })
+    ).toBeInTheDocument();
+  });
+
+  it('shows no after-fees figure without a character', async () => {
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer(null);
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+    await within(region).findByText('25.0%');
+
+    const row = within(region).getByText('Tritanium').closest('tr') as HTMLElement;
+    expect(within(row).getAllByText('—').length).toBeGreaterThan(0);
+    expect(mockedLoadModifiers).not.toHaveBeenCalled();
+  });
+
+  it("prices after-fees at the character's skills: spread minus both broker fees and sales tax", async () => {
+    mockedLoadModifiers.mockResolvedValue({
+      skills: { [SKILL_IDS.accounting]: 5, [SKILL_IDS.brokerRelations]: 0 },
+    } as unknown as CharacterModifiers);
+    const user = userEvent.setup();
+    act(() => useCompareSet.setState({ items: [ITEM_A] }));
+    renderDrawer(90000001);
+    await user.click(screen.getByRole('button', { name: 'Compare (1)' }));
+    const region = await screen.findByRole('region', { name: 'Compare' });
+
+    // 20 spread - 3.375 tax on 100 - two 100 ISK minimum broker fees.
+    expect(
+      await within(region).findByText('-183.38 ISK', { selector: '.sr-only' })
+    ).toBeInTheDocument();
   });
 
   it('removes an item from the row and from the underlying Compare Set', async () => {

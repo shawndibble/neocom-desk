@@ -1393,6 +1393,15 @@ export function Market() {
           onAddToQuickbar={handleAddToQuickbar}
           quickbarAvailable={activeCharacterId !== null}
           onShowInfo={handleShowInfo}
+          characterId={activeCharacterId}
+          hub={effectiveHub}
+          standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
+          sourceLabel={
+            effectiveLocation.mode === 'hub'
+              ? effectiveHub.systemName
+              : (marketRegions?.find((region) => region.id === orderBookLocation.regionId)?.name ??
+                hubRegionName)
+          }
         />
       )}
 

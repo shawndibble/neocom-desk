@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   appraisalNet,
   appraisalUndercut,
+  compareMargin,
   buildAppraisal,
   buildHubComparison,
   computeAppraisalRefine,
@@ -592,5 +593,45 @@ describe('appraisalUndercut', () => {
     });
     const listValue = (undercut?.price ?? 0) * priced.quantity;
     expect(listNet).toBeCloseTo(listValue - listValue * 0.075 - listValue * 0.03, 4);
+  });
+});
+
+describe('compareMargin (issue #1745)', () => {
+  const fees = { accountingLevel: 5, brokerRelationsLevel: 0, standing: ZERO_STANDINGS };
+
+  it('reports spread and its percentage of the best buy', () => {
+    const { spread, spreadPct } = compareMargin(1_200, 1_000, fees);
+    expect(spread).toBe(200);
+    expect(spreadPct).toBeCloseTo(20, 6);
+  });
+
+  it("charges broker fee on both orders and sales tax on the sell, at appraisalNet's rates", () => {
+    const { afterFees } = compareMargin(1_200_000, 1_000_000, fees);
+    // salesTaxPct(5) = 3.375%; broker fee, no skills/standings = 3%.
+    expect(afterFees).toBeCloseTo(
+      200_000 - 1_200_000 * 0.03375 - (1_200_000 + 1_000_000) * 0.03,
+      4
+    );
+    const net = appraisalNet([{ typeId: 1, name: 'x', quantity: 1, buy: 1, sell: 1 }], fees);
+    expect(net.salesTaxPct).toBeCloseTo(3.375, 6);
+    expect(net.brokerFeePct).toBeCloseTo(3, 6);
+  });
+
+  it('applies the 100 ISK broker-fee minimum to each order', () => {
+    const { afterFees } = compareMargin(12, 10, { ...fees, accountingLevel: 0 });
+    expect(afterFees).toBeCloseTo(2 - 12 * 0.075 - 100 - 100, 6);
+  });
+
+  it('is null on every figure when either side has no order', () => {
+    expect(compareMargin(null, 1_000, fees)).toEqual({
+      spread: null,
+      spreadPct: null,
+      afterFees: null,
+    });
+    expect(compareMargin(1_000, null, fees).afterFees).toBeNull();
+  });
+
+  it('leaves the percentage null when the best buy is zero', () => {
+    expect(compareMargin(10, 0, fees).spreadPct).toBeNull();
   });
 });
