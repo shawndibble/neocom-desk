@@ -1,0 +1,8 @@
+# Scope decisions — Fittings Start screen: one searchable list with a preview
+
+_Recorded 2026-09-25. Replaces the Start screen layout in `20260924-215855` (a hull picker beside Import, My Fittings and In-game Fittings panels); the rest of that decision stands._
+
+- **On a desktop, the Start screen is your fittings, not a hull picker.** One search box ("Search by name or hull") covers the active Character's saved and In-game Fittings together, grouped by hull, with each row tagged Saved where it is. Picking a row previews it beside the list: the hull's render, DPS, EHP, CPU and powergrid, and whether the Character can fly it — worked out for the picked Fitting only, so a long list costs nothing. The preview's Open, Compare (to `/fittings/compare?f=`, disabled when the Fitting is too large to link), and for saved ones Rename and Delete replace the per-row buttons of the old panels. Double-clicking a row opens it.
+- **Starting from a hull and Import are buttons, each opening a dialog.** "New from hull" opens the existing hull search; Import opens the Load card (EFT, links, killmails, EVE XML). A share link that won't open (`shareError`) opens the Import dialog by itself, as it used to select the Import tab.
+- **The tabbed layout is unchanged** for a phone's Start screen, the editor's Fittings menu dialog and the Compare picker: New / Import / My Fittings / In-game, one at a time, and a tap opens the Fitting. The list-and-preview screen is desktop only; a phone has no room for a preview beside a list, and the dialog and picker have no use for one.
+- **Rejected: a sortable table** (different ships are judged on different numbers, so shared columns say little), **a tile grid** and **collapsible hull groups** (a wide list wastes horizontal space).

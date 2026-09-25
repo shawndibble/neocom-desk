@@ -1,13 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { Button, IconButton, Modal, Panel, SearchInput, TextInput } from '@/components/ui';
+import { IconButton, Panel, SearchInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { db, type FittingRecord } from '@/db';
-import { decodeFittingShare } from '@/engine/fitting/fittingShare';
-import { filterMyFittings, groupByHull, type MyFittingRow } from '@/engine/fittings/myFittings';
-import { loadTypes } from '@/sde/loadSde';
-import { deleteFitting, renameFitting } from './myFittings';
+import type { FittingRecord } from '@/db';
+import { filterMyFittings, groupByHull } from '@/engine/fittings/myFittings';
+import { DeleteFittingModal, RenameFittingModal } from './SavedFittingModals';
+import { savedRows, useSavedFittings } from './useLibraryFittings';
 
 interface MyFittingsPanelProps {
   characterId: number | null;
@@ -15,64 +13,18 @@ interface MyFittingsPanelProps {
   onOpen: (record: FittingRecord) => void;
 }
 
-/** Each saved code's hull name; null when the code no longer decodes. */
-function useHullNames(records: readonly FittingRecord[] | undefined): Map<string, string | null> {
-  const { t } = useTranslation();
-  const [hulls, setHulls] = useState<Map<string, string | null>>(new Map());
-  useEffect(() => {
-    if (!records) return;
-    let cancelled = false;
-    void (async () => {
-      const types = await loadTypes();
-      const next = new Map<string, string | null>();
-      for (const record of records) {
-        const decoded = await decodeFittingShare(record.code);
-        next.set(
-          record.id,
-          decoded.ok
-            ? (types[String(decoded.value.hullTypeId)]?.name ??
-                t('common.unknownType', { id: decoded.value.hullTypeId }))
-            : null
-        );
-      }
-      if (!cancelled) setHulls(next);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [records, t]);
-  return hulls;
-}
-
 /** The saved Fittings, grouped by hull and searchable; click one to open it. */
 export function MyFittingsPanel({ characterId, onOpen }: MyFittingsPanelProps) {
   const { t } = useTranslation();
-  const records = useLiveQuery(
-    () =>
-      characterId === null
-        ? Promise.resolve([] as FittingRecord[])
-        : db.fittings.where('characterId').equals(characterId).toArray(),
-    [characterId]
-  );
-  const hulls = useHullNames(records);
+  const { records, hulls } = useSavedFittings(characterId);
   const [query, setQuery] = useState('');
   const [renaming, setRenaming] = useState<FittingRecord | null>(null);
-  const [renameText, setRenameText] = useState('');
   const [deleting, setDeleting] = useState<FittingRecord | null>(null);
 
-  const groups = useMemo(() => {
-    const rows: (MyFittingRow & { record: FittingRecord })[] = (records ?? [])
-      // A row whose hull is still decoding is left out rather than flashed
-      // under "Unknown hull".
-      .filter((record) => hulls.has(record.id))
-      .map((record) => ({
-        id: record.id,
-        name: record.name,
-        hull: hulls.get(record.id) ?? null,
-        record,
-      }));
-    return groupByHull(filterMyFittings(rows, query));
-  }, [records, hulls, query]);
+  const groups = useMemo(
+    () => groupByHull(filterMyFittings(savedRows(records, hulls), query)),
+    [records, hulls, query]
+  );
 
   if (characterId === null) return null;
   const total = records?.length ?? 0;
@@ -116,7 +68,6 @@ export function MyFittingsPanel({ characterId, onOpen }: MyFittingsPanelProps) {
                         tooltip={t('fittings.myFittings.confirmRename')}
                         onClick={() => {
                           setRenaming(row.record);
-                          setRenameText(row.name);
                         }}
                       />
                       <IconButton
@@ -136,61 +87,8 @@ export function MyFittingsPanel({ characterId, onOpen }: MyFittingsPanelProps) {
         )}
       </div>
 
-      <Modal
-        open={renaming !== null}
-        onClose={() => setRenaming(null)}
-        title={t('fittings.myFittings.confirmRename')}
-      >
-        <form
-          className="space-y-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const name = renameText.trim();
-            if (renaming && name !== '') void renameFitting(renaming, name);
-            setRenaming(null);
-          }}
-        >
-          <label className="block text-xs text-text-dim" htmlFor="my-fitting-rename">
-            {t('fittings.myFittings.renameLabel')}
-          </label>
-          <TextInput
-            id="my-fitting-rename"
-            className="w-full"
-            value={renameText}
-            onChange={(e) => setRenameText(e.target.value)}
-          />
-          <div className="flex justify-end gap-2">
-            <Button onClick={() => setRenaming(null)}>{t('fittings.myFittings.cancel')}</Button>
-            <Button type="submit" variant="primary" disabled={renameText.trim() === ''}>
-              {t('fittings.myFittings.confirmRename')}
-            </Button>
-          </div>
-        </form>
-      </Modal>
-
-      <Modal
-        open={deleting !== null}
-        onClose={() => setDeleting(null)}
-        title={t('fittings.myFittings.confirmDelete')}
-      >
-        <div className="space-y-3">
-          <p className="text-sm text-text">
-            {t('fittings.myFittings.deleteConfirm', { name: deleting?.name ?? '' })}
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button onClick={() => setDeleting(null)}>{t('fittings.myFittings.cancel')}</Button>
-            <Button
-              variant="danger"
-              onClick={() => {
-                if (deleting) void deleteFitting(deleting);
-                setDeleting(null);
-              }}
-            >
-              {t('fittings.myFittings.confirmDelete')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      <RenameFittingModal record={renaming} onClose={() => setRenaming(null)} />
+      <DeleteFittingModal record={deleting} onClose={() => setDeleting(null)} />
     </Panel>
   );
 }

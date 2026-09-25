@@ -4,19 +4,16 @@
  * `/fittings` route (`routeScopes.ts`) — Load (EFT paste), stats and editing
  * all work with no grant at all, same reasoning as Clones' `ReauthBanner`.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, DataAgeBadge, EmptyState, IconButton, Panel, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
-import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import type { LoadedFitting } from '@/engine/fittings/load';
 import { groupByHull, type MyFittingRow } from '@/engine/fittings/myFittings';
-import type { CachedResult } from '@/esi/cache';
 import type { CharacterFitting } from '@/esi/endpoints';
-import { loadTypes } from '@/sde/loadSde';
-import { loadInGameFittings } from './inGameFittings';
+import { useInGameFittings } from './useLibraryFittings';
 
 interface InGameFittingsPanelProps {
   characterId: number;
@@ -25,51 +22,7 @@ interface InGameFittingsPanelProps {
 
 export function InGameFittingsPanel({ characterId, onOpen }: InGameFittingsPanelProps) {
   const { t } = useTranslation();
-  const granted = useEndpointsGranted(['getCharacterFittings']);
-  const [result, setResult] = useState<CachedResult<CharacterFitting[]> | null>(null);
-  const [hullNames, setHullNames] = useState<ReadonlyMap<number, string>>(new Map());
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
-
-  // Guards a Character switch mid-fetch: a stale response landing after a
-  // newer request started must not overwrite what that newer request set.
-  const requestIdRef = useRef(0);
-
-  async function refresh() {
-    const requestId = ++requestIdRef.current;
-    setLoading(true);
-    setError(false);
-    try {
-      const { cached } = await loadInGameFittings(characterId);
-      const types = await loadTypes();
-      if (requestId !== requestIdRef.current) return;
-      const names = new Map<number, string>();
-      for (const fitting of cached?.data ?? []) {
-        if (!names.has(fitting.ship_type_id)) {
-          names.set(
-            fitting.ship_type_id,
-            types[String(fitting.ship_type_id)]?.name ??
-              t('common.unknownType', { id: fitting.ship_type_id })
-          );
-        }
-      }
-      setResult(cached);
-      setHullNames(names);
-    } catch {
-      if (requestId === requestIdRef.current) setError(true);
-    } finally {
-      if (requestId === requestIdRef.current) setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    requestIdRef.current++;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new Character/grant, not a render-time derivation
-    setResult(null);
-    setError(false);
-    if (granted === true) void refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh() reads characterId via closure; a Character switch is the only thing that should re-fetch.
-  }, [characterId, granted]);
+  const { granted, result, hullNames, loading, error, refresh } = useInGameFittings(characterId);
 
   const fittings = result?.data ?? [];
   const groups = useMemo(() => {
