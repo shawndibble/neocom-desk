@@ -192,7 +192,7 @@ export async function respondToCalendarEvent(
   try {
     await putCharacterCalendarResponse(characterId, eventId, response);
   } catch (err) {
-    if (isAuthFailure(err)) emitEsiAuthFailure(characterId);
+    if (isAuthFailure(err)) emitEsiAuthFailure(characterId, 'putCharacterCalendarResponse');
     return false;
   }
 

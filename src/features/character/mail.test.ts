@@ -220,7 +220,8 @@ describe('markMailReadOnEsi', () => {
 
     try {
       await markMailReadOnEsi(CHAR_ID, 7);
-      expect(reported).toHaveBeenCalledWith(CHAR_ID);
+      // Names the endpoint, so the notice can ask for its Permission.
+      expect(reported).toHaveBeenCalledWith(CHAR_ID, 'putCharacterMail');
     } finally {
       unsubscribe();
     }
@@ -350,7 +351,7 @@ describe('sendMail', () => {
 
     try {
       await expect(sendMail(CHAR_ID, RECIPIENTS, 'RE: Hi', 'On my way')).rejects.toThrow();
-      expect(reported).toHaveBeenCalledWith(CHAR_ID);
+      expect(reported).toHaveBeenCalledWith(CHAR_ID, 'postCharacterMail');
     } finally {
       unsubscribe();
     }

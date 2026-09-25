@@ -393,7 +393,7 @@ describe('respondToCalendarEvent', () => {
 
     try {
       await respondToCalendarEvent(CHAR_ID, 1, 'tentative');
-      expect(reported).toHaveBeenCalledWith(CHAR_ID);
+      expect(reported).toHaveBeenCalledWith(CHAR_ID, 'putCharacterCalendarResponse');
     } finally {
       unsubscribe();
     }
