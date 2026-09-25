@@ -4036,6 +4036,19 @@
     "unresolvedTypeId": "type id {{typeId}}",
     "backToApp": "Open Neocom Desk"
   },
+  "fittingShare": {
+    "title": "Shared fitting",
+    "banner": "Shown at every skill level V, with no clone — log in to see this fit under your own pilot.",
+    "invalidTitle": "This link isn't valid",
+    "invalidHint": "The link may be corrupted, incomplete, or built by a newer version of Neocom Desk. Ask whoever sent it to share it again.",
+    "loadFailedTitle": "Could not load this fitting",
+    "loadFailedHint": "Something went wrong working out its stats. Try again.",
+    "moduleListTitle": "Modules",
+    "openInApp": "Open in Neocom Desk",
+    "copyEft": "Copy EFT",
+    "copied": "Copied",
+    "copyFailed": "Couldn't copy"
+  },
   "notFound": {
     "title": "Page not found",
     "hint": "That address does not match anything in Neocom Desk. The link may be wrong, or it may have pointed at something that has since moved.",
