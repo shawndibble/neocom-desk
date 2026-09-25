@@ -987,7 +987,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
           <ul className="divide-y divide-line">
             {layout.ordinary.map((eventId) => renderEvent(eventId, false))}
             {layout.corp.length > 0 && (
-              <li key="corp-group">
+              <li>
                 {/*
                   One group for the corp events, headed like an EVE family:
                   a label, then a select-all per channel. They share one

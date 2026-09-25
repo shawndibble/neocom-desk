@@ -94,7 +94,7 @@ export function AllCharactersNotificationSection({
                 section, but every checkbox here reads/writes the
                 cross-Character aggregate instead of one Character's value.
               */}
-        {eventId === 'eveNotification' && (
+        {eventId === layout.eve && (
           <div className="border-t border-line bg-panel/40 pl-3">
             {NOTIFICATION_FAMILIES.map((family) => {
               const familyTypes = eveTypesByFamily(family);
@@ -227,18 +227,16 @@ export function AllCharactersNotificationSection({
             {t('settings.notifications.allCharactersHint')}
           </p>
           {/* The same captions a Character's own section shows. Without them this
-            section is two unlabelled columns of checkboxes — and unlike that
-            section, which is collapsed by default, this one is always open, so
-            these are the first channel checkboxes anyone sees. */}
+            section is two unlabelled columns of checkboxes. */}
           <div className="bg-panel-2">
             <ChannelColumnHeadings />
           </div>
           <ul className="divide-y divide-line bg-panel-2">
             {layout.ordinary.map((eventId) => renderEvent(eventId))}
             {layout.corp.length > 0 && (
-              <li key="corp-group">
+              <li>
                 {/* Headed like an EVE family: a label, then a broadcast select-all per channel. */}
-                <div className="flex items-center justify-between gap-3 bg-panel/30 px-3 py-1">
+                <div className="flex items-center justify-between gap-3 bg-panel/40 px-3 py-1">
                   <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                     {corpGroupLabel}
                   </span>
