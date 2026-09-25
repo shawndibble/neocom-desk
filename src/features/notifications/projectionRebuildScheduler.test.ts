@@ -25,6 +25,20 @@ afterEach(() => {
 });
 
 describe('createCoalescedRebuild', () => {
+  it('cancel drops a scheduled rebuild that has not started', async () => {
+    const rebuild = vi.fn(async () => {});
+    const schedule = createCoalescedRebuild(rebuild, DELAY);
+
+    schedule(Promise.resolve());
+    schedule.cancel();
+    await vi.advanceTimersByTimeAsync(DELAY * 5);
+    expect(rebuild).not.toHaveBeenCalled();
+
+    schedule(Promise.resolve());
+    await vi.advanceTimersByTimeAsync(DELAY);
+    expect(rebuild).toHaveBeenCalledTimes(1);
+  });
+
   it('rebuilds once after the quiet period, not per write', async () => {
     const rebuild = vi.fn(async () => {});
     const schedule = createCoalescedRebuild(rebuild, DELAY);

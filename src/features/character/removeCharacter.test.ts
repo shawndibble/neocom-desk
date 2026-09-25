@@ -9,6 +9,16 @@ const syncMock = vi.hoisted(() => ({
   purgeCharacterRemoteDataOrDefer: vi.fn(async () => true),
 }));
 vi.mock('@/sync', () => syncMock);
+const pushMock = vi.hoisted(() => ({
+  scheduleProjectionRebuild: Object.assign(vi.fn(), { cancel: vi.fn() }),
+  unregisterProjectionRegistration: vi.fn(async () => {}),
+}));
+vi.mock('@/features/notifications/projectionRebuildScheduler', () => ({
+  scheduleProjectionRebuild: pushMock.scheduleProjectionRebuild,
+}));
+vi.mock('@/features/notifications/projectionUpload', () => ({
+  unregisterProjectionRegistration: pushMock.unregisterProjectionRegistration,
+}));
 
 async function seedCharacter(characterId: number): Promise<void> {
   await db.characters.put({
@@ -120,6 +130,22 @@ beforeEach(async () => {
 });
 
 describe('removeCharacter', () => {
+  it('re-uploads the remaining roster, without unregistering, while Characters remain', async () => {
+    await seedCharacter(1);
+    await seedCharacter(2);
+    await removeCharacter(1, false);
+    expect(pushMock.scheduleProjectionRebuild).toHaveBeenCalledTimes(1);
+    expect(pushMock.unregisterProjectionRegistration).not.toHaveBeenCalled();
+  });
+
+  it('cancels the pending rebuild and unregisters push when the last Character is removed', async () => {
+    await seedCharacter(1);
+    await removeCharacter(1, false);
+    expect(pushMock.scheduleProjectionRebuild.cancel).toHaveBeenCalledTimes(1);
+    expect(pushMock.unregisterProjectionRegistration).toHaveBeenCalledTimes(1);
+    expect(pushMock.scheduleProjectionRebuild).not.toHaveBeenCalled();
+  });
+
   it('deletes every local row for the character', async () => {
     await seedCharacter(1);
 

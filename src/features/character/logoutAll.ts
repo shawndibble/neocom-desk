@@ -12,6 +12,8 @@
 
 import { db } from '@/db';
 import { signOutOfSync, triggerSync } from '@/sync';
+import { scheduleProjectionRebuild } from '@/features/notifications/projectionRebuildScheduler';
+import { unregisterProjectionRegistration } from '@/features/notifications/projectionUpload';
 import { removeCharacter } from './removeCharacter';
 
 /**
@@ -55,10 +57,13 @@ export async function logoutAllCharacters(syncConfigured: boolean): Promise<numb
   const ids = characters.map((character) => character.characterId);
   if (syncConfigured) await flushSync(ids);
   for (const id of ids) {
-    await removeCharacter(id, false);
+    await removeCharacter(id, false, false);
   }
   // A token whose Character row is already gone is still a login on this device.
   await db.tokens.clear();
+  // Once for the whole roster, and no rebuild may re-register it afterwards.
+  scheduleProjectionRebuild.cancel();
+  await unregisterProjectionRegistration();
   if (syncConfigured) {
     await signOutOfSync().catch(() => {
       // Nothing more to undo: the tokens that could re-mint it are gone.

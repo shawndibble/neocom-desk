@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readNotificationPermission } from './permission';
-import { webPushSupport, registerDeviceForWebPush } from '@/sync/deviceRegistration';
-import { uploadProjectionRows } from './projectionUpload';
+import {
+  webPushSupport,
+  registerDeviceForWebPush,
+  unregisterDeviceForWebPush,
+} from '@/sync/deviceRegistration';
+import { uploadProjectionRows, unregisterProjectionRegistration } from './projectionUpload';
 import type { ProjectionRow } from '@/engine/projection';
 
 vi.mock('./permission', () => ({
@@ -10,6 +14,7 @@ vi.mock('./permission', () => ({
 vi.mock('@/sync/deviceRegistration', () => ({
   webPushSupport: vi.fn(),
   registerDeviceForWebPush: vi.fn(),
+  unregisterDeviceForWebPush: vi.fn(),
 }));
 
 const readyRegistration = {} as ServiceWorkerRegistration;
@@ -70,5 +75,31 @@ describe('uploadProjectionRows', () => {
   it('resolves rather than rejecting when registration fails', async () => {
     vi.mocked(registerDeviceForWebPush).mockRejectedValue(new Error('network error'));
     await expect(uploadProjectionRows(new Map([[1, [ROW]]]))).resolves.toBeUndefined();
+  });
+});
+
+describe('unregisterProjectionRegistration', () => {
+  it('unregisters this device when push is supported and granted', async () => {
+    await unregisterProjectionRegistration();
+    expect(unregisterDeviceForWebPush).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing when the browser cannot receive push', async () => {
+    vi.mocked(webPushSupport).mockReturnValue('unsupported');
+    await unregisterProjectionRegistration();
+    expect(unregisterDeviceForWebPush).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when permission was not granted', async () => {
+    vi.mocked(readNotificationPermission).mockReturnValue('default');
+    await unregisterProjectionRegistration();
+    expect(unregisterDeviceForWebPush).not.toHaveBeenCalled();
+  });
+
+  it('logs and resolves when the unregistration fails', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(unregisterDeviceForWebPush).mockRejectedValue(new Error('offline'));
+    await expect(unregisterProjectionRegistration()).resolves.toBeUndefined();
+    expect(error).toHaveBeenCalled();
   });
 });

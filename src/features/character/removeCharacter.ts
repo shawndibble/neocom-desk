@@ -15,6 +15,8 @@ import { purgeCharacterCacheOrSuppress, purgeSharedStructureCache } from '@/esi/
 import { clearCharacterSyncBookkeeping, purgeCharacterRemoteDataOrDefer } from '@/sync';
 import { refreshAppBadge } from '@/features/notifications/appBadge';
 import { deleteFeedForCharacter } from '@/features/notifications/feed';
+import { scheduleProjectionRebuild } from '@/features/notifications/projectionRebuildScheduler';
+import { unregisterProjectionRegistration } from '@/features/notifications/projectionUpload';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 export interface RemoveCharacterResult {
@@ -33,10 +35,14 @@ export interface RemoveCharacterResult {
  *   do the same for `scheduleSync`/`triggerSync`, see app/syncStatus.ts).
  *   With sync unconfigured there is nothing remote to purge, and attempting
  *   it would just fail and record a marker that can never be retried.
+ * @param syncPush Whether to bring this device's Scheduled Push registration in
+ *   line with the remaining roster. `logoutAllCharacters` turns it off and
+ *   unregisters once itself, rather than once per Character.
  */
 export async function removeCharacter(
   characterId: number,
-  attemptRemotePurge: boolean
+  attemptRemotePurge: boolean,
+  syncPush = true
 ): Promise<RemoveCharacterResult> {
   const remotePurged = attemptRemotePurge
     ? await purgeCharacterRemoteDataOrDefer(characterId)
@@ -65,8 +71,20 @@ export async function removeCharacter(
   // Not part of that purge: the shared rows aren't this Character's own —
   // they survive as long as the roster does, and only stop being that
   // roster's own knowledge once nobody in it is left (esi/cachePurge.ts).
-  if ((await db.characters.count()) === 0) {
+  const remaining = await db.characters.count();
+  if (remaining === 0) {
     await purgeSharedStructureCache();
+  }
+  // This device's own push registration follows its roster: gone with the
+  // last Character, re-uploaded without this one otherwise. The removed
+  // Character's stored Projection is left alone (other devices keep it).
+  if (syncPush) {
+    if (remaining === 0) {
+      scheduleProjectionRebuild.cancel();
+      await unregisterProjectionRegistration();
+    } else {
+      scheduleProjectionRebuild(Promise.resolve());
+    }
   }
 
   const { activeCharacterId, setActiveCharacter, clearActiveCharacter } =
