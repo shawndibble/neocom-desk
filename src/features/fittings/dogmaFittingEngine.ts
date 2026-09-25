@@ -406,3 +406,24 @@ export function checkCharges(
   }
   return fits;
 }
+
+/**
+ * The charge groups `typeId` itself declares, from calculating it alone on
+ * the hull — the same attributes `extractModuleResult` reads off a module
+ * already in the Fitting, but for one that isn't fitted yet (issue #1728):
+ * `addModule`'s default-charge candidates need this before the module has a
+ * calculated result of its own to read `chargeGroupIds` off.
+ */
+export function chargeGroupIdsFor(
+  shipTypeId: number,
+  slot: FittingSlotKind,
+  typeId: number
+): number[] {
+  assertReady();
+  const fit: Fit = {
+    ship: { type_id: shipTypeId },
+    items: [{ type_id: typeId, slot: { type: slot, index: 0 }, state: 'online' }],
+  };
+  const { items } = calculate(fit);
+  return items[0] ? extractModuleResult(items[0]).chargeGroupIds : [];
+}
