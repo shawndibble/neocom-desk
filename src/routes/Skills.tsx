@@ -7,7 +7,6 @@ import {
   EmptyState,
   PageHeader,
   Panel,
-  ReauthBanner,
   SearchInput,
   SkillBar,
   Spinner,
@@ -16,7 +15,7 @@ import {
 } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
-import { beginEveLogin } from '@/app/loginFlow';
+import { GrantBanner } from '@/app/GrantNote';
 import { SkillsSubNav } from '@/features/skills/SkillsSubNav';
 import { AttributeChips } from '@/features/skills/AttributeChips';
 import { ImplantChip } from '@/features/skills/ImplantChip';
@@ -302,11 +301,12 @@ export function Skills() {
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : skillsNeedsReauth ? (
-        <ReauthBanner
+        <GrantBanner
+          characterId={activeCharacterId}
+          endpoints={['getCharacterSkills']}
           title={t('skills.reauthTitle')}
           hint={t('skills.reauthHint')}
           actionLabel={t('skills.reauthAction')}
-          onLogin={() => void beginEveLogin()}
         />
       ) : !skillsResult ? (
         <EmptyState title={t('skills.emptyTitle')} hint={t('skills.emptyHint')} />

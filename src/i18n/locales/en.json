@@ -54,7 +54,6 @@
     "implantsAssumedTitle": "Assumes no implants",
     "implantsAssumedAction": "Grant Character details",
     "standingsAssumedTitle": "Assumes base standings",
-    "standingsAssumedTitleFor": "{{character}} — Assumes base standings",
     "standingsAssumedAction": "Grant Character details"
   },
   "fittings": {

@@ -12,7 +12,6 @@ import {
   IconButton,
   PageHeader,
   Panel,
-  ReauthBanner,
   SearchInput,
   Spinner,
   StandingIcon,
@@ -32,8 +31,7 @@ import {
   type ContactsAcrossColumnId,
   type ContactsCharacterColumnId,
 } from './contactsColumns';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { GrantBanner } from '@/app/GrantNote';
 import { loadContacts } from '@/features/character/contacts';
 import {
   ALL_CONTACT_TYPES,
@@ -881,13 +879,12 @@ export function Contacts() {
           isColumnVisible={acrossColumnVisibility.isVisible}
         />
       ) : contactsNeedsReauth ? (
-        <ReauthBanner
+        <GrantBanner
+          characterId={activeCharacterId}
+          endpoints={['getCharacterContacts']}
           title={t('contacts.reauthTitle')}
           hint={t('contacts.reauthHint')}
           actionLabel={t('contacts.reauthAction')}
-          onLogin={() =>
-            void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterContacts']) })
-          }
         />
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />

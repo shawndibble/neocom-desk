@@ -9,10 +9,11 @@ import { assignLocation } from './navigation';
 export interface EveLoginOptions {
   /**
    * The Character this login is *for*. Defaults to the active one, which is
-   * what every re-auth entry point means: a `ReauthBanner`, the
-   * `AuthFailureNotice`, a `ScopeGate` — all of them are pressed while looking
-   * at one Character's data. Pass it explicitly only where the Character is not
-   * the active one.
+   * what the shell-level entry points mean: the `AuthFailureNotice`, a
+   * `ScopeGate` — both pressed while looking at the active Character's data.
+   * Per-page Grant CTAs go through `grantAction.ts`'s `beginGrant`, which
+   * always names the Character, since in a multi-Character view it is often
+   * not the active one.
    */
   characterId?: number;
   /** Opt-in scope groups to add to the request, e.g. `['corp']`. */

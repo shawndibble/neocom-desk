@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { PageHeader, Panel, ReauthBanner, Tabs } from '@/components/ui';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { PageHeader, Panel, Tabs } from '@/components/ui';
+import { GrantBanner } from '@/app/GrantNote';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
 import { industryTabs, type IndustryTab } from './industryTabs';
 
@@ -54,13 +53,12 @@ export function IndustryHeader({
 
       {blueprintsNeedsReauth && (
         <Panel title={t('industry.blueprintsTitle')}>
-          <ReauthBanner
+          <GrantBanner
+            characterId={activeCharacterId}
+            endpoints={['getCharacterBlueprints']}
             title={t('industry.blueprintsReauthTitle')}
             hint={t('industry.blueprintsReauthHint')}
             actionLabel={t('industry.blueprintsReauthAction')}
-            onLogin={() =>
-              void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterBlueprints']) })
-            }
           />
         </Panel>
       )}

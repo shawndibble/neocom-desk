@@ -13,7 +13,6 @@ import {
   IconButton,
   InfoTooltip,
   Panel,
-  ReauthBanner,
   SearchInput,
   Select,
   SelectContent,
@@ -26,8 +25,7 @@ import {
 } from '@/components/ui';
 import { useColumnVisibility } from '@/lib/columnVisibility';
 import * as Icon from '@/components/ui/icons';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints } from '@/esi/registry';
+import { GrantBanner } from '@/app/GrantNote';
 import { CharacterBadge } from '@/features/character/assetBrowserRows';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
@@ -854,21 +852,15 @@ export function OpenOrdersPanel({
           </p>
         )}
         {reauthEntries.map((entry) => (
-          <ReauthBanner
+          <GrantBanner
             key={entry.characterId}
+            characterId={entry.characterId}
+            characterName={entry.characterName}
+            endpoints={['getCharacterOrders']}
             variant="ghost"
-            title={t('reauth.titleFor', {
-              character: entry.characterName,
-              title: t('orders.reauthTitle'),
-            })}
+            title={t('orders.reauthTitle')}
             hint={t('orders.reauthHint')}
             actionLabel={t('orders.reauthAction')}
-            onLogin={() =>
-              void beginEveLogin({
-                characterId: entry.characterId,
-                groups: permissionsForEndpoints(['getCharacterOrders']),
-              })
-            }
           />
         ))}
         {floorCharacterIds.map((characterId) => (
