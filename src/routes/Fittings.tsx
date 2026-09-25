@@ -11,6 +11,7 @@ import {
   addDrones,
   addModule,
   firstFreeSlotIndex,
+  moveModule,
   swapModuleType,
 } from '@/engine/fittings/fittingEdit';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
@@ -19,7 +20,7 @@ import { MyFittingsPanel } from '@/features/fittings/MyFittingsPanel';
 import { FittingExportMenu } from '@/features/fittings/FittingExportMenu';
 import { FittingLoadCard } from '@/features/fittings/FittingLoadCard';
 import { InGameFittingsPanel } from '@/features/fittings/InGameFittingsPanel';
-import { FittingRackList, ModuleRow } from '@/features/fittings/FittingRackList';
+import { FittingRackList, ModuleRow, RackSlots } from '@/features/fittings/FittingRackList';
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPanel';
@@ -62,6 +63,8 @@ export function Fittings() {
   }, [hydrateView]);
   const view = resolveFittingView(storedView, isPhone);
   const [statsOpen, setStatsOpen] = useState(false);
+  // Phone Ring: the rack whose slots sheet is open (scope decision `20260924-205720`).
+  const [rackSheet, setRackSheet] = useState<FittingSlotKind | null>(null);
   // Ring view: the filled slot whose module panel is open.
   const [moduleSlot, setModuleSlot] = useState<{ slot: FittingSlotKind; slotIndex: number } | null>(
     null
@@ -140,6 +143,7 @@ export function Fittings() {
       canPlace={canPlace}
       onAdd={handleAdd}
       showGroups={isDesktop}
+      dragToRing={isDesktop && view === 'ring'}
     />
   );
 
@@ -240,7 +244,12 @@ export function Fittings() {
                 fitting={fitting}
                 stats={stats}
                 unusableModuleKeys={gaps?.unusableModuleKeys}
+                typeName={(typeId) => catalogue?.types[String(typeId)]?.name ?? `#${typeId}`}
                 onSlotSelect={selectSlot}
+                onDropType={(rack, index, typeId) => edit((f) => addModule(f, rack, index, typeId))}
+                onMoveModule={(rack, from, to) => edit((f) => moveModule(f, rack, from, to))}
+                compact={isPhone}
+                onRackOpen={setRackSheet}
               />
             ) : (
               <FittingRackList
@@ -309,6 +318,35 @@ export function Fittings() {
                 <FittingVariationsPanel rows={variationRows} onSelect={swapVariation} />
               </div>
             </div>
+          )}
+        </Modal>
+      )}
+      {fitting && isPhone && (
+        <Modal
+          open={rackSheet !== null}
+          onClose={() => setRackSheet(null)}
+          title={t(`fittings.list.rack.${rackSheet ?? 'high'}`)}
+          placement="sheet"
+        >
+          {rackSheet && (
+            <RackSlots
+              rack={rackSheet}
+              hideLabel
+              fitting={fitting}
+              catalogue={catalogue}
+              engineReady={workspace.engineReady}
+              profile={workspace.profile}
+              edit={edit}
+              stats={stats}
+              moduleResults={moduleResults}
+              target={target}
+              onSelectTarget={(next) => {
+                // One sheet at a time: the Add sheet takes over from the rack's.
+                setRackSheet(null);
+                selectTarget(next);
+              }}
+              unusableModuleKeys={gaps?.unusableModuleKeys}
+            />
           )}
         </Modal>
       )}

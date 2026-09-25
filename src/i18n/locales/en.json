@@ -158,7 +158,16 @@
       "title": "Ring",
       "slotFitted": "{{rack}} {{index}}, {{state}}",
       "slotEmpty": "{{rack}} {{index}}, empty",
-      "openStats": "Stats"
+      "openStats": "Stats",
+      "tooltipFitted": "{{rack}} {{index}}: {{name}} ({{state}})",
+      "tooltipCharge": "Loaded: {{name}}",
+      "tooltipCantUse": "Can’t use: missing skills",
+      "tooltipEmpty": "{{rack}} {{index}}: empty. Click to add, or drop a module here.",
+      "tooltipEmptyCompact": "{{rack}} {{index}}: empty",
+      "rackHint": "Tap a rack to edit its slots",
+      "rackCount": "{{fitted}} / {{total}}",
+      "rackCantUse_one": "{{count}} can’t use",
+      "rackCantUse_other": "{{count}} can’t use"
     },
     "edit": {
       "stateLabel": "State of {{name}}",

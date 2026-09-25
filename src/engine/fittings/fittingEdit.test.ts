@@ -4,6 +4,7 @@ import {
   addModule,
   droneGroups,
   firstFreeSlotIndex,
+  moveModule,
   removeModule,
   setDroneCounts,
   setModuleCharge,
@@ -44,6 +45,29 @@ describe('addModule', () => {
   it('does not mutate its input', () => {
     addModule(base, 'medium', 0, 438);
     expect(base.modules).toHaveLength(2);
+  });
+});
+
+describe('moveModule', () => {
+  it('moves a module to a free slot of its rack, keeping state and charge', () => {
+    const next = moveModule(base, 'high', 0, 3);
+    expect(next.modules.filter((m) => m.slot === 'high')).toEqual([
+      { slot: 'high', slotIndex: 3, typeId: 2889, state: 'active', chargeTypeId: 185 },
+    ]);
+  });
+
+  it('swaps with whatever occupies the target slot', () => {
+    const two = addModule(base, 'high', 2, 3001);
+    const next = moveModule(two, 'high', 0, 2);
+    expect(next.modules.filter((m) => m.slot === 'high')).toEqual([
+      { slot: 'high', slotIndex: 0, typeId: 3001, state: 'active' },
+      { slot: 'high', slotIndex: 2, typeId: 2889, state: 'active', chargeTypeId: 185 },
+    ]);
+  });
+
+  it('leaves the Fitting as it was for an empty source or the same slot', () => {
+    expect(moveModule(base, 'high', 5, 1)).toBe(base);
+    expect(moveModule(base, 'high', 0, 0)).toBe(base);
   });
 });
 

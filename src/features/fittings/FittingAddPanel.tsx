@@ -10,6 +10,7 @@ import {
 import { targetRack, type AddTarget } from './addTarget';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 import { checkCandidates, type CandidateCheck } from './dogmaFittingEngine';
+import { endFittingDrag, startFittingDrag } from './fittingDrag';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
 interface FittingAddPanelProps {
@@ -24,6 +25,8 @@ interface FittingAddPanelProps {
   onAdd: (typeId: number, rack: CandidateRack) => void;
   /** Desktop shows the market-group browser; the phone sheet is search only. */
   showGroups: boolean;
+  /** Items drag onto the Ring's slots (pointer only — scope decision `20260924-205720`). */
+  dragToRing?: boolean;
 }
 
 function descendantGroupIds(root: number, catalogue: FittingCatalogue): Set<number> {
@@ -54,6 +57,7 @@ export function FittingAddPanel({
   canPlace,
   onAdd,
   showGroups,
+  dragToRing = false,
 }: FittingAddPanelProps) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -210,8 +214,26 @@ export function FittingAddPanel({
           {results.map(({ entry, check }) => {
             const entryRack = catalogue.rackOf[String(entry.typeId)];
             const placeable = engineReady && canPlace(entryRack);
+            // Dragging onto a Ring slot replaces what's there, so a full rack
+            // still drags; it only needs the ship data to judge the drop.
+            const draggable = dragToRing && engineReady && entryRack !== 'drone';
             return (
-              <li key={entry.typeId}>
+              <li
+                key={entry.typeId}
+                draggable={draggable}
+                onDragStart={
+                  draggable
+                    ? (event) =>
+                        startFittingDrag(event, {
+                          kind: 'type',
+                          typeId: entry.typeId,
+                          rack: entryRack,
+                        })
+                    : undefined
+                }
+                onDragEnd={draggable ? endFittingDrag : undefined}
+                className={draggable ? 'cursor-grab active:cursor-grabbing' : undefined}
+              >
                 <Button
                   align="start"
                   className="w-full"

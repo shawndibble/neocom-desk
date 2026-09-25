@@ -63,7 +63,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
   });
 
-  test('switches to the Ring view, keeps 44px slots, and remembers the choice across a reload', async ({
+  test('switches to the Ring overview, edits a rack through a 44px rack button, and remembers the choice across a reload', async ({
     page,
   }) => {
     await signInAndGoto(page, './fittings');
@@ -94,11 +94,17 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await ringToggle.click();
 
     await expect(page.getByRole('heading', { name: 'Ring' })).toBeVisible();
-    const slot = page.getByLabel(/^High slots 1,/);
-    await expect(slot).toBeVisible();
-    const slotBox = await slot.boundingBox();
-    expect(slotBox!.width).toBeGreaterThanOrEqual(44);
-    expect(slotBox!.height).toBeGreaterThanOrEqual(44);
+    // At 390px the ring is an overview — its tiles are too small to be the
+    // tap target (scope decision 20260924-205720) — so the rack buttons are.
+    await expect(page.getByLabel(/^High slots 1,/)).toBeVisible();
+    const rackButton = page.getByRole('button', { name: /^High slots\s*\d+ \/ \d+/ });
+    const rackBox = await rackButton.boundingBox();
+    expect(rackBox!.height).toBeGreaterThanOrEqual(44);
+    await rackButton.click();
+    const sheet = page.getByRole('dialog', { name: 'High slots' });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByText('125mm Gatling AutoCannon I')).toBeVisible();
+    await page.keyboard.press('Escape');
 
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Ring' })).toBeVisible();
