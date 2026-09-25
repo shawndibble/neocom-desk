@@ -325,6 +325,8 @@ export function PlanChainTable({ rows, productName, hubId }: PlanChainTableProps
         // Titles the card below `sm`: the tier chip carries the hierarchy that
         // indentation carries on desktop, so no depth gutter is spent at 390px.
         primary: true,
+        // A wrapped name lifts its whole row at 1024, uneven against its siblings.
+        className: 'whitespace-nowrap',
         sortValue: (row) => row.name,
         // Plan hub isn't in the URL, so it must be carried explicitly to
         // match this row's own unit-price cell — see MarketItemLink's hubId.

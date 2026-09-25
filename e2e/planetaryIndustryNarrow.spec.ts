@@ -353,24 +353,8 @@ test.describe('PI Plan — stacked Sensitivity card', () => {
       .locator('tbody tr')
       .evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
     expect(heights.length).toBeGreaterThan(1);
-    console.log(
-      'HEIGHTS',
-      JSON.stringify(heights),
-      JSON.stringify(
-        await chain
-          .locator('tbody tr')
-          .evaluateAll((rows) =>
-            rows.map((r) =>
-              Array.from(r.children).map(
-                (c) =>
-                  Math.round(c.getBoundingClientRect().height) +
-                  ':' +
-                  Math.round(c.getBoundingClientRect().width)
-              )
-            )
-          )
-      )
-    );
+    // One line tall: a wrapped cell anywhere in a row (name included) would lift it.
+    expect(new Set(heights.map((h) => Math.round(h))).size).toBe(1);
     for (const h of heights) expect(h).toBeCloseTo(heights[0], 0);
 
     // The cell is its own line: role and hub read are two spans, never one string.
