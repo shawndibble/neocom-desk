@@ -29,6 +29,8 @@ interface FittingPreviewProps {
   onCompare: (code: string) => void;
   onRename: () => void;
   onDelete: () => void;
+  /** Keeps edited notes on a saved fitting. */
+  onSaveNotes: (notes: string) => void;
 }
 
 type PreviewTab = 'offense' | 'defense' | 'skills' | 'notes';
@@ -78,9 +80,9 @@ function useShareCode(row: LibraryRow, fitting: Fitting | null): string | null |
   return encoded?.fitting === fitting ? encoded.code : undefined;
 }
 
-/** What a row has to say for itself beyond its stats: an In-game Fitting's description. */
+/** A saved fitting's notes, or an In-game one's description. */
 function rowNotes(row: LibraryRow): string {
-  return row.source === 'inGame' ? row.inGame.description.trim() : '';
+  return row.source === 'saved' ? (row.record.notes ?? '') : row.inGame.description.trim();
 }
 
 /**
@@ -97,6 +99,7 @@ export function FittingPreview({
   onCompare,
   onRename,
   onDelete,
+  onSaveNotes,
 }: FittingPreviewProps) {
   const { t } = useTranslation();
   const fitting = usePreviewFitting(row);
@@ -114,7 +117,10 @@ export function FittingPreview({
     { id: 'offense', label: t('fittings.start.preview.tabOffense') },
     { id: 'defense', label: t('fittings.start.preview.tabDefense') },
     { id: 'skills', label: t('fittings.start.preview.tabSkills') },
-    ...(notes === '' ? [] : [{ id: 'notes', label: t('fittings.start.preview.tabNotes') }]),
+    // A saved fitting always offers Notes (to write them); an In-game one only when it has a description.
+    ...(row.source === 'saved' || notes !== ''
+      ? [{ id: 'notes', label: t('fittings.start.preview.tabNotes') }]
+      : []),
   ];
   const shownTab = tabs.some((entry) => entry.id === tab) ? tab : 'offense';
 
@@ -193,7 +199,10 @@ export function FittingPreview({
               {shownTab === 'skills' ? (
                 fitting && <SkillsPanel fitting={fitting} characterId={characterId} />
               ) : shownTab === 'notes' ? (
-                <NotesPanel text={notes} />
+                <NotesPanel
+                  text={notes}
+                  onSave={row.source === 'saved' ? onSaveNotes : undefined}
+                />
               ) : stats ? (
                 shownTab === 'offense' ? (
                   <OffensePanel stats={stats} typeName={typeName} />

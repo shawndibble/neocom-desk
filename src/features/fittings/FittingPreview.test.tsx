@@ -54,6 +54,7 @@ function show(row: LibraryRow) {
       onCompare={noop}
       onRename={noop}
       onDelete={noop}
+      onSaveNotes={noop}
     />
   );
 }
@@ -75,9 +76,9 @@ describe('FittingPreview', () => {
     expect(screen.queryByRole('tab', { name: 'Notes' })).not.toBeInTheDocument();
   });
 
-  it('leaves Notes out for a saved fitting (it has none yet)', () => {
+  it('always offers Notes on a saved fitting, so notes can be written', () => {
     show(savedRow('Rifter'));
-    expect(screen.queryByRole('tab', { name: 'Notes' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Notes' })).toBeInTheDocument();
   });
 
   it('says an unreadable saved fitting cannot be read, with no Ring or tabs', () => {

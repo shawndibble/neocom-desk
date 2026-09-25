@@ -19,6 +19,7 @@ import { filterMyFittings, groupByHull } from '@/engine/fittings/myFittings';
 import { FittingLoadCard } from './FittingLoadCard';
 import { FittingPreview } from './FittingPreview';
 import { HullPicker } from './HullPicker';
+import { setFittingNotes } from './myFittings';
 import { DeleteFittingModal, RenameFittingModal } from './SavedFittingModals';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { FittingLibrarySource } from './useFittingPicker';
@@ -236,6 +237,9 @@ export function FittingStartScreen({
               onCompare={(code) => void navigate(`/fittings/compare?f=${encodeURIComponent(code)}`)}
               onRename={() => selected.source === 'saved' && setRenaming(selected.record)}
               onDelete={() => selected.source === 'saved' && setDeleting(selected.record)}
+              onSaveNotes={(notes) =>
+                selected.source === 'saved' && void setFittingNotes(selected.record, notes)
+              }
             />
           ) : (
             <p className="text-sm text-text-dim">{t('fittings.start.pickToPreview')}</p>

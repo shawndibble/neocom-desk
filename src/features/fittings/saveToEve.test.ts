@@ -52,6 +52,17 @@ describe('saveFittingToEve', () => {
     expect(sent.name).toHaveLength(IN_GAME_FITTING_NAME_MAX);
   });
 
+  it('sends the description, cut to the ESI 500-character limit', async () => {
+    postCharacterFittingMock.mockResolvedValue({ data: { fitting_id: 1 } });
+    await saveFittingToEve({
+      characterId: 1,
+      fitting: FITTING,
+      name: 'Kite',
+      description: 'z'.repeat(600),
+    });
+    expect(postCharacterFittingMock.mock.calls[0][1].description).toHaveLength(500);
+  });
+
   it('deletes the overwritten fitting only after the create succeeds', async () => {
     postCharacterFittingMock.mockResolvedValue({ data: { fitting_id: 99 } });
     deleteCharacterFittingMock.mockResolvedValue({ data: null });

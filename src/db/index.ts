@@ -550,6 +550,8 @@ export interface FittingRecord {
   name: string;
   /** The Fitting's share code (`encodeFittingShare`), not a URL. */
   code: string;
+  /** Free-text notes, sent as the description on Save to EVE; absent for none. */
+  notes?: string;
   updatedAt: number;
 }
 
