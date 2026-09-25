@@ -52,15 +52,31 @@ export function newFitting(shipTypeId: number, name: string): Fitting {
  * Fits `typeId` at `slot`/`slotIndex`, replacing (and unloading) whatever was
  * there. Asks for `'active'`: the engine lowers a requested state to what the
  * module can actually reach, so a passive module simply calculates online.
+ *
+ * A charge-taking module doesn't land empty: it copies the charge another
+ * fitted module of the same type already has loaded, or — with none fitted
+ * yet — the first of `defaultChargeCandidates` (the caller's own
+ * allowed-charge list, since resolving one needs the dogma engine this pure
+ * module never touches). Neither applies, it lands empty, same as before.
  */
 export function addModule(
   fitting: Fitting,
   slot: FittingSlotKind,
   slotIndex: number,
-  typeId: number
+  typeId: number,
+  defaultChargeCandidates: readonly number[] = []
 ): Fitting {
+  const chargeTypeId =
+    fitting.modules.find((module) => module.typeId === typeId && module.chargeTypeId !== undefined)
+      ?.chargeTypeId ?? defaultChargeCandidates[0];
   const modules = fitting.modules.filter((module) => !isAt(module, slot, slotIndex));
-  modules.push({ slot, slotIndex, typeId, state: 'active' });
+  modules.push({
+    slot,
+    slotIndex,
+    typeId,
+    state: 'active',
+    ...(chargeTypeId !== undefined ? { chargeTypeId } : {}),
+  });
   modules.sort(byRackThenIndex);
   return { ...fitting, modules };
 }

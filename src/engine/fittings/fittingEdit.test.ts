@@ -59,6 +59,38 @@ describe('addModule', () => {
     addModule(base, 'medium', 0, 438);
     expect(base.modules).toHaveLength(2);
   });
+
+  it('copies an already-loaded charge from a sibling of the same type', () => {
+    const next = addModule(base, 'medium', 0, 2889);
+    expect(next.modules.find((m) => m.slot === 'medium' && m.slotIndex === 0)).toEqual({
+      slot: 'medium',
+      slotIndex: 0,
+      typeId: 2889,
+      state: 'active',
+      chargeTypeId: 185,
+    });
+  });
+
+  it('falls back to the first default-charge candidate when no sibling has one', () => {
+    const next = addModule(base, 'medium', 0, 438, [77, 88]);
+    expect(next.modules.find((m) => m.slot === 'medium' && m.slotIndex === 0)?.chargeTypeId).toBe(
+      77
+    );
+  });
+
+  it('prefers a sibling copy over the default-charge candidates', () => {
+    const next = addModule(base, 'medium', 0, 2889, [999]);
+    expect(next.modules.find((m) => m.slot === 'medium' && m.slotIndex === 0)?.chargeTypeId).toBe(
+      185
+    );
+  });
+
+  it('stays chargeless with no sibling charge and no candidates', () => {
+    const next = addModule(base, 'medium', 0, 438);
+    expect(
+      next.modules.find((m) => m.slot === 'medium' && m.slotIndex === 0)?.chargeTypeId
+    ).toBeUndefined();
+  });
 });
 
 describe('newFitting', () => {
