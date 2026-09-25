@@ -12,6 +12,7 @@
  * rather than push, so Back skips the in-between counts.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { db } from '@/db';
 import { saveFitting } from './myFittings';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useUrlParam } from '@/lib/useUrlState';
@@ -121,6 +122,7 @@ export function useFittingWorkspace(): FittingWorkspace {
   const ownWriteRef = useRef<{ code: string; fitting: Fitting | null } | null>(null);
   // A saved Fitting being opened: the decode effect names the Fitting after
   // it (the share code carries no name) and keeps `savedId` for it.
+  const savingRef = useRef(false);
   const pendingOpenRef = useRef<{ code: string; name: string } | null>(null);
 
   // The Fitting the next edit applies to: the latest edit's result even before
@@ -264,15 +266,32 @@ export function useFittingWorkspace(): FittingWorkspace {
     if (activeCharacterId === null || current === null) return;
     // Encoded now rather than read from the URL, which lags an edit until its
     // own async encode lands.
-    const encoded = await encodeFittingShare(fittingToShareInput(current));
-    if (!encoded.ok) return;
-    const record = await saveFitting(activeCharacterId, {
-      ...(savedId !== null ? { id: savedId } : {}),
-      name: current.name,
-      code: encoded.payload,
-    });
-    setSavedId(record.id);
+    if (savingRef.current) return;
+    savingRef.current = true;
+    try {
+      const encoded = await encodeFittingShare(fittingToShareInput(current));
+      if (!encoded.ok) return;
+      // The record may have been deleted from the list since it was opened;
+      // then this is a new save. A live one keeps its name, which the list
+      // may have renamed since the Fitting was opened.
+      const existing = savedId === null ? undefined : await db.fittings.get(savedId);
+      const updating = existing?.characterId === activeCharacterId ? existing : undefined;
+      const record = await saveFitting(activeCharacterId, {
+        ...(updating ? { id: updating.id } : {}),
+        name: updating?.name ?? current.name,
+        code: encoded.payload,
+      });
+      setSavedId(record.id);
+    } finally {
+      savingRef.current = false;
+    }
   }, [activeCharacterId, savedId]);
+
+  // A saved record belongs to one Character.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new Character, not a render-time derivation
+    setSavedId(null);
+  }, [activeCharacterId]);
 
   const openSaved = useCallback(
     (record: { id: string; name: string; code: string }) => {
