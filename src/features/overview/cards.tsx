@@ -163,7 +163,12 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
   return (
     <BoardCard
       title={t('overview.board.miningTax')}
-      meta={<SeverityWord severity={miningTaxSeverity(data)} />}
+      meta={
+        <SeverityWord
+          severity={miningTaxSeverity(data)}
+          warningLabel={data?.needsReauth ? REAUTH_WORD : 'overview.board.word.unpaid'}
+        />
+      }
       to="/mining/tax"
       openLabel={t('overview.board.open')}
       footer={
@@ -219,7 +224,12 @@ export function PlanetaryCard({ data }: { data: PlanetaryBoardData | null }) {
   return (
     <BoardCard
       title={t('overview.board.planetary')}
-      meta={<SeverityWord severity={planetarySeverity(data)} />}
+      meta={
+        <SeverityWord
+          severity={planetarySeverity(data)}
+          warningLabel={data?.needsReauth ? REAUTH_WORD : undefined}
+        />
+      }
       to="/planetary-industry"
       openLabel={t('overview.board.open')}
       footer={
@@ -306,7 +316,12 @@ export function IndustryCard({
   return (
     <BoardCard
       title={t('overview.board.industry')}
-      meta={<SeverityWord severity={industrySeverity(jobs, needsReauth, nowMs)} />}
+      meta={
+        <SeverityWord
+          severity={industrySeverity(jobs, needsReauth, nowMs)}
+          warningLabel={needsReauth ? REAUTH_WORD : 'overview.board.word.ready'}
+        />
+      }
       to="/industry"
       openLabel={t('overview.board.open')}
       footer={(() => {
@@ -503,7 +518,20 @@ export function EverythingElseCard({ domains }: { domains: readonly FoldedDomain
  * the two border colours apart (DESIGN.md §7), and the word is shorter than
  * the tooltip explaining a dot would be.
  */
-function SeverityWord({ severity }: { severity: DeadlineSeverity | null }) {
+const REAUTH_WORD = 'overview.board.word.reauth';
+
+/**
+ * `warningLabel` swaps only the generic "Due soon" word: that one is false on
+ * every card here except a planetary batch, so each domain names its own
+ * reason. The severity itself (and so the phone sort) is untouched.
+ */
+function SeverityWord({
+  severity,
+  warningLabel,
+}: {
+  severity: DeadlineSeverity | null;
+  warningLabel?: string;
+}) {
   const { t } = useTranslation();
   // Nothing at all while the card is still loading: a "Clear" verdict over a
   // footer reading "Checking…" is a claim the card cannot yet make.
@@ -511,7 +539,9 @@ function SeverityWord({ severity }: { severity: DeadlineSeverity | null }) {
   return (
     <span className="flex min-w-0 items-center gap-1 text-[0.6875rem] tracking-widest whitespace-nowrap uppercase">
       <SeverityIcon severity={severity} />
-      <span className="truncate text-text-dim">{t(SEVERITY_LABEL[severity])}</span>
+      <span className="truncate text-text-dim">
+        {t(severity === 'warning' && warningLabel ? warningLabel : SEVERITY_LABEL[severity])}
+      </span>
     </span>
   );
 }

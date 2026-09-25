@@ -46,10 +46,16 @@ export function ordersSeverity(
   return counts.expiringOrStale > 0 ? 'watch' : 'clear';
 }
 
+/** Unpaid tax is a routine debt, not an emergency, until it has sat this long. */
+export const MINING_TAX_WARNING_DAYS = 30;
+
 export function miningTaxSeverity(data: MiningTaxBoardData | null): DeadlineSeverity | null {
   if (data === null) return null;
   if (data.needsReauth) return UNREADABLE;
-  if (data.unpaidIsk > 0) return 'warning';
+  if (data.unpaidIsk > 0) {
+    const aged = data.oldestUnpaidDays !== null && data.oldestUnpaidDays >= MINING_TAX_WARNING_DAYS;
+    return aged ? 'warning' : 'watch';
+  }
   return data.unassignedCount > 0 ? 'watch' : 'clear';
 }
 
