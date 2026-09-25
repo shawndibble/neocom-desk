@@ -111,6 +111,17 @@ const HULL_RULES: ReadonlySet<string> = new Set([
   'max_type',
 ]);
 
+/** The resources a lone module can overflow the bare hull on, as `resource:<kind>`. */
+const FITTING_RESOURCE_RULES: ReadonlySet<string> = new Set([
+  'resource:cpu',
+  'resource:powergrid',
+  'resource:calibration',
+]);
+
+/**
+ * `ruleTypes` are the engine's `Rule.type`s, a resource rule spelled
+ * `resource:<kind>` (`resource:powergrid`) so the kinds can be told apart.
+ */
 export function classifyRuleBreaks(ruleTypes: readonly string[]): {
   fitsHull: boolean;
   canFly: boolean;
@@ -120,6 +131,6 @@ export function classifyRuleBreaks(ruleTypes: readonly string[]): {
   return {
     fitsHull: !ruleTypes.some((rule) => HULL_RULES.has(rule)),
     canFly: !ruleTypes.includes('skill'),
-    fitsResources: !ruleTypes.includes('resource'),
+    fitsResources: !ruleTypes.some((rule) => FITTING_RESOURCE_RULES.has(rule)),
   };
 }

@@ -7,10 +7,20 @@ describe('classifyRuleBreaks', () => {
   });
 
   it('tells an item too big for the bare hull’s CPU, powergrid or calibration apart from a hull break', () => {
-    expect(classifyRuleBreaks(['resource'])).toEqual({
+    expect(classifyRuleBreaks(['resource:powergrid'])).toEqual({
       fitsHull: true,
       canFly: true,
       fitsResources: false,
+    });
+    expect(classifyRuleBreaks(['resource:cpu']).fitsResources).toBe(false);
+    expect(classifyRuleBreaks(['resource:calibration']).fitsResources).toBe(false);
+  });
+
+  it('leaves other resources (a drone bay, charge capacity) to the Fitting itself', () => {
+    expect(classifyRuleBreaks(['resource:drone_bay', 'resource:charge_capacity'])).toEqual({
+      fitsHull: true,
+      canFly: true,
+      fitsResources: true,
     });
   });
 

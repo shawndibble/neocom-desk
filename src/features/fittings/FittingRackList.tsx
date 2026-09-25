@@ -4,8 +4,10 @@ import { Button, IconButton, NativeSelect, Panel, TextInput, TypeIcon } from '@/
 import { AddRow, Close, Compare } from '@/components/ui/icons';
 import {
   droneBayUsed,
+  droneCountMax,
   droneGroups,
-  maxDroneCount,
+  setDroneCountWithinBay,
+  type DroneBay,
   removeModule,
   setDroneCounts,
   setModuleCharge,
@@ -26,7 +28,7 @@ import { showsDrones } from '@/engine/fittings/stats';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { checkCharges } from './dogmaFittingEngine';
 import type { AddTarget } from './addTarget';
-import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
+import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
 
 const STATES: readonly FittingItemState[] = ['offline', 'online', 'active', 'overload'];
@@ -119,12 +121,10 @@ function SlotName({
   name: string;
   onShowInfo?: ShowInfo;
 }) {
-  const { t } = useTranslation();
   if (!onShowInfo) return <span className={SLOT_NAME_CLASS}>{name}</span>;
   return (
     <button
       type="button"
-      title={t('fittings.list.showInfo', { name })}
       className={`${SLOT_NAME_CLASS} cursor-pointer text-accent underline-offset-2 hover:underline`}
       onClick={() => onShowInfo(typeId, name)}
     >
@@ -284,26 +284,6 @@ function SlotCard({
       </div>
     </div>
   );
-}
-
-/**
- * Sets one of a drone type's two counts, keeping the other as the Fitting has
- * it now — and no higher than the bay holds beside everything else in it.
- */
-function withDroneCount(
-  fitting: Fitting,
-  typeId: number,
-  counts: Partial<{ inSpace: number; inBay: number }>,
-  maxOf: (fitting: Fitting, typeId: number) => number
-): Fitting {
-  const current = droneGroups(fitting).find((group) => group.typeId === typeId);
-  const max = maxOf(fitting, typeId);
-  const inSpace = counts.inSpace ?? current?.inSpace ?? 0;
-  const inBay = counts.inBay ?? current?.inBay ?? 0;
-  return setDroneCounts(fitting, typeId, {
-    inSpace: counts.inSpace === undefined ? inSpace : Math.min(inSpace, max - inBay),
-    inBay: counts.inBay === undefined ? inBay : Math.min(inBay, max - inSpace),
-  });
 }
 
 /**
@@ -490,10 +470,10 @@ export function FittingRackList({
   const context = { fitting, catalogue, engineReady, profile, edit };
   const drones = droneGroups(fitting);
   const dronesShown = showsDrones(stats, drones.length);
-  const droneVolume = (typeId: number) => catalogue?.types[String(typeId)]?.volume ?? 0;
+  const droneVolume = (typeId: number) => catalogueVolume(catalogue, typeId);
   // Before the ship data the bay's size is unknown, so nothing is capped yet.
-  const maxOf = (f: Fitting, typeId: number) =>
-    stats === null ? Infinity : maxDroneCount(f, typeId, stats.droneCapacity, droneVolume);
+  const bay: DroneBay | null =
+    stats === null ? null : { capacity: stats.droneCapacity, volumeOf: droneVolume };
 
   return (
     <Panel title={t('fittings.list.title')} actions={actions}>
@@ -572,10 +552,10 @@ export function FittingRackList({
                     <DroneCountInput
                       label={t('fittings.edit.inSpace')}
                       value={group.inSpace}
-                      max={maxOf(fitting, group.typeId) - group.inBay}
+                      max={droneCountMax(fitting, group.typeId, 'inSpace', bay)}
                       onCommit={(inSpace) =>
                         edit(
-                          (f) => withDroneCount(f, group.typeId, { inSpace }, maxOf),
+                          (f) => setDroneCountWithinBay(f, group.typeId, { inSpace }, bay),
                           `drone-space-${group.typeId}`
                         )
                       }
@@ -583,10 +563,10 @@ export function FittingRackList({
                     <DroneCountInput
                       label={t('fittings.edit.inBay')}
                       value={group.inBay}
-                      max={maxOf(fitting, group.typeId) - group.inSpace}
+                      max={droneCountMax(fitting, group.typeId, 'inBay', bay)}
                       onCommit={(inBay) =>
                         edit(
-                          (f) => withDroneCount(f, group.typeId, { inBay }, maxOf),
+                          (f) => setDroneCountWithinBay(f, group.typeId, { inBay }, bay),
                           `drone-bay-${group.typeId}`
                         )
                       }

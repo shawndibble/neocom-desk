@@ -372,7 +372,9 @@ describe('fit checks', () => {
         // No launcher hardpoint: the engine reports it against the ship.
         ...(typeId === 4 ? [{ target: { type: 'ship' }, rule: { type: 'slots' } }] : []),
         // More powergrid than the bare hull has: also reported against the ship.
-        ...(typeId === 5 ? [{ target: { type: 'ship' }, rule: { type: 'resource' } }] : []),
+        ...(typeId === 5
+          ? [{ target: { type: 'ship' }, rule: { type: 'resource', resource: 'powergrid' } }]
+          : []),
       ];
       return { ship: { attributes: new Map() }, items: [], violations };
     });

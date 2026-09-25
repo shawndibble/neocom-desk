@@ -224,25 +224,27 @@ export function droneBayUsed(fitting: Fitting, volumeOf: (typeId: number) => num
   return fitting.drones.reduce((sum, drone) => sum + volumeOf(drone.typeId) * drone.quantity, 0);
 }
 
+/** A drone bay: its size, and how big each drone is. */
+export interface DroneBay {
+  /** m3. */
+  capacity: number;
+  /** m3 of one drone of a type; 0 when unknown. */
+  volumeOf: (typeId: number) => number;
+}
+
 /**
- * The most of `typeId` (in space and in the bay together) that fits a bay of
- * `capacity` m3 beside the Fitting's other drones. `Infinity` when the type's
- * volume is unknown, so a missing figure never blocks adding.
+ * How many more of `typeId` fit the bay beside what it already holds —
+ * never below zero, even on a fit already over the cap. `Infinity` when the
+ * type's volume or the bay (`null`, before the ship data) is unknown, so a
+ * missing figure never blocks an edit.
  */
-export function maxDroneCount(
-  fitting: Fitting,
-  typeId: number,
-  capacity: number,
-  volumeOf: (typeId: number) => number
-): number {
-  const volume = volumeOf(typeId);
+export function droneRoom(fitting: Fitting, typeId: number, bay: DroneBay | null): number {
+  if (bay === null) return Infinity;
+  const volume = bay.volumeOf(typeId);
   if (volume <= 0) return Infinity;
-  const others = droneBayUsed(
-    { ...fitting, drones: fitting.drones.filter((drone) => drone.typeId !== typeId) },
-    volumeOf
-  );
+  const free = bay.capacity - droneBayUsed(fitting, bay.volumeOf);
   // A hair of tolerance, so 50 m3 of 5 m3 drones counts as ten, not 9.999….
-  return Math.max(0, Math.floor((capacity - others) / volume + 1e-9));
+  return Math.max(0, Math.floor(free / volume + 1e-9));
 }
 
 /**
@@ -253,12 +255,38 @@ export function addDronesWithinBay(
   fitting: Fitting,
   typeId: number,
   quantity: number,
-  capacity: number,
-  volumeOf: (typeId: number) => number
+  bay: DroneBay | null
 ): Fitting {
-  const current = droneGroups(fitting).find((group) => group.typeId === typeId);
-  const held = (current?.inSpace ?? 0) + (current?.inBay ?? 0);
-  const room = maxDroneCount(fitting, typeId, capacity, volumeOf) - held;
-  const adding = Math.min(quantity, room);
+  const adding = Math.min(quantity, droneRoom(fitting, typeId, bay));
   return adding >= 1 ? addDrones(fitting, typeId, adding) : fitting;
+}
+
+/** The highest one of a type's two counts may go: where it is now, plus the room left. */
+export function droneCountMax(
+  fitting: Fitting,
+  typeId: number,
+  which: 'inSpace' | 'inBay',
+  bay: DroneBay | null
+): number {
+  const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
+  return (group?.[which] ?? 0) + droneRoom(fitting, typeId, bay);
+}
+
+/**
+ * Sets one of a type's two counts (the List's boxes), keeping the other. A
+ * count may always come down; going up, it stops at what the bay holds.
+ */
+export function setDroneCountWithinBay(
+  fitting: Fitting,
+  typeId: number,
+  counts: Partial<{ inSpace: number; inBay: number }>,
+  bay: DroneBay | null
+): Fitting {
+  const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
+  const cap = (which: 'inSpace' | 'inBay') => {
+    const asked = counts[which];
+    if (asked === undefined) return group?.[which] ?? 0;
+    return Math.min(asked, droneCountMax(fitting, typeId, which, bay));
+  };
+  return setDroneCounts(fitting, typeId, { inSpace: cap('inSpace'), inBay: cap('inBay') });
 }

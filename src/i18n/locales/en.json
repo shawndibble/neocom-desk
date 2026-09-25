@@ -160,7 +160,6 @@
       "droneBay": "Drone bay (m³)",
       "overBy": "Over by {{amount}}",
       "cantUse": "Can't use",
-      "showInfo": "Show info for {{name}}",
       "variationsFor": "Variations of {{name}}",
       "drones": "Drones",
       "rack": {
@@ -337,6 +336,9 @@
       "maxVelocityMeta": "{{value}} m/s",
       "unknownItems_one": "{{count}} item has no data in this build",
       "unknownItems_other": "{{count}} items have no data in this build",
+      "unknownItemCount": "{{name}} ×{{count}}",
+      "unknownItemsMore_one": "…and {{count}} more",
+      "unknownItemsMore_other": "…and {{count}} more",
       "priceBuy": "Buy orders: {{value}} ISK",
       "priceSell": "Sell orders: {{value}} ISK",
       "priceUnpriced_one": "{{count}} item has no price at this hub",

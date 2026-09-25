@@ -29,6 +29,11 @@ export function catalogueTypeName(catalogue: FittingCatalogue | null, typeId: nu
   return catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
 }
 
+/** One unit's m3 from the catalogue, or 0 while it loads or when it has none. */
+export function catalogueVolume(catalogue: FittingCatalogue | null, typeId: number): number {
+  return catalogue?.types[String(typeId)]?.volume ?? 0;
+}
+
 function buildCatalogue(
   types: TypeMap,
   rackOf: Record<string, CandidateRack>,

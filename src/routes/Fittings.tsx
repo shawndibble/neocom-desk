@@ -17,12 +17,13 @@ import type { CandidateRack } from '@/engine/fittings/candidates';
 import {
   addDronesWithinBay,
   addModule,
+  droneRoom,
   firstFreeSlotIndex,
-  maxDroneCount,
   loadChargeIntoAll,
   moveModule,
   newFitting,
   swapModuleType,
+  type DroneBay,
 } from '@/engine/fittings/fittingEdit';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
@@ -45,7 +46,11 @@ import {
 } from '@/features/fittings/fittingViewPreference';
 import { MissingSkillsChip } from '@/features/fittings/MissingSkillsChip';
 import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
-import { catalogueTypeName, useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
+import {
+  catalogueTypeName,
+  catalogueVolume,
+  useFittingCatalogue,
+} from '@/features/fittings/useFittingCatalogue';
 import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
 import { useModuleVariations } from '@/features/fittings/useModuleVariations';
 import { useOverlayFitting } from '@/features/fittings/useOverlayFitting';
@@ -154,16 +159,16 @@ export function Fittings() {
     setLibrary(tab);
   }
 
-  const droneVolume = (typeId: number) => catalogue?.types[String(typeId)]?.volume ?? 0;
+  // Before the ship data the bay's size is unknown (null), so nothing is capped yet.
+  const droneBay: DroneBay | null =
+    stats === null
+      ? null
+      : { capacity: stats.droneCapacity, volumeOf: (typeId) => catalogueVolume(catalogue, typeId) };
 
   function canPlace(rack: CandidateRack, typeId: number): boolean {
     if (rack === 'drone') {
-      if (!dronesShown || fitting === null || stats === null) return false;
       // Room for one more of this drone beside what the bay already holds.
-      const held = fitting.drones
-        .filter((drone) => drone.typeId === typeId)
-        .reduce((sum, drone) => sum + drone.quantity, 0);
-      return maxDroneCount(fitting, typeId, stats.droneCapacity, droneVolume) > held;
+      return dronesShown && fitting !== null && droneRoom(fitting, typeId, droneBay) >= 1;
     }
     if (fitting === null || slotCounts === null) return false;
     if (target?.kind === 'slot' && target.slot === rack) return true;
@@ -172,9 +177,7 @@ export function Fittings() {
 
   function handleAdd(typeId: number, rack: CandidateRack) {
     if (rack === 'drone') {
-      if (stats === null) return;
-      const capacity = stats.droneCapacity;
-      edit((f) => addDronesWithinBay(f, typeId, 1, capacity, droneVolume), `drone-add-${typeId}`);
+      edit((f) => addDronesWithinBay(f, typeId, 1, droneBay), `drone-add-${typeId}`);
       if (addMode === 'sheet') closeAdd();
       return;
     }

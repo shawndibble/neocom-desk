@@ -316,7 +316,9 @@ export function checkCandidates(
         (v) => v.target.type === 'ship' && v.rule.type !== 'skill'
       );
       check = classifyRuleBreaks(
-        [...rulesNaming(violations, 'item'), ...shipRules].map((v) => v.rule.type)
+        [...rulesNaming(violations, 'item'), ...shipRules].map((v) =>
+          v.rule.type === 'resource' ? `resource:${v.rule.resource}` : v.rule.type
+        )
       );
       cache.set(key, check);
     }
