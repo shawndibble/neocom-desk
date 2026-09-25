@@ -721,4 +721,130 @@ describe('PlanetaryIndustry', () => {
     );
     expect(window.location.pathname).toContain('/planetary-industry');
   });
+
+  it("summarizes an alt colony group's header with its own stopped count and next expiry", async () => {
+    const ALT_ID = 92;
+    const STOPPED_PLANET_ID = 40000002;
+    const ACTIVE_PLANET_ID = 40000003;
+    await addAlt(ALT_ID, 'Alt Two', [PLANETS_SCOPE]);
+    await db.esiCache.put({
+      characterId: ALT_ID,
+      key: 'planets',
+      value: [
+        { ...planetsPayload[0], planet_id: STOPPED_PLANET_ID, owner_id: ALT_ID },
+        { ...planetsPayload[0], planet_id: ACTIVE_PLANET_ID, owner_id: ALT_ID },
+      ],
+      fetchedAt: Date.now(),
+    });
+    // Already expired, same fixture the active Character's own colony uses.
+    await db.esiCache.put({
+      characterId: ALT_ID,
+      key: `planet:${STOPPED_PLANET_ID}`,
+      value: detailPayload,
+      fetchedAt: Date.now(),
+    });
+    await db.esiCache.put({
+      characterId: ALT_ID,
+      key: `planet:${ACTIVE_PLANET_ID}`,
+      value: {
+        links: [],
+        routes: [],
+        pins: [
+          {
+            pin_id: 21,
+            type_id: 2848,
+            latitude: 0,
+            longitude: 0,
+            expiry_time: new Date(BASE_NOW + 50 * 60_000).toISOString(),
+            extractor_details: { heads: [{ head_id: 1, latitude: 0, longitude: 0 }] },
+          },
+        ],
+      },
+      fetchedAt: Date.now(),
+    });
+
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
+
+    // One planet already stopped, the other's soonest expiry is what "next"
+    // reports — the stopped planet's own (already past) expiry must not leak
+    // into it. The minute count itself is deliberately not pinned: it drifts
+    // with how long the test took to reach this assertion.
+    expect(within(coloniesPanel()).getByText(/^1 stopped · next \d+m$/)).toBeInTheDocument();
+  });
+
+  it("resolves an alt colony's unresolved planet and product names via a public lookup, not raw ids", async () => {
+    const ALT_ID = 92;
+    const ALT_PLANET_ID = 40000002;
+    const ALT_PRODUCT_ID = 77_777;
+    await addAlt(ALT_ID, 'Alt Two', [PLANETS_SCOPE]);
+    server.use(
+      http.get(`${ESI}/universe/planets/${ALT_PLANET_ID}`, () =>
+        HttpResponse.json({
+          planet_id: ALT_PLANET_ID,
+          name: 'Amarr III',
+          system_id: SYSTEM_ID,
+          type_id: 11,
+          position: { x: 0, y: 0, z: 0 },
+        })
+      ),
+      http.post(`${ESI}/universe/names`, async ({ request }) => {
+        const ids = (await request.json()) as number[];
+        const withAltProduct: typeof NAMES = {
+          ...NAMES,
+          [ALT_PRODUCT_ID]: { name: 'Some Product', category: 'inventory_type' },
+        };
+        return HttpResponse.json(
+          ids.filter((id) => withAltProduct[id]).map((id) => ({ id, ...withAltProduct[id] }))
+        );
+      })
+    );
+    await db.esiCache.put({
+      characterId: ALT_ID,
+      key: 'planets',
+      value: [{ ...planetsPayload[0], planet_id: ALT_PLANET_ID, owner_id: ALT_ID }],
+      fetchedAt: Date.now(),
+    });
+    await db.esiCache.put({
+      characterId: ALT_ID,
+      key: `planet:${ALT_PLANET_ID}`,
+      value: {
+        links: [],
+        routes: [],
+        pins: [
+          {
+            pin_id: 30,
+            type_id: 2848,
+            latitude: 0,
+            longitude: 0,
+            expiry_time: new Date(BASE_NOW + 5 * DAY_MS).toISOString(),
+            extractor_details: {
+              heads: [{ head_id: 1, latitude: 0, longitude: 0 }],
+              product_type_id: ALT_PRODUCT_ID,
+            },
+          },
+        ],
+      },
+      fetchedAt: Date.now(),
+    });
+
+    render(<App />);
+    await colonyPanelFor(/Jita IV/);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
+
+    const panel = coloniesPanel();
+    // The planet name resolves via the public per-planet lookup instead of
+    // staying "Planet #id" — the colony data itself is still cache-only
+    // (no `/characters/{id}/planets` call for this alt anywhere in this test).
+    expect(await within(panel).findByText('Amarr III')).toBeInTheDocument();
+    expect(
+      within(panel).queryByText(new RegExp(`Planet #${ALT_PLANET_ID}`))
+    ).not.toBeInTheDocument();
+
+    await user.click(within(panel).getByRole('button', { name: /Amarr III/ }));
+    expect(await within(panel).findByText('Some Product')).toBeInTheDocument();
+  });
 });
