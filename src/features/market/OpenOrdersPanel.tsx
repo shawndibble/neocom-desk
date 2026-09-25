@@ -484,13 +484,16 @@ export function OpenOrdersPanel({
 
   const nameFor = (typeId: number) => snapshot?.typeNames.get(typeId) ?? `Type #${typeId}`;
 
-  // Whoever has a floor on screen: each note checks that character's own grant,
-  // since every character's floor prices with their own standings.
+  // Whoever has a floor on screen (same rows the floor column follows): each
+  // note checks that character's own grant, since each floor prices with
+  // that character's standings.
   const floorCharacters = useMemo(() => {
-    const m = new Map<number, string>();
-    for (const row of allRows) if (row.floor) m.set(row.characterId, row.characterName);
-    return [...m];
-  }, [allRows]);
+    const byId = new Map<number, { characterId: number; characterName: string }>();
+    for (const { floor, characterId, characterName } of groupingRows) {
+      if (floor) byId.set(characterId, { characterId, characterName });
+    }
+    return [...byId.values()];
+  }, [groupingRows]);
 
   const reauthEntries = useMemo(
     () => snapshot?.openOrders.entries.filter((e) => e.needsReauth) ?? [],
@@ -831,7 +834,7 @@ export function OpenOrdersPanel({
             }
           />
         ))}
-        {floorCharacters.map(([characterId, characterName]) => (
+        {floorCharacters.map(({ characterId, characterName }) => (
           <AssumesBaseStandingsNote
             key={characterId}
             characterId={characterId}

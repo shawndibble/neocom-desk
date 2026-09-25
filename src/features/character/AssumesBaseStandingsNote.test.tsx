@@ -64,5 +64,7 @@ describe('AssumesBaseStandingsNote', () => {
     );
 
     expect(await screen.findByText('Alt — Assumes base standings')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Grant Character details' }));
+    expect(beginEveLogin).toHaveBeenCalledWith(expect.objectContaining({ characterId: OTHER_ID }));
   });
 });

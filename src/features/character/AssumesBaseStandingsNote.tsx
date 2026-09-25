@@ -33,15 +33,25 @@ export function AssumesBaseStandingsNote({
   const { t } = useTranslation();
   const granted = useEndpointsGranted(STANDINGS_ENDPOINTS, characterId);
   if (granted !== false) return null;
-  const title = t('character.assumesBaseStandings.title');
   return (
     <div className={className}>
       <ReauthBanner
         variant="ghost"
-        title={characterName ? `${characterName} — ${title}` : title}
+        title={
+          characterName
+            ? t('character.assumesBaseStandings.titleFor', { character: characterName })
+            : t('character.assumesBaseStandings.title')
+        }
         hint={hint}
         actionLabel={t('character.assumesBaseStandings.action')}
-        onLogin={() => void beginEveLogin({ groups: permissionsForEndpoints(STANDINGS_ENDPOINTS) })}
+        // The figure's own Character: `beginEveLogin` otherwise merges in the
+        // active Character's grant, and SSO issues exactly what was requested.
+        onLogin={() =>
+          void beginEveLogin({
+            characterId: characterId ?? undefined,
+            groups: permissionsForEndpoints(STANDINGS_ENDPOINTS),
+          })
+        }
       />
     </div>
   );

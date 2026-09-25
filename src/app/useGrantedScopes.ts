@@ -17,12 +17,12 @@ export function useGrantedScopes(characterId?: number | null): readonly string[]
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const targetId = characterId === undefined ? activeCharacterId : characterId;
-  const scopes = useLiveQuery(async () => {
+  const grant = useLiveQuery(async () => {
     if (targetId === null) return undefined;
     const token = await db.tokens.get(targetId);
     // No token row means no grant at all — exactly what the gate is for, not a
     // reason to fall through as if everything were permitted.
-    return token?.scopes ?? [];
+    return { characterId: targetId, scopes: token?.scopes ?? [] };
   }, [targetId]);
 
   // "No active Character" is not "granted nothing": `hydrate()` is async, so
@@ -31,7 +31,9 @@ export function useGrantedScopes(characterId?: number | null): readonly string[]
   // explicit `characterId` is already known, so it doesn't wait on that.
   if (characterId === undefined && !hydrated) return undefined;
   if (targetId === null) return undefined;
-  return scopes;
+  // `useLiveQuery` keeps its last result across a dep change, so a switch of
+  // Character would briefly answer with the previous one's grant.
+  return grant?.characterId === targetId ? grant.scopes : undefined;
 }
 
 /**

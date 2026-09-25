@@ -1660,7 +1660,8 @@
     },
     "assumesBaseStandings": {
       "title": "Assumes base standings",
-      "action": "Grant Character details"
+      "action": "Grant Character details",
+      "titleFor": "{{character}} — Assumes base standings"
     }
   },
   "characters": {
