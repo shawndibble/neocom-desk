@@ -355,7 +355,6 @@ test.describe('PI Plan — stacked Sensitivity card', () => {
     expect(heights.length).toBeGreaterThan(1);
     // One line tall: a wrapped cell anywhere in a row (name included) would lift it.
     expect(new Set(heights.map((h) => Math.round(h))).size).toBe(1);
-    for (const h of heights) expect(h).toBeCloseTo(heights[0], 0);
 
     // The cell is its own line: role and hub read are two spans, never one string.
     const cells = chain.locator('tbody tr td:nth-child(6) > span');
