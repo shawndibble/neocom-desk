@@ -3,7 +3,7 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
-import { Button, EmptyState, Modal, Panel, Spinner } from '@/components/ui';
+import { Button, EmptyState, Modal, Spinner } from '@/components/ui';
 import { useIndustryWorkspace } from '@/features/industry/useIndustryWorkspace';
 import { IndustryHeader } from '@/features/industry/IndustryHeader';
 import {
@@ -554,43 +554,43 @@ export function Industry() {
               />
             )
           ) : (
-            <Panel>
-              {(plans?.length ?? 0) > 0 && (
-                <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
-              )}
-              <BuildPlanList
-                plans={plans}
-                catalog={catalog}
-                selectedId={null}
-                onSelect={(id) => navigate(`/industry/plans/${id}`)}
-                // Stays on the index, same as duplicate — the search box adds
-                // a row to manage, it doesn't presume the pilot wants to edit
-                // it immediately. `void`: `onCreate` only takes the entry.
-                onCreate={(entry) => void createPlan(entry)}
-                onDuplicate={(id) => void handleDuplicate(id)}
-                onDelete={(id) => void handleDelete(id)}
-                onRename={(id, name) => void handleRename(id, name)}
-                compareMode={compareMode}
-                compareSelectedIds={compareSelectedIds}
-                onToggleCompareMode={toggleCompareMode}
-                onToggleCompareSelected={toggleCompareSelected}
-                onOpenCompare={() => setComparing(true)}
-                groups={groups}
-                expandedGroupIds={expandedGroupIds}
-                selectedGroupId={null}
-                onToggleGroup={(groupId) =>
-                  void setGroupExpanded(groupId, !expandedGroupIds.has(groupId))
-                }
-                onSelectGroup={(groupId) => navigate(`/industry/groups/${groupId}`)}
-                onCreateGroup={() => void handleCreateGroup()}
-                onRenameGroup={(groupId, name) => void handleRenameGroup(groupId, name)}
-                onDeleteGroup={requestDeleteGroup}
-                onMovePlan={(planId, groupId) => void handleMovePlan(planId, groupId)}
-                onOpenFitImport={() => setFitImportOpen(true)}
-                statsByPlanId={statsByPlanId}
-                statsByGroupId={statsByGroupId}
-              />
-            </Panel>
+            <BuildPlanList
+              note={
+                (plans?.length ?? 0) > 0 && (
+                  <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
+                )
+              }
+              plans={plans}
+              catalog={catalog}
+              selectedId={null}
+              onSelect={(id) => navigate(`/industry/plans/${id}`)}
+              // Stays on the index, same as duplicate — the search box adds
+              // a row to manage, it doesn't presume the pilot wants to edit
+              // it immediately. `void`: `onCreate` only takes the entry.
+              onCreate={(entry) => void createPlan(entry)}
+              onDuplicate={(id) => void handleDuplicate(id)}
+              onDelete={(id) => void handleDelete(id)}
+              onRename={(id, name) => void handleRename(id, name)}
+              compareMode={compareMode}
+              compareSelectedIds={compareSelectedIds}
+              onToggleCompareMode={toggleCompareMode}
+              onToggleCompareSelected={toggleCompareSelected}
+              onOpenCompare={() => setComparing(true)}
+              groups={groups}
+              expandedGroupIds={expandedGroupIds}
+              selectedGroupId={null}
+              onToggleGroup={(groupId) =>
+                void setGroupExpanded(groupId, !expandedGroupIds.has(groupId))
+              }
+              onSelectGroup={(groupId) => navigate(`/industry/groups/${groupId}`)}
+              onCreateGroup={() => void handleCreateGroup()}
+              onRenameGroup={(groupId, name) => void handleRenameGroup(groupId, name)}
+              onDeleteGroup={requestDeleteGroup}
+              onMovePlan={(planId, groupId) => void handleMovePlan(planId, groupId)}
+              onOpenFitImport={() => setFitImportOpen(true)}
+              statsByPlanId={statsByPlanId}
+              statsByGroupId={statsByGroupId}
+            />
           )}
         </>
       )}

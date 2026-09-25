@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   DndContext,
@@ -31,6 +31,7 @@ import {
   EmptyState,
   IconButton,
   IskAmount,
+  Panel,
   TextInput,
   Tooltip,
 } from '@/components/ui';
@@ -224,6 +225,8 @@ interface BuildPlanListProps {
   /** Moves one plan into a group, or out of every group when null. */
   onMovePlan: (planId: string, groupId: string | null) => void;
   onOpenFitImport: () => void;
+  /** Sits under the header bar, above the search box � e.g. the base-standings note. */
+  note?: ReactNode;
   /** Profit / Verdict / Runs per plan row — `undefined` renders every column as "—". */
   statsByPlanId: ReadonlyMap<string, PlanIndexStats>;
   /** Profit / Verdict per group row (rolled up from its members) — Runs has no group-level meaning. */
@@ -612,6 +615,7 @@ export function BuildPlanList({
   onDeleteGroup,
   onMovePlan,
   onOpenFitImport,
+  note,
   statsByPlanId,
   statsByGroupId,
 }: BuildPlanListProps) {
@@ -725,12 +729,10 @@ export function BuildPlanList({
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('industry.title')}
-        </h2>
-        {compareMode ? (
+    <Panel
+      title={t('industry.title')}
+      actions={
+        compareMode ? (
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={onToggleCompareMode}>
               {t('industry.compareCancel')}
@@ -759,9 +761,9 @@ export function BuildPlanList({
               onClick={onCreateGroup}
             />
             {/* Compare was a labelled button until the two controls above
-                joined it (#626) — three labels wrapped the toolbar onto a
-                second line on a phone, which is the width this list can least
-                afford. */}
+                  joined it (#626) — three labels wrapped the toolbar onto a
+                  second line on a phone, which is the width this list can least
+                  afford. */}
             {plans.length > 1 && (
               <IconButton
                 size="sm"
@@ -771,114 +773,117 @@ export function BuildPlanList({
               />
             )}
           </div>
-        )}
-      </div>
+        )
+      }
+    >
+      {note}
+      <div className="space-y-2">
+        <BlueprintPicker catalog={catalog} onPick={onCreate} />
 
-      <BlueprintPicker catalog={catalog} onPick={onCreate} />
-
-      {plans.length === 0 && groups.length === 0 ? (
-        <EmptyState
-          title={t('industry.emptyTitle')}
-          hint={t('industry.emptyHint')}
-          className="py-6"
-        />
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={collisionDetection}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-          onDragCancel={endDrag}
-          // Droppable rects are measured once at drag start by default, and
-          // this list reflows *during* a drag: dropping expands the target
-          // group (Industry.tsx), and the underlying `useLiveQuery` can
-          // deliver a changed plan set at any moment. Every rect below the
-          // change would otherwise be stale for the rest of the drag.
-          measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
-          // Wider edge threshold and stronger acceleration than dnd-kit's
-          // default (#408, matching EntryList.tsx): now that the list has no
-          // scroller of its own, the nearest scrollable ancestor dnd-kit finds
-          // is the page itself, and the default threshold leaves too little
-          // room near the viewport's top/bottom edge to trigger autoscroll
-          // before the pointer runs off screen.
-          autoScroll={{ threshold: { x: 0.2, y: 0.25 }, acceleration: 20 }}
-        >
-          {/* Column labels for the three cells every row now carries. Not a
+        {plans.length === 0 && groups.length === 0 ? (
+          <EmptyState
+            title={t('industry.emptyTitle')}
+            hint={t('industry.emptyHint')}
+            className="py-6"
+          />
+        ) : (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={collisionDetection}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+            onDragCancel={endDrag}
+            // Droppable rects are measured once at drag start by default, and
+            // this list reflows *during* a drag: dropping expands the target
+            // group (Industry.tsx), and the underlying `useLiveQuery` can
+            // deliver a changed plan set at any moment. Every rect below the
+            // change would otherwise be stale for the rest of the drag.
+            measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+            // Wider edge threshold and stronger acceleration than dnd-kit's
+            // default (#408, matching EntryList.tsx): now that the list has no
+            // scroller of its own, the nearest scrollable ancestor dnd-kit finds
+            // is the page itself, and the default threshold leaves too little
+            // room near the viewport's top/bottom edge to trigger autoscroll
+            // before the pointer runs off screen.
+            autoScroll={{ threshold: { x: 0.2, y: 0.25 }, acceleration: 20 }}
+          >
+            {/* Column labels for the three cells every row now carries. Not a
               `role="table"` header — this list stays the flat `<ul>` above
               (a nested list per group would announce "list, 1 item" before
               every plan), so this is a plain labelled strip lined up with the
               row cells by the same fixed widths, not real table cells. */}
-          <div className="flex items-center gap-2 border-b border-line bg-panel-2 px-2 py-1.5 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
-            <span className="flex-1">{t('industry.title')}</span>
-            <span className="w-24 shrink-0 text-right">{t('industry.profitColumn')}</span>
-            <span className="hidden w-14 shrink-0 justify-end sm:flex">
-              {t('industry.verdictColumn')}
-            </span>
-            <span className="hidden w-8 shrink-0 text-right sm:block">
-              {t('industry.runsColumn')}
-            </span>
-            <span className="w-9 shrink-0" aria-hidden="true" />
-          </div>
-          <ul className="rounded-xs border border-line">
-            {/* A group's header and its members are siblings in this one list,
+            <div className="flex items-center gap-2 border-b border-line bg-panel-2 px-2 py-1.5 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+              <span className="flex-1">{t('industry.title')}</span>
+              <span className="w-24 shrink-0 text-right">{t('industry.profitColumn')}</span>
+              <span className="hidden w-14 shrink-0 justify-end sm:flex">
+                {t('industry.verdictColumn')}
+              </span>
+              <span className="hidden w-8 shrink-0 text-right sm:block">
+                {t('industry.runsColumn')}
+              </span>
+              <span className="w-9 shrink-0" aria-hidden="true" />
+            </div>
+            <ul className="rounded-xs border border-line">
+              {/* A group's header and its members are siblings in this one list,
                 not a nested `ul` per group: a nested list announces "list, 1
                 item" before every single plan. */}
-            {groups.map((group) => {
-              const members = membersByGroup.get(group.id) ?? [];
-              const selectedCount = members.filter((p) => compareSelectedIds.has(p.id)).length;
-              return (
-                <Fragment key={group.id}>
-                  <GroupHeader
-                    group={group}
-                    expanded={expandedGroupIds.has(group.id)}
-                    active={group.id === selectedGroupId}
-                    dropActive={dropTarget?.groupId === group.id}
-                    compareMode={compareMode}
-                    membersSelected={
-                      members.length > 0 && selectedCount === members.length
-                        ? 'all'
-                        : selectedCount > 0
-                          ? 'some'
-                          : 'none'
-                    }
-                    onToggle={() => onToggleGroup(group.id)}
-                    onSelect={() => onSelectGroup(group.id)}
-                    onRename={(name) => onRenameGroup(group.id, name)}
-                    onDelete={() => onDeleteGroup(group.id)}
-                    stats={statsByGroupId.get(group.id)}
-                    onToggleAllMembers={(selected) => {
-                      // Toggled one row at a time, through the very callback a
-                      // row's own checkbox uses, so the header can never write a
-                      // selection the rows disagree with.
-                      for (const member of members) {
-                        if (compareSelectedIds.has(member.id) !== selected) {
-                          onToggleCompareSelected(member.id);
-                        }
+              {groups.map((group) => {
+                const members = membersByGroup.get(group.id) ?? [];
+                const selectedCount = members.filter((p) => compareSelectedIds.has(p.id)).length;
+                return (
+                  <Fragment key={group.id}>
+                    <GroupHeader
+                      group={group}
+                      expanded={expandedGroupIds.has(group.id)}
+                      active={group.id === selectedGroupId}
+                      dropActive={dropTarget?.groupId === group.id}
+                      compareMode={compareMode}
+                      membersSelected={
+                        members.length > 0 && selectedCount === members.length
+                          ? 'all'
+                          : selectedCount > 0
+                            ? 'some'
+                            : 'none'
                       }
-                    }}
-                  />
-                  {expandedGroupIds.has(group.id) &&
-                    members.map((plan) => <PlanRow key={plan.id} {...rowProps(plan)} indented />)}
-                </Fragment>
-              );
-            })}
-            {ungrouped.map((plan) => (
-              <PlanRow key={plan.id} {...rowProps(plan)} />
-            ))}
-          </ul>
-          {/* Name only, not a copy of the row: a second set of the row's
+                      onToggle={() => onToggleGroup(group.id)}
+                      onSelect={() => onSelectGroup(group.id)}
+                      onRename={(name) => onRenameGroup(group.id, name)}
+                      onDelete={() => onDeleteGroup(group.id)}
+                      stats={statsByGroupId.get(group.id)}
+                      onToggleAllMembers={(selected) => {
+                        // Toggled one row at a time, through the very callback a
+                        // row's own checkbox uses, so the header can never write a
+                        // selection the rows disagree with.
+                        for (const member of members) {
+                          if (compareSelectedIds.has(member.id) !== selected) {
+                            onToggleCompareSelected(member.id);
+                          }
+                        }
+                      }}
+                    />
+                    {expandedGroupIds.has(group.id) &&
+                      members.map((plan) => <PlanRow key={plan.id} {...rowProps(plan)} indented />)}
+                  </Fragment>
+                );
+              })}
+              {ungrouped.map((plan) => (
+                <PlanRow key={plan.id} {...rowProps(plan)} />
+              ))}
+            </ul>
+            {/* Name only, not a copy of the row: a second set of the row's
               labelled buttons would put duplicate accessible names in the
               document for as long as the drag lasts. */}
-          <DragOverlay>
-            {draggingPlan && (
-              <div className="rounded-xs border border-accent-dim bg-panel-2 px-2 py-1.5 text-xs">
-                {draggingPlan.name}
-              </div>
-            )}
-          </DragOverlay>
-        </DndContext>
-      )}
-    </div>
+            <DragOverlay>
+              {draggingPlan && (
+                <div className="rounded-xs border border-accent-dim bg-panel-2 px-2 py-1.5 text-xs">
+                  {draggingPlan.name}
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
+        )}
+      </div>
+    </Panel>
   );
 }
