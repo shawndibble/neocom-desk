@@ -9,6 +9,7 @@
  */
 import { deleteCharacterFitting, postCharacterFitting } from '@/esi/endpoints';
 import { EsiError } from '@/esi/client';
+import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
 import { fittingToEsiFitting } from '@/engine/fittings/esiFittingMapper';
 import type { Fitting } from '@/engine/fittings/types';
 
@@ -40,7 +41,12 @@ export type SaveToEveResult =
       /** Set when overwriting and the old Fitting's delete failed — the pilot now has both. Null otherwise. */
       overwriteError: string | null;
     }
-  | { ok: false; message: string };
+  | {
+      ok: false;
+      message: string;
+      /** ESI refused and the grant lacks the write scope: logging in again for the Fittings Permission fixes it. */
+      needsPermission?: true;
+    };
 
 function messageOf(err: unknown): string {
   return err instanceof EsiError ? err.message : 'Unknown error';
@@ -56,7 +62,10 @@ export async function saveFittingToEve(input: SaveToEveInput): Promise<SaveToEve
     if (data === null) return { ok: false, message: 'ESI returned no fitting id' };
     fittingId = data.fitting_id;
   } catch (err) {
-    return { ok: false, message: messageOf(err) };
+    const outcome = await reportWriteAuthFailure(characterId, err, 'postCharacterFitting');
+    return outcome === 'grant-needed'
+      ? { ok: false, message: messageOf(err), needsPermission: true }
+      : { ok: false, message: messageOf(err) };
   }
 
   let overwriteError: string | null = null;

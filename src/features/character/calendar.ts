@@ -8,8 +8,7 @@ import {
   type CalendarRsvpResponse,
 } from '@/esi/endpoints';
 import { loadWithCacheStatus, readCached, writeCached, type StatusResult } from '@/esi/cache';
-import { isAuthFailure } from '@/esi/client';
-import { emitEsiAuthFailure } from '@/esi/authFailureSignal';
+import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
 import { parseInstant } from '@/engine/esiInstant';
 import { stillRunning, type CalendarRetentionEntry } from '@/engine/character/calendarRetention';
 
@@ -192,7 +191,7 @@ export async function respondToCalendarEvent(
   try {
     await putCharacterCalendarResponse(characterId, eventId, response);
   } catch (err) {
-    if (isAuthFailure(err)) emitEsiAuthFailure(characterId, 'putCharacterCalendarResponse');
+    await reportWriteAuthFailure(characterId, err, 'putCharacterCalendarResponse');
     return false;
   }
 

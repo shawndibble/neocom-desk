@@ -145,6 +145,9 @@
       "saving": "Saving…",
       "cancel": "Cancel",
       "errorTitle": "Couldn't save",
+      "grantTitle": "Saving to EVE needs the Fittings permission",
+      "grantHint": "This character logged in without it. Grant it, then save again.",
+      "grantAction": "Grant Fittings permission",
       "overwriteFailedTitle": "Saved, but the old Fitting is still there",
       "overwriteFailed": "Saved as \"{{name}}\", but EVE wouldn't remove the Fitting it was replacing: {{message}}. Delete it in-game yourself.",
       "close": "Close"

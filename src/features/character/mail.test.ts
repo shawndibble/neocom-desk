@@ -227,6 +227,30 @@ describe('markMailReadOnEsi', () => {
     }
   });
 
+  it('stays quiet on a 403 when the grant already holds organize_mail: a re-login could not fix it', async () => {
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 600_000,
+      scopes: ['esi-mail.organize_mail.v1'],
+    });
+    server.use(
+      http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`, () =>
+        HttpResponse.json({ error: 'forbidden' }, { status: 403 })
+      )
+    );
+    const reported = vi.fn();
+    const unsubscribe = onEsiAuthFailure(reported);
+
+    try {
+      await markMailReadOnEsi(CHAR_ID, 7);
+      expect(reported).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe();
+    }
+  });
+
   it('does not signal the reauth banner for a non-auth failure (network error)', async () => {
     server.use(
       http.put(`${ESI_BASE_URL}/characters/${CHAR_ID}/mail/7/`, () => HttpResponse.error())

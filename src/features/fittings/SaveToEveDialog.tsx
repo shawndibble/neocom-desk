@@ -19,6 +19,7 @@ import {
   SelectValue,
   TextInput,
 } from '@/components/ui';
+import { GrantBanner } from '@/app/GrantNote';
 import type { CharacterFitting } from '@/esi/endpoints';
 import type { Fitting } from '@/engine/fittings/types';
 import { loadInGameFittings } from './inGameFittings';
@@ -48,6 +49,8 @@ export function SaveToEveDialog({
   const [target, setTarget] = useState<string>(NEW_TARGET);
   const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  /** The save was refused for want of the Fittings Permission, which a re-login can grant. */
+  const [needsPermission, setNeedsPermission] = useState(false);
   /** Set when a save succeeded but the overwritten Fitting's delete failed — the pilot now has both. */
   const [overwriteFailure, setOverwriteFailure] = useState<{
     name: string;
@@ -60,6 +63,7 @@ export function SaveToEveDialog({
     setName(clampFittingName(fitting.name));
     setTarget(NEW_TARGET);
     setErrorMessage(null);
+    setNeedsPermission(false);
     setOverwriteFailure(null);
     void (async () => {
       try {
@@ -80,6 +84,7 @@ export function SaveToEveDialog({
     if (trimmed === '') return;
     setSaving(true);
     setErrorMessage(null);
+    setNeedsPermission(false);
     try {
       const result = await saveFittingToEve({
         characterId,
@@ -89,7 +94,8 @@ export function SaveToEveDialog({
         overwriteFittingId: overwriteTarget?.fitting_id,
       });
       if (!result.ok) {
-        setErrorMessage(result.message);
+        if (result.needsPermission) setNeedsPermission(true);
+        else setErrorMessage(result.message);
         return;
       }
       onSaved();
@@ -169,6 +175,16 @@ export function SaveToEveDialog({
           <p role="alert" className="text-xs text-warning">
             {t('fittings.saveToEve.overwriteConfirm', { name: overwriteTarget.name })}
           </p>
+        )}
+        {needsPermission && (
+          <GrantBanner
+            variant="ghost"
+            characterId={characterId}
+            endpoints={['postCharacterFitting']}
+            title={t('fittings.saveToEve.grantTitle')}
+            hint={t('fittings.saveToEve.grantHint')}
+            actionLabel={t('fittings.saveToEve.grantAction')}
+          />
         )}
         {errorMessage && (
           <p role="alert" className="text-xs text-danger">

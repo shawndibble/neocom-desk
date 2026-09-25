@@ -24,6 +24,7 @@ import {
 } from '@/esi/cache';
 import { isAuthFailure } from '@/esi/client';
 import { emitEsiAuthFailure } from '@/esi/authFailureSignal';
+import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
 import { mergeMailHeaderPage, MAIL_HEADERS_PAGE_SIZE } from '@/engine/mail';
 
 const KEYS = {
@@ -144,7 +145,7 @@ export async function markMailReadOnEsi(characterId: number, mailId: number): Pr
   try {
     await putCharacterMail(characterId, mailId, { read: true });
   } catch (err) {
-    if (isAuthFailure(err)) emitEsiAuthFailure(characterId, 'putCharacterMail');
+    await reportWriteAuthFailure(characterId, err, 'putCharacterMail');
     return;
   }
   const headers = await readCached<MailHeader[]>(characterId, KEYS.headers);
@@ -183,7 +184,7 @@ export async function sendMail(
     if (result.data === null) throw new Error('ESI did not answer with a mail id.');
     mailId = result.data;
   } catch (err) {
-    if (isAuthFailure(err)) emitEsiAuthFailure(characterId, 'postCharacterMail');
+    await reportWriteAuthFailure(characterId, err, 'postCharacterMail');
     throw err;
   }
   await db.esiCache.delete([characterId, KEYS.headers]);
