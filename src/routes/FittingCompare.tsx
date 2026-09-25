@@ -15,7 +15,7 @@ import {
   compareWindow,
   modulesThatDiffer,
 } from '@/engine/fittings/fittingCompare';
-import type { FittingStats } from '@/engine/fittings/types';
+import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useCompareCodes, MAX_COMPARE_SLOTS } from '@/features/fittings/compareUrl';
@@ -65,24 +65,36 @@ export function FittingCompare() {
 
   const anyError = slots.some((slot) => slot?.shareError);
   const anyStatsFailed = stats.failed.some(Boolean);
-  const validFittings = fittings.filter((f) => f !== null);
-  const statsReady =
+  // Slots whose stats calculated. A slot that failed is left out of the table (its column shows a
+  // dash) so one bad Fitting doesn't hide the rest; best/differs are worked out over these only.
+  const okSlots = useMemo(
+    () => stats.values.flatMap((s, index) => (s ? [index] : [])),
+    [stats.values]
+  );
+  const settled =
     count > 0 &&
     !anyError &&
     slots.every((slot) => slot !== null) &&
-    stats.values.every((s) => s !== null);
+    stats.values.every((s, index) => s !== null || stats.failed[index]);
+  const statsReady = settled && okSlots.length > 0;
   // One Fitting has nothing to differ from, so show all its stats rather than an empty table.
-  const showDifferencesOnly = differencesOnly && count >= 2;
+  const showDifferencesOnly = differencesOnly && okSlots.length >= 2;
 
   const table = useMemo(
-    () => (statsReady ? compareFittingStats(stats.values as readonly FittingStats[]) : null),
-    [statsReady, stats.values]
+    () =>
+      statsReady
+        ? compareFittingStats(okSlots.map((index) => stats.values[index] as FittingStats))
+        : null,
+    [statsReady, okSlots, stats.values]
   );
   const moduleDiffs = useMemo(
-    () => (statsReady ? modulesThatDiffer(validFittings) : []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `validFittings` is a fresh array every render; `fittings` (from the memoized `slots`) is its stable underlying identity.
-    [statsReady, fittings]
+    () => (statsReady ? modulesThatDiffer(okSlots.map((index) => fittings[index] as Fitting)) : []),
+    [statsReady, okSlots, fittings]
   );
+  const statsPosition = (index: number) => {
+    const position = okSlots.indexOf(index);
+    return position === -1 ? null : position;
+  };
 
   function headerFor(index: number) {
     const slot = slots[index];
@@ -131,6 +143,7 @@ export function FittingCompare() {
 
   const columns: FittingCompareColumn[] = visible.map((index) => ({
     index,
+    statsIndex: statsPosition(index),
     header: headerFor(index),
   }));
 
@@ -209,7 +222,10 @@ export function FittingCompare() {
                 />
               </Panel>
               <Panel title={t('fittings.compare.modulesTitle')}>
-                <FittingCompareModulesSummary entries={moduleDiffs} visible={visible} />
+                <FittingCompareModulesSummary
+                  entries={moduleDiffs}
+                  visible={visible.map(statsPosition)}
+                />
               </Panel>
             </>
           )}

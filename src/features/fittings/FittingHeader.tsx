@@ -30,8 +30,6 @@ interface FittingHeaderProps {
   price: Appraisal | null;
   /** What its numbers are worked out under — implants, missing skills. */
   context?: ReactNode;
-  /** The Ring | List switch — absent where the page's tabs carry it. */
-  view?: ReactNode;
   save: ReactNode;
   /**
    * Below desktop: identity and Save on the first line, the Fittings menu and
@@ -105,7 +103,6 @@ export function FittingHeader({
   onCompare,
   price,
   context,
-  view,
   save,
   compact = false,
 }: FittingHeaderProps) {
@@ -186,7 +183,6 @@ export function FittingHeader({
             {libraryItems}
           </DropdownMenuContent>
         </DropdownMenu>
-        {view}
         <Button onClick={onCompare}>{t('fittings.compare.entryButton')}</Button>
         <FittingExportMenu fitting={fitting} price={price} />
         {save}

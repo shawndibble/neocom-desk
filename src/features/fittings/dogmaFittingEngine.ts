@@ -255,6 +255,8 @@ export interface CandidateCheck {
   fitsHull: boolean;
   /** The pilot has every skill it needs. */
   canFly: boolean;
+  /** Fits the bare hull's CPU, powergrid and calibration (with the pilot's skills) — else it never could. */
+  fitsResources: boolean;
 }
 
 function assertReady(): void {
@@ -314,7 +316,9 @@ export function checkCandidates(
         (v) => v.target.type === 'ship' && v.rule.type !== 'skill'
       );
       check = classifyRuleBreaks(
-        [...rulesNaming(violations, 'item'), ...shipRules].map((v) => v.rule.type)
+        [...rulesNaming(violations, 'item'), ...shipRules].map((v) =>
+          v.rule.type === 'resource' ? `resource:${v.rule.resource}` : v.rule.type
+        )
       );
       cache.set(key, check);
     }

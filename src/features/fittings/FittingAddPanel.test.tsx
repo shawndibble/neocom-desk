@@ -70,7 +70,9 @@ describe('FittingAddPanel', () => {
   it('lists only what fits the chosen slot and hull, and adds on click', async () => {
     const user = userEvent.setup();
     checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
-      return new Map(ids.map((id) => [id, { fitsHull: id !== 1, canFly: id !== 2 }]));
+      return new Map(
+        ids.map((id) => [id, { fitsHull: id !== 1, canFly: id !== 2, fitsResources: true }])
+      );
     });
     const { onAdd } = renderPanel();
 
@@ -91,13 +93,27 @@ describe('FittingAddPanel', () => {
 
   it('browses only the groups holding something that fits the hull', async () => {
     checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
-      return new Map(ids.map((id) => [id, { fitsHull: id !== 4, canFly: true }]));
+      return new Map(
+        ids.map((id) => [id, { fitsHull: id !== 4, canFly: true, fitsResources: true }])
+      );
     });
     renderPanel({ target: null });
 
     expect(await screen.findByRole('button', { name: /Afterburners/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Damage Controls/ })).toBeInTheDocument();
     // Structure modules never fit a ship, so their group never shows.
+    expect(screen.queryByText('Structure Equipment')).toBeNull();
+  });
+
+  it('hides modules too big for the bare hull’s CPU, powergrid or calibration', async () => {
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(
+        ids.map((id) => [id, { fitsHull: true, canFly: true, fitsResources: id !== 4 }])
+      );
+    });
+    renderPanel({ target: null });
+
+    expect(await screen.findByRole('button', { name: /Afterburners/ })).toBeInTheDocument();
     expect(screen.queryByText('Structure Equipment')).toBeNull();
   });
 

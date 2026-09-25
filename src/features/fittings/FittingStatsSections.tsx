@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Caret } from '@/components/ui';
+import { Caret, Tooltip } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
 import {
   alignTimeSeconds,
@@ -240,6 +240,32 @@ function StatSection({
       {expanded && <div className="space-y-2 px-3 pb-3">{children}</div>}
     </section>
   );
+}
+
+/** Lines the "no data" tooltip lists before it sums up the rest — a tooltip is no place for a long list. */
+const UNKNOWN_ITEMS_SHOWN = 10;
+
+/**
+ * The items with no data in this build, one per line — "Name ×2" where the
+ * Fitting has several, so the lines add up to the count beside them.
+ */
+function unknownItemsList(
+  typeIds: readonly number[],
+  typeName: (typeId: number) => string,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string {
+  const counts = new Map<number, number>();
+  for (const typeId of typeIds) counts.set(typeId, (counts.get(typeId) ?? 0) + 1);
+  const lines = [...counts].map(([typeId, count]) =>
+    count > 1
+      ? t('fittings.stats.unknownItemCount', { name: typeName(typeId), count })
+      : typeName(typeId)
+  );
+  if (lines.length <= UNKNOWN_ITEMS_SHOWN) return lines.join('\n');
+  return [
+    ...lines.slice(0, UNKNOWN_ITEMS_SHOWN),
+    t('fittings.stats.unknownItemsMore', { count: lines.length - UNKNOWN_ITEMS_SHOWN }),
+  ].join('\n');
 }
 
 interface FittingStatsSectionsProps {
@@ -680,7 +706,18 @@ export function FittingStatsSections({
             />
             {stats.unknownItemTypeIds.length > 0 && (
               <p className="text-xs text-warning">
-                {t('fittings.stats.unknownItems', { count: stats.unknownItemTypeIds.length })}
+                {/* Which items, one per line — on hover, focus or a tap. */}
+                <Tooltip
+                  openOnTap
+                  content={unknownItemsList(stats.unknownItemTypeIds, typeName, t)}
+                >
+                  <button
+                    type="button"
+                    className="cursor-help underline decoration-dotted underline-offset-2"
+                  >
+                    {t('fittings.stats.unknownItems', { count: stats.unknownItemTypeIds.length })}
+                  </button>
+                </Tooltip>
               </p>
             )}
           </>
