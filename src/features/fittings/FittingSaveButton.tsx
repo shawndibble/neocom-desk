@@ -4,6 +4,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui';
 import { Expanded } from '@/components/ui/icons';
@@ -16,6 +17,8 @@ interface FittingSaveButtonProps {
   saveBlockedReason?: string;
   /** The Fitting came from a My Fittings record, so Save updates it. */
   updating: boolean;
+  /** Saves what's on screen as a new My Fittings record, leaving the one it came from untouched. Only offered once there's an original to keep (`updating`). */
+  onSaveAsNew: () => void;
   onSaveToEve: () => void;
   canSaveToEve: boolean;
   saveToEveBlockedReason?: string;
@@ -31,6 +34,7 @@ export function FittingSaveButton({
   canSave,
   saveBlockedReason,
   updating,
+  onSaveAsNew,
   onSaveToEve,
   canSaveToEve,
   saveToEveBlockedReason,
@@ -58,6 +62,14 @@ export function FittingSaveButton({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-56">
+          {updating && (
+            <>
+              <DropdownMenuItem disabled={!canSave} onSelect={onSaveAsNew}>
+                {t('fittings.myFittings.saveAsNew')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
           <DropdownMenuItem disabled={!canSaveToEve} onSelect={onSaveToEve}>
             {t('fittings.saveToEve.action')}
           </DropdownMenuItem>

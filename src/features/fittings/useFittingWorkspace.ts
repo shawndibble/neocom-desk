@@ -134,6 +134,13 @@ export interface FittingWorkspace extends FittingEvaluation {
    * Dexie. Updates the record the Fitting was opened from, else adds one.
    */
   save: () => Promise<void>;
+  /**
+   * "Save as new…" (issue #1747): always adds a new My Fittings record from
+   * what's on screen, leaving the record the Fitting was opened from
+   * untouched. Becomes the Fitting's own saved record afterward, same as a
+   * first-time Save.
+   */
+  saveAsNew: (name: string) => Promise<void>;
   /** Opens a saved Fitting by its share code, under its saved name. */
   openSaved: (record: { id: string; name: string; code: string }) => void;
 }
@@ -435,6 +442,28 @@ export function useFittingWorkspace(): FittingWorkspace {
     }
   }, [activeCharacterId, savedId]);
 
+  const saveAsNew = useCallback(
+    async (name: string) => {
+      const current = latestFittingRef.current;
+      if (activeCharacterId === null || current === null) return;
+      launchPendingRef.current = null;
+      if (savingRef.current) return;
+      savingRef.current = true;
+      try {
+        const encoded = await encodeFittingShare(fittingToShareInput(current));
+        if (!encoded.ok) return;
+        const record = await saveFitting(activeCharacterId, { name, code: encoded.payload });
+        setSavedId(record.id);
+        // Now editing the new record, same as a first-time Save — its name
+        // goes on screen too, not just in My Fittings.
+        applyEdit((f) => ({ ...f, name }), { history: 'none' });
+      } finally {
+        savingRef.current = false;
+      }
+    },
+    [activeCharacterId, applyEdit]
+  );
+
   // A saved record belongs to one Character; so does a launch's drone count.
   useEffect(() => {
     launchPendingRef.current = null;
@@ -526,6 +555,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     savedId,
     canSave,
     save,
+    saveAsNew,
     openSaved,
   };
 }

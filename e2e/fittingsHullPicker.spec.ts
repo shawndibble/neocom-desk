@@ -1,5 +1,5 @@
 /**
- * Fittings Start screen hull picker (issue #1637): the class list scrolls
+ * Fittings hull picker (issue #1637), opened from the Start screen's New from hull button: the class list scrolls
  * vertically only — no class is stranded off the right edge of a
  * height-capped multi-column box.
  */
@@ -17,6 +17,13 @@ test.describe('Fittings — hull picker', () => {
     test(`scrolls vertically to the last class at ${viewport.width}px`, async ({ page }) => {
       await page.setViewportSize(viewport);
       await signInAndGoto(page, './fittings');
+
+      // On a desktop the picker is behind the Start screen's "New from hull"
+      // button; a phone shows it as the first tab.
+      const newFromHull = page.getByRole('button', { name: 'New from hull' });
+      const hullSearch = page.getByRole('searchbox', { name: 'Search hulls' });
+      await newFromHull.or(hullSearch).first().waitFor();
+      if (await newFromHull.isVisible()) await newFromHull.click();
 
       // Nothing is listed until the player searches; "e" matches (nearly) every
       // class, so the full list is what gets measured. The list renders once the

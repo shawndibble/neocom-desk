@@ -6,7 +6,16 @@ import { formatIskCompact } from '@/lib/isk';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useTranslation } from 'react-i18next';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Button, Disclosure, Modal, PageHeader, Panel, SlideOver, Tabs } from '@/components/ui';
+import {
+  Button,
+  Disclosure,
+  Modal,
+  PageHeader,
+  Panel,
+  SlideOver,
+  Tabs,
+  TextInput,
+} from '@/components/ui';
 import { AddRow } from '@/components/ui/icons';
 import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
 import { useWeatherName } from '@/features/fittings/abyssalWeatherSelection';
@@ -34,6 +43,7 @@ import {
 } from '@/engine/fittings/fittingEdit';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
+import { writeCompareCodes } from '@/features/fittings/compareUrl';
 import { FittingHeader } from '@/features/fittings/FittingHeader';
 import { FittingSaveButton } from '@/features/fittings/FittingSaveButton';
 import { LoadWarnings } from '@/features/fittings/FittingLoadCard';
@@ -155,6 +165,24 @@ function FittingsPage() {
   // The weather the numbers on screen are in — which lags a new pick until they land.
   const weatherName = useWeatherName(workspace.statsWeatherTypeId);
   const [saveToEveOpen, setSaveToEveOpen] = useState(false);
+  const [saveAsNewOpen, setSaveAsNewOpen] = useState(false);
+  const [saveAsNewName, setSaveAsNewName] = useState('');
+  // The record the open Fitting was saved from, for the "Save as new…"
+  // prefill and to tell Compare there are unsaved edits against it.
+  const savedRecord = useLiveQuery(
+    () => (workspace.savedId === null ? undefined : db.fittings.get(workspace.savedId)),
+    [workspace.savedId]
+  );
+  const currentShareCode = new URLSearchParams(location.search).get('f');
+  const hasUnsavedEdits =
+    workspace.savedId !== null &&
+    savedRecord !== undefined &&
+    // Guards the render right after a save/save-as-new, where `savedRecord`
+    // (async, via useLiveQuery) can still be the previous record for a tick
+    // after `workspace.savedId` (synchronous) already points at the new one.
+    savedRecord.id === workspace.savedId &&
+    currentShareCode !== null &&
+    savedRecord.code !== currentShareCode;
   // The item whose info (the Market's item detail) is open — a List name click.
   const [infoItem, setInfoItem] = useState<{ typeId: number; name: string } | null>(null);
   const showInfo = (typeId: number, name: string) => setInfoItem({ typeId, name });
@@ -491,7 +519,19 @@ function FittingsPage() {
         subtitle={subtitle}
         hasCharacter={activeCharacterId !== null}
         onLibrary={openLibrary}
-        onCompare={() => navigate(`/fittings/compare${location.search}`)}
+        onCompare={() => {
+          // Unsaved edits against a saved Fitting: Compare opens saved vs.
+          // current rather than just the one code already in the URL.
+          if (hasUnsavedEdits && savedRecord && currentShareCode) {
+            const params = writeCompareCodes(new URLSearchParams(), [
+              savedRecord.code,
+              currentShareCode,
+            ]);
+            navigate(`/fittings/compare?${params.toString()}`);
+            return;
+          }
+          navigate(`/fittings/compare${location.search}`);
+        }}
         price={workspace.price}
         // The open slide-out takes 26rem off the page, too little for the one-row header.
         compact={addMode === 'sheet' || (addMode === 'slideOut' && addOpen)}
@@ -529,6 +569,14 @@ function FittingsPage() {
                   : undefined
             }
             updating={workspace.savedId !== null}
+            onSaveAsNew={() => {
+              setSaveAsNewName(
+                t('fittings.myFittings.saveAsNewDefaultName', {
+                  name: savedRecord?.name ?? fitting.name,
+                })
+              );
+              setSaveAsNewOpen(true);
+            }}
             onSaveToEve={() => setSaveToEveOpen(true)}
             canSaveToEve={activeCharacterId !== null && canSaveToEve === true}
             saveToEveBlockedReason={
@@ -617,6 +665,40 @@ function FittingsPage() {
           </div>
         ))}
 
+      <Modal
+        open={saveAsNewOpen}
+        onClose={() => setSaveAsNewOpen(false)}
+        title={t('fittings.myFittings.saveAsNewTitle')}
+      >
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const name = saveAsNewName.trim();
+            if (name === '') return;
+            void workspace.saveAsNew(name);
+            setSaveAsNewOpen(false);
+          }}
+        >
+          <label className="block text-xs text-text-dim" htmlFor="fitting-save-as-new-name">
+            {t('fittings.myFittings.saveAsNewLabel')}
+          </label>
+          <TextInput
+            id="fitting-save-as-new-name"
+            className="w-full"
+            value={saveAsNewName}
+            onChange={(e) => setSaveAsNewName(e.target.value)}
+          />
+          <div className="flex justify-end gap-2">
+            <Button onClick={() => setSaveAsNewOpen(false)}>
+              {t('fittings.myFittings.cancel')}
+            </Button>
+            <Button type="submit" variant="primary" disabled={saveAsNewName.trim() === ''}>
+              {t('fittings.myFittings.saveAsNewConfirm')}
+            </Button>
+          </div>
+        </form>
+      </Modal>
       {activeCharacterId !== null && (
         <SaveToEveDialog
           open={saveToEveOpen}

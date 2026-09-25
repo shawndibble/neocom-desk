@@ -366,7 +366,51 @@ function MarketGroupTree({
   quickbarAvailable,
   onShowInfo,
 }: MarketGroupTreeProps) {
+  const { t } = useTranslation();
   const filtering = filterResult !== null;
+
+  function renderItem(item: MarketTypeEntry, itemDepth: number) {
+    const blueprintTypeID = blueprintTypeIdFor(blueprintCatalog, item.typeId);
+    return (
+      <li key={item.typeId}>
+        <ItemContextMenu
+          typeId={item.typeId}
+          itemName={item.name}
+          blueprintTypeID={blueprintTypeID}
+          onAddToQuickbar={onAddToQuickbar}
+          quickbarAvailable={quickbarAvailable}
+          onShowInfo={onShowInfo}
+          onOpenChange={(open) => {
+            if (open) onRequestBlueprintCatalog();
+          }}
+        >
+          {/* The trigger holds the More actions button beside the
+                  item button (buttons don't nest), so both sit inside
+                  the menu. */}
+          <div className="flex items-center">
+            <button
+              type="button"
+              onClick={() => onSelect(item.typeId)}
+              style={{ paddingLeft: `${itemDepth * 0.75 + 0.75}rem` }}
+              // Read back on Back-to-finder (issue #1485), to return focus
+              // to the row that opened the item panel — `data-` rather
+              // than an id/ref, since the tree fully unmounts/remounts
+              // whenever a search collapses or re-expands a group.
+              data-tree-item-id={item.typeId}
+              aria-current={selectedTypeId === item.typeId ? 'true' : undefined}
+              className={`flex min-h-11 min-w-0 flex-1 items-center gap-1.5 truncate py-1 text-left text-xs hover:text-accent md:min-h-0 ${
+                selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
+              }`}
+            >
+              <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
+              <span className="truncate">{item.name}</span>
+            </button>
+            <RowMoreActions />
+          </div>
+        </ItemContextMenu>
+      </li>
+    );
+  }
 
   function renderGroup(group: MarketGroupNode, depth: number) {
     if (filtering && !filterResult.visibleGroupIds.has(group.id)) return null;
@@ -407,48 +451,7 @@ function MarketGroupTree({
         {expanded && (children.length > 0 || items.length > 0) && (
           <ul>
             {children.map((child) => renderGroup(child, depth + 1))}
-            {items.map((item) => {
-              const blueprintTypeID = blueprintTypeIdFor(blueprintCatalog, item.typeId);
-              return (
-                <li key={item.typeId}>
-                  <ItemContextMenu
-                    typeId={item.typeId}
-                    itemName={item.name}
-                    blueprintTypeID={blueprintTypeID}
-                    onAddToQuickbar={onAddToQuickbar}
-                    quickbarAvailable={quickbarAvailable}
-                    onShowInfo={onShowInfo}
-                    onOpenChange={(open) => {
-                      if (open) onRequestBlueprintCatalog();
-                    }}
-                  >
-                    {/* The trigger holds the More actions button beside the
-                        item button (buttons don't nest), so both sit inside
-                        the menu. */}
-                    <div className="flex items-center">
-                      <button
-                        type="button"
-                        onClick={() => onSelect(item.typeId)}
-                        style={{ paddingLeft: `${(depth + 1) * 0.75 + 0.75}rem` }}
-                        // Read back on Back-to-finder (issue #1485), to return focus
-                        // to the row that opened the item panel — `data-` rather
-                        // than an id/ref, since the tree fully unmounts/remounts
-                        // whenever a search collapses or re-expands a group.
-                        data-tree-item-id={item.typeId}
-                        aria-current={selectedTypeId === item.typeId ? 'true' : undefined}
-                        className={`flex min-h-11 min-w-0 flex-1 items-center gap-1.5 truncate py-1 text-left text-xs hover:text-accent md:min-h-0 ${
-                          selectedTypeId === item.typeId ? 'text-accent' : 'text-text-dim'
-                        }`}
-                      >
-                        <TypeIcon typeId={item.typeId} size={32} className="h-4 w-4 shrink-0" />
-                        <span className="truncate">{item.name}</span>
-                      </button>
-                      <RowMoreActions />
-                    </div>
-                  </ItemContextMenu>
-                </li>
-              );
-            })}
+            {items.map((item) => renderItem(item, depth + 1))}
           </ul>
         )}
       </li>
@@ -460,7 +463,15 @@ function MarketGroupTree({
     // Flat cap, not viewport-relative: `QuickbarList` renders below this
     // tree in the same column, so sizing the tree to all remaining viewport
     // height would push the quickbar off-screen.
-    <ul className="max-h-[32rem] overflow-y-auto">{roots.map((root) => renderGroup(root, 0))}</ul>
+    <div className="max-h-[32rem] overflow-y-auto">
+      {filterResult?.bestMatch && (
+        <div className="mb-2 border-b border-line pb-2">
+          <p className="pb-1 text-[0.6875rem] text-text-dim uppercase">{t('market.bestMatch')}</p>
+          <ul>{renderItem(filterResult.bestMatch, 0)}</ul>
+        </div>
+      )}
+      <ul>{roots.map((root) => renderGroup(root, 0))}</ul>
+    </div>
   );
 }
 
@@ -1018,7 +1029,9 @@ export function Market() {
               <div className="flex justify-center py-8">
                 <Spinner label={t('common.loading')} />
               </div>
-            ) : filterResult && filterResult.visibleGroupIds.size === 0 ? (
+            ) : filterResult &&
+              filterResult.visibleGroupIds.size === 0 &&
+              !filterResult.bestMatch ? (
               <EmptyState title={t('market.noResults')} className="py-8" />
             ) : (
               <div className="mt-3 border-t border-line pt-2">
@@ -1414,6 +1427,15 @@ export function Market() {
           onAddToQuickbar={handleAddToQuickbar}
           quickbarAvailable={activeCharacterId !== null}
           onShowInfo={handleShowInfo}
+          characterId={activeCharacterId}
+          hub={effectiveHub}
+          standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
+          sourceLabel={
+            effectiveLocation.mode === 'hub'
+              ? effectiveHub.systemName
+              : (marketRegions?.find((region) => region.id === orderBookLocation.regionId)?.name ??
+                hubRegionName)
+          }
         />
       )}
 

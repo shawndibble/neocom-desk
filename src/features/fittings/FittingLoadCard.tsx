@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
 import { fieldBaseClassName } from '@/components/ui/controlStyles';
@@ -18,6 +18,8 @@ interface FittingLoadCardProps {
   tooLargeToShare: boolean;
   onLoadFittingXmlDocument: (document: FittingXmlDocument) => Promise<FittingXmlListItem[]>;
   onOpenLoaded: (loaded: LoadedFitting) => Promise<void>;
+  /** No panel chrome of its own, for a host that already has a title (a dialog). */
+  bare?: boolean;
 }
 
 function WarningList({ title, lines }: { title: string; lines: string[] }) {
@@ -64,6 +66,18 @@ export function LoadWarnings({ load }: { load: LoadOutcome | null }) {
   );
 }
 
+function LoadFrame({
+  bare,
+  title,
+  children,
+}: {
+  bare: boolean;
+  title: string;
+  children: ReactNode;
+}) {
+  return bare ? <>{children}</> : <Panel title={title}>{children}</Panel>;
+}
+
 export function FittingLoadCard({
   onLoad,
   lastLoad,
@@ -71,6 +85,7 @@ export function FittingLoadCard({
   tooLargeToShare,
   onLoadFittingXmlDocument,
   onOpenLoaded,
+  bare = false,
 }: FittingLoadCardProps) {
   const { t } = useTranslation();
   const [text, setText] = useState('');
@@ -114,7 +129,7 @@ export function FittingLoadCard({
   const loadError = lastLoad?.kind === 'failed' ? lastLoad.error : null;
 
   return (
-    <Panel title={t('fittings.load.title')}>
+    <LoadFrame bare={bare} title={t('fittings.load.title')}>
       <div className="space-y-3">
         <label className="block text-xs text-text-dim" htmlFor="fitting-load-text">
           {t('fittings.load.pasteLabel')}
@@ -212,6 +227,6 @@ export function FittingLoadCard({
           )}
         </div>
       </div>
-    </Panel>
+    </LoadFrame>
   );
 }

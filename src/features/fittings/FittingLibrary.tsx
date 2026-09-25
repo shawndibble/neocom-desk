@@ -4,6 +4,7 @@ import { Panel, Tabs } from '@/components/ui';
 import type { HullEntry } from '@/engine/fittings/hullCatalogue';
 import { loadDogmaEngine } from './dogmaFittingEngine';
 import { FittingLoadCard } from './FittingLoadCard';
+import { FittingStartScreen } from './FittingStartScreen';
 import { HullPicker } from './HullPicker';
 import { InGameFittingsPanel } from './InGameFittingsPanel';
 import { MyFittingsPanel } from './MyFittingsPanel';
@@ -24,9 +25,10 @@ interface FittingLibraryProps {
   /** Called once any of the ways in here has opened a Fitting. */
   onOpened?: () => void;
   /**
-   * `page`: the Start screen with nothing open — the hull picker beside Import
-   * and the fitting lists. `tabs`: one section at a time, for a phone's Start
-   * screen and for the editor's Fittings menu dialog.
+   * `page`: the desktop Start screen with nothing open — one searchable list
+   * of saved and In-game Fittings with a preview (`FittingStartScreen`).
+   * `tabs`: one section at a time, for a phone's Start screen, the editor's
+   * Fittings menu dialog and the Compare picker.
    */
   layout: 'page' | 'tabs';
   initialTab?: LibraryTab;
@@ -104,16 +106,16 @@ export function FittingLibrary({
       ),
   };
 
-  if (layout === 'page') {
+  if (layout === 'page' && onStartHull) {
     return (
-      <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(0,1fr)_26rem]">
-        <Panel title={t('fittings.start.newTitle')}>{sections.new}</Panel>
-        <div className="space-y-3">
-          {sections.import}
-          {sections.mine}
-          {sections.ingame}
-        </div>
-      </div>
+      <FittingStartScreen
+        workspace={workspace}
+        catalogue={catalogue}
+        characterId={characterId}
+        inGameKey={inGameKey}
+        onStartHull={onStartHull}
+        onOpened={onOpened}
+      />
     );
   }
 
