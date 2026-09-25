@@ -30,6 +30,15 @@ export interface SummaryStripProps {
    * an idle one is the silence this board was rebuilt to remove.
    */
   trainingUnavailable: boolean;
+  /**
+   * Whether this Character would actually raise the `characterNotTraining`
+   * alert — false only when that alert is muted in its feed channel for this
+   * Character (its one existing per-pilot opt-out, e.g. a deliberately
+   * parked alt). An idle queue otherwise gets the same warning treatment the
+   * alert itself uses, so the board and the alert feed never disagree about
+   * how urgent this is (issue #1731).
+   */
+  notTrainingAlertEnabled: boolean;
   walletUnavailable: boolean;
   /** The board's own read threw. Rarer than a lapsed grant and not fixable by logging in, so it says something different. */
   failed: boolean;
@@ -44,6 +53,7 @@ export function SummaryStrip({
   training,
   wallet,
   trainingUnavailable,
+  notTrainingAlertEnabled,
   walletUnavailable,
   failed,
   fetchedAt,
@@ -69,9 +79,13 @@ export function SummaryStrip({
 
         <Cell label={t('overview.board.trainingNow')}>
           {trainingUnavailable ? (
-            <Unreadable>{t('overview.board.trainingUnavailable')}</Unreadable>
+            <WarningLine>{t('overview.board.trainingUnavailable')}</WarningLine>
           ) : training === null ? (
-            <Value muted>{t('overview.board.notTraining')}</Value>
+            notTrainingAlertEnabled ? (
+              <WarningLine to="/skills/plans">{t('overview.board.notTraining')}</WarningLine>
+            ) : (
+              <Value muted>{t('overview.board.notTraining')}</Value>
+            )
           ) : (
             <Link to={training.to} className="min-w-0 hover:underline">
               <Value>{training.label}</Value>
@@ -82,9 +96,9 @@ export function SummaryStrip({
 
         <Cell label={t('overview.wallet')}>
           {walletUnavailable ? (
-            <Unreadable>{t('overview.board.walletUnavailable')}</Unreadable>
+            <WarningLine>{t('overview.board.walletUnavailable')}</WarningLine>
           ) : failed ? (
-            <Unreadable>{t('common.loadFailedTitle')}</Unreadable>
+            <WarningLine>{t('common.loadFailedTitle')}</WarningLine>
           ) : wallet === null ? (
             <Value muted>—</Value>
           ) : (
@@ -176,18 +190,26 @@ function Note({ children }: { children: ReactNode }) {
 }
 
 /**
- * A cell that could not be read.
- *
- * Toned `warning` rather than dimmed, because it is not a quiet answer — it is
- * the absence of one, and it is the single thing on this strip the reader can
- * act on immediately. `SeverityIcon` carries the shape so the tone is never
- * the only signal (DESIGN.md §7).
+ * A cell that could not be read, or a known state worth the same alarm (an
+ * idle queue, which already has its own `characterNotTraining` alert — issue
+ * #1731). Toned `warning` rather than dimmed either way: both are the single
+ * thing on this strip the reader can act on immediately. `SeverityIcon`
+ * carries the shape so the tone is never the only signal (DESIGN.md §7). A
+ * `to` makes it a link, for the idle case's "go fix this" destination.
  */
-function Unreadable({ children }: { children: ReactNode }) {
-  return (
-    <span className="flex min-w-0 items-center gap-1.5 text-base font-medium text-warning">
+function WarningLine({ to, children }: { to?: string; children: ReactNode }) {
+  const className = `flex min-w-0 items-center gap-1.5 text-base font-medium text-warning${to ? ' hover:underline' : ''}`;
+  const content = (
+    <>
       <SeverityIcon severity="warning" />
       <span className="truncate">{children}</span>
-    </span>
+    </>
+  );
+  return to ? (
+    <Link to={to} className={className}>
+      {content}
+    </Link>
+  ) : (
+    <span className={className}>{content}</span>
   );
 }

@@ -34,6 +34,10 @@ import * as rosterModule from '@/features/character/roster';
 import type { RosterEntry } from '@/features/character/roster';
 import * as rosterAttentionModule from '@/features/character/rosterAttention';
 import type { AttentionEntry } from '@/features/character/rosterAttention';
+import {
+  useNotificationPreferences,
+  DEFAULT_NOTIFICATION_PREFERENCES,
+} from '@/features/notifications/preferences';
 import { Characters } from './Characters';
 
 vi.mock('@/app/loginFlow', () => ({
@@ -91,6 +95,7 @@ beforeEach(async () => {
     value: DEFAULT_SP_EXTRACTION_THRESHOLD_SP,
     hydrated: false,
   });
+  useNotificationPreferences.setState({ value: DEFAULT_NOTIFICATION_PREFERENCES, hydrated: true });
   await db.characters.bulkPut([
     { characterId: 91, name: 'Pilot One', ownerHash: 'oh-1', addedAt: 1 },
     { characterId: 92, name: 'Pilot Two', ownerHash: 'oh-2', addedAt: 2 },
@@ -207,6 +212,82 @@ describe('Characters', () => {
     const pilotTwoCard = screen.getByText('Pilot Two').closest('li');
     expect(pilotTwoCard).toHaveTextContent('Unknown');
     expect(pilotTwoCard?.querySelector('time')).toBeNull();
+  });
+
+  it('warns on an idle queue the same as the characterNotTraining alert would, and ranks it with paused', async () => {
+    await db.esiCache.put({ characterId: 91, key: 'skillqueue', value: [], fetchedAt: Date.now() });
+    // Pilot Two has no cached queue at all — 'unknown', not 'idle'.
+
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
+    const idleValue = await within(pilotOneCard).findByText('Idle');
+    expect(idleValue).toHaveClass('text-warning');
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+    const table = await screen.findByRole('table');
+    const trainingHeader = within(table).getByRole('columnheader', { name: 'Training' });
+    const trainingIndex = within(table).getAllByRole('columnheader').indexOf(trainingHeader);
+    const pilotOneRow = within(table).getByText('Pilot One').closest('tr');
+    if (!pilotOneRow) throw new Error('expected a Pilot One row');
+    const cell = within(pilotOneRow).getAllByRole('cell')[trainingIndex];
+    expect(within(cell).getByText('Idle')).toHaveClass('text-warning');
+  });
+
+  it('sorts a muted-idle Character with unknown, not with paused, matching its own neutral tone', async () => {
+    // Pilot One: idle, but with the alert muted — should rank away from paused.
+    await db.esiCache.put({ characterId: 91, key: 'skillqueue', value: [], fetchedAt: Date.now() });
+    await useNotificationPreferences.getState().setValue({
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      perCharacter: { 91: { characterNotTraining: { feed: false } } },
+    });
+    // Pilot Two: genuinely paused — no date fields at all.
+    await db.esiCache.put({
+      characterId: 92,
+      key: 'skillqueue',
+      value: [{ skill_id: 1, queue_position: 0, finished_level: 1 }],
+      fetchedAt: Date.now(),
+    });
+
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+    const table = await screen.findByRole('table');
+    await screen.findByText('Paused');
+    await screen.findByText('Idle');
+
+    const trainingHeader = within(table).getByRole('columnheader', { name: 'Training' });
+    await user.click(within(trainingHeader).getByRole('button'));
+    await waitFor(() => expect(trainingHeader).toHaveAttribute('aria-sort'));
+
+    const namesInOrder = within(table)
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => within(row).getByText(/^Pilot (One|Two)$/).textContent);
+    const ascending = trainingHeader.getAttribute('aria-sort') === 'ascending';
+    // Paused is rank 0, muted-idle now ranks with unknown (2) — paused comes
+    // first ascending, last descending, regardless of which the first click picks.
+    expect(namesInOrder).toEqual(
+      ascending ? ['Pilot Two', 'Pilot One'] : ['Pilot One', 'Pilot Two']
+    );
+  });
+
+  it('keeps an idle queue neutral for a Character with the characterNotTraining alert muted', async () => {
+    await db.esiCache.put({ characterId: 91, key: 'skillqueue', value: [], fetchedAt: Date.now() });
+    await useNotificationPreferences.getState().setValue({
+      ...DEFAULT_NOTIFICATION_PREFERENCES,
+      perCharacter: { 91: { characterNotTraining: { feed: false } } },
+    });
+
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
+    const idleValue = await within(pilotOneCard).findByText('Idle');
+    expect(idleValue).not.toHaveClass('text-warning');
+    expect(idleValue).toHaveClass('text-text');
   });
 
   it('shows corp/alliance names when public info loads, dashes when offline', async () => {

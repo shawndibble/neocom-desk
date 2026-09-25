@@ -46,6 +46,10 @@ import { loadRosterSnapshot, type RosterEntry } from '@/features/character/roste
 import { loadRosterAttention, type AttentionEntry } from '@/features/character/rosterAttention';
 import { useAlertCountsByCharacter } from '@/features/notifications/alertCountsByCharacter';
 import {
+  useNotificationPreferences,
+  isNotTrainingAlertEnabledFor,
+} from '@/features/notifications/preferences';
+import {
   useSpExtractionMonitoringEnabled,
   useSpExtractionThresholdSp,
 } from '@/features/character/spExtractionSettings';
@@ -108,25 +112,48 @@ import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
 
 const UNGROUPED_VALUE = '__ungrouped__';
 
+// `idle` is `warning`, not `default`: the app already raises a
+// `characterNotTraining` warning alert for an idle queue, so this chip must
+// not disagree with it (issue #1731). `queueChipTone` below overrides that
+// back to `default` for the one Character-level opt-out that alert has.
 const QUEUE_STATE_TONE: Record<QueueState, StatChipTone> = {
   training: 'success',
   endingSoon: 'warning',
   paused: 'danger',
-  idle: 'default',
+  idle: 'warning',
   unknown: 'default',
 };
 
 // Same "most-needs-attention first" ordering as PI's ATTENTION_RANK, mapped
-// onto training's own tones: paused (danger) worst, then endingSoon (warning),
-// then idle/unknown (default, no distinct order between the two), then
-// training (success) last since it needs no attention at all.
+// onto training's own tones: paused and idle (both now warning-or-worse)
+// share rank 0, then endingSoon, then unknown (no cached queue yet), then
+// training last since it needs no attention at all.
 const QUEUE_STATE_RANK: Record<QueueState, number> = {
   paused: 0,
+  idle: 0,
   endingSoon: 1,
-  idle: 2,
   unknown: 2,
   training: 3,
 };
+
+/**
+ * `QUEUE_STATE_TONE`, overridden back to `default` for an idle queue when
+ * this Character has muted the `characterNotTraining` alert in its feed
+ * channel — the alert's own only per-pilot opt-out (issue #1731), e.g. a
+ * deliberately parked alt banking skill points. Every other state ignores
+ * the opt-out: it exists to silence the idle warning specifically, not to
+ * dim a paused or ending-soon queue.
+ */
+function queueChipTone(state: QueueState, notTrainingAlertEnabled: boolean): StatChipTone {
+  if (state === 'idle' && !notTrainingAlertEnabled) return 'default';
+  return QUEUE_STATE_TONE[state];
+}
+
+/** `QUEUE_STATE_RANK`, with the same opt-out override as `queueChipTone` — a muted idle Character sorts with `unknown`, not with `paused`, so its position agrees with its now-neutral chip. */
+function queueChipRank(state: QueueState, notTrainingAlertEnabled: boolean): number {
+  if (state === 'idle' && !notTrainingAlertEnabled) return QUEUE_STATE_RANK.unknown;
+  return QUEUE_STATE_RANK[state];
+}
 
 const DENSITY_LABEL_KEYS = {
   0.875: 'characters.densityCompact',
@@ -197,6 +224,8 @@ interface CharacterCardProps {
   info: PublicInfoEntry | undefined;
   stats: CharacterSortStats | undefined;
   queue: QueueInfo | undefined;
+  /** Whether this Character's `characterNotTraining` alert is on — false only for its one opt-out (issue #1731). */
+  notTrainingAlertEnabled: boolean;
   groups: readonly CharacterGroup[];
   groupId: string | null;
   starred: boolean;
@@ -230,6 +259,7 @@ function CharacterCard({
   info,
   stats,
   queue,
+  notTrainingAlertEnabled,
   groups,
   groupId,
   starred,
@@ -346,7 +376,7 @@ function CharacterCard({
         {queue && (
           <StatChip
             label={t('characters.queueState')}
-            tone={QUEUE_STATE_TONE[queue.state]}
+            tone={queueChipTone(queue.state, notTrainingAlertEnabled)}
             value={t(`characters.queueStates.${queue.state}`)}
           />
         )}
@@ -452,6 +482,8 @@ interface CharacterRow {
   info: PublicInfoEntry | undefined;
   stats: CharacterSortStats | undefined;
   queue: QueueInfo | undefined;
+  /** Whether this Character's `characterNotTraining` alert is on — false only for its one opt-out (issue #1731). */
+  notTrainingAlertEnabled: boolean;
   attention: AttentionEntry | undefined;
   alertCount: number;
   /** From the same roster snapshot `stats` comes from — undefined until skills have loaded once. */
@@ -648,10 +680,12 @@ function buildColumns(
     training: {
       id: 'training',
       header: t('characters.column.training'),
-      sortValue: (row) => (row.queue ? QUEUE_STATE_RANK[row.queue.state] : undefined),
+      sortValue: (row) =>
+        row.queue ? queueChipRank(row.queue.state, row.notTrainingAlertEnabled) : undefined,
       render: (row) => {
         if (!row.queue) return '—';
-        const tone = STAT_CHIP_TONE_TEXT_CLASS[QUEUE_STATE_TONE[row.queue.state]];
+        const tone =
+          STAT_CHIP_TONE_TEXT_CLASS[queueChipTone(row.queue.state, row.notTrainingAlertEnabled)];
         // Only `training`/`endingSoon` carry a finish time — paused/idle/
         // unknown have nothing to count down to, so they keep the plain
         // state label they've always shown.
@@ -813,6 +847,9 @@ export function Characters() {
   const hydrateSpExtractionThreshold = useSpExtractionThresholdSp((state) => state.hydrate);
 
   const alertCounts = useAlertCountsByCharacter();
+  const notificationPrefs = useNotificationPreferences((state) => state.value);
+  const notTrainingAlertEnabledFor = (characterId: number) =>
+    isNotTrainingAlertEnabledFor(notificationPrefs, characterId);
   const timeZone = useTimeZone();
 
   const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
@@ -1139,6 +1176,7 @@ export function Characters() {
           info: publicInfo[character.characterId],
           stats: stats.get(character.characterId),
           queue: queueById.get(character.characterId),
+          notTrainingAlertEnabled: notTrainingAlertEnabledFor(character.characterId),
           attention: attentionById.get(character.characterId),
           alertCount: alertCounts.get(character.characterId) ?? 0,
           jobSlotSkills: jobSlotSkillsById.get(character.characterId),
@@ -1182,6 +1220,7 @@ export function Characters() {
               info={publicInfo[characterId]}
               stats={stats.get(characterId)}
               queue={queueById.get(characterId)}
+              notTrainingAlertEnabled={notTrainingAlertEnabledFor(characterId)}
               groups={groupsValue.groups}
               groupId={groupIdByCharacterId.get(characterId) ?? null}
               starred={isCharacterStarred(starred, characterId)}

@@ -46,7 +46,10 @@ import type { DisplayAlertGroup } from '@/features/notifications/alertsFilter';
 import { readFeed } from '@/features/notifications/feed';
 import { dismissFeedEntriesAndSync } from '@/features/notifications/feedSync';
 import { visibleFeedEntries } from '@/features/notifications/feedSelection';
-import { useNotificationPreferences } from '@/features/notifications/preferences';
+import {
+  useNotificationPreferences,
+  isNotTrainingAlertEnabledFor,
+} from '@/features/notifications/preferences';
 import { SummaryStrip } from '@/features/overview/SummaryStrip';
 import {
   AlertsColumn,
@@ -292,6 +295,13 @@ export function Overview() {
       : null;
   const queueDepth = sortedQueue ? selectQueueDepth(sortedQueue, now) : null;
   const trainingFinishMs = activeEntry?.finish_date ? Date.parse(activeEntry.finish_date) : null;
+  // `skillsQueueData === null` also covers "hasn't loaded yet" (RouteSnapshot's
+  // own doc comment), not just a genuinely empty queue — without this guard, a
+  // slow first load would flash the warning-tone "not training" cell below
+  // before the real queue lands, rather than the neutral loading state it used
+  // to show.
+  const notTrainingAlertEnabled =
+    skillsQueueData !== null && isNotTrainingAlertEnabledFor(prefsValue, activeCharacterId);
 
   const planetary = planetarySnapshot.data;
   const industryJobs = industrySnapshot.data?.jobs ?? [];
@@ -452,6 +462,7 @@ export function Overview() {
               }
         }
         trainingUnavailable={skillsQueueData?.queueNeedsReauth ?? false}
+        notTrainingAlertEnabled={notTrainingAlertEnabled}
         walletUnavailable={walletSnapshot.data?.needsReauth ?? false}
         failed={Boolean(walletSnapshot.error)}
         training={
