@@ -5278,6 +5278,7 @@
     "destinationRegionLabel": "To region",
     "minRewardLabel": "Min reward",
     "maxCollateralLabel": "Max collateral",
+    "iskFilterHint": "= {{amount}} ISK",
     "maxVolumeLabel": "Max volume (m³)",
     "minDaysLabel": "Min days",
     "routeColumn": "Route",
