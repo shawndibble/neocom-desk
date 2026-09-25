@@ -7,6 +7,7 @@ import {
   ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
+  CachedEmptyState,
   EmptyState,
   FilterBar,
   FilterChip,
@@ -896,7 +897,16 @@ export function OpenOrdersPanel({
       </div>
 
       {reauthEntries.length === 0 && allRows.length === 0 ? (
-        <EmptyState title={t('orders.emptyTitle')} hint={t('orders.emptyHint')} className="py-8" />
+        // Every Character skipped: the "hasn't shared" notes above already say why.
+        skipped.length > 0 && snapshot.openOrders.entries.length === 0 ? null : (
+          <CachedEmptyState
+            result={{ fromCache: fromCacheAny }}
+            title={t('orders.emptyTitle')}
+            hint={t('orders.emptyHint')}
+            fetchedTitle={t('orders.emptyFetchedTitle')}
+            className="py-8"
+          />
+        )
       ) : (
         <>
           <div className="border-b border-line px-3 py-2">

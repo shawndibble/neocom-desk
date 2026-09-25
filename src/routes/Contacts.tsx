@@ -6,6 +6,7 @@ import {
   ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
+  CachedEmptyState,
   EmptyState,
   FilterBar,
   FilterChip,
@@ -890,7 +891,12 @@ export function Contacts() {
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : !contactsResult || contacts.length === 0 ? (
-        <EmptyState title={t('contacts.emptyTitle')} hint={t('contacts.emptyHint')} />
+        <CachedEmptyState
+          result={contactsResult}
+          title={t('contacts.emptyTitle')}
+          hint={t('contacts.emptyHint')}
+          fetchedTitle={t('contacts.emptyFetchedTitle')}
+        />
       ) : (
         <Panel padded={false}>
           {contactsResult.fromCache && (

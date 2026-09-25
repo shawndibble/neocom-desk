@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   DataAgeBadge,
+  CachedEmptyState,
   EmptyState,
   FilterChip,
   IconButton,
@@ -567,7 +568,12 @@ export function Mail() {
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : !headersResult || headers.length === 0 ? (
-        <EmptyState title={t('mail.emptyTitle')} hint={t('mail.emptyHint')} />
+        <CachedEmptyState
+          result={headersResult}
+          title={t('mail.emptyTitle')}
+          hint={t('mail.emptyHint')}
+          fetchedTitle={t('mail.emptyFetchedTitle')}
+        />
       ) : (
         <>
           {headersResult.fromCache && (

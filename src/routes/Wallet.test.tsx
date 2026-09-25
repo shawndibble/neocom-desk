@@ -167,7 +167,7 @@ describe('Wallet', () => {
     );
     render(<App />);
     expect(await screen.findByText('250')).toBeInTheDocument();
-    expect(screen.getByText(/no loyalty points cached/i)).toBeInTheDocument();
+    expect(screen.getByText(/^no loyalty points$/i)).toBeInTheDocument();
   });
 
   it('shows a re-login prompt under Loyalty Points (not the wallet reauth) when the loyalty scope was revoked', async () => {

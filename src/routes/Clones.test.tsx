@@ -235,7 +235,7 @@ describe('Clones', () => {
       http.get(`${ESI}/characters/${CHAR_ID}/clones`, () => HttpResponse.json({ jump_clones: [] }))
     );
     render(<App />);
-    expect(await screen.findByText('No jump clones cached')).toBeInTheDocument();
+    expect(await screen.findByText('No jump clones')).toBeInTheDocument();
   });
 
   it('carries the same character header the Overview tab shows, not a page title', async () => {
@@ -266,7 +266,7 @@ describe('Clones', () => {
       http.get(`${ESI}/characters/${CHAR_ID}/clones`, () => HttpResponse.json({ jump_clones: [] }))
     );
     render(<App />);
-    await screen.findByText('No jump clones cached');
+    await screen.findByText('No jump clones');
 
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
   });

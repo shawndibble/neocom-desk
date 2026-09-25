@@ -8,6 +8,7 @@ import {
   DataAgeBadge,
   DataTable,
   DateRangeFields,
+  CachedEmptyState,
   EmptyState,
   FilterBar,
   FilterField,
@@ -1409,9 +1410,11 @@ export function Wallet() {
                 <p className="mt-3 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
               )}
               {journal.length === 0 ? (
-                <EmptyState
+                <CachedEmptyState
+                  result={journalResult}
                   title={t('wallet.journalEmptyTitle')}
                   hint={t('wallet.journalEmptyHint')}
+                  fetchedTitle={t('wallet.journalEmptyFetchedTitle')}
                   className="py-8"
                 />
               ) : (
@@ -1457,9 +1460,11 @@ export function Wallet() {
                 />
               </div>
             ) : !loyaltyResult || otherLoyalty.length === 0 ? (
-              <EmptyState
+              <CachedEmptyState
+                result={loyaltyResult}
                 title={t('loyalty.emptyTitle')}
                 hint={t('loyalty.emptyHint')}
+                fetchedTitle={t('loyalty.emptyFetchedTitle')}
                 className="py-8"
               />
             ) : (
@@ -1519,9 +1524,11 @@ export function Wallet() {
           }
         >
           {!journalResult || journal.length === 0 ? (
-            <EmptyState
+            <CachedEmptyState
+              result={journalResult}
               title={t('wallet.journalEmptyTitle')}
               hint={t('wallet.journalEmptyHint')}
+              fetchedTitle={t('wallet.journalEmptyFetchedTitle')}
               className="py-8"
             />
           ) : (
