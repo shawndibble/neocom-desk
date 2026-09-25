@@ -340,3 +340,17 @@ export function overheatedOrNull(
 export function alignTimeSeconds(massKg: number, agility: number): number {
   return (Math.log(4) * agility * massKg) / 1_000_000;
 }
+
+/**
+ * Whether the editor shows drones at all: a hull with no drone bay and no
+ * bandwidth (a Corax) has nothing to put them in. Drones already in the
+ * Fitting (a pasted fit) keep it showing, so they can be removed; before the
+ * ship data, only those do.
+ */
+export function showsDrones(
+  stats: Pick<FittingStats, 'droneCapacity' | 'droneBandwidthTotal'> | null,
+  fittedDrones: number
+): boolean {
+  if (fittedDrones > 0) return true;
+  return stats !== null && (stats.droneCapacity > 0 || stats.droneBandwidthTotal > 0);
+}

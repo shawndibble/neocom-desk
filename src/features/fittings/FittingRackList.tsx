@@ -20,6 +20,7 @@ import {
   type PilotProfile,
 } from '@/engine/fittings/types';
 import { moduleKey } from '@/engine/fittings/skillGaps';
+import { showsDrones } from '@/engine/fittings/stats';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { checkCharges } from './dogmaFittingEngine';
 import type { AddTarget } from './addTarget';
@@ -140,26 +141,34 @@ export function ModuleRow({
   const loadedListed = loadedCharge === undefined || charges.some((c) => c.id === loadedCharge);
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-xs bg-panel-2 p-1.5">
-      <TypeIcon typeId={typeId} size={32} width={24} height={24} />
-      {onOpenVariations ? (
-        <button
-          type="button"
-          className="min-w-0 flex-1 truncate text-left text-xs text-accent underline-offset-2 hover:underline"
-          onClick={() => onOpenVariations(slot, slotIndex)}
-        >
-          {name}
-        </button>
-      ) : (
-        <span className="min-w-0 flex-1 truncate text-xs">{name}</span>
-      )}
-      {cantUse && (
-        <span className="shrink-0 rounded-xs border border-danger px-1 text-[0.6875rem] font-semibold text-danger">
-          {t('fittings.list.cantUse')}
-        </span>
-      )}
+    <SlotCard
+      identity={
+        <>
+          <TypeIcon typeId={typeId} size={32} width={24} height={24} />
+          {onOpenVariations ? (
+            <button
+              type="button"
+              className={`${SLOT_NAME_CLASS} text-accent underline-offset-2 hover:underline`}
+              onClick={() => onOpenVariations(slot, slotIndex)}
+            >
+              {name}
+            </button>
+          ) : (
+            <span className={SLOT_NAME_CLASS}>{name}</span>
+          )}
+          {cantUse && (
+            <span className="shrink-0 rounded-xs border border-danger px-1 text-[0.6875rem] font-semibold text-danger">
+              {t('fittings.list.cantUse')}
+            </span>
+          )}
+        </>
+      }
+      removeLabel={t('fittings.edit.remove', { name })}
+      onRemove={() => edit((f) => removeModule(f, slot, slotIndex))}
+    >
       <NativeSelect
         size="sm"
+        className="w-28 shrink-0"
         aria-label={t('fittings.edit.stateLabel', { name })}
         value={module.state}
         onChange={(event) =>
@@ -175,6 +184,7 @@ export function ModuleRow({
       {(charges.length > 0 || loadedCharge !== undefined) && (
         <NativeSelect
           size="sm"
+          className="min-w-0 flex-1 @min-[34rem]:w-56 @min-[34rem]:flex-none"
           aria-label={t('fittings.edit.chargeLabel', { name })}
           value={loadedCharge ?? ''}
           onChange={(event) =>
@@ -199,13 +209,48 @@ export function ModuleRow({
           ))}
         </NativeSelect>
       )}
-      <IconButton
-        icon={<Close />}
-        size="sm"
-        tone="danger"
-        label={t('fittings.edit.remove', { name })}
-        onClick={() => edit((f) => removeModule(f, slot, slotIndex))}
-      />
+    </SlotCard>
+  );
+}
+
+const SLOT_NAME_CLASS =
+  'line-clamp-2 min-w-0 flex-1 text-left text-sm break-words @min-[34rem]:truncate @min-[34rem]:text-xs';
+
+/**
+ * A fitted module's or drone's card. In a narrow column (a phone) the name
+ * gets the first line to itself — two lines if it needs them — with remove
+ * in the top-right corner as on the app's other cards, and the controls
+ * below; with room, it is one line, remove last.
+ */
+function SlotCard({
+  identity,
+  removeLabel,
+  onRemove,
+  children,
+}: {
+  identity: ReactNode;
+  removeLabel: string;
+  onRemove: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="@container rounded-xs bg-panel-2">
+      <div className="relative flex flex-wrap items-center gap-x-2 gap-y-1.5 p-1.5 @min-[34rem]:flex-nowrap">
+        <div className="flex min-h-9 min-w-0 basis-full items-center gap-2 pr-11 @min-[34rem]:min-h-0 @min-[34rem]:flex-1 @min-[34rem]:basis-0 @min-[34rem]:pr-0">
+          {identity}
+        </div>
+        <div className="flex min-w-0 basis-full items-center gap-2 @min-[34rem]:basis-auto">
+          {children}
+        </div>
+        <IconButton
+          icon={<Close />}
+          tone="danger"
+          variant="plain"
+          label={removeLabel}
+          onClick={onRemove}
+          className="absolute top-0 right-0 @min-[34rem]:static"
+        />
+      </div>
     </div>
   );
 }
@@ -392,6 +437,7 @@ export function FittingRackList({
   const { t } = useTranslation();
   const context = { fitting, catalogue, engineReady, profile, edit };
   const drones = droneGroups(fitting);
+  const dronesShown = showsDrones(stats, drones.length);
 
   return (
     <Panel title={t('fittings.list.title')} actions={actions}>
@@ -412,11 +458,13 @@ export function FittingRackList({
             used={stats?.calibrationUsed ?? null}
             total={stats?.calibrationTotal ?? null}
           />
-          <ResourceBar
-            label={t('fittings.list.droneBandwidth')}
-            used={stats?.droneBandwidthUsed ?? null}
-            total={stats?.droneBandwidthTotal ?? null}
-          />
+          {dronesShown && (
+            <ResourceBar
+              label={t('fittings.list.droneBandwidth')}
+              used={stats?.droneBandwidthUsed ?? null}
+              total={stats?.droneBandwidthTotal ?? null}
+            />
+          )}
         </div>
 
         {!engineReady && (
@@ -437,57 +485,57 @@ export function FittingRackList({
           />
         ))}
 
-        <div>
-          <p className={RACK_LABEL_CLASS}>{t('fittings.list.drones')}</p>
-          <div className="space-y-1.5">
-            {drones.map((group) => {
-              const name = catalogueTypeName(catalogue, group.typeId);
-              return (
-                <div
-                  key={group.typeId}
-                  className="flex flex-wrap items-center gap-2 rounded-xs bg-panel-2 p-1.5"
-                >
-                  <TypeIcon typeId={group.typeId} size={32} width={24} height={24} />
-                  <span className="min-w-0 flex-1 truncate text-xs">{name}</span>
-                  <DroneCountInput
-                    label={t('fittings.edit.inSpace')}
-                    value={group.inSpace}
-                    onCommit={(inSpace) =>
-                      edit(
-                        (f) => withDroneCount(f, group.typeId, { inSpace }),
-                        `drone-space-${group.typeId}`
-                      )
+        {dronesShown && (
+          <div>
+            <p className={RACK_LABEL_CLASS}>{t('fittings.list.drones')}</p>
+            <div className="space-y-1.5">
+              {drones.map((group) => {
+                const name = catalogueTypeName(catalogue, group.typeId);
+                return (
+                  <SlotCard
+                    key={group.typeId}
+                    identity={
+                      <>
+                        <TypeIcon typeId={group.typeId} size={32} width={24} height={24} />
+                        <span className={SLOT_NAME_CLASS}>{name}</span>
+                      </>
                     }
-                  />
-                  <DroneCountInput
-                    label={t('fittings.edit.inBay')}
-                    value={group.inBay}
-                    onCommit={(inBay) =>
-                      edit(
-                        (f) => withDroneCount(f, group.typeId, { inBay }),
-                        `drone-bay-${group.typeId}`
-                      )
-                    }
-                  />
-                  <IconButton
-                    icon={<Close />}
-                    size="sm"
-                    tone="danger"
-                    label={t('fittings.edit.remove', { name })}
-                    onClick={() =>
+                    removeLabel={t('fittings.edit.remove', { name })}
+                    onRemove={() =>
                       edit((f) => setDroneCounts(f, group.typeId, { inSpace: 0, inBay: 0 }))
                     }
-                  />
-                </div>
-              );
-            })}
-            <AddSlotButton
-              label={t('fittings.edit.addDrones')}
-              selected={target?.kind === 'drone'}
-              onClick={() => onSelectTarget({ kind: 'drone' })}
-            />
+                  >
+                    <DroneCountInput
+                      label={t('fittings.edit.inSpace')}
+                      value={group.inSpace}
+                      onCommit={(inSpace) =>
+                        edit(
+                          (f) => withDroneCount(f, group.typeId, { inSpace }),
+                          `drone-space-${group.typeId}`
+                        )
+                      }
+                    />
+                    <DroneCountInput
+                      label={t('fittings.edit.inBay')}
+                      value={group.inBay}
+                      onCommit={(inBay) =>
+                        edit(
+                          (f) => withDroneCount(f, group.typeId, { inBay }),
+                          `drone-bay-${group.typeId}`
+                        )
+                      }
+                    />
+                  </SlotCard>
+                );
+              })}
+              <AddSlotButton
+                label={t('fittings.edit.addDrones')}
+                selected={target?.kind === 'drone'}
+                onClick={() => onSelectTarget({ kind: 'drone' })}
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </Panel>
   );

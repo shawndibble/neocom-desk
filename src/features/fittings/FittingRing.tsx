@@ -19,6 +19,7 @@ import {
   type RingSlot,
 } from '@/engine/fittings/ringLayout';
 import { moduleKey } from '@/engine/fittings/skillGaps';
+import { showsDrones } from '@/engine/fittings/stats';
 import type { Fitting, FittingSlotKind, FittingStats } from '@/engine/fittings/types';
 import { typeIconUrl, typeRenderUrl } from '@/lib/eveImages';
 import {
@@ -390,6 +391,8 @@ export function FittingRing({
   const pg = useOverBudgetFlash(pgUsed, pgTotal);
   const cal = useOverBudgetFlash(calUsed, calTotal);
   const bw = useOverBudgetFlash(bwUsed, bwTotal);
+  // A hull with no drone bay (a Corax) has no bandwidth gauge or readout.
+  const dronesShown = showsDrones(stats, fitting.drones.length);
 
   const cantUse = (slot: RingSlot) =>
     slot.module !== undefined && (unusableModuleKeys?.has(moduleKey(slot.module)) ?? false);
@@ -474,15 +477,17 @@ export function FittingRing({
                 cx={cx}
                 cy={cy}
               />
-              <RimGauge
-                gauge={GAUGES.droneBandwidth}
-                used={bwUsed}
-                total={bwTotal}
-                overBudget={bw.overBudget}
-                tone="dim"
-                cx={cx}
-                cy={cy}
-              />
+              {dronesShown && (
+                <RimGauge
+                  gauge={GAUGES.droneBandwidth}
+                  used={bwUsed}
+                  total={bwTotal}
+                  overBudget={bw.overBudget}
+                  tone="dim"
+                  cx={cx}
+                  cy={cy}
+                />
+              )}
               <RimGauge
                 gauge={GAUGES.cpu}
                 used={cpuUsed}
@@ -540,14 +545,16 @@ export function FittingRing({
                 flash={cal}
                 className={`${corner} @min-[40.625rem]:top-0 @min-[40.625rem]:left-0`}
               />
-              <Readout
-                label={t('fittings.list.droneBandwidth')}
-                used={bwUsed}
-                total={bwTotal}
-                valueKey="fittings.ring.readoutDroneBandwidth"
-                flash={bw}
-                className={`${corner} @min-[40.625rem]:top-0 @min-[40.625rem]:right-0 @min-[40.625rem]:text-right`}
-              />
+              {dronesShown && (
+                <Readout
+                  label={t('fittings.list.droneBandwidth')}
+                  used={bwUsed}
+                  total={bwTotal}
+                  valueKey="fittings.ring.readoutDroneBandwidth"
+                  flash={bw}
+                  className={`${corner} @min-[40.625rem]:top-0 @min-[40.625rem]:right-0 @min-[40.625rem]:text-right`}
+                />
+              )}
               {/* `contents` keeps the two as grid cells when narrow; wide, they stack in the corner. */}
               <div
                 className={`contents ${corner} @min-[40.625rem]:right-0 @min-[40.625rem]:bottom-0 @min-[40.625rem]:flex @min-[40.625rem]:flex-col @min-[40.625rem]:gap-1 @min-[40.625rem]:text-right`}
