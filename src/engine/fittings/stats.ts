@@ -95,7 +95,7 @@ export function extractFittingStats(
   itemTypeIds: readonly number[],
   shipAttributes: AttributeMap,
   itemResults: readonly ItemCalculationResult[]
-): Omit<FittingStats, 'calibrationUsed' | 'droneBandwidthUsed' | 'modules'> {
+): Omit<FittingStats, 'calibrationUsed' | 'droneBandwidthUsed' | 'modules' | 'applied'> {
   const cpuTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.cpuOutput);
   const powergridTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.powerOutput);
 

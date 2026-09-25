@@ -160,11 +160,19 @@
 // on another — see features/fittings/damageProfiles.ts. Never deleted via
 // deleteSyncedSetting: deleting a custom profile rewrites the array, and the
 // selection is only ever replaced, so the tombstone-expiry edge does not bite.
+//
+// sync.fittingTargetProfiles + sync.fittingTargetProfileId (issue #1546): the
+// same pair for Target Profiles — the pilot's custom ones and which profile
+// the Fittings applied-DPS graphs are worked out against. Two keys for the
+// same reason, never deleted for the same reason — see
+// features/fittings/targetProfiles.ts.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.corpDarkAfterDays',
   'sync.defaultCharacterFilter',
   'sync.fittingDamageProfileId',
   'sync.fittingDamageProfiles',
+  'sync.fittingTargetProfileId',
+  'sync.fittingTargetProfiles',
   'sync.industryAssumedMe',
   'sync.industryAssumedTe',
   'sync.industryBuildGroups',

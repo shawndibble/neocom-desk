@@ -8,6 +8,7 @@ import wasmInit, {
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import { extractFittingStats, extractModuleResult } from '@/engine/fittings/stats';
+import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import {
   ITEM_DOGMA_ATTRIBUTE,
   type Fitting,
@@ -181,7 +182,13 @@ export async function computeFittingStats(
   // `fittingToDogmaFit` puts the modules first, so module i is items[i].
   const modules = fitting.modules.map((_, index) => extractModuleResult(calculation.items[index]));
 
-  return { ...baseStats, calibrationUsed, droneBandwidthUsed, modules };
+  const applied = extractAppliedDpsInputs(
+    dogmaFit.items,
+    calculation.items,
+    calculation.character.attributes
+  );
+
+  return { ...baseStats, calibrationUsed, droneBandwidthUsed, modules, applied };
 }
 
 export interface CandidateCheck {

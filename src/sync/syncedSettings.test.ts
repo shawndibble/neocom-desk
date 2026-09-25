@@ -10,6 +10,8 @@ const PINNED_SYNCED_SETTING_KEYS: string[] = [
   'sync.defaultCharacterFilter',
   'sync.fittingDamageProfileId',
   'sync.fittingDamageProfiles',
+  'sync.fittingTargetProfileId',
+  'sync.fittingTargetProfiles',
   'sync.industryAssumedMe',
   'sync.industryAssumedTe',
   'sync.industryBuildGroups',

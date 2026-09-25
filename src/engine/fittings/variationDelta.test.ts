@@ -44,6 +44,7 @@ const base: FittingStats = {
     warpSpeed: 3,
   },
   unknownItemTypeIds: [],
+  applied: { weapons: [], droneControlRange: 20000 },
   slotCounts: { high: 4, medium: 4, low: 4, rig: 3, subsystem: 0 },
   modules: [],
 };

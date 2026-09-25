@@ -5,6 +5,7 @@
  * requirement); `src/features/fittings/dogmaFittingEngine.ts` is the only
  * place that talks to the vendor package, and maps these shapes onto its own.
  */
+import type { AppliedDpsInputs } from './appliedDps';
 
 export type FittingSlotKind = 'high' | 'medium' | 'low' | 'rig' | 'subsystem';
 
@@ -168,6 +169,8 @@ export interface FittingStats {
   slotCounts: Record<FittingSlotKind, number>;
   /** Index-parallel to `Fitting.modules`. */
   modules: FittingModuleResult[];
+  /** What applied DPS against a Target Profile is worked out from (`appliedDps.ts`). */
+  applied: AppliedDpsInputs;
 }
 
 /** What the engine made of one fitted module. */

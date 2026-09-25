@@ -11,6 +11,7 @@ import { resolveFittingShareView } from '@/features/fittings/resolveFittingShare
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { useDamageProfiles } from '@/features/fittings/damageProfiles';
+import { useTargetProfiles } from '@/features/fittings/targetProfiles';
 import {
   computeFittingStats,
   type DogmaAssetProgress,
@@ -62,6 +63,7 @@ export function FittingShared() {
   // The viewer's own Damage Profile (a local-then-synced setting, so it works
   // with no session too) — the link itself never carries one.
   const damageProfiles = useDamageProfiles();
+  const targetProfiles = useTargetProfiles();
   const damageProfile = damageProfiles.selected;
   const damageProfilesHydrated = damageProfiles.hydrated;
   const [copyFailed, setCopyFailed] = useState(false);
@@ -227,6 +229,7 @@ export function FittingShared() {
             statsError={statsError}
             price={price}
             damageProfiles={damageProfiles}
+            targetProfiles={targetProfiles}
           />
           <ModuleList fitting={state.fitting} typeName={typeName} />
         </>
