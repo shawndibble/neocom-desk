@@ -97,13 +97,14 @@ dashed against solid, bars against a line, its own strip.
 | `kind-skill-training`    | `#d8beff` | Skill-queue completions.                |
 | `kind-industry-job`      | `#e59a55` | Industry job deliveries.                |
 | `kind-planet-extraction` | `#6fdecd` | PI extractor program ends.              |
+| `kind-moon-chunk`        | `#a0a8b8` | Moon chunk arrivals and decays.         |
 | `kind-contract-expiry`   | `#f2879f` | Contract expiries.                      |
 | `kind-order-expiry`      | `#c9d96a` | Market-order expiries.                  |
 | `kind-skill-plan`        | `#e0d0a8` | Projected Skill Plan steps (outlined).  |
 
 Every other color scale in this app is **ordinal or semantic** — `securityStatusColor`
 is a position on a numeric scale, `STANDING_TONE` and the severity ladder are
-magnitudes. These seven are **nominal**: no order, no magnitude, identity only. They say
+magnitudes. These eight are **nominal**: no order, no magnitude, identity only. They say
 which part of the app a deadline came from, and they are read by
 `src/components/ui/kindTone.ts` (`KIND_FILL`, `KIND_TEXT`).
 
@@ -581,7 +582,7 @@ route ad hoc.
 | `line-bright` on `panel-2` (resting field border, non-text ≥3:1) | 3.15                  |
 | `::selection` fill / `text`                                      | 4.64                  |
 
-Clock-kind tokens (§1) color countdown **text**, so all seven are measured on all three
+Clock-kind tokens (§1) color countdown **text**, so all eight are measured on all three
 surfaces — `bg` / `panel` / `panel-2`:
 
 | Token                    | Ratios                |
@@ -590,6 +591,7 @@ surfaces — `bg` / `panel` / `panel-2`:
 | `kind-skill-training`    | 11.72 / 11.01 / 10.27 |
 | `kind-industry-job`      | 8.37 / 7.86 / 7.33    |
 | `kind-planet-extraction` | 11.98 / 11.25 / 10.50 |
+| `kind-moon-chunk`        | 8.09 / 7.60 / 7.09    |
 | `kind-contract-expiry`   | 8.05 / 7.56 / 7.05    |
 | `kind-order-expiry`      | 12.54 / 11.78 / 10.99 |
 | `kind-skill-plan`        | 12.67 / 11.90 / 11.10 |
@@ -607,7 +609,7 @@ surfaces — `bg` / `panel` / `panel-2`:
   which uses `focus:outline-none`: a ring there reads as a control that isn't one.
 - Color never the sole signal: ISK deltas keep signs, statuses keep words/icons,
   clock kinds keep their glyph and their written name.
-- **The nominal palette (§1) is reinforcement, never the signal.** Seven hues cannot be
+- **The nominal palette (§1) is reinforcement, never the signal.** Eight hues cannot be
   made mutually distinct under dichromacy while staying inside this palette's
   lightness/chroma band; measured separation is ΔE ≥ 28 under normal vision and
   ≥ 21 under protanopia, but industry/orders fall to ΔE 12 under deuteranopia and
@@ -615,7 +617,8 @@ surfaces — `bg` / `panel` / `panel-2`:
   encoded by hue alone — it is why the rail's rows carry `KIND_ICON` and the kind's
   name, the filter menu carries labels beside its swatches, and the map and ticker
   name their kinds in `aria-label`. Do not add a surface that paints these hues with
-  nothing beside them.
+  nothing beside them. `kind-moon-chunk` (a cool grey) was measured for normal vision
+  only (ΔE ≥ 30 from every other tone); it leans on the glyph and name like the rest.
 - Tabs: full `role="tablist"` semantics + arrow-key navigation.
 - Spinners expose `role="status"`; DataAgeBadge exposes absolute timestamp via
   `<time dateTime>` + `title`.

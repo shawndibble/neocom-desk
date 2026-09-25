@@ -227,6 +227,34 @@ describe('division layout (AC1)', () => {
     await user.click(await screen.findByRole('link', { name: /Division 1/ }));
     expect(await screen.findByText('Type #34')).toBeInTheDocument();
   });
+
+  // Office pass-through end-to-end — see assetDivisions.test.ts for the bug itself.
+  it("places an office's contents in their real hangar division, named by the station the office sits at", async () => {
+    mocked.loadCorporationAssets.mockResolvedValue(
+      cached([
+        asset({ item_id: 50, type_id: 27, location_flag: 'OfficeFolder' }),
+        asset({
+          item_id: 1,
+          quantity: 5000,
+          location_flag: 'CorpSAG3',
+          location_type: 'item',
+          location_id: 50,
+        }),
+      ])
+    );
+    const user = userEvent.setup();
+    await divisionList();
+    expect(screen.queryByRole('link', { name: /Office/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: /Division 3/ }));
+    const locationLink = await screen.findByRole('link', { name: /Jita IV - Moon 4/ });
+    expect(locationLink).toBeInTheDocument();
+    expect(screen.queryByText('Tritanium')).not.toBeInTheDocument();
+
+    await user.click(locationLink);
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.getByText('×5,000')).toBeInTheDocument();
+  });
 });
 
 describe('special flag groups (AC3)', () => {

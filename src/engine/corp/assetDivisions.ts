@@ -20,7 +20,14 @@
  * at the boundary, the same split `engine/corp/members.ts` makes for
  * `MemberActivity`.
  */
-import { buildAssetGroups, type AssetTreeGroup, type EngineAsset } from '../assetTree';
+import {
+  buildAssetGroups,
+  nodeContribution,
+  type AssetTreeContainerNode,
+  type AssetTreeGroup,
+  type AssetTreeNode,
+  type EngineAsset,
+} from '../assetTree';
 
 /** The seven hangar divisions every corporation has, in order. */
 export const HANGAR_DIVISIONS = [1, 2, 3, 4, 5, 6, 7] as const;
@@ -101,6 +108,85 @@ function toEngineAsset(asset: CorpAssetInput): EngineAsset {
 }
 
 /**
+ * Sentinel `location_flag` for the synthetic node `buildCorpAssetTree` wraps
+ * an office's contents in, keyed on the station/structure the office sits
+ * at — never a real ESI flag, so it can never collide with one on the wire.
+ */
+export const CORP_ASSET_LOCATION_FLAG = '__corp-asset-location__';
+
+/** The station/structure id a location-wrapper node stands for, or null for any other node. */
+export function corpAssetLocationId(node: AssetTreeNode): number | null {
+  return node.kind !== 'bay' && node.asset.location_flag === CORP_ASSET_LOCATION_FLAG
+    ? -node.asset.item_id
+    : null;
+}
+
+function locationNode(
+  stationId: number,
+  children: AssetTreeNode[],
+  priceByTypeId: ReadonlyMap<number, number>
+): AssetTreeContainerNode {
+  let itemCount = 0;
+  let estimatedValue = 0;
+  for (const child of children) {
+    const contribution = nodeContribution(child, priceByTypeId);
+    itemCount += contribution.itemCount;
+    estimatedValue += contribution.estimatedValue;
+  }
+  return {
+    kind: 'container',
+    asset: {
+      // Negated: real item ids are always positive, so this can never
+      // collide with a sibling asset's — segment/React keys are item_id alone.
+      item_id: -stationId,
+      type_id: 0,
+      quantity: 0,
+      location_id: stationId,
+      location_type: 'station',
+      location_flag: CORP_ASSET_LOCATION_FLAG,
+    },
+    children,
+    itemCount,
+    estimatedValue,
+  };
+}
+
+/**
+ * Wraps a group's office-derived roots by station. `buildAssetGroups` has
+ * no such level — it groups roots by `groupIdFor` once and stops — so this
+ * runs once more after, over roots already sorted into their real division.
+ * A root that didn't come through an office stays exactly where
+ * `buildAssetGroups` put it, unwrapped.
+ */
+function withLocationLevels(
+  group: AssetTreeGroup<CorpAssetGroupId>,
+  stationIdByItemId: ReadonlyMap<number, number>,
+  priceByTypeId: ReadonlyMap<number, number>
+): AssetTreeGroup<CorpAssetGroupId> {
+  const byStation = new Map<number, AssetTreeNode[]>();
+  const direct: AssetTreeNode[] = [];
+
+  for (const node of group.children) {
+    const stationId = node.kind === 'bay' ? undefined : stationIdByItemId.get(node.asset.item_id);
+    if (stationId === undefined) {
+      direct.push(node);
+      continue;
+    }
+    const list = byStation.get(stationId) ?? [];
+    list.push(node);
+    byStation.set(stationId, list);
+  }
+
+  if (byStation.size === 0) return group;
+
+  const locationNodes = [...byStation.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([stationId, stationChildren]) => locationNode(stationId, stationChildren, priceByTypeId));
+
+  return { ...group, children: [...locationNodes, ...direct] };
+}
+
+/**
  * The corp assets tree: divisions/flag groups as `buildAssetGroups`' top
  * axis, exactly `ALL_CORP_ASSET_GROUP_IDS`'s order. The seven hangar
  * divisions are always present even when empty ("seven hangar divisions as
@@ -109,16 +195,44 @@ function toEngineAsset(asset: CorpAssetInput): EngineAsset {
  * (CONTEXT.md round 44). Beneath each root, a container/ship/bay recurses
  * exactly as `/assets`' own tree does — a container placed in a division
  * shows its contents nested inside it, not flag-bucketed separately.
+ *
+ * An office is a pass-through, not a bucket: it holds nothing of its own, so
+ * its own row is dropped before grouping rather than bucketed under
+ * `'officeFolder'` the way every other root would be. Its children keep
+ * their own `location_id` pointing at the now-absent office item id, which
+ * is exactly the condition `buildAssetGroups`' own orphan-rescue pass
+ * already promotes to a root of its own — grouped by *its* real `CorpSAGn`
+ * flag, which `buildNode` never reads at the top level otherwise. Each
+ * promoted root is then wrapped in a location node named for the office's
+ * own station, by `withLocationLevels`.
  */
 export function buildCorpAssetTree(
   inputs: readonly CorpAssetInput[],
   priceByTypeId: ReadonlyMap<number, number> = new Map()
 ): AssetTreeGroup<CorpAssetGroupId>[] {
-  return buildAssetGroups(
-    inputs.map(toEngineAsset),
+  const officeStationByItemId = new Map<number, number>();
+  for (const input of inputs) {
+    if (input.locationFlag === 'OfficeFolder') {
+      officeStationByItemId.set(input.itemId, input.locationId);
+    }
+  }
+
+  const stationIdByItemId = new Map<number, number>();
+  const passThroughAssets: EngineAsset[] = [];
+  for (const input of inputs) {
+    if (input.locationFlag === 'OfficeFolder') continue;
+    const stationId = officeStationByItemId.get(input.locationId);
+    if (stationId !== undefined) stationIdByItemId.set(input.itemId, stationId);
+    passThroughAssets.push(toEngineAsset(input));
+  }
+
+  const groups = buildAssetGroups(
+    passThroughAssets,
     ALL_CORP_ASSET_GROUP_IDS,
     new Set(HANGAR_DIVISIONS),
     (asset) => corpAssetGroupId(asset.location_flag),
     priceByTypeId
   );
+
+  return groups.map((group) => withLocationLevels(group, stationIdByItemId, priceByTypeId));
 }

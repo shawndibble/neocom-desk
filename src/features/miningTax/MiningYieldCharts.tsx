@@ -86,6 +86,7 @@ function RateTooltip({ active, payload, label }: TooltipContentProps): React.Rea
       <p>
         {t('miningTax.overview.iskPerHour')}: {formatIsk(point.iskPerHour, 0)} ISK
       </p>
+      <p className="text-text-dim">{t('miningTax.overview.rateChartBasis')}</p>
     </div>
   );
 }
@@ -209,6 +210,9 @@ export default function MiningYieldCharts({
       <Panel padded>
         <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
           {t('miningTax.overview.rateChartTitle')}
+        </p>
+        <p className="mb-1 text-[0.6875rem] text-text-dim">
+          {t('miningTax.overview.rateChartBasis')}
         </p>
         <div role="img" aria-label={t('miningTax.overview.rateChartTitle')} className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">

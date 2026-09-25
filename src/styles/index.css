@@ -88,13 +88,14 @@
    * Clock kinds — the app's one NOMINAL palette (DESIGN.md §1). Identity, not
    * magnitude and not status: these say which part of the app a deadline came
    * from. Every hue sits at least 20 ΔE from accent/success/warning/danger so
-   * none of them can be mistaken for a status tone, and all seven clear AA on
+   * none of them can be mistaken for a status tone, and all eight clear AA on
    * bg, panel and panel-2 because they colour countdown text, not just dots.
    */
   --color-kind-calendar-event: #7e9cfd;
   --color-kind-skill-training: #d8beff;
   --color-kind-industry-job: #e59a55;
   --color-kind-planet-extraction: #6fdecd;
+  --color-kind-moon-chunk: #a0a8b8;
   --color-kind-contract-expiry: #f2879f;
   --color-kind-order-expiry: #c9d96a;
   --color-kind-skill-plan: #e0d0a8;

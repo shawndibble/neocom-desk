@@ -37,6 +37,19 @@ describe('MiningYieldCharts', () => {
     expect(within(compare).getByText('1,200 ISK')).toBeInTheDocument();
   });
 
+  it('states the rate chart time basis under its title', () => {
+    render(
+      <MiningYieldCharts
+        dailyRate={[{ date: '2026-09-01', iskPerHour: 1234567, source: 'saved' }]}
+        typeComparison={typeComparison}
+        showRefining
+      />
+    );
+    expect(
+      screen.getByText("Each day's value ÷ 24 h, averaged over calendar time")
+    ).toBeInTheDocument();
+  });
+
   it('drops the refined column from the type table when refining is hidden', () => {
     render(
       <MiningYieldCharts dailyRate={[]} typeComparison={typeComparison} showRefining={false} />

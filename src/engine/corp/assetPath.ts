@@ -36,6 +36,9 @@ export function resolveCorpAssetPath(
   segments: readonly string[]
 ): ResolvedCorpAssetPath {
   if (groupId === null) return ROOT;
+  // An office is a pass-through: 'officeFolder' can never hold real content,
+  // so a stale link into it lands on the division list, not a phantom 404.
+  if (groupId === 'officeFolder') return ROOT;
 
   const group = groups.find((candidate) => candidate.id === groupId);
   // An unknown group id is reported whole rather than silently redirected —

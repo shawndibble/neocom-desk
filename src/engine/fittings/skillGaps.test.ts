@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { computeSkillGaps, resourceOverage } from './skillGaps';
-import type { Fitting } from './types';
+import { computeSkillGaps, firstResourceOverage, resourceOverage } from './skillGaps';
+import type { Fitting, FittingStats } from './types';
 
 const fitting: Fitting = {
   name: 'Test',
@@ -30,6 +30,32 @@ describe('resourceOverage', () => {
     expect(resourceOverage(50, 100)).toBe(0);
     expect(resourceOverage(null, 100)).toBe(0);
     expect(resourceOverage(10, null)).toBe(0);
+  });
+});
+
+describe('firstResourceOverage', () => {
+  const within = {
+    cpuUsed: 50,
+    cpuTotal: 100,
+    powergridUsed: 50,
+    powergridTotal: 100,
+    calibrationUsed: 0,
+    calibrationTotal: 400,
+  } as FittingStats;
+
+  it('is null when every budget holds', () => {
+    expect(firstResourceOverage(within)).toBeNull();
+  });
+
+  it('names the resource and amount it is over on', () => {
+    expect(firstResourceOverage({ ...within, cpuUsed: 202 })).toEqual({
+      resource: 'cpu',
+      amount: 102,
+    });
+    expect(firstResourceOverage({ ...within, calibrationUsed: 450 })).toEqual({
+      resource: 'calibration',
+      amount: 50,
+    });
   });
 });
 

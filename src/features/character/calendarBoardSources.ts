@@ -28,6 +28,7 @@ import type {
 import { isActiveContractStatus } from '@/engine/contractStatus';
 import { parseInstant } from '@/engine/esiInstant';
 import type { BoardCalendarEventSource, BoardClockSource } from '@/engine/character/board';
+import type { BoardExtractionSource } from '@/engine/corp/board';
 import { stepKey, type SkillPlanSchedule } from '@/engine/skillPlanSchedule';
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
@@ -171,6 +172,28 @@ export function toPlanetExtractionSources(colonies: readonly ColonyPins[]): Boar
     }
   }
   return sources;
+}
+
+/**
+ * One row per moon drill: the chunk's arrival while it is still coming, its
+ * natural decay once it has landed — the same rule the corp ops board applies
+ * (`engine/corp/board.ts`), so the two boards never disagree about a chunk.
+ * Which of the two it is rides in `detail` (`arrival` / `decay`); the view
+ * owns the wording.
+ */
+export function toMoonChunkSources(
+  extractions: readonly BoardExtractionSource[],
+  nowMs: number
+): BoardClockSource[] {
+  return extractions.map((extraction) => {
+    const arrived = nowMs >= extraction.chunkArrivalMs;
+    return {
+      id: String(extraction.structureId),
+      subject: extraction.subject,
+      detail: arrived ? 'decay' : 'arrival',
+      deadlineMs: arrived ? extraction.naturalDecayMs : extraction.chunkArrivalMs,
+    };
+  });
 }
 
 /**

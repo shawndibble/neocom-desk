@@ -34,6 +34,7 @@ const KIND_ICON: Record<CharacterBoardItemKind, typeof Icon.Skills> = {
   skillTraining: Icon.Skills,
   industryJob: Icon.Industry,
   planetExtraction: Icon.Planetary,
+  moonChunk: Icon.MoonMining,
   contractExpiry: Icon.Contracts,
   orderExpiry: Icon.Orders,
   skillPlan: Icon.FlatList,

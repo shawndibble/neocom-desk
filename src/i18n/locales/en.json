@@ -478,6 +478,7 @@
       "fits": "Fits",
       "fitsYes": "Fits",
       "fitsNo": "Doesn't fit",
+      "stillOverBy": "Still over by {{amount}} {{resource}}",
       "canFly": "Can fly",
       "canFlyYes": "Can fly",
       "canFlyNo": "Can't fly",
@@ -2514,7 +2515,12 @@
         "summaryDay": "Valued at {{price}} on the day mined.",
         "summaryNow": "Valued at today's live {{price}} price for every day.",
         "summaryDayRated": "Valued at {{percent}}% of {{price}} on the day mined.",
-        "summaryNowRated": "Valued at {{percent}}% of today's live {{price}} price for every day."
+        "summaryNowRated": "Valued at {{percent}}% of today's live {{price}} price for every day.",
+        "usageSaved_one": "{{count}} of {{total}} day uses saved prices",
+        "usageSaved_other": "{{count}} of {{total}} days use saved prices",
+        "usageAverage": "{{count}} daily avg",
+        "usageLive": "{{count}} live",
+        "usageNone": "{{count}} unpriced"
       },
       "daysCoveredValue": "{{count}} of {{total}}",
       "historyStartsHint": "Saved history starts {{date}}",
@@ -2526,6 +2532,7 @@
       },
       "iskPerHour": "ISK/hr",
       "rateChartTitle": "ISK/hr trend",
+      "rateChartBasis": "Each day's value ÷ 24 h, averaged over calendar time",
       "compareChartTitle": "Raw vs. refined value by type",
       "compareChartTitleRawOnly": "Value by ore type",
       "refiningHiddenNote": "Refining hidden. Raw value only.",
@@ -2798,11 +2805,16 @@
       "skillTraining": "Skill queue",
       "industryJob": "Industry jobs",
       "planetExtraction": "Planets",
+      "moonChunk": "Moon chunks",
       "contractExpiry": "Contracts",
       "orderExpiry": "Market orders",
       "skillPlan": "Skill plan"
     },
     "detail": {
+      "moonChunk": {
+        "arrival": "arrives",
+        "decay": "decays if not fractured"
+      },
       "industryJob": {
         "active": "in progress",
         "ready": "ready to deliver"
@@ -5005,6 +5017,7 @@
       "loadFailedTitle": "Could not load corp assets",
       "loadFailedHint": "The corporation asset read failed and nothing is cached yet. Try refreshing.",
       "searchPlaceholder": "Search items…",
+      "unknownLocation": "Location #{{locationId}}",
       "flag": {
         "officeFolder": "Office",
         "corpDeliveries": "Deliveries",
