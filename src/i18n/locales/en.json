@@ -645,6 +645,10 @@
       "canFlyAllCharactersTitle": "Can {{fitting}} be flown?",
       "canFlyLoading": "Checking skills…",
       "canFlyCharacterFailed": "Skills unknown",
+      "fitsYes": "Fits",
+      "overBy": "Over {{resource}} by {{amount}}",
+      "priceLoading": "Loading prices…",
+      "priceFailed": "Couldn't load prices for one or more Fittings.",
       "statsTitle": "Stats",
       "modulesTitle": "Modules that differ",
       "noDifferences": "Nothing differs between the compared Fittings.",
@@ -708,7 +712,9 @@
         "maxVelocity": "Max velocity (m/s)",
         "agility": "Inertia modifier",
         "mass": "Mass (t)",
-        "warpSpeed": "Warp speed (AU/s)"
+        "warpSpeed": "Warp speed (AU/s)",
+        "priceSell": "Price (sell)",
+        "priceBuy": "Price (buy)"
       }
     }
   },

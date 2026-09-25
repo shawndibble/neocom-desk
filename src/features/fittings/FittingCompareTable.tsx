@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import type { CompareRow } from '@/engine/fittings/fittingCompare';
 import { STAT_DIGITS } from '@/engine/fittings/fittingStatFields';
+import { formatIsk } from '@/lib/isk';
 
 type Translate = (key: string, opts?: Record<string, unknown>) => string;
 
@@ -19,6 +20,14 @@ function formatValue(row: CompareRow, index: number, t: Translate): string {
       : t('fittings.compare.stat.capacitorUnstable', { seconds: (-value).toFixed(0) });
   }
   if (row.key === 'appliedDps' || row.key === 'bestRange') return row.values[index]!.toFixed(1);
+  if (row.key === 'priceSell' || row.key === 'priceBuy') {
+    const value = row.values[index]!;
+    // NaN marks a slot whose price fetch failed — the engine row still carries it so the other
+    // slots' prices can show, but there's nothing to format here.
+    if (Number.isNaN(value)) return '—';
+    // Whole ISK, same rounding the engine row was built at, so what's shown always matches what `differs` compared.
+    return formatIsk(value, 0);
+  }
   return row.values[index]!.toFixed(STAT_DIGITS[row.key]);
 }
 

@@ -48,6 +48,15 @@ describe('FittingCompareTable', () => {
     expect(screen.getAllByText('(Best)')).toHaveLength(1);
   });
 
+  it('shows a dash for a price row where that slot has no price, and formats the rest as ISK', () => {
+    const rows: CompareRow[] = [
+      { key: 'priceSell', values: [1_000_000, NaN], differs: true, bestIndices: [] },
+    ];
+    render(<FittingCompareTable rows={rows} columns={COLUMNS} differencesOnly={false} />);
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getByText('1,000,000')).toBeInTheDocument();
+  });
+
   it('shows a message when nothing differs and differences-only is on', () => {
     const tied: CompareRow[] = [
       { key: 'ehp', values: [1000, 1000], differs: false, bestIndices: [] },
