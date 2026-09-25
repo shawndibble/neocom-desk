@@ -208,7 +208,7 @@ export function FittingCompare() {
 
           {!statsReady ? (
             <Panel title={t('fittings.compare.statsTitle')}>
-              <p className="text-xs text-text-dim">
+              <p className={profileFailed ? 'text-xs text-danger' : 'text-xs text-text-dim'}>
                 {profileFailed
                   ? t('fittings.compare.profileFailed')
                   : anyError
