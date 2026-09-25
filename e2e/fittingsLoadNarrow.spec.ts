@@ -85,7 +85,8 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     await page.getByRole('button', { name: 'Load', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'List' })).toBeVisible();
 
-    const ringToggle = page.getByRole('button', { name: 'Ring', exact: true });
+    // Below desktop the Ring, the List and the stats are one row of tabs.
+    const ringToggle = page.getByRole('tab', { name: 'Ring', exact: true });
     const toggleBox = await ringToggle.boundingBox();
     expect(toggleBox!.height).toBeGreaterThanOrEqual(44);
     await ringToggle.click();

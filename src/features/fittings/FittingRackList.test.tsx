@@ -70,4 +70,33 @@ describe('FittingRackList', () => {
     );
     expect(screen.getAllByText("Can't use")).toHaveLength(1);
   });
+
+  it('has no Drones section or bandwidth bar on a hull without a drone bay', () => {
+    const noBay = { ...statsWith(10), droneCapacity: 0, droneBandwidthTotal: 0 };
+    const { rerender } = render(<FittingRackList fitting={fitting} stats={noBay} />);
+    expect(screen.queryByText('Drones')).toBeNull();
+    expect(screen.queryByRole('meter', { name: 'Drone bandwidth' })).toBeNull();
+
+    rerender(
+      <FittingRackList
+        fitting={fitting}
+        stats={{ ...noBay, droneCapacity: 25, droneBandwidthTotal: 25 }}
+      />
+    );
+    expect(screen.getByText('Drones')).toBeTruthy();
+    expect(screen.getByRole('meter', { name: 'Drone bandwidth' })).toBeTruthy();
+  });
+
+  it("keeps a pasted fit's drones on such a hull, so they can be removed", () => {
+    const noBay = { ...statsWith(10), droneCapacity: 0, droneBandwidthTotal: 0 };
+    render(
+      <FittingRackList
+        fitting={{ ...fitting, drones: [{ typeId: 2486, quantity: 2, state: 'active' }] }}
+        stats={noBay}
+      />
+    );
+    expect(screen.getByText('Drones')).toBeTruthy();
+    // The two modules' removes, and the drones'.
+    expect(screen.getAllByRole('button', { name: /^Remove/ })).toHaveLength(3);
+  });
 });

@@ -10,6 +10,7 @@ import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { moduleKey } from '@/engine/fittings/skillGaps';
+import { showsDrones } from '@/engine/fittings/stats';
 import type { Fitting, FittingSlotKind } from '@/engine/fittings/types';
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import {
@@ -23,7 +24,6 @@ import {
 } from '@/engine/fittings/fittingEdit';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
-import { FittingExportMenu } from '@/features/fittings/FittingExportMenu';
 import { FittingHeader } from '@/features/fittings/FittingHeader';
 import { FittingSaveButton } from '@/features/fittings/FittingSaveButton';
 import { LoadWarnings } from '@/features/fittings/FittingLoadCard';
@@ -39,6 +39,7 @@ import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import {
   resolveFittingView,
   useFittingViewPreference,
+  type FittingView,
 } from '@/features/fittings/fittingViewPreference';
 import { MissingSkillsChip } from '@/features/fittings/MissingSkillsChip';
 import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
@@ -94,7 +95,8 @@ export function Fittings() {
     void hydrateView();
   }, [hydrateView]);
   const view = resolveFittingView(storedView, isPhone);
-  const [phoneTab, setPhoneTab] = useState<'fitting' | 'stats'>('fitting');
+  // Below desktop the Ring, the List and the stats are one set of tabs.
+  const [phoneTab, setPhoneTab] = useState<'editor' | 'stats'>('editor');
   // Phone Ring: the rack whose slots sheet is open (scope decision `20260924-205720`).
   const [rackSheet, setRackSheet] = useState<FittingSlotKind | null>(null);
   // The filled slot whose module panel is open.
@@ -132,6 +134,7 @@ export function Fittings() {
     closeAdd();
   }
   const slotCounts = stats?.slotCounts ?? null;
+  const dronesShown = fitting !== null && showsDrones(stats, fitting.drones.length);
   // Module results only line up with the Fitting they were calculated for.
   const moduleResults = stats !== null && workspace.statsFitting === fitting ? stats.modules : null;
   const typeName = (typeId: number) => catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
@@ -142,7 +145,7 @@ export function Fittings() {
   }
 
   function canPlace(rack: CandidateRack): boolean {
-    if (rack === 'drone') return true;
+    if (rack === 'drone') return dronesShown;
     if (fitting === null || slotCounts === null) return false;
     if (target?.kind === 'slot' && target.slot === rack) return true;
     return firstFreeSlotIndex(fitting, rack, slotCounts[rack]) !== null;
@@ -212,6 +215,7 @@ export function Fittings() {
         edit((f) => loadChargeIntoAll(f, moduleTypeId, chargeTypeId))
       }
       dragToRing={isDesktop && view === 'ring'}
+      showDrones={dronesShown}
     />
   );
 
@@ -324,6 +328,7 @@ export function Fittings() {
       damageProfiles={workspace.damageProfiles}
       targetProfiles={targetProfiles}
       overlay={overlay}
+      showDrones={dronesShown}
       heading={
         <>
           <span>
@@ -365,6 +370,8 @@ export function Fittings() {
         subtitle={subtitle}
         hasCharacter={activeCharacterId !== null}
         onLibrary={openLibrary}
+        price={workspace.price}
+        compact={addMode === 'sheet'}
         context={
           <>
             <ImplantBasisControl
@@ -386,35 +393,34 @@ export function Fittings() {
             )}
           </>
         }
-        actions={
-          <>
-            {viewHydrated && (
-              <FittingViewToggle value={view} onChange={(next) => void setView(next)} />
-            )}
-            <FittingExportMenu fitting={fitting} price={workspace.price} />
-            <FittingSaveButton
-              onSave={() => void workspace.save()}
-              canSave={workspace.canSave}
-              saveBlockedReason={
-                activeCharacterId === null
-                  ? t('fittings.myFittings.needCharacter')
-                  : workspace.tooLargeToShare
-                    ? t('fittings.myFittings.tooLarge')
-                    : undefined
-              }
-              updating={workspace.savedId !== null}
-              onSaveToEve={() => setSaveToEveOpen(true)}
-              canSaveToEve={activeCharacterId !== null && canSaveToEve === true}
-              saveToEveBlockedReason={
-                activeCharacterId === null
-                  ? t('fittings.saveToEve.needCharacter')
-                  : canSaveToEve === false
-                    ? t('fittings.saveToEve.needPermission')
-                    : undefined
-              }
-              short={isPhone}
-            />
-          </>
+        view={
+          viewHydrated && addMode !== 'sheet' ? (
+            <FittingViewToggle value={view} onChange={(next) => void setView(next)} />
+          ) : undefined
+        }
+        save={
+          <FittingSaveButton
+            onSave={() => void workspace.save()}
+            canSave={workspace.canSave}
+            saveBlockedReason={
+              activeCharacterId === null
+                ? t('fittings.myFittings.needCharacter')
+                : workspace.tooLargeToShare
+                  ? t('fittings.myFittings.tooLarge')
+                  : undefined
+            }
+            updating={workspace.savedId !== null}
+            onSaveToEve={() => setSaveToEveOpen(true)}
+            canSaveToEve={activeCharacterId !== null && canSaveToEve === true}
+            saveToEveBlockedReason={
+              activeCharacterId === null
+                ? t('fittings.saveToEve.needCharacter')
+                : canSaveToEve === false
+                  ? t('fittings.saveToEve.needPermission')
+                  : undefined
+            }
+            short={isPhone}
+          />
         }
       />
       {workspace.tooLargeToShare && (
@@ -436,14 +442,22 @@ export function Fittings() {
           <div className="space-y-3">
             <Tabs
               tabs={[
-                { id: 'fitting', label: t('fittings.phoneTabs.fitting') },
+                { id: 'ring', label: t('fittings.view.ring') },
+                { id: 'list', label: t('fittings.view.list') },
                 { id: 'stats', label: t('fittings.phoneTabs.stats') },
               ]}
-              value={phoneTab}
-              onChange={(id) => setPhoneTab(id as 'fitting' | 'stats')}
+              value={phoneTab === 'stats' ? 'stats' : view}
+              onChange={(id) => {
+                if (id === 'stats') {
+                  setPhoneTab('stats');
+                  return;
+                }
+                setPhoneTab('editor');
+                void setView(id as FittingView);
+              }}
               label={t('fittings.phoneTabs.label')}
             />
-            {phoneTab === 'fitting' ? editor : statsSections}
+            {phoneTab === 'stats' ? statsSections : editor}
           </div>
         ) : (
           <div

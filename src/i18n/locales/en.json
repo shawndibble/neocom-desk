@@ -268,10 +268,10 @@
       "myFittings": "My Fittings…",
       "inGame": "In-game Fittings…",
       "moreSave": "More save options",
+      "moreActions": "Fitting actions",
       "savedInMyFittings": "Saved in My Fittings"
     },
     "phoneTabs": {
-      "fitting": "Fitting",
       "stats": "Stats",
       "label": "Fitting sections"
     },
@@ -524,7 +524,11 @@
         "clone": "My clone",
         "fitting": "Fitting's"
       },
-      "editSet": "Edit set",
+      "editSet": "Edit Fitting's set",
+      "chipLabel": "Implants:",
+      "popoverTitle": "Implants in these stats",
+      "cloneExplain": "The implants in {{name}}'s current clone.",
+      "fittingExplain": "The implant set saved with this Fitting.",
       "modalTitle": "Implants & boosters",
       "implantsHeading": "Implants",
       "boostersHeading": "Boosters",

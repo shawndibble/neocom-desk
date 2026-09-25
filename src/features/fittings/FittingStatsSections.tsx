@@ -255,6 +255,8 @@ interface FittingStatsSectionsProps {
   overlay?: OverlayFitting;
   /** A line above the sections — whose skills the numbers are worked out under. */
   heading?: ReactNode;
+  /** The hull takes drones (`showsDrones`) — else there is no Drones section. */
+  showDrones?: boolean;
 }
 
 /**
@@ -274,6 +276,7 @@ export function FittingStatsSections({
   targetProfiles,
   overlay,
   heading,
+  showDrones = true,
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
   const profileName = useDamageProfileName()(damageProfiles.selected);
@@ -609,35 +612,36 @@ export function FittingStatsSections({
         )
       )}
 
-      {section(
-        'drones',
-        stats ? t('fittings.stats.weaponDps', { value: stats.droneDps.toFixed(1) }) : undefined,
-        stats ? (
-          <Facts
-            items={[
-              {
-                label: t('fittings.stats.fact.droneDps'),
-                value: stats.droneDps.toFixed(1),
-              },
-              {
-                label: t('fittings.stats.fact.bandwidth'),
-                value: t('fittings.stats.unit.bandwidth', {
-                  used: stats.droneBandwidthUsed.toFixed(0),
-                  total: stats.droneBandwidthTotal.toFixed(0),
-                }),
-              },
-              {
-                label: t('fittings.stats.fact.droneBay'),
-                value: t('fittings.stats.unit.cubicMetres', {
-                  value: stats.droneCapacity.toFixed(0),
-                }),
-              },
-            ]}
-          />
-        ) : (
-          placeholder
-        )
-      )}
+      {showDrones &&
+        section(
+          'drones',
+          stats ? t('fittings.stats.weaponDps', { value: stats.droneDps.toFixed(1) }) : undefined,
+          stats ? (
+            <Facts
+              items={[
+                {
+                  label: t('fittings.stats.fact.droneDps'),
+                  value: stats.droneDps.toFixed(1),
+                },
+                {
+                  label: t('fittings.stats.fact.bandwidth'),
+                  value: t('fittings.stats.unit.bandwidth', {
+                    used: stats.droneBandwidthUsed.toFixed(0),
+                    total: stats.droneBandwidthTotal.toFixed(0),
+                  }),
+                },
+                {
+                  label: t('fittings.stats.fact.droneBay'),
+                  value: t('fittings.stats.unit.cubicMetres', {
+                    value: stats.droneCapacity.toFixed(0),
+                  }),
+                },
+              ]}
+            />
+          ) : (
+            placeholder
+          )
+        )}
 
       {section(
         'fitting',

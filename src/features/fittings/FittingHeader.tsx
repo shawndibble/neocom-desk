@@ -7,11 +7,15 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  IconButton,
   TypeIcon,
 } from '@/components/ui';
-import { Expanded } from '@/components/ui/icons';
+import { Expanded, More } from '@/components/ui/icons';
 import type { Fitting } from '@/engine/fittings/types';
+import type { Appraisal } from '@/engine/market/appraisal';
 import type { LibraryTab } from './FittingLibrary';
+import { FittingExportItems, FittingExportMenu, FittingExportNotice } from './FittingExportMenu';
+import { useFittingExport } from './useFittingExport';
 
 interface FittingHeaderProps {
   fitting: Fitting;
@@ -20,43 +24,107 @@ interface FittingHeaderProps {
   /** In-game Fittings need a Character. */
   hasCharacter: boolean;
   onLibrary: (tab: LibraryTab) => void;
+  /** The Fitting's Jita price, for Export; null while it loads. */
+  price: Appraisal | null;
   /** What its numbers are worked out under — implants, missing skills. */
   context?: ReactNode;
-  /** View toggle, Export, Save — right-aligned after the Fittings menu. */
-  actions: ReactNode;
+  /** The Ring | List switch — absent where the page's tabs carry it. */
+  view?: ReactNode;
+  save: ReactNode;
+  /**
+   * Below desktop: identity and Save on the first line, the Fittings menu and
+   * Export folded into one ⋮ menu beside them, what the numbers assume below.
+   */
+  compact?: boolean;
 }
 
 /**
  * The open Fitting's header, one row as in mockup A (scope decision
  * `20260924-215855`): what the Fitting is, what its numbers assume, then
  * its controls — a Fittings menu for opening a different one (new from a
- * hull, Import, My Fittings, In-game), the view, Export and Save. On a
- * narrow screen the groups wrap onto their own lines.
+ * hull, Import, My Fittings, In-game), the view, Export and Save.
  */
 export function FittingHeader({
   fitting,
   subtitle,
   hasCharacter,
   onLibrary,
+  price,
   context,
-  actions,
+  view,
+  save,
+  compact = false,
 }: FittingHeaderProps) {
   const { t } = useTranslation();
+  const exportActions = useFittingExport(fitting);
+
+  const identity = (
+    <div
+      className={`flex min-w-0 flex-1 items-center gap-3 ${compact ? '' : 'md:min-w-48 md:flex-none'}`}
+    >
+      <TypeIcon
+        typeId={fitting.shipTypeId}
+        size={64}
+        width={compact ? 40 : 44}
+        height={compact ? 40 : 44}
+        className="shrink-0 border border-line"
+      />
+      <div className="min-w-0">
+        <h1 className="truncate text-lg font-semibold">{fitting.name}</h1>
+        {subtitle && <p className="truncate text-xs text-text-dim">{subtitle}</p>}
+      </div>
+    </div>
+  );
+
+  const libraryItems = (
+    <>
+      <DropdownMenuItem onSelect={() => onLibrary('new')}>
+        {t('fittings.header.newFromHull')}
+      </DropdownMenuItem>
+      <DropdownMenuItem onSelect={() => onLibrary('import')}>
+        {t('fittings.header.import')}
+      </DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onSelect={() => onLibrary('mine')}>
+        {t('fittings.header.myFittings')}
+      </DropdownMenuItem>
+      {hasCharacter && (
+        <DropdownMenuItem onSelect={() => onLibrary('ingame')}>
+          {t('fittings.header.inGame')}
+        </DropdownMenuItem>
+      )}
+    </>
+  );
+
+  if (compact) {
+    return (
+      <div className="space-y-2 rounded-xs border border-line bg-panel/85 p-2 backdrop-blur-sm">
+        <div className="flex items-center gap-2">
+          {identity}
+          {save}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton icon={<More />} label={t('fittings.header.moreActions')} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-56">
+              {libraryItems}
+              <DropdownMenuSeparator />
+              <p className="px-2 pt-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('fittings.export.button')}
+              </p>
+              <FittingExportItems actions={exportActions} price={price} />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <FittingExportNotice notice={exportActions.notice} />
+        {context && <div className="flex flex-wrap items-center gap-2">{context}</div>}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xs border border-line bg-panel/85 px-3 py-2 backdrop-blur-sm">
-      <div className="flex min-w-48 items-center gap-3">
-        <TypeIcon
-          typeId={fitting.shipTypeId}
-          size={64}
-          width={44}
-          height={44}
-          className="border border-line"
-        />
-        <div className="min-w-0">
-          <h1 className="truncate text-lg font-semibold">{fitting.name}</h1>
-          {subtitle && <p className="truncate text-xs text-text-dim">{subtitle}</p>}
-        </div>
-      </div>
+      {identity}
       {context && <div className="flex flex-wrap items-center gap-3">{context}</div>}
       <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
         <DropdownMenu>
@@ -67,24 +135,12 @@ export function FittingHeader({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-56">
-            <DropdownMenuItem onSelect={() => onLibrary('new')}>
-              {t('fittings.header.newFromHull')}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onLibrary('import')}>
-              {t('fittings.header.import')}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => onLibrary('mine')}>
-              {t('fittings.header.myFittings')}
-            </DropdownMenuItem>
-            {hasCharacter && (
-              <DropdownMenuItem onSelect={() => onLibrary('ingame')}>
-                {t('fittings.header.inGame')}
-              </DropdownMenuItem>
-            )}
+            {libraryItems}
           </DropdownMenuContent>
         </DropdownMenu>
-        {actions}
+        {view}
+        <FittingExportMenu fitting={fitting} price={price} />
+        {save}
       </div>
     </div>
   );

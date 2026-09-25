@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   alignTimeSeconds,
+  showsDrones,
   extractFittingStats,
   extractModuleResult,
   extractOffense,
@@ -430,5 +431,28 @@ describe('alignTimeSeconds', () => {
   it('is zero for a massless or inertia-free ship rather than NaN', () => {
     expect(alignTimeSeconds(0, 0.5)).toBe(0);
     expect(alignTimeSeconds(1_000_000, 0)).toBe(0);
+  });
+});
+
+describe('showsDrones', () => {
+  const corax = { droneCapacity: 0, droneBandwidthTotal: 0 };
+  const tristan = { droneCapacity: 40, droneBandwidthTotal: 25 };
+
+  it('is true for a hull with a drone bay or drone bandwidth', () => {
+    expect(showsDrones(tristan, 0)).toBe(true);
+    expect(showsDrones({ droneCapacity: 25, droneBandwidthTotal: 0 }, 0)).toBe(true);
+  });
+
+  it('is false for a hull with neither', () => {
+    expect(showsDrones(corax, 0)).toBe(false);
+  });
+
+  it('stays true while drones are fitted, so a pasted fit’s drones can still be removed', () => {
+    expect(showsDrones(corax, 2)).toBe(true);
+  });
+
+  it('waits for the ship data before offering drones, rather than flashing them', () => {
+    expect(showsDrones(null, 0)).toBe(false);
+    expect(showsDrones(null, 1)).toBe(true);
   });
 });
