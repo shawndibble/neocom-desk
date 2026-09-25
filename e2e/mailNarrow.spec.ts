@@ -17,7 +17,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
-import { CHARACTER_ID } from './support/fixtureData';
+import { CHARACTER_ID, CHARACTER_NAME } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
 
@@ -89,4 +89,13 @@ test('reading pane: last line of a long mail is reachable above the fixed tab ba
   expect(markerBox).not.toBeNull();
   expect(tabBarBox).not.toBeNull();
   expect(markerBox!.y + markerBox!.height).toBeLessThanOrEqual(tabBarBox!.y);
+});
+
+// Issue #1765: below `md` only Overview said whose data you were looking at.
+test('PageHeader carries an identity avatar linking to /characters at 390px', async ({ page }) => {
+  await page.setViewportSize(PHONE);
+  await signInAndGoto(page, './mail');
+  const avatar = page.getByRole('link', { name: `${CHARACTER_NAME}, switch character` });
+  await expect(avatar).toBeVisible();
+  await expect(avatar).toHaveAttribute('href', /\/characters$/);
 });
