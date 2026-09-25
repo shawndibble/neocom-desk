@@ -13,6 +13,7 @@ import {
   moveModule,
   newFitting,
   removeModule,
+  setCargoQuantity,
   setDroneCountWithinBay,
   setDroneCounts,
   setModuleCharge,
@@ -342,5 +343,44 @@ describe('droneTotals', () => {
       cargo: [],
     };
     expect(droneTotals(fit)).toEqual({ inSpace: 2, inBay: 4 });
+  });
+});
+
+describe('setCargoQuantity', () => {
+  const withCargo: Fitting = {
+    ...base,
+    cargo: [
+      { typeId: 209, quantity: 1500 },
+      { typeId: 3001, quantity: 1 },
+    ],
+  };
+
+  it('sets a cargo type’s quantity in place, whole numbers only', () => {
+    const next = setCargoQuantity(withCargo, 209, 250.7);
+    expect(next.cargo).toEqual([
+      { typeId: 209, quantity: 250 },
+      { typeId: 3001, quantity: 1 },
+    ]);
+    expect(withCargo.cargo[0].quantity).toBe(1500);
+  });
+
+  it('removes the type at zero or below', () => {
+    expect(setCargoQuantity(withCargo, 209, 0).cargo).toEqual([{ typeId: 3001, quantity: 1 }]);
+    expect(setCargoQuantity(withCargo, 3001, -4).cargo).toEqual([{ typeId: 209, quantity: 1500 }]);
+  });
+
+  it('folds several stacks of one type into its first', () => {
+    const split: Fitting = {
+      ...base,
+      cargo: [
+        { typeId: 209, quantity: 100 },
+        { typeId: 3001, quantity: 1 },
+        { typeId: 209, quantity: 50 },
+      ],
+    };
+    expect(setCargoQuantity(split, 209, 400).cargo).toEqual([
+      { typeId: 209, quantity: 400 },
+      { typeId: 3001, quantity: 1 },
+    ]);
   });
 });

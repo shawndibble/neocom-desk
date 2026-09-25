@@ -117,11 +117,16 @@ const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
  * the point of pinning in `package.json` is to have exactly one place the
  * version lives.
  *
+ * It runs in `configResolved`, not `buildStart`: the dev server takes its
+ * list of `public/` files before `buildStart` fires, so a file copied there
+ * on a fresh checkout's first `vite dev` was answered with the SPA's HTML
+ * page until the server restarted.
+ *
  * The copy is a no-op once the destination already has a same-size file:
- * `buildStart` fires for `vite dev` as well as `vite build`, and e2e boots
+ * `configResolved` fires for `vite dev` as well as `vite build`, and e2e boots
  * both a `vite build` preview *and* a `vite dev` server against the same
  * checkout (`playwright.config.ts`'s `built`/`dev` projects) — an
- * unconditional copy on the second `buildStart` would touch these files'
+ * unconditional copy on the second start would touch these files'
  * mtimes after `npm run build` already ran, and `scripts/e2e-preview.mjs`
  * treats all of `public/` as a build input, so it would then see `public` as
  * newer than `dist` and refuse to start, thinking the bundle was stale.
@@ -135,7 +140,7 @@ function copyDogmaEngineAssets() {
   ];
   return {
     name: 'neocom-dogma-engine-assets',
-    buildStart() {
+    configResolved() {
       const destDir = join(process.cwd(), 'public', 'vendor', 'dogma');
       mkdirSync(destDir, { recursive: true });
       for (const [pkgPath, destName] of copies) {

@@ -113,13 +113,15 @@ export default function ProductionProfitChart({ points, trend }: ProductionProfi
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <DataTable
-        columns={columns}
-        rows={points}
-        rowKey={(p) => p.date}
-        label={t('industry.profitHistoryChartLabel')}
-        className="sr-only"
-      />
+      {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
+      <div className="sr-only">
+        <DataTable
+          columns={columns}
+          rows={points}
+          rowKey={(p) => p.date}
+          label={t('industry.profitHistoryChartLabel')}
+        />
+      </div>
     </div>
   );
 }

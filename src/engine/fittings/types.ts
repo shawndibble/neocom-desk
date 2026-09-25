@@ -296,10 +296,13 @@ export const DOGMA_ATTRIBUTE = {
   armorExplosiveResonance: 268,
   armorKineticResonance: 269,
   armorThermalResonance: 270,
-  hullEmResonance: 974,
-  hullExplosiveResonance: 975,
-  hullKineticResonance: 976,
-  hullThermalResonance: 977,
+  // The ship's own structure resists (`emDamageResonance` and siblings). Not
+  // 974-977 (`hullEmDamageResonance`…): those are the modifiers a Damage
+  // Control carries, and a ship reads them as their default of 1.
+  hullEmResonance: 113,
+  hullExplosiveResonance: 111,
+  hullKineticResonance: 109,
+  hullThermalResonance: 110,
   maxTargetRange: 76,
   maxLockedTargets: 192,
   scanResolution: 564,

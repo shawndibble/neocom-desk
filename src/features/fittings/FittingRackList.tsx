@@ -9,6 +9,7 @@ import {
   setDroneCountWithinBay,
   type DroneBay,
   removeModule,
+  setCargoQuantity,
   setDroneCounts,
   setModuleCharge,
   setModuleState,
@@ -151,10 +152,12 @@ export function ModuleRow({
   const shipTypeId = fitting.shipTypeId;
 
   // Offer only states the module can reach — every state until its own
-  // calculation says otherwise — plus whatever it's set to now.
+  // calculation says otherwise — and show the one it reached: a pasted fit
+  // asks for "active" everywhere, which a passive module or rig runs online.
   const maxState = result?.maxState ?? 'overload';
+  const shownState = result?.state ?? module.state;
   const states = STATES.slice(0, STATES.indexOf(maxState) + 1);
-  if (!states.includes(module.state)) states.push(module.state);
+  if (!states.includes(shownState)) states.push(shownState);
 
   const chargeGroupIds = result?.chargeGroupIds;
   const charges = useMemo(() => {
@@ -192,7 +195,7 @@ export function ModuleRow({
         size="sm"
         className="w-28 shrink-0"
         aria-label={t('fittings.edit.stateLabel', { name })}
-        value={module.state}
+        value={shownState}
         onChange={(event) =>
           edit((f) => setModuleState(f, slot, slotIndex, event.target.value as FittingItemState))
         }
@@ -287,20 +290,23 @@ function SlotCard({
 }
 
 /**
- * A drone count box. Keeps what's being typed as a local draft, so the box
- * can be emptied on the way to a new number instead of snapping back; each
- * complete number is committed as it's typed — capped at `max` (what the
- * drone bay holds), and a number over it shows as the cap.
+ * A drone or cargo count box. Keeps what's being typed as a local draft, so
+ * the box can be emptied on the way to a new number instead of snapping back;
+ * each complete number is committed as it's typed — capped at `max` (what the
+ * drone bay holds), and a number over it shows as the cap. With `min`, a
+ * number below it stays a draft rather than being committed.
  */
-function DroneCountInput({
+function CountInput({
   label,
   value,
-  max,
+  max = Number.POSITIVE_INFINITY,
+  min = 0,
   onCommit,
 }: {
   label: string;
   value: number;
-  max: number;
+  max?: number;
+  min?: number;
   onCommit: (count: number) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
@@ -309,14 +315,14 @@ function DroneCountInput({
       {label}
       <TextInput
         type="number"
-        min={0}
+        min={min}
         max={Number.isFinite(max) ? max : undefined}
         size="sm"
         className="w-16"
         value={draft ?? String(value)}
         onChange={(event) => {
           const raw = event.target.value;
-          if (raw === '' || !Number.isFinite(Number(raw))) {
+          if (raw === '' || !Number.isFinite(Number(raw)) || Number(raw) < min) {
             setDraft(raw);
             return;
           }
@@ -506,7 +512,7 @@ export function DroneSection({
                 edit((f) => setDroneCounts(f, group.typeId, { inSpace: 0, inBay: 0 }))
               }
             >
-              <DroneCountInput
+              <CountInput
                 label={t('fittings.edit.inSpace')}
                 value={group.inSpace}
                 max={droneCountMax(fitting, group.typeId, 'inSpace', bay)}
@@ -517,7 +523,7 @@ export function DroneSection({
                   )
                 }
               />
-              <DroneCountInput
+              <CountInput
                 label={t('fittings.edit.inBay')}
                 value={group.inBay}
                 max={droneCountMax(fitting, group.typeId, 'inBay', bay)}
@@ -646,6 +652,43 @@ export function FittingRackList({
           onSelectTarget={onSelectTarget}
           onShowInfo={onShowInfo}
         />
+
+        {/* What a pasted fit carries besides its slots and drones: ammo, filaments, a depot. */}
+        {fitting.cargo.length > 0 && (
+          <div>
+            <p className={RACK_LABEL_CLASS}>{t('fittings.list.cargo')}</p>
+            <div className="space-y-1.5">
+              {fitting.cargo.map((item) => {
+                const name = catalogueTypeName(catalogue, item.typeId);
+                return (
+                  <SlotCard
+                    key={item.typeId}
+                    identity={
+                      <>
+                        <TypeIcon typeId={item.typeId} size={32} width={24} height={24} />
+                        <SlotName typeId={item.typeId} name={name} onShowInfo={onShowInfo} />
+                      </>
+                    }
+                    removeLabel={t('fittings.edit.remove', { name })}
+                    onRemove={() => edit((f) => setCargoQuantity(f, item.typeId, 0))}
+                  >
+                    <CountInput
+                      label={t('fittings.edit.quantity')}
+                      value={item.quantity}
+                      min={1}
+                      onCommit={(quantity) =>
+                        edit(
+                          (f) => setCargoQuantity(f, item.typeId, quantity),
+                          `cargo-${item.typeId}`
+                        )
+                      }
+                    />
+                  </SlotCard>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </Panel>
   );

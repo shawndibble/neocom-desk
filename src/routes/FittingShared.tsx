@@ -176,7 +176,11 @@ export function FittingShared() {
 
       {state.status === 'ready' && (
         <>
-          <FittingRing fitting={state.fitting} stats={stats} />
+          <FittingRing
+            fitting={state.fitting}
+            stats={stats}
+            moduleResults={stats?.modules ?? null}
+          />
           <FittingStatsSections
             stats={stats}
             statsProgress={statsProgress}

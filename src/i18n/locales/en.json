@@ -164,6 +164,7 @@
       "cantUse": "Can't use",
       "variationsFor": "Variations of {{name}}",
       "drones": "Drones",
+      "cargo": "Cargo",
       "rack": {
         "high": "High slots",
         "medium": "Mid slots",
@@ -197,6 +198,11 @@
       "readoutPowergrid": "{{used}} / {{total}} MW",
       "readoutCalibration": "{{used}} / {{total}}",
       "readoutDroneBandwidth": "{{used}} / {{total}} Mbit/s",
+      "gauge": "{{label}}: {{value}} ({{percent}}%)",
+      "gaugeOver": "{{label}}: {{value}} ({{percent}}%), over by {{amount}}",
+      "gaugeLoading": "{{label}}: calculating…",
+      "droneTile": "{{name}}: {{inSpace}} in space, {{inBay}} in bay",
+      "cargoTile": "{{name}} ×{{quantity}}",
       "rackHint": "Tap a rack to edit its slots",
       "droneCount": "{{inSpace}} launched · {{inBay}} in bay",
       "rackCount": "{{fitted}} / {{total}}",
@@ -213,6 +219,7 @@
       "addDrones": "Add drones",
       "inSpace": "In space",
       "inBay": "In bay",
+      "quantity": "Quantity",
       "slotsWaitForShipData": "Empty slots appear once the ship data has downloaded."
     },
     "add": {

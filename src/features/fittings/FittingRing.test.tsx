@@ -128,6 +128,72 @@ describe('FittingRing', () => {
     expect(container.querySelectorAll('.flash-danger')).toHaveLength(1);
     expect(container.querySelector('path.stroke-danger')).not.toBeNull();
   });
+
+  it('draws CPU and powergrid as their own rim bands, each naming its numbers on hover', async () => {
+    const { container } = render(<FittingRing fitting={fitting} stats={statsWith(25)} />);
+    const cpu = container.querySelector('[data-gauge="cpu"]')!;
+    const powergrid = container.querySelector('[data-gauge="powergrid"]')!;
+    expect(cpu).not.toBeNull();
+    expect(powergrid).not.toBeNull();
+    // Told apart by form, not only by side: powergrid's band is dashed.
+    expect(powergrid.querySelector('path[stroke-dasharray]')).not.toBeNull();
+    expect(cpu.querySelector('path[stroke-dasharray]')).toBeNull();
+
+    fireEvent.pointerMove(cpu, { pointerType: 'mouse' });
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('CPU: 25.0 / 100.0 tf (25%)');
+  });
+
+  it('says how far over budget in the band’s tooltip', async () => {
+    const { container } = render(<FittingRing fitting={fitting} stats={statsWith(112.5)} />);
+    fireEvent.pointerMove(container.querySelector('[data-gauge="cpu"]')!, {
+      pointerType: 'mouse',
+    });
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'CPU: 112.5 / 100.0 tf (113%), over by 12.5'
+    );
+  });
+
+  it('names the state a module actually reached, not the one a paste asked for', () => {
+    render(
+      <FittingRing
+        fitting={fitting}
+        stats={statsWith(10)}
+        moduleResults={[
+          { state: 'active', maxState: 'overload', chargeGroupIds: [] },
+          { state: 'online', maxState: 'online', chargeGroupIds: [] },
+        ]}
+      />
+    );
+    expect(screen.getByLabelText('Low slots 1, online')).toBeTruthy();
+  });
+
+  it('marks the slot the Add panel is filling', () => {
+    render(
+      <FittingRing
+        fitting={fitting}
+        stats={statsWith(10)}
+        selectedSlot={{ rack: 'high', index: 1 }}
+      />
+    );
+    expect(screen.getByLabelText('High slots 2, empty')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByLabelText('High slots 3, empty')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('lists the drones and cargo beneath the ring, with their counts', () => {
+    render(
+      <FittingRing
+        fitting={{
+          ...fitting,
+          drones: [{ typeId: 2488, quantity: 3, state: 'online' }],
+          cargo: [{ typeId: 209, quantity: 1535 }],
+        }}
+        stats={{ ...statsWith(10), droneCapacity: 100, droneBandwidthTotal: 20 }}
+        typeName={(typeId) => ({ 2488: 'Warrior II', 209: 'Scourge Heavy Missile' })[typeId] ?? ''}
+      />
+    );
+    expect(screen.getByLabelText('Warrior II: 0 in space, 3 in bay')).toBeTruthy();
+    expect(screen.getByLabelText('Scourge Heavy Missile ×1,535')).toHaveTextContent('1.5K');
+  });
 });
 
 describe('resolveFittingView', () => {

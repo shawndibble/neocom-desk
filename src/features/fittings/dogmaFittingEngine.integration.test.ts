@@ -134,7 +134,7 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
 
     const calculation = calculate(dogmaFit);
     const stats = extractFittingStats(
-      dogmaFit.items.map((item) => item.type_id),
+      dogmaFit.items,
       calculation.ship.attributes,
       calculation.items
     );
@@ -155,7 +155,7 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
 
     const calculation = calculate(dogmaFit);
     const stats = extractFittingStats(
-      dogmaFit.items.map((item) => item.type_id),
+      dogmaFit.items,
       calculation.ship.attributes,
       calculation.items
     );
@@ -177,7 +177,7 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
 
     const calculation = calculate(dogmaFit);
     const stats = extractFittingStats(
-      dogmaFit.items.map((item) => item.type_id),
+      dogmaFit.items,
       calculation.ship.attributes,
       calculation.items
     );
@@ -193,7 +193,7 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
 
     const calculation = calculate(dogmaFit);
     const stats = extractFittingStats(
-      dogmaFit.items.map((item) => item.type_id),
+      dogmaFit.items,
       calculation.ship.attributes,
       calculation.items
     );
@@ -202,6 +202,46 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     // The rest of the fit still calculated — same as the clean-fit case above.
     expect(stats.cpuTotal).toBeCloseTo(437.5, 6);
     expect(stats.droneDps).toBeCloseTo(124.578, 2);
+  });
+
+  it('never marks cargo as unknown — the engine calculates nothing for it, known or not', () => {
+    const fitting = vexorNavyIssueFit();
+    fitting.cargo = [{ typeId: ANTIMATTER_CHARGE_M, quantity: 1000 }];
+    const profile = buildAllVProfile(ALL_TEST_SKILL_IDS);
+    const dogmaFit = fittingToDogmaFit(fitting, profile);
+
+    const calculation = calculate(dogmaFit);
+    const stats = extractFittingStats(
+      dogmaFit.items,
+      calculation.ship.attributes,
+      calculation.items
+    );
+
+    expect(stats.unknownItemTypeIds).toEqual([]);
+  });
+
+  it("reads the hull's own resists, not the Damage Control modifier attributes", () => {
+    // A bare Rifter: every hull since 2021 has a flat 33% structure resist.
+    const fitting: Fitting = {
+      name: 'Bare Rifter',
+      shipTypeId: RIFTER,
+      modules: [],
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(ALL_TEST_SKILL_IDS));
+
+    const calculation = calculate(dogmaFit);
+    const stats = extractFittingStats(
+      dogmaFit.items,
+      calculation.ship.attributes,
+      calculation.items
+    );
+
+    expect(stats.hull.emResonance).toBeCloseTo(0.67, 4);
+    expect(stats.hull.thermalResonance).toBeCloseTo(0.67, 4);
+    expect(stats.hull.kineticResonance).toBeCloseTo(0.67, 4);
+    expect(stats.hull.explosiveResonance).toBeCloseTo(0.67, 4);
   });
 
   it('breaks Offense into per-weapon rows that sum to the engine total, overheated from its overload state', () => {
@@ -263,7 +303,7 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
 
     const calculation = calculate(dogmaFit);
     const stats = extractFittingStats(
-      dogmaFit.items.map((item) => item.type_id),
+      dogmaFit.items,
       calculation.ship.attributes,
       calculation.items
     );

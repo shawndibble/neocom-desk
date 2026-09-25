@@ -239,13 +239,15 @@ export default function MiningYieldCharts({
           </ResponsiveContainer>
         </div>
         {/* A sibling of the `role="img"` box, never a child — see WalletBalanceChart. */}
-        <DataTable
-          columns={rateColumns}
-          rows={dailyRate}
-          rowKey={(point) => point.date}
-          label={t('miningTax.overview.rateChartTitle')}
-          className="sr-only"
-        />
+        {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
+        <div className="sr-only">
+          <DataTable
+            columns={rateColumns}
+            rows={dailyRate}
+            rowKey={(point) => point.date}
+            label={t('miningTax.overview.rateChartTitle')}
+          />
+        </div>
         <ul className="mt-1 flex flex-wrap gap-x-3.5 text-[0.6875rem] text-text-dim">
           {LEGEND_SOURCES.map((source) => (
             <li key={source} className="flex items-center gap-1">
@@ -319,13 +321,15 @@ export default function MiningYieldCharts({
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <DataTable
-          columns={compareColumns}
-          rows={typeComparison}
-          rowKey={(point) => point.typeId}
-          label={compareChartTitle}
-          className="sr-only"
-        />
+        {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
+        <div className="sr-only">
+          <DataTable
+            columns={compareColumns}
+            rows={typeComparison}
+            rowKey={(point) => point.typeId}
+            label={compareChartTitle}
+          />
+        </div>
         {!showRefining && (
           <p className="mt-1 text-[0.6875rem] text-text-dim">
             {t('miningTax.overview.refiningHiddenNote')}

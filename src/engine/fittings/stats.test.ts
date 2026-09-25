@@ -69,13 +69,53 @@ describe('extractFittingStats', () => {
   });
 
   it('collects the type ids of items the engine returned empty attributes for', () => {
-    const stats = extractFittingStats([4405, 999999999, 2488], attrs({}), [
-      { attributes: new Map([[1, { value: 1 }]]) },
-      { attributes: new Map() },
-      { attributes: new Map([[2, { value: 1 }]]) },
-    ]);
+    const stats = extractFittingStats(
+      [
+        { type_id: 4405, slot: { type: 'low' } },
+        { type_id: 999999999, slot: { type: 'rig' } },
+        { type_id: 2488, slot: { type: 'drone_bay' } },
+      ],
+      attrs({}),
+      [
+        { attributes: new Map([[1, { value: 1 }]]) },
+        { attributes: new Map() },
+        { attributes: new Map([[2, { value: 1 }]]) },
+      ]
+    );
 
     expect(stats.unknownItemTypeIds).toEqual([999999999]);
+  });
+
+  it('never counts cargo as unknown, since the engine calculates nothing for it', () => {
+    const stats = extractFittingStats([{ type_id: 209, slot: { type: 'cargo' } }], attrs({}), [
+      { attributes: new Map() },
+    ]);
+
+    expect(stats.unknownItemTypeIds).toEqual([]);
+  });
+
+  it("reads hull resists from the ship's own resonance ids (EM 113, thermal 110, kinetic 109, explosive 111)", () => {
+    // Literal ids, not DOGMA_ATTRIBUTE: a fixture built from the constants
+    // under test would agree with a wrong constant.
+    const ship = new Map([
+      [113, { value: 0.67 }],
+      [110, { value: 0.6 }],
+      [109, { value: 0.5 }],
+      [111, { value: 0.4 }],
+      [974, { value: 1 }],
+      [975, { value: 1 }],
+      [976, { value: 1 }],
+      [977, { value: 1 }],
+    ]);
+
+    const stats = extractFittingStats([], ship, []);
+
+    expect(stats.hull).toMatchObject({
+      emResonance: 0.67,
+      thermalResonance: 0.6,
+      kineticResonance: 0.5,
+      explosiveResonance: 0.4,
+    });
   });
 
   it('treats every attribute as 0 when the ship result carries none at all', () => {
