@@ -443,6 +443,17 @@ describe('launchDrones', () => {
     ).toEqual([{ typeId: 2185, inSpace: 2, inBay: 1 }]);
   });
 
+  it('keeps a drone of unknown (infinite) bandwidth in the bay', () => {
+    const fit = carrying([{ typeId: 9999, quantity: 3, state: 'online' }]);
+    expect(
+      launchDrones(fit, {
+        bandwidthTotal: 125,
+        maxActive: 5,
+        bandwidthOf: () => Number.POSITIVE_INFINITY,
+      })
+    ).toBe(fit);
+  });
+
   it('returns the same Fitting when nothing can launch', () => {
     const fit = carrying([{ typeId: 2185, quantity: 2, state: 'online' }]);
     expect(launchDrones(fit, { bandwidthTotal: 5, maxActive: 5, bandwidthOf })).toBe(fit);

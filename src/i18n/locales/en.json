@@ -308,7 +308,8 @@
       },
       "downloaded": {
         "eveXml": "Fitting XML downloaded"
-      }
+      },
+      "downloadFailed": "Couldn't make the file."
     },
     "stats": {
       "error": "Couldn't load ship data for this fit.",

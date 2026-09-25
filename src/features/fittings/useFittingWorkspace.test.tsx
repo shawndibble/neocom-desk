@@ -28,10 +28,13 @@ vi.mock('@/sde/loadSde', () => ({
 }));
 vi.mock('@/sync', () => ({ scheduleSync: vi.fn(), markFittingDeleted: vi.fn() }));
 vi.mock('./fittingPrice', () => ({ loadFittingPrice: async () => null }));
+// Stats land once this resolves; a test holds it to act before they do.
+const statsGate = vi.hoisted(() => ({ wait: Promise.resolve() as Promise<void> }));
 vi.mock('./dogmaFittingEngine', () => ({
   isDogmaEngineReady: () => false,
-  computeFittingStats: async (fitting: Fitting) =>
-    ({
+  computeFittingStats: async (fitting: Fitting) => {
+    await statsGate.wait;
+    return {
       // A light drone draws 5 Mbit/s; the hull has room for four, the pilot controls five.
       droneBandwidthTotal: 20,
       maxActiveDrones: 5,
@@ -41,7 +44,8 @@ vi.mock('./dogmaFittingEngine', () => ({
         maxState: 'online',
         chargeGroupIds: [],
       })),
-    }) as unknown as FittingStats,
+    } as unknown as FittingStats;
+  },
 }));
 
 const RIFTER: Fitting = {
@@ -252,5 +256,44 @@ describe('useFittingWorkspace — drones on Load', () => {
     const view = await renderAt(RIFTER);
     await waitFor(() => expect(view.result.current.workspace.stats).not.toBeNull());
     expect(view.result.current.workspace.fitting?.drones).toEqual(RIFTER.drones);
+  });
+});
+
+describe('useFittingWorkspace — drone launch edge cases', () => {
+  const BAY_ONLY: Fitting = {
+    name: 'Rifter',
+    shipTypeId: 587,
+    modules: [],
+    drones: [{ typeId: 2454, quantity: 6, state: 'online' }],
+    cargo: [],
+  };
+  const PASTE = ['[Rifter, Again]', '', 'Hobgoblin I x6'].join('\n');
+
+  it('launches a Load identical to the Fitting already open, whose URL does not change', async () => {
+    const view = await renderAt(BAY_ONLY);
+    await waitFor(() => expect(view.result.current.workspace.stats).not.toBeNull());
+    await act(() => view.result.current.workspace.loadFromInput(PASTE));
+    await waitFor(() =>
+      expect(droneGroups(view.result.current.workspace.fitting!)).toEqual([
+        { typeId: 2454, inSpace: 4, inBay: 2 },
+      ])
+    );
+  });
+
+  it('does not launch after a Save made before the stats arrived, so the record matches the screen', async () => {
+    useActiveCharacter.setState({ activeCharacterId: 90000001 });
+    const view = await renderAt(RIFTER);
+    let release = () => {};
+    statsGate.wait = new Promise<void>((resolve) => (release = resolve));
+    await act(() => view.result.current.workspace.loadFromInput(PASTE));
+    await waitFor(() =>
+      expect(view.result.current.workspace.fitting?.drones).toEqual(BAY_ONLY.drones)
+    );
+    await act(() => view.result.current.workspace.save());
+    await act(async () => release());
+    await waitFor(() => expect(view.result.current.workspace.stats).not.toBeNull());
+    expect(view.result.current.workspace.fitting?.drones).toEqual(BAY_ONLY.drones);
+    statsGate.wait = Promise.resolve();
+    useActiveCharacter.setState({ activeCharacterId: null });
   });
 });

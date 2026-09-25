@@ -137,9 +137,14 @@ export function fittingToEveXml(fitting: Fitting, nameFor: ItemNameFor): string 
       lines.push(hardware(`slot="${slot}" type="${xmlAttr(nameFor(module.typeId))}"`));
     }
   }
+  // One line per drone type: the file has no in-space/in-bay split to keep.
+  const drones = new Map<number, number>();
   for (const drone of fitting.drones) {
-    const type = xmlAttr(nameFor(drone.typeId));
-    lines.push(hardware(`qty="${drone.quantity}" slot="drone bay" type="${type}"`));
+    drones.set(drone.typeId, (drones.get(drone.typeId) ?? 0) + drone.quantity);
+  }
+  for (const [typeId, quantity] of drones) {
+    const type = xmlAttr(nameFor(typeId));
+    lines.push(hardware(`qty="${quantity}" slot="drone bay" type="${type}"`));
   }
   const cargo = new Map<number, number>();
   const carry = (typeId: number, quantity: number) =>

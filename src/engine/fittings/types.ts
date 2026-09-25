@@ -332,14 +332,9 @@ export const DOGMA_ATTRIBUTE = {
   subsystemSlots: 1367,
 } as const;
 
-/**
- * Item-level (not ship-level) dogma attributes this seam reads off a fitted
- * item's own calculation result — a rig's calibration cost and a drone's
- * bandwidth draw are per-item, so unlike everything in `DOGMA_ATTRIBUTE`
- * there is no single ship-level "used" total to read; it's summed from these
- * across whichever items actually draw it (rigs; active/online drones).
- * Verified 2026-09-24 against a live run of the pinned engine.
- */
+/** What a failed stats calculation was about: the pilot's skills, or the ship data and its calculation. */
+export type StatsErrorReason = 'skills' | 'shipData';
+
 /**
  * Read off the calculation's character result: "Max Active Drones", which
  * the Drones skill raises by one a level. Verified 2026-09-25 against the
@@ -349,6 +344,14 @@ export const CHARACTER_DOGMA_ATTRIBUTE = {
   maxActiveDrones: 352,
 } as const;
 
+/**
+ * Item-level (not ship-level) dogma attributes this seam reads off a fitted
+ * item's own calculation result — a rig's calibration cost and a drone's
+ * bandwidth draw are per-item, so unlike everything in `DOGMA_ATTRIBUTE`
+ * there is no single ship-level "used" total to read; it's summed from these
+ * across whichever items actually draw it (rigs; active/online drones).
+ * Verified 2026-09-24 against a live run of the pinned engine.
+ */
 export const ITEM_DOGMA_ATTRIBUTE = {
   calibrationCost: 1153,
   droneBandwidthNeeded: 1272,

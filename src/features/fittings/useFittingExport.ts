@@ -50,7 +50,7 @@ export function useFittingExport(fitting: Fitting) {
       downloadTextFile(filename, text, 'application/xml;charset=utf-8');
       setNotice(t('fittings.export.downloaded.eveXml'));
     } catch {
-      setNotice(t('fittings.export.copyFailed'));
+      setNotice(t('fittings.export.downloadFailed'));
     }
   }
 

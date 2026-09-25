@@ -13,6 +13,7 @@ import type {
   FittingStats,
   LocalRepair,
   Resonances,
+  StatsErrorReason,
 } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import type { DogmaAssetProgress } from './dogmaFittingEngine';
@@ -273,7 +274,7 @@ interface FittingStatsSectionsProps {
   statsProgress: DogmaAssetProgress | null;
   statsError: boolean;
   /** What failed, when `statsError`: the pilot's skills, or the ship data / calculation. */
-  statsErrorReason?: 'skills' | 'shipData';
+  statsErrorReason?: StatsErrorReason;
   /** Tries the failed load again; without it the error has no retry. */
   onRetry?: () => void;
   price: Appraisal | null;

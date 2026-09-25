@@ -225,15 +225,25 @@ export interface DroneLaunchLimits {
  */
 export function launchDrones(fitting: Fitting, limits: DroneLaunchLimits): Fitting {
   const groups = droneGroups(fitting);
+  // Only drones already out draw bandwidth — and skipping the rest keeps an
+  // unknown (infinite) one in the bay from turning the sum into NaN.
   let bandwidthLeft =
     limits.bandwidthTotal -
-    groups.reduce((sum, group) => sum + group.inSpace * limits.bandwidthOf(group.typeId), 0);
+    groups.reduce(
+      (sum, group) =>
+        group.inSpace > 0 ? sum + group.inSpace * limits.bandwidthOf(group.typeId) : sum,
+      0
+    );
   let countLeft = limits.maxActive - groups.reduce((sum, group) => sum + group.inSpace, 0);
   let next = fitting;
   for (const group of groups) {
     if (countLeft <= 0) break;
     const each = limits.bandwidthOf(group.typeId);
-    const byBandwidth = each > 0 ? Math.floor(bandwidthLeft / each) : Number.POSITIVE_INFINITY;
+    const byBandwidth = !Number.isFinite(each)
+      ? 0
+      : each > 0
+        ? Math.floor(bandwidthLeft / each)
+        : Number.POSITIVE_INFINITY;
     const launched = Math.max(0, Math.min(group.inBay, countLeft, byBandwidth));
     if (launched === 0) continue;
     next = setDroneCounts(next, group.typeId, {
