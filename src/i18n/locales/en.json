@@ -2191,6 +2191,7 @@
     "journalTab": "Journal",
     "transactionsTab": "Transactions",
     "corpTransactionsTab": "Corp Transactions",
+    "transactionsLink": "Transactions →",
     "refresh": "Refresh",
     "isk": "ISK",
     "balanceEmpty": "No wallet data cached. Reconnect to fetch it.",
