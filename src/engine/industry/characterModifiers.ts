@@ -185,13 +185,21 @@ export function baselineRefiningEfficiency(
 }
 
 /**
+ * Whether a refining implant touches this type at all: ore and ice (which
+ * carry a specialisation skill) yes, scrap never — the RX-80x line's own
+ * description covers ore and ice only.
+ */
+export function refiningImplantApplies(specialisationSkillId: number | undefined): boolean {
+  return specialisationSkillId !== undefined;
+}
+
+/**
  * The refining implant bonus that actually applied to this type: 0 on
- * scrap, which the RX-80x line never touches — so a hint names the implant
- * only when it moved the number (f4b5a3f5).
+ * scrap, so a hint names the implant only when it moved the number (f4b5a3f5).
  */
 export function appliedRefiningImplantPct(
   modifiers: CharacterModifiers,
   specialisationSkillId: number | undefined
 ): number {
-  return specialisationSkillId === undefined ? 0 : modifiers.refiningImplantPct;
+  return refiningImplantApplies(specialisationSkillId) ? modifiers.refiningImplantPct : 0;
 }

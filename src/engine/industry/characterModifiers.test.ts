@@ -6,6 +6,7 @@ import {
   refiningEfficiency,
   baselineRefiningEfficiency,
   appliedRefiningImplantPct,
+  refiningImplantApplies,
   MANUFACTURING_TIME_IMPLANT_TYPE_IDS,
   REFINING_IMPLANT_TYPE_IDS,
 } from './characterModifiers';
@@ -219,6 +220,16 @@ describe('baselineRefiningEfficiency', () => {
       [RX_802]
     );
     expect(baselineRefiningEfficiency(m)).toBeCloseTo(0.5 * 1.15 * 1.1 * 1.02, 10);
+  });
+});
+
+describe('refiningImplantApplies', () => {
+  it('is true for ore and ice, which carry a specialisation skill', () => {
+    expect(refiningImplantApplies(SIMPLE_ORE_PROCESSING)).toBe(true);
+  });
+
+  it('is false for scrap (issue #1227)', () => {
+    expect(refiningImplantApplies(undefined)).toBe(false);
   });
 });
 

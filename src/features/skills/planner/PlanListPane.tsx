@@ -14,7 +14,9 @@ import { useIsDesktop } from '@/lib/useIsDesktop';
 import { newPlan } from './newPlan';
 import { PlanList, type PlanRowStats } from './PlanList';
 import { schedulePlan, type PlanScheduleInputs } from './planSchedule';
+import { readsLoadedImplants } from './whatIfImplants';
 import { cloneStateFor, useCloneStates } from '../cloneState';
+import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import type { RemapAvailability } from './remapAvailability';
 
 interface PlanListPaneProps {
@@ -97,6 +99,12 @@ export function PlanListPane({
     return out;
   }, [plans, scheduleInputs, cloneStates, cloneStatesHydrated, activeCharacterId, loadedAtMs]);
 
+  // The sidebar sits beside the Plan Editor, which carries its own note.
+  const showImplantsNote =
+    height !== 'sidebar' &&
+    stats !== undefined &&
+    (plans ?? []).some((plan) => readsLoadedImplants(plan.whatIfImplants));
+
   const [scrollerRef, scrollerMaxHeight] = useViewportBoundedHeight(VIEWPORT_BOUNDED_BOTTOM_GAP_PX);
 
   function syncAfterEdit() {
@@ -144,6 +152,14 @@ export function PlanListPane({
 
   return (
     <Panel className={className}>
+      {showImplantsNote && (
+        <div className="border-b border-line px-3 empty:hidden">
+          <ImplantsAssumedNote
+            characterId={activeCharacterId}
+            hint={t('plans.assumesNoImplantsHint')}
+          />
+        </div>
+      )}
       <div
         ref={scrollerRef}
         // `40vh` rather than a rem constant: it has to leave room for the

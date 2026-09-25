@@ -39,6 +39,7 @@ import { TargetPlanPicker } from '../TargetPlanPicker';
 import { buildShipsWithMastery, type ShipOption } from './shipCatalog';
 import { scheduleEntries } from './scheduleEntries';
 import { buildFitCheckRows } from './fitCheckRows';
+import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import {
   masteryRowSortValue,
   mergeShipEntries,
@@ -284,6 +285,9 @@ export function ShipsPanel({
       }
     >
       <div className="space-y-2 p-3">
+        {hasContext && untrained.length > 0 && (
+          <ImplantsAssumedNote hint={t('plans.assumesNoImplantsHint')} />
+        )}
         <SearchInput
           value={query}
           onChange={(e) => {

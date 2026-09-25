@@ -50,10 +50,14 @@ import {
   type ReprocessingInput,
 } from './orderExits';
 import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
-import { appliedRefiningImplantPct } from '@/engine/industry/characterModifiers';
+import {
+  appliedRefiningImplantPct,
+  refiningImplantApplies,
+} from '@/engine/industry/characterModifiers';
 import { roundPriceUp } from '@/engine/market/priceTick';
 import { CopyablePrice } from './CopyablePrice';
 import { MarketItemLink } from './MarketItemLink';
+import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 
 export interface OrderDetailModalProps {
   open: boolean;
@@ -1212,6 +1216,15 @@ export function OrderDetailModal({
                         })}
                       </p>
                     )}
+                    {reprocessing &&
+                      refiningImplantApplies(reprocessing.entry.specialisationSkillID) && (
+                        <ImplantsAssumedNote
+                          characterId={row.characterId}
+                          hint={t('market.orders.exitReprocessAssumesNoImplants', {
+                            character: row.characterName,
+                          })}
+                        />
+                      )}
                     {refine.partial && (
                       <p className="text-warning">{t('market.orders.exitReprocessPartial')}</p>
                     )}

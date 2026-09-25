@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
+import { ESI_REGISTRY } from '@/esi/registry';
 import type { SkillCatalog } from '@/features/skills/skillMap';
 import type { EngineSkill } from '@/engine/types';
 import type { SkillPlanRecord } from '@/db';
@@ -147,5 +148,79 @@ describe('PlanListPane: per-plan schedule stats (#1416)', () => {
     );
     await screen.findByText('Empty plan');
     expect(screen.queryByText('Nothing to train')).not.toBeInTheDocument();
+  });
+
+  describe('Character details implant note (issue #1588)', () => {
+    const NOTE = 'Assumes no implants';
+
+    async function seedGrant(scopes: readonly string[]): Promise<void> {
+      await db.tokens.put({
+        characterId: CHAR_ID,
+        accessToken: 'access',
+        refreshToken: 'refresh',
+        expiresAt: Date.now() + 60_000,
+        scopes: [...scopes],
+      });
+    }
+
+    function renderPane(height?: 'viewport' | 'sidebar') {
+      render(
+        <MemoryRouter>
+          <PlanListPane
+            activeCharacterId={CHAR_ID}
+            remapInfo={null}
+            scheduleInputs={scheduleInputs(true)}
+            height={height}
+          />
+        </MemoryRouter>
+      );
+    }
+
+    afterEach(async () => {
+      await db.tokens.clear();
+    });
+
+    it('notes that row training times assume no implants when the grant is missing', async () => {
+      await seed();
+      await seedGrant([]);
+      renderPane();
+
+      expect(await screen.findByText(NOTE)).toBeInTheDocument();
+    });
+
+    it('hides the note once Character details is granted', async () => {
+      await seed();
+      await seedGrant([ESI_REGISTRY.getCharacterImplants.scope]);
+      renderPane();
+
+      await screen.findByText('Nothing to train');
+      await waitFor(() => expect(screen.queryByText(NOTE)).not.toBeInTheDocument());
+    });
+
+    it('hides the note when every plan sets its own What-If implants', async () => {
+      await db.skillPlans.add({
+        id: 'p2',
+        characterId: CHAR_ID,
+        name: 'Override plan',
+        entries: [],
+        remapCount: 0,
+        updatedAt: Date.now(),
+        whatIfImplants: { kind: 'preset', preset: 'none' },
+      } as unknown as SkillPlanRecord);
+      await seedGrant([]);
+      renderPane();
+
+      await screen.findByText('Nothing to train');
+      expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+    });
+
+    it('leaves the note to the Plan Editor when shown as its sidebar', async () => {
+      await seed();
+      await seedGrant([]);
+      renderPane('sidebar');
+
+      await screen.findByText('Nothing to train');
+      expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+    });
   });
 });

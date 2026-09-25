@@ -26,6 +26,7 @@ function outcome(sell: number): AppraisalOutcome {
     },
     unmatched: [],
     implantBonusPct: 0,
+    refinesOreOrIce: false,
     accountingLevel: null,
     brokerRelationsLevel: null,
   };
