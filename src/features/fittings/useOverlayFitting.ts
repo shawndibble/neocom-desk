@@ -11,7 +11,7 @@ import type { AppliedDpsInputs } from '@/engine/fittings/appliedDps';
 import { decodeFittingShare } from '@/engine/fitting/fittingShare';
 import { shareToFitting } from '@/engine/fittings/shareMapper';
 import type { DamageProfile, PilotProfile } from '@/engine/fittings/types';
-import { useAbyssalWeather } from './abyssalWeatherSelection';
+import { useStatsConditions } from './statsConditions';
 import { evaluateFitting } from './useFittingEvaluation';
 
 export interface OverlayFitting {
@@ -41,7 +41,7 @@ export function useOverlayFitting({
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [result, setResult] = useState<OverlayFitting['result']>(null);
-  const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
+  const conditions = useStatsConditions();
 
   // A saved Fitting belongs to one Character.
   useEffect(() => {
@@ -61,7 +61,7 @@ export function useOverlayFitting({
         const decoded = await decodeFittingShare(record.code);
         if (!decoded.ok || cancelled) return;
         const fitting = shareToFitting(decoded.value, record.name);
-        const stats = await evaluateFitting(fitting, profile, damageProfile, weatherTypeId);
+        const stats = await evaluateFitting(fitting, profile, damageProfile, conditions);
         if (!cancelled) setResult({ name: record.name, applied: stats.applied });
       } catch {
         // An overlay that won't calculate simply isn't drawn.
@@ -70,7 +70,7 @@ export function useOverlayFitting({
     return () => {
       cancelled = true;
     };
-  }, [record, profile, damageProfile, weatherTypeId]);
+  }, [record, profile, damageProfile, conditions]);
 
   const options = useMemo(
     () =>

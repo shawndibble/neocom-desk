@@ -5,6 +5,7 @@ import {
   extractCapacitorBudget,
   extractDroneLimits,
   extractTank,
+  extractLockedTargets,
   extractFittingStats,
   extractModuleResult,
   extractOffense,
@@ -701,5 +702,72 @@ describe('extractTank', () => {
       { typeId: 33101, layer: 'armor', loaded: 78, empty: 26, isLoaded: false },
     ]);
     expect(tank.sustained.armor).toBeCloseTo(26, 6);
+  });
+});
+
+describe('extractFittingStats resources', () => {
+  it('reads the sensor strength and names which of the four the hull has', () => {
+    const stats = extractFittingStats(
+      [],
+      attrs({ scanStrength: 21.6, scanRadarStrength: 21.6 }),
+      []
+    );
+    expect(stats.sensor).toEqual({ strength: 21.6, type: 'radar' });
+  });
+
+  it('has no sensor type on a hull with none', () => {
+    expect(extractFittingStats([], attrs({}), []).sensor).toEqual({ strength: 0, type: null });
+  });
+
+  it('reads the cargo hold, fleet hangar and mining hold', () => {
+    const stats = extractFittingStats(
+      [],
+      attrs({ cargoCapacity: 4600, fleetHangarCapacity: 5000, miningHoldCapacity: 28000 }),
+      []
+    );
+    expect(stats.holds).toEqual({ cargo: 4600, fleetHangar: 5000, miningHold: 28000 });
+  });
+
+  it('reads a jump drive only on a hull that has one', () => {
+    const jumper = extractFittingStats(
+      [],
+      attrs({
+        jumpDriveRange: 7,
+        jumpDriveConsumptionAmount: 3000,
+        jumpDriveConsumptionType: 16274,
+      }),
+      []
+    );
+    expect(jumper.jumpDrive).toEqual({
+      rangeLightYears: 7,
+      fuelTypeId: 16274,
+      fuelPerLightYear: 3000,
+    });
+    // Every hull reads the consumption default; only the range says there's a drive.
+    expect(
+      extractFittingStats([], attrs({ jumpDriveConsumptionAmount: 1000 }), []).jumpDrive
+    ).toBeNull();
+  });
+});
+
+describe('extractLockedTargets', () => {
+  const character = (bonus?: number) =>
+    new Map(bonus === undefined ? [] : [[192, { value: bonus }]]);
+
+  it('is the lower of the hull’s limit and the pilot’s: two, plus a target a level of Target Management and Advanced Target Management', () => {
+    expect(extractLockedTargets(attrs({ maxLockedTargets: 7 }), character(10))).toEqual({
+      ship: 7,
+      pilot: 12,
+      effective: 7,
+    });
+    expect(extractLockedTargets(attrs({ maxLockedTargets: 7 }), character(1))).toEqual({
+      ship: 7,
+      pilot: 3,
+      effective: 3,
+    });
+  });
+
+  it('gives an untrained pilot the base two', () => {
+    expect(extractLockedTargets(attrs({ maxLockedTargets: 7 }), character()).effective).toBe(2);
   });
 });

@@ -10,7 +10,7 @@ type EngineCall = [
   PilotProfile,
   unknown,
   DamageProfile | undefined,
-  { overheated?: boolean; weatherTypeId?: number }?,
+  { overheated?: boolean; weatherTypeId?: number; overheatAll?: boolean }?,
 ];
 
 const engine = vi.hoisted(() => ({
@@ -33,6 +33,7 @@ vi.mock('./damageProfiles', () => ({
 
 const { useFittingEvaluation, evaluateFitting } = await import('./useFittingEvaluation');
 const { useAbyssalWeather } = await import('./abyssalWeatherSelection');
+const { useOverheatAll } = await import('./statsConditions');
 
 const RIFTER: Fitting = {
   name: 'Rifter',
@@ -76,6 +77,8 @@ beforeEach(() => {
   damage.selected = GURISTAS;
   useAbyssalWeather.setState({ weatherTypeId: null });
 });
+
+const NORMAL = { weatherTypeId: null, overheatAll: false };
 
 describe('useFittingEvaluation', () => {
   it("runs the main stats and every variant under the Fitting's own set on that basis", async () => {
@@ -136,15 +139,24 @@ describe('useFittingEvaluation', () => {
     const { result } = render({ fitting: RIFTER });
     await waitFor(() => expect(result.current.variants).not.toBeNull());
     await result.current.variants!.compare(addModule(RIFTER, 'medium', 0, 438));
-    await evaluateFitting(SLASHER, CLONE, GURISTAS, 47390);
+    await evaluateFitting(SLASHER, CLONE, GURISTAS, { weatherTypeId: 47390, overheatAll: false });
     // Main stats, the variant's baseline, the variant, and another Fitting.
     expect(calls().map((call) => call[4]?.weatherTypeId)).toEqual([47390, 47390, 47390, 47390]);
     // The stats say which weather they were worked out in, so a heading can't name another.
     expect(result.current.statsWeatherTypeId).toBe(47390);
 
     engine.computeFittingStats.mockClear();
-    await evaluateFitting(SLASHER, CLONE, GURISTAS, null);
+    await evaluateFitting(SLASHER, CLONE, GURISTAS, NORMAL);
     expect(calls()[0][4]?.weatherTypeId).toBeUndefined();
+  });
+
+  it('overheats every evaluation while Overheat all is on', async () => {
+    useOverheatAll.setState({ overheatAll: true });
+    const { result } = render({ fitting: RIFTER });
+    await waitFor(() => expect(result.current.variants).not.toBeNull());
+    await result.current.variants!.compare(addModule(RIFTER, 'medium', 0, 438));
+    expect(calls().map((call) => call[4]?.overheatAll)).toEqual([true, true, true]);
+    useOverheatAll.setState({ overheatAll: false });
   });
 
   it('reports a failed calculation as an error rather than loading forever', async () => {
@@ -189,8 +201,13 @@ describe('useFittingEvaluation', () => {
 });
 
 describe('evaluateFitting', () => {
+  it('overheats everything when asked to', async () => {
+    await evaluateFitting(RIFTER, CLONE, GURISTAS, { weatherTypeId: null, overheatAll: true });
+    expect(calls()[0][4]).toEqual({ overheatAll: true });
+  });
+
   it('works out another Fitting on the set it carries, under the given Damage Profile', async () => {
-    await evaluateFitting(RIFTER, CLONE, GURISTAS, null);
+    await evaluateFitting(RIFTER, CLONE, GURISTAS, NORMAL);
     const [[fitting, pilot, , damageProfile]] = calls();
     expect(fitting).toBe(RIFTER);
     expect(pilot.implantTypeIds).toEqual([19540]);
@@ -198,7 +215,7 @@ describe('evaluateFitting', () => {
   });
 
   it("uses the pilot's own clone for a Fitting that carries no set", async () => {
-    await evaluateFitting({ ...RIFTER, implantSet: undefined }, CLONE, undefined, null);
+    await evaluateFitting({ ...RIFTER, implantSet: undefined }, CLONE, undefined, NORMAL);
     expect(calls()[0]![1]).toBe(CLONE);
   });
 });

@@ -15,7 +15,12 @@ import {
   type WeaponRow,
   type Resonances,
   type AncillaryRepairer,
+  type JumpDriveStats,
+  type LockedTargets,
+  type SensorStats,
+  type SensorType,
   type TankStats,
+  CHARACTER_BASE_LOCKED_TARGETS,
 } from './types';
 import {
   capacitorBudget,
@@ -135,6 +140,48 @@ function layerDefense(
   };
 }
 
+const SENSOR_ATTRIBUTE: Record<SensorType, number> = {
+  radar: DOGMA_ATTRIBUTE.scanRadarStrength,
+  ladar: DOGMA_ATTRIBUTE.scanLadarStrength,
+  magnetometric: DOGMA_ATTRIBUTE.scanMagnetometricStrength,
+  gravimetric: DOGMA_ATTRIBUTE.scanGravimetricStrength,
+};
+
+function sensorStats(shipAttributes: AttributeMap): SensorStats {
+  const type =
+    (Object.keys(SENSOR_ATTRIBUTE) as SensorType[]).find(
+      (kind) => readAttribute(shipAttributes, SENSOR_ATTRIBUTE[kind]) > 0
+    ) ?? null;
+  return { strength: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.scanStrength), type };
+}
+
+/** A jump drive's range is what says a hull has one; every hull reads the fuel default. */
+function jumpDriveStats(shipAttributes: AttributeMap): JumpDriveStats | null {
+  const rangeLightYears = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.jumpDriveRange);
+  if (rangeLightYears <= 0) return null;
+  return {
+    rangeLightYears,
+    fuelTypeId: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.jumpDriveConsumptionType),
+    fuelPerLightYear: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.jumpDriveConsumptionAmount),
+  };
+}
+
+/**
+ * The hull's lock limit against the pilot's. The engine's own "effective"
+ * figure misses the pilot's base of two, so this adds it back to the skill
+ * bonus the character result carries (`CHARACTER_DOGMA_ATTRIBUTE`).
+ */
+export function extractLockedTargets(
+  shipAttributes: AttributeMap,
+  characterAttributes: AttributeMap
+): LockedTargets {
+  const ship = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.maxLockedTargets);
+  const pilot =
+    CHARACTER_BASE_LOCKED_TARGETS +
+    readAttribute(characterAttributes, CHARACTER_DOGMA_ATTRIBUTE.maxLockedTargets);
+  return { ship, pilot, effective: Math.min(ship, pilot) };
+}
+
 /**
  * What limits the drones in space: how many the pilot controls, and each
  * drone type's bandwidth (read even for a stack still in the bay, which draws
@@ -202,6 +249,8 @@ export function extractFittingStats(
   | 'applied'
   | 'capacitorBudget'
   | 'tank'
+  | 'lockedTargets'
+  | 'allOverheated'
 > {
   const cpuTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.cpuOutput);
   const powergridTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.powerOutput);
@@ -242,6 +291,13 @@ export function extractFittingStats(
     unknownItemTypeIds: items
       .filter((item, index) => isUnknownItem(item, itemResults[index]))
       .map((item) => item.type_id),
+    sensor: sensorStats(shipAttributes),
+    holds: {
+      cargo: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.cargoCapacity),
+      fleetHangar: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.fleetHangarCapacity),
+      miningHold: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.miningHoldCapacity),
+    },
+    jumpDrive: jumpDriveStats(shipAttributes),
     slotCounts: {
       high: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.hiSlots),
       medium: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.medSlots),

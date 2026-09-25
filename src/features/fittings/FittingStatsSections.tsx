@@ -19,7 +19,8 @@ import type { DogmaAssetProgress } from './dogmaFittingEngine';
 import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
 import { DamageProfilePicker } from './DamageProfilePicker';
 import { AppliedDpsPanel } from './AppliedDpsPanel';
-import { Facts, Overheated } from './StatFacts';
+import { Facts, Overheated, type Fact } from './StatFacts';
+import { StatsToolbar } from './StatsToolbar';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
   isSectionExpanded,
@@ -177,12 +178,15 @@ function StatSection({
   title,
   meta,
   warning,
+  hot = false,
   expanded,
   onToggle,
   children,
 }: {
   title: string;
   meta: string | undefined;
+  /** Every figure is the overheated one ("Overheat all"): read in the warning tone, as the game marks heat. */
+  hot?: boolean;
   /** Shown on the row itself, so a warning inside a collapsed section isn't missed. */
   warning?: string;
   expanded: boolean;
@@ -204,9 +208,15 @@ function StatSection({
           </button>
         </h3>
         {warning && <span className="shrink-0 text-xs text-warning">{warning}</span>}
-        {meta && <span className="shrink-0 text-sm tabular-nums">{meta}</span>}
+        {meta && (
+          <span className={`shrink-0 text-sm tabular-nums ${hot ? 'text-warning' : ''}`}>
+            {meta}
+          </span>
+        )}
       </div>
-      {expanded && <div className="space-y-2 px-3 pb-3">{children}</div>}
+      {expanded && (
+        <div className={`space-y-2 px-3 pb-3 ${hot ? 'text-warning' : ''}`}>{children}</div>
+      )}
     </section>
   );
 }
@@ -340,6 +350,7 @@ export function FittingStatsSections({
         title={t(`fittings.stats.section.${id}`)}
         meta={meta}
         warning={warning}
+        hot={stats?.allOverheated ?? false}
         expanded={isExpanded(id)}
         onToggle={() => toggle(id)}
       >
@@ -399,6 +410,51 @@ export function FittingStatsSections({
     return rows;
   }
 
+  /** Holds, jump drive and sensors: what the hull carries, beside what the fit asks of it. */
+  function resourceFacts(s: FittingStats): Fact[] {
+    const facts: Fact[] = [
+      {
+        label: t('fittings.stats.fact.cargo'),
+        value: t('fittings.stats.unit.cubicMetres', { value: s.holds.cargo.toFixed(0) }),
+      },
+    ];
+    if (s.holds.fleetHangar > 0)
+      facts.push({
+        label: t('fittings.stats.fact.fleetHangar'),
+        value: t('fittings.stats.unit.cubicMetres', { value: s.holds.fleetHangar.toFixed(0) }),
+      });
+    if (s.holds.miningHold > 0)
+      facts.push({
+        label: t('fittings.stats.fact.miningHold'),
+        value: t('fittings.stats.unit.cubicMetres', { value: s.holds.miningHold.toFixed(0) }),
+      });
+    if (s.sensor.type !== null)
+      facts.push({
+        label: t('fittings.stats.fact.sensorStrength'),
+        value: t('fittings.stats.unit.sensor', {
+          value: s.sensor.strength.toFixed(1),
+          type: t(`fittings.stats.sensorType.${s.sensor.type}`),
+        }),
+      });
+    if (s.jumpDrive)
+      facts.push(
+        {
+          label: t('fittings.stats.fact.jumpRange'),
+          value: t('fittings.stats.unit.lightYears', {
+            value: s.jumpDrive.rangeLightYears.toFixed(2),
+          }),
+        },
+        {
+          label: t('fittings.stats.fact.jumpFuel'),
+          value: t('fittings.stats.unit.fuelPerLightYear', {
+            value: s.jumpDrive.fuelPerLightYear.toFixed(0),
+            fuel: typeName(s.jumpDrive.fuelTypeId),
+          }),
+        }
+      );
+    return facts;
+  }
+
   return (
     <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
       {heading && (
@@ -407,6 +463,7 @@ export function FittingStatsSections({
         </div>
       )}
       {conditions && <div className="border-b border-line px-3 py-2">{conditions}</div>}
+      {stats && <StatsToolbar stats={stats} />}
       {statsError && (
         <div
           role="alert"
@@ -540,7 +597,10 @@ export function FittingStatsSections({
               },
               {
                 label: t('fittings.stats.fact.lockedTargets'),
-                value: String(stats.targeting.maxLockedTargets),
+                value:
+                  stats.lockedTargets.ship === stats.lockedTargets.pilot
+                    ? String(stats.targeting.maxLockedTargets)
+                    : t('fittings.stats.lockedTargetsValue', { ...stats.lockedTargets }),
               },
               {
                 label: t('fittings.stats.fact.scanResolution'),
@@ -642,6 +702,10 @@ export function FittingStatsSections({
                     value: stats.droneCapacity.toFixed(0),
                   }),
                 },
+                {
+                  label: t('fittings.stats.fact.maxActiveDrones'),
+                  value: String(stats.maxActiveDrones),
+                },
               ]}
             />
           ) : (
@@ -682,6 +746,7 @@ export function FittingStatsSections({
                     total: stats.calibrationTotal.toFixed(0),
                   }),
                 },
+                ...resourceFacts(stats),
               ]}
             />
             {stats.unknownItemTypeIds.length > 0 && (

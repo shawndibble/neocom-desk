@@ -13,6 +13,7 @@ import {
   extractTank,
   extractDroneLimits,
   extractFittingStats,
+  extractLockedTargets,
   extractModuleResult,
   extractOffense,
   extractOverheatedStats,
@@ -186,6 +187,16 @@ export function withWeather(fit: Fit, weatherTypeId?: number): Fit {
   };
 }
 
+/** What a Fitting's stats are worked out under, beyond the pilot and the Damage Profile. */
+export interface StatsOptions {
+  /** Also work out the overheated values (the default); callers that never show heat opt out of the cost. */
+  overheated?: boolean;
+  /** Every figure overheated — every module that can overheat, overloaded (the "Overheat all" switch). */
+  overheatAll?: boolean;
+  /** An Abyssal weather's beacon type id. */
+  weatherTypeId?: number;
+}
+
 /**
  * Works out a Fitting's stats under a pilot's skills and implants, with EHP
  * measured against `damageProfile` (the engine's uniform default without
@@ -197,20 +208,41 @@ export async function computeFittingStats(
   profile: PilotProfile,
   onProgress?: (progress: DogmaAssetProgress) => void,
   damageProfile?: DamageProfile,
-  {
-    overheated: withOverheated = true,
-    weatherTypeId,
-  }: { overheated?: boolean; weatherTypeId?: number } = {}
+  { overheated: withOverheated = true, overheatAll = false, weatherTypeId }: StatsOptions = {}
 ): Promise<FittingStats> {
   await loadDogmaEngine(onProgress);
   // The overheated recalculation below spreads this fit, so it keeps the weather too.
   const dogmaFit = withWeather(fittingToDogmaFit(fitting, profile, damageProfile), weatherTypeId);
   const calculation = calculate(dogmaFit);
-  const baseStats = extractFittingStats(
-    dogmaFit.items,
-    calculation.ship.attributes,
-    calculation.items
+
+  // Overheated values come from the engine itself (its overload state), not
+  // a multiplier applied here: the same fit again with every active module
+  // that can overheat set to overload. Skipped when there is none, so a fit
+  // with nothing to overheat costs one calculation and shows no overheated line.
+  const heatable = dogmaFit.items.map(
+    (_, index) =>
+      index < fitting.modules.length &&
+      calculation.items[index]?.max_state === 'overload' &&
+      calculation.items[index]?.state === 'active'
   );
+  const heatedCalculation =
+    (withOverheated || overheatAll) && heatable.includes(true)
+      ? calculate({
+          ...dogmaFit,
+          items: dogmaFit.items.map((item, index) =>
+            heatable[index] ? { ...item, state: 'overload' } : item
+          ),
+        })
+      : null;
+
+  // "Overheat all": every figure is the heated one, with no second number
+  // beside it. The editor's state controls still read the unheated result —
+  // they show what the pilot set, not the what-if.
+  const allOverheated = overheatAll && heatedCalculation !== null;
+  const shown = allOverheated ? heatedCalculation : calculation;
+  const beside = allOverheated || !withOverheated ? null : heatedCalculation;
+
+  const baseStats = extractFittingStats(dogmaFit.items, shown.ship.attributes, shown.items);
 
   // Calibration and drone bandwidth have no single ship-level "used" id the
   // way cpuFree/powerFree do (see types.ts's DOGMA_ATTRIBUTE doc comment) —
@@ -221,7 +253,7 @@ export async function computeFittingStats(
   let calibrationUsed = 0;
   let droneBandwidthUsed = 0;
   dogmaFit.items.forEach((item, index) => {
-    const itemAttributes = calculation.items[index]?.attributes;
+    const itemAttributes = shown.items[index]?.attributes;
     if (!itemAttributes) return;
     if (item.slot.type === 'rig') {
       calibrationUsed += itemAttributes.get(ITEM_DOGMA_ATTRIBUTE.calibrationCost)?.value ?? 0;
@@ -233,27 +265,6 @@ export async function computeFittingStats(
 
   // `fittingToDogmaFit` puts the modules first, so module i is items[i].
   const modules = fitting.modules.map((_, index) => extractModuleResult(calculation.items[index]));
-
-  // Overheated values come from the engine itself (its overload state), not
-  // a multiplier applied here: the same fit again with every active module
-  // that can overheat set to overload. Skipped when there is none, so a fit
-  // with nothing to overheat costs one calculation and shows no overheated line.
-  // Callers that never show heat (the variations diff) opt out of the cost.
-  const heatable = dogmaFit.items.map(
-    (_, index) =>
-      index < fitting.modules.length &&
-      calculation.items[index]?.max_state === 'overload' &&
-      calculation.items[index]?.state === 'active'
-  );
-  const overheatedCalculation =
-    withOverheated && heatable.includes(true)
-      ? calculate({
-          ...dogmaFit,
-          items: dogmaFit.items.map((item, index) =>
-            heatable[index] ? { ...item, state: 'overload' } : item
-          ),
-        })
-      : null;
 
   // Drones follow the modules in `dogmaFit.items`.
   const offenseItems: OffenseItem[] = [
@@ -269,36 +280,26 @@ export async function computeFittingStats(
       isDrone: true,
     })),
   ];
-  const offense = extractOffense(
-    offenseItems,
-    calculation.items,
-    overheatedCalculation?.items ?? null
-  );
-  const overheated = overheatedCalculation
-    ? extractOverheatedStats(overheatedCalculation.ship.attributes)
-    : null;
+  const offense = extractOffense(offenseItems, shown.items, beside?.items ?? null);
+  const overheated = beside ? extractOverheatedStats(beside.ship.attributes) : null;
 
-  const applied = extractAppliedDpsInputs(
-    dogmaFit.items,
-    calculation.items,
-    calculation.character.attributes
-  );
+  const applied = extractAppliedDpsInputs(dogmaFit.items, shown.items, shown.character.attributes);
+  const lockedTargets = extractLockedTargets(shown.ship.attributes, shown.character.attributes);
 
   return {
     ...baseStats,
-    ...extractDroneLimits(dogmaFit.items, calculation.items, calculation.character.attributes),
+    targeting: { ...baseStats.targeting, maxLockedTargets: lockedTargets.effective },
+    ...extractDroneLimits(dogmaFit.items, shown.items, shown.character.attributes),
     calibrationUsed,
     droneBandwidthUsed,
     modules,
     offense,
     overheated,
     applied,
-    capacitorBudget: extractCapacitorBudget(
-      dogmaFit.items,
-      calculation.items,
-      calculation.ship.attributes
-    ),
-    tank: extractTank(dogmaFit.items, calculation.items, calculation.ship.attributes, baseStats),
+    capacitorBudget: extractCapacitorBudget(dogmaFit.items, shown.items, shown.ship.attributes),
+    tank: extractTank(dogmaFit.items, shown.items, shown.ship.attributes, baseStats),
+    lockedTargets,
+    allOverheated,
   };
 }
 

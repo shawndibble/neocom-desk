@@ -6,6 +6,7 @@ import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import { withWeather } from './dogmaFittingEngine';
 import {
   extractCapacitorBudget,
+  extractLockedTargets,
   extractTank,
   extractDroneLimits,
   extractFittingStats,
@@ -56,6 +57,9 @@ const HEAVY_MISSILE_LAUNCHER_II = 2410;
 const SCOURGE_HEAVY_MISSILE = 209;
 // Looked up by exact name in the pinned `sde.dat`, 2026-09-25.
 const HURRICANE = 24702;
+const MAELSTROM = 24694;
+const HULK = 22544;
+const THANATOS = 23911;
 const MEDIUM_SHIELD_BOOSTER_II = 10850;
 const MEDIUM_CAPACITOR_BOOSTER_II = 2024;
 const CAP_BOOSTER_400 = 11287;
@@ -525,6 +529,52 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     } as const;
     expect(run({ ...asb, chargeTypeId: CAP_BOOSTER_150 }).budget.drain).toBe(0);
     expect(run(asb).budget.drain).toBeGreaterThan(0);
+  });
+
+  it('caps locked targets at the lower of the hull and the pilot, who starts at two', () => {
+    const maelstrom: Fitting = {
+      name: 'M',
+      shipTypeId: MAELSTROM,
+      modules: [],
+      drones: [],
+      cargo: [],
+    };
+    const locks = (skills: [number, number][]) => {
+      const dogmaFit = fittingToDogmaFit(maelstrom, buildPilotProfile(new Map(skills), []));
+      const calculation = calculate(dogmaFit);
+      return extractLockedTargets(calculation.ship.attributes, calculation.character.attributes);
+    };
+    // A Maelstrom locks 7; Target Management (3429) / Advanced (3430) add one a level to two.
+    expect(locks([])).toEqual({ ship: 7, pilot: 2, effective: 2 });
+    expect(locks([[3429, 1]])).toEqual({ ship: 7, pilot: 3, effective: 3 });
+    expect(
+      locks([
+        [3429, 5],
+        [3430, 5],
+      ])
+    ).toEqual({ ship: 7, pilot: 12, effective: 7 });
+  });
+
+  it('reads the sensor strength and type, the holds and the jump drive off the hull', () => {
+    const read = (shipTypeId: number) => {
+      const dogmaFit = fittingToDogmaFit(
+        { name: 'H', shipTypeId, modules: [], drones: [], cargo: [] },
+        buildPilotProfile(new Map(), [])
+      );
+      const calculation = calculate(dogmaFit);
+      return extractFittingStats(dogmaFit.items, calculation.ship.attributes, calculation.items);
+    };
+    const caracal = read(CARACAL);
+    expect(caracal.sensor.type).toBe('gravimetric');
+    expect(caracal.sensor.strength).toBeGreaterThan(0);
+    expect(caracal.holds.cargo).toBeGreaterThan(0);
+    expect(caracal.jumpDrive).toBeNull();
+    // A Hulk has a mining hold; a Thanatos (carrier) a fleet hangar and a jump drive.
+    expect(read(HULK).holds.miningHold).toBe(11500);
+    const thanatos = read(THANATOS);
+    expect(thanatos.holds.fleetHangar).toBeGreaterThan(0);
+    expect(thanatos.jumpDrive?.rangeLightYears).toBeGreaterThan(0);
+    expect(thanatos.jumpDrive?.fuelPerLightYear).toBeGreaterThan(0);
   });
 
   it('reads applied-DPS inputs: running turrets, loaded launchers, launched drones only', () => {

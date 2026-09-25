@@ -142,6 +142,40 @@ export interface NavigationStats {
   warpSpeed: number;
 }
 
+export type SensorType = 'radar' | 'ladar' | 'magnetometric' | 'gravimetric';
+
+export interface SensorStats {
+  strength: number;
+  /** Which of the four the hull has; null for none. */
+  type: SensorType | null;
+}
+
+/** Hold capacities, m³; 0 where the hull has no such hold. */
+export interface HoldStats {
+  cargo: number;
+  fleetHangar: number;
+  miningHold: number;
+}
+
+export interface JumpDriveStats {
+  rangeLightYears: number;
+  /** The isotope the drive burns. */
+  fuelTypeId: number;
+  /** Isotopes a light year, under the pilot's skills. */
+  fuelPerLightYear: number;
+}
+
+/**
+ * How many targets can be locked: the hull's own limit, the pilot's (two
+ * untrained, one more a level of Target Management and of Advanced Target
+ * Management), and the lower of the two, which is what counts.
+ */
+export interface LockedTargets {
+  ship: number;
+  pilot: number;
+  effective: number;
+}
+
 export interface FittingStats {
   cpuUsed: number;
   cpuTotal: number;
@@ -181,6 +215,18 @@ export interface FittingStats {
   /** Peak recharge against what the running modules draw (`tank.ts`). */
   capacitorBudget: CapacitorBudget;
   tank: TankStats;
+  sensor: SensorStats;
+  holds: HoldStats;
+  /** Null on a hull without a jump drive. */
+  jumpDrive: JumpDriveStats | null;
+  /** `targeting.maxLockedTargets` is `lockedTargets.effective`. */
+  lockedTargets: LockedTargets;
+  /**
+   * Every figure was worked out with every module that can overheat
+   * overloaded (the "Overheat all" switch); `overheated` is then null, since
+   * the heated values are the values.
+   */
+  allOverheated: boolean;
   /**
    * The same fit recalculated by the engine with every active module that
    * can overheat set to overload; null when no module can (nothing to show).
@@ -424,7 +470,16 @@ export type StatsErrorReason = 'skills' | 'shipData';
  */
 export const CHARACTER_DOGMA_ATTRIBUTE = {
   maxActiveDrones: 352,
+  // The targets the pilot's skills add: Target Management and Advanced
+  // Target Management each +1 a level (their `maxTargetBonus`, 311, is 1).
+  // The engine leaves out the character's own base of two
+  // (`CHARACTER_BASE_LOCKED_TARGETS`): a live run reads 5 at Target
+  // Management V alone and nothing untrained (2026-09-25).
+  maxLockedTargets: 192,
 } as const;
+
+/** `maxLockedTargets` on the SDE's CharacterType (1373): what an untrained pilot can lock. */
+export const CHARACTER_BASE_LOCKED_TARGETS = 2;
 
 /**
  * Item-level (not ship-level) dogma attributes this seam reads off a fitted

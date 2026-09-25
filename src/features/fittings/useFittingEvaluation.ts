@@ -25,7 +25,7 @@ import {
 import type { DamageProfile, Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
-import { useAbyssalWeather } from './abyssalWeatherSelection';
+import { statsOptions, useStatsConditions, type StatsConditions } from './statsConditions';
 import { useDamageProfiles, type DamageProfiles } from './damageProfiles';
 import {
   computeFittingStats,
@@ -82,20 +82,15 @@ export interface FittingEvaluation {
   variants: VariantEvaluator | null;
 }
 
-/** The engine's weather option: none for normal space. */
-function weatherOption(weatherTypeId: number | null): { weatherTypeId?: number } {
-  return weatherTypeId === null ? {} : { weatherTypeId };
-}
-
 function withoutOverheat(
   fitting: Fitting,
   pilot: PilotProfile,
   damageProfile: DamageProfile,
-  weatherTypeId: number | null
+  conditions: StatsConditions
 ): Promise<FittingStats> {
   return computeFittingStats(fitting, pilot, undefined, damageProfile, {
     overheated: false,
-    ...weatherOption(weatherTypeId),
+    ...statsOptions(conditions),
   });
 }
 
@@ -103,7 +98,7 @@ function variantEvaluator(
   fitting: Fitting,
   pilot: PilotProfile,
   damageProfile: DamageProfile,
-  weatherTypeId: number | null
+  conditions: StatsConditions
 ): VariantEvaluator {
   // Dropped on failure so a transient error doesn't wedge every later compare.
   let baseline: Promise<FittingStats> | null = null;
@@ -112,7 +107,7 @@ function variantEvaluator(
     profile: pilot,
     async compare(variant) {
       if (baseline === null) {
-        const pending = withoutOverheat(fitting, pilot, damageProfile, weatherTypeId);
+        const pending = withoutOverheat(fitting, pilot, damageProfile, conditions);
         baseline = pending;
         pending.catch(() => {
           if (baseline === pending) baseline = null;
@@ -120,7 +115,7 @@ function variantEvaluator(
       }
       const [before, after] = await Promise.all([
         baseline,
-        withoutOverheat(variant, pilot, damageProfile, weatherTypeId),
+        withoutOverheat(variant, pilot, damageProfile, conditions),
       ]);
       return { before, after };
     },
@@ -130,23 +125,17 @@ function variantEvaluator(
 /**
  * A Fitting other than the open one (Fitting Compare, the applied-DPS
  * overlay), on the basis it would open on: its own carried set when it
- * carries one, else the pilot's clone — in the same Abyssal weather as the
- * open one (`useAbyssalWeather`, passed in so a caller re-runs when it changes).
+ * carries one, else the pilot's clone — under the same conditions as the
+ * open one (`useStatsConditions`, passed in so a caller re-runs when they change).
  */
 export function evaluateFitting(
   fitting: Fitting,
   profile: PilotProfile,
   damageProfile: DamageProfile | undefined,
-  weatherTypeId: number | null
+  conditions: StatsConditions
 ): Promise<FittingStats> {
   const pilot = applyImplantBasis(profile, fitting.implantSet, defaultImplantBasis(fitting));
-  return computeFittingStats(
-    fitting,
-    pilot,
-    undefined,
-    damageProfile,
-    weatherOption(weatherTypeId)
-  );
+  return computeFittingStats(fitting, pilot, undefined, damageProfile, statsOptions(conditions));
 }
 
 /** The open Fitting's stats, price and Variations evaluator. */
@@ -157,7 +146,7 @@ export function useFittingEvaluation({
 }: FittingEvaluationInput): FittingEvaluation {
   const damageProfiles = useDamageProfiles();
   const damageProfile = damageProfiles.hydrated ? damageProfiles.selected : null;
-  const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
+  const conditions = useStatsConditions();
 
   // Keyed on the carried set, not the Fitting: an edit that leaves the set
   // alone keeps this object, and with it `variants` and its baseline.
@@ -206,11 +195,11 @@ export function useFittingEvaluation({
             if (!cancelled) setStatsProgress(progress);
           },
           damageProfile,
-          weatherOption(weatherTypeId)
+          statsOptions(conditions)
         );
         if (cancelled) return;
         setEngineReady(true);
-        setStats({ fitting, stats: result, weatherTypeId });
+        setStats({ fitting, stats: result, weatherTypeId: conditions.weatherTypeId });
       } catch {
         if (!cancelled) setStatsError(true);
       }
@@ -218,7 +207,7 @@ export function useFittingEvaluation({
     return () => {
       cancelled = true;
     };
-  }, [fitting, pilot, damageProfile, weatherTypeId, attempt]);
+  }, [fitting, pilot, damageProfile, conditions, attempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -236,8 +225,8 @@ export function useFittingEvaluation({
     () =>
       fitting === null || pilot === null || damageProfile === null || !engineReady
         ? null
-        : variantEvaluator(fitting, pilot, damageProfile, weatherTypeId),
-    [fitting, pilot, damageProfile, weatherTypeId, engineReady]
+        : variantEvaluator(fitting, pilot, damageProfile, conditions),
+    [fitting, pilot, damageProfile, conditions, engineReady]
   );
 
   return {

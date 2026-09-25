@@ -12,10 +12,13 @@ import type { OverlayFitting } from './useOverlayFitting';
 import { FittingStatsSections } from './FittingStatsSections';
 import { db } from '@/db';
 import { useStatsSectionsPreference } from './statsSectionsPreference';
+import { useOverheatAll } from './statsConditions';
+import { configureClipboard } from '@/lib/clipboard';
 
 beforeEach(async () => {
   await db.settings.clear();
   useStatsSectionsPreference.setState({ value: {}, hydrated: false });
+  useOverheatAll.setState({ overheatAll: false });
 });
 import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
 
@@ -516,5 +519,84 @@ describe('FittingStatsSections — remembered layout', () => {
       'true'
     );
     expect(screen.getByRole('button', { name: 'Price' })).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
+describe('FittingStatsSections — Overheat all and Copy stats', () => {
+  it('turns Overheat all on for every calculation, and reads every figure in the warning tone once it is', async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderSections(heatedStats());
+    await user.click(screen.getByRole('checkbox', { name: 'Overheat all' }));
+    expect(useOverheatAll.getState().overheatAll).toBe(true);
+
+    rerender(
+      <FittingStatsSections
+        stats={{
+          ...heatedStats(),
+          allOverheated: true,
+          overheated: null,
+          offense: {
+            ...heatedStats().offense,
+            weapons: heatedStats().offense.weapons.map((row) => ({ ...row, overheated: null })),
+            overheated: null,
+          },
+        }}
+        statsProgress={null}
+        statsError={false}
+        price={null}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={typeName}
+      />
+    );
+    expect(screen.getByText('4619 EHP')).toHaveClass('text-warning');
+    // No second, "overheated" number beside the heated one.
+    expect(screen.queryByText(/overheated$/)).toBeNull();
+  });
+
+  it('has nothing to overheat on a fit with no module that can', () => {
+    renderSections(stats());
+    expect(screen.getByRole('checkbox', { name: 'Overheat all' })).toBeDisabled();
+  });
+
+  it('copies the headline stats as text', async () => {
+    const written: string[] = [];
+    configureClipboard(async (text) => {
+      written.push(text);
+    });
+    const user = userEvent.setup();
+    renderSections(heatedStats());
+    await user.click(screen.getByRole('button', { name: 'Copy stats' }));
+    expect(written[0]).toMatch(/^DPS 173\.7 \(181\.7 overheated\)/);
+    expect(await screen.findByText('Stats copied')).toBeInTheDocument();
+    configureClipboard(null);
+  });
+});
+
+describe('FittingStatsSections — resources', () => {
+  it('names both lock limits when the pilot and the hull differ', async () => {
+    const user = userEvent.setup();
+    renderSections(stats({ lockedTargets: { ship: 7, pilot: 3, effective: 3 } }));
+    await user.click(screen.getByRole('button', { name: 'Targeting' }));
+    expect(screen.getByText('3 (hull 7, pilot 3)')).toBeInTheDocument();
+  });
+
+  it('reads out the holds, the sensor and the jump drive in Fitting', async () => {
+    const user = userEvent.setup();
+    renderSections(
+      stats({
+        holds: { cargo: 450, fleetHangar: 5000, miningHold: 0 },
+        sensor: { strength: 21.6, type: 'gravimetric' },
+        jumpDrive: { rangeLightYears: 7, fuelTypeId: 16274, fuelPerLightYear: 3000 },
+      })
+    );
+    await user.click(screen.getByRole('button', { name: 'Fitting' }));
+    const fitting = within(sectionBody('Fitting'));
+    expect(fitting.getByText('450 m³')).toBeInTheDocument();
+    expect(fitting.getByText('5000 m³')).toBeInTheDocument();
+    expect(fitting.queryByText('Mining hold')).toBeNull();
+    expect(fitting.getByText('21.6 Gravimetric')).toBeInTheDocument();
+    expect(fitting.getByText('7.00 ly')).toBeInTheDocument();
+    expect(fitting.getByText('3000 #16274/ly')).toBeInTheDocument();
   });
 });

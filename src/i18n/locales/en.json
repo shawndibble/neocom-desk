@@ -520,7 +520,14 @@
         "powergrid": "Powergrid",
         "calibration": "Calibration",
         "sell": "Sell",
-        "buy": "Buy"
+        "buy": "Buy",
+        "maxActiveDrones": "Max active drones",
+        "cargo": "Cargo hold",
+        "fleetHangar": "Fleet hangar",
+        "miningHold": "Mining hold",
+        "jumpRange": "Jump range",
+        "jumpFuel": "Jump fuel",
+        "sensorStrength": "Sensor strength"
       },
       "unit": {
         "gj": "{{value}} GJ",
@@ -536,7 +543,10 @@
         "isk": "{{value}} ISK",
         "ehpPerSecond": "{{value}} EHP/s",
         "gjPerSecond": "{{value}} GJ/s",
-        "hpPerSecond": "{{value}} HP/s"
+        "hpPerSecond": "{{value}} HP/s",
+        "lightYears": "{{value}} ly",
+        "sensor": "{{value}} {{type}}",
+        "fuelPerLightYear": "{{value}} {{fuel}}/ly"
       },
       "tank": {
         "passiveShield": "Passive shield regen: {{value}} HP/s",
@@ -554,6 +564,31 @@
         "delta": "Delta",
         "boosterCharge": "Booster charge to hold peak",
         "chargeEvery": "1 every {{seconds}} s"
+      },
+      "copyText": {
+        "allOverheated": "All figures overheated",
+        "dps": "DPS {{dps}}{{overheated}} · volley {{volley}}",
+        "dpsOverheated": " ({{value}} overheated)",
+        "ehp": "EHP {{ehp}} · shield {{shield}} HP · armor {{armor}} HP · hull {{hull}} HP",
+        "resists": "Resists EM/Th/Kin/Exp: shield {{shield}} · armor {{armor}} · hull {{hull}}",
+        "tank": "Tank {{burst}} EHP/s burst · {{sustained}} EHP/s sustained",
+        "capacitor": "Capacitor {{state}} · delta {{delta}} GJ/s",
+        "navigation": "Speed {{speed}} m/s · align {{align}} s · warp {{warp}} AU/s",
+        "targeting": "Targeting {{range}} km · {{targets}} targets · {{scanResolution}} mm · signature {{signature}} m",
+        "drones": "Drones {{dps}} DPS · {{used}} / {{total}} Mbit/s",
+        "fitting": "CPU {{cpuUsed}} / {{cpuTotal}} · PG {{pgUsed}} / {{pgTotal}} · calibration {{calibrationUsed}} / {{calibrationTotal}}"
+      },
+      "copy": "Copy stats",
+      "copied": "Stats copied",
+      "copyFailed": "Couldn't copy",
+      "overheatAll": "Overheat all",
+      "overheatAllOn": "Every figure is overheated",
+      "lockedTargetsValue": "{{effective}} (hull {{ship}}, pilot {{pilot}})",
+      "sensorType": {
+        "radar": "Radar",
+        "ladar": "Ladar",
+        "magnetometric": "Magnetometric",
+        "gravimetric": "Gravimetric"
       }
     },
     "variations": {
@@ -617,7 +652,13 @@
         "maxVelocity": "Max velocity {{value}} m/s",
         "agility": "Inertia modifier {{value}}",
         "mass": "Mass {{value}} t",
-        "warpSpeed": "Warp speed {{value}} AU/s"
+        "warpSpeed": "Warp speed {{value}} AU/s",
+        "overheatedDps": "Overheated DPS {{value}}",
+        "burstTank": "Burst tank {{value}} EHP/s",
+        "sustainedTank": "Sustained tank {{value}} EHP/s",
+        "capacitorDelta": "Capacitor delta {{value}} GJ/s",
+        "sensorStrength": "Sensor strength {{value}}",
+        "cargoCapacity": "Cargo hold {{value}} m³"
       }
     },
     "damageProfile": {
@@ -802,7 +843,13 @@
         "mass": "Mass (t)",
         "warpSpeed": "Warp speed (AU/s)",
         "priceSell": "Price (sell)",
-        "priceBuy": "Price (buy)"
+        "priceBuy": "Price (buy)",
+        "overheatedDps": "Overheated DPS",
+        "burstTank": "Burst tank (EHP/s)",
+        "sustainedTank": "Sustained tank (EHP/s)",
+        "capacitorDelta": "Capacitor delta (GJ/s)",
+        "sensorStrength": "Sensor strength",
+        "cargoCapacity": "Cargo hold (m³)"
       }
     }
   },
