@@ -88,8 +88,12 @@ for (const size of [
     const trainingCell = strip.locator('span.flex-col', {
       has: page.getByText('Training now', { exact: true }),
     });
+    // `.first()`: an idle queue now renders "Nothing in training" as a link
+    // (issue #1731), whose accessible name matches `getByRole('link')` while
+    // its own inner text node also matches `getByText` — two elements for
+    // one state, so the `.or()` needs a `.first()` to stay a single match.
     await expect(
-      trainingCell.getByRole('link').or(trainingCell.getByText('Nothing in training'))
+      trainingCell.getByRole('link').or(trainingCell.getByText('Nothing in training')).first()
     ).toBeVisible();
 
     const truncated = await strip.evaluate((section) =>

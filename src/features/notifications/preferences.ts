@@ -375,6 +375,14 @@ export async function setFeedMutedForCharacters(
   }
 }
 
+/** Whether this Character would actually raise `characterNotTraining` in the Feed — its one per-pilot opt-out (issue #1731), read by the Overview board and Characters page so neither can disagree with the alert itself. */
+export function isNotTrainingAlertEnabledFor(
+  value: NotificationPreferencesValue,
+  characterId: number
+): boolean {
+  return isEventEnabledFor(characterEventPrefs(value, characterId), 'characterNotTraining', 'feed');
+}
+
 /** One Character's thresholds, defaulted (issue #299) — the shape both the settings row and the poller read. */
 export function characterEventThresholds(
   value: NotificationPreferencesValue,
