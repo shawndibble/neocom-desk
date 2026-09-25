@@ -4101,6 +4101,7 @@
       "instantNetHelp": "Selling into buy orders here, after {{tax}}% sales tax. No broker fee: filling an order lists nothing. Always at 100% of market.",
       "listNet": "You receive, listing",
       "listNetHelp": "Listing one price step under the cheapest seller here, after {{tax}}% sales tax and a {{broker}}% broker fee, 100 ISK minimum per row. Always at 100% of market.",
+      "netAlwaysAt100Note": "\"You receive\" figures are always priced at 100% market, no matter Price %.",
       "assumesBaseStandingsHint": "The broker fee above is calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
       "refineTotal": "Refine total",
       "refineTotalHelp": "What refining the list with the active Character's own reprocessing skills would fetch, sold into buy orders at this hub. Assumes an NPC station's 50% base rate and no ore-specialisation skill — neither is modelled — so a trained miner's real yield runs higher than shown.",
