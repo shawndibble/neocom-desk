@@ -52,8 +52,17 @@ const STAT_DIRECTION: Readonly<Partial<Record<FittingStatKey, 'higher' | 'lower'
 /** The two rows worked out against the selected Target Profile, not read off `FittingStats`. */
 export type AppliedCompareKey = 'appliedDps' | 'bestRange';
 
+/** Fit-wide sell/buy totals — the two figures this table needs out of `loadFittingPrice`'s wider `Appraisal.totals` (which also carries spread, refine, and unpriced-row counts this compare doesn't use). */
+export interface FittingPriceTotals {
+  readonly sell: number;
+  readonly buy: number;
+}
+
+/** The two rows a caller supplies once its (async, non-pure) price fetch has settled for every compared Fitting. */
+export type PriceCompareKey = 'priceSell' | 'priceBuy';
+
 export interface CompareRow {
-  key: StatChangeKey | AppliedCompareKey;
+  key: StatChangeKey | AppliedCompareKey | PriceCompareKey;
   /** Index-parallel to the input fittings, rounded at the same digits `FittingStatsSections` displays. */
   values: readonly number[];
   /** `false` when every fitting rounds to the same value. */
@@ -129,12 +138,30 @@ function appliedRows(statsList: readonly FittingStats[], target: TargetProfile):
 }
 
 /**
+ * No "better"/"worse" side for cost — a cheaper fit isn't necessarily the right pick for a doctrine, so neither
+ * price row is highlighted. A `null` entry (that slot's price fetch failed) becomes `NaN` — `formatValue` renders
+ * it as a dash, and `Set`'s same-value-zero equality treats every `NaN` as equal, so failed slots never register
+ * as "differing" against each other.
+ */
+function priceRows(prices: readonly (FittingPriceTotals | null)[]): CompareRow[] {
+  const sell = prices.map((p) => (p ? round(p.sell, 0) : NaN));
+  const buy = prices.map((p) => (p ? round(p.buy, 0) : NaN));
+  return [
+    { key: 'priceSell', values: sell, differs: new Set(sell).size > 1, bestIndices: [] },
+    { key: 'priceBuy', values: buy, differs: new Set(buy).size > 1, bestIndices: [] },
+  ];
+}
+
+/**
  * Every stat row for N fittings side by side — the differences-only toggle filters `rows` by `differs` at the UI layer.
- * Passing a `target` adds the applied-DPS rows.
+ * Passing a `target` adds the applied-DPS rows. Passing `prices` (index-parallel to `statsList`, `null` for a slot
+ * whose price fetch failed) adds the sell/buy rows — the whole pair is omitted while any slot is still in flight,
+ * but a settled failure on one slot doesn't hide the slots that priced.
  */
 export function compareFittingStats(
   statsList: readonly FittingStats[],
-  target?: TargetProfile
+  target?: TargetProfile,
+  prices?: readonly (FittingPriceTotals | null)[]
 ): CompareTable {
   const rows: CompareRow[] = NUMERIC_FIELDS.map((field) => {
     const values = statsList.map((s) => round(field.value(s), field.digits));
@@ -147,6 +174,7 @@ export function compareFittingStats(
   });
   rows.push(capacitorRow(statsList));
   if (target) rows.push(...appliedRows(statsList, target));
+  if (prices) rows.push(...priceRows(prices));
   return { rows };
 }
 

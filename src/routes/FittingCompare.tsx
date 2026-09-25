@@ -15,6 +15,7 @@ import {
   compareWindow,
   modulesThatDiffer,
 } from '@/engine/fittings/fittingCompare';
+import { firstResourceOverage } from '@/engine/fittings/skillGaps';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -30,6 +31,7 @@ import {
 import { CompareCanFlyByCharacter } from '@/features/fittings/CompareCanFlyByCharacter';
 import { useCompareCanFly } from '@/features/fittings/useCompareCanFly';
 import { useCompareFittings } from '@/features/fittings/useCompareFittings';
+import { useComparePrice } from '@/features/fittings/useComparePrice';
 import { useCompareStats } from '@/features/fittings/useCompareStats';
 import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
 import { DamageProfilePicker } from '@/features/fittings/DamageProfilePicker';
@@ -64,6 +66,7 @@ export function FittingCompare() {
   const target = targetProfiles.selected;
   const stats = useCompareStats(fittings, profile);
   const canFly = useCompareCanFly(fittings, profile);
+  const price = useComparePrice(fittings, profile);
   const isPhone = useIsPhone();
   const [page, setPage] = useState(0);
   const [differencesOnly, setDifferencesOnly] = useState(true);
@@ -100,15 +103,26 @@ export function FittingCompare() {
   // One Fitting has nothing to differ from, so show all its stats rather than an empty table.
   const showDifferencesOnly = differencesOnly && okSlots.length >= 2;
 
+  // Price rows join the table once every shown Fitting's hub fetch has settled (succeeded or
+  // failed) — a slower network fetch than the stats calc must not delay the rest of the table
+  // from appearing. A settled failure on one slot still lets the rest show their price, same as
+  // `okSlots` doing this for `stats` above.
+  const priceSettled = okSlots.every(
+    (index) => price.values[index] !== null || price.failed[index]
+  );
+  const pricesReady = priceSettled && okSlots.some((index) => price.values[index] !== null);
+  const anyPriceFailed = okSlots.some((index) => price.failed[index]);
+
   const table = useMemo(
     () =>
       statsReady
         ? compareFittingStats(
             okSlots.map((index) => stats.values[index] as FittingStats),
-            target
+            target,
+            pricesReady ? okSlots.map((index) => price.values[index]) : undefined
           )
         : null,
-    [statsReady, okSlots, stats.values, target]
+    [statsReady, okSlots, stats.values, target, pricesReady, price.values]
   );
   const moduleDiffs = useMemo(
     () => (statsReady ? modulesThatDiffer(okSlots.map((index) => fittings[index] as Fitting)) : []),
@@ -141,11 +155,25 @@ export function FittingCompare() {
       );
     }
     const flies = canFly.values[index];
+    const fitStats = stats.values[index];
+    // Whole-fit CPU/PG/calibration budget — additional to "Can fly" (a skills check), not a
+    // replacement: a fit can fly but not fit (over budget), and the two must read distinctly.
+    const overage = fitStats ? firstResourceOverage(fitStats) : null;
     return (
       <div className="flex flex-col items-end gap-1">
         <span className="max-w-40 truncate font-medium text-text">{slot.fitting?.name}</span>
         {stats.failed[index] && (
           <span className="text-danger">{t('fittings.compare.statsFailed')}</span>
+        )}
+        {fitStats && (
+          <span className={overage ? 'text-danger' : 'text-success'}>
+            {overage
+              ? t('fittings.compare.overBy', {
+                  resource: t(`fittings.list.${overage.resource}`),
+                  amount: overage.amount.toFixed(0),
+                })
+              : t('fittings.compare.fitsYes')}
+          </span>
         )}
         {flies !== null && flies !== undefined && (
           <span className={flies ? 'text-success' : 'text-danger'}>
@@ -257,6 +285,13 @@ export function FittingCompare() {
                   columns={columns}
                   differencesOnly={showDifferencesOnly}
                 />
+                {!pricesReady && (
+                  <p className="mt-2 text-xs text-text-dim">
+                    {anyPriceFailed
+                      ? t('fittings.compare.priceFailed')
+                      : t('fittings.compare.priceLoading')}
+                  </p>
+                )}
                 <p className="mt-2 text-xs text-text-dim">{t('fittings.appliedDps.assumptions')}</p>
               </Panel>
               {okSlots.length >= 2 && (

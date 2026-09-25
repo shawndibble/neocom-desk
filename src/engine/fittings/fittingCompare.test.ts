@@ -191,6 +191,57 @@ describe('compareFittingStats', () => {
   });
 });
 
+describe('compareFittingStats price rows', () => {
+  it('adds no price rows when prices is omitted', () => {
+    const table = compareFittingStats([stats(), stats()]);
+    expect(table.rows.some((row) => row.key === 'priceSell' || row.key === 'priceBuy')).toBe(false);
+  });
+
+  it('adds sell and buy rows, marked differing, when totals differ', () => {
+    const table = compareFittingStats([stats(), stats()], undefined, [
+      { sell: 1_000_000, buy: 900_000 },
+      { sell: 1_500_000, buy: 1_200_000 },
+    ]);
+    const sell = table.rows.find((row) => row.key === 'priceSell')!;
+    const buy = table.rows.find((row) => row.key === 'priceBuy')!;
+    expect(sell.values).toEqual([1_000_000, 1_500_000]);
+    expect(sell.differs).toBe(true);
+    expect(buy.values).toEqual([900_000, 1_200_000]);
+    expect(buy.differs).toBe(true);
+  });
+
+  it('does not mark a price row as differing when both fittings round to the same total', () => {
+    const table = compareFittingStats([stats(), stats()], undefined, [
+      { sell: 1_000_000.2, buy: 900_000 },
+      { sell: 999_999.8, buy: 900_000 },
+    ]);
+    const sell = table.rows.find((row) => row.key === 'priceSell')!;
+    const buy = table.rows.find((row) => row.key === 'priceBuy')!;
+    expect(sell.differs).toBe(false);
+    expect(buy.differs).toBe(false);
+  });
+
+  it('gives no best-value highlight for price (cost is not ranked)', () => {
+    const table = compareFittingStats([stats(), stats()], undefined, [
+      { sell: 2_000_000, buy: 1_000_000 },
+      { sell: 1_000_000, buy: 500_000 },
+    ]);
+    const sell = table.rows.find((row) => row.key === 'priceSell')!;
+    expect(sell.bestIndices).toEqual([]);
+  });
+
+  it('still shows price for the fittings that priced, when one slot has no price', () => {
+    const table = compareFittingStats([stats(), stats()], undefined, [
+      { sell: 1_000_000, buy: 900_000 },
+      null,
+    ]);
+    const sell = table.rows.find((row) => row.key === 'priceSell')!;
+    expect(sell.values[0]).toBe(1_000_000);
+    expect(Number.isNaN(sell.values[1])).toBe(true);
+    expect(sell.differs).toBe(true);
+  });
+});
+
 const RIFTER_HULL = 587;
 
 function fitting(modules: Fitting['modules']): Fitting {
