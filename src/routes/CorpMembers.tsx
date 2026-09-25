@@ -41,6 +41,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { CorpDenied } from '@/features/corp/CorpDenied';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import {
   CorpRosterColumnPicker,
@@ -438,7 +439,11 @@ export function CorpMembers() {
     return (
       <div className="space-y-4">
         <PageHeader title={t('corp.members.title')} />
-        <EmptyState title={t('corp.members.noAccessTitle')} hint={t('corp.members.noAccessHint')} />
+        <CorpDenied
+          reason={gate.reason}
+          title={t('corp.members.noAccessTitle')}
+          hint={t('corp.members.noAccessHint')}
+        />
       </div>
     );
   }

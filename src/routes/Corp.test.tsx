@@ -185,12 +185,21 @@ describe('access states (AC1)', () => {
     expect(await screen.findByText('Every structure is fuelled')).toBeInTheDocument();
   });
 
-  it.each(['none', 'roles-without-grant'] as const)(
-    'shows no board and no error for a %s character who reached the URL anyway',
+  it('shows no board and no Grant for a none character who reached the URL anyway', () => {
+    mockedAccess.mockReturnValue(accessOf('none', {}));
+    renderCorp();
+    expect(screen.getByText('No corporation access')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /grant/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Corporation' })).not.toBeInTheDocument();
+  });
+
+  it.each(['not-granted', 'roles-without-grant'] as const)(
+    'offers the Grant, and no board, for a %s character who reached the URL anyway',
     (state) => {
       mockedAccess.mockReturnValue(accessOf(state, {}));
       renderCorp();
-      expect(screen.getByText('No corporation access')).toBeInTheDocument();
+      expect(screen.getByText("Corporation data isn't granted")).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Grant corporation access' })).toBeInTheDocument();
       expect(screen.queryByRole('navigation', { name: 'Corporation' })).not.toBeInTheDocument();
     }
   );
