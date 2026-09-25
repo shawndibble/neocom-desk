@@ -6,8 +6,10 @@ const REQUIREMENTS: Record<number, { skillTypeID: number; level: number }[]> = {
   12005: [{ skillTypeID: 3332, level: 5 }], // an Ishtar: Gallente Cruiser V
   587: [{ skillTypeID: 3329, level: 1 }], // a Rifter: Minmatar Frigate I
 };
+// 99 stands for a type ESI couldn't supply.
 vi.mock('./skillRequirements', () => ({
-  loadRequirements: async (typeId: number) => REQUIREMENTS[typeId] ?? [],
+  loadKnownRequirements: async (typeId: number) =>
+    typeId === 99 ? null : (REQUIREMENTS[typeId] ?? []),
 }));
 vi.mock('@/features/skills/skillMap', () => ({
   loadSkillCatalog: async () => ({
@@ -33,6 +35,10 @@ const hull = (shipTypeId: number): Fitting => ({
 });
 
 const ISHTAR = hull(12005);
+const UNKNOWN_MODULE: Fitting = {
+  ...hull(587),
+  modules: [{ slot: 'high', slotIndex: 0, typeId: 99, state: 'active' }],
+};
 const RIFTER = hull(587);
 
 describe('useFittingAlpha', () => {
@@ -41,6 +47,12 @@ describe('useFittingAlpha', () => {
     await waitFor(() => expect(result.current.blockers).not.toBeNull());
     expect(result.current.blockers).toEqual([{ skillTypeID: 3332, level: 5, alphaMaxLevel: 4 }]);
     expect(result.current.skillName(3332)).toBe('Gallente Cruiser');
+  });
+
+  it('gives no verdict while a fitted type’s requirements are unknown, rather than a false Alpha OK', async () => {
+    const { result } = renderHook(() => useFittingAlpha(UNKNOWN_MODULE));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(result.current.blockers).toBeNull();
   });
 
   it('reports none for a fit an Alpha can fly', async () => {

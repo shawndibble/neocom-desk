@@ -210,7 +210,7 @@
           "offline": "Offline",
           "online": "Online",
           "active": "Active",
-          "overload": "Overheat"
+          "overload": "Overloaded"
         },
         "unload": "Unload {{name}}",
         "info": "Show info",
@@ -219,7 +219,11 @@
       },
       "hardpoints": {
         "turret": "Turret hardpoints: {{used}} of {{total}} used",
-        "launcher": "Launcher hardpoints: {{used}} of {{total}} used"
+        "launcher": "Launcher hardpoints: {{used}} of {{total}} used",
+        "turretLoading": "Turret hardpoints: {{total}}",
+        "launcherLoading": "Launcher hardpoints: {{total}}",
+        "over_one": "{{label}} — {{count}} more than the hull has",
+        "over_other": "{{label}} — {{count}} more than the hull has"
       },
       "cargoTile": "{{name}} ×{{quantity}}",
       "rackHint": "Tap a rack to edit its slots",
@@ -305,8 +309,8 @@
     "alpha": {
       "ok": "Alpha OK",
       "omega": "Omega only",
-      "okTooltip": "An Alpha clone can train every skill this fit needs.",
-      "omegaTooltip": "Needs an Omega clone — an Alpha can't train:",
+      "okTooltip": "By skill caps: an Alpha clone can train every skill this fit needs.",
+      "omegaTooltip": "By skill caps, this needs an Omega clone — an Alpha can't train:",
       "capped": "{{skill}} {{level}} (Alpha max {{max}})",
       "untrainable": "{{skill}} {{level}} (Alphas can’t train it)",
       "more_one": "and {{count}} more",

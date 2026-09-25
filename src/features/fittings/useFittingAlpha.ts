@@ -1,6 +1,6 @@
 /**
  * Whether an Alpha clone can fly the open Fitting, by skill caps: the skills
- * every fitted type needs (`loadRequirements`, shared with the skill gaps),
+ * every fitted type needs (the requirements the skill gaps read too),
  * checked with their prerequisites against the SDE's Alpha caps. Needs no
  * Character — it is a property of the fit, not of who flies it.
  */
@@ -9,7 +9,7 @@ import { fittingAlphaBlockers, type AlphaBlocker } from '@/engine/fittings/alpha
 import { fittingRequirementTypeIds } from '@/engine/fittings/skillGaps';
 import type { Fitting } from '@/engine/fittings/types';
 import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
-import { loadRequirements } from './skillRequirements';
+import { loadKnownRequirements } from './skillRequirements';
 
 export interface FittingAlpha {
   /** Null while loading (or with nothing open); empty when an Alpha can fly it. */
@@ -29,13 +29,18 @@ export function useFittingAlpha(fitting: Fitting | null): FittingAlpha {
         const typeIds = fittingRequirementTypeIds(fitting);
         const [skills, required] = await Promise.all([
           loadSkillCatalog(),
-          Promise.all(typeIds.map(loadRequirements)),
+          Promise.all(typeIds.map(loadKnownRequirements)),
         ]);
         if (cancelled) return;
         setCatalog(skills);
+        // A type ESI couldn't supply might need anything: no verdict beats a false "Alpha OK".
+        if (required.some((skills) => skills === null)) return;
         setResult({
           fitting,
-          blockers: fittingAlphaBlockers(required.flat(), skills.engineSkills),
+          blockers: fittingAlphaBlockers(
+            required.flatMap((skills) => skills ?? []),
+            skills.engineSkills
+          ),
         });
       } catch {
         // No verdict rather than a wrong one; the chip stays hidden.

@@ -4,19 +4,17 @@
  * `launcherFitted` effects), whatever its state. The hull's totals are ship
  * attributes the stats carry; the engine never subtracts what is fitted.
  */
-import type { Fitting } from './types';
+import type { Fitting, HardpointCounts } from './types';
 
-/** Which hardpoint a type takes; `undefined` while it isn't known yet. */
-export type HardpointKindOf = (typeId: number) => 'turret' | 'launcher' | null | undefined;
+/** The hardpoint a type takes, if any. */
+export type HardpointKind = 'turret' | 'launcher';
 
-export interface HardpointsUsed {
-  turrets: number;
-  launchers: number;
-}
+/** Which hardpoint a type takes (null: none); `undefined` while it isn't known yet. */
+export type HardpointKindOf = (typeId: number) => HardpointKind | null | undefined;
 
 /** Null until every high slot module's kind is known, so it never undercounts. */
-export function countHardpoints(fitting: Fitting, kindOf: HardpointKindOf): HardpointsUsed | null {
-  const used: HardpointsUsed = { turrets: 0, launchers: 0 };
+export function countHardpoints(fitting: Fitting, kindOf: HardpointKindOf): HardpointCounts | null {
+  const used: HardpointCounts = { turrets: 0, launchers: 0 };
   for (const module of fitting.modules) {
     if (module.slot !== 'high') continue;
     const kind = kindOf(module.typeId);

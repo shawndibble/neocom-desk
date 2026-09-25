@@ -248,12 +248,12 @@ describe('FittingRing', () => {
       within(menu)
         .getAllByRole('menuitemradio')
         .map((item) => item.textContent?.replace('✓', ''))
-    ).toEqual(['Offline', 'Online', 'Active', 'Overheat']);
+    ).toEqual(['Offline', 'Online', 'Active', 'Overloaded']);
     expect(within(menu).getByRole('menuitemradio', { name: 'Active' })).toHaveAttribute(
       'aria-checked',
       'true'
     );
-    fireEvent.click(within(menu).getByRole('menuitemradio', { name: 'Overheat' }));
+    fireEvent.click(within(menu).getByRole('menuitemradio', { name: 'Overloaded' }));
     expect(actions.setState).toHaveBeenCalledWith('high', 0, 'overload');
 
     fireEvent.contextMenu(screen.getByLabelText('High slots 1, active'));
@@ -305,6 +305,9 @@ describe('FittingRing', () => {
     expect(turrets.querySelectorAll('circle')).toHaveLength(3);
     expect(turrets.querySelectorAll('circle.fill-accent')).toHaveLength(2);
     expect(container.querySelectorAll('[data-hardpoints="launcher"] circle')).toHaveLength(2);
+    // The same numbers as text, for a screen reader or a keyboard — the rim is a picture.
+    expect(screen.getByText('Turret hardpoints: 2 of 3 used')).toBeTruthy();
+    expect(screen.getByText('Launcher hardpoints: 0 of 2 used')).toBeTruthy();
 
     fireEvent.pointerMove(turrets, { pointerType: 'mouse' });
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Turret hardpoints: 2 of 3 used');
@@ -322,6 +325,37 @@ describe('FittingRing', () => {
     expect(
       container.querySelectorAll('[data-hardpoints="turret"] circle.fill-danger')
     ).toHaveLength(1);
+    // Not by colour alone.
+    expect(
+      screen.getByText('Turret hardpoints: 2 of 1 used — 1 more than the hull has')
+    ).toBeTruthy();
+  });
+
+  it('gives a subsystem’s menu no states — a subsystem can’t be put offline', async () => {
+    const t3: Fitting = {
+      ...fitting,
+      modules: [
+        ...fitting.modules,
+        { slot: 'subsystem', slotIndex: 0, typeId: 30, state: 'online' },
+      ],
+    };
+    render(
+      <FittingRing
+        fitting={t3}
+        stats={statsWith(10)}
+        moduleActions={{
+          setState: vi.fn(),
+          unloadCharge: vi.fn(),
+          showInfo: vi.fn(),
+          openVariations: vi.fn(),
+          remove: vi.fn(),
+        }}
+      />
+    );
+    fireEvent.contextMenu(screen.getByLabelText(/^Subsystems 1, /));
+    const menu = await screen.findByRole('menu');
+    expect(within(menu).queryAllByRole('menuitemradio')).toHaveLength(0);
+    expect(within(menu).getByRole('menuitem', { name: /^Remove/ })).toBeTruthy();
   });
 });
 

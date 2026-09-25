@@ -7,8 +7,9 @@ const KIND: Record<number, 'turret' | 'launcher' | null> = {
   10631: 'launcher',
   3244: null,
 };
+// 99 stands for a type ESI couldn't supply.
 vi.mock('./hardpointKinds', () => ({
-  loadHardpointKind: async (typeId: number) => KIND[typeId] ?? null,
+  loadHardpointKind: async (typeId: number) => (typeId === 99 ? undefined : (KIND[typeId] ?? null)),
 }));
 
 const { useFittingHardpoints } = await import('./useFittingHardpoints');
@@ -26,10 +27,21 @@ const RIFTER: Fitting = {
   cargo: [],
 };
 
+const WITH_UNKNOWN: Fitting = {
+  ...RIFTER,
+  modules: [...RIFTER.modules, { slot: 'high', slotIndex: 3, typeId: 99, state: 'active' }],
+};
+
 describe('useFittingHardpoints', () => {
   it('counts the turrets and launchers the high slots take', async () => {
     const { result } = renderHook(() => useFittingHardpoints(RIFTER));
     await waitFor(() => expect(result.current).toEqual({ turrets: 2, launchers: 1 }));
+  });
+
+  it('stays unknown while a high-slot type can’t be fetched, rather than showing its pip free', async () => {
+    const { result } = renderHook(() => useFittingHardpoints(WITH_UNKNOWN));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(result.current).toBeNull();
   });
 
   it('is null with nothing open', () => {

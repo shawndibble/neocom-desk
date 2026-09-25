@@ -158,7 +158,7 @@ export interface FittingStats {
   droneBandwidthByType: Record<number, number>;
   droneCapacity: number;
   /** The hull's turret and launcher hardpoints; what the high slots take is `countHardpoints`. */
-  hardpoints: { turrets: number; launchers: number };
+  hardpoints: HardpointCounts;
   ehp: number;
   capacitor: CapacitorStatus;
   capacitorCapacity: number;
@@ -337,6 +337,12 @@ export const DOGMA_ATTRIBUTE = {
   rigSlots: 1137,
   subsystemSlots: 1367,
 } as const;
+
+/** Turret and launcher hardpoints — a hull's, or those its high slots take. */
+export interface HardpointCounts {
+  turrets: number;
+  launchers: number;
+}
 
 /** What a failed stats calculation was about: the pilot's skills, or the ship data and its calculation. */
 export type StatsErrorReason = 'skills' | 'shipData';

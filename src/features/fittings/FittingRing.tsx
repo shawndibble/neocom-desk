@@ -34,9 +34,8 @@ import {
   type RingRack,
   type RingSlot,
 } from '@/engine/fittings/ringLayout';
-import { cargoGroups } from '@/engine/fittings/fittingEdit';
-import { reachableModuleStates } from '@/engine/fittings/fittingEdit';
-import type { HardpointsUsed } from '@/engine/fittings/hardpoints';
+import { cargoGroups, reachableModuleStates } from '@/engine/fittings/fittingEdit';
+import type { HardpointKind } from '@/engine/fittings/hardpoints';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
 import type {
@@ -45,6 +44,7 @@ import type {
   FittingModuleResult,
   FittingSlotKind,
   FittingStats,
+  HardpointCounts,
 } from '@/engine/fittings/types';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { typeIconUrl, typeRenderUrl } from '@/lib/eveImages';
@@ -133,7 +133,7 @@ interface FittingRingProps {
    */
   moduleActions?: RingModuleActions;
   /** The turrets and launchers the high slots take; null (no pips filled) until known. */
-  hardpointsUsed?: HardpointsUsed | null;
+  hardpointsUsed?: HardpointCounts | null;
   /** The panel header's controls — the page's "+ Add module". */
   actions?: ReactNode;
 }
@@ -231,6 +231,22 @@ function RimGauge({
   );
 }
 
+/**
+ * A kind's hardpoints in words — the tooltip, and the text a screen reader
+ * gets for the pips (which are a picture) — naming any overfit, so it isn't
+ * told by colour alone.
+ */
+function hardpointLabel(
+  t: ReturnType<typeof useTranslation>['t'],
+  kind: HardpointKind,
+  used: number | null,
+  total: number
+): string {
+  if (used === null) return t(`fittings.ring.hardpoints.${kind}Loading`, { total });
+  const label = t(`fittings.ring.hardpoints.${kind}`, { used, total });
+  return used > total ? t('fittings.ring.hardpoints.over', { label, count: used - total }) : label;
+}
+
 /** A pip's radius, and the band a pointer hovers to read a kind's numbers. */
 const PIP_RADIUS = 5;
 const PIP_HIT_WIDTH = 22;
@@ -245,7 +261,7 @@ function HardpointPips({
   used,
   compact,
 }: {
-  kind: 'turret' | 'launcher';
+  kind: HardpointKind;
   total: number;
   /** Null until every high-slot type is known: then nothing shows as taken. */
   used: number | null;
@@ -278,9 +294,8 @@ function HardpointPips({
   if (compact) return <g data-hardpoints={kind}>{pips}</g>;
   const first = angles[0];
   const last = angles[angles.length - 1];
-  const label = t(`fittings.ring.hardpoints.${kind}`, { used: used ?? '…', total });
   return (
-    <Tooltip content={label}>
+    <Tooltip content={hardpointLabel(t, kind, used, total)}>
       <g data-hardpoints={kind} className="pointer-events-auto">
         <path
           d={arcPath(Math.min(first, last) - 2, Math.max(first, last) + 2, RING_GAUGE_RADIUS, c, c)}
@@ -558,38 +573,46 @@ function SlotTile({
     );
   }
   const { rack } = slot;
-  const at = slot.index;
+  const slotIndex = slot.index;
   const name = nameOf(module.typeId);
+  // A subsystem can't be put offline, so its menu has no states to pick.
+  const hasStates = rack !== 'subsystem';
   return (
     <ContextMenu>
       <Tooltip content={tooltip}>
         <ContextMenuTrigger asChild>{tile}</ContextMenuTrigger>
       </Tooltip>
       <ContextMenuContent>
-        <ContextMenuRadioGroup
-          value={shownState}
-          onValueChange={(value) => actions.setState(rack, at, value as FittingItemState)}
-        >
-          {reachableModuleStates(maxState ?? 'overload', shownState).map((option) => (
-            <ContextMenuRadioItem key={option} value={option}>
-              {t(`fittings.ring.menu.state.${option}`)}
-            </ContextMenuRadioItem>
-          ))}
-        </ContextMenuRadioGroup>
-        <ContextMenuSeparator />
+        {hasStates && (
+          <>
+            <ContextMenuRadioGroup
+              value={shownState}
+              onValueChange={(value) =>
+                actions.setState(rack, slotIndex, value as FittingItemState)
+              }
+            >
+              {reachableModuleStates(maxState ?? 'overload', shownState).map((option) => (
+                <ContextMenuRadioItem key={option} value={option}>
+                  {t(`fittings.ring.menu.state.${option}`)}
+                </ContextMenuRadioItem>
+              ))}
+            </ContextMenuRadioGroup>
+            <ContextMenuSeparator />
+          </>
+        )}
         {module.chargeTypeId !== undefined && (
-          <ContextMenuItem onSelect={() => actions.unloadCharge(rack, at)}>
+          <ContextMenuItem onSelect={() => actions.unloadCharge(rack, slotIndex)}>
             {t('fittings.ring.menu.unload', { name: nameOf(module.chargeTypeId) })}
           </ContextMenuItem>
         )}
         <ContextMenuItem onSelect={() => actions.showInfo(module.typeId, name)}>
           {t('fittings.ring.menu.info')}
         </ContextMenuItem>
-        <ContextMenuItem onSelect={() => actions.openVariations(rack, at)}>
+        <ContextMenuItem onSelect={() => actions.openVariations(rack, slotIndex)}>
           {t('fittings.ring.menu.variations')}
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem className="text-danger" onSelect={() => actions.remove(rack, at)}>
+        <ContextMenuItem className="text-danger" onSelect={() => actions.remove(rack, slotIndex)}>
           {t('fittings.ring.menu.remove', { name })}
         </ContextMenuItem>
       </ContextMenuContent>
@@ -710,14 +733,10 @@ export function FittingRing({
     selectedSlot === undefined
       ? undefined
       : selectedSlot?.rack === slot.rack && selectedSlot.index === slot.index;
-  const maxStateOf = (slot: RingSlot) => {
-    if (!slot.module || !moduleResults) return undefined;
-    return moduleResults[fitting.modules.indexOf(slot.module)]?.maxState;
-  };
-  const reachedState = (slot: RingSlot) => {
-    if (!slot.module || !moduleResults) return undefined;
-    return moduleResults[fitting.modules.indexOf(slot.module)]?.state;
-  };
+  const resultOf = (slot: RingSlot) =>
+    slot.module && moduleResults ? moduleResults[fitting.modules.indexOf(slot.module)] : undefined;
+  const maxStateOf = (slot: RingSlot) => resultOf(slot)?.maxState;
+  const reachedState = (slot: RingSlot) => resultOf(slot)?.state;
 
   function tilePosition(angle: number): CSSProperties {
     const p = ringPoint(angle, RING_SLOT_RADIUS);
@@ -846,6 +865,17 @@ export function FittingRing({
             );
           })}
         </div>
+
+        {stats && (stats.hardpoints.turrets > 0 || stats.hardpoints.launchers > 0) && (
+          <ul className="sr-only">
+            {(['turret', 'launcher'] as const).map((kind) => {
+              const total = stats.hardpoints[kind === 'turret' ? 'turrets' : 'launchers'];
+              const used = hardpointsUsed?.[kind === 'turret' ? 'turrets' : 'launchers'] ?? null;
+              if (total === 0 && !used) return null;
+              return <li key={kind}>{hardpointLabel(t, kind, used, total)}</li>;
+            })}
+          </ul>
+        )}
 
         {/* Laid out as the rim is: calibration and powergrid on the left, bandwidth and CPU on the right. */}
         {!compact && (

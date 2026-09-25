@@ -13,7 +13,7 @@ describe('AlphaCloneChip', () => {
     const chip = screen.getByRole('button', { name: 'Alpha OK' });
     await userEvent.hover(chip);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(
-      'An Alpha clone can train every skill this fit needs.'
+      'By skill caps: an Alpha clone can train every skill this fit needs.'
     );
   });
 
