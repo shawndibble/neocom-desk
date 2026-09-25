@@ -6,7 +6,12 @@ const wasmInitMock = vi.fn<(init: { module_or_path: ArrayBuffer }) => Promise<vo
 );
 type MockFit = {
   ship: { type_id: number };
-  items: { type_id: number; slot: { type: string }; charge?: { type_id: number } }[];
+  items: {
+    type_id: number;
+    slot: { type: string };
+    state?: string;
+    charge?: { type_id: number };
+  }[];
 };
 const calculateMock = vi.fn<(fit: MockFit, options?: { validate?: boolean }) => unknown>();
 const loadSdeMock = vi.fn<(bytes: Uint8Array) => number>();
@@ -226,6 +231,114 @@ describe('computeFittingStats module results', () => {
       { state: 'active', maxState: 'overload', chargeGroupIds: [83] },
       { state: 'online', maxState: 'online', chargeGroupIds: [] },
     ]);
+  });
+});
+
+describe('computeFittingStats overheated values', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const DPS = -12;
+  const VOLLEY = -21;
+  const EHP = -43;
+
+  it('recalculates with every heatable active module overloaded and reads overheated values off it', async () => {
+    stubNetwork();
+    calculateMock.mockReset();
+    calculateMock.mockImplementation((fit) => {
+      const heated = fit.items[0].state === 'overload';
+      return {
+        ship: { attributes: new Map([[EHP, { value: heated ? 1200 : 1000 }]]) },
+        items: [
+          {
+            attributes: new Map([
+              [DPS, { value: heated ? 12 : 10 }],
+              [VOLLEY, { value: 50 }],
+            ]),
+            state: heated ? 'overload' : 'active',
+            max_state: 'overload',
+          },
+          { attributes: new Map(), state: 'active', max_state: 'active' },
+          {
+            attributes: new Map([
+              [DPS, { value: 4 }],
+              [VOLLEY, { value: 16 }],
+            ]),
+            state: 'active',
+            max_state: 'active',
+          },
+        ],
+      };
+    });
+    const { computeFittingStats } = await freshModule();
+
+    const stats = await computeFittingStats(
+      {
+        ...fitting,
+        modules: [
+          { slot: 'high', slotIndex: 0, typeId: 3186, state: 'active', chargeTypeId: 230 },
+          { slot: 'low', slotIndex: 0, typeId: 2048, state: 'active' },
+        ],
+        drones: [{ typeId: 2488, quantity: 5, state: 'active' }],
+      },
+      profile
+    );
+
+    expect(calculateMock).toHaveBeenCalledTimes(2);
+    const heatedFit = calculateMock.mock.calls[1][0];
+    expect(heatedFit.items.map((item) => item.state)).toEqual(['overload', 'active', 'active']);
+    expect(stats.offense.weapons).toEqual([
+      expect.objectContaining({
+        typeId: 3186,
+        count: 1,
+        dps: 10,
+        overheated: { dps: 12, volley: 50 },
+      }),
+      expect.objectContaining({ typeId: 2488, count: 5, dps: 20, overheated: null }),
+    ]);
+    expect(stats.offense.dps).toBe(30);
+    expect(stats.offense.overheated?.dps).toBe(32);
+    expect(stats.ehp).toBe(1000);
+    expect(stats.overheated?.ehp).toBe(1200);
+  });
+
+  it('calculates once and reports no overheated values when no module can overheat', async () => {
+    stubNetwork();
+    calculateMock.mockReset();
+    calculateMock.mockReturnValue({
+      ship: { attributes: new Map() },
+      items: [{ attributes: new Map(), state: 'online', max_state: 'online' }],
+    });
+    const { computeFittingStats } = await freshModule();
+
+    const stats = await computeFittingStats(
+      { ...fitting, modules: [{ slot: 'low', slotIndex: 0, typeId: 2048, state: 'online' }] },
+      profile
+    );
+
+    expect(calculateMock).toHaveBeenCalledTimes(1);
+    expect(stats.overheated).toBeNull();
+    expect(stats.offense.overheated).toBeNull();
+  });
+
+  it('skips the overheated calculation when asked to', async () => {
+    stubNetwork();
+    calculateMock.mockReset();
+    calculateMock.mockReturnValue({
+      ship: { attributes: new Map() },
+      items: [{ attributes: new Map(), state: 'active', max_state: 'overload' }],
+    });
+    const { computeFittingStats } = await freshModule();
+
+    const stats = await computeFittingStats(
+      { ...fitting, modules: [{ slot: 'high', slotIndex: 0, typeId: 3186, state: 'active' }] },
+      profile,
+      undefined,
+      undefined,
+      { overheated: false }
+    );
+
+    expect(calculateMock).toHaveBeenCalledTimes(1);
+    expect(stats.overheated).toBeNull();
   });
 });
 

@@ -26,7 +26,7 @@ import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { checkCharges } from './dogmaFittingEngine';
 import type { AddTarget } from './addTarget';
 import { ImplantBasisControl } from './ImplantBasisControl';
-import type { FittingCatalogue } from './useFittingCatalogue';
+import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
 
 const STATES: readonly FittingItemState[] = ['offline', 'online', 'active', 'overload'];
@@ -86,10 +86,6 @@ function ResourceBar({ label, used, total }: ResourceBarProps) {
   );
 }
 
-function typeName(catalogue: FittingCatalogue | null, typeId: number): string {
-  return catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
-}
-
 export interface EditContext {
   fitting: Fitting;
   catalogue: FittingCatalogue | null;
@@ -120,7 +116,7 @@ export function ModuleRow({
   onOpenVariations,
 }: ModuleRowProps) {
   const { t } = useTranslation();
-  const name = typeName(catalogue, module.typeId);
+  const name = catalogueTypeName(catalogue, module.typeId);
   const { slot, slotIndex, typeId } = module;
   const shipTypeId = fitting.shipTypeId;
 
@@ -140,7 +136,7 @@ export function ModuleRow({
         : new Set(candidates);
     return candidates
       .filter((id) => accepted.has(id))
-      .map((id) => ({ id, name: typeName(catalogue, id) }))
+      .map((id) => ({ id, name: catalogueTypeName(catalogue, id) }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [chargeGroupIds, catalogue, engineReady, profile, shipTypeId, slot, typeId]);
   const loadedCharge = module.chargeTypeId;
@@ -197,7 +193,7 @@ export function ModuleRow({
         >
           <option value="">{t('fittings.edit.noCharge')}</option>
           {!loadedListed && loadedCharge !== undefined && (
-            <option value={loadedCharge}>{typeName(catalogue, loadedCharge)}</option>
+            <option value={loadedCharge}>{catalogueTypeName(catalogue, loadedCharge)}</option>
           )}
           {charges.map((charge) => (
             <option key={charge.id} value={charge.id}>
@@ -287,6 +283,81 @@ function AddSlotButton({
   );
 }
 
+interface RackSlotsProps extends EditContext {
+  rack: FittingSlotKind;
+  stats: FittingStats | null;
+  moduleResults: FittingModuleResult[] | null;
+  target: AddTarget | null;
+  onSelectTarget: (target: AddTarget) => void;
+  unusableModuleKeys?: ReadonlySet<string>;
+  onOpenVariations?: (slot: FittingSlotKind, slotIndex: number) => void;
+  /** Hides the rack's own heading — a rack sheet titles it already. */
+  hideLabel?: boolean;
+}
+
+/**
+ * One rack's slots, filled and empty: the List view's rack section, and the
+ * whole of the phone Ring's rack sheet (scope decision `20260924-205720`).
+ */
+export function RackSlots({
+  rack,
+  stats,
+  moduleResults,
+  target,
+  onSelectTarget,
+  unusableModuleKeys,
+  onOpenVariations,
+  hideLabel = false,
+  ...context
+}: RackSlotsProps) {
+  const { t } = useTranslation();
+  const fitted: { module: FittingModule; index: number }[] = [];
+  context.fitting.modules.forEach((module, index) => {
+    if (module.slot === rack) fitted.push({ module, index });
+  });
+  const slotCounts = stats?.slotCounts ?? null;
+  const bySlot = new Map(fitted.map((entry) => [entry.module.slotIndex, entry]));
+  const highestFitted = Math.max(-1, ...fitted.map((entry) => entry.module.slotIndex));
+  // A module past the rack's end (a pasted over-full fit) still shows, so it can be removed.
+  const slotCount = Math.max(slotCounts?.[rack] ?? 0, highestFitted + 1);
+  if (slotCount === 0) return null;
+  const rackLabel = t(`fittings.list.rack.${rack}`);
+  return (
+    <div>
+      {!hideLabel && <p className={RACK_LABEL_CLASS}>{rackLabel}</p>}
+      <div className="space-y-1.5">
+        {Array.from({ length: slotCount }, (_, slotIndex) => {
+          const entry = bySlot.get(slotIndex);
+          if (entry) {
+            return (
+              <ModuleRow
+                key={slotIndex}
+                {...context}
+                module={entry.module}
+                result={moduleResults?.[entry.index] ?? null}
+                cantUse={unusableModuleKeys?.has(moduleKey(entry.module)) ?? false}
+                onOpenVariations={onOpenVariations}
+              />
+            );
+          }
+          // Before ship data, a gap below a fitted module is just a gap — no Add yet.
+          if (slotCounts === null) return null;
+          return (
+            <AddSlotButton
+              key={slotIndex}
+              label={t('fittings.edit.emptySlot', { rack: rackLabel })}
+              selected={
+                target?.kind === 'slot' && target.slot === rack && target.slotIndex === slotIndex
+              }
+              onClick={() => onSelectTarget({ kind: 'slot', slot: rack, slotIndex })}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 interface FittingRackListProps extends EditContext {
   stats: FittingStats | null;
   /** Index-parallel to `fitting.modules`; null while the open fit's own calculation is pending. */
@@ -328,13 +399,7 @@ export function FittingRackList({
 }: FittingRackListProps) {
   const { t } = useTranslation();
   const context = { fitting, catalogue, engineReady, profile, edit };
-  const modulesByRack = new Map<FittingSlotKind, { module: FittingModule; index: number }[]>();
-  for (const rack of FITTING_SLOT_KINDS) modulesByRack.set(rack, []);
-  fitting.modules.forEach((module, index) =>
-    modulesByRack.get(module.slot)?.push({ module, index })
-  );
   const drones = droneGroups(fitting);
-  const slotCounts = stats?.slotCounts ?? null;
 
   return (
     <Panel
@@ -377,57 +442,25 @@ export function FittingRackList({
           <p className="text-xs text-text-dim">{t('fittings.edit.slotsWaitForShipData')}</p>
         )}
 
-        {FITTING_SLOT_KINDS.map((rack) => {
-          const fitted = modulesByRack.get(rack) ?? [];
-          const bySlot = new Map(fitted.map((entry) => [entry.module.slotIndex, entry]));
-          const highestFitted = Math.max(-1, ...fitted.map((entry) => entry.module.slotIndex));
-          // A module past the rack's end (a pasted over-full fit) still shows, so it can be removed.
-          const slotCount = Math.max(slotCounts?.[rack] ?? 0, highestFitted + 1);
-          if (slotCount === 0) return null;
-          const rackLabel = t(`fittings.list.rack.${rack}`);
-          return (
-            <div key={rack}>
-              <p className={RACK_LABEL_CLASS}>{rackLabel}</p>
-              <div className="space-y-1.5">
-                {Array.from({ length: slotCount }, (_, slotIndex) => {
-                  const entry = bySlot.get(slotIndex);
-                  if (entry) {
-                    return (
-                      <ModuleRow
-                        key={slotIndex}
-                        {...context}
-                        module={entry.module}
-                        result={moduleResults?.[entry.index] ?? null}
-                        cantUse={unusableModuleKeys?.has(moduleKey(entry.module)) ?? false}
-                        onOpenVariations={onOpenVariations}
-                      />
-                    );
-                  }
-                  // Before ship data, a gap below a fitted module is just a gap — no Add yet.
-                  if (slotCounts === null) return null;
-                  return (
-                    <AddSlotButton
-                      key={slotIndex}
-                      label={t('fittings.edit.emptySlot', { rack: rackLabel })}
-                      selected={
-                        target?.kind === 'slot' &&
-                        target.slot === rack &&
-                        target.slotIndex === slotIndex
-                      }
-                      onClick={() => onSelectTarget({ kind: 'slot', slot: rack, slotIndex })}
-                    />
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
+        {FITTING_SLOT_KINDS.map((rack) => (
+          <RackSlots
+            key={rack}
+            {...context}
+            rack={rack}
+            stats={stats}
+            moduleResults={moduleResults}
+            target={target}
+            onSelectTarget={onSelectTarget}
+            unusableModuleKeys={unusableModuleKeys}
+            onOpenVariations={onOpenVariations}
+          />
+        ))}
 
         <div>
           <p className={RACK_LABEL_CLASS}>{t('fittings.list.drones')}</p>
           <div className="space-y-1.5">
             {drones.map((group) => {
-              const name = typeName(catalogue, group.typeId);
+              const name = catalogueTypeName(catalogue, group.typeId);
               return (
                 <div
                   key={group.typeId}

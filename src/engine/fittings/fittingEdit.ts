@@ -69,6 +69,27 @@ export function swapModuleType(
   return updateModule(fitting, slot, slotIndex, (module) => ({ ...module, typeId }));
 }
 
+/**
+ * Moves the module at `from` to `to` within one rack — a drag on the Ring —
+ * keeping its state and charge, and swapping with whatever sat at `to`.
+ * An empty `from` or `from === to` leaves the Fitting as it was.
+ */
+export function moveModule(
+  fitting: Fitting,
+  slot: FittingSlotKind,
+  from: number,
+  to: number
+): Fitting {
+  if (from === to || !fitting.modules.some((module) => isAt(module, slot, from))) return fitting;
+  const modules = fitting.modules.map((module) => {
+    if (isAt(module, slot, from)) return { ...module, slotIndex: to };
+    if (isAt(module, slot, to)) return { ...module, slotIndex: from };
+    return module;
+  });
+  modules.sort(byRackThenIndex);
+  return { ...fitting, modules };
+}
+
 export function removeModule(fitting: Fitting, slot: FittingSlotKind, slotIndex: number): Fitting {
   return {
     ...fitting,
