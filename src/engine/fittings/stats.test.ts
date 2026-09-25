@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { extractFittingStats, extractModuleResult } from './stats';
+import {
+  extractFittingStats,
+  extractModuleResult,
+  extractOffense,
+  extractOverheatedStats,
+  overheatedOrNull,
+  type OffenseItem,
+} from './stats';
 import { DOGMA_ATTRIBUTE, ITEM_DOGMA_ATTRIBUTE } from './types';
 
 function attrs(
@@ -214,5 +221,139 @@ describe('extractModuleResult', () => {
       extractModuleResult({ attributes: new Map(), state: 'online', max_state: 'online' })
         .chargeGroupIds
     ).toEqual([]);
+  });
+});
+
+function weaponResult(
+  dps: number,
+  volley: number,
+  state: 'online' | 'active' | 'overload' = 'active',
+  maxState: 'active' | 'overload' = 'overload'
+) {
+  return {
+    attributes: new Map([
+      [ITEM_DOGMA_ATTRIBUTE.damagePerSecond, { value: dps }],
+      [ITEM_DOGMA_ATTRIBUTE.damageVolley, { value: volley }],
+    ]),
+    state,
+    max_state: maxState,
+  };
+}
+
+const BLASTER: OffenseItem = { typeId: 3186, chargeTypeId: 230, quantity: 1, isDrone: false };
+const WARRIOR: OffenseItem = { typeId: 2488, quantity: 5, isDrone: true };
+
+describe('extractOffense', () => {
+  it('groups identical weapons into one row, scales drones by stack size, and sums rows to the total', () => {
+    const offense = extractOffense(
+      [BLASTER, BLASTER, WARRIOR],
+      [weaponResult(26.8, 152), weaponResult(26.8, 152), weaponResult(24, 96, 'active', 'active')],
+      null
+    );
+
+    expect(offense.weapons).toEqual([
+      expect.objectContaining({ typeId: 3186, chargeTypeId: 230, isDrone: false, count: 2 }),
+      expect.objectContaining({ typeId: 2488, isDrone: true, count: 5 }),
+    ]);
+    expect(offense.weapons[0].dps).toBeCloseTo(53.6, 6);
+    expect(offense.weapons[0].volley).toBeCloseTo(304, 6);
+    expect(offense.weapons[1].dps).toBeCloseTo(120, 6);
+    expect(offense.weapons[1].volley).toBeCloseTo(480, 6);
+    expect(offense.dps).toBeCloseTo(173.6, 6);
+    expect(offense.volley).toBeCloseTo(784, 6);
+  });
+
+  it('keeps the same weapon with a different charge on its own row', () => {
+    const offense = extractOffense(
+      [BLASTER, { ...BLASTER, chargeTypeId: 238 }],
+      [weaponResult(26.8, 152), weaponResult(20, 110)],
+      null
+    );
+
+    expect(offense.weapons.map((row) => row.chargeTypeId)).toEqual([230, 238]);
+  });
+
+  it('leaves out weapons that are not firing and items that deal no damage', () => {
+    const offense = extractOffense(
+      [
+        BLASTER,
+        { ...BLASTER, chargeTypeId: undefined },
+        { typeId: 2048, quantity: 1, isDrone: false },
+      ],
+      [
+        weaponResult(0, 204, 'online'), // an online launcher still reports a volley
+        weaponResult(0, 0), // active, but no charge loaded
+        { attributes: new Map(), state: 'active' as const, max_state: 'active' as const },
+      ],
+      null
+    );
+
+    expect(offense.weapons).toEqual([]);
+    expect(offense.dps).toBe(0);
+    expect(offense.volley).toBe(0);
+  });
+
+  it('reads each overheatable row from the overheated calculation, and never overheats drones', () => {
+    const offense = extractOffense(
+      [BLASTER, BLASTER, WARRIOR],
+      [weaponResult(26.8, 152), weaponResult(26.8, 152), weaponResult(24, 96, 'active', 'active')],
+      [
+        weaponResult(30.8, 175, 'overload'),
+        weaponResult(30.8, 175, 'overload'),
+        weaponResult(24, 96, 'active', 'active'),
+      ]
+    );
+
+    expect(offense.weapons[0].overheatedDps).toBeCloseTo(61.6, 6);
+    expect(offense.weapons[0].overheatedVolley).toBeCloseTo(350, 6);
+    expect(offense.weapons[1].overheatedDps).toBeNull();
+    expect(offense.weapons[1].overheatedVolley).toBeNull();
+    // Rows that can't overheat count at their normal value in the overheated total.
+    expect(offense.overheatedDps).toBeCloseTo(181.6, 6);
+    expect(offense.overheatedVolley).toBeCloseTo(830, 6);
+  });
+
+  it('has no overheated values at all without an overheated calculation', () => {
+    const offense = extractOffense([BLASTER], [weaponResult(26.8, 152)], null);
+
+    expect(offense.weapons[0].overheatedDps).toBeNull();
+    expect(offense.overheatedDps).toBeNull();
+    expect(offense.overheatedVolley).toBeNull();
+  });
+
+  it('has no overheated total when only drones fire', () => {
+    const offense = extractOffense(
+      [WARRIOR],
+      [weaponResult(24, 96, 'active', 'active')],
+      [weaponResult(24, 96, 'active', 'active')]
+    );
+
+    expect(offense.overheatedDps).toBeNull();
+  });
+});
+
+describe('local repair and overheated stats', () => {
+  it("reads the ship's local shield, armor and hull repair rates", () => {
+    const stats = extractFittingStats(
+      [],
+      attrs({ shieldBoostRate: 40, armorRepairRate: 63.2, hullRepairRate: 0 }),
+      []
+    );
+
+    expect(stats.repair).toEqual({ shield: 40, armor: 63.2, hull: 0 });
+  });
+
+  it('reads EHP, max velocity and repair rates off the overheated calculation', () => {
+    expect(
+      extractOverheatedStats(attrs({ ehp: 17204, maxVelocity: 1200, armorRepairRate: 81.8 }))
+    ).toEqual({ ehp: 17204, maxVelocity: 1200, repair: { shield: 0, armor: 81.8, hull: 0 } });
+  });
+});
+
+describe('overheatedOrNull', () => {
+  it('returns the overheated value only when it differs at display rounding', () => {
+    expect(overheatedOrNull(63.2, 81.8, 1)).toBe(81.8);
+    expect(overheatedOrNull(63.21, 63.24, 1)).toBeNull();
+    expect(overheatedOrNull(63.2, null, 1)).toBeNull();
   });
 });

@@ -7,7 +7,13 @@ import wasmInit, {
 } from '@eveshipfit/dogma-engine';
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
-import { extractFittingStats, extractModuleResult } from '@/engine/fittings/stats';
+import {
+  extractFittingStats,
+  extractModuleResult,
+  extractOffense,
+  extractOverheatedStats,
+  type OffenseItem,
+} from '@/engine/fittings/stats';
 import {
   ITEM_DOGMA_ATTRIBUTE,
   type Fitting,
@@ -177,7 +183,54 @@ export async function computeFittingStats(
   // `fittingToDogmaFit` puts the modules first, so module i is items[i].
   const modules = fitting.modules.map((_, index) => extractModuleResult(calculation.items[index]));
 
-  return { ...baseStats, calibrationUsed, droneBandwidthUsed, modules };
+  // Overheated values come from the engine itself (its overload state), not
+  // a multiplier applied here: the same fit again with every active module
+  // that can overheat set to overload. Skipped when there is none, so a fit
+  // with nothing to overheat costs one calculation and shows no overheated line.
+  let heatable = false;
+  const overheatedFit: Fit = {
+    ...dogmaFit,
+    items: dogmaFit.items.map((item, index) => {
+      const result = calculation.items[index];
+      if (index >= fitting.modules.length || result?.max_state !== 'overload') return item;
+      if (result.state !== 'active') return item;
+      heatable = true;
+      return { ...item, state: 'overload' };
+    }),
+  };
+  const overheatedCalculation = heatable ? calculate(overheatedFit) : null;
+
+  // Drones follow the modules in `dogmaFit.items`.
+  const offenseItems: OffenseItem[] = [
+    ...fitting.modules.map((module) => ({
+      typeId: module.typeId,
+      chargeTypeId: module.chargeTypeId,
+      quantity: 1,
+      isDrone: false,
+    })),
+    ...fitting.drones.map((drone) => ({
+      typeId: drone.typeId,
+      quantity: drone.quantity,
+      isDrone: true,
+    })),
+  ];
+  const offense = extractOffense(
+    offenseItems,
+    calculation.items,
+    overheatedCalculation?.items ?? null
+  );
+  const overheated = overheatedCalculation
+    ? extractOverheatedStats(overheatedCalculation.ship.attributes)
+    : null;
+
+  return {
+    ...baseStats,
+    calibrationUsed,
+    droneBandwidthUsed,
+    modules,
+    offense,
+    overheated,
+  };
 }
 
 export interface CandidateCheck {

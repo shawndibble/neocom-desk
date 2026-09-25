@@ -176,6 +176,7 @@ export function Fittings() {
       statsProgress={workspace.statsProgress}
       statsError={workspace.statsError}
       price={workspace.price}
+      typeName={(typeId) => catalogue?.types[String(typeId)]?.name ?? `#${typeId}`}
     />
   );
 

@@ -1,8 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { CollapsiblePanel } from '@/components/ui';
-import { resistPct } from '@/engine/fittings/stats';
-import type { FittingStats, LayerDefense } from '@/engine/fittings/types';
+import { overheatedOrNull, resistPct } from '@/engine/fittings/stats';
+import type { FittingStats, LayerDefense, LocalRepair, WeaponRow } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import type { DogmaAssetProgress } from './dogmaFittingEngine';
 
@@ -46,6 +46,40 @@ function LayerCard({ title, layer }: { title: string; layer: LayerDefense }) {
   );
 }
 
+/**
+ * An overheated value beside its normal one, in the warning tone — the
+ * game marks heat the same way. Renders nothing when `value` is null.
+ */
+function Overheated({ value, digits }: { value: number | null; digits: number }) {
+  const { t } = useTranslation();
+  if (value === null) return null;
+  return (
+    <span className="ml-1 text-warning">
+      {t('fittings.stats.overheated', { value: value.toFixed(digits) })}
+    </span>
+  );
+}
+
+function DamageFigures({
+  dps,
+  volley,
+  overheatedDps,
+  overheatedVolley,
+}: Pick<WeaponRow, 'dps' | 'volley' | 'overheatedDps' | 'overheatedVolley'>) {
+  const { t } = useTranslation();
+  return (
+    <span className="shrink-0 text-right">
+      <span>{t('fittings.stats.weaponDps', { value: dps.toFixed(1) })}</span>
+      <Overheated value={overheatedOrNull(dps, overheatedDps, 1)} digits={1} />
+      <span className="text-text-dim"> · </span>
+      <span>{t('fittings.stats.weaponVolley', { value: volley.toFixed(0) })}</span>
+      <Overheated value={overheatedOrNull(volley, overheatedVolley, 0)} digits={0} />
+    </span>
+  );
+}
+
+const REPAIR_LAYERS: readonly (keyof LocalRepair)[] = ['shield', 'armor', 'hull'];
+
 const SECTIONS = [
   'capacitor',
   'offense',
@@ -63,6 +97,8 @@ interface FittingStatsSectionsProps {
   statsProgress: DogmaAssetProgress | null;
   statsError: boolean;
   price: Appraisal | null;
+  /** Names an Offense row's weapon, charge or drone. */
+  typeName: (typeId: number) => string;
 }
 
 export function FittingStatsSections({
@@ -70,6 +106,7 @@ export function FittingStatsSections({
   statsProgress,
   statsError,
   price,
+  typeName,
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState<Record<Section, boolean>>(
@@ -138,18 +175,83 @@ export function FittingStatsSections({
 
       {section(
         'offense',
-        undefined,
-        <p className="text-xs text-text-dim">{t('fittings.stats.offenseComingSoon')}</p>
+        stats && stats.offense.weapons.length > 0
+          ? t('fittings.stats.weaponDps', { value: stats.offense.dps.toFixed(1) })
+          : undefined,
+        stats ? (
+          stats.offense.weapons.length > 0 ? (
+            <ul className="space-y-1 text-xs">
+              {stats.offense.weapons.map((row) => (
+                <li
+                  key={`${row.isDrone}:${row.typeId}:${row.chargeTypeId ?? ''}`}
+                  className="flex flex-wrap justify-between gap-x-2"
+                >
+                  <span className="min-w-0">
+                    <span>
+                      {t('fittings.stats.weaponRow', {
+                        count: row.count,
+                        name: typeName(row.typeId),
+                      })}
+                    </span>
+                    {row.chargeTypeId !== undefined && (
+                      <span className="block text-text-dim">{typeName(row.chargeTypeId)}</span>
+                    )}
+                    {row.isDrone && (
+                      <span className="block text-text-dim">
+                        {t('fittings.stats.dronesNoOverheat')}
+                      </span>
+                    )}
+                  </span>
+                  <DamageFigures {...row} />
+                </li>
+              ))}
+              <li className="flex justify-between gap-x-2 border-t border-line pt-1 font-semibold">
+                <span>{t('fittings.stats.offenseTotal')}</span>
+                <DamageFigures {...stats.offense} />
+              </li>
+            </ul>
+          ) : (
+            <p className="text-xs text-text-dim">{t('fittings.stats.offenseNone')}</p>
+          )
+        ) : (
+          placeholder
+        )
       )}
 
       {section(
         'defense',
         stats ? t('fittings.stats.defenseEhp', { value: stats.ehp.toFixed(0) }) : undefined,
         stats ? (
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <LayerCard title={t('fittings.stats.shield')} layer={stats.shield} />
-            <LayerCard title={t('fittings.stats.armor')} layer={stats.armor} />
-            <LayerCard title={t('fittings.stats.hull')} layer={stats.hull} />
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              <LayerCard title={t('fittings.stats.shield')} layer={stats.shield} />
+              <LayerCard title={t('fittings.stats.armor')} layer={stats.armor} />
+              <LayerCard title={t('fittings.stats.hull')} layer={stats.hull} />
+            </div>
+            <ul className="space-y-1 text-xs text-text-dim">
+              {overheatedOrNull(stats.ehp, stats.overheated?.ehp, 0) !== null && (
+                <li>
+                  {t('fittings.stats.ehpLine', { value: stats.ehp.toFixed(0) })}
+                  <Overheated
+                    value={overheatedOrNull(stats.ehp, stats.overheated?.ehp, 0)}
+                    digits={0}
+                  />
+                </li>
+              )}
+              {REPAIR_LAYERS.filter((layer) => stats.repair[layer] > 0).map((layer) => (
+                <li key={layer}>
+                  {t(`fittings.stats.repair.${layer}`, { value: stats.repair[layer].toFixed(1) })}
+                  <Overheated
+                    value={overheatedOrNull(
+                      stats.repair[layer],
+                      stats.overheated?.repair[layer],
+                      1
+                    )}
+                    digits={1}
+                  />
+                </li>
+              ))}
+            </ul>
           </div>
         ) : (
           placeholder
@@ -194,6 +296,14 @@ export function FittingStatsSections({
           <ul className="space-y-1 text-xs text-text-dim">
             <li>
               {t('fittings.stats.maxVelocity', { value: stats.navigation.maxVelocity.toFixed(0) })}
+              <Overheated
+                value={overheatedOrNull(
+                  stats.navigation.maxVelocity,
+                  stats.overheated?.maxVelocity,
+                  0
+                )}
+                digits={0}
+              />
             </li>
             <li>{t('fittings.stats.agility', { value: stats.navigation.agility.toFixed(3) })}</li>
             <li>
