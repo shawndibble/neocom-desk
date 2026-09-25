@@ -105,6 +105,21 @@ export async function beginAddCharacterLogin(): Promise<void> {
 }
 
 /**
+ * Add a Character with a hand-picked set of Permissions — the Customize
+ * permissions dialog's own submit (issue #1522). Same "nobody to union with"
+ * reasoning as `beginAddCharacterLogin`: the returning identity is unknowable
+ * until EVE sends them back. Unlike that base request, `groups` here may omit
+ * a default-on Permission (an unchecked box) or include an opt-in one
+ * (Corporation, Structure markets) — Customize offers all 13 either way.
+ */
+export async function beginCustomizedAddCharacterLogin(
+  groups: readonly ScopeGroup[]
+): Promise<void> {
+  const scopes = [...new Set([...CORE_GRANT, ...groups.flatMap((group) => scopesForGroup(group))])];
+  assignLocation(await startLogin(scopes));
+}
+
+/**
  * Restart whatever login this tab last began, asking for the same scopes.
  *
  * `false` when this tab has no record of one, which is the honest answer: the

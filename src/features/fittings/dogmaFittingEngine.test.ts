@@ -4,12 +4,16 @@ import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 const wasmInitMock = vi.fn<(init: { module_or_path: ArrayBuffer }) => Promise<void>>(
   async () => {}
 );
-const calculateMock = vi.fn<(fit: { ship: { type_id: number } }) => unknown>();
+type MockFit = {
+  ship: { type_id: number };
+  items: { type_id: number; slot: { type: string }; charge?: { type_id: number } }[];
+};
+const calculateMock = vi.fn<(fit: MockFit, options?: { validate?: boolean }) => unknown>();
 const loadSdeMock = vi.fn<(bytes: Uint8Array) => number>();
 
 vi.mock('@eveshipfit/dogma-engine', () => ({
   default: (init: { module_or_path: ArrayBuffer }) => wasmInitMock(init),
-  calculate: (fit: { ship: { type_id: number } }) => calculateMock(fit),
+  calculate: (fit: MockFit, options?: { validate?: boolean }) => calculateMock(fit, options),
   load_sde: (bytes: Uint8Array) => loadSdeMock(bytes),
 }));
 
@@ -190,5 +194,122 @@ describe('computeFittingStats', () => {
 
     expect(stats.calibrationUsed).toBe(100);
     expect(stats.droneBandwidthUsed).toBe(15); // 5 Mbit x 3 active, bay stack excluded
+  });
+});
+
+describe('computeFittingStats module results', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("reports each module's reached and highest state, index-parallel to the fitting's modules", async () => {
+    stubNetwork();
+    calculateMock.mockReturnValue({
+      ship: { attributes: new Map() },
+      items: [
+        { attributes: new Map([[604, { value: 83 }]]), state: 'active', max_state: 'overload' },
+        { attributes: new Map(), state: 'online', max_state: 'online' },
+      ],
+    });
+    const { computeFittingStats } = await freshModule();
+
+    const stats = await computeFittingStats(
+      {
+        ...fitting,
+        modules: [
+          { slot: 'high', slotIndex: 0, typeId: 2889, state: 'active' },
+          { slot: 'low', slotIndex: 0, typeId: 2048, state: 'active' },
+        ],
+      },
+      profile
+    );
+
+    expect(stats.modules).toEqual([
+      { state: 'active', maxState: 'overload', chargeGroupIds: [83] },
+      { state: 'online', maxState: 'online', chargeGroupIds: [] },
+    ]);
+  });
+});
+
+describe('fit checks', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('is not ready, and refuses to check, before the engine has loaded', async () => {
+    const { isDogmaEngineReady, checkCandidates } = await freshModule();
+    expect(isDogmaEngineReady()).toBe(false);
+    expect(() => checkCandidates(587, 'low', [2048], profile)).toThrow();
+  });
+
+  it('checks each candidate alone on the hull, reading its own rules and the hull-level ones it causes', async () => {
+    stubNetwork();
+    calculateMock.mockImplementation((fit) => {
+      const typeId = fit.items[0].type_id;
+      const violations = [
+        // The hull itself needing a skill says nothing about the candidate.
+        { target: { type: 'ship' }, rule: { type: 'skill' } },
+        ...(typeId === 1
+          ? [{ target: { type: 'item', index: 0 }, rule: { type: 'wrong_slot' } }]
+          : []),
+        ...(typeId === 2 ? [{ target: { type: 'item', index: 0 }, rule: { type: 'skill' } }] : []),
+        // No launcher hardpoint: the engine reports it against the ship.
+        ...(typeId === 4 ? [{ target: { type: 'ship' }, rule: { type: 'slots' } }] : []),
+      ];
+      return { ship: { attributes: new Map() }, items: [], violations };
+    });
+    const { loadDogmaEngine, isDogmaEngineReady, checkCandidates } = await freshModule();
+    await loadDogmaEngine();
+    expect(isDogmaEngineReady()).toBe(true);
+    calculateMock.mockClear();
+
+    const result = checkCandidates(587, 'low', [1, 2, 3, 4], profile);
+
+    expect(result.get(1)).toEqual({ fitsHull: false, canFly: true });
+    expect(result.get(2)).toEqual({ fitsHull: true, canFly: false });
+    expect(result.get(3)).toEqual({ fitsHull: true, canFly: true });
+    expect(result.get(4)).toEqual({ fitsHull: false, canFly: true });
+    expect(calculateMock.mock.calls[0][0].items[0].slot).toEqual({ type: 'low', index: 0 });
+    expect(calculateMock.mock.calls[0][1]).toEqual({ validate: true });
+
+    // Memoized per hull + rack + profile: asking again recalculates nothing.
+    calculateMock.mockClear();
+    checkCandidates(587, 'low', [1, 2, 3, 4], profile);
+    expect(calculateMock).not.toHaveBeenCalled();
+  });
+
+  it('puts a drone candidate in the drone bay', async () => {
+    stubNetwork();
+    calculateMock.mockReturnValue({ ship: { attributes: new Map() }, items: [], violations: [] });
+    const { loadDogmaEngine, checkCandidates } = await freshModule();
+    await loadDogmaEngine();
+    calculateMock.mockClear();
+
+    checkCandidates(587, 'drone', [2454], profile);
+
+    expect(calculateMock.mock.calls[0][0].items[0].slot).toEqual({ type: 'drone_bay' });
+  });
+
+  it('keeps the charges a module accepts, dropping wrong group, wrong size or too big', async () => {
+    stubNetwork();
+    calculateMock.mockImplementation((fit) => {
+      const chargeId = fit.items[0].charge?.type_id;
+      const violations =
+        chargeId === 10
+          ? [{ target: { type: 'charge', index: 0 }, rule: { type: 'charge_size' } }]
+          : chargeId === 11
+            ? [
+                {
+                  target: { type: 'item', index: 0 },
+                  rule: { type: 'resource', resource: 'charge_capacity' },
+                },
+              ]
+            : chargeId === 12
+              ? [{ target: { type: 'charge', index: 0 }, rule: { type: 'skill' } }]
+              : [];
+      return { ship: { attributes: new Map() }, items: [], violations };
+    });
+    const { loadDogmaEngine, checkCharges } = await freshModule();
+    await loadDogmaEngine();
+
+    const fitting = checkCharges(587, { slot: 'high', typeId: 2889 }, [9, 10, 11, 12], profile);
+
+    expect([...fitting]).toEqual([9, 12]);
   });
 });

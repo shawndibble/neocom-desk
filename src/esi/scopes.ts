@@ -43,8 +43,12 @@ function derive(belongs: (spec: EsiEndpointSpec) => boolean): readonly Scope[] {
  */
 export const CORE_GRANT: readonly Scope[] = derive((spec) => spec.group === undefined);
 
-/** The Scope Groups (Permissions) that are part of the Base Grant. */
-const DEFAULT_ON_GROUPS: readonly ScopeGroup[] = SCOPE_GROUPS.filter(
+/**
+ * The Scope Groups (Permissions) that are part of the Base Grant — also the
+ * Customize permissions dialog's starting selection (issue #1522), since that
+ * is the same "what does a Character get by default" question.
+ */
+export const DEFAULT_ON_GROUPS: readonly ScopeGroup[] = SCOPE_GROUPS.filter(
   (group) => PERMISSIONS[group].defaultOn
 );
 

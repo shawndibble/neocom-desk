@@ -1,9 +1,17 @@
-import wasmInit, { calculate, load_sde } from '@eveshipfit/dogma-engine';
+import wasmInit, {
+  calculate,
+  load_sde,
+  type Fit,
+  type FitItem,
+  type Violation,
+} from '@eveshipfit/dogma-engine';
+import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
-import { extractFittingStats } from '@/engine/fittings/stats';
+import { extractFittingStats, extractModuleResult } from '@/engine/fittings/stats';
 import {
   ITEM_DOGMA_ATTRIBUTE,
   type Fitting,
+  type FittingSlotKind,
   type FittingStats,
   type PilotProfile,
 } from '@/engine/fittings/types';
@@ -72,6 +80,12 @@ async function fetchWithProgress(
 }
 
 let enginePromise: Promise<void> | null = null;
+let engineReady = false;
+
+/** True once `loadDogmaEngine` has resolved — the fit checks below are synchronous and need it. */
+export function isDogmaEngineReady(): boolean {
+  return engineReady;
+}
 
 /**
  * Loads the WASM engine and its pinned SDE snapshot, lazily and once
@@ -112,6 +126,7 @@ export function loadDogmaEngine(
 
       await wasmInit({ module_or_path: wasmBytes });
       load_sde(new Uint8Array(sdeBytes));
+      engineReady = true;
     })().catch((error: unknown) => {
       // A failed load (offline on first visit, a bad response, …) must not
       // wedge every later attempt behind the same rejected promise.
@@ -159,5 +174,117 @@ export async function computeFittingStats(
     }
   });
 
-  return { ...baseStats, calibrationUsed, droneBandwidthUsed };
+  // `fittingToDogmaFit` puts the modules first, so module i is items[i].
+  const modules = fitting.modules.map((_, index) => extractModuleResult(calculation.items[index]));
+
+  return { ...baseStats, calibrationUsed, droneBandwidthUsed, modules };
+}
+
+export interface CandidateCheck {
+  /** Nothing about the hull rules it out — rack, hardpoints, rig size, hull restrictions. */
+  fitsHull: boolean;
+  /** The pilot has every skill it needs. */
+  canFly: boolean;
+}
+
+function assertReady(): void {
+  if (!engineReady) throw new Error('Dogma engine not loaded; await loadDogmaEngine() first');
+}
+
+function rulesNaming(violations: readonly Violation[] | undefined, target: 'item' | 'charge') {
+  return (violations ?? []).filter(
+    (violation) => violation.target.type === target && violation.target.index === 0
+  );
+}
+
+const candidateCache = new WeakMap<PilotProfile, Map<string, CandidateCheck>>();
+
+/**
+ * The Add panel's "fits this hull" and "can fly" chips (issue #1533): each
+ * candidate is calculated alone on the bare hull with the engine's own
+ * fitting rules on (`validate`). The rules that name the candidate count,
+ * and so do the ship-level ones other than skills: with the candidate the
+ * only item, a hardpoint shortfall (`slots`, which the engine reports
+ * against the ship) can only be its doing, while a hull the pilot can't fly
+ * says nothing about a module. Alone, not
+ * on the open Fitting, so the answer depends only on hull + rack + pilot and
+ * is memoized on exactly that; a clash with something already fitted (a
+ * second one-per-ship module, hardpoints all used) shows on the Fitting
+ * itself once added. Cheap (~0.3 ms a candidate), but only ever asked about
+ * the results that survived the static filters in `candidates.ts`.
+ */
+export function checkCandidates(
+  shipTypeId: number,
+  rack: CandidateRack,
+  typeIds: readonly number[],
+  profile: PilotProfile
+): Map<number, CandidateCheck> {
+  assertReady();
+  let cache = candidateCache.get(profile);
+  if (!cache) {
+    cache = new Map();
+    candidateCache.set(profile, cache);
+  }
+  const results = new Map<number, CandidateCheck>();
+  for (const typeId of typeIds) {
+    const key = `${shipTypeId}:${rack}:${typeId}`;
+    let check = cache.get(key);
+    if (!check) {
+      const item: FitItem =
+        rack === 'drone'
+          ? { type_id: typeId, slot: { type: 'drone_bay' }, quantity: 1, state: 'online' }
+          : { type_id: typeId, slot: { type: rack, index: 0 }, state: 'online' };
+      const fit: Fit = {
+        ship: { type_id: shipTypeId },
+        items: [item],
+        character: { skills: profile.skillLevels },
+      };
+      const { violations } = calculate(fit, { validate: true });
+      const shipRules = (violations ?? []).filter(
+        (v) => v.target.type === 'ship' && v.rule.type !== 'skill'
+      );
+      check = classifyRuleBreaks(
+        [...rulesNaming(violations, 'item'), ...shipRules].map((v) => v.rule.type)
+      );
+      cache.set(key, check);
+    }
+    results.set(typeId, check);
+  }
+  return results;
+}
+
+/**
+ * Which of `chargeTypeIds` the module takes: loaded into it alone on the
+ * hull, a charge of the wrong group or size, or too big for the module's
+ * capacity, breaks a rule. A missing skill doesn't — the charge still loads.
+ */
+export function checkCharges(
+  shipTypeId: number,
+  module: { slot: FittingSlotKind; typeId: number },
+  chargeTypeIds: readonly number[],
+  profile: PilotProfile
+): Set<number> {
+  assertReady();
+  const fits = new Set<number>();
+  for (const chargeTypeId of chargeTypeIds) {
+    const fit: Fit = {
+      ship: { type_id: shipTypeId },
+      items: [
+        {
+          type_id: module.typeId,
+          slot: { type: module.slot, index: 0 },
+          state: 'online',
+          charge: { type_id: chargeTypeId },
+        },
+      ],
+      character: { skills: profile.skillLevels },
+    };
+    const { violations } = calculate(fit, { validate: true });
+    const chargeRules = rulesNaming(violations, 'charge').filter((v) => v.rule.type !== 'skill');
+    const tooBig = rulesNaming(violations, 'item').some(
+      (v) => v.rule.type === 'resource' && v.rule.resource === 'charge_capacity'
+    );
+    if (chargeRules.length === 0 && !tooBig) fits.add(chargeTypeId);
+  }
+  return fits;
 }
