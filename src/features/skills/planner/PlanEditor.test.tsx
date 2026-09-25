@@ -22,6 +22,8 @@ vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(und
 const loadCharacterSkillQueue =
   vi.fn<(characterId: number) => Promise<CachedResult<SkillQueueEntry[]> | null>>();
 
+vi.mock('./jumpCloneImplants', () => ({ useJumpCloneImplantSets: () => [] }));
+
 vi.mock('../data', () => ({
   loadCharacterSkillQueue: (characterId: number) => loadCharacterSkillQueue(characterId),
 }));

@@ -163,3 +163,37 @@ export function readsLoadedImplants(raw: unknown): boolean {
   const selection = normalizeWhatIfSelection(raw);
   return selection.kind === 'preset' && selection.preset === 'current';
 }
+
+/**
+ * A jump clone's own attribute implants, offered as one more way to fill in
+ * the What-If selection (#1727). `bonuses` is already summed per attribute.
+ */
+export interface JumpCloneImplantSet {
+  id: number;
+  label: string;
+  bonuses: Implants;
+}
+
+/**
+ * Picking a jump clone freezes its real implants as a custom set, the same
+ * shape as any typed-in one — so nothing downstream (costing, sync, the
+ * per-slot inputs) needs to know a clone was the source.
+ */
+export function cloneSelection(clone: JumpCloneImplantSet): WhatIfImplantSelection {
+  return { kind: 'custom', bonuses: fill((name) => clone.bonuses[name] ?? 0) };
+}
+
+/** The clone whose implants the selection resolves to exactly, else `null`. */
+export function matchingCloneId(
+  selection: WhatIfImplantSelection,
+  currentImplants: Implants,
+  clones: readonly JumpCloneImplantSet[]
+): number | null {
+  if (selection.kind !== 'custom') return null;
+  const resolved = whatIfImplants(selection, currentImplants);
+  const match = clones.find((clone) => {
+    const set = whatIfImplants(cloneSelection(clone), currentImplants);
+    return (Object.keys(set) as AttributeName[]).every((name) => set[name] === resolved[name]);
+  });
+  return match?.id ?? null;
+}
