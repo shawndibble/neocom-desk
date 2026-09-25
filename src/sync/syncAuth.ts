@@ -28,6 +28,16 @@ interface MintResponse {
 let inflight: { characterId: number; promise: Promise<string> } | null = null;
 
 /**
+ * Drop the Firebase session. It persists across reloads (IndexedDB), so without
+ * this the last Character's credential would outlive a "log out of this
+ * device". Sync docs are untouched: this is the local session only.
+ */
+export async function signOutOfSync(): Promise<void> {
+  inflight = null;
+  await signOut(getSyncAuth());
+}
+
+/**
  * Ensure the Firebase session is signed in as this character; mint + sign in
  * when it isn't (first sync or character switch). Returns the Firebase uid.
  */

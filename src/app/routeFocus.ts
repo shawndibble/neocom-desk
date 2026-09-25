@@ -61,7 +61,7 @@ function focusHeading(container: HTMLElement): boolean {
 /**
  * First load does nothing — the browser already starts at the top of a fresh
  * document — and neither does a URL with a hash, whose target owns scroll and
- * focus (`?`'s `/settings/general#shortcuts`). `preventScroll` everywhere, so
+ * focus (an old `/settings/general#shortcuts` link, say). `preventScroll` everywhere, so
  * Back and Forward keep whatever scroll the page restores. A page whose `<h1>`
  * waits on data gets `HEADING_WAIT_MS` to render it; the container itself
  * takes focus if none ever appears. Either way, a pilot who already clicked

@@ -79,10 +79,15 @@ function stubNotification(permission: NotificationPermission) {
   return requestPermission;
 }
 
-/** Switches Settings' own tab bar (General / Notifications / Data / Activity Log) — not app navigation. */
+/** Settings' own left rail, as opposed to the app's — both carry links named "Market", "Characters"... */
+function settingsNav(): HTMLElement {
+  return screen.getByRole('navigation', { name: /settings sections/i });
+}
+
+/** Opens one of Settings' sections from its rail. */
 async function openTab(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
   await screen.findByRole('heading', { level: 1, name: /settings/i });
-  await user.click(screen.getByRole('tab', { name }));
+  await user.click(within(settingsNav()).getByRole('link', { name }));
 }
 
 // Rendered through <App /> rather than in isolation: /settings has a nav
@@ -152,6 +157,7 @@ describe('Settings', () => {
   });
 
   it('lists the keyboard shortcuts, so they are discoverable (issue #25)', async () => {
+    window.history.pushState({}, '', '/settings/shortcuts');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -164,6 +170,7 @@ describe('Settings', () => {
 
   it('turns the single-key shortcuts off, persists it, and says so in the list (issue #1494)', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/shortcuts');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -294,6 +301,7 @@ describe('Settings', () => {
       value: { total_sp: 1 },
       fetchedAt: 1,
     });
+    window.history.pushState({}, '', '/settings/dataAge');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -306,7 +314,7 @@ describe('Settings', () => {
   it('Data Age tab shows an empty state when nothing has succeeded yet', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await openTab(user, /^data$/i);
+    await openTab(user, /^data & storage$/i);
 
     expect(screen.getByRole('heading', { name: /data age/i })).toBeInTheDocument();
     expect(screen.getByText(/nothing fetched yet/i)).toBeInTheDocument();
@@ -315,7 +323,7 @@ describe('Settings', () => {
   it('Data Age tab lists only the latest successful fetch per endpoint/character, skipping failures (issue #32)', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await openTab(user, /^data$/i);
+    await openTab(user, /^data & storage$/i);
 
     act(() => {
       const log = useActivityLog.getState();
@@ -371,12 +379,12 @@ const CHAR_2_ID = 92;
  * rather than the whole document.
  */
 async function notificationsPanel(): Promise<HTMLElement> {
-  // Notifications is a tab of its own now, so every query below has to open it
+  // Notifications is a section of its own, so every query below has to open it
   // first — `fireEvent` rather than `userEvent` so this stays callable from the
   // tests that never set up a `user`.
   await screen.findByRole('heading', { level: 1, name: /settings/i });
-  const tab = screen.getByRole('tab', { name: /^notifications$/i });
-  if (tab.getAttribute('aria-selected') !== 'true') fireEvent.click(tab);
+  const link = within(settingsNav()).getByRole('link', { name: /^notifications$/i });
+  if (link.getAttribute('aria-current') !== 'page') fireEvent.click(link);
   const heading = await screen.findByRole('heading', { name: /^notifications$/i });
   const section = heading.closest('section');
   if (!section) throw new Error('Notifications panel has no section wrapper');
@@ -767,11 +775,11 @@ describe('Settings — Notifications (issue #170)', () => {
     // The feed links to /settings/notifications directly (ADR 0015: tab is a path segment).
     window.history.pushState({}, '', '/settings/notifications');
     render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    expect(await screen.findByRole('tab', { name: /^notifications$/i })).toHaveAttribute(
-      'aria-selected',
-      'true'
-    );
+    expect(
+      await within(settingsNav()).findByRole('link', { name: /^notifications$/i })
+    ).toHaveAttribute('aria-current', 'page');
     expect(await screen.findByRole('heading', { name: /^notifications$/i })).toBeInTheDocument();
   });
 
@@ -799,10 +807,11 @@ describe('Settings — Notifications (issue #170)', () => {
     // The link to hand someone who asks what the app stores, from outside the app.
     window.history.pushState({}, '', '/settings/faq');
     render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
 
-    expect(await screen.findByRole('tab', { name: /^faq$/i })).toHaveAttribute(
-      'aria-selected',
-      'true'
+    expect(await within(settingsNav()).findByRole('link', { name: /^faq$/i })).toHaveAttribute(
+      'aria-current',
+      'page'
     );
     expect(await screen.findByRole('heading', { name: /what we store/i })).toBeInTheDocument();
   });
@@ -1207,6 +1216,7 @@ describe('Settings defaults', () => {
   });
 
   it('surfaces the trade hub that Market Browser already writes', async () => {
+    window.history.pushState({}, '', '/settings/market');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1220,6 +1230,7 @@ describe('Settings defaults', () => {
 
   it('clamps the assumed ME into the range the engine accepts', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1236,6 +1247,7 @@ describe('Settings defaults', () => {
 
   it('clamps the assumed TE into the range the engine accepts', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1252,6 +1264,7 @@ describe('Settings defaults', () => {
 
   it('shows the stored assumed TE on a cold load, not the default', async () => {
     await db.settings.put({ key: ASSUMED_TE_SETTING_KEY, value: 4 });
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1259,6 +1272,7 @@ describe('Settings defaults', () => {
   });
 
   it('hides rig and tax for an NPC station, which fits neither', async () => {
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1273,6 +1287,7 @@ describe('Settings defaults', () => {
     // /settings is deep-linkable and mounts none of the pages that hydrate
     // these stores, so it has to hydrate them itself.
     await db.settings.put({ key: ASSUMED_ME_SETTING_KEY, value: 7 });
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1287,6 +1302,7 @@ describe('Settings defaults', () => {
       key: FACILITY_DEFAULTS_SETTING_KEY,
       value: { facility: 'azbel', rigLevel: 't2', facilityTaxPct: 5 },
     });
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1302,6 +1318,7 @@ describe('Settings defaults', () => {
       value: { facility: 'azbel', rigFit: ['meT1', 'teT1', 'none'], facilityTaxPct: 2 },
       hydrated: true,
     });
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1309,25 +1326,26 @@ describe('Settings defaults', () => {
     expect(screen.getByLabelText(/facility tax/i)).toHaveValue(2);
   });
 
-  it('shows the shortcut list for #shortcuts, even from another tab', async () => {
+  it('shows the shortcut list from the ? shortcut, even from another section', async () => {
     const user = userEvent.setup();
     window.history.pushState({}, '', '/settings/faq');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
-    expect(await screen.findByRole('tab', { name: /faq/i })).toHaveAttribute(
-      'aria-selected',
-      'true'
+    expect(await within(settingsNav()).findByRole('link', { name: /faq/i })).toHaveAttribute(
+      'aria-current',
+      'page'
     );
 
-    // The real `?` shortcut, pressed from a tab that is not General. It
-    // navigates to /settings/general#shortcuts, so both the tab and the
-    // anchor land correctly regardless of which tab was showing before.
+    // The real `?` shortcut, pressed from a section that is not Shortcuts. It
+    // navigates to /settings/shortcuts, so it lands correctly regardless of
+    // which section was showing before.
     await user.keyboard('{Shift>}?{/Shift}');
 
     expect(await screen.findByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
   });
 
   it('offers a reaction location default, which nothing could set before', async () => {
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1343,6 +1361,7 @@ describe('Settings defaults', () => {
 
   it('offers no refinery as the manufacturing default, since reactions have their own', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1362,6 +1381,7 @@ describe('Settings defaults', () => {
 
   it('only offers refineries as a reaction location', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1377,6 +1397,7 @@ describe('Settings defaults', () => {
 
   it('persists a reaction location tax', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1394,6 +1415,7 @@ describe('Settings defaults', () => {
       key: REACTION_FACILITY_DEFAULTS_SETTING_KEY,
       value: { facility: 'tatara', rigFit: ['meT2', 'none', 'none'], facilityTaxPct: 4 },
     });
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1404,6 +1426,7 @@ describe('Settings defaults', () => {
   });
 
   it('offers the PI expiring-soon window, defaulting to 24 hours', async () => {
+    window.history.pushState({}, '', '/settings/industry');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1412,15 +1435,21 @@ describe('Settings defaults', () => {
   });
 
   it('hides the corp inactivity policy from a character with no corp access', async () => {
+    window.history.pushState({}, '', '/settings/corporation');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
     // Hide rather than lock, the same rule the corp nav follows — a setting
-    // for a page you cannot open is noise.
+    // for a page you cannot open is noise. The URL still resolves, to a note.
+    expect(await screen.findByText(/appear once the active character/i)).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: /members go dark/i })).not.toBeInTheDocument();
+    expect(
+      within(settingsNav()).queryByRole('link', { name: /^corporation$/i })
+    ).not.toBeInTheDocument();
   });
 
   it('offers the default character filter, defaulting to "This character" (issue #607)', async () => {
+    window.history.pushState({}, '', '/settings/characters');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1429,6 +1458,7 @@ describe('Settings defaults', () => {
 
   it('persists a switch to "All characters"', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/characters');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1450,7 +1480,7 @@ describe('Reset saved view preferences', () => {
     // snapshot's `pathname` never advances to the tab it redirected to.
     // Starting already on the tab path sidesteps that, and must happen
     // before the snapshot is taken.
-    window.history.pushState({}, '', '/settings/general');
+    window.history.pushState({}, '', '/settings/dataAge');
 
     const reloadSpy = vi.fn();
     vi.stubGlobal('location', { ...window.location, reload: reloadSpy });
@@ -1482,6 +1512,7 @@ describe('Reset saved view preferences', () => {
 describe('Settings — phone tab bar', () => {
   it("writes the pilot's four, device-local and in the rail's order", async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/mobileTabs');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1504,6 +1535,7 @@ describe('Settings — phone tab bar', () => {
 
   it('holds the old bar until a replacement is picked, so it is never short', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/mobileTabs');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1517,6 +1549,7 @@ describe('Settings — phone tab bar', () => {
 
   it('goes inert at four rather than guessing which tab a fifth pick replaces', async () => {
     const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/mobileTabs');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1530,6 +1563,9 @@ describe('Settings — phone tab bar', () => {
       'aria-pressed',
       'false'
     );
+    // The click above left the pointer on the chip; leave and re-enter so the
+    // tooltip sees a fresh pointer move rather than depending on timing.
+    await user.unhover(wallet);
     await user.hover(wallet);
     expect(await screen.findByRole('tooltip')).toHaveTextContent(/the bar holds four/i);
 
@@ -1541,6 +1577,7 @@ describe('Settings — phone tab bar', () => {
   });
 
   it('puts the default four back', async () => {
+    window.history.pushState({}, '', '/settings/mobileTabs');
     await db.settings.put({
       key: MOBILE_TABS_KEY,
       value: ['/mail', '/wallet', '/overview', '/assets'],
@@ -1562,5 +1599,150 @@ describe('Settings — phone tab bar', () => {
     await waitFor(async () => {
       expect((await db.settings.get(MOBILE_TABS_KEY))?.value).toEqual([...DEFAULT_MOBILE_TABS]);
     });
+  });
+});
+
+describe('Settings — sections rail', () => {
+  it('files every section under a group heading, with no tab bar', async () => {
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+
+    const nav = settingsNav();
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(
+      within(nav)
+        .getAllByRole('link')
+        .map((link) => link.textContent)
+    ).toEqual([
+      'Display',
+      'Mobile tabs',
+      'Shortcuts',
+      'Permissions',
+      'Industry',
+      'Market',
+      'Characters',
+      // Corporation is absent: this character has no corp access.
+      'Notifications',
+      'Data & storage',
+      'This device',
+      'Activity Log',
+      'FAQ',
+    ]);
+    for (const group of ['App', 'Defaults', 'Alerts', 'Data & device']) {
+      expect(within(nav).getByText(group)).toBeInTheDocument();
+    }
+  });
+
+  it('opens a section from its link and marks it current', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await openTab(user, /^market$/i);
+
+    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toBeInTheDocument();
+    expect(within(settingsNav()).getByRole('link', { name: /^market$/i })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
+    expect(window.location.pathname).toBe('/settings/market');
+  });
+
+  it('carries an old /settings/general#shortcuts link on to the Shortcuts section', async () => {
+    window.history.pushState({}, '', '/settings/general#shortcuts');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: /keyboard shortcuts/i })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/settings/shortcuts');
+  });
+
+  it('carries an old #corp-access link on to the Permissions section', async () => {
+    window.history.pushState({}, '', '/settings/general#corp-access');
+    render(<App />);
+
+    await waitFor(() => expect(window.location.pathname).toBe('/settings/permissions'));
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    await waitFor(() =>
+      expect(within(settingsNav()).getByRole('link', { name: /^permissions$/i })).toHaveAttribute(
+        'aria-current',
+        'page'
+      )
+    );
+  });
+});
+
+describe('Settings — This device', () => {
+  it('logs out of every character, keeps the settings, and lands on the login page', async () => {
+    const user = userEvent.setup();
+    await db.characters.put({ characterId: 92, name: 'Pilot Two', ownerHash: 'oh2', addedAt: 2 });
+    await db.tokens.put({
+      characterId: CHAR_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 1000,
+      scopes: [],
+    });
+    await db.settings.put({ key: ASSUMED_ME_SETTING_KEY, value: 7 });
+    window.history.pushState({}, '', '/settings/device');
+    render(<App />);
+
+    expect(
+      await screen.findByText(/2 characters are logged in on this browser/i)
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^log out$/i }));
+    const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
+    expect(within(dialog).getByText(/removes 2 characters' logins/i)).toBeInTheDocument();
+    // Nothing happens until the dialog is confirmed.
+    expect(await db.characters.count()).toBe(2);
+
+    await user.click(within(dialog).getByRole('button', { name: /^log out$/i }));
+
+    await waitFor(() => expect(window.location.pathname).toBe('/login'));
+    expect(await db.characters.count()).toBe(0);
+    expect(await db.tokens.count()).toBe(0);
+    expect((await db.settings.get(ASSUMED_ME_SETTING_KEY))?.value).toBe(7);
+  });
+
+  it('leaves everything in place when the dialog is cancelled', async () => {
+    const user = userEvent.setup();
+    window.history.pushState({}, '', '/settings/device');
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: /^log out$/i }));
+    const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
+    await user.click(within(dialog).getByRole('button', { name: /cancel/i }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(await db.characters.count()).toBe(1);
+  });
+});
+
+describe('Settings — review follow-ups', () => {
+  it('keeps the dialog open and says so when logging out fails', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(db.characters, 'delete').mockRejectedValueOnce(new Error('disk full'));
+    window.history.pushState({}, '', '/settings/device');
+    render(<App />);
+
+    await user.click(await screen.findByRole('button', { name: /^log out$/i }));
+    const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
+    await user.click(within(dialog).getByRole('button', { name: /^log out$/i }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(/could not log out/i);
+    expect(await db.characters.count()).toBe(1);
+  });
+
+  it('ignores a hash that only names an inherited object member', async () => {
+    window.history.pushState({}, '', '/settings/market#constructor');
+    render(<App />);
+
+    expect(await screen.findByRole('combobox', { name: /default trade hub/i })).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/settings/market');
+  });
+
+  it('puts the CCP data credit at the foot of Data & storage', async () => {
+    window.history.pushState({}, '', '/settings/dataAge');
+    render(<App />);
+
+    expect(await screen.findByRole('heading', { name: /data credit/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /clear cached esi data/i })).toBeInTheDocument();
   });
 });

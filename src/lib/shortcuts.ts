@@ -100,8 +100,8 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
     allowsShift: true,
     descriptionKey: 'shortcuts.showShortcuts',
     // The list this opens is the one rendered from this very array, under the
-    // `#shortcuts` anchor on Settings' General tab.
-    run: (navigate) => navigate('/settings/general#shortcuts'),
+    // Shortcuts section of Settings.
+    run: (navigate) => navigate('/settings/shortcuts'),
   },
   {
     id: 'close',

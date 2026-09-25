@@ -16,7 +16,7 @@ const LINK = 'text-accent hover:underline';
 /**
  * Settings' FAQ tab.
  *
- * One Panel per question, stacked like the General tab's — so a new question is
+ * One Panel per question, stacked like Settings' other sections — so a new question is
  * an addition rather than a rewrite, and each is independently linkable-to by
  * eye when someone is scanning for one answer.
  *

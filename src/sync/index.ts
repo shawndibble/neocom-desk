@@ -26,6 +26,15 @@ export async function triggerSync(characterId: number): Promise<void> {
 }
 
 /**
+ * Sign out of the Firebase session this device holds (see `syncAuth.ts`).
+ * Only call it where sync is configured: the Firebase getters throw otherwise.
+ */
+export async function signOutOfSync(): Promise<void> {
+  const { signOutOfSync } = await import('./syncAuth');
+  return signOutOfSync();
+}
+
+/**
  * Debounced sync — call after each edit. Fire-and-forget: a failed driver load
  * (offline before the chunk is precached) is swallowed and no sync happens.
  */
