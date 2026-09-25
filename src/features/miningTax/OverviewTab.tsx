@@ -65,8 +65,8 @@ import {
   ShowRefiningToggle,
   ValueMenu,
 } from './OverviewSettings';
-import { basisSummary } from './basisLabel';
-import { weakestSource, type PriceSource } from '@/engine/miningTax/priceBasis';
+import { basisSummary, basisUsage } from './basisLabel';
+import { countDaysBySource, weakestSource, type PriceSource } from '@/engine/miningTax/priceBasis';
 import { YieldDetailModal } from './YieldDetailModal';
 import { sumVolume, volumeDisplayMode } from './volume';
 import { VolumeDisplay } from './volumeDisplay';
@@ -277,6 +277,11 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
     };
   }, [visibleRows, data]);
 
+  const daysBySource = useMemo(
+    () =>
+      countDaysBySource(visibleRows.map((r) => ({ date: r.entry.date, source: r.priceSource }))),
+    [visibleRows]
+  );
   const dailyRate: DailyRatePoint[] = useMemo(() => {
     const byDate = new Map<string, number>();
     const sourcesByDate = new Map<string, PriceSource[]>();
@@ -554,7 +559,11 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
             />
           ) : (
             <>
-              <p className="text-xs text-text-dim">{basisSummary(t, basis, buybackRate)}</p>
+              <p className="text-xs text-text-dim">
+                {[basisSummary(t, basis, buybackRate), basisUsage(t, basis, daysBySource)]
+                  .filter(Boolean)
+                  .join(' ')}
+              </p>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <Panel>
                   <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">

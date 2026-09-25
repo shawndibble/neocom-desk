@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import '@/i18n';
 import i18n from '@/i18n';
-import { basisSummary, valueButtonLabel } from './basisLabel';
+import { basisSummary, basisUsage, valueButtonLabel } from './basisLabel';
 
 describe('valueButtonLabel', () => {
   it('is just the basis at the default 100% rate', () => {
@@ -32,5 +32,30 @@ describe('basisSummary', () => {
     expect(basisSummary(i18n.t, 'now-buy', 0)).toBe(
       "Valued at 0% of today's live Jita buy price for every day."
     );
+  });
+});
+
+describe('basisUsage', () => {
+  const counts = { total: 6, saved: 6, average: 0, live: 0, none: 0 };
+
+  it('counts saved days when nothing fell back', () => {
+    expect(basisUsage(i18n.t, 'buy', counts)).toBe('6 of 6 days use saved prices');
+  });
+
+  it('singular for one day', () => {
+    expect(basisUsage(i18n.t, 'buy', { ...counts, total: 1, saved: 1 })).toBe(
+      '1 of 1 day uses saved prices'
+    );
+  });
+
+  it('names each fallback source', () => {
+    expect(basisUsage(i18n.t, 'sell', { total: 8, saved: 4, average: 2, live: 1, none: 1 })).toBe(
+      '4 of 8 days use saved prices, 2 daily avg, 1 live, 1 unpriced'
+    );
+  });
+
+  it('is empty under a now basis or with no days', () => {
+    expect(basisUsage(i18n.t, 'now-buy', counts)).toBe('');
+    expect(basisUsage(i18n.t, 'buy', { ...counts, total: 0, saved: 0 })).toBe('');
   });
 });
