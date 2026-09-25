@@ -23,6 +23,7 @@ import {
 export type LoadInput =
   | { kind: 'eft'; text: string }
   | { kind: 'dna'; dna: string }
+  | { kind: 'share'; code: string }
   | { kind: 'killmail'; killmailId: number; hash?: string }
   | { kind: 'unknown' };
 
@@ -53,6 +54,9 @@ export function classifyLoadInput(input: string): LoadInput {
   if (/^https?:\/\//i.test(text)) {
     try {
       const url = new URL(text);
+      // This app's own Share Link (a Fitting's Export menu): the code rides in `?f=`.
+      const code = url.searchParams.get('f');
+      if (code && /\/fittings\/?$/.test(url.pathname)) return { kind: 'share', code };
       if (/(^|\.)eveship\.fit$/i.test(url.hostname)) {
         const fit = url.searchParams.get('fit') ?? decodeURIComponent(url.hash.replace(/^#/, ''));
         return classifyPlain(fit);

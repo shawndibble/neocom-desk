@@ -17,6 +17,7 @@ import {
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
 import { MyFittingsPanel } from '@/features/fittings/MyFittingsPanel';
+import { FittingExportMenu } from '@/features/fittings/FittingExportMenu';
 import { FittingLoadCard } from '@/features/fittings/FittingLoadCard';
 import { InGameFittingsPanel } from '@/features/fittings/InGameFittingsPanel';
 import { SaveToEveDialog } from '@/features/fittings/SaveToEveDialog';
@@ -214,6 +215,7 @@ export function Fittings() {
               >
                 {t('fittings.saveToEve.action')}
               </Button>
+              <FittingExportMenu fitting={fitting} price={workspace.price} />
               {viewHydrated && (
                 <FittingViewToggle value={view} onChange={(next) => void setView(next)} />
               )}
@@ -224,9 +226,12 @@ export function Fittings() {
       <FittingLoadCard
         onLoad={workspace.loadFromInput}
         unresolved={workspace.unresolved}
+        fitXmlUnresolved={workspace.fitXmlUnresolved}
         shareError={workspace.shareError}
         loadError={workspace.loadError}
         tooLargeToShare={workspace.tooLargeToShare}
+        onLoadFittingXmlDocument={workspace.loadFittingXmlDocument}
+        onOpenFittingXmlEntry={workspace.openFittingXmlEntry}
       />
       {activeCharacterId !== null && (
         <InGameFittingsPanel

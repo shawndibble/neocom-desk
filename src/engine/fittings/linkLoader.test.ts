@@ -16,6 +16,14 @@ const SLOTS: EftSlotLookup = {
 };
 
 describe('classifyLoadInput', () => {
+  it("reads this app's own Share Link back as a share code", () => {
+    expect(classifyLoadInput('https://x.example/neocom-desk/fittings?f=1.abc_-')).toEqual({
+      kind: 'share',
+      code: '1.abc_-',
+    });
+    expect(classifyLoadInput('https://x.example/market?f=1.abc').kind).toBe('unknown');
+  });
+
   it('recognises a bare DNA string', () => {
     expect(classifyLoadInput('587:100;2:200;1::')).toEqual({
       kind: 'dna',

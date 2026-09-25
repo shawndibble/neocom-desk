@@ -90,7 +90,25 @@
       "tooLargeToShare": "This Fitting is loaded, but too large to carry in a link — reloading this page will lose it.",
       "unresolvedTitle_one": "{{count}} line wasn't recognized",
       "unresolvedTitle_other": "{{count}} lines weren't recognized",
-      "unresolvedLine": "Line {{line}}: \"{{text}}\" — {{reason}}"
+      "unresolvedLine": "Line {{line}}: \"{{text}}\" — {{reason}}",
+      "xml": {
+        "browseLabel": "Load a fittings file (EVE XML)",
+        "browse": "Browse",
+        "error": {
+          "tooLarge": "That file is too large to be a fittings export.",
+          "readFailed": "Couldn't read that file.",
+          "malformedXml": "That file isn't valid XML.",
+          "unsupportedFormat": "That file isn't a fittings export.",
+          "empty": "That file has no fittings in it."
+        },
+        "listTitle": "Choose a Fitting to load",
+        "listNotSaved": "Nothing here is saved until you open one and choose Save to My Fittings.",
+        "listError": "Not recognized: {{reason}}",
+        "open": "Open {{name}}",
+        "unresolvedTitle_one": "{{count}} item in this Fitting wasn't recognized",
+        "unresolvedTitle_other": "{{count}} items in this Fitting weren't recognized",
+        "unresolvedLine": "\"{{text}}\" — {{reason}}"
+      }
     },
     "inGame": {
       "title": "In-game Fittings",
@@ -198,6 +216,22 @@
       "loadingCatalogue": "Loading items…",
       "noResults": "No matching items.",
       "missingSkills": "Missing skills"
+    },
+    "export": {
+      "button": "Export",
+      "shareLink": "Copy Share Link",
+      "eft": "Copy EFT",
+      "chatLink": "Copy in-game link",
+      "multibuy": "Copy multibuy list",
+      "appraise": "Appraise in Market",
+      "tooLarge": "Too large to share as a link.",
+      "copyFailed": "Couldn't copy to the clipboard.",
+      "copied": {
+        "shareLink": "Share Link copied",
+        "eft": "EFT copied",
+        "chatLink": "In-game link copied",
+        "multibuy": "Multibuy list copied"
+      }
     },
     "stats": {
       "show": "Show detail",
