@@ -92,9 +92,10 @@ export function browserTree<T extends CandidateEntry>(
  * Rules (the engine's `Rule.type`) under which an item cannot go on this hull
  * at all, whatever else is fitted: wrong rack, no hardpoint, wrong rig size,
  * a hull-restricted or capital/structure item, a one-per-ship limit.
- * Resource overflow is deliberately absent: the game lets you fit an item
- * that overflows CPU or powergrid — it just can't online — and the editor
- * flashes the bar rather than hiding the item.
+ * Resource overflow is not a hull rule (the game lets you fit an item that
+ * overflows CPU or powergrid — it just can't online): it is its own answer,
+ * `fitsResources`, since an item that overflows the bare hull alone can never
+ * be used on it.
  */
 const HULL_RULES: ReadonlySet<string> = new Set([
   'wrong_slot',
@@ -110,12 +111,26 @@ const HULL_RULES: ReadonlySet<string> = new Set([
   'max_type',
 ]);
 
+/** The resources a lone module can overflow the bare hull on, as `resource:<kind>`. */
+const FITTING_RESOURCE_RULES: ReadonlySet<string> = new Set([
+  'resource:cpu',
+  'resource:powergrid',
+  'resource:calibration',
+]);
+
+/**
+ * `ruleTypes` are the engine's `Rule.type`s, a resource rule spelled
+ * `resource:<kind>` (`resource:powergrid`) so the kinds can be told apart.
+ */
 export function classifyRuleBreaks(ruleTypes: readonly string[]): {
   fitsHull: boolean;
   canFly: boolean;
+  /** Fits the bare hull's CPU, powergrid and calibration, with the pilot's skills. */
+  fitsResources: boolean;
 } {
   return {
     fitsHull: !ruleTypes.some((rule) => HULL_RULES.has(rule)),
     canFly: !ruleTypes.includes('skill'),
+    fitsResources: !ruleTypes.some((rule) => FITTING_RESOURCE_RULES.has(rule)),
   };
 }

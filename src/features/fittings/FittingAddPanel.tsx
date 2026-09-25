@@ -38,8 +38,8 @@ interface FittingAddPanelProps {
   /** Ship data (dogma engine) loaded — slot and fit checks can run. */
   engineReady: boolean;
   profile: PilotProfile | null;
-  /** Whether an item of this rack has somewhere to go right now. */
-  canPlace: (rack: CandidateRack) => boolean;
+  /** Whether this item (of this rack) has somewhere to go right now — a free slot, or room in the drone bay. */
+  canPlace: (rack: CandidateRack, typeId: number) => boolean;
   onAdd: (typeId: number, rack: CandidateRack) => void;
   /** Drops the chosen slot, so the browser shows every rack again. */
   onClearTarget?: () => void;
@@ -89,7 +89,9 @@ function browseFilter(
       return false;
     if (hullFit !== null) {
       const check = hullFit.get(entry.typeId);
-      if (!check?.fitsHull || (canFlyOnly && !check.canFly)) return false;
+      // Modules the ship can't take — by the hull's rules, or too big for its
+      // CPU / powergrid / calibration even with nothing else fitted — never show.
+      if (!check?.fitsHull || !check.fitsResources || (canFlyOnly && !check.canFly)) return false;
     }
     return true;
   };
@@ -257,7 +259,7 @@ export function FittingAddPanel({
         entry={entry}
         rack={rack}
         check={hullFit?.get(entry.typeId) ?? null}
-        placeable={engineReady && canPlace(rack)}
+        placeable={engineReady && canPlace(rack, entry.typeId)}
         draggable={dragToRing && engineReady && rack !== 'drone'}
         onAdd={onAdd}
       />

@@ -2,12 +2,34 @@ import { describe, expect, it } from 'vitest';
 import { browserTree, classifyRuleBreaks, type CandidateEntry } from './candidates';
 
 describe('classifyRuleBreaks', () => {
-  it('passes an item that only overflows a resource', () => {
-    expect(classifyRuleBreaks(['resource'])).toEqual({ fitsHull: true, canFly: true });
+  it('passes an item that breaks nothing', () => {
+    expect(classifyRuleBreaks([])).toEqual({ fitsHull: true, canFly: true, fitsResources: true });
+  });
+
+  it('tells an item too big for the bare hull’s CPU, powergrid or calibration apart from a hull break', () => {
+    expect(classifyRuleBreaks(['resource:powergrid'])).toEqual({
+      fitsHull: true,
+      canFly: true,
+      fitsResources: false,
+    });
+    expect(classifyRuleBreaks(['resource:cpu']).fitsResources).toBe(false);
+    expect(classifyRuleBreaks(['resource:calibration']).fitsResources).toBe(false);
+  });
+
+  it('leaves other resources (a drone bay, charge capacity) to the Fitting itself', () => {
+    expect(classifyRuleBreaks(['resource:drone_bay', 'resource:charge_capacity'])).toEqual({
+      fitsHull: true,
+      canFly: true,
+      fitsResources: true,
+    });
   });
 
   it('flags a skill shortfall as not flyable, but still fitting the hull', () => {
-    expect(classifyRuleBreaks(['skill', 'resource'])).toEqual({ fitsHull: true, canFly: false });
+    expect(classifyRuleBreaks(['skill'])).toEqual({
+      fitsHull: true,
+      canFly: false,
+      fitsResources: true,
+    });
   });
 
   it.each(['wrong_slot', 'slots', 'rig_size', 'ship_restricted', 'capital_item', 'max_group'])(

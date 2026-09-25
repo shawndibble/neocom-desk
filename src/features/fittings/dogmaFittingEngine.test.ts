@@ -371,6 +371,10 @@ describe('fit checks', () => {
         ...(typeId === 2 ? [{ target: { type: 'item', index: 0 }, rule: { type: 'skill' } }] : []),
         // No launcher hardpoint: the engine reports it against the ship.
         ...(typeId === 4 ? [{ target: { type: 'ship' }, rule: { type: 'slots' } }] : []),
+        // More powergrid than the bare hull has: also reported against the ship.
+        ...(typeId === 5
+          ? [{ target: { type: 'ship' }, rule: { type: 'resource', resource: 'powergrid' } }]
+          : []),
       ];
       return { ship: { attributes: new Map() }, items: [], violations };
     });
@@ -379,12 +383,13 @@ describe('fit checks', () => {
     expect(isDogmaEngineReady()).toBe(true);
     calculateMock.mockClear();
 
-    const result = checkCandidates(587, 'low', [1, 2, 3, 4], profile);
+    const result = checkCandidates(587, 'low', [1, 2, 3, 4, 5], profile);
 
-    expect(result.get(1)).toEqual({ fitsHull: false, canFly: true });
-    expect(result.get(2)).toEqual({ fitsHull: true, canFly: false });
-    expect(result.get(3)).toEqual({ fitsHull: true, canFly: true });
-    expect(result.get(4)).toEqual({ fitsHull: false, canFly: true });
+    expect(result.get(1)).toEqual({ fitsHull: false, canFly: true, fitsResources: true });
+    expect(result.get(2)).toEqual({ fitsHull: true, canFly: false, fitsResources: true });
+    expect(result.get(3)).toEqual({ fitsHull: true, canFly: true, fitsResources: true });
+    expect(result.get(4)).toEqual({ fitsHull: false, canFly: true, fitsResources: true });
+    expect(result.get(5)).toEqual({ fitsHull: true, canFly: true, fitsResources: false });
     expect(calculateMock.mock.calls[0][0].items[0].slot).toEqual({ type: 'low', index: 0 });
     expect(calculateMock.mock.calls[0][1]).toEqual({ validate: true });
 
