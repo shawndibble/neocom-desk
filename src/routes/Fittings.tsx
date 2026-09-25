@@ -42,6 +42,7 @@ import {
   type DroneBay,
 } from '@/engine/fittings/fittingEdit';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
+import { chargeGroupIdsFor, checkCharges } from '@/features/fittings/dogmaFittingEngine';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
 import { writeCompareCodes } from '@/features/fittings/compareUrl';
 import { FittingHeader } from '@/features/fittings/FittingHeader';
@@ -235,6 +236,39 @@ function FittingsPage() {
     return firstFreeSlotIndex(fitting, rack, slotCounts[rack]) !== null;
   }
 
+  /**
+   * The charges a not-yet-fitted `typeId` could default to at `rack` — its
+   * own charge groups (calculated alone, since it has no fitted result yet),
+   * narrowed to what the hull and skills accept, alphabetical to match the
+   * Charges tab's own ordering (issue #1728's "first charge listed").
+   */
+  function resolveDefaultChargeCandidates(rack: FittingSlotKind, typeId: number): number[] {
+    if (
+      fitting === null ||
+      !workspace.engineReady ||
+      workspace.profile === null ||
+      catalogue === null
+    ) {
+      return [];
+    }
+    const groupIds = chargeGroupIdsFor(fitting.shipTypeId, rack, typeId);
+    if (groupIds.length === 0) return [];
+    const candidates = [
+      ...new Set(groupIds.flatMap((id) => catalogue.typeIdsByGroup.get(id) ?? [])),
+    ];
+    const accepted = checkCharges(
+      fitting.shipTypeId,
+      { slot: rack, typeId },
+      candidates,
+      workspace.profile
+    );
+    return candidates
+      .filter((id) => accepted.has(id))
+      .sort((a, b) =>
+        catalogueTypeName(catalogue, a).localeCompare(catalogueTypeName(catalogue, b))
+      );
+  }
+
   function handleAdd(typeId: number, rack: CandidateRack) {
     if (rack === 'drone') {
       edit((f) => addDronesWithinBay(f, typeId, 1, droneBay), `drone-add-${typeId}`);
@@ -252,7 +286,9 @@ function FittingsPage() {
       const slotIndex =
         onTarget && target.kind === 'slot' ? target.slotIndex : firstFreeSlotIndex(f, rack, count);
       if (slotIndex === null) return f;
-      const next = addModule(f, rack, slotIndex, typeId);
+      const next = addModule(f, rack, slotIndex, typeId, () =>
+        resolveDefaultChargeCandidates(rack, typeId)
+      );
       if (onTarget) {
         const free = firstFreeSlotIndex(next, rack, count);
         after.target = free === null ? null : { kind: 'slot', slot: rack, slotIndex: free };
@@ -389,7 +425,12 @@ function FittingsPage() {
           // Drag is pointer-only: a touch tablet taps a slot and picks instead.
           onDropType={
             isDesktop
-              ? (rack, index, typeId) => edit((f) => addModule(f, rack, index, typeId))
+              ? (rack, index, typeId) =>
+                  edit((f) =>
+                    addModule(f, rack, index, typeId, () =>
+                      resolveDefaultChargeCandidates(rack, typeId)
+                    )
+                  )
               : undefined
           }
           onMoveModule={
