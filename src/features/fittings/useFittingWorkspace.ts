@@ -26,8 +26,17 @@ import { decodeFittingShare, encodeFittingShare } from '@/engine/fitting/fitting
 import {
   loadEftFitting,
   eftResultToFitting,
+  type EftLoadResult,
+  type EftSlotLookup,
   type EftUnresolvedItem,
 } from '@/engine/fittings/eftLoader';
+import {
+  classifyLoadInput,
+  killmailVictimToLoadResult,
+  loadDnaFitting,
+} from '@/engine/fittings/linkLoader';
+import { getKillmail } from '@/esi/endpoints';
+import { fetchKillmailHash } from '@/lib/zkillboard';
 import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapper';
 import { buildAllVProfile } from '@/engine/fittings/pilotProfile';
 import {
@@ -53,6 +62,27 @@ import {
 } from './dogmaFittingEngine';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 
+/** Why a Load produced no Fitting, beyond the per-line `unresolved` list. */
+export type LoadError = 'unrecognised' | 'killmail-not-found' | 'killmail-failed';
+
+/** Fetches a killmail's victim and reads its fit; the hash is looked up when the link had none. */
+async function loadKillmailFitting(
+  killmailId: number,
+  hash: string | undefined,
+  slotByTypeId: EftSlotLookup
+): Promise<EftLoadResult | LoadError> {
+  const resolvedHash = hash ?? (await fetchKillmailHash(killmailId));
+  if (resolvedHash === null) return 'killmail-not-found';
+  try {
+    const { data } = await getKillmail(killmailId, resolvedHash);
+    return data === null
+      ? 'killmail-failed'
+      : killmailVictimToLoadResult(data.victim, slotByTypeId);
+  } catch {
+    return 'killmail-failed';
+  }
+}
+
 async function hullName(typeId: number): Promise<string> {
   const types = await loadTypes();
   return types[String(typeId)]?.name ?? `Type ${typeId}`;
@@ -73,7 +103,10 @@ export interface FittingWorkspace {
   unresolved: EftUnresolvedItem[];
   /** Set when the open Fitting was too large to fit a Share Link. */
   tooLargeToShare: boolean;
-  loadFromEftText: (text: string) => Promise<void>;
+  /** Why the last Load produced no Fitting; null after a Load that did. */
+  loadError: LoadError | null;
+  /** Loads EFT text, a DNA string / chat link, an eveship.fit link, or a killmail link. */
+  loadFromInput: (text: string) => Promise<void>;
   /**
    * Applies a change to the open Fitting and rewrites `?f=`. `coalesceKey`
    * names the control it came from; a repeat of the same key within a second
@@ -122,6 +155,7 @@ export function useFittingWorkspace(): FittingWorkspace {
   const [shareError, setShareError] = useState<ShareDecodeError | null>(null);
   const [unresolved, setUnresolved] = useState<EftUnresolvedItem[]>([]);
   const [tooLargeToShare, setTooLargeToShare] = useState(false);
+  const [loadError, setLoadError] = useState<LoadError | null>(null);
   const [savedId, setSavedId] = useState<string | null>(null);
 
   const [stats, setStats] = useState<{ fitting: Fitting; stats: FittingStats } | null>(null);
@@ -221,10 +255,30 @@ export function useFittingWorkspace(): FittingWorkspace {
     };
   }, [shareCode]);
 
-  const loadFromEftText = useCallback(
+  const loadFromInput = useCallback(
     async (text: string) => {
+      setLoadError(null);
+      const input = classifyLoadInput(text);
+      if (input.kind === 'unknown') {
+        setUnresolved([]);
+        setLoadError('unrecognised');
+        return;
+      }
       const [typeByName, slotByTypeId] = await Promise.all([loadItemNameMap(), loadFittingSlots()]);
-      const result = loadEftFitting(text, typeByName, slotByTypeId);
+      let result: EftLoadResult;
+      if (input.kind === 'eft') {
+        result = loadEftFitting(input.text, typeByName, slotByTypeId);
+      } else if (input.kind === 'dna') {
+        result = loadDnaFitting(input.dna, slotByTypeId);
+      } else {
+        const loaded = await loadKillmailFitting(input.killmailId, input.hash, slotByTypeId);
+        if (typeof loaded === 'string') {
+          setUnresolved([]);
+          setLoadError(loaded);
+          return;
+        }
+        result = loaded;
+      }
       setUnresolved(result.unresolved);
       if (result.hullTypeId === null) return;
       setSavedId(null);
@@ -435,7 +489,8 @@ export function useFittingWorkspace(): FittingWorkspace {
     shareError,
     unresolved,
     tooLargeToShare,
-    loadFromEftText,
+    loadError,
+    loadFromInput,
     edit,
     implantBasis,
     canUseCloneBasis,

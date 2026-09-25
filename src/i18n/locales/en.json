@@ -72,12 +72,17 @@
     },
     "load": {
       "title": "Load",
-      "pasteLabel": "Paste EFT fit text",
+      "pasteLabel": "Link or text",
       "pastePlaceholder": "[Rifter, My Fit]\n125mm Gatling AutoCannon I\n...",
       "button": "Load",
       "shareError": {
         "invalid": "That link isn't a valid Fitting.",
         "unsupported-version": "That link was made by a newer version of Neocom Desk."
+      },
+      "loadError": {
+        "unrecognised": "That isn't something Load can read. Paste EFT fit text, an in-game fitting link or DNA string, an eveship.fit link, or a zKillboard killmail link.",
+        "killmail-not-found": "That killmail couldn't be found on zKillboard.",
+        "killmail-failed": "The killmail couldn't be fetched from ESI. Try again in a moment."
       },
       "tooLargeToShare": "This Fitting is loaded, but too large to carry in a link — reloading this page will lose it.",
       "unresolvedTitle_one": "{{count}} line wasn't recognized",

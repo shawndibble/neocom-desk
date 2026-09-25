@@ -8,6 +8,23 @@
  * path segments live in one place instead of as template strings in JSX.
  */
 
+/**
+ * A zKillboard link carries only the killmail id, but ESI's killmail endpoint
+ * also wants the hash — which only zKillboard's API knows. `null` when the
+ * kill isn't there or the request fails.
+ */
+export async function fetchKillmailHash(killmailId: number): Promise<string | null> {
+  try {
+    const response = await fetch(`https://zkillboard.com/api/killID/${killmailId}/`);
+    if (!response.ok) return null;
+    const body: unknown = await response.json();
+    const hash = Array.isArray(body) ? (body[0] as { zkb?: { hash?: unknown } })?.zkb?.hash : null;
+    return typeof hash === 'string' ? hash : null;
+  } catch {
+    return null;
+  }
+}
+
 export function characterZkillUrl(characterId: number): string {
   return `https://zkillboard.com/character/${characterId}/`;
 }
