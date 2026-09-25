@@ -16,6 +16,7 @@ import {
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
 import { MyFittingsPanel } from '@/features/fittings/MyFittingsPanel';
+import { FittingExportMenu } from '@/features/fittings/FittingExportMenu';
 import { FittingLoadCard } from '@/features/fittings/FittingLoadCard';
 import { FittingRackList, ModuleRow } from '@/features/fittings/FittingRackList';
 import { FittingRing } from '@/features/fittings/FittingRing';
@@ -193,6 +194,7 @@ export function Fittings() {
                   ? t('fittings.myFittings.save')
                   : t('fittings.myFittings.update')}
               </Button>
+              <FittingExportMenu fitting={fitting} price={workspace.price} />
               {viewHydrated && (
                 <FittingViewToggle value={view} onChange={(next) => void setView(next)} />
               )}

@@ -164,6 +164,22 @@
       "noResults": "No matching items.",
       "missingSkills": "Missing skills"
     },
+    "export": {
+      "button": "Export",
+      "shareLink": "Copy Share Link",
+      "eft": "Copy EFT",
+      "chatLink": "Copy in-game link",
+      "multibuy": "Copy multibuy list",
+      "appraise": "Appraise in Market",
+      "tooLarge": "Too large to share as a link.",
+      "copyFailed": "Couldn't copy to the clipboard.",
+      "copied": {
+        "shareLink": "Share Link copied",
+        "eft": "EFT copied",
+        "chatLink": "In-game link copied",
+        "multibuy": "Multibuy list copied"
+      }
+    },
     "stats": {
       "show": "Show detail",
       "hide": "Hide detail",
