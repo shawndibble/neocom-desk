@@ -144,7 +144,8 @@ export const ROUTE_REQUIREMENTS = {
   // enhancement layered on an already-working page, the same reasoning
   // round 4 already ruled out for /clones below. A character who hasn't
   // re-granted it still sees every asset; jumps-away just degrades to "-"
-  // with a tooltip (Assets.tsx / features/character/location.ts) instead of
+  // with a tooltip, plus an inline ghost re-grant note above the list (issue
+  // #1590; Assets.tsx / features/character/location.ts) instead of
   // gating the whole tab on a grant most existing users don't have yet.
   '/assets': {
     endpoints: [
