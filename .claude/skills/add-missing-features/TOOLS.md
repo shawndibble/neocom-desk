@@ -25,7 +25,12 @@ v2, AllianceAuth Market Manager, EVE Tycoon MCP server, Uedama Scout (#1043),
 EVE Metro, EVE Crews (cleared: a lore roleplay crew layer, no
 industry/manufacturing/market/wallet endpoint — out of remit despite the
 category's top post count, 185), EVE-NAV (nav.ceve.cc, live: a 3D capital/JF
-jump planner; DOTLAN and Compass already cover this, so incremental).
+jump planner; DOTLAN and Compass already cover this, so incremental),
+Missioneers' Atlas (live: static-SDE LP store finder with LP/ISK cost and
+required items, plus agent finder, mission browser and zKill system intel — no
+market pricing, wallet or industry; the LP finder is covered by #718/#1050/#1068,
+the rest is mission-running remit), Gatewatch (Discord intel/DScan backend) and
+EVE PvP Corp Activity Search (both intel, non-ISK).
 
 **Three classes are closed, and with them the ecosystem has no untested class
 left**; a sweep's job is to notice a tool fitting none of them. (1) _Web
