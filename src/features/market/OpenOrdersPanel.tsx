@@ -840,11 +840,8 @@ export function OpenOrdersPanel({
             <FilterBar
               value={filter}
               onChange={setFilter}
-              // A chip per problem plus three selects is two full rows above
-              // the worklist they exist to narrow, so the whole box lives
-              // behind the funnel at every width here. The active chips stay
-              // outside it, where they can be seen and dropped.
-              collapsible
+              // The active chips stay outside the funnel box, where they can
+              // be seen and dropped.
               activeCount={visibleChips.length}
               search={
                 <SearchInput

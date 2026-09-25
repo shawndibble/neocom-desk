@@ -369,9 +369,6 @@ function BpcFilterBar({
       value={compositeValue}
       onChange={handleCompositeChange}
       activeCount={activeCount}
-      // Six fields plus two chip groups wrap to three rows inline, above
-      // the table they exist to narrow.
-      collapsible
       className="border-b border-line px-3 py-2"
       search={
         <SearchInput

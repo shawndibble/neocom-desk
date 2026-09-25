@@ -248,10 +248,6 @@ function ContractSearchFilterBar({
       value={filter}
       onChange={onChange}
       activeCount={activeCount}
-      // Region, max price, min quantity, sale kind, Jump Range and Current
-      // System: six controls beside the search box wrap to two rows above
-      // the table they exist to narrow — the same call the Courier bar makes.
-      collapsible
       actions={actions}
       className="border-b border-line px-3 py-2"
       search={
@@ -1024,7 +1020,7 @@ export function ContractSearchPanel({
                 />
 
                 {/*
-                  Outside the bar, not inside its `children`: `collapsible`
+                  Outside the bar, not inside its `children`: the funnel box
                   unmounts those the moment the funnel closes, and a range set
                   from a pasted link must still explain itself with the
                   sheet/row shut. `JumpRangeNote` itself renders nothing once

@@ -459,10 +459,6 @@ function CourierFilterBar({
       value={filter}
       onChange={onChange}
       activeCount={activeCount}
-      // Well past the set `collapsible` exists for: laid out inline these wrap
-      // to two rows above the table they exist to narrow — the same call the
-      // item bar beside this one now makes for its own six controls.
-      collapsible
       actions={actions}
       className="border-b border-line px-3 py-2"
       search={

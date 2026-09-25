@@ -1791,6 +1791,9 @@
     "retention": "This device keeps the last 300 alerts, and syncs 30 days of them between your devices."
   },
   "common": {
+    "columnsButton": "Columns",
+    "columnsMenuTitle": "Columns",
+    "resetColumns": "Reset to default",
     "close": "Close",
     "save": "Save",
     "cancel": "Cancel",
