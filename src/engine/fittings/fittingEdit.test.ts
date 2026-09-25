@@ -1,20 +1,27 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  addCargo,
   addDrones,
   addDronesWithinBay,
   addModule,
   cargoGroups,
+  cargoVolumeUsed,
+  copyToAllOfType,
   launchDrones,
   droneBayUsed,
   droneCountMax,
   droneRoom,
   droneGroups,
   droneTotals,
+  fillRack,
   firstFreeSlotIndex,
   loadChargeIntoAll,
+  loadChargeIntoCompatible,
   moveModule,
   reachableModuleStates,
   newFitting,
+  recallDrones,
+  removeAllOfType,
   removeModule,
   setCargoQuantity,
   setDroneCountWithinBay,
@@ -23,7 +30,7 @@ import {
   setModuleState,
   swapModuleType,
 } from './fittingEdit';
-import type { Fitting } from './types';
+import type { Fitting, FittingModule } from './types';
 import type { DroneBay } from './fittingEdit';
 
 const base: Fitting = {
@@ -508,5 +515,223 @@ describe('reachableModuleStates', () => {
 
   it('keeps the state it is in, even past what it can reach, so a control can show it', () => {
     expect(reachableModuleStates('online', 'active')).toEqual(['offline', 'online', 'active']);
+  });
+});
+
+describe('loadChargeIntoCompatible', () => {
+  // Two launcher types (a Heavy and a Heavy Assault launcher) that both take
+  // the same missile, and a web that takes nothing.
+  const launchers: Fitting = {
+    ...base,
+    modules: [
+      { slot: 'high', slotIndex: 0, typeId: 8105, state: 'active' },
+      { slot: 'high', slotIndex: 1, typeId: 8105, state: 'active', chargeTypeId: 209 },
+      { slot: 'high', slotIndex: 2, typeId: 25715, state: 'active' },
+      { slot: 'medium', slotIndex: 0, typeId: 526, state: 'active' },
+    ],
+    cargo: [{ typeId: 24519, quantity: 1000 }],
+  };
+  const missileTakers = new Set([8105, 25715]);
+  const accepts = (module: FittingModule) => missileTakers.has(module.typeId);
+  const perLoad = (module: FittingModule) => (module.typeId === 8105 ? 40 : 30);
+
+  it('loads the charge into every compatible module, whatever its type', () => {
+    const result = loadChargeIntoCompatible(launchers, 24519, { accepts });
+    expect(result.fitting.modules.map((m) => m.chargeTypeId)).toEqual([
+      24519,
+      24519,
+      24519,
+      undefined,
+    ]);
+    expect(result).toMatchObject({ loaded: 3, wanted: 3, ranOut: false });
+    // Not from cargo: the hold is untouched.
+    expect(result.fitting.cargo).toEqual(launchers.cargo);
+    expect(launchers.modules[0].chargeTypeId).toBeUndefined();
+  });
+
+  it('loads only the one module asked for', () => {
+    const result = loadChargeIntoCompatible(launchers, 24519, {
+      accepts,
+      only: { slot: 'high', slotIndex: 2 },
+    });
+    expect(result.fitting.modules.map((m) => m.chargeTypeId)).toEqual([
+      undefined,
+      209,
+      24519,
+      undefined,
+    ]);
+    expect(result).toMatchObject({ loaded: 1, wanted: 1 });
+  });
+
+  it('debits cargo by each module’s load, returning the replaced charge to the hold', () => {
+    const result = loadChargeIntoCompatible(launchers, 24519, {
+      accepts,
+      chargesPerLoad: (module, charge) => (charge === 209 ? 50 : perLoad(module)),
+      fromCargo: true,
+    });
+    expect(result.fitting.modules.map((m) => m.chargeTypeId)).toEqual([
+      24519,
+      24519,
+      24519,
+      undefined,
+    ]);
+    expect(result.fitting.cargo).toEqual([
+      { typeId: 24519, quantity: 1000 - 40 - 40 - 30 },
+      { typeId: 209, quantity: 50 },
+    ]);
+  });
+
+  it('merges a returned charge into its existing cargo stack', () => {
+    const fit: Fitting = {
+      ...launchers,
+      cargo: [...launchers.cargo, { typeId: 209, quantity: 5 }],
+    };
+    const result = loadChargeIntoCompatible(fit, 24519, {
+      accepts,
+      chargesPerLoad: perLoad,
+      fromCargo: true,
+    });
+    expect(result.fitting.cargo).toContainEqual({ typeId: 209, quantity: 45 });
+  });
+
+  it('on a shortfall loads what it can, a part-load counting, and says the cargo ran out', () => {
+    const fit: Fitting = { ...launchers, cargo: [{ typeId: 24519, quantity: 50 }] };
+    const result = loadChargeIntoCompatible(fit, 24519, {
+      accepts,
+      chargesPerLoad: perLoad,
+      fromCargo: true,
+    });
+    // 40 into the first launcher, the last 10 into the second; none left for the third.
+    expect(result.fitting.modules.map((m) => m.chargeTypeId)).toEqual([
+      24519,
+      24519,
+      undefined,
+      undefined,
+    ]);
+    expect(result).toMatchObject({ loaded: 2, wanted: 3, ranOut: true });
+    expect(result.fitting.cargo).toEqual([{ typeId: 209, quantity: 40 }]);
+  });
+
+  it('skips a module already holding the charge, with no debit', () => {
+    const fit: Fitting = {
+      ...launchers,
+      modules: launchers.modules.map((m) =>
+        missileTakers.has(m.typeId) ? { ...m, chargeTypeId: 24519 } : m
+      ),
+    };
+    const result = loadChargeIntoCompatible(fit, 24519, {
+      accepts,
+      chargesPerLoad: perLoad,
+      fromCargo: true,
+    });
+    expect(result.fitting).toBe(fit);
+    expect(result).toMatchObject({ loaded: 3, wanted: 3, ranOut: false });
+  });
+
+  it('returns the same Fitting when nothing takes the charge, or the cargo holds none', () => {
+    expect(loadChargeIntoCompatible(launchers, 24519, { accepts: () => false }).fitting).toBe(
+      launchers
+    );
+    const empty = loadChargeIntoCompatible(launchers, 12345, {
+      accepts,
+      chargesPerLoad: perLoad,
+      fromCargo: true,
+    });
+    expect(empty.fitting).toBe(launchers);
+    expect(empty).toMatchObject({ loaded: 0, wanted: 3, ranOut: true });
+  });
+});
+
+describe('addCargo / cargoVolumeUsed', () => {
+  it('adds to a type’s stack, or appends a new one', () => {
+    const fit: Fitting = { ...base, cargo: [{ typeId: 209, quantity: 10 }] };
+    expect(addCargo(fit, 209, 5).cargo).toEqual([{ typeId: 209, quantity: 15 }]);
+    expect(addCargo(fit, 3001, 2).cargo).toEqual([
+      { typeId: 209, quantity: 10 },
+      { typeId: 3001, quantity: 2 },
+    ]);
+    expect(addCargo(fit, 3001, 0)).toBe(fit);
+  });
+
+  it('sums m3 over every stack', () => {
+    const fit: Fitting = {
+      ...base,
+      cargo: [
+        { typeId: 209, quantity: 100 },
+        { typeId: 3001, quantity: 2 },
+      ],
+    };
+    expect(cargoVolumeUsed(fit, (id) => (id === 209 ? 0.01 : 5))).toBeCloseTo(11);
+  });
+});
+
+describe('module bulk edits', () => {
+  const three: Fitting = {
+    ...base,
+    modules: [
+      { slot: 'high', slotIndex: 0, typeId: 2889, state: 'overload', chargeTypeId: 186 },
+      { slot: 'high', slotIndex: 1, typeId: 2889, state: 'active', chargeTypeId: 185 },
+      { slot: 'high', slotIndex: 2, typeId: 2889, state: 'offline' },
+      { slot: 'low', slotIndex: 1, typeId: 2048, state: 'online' },
+    ],
+  };
+
+  it('copies one module’s state and charge to every module of its type', () => {
+    const next = copyToAllOfType(three, 'high', 0);
+    expect(next.modules.slice(0, 3).map((m) => [m.state, m.chargeTypeId])).toEqual([
+      ['overload', 186],
+      ['overload', 186],
+      ['overload', 186],
+    ]);
+    expect(next.modules[3]).toBe(three.modules[3]);
+  });
+
+  it('copying an empty module unloads the others too', () => {
+    const next = copyToAllOfType(three, 'high', 2);
+    expect(next.modules.slice(0, 3).every((m) => m.chargeTypeId === undefined)).toBe(true);
+  });
+
+  it('removes every module of a type', () => {
+    expect(removeAllOfType(three, 2889).modules).toEqual([three.modules[3]]);
+  });
+
+  it('fills a rack’s empty slots with one type', () => {
+    const next = fillRack(three, 'high', 5, 2889, () => [185]);
+    expect(next.modules.filter((m) => m.slot === 'high').map((m) => m.slotIndex)).toEqual([
+      0, 1, 2, 3, 4,
+    ]);
+    // A fresh one copies a sibling's charge, as addModule does.
+    expect(next.modules.find((m) => m.slotIndex === 4)?.chargeTypeId).toBe(186);
+    expect(fillRack(three, 'high', 3, 2889)).toBe(three);
+  });
+});
+
+describe('launching and recalling one drone type', () => {
+  const bandwidthOf = (typeId: number) => (typeId === 2185 ? 10 : 5);
+  const fit: Fitting = {
+    ...base,
+    drones: [
+      { typeId: 2185, quantity: 2, state: 'online' },
+      { typeId: 2454, quantity: 5, state: 'online' },
+    ],
+  };
+
+  it('launches only the type asked for', () => {
+    expect(
+      droneGroups(launchDrones(fit, { bandwidthTotal: 50, maxActive: 5, bandwidthOf }, 2454))
+    ).toEqual([
+      { typeId: 2185, inSpace: 0, inBay: 2 },
+      { typeId: 2454, inSpace: 5, inBay: 0 },
+    ]);
+  });
+
+  it('recalls a type into the bay; the same Fitting when none is out', () => {
+    const out = setDroneCounts(fit, 2454, { inSpace: 3, inBay: 2 });
+    expect(droneGroups(recallDrones(out, 2454))).toContainEqual({
+      typeId: 2454,
+      inSpace: 0,
+      inBay: 5,
+    });
+    expect(recallDrones(fit, 2454)).toBe(fit);
   });
 });
