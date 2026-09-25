@@ -316,6 +316,26 @@
       "more_one": "and {{count}} more",
       "more_other": "and {{count}} more"
     },
+    "weather": {
+      "label": "Abyssal weather",
+      "none": "Normal space",
+      "option": "{{kind}} {{level}}",
+      "kind": {
+        "dark": "Dark",
+        "electrical": "Electrical",
+        "exotic": "Exotic",
+        "firestorm": "Firestorm",
+        "gamma": "Gamma"
+      },
+      "effect": {
+        "dark": "Velocity +50% · turret optimal and falloff −{{penalty}}%",
+        "electrical": "Capacitor recharge time −50% · EM resists −{{penalty}}%",
+        "exotic": "Scan resolution +50% · kinetic resists −{{penalty}}%",
+        "firestorm": "Armor HP +50% · thermal resists −{{penalty}}%",
+        "gamma": "Shield HP +50% · explosive resists −{{penalty}}%"
+      },
+      "in": "in {{weather}}"
+    },
     "phoneTabs": {
       "stats": "Stats",
       "label": "Fitting sections"

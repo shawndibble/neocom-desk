@@ -28,6 +28,7 @@ import {
 import { useCompareCanFly } from '@/features/fittings/useCompareCanFly';
 import { useCompareFittings } from '@/features/fittings/useCompareFittings';
 import { useCompareStats } from '@/features/fittings/useCompareStats';
+import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
 import { DamageProfilePicker } from '@/features/fittings/DamageProfilePicker';
 import { useDamageProfiles } from '@/features/fittings/damageProfiles';
 import { TargetProfilePicker } from '@/features/fittings/TargetProfilePicker';
@@ -177,6 +178,7 @@ export function FittingCompare() {
       />
 
       <DamageProfilePicker damageProfiles={damageProfiles} />
+      <AbyssalWeatherPicker />
       <TargetProfilePicker targetProfiles={targetProfiles} />
 
       {count === 0 ? (

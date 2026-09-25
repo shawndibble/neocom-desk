@@ -1,4 +1,5 @@
 import wasmInit, {
+  beacon,
   calculate,
   load_sde,
   type Fit,
@@ -163,20 +164,45 @@ export function loadDogmaEngine(
 }
 
 /**
+ * The fit inside an Abyssal weather: the weather's beacon (see
+ * `engine/fittings/abyssalWeather.ts`) as what the fit takes in. No weather
+ * leaves it as it is. Here, not in the pure mapper, because only this seam
+ * may call the engine — `beacon()` is the engine's own.
+ */
+export function withWeather(fit: Fit, weatherTypeId?: number): Fit {
+  if (weatherTypeId === undefined) return fit;
+  const weather = beacon(weatherTypeId);
+  // Beside whatever the fit already takes in, not instead of it.
+  const incoming = fit.incoming ?? {};
+  return {
+    ...fit,
+    incoming: {
+      ...incoming,
+      effects: [...(incoming.effects ?? []), ...(weather.effects ?? [])],
+      buffs: [...(incoming.buffs ?? []), ...(weather.buffs ?? [])],
+    },
+  };
+}
+
+/**
  * Works out a Fitting's stats under a pilot's skills and implants, with EHP
  * measured against `damageProfile` (the engine's uniform default without
- * one). Loads the engine first if this is the first call anywhere in the
- * session.
+ * one), inside `weather` when there is one. Loads the engine first if this
+ * is the first call anywhere in the session.
  */
 export async function computeFittingStats(
   fitting: Fitting,
   profile: PilotProfile,
   onProgress?: (progress: DogmaAssetProgress) => void,
   damageProfile?: DamageProfile,
-  { overheated: withOverheated = true }: { overheated?: boolean } = {}
+  {
+    overheated: withOverheated = true,
+    weatherTypeId,
+  }: { overheated?: boolean; weatherTypeId?: number } = {}
 ): Promise<FittingStats> {
   await loadDogmaEngine(onProgress);
-  const dogmaFit = fittingToDogmaFit(fitting, profile, damageProfile);
+  // The overheated recalculation below spreads this fit, so it keeps the weather too.
+  const dogmaFit = withWeather(fittingToDogmaFit(fitting, profile, damageProfile), weatherTypeId);
   const calculation = calculate(dogmaFit);
   const baseStats = extractFittingStats(
     dogmaFit.items,

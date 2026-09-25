@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it } from 'vitest';
 import wasmInit, { calculate } from '@eveshipfit/dogma-engine';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
+import { withWeather } from './dogmaFittingEngine';
 import {
   extractDroneLimits,
   extractFittingStats,
@@ -245,6 +246,71 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     );
 
     expect(stats.unknownItemTypeIds).toEqual([]);
+  });
+
+  it('applies an Abyssal weather: its resist penalty grows with the level, its bonus does not', () => {
+    const fitting: Fitting = {
+      name: 'Rifter',
+      shipTypeId: RIFTER,
+      modules: [],
+      drones: [],
+      cargo: [],
+    };
+    const fit = fittingToDogmaFit(fitting, buildAllVProfile(ALL_TEST_SKILL_IDS));
+    const read = (weatherTypeId?: number) => {
+      const withIt = withWeather(fit, weatherTypeId);
+      const calculation = calculate(withIt);
+      return extractFittingStats(withIt.items, calculation.ship.attributes, calculation.items);
+    };
+    const clear = read();
+    // Firestorm (infernal_weather_1 / _3): thermal resist penalty, +50% armor HP.
+    const firestorm1 = read(47390);
+    const firestorm3 = read(47392);
+
+    expect(firestorm1.armor.hp).toBeCloseTo(clear.armor.hp * 1.5, 6);
+    expect(firestorm3.armor.hp).toBeCloseTo(clear.armor.hp * 1.5, 6);
+    expect(firestorm1.armor.thermalResonance).toBeGreaterThan(clear.armor.thermalResonance);
+    expect(firestorm3.armor.thermalResonance).toBeGreaterThan(firestorm1.armor.thermalResonance);
+    // Other damage types untouched.
+    expect(firestorm3.armor.kineticResonance).toBeCloseTo(clear.armor.kineticResonance, 6);
+  });
+
+  it('gives every weather the bonus and the level-scaled penalty the picker names', () => {
+    // A Rifter with a loaded 200mm AutoCannon II (2889, EMP S 12608), so Dark's range penalty shows.
+    const fitting: Fitting = {
+      name: 'Rifter',
+      shipTypeId: RIFTER,
+      modules: [{ slot: 'high', slotIndex: 0, typeId: 2889, state: 'active', chargeTypeId: 12608 }],
+      drones: [],
+      cargo: [],
+    };
+    const fit = fittingToDogmaFit(fitting, buildAllVProfile(ALL_TEST_SKILL_IDS));
+    const read = (weatherTypeId?: number) => {
+      const withIt = withWeather(fit, weatherTypeId);
+      const calculation = calculate(withIt);
+      return {
+        stats: extractFittingStats(withIt.items, calculation.ship.attributes, calculation.items),
+        optimal: calculation.items[0].attributes.get(54)!.value,
+      };
+    };
+    const clear = read();
+    const ratio = (weatherTypeId: number, pick: (r: ReturnType<typeof read>) => number) =>
+      pick(read(weatherTypeId)) / pick(clear);
+
+    // Dark: +50% velocity; turret optimal −30% at 1, −70% at 3.
+    expect(ratio(47378, (r) => r.stats.navigation.maxVelocity)).toBeCloseTo(1.5, 6);
+    expect(ratio(47378, (r) => r.optimal)).toBeCloseTo(0.7, 6);
+    expect(ratio(47380, (r) => r.optimal)).toBeCloseTo(0.3, 6);
+    // Electrical: recharge time halved; EM resonance ×1.3 at 1, ×1.7 at 3 (resists −30 / −70%).
+    expect(ratio(47381, (r) => r.stats.capacitorRechargeTime)).toBeCloseTo(0.5, 6);
+    expect(ratio(47381, (r) => r.stats.armor.emResonance)).toBeCloseTo(1.3, 6);
+    expect(ratio(47383, (r) => r.stats.armor.emResonance)).toBeCloseTo(1.7, 6);
+    // Exotic: +50% scan resolution; kinetic resists down.
+    expect(ratio(47384, (r) => r.stats.targeting.scanResolution)).toBeCloseTo(1.5, 6);
+    expect(ratio(47384, (r) => r.stats.armor.kineticResonance)).toBeCloseTo(1.3, 6);
+    // Gamma: +50% shield HP; explosive resists down.
+    expect(ratio(47387, (r) => r.stats.shield.hp)).toBeCloseTo(1.5, 6);
+    expect(ratio(47387, (r) => r.stats.shield.explosiveResonance)).toBeCloseTo(1.3, 6);
   });
 
   it("reads the hull's own resists, not the Damage Control modifier attributes", () => {

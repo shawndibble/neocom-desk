@@ -286,6 +286,8 @@ interface FittingStatsSectionsProps {
   overlay?: OverlayFitting;
   /** A line above the sections — whose skills the numbers are worked out under. */
   heading?: ReactNode;
+  /** Controls for the conditions every section is worked out in (the Abyssal weather), under the heading. */
+  conditions?: ReactNode;
   /** The hull takes drones (`showsDrones`) — else there is no Drones section. */
   showDrones?: boolean;
 }
@@ -309,6 +311,7 @@ export function FittingStatsSections({
   targetProfiles,
   overlay,
   heading,
+  conditions,
   showDrones = true,
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
@@ -419,6 +422,7 @@ export function FittingStatsSections({
           {heading}
         </div>
       )}
+      {conditions && <div className="border-b border-line px-3 py-2">{conditions}</div>}
       {statsError && (
         <div
           role="alert"
