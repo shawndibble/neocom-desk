@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useIsPhone } from '@/lib/useIsPhone';
 import {
   Button,
   ColumnPickerMenu,
@@ -1288,7 +1289,14 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
     columns.map((column) => column.id)
   );
 
-  const visibleRows = showAll ? displayRows : displayRows.slice(0, ROW_CAP);
+  // `DataTable` only groups by lane on phone (`groupBy` is a no-op at `sm`
+  // and up), and a collapsed lane costs nothing extra to render — so capping
+  // there just corrupts lane counts and can drop a whole lane past the cut.
+  // Desktop shows the flat, ungrouped list, where the cap still earns its
+  // keep against render cost.
+  const isPhone = useIsPhone();
+  const isCapped = !isPhone && !showAll;
+  const visibleRows = isCapped ? displayRows.slice(0, ROW_CAP) : displayRows;
 
   /**
    * Phone-only lane folding. Memoised because `DataTable` regroups whenever
@@ -1410,7 +1418,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
             stackSummary={stackSummary}
             groupBy={groupBy}
           />
-          {!showAll && displayRows.length > ROW_CAP && (
+          {isCapped && displayRows.length > ROW_CAP && (
             <div className="px-3 py-2">
               <Button size="sm" onClick={() => setShowAll(true)}>
                 {t('contractSearch.showAll', { count: displayRows.length })}
