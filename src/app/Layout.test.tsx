@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -58,10 +58,27 @@ function renderLayout() {
   );
 }
 
+/**
+ * The `/characters` stub used by `renderLayoutWithRoutes`, extended to show
+ * the `from` location state a switch-character link carries (#1764) — a
+ * sibling `<p>` rather than folding it into "characters page"'s own text, so
+ * the shortcut tests' exact `findByText('characters page')` still matches.
+ */
+function CharactersPageStub() {
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from;
+  return (
+    <div>
+      <p>characters page</p>
+      <p data-testid="characters-page-from">{from ?? ''}</p>
+    </div>
+  );
+}
+
 /** For the shortcut tests below, which need more than one destination route. */
-function renderLayoutWithRoutes() {
+function renderLayoutWithRoutes(initialEntry = '/overview') {
   return render(
-    <MemoryRouter initialEntries={['/overview']}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Routes>
         <Route element={<Layout />}>
           <Route
@@ -74,7 +91,7 @@ function renderLayoutWithRoutes() {
             }
           />
           <Route path="/market" element={<div>market page</div>} />
-          <Route path="/characters" element={<div>characters page</div>} />
+          <Route path="/characters" element={<CharactersPageStub />} />
           {/* `/*`: Settings' tabs are real path segments now (ADR 0015), so the
               `?` shortcut's `/settings/shortcuts` target has to match
               this route too, not just the bare page path. */}
@@ -1012,5 +1029,68 @@ describe("Layout mobile tab bar follows the pilot's choice", () => {
     expect(await within(sheet).findByRole('link', { name: 'Corporation' })).toBeInTheDocument();
     expect(await within(sheet).findByRole('link', { name: 'Settings' })).toBeInTheDocument();
     expect(within(sheet).getByRole('link', { name: 'Pilot One' })).toBeInTheDocument();
+  });
+});
+
+describe('Layout Characters switch carries the page it started from (#1764)', () => {
+  it('does not duplicate Characters as a plain sheet row when it is not chosen for the tab bar', async () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    const user = userEvent.setup();
+    renderLayout();
+
+    const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+    await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
+    const sheet = screen.getByRole('dialog', { name: 'More' });
+
+    // Only the dedicated portrait+name row reaches /characters — not a second, plain-text row
+    // (the ordinary sheet rows loop would otherwise also list it, named "Characters").
+    const characterLinks = within(sheet)
+      .getAllByRole('link')
+      .filter((link) => link.getAttribute('href') === '/characters');
+    expect(characterLinks).toHaveLength(1);
+  });
+
+  it("the More sheet's Character link passes the page it was opened from", async () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    const user = userEvent.setup();
+    renderLayoutWithRoutes('/market');
+    expect(await screen.findByText('market page')).toBeInTheDocument();
+
+    const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+    await user.click(within(mobileNav).getByRole('button', { name: 'More' }));
+    const sheet = screen.getByRole('dialog', { name: 'More' });
+    await user.click(within(sheet).getByRole('link', { name: 'Switch character' }));
+
+    expect(await screen.findByText('characters page')).toBeInTheDocument();
+    expect(screen.getByTestId('characters-page-from')).toHaveTextContent('/market');
+  });
+
+  it('a tab-bar entry for Characters (once chosen) passes the page it was opened from', async () => {
+    useMobileTabs.setState({
+      value: ['/characters', '/alerts', '/skills', '/industry'],
+      hydrated: true,
+    });
+    const user = userEvent.setup();
+    renderLayoutWithRoutes('/market');
+    expect(await screen.findByText('market page')).toBeInTheDocument();
+
+    const mobileNav = screen.getByRole('navigation', { name: 'Mobile navigation' });
+    await user.click(within(mobileNav).getByRole('link', { name: 'Characters' }));
+
+    expect(await screen.findByText('characters page')).toBeInTheDocument();
+    expect(screen.getByTestId('characters-page-from')).toHaveTextContent('/market');
+  });
+
+  it("the desktop rail's Character link carries no origin — desktop behavior is unchanged", async () => {
+    mockIsSyncConfigured.mockReturnValue(false);
+    const user = userEvent.setup();
+    renderLayoutWithRoutes('/market');
+    expect(await screen.findByText('market page')).toBeInTheDocument();
+
+    const rail = screen.getByRole('complementary');
+    await user.click(within(rail).getByRole('link', { name: 'Switch character' }));
+
+    expect(await screen.findByText('characters page')).toBeInTheDocument();
+    expect(screen.getByTestId('characters-page-from')).toHaveTextContent('');
   });
 });

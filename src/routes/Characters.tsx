@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type CharacterRecord } from '@/db';
@@ -764,6 +764,7 @@ function buildColumns(
 export function Characters() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const characters = useLiveQuery(() => db.characters.orderBy('characterId').toArray());
   const publicInfo = usePublicInfo((state) => state.byCharacterId);
   const loadPublicInfoMany = usePublicInfo((state) => state.loadMany);
@@ -991,7 +992,12 @@ export function Characters() {
 
   async function select(characterId: number) {
     await setActiveCharacter(characterId);
-    navigate('/overview');
+    // Return to wherever the switch started (the tab bar, or the More
+    // sheet's portrait+name row) — falling back to Overview when there is
+    // nowhere to return to (a fresh load) or the origin was this page itself
+    // (#1764).
+    const from = (location.state as { from?: string } | null)?.from;
+    navigate(from && from !== '/characters' ? from : '/overview');
   }
 
   /**

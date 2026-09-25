@@ -25,6 +25,33 @@ async function landOnCharactersAtPhoneWidth(page: Page) {
   await expect(page.getByRole('button', { name: `Select ${CHARACTER_NAME}` })).toBeVisible();
 }
 
+test('picking a Character from the More sheet returns to the page you switched from, not always Overview (#1764)', async ({
+  page,
+}) => {
+  await landOnCharactersAtPhoneWidth(page);
+  await page.getByRole('button', { name: `Select ${CHARACTER_NAME}` }).click();
+  await expect(page).toHaveURL(/\/overview$/);
+
+  const mobileNav = page.getByRole('navigation', { name: 'Mobile navigation' });
+
+  // Navigate away from Overview via the More sheet, so switching characters
+  // has somewhere other than Overview to prove it returns to.
+  await mobileNav.getByRole('button', { name: 'More' }).click();
+  await page.getByRole('dialog', { name: 'More' }).getByRole('link', { name: 'Mail' }).click();
+  await expect(page).toHaveURL(/\/mail$/);
+
+  // Switch characters via the More sheet's portrait+name row.
+  await mobileNav.getByRole('button', { name: 'More' }).click();
+  await page
+    .getByRole('dialog', { name: 'More' })
+    .getByRole('link', { name: CHARACTER_NAME })
+    .click();
+  await expect(page).toHaveURL(/\/characters$/);
+
+  await page.getByRole('button', { name: `Select ${CHARACTER_NAME}` }).click();
+  await expect(page).toHaveURL(/\/mail$/);
+});
+
 test('New Group, density, and view-mode controls share one row at 390px', async ({ page }) => {
   await landOnCharactersAtPhoneWidth(page);
 
