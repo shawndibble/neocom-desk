@@ -4511,6 +4511,7 @@
     "notifications": {
       "hint": "Pick what each character is told about, and how. Browser raises a pop-up from your operating system; Overview adds a row to the Overview page inside the app. These choices stay on this device.",
       "blockedNotice": "Notifications are blocked — enable them in your browser's site settings, then return here.",
+      "blockedNoticePlayApp": "Notifications are off for this app — open your phone's Settings → Apps → Neocom Desk → Notifications, turn them on, then return here.",
       "installRequiredNotice": "On iPhone and iPad, notifications only work once Neocom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
       "enableHint": "This device hasn't granted notification permission yet.",
       "enableButton": "Turn on browser notifications",

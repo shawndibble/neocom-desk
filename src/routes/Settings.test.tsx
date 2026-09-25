@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, onTestFinished, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -21,6 +21,7 @@ import { isEventEnabledFor } from '@/features/notifications/eventSelection';
 import { rebuildProjection } from '@/features/notifications/projectionRebuild';
 import { PROJECTION_REBUILD_DELAY_MS } from '@/features/notifications/projectionRebuildScheduler';
 import { App } from '@/app/App';
+import { PLAY_STORE_PACKAGE } from '@/lib/playStoreApp';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeFormat, DEFAULT_TIME_FORMAT, TIME_FORMAT_SETTING_KEY } from '@/lib/timeFormat';
 import { useMarketHub } from '@/features/market/hub';
@@ -547,6 +548,24 @@ describe('Settings — Notifications (issue #170)', () => {
     expect(
       screen.getByRole('checkbox', { name: 'New Mail, browser notifications' })
     ).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('points the Play Store app at Android app settings, not browser site settings, while denied', async () => {
+    // In the TWA, Chrome delegates the grant to the Android app's own
+    // notification toggle, so "site settings" names a screen that can't fix it.
+    vi.spyOn(document, 'referrer', 'get').mockReturnValue(`android-app://${PLAY_STORE_PACKAGE}`);
+    onTestFinished(() => {
+      vi.restoreAllMocks();
+      window.sessionStorage.clear();
+    });
+    stubNotification('denied');
+    render(<App />);
+    await notificationsPanel();
+
+    expect(
+      await screen.findByText(/settings → apps → neocom desk → notifications/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/site settings/i)).not.toBeInTheDocument();
   });
 
   it('offers an Enable button that makes the browser request, and no request without it', async () => {

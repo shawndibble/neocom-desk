@@ -120,6 +120,7 @@ import { loadCharacterRoles, corpWideRoles } from '@/features/corp/roles';
 import { corpCapabilities, type CorpCapabilities } from '@/engine/corpRoles';
 import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
+import { isPlayStoreApp } from '@/lib/playStoreApp';
 
 const EVENT_BY_ID = new Map(NOTIFICATION_EVENTS.map((event) => [event.id, event]));
 
@@ -251,6 +252,10 @@ export function NotificationsPanel() {
   // Enable button would either do nothing or grant a permission that can
   // never deliver anything, so this state shows why instead of the button.
   const installRequired = webPushSupport() === 'requires-install';
+  // In the Play Store app Chrome delegates the grant to the Android app's own
+  // notification toggle (docs/ANDROID-TWA.md), so the blocked notice has to
+  // name that screen — browser site settings can't unblock it.
+  const [inPlayStoreApp] = useState(isPlayStoreApp);
 
   const [search, setSearch] = useUrlParam('search', SEARCH_PARAM);
   const [expandedCharacterIds, setExpandedCharacterIds] = useState<ReadonlySet<number>>(new Set());
@@ -476,7 +481,11 @@ export function NotificationsPanel() {
             role="status"
             className="rounded-xs border border-warning/60 bg-warning/10 px-3 py-2 text-xs text-warning"
           >
-            {t('settings.notifications.blockedNotice')}
+            {t(
+              inPlayStoreApp
+                ? 'settings.notifications.blockedNoticePlayApp'
+                : 'settings.notifications.blockedNotice'
+            )}
           </p>
         )}
         {/*
