@@ -41,6 +41,8 @@ export interface ItemContextMenuProps {
   onToggleBuildHere?: () => void;
   /** Picks the toggle's label. Meaningless without `onToggleBuildHere`. */
   buildingHere?: boolean;
+  /** Caller-specific entries appended after the shared ones (Open Orders' "Copy new price"). */
+  extraItems?: ReactNode;
   onOpenChange?: (open: boolean) => void;
   children: ReactElement;
 }
@@ -88,6 +90,7 @@ function useItemMenuItems(
     onViewInIndustryAsMaterial,
     onToggleBuildHere,
     buildingHere,
+    extraItems,
   }: ItemMenuProps,
   onAlertRequest: () => void
 ): ReactNode {
@@ -166,6 +169,7 @@ function useItemMenuItems(
           {t('market.contextMenu.piPlan')}
         </MenuItem>
       )}
+      {extraItems}
     </>
   );
 }
