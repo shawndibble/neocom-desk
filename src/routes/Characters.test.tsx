@@ -107,7 +107,9 @@ function locationSearch(): string {
   return screen.getByTestId('location-search').textContent ?? '';
 }
 
-function renderCharacters(initialEntry = '/characters') {
+function renderCharacters(
+  initialEntry: string | { pathname: string; state?: unknown } = '/characters'
+) {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <LocationProbe />
@@ -118,6 +120,7 @@ function renderCharacters(initialEntry = '/characters') {
         <Route path="/industry" element={<div>industry page</div>} />
         <Route path="/planetary-industry" element={<div>pi page</div>} />
         <Route path="/alerts" element={<div>alerts page</div>} />
+        <Route path="/mail" element={<div>mail page</div>} />
       </Routes>
     </MemoryRouter>
   );
@@ -222,6 +225,22 @@ describe('Characters', () => {
     expect(await screen.findByText('overview page')).toBeInTheDocument();
     expect(useActiveCharacter.getState().activeCharacterId).toBe(91);
     expect((await db.settings.get(ACTIVE_CHARACTER_KEY))?.value).toBe(91);
+  });
+
+  it('selecting a character returns to the page the switch started from (#1764)', async () => {
+    const user = userEvent.setup();
+    renderCharacters({ pathname: '/characters', state: { from: '/mail' } });
+    await user.click(await screen.findByRole('button', { name: 'Select Pilot One' }));
+
+    expect(await screen.findByText('mail page')).toBeInTheDocument();
+  });
+
+  it('falls back to /overview when the origin is /characters itself (#1764)', async () => {
+    const user = userEvent.setup();
+    renderCharacters({ pathname: '/characters', state: { from: '/characters' } });
+    await user.click(await screen.findByRole('button', { name: 'Select Pilot One' }));
+
+    expect(await screen.findByText('overview page')).toBeInTheDocument();
   });
 
   it('add character starts an ADD-A-CHARACTER login, not a re-auth', async () => {
