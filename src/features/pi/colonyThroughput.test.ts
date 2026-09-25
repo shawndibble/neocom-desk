@@ -46,6 +46,7 @@ function baseColony(overrides: Partial<BuiltColonyAdvice>): BuiltColonyAdvice {
     },
     extractors: [],
     extractedPerHour: [],
+    stoppedExtraction: null,
     production: [],
     linkCount: 0,
     hasUnverifiedExtractors: false,

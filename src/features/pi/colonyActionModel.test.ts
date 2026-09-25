@@ -47,6 +47,7 @@ function colony(
       expiryMs: null,
     })),
     extractedPerHour: extraction,
+    stoppedExtraction: null,
     production: overrides.production ?? [{ schematicId: BACTERIA_SCHEMATIC, count: 8 }],
     linkCount: 12,
     hasUnverifiedExtractors: false,

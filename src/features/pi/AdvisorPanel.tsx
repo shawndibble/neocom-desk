@@ -150,6 +150,8 @@ function customsTooltip(source: CustomsRateSource, t: TFunction): string {
 
 interface Snapshot {
   pi: PiData;
+  /** When this snapshot was loaded — a stopped extractor is judged against this, not a fresh `Date.now()` at render (impure during render). */
+  nowMs: number;
   systems: SystemGroup[];
   details: Map<number, CharacterPlanetDetail>;
   planetsBySystem: Map<number, SystemPlanet[]>;
@@ -427,6 +429,7 @@ async function loadAdvisorSnapshot(characterId: number, priceHub: TradeHub): Pro
             colonies: entries.map((entry) => entry.planet),
             details: altDetails,
             planetRadiusKm,
+            nowMs,
           },
           pi
         )
@@ -436,6 +439,7 @@ async function loadAdvisorSnapshot(characterId: number, priceHub: TradeHub): Pro
 
   return {
     pi,
+    nowMs,
     altAdvice,
     altTaxRates,
     altOwners,
@@ -981,6 +985,7 @@ export function AdvisorPanel({
         colonies: activeSystem.colonies,
         details: snapshot.details,
         planetRadiusKm: snapshot.planetRadiusKm,
+        nowMs: snapshot.nowMs,
       },
       snapshot.pi
     );
@@ -1076,6 +1081,7 @@ export function AdvisorPanel({
         colonies: system.colonies,
         details: snapshot.details,
         planetRadiusKm: snapshot.planetRadiusKm,
+        nowMs: snapshot.nowMs,
       },
       snapshot.pi
     )

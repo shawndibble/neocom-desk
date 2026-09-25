@@ -63,6 +63,7 @@ function built(
       },
       extractors: [{ pinId: 1, productTypeId: resource, ratePerHour: extraction, expiryMs: null }],
       extractedPerHour: [{ typeId: resource, unitsPerHour: extraction }],
+      stoppedExtraction: null,
       production: [{ schematicId, count: pins }],
       linkCount: 4,
       hasUnverifiedExtractors: false,

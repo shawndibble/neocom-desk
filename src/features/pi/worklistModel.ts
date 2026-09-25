@@ -28,10 +28,12 @@
  *
  * ## What ranks where, and why
  *
- * 1. **An overflowing colony leads, whatever it is worth.** A colony that
- *    fills its Launchpad before the pilot comes back stops extracting, so
- *    every other figure the page prints for it is being thrown away. There is
- *    no point tuning a colony that is standing still.
+ * 1. **An overflowing colony leads, whatever it is worth — and so does a
+ *    stopped one.** A colony that fills its Launchpad before the pilot comes
+ *    back stops extracting, so every other figure the page prints for it is
+ *    being thrown away. There is no point tuning a colony that is standing
+ *    still, and the same is true of one whose extractor program has simply
+ *    run out: `stopped` shares this colony's top band for the same reason.
  * 2. **Then steps that earn**, by ISK an hour, across planets.
  * 3. **Then a removal whose freed budget buys extraction**, ranked by how many
  *    starved facilities that extraction would feed. It earns — but what those
@@ -49,7 +51,10 @@
 import type { PlanetType } from '@/esi/endpoints';
 import type { PinCounts, PinLoad } from '@/engine/pi/types';
 
-export type WorklistVerb = 'haul' | 'remove' | 'add' | 'swap' | 'rebuild';
+export type WorklistVerb = 'haul' | 'remove' | 'add' | 'swap' | 'rebuild' | 'stopped';
+
+/** Verbs that mean something is broken, not merely an opportunity to earn more. */
+export const FAULT_VERBS: ReadonlySet<WorklistVerb> = new Set(['remove', 'haul', 'stopped']);
 
 /** One thing to go and do, on one planet. */
 export interface WorklistRow {
@@ -73,6 +78,9 @@ export interface WorklistRow {
   pinCount?: number;
   /** On a `haul` row: what the colony can hold, against what the pilot's cadence needs. */
   window?: { hoursToFull: number; haulHours: number };
+  /** On a `stopped` row: how long the longest-idle extractor has been dry, and how many are. */
+  hoursStopped?: number;
+  stoppedCount?: number;
   /** On a `rebuild` row: the tier and the pins the layout is made of. */
   tier?: number;
   pins?: PinCounts;
@@ -152,6 +160,8 @@ export interface WorklistColony {
   conversions: readonly WorklistOpportunity[];
   rebuild: WorklistRebuild | null;
   throughput: WorklistThroughput | null;
+  /** Set when an extractor's own program has run dry — see `advisorModel.ts`'s `stoppedExtraction`. */
+  stopped: { count: number; hoursStopped: number } | null;
 }
 
 /**
@@ -194,6 +204,24 @@ function rankColony(colony: WorklistColony): Ranked[] {
         label: colony.name ?? String(planetId),
         iskPerHour: flow.lostIskPerHour,
         window: { hoursToFull: flow.hoursToFull, haulHours: flow.haulHours },
+      },
+    });
+  }
+
+  // A dry extractor beats every other fault too: it is earning 0 right now,
+  // not "less than it could" — the same band as an overflowing colony.
+  if (colony.stopped) {
+    out.push({
+      band: BAND.overflow,
+      isk: 0,
+      row: {
+        ...base(colony),
+        key: `${planetId}:stopped`,
+        verb: 'stopped',
+        label: colony.name ?? String(planetId),
+        iskPerHour: null,
+        hoursStopped: colony.stopped.hoursStopped,
+        stoppedCount: colony.stopped.count,
       },
     });
   }

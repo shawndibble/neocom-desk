@@ -19,9 +19,10 @@ import { VerbTag, type DirectiveVerb } from './DirectiveRow';
 import { layoutLabel } from './colonyPlan';
 import type { Worklist as WorklistData, WorklistRow } from './worklistModel';
 
-/** Every worklist verb is a directive verb; `haul` reads as a fault, like `remove`. */
+/** Every worklist verb is a directive verb; `haul` and `stopped` read as faults, like `remove`. */
 const VERB: Record<WorklistRow['verb'], DirectiveVerb> = {
   haul: 'remove',
+  stopped: 'remove',
   remove: 'remove',
   add: 'add',
   swap: 'swap',
@@ -57,6 +58,15 @@ function Worth({ row }: { row: WorklistRow }) {
     return (
       <span className="text-right text-xs font-semibold whitespace-nowrap tabular-nums text-accent">
         {t('piAdvisor.worklistFeeds', { count: row.wouldFeed ?? 0 })}
+      </span>
+    );
+  }
+  // A stopped extractor's program is dry, not a step with a price — the
+  // duration is the whole fact this row has to give.
+  if (row.verb === 'stopped' && row.hoursStopped !== undefined) {
+    return (
+      <span className="text-right text-xs font-semibold whitespace-nowrap text-warning tabular-nums">
+        {t('piAdvisor.worklistStopped', { duration: span(row.hoursStopped, t) })}
       </span>
     );
   }
@@ -98,6 +108,9 @@ function Step({ row }: { row: WorklistRow }) {
         })}
       </>
     );
+  }
+  if (row.verb === 'stopped') {
+    return <>{t('piAdvisor.rowStopped', { count: row.stoppedCount ?? 0 })}</>;
   }
   if (row.key.endsWith(':add:freed')) {
     return (

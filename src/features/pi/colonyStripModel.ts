@@ -28,7 +28,7 @@
  * all. Both are worse than saying what is true.
  */
 import type { PlanetType } from '@/esi/endpoints';
-import type { Worklist } from './worklistModel';
+import { FAULT_VERBS, type Worklist } from './worklistModel';
 
 export interface ColonyStripColony {
   planetId: number;
@@ -77,11 +77,9 @@ export function colonyStripRows(input: ColonyStripInput): ColonyStripRow[] {
   const faultsBy = new Map<number, number>();
   const stepsBy = new Map<number, number>();
 
-  // `remove` and `haul` are faults: something runs that nothing feeds, or the
-  // colony has stopped because it filled up. `add`, `swap` and `rebuild` earn
-  // more — worth doing, but nothing about them is broken.
+  // `add`, `swap` and `rebuild` earn more but aren't broken — see `FAULT_VERBS`.
   for (const row of [...tuning, ...rebuilds]) {
-    const bucket = row.verb === 'remove' || row.verb === 'haul' ? faultsBy : stepsBy;
+    const bucket = FAULT_VERBS.has(row.verb) ? faultsBy : stepsBy;
     bucket.set(row.planetId, (bucket.get(row.planetId) ?? 0) + 1);
   }
 

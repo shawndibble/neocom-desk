@@ -26,20 +26,21 @@ function row(over: Partial<WorklistRow> & { planetId: number; verb: WorklistRow[
 const EMPTY: Worklist = { tuning: [], rebuilds: [] };
 
 describe('colonyStripRows', () => {
-  it('counts a haul and a removal as faults, and an addition as a step', () => {
+  it('counts a haul, a removal and a stopped extractor as faults, and an addition as a step', () => {
     const [only] = colonyStripRows({
       colonies: [colony({ planetId: 1 })],
       worklist: {
         tuning: [
           row({ planetId: 1, verb: 'haul' }),
           row({ planetId: 1, verb: 'remove' }),
+          row({ planetId: 1, verb: 'stopped' }),
           row({ planetId: 1, verb: 'add' }),
         ],
         rebuilds: [],
       },
       haulHours: 24,
     });
-    expect(only.faults).toBe(2);
+    expect(only.faults).toBe(3);
     expect(only.steps).toBe(1);
   });
 
