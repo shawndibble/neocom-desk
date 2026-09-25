@@ -53,6 +53,7 @@ vi.mock('@/features/character/systemSecurity', () => ({
 
 // The build location search only renders once the scope is known to be
 // granted; without this the box under test is the re-auth offer instead.
+// `useEndpointsGranted` likewise keeps the standings note out of the way.
 vi.mock('@/app/useGrantedScopes', () => ({
   useGrantedScopes: () => ['esi-search.search_structures.v1'],
   useEndpointsGranted: () => true,

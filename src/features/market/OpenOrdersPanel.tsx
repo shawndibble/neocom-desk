@@ -487,13 +487,10 @@ export function OpenOrdersPanel({
   // Whoever has a floor on screen (same rows the floor column follows): each
   // note checks that character's own grant, since each floor prices with
   // that character's standings.
-  const floorCharacters = useMemo(() => {
-    const byId = new Map<number, { characterId: number; characterName: string }>();
-    for (const { floor, characterId, characterName } of groupingRows) {
-      if (floor) byId.set(characterId, { characterId, characterName });
-    }
-    return [...byId.values()];
-  }, [groupingRows]);
+  const floorCharacterIds = useMemo(
+    () => [...new Set(groupingRows.filter((row) => row.floor).map((row) => row.characterId))],
+    [groupingRows]
+  );
 
   const reauthEntries = useMemo(
     () => snapshot?.openOrders.entries.filter((e) => e.needsReauth) ?? [],
@@ -834,11 +831,11 @@ export function OpenOrdersPanel({
             }
           />
         ))}
-        {floorCharacters.map(({ characterId, characterName }) => (
+        {floorCharacterIds.map((characterId) => (
           <AssumesBaseStandingsNote
             key={characterId}
             characterId={characterId}
-            characterName={characterName}
+            characterName={characterNamesById.get(characterId)}
             hint={t('market.orders.assumesBaseStandingsHint')}
           />
         ))}

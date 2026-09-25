@@ -267,10 +267,7 @@ export function MarketWideOpportunitiesPanel({
         />
       ) : (
         <div className="flex flex-col gap-2">
-          <AssumesBaseStandingsNote
-            characterId={activeCharacterId}
-            hint={t('industry.assumesBaseStandingsHint')}
-          />
+          <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
           {gatedCount > 0 && (
             <div className="flex justify-end">
               <FilterChip

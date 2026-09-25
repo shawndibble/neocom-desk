@@ -30,7 +30,6 @@ export function useGrantedScopes(characterId?: number | null): readonly string[]
   // would paint a re-auth banner over a perfectly healthy Character. An
   // explicit `characterId` is already known, so it doesn't wait on that.
   if (characterId === undefined && !hydrated) return undefined;
-  if (targetId === null) return undefined;
   // `useLiveQuery` keeps its last result across a dep change, so a switch of
   // Character would briefly answer with the previous one's grant.
   return grant?.characterId === targetId ? grant.scopes : undefined;
@@ -55,10 +54,11 @@ export function useLockedRoutes(paths: readonly AppRoutePath[]): ReadonlySet<App
 
 /**
  * Whether a Character's grant (the active one's unless `characterId` is
- * given) covers every scope `endpoints` declares — for a figure that degrades to a documented assumption rather
- * than gating a whole page (issue #1526). `undefined` while the grant is
- * still unknown, so a caller can hold its note back rather than flash it on
- * a cold load, same as `useGrantedScopes` itself.
+ * given) covers every scope `endpoints` declares — for a figure that
+ * degrades to a documented assumption rather than gating a whole page
+ * (issue #1526). `undefined` while the grant is still unknown, so a caller
+ * can hold its note back rather than flash it on a cold load, same as
+ * `useGrantedScopes` itself.
  */
 export function useEndpointsGranted(
   endpoints: readonly EsiEndpointId[],

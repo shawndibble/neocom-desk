@@ -556,10 +556,7 @@ export function Industry() {
           ) : (
             <Panel>
               {(plans?.length ?? 0) > 0 && (
-                <AssumesBaseStandingsNote
-                  characterId={activeCharacterId}
-                  hint={t('industry.assumesBaseStandingsHint')}
-                />
+                <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
               )}
               <BuildPlanList
                 plans={plans}

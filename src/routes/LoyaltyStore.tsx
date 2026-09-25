@@ -489,7 +489,6 @@ export function LoyaltyStore() {
           {priceBasis === 'sell' && (
             <AssumesBaseStandingsNote
               className="border-b border-line px-3"
-              characterId={activeCharacterId}
               hint={t('loyaltyStore.assumesBaseStandingsHint')}
             />
           )}
