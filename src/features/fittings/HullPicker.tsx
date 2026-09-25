@@ -11,8 +11,9 @@ interface HullPickerProps {
 }
 
 /**
- * "New fitting from a hull" (scope decision `20260924-215855`): search, or
- * browse the Ships market groups by class, pick one, and Start fitting opens
+ * "New fitting from a hull" (scope decision `20260924-215855`): search
+ * (nothing is listed until the player types), hulls grouped by Ships market
+ * class, pick one, and Start fitting opens
  * the bare hull. Needs only the static market data, so it works before the
  * ship data (dogma engine) has downloaded.
  */
@@ -28,7 +29,11 @@ export function HullPicker({ catalogue, onStart }: HullPickerProps) {
         : buildHullCatalogue([...catalogue.groupsById.values()], catalogue.marketTypes),
     [catalogue]
   );
-  const shown = useMemo(() => searchHulls(hulls, query), [hulls, query]);
+  const hasQuery = query.trim() !== '';
+  const shown = useMemo(
+    () => (hasQuery ? searchHulls(hulls, query) : []),
+    [hulls, query, hasQuery]
+  );
 
   return (
     <div className="flex min-h-0 flex-col gap-3">
@@ -40,6 +45,8 @@ export function HullPicker({ catalogue, onStart }: HullPickerProps) {
       />
       {catalogue === null ? (
         <p className="text-xs text-text-dim">{t('fittings.add.loadingCatalogue')}</p>
+      ) : !hasQuery ? (
+        <p className="text-xs text-text-dim">{t('fittings.start.searchToBegin')}</p>
       ) : shown.length === 0 ? (
         <p className="text-xs text-text-dim">{t('fittings.start.noHulls')}</p>
       ) : (
