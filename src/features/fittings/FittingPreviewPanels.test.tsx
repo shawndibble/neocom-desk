@@ -123,6 +123,18 @@ describe('NotesPanel', () => {
     expect(screen.getByText(/first/)).toHaveClass('whitespace-pre-wrap');
   });
 
+  it('shows notes that change underneath it while nothing is being typed, and saves only real edits', async () => {
+    const onSave = vi.fn();
+    const { rerender } = render(<NotesPanel text="Old." onSave={onSave} />);
+    rerender(<NotesPanel text="Synced from another device." onSave={onSave} />);
+    const box = screen.getByRole('textbox', { name: 'Notes' });
+    expect(box).toHaveValue('Synced from another device.');
+
+    await userEvent.click(box);
+    await userEvent.tab();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it('saves edited notes when the field loses focus, and only if they changed', async () => {
     const onSave = vi.fn();
     render(<NotesPanel text="Overheat late." onSave={onSave} />);

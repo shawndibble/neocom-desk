@@ -236,7 +236,10 @@ export function SkillsPanel({
  */
 export function NotesPanel({ text, onSave }: { text: string; onSave?: (text: string) => void }) {
   const { t } = useTranslation();
-  const [draft, setDraft] = useState(text);
+  // `null` until the player types: what shows is then the saved text, so a
+  // synced change to the notes is never overwritten by a stale copy.
+  const [draft, setDraft] = useState<string | null>(null);
+  if (draft !== null && draft === text) setDraft(null);
   if (onSave === undefined) return <p className="text-sm whitespace-pre-wrap">{text}</p>;
   return (
     <div className="space-y-1">
@@ -245,14 +248,14 @@ export function NotesPanel({ text, onSave }: { text: string; onSave?: (text: str
       </label>
       <textarea
         id="fitting-notes"
-        value={draft}
+        value={draft ?? text}
         rows={5}
         maxLength={IN_GAME_FITTING_DESCRIPTION_MAX}
         placeholder={t('fittings.start.preview.notesPlaceholder')}
         className={`${fieldBaseClassName} w-full p-2 text-sm`}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={() => {
-          if (draft !== text) onSave(draft);
+          if (draft !== null && draft !== text) onSave(draft);
         }}
       />
       <p className="text-xs text-text-dim">
