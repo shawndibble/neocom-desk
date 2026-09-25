@@ -371,6 +371,16 @@ describe('Market Browser', () => {
     expect(screen.queryByText('Ore')).not.toBeInTheDocument();
   });
 
+  it('pins an exact-name match under a "Best match" heading above the tree (issue #1742)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.type(await screen.findByRole('searchbox'), 'rifter');
+
+    expect(await screen.findByText('Best match')).toBeInTheDocument();
+    expect(screen.getAllByText('Rifter')).toHaveLength(1);
+  });
+
   it('tells assistive tech whether a Market Group is expanded', async () => {
     const user = userEvent.setup();
     render(<App />);

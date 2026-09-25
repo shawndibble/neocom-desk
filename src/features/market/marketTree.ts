@@ -29,10 +29,12 @@ export function addAncestors(
 }
 
 export interface MarketTreeFilterResult {
-  /** Every group id that must render: matched leaf groups plus their ancestors. */
+  /** Every group id that must render: matched leaf groups plus their ancestors (bestMatch excluded). */
   visibleGroupIds: ReadonlySet<number>;
-  /** Matched items, capped at MARKET_TREE_MATCH_LIMIT, keyed by their market group. */
+  /** Matched items, capped at MARKET_TREE_MATCH_LIMIT, keyed by their market group (bestMatch excluded). */
   matchedTypesByGroup: ReadonlyMap<number, MarketTypeEntry[]>;
+  /** The item whose name equals the query, pinned above the tree; null when none does. */
+  bestMatch: MarketTypeEntry | null;
   /** Full match count before the cap, for the "N total" / capped copy. */
   totalMatches: number;
   capped: boolean;
@@ -61,7 +63,12 @@ export function filterMarketTree(
   const visibleGroupIds = new Set<number>();
   const matchedTypesByGroup = new Map<number, MarketTypeEntry[]>();
 
+  // Pinned above the tree, so it is left out of the tree itself rather than shown twice.
+  const needle = query.trim().toLowerCase();
+  const bestMatch = shown.find((type) => type.name.toLowerCase() === needle) ?? null;
+
   for (const type of shown) {
+    if (type === bestMatch) continue;
     let list = matchedTypesByGroup.get(type.marketGroupId);
     if (!list) {
       list = [];
@@ -71,5 +78,5 @@ export function filterMarketTree(
     addAncestors(type.marketGroupId, groupsById, visibleGroupIds);
   }
 
-  return { visibleGroupIds, matchedTypesByGroup, totalMatches, capped };
+  return { visibleGroupIds, matchedTypesByGroup, bestMatch, totalMatches, capped };
 }

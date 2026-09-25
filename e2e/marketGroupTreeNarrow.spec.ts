@@ -25,7 +25,7 @@ const DESKTOP = { width: 1280, height: 800 };
 const MD_EDGE = { width: 768, height: 800 };
 
 /**
- * Searches the item finder for Tritanium, which lives at
+ * Searches the item finder for a partial "Tritaniu" (an exact name would pin the item above the tree, out of it), which lives at
  * Manufacture & Research > Materials > Minerals. Search auto-expands the
  * matched branch, so both row shapes this spec measures — the `Minerals`
  * group header and the `Tritanium` leaf — are rendered afterwards.
@@ -33,7 +33,7 @@ const MD_EDGE = { width: 768, height: 800 };
 async function searchTritanium(page: Page) {
   await signInAndGoto(page, './market');
 
-  await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritanium');
+  await page.getByRole('searchbox', { name: 'Search items' }).fill('Tritaniu');
 }
 
 /** The tree has its own scrollport (`max-h-[32rem]`), so scroll before measuring. */

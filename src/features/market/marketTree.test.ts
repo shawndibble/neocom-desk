@@ -61,7 +61,7 @@ describe('filterMarketTree', () => {
   });
 
   it('matches a leaf item and keeps its whole ancestor chain visible, hiding unrelated branches', () => {
-    const result = filterMarketTree(GROUPS, TYPES, 'rifter');
+    const result = filterMarketTree(GROUPS, TYPES, 'rifte');
     expect(result).not.toBeNull();
     expect(result?.visibleGroupIds).toEqual(new Set([1, 2]));
     expect(result?.matchedTypesByGroup.get(2)?.map((t) => t.name)).toEqual(['Rifter']);
@@ -90,6 +90,28 @@ describe('filterMarketTree', () => {
     expect(result?.totalMatches).toBe(MARKET_TREE_MATCH_LIMIT + 10);
     expect(result?.capped).toBe(true);
     expect(result?.matchedTypesByGroup.get(2)?.length).toBe(MARKET_TREE_MATCH_LIMIT);
+  });
+
+  it('pins an item whose name equals the query (case-insensitive) as bestMatch', () => {
+    const types: MarketTypeEntry[] = [
+      { typeId: 1, name: 'Rifter Blueprint', marketGroupId: 4 },
+      ...TYPES,
+    ];
+    expect(filterMarketTree(GROUPS, types, 'RIFTER')?.bestMatch?.typeId).toBe(587);
+    expect(filterMarketTree(GROUPS, types, '  rifter ')?.bestMatch?.typeId).toBe(587);
+  });
+
+  it('leaves the pinned bestMatch out of the tree so it is not listed twice', () => {
+    const result = filterMarketTree(GROUPS, TYPES, 'rifter');
+    expect(result?.bestMatch?.typeId).toBe(587);
+    expect(result?.matchedTypesByGroup.size).toBe(0);
+    expect(result?.visibleGroupIds.size).toBe(0);
+    expect(result?.totalMatches).toBe(1);
+  });
+
+  it('has no bestMatch when no name equals the query', () => {
+    expect(filterMarketTree(GROUPS, TYPES, 'rift')?.bestMatch).toBeNull();
+    expect(filterMarketTree(GROUPS, TYPES, 'nonexistent')?.bestMatch).toBeNull();
   });
 
   it('reports no match anywhere as an empty result, not an error', () => {
