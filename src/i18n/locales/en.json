@@ -575,10 +575,7 @@
       "profileFailed": "Couldn't load your pilot's skills and implants, so the comparison can't be calculated.",
       "profileRetry": "Try again",
       "picker": {
-        "title": "Compare with…",
-        "myFittings": "My Fittings",
-        "inGame": "In-game Fittings",
-        "load": "Load"
+        "title": "Compare with…"
       },
       "modules": {
         "none": "Every module is shared across the compared Fittings."

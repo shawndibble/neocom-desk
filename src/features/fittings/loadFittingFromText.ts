@@ -1,7 +1,7 @@
 /**
  * The pure "text -> Fitting" step of a Load: EFT paste, a DNA/in-game chat
  * link, or a killmail link. Shared by `useFittingWorkspace`'s paste box and
- * the compare page's "Compare with... > Load" tab — neither owns the other's
+ * the compare picker's Load section (`useFittingPicker`) — neither owns the other's
  * state, so this returns a result instead of committing anywhere.
  */
 import { getKillmail } from '@/esi/endpoints';

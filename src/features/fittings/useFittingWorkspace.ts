@@ -79,6 +79,34 @@ export function resolveFittingXmlOpenAction(items: FittingXmlListItem[]): Fittin
     : { kind: 'list' };
 }
 
+/**
+ * Resolves a Loaded fittings-XML document's `<fitting>` entries against the
+ * type catalog — display data for the picker list, nothing opened yet. A
+ * hull that doesn't resolve becomes a `fitting: null` row rather than
+ * dropping the entry, so a malformed fit in a multi-fit file surfaces its
+ * own reason without taking the rest of the file down with it.
+ */
+export async function resolveFittingXmlDocument(
+  document: FittingXmlDocument
+): Promise<FittingXmlListItem[]> {
+  const [typeByName, types] = await Promise.all([loadItemNameMap(), loadTypes()]);
+  return document.entries.map((entry) => {
+    const result = loadEveFitXmlEntry(entry, typeByName);
+    const hullTypeId = result.hullTypeId;
+    const resolvedHullName =
+      hullTypeId === null ? null : (types[String(hullTypeId)]?.name ?? `Type ${hullTypeId}`);
+    const name = entry.name.trim() !== '' ? entry.name : (resolvedHullName ?? entry.shipTypeName);
+    return {
+      name,
+      hullTypeId,
+      hullName: resolvedHullName,
+      hullError: hullTypeId === null ? result.unresolved[0]!.reason : null,
+      unresolved: result.unresolved,
+      fitting: hullTypeId === null ? null : fitXmlEntryResultToFitting(result, name),
+    };
+  });
+}
+
 const COALESCE_MS = 1000;
 
 /** A pure change to the open Fitting — one of `src/engine/fittings/fittingEdit.ts`'s. */
@@ -317,36 +345,6 @@ export function useFittingWorkspace(): FittingWorkspace {
     [commitFitting]
   );
 
-  /**
-   * Resolves a Loaded fittings-XML document's `<fitting>` entries against the
-   * type catalog — display data for the picker list, nothing opened yet. A
-   * hull that doesn't resolve becomes a `fitting: null` row rather than
-   * dropping the entry, so a malformed fit in a multi-fit file surfaces its
-   * own reason without taking the rest of the file down with it.
-   */
-  const loadFittingXmlDocument = useCallback(
-    async (document: FittingXmlDocument): Promise<FittingXmlListItem[]> => {
-      const [typeByName, types] = await Promise.all([loadItemNameMap(), loadTypes()]);
-      return document.entries.map((entry) => {
-        const result = loadEveFitXmlEntry(entry, typeByName);
-        const hullTypeId = result.hullTypeId;
-        const resolvedHullName =
-          hullTypeId === null ? null : (types[String(hullTypeId)]?.name ?? `Type ${hullTypeId}`);
-        const name =
-          entry.name.trim() !== '' ? entry.name : (resolvedHullName ?? entry.shipTypeName);
-        return {
-          name,
-          hullTypeId,
-          hullName: resolvedHullName,
-          hullError: hullTypeId === null ? result.unresolved[0]!.reason : null,
-          unresolved: result.unresolved,
-          fitting: hullTypeId === null ? null : fitXmlEntryResultToFitting(result, name),
-        };
-      });
-    },
-    []
-  );
-
   const openFittingXmlEntry = useCallback(
     async (item: FittingXmlListItem) => {
       if (item.fitting === null) return;
@@ -528,7 +526,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     tooLargeToShare,
     loadError,
     loadFromInput,
-    loadFittingXmlDocument,
+    loadFittingXmlDocument: resolveFittingXmlDocument,
     openFittingXmlEntry,
     openFitting,
     edit,
