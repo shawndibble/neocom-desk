@@ -337,9 +337,9 @@ describe('ItemDetailModal', () => {
     // no-Character degraded "Level 3" text.
     expect(screen.getByLabelText('Not trained')).toBeInTheDocument();
 
-    // No plan yet -> "Create Plan & Add" (FitCheck/Mastery's shared label
+    // No plan yet -> "Create Skill Plan and add" (FitCheck/Mastery's shared label
     // contract, issue #1378).
-    await user.click(screen.getByRole('button', { name: 'Create Plan & Add' }));
+    await user.click(screen.getByRole('button', { name: 'Create Skill Plan and add' }));
 
     expect(await screen.findByRole('button', { name: 'Added' })).toBeInTheDocument();
     const plans = await db.skillPlans.where('characterId').equals(CHARACTER_ID).toArray();
@@ -481,10 +481,12 @@ describe('ItemDetailModal', () => {
     const popoverContent = skillLine.closest('div') as HTMLElement;
     expect(within(popoverContent).getByText('Not trained')).toBeInTheDocument();
 
-    // Zero plans yet -> "Create Plan & Add", matching FitCheckPanel/MasteryPanel's
+    // Zero plans yet -> "Create Skill Plan and add", matching FitCheckPanel/MasteryPanel's
     // convention. The item's own Required Skills section also has a button
     // here (for Gunnery) — scope to this popover's own button.
-    await user.click(within(popoverContent).getByRole('button', { name: 'Create Plan & Add' }));
+    await user.click(
+      within(popoverContent).getByRole('button', { name: 'Create Skill Plan and add' })
+    );
 
     await waitFor(async () => {
       const plans = await db.skillPlans.where('characterId').equals(CHARACTER_ID).toArray();

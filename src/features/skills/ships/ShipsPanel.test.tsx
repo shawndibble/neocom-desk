@@ -154,14 +154,14 @@ describe('ShipsPanel', () => {
     expect(screen.queryByText('Gunnery')).not.toBeInTheDocument();
   });
 
-  it('Add All to Plan adds only the currently visible untrained rows', async () => {
+  it('Add all to Skill Plan adds only the currently visible untrained rows', async () => {
     const user = userEvent.setup();
     const target = fakeTarget();
     renderPanel(target);
     await pickVexor(user);
     await waitFor(() => expect(screen.getByText('Gunnery')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: 'Create Plan & Add' }));
+    await user.click(screen.getByRole('button', { name: 'Create Skill Plan and add' }));
     expect(target.addEntries).toHaveBeenCalledWith(
       [{ skillTypeID: 3300, targetLevel: 1 }],
       'Vexor'
