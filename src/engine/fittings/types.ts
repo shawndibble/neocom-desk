@@ -314,7 +314,10 @@ export const DOGMA_ATTRIBUTE = {
   maxVelocity: 37,
   agility: 70,
   mass: 4,
-  warpSpeed: 1281,
+  // The warp speed is base × multiplier: the base (1281) is 1 on every hull,
+  // and the hull's own speed — plus any rig's bonus — is in the multiplier.
+  baseWarpSpeed: 1281,
+  warpSpeedMultiplier: 600,
   droneBandwidth: 1271,
   droneCapacity: 283,
   calibration: 1132,

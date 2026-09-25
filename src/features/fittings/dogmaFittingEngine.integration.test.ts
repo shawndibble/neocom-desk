@@ -269,6 +269,8 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(stats.hull.thermalResonance).toBeCloseTo(0.67, 4);
     expect(stats.hull.kineticResonance).toBeCloseTo(0.67, 4);
     expect(stats.hull.explosiveResonance).toBeCloseTo(0.67, 4);
+    // A frigate warps at 5 AU/s; the base-speed attribute alone reads 1 on every hull.
+    expect(stats.navigation.warpSpeed).toBeCloseTo(5, 6);
   });
 
   it('breaks Offense into per-weapon rows that sum to the engine total, overheated from its overload state', () => {

@@ -209,7 +209,8 @@ describe('extractFittingStats', () => {
         maxVelocity: 391.4625,
         agility: 3.2,
         mass: 1067000,
-        warpSpeed: 3,
+        baseWarpSpeed: 1,
+        warpSpeedMultiplier: 3,
       }),
       []
     );
@@ -518,5 +519,16 @@ describe('extractDroneLimits', () => {
 
   it('allows no drones in space when the character has no Drones skill', () => {
     expect(extractDroneLimits([], [], new Map()).maxActiveDrones).toBe(0);
+  });
+});
+
+describe('extractFittingStats — warp speed', () => {
+  it('is base warp speed (1281) times the hull’s warp speed multiplier (600), in AU/s', () => {
+    // Literal ids: a Rifter's base is 1 and its multiplier 5 — the base alone is 1 on every hull.
+    const ship = new Map([
+      [1281, { value: 1 }],
+      [600, { value: 5 }],
+    ]);
+    expect(extractFittingStats([], ship, []).navigation.warpSpeed).toBe(5);
   });
 });

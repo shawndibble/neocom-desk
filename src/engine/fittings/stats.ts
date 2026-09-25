@@ -217,7 +217,9 @@ export function extractFittingStats(
       maxVelocity: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.maxVelocity),
       agility: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.agility),
       mass: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.mass),
-      warpSpeed: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.warpSpeed),
+      warpSpeed:
+        readAttribute(shipAttributes, DOGMA_ATTRIBUTE.baseWarpSpeed) *
+        readAttribute(shipAttributes, DOGMA_ATTRIBUTE.warpSpeedMultiplier),
     },
     unknownItemTypeIds: items
       .filter((item, index) => isUnknownItem(item, itemResults[index]))
