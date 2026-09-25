@@ -1,5 +1,11 @@
 import type { ReactNode } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { useTranslation } from 'react-i18next';
+import { Link, useInRouterContext, useLocation } from 'react-router-dom';
+import { db } from '@/db';
 import { cx } from '@/lib/cx';
+import { useActiveCharacter } from '@/stores/activeCharacter';
+import { CharacterAvatar } from './CharacterAvatar';
 
 interface PageHeaderProps {
   /** Already-translated page title. Rendered as the route's one `<h1>`. */
@@ -32,6 +38,38 @@ interface PageHeaderProps {
 }
 
 /**
+ * Phone-only "whose data is this" cue: only Overview carries a portrait below
+ * `md`, so an alt's Mail looked identical to the main's. Links to Characters
+ * with this page as the return target (#1764). Absent on `/characters` itself
+ * (it would link to where you already are) and with no active Character.
+ */
+function PhoneIdentityAvatar() {
+  const { t } = useTranslation();
+  const { pathname } = useLocation();
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const character = useLiveQuery(
+    () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
+    [activeCharacterId]
+  );
+  if (!character || pathname === '/characters') return null;
+  return (
+    <Link
+      to="/characters"
+      state={{ from: pathname }}
+      aria-label={t('nav.switchCharacterNamed', { name: character.name })}
+      className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:hidden"
+    >
+      <CharacterAvatar
+        characterId={character.characterId}
+        size="sm"
+        loading="lazy"
+        className="rounded-full"
+      />
+    </Link>
+  );
+}
+
+/**
  * Every route's top line: title, then its data age, then its controls.
  *
  * Before this, fourteen routes hand-rolled the same header and had drifted —
@@ -49,6 +87,8 @@ interface PageHeaderProps {
  * switch between them on the bottom tab bar.
  */
 export function PageHeader({ title, meta, actions, subNav, className = '' }: PageHeaderProps) {
+  // Some unit tests render a route's header without a router.
+  const inRouter = useInRouterContext();
   return (
     <header
       className={cx(
@@ -71,8 +111,9 @@ export function PageHeader({ title, meta, actions, subNav, className = '' }: Pag
       {subNav && (
         <div className="order-last w-full min-w-0 md:order-none md:w-auto md:flex-1">{subNav}</div>
       )}
-      {actions && (
+      {(actions || inRouter) && (
         <div className={cx('ml-auto flex items-center gap-1.5', subNav ? 'pb-1' : undefined)}>
+          {inRouter && <PhoneIdentityAvatar />}
           {actions}
         </div>
       )}
