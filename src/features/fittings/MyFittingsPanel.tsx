@@ -111,6 +111,7 @@ export function MyFittingsPanel({ characterId, onOpen }: MyFittingsPanelProps) {
                         size="sm"
                         icon={<Icon.Rename />}
                         label={t('fittings.myFittings.rename', { name: row.name })}
+                        tooltip={t('fittings.myFittings.confirmRename')}
                         onClick={() => {
                           setRenaming(row.record);
                           setRenameText(row.name);
@@ -121,6 +122,7 @@ export function MyFittingsPanel({ characterId, onOpen }: MyFittingsPanelProps) {
                         tone="danger"
                         icon={<Icon.Close />}
                         label={t('fittings.myFittings.delete', { name: row.name })}
+                        tooltip={t('fittings.myFittings.confirmDelete')}
                         onClick={() => setDeleting(row.record)}
                       />
                     </li>
