@@ -10,6 +10,7 @@ import type { CandidateRack } from '@/engine/fittings/candidates';
 import { addDrones, addModule, firstFreeSlotIndex } from '@/engine/fittings/fittingEdit';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
+import { MyFittingsPanel } from '@/features/fittings/MyFittingsPanel';
 import { FittingLoadCard } from '@/features/fittings/FittingLoadCard';
 import { FittingRackList, ModuleRow } from '@/features/fittings/FittingRackList';
 import { FittingRing } from '@/features/fittings/FittingRing';
@@ -154,8 +155,28 @@ export function Fittings() {
       <PageHeader
         title={t('nav.fittings')}
         actions={
-          fitting && viewHydrated ? (
-            <FittingViewToggle value={view} onChange={(next) => void setView(next)} />
+          fitting ? (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="primary"
+                disabled={!workspace.canSave}
+                title={
+                  activeCharacterId === null
+                    ? t('fittings.myFittings.needCharacter')
+                    : workspace.tooLargeToShare
+                      ? t('fittings.myFittings.tooLarge')
+                      : undefined
+                }
+                onClick={() => void workspace.save()}
+              >
+                {workspace.savedId === null
+                  ? t('fittings.myFittings.save')
+                  : t('fittings.myFittings.update')}
+              </Button>
+              {viewHydrated && (
+                <FittingViewToggle value={view} onChange={(next) => void setView(next)} />
+              )}
+            </div>
           ) : undefined
         }
       />
@@ -165,6 +186,7 @@ export function Fittings() {
         shareError={workspace.shareError}
         tooLargeToShare={workspace.tooLargeToShare}
       />
+      <MyFittingsPanel characterId={activeCharacterId} onOpen={workspace.openSaved} />
       {fitting && viewHydrated && (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <div className="space-y-3">

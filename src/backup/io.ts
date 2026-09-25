@@ -28,6 +28,7 @@ const EDITABLE_TABLES = [
   'stationPins',
   'planetRichness',
   'payees',
+  'fittings',
   'miningTaxAssignments',
   'productionRuns',
   'productionSaleLinks',

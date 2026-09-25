@@ -226,7 +226,7 @@ describe('schema upgrade v6 -> v7', () => {
   });
 
   it('the shipped database is at its current version with v7’s index live', () => {
-    expect(db.verno).toBe(16);
+    expect(db.verno).toBe(17);
     expect(db.characters.schema.indexes.map((i) => i.name)).toContain('corporationId');
   });
 });
@@ -266,6 +266,7 @@ describe('schema upgrade v8 -> v9 (Production Log, issue #525)', () => {
         'buildPlans',
         'characters',
         'esiCache',
+        'fittings',
         'jitaPriceSnapshots',
         'mailDrafts',
         'miningLedgerHistory',
@@ -361,5 +362,12 @@ describe('schema upgrade v14 -> v15 (saved Jita prices, issue #1279)', () => {
   it('adds jitaPriceSnapshots keyed by date, with no other index', () => {
     expect(db.jitaPriceSnapshots.schema.primKey.name).toBe('date');
     expect(db.jitaPriceSnapshots.schema.indexes.map((i) => i.name)).toEqual([]);
+  });
+});
+
+describe('schema upgrade v16 -> v17 (My Fittings, issue #1538)', () => {
+  it('adds fittings keyed by id, indexed on characterId', () => {
+    expect(db.fittings.schema.primKey.name).toBe('id');
+    expect(db.fittings.schema.indexes.map((i) => i.name)).toEqual(['characterId']);
   });
 });
