@@ -475,6 +475,10 @@ export function FittingStatsSections({
                 <DamageFigures {...stats.offense} />
               </li>
             </ul>
+          ) : stats.offense.chargelessWeaponCount > 0 ? (
+            <p className="text-xs text-text-dim">
+              {t('fittings.stats.offenseNoCharge', { count: stats.offense.chargelessWeaponCount })}
+            </p>
           ) : (
             <p className="text-xs text-text-dim">{t('fittings.stats.offenseNone')}</p>
           )
@@ -489,6 +493,7 @@ export function FittingStatsSections({
         stats ? (
           <AppliedDpsPanel
             applied={stats.applied}
+            chargelessWeaponCount={stats.offense.chargelessWeaponCount}
             targetProfiles={targetProfiles}
             overlay={overlay}
           />

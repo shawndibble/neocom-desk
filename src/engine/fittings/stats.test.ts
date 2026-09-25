@@ -422,6 +422,85 @@ describe('extractOffense', () => {
 
     expect(offense.weapons.map(weaponRowKey)).toEqual(['module:3186:230', 'drone:2488:']);
   });
+
+  function chargeSlotResult(state: 'online' | 'active' | 'overload' = 'active') {
+    return {
+      attributes: new Map([
+        [ITEM_DOGMA_ATTRIBUTE.damagePerSecond, { value: 0 }],
+        [ITEM_DOGMA_ATTRIBUTE.damageVolley, { value: 0 }],
+        [ITEM_DOGMA_ATTRIBUTE.chargeGroup1, { value: 83 }],
+      ]),
+      state,
+      max_state: 'active' as const,
+    };
+  }
+
+  it('counts an active turret with no charge loaded as chargeless, not as an ordinary empty row', () => {
+    const offense = extractOffense(
+      [{ ...BLASTER, chargeTypeId: undefined }],
+      [chargeSlotResult('active')],
+      null
+    );
+
+    expect(offense.weapons).toEqual([]);
+    expect(offense.chargelessWeaponCount).toBe(1);
+  });
+
+  it('does not count a charge-taking slot that is simply not active as chargeless', () => {
+    const offense = extractOffense(
+      [{ ...BLASTER, chargeTypeId: undefined }],
+      [chargeSlotResult('online')],
+      null
+    );
+
+    expect(offense.chargelessWeaponCount).toBe(0);
+  });
+
+  it('does not count an active non-weapon module dealing no damage as chargeless', () => {
+    const offense = extractOffense(
+      [{ typeId: 2048, quantity: 1, isDrone: false }],
+      [{ attributes: new Map(), state: 'active', max_state: 'active' }],
+      null
+    );
+
+    expect(offense.chargelessWeaponCount).toBe(0);
+  });
+
+  it('never counts drones as chargeless, even if the row would otherwise qualify', () => {
+    const offense = extractOffense(
+      [{ ...WARRIOR, quantity: 0 }],
+      [chargeSlotResult('active')],
+      null
+    );
+
+    expect(offense.chargelessWeaponCount).toBe(0);
+  });
+
+  it('does not count a charge-taking module as chargeless when a charge is already loaded', () => {
+    // e.g. a mining laser with a crystal fitted: it deals no damage (not a
+    // weapon), so it must not be mistaken for a weapon missing its charge.
+    const offense = extractOffense(
+      [{ typeId: 4001, chargeTypeId: 5001, quantity: 1, isDrone: false }],
+      [chargeSlotResult('active')],
+      null
+    );
+
+    expect(offense.chargelessWeaponCount).toBe(0);
+  });
+
+  it('counts only the chargeless row when a chargeless-active and a genuinely-inactive weapon both sit empty', () => {
+    const offense = extractOffense(
+      [
+        { ...BLASTER, chargeTypeId: undefined },
+        { ...BLASTER, chargeTypeId: undefined },
+      ],
+      [chargeSlotResult('active'), chargeSlotResult('online')],
+      null
+    );
+
+    expect(offense.weapons).toEqual([]);
+    expect(offense.chargelessWeaponCount).toBe(1);
+  });
 });
 
 describe('local repair and overheated stats', () => {

@@ -57,7 +57,7 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     unknownItemTypeIds: [],
     slotCounts: { high: 4, medium: 4, low: 4, rig: 3, subsystem: 0 },
     modules: [],
-    offense: { weapons: [], dps: 0, volley: 0, overheated: null },
+    offense: { weapons: [], dps: 0, volley: 0, overheated: null, chargelessWeaponCount: 0 },
     applied: { weapons: [], droneControlRange: 20000 },
     repair: { shield: 0, armor: 0, hull: 0 },
     overheated: null,
@@ -113,8 +113,24 @@ describe('compareFittingStats', () => {
 
   it('compares total DPS and volley (weapons and drones), higher is best', () => {
     const table = compareFittingStats([
-      stats({ offense: { weapons: [], dps: 250.04, volley: 1200, overheated: null } }),
-      stats({ offense: { weapons: [], dps: 310.26, volley: 900, overheated: null } }),
+      stats({
+        offense: {
+          weapons: [],
+          dps: 250.04,
+          volley: 1200,
+          overheated: null,
+          chargelessWeaponCount: 0,
+        },
+      }),
+      stats({
+        offense: {
+          weapons: [],
+          dps: 310.26,
+          volley: 900,
+          overheated: null,
+          chargelessWeaponCount: 0,
+        },
+      }),
     ]);
     const dps = table.rows.find((row) => row.key === 'totalDps')!;
     expect(dps.values).toEqual([250, 310.3]);
