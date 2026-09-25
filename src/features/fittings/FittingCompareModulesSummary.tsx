@@ -44,7 +44,7 @@ export function FittingCompareModulesSummary({
         <li key={entry.typeId} className="flex items-center gap-2">
           <TypeIcon typeId={entry.typeId} size={32} className="h-4 w-4 shrink-0" />
           <span className="min-w-0 flex-1 truncate">
-            {names.get(entry.typeId) ?? `Type ${entry.typeId}`}
+            {names.get(entry.typeId) ?? t('common.unknownType', { id: entry.typeId })}
           </span>
           <span className="flex shrink-0 gap-3 tabular-nums text-text-dim">
             {visible.map((position, column) => (
