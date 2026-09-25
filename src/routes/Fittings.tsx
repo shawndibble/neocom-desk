@@ -203,8 +203,11 @@ export function Fittings() {
       <FittingLoadCard
         onLoad={workspace.loadFromEftText}
         unresolved={workspace.unresolved}
+        fitXmlUnresolved={workspace.fitXmlUnresolved}
         shareError={workspace.shareError}
         tooLargeToShare={workspace.tooLargeToShare}
+        onLoadFittingXmlDocument={workspace.loadFittingXmlDocument}
+        onOpenFittingXmlEntry={workspace.openFittingXmlEntry}
       />
       <MyFittingsPanel characterId={activeCharacterId} onOpen={workspace.openSaved} />
       {fitting && viewHydrated && (

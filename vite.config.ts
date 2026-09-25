@@ -70,6 +70,7 @@ const DOM_TS_TESTS = [
   'src/sync/deviceRegistration.test.ts',
   'src/features/market/appraisalShareData.test.ts',
   // DOMParser
+  'src/features/fittings/fittingXmlDocument.test.ts',
   'src/features/skills/planner/planXmlDocument.test.ts',
   'src/features/skills/planner/planXmlImport.test.ts',
 ];
