@@ -193,11 +193,7 @@ export interface NewCharacterFitting {
   items: CharacterFittingItem[];
 }
 
-/**
- * Saves a new In-game Fitting. Not called anywhere yet — the Base Grant
- * write scope lands with the read side (issue #1539); Save to EVE (#1540) is
- * the first caller.
- */
+/** Saves a new In-game Fitting — Save to EVE (#1540) via `saveFittingToEve`. */
 export function postCharacterFitting(
   characterId: number,
   fitting: NewCharacterFitting,
@@ -209,6 +205,27 @@ export function postCharacterFitting(
     method: 'POST',
     body: fitting,
     endpointId: 'postCharacterFitting',
+  });
+}
+
+// --- DELETE /characters/{character_id}/fittings/{fitting_id}/ (esi-fittings.write_fittings.v1) ---
+
+/**
+ * Deletes an In-game Fitting. Save to EVE's overwrite path (#1540) calls this
+ * only after the replacement `postCharacterFitting` has already succeeded —
+ * ESI has no edit endpoint, so overwriting is a create-then-delete, in that
+ * order, so a failed create never costs the pilot their original.
+ */
+export function deleteCharacterFitting(
+  characterId: number,
+  fittingId: number,
+  options: { signal?: AbortSignal } = {}
+): Promise<EsiResult<void>> {
+  return esiFetch<void>(`/characters/${characterId}/fittings/${fittingId}/`, {
+    ...options,
+    characterId,
+    method: 'DELETE',
+    endpointId: 'deleteCharacterFitting',
   });
 }
 
