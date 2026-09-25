@@ -13,8 +13,8 @@ import type { CapacitorStatus, Fitting, FittingStats } from './types';
 
 /** `null` means the field has no "better"/"worse" side — CPU/PG/calibration used-or-total, mass — so no value is highlighted. */
 const STAT_DIRECTION: Readonly<Partial<Record<FittingStatKey, 'higher' | 'lower'>>> = {
-  weaponDps: 'higher',
-  weaponVolley: 'higher',
+  totalDps: 'higher',
+  totalVolley: 'higher',
   droneDps: 'higher',
   droneCapacity: 'higher',
   ehp: 'higher',

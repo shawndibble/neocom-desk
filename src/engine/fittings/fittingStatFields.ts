@@ -16,8 +16,8 @@ export type FittingStatKey =
   | 'powergridTotal'
   | 'calibrationUsed'
   | 'calibrationTotal'
-  | 'weaponDps'
-  | 'weaponVolley'
+  | 'totalDps'
+  | 'totalVolley'
   | 'droneDps'
   | 'droneBandwidthUsed'
   | 'droneBandwidthTotal'
@@ -69,8 +69,8 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
   { key: 'powergridTotal', digits: 1, value: (s) => s.powergridTotal },
   { key: 'calibrationUsed', digits: 0, value: (s) => s.calibrationUsed },
   { key: 'calibrationTotal', digits: 0, value: (s) => s.calibrationTotal },
-  { key: 'weaponDps', digits: 1, value: (s) => s.offense.dps },
-  { key: 'weaponVolley', digits: 0, value: (s) => s.offense.volley },
+  { key: 'totalDps', digits: 1, value: (s) => s.offense.dps },
+  { key: 'totalVolley', digits: 0, value: (s) => s.offense.volley },
   { key: 'droneDps', digits: 1, value: (s) => s.droneDps },
   { key: 'droneBandwidthUsed', digits: 0, value: (s) => s.droneBandwidthUsed },
   { key: 'droneBandwidthTotal', digits: 0, value: (s) => s.droneBandwidthTotal },

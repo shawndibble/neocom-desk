@@ -5,9 +5,11 @@
  * object reference. `compute` must be a stable, module-level function (not a
  * closure recreated every render), or this cache defeats itself.
  *
- * A compute that throws or resolves `null` is cached as failed for that
- * Fitting/profile pair, so the caller can tell "still working" from "gave up"
- * instead of waiting on it forever.
+ * A compute that throws or resolves `null` is reported as failed, so the
+ * caller can tell "still working" from "gave up" instead of waiting on it
+ * forever. A failure is kept only until the next change to the compared
+ * Fittings or the profile, which retries it — a passing network or SDE
+ * error doesn't stick to that Fitting for the life of the page.
  */
 import { useEffect, useRef, useState } from 'react';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
@@ -49,9 +51,10 @@ export function useCompareAsync<T>(
     };
     setResult(snapshot());
     if (profile === null) return;
-    const missing = fittings.filter(
-      (fitting): fitting is Fitting => fitting !== null && read(fitting) === null
-    );
+    const missing = fittings.filter((fitting): fitting is Fitting => {
+      const entry = read(fitting);
+      return fitting !== null && (entry === null || 'failed' in entry);
+    });
     if (missing.length === 0) return;
     void (async () => {
       const results = await Promise.all(

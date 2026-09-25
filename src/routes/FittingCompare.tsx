@@ -35,7 +35,7 @@ export function FittingCompare() {
   const profile = usePilotProfile(activeCharacterId);
   const fittings = useMemo(() => slots.map((slot) => slot?.fitting ?? null), [slots]);
   const stats = useCompareStats(fittings, profile);
-  const canFly = useCompareCanFly(fittings, profile).values;
+  const canFly = useCompareCanFly(fittings, profile);
   const isPhone = useIsPhone();
   const [page, setPage] = useState(0);
   const [differencesOnly, setDifferencesOnly] = useState(true);
@@ -97,7 +97,7 @@ export function FittingCompare() {
         </div>
       );
     }
-    const flies = canFly[index];
+    const flies = canFly.values[index];
     return (
       <div className="flex flex-col items-end gap-1">
         <span className="max-w-40 truncate font-medium text-text">{slot.fitting?.name}</span>
@@ -108,6 +108,9 @@ export function FittingCompare() {
           <span className={flies ? 'text-success' : 'text-danger'}>
             {flies ? t('fittings.compare.canFlyYes') : t('fittings.compare.canFlyNo')}
           </span>
+        )}
+        {canFly.failed[index] && (
+          <span className="text-text-dim">{t('fittings.compare.canFlyUnknown')}</span>
         )}
         <IconButton
           icon={<Icon.Close />}

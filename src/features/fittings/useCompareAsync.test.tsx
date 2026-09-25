@@ -23,6 +23,23 @@ describe('useCompareAsync', () => {
     expect(result.current.failed).toEqual([false, true, true, false]);
   });
 
+  it('retries a failed slot when the compared Fittings change, instead of keeping the failure', async () => {
+    let attempts = 0;
+    const flaky = async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error('network blip');
+      return 'ok';
+    };
+    const { result, rerender } = renderHook(
+      ({ fittings }) => useCompareAsync(fittings, profile, flaky),
+      { initialProps: { fittings: [good] as (Fitting | null)[] } }
+    );
+    await waitFor(() => expect(result.current.failed).toEqual([true]));
+    rerender({ fittings: [good, null] });
+    await waitFor(() => expect(result.current.values[0]).toBe('ok'));
+    expect(result.current.failed).toEqual([false, false]);
+  });
+
   it('reports nothing failed while still waiting on a profile', () => {
     const fittings = [good];
     const { result } = renderHook(() => useCompareAsync(fittings, null, compute));

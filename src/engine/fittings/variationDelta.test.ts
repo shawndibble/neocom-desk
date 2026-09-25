@@ -64,10 +64,10 @@ describe('diffFittingStats', () => {
     expect(delta.changes).toEqual([{ key: 'ehp', before: 20000, after: 24000 }]);
   });
 
-  it('reports a weapon DPS change (e.g. a turret variation)', () => {
+  it('reports a total DPS change (e.g. a turret variation)', () => {
     const after: FittingStats = { ...base, offense: { ...base.offense, dps: 120 } };
     expect(diffFittingStats(base, after).changes).toEqual([
-      { key: 'weaponDps', before: 0, after: 120 },
+      { key: 'totalDps', before: 0, after: 120 },
     ]);
   });
 

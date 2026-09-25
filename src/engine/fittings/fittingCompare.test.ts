@@ -106,15 +106,15 @@ describe('compareFittingStats', () => {
     expect(row.bestIndices).toEqual([]);
   });
 
-  it('compares turret/missile DPS and volley, higher is best', () => {
+  it('compares total DPS and volley (weapons and drones), higher is best', () => {
     const table = compareFittingStats([
       stats({ offense: { weapons: [], dps: 250.04, volley: 1200, overheated: null } }),
       stats({ offense: { weapons: [], dps: 310.26, volley: 900, overheated: null } }),
     ]);
-    const dps = table.rows.find((row) => row.key === 'weaponDps')!;
+    const dps = table.rows.find((row) => row.key === 'totalDps')!;
     expect(dps.values).toEqual([250, 310.3]);
     expect(dps.bestIndices).toEqual([1]);
-    const volley = table.rows.find((row) => row.key === 'weaponVolley')!;
+    const volley = table.rows.find((row) => row.key === 'totalVolley')!;
     expect(volley.bestIndices).toEqual([0]);
   });
 
