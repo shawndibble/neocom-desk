@@ -113,6 +113,7 @@ const PRELOADERS: Record<Exclude<AppRoutePath, '/overview'>, () => Promise<Route
   '/industry/plans/:planId': loadIndustryPlanPage,
   '/industry/groups/:groupId': loadIndustryGroupPage,
   '/fittings': loadFittings,
+  '/fittings/edit': loadFittings,
   '/fittings/compare': loadFittingCompare,
   '/market': loadMarket,
   '/wallet': loadWallet,

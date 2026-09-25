@@ -24,6 +24,13 @@ describe('classifyLoadInput', () => {
     expect(classifyLoadInput('https://x.example/market?f=1.abc').kind).toBe('unknown');
   });
 
+  it('reads the editor address back too, as copied from the address bar', () => {
+    expect(classifyLoadInput('https://x.example/neocom-desk/fittings/edit?f=1.abc_-')).toEqual({
+      kind: 'share',
+      code: '1.abc_-',
+    });
+  });
+
   it('recognises a bare DNA string', () => {
     expect(classifyLoadInput('587:100;2:200;1::')).toEqual({
       kind: 'dna',

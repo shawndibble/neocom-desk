@@ -30,6 +30,7 @@ const ROUTE_TITLE_KEYS = {
   '/skills/ships': ['nav.skills', 'skills.shipsTab'],
   '/industry': ['nav.industry'],
   '/fittings': ['nav.fittings'],
+  '/fittings/edit': ['nav.fittings', 'fittings.editTitle'],
   '/fittings/compare': ['nav.fittings', 'fittings.compare.title'],
   '/industry/plans/:planId': ['nav.industry', 'industry.buildPlansTab'],
   '/industry/groups/:groupId': ['nav.industry', 'industry.buildPlansTab'],

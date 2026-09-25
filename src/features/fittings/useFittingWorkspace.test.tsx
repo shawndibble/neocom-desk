@@ -13,6 +13,7 @@ import {
   removeModule,
   setDroneCounts,
 } from '@/engine/fittings/fittingEdit';
+import type { LoadedFitting } from '@/engine/fittings/load';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { useFittingWorkspace } from './useFittingWorkspace';
 
@@ -146,6 +147,69 @@ describe('useFittingWorkspace editing', () => {
   });
 });
 
+describe('useFittingWorkspace — the editor has its own path', () => {
+  function renderAtStart() {
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <MemoryRouter initialEntries={['/fittings']}>{children}</MemoryRouter>
+    );
+    return renderHook(
+      () => ({
+        workspace: useFittingWorkspace(),
+        location: useLocation(),
+        navigationType: useNavigationType(),
+        navigate: useNavigate(),
+      }),
+      { wrapper }
+    );
+  }
+  // No drones: a Load's drone launch would rewrite the URL after the open.
+  const NAKED: Fitting = { ...RIFTER, drones: [] };
+  const inGame: LoadedFitting = {
+    kind: 'fitting',
+    source: 'in-game',
+    fitting: NAKED,
+    unresolved: [],
+  };
+
+  it('opening a Fitting from the Start screen pushes /fittings/edit, so Back returns to the library', async () => {
+    const view = renderAtStart();
+    expect(view.result.current.workspace.fitting).toBeNull();
+
+    await act(() => view.result.current.workspace.openLoaded(inGame));
+    await waitFor(() => expect(view.result.current.workspace.fitting).not.toBeNull());
+    expect(view.result.current.location.pathname).toBe('/fittings/edit');
+    expect(view.result.current.location.search).toMatch(/^\?f=/);
+    expect(view.result.current.navigationType).toBe('PUSH');
+
+    act(() => view.result.current.navigate(-1));
+    await waitFor(() => expect(view.result.current.location.pathname).toBe('/fittings'));
+    await waitFor(() => expect(view.result.current.workspace.fitting).toBeNull());
+  });
+
+  it('opening a saved Fitting lands on /fittings/edit too', async () => {
+    const encoded = await encodeFittingShare(fittingToShareInput(NAKED));
+    if (!encoded.ok) throw new Error('encode failed');
+    const view = renderAtStart();
+    act(() =>
+      view.result.current.workspace.openSaved({ id: 'r1', name: 'Kite', code: encoded.payload })
+    );
+    await waitFor(() => expect(view.result.current.location.pathname).toBe('/fittings/edit'));
+    expect(view.result.current.navigationType).toBe('PUSH');
+  });
+
+  it('re-opening the Fitting already open adds no history entry', async () => {
+    const view = renderAtStart();
+    await act(() => view.result.current.workspace.openLoaded(inGame));
+    await waitFor(() => expect(view.result.current.workspace.fitting).not.toBeNull());
+    const url = view.result.current.location.search;
+
+    await act(() => view.result.current.workspace.openLoaded(inGame));
+    expect(view.result.current.location.search).toBe(url);
+    act(() => view.result.current.navigate(-1));
+    await waitFor(() => expect(view.result.current.location.pathname).toBe('/fittings'));
+  });
+});
+
 describe('useFittingWorkspace saving (My Fittings)', () => {
   beforeEach(async () => {
     await db.fittings.clear();
@@ -218,9 +282,9 @@ describe('useFittingWorkspace saving (My Fittings)', () => {
 });
 
 describe('useFittingWorkspace — drones on Load', () => {
-  it('launches a pasted fit’s drones once its stats say how many fit, replacing the Load’s own entry', async () => {
+  it('launches a pasted fit’s drones once its stats say how many fit, replacing the Load’s own new entry', async () => {
     const view = await renderAt(RIFTER);
-    // A Fitting to go Back to; the Load then replaces the entry after it.
+    // A Fitting to go Back to; the Load then adds an entry after it.
     const encoded = await encodeFittingShare(
       fittingToShareInput(addModule(RIFTER, 'medium', 0, 438))
     );
@@ -242,14 +306,13 @@ describe('useFittingWorkspace — drones on Load', () => {
     );
     expect(view.result.current.navigationType).toBe('REPLACE');
 
-    // The launch overwrote the Load's own entry rather than adding one, so
-    // Back leaves the Load altogether — no in-bay copy of it to step through.
+    // The launch overwrote the Load's own entry rather than adding another, so
+    // Back leaves the Load altogether — no in-bay copy of it to step through —
+    // and returns to the Fitting that was open before it.
     expect(view.result.current.location.search).not.toBe(loadedOver);
     act(() => view.result.current.navigate(-1));
-    await waitFor(() =>
-      expect(view.result.current.workspace.fitting?.modules).toEqual(RIFTER.modules)
-    );
-    expect(view.result.current.workspace.fitting?.drones).toEqual(RIFTER.drones);
+    await waitFor(() => expect(view.result.current.location.search).toBe(loadedOver));
+    await waitFor(() => expect(view.result.current.workspace.fitting?.modules).toHaveLength(2));
   });
 
   it('leaves the drones of a Fitting opened by link where the link put them', async () => {

@@ -57,6 +57,7 @@
     "standingsAssumedAction": "Grant Character details"
   },
   "fittings": {
+    "editTitle": "Editor",
     "myFittings": {
       "title": "My Fittings",
       "save": "Save",
