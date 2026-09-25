@@ -84,6 +84,14 @@ describe('the default bar', () => {
   });
 });
 
+describe('the choice list', () => {
+  it('includes /characters, off by default, last in canonical order (#1764 — it keeps the More-sheet position it has today)', () => {
+    expect(MOBILE_TAB_CHOICES).toContain('/characters');
+    expect(MOBILE_TAB_CHOICES.at(-1)).toBe('/characters');
+    expect(DEFAULT_MOBILE_TABS).not.toContain('/characters');
+  });
+});
+
 describe('labels', () => {
   it('names every choice, so no tab or sheet row can render blank', () => {
     for (const path of MOBILE_TAB_CHOICES) {

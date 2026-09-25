@@ -44,6 +44,8 @@ interface AssignDialogProps {
   onCancel: () => void;
   /** Status-specific buttons (Dismiss / Mark as paid / Resolve) rendered alongside Assign and Cancel — RowDetailModal owns these, since which one applies depends on the row's status, not on this form. */
   extraActions?: ReactNode;
+  /** Opens the Payee manager from the no-Payees state. The dialog stays mounted underneath, so the form appears in place once a Payee exists. */
+  onAddPayee?: () => void;
 }
 
 /** Rounds to the cent — what the editable ISK fields below prefill and display, since a raw float in a number input reads as noise. */
@@ -135,6 +137,7 @@ export function AssignDialog({
   onAssigned,
   onCancel,
   extraActions,
+  onAddPayee,
 }: AssignDialogProps) {
   const { t } = useTranslation();
   const isEditing = assignment !== null;
@@ -305,7 +308,16 @@ export function AssignDialog({
     taxOwed >= 0;
 
   if (payees.length === 0) {
-    return <p className="text-xs text-text-dim">{t('miningTax.noPayeesHint')}</p>;
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-text-dim">{t('miningTax.noPayeesHint')}</p>
+        {onAddPayee && (
+          <Button size="sm" onClick={onAddPayee}>
+            {t('miningTax.addPayee')}
+          </Button>
+        )}
+      </div>
+    );
   }
 
   return (

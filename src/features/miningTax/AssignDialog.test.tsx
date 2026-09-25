@@ -66,7 +66,11 @@ function payee(overrides: Partial<PayeeRecord> = {}): PayeeRecord {
   };
 }
 
-function renderDialog(payees: PayeeRecord[], assignment: MiningTaxAssignmentRecord | null = null) {
+function renderDialog(
+  payees: PayeeRecord[],
+  assignment: MiningTaxAssignmentRecord | null = null,
+  onAddPayee?: () => void
+) {
   render(
     <AssignDialog
       row={row}
@@ -78,12 +82,30 @@ function renderDialog(payees: PayeeRecord[], assignment: MiningTaxAssignmentReco
       busy={false}
       onAssigned={vi.fn()}
       onCancel={vi.fn()}
+      onAddPayee={onAddPayee}
     />
   );
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+describe('AssignDialog — no Payees yet', () => {
+  it('offers an Add Payee button that hands off to the Payee manager', async () => {
+    const onAddPayee = vi.fn();
+    renderDialog([], null, onAddPayee);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add Payee' }));
+
+    expect(onAddPayee).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows only the hint when there is no way to open the manager', () => {
+    renderDialog([]);
+
+    expect(screen.queryByRole('button', { name: 'Add Payee' })).not.toBeInTheDocument();
+  });
 });
 
 describe('AssignDialog — the money path', () => {

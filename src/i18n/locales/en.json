@@ -2288,6 +2288,7 @@
     "payeePlaceholder": "Choose a Payee…",
     "rememberSystemLabel": "Remember {{system}} for {{payee}}",
     "noPayeesHint": "Add a Payee first, from Manage Payees, before assigning this entry.",
+    "unassignedNoPayeesPrompt": "Add a Payee (the moon's landlord) before assigning this ore.",
     "oreLinesLabel": "Ore to assign",
     "splitHint": "Uncheck a line to leave it for a different Payee.",
     "taxPctLabel": "Tax %",
