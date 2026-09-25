@@ -143,6 +143,22 @@ describe('FittingRing', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('CPU: 25.0 / 100.0 tf (25%)');
   });
 
+  it('keeps the gauges out of the accessibility tree — the readouts carry their numbers', () => {
+    const { container } = render(<FittingRing fitting={fitting} stats={statsWith(25)} />);
+    expect(container.querySelector('[data-gauge="cpu"]')!.closest('svg')).toHaveAttribute(
+      'aria-hidden',
+      'true'
+    );
+    expect(screen.getByRole('meter', { name: 'CPU' })).toBeTruthy();
+  });
+
+  it('draws plain gauges on the phone overview, with no thin tap target to reveal them', () => {
+    const { container } = render(<FittingRing fitting={fitting} stats={statsWith(25)} compact />);
+    const cpu = container.querySelector('[data-gauge="cpu"]')!;
+    expect(cpu).not.toHaveAttribute('data-state');
+    expect(cpu).not.toHaveClass('pointer-events-auto');
+  });
+
   it('says how far over budget in the band’s tooltip', async () => {
     const { container } = render(<FittingRing fitting={fitting} stats={statsWith(112.5)} />);
     fireEvent.pointerMove(container.querySelector('[data-gauge="cpu"]')!, {

@@ -3,6 +3,7 @@ import {
   addDrones,
   addDronesWithinBay,
   addModule,
+  cargoGroups,
   droneBayUsed,
   droneCountMax,
   droneRoom,
@@ -380,6 +381,23 @@ describe('setCargoQuantity', () => {
     };
     expect(setCargoQuantity(split, 209, 400).cargo).toEqual([
       { typeId: 209, quantity: 400 },
+      { typeId: 3001, quantity: 1 },
+    ]);
+  });
+});
+
+describe('cargoGroups', () => {
+  it('lists each cargo type once, first-seen order, with every stack of it added up', () => {
+    const split: Fitting = {
+      ...base,
+      cargo: [
+        { typeId: 209, quantity: 100 },
+        { typeId: 3001, quantity: 1 },
+        { typeId: 209, quantity: 50 },
+      ],
+    };
+    expect(cargoGroups(split)).toEqual([
+      { typeId: 209, quantity: 150 },
       { typeId: 3001, quantity: 1 },
     ]);
   });

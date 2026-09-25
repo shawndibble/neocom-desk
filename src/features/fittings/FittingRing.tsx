@@ -21,6 +21,7 @@ import {
   type RingRack,
   type RingSlot,
 } from '@/engine/fittings/ringLayout';
+import { cargoGroups } from '@/engine/fittings/fittingEdit';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
 import type {
@@ -63,6 +64,8 @@ const GAUGE_STYLE: Readonly<
   calibration: { width: 6, tone: 'dim' },
   droneBandwidth: { width: 6, tone: 'dim' },
 };
+
+const TONE_STROKE = { accent: 'stroke-accent', dim: 'stroke-text-dim' } as const;
 
 /** Wide enough to be easy to hover without reaching the tiles inside it. */
 const GAUGE_HIT_WIDTH = 22;
@@ -154,14 +157,33 @@ function RimGauge({
   const style = GAUGE_STYLE[gauge];
   const c = RING_VIEW / 2;
   const { filled, empty } = gaugeArc(from, to, share(budget.used, budget.total));
-  const fillClass = budget.flash.overBudget
-    ? 'stroke-danger'
-    : style.tone === 'accent'
-      ? 'stroke-accent'
-      : 'stroke-text-dim';
+  const fillClass = budget.flash.overBudget ? 'stroke-danger' : TONE_STROKE[style.tone];
   const draw = (range: [number, number]) => arcPath(range[0], range[1], RING_GAUGE_RADIUS, c, c);
+  const bands = (
+    <>
+      {empty && (
+        <path
+          d={draw(empty)}
+          className="fill-none stroke-line"
+          strokeWidth={style.width}
+          strokeDasharray={style.dash}
+        />
+      )}
+      {filled && (
+        <path
+          d={draw(filled)}
+          className={`fill-none ${fillClass}`}
+          strokeWidth={style.width}
+          strokeDasharray={style.dash}
+        />
+      )}
+    </>
+  );
+  // The phone overview has no readouts and a band there is a sliver to tap,
+  // so it is just drawn; its numbers are on the List bars and the Stats tab.
+  if (compact) return <g data-gauge={gauge}>{bands}</g>;
   return (
-    <Tooltip content={gaugeTooltip(t, budget)} openOnTap={compact}>
+    <Tooltip content={gaugeTooltip(t, budget)}>
       {/* The svg itself lets the pointer through to the tiles; only this band catches it. */}
       <g data-gauge={gauge} className="pointer-events-auto">
         <path
@@ -169,22 +191,7 @@ function RimGauge({
           className="fill-none stroke-transparent"
           strokeWidth={GAUGE_HIT_WIDTH}
         />
-        {empty && (
-          <path
-            d={draw(empty)}
-            className="fill-none stroke-line"
-            strokeWidth={style.width}
-            strokeDasharray={style.dash}
-          />
-        )}
-        {filled && (
-          <path
-            d={draw(filled)}
-            className={`fill-none ${fillClass}`}
-            strokeWidth={style.width}
-            strokeDasharray={style.dash}
-          />
-        )}
+        {bands}
       </g>
     </Tooltip>
   );
@@ -200,7 +207,7 @@ function GaugeSwatch({ gauge }: { gauge: RingGauge }) {
         y1={5}
         x2={20}
         y2={5}
-        className={style.tone === 'accent' ? 'stroke-accent' : 'stroke-text-dim'}
+        className={TONE_STROKE[style.tone]}
         strokeWidth={style.width / 2}
         strokeDasharray={style.dash ? '4 2' : undefined}
       />
@@ -576,6 +583,7 @@ export function FittingRing({
     RING_RACKS.includes(slot.rack as RingRack)
   );
   const subsystems = slots.filter((slot) => slot.rack === 'subsystem');
+  const cargo = cargoGroups(fitting);
   const ghosts = RING_RACKS.flatMap((rack) =>
     ringGhostIndices(rack, ringSlots.filter((slot) => slot.rack === rack).length).map((index) => ({
       rack,
@@ -614,8 +622,11 @@ export function FittingRing({
           <svg
             viewBox={`0 0 ${RING_VIEW} ${RING_VIEW}`}
             className="pointer-events-none absolute inset-0 h-full w-full"
+            // The readouts' meters carry these numbers for assistive tech; the
+            // hover bubbles are a pointer's shortcut to them.
+            aria-hidden="true"
           >
-            <g aria-hidden="true">
+            <g>
               <circle
                 cx={centre}
                 cy={centre}
@@ -740,11 +751,11 @@ export function FittingRing({
         )}
 
         {/* What the ring has no slot for; the drones get a panel of their own beneath it. */}
-        {fitting.cargo.length > 0 && (
+        {cargo.length > 0 && (
           <div>
             <p className={MICRO_LABEL}>{t('fittings.list.cargo')}</p>
             <div className="flex flex-wrap gap-2">
-              {fitting.cargo.map((item) => (
+              {cargo.map((item) => (
                 <CargoTile
                   key={item.typeId}
                   typeId={item.typeId}

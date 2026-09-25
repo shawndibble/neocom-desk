@@ -237,6 +237,18 @@ export function setCargoQuantity(fitting: Fitting, typeId: number, quantity: num
 }
 
 /**
+ * One entry per cargo type, first-seen order, however many stacks it arrived
+ * as (a paste can list a type twice) — what the editor shows and edits.
+ */
+export function cargoGroups(fitting: Fitting): FittingCargoItem[] {
+  const groups = new Map<number, number>();
+  for (const item of fitting.cargo) {
+    groups.set(item.typeId, (groups.get(item.typeId) ?? 0) + item.quantity);
+  }
+  return [...groups].map(([typeId, quantity]) => ({ typeId, quantity }));
+}
+
+/**
  * m3 of the drone bay the Fitting's drones take. A drone in space came out
  * of the bay and goes back into it, so it counts the same as one sitting there.
  */

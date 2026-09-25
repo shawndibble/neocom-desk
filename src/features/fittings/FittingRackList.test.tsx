@@ -135,6 +135,28 @@ describe('FittingRackList', () => {
     expect(edits.at(-1)?.cargo).toEqual([]);
   });
 
+  it('shows a type pasted as two cargo stacks as one row, and edits it as one', () => {
+    const edits: Fitting[] = [];
+    const split: Fitting = {
+      ...fitting,
+      cargo: [
+        { typeId: 209, quantity: 100 },
+        { typeId: 209, quantity: 50 },
+      ],
+    };
+    render(
+      <FittingRackList
+        fitting={split}
+        stats={statsWith(10)}
+        edit={(apply) => edits.push(apply(split))}
+      />
+    );
+    const quantity = screen.getByLabelText('Quantity') as HTMLInputElement;
+    expect(quantity.value).toBe('150');
+    fireEvent.change(quantity, { target: { value: '400' } });
+    expect(edits.at(-1)?.cargo).toEqual([{ typeId: 209, quantity: 400 }]);
+  });
+
   it('has no Cargo section when nothing is carried', () => {
     render(<FittingRackList fitting={fitting} stats={statsWith(10)} />);
     expect(screen.queryByText('Cargo')).toBeNull();

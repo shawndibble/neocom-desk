@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, IconButton, NativeSelect, Panel, TextInput, TypeIcon } from '@/components/ui';
 import { AddRow, Close, Compare } from '@/components/ui/icons';
 import {
+  cargoGroups,
   droneBayUsed,
   droneCountMax,
   droneGroups,
@@ -292,9 +293,9 @@ function SlotCard({
 /**
  * A drone or cargo count box. Keeps what's being typed as a local draft, so
  * the box can be emptied on the way to a new number instead of snapping back;
- * each complete number is committed as it's typed — capped at `max` (what the
- * drone bay holds), and a number over it shows as the cap. With `min`, a
- * number below it stays a draft rather than being committed.
+ * each complete number is committed as it's typed — capped at `max` when
+ * given (for drones, what the bay holds), a number over it showing as the cap.
+ * With `min`, a number below it stays a draft rather than being committed.
  */
 function CountInput({
   label,
@@ -588,6 +589,7 @@ export function FittingRackList({
   const drones = droneGroups(fitting);
   const dronesShown = showsDrones(stats, drones.length);
   const droneVolume = (typeId: number) => catalogueVolume(catalogue, typeId);
+  const cargo = cargoGroups(fitting);
 
   return (
     <Panel title={t('fittings.list.title')} actions={actions}>
@@ -654,11 +656,11 @@ export function FittingRackList({
         />
 
         {/* What a pasted fit carries besides its slots and drones: ammo, filaments, a depot. */}
-        {fitting.cargo.length > 0 && (
+        {cargo.length > 0 && (
           <div>
             <p className={RACK_LABEL_CLASS}>{t('fittings.list.cargo')}</p>
             <div className="space-y-1.5">
-              {fitting.cargo.map((item) => {
+              {cargo.map((item) => {
                 const name = catalogueTypeName(catalogue, item.typeId);
                 return (
                   <SlotCard
