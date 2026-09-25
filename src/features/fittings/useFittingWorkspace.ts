@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { db } from '@/db';
 import { saveFitting } from './myFittings';
+import { useDamageProfiles, type DamageProfiles } from './damageProfiles';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useUrlParam } from '@/lib/useUrlState';
 import { nullableTextParam } from '@/lib/urlState';
@@ -167,6 +168,8 @@ export interface FittingWorkspace {
   engineReady: boolean;
   /** Skills and implants the stats and fit checks use; null while loading. */
   profile: PilotProfile | null;
+  /** The Damage Profile the stats' EHP is measured against, and the pilot's custom ones (synced). */
+  damageProfiles: DamageProfiles;
   price: Appraisal | null;
   /** The saved record the open Fitting came from, so Save updates it. */
   savedId: string | null;
@@ -203,6 +206,8 @@ export function useFittingWorkspace(): FittingWorkspace {
   const [basisOverride, setBasisOverride] = useState<ImplantBasis | null>(null);
 
   const [price, setPrice] = useState<Appraisal | null>(null);
+  const damageProfiles = useDamageProfiles();
+  const damageProfile = damageProfiles.selected;
 
   // Set right before this hook's own `setShareCode` writes, so the decode
   // effect below can tell "the URL changed because we just wrote it" (keep
@@ -557,9 +562,14 @@ export function useFittingWorkspace(): FittingWorkspace {
         // resolved basis is "fitting" — `profile` (exposed as-is to fit
         // checks/candidates, which only care about skills) stays untouched.
         const effectiveProfile = applyImplantBasis(profile, fitting, implantBasis);
-        const result = await computeFittingStats(fitting, effectiveProfile, (progress) => {
-          if (!cancelled) setStatsProgress(progress);
-        });
+        const result = await computeFittingStats(
+          fitting,
+          effectiveProfile,
+          (progress) => {
+            if (!cancelled) setStatsProgress(progress);
+          },
+          damageProfile
+        );
         if (cancelled) return;
         setEngineReady(true);
         setStats({ fitting, stats: result });
@@ -570,7 +580,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     return () => {
       cancelled = true;
     };
-  }, [fitting, profile, implantBasis]);
+  }, [fitting, profile, implantBasis, damageProfile]);
 
   // Price: independent of the dogma engine, so it can — and should — resolve
   // well before stats do.
@@ -608,6 +618,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     statsError,
     engineReady,
     profile,
+    damageProfiles,
     price,
     savedId,
     canSave,

@@ -169,6 +169,7 @@ export function Fittings() {
       statsProgress={workspace.statsProgress}
       statsError={workspace.statsError}
       price={workspace.price}
+      damageProfiles={workspace.damageProfiles}
     />
   );
 
