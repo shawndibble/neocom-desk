@@ -83,6 +83,15 @@ After shipping a build that turns delegation on, a user who already allowed
 notifications while Chrome owned them must toggle notifications off and on in
 the app so the device registers again through the shell.
 
+**Still blocked with the app toggle on:** a Chrome site-level block on
+`neocomdesk.com` wins over the app's Android notification toggle. The page
+keeps reading `denied`, and the Play app's "Notifications are off" box stays
+even after a full restart. Neither the app toggle nor the Open notification
+settings button can clear it. Fix: Chrome → Settings → Site settings →
+Notifications → `neocomdesk.com` → Clear & reset (or Allow), then restart the
+app fully. Seen on a real device on 2026-09-25, after an earlier "remove the
+Chrome grant" cleanup left the site blocked.
+
 ### Notification settings button
 
 With delegation, the real switch is the Android app's own notification toggle,
