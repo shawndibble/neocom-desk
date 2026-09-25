@@ -542,8 +542,12 @@ export function OrderDetailModal({
       ? `${haulGaps[0].systemName} · +${formatIsk(haulGaps[0].overLocal, 2)}`
       : t('market.orders.trailingNoExit');
 
-  // "The numbers" (issue #1428): the stat grid plus the past-expiry line,
-  // shared between the always-open desktop layout and the phone Disclosure.
+  // Buy orders fill rather than sell out, and are beaten by a higher bid
+  // rather than a cheaper ask (#1733).
+  const whoLabel = t(row.isBuyOrder ? 'market.orders.whoBidsHigher' : 'market.orders.whoIsCheaper');
+
+  // "The numbers" (issue #1428): the stat grid, past-expiry line inside its
+  // own card, shared between the always-open desktop layout and the phone Disclosure.
   const numbersContent = (
     <>
       <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
@@ -555,8 +559,8 @@ export function OrderDetailModal({
           }
         />
         <StatCard
-          label={t('market.orders.sellsOutIn')}
-          tooltip={t('market.orders.sellsOutHelp')}
+          label={t(row.isBuyOrder ? 'market.orders.fillsIn' : 'market.orders.sellsOutIn')}
+          tooltip={t(row.isBuyOrder ? 'market.orders.fillsInHelp' : 'market.orders.sellsOutHelp')}
           value={sellValue}
           tone={sellPastExpiry ? 'danger' : 'default'}
           caption={
@@ -566,7 +570,13 @@ export function OrderDetailModal({
                 })
               : null
           }
-        />
+        >
+          {sellPastExpiry && (
+            <p className="mt-0.5 text-[0.6875rem] text-danger">
+              {t('market.orders.sellsOutPastExpiry')}
+            </p>
+          )}
+        </StatCard>
         <StatCard
           label={t('market.orders.statVolumeLeft')}
           value={`${row.volumeRemain.toLocaleString()} / ${row.volumeTotal.toLocaleString()}`}
@@ -596,7 +606,11 @@ export function OrderDetailModal({
           }
         />
         <StatCard
-          label={t('market.orders.statIfSellsAsListed')}
+          label={t(
+            row.isBuyOrder
+              ? 'market.orders.statIfFillsAsListed'
+              : 'market.orders.statIfSellsAsListed'
+          )}
           value={netIfSellsAsListed === null ? t('common.unknown') : signedIsk(netIfSellsAsListed)}
           tone={
             netIfSellsAsListed === null ? 'default' : netIfSellsAsListed >= 0 ? 'success' : 'danger'
@@ -604,9 +618,6 @@ export function OrderDetailModal({
           caption={netIfSellsAsListed === null ? null : t('market.orders.statPerUnitAfterFees')}
         />
       </div>
-      {sellPastExpiry && (
-        <p className="mt-2 text-xs text-danger">{t('market.orders.sellsOutPastExpiry')}</p>
-      )}
     </>
   );
 
@@ -765,7 +776,7 @@ export function OrderDetailModal({
 
         <section className="rounded-xs border border-line">
           <Disclosure
-            label={t('market.orders.whoIsCheaper')}
+            label={whoLabel}
             trailing={whoTrailing}
             expanded={expandedSections.has('whoCheaper')}
             onToggle={() => toggleSection('whoCheaper')}
@@ -784,7 +795,7 @@ export function OrderDetailModal({
           */}
             <div
               role="table"
-              aria-label={t('market.orders.whoIsCheaper')}
+              aria-label={whoLabel}
               className="grid grid-cols-[auto_1fr_auto] text-xs md:grid-cols-[auto_1fr_auto_auto_auto]"
             >
               <div role="row" className="contents">
@@ -894,112 +905,114 @@ export function OrderDetailModal({
           </Disclosure>
         </section>
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <section className="rounded-xs border border-line">
-            {row.costBasis === null ? (
-              <>
-                <h3 className="border-b border-line bg-panel-2 px-3 py-2 text-xs font-semibold tracking-widest text-text-dim uppercase">
-                  {t('market.orders.floorWorking')}
-                </h3>
-                <div className="space-y-1.5 px-3 py-2">
-                  <p className="text-sm text-text">{t('market.orders.noCostBasisTitle')}</p>
-                  <p className="text-xs text-text-dim">{t('market.orders.noCostBasisHint')}</p>
-                  {row.walletGap && (
-                    <p className="text-xs text-text-dim">
-                      {row.walletGap.kind === 'partial'
-                        ? t('market.orders.walletBasisPartial', {
-                            covered: row.walletGap.coveredUnits.toLocaleString(),
-                            total: row.walletGap.pool.toLocaleString(),
-                          })
-                        : t('market.orders.walletBasisHistoryShort')}
-                      {row.walletGap.truncated
-                        ? ' ' + t('market.orders.walletBasisTruncated')
-                        : null}
-                    </p>
-                  )}
-                  <Link
-                    to="/industry"
-                    className={buttonClassName({ variant: 'ghost', size: 'sm' })}
-                  >
-                    {t('market.orders.linkBuild')}
-                  </Link>
-                </div>
-              </>
-            ) : (
-              <Disclosure
-                label={t('market.orders.floorWorking')}
-                trailing={costBasisTrailing ?? undefined}
-                expanded={expandedSections.has('costBasis')}
-                onToggle={() => toggleSection('costBasis')}
-              >
-                <div className="space-y-1.5 px-3 py-2">
-                  <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                    {row.costBasis.source === 'wallet' ? (
-                      <>
-                        <LedgerRow
-                          label={t('market.orders.walletBasisUnits')}
-                          value={row.costBasis.unitsCovered.toLocaleString()}
-                        />
-                        <LedgerRow
-                          label={t('market.orders.walletBasisBuys')}
-                          value={row.costBasis.buyCount.toLocaleString()}
-                        />
-                        <LedgerRow
-                          label={t('market.orders.walletBasisRange')}
-                          value={t('market.orders.walletBasisRangeValue', {
-                            from: new Date(row.costBasis.oldestBuy).toLocaleDateString(),
-                            to: new Date(row.costBasis.newestBuy).toLocaleDateString(),
-                          })}
-                        />
-                      </>
-                    ) : (
-                      <>
-                        <LedgerRow
-                          label={t('industry.quantity')}
-                          value={row.costBasis.runQuantity.toLocaleString()}
-                        />
-                        <LedgerRow
-                          label={t('industry.materialCost')}
-                          value={`${formatIsk(row.costBasis.materialCost)} ISK`}
-                        />
-                        <LedgerRow
-                          label={t('industry.jobFee')}
-                          value={`${formatIsk(row.costBasis.jobFee)} ISK`}
-                        />
-                        <LedgerRow
-                          label={t('industry.totalCost')}
-                          value={`${formatIsk(row.costBasis.materialCost + row.costBasis.jobFee)} ISK`}
-                        />
-                      </>
+        {/* Cost basis and exits are sell-side ideas: a buy order has neither (#1733). */}
+        {!row.isBuyOrder && (
+          <div className="grid gap-3 md:grid-cols-2">
+            <section className="rounded-xs border border-line">
+              {row.costBasis === null ? (
+                <>
+                  <h3 className="border-b border-line bg-panel-2 px-3 py-2 text-xs font-semibold tracking-widest text-text-dim uppercase">
+                    {t('market.orders.floorWorking')}
+                  </h3>
+                  <div className="space-y-1.5 px-3 py-2">
+                    <p className="text-sm text-text">{t('market.orders.noCostBasisTitle')}</p>
+                    <p className="text-xs text-text-dim">{t('market.orders.noCostBasisHint')}</p>
+                    {row.walletGap && (
+                      <p className="text-xs text-text-dim">
+                        {row.walletGap.kind === 'partial'
+                          ? t('market.orders.walletBasisPartial', {
+                              covered: row.walletGap.coveredUnits.toLocaleString(),
+                              total: row.walletGap.pool.toLocaleString(),
+                            })
+                          : t('market.orders.walletBasisHistoryShort')}
+                        {row.walletGap.truncated
+                          ? ' ' + t('market.orders.walletBasisTruncated')
+                          : null}
+                      </p>
                     )}
-                    {/*
+                    <Link
+                      to="/industry"
+                      className={buttonClassName({ variant: 'ghost', size: 'sm' })}
+                    >
+                      {t('market.orders.linkBuild')}
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <Disclosure
+                  label={t('market.orders.floorWorking')}
+                  trailing={costBasisTrailing ?? undefined}
+                  expanded={expandedSections.has('costBasis')}
+                  onToggle={() => toggleSection('costBasis')}
+                >
+                  <div className="space-y-1.5 px-3 py-2">
+                    <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                      {row.costBasis.source === 'wallet' ? (
+                        <>
+                          <LedgerRow
+                            label={t('market.orders.walletBasisUnits')}
+                            value={row.costBasis.unitsCovered.toLocaleString()}
+                          />
+                          <LedgerRow
+                            label={t('market.orders.walletBasisBuys')}
+                            value={row.costBasis.buyCount.toLocaleString()}
+                          />
+                          <LedgerRow
+                            label={t('market.orders.walletBasisRange')}
+                            value={t('market.orders.walletBasisRangeValue', {
+                              from: new Date(row.costBasis.oldestBuy).toLocaleDateString(),
+                              to: new Date(row.costBasis.newestBuy).toLocaleDateString(),
+                            })}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          <LedgerRow
+                            label={t('industry.quantity')}
+                            value={row.costBasis.runQuantity.toLocaleString()}
+                          />
+                          <LedgerRow
+                            label={t('industry.materialCost')}
+                            value={`${formatIsk(row.costBasis.materialCost)} ISK`}
+                          />
+                          <LedgerRow
+                            label={t('industry.jobFee')}
+                            value={`${formatIsk(row.costBasis.jobFee)} ISK`}
+                          />
+                          <LedgerRow
+                            label={t('industry.totalCost')}
+                            value={`${formatIsk(row.costBasis.materialCost + row.costBasis.jobFee)} ISK`}
+                          />
+                        </>
+                      )}
+                      {/*
                       Per unit, not per run — the pivot from the batch totals
                       above to the per-unit figures below. `unitCost` is
                       exactly `totalCost / runQuantity` (orderCostBasis.ts);
                       2 decimals to match the floor rows it feeds into, not
                       the 0-decimal batch totals above it.
                     */}
-                    <LedgerRow
-                      label={t('market.orders.costPerUnit')}
-                      value={`${formatIsk(row.costBasis.unitCost, 2)} ISK`}
-                    />
-                    {row.costBasis.source === 'wallet' && (
-                      <div className="col-span-2 space-y-0.5 text-text-dim">
-                        <ul>
-                          {row.costBasis.buys.map((buy, i) => (
-                            <li key={i}>
-                              {t('market.orders.walletBasisBuyLine', {
-                                quantity: buy.quantity.toLocaleString(),
-                                price: formatIsk(buy.unitPrice, 2),
-                                date: new Date(buy.date).toLocaleDateString(),
-                              })}
-                            </li>
-                          ))}
-                        </ul>
-                        <p>{t('market.orders.walletBasisNoBuyFee')}</p>
-                      </div>
-                    )}
-                    {/*
+                      <LedgerRow
+                        label={t('market.orders.costPerUnit')}
+                        value={`${formatIsk(row.costBasis.unitCost, 2)} ISK`}
+                      />
+                      {row.costBasis.source === 'wallet' && (
+                        <div className="col-span-2 space-y-0.5 text-text-dim">
+                          <ul>
+                            {row.costBasis.buys.map((buy, i) => (
+                              <li key={i}>
+                                {t('market.orders.walletBasisBuyLine', {
+                                  quantity: buy.quantity.toLocaleString(),
+                                  price: formatIsk(buy.unitPrice, 2),
+                                  date: new Date(buy.date).toLocaleDateString(),
+                                })}
+                              </li>
+                            ))}
+                          </ul>
+                          <p>{t('market.orders.walletBasisNoBuyFee')}</p>
+                        </div>
+                      )}
+                      {/*
                       Rendered as ISK off `floor.relist`, not as a bare
                       percentage: `unitCost + salesTax(relist) +
                       brokerFeePerUnit === relist` by construction
@@ -1023,225 +1036,226 @@ export function OrderDetailModal({
                       (Advanced Broker Relations' Relist Discount), so this
                       readout is correct with no separate fee call needed.
                     */}
-                    {skills && row.floor && (
+                      {skills && row.floor && (
+                        <>
+                          <LedgerRow
+                            label={t('industry.salesTax')}
+                            value={`${formatIsk(salesTax(row.floor.relist, skills.accountingLevel), 2)} ISK`}
+                          />
+                          <LedgerRow
+                            label={t('market.orders.relistBrokerFee')}
+                            value={`${formatIsk(row.floor.relist - row.costBasis.unitCost - salesTax(row.floor.relist, skills.accountingLevel), 2)} ISK`}
+                          />
+                        </>
+                      )}
+                      {row.floor && (
+                        // Only ONE floor is ever shown as a ledger number
+                        // (design decision): `floor.fill` — what leaving the
+                        // order alone would net once it sells — appears only in
+                        // the prose below, which is the one place the smaller
+                        // number is the answer to something. Rounded UP to a
+                        // legal price for display, same as the stat chip above
+                        // — the ledger math itself still sums to the exact
+                        // `row.floor.relist`, never the rounded figure.
+                        <LedgerRow
+                          label={t('market.orders.floorLabel')}
+                          value={
+                            <>
+                              <CopyablePrice
+                                price={roundPriceUp(row.floor.relist) ?? row.floor.relist}
+                              />{' '}
+                              ISK
+                            </>
+                          }
+                        />
+                      )}
+                    </dl>
+                    {row.floor && (
                       <>
-                        <LedgerRow
-                          label={t('industry.salesTax')}
-                          value={`${formatIsk(salesTax(row.floor.relist, skills.accountingLevel), 2)} ISK`}
-                        />
-                        <LedgerRow
-                          label={t('market.orders.relistBrokerFee')}
-                          value={`${formatIsk(row.floor.relist - row.costBasis.unitCost - salesTax(row.floor.relist, skills.accountingLevel), 2)} ISK`}
-                        />
+                        <p className="text-xs text-text-dim">
+                          {t('market.orders.floorBreakEvenNote')}
+                        </p>
+                        <div className="rounded-xs border border-line bg-panel-2 p-2">
+                          <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                            {t('market.orders.floorWhyBroker')}
+                          </p>
+                          <p className="mt-1 text-xs text-text">
+                            {t('market.orders.floorWhyBrokerBody', {
+                              relist: formatIsk(row.floor.relist, 2),
+                            })}
+                          </p>
+                          <p className="mt-1 text-xs text-text-dim">
+                            {t('market.orders.floorWhyBrokerFill', {
+                              price: formatIsk(row.price, 2),
+                              fill: formatIsk(row.floor.fill, 2),
+                              difference: formatIsk(row.floor.relist - row.floor.fill, 2),
+                            })}
+                          </p>
+                        </div>
                       </>
                     )}
-                    {row.floor && (
-                      // Only ONE floor is ever shown as a ledger number
-                      // (design decision): `floor.fill` — what leaving the
-                      // order alone would net once it sells — appears only in
-                      // the prose below, which is the one place the smaller
-                      // number is the answer to something. Rounded UP to a
-                      // legal price for display, same as the stat chip above
-                      // — the ledger math itself still sums to the exact
-                      // `row.floor.relist`, never the rounded figure.
-                      <LedgerRow
-                        label={t('market.orders.floorLabel')}
-                        value={
-                          <>
-                            <CopyablePrice
-                              price={roundPriceUp(row.floor.relist) ?? row.floor.relist}
-                            />{' '}
-                            ISK
-                          </>
-                        }
-                      />
-                    )}
-                  </dl>
-                  {row.floor && (
-                    <>
-                      <p className="text-xs text-text-dim">
-                        {t('market.orders.floorBreakEvenNote')}
-                      </p>
-                      <div className="rounded-xs border border-line bg-panel-2 p-2">
-                        <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                          {t('market.orders.floorWhyBroker')}
-                        </p>
-                        <p className="mt-1 text-xs text-text">
-                          {t('market.orders.floorWhyBrokerBody', {
-                            relist: formatIsk(row.floor.relist, 2),
-                          })}
-                        </p>
-                        <p className="mt-1 text-xs text-text-dim">
-                          {t('market.orders.floorWhyBrokerFill', {
-                            price: formatIsk(row.price, 2),
-                            fill: formatIsk(row.floor.fill, 2),
-                            difference: formatIsk(row.floor.relist - row.floor.fill, 2),
-                          })}
-                        </p>
-                      </div>
-                    </>
-                  )}
-                  <Link
-                    to="/industry"
-                    className={buttonClassName({ variant: 'ghost', size: 'sm' })}
-                  >
-                    {t('market.orders.linkBuild')}
-                  </Link>
-                </div>
-              </Disclosure>
-            )}
-          </section>
+                    <Link
+                      to="/industry"
+                      className={buttonClassName({ variant: 'ghost', size: 'sm' })}
+                    >
+                      {t('market.orders.linkBuild')}
+                    </Link>
+                  </div>
+                </Disclosure>
+              )}
+            </section>
 
-          <section className="rounded-xs border border-line">
-            <Disclosure
-              label={t('market.orders.exitsTitle')}
-              trailing={exitsTrailing}
-              expanded={expandedSections.has('exits')}
-              onToggle={() => toggleSection('exits')}
-            >
-              <div className="space-y-1.5 px-3 py-2 text-xs">
-                {exits.length === 0 ? (
-                  <p className="text-text-dim">{t('market.orders.exitsNoFloor')}</p>
-                ) : (
-                  exits.map((exit) => (
-                    <p key={exit.kind} className="flex items-baseline justify-between gap-3">
-                      <span className="text-text-dim">
-                        {exit.kind === 'hold' && sell.kind === 'known'
-                          ? t('market.orders.exitHoldSellsIn', {
-                              price: formatIsk(exit.price, 2),
-                              days: sell.daysToClear,
-                            })
-                          : t(
-                              `market.orders.exit${exit.kind[0].toUpperCase()}${exit.kind.slice(1)}`,
-                              {
+            <section className="rounded-xs border border-line">
+              <Disclosure
+                label={t('market.orders.exitsTitle')}
+                trailing={exitsTrailing}
+                expanded={expandedSections.has('exits')}
+                onToggle={() => toggleSection('exits')}
+              >
+                <div className="space-y-1.5 px-3 py-2 text-xs">
+                  {exits.length === 0 ? (
+                    <p className="text-text-dim">{t('market.orders.exitsNoFloor')}</p>
+                  ) : (
+                    exits.map((exit) => (
+                      <p key={exit.kind} className="flex items-baseline justify-between gap-3">
+                        <span className="text-text-dim">
+                          {exit.kind === 'hold' && sell.kind === 'known'
+                            ? t('market.orders.exitHoldSellsIn', {
                                 price: formatIsk(exit.price, 2),
-                              }
-                            )}
-                      </span>
-                      <span className="flex shrink-0 items-center gap-1.5">
-                        {/*
+                                days: sell.daysToClear,
+                              })
+                            : t(
+                                `market.orders.exit${exit.kind[0].toUpperCase()}${exit.kind.slice(1)}`,
+                                {
+                                  price: formatIsk(exit.price, 2),
+                                }
+                              )}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-1.5">
+                          {/*
                         Only the undercut exit is a price to TYPE somewhere —
                         hold, dump and reprocess are all facts already true,
                         not suggestions. Icon-only: the sentence to the left
                         (`exitUndercutStation`) already states this price.
                       */}
-                        {exit.kind === 'undercutStation' && (
-                          <CopyablePrice price={exit.price} showValue={false} />
-                        )}
-                        <span
-                          className={cx(
-                            'tabular-nums',
-                            exit.netPerUnit >= 0 ? 'text-isk-pos' : 'text-isk-neg'
+                          {exit.kind === 'undercutStation' && (
+                            <CopyablePrice price={exit.price} showValue={false} />
                           )}
-                        >
-                          {t('market.orders.exitPerUnit', {
-                            amount: signedIsk(exit.netPerUnit),
-                          })}
+                          <span
+                            className={cx(
+                              'tabular-nums',
+                              exit.netPerUnit >= 0 ? 'text-isk-pos' : 'text-isk-neg'
+                            )}
+                          >
+                            {t('market.orders.exitPerUnit', {
+                              amount: signedIsk(exit.netPerUnit),
+                            })}
+                          </span>
                         </span>
-                      </span>
-                    </p>
-                  ))
-                )}
-                {/*
+                      </p>
+                    ))
+                  )}
+                  {/*
                 Hauling is a gap and a distance, never a net: what a hub pays
                 is knowable, what a courier charges is not. The rows survive a
                 missing Order Floor for the same reason — "Amarr bids more
                 than anyone here" needs no cost basis behind it.
               */}
-                {!row.isBuyOrder && (
-                  <div className="border-t border-line pt-1.5">
-                    <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                      {t('market.orders.exitHaulTitle')}
-                    </p>
-                    {hubs === undefined ? (
-                      <p className="mt-1 text-text-dim">
-                        {t(
-                          hubsFailed
-                            ? 'market.orders.exitHaulUnavailable'
-                            : 'market.orders.exitHaulLoading'
-                        )}
+                  {!row.isBuyOrder && (
+                    <div className="border-t border-line pt-1.5">
+                      <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                        {t('market.orders.exitHaulTitle')}
                       </p>
-                    ) : haulGaps.length === 0 ? (
-                      <p className="mt-1 text-text-dim">{t('market.orders.exitHaulNone')}</p>
-                    ) : (
-                      <>
-                        {haulGaps.map((gap) => (
-                          <p
-                            key={gap.hubId}
-                            className="mt-1 flex items-baseline justify-between gap-3"
-                          >
-                            <span className="text-text-dim">
-                              {t('market.orders.exitHaulHub', {
-                                hub: gap.systemName,
-                                price: formatIsk(gap.price, 2),
-                              })}{' '}
-                              <JumpsAwayText result={gap.jumps} t={t} />
-                            </span>
-                            <span className="shrink-0 tabular-nums text-success">
-                              {t('market.orders.exitHaulGap', {
-                                amount: formatIsk(gap.overLocal, 2),
-                                total: formatIsk(gap.totalIsk, 2),
-                              })}
-                            </span>
-                          </p>
-                        ))}
-                        <p className="mt-1 text-text-dim">{t('market.orders.exitHaulNote')}</p>
-                      </>
-                    )}
-                  </div>
-                )}
-                {!reprocessing && (
-                  <p className="flex items-baseline justify-between gap-3 text-text-dim">
-                    <span>{t('market.orders.exitReprocessNotBuilt')}</span>
-                    <span className="shrink-0">{t('market.orders.exitNotBuilt')}</span>
-                  </p>
-                )}
-                {refine && (
-                  <>
-                    {/*
+                      {hubs === undefined ? (
+                        <p className="mt-1 text-text-dim">
+                          {t(
+                            hubsFailed
+                              ? 'market.orders.exitHaulUnavailable'
+                              : 'market.orders.exitHaulLoading'
+                          )}
+                        </p>
+                      ) : haulGaps.length === 0 ? (
+                        <p className="mt-1 text-text-dim">{t('market.orders.exitHaulNone')}</p>
+                      ) : (
+                        <>
+                          {haulGaps.map((gap) => (
+                            <p
+                              key={gap.hubId}
+                              className="mt-1 flex items-baseline justify-between gap-3"
+                            >
+                              <span className="text-text-dim">
+                                {t('market.orders.exitHaulHub', {
+                                  hub: gap.systemName,
+                                  price: formatIsk(gap.price, 2),
+                                })}{' '}
+                                <JumpsAwayText result={gap.jumps} t={t} />
+                              </span>
+                              <span className="shrink-0 tabular-nums text-success">
+                                {t('market.orders.exitHaulGap', {
+                                  amount: formatIsk(gap.overLocal, 2),
+                                  total: formatIsk(gap.totalIsk, 2),
+                                })}
+                              </span>
+                            </p>
+                          ))}
+                          <p className="mt-1 text-text-dim">{t('market.orders.exitHaulNote')}</p>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  {!reprocessing && (
+                    <p className="flex items-baseline justify-between gap-3 text-text-dim">
+                      <span>{t('market.orders.exitReprocessNotBuilt')}</span>
+                      <span className="shrink-0">{t('market.orders.exitNotBuilt')}</span>
+                    </p>
+                  )}
+                  {refine && (
+                    <>
+                      {/*
                     The assumption, stated rather than folded into the number:
                     a structure's own reprocessing rate, its rigs and the
                     standings-based station tax are not readable from ESI, so
                     this prices a plain NPC station with no tax deducted.
                   */}
-                    <p className="text-text-dim">
-                      {t('market.orders.exitReprocessAssumption', {
-                        rate: Math.round(BASE_STATION_REPROCESSING_RATE * 100),
-                      })}
-                    </p>
-                    {refineImplantPct > 0 && (
                       <p className="text-text-dim">
-                        {t('market.orders.exitReprocessImplant', {
-                          pct: refineImplantPct,
+                        {t('market.orders.exitReprocessAssumption', {
+                          rate: Math.round(BASE_STATION_REPROCESSING_RATE * 100),
                         })}
                       </p>
-                    )}
-                    {reprocessing &&
-                      refiningImplantApplies(reprocessing.entry.specialisationSkillID) && (
-                        <ImplantsAssumedNote
-                          characterId={row.characterId}
-                          hint={t('market.orders.exitReprocessAssumesNoImplants', {
-                            character: row.characterName,
+                      {refineImplantPct > 0 && (
+                        <p className="text-text-dim">
+                          {t('market.orders.exitReprocessImplant', {
+                            pct: refineImplantPct,
                           })}
-                        />
+                        </p>
                       )}
-                    {refine.partial && (
-                      <p className="text-warning">{t('market.orders.exitReprocessPartial')}</p>
-                    )}
-                    {refine.unitsLeftOver !== undefined && refine.unitsLeftOver > 0 && (
-                      <p className="text-text-dim">
-                        {t('market.orders.exitReprocessLeftOver', {
-                          count: refine.unitsLeftOver,
-                        })}
-                      </p>
-                    )}
-                  </>
-                )}
-                <p className="text-text-dim">{t('market.orders.orderSoFarNotBuilt')}</p>
-              </div>
-            </Disclosure>
-          </section>
-        </div>
+                      {reprocessing &&
+                        refiningImplantApplies(reprocessing.entry.specialisationSkillID) && (
+                          <ImplantsAssumedNote
+                            characterId={row.characterId}
+                            hint={t('market.orders.exitReprocessAssumesNoImplants', {
+                              character: row.characterName,
+                            })}
+                          />
+                        )}
+                      {refine.partial && (
+                        <p className="text-warning">{t('market.orders.exitReprocessPartial')}</p>
+                      )}
+                      {refine.unitsLeftOver !== undefined && refine.unitsLeftOver > 0 && (
+                        <p className="text-text-dim">
+                          {t('market.orders.exitReprocessLeftOver', {
+                            count: refine.unitsLeftOver,
+                          })}
+                        </p>
+                      )}
+                    </>
+                  )}
+                  <p className="text-text-dim">{t('market.orders.orderSoFarNotBuilt')}</p>
+                </div>
+              </Disclosure>
+            </section>
+          </div>
+        )}
       </div>
     </Modal>
   );
