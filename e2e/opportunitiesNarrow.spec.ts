@@ -121,9 +121,12 @@ test.describe('Opportunities — ranked phone list', () => {
 
     const trigger = page.getByRole('button', { name: /Sort by ISK\/hour/ });
     await expect(trigger).toBeVisible();
-    const box = await trigger.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box!.height).toBeGreaterThanOrEqual(44);
+    // Polled, not read once: the list re-renders as the ranking lands, and a
+    // trigger remounted between the visibility check and the measurement
+    // reads as a null box — a CI-only flake, not a short target.
+    await expect
+      .poll(async () => (await trigger.boundingBox())?.height ?? 0)
+      .toBeGreaterThanOrEqual(44);
   });
 
   test('the selection checkbox is pinned with a real ~44px target', async ({ page }) => {
@@ -137,10 +140,13 @@ test.describe('Opportunities — ranked phone list', () => {
     const position = await wrapper.evaluate((el) => getComputedStyle(el).position);
     expect(position).toBe('absolute');
 
-    const box = await wrapper.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box!.width).toBeGreaterThanOrEqual(44);
-    expect(box!.height).toBeGreaterThanOrEqual(44);
+    // Polled for the same remount race as the Sort by trigger above.
+    await expect
+      .poll(async () => {
+        const box = await wrapper.boundingBox();
+        return Math.min(box?.width ?? 0, box?.height ?? 0);
+      })
+      .toBeGreaterThanOrEqual(44);
   });
 
   test('changing the sort changes which metric leads the card', async ({ page }) => {
@@ -177,10 +183,12 @@ test.describe('Opportunities — ranked phone list', () => {
 
     const checkbox = page.getByRole('checkbox', { name: /Select Rifter/ });
     await expect(checkbox).toBeVisible();
-    const box = await checkbox.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box!.width).toBeCloseTo(16, 0);
-    expect(box!.height).toBeCloseTo(16, 0);
+    await expect
+      .poll(async () => {
+        const box = await checkbox.boundingBox();
+        return box && [Math.round(box.width), Math.round(box.height)];
+      })
+      .toEqual([16, 16]);
   });
 
   /**

@@ -88,4 +88,14 @@ describe('CorpBoardRow', () => {
 
     expect(onShowInfo).toHaveBeenCalledWith(587, 'Rifter Blueprint');
   });
+
+  it('titles the truncated subject and detail lines with their full text', () => {
+    renderRow(jobItem);
+
+    expect(screen.getByText('Rifter Blueprint')).toHaveAttribute('title', 'Rifter Blueprint');
+    expect(screen.getByText('Job finished, waiting on delivery')).toHaveAttribute(
+      'title',
+      'Job finished, waiting on delivery'
+    );
+  });
 });

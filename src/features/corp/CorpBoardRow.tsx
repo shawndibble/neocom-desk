@@ -199,6 +199,7 @@ export function CorpBoardRow({
 }) {
   const { t } = useTranslation();
   const actions = useBoardRowActions(item, onShowInfo);
+  const detail = detailText(item, t);
   return (
     // `ContextMenuTrigger asChild` clones the `<li>` itself rather than
     // wrapping it, the same way `VariationsTable.tsx` triggers off a `<tr>` —
@@ -214,8 +215,12 @@ export function CorpBoardRow({
       <li className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-line px-3 py-2.5 last:border-b-0">
         <Countdown item={item} />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm">{item.subject}</p>
-          <p className="truncate text-xs text-text-dim">{detailText(item, t)}</p>
+          <p className="truncate text-sm" title={item.subject}>
+            {item.subject}
+          </p>
+          <p className="truncate text-xs text-text-dim" title={detail}>
+            {detail}
+          </p>
         </div>
         {/*
           The severity is already carried by the countdown's colour and shape;
