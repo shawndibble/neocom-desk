@@ -41,6 +41,8 @@ interface RowDetailModalProps {
   onJoin?: () => void;
   /** Opens `SplitDialog` to move part of this day's ore to a second Payee — offered for Outstanding/Paid rows that aren't part of a joined group. */
   onSplit?: () => void;
+  /** Opens the Payee manager over this modal when the pilot has no Payees yet. */
+  onAddPayee?: () => void;
 }
 
 /**
@@ -71,6 +73,7 @@ export function RowDetailModal({
   onUndo,
   onJoin,
   onSplit,
+  onAddPayee,
 }: RowDetailModalProps) {
   const { t } = useTranslation();
   const oreLines = assignment ? assignment.oreLines : row.unassignedOreLines;
@@ -193,6 +196,7 @@ export function RowDetailModal({
             busy={busy}
             onAssigned={onAssigned}
             onCancel={onClose}
+            onAddPayee={onAddPayee}
             extraActions={
               <>
                 {status === 'unassigned' && (

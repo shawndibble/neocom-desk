@@ -7,6 +7,7 @@ import {
   loadPublicCharacterInfo,
   loadPublicCorporationInfo,
   loadPublicAllianceInfo,
+  loadPublicEmploymentHistory,
 } from './publicInfoData';
 
 const server = setupServer();
@@ -134,5 +135,49 @@ describe('loadPublicAllianceInfo', () => {
     const info = await loadPublicAllianceInfo(404);
 
     expect(info).toBeNull();
+  });
+});
+
+describe('loadPublicEmploymentHistory', () => {
+  it('returns newest-first rows with corp names, cached under the global sentinel', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/91/corporationhistory`, () =>
+        HttpResponse.json([
+          { corporation_id: 10, record_id: 1, start_date: '2020-01-01T00:00:00Z' },
+          { corporation_id: 20, record_id: 2, start_date: '2022-01-01T00:00:00Z' },
+        ])
+      ),
+      http.post(`${ESI_BASE_URL}/universe/names`, () =>
+        HttpResponse.json([
+          { id: 10, name: 'Old Corp', category: 'corporation' },
+          { id: 20, name: 'New Corp', category: 'corporation' },
+        ])
+      )
+    );
+
+    const result = await loadPublicEmploymentHistory(91);
+
+    expect(result?.rows.map((r) => r.corporationId)).toEqual([20, 10]);
+    expect(result?.rows[0].ongoing).toBe(true);
+    expect(result?.names.get(20)).toBe('New Corp');
+    expect(await db.esiCache.get([0, 'public-employment:91'])).toBeDefined();
+  });
+
+  it('returns null when unresolvable (offline + uncached)', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/404/corporationhistory`, () => HttpResponse.error())
+    );
+
+    expect(await loadPublicEmploymentHistory(404)).toBeNull();
+  });
+
+  it('returns an empty row list for an empty history', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/92/corporationhistory`, () => HttpResponse.json([]))
+    );
+
+    const result = await loadPublicEmploymentHistory(92);
+
+    expect(result?.rows).toEqual([]);
   });
 });

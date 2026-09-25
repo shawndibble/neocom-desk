@@ -297,4 +297,104 @@ describe('PublicInfoModal', () => {
       )
     );
   });
+
+  describe('Employment tab', () => {
+    const char = {
+      name: 'Hist Pilot',
+      corporation_id: 2,
+      birthday: '2020-01-01T00:00:00Z',
+      bloodline_id: 1,
+      gender: 'male',
+      race_id: 1,
+      security_status: 1.5,
+    };
+    const corp = {
+      name: 'Some Corp',
+      ticker: 'SOME',
+      ceo_id: 99,
+      creator_id: 99,
+      member_count: 42,
+      tax_rate: 0.1,
+    };
+
+    it('lazy-loads the character corporation history only once the tab is opened', async () => {
+      let historyRequests = 0;
+      mockCharacter(91, char);
+      mockCorporation(2, corp);
+      server.use(
+        http.get(`${ESI_BASE_URL}/characters/91/corporationhistory`, () => {
+          historyRequests++;
+          return HttpResponse.json([
+            { corporation_id: 10, record_id: 1, start_date: '2020-01-01T00:00:00Z' },
+            { corporation_id: 2, record_id: 2, start_date: '2022-01-01T00:00:00Z' },
+          ]);
+        })
+      );
+      mockNames([
+        { id: 10, name: 'Old Corp' },
+        { id: 2, name: 'Some Corp' },
+        { id: 99, name: 'CEO Pilot' },
+      ]);
+
+      render(<PublicInfoModal />);
+      act(() => usePublicInfoModalStore.getState().open('character', 91));
+
+      const dialog = await screen.findByRole('dialog');
+      const tab = await within(dialog).findByRole('tab', { name: 'Employment' });
+      await within(dialog).findByRole('tab', { name: 'Corporation' });
+      expect(historyRequests).toBe(0);
+
+      tab.click();
+
+      expect(await within(dialog).findByText('Old Corp')).toBeInTheDocument();
+      expect(within(dialog).getByText('Current')).toBeInTheDocument();
+      expect(historyRequests).toBe(1);
+    });
+
+    it('shows an empty state for an empty history', async () => {
+      mockCharacter(91, char);
+      mockCorporation(2, corp);
+      mockNames([{ id: 99, name: 'CEO Pilot' }]);
+      server.use(
+        http.get(`${ESI_BASE_URL}/characters/91/corporationhistory`, () => HttpResponse.json([]))
+      );
+
+      render(<PublicInfoModal />);
+      act(() => usePublicInfoModalStore.getState().open('character', 91));
+
+      const dialog = await screen.findByRole('dialog');
+      (await within(dialog).findByRole('tab', { name: 'Employment' })).click();
+
+      expect(await within(dialog).findByText('No employment history')).toBeInTheDocument();
+    });
+
+    it('shows the error state when the history is unreadable and uncached', async () => {
+      mockCharacter(91, char);
+      mockCorporation(2, corp);
+      mockNames([{ id: 99, name: 'CEO Pilot' }]);
+      server.use(
+        http.get(`${ESI_BASE_URL}/characters/91/corporationhistory`, () => HttpResponse.error())
+      );
+
+      render(<PublicInfoModal />);
+      act(() => usePublicInfoModalStore.getState().open('character', 91));
+
+      const dialog = await screen.findByRole('dialog');
+      (await within(dialog).findByRole('tab', { name: 'Employment' })).click();
+
+      expect(await within(dialog).findByText('Could not load')).toBeInTheDocument();
+    });
+
+    it('has no Employment tab for a corporation request', async () => {
+      mockCorporation(2, corp);
+      mockNames([{ id: 99, name: 'CEO Pilot' }]);
+
+      render(<PublicInfoModal />);
+      act(() => usePublicInfoModalStore.getState().open('corporation', 2));
+
+      const dialog = await screen.findByRole('dialog');
+      await screen.findByText('SOME');
+      expect(within(dialog).queryByRole('tab', { name: 'Employment' })).not.toBeInTheDocument();
+    });
+  });
 });
