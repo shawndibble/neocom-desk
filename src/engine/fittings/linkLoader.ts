@@ -36,7 +36,9 @@ export type LoadInput =
 
 const DNA = /^\d+(?::\d+_?;\d+)+:*$/;
 const DNA_IN_TEXT = /fitting:(\d+(?::\d+_?;\d+)+:*)/i;
-const EFT_HEADER = /^\s*\[[^\]\n]+\]/;
+const EFT_HEADER = /^\s*\[[^\]\n]+,[^\]\n]*\]/;
+/** A bare `[Ship]`; tried last, since a chat paste's `[ timestamp ]` prefix looks the same. */
+const BARE_EFT_HEADER = /^\s*\[[^\]\n]+\]/;
 const ZKILL = /zkillboard\.com\/kill\/(\d+)/i;
 const ESI_KILL = /\/killmails\/(\d+)\/([0-9a-f]{40})/i;
 
@@ -47,6 +49,7 @@ function classifyPlain(text: string): LoadInput {
   if (DNA.test(trimmed)) return { kind: 'dna', dna: trimmed };
   const chat = DNA_IN_TEXT.exec(trimmed);
   if (chat) return { kind: 'dna', dna: chat[1] };
+  if (BARE_EFT_HEADER.test(trimmed)) return { kind: 'eft', text: trimmed };
   return { kind: 'unknown' };
 }
 
