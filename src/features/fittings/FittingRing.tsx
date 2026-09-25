@@ -21,7 +21,6 @@ import {
   type RingRack,
   type RingSlot,
 } from '@/engine/fittings/ringLayout';
-import { droneGroups } from '@/engine/fittings/fittingEdit';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
 import type {
@@ -447,19 +446,8 @@ function SlotTile({
   );
 }
 
-/** A drone stack or cargo item beneath the ring: its icon, a count, and a tooltip naming it. */
-function HoldTile({
-  typeId,
-  count,
-  tooltip,
-  dim = false,
-}: {
-  typeId: number;
-  count: number;
-  tooltip: string;
-  /** Nothing of it in space — a drone left in the bay. */
-  dim?: boolean;
-}) {
+/** A cargo item beneath the ring: its icon, a count, and a tooltip naming it. */
+function CargoTile({ typeId, count, tooltip }: { typeId: number; count: number; tooltip: string }) {
   const shown = formatCompactNumber(count);
   return (
     <Tooltip content={tooltip} openOnTap>
@@ -469,11 +457,7 @@ function HoldTile({
         aria-label={shown === String(count) ? tooltip : `${tooltip} (${shown})`}
         className="relative h-11 w-11 shrink-0 border border-line-bright bg-bg"
       >
-        <TypeIcon
-          typeId={typeId}
-          size={64}
-          className={`h-full w-full ${dim ? 'opacity-50' : ''}`}
-        />
+        <TypeIcon typeId={typeId} size={64} className="h-full w-full" />
         <span className="absolute right-0 bottom-0 bg-bg/85 px-0.5 text-[0.625rem] leading-tight font-semibold text-text tabular-nums">
           {shown}
         </span>
@@ -491,8 +475,8 @@ function HoldTile({
  * the resource budgets as bands on the rim: CPU solid up the lower right,
  * powergrid dashed up the lower left, calibration and drone bandwidth thin
  * above them. Hovering a band gives its numbers; the same numbers sit in a
- * strip beneath the ring laid out as the rim is. Subsystems (T3s), drones and
- * cargo sit in rows below.
+ * strip beneath the ring laid out as the rim is. Subsystems (T3s) and cargo
+ * sit in rows below; the page puts the drones in a panel of their own.
  *
  * Tiles take drops: an Add panel item on a slot of its rack, or a fitted
  * module dragged along its rack. The phone overview (`compact`) is read-only;
@@ -598,7 +582,6 @@ export function FittingRing({
       index,
     }))
   );
-  const drones = droneGroups(fitting);
 
   const tileProps = {
     compact,
@@ -756,47 +739,23 @@ export function FittingRing({
           </div>
         )}
 
-        {/* What the ring has no slot for: the drones and the cargo, as in the game's bays. */}
-        {(drones.length > 0 || fitting.cargo.length > 0) && (
-          <div className="flex flex-wrap gap-x-6 gap-y-3">
-            {drones.length > 0 && (
-              <div>
-                <p className={MICRO_LABEL}>{t('fittings.list.drones')}</p>
-                <div className="flex flex-wrap gap-2">
-                  {drones.map((group) => (
-                    <HoldTile
-                      key={group.typeId}
-                      typeId={group.typeId}
-                      count={group.inSpace + group.inBay}
-                      dim={group.inSpace === 0}
-                      tooltip={t('fittings.ring.droneTile', {
-                        name: nameOf(group.typeId),
-                        inSpace: group.inSpace,
-                        inBay: group.inBay,
-                      })}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-            {fitting.cargo.length > 0 && (
-              <div>
-                <p className={MICRO_LABEL}>{t('fittings.list.cargo')}</p>
-                <div className="flex flex-wrap gap-2">
-                  {fitting.cargo.map((item) => (
-                    <HoldTile
-                      key={item.typeId}
-                      typeId={item.typeId}
-                      count={item.quantity}
-                      tooltip={t('fittings.ring.cargoTile', {
-                        name: nameOf(item.typeId),
-                        quantity: item.quantity.toLocaleString(),
-                      })}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
+        {/* What the ring has no slot for; the drones get a panel of their own beneath it. */}
+        {fitting.cargo.length > 0 && (
+          <div>
+            <p className={MICRO_LABEL}>{t('fittings.list.cargo')}</p>
+            <div className="flex flex-wrap gap-2">
+              {fitting.cargo.map((item) => (
+                <CargoTile
+                  key={item.typeId}
+                  typeId={item.typeId}
+                  count={item.quantity}
+                  tooltip={t('fittings.ring.cargoTile', {
+                    name: nameOf(item.typeId),
+                    quantity: item.quantity.toLocaleString(),
+                  })}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>

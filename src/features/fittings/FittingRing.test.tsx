@@ -193,19 +193,14 @@ describe('FittingRing', () => {
     expect(screen.getByLabelText('High slots 2, empty')).not.toHaveAttribute('aria-pressed');
   });
 
-  it('lists the drones and cargo beneath the ring, with their counts', () => {
+  it('lists the cargo beneath the ring, with its counts', () => {
     render(
       <FittingRing
-        fitting={{
-          ...fitting,
-          drones: [{ typeId: 2488, quantity: 3, state: 'online' }],
-          cargo: [{ typeId: 209, quantity: 1535 }],
-        }}
-        stats={{ ...statsWith(10), droneCapacity: 100, droneBandwidthTotal: 20 }}
-        typeName={(typeId) => ({ 2488: 'Warrior II', 209: 'Scourge Heavy Missile' })[typeId] ?? ''}
+        fitting={{ ...fitting, cargo: [{ typeId: 209, quantity: 1535 }] }}
+        stats={statsWith(10)}
+        typeName={(typeId) => (typeId === 209 ? 'Scourge Heavy Missile' : '')}
       />
     );
-    expect(screen.getByLabelText('Warrior II: 0 in space, 3 in bay')).toBeTruthy();
     // The badge's own "1.5K" is part of the name, so it can be spoken to select it.
     expect(screen.getByLabelText('Scourge Heavy Missile ×1,535 (1.5K)')).toHaveTextContent('1.5K');
   });

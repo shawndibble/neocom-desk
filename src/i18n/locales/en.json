@@ -201,7 +201,6 @@
       "gauge": "{{label}}: {{value}} ({{percent}}%)",
       "gaugeOver": "{{label}}: {{value}} ({{percent}}%), over by {{amount}}",
       "gaugeLoading": "{{label}}: calculating…",
-      "droneTile": "{{name}}: {{inSpace}} in space, {{inBay}} in bay",
       "cargoTile": "{{name}} ×{{quantity}}",
       "rackHint": "Tap a rack to edit its slots",
       "droneCount": "{{inSpace}} launched · {{inBay}} in bay",
