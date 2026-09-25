@@ -23,10 +23,11 @@
  */
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { DataAgeBadge, EmptyState, IconButton, PageHeader, Spinner } from '@/components/ui';
+import { DataAgeBadge, IconButton, PageHeader, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
+import { CorpDenied } from '@/features/corp/CorpDenied';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import { CorpVitalsRail } from '@/features/corp/CorpVitalsRail';
 import { CorpStanding } from '@/features/corp/CorpStanding';
@@ -538,7 +539,11 @@ export function Corp() {
     return (
       <div className="space-y-4">
         <PageHeader title={t('corp.title')} />
-        <EmptyState title={t('corp.noAccessTitle')} hint={t('corp.noAccessHint')} />
+        <CorpDenied
+          reason={gate.reason}
+          title={t('corp.noAccessTitle')}
+          hint={t('corp.noAccessHint')}
+        />
       </div>
     );
   }
