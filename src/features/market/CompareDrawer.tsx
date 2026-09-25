@@ -13,6 +13,7 @@
  * a separate modal that covered the order book.
  */
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -45,6 +46,12 @@ import { formatVolume } from './format';
 import { downloadCsv } from '@/lib/downloadCsv';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { ItemContextMenu } from './ItemContextMenu';
+import { compareMargin, type AppraisalNetFees } from '@/engine/market/appraisal';
+import { ZERO_STANDINGS, type ResolvedStandings } from '@/engine/market/standings';
+import type { TradeHub } from '@/market/hubs';
+import { SKILL_IDS } from '@/engine/industry/types';
+import { loadCharacterModifiers } from '@/features/character/characterModifiers';
+import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { blueprintTypeIdFor } from './useBlueprintCatalog';
 
 const DRAWER_ID = 'compare-drawer';
@@ -79,7 +86,22 @@ export interface CompareDrawerProps {
   onAddToQuickbar: (typeId: number, itemName: string) => void;
   quickbarAvailable: boolean;
   onShowInfo: (typeId: number, itemName: string) => void;
+  /** The active Character, whose skills and `standing` price the after-fees column; null shows no after-fees figure. */
+  characterId: number | null;
+  /** The Trade Hub the fees are quoted at. */
+  hub: TradeHub;
+  /** `characterId`'s standing toward `hub`'s NPC station owner. */
+  standing: ResolvedStandings;
+  /** Where the prices are drawn from — the hub's system, or the chosen Region — named in the header. */
+  sourceLabel: string;
 }
+
+/** Base-rate stand-in so spread and spread % (which need no fees) still show before the Character's skills load. */
+const NO_SKILL_FEES: AppraisalNetFees = {
+  accountingLevel: 0,
+  brokerRelationsLevel: 0,
+  standing: ZERO_STANDINGS,
+};
 
 /** Mounted only while the Compare Set is non-empty — see Market.tsx. Unmounting on empty resets the drawer's own open/height state for free. */
 export function CompareDrawer({
@@ -90,6 +112,9 @@ export function CompareDrawer({
   onAddToQuickbar,
   quickbarAvailable,
   onShowInfo,
+  characterId,
+  standing,
+  sourceLabel,
 }: CompareDrawerProps) {
   const { t } = useTranslation();
   const items = useCompareSet((state) => state.items);
@@ -130,6 +155,35 @@ export function CompareDrawer({
     location,
     refreshTick,
   });
+  const [skillLevels, setSkillLevels] = useState<{
+    characterId: number;
+    accountingLevel: number;
+    brokerRelationsLevel: number;
+  } | null>(null);
+  useEffect(() => {
+    if (characterId === null || mode === 'closed') return;
+    let cancelled = false;
+    void loadCharacterModifiers(characterId, Date.now()).then((modifiers) => {
+      if (cancelled) return;
+      setSkillLevels({
+        characterId,
+        accountingLevel: modifiers.skills[SKILL_IDS.accounting] ?? 0,
+        brokerRelationsLevel: modifiers.skills[SKILL_IDS.brokerRelations] ?? 0,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [characterId, mode]);
+  // Null with no Character, or until *their* skills load — a stale
+  // previous Character's levels never price this one.
+  const fees = useMemo<AppraisalNetFees | null>(
+    () =>
+      skillLevels !== null && skillLevels.characterId === characterId
+        ? { ...skillLevels, standing }
+        : null,
+    [skillLevels, characterId, standing]
+  );
   const attributes = useCompareAttributes(items, mode !== 'closed' && view === 'attributes');
 
   function close() {
@@ -164,6 +218,19 @@ export function CompareDrawer({
       setHeightPx((h) => clampHeight(h - STEP));
     }
   }
+
+  const marginFor = useCallback(
+    (row: CompareRow) => {
+      const margin = compareMargin(
+        row.summary?.bestSell ?? null,
+        row.summary?.bestBuy ?? null,
+        fees ?? NO_SKILL_FEES
+      );
+      // Without the Character's skills the after-fees figure would be a base-rate lie.
+      return fees ? margin : { ...margin, afterFees: null };
+    },
+    [fees]
+  );
 
   const columns = useMemo<DataTableColumn<CompareRow>[]>(
     () => [
@@ -239,6 +306,31 @@ export function CompareDrawer({
         sortValue: (row) => row.summary?.spread ?? undefined,
       },
       {
+        id: 'spreadPct',
+        header: t('market.compare.columnSpreadPct'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (row) => {
+          if (row.loading) return '…';
+          const { spreadPct } = marginFor(row);
+          return spreadPct != null ? `${spreadPct.toFixed(1)}%` : '—';
+        },
+        sortValue: (row) => marginFor(row).spreadPct ?? undefined,
+      },
+      {
+        id: 'afterFees',
+        header: t('market.compare.columnAfterFees'),
+        headerTooltip: t('market.compare.columnAfterFeesHelp'),
+        align: 'right',
+        className: 'tabular-nums',
+        render: (row) => {
+          if (row.loading) return '…';
+          const { afterFees } = marginFor(row);
+          return afterFees != null ? <IskAmount value={afterFees} revealOn="tap" /> : '—';
+        },
+        sortValue: (row) => marginFor(row).afterFees ?? undefined,
+      },
+      {
         id: 'volume',
         header: t('market.compare.columnVolume'),
         align: 'right',
@@ -259,6 +351,7 @@ export function CompareDrawer({
     ],
     [
       t,
+      marginFor,
       removeItem,
       blueprintCatalog,
       onRequestBlueprintCatalog,
@@ -345,6 +438,11 @@ export function CompareDrawer({
                   </button>
                 ))}
               </span>
+              {view === 'prices' && (
+                <span className="text-[0.6875rem] text-text-dim">
+                  {t('market.compare.pricesFrom', { place: sourceLabel })}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {view === 'prices' && (
@@ -392,12 +490,20 @@ export function CompareDrawer({
                 <Spinner label={t('common.loading')} />
               </div>
             ) : (
-              <DataTable
-                columns={columns}
-                rows={rows}
-                rowKey={(row) => row.typeId}
-                label={t('market.compare.title')}
-              />
+              <>
+                {fees && (
+                  <AssumesBaseStandingsNote
+                    className="border-b border-line px-3"
+                    hint={t('market.compare.assumesBaseStandingsHint')}
+                  />
+                )}
+                <DataTable
+                  columns={columns}
+                  rows={rows}
+                  rowKey={(row) => row.typeId}
+                  label={t('market.compare.title')}
+                />
+              </>
             )}
           </div>
         </section>

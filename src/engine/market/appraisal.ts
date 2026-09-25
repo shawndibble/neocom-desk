@@ -368,6 +368,40 @@ export function appraisalNet(
   };
 }
 
+/** One Compare Set item's trade margin at the character's own fee rates — see `compareMargin`. */
+export interface CompareMargin {
+  /** Best sell minus best buy, ISK; null when either side has no order. */
+  spread: number | null;
+  /** The spread as a percentage of the best buy (the ISK tied up buying); null with no spread or a zero buy. */
+  spreadPct: number | null;
+  /**
+   * The spread left after buying at the best buy and selling at the best sell
+   * with orders of your own: broker fee on both orders (100 ISK minimum each,
+   * one unit) plus sales tax on the sell. Uses the same `brokerFee`/`salesTax`
+   * rates as `appraisalNet`, so the two surfaces agree.
+   */
+  afterFees: number | null;
+}
+
+/** Spread, spread %, and spread after fees for one unit bought at `bestBuy` and sold at `bestSell`. */
+export function compareMargin(
+  bestSell: number | null,
+  bestBuy: number | null,
+  { accountingLevel, brokerRelationsLevel, standing }: AppraisalNetFees
+): CompareMargin {
+  if (bestSell === null || bestBuy === null) {
+    return { spread: null, spreadPct: null, afterFees: null };
+  }
+  const spread = bestSell - bestBuy;
+  const broker = (value: number) =>
+    brokerFee(value, brokerRelationsLevel, standing.factionStanding, standing.corpStanding);
+  return {
+    spread,
+    spreadPct: bestBuy > 0 ? (spread / bestBuy) * 100 : null,
+    afterFees: spread - salesTax(bestSell, accountingLevel) - broker(bestSell) - broker(bestBuy),
+  };
+}
+
 /** One Trade Hub's row in the Compare Hubs table: both sides, at the given percentage. */
 export interface HubComparisonTotals {
   /** Null when nothing among the items has a buy price at this hub — a dash, not a 0. */
