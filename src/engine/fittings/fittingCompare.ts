@@ -9,6 +9,8 @@ import {
   type FittingStatKey,
   type StatChangeKey,
 } from './fittingStatFields';
+import { appliedDps, appliedDpsVsRange, bestRange, graphMaxRange } from './appliedDps';
+import type { TargetProfile } from './targetProfile';
 import type { CapacitorStatus, Fitting, FittingStats } from './types';
 
 /** `null` means the field has no "better"/"worse" side — CPU/PG/calibration used-or-total, mass — so no value is highlighted. */
@@ -47,8 +49,11 @@ const STAT_DIRECTION: Readonly<Partial<Record<FittingStatKey, 'higher' | 'lower'
   warpSpeed: 'higher',
 };
 
+/** The two rows worked out against the selected Target Profile, not read off `FittingStats`. */
+export type AppliedCompareKey = 'appliedDps' | 'bestRange';
+
 export interface CompareRow {
-  key: StatChangeKey;
+  key: StatChangeKey | AppliedCompareKey;
   /** Index-parallel to the input fittings, rounded at the same digits `FittingStatsSections` displays. */
   values: readonly number[];
   /** `false` when every fitting rounds to the same value. */
@@ -101,8 +106,36 @@ function capacitorRow(statsList: readonly FittingStats[]): CompareRow {
   };
 }
 
-/** Every stat row for N fittings side by side — the differences-only toggle filters `rows` by `differs` at the UI layer. */
-export function compareFittingStats(statsList: readonly FittingStats[]): CompareTable {
+/**
+ * Applied DPS and the range it peaks at (km), per fitting, on the same range axis the single-Fitting
+ * page uses for a lone Fitting (`graphMaxRange`) so the numbers match. No firing weapons: 0 and 0.
+ */
+function appliedRows(statsList: readonly FittingStats[], target: TargetProfile): CompareRow[] {
+  const points = statsList.map(({ applied }) => {
+    const at = bestRange(appliedDpsVsRange(applied, target, graphMaxRange([applied])));
+    return { dps: round(appliedDps(applied, target, at), 1), km: round(at / 1000, 1) };
+  });
+  const dps = points.map((p) => p.dps);
+  const km = points.map((p) => p.km);
+  return [
+    {
+      key: 'appliedDps',
+      values: dps,
+      differs: new Set(dps).size > 1,
+      bestIndices: bestIndicesFor(dps, 'higher'),
+    },
+    { key: 'bestRange', values: km, differs: new Set(km).size > 1, bestIndices: [] },
+  ];
+}
+
+/**
+ * Every stat row for N fittings side by side — the differences-only toggle filters `rows` by `differs` at the UI layer.
+ * Passing a `target` adds the applied-DPS rows.
+ */
+export function compareFittingStats(
+  statsList: readonly FittingStats[],
+  target?: TargetProfile
+): CompareTable {
   const rows: CompareRow[] = NUMERIC_FIELDS.map((field) => {
     const values = statsList.map((s) => round(field.value(s), field.digits));
     return {
@@ -113,6 +146,7 @@ export function compareFittingStats(statsList: readonly FittingStats[]): Compare
     };
   });
   rows.push(capacitorRow(statsList));
+  if (target) rows.push(...appliedRows(statsList, target));
   return { rows };
 }
 

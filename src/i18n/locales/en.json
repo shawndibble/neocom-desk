@@ -599,6 +599,8 @@
         "calibrationUsed": "Calibration used",
         "calibrationTotal": "Calibration total",
         "totalDps": "Total DPS",
+        "appliedDps": "Applied DPS",
+        "bestRange": "Best range (km)",
         "totalVolley": "Total volley",
         "droneDps": "Drone DPS",
         "droneBandwidthUsed": "Drone bandwidth used",

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { compareFittingStats, modulesThatDiffer, compareWindow } from './fittingCompare';
+import { appliedDps, appliedDpsVsRange, bestRange, graphMaxRange } from './appliedDps';
+import type { AppliedDpsInputs } from './appliedDps';
 import type { Fitting, FittingStats } from './types';
 
 function stats(overrides: Partial<FittingStats> = {}): FittingStats {
@@ -191,6 +193,82 @@ const RIFTER_HULL = 587;
 function fitting(modules: Fitting['modules']): Fitting {
   return { name: 'Test', shipTypeId: RIFTER_HULL, modules, drones: [], cargo: [] };
 }
+
+describe('compareFittingStats applied DPS rows', () => {
+  const target = { signatureRadius: 125, velocity: 350 };
+  const railgun: AppliedDpsInputs = {
+    droneControlRange: 20000,
+    weapons: [
+      {
+        kind: 'turret',
+        dps: 300,
+        optimal: 30000,
+        falloff: 10000,
+        tracking: 0.05,
+        optimalSigRadius: 400,
+      },
+    ],
+  };
+  const missiles: AppliedDpsInputs = {
+    droneControlRange: 20000,
+    weapons: [
+      {
+        kind: 'missile',
+        dps: 200,
+        range: 60000,
+        explosionRadius: 100,
+        explosionVelocity: 500,
+        damageReductionFactor: 0.9,
+      },
+    ],
+  };
+
+  function expected(applied: AppliedDpsInputs) {
+    const at = bestRange(appliedDpsVsRange(applied, target, graphMaxRange([applied])));
+    return { dps: appliedDps(applied, target, at), km: at / 1000 };
+  }
+  const tenth = (n: number) => Math.round(n * 10) / 10;
+
+  it('adds no applied rows without a Target Profile', () => {
+    const keys = compareFittingStats([stats()]).rows.map((r) => r.key);
+    expect(keys).not.toContain('appliedDps');
+    expect(keys).not.toContain('bestRange');
+  });
+
+  it("gives each column the single-Fitting page's applied DPS and its own best range", () => {
+    const table = compareFittingStats(
+      [stats({ applied: railgun }), stats({ applied: missiles })],
+      target
+    );
+    const dps = table.rows.find((r) => r.key === 'appliedDps')!;
+    const range = table.rows.find((r) => r.key === 'bestRange')!;
+    const [a, b] = [expected(railgun), expected(missiles)];
+    expect(dps.values).toEqual([tenth(a.dps), tenth(b.dps)]);
+    expect(range.values).toEqual([tenth(a.km), tenth(b.km)]);
+  });
+
+  it('highlights the higher applied DPS and leaves best range without a best side', () => {
+    const table = compareFittingStats(
+      [stats({ applied: railgun }), stats({ applied: missiles })],
+      target
+    );
+    const dps = table.rows.find((r) => r.key === 'appliedDps')!;
+    const range = table.rows.find((r) => r.key === 'bestRange')!;
+    expect(dps.differs).toBe(true);
+    expect(dps.bestIndices).toEqual([dps.values[0]! > dps.values[1]! ? 0 : 1]);
+    expect(range.differs).toBe(true);
+    expect(range.bestIndices).toEqual([]);
+  });
+
+  it('shows 0 for a Fitting with no firing weapons', () => {
+    const table = compareFittingStats([stats(), stats({ applied: missiles })], target);
+    const dps = table.rows.find((r) => r.key === 'appliedDps')!;
+    const range = table.rows.find((r) => r.key === 'bestRange')!;
+    expect(dps.values[0]).toBe(0);
+    expect(range.values[0]).toBe(0);
+    expect(dps.bestIndices).toEqual([1]);
+  });
+});
 
 describe('modulesThatDiffer', () => {
   it('excludes a module every fitting shares in the same quantity', () => {

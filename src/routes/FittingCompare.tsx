@@ -30,6 +30,8 @@ import { useCompareFittings } from '@/features/fittings/useCompareFittings';
 import { useCompareStats } from '@/features/fittings/useCompareStats';
 import { DamageProfilePicker } from '@/features/fittings/DamageProfilePicker';
 import { useDamageProfiles } from '@/features/fittings/damageProfiles';
+import { TargetProfilePicker } from '@/features/fittings/TargetProfilePicker';
+import { useTargetProfiles } from '@/features/fittings/targetProfiles';
 import { usePilotProfile } from '@/features/fittings/fittingPilotProfile';
 
 /**
@@ -49,6 +51,8 @@ export function FittingCompare() {
   } = usePilotProfile(activeCharacterId);
   const fittings = useMemo(() => slots.map((slot) => slot?.fitting ?? null), [slots]);
   const damageProfiles = useDamageProfiles();
+  const targetProfiles = useTargetProfiles();
+  const target = targetProfiles.selected;
   const stats = useCompareStats(fittings, profile);
   const canFly = useCompareCanFly(fittings, profile);
   const isPhone = useIsPhone();
@@ -90,9 +94,12 @@ export function FittingCompare() {
   const table = useMemo(
     () =>
       statsReady
-        ? compareFittingStats(okSlots.map((index) => stats.values[index] as FittingStats))
+        ? compareFittingStats(
+            okSlots.map((index) => stats.values[index] as FittingStats),
+            target
+          )
         : null,
-    [statsReady, okSlots, stats.values]
+    [statsReady, okSlots, stats.values, target]
   );
   const moduleDiffs = useMemo(
     () => (statsReady ? modulesThatDiffer(okSlots.map((index) => fittings[index] as Fitting)) : []),
@@ -170,6 +177,7 @@ export function FittingCompare() {
       />
 
       <DamageProfilePicker damageProfiles={damageProfiles} />
+      <TargetProfilePicker targetProfiles={targetProfiles} />
 
       {count === 0 ? (
         <EmptyState
@@ -236,6 +244,7 @@ export function FittingCompare() {
                   columns={columns}
                   differencesOnly={showDifferencesOnly}
                 />
+                <p className="mt-2 text-xs text-text-dim">{t('fittings.appliedDps.assumptions')}</p>
               </Panel>
               <Panel title={t('fittings.compare.modulesTitle')}>
                 <FittingCompareModulesSummary
