@@ -136,10 +136,13 @@ import {
   readsLoadedImplants,
   setWhatIfBonus,
   toCustomSelection,
+  cloneSelection,
+  matchingCloneId,
   MAX_IMPLANT_BONUS,
   MIN_IMPLANT_BONUS,
   WHAT_IF_IMPLANT_PRESETS,
 } from './whatIfImplants';
+import { useJumpCloneImplantSets } from './jumpCloneImplants';
 import { resolvePlanBoosters, toBoosters } from './planBooster';
 import { BoosterList } from './BoosterList';
 import { ImportClipboardDialog } from './ImportClipboardDialog';
@@ -405,6 +408,8 @@ export function PlanEditor({
   );
   const setWhatIf = (selection: WhatIfImplantSelection): void =>
     onUpdate({ whatIfImplants: selection });
+  const jumpClones = useJumpCloneImplantSets(characterId);
+  const matchedCloneId = matchingCloneId(whatIf, implants, jumpClones);
   const effectiveImplants = useMemo(() => whatIfImplants(whatIf, implants), [whatIf, implants]);
 
   // Training time assumes no implants only when it is actually reading the
@@ -1732,16 +1737,25 @@ export function PlanEditor({
             <label className="flex flex-1 items-center justify-between gap-2">
               {t('plans.whatIfImplants')}
               <Select
-                value={whatIf.kind === 'custom' ? 'custom' : whatIf.preset}
+                value={
+                  matchedCloneId !== null
+                    ? `clone:${matchedCloneId}`
+                    : whatIf.kind === 'custom'
+                      ? 'custom'
+                      : whatIf.preset
+                }
                 // Picking 'custom' freezes what is in force into five editable
                 // slots without changing a number (toCustomSelection).
-                onValueChange={(value) =>
+                onValueChange={(value) => {
+                  const clone = jumpClones.find((c) => `clone:${c.id}` === value);
                   setWhatIf(
-                    value === 'custom'
-                      ? toCustomSelection(whatIf, implants)
-                      : { kind: 'preset', preset: value as WhatIfImplantPreset }
-                  )
-                }
+                    clone
+                      ? cloneSelection(clone)
+                      : value === 'custom'
+                        ? toCustomSelection(whatIf, implants)
+                        : { kind: 'preset', preset: value as WhatIfImplantPreset }
+                  );
+                }}
               >
                 <SelectTrigger size="md" aria-label={t('plans.whatIfImplants')} className="w-36">
                   <SelectValue />
@@ -1754,6 +1768,11 @@ export function PlanEditor({
                         : preset === 'current'
                           ? t('plans.whatIfCurrent')
                           : preset}
+                    </SelectItem>
+                  ))}
+                  {jumpClones.map((clone) => (
+                    <SelectItem key={clone.id} value={`clone:${clone.id}`}>
+                      {t('plans.whatIfJumpClone', { label: clone.label })}
                     </SelectItem>
                   ))}
                   <SelectItem value="custom">{t('plans.whatIfCustom')}</SelectItem>

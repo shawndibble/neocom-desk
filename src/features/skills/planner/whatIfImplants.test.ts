@@ -3,6 +3,8 @@ import type { WhatIfImplantSelection } from '@/db';
 import type { Implants } from '@/engine/types';
 import {
   DEFAULT_WHAT_IF_SELECTION,
+  cloneSelection,
+  matchingCloneId,
   normalizeWhatIfSelection,
   readsLoadedImplants,
   setWhatIfBonus,
@@ -259,5 +261,35 @@ describe('readsLoadedImplants', () => {
     expect(readsLoadedImplants(preset('none'))).toBe(false);
     expect(readsLoadedImplants(preset('+3'))).toBe(false);
     expect(readsLoadedImplants(custom({ intelligence: 3 } as Implants))).toBe(false);
+  });
+});
+
+describe('jump-clone what-if presets', () => {
+  const clones = [
+    { id: 11, label: 'Clone A', bonuses: { memory: 4, perception: 4 } },
+    { id: 12, label: 'Clone B', bonuses: { intelligence: 5 } },
+  ];
+
+  it('selecting a clone yields a custom selection of its own implants', () => {
+    expect(cloneSelection(clones[0]!)).toEqual(
+      custom({ intelligence: 0, memory: 4, perception: 4, willpower: 0, charisma: 0 })
+    );
+  });
+
+  it('a clone selection costs against that clone, not the loaded implants', () => {
+    expect(whatIfImplants(cloneSelection(clones[1]!), { memory: 5 })).toEqual({
+      intelligence: 5,
+      memory: 0,
+      perception: 0,
+      willpower: 0,
+      charisma: 0,
+    });
+  });
+
+  it('finds the clone a selection matches, and none once a slot is edited', () => {
+    const selected = cloneSelection(clones[1]!);
+    expect(matchingCloneId(selected, {}, clones)).toBe(12);
+    expect(matchingCloneId(setWhatIfBonus(selected, {}, 'memory', 1), {}, clones)).toBeNull();
+    expect(matchingCloneId(preset('current'), {}, clones)).toBeNull();
   });
 });
