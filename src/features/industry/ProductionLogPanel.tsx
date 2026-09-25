@@ -45,6 +45,7 @@ import {
 import { SaleLinkingModals } from './SaleLinkingControls';
 import { useSaleLinking } from './useSaleLinking';
 import { iskToneClass } from '@/features/character/format';
+import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { formatIsk } from '@/lib/isk';
 import { formatPercent } from './format';
 import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
@@ -384,6 +385,7 @@ export function ProductionLogPanel({
   }
 
   const {
+    summaries,
     itemRows,
     runRows,
     filteredRunCount,
@@ -545,6 +547,12 @@ export function ProductionLogPanel({
               })}
             </span>
           </div>
+          {summaries.some((s) => s.profit.brokerFee > 0) && (
+            <AssumesBaseStandingsNote
+              characterId={characterId}
+              hint={t('industry.productionLogAssumesBaseStandingsHint')}
+            />
+          )}
           <div className="divide-y divide-line rounded-xs border border-line">
             <TotalRow label={t('industry.totalCostLogged')} value={formatIsk(totalCostLogged)} />
             <TotalRow

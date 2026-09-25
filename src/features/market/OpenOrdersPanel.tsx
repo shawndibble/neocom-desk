@@ -27,6 +27,7 @@ import * as Icon from '@/components/ui/icons';
 import { beginEveLogin } from '@/app/loginFlow';
 import { permissionsForEndpoints } from '@/esi/registry';
 import { CharacterBadge } from '@/features/character/assetBrowserRows';
+import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { resolveCharacterFilter } from '@/features/character/characterFilterValue';
 import { loadReprocessing } from '@/sde/loadSde';
@@ -483,6 +484,14 @@ export function OpenOrdersPanel({
 
   const nameFor = (typeId: number) => snapshot?.typeNames.get(typeId) ?? `Type #${typeId}`;
 
+  // Whoever has a floor on screen: each note checks that character's own grant,
+  // since every character's floor prices with their own standings.
+  const floorCharacters = useMemo(() => {
+    const m = new Map<number, string>();
+    for (const row of allRows) if (row.floor) m.set(row.characterId, row.characterName);
+    return [...m];
+  }, [allRows]);
+
   const reauthEntries = useMemo(
     () => snapshot?.openOrders.entries.filter((e) => e.needsReauth) ?? [],
     [snapshot]
@@ -820,6 +829,14 @@ export function OpenOrdersPanel({
             onLogin={() =>
               void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterOrders']) })
             }
+          />
+        ))}
+        {floorCharacters.map(([characterId, characterName]) => (
+          <AssumesBaseStandingsNote
+            key={characterId}
+            characterId={characterId}
+            characterName={characterName}
+            hint={t('market.orders.assumesBaseStandingsHint')}
           />
         ))}
         {fromCacheAny && (

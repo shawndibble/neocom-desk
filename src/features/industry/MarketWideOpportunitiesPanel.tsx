@@ -24,6 +24,7 @@ import {
 } from '@/components/ui';
 import { db } from '@/db';
 import { iskToneClass } from '@/features/character/format';
+import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { MarketWideTreeMap } from '@/sde/types';
@@ -266,6 +267,10 @@ export function MarketWideOpportunitiesPanel({
         />
       ) : (
         <div className="flex flex-col gap-2">
+          <AssumesBaseStandingsNote
+            characterId={activeCharacterId}
+            hint={t('industry.assumesBaseStandingsHint')}
+          />
           {gatedCount > 0 && (
             <div className="flex justify-end">
               <FilterChip

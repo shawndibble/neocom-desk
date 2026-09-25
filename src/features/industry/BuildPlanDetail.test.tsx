@@ -55,6 +55,7 @@ vi.mock('@/features/character/systemSecurity', () => ({
 // granted; without this the box under test is the re-auth offer instead.
 vi.mock('@/app/useGrantedScopes', () => ({
   useGrantedScopes: () => ['esi-search.search_structures.v1'],
+  useEndpointsGranted: () => true,
 }));
 
 const BLUEPRINT: BlueprintType = {
