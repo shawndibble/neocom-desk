@@ -5,6 +5,7 @@
  * components — same precedent as `route/jumpsCell.tsx`.
  */
 import type { TFunction } from 'i18next';
+import { Tooltip } from '@/components/ui';
 import {
   resolveOrderLocation,
   type NpcStationLookup,
@@ -27,7 +28,22 @@ export function LocationCell({ order, npcStations, solarSystems, t }: LocationCe
   // repeat a word the eye had just read on every row of the book. The full
   // form survives where it is pasted or exported rather than scanned —
   // `OrderRowContextMenu`'s copy action and `orderBookCsv`.
-  return <span>{location.stationName ?? t('market.unknownStructure')}</span>;
+  if (location.stationName === null) {
+    return <span>{t('market.unknownStructure')}</span>;
+  }
+  // `sm:`-scoped: nothing truncates on the phone card, so the underline
+  // would mislead there. No `openOnTap` — it reveals nothing new, and
+  // `DataTable` treats an `openOnTap` trigger as the row's own click.
+  return (
+    <Tooltip content={location.stationName}>
+      <span
+        tabIndex={0}
+        className="sm:cursor-help sm:underline sm:decoration-dotted sm:decoration-text-dim/50 sm:underline-offset-2"
+      >
+        {location.stationName}
+      </span>
+    </Tooltip>
+  );
 }
 
 /** Security dropped from `LocationCell` (see above) lives here instead, as its own optional column. */

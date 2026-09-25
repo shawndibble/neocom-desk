@@ -1071,7 +1071,10 @@ export function Market() {
           </Panel>
 
           <Panel
-            className={isDesktop || selectedTypeId !== null ? '' : 'hidden'}
+            // `min-w-0`: a grid track doesn't shrink a child below its own
+            // intrinsic content width by default — a wide table row here
+            // was forcing the whole page to scroll sideways.
+            className={`min-w-0 ${isDesktop || selectedTypeId !== null ? '' : 'hidden'}`}
             title={selectedItem?.name}
             headingRef={itemHeadingRef}
             meta={
