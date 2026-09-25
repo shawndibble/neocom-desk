@@ -13,7 +13,11 @@
  */
 import { useEffect, useMemo, useState } from 'react';
 import { swapModuleType } from '@/engine/fittings/fittingEdit';
-import { fitsResourceBudget } from '@/engine/fittings/skillGaps';
+import {
+  firstResourceOverage,
+  fitsResourceBudget,
+  type ResourceBudgetOverage,
+} from '@/engine/fittings/skillGaps';
 import type { FittingSlotKind } from '@/engine/fittings/types';
 import { diffFittingStats, type FittingStatsDelta } from '@/engine/fittings/variationDelta';
 import {
@@ -33,6 +37,8 @@ export interface VariationRow {
   metaGroupName: string;
   delta: FittingStatsDelta | null;
   fits: boolean | null;
+  /** Set only when the swap is over a CPU/PG/calibration budget; null otherwise (including a hull-rule miss). */
+  overage: ResourceBudgetOverage | null;
   canFly: boolean | null;
   /** Jita sell price; null if the hub has no sell orders for it. */
   price: number | null;
@@ -51,6 +57,7 @@ interface UseModuleVariationsParams {
 interface ComputedEntry {
   delta: FittingStatsDelta;
   fits: boolean;
+  overage: ResourceBudgetOverage | null;
   canFly: boolean;
 }
 
@@ -113,6 +120,7 @@ export function useModuleVariations({
             {
               delta: diffFittingStats(before, after),
               fits: fitsResourceBudget(after) && (check?.fitsHull ?? true),
+              overage: firstResourceOverage(after),
               canFly: check?.canFly ?? true,
             },
           ];
@@ -169,6 +177,7 @@ export function useModuleVariations({
     metaGroupName: member.metaGroupName,
     delta: fresh?.byTypeId.get(member.typeId)?.delta ?? null,
     fits: fresh?.byTypeId.get(member.typeId)?.fits ?? null,
+    overage: fresh?.byTypeId.get(member.typeId)?.overage ?? null,
     canFly: fresh?.byTypeId.get(member.typeId)?.canFly ?? null,
     price: freshPrices?.byTypeId.get(member.typeId) ?? null,
   }));
