@@ -60,31 +60,32 @@ function show(row: LibraryRow) {
 }
 
 describe('FittingPreview', () => {
-  it('offers Offense, Defense and Skills, and Notes when an In-game fitting has a description', () => {
+  const heading = (name: string) => screen.queryByRole('heading', { name });
+
+  it('shows the Ring, then Offense, Defense and Skills as boxes, with Notes when an In-game fitting has a description', () => {
     show(inGameRow('Kite the frigates.'));
-    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
-      'Offense',
-      'Defense',
-      'Skills',
-      'Notes',
-    ]);
     expect(screen.getByTestId('ring')).toBeInTheDocument();
+    for (const name of ['Offense', 'Defense', 'Skills', 'Notes']) {
+      expect(heading(name)).toBeInTheDocument();
+    }
+    expect(screen.getByText('Kite the frigates.')).toBeInTheDocument();
   });
 
   it('leaves Notes out when there is no description to show', () => {
     show(inGameRow('   '));
-    expect(screen.queryByRole('tab', { name: 'Notes' })).not.toBeInTheDocument();
+    expect(heading('Offense')).toBeInTheDocument();
+    expect(heading('Notes')).not.toBeInTheDocument();
   });
 
   it('always offers Notes on a saved fitting, so notes can be written', () => {
     show(savedRow('Rifter'));
-    expect(screen.getByRole('tab', { name: 'Notes' })).toBeInTheDocument();
+    expect(heading('Notes')).toBeInTheDocument();
   });
 
-  it('says an unreadable saved fitting cannot be read, with no Ring or tabs', () => {
+  it('says an unreadable saved fitting cannot be read, with no Ring or boxes', () => {
     show(savedRow(null));
     expect(screen.getByText(/can no longer be read/)).toBeInTheDocument();
     expect(screen.queryByTestId('ring')).not.toBeInTheDocument();
-    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    expect(heading('Offense')).not.toBeInTheDocument();
   });
 });
