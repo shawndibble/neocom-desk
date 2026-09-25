@@ -202,7 +202,9 @@ describe('Assets', () => {
     expect(chipLabel.closest('header')).toBe(
       screen.getByRole('heading', { level: 1 }).parentElement
     );
+    expect(chipLabel.parentElement).toHaveTextContent('Total value0');
     expect(screen.queryByText(/Total Assets Value/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/(filtered)/)).not.toBeInTheDocument();
 
     await openLocation(user, JITA);
     expect(await screen.findByText('Tritanium')).toBeInTheDocument();
@@ -425,6 +427,7 @@ describe('Assets', () => {
     );
     render(<App />);
     expect(await screen.findByText(/no assets cached/i)).toBeInTheDocument();
+    expect(screen.queryByText('Total value')).not.toBeInTheDocument();
   });
 
   it('shows a re-login prompt (not a silent empty state) when the assets scope was revoked', async () => {
