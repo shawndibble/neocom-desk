@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
   DataTable,
+  CachedEmptyState,
   EmptyState,
   IconButton,
   Panel,
@@ -283,9 +284,11 @@ export function TransactionsPanel({
       }
     >
       {!transactionsResult || transactions.length === 0 ? (
-        <EmptyState
+        <CachedEmptyState
+          result={transactionsResult}
           title={t('wallet.transactionsEmptyTitle')}
           hint={t('wallet.transactionsEmptyHint')}
+          fetchedTitle={t('wallet.transactionsEmptyFetchedTitle')}
           className="py-8"
         />
       ) : (

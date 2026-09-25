@@ -8,6 +8,7 @@ export { StatChip } from './StatChip';
 export { STAT_CHIP_TONE_TEXT_CLASS } from './statChipTone';
 export type { StatChipTone } from './statChipTone';
 export { DataAgeBadge } from './DataAgeBadge';
+export { CachedEmptyState } from './CachedEmptyState';
 export { EmptyState } from './EmptyState';
 export { Tabs } from './Tabs';
 export type { TabItem } from './Tabs';

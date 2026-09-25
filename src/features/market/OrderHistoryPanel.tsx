@@ -5,6 +5,7 @@ import {
   ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
+  CachedEmptyState,
   EmptyState,
   FilterBar,
   FilterChip,
@@ -362,9 +363,11 @@ export function OrderHistoryPanel({
           />
         </div>
       ) : !historyResult || history.length === 0 ? (
-        <EmptyState
+        <CachedEmptyState
+          result={historyResult}
           title={t('orders.historyEmptyTitle')}
           hint={t('orders.historyEmptyHint')}
+          fetchedTitle={t('orders.historyEmptyFetchedTitle')}
           className="py-8"
         />
       ) : (

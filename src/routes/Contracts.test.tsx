@@ -671,12 +671,12 @@ describe('Contracts tab strip (issue #908)', () => {
     );
     const user = userEvent.setup();
     render(<App />);
-    expect(await screen.findByText(/no contracts cached/i)).toBeInTheDocument();
+    expect(await screen.findByText(/^no contracts$/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole('tab', { name: 'Search' }));
 
     expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
-    expect(screen.queryByText(/no contracts cached/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^no contracts$/i)).not.toBeInTheDocument();
   });
 
   it('reaches Search even when the contracts scope was revoked', async () => {

@@ -6,6 +6,7 @@ import {
   Button,
   Caret,
   DataAgeBadge,
+  CachedEmptyState,
   EmptyState,
   FilterChip,
   IconButton,
@@ -1275,7 +1276,14 @@ export function PlanetaryIndustry() {
             // Truly nothing anywhere — not just the active Character's own
             // colonies — and a banner above hasn't already explained why.
             !planetsNeedsReauth &&
-            !error && <EmptyState title={t('pi.emptyTitle')} hint={t('pi.emptyHint')} />
+            !error && (
+              <CachedEmptyState
+                result={planetsResult}
+                title={t('pi.emptyTitle')}
+                hint={t('pi.emptyHint')}
+                fetchedTitle={t('pi.emptyFetchedTitle')}
+              />
+            )
           ) : (
             <>
               <Panel>

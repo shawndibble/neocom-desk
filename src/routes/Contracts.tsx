@@ -8,6 +8,7 @@ import {
   ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
+  CachedEmptyState,
   EmptyState,
   FilterBar,
   FilterChip,
@@ -555,7 +556,12 @@ export function Contracts() {
       ) : error ? (
         <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
       ) : !contractsResult || contracts.length === 0 ? (
-        <EmptyState title={t('contracts.emptyTitle')} hint={t('contracts.emptyHint')} />
+        <CachedEmptyState
+          result={contractsResult}
+          title={t('contracts.emptyTitle')}
+          hint={t('contracts.emptyHint')}
+          fetchedTitle={t('contracts.emptyFetchedTitle')}
+        />
       ) : (
         <Panel padded={false}>
           {contractsResult.fromCache && (

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   DataAgeBadge,
   DataTable,
+  CachedEmptyState,
   EmptyState,
   IconButton,
   Panel,
@@ -324,7 +325,12 @@ export function Clones() {
               </p>
             )}
             {clones.length === 0 ? (
-              <EmptyState title={t('clones.emptyTitle')} hint={t('clones.emptyHint')} />
+              <CachedEmptyState
+                result={clonesResult}
+                title={t('clones.emptyTitle')}
+                hint={t('clones.emptyHint')}
+                fetchedTitle={t('clones.emptyFetchedTitle')}
+              />
             ) : (
               <DataTable
                 label={t('clones.title')}

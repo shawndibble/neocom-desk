@@ -331,7 +331,7 @@ describe('PlanetaryIndustry', () => {
   it('shows the empty state when there are no colonies', async () => {
     server.use(http.get(`${ESI}/characters/${CHAR_ID}/planets`, () => HttpResponse.json([])));
     render(<App />);
-    expect(await screen.findByText('No planetary colonies cached')).toBeInTheDocument();
+    expect(await screen.findByText('No planetary colonies')).toBeInTheDocument();
   });
 
   it('shows a re-login prompt when the planets scope itself was revoked', async () => {
