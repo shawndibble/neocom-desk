@@ -4,7 +4,13 @@
 // Why, and the retention rules: scripts/lib/assetRetention.mjs.
 //
 // Usage (after `npm run build`, before the Pages upload):
-//   node scripts/keep-old-assets.mjs https://neocomdesk.com
+//   node scripts/keep-old-assets.mjs https://neocomdesk.com [history.json]
+//
+// The optional history path is read first and rewritten afterwards — CI keeps
+// it in the Actions cache. The copy on the live site is only the fallback:
+// Pages' CDN serves anything up to 10 minutes stale and ignores query strings
+// and no-cache headers, and deploys land minutes apart, so it can be the
+// history from two deploys ago.
 //
 // Runs after the build on purpose: `vite-plugin-pwa` has already written the
 // precache manifest, so carried files are served but never precached — the
@@ -14,7 +20,7 @@
 // ships the build as-is, which is exactly what deploys did before it.
 // No deps; Node 24 built-ins only.
 
-import { mkdir, readdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -29,18 +35,24 @@ const DIST = join(ROOT, 'dist');
 const PARALLEL = 8;
 
 const site = process.argv[2]?.replace(/\/+$/, '');
+const localHistory = process.argv[3];
 if (!site) {
-  console.error('usage: node scripts/keep-old-assets.mjs <site-url>');
+  console.error('usage: node scripts/keep-old-assets.mjs <site-url> [history.json]');
   process.exit(1);
 }
 
-// Pages' CDN caches everything for 10 minutes and deploys land minutes apart,
-// so a plain fetch can return the history from two deploys ago. A unique query
-// string misses the cache.
 async function fetchLive(path) {
-  const res = await fetch(`${site}/${path}?t=${Date.now()}`);
+  const res = await fetch(`${site}/${path}`);
   if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
   return res;
+}
+
+async function readLocal(path) {
+  try {
+    return await readFile(path, 'utf-8');
+  } catch {
+    return null;
+  }
 }
 
 async function readText(path) {
@@ -68,13 +80,24 @@ async function download(path) {
   return body.length;
 }
 
+// One retry: a dropped file leaves the history for good, so a network blip
+// must not be what drops it.
+async function downloadWithRetry(path) {
+  try {
+    return await download(path);
+  } catch {
+    return await download(path);
+  }
+}
+
 const now = Date.now();
 const built = await builtAssets();
 
 // The history file is the record; the live `sw.js` manifest is the last
 // build's own list, which covers the first deploy (no history yet) and a
 // history the CDN still served stale.
-const historyText = await readText(ASSET_HISTORY_FILE);
+const historyText =
+  (localHistory && (await readLocal(localHistory))) ?? (await readText(ASSET_HISTORY_FILE));
 const swText = await readText('sw.js');
 const history =
   historyText === null ? { current: [], retired: {} } : parseAssetHistory(historyText);
@@ -93,7 +116,7 @@ await Promise.all(
   Array.from({ length: PARALLEL }, async () => {
     for (let path = queue.shift(); path; path = queue.shift()) {
       try {
-        const size = await download(path);
+        const size = await downloadWithRetry(path);
         bytes += size;
       } catch (error) {
         missing.push(path);
@@ -105,7 +128,12 @@ await Promise.all(
 
 // A file the live site no longer has can't be carried now or later.
 for (const path of missing) delete plan.history.retired[path];
-await writeFile(join(DIST, ASSET_HISTORY_FILE), `${JSON.stringify(plan.history)}\n`);
+const historyJson = `${JSON.stringify(plan.history)}\n`;
+await writeFile(join(DIST, ASSET_HISTORY_FILE), historyJson);
+if (localHistory) {
+  await mkdir(dirname(localHistory), { recursive: true });
+  await writeFile(localHistory, historyJson);
+}
 
 console.log(
   `keep-old-assets: ${built.length} built, ${plan.carry.length - missing.length} carried ` +
