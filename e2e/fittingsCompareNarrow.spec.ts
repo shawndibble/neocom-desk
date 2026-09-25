@@ -56,24 +56,29 @@ test.describe('Fitting Compare at 390px', () => {
     await answerAnyType(page);
     await page.setViewportSize(PHONE);
 
+    // The compared Fittings' names only render once `FittingCompare`'s own `statsReady` gate
+    // opens (the same dogma WASM+SDE compute `fittingsLoadNarrow` avoids waiting on elsewhere) —
+    // give it the same cold-runner headroom the other narrow specs already use for that gate.
+    const STATS_TIMEOUT = { timeout: 20_000 };
+
     await addFitting(page, RIFTER_A);
-    await expect(page.getByText('Tracer Test')).toBeVisible();
+    await expect(page.getByText('Tracer Test')).toBeVisible(STATS_TIMEOUT);
 
     await addFitting(page, RIFTER_B);
-    await expect(page.getByText('Tracer Test')).toBeVisible();
-    await expect(page.getByText('Backup Test')).toBeVisible();
+    await expect(page.getByText('Tracer Test')).toBeVisible(STATS_TIMEOUT);
+    await expect(page.getByText('Backup Test')).toBeVisible(STATS_TIMEOUT);
     await expect(page.getByText('Show differences only')).toBeVisible();
 
     // A third slot brings phone paging into play (2 of 3 columns shown at a time).
     await addFitting(page, RIFTER_C);
     const prev = page.getByRole('button', { name: 'Previous' });
     const next = page.getByRole('button', { name: 'Next' });
-    await expect(prev).toBeVisible();
+    await expect(prev).toBeVisible(STATS_TIMEOUT);
     expect(await prev.isDisabled()).toBe(true);
     const nextBox = await next.boundingBox();
     expect(nextBox!.height).toBeGreaterThanOrEqual(44);
 
-    await expect(page.getByText('Tracer Test')).toBeVisible();
+    await expect(page.getByText('Tracer Test')).toBeVisible(STATS_TIMEOUT);
     await expect(page.getByText('Third Test')).not.toBeVisible();
 
     await next.click();
