@@ -194,6 +194,21 @@ describe('Assets', () => {
     expect(await screen.findByText('Pyerite')).toBeInTheDocument();
   });
 
+  it('shows the total value as a stat chip in the page header at the root, hidden when drilled in (issue #1617)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    expect(await screen.findByText(JITA)).toBeInTheDocument();
+    const chipLabel = screen.getByText('Total value');
+    expect(chipLabel.closest('header')).toBe(
+      screen.getByRole('heading', { level: 1 }).parentElement
+    );
+    expect(screen.queryByText(/Total Assets Value/)).not.toBeInTheDocument();
+
+    await openLocation(user, JITA);
+    expect(await screen.findByText('Tritanium')).toBeInTheDocument();
+    expect(screen.queryByText('Total value')).not.toBeInTheDocument();
+  });
+
   it('moves focus to the level heading on drill-in, and back to the root heading on Back (issue #1485)', async () => {
     const user = userEvent.setup();
     render(<App />);
