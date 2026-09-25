@@ -159,6 +159,18 @@ describe('Contracts', () => {
     expect(within(table).getByText('Finished')).toBeInTheDocument();
   });
 
+  it('keeps the static status off the accent colour and labels the amount column price / reward', async () => {
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    const outstanding = within(table).getByText('Outstanding').closest('td')!;
+    expect(outstanding.className).toContain('text-text');
+    expect(outstanding.className).not.toContain('text-accent');
+    expect(
+      within(table).getByRole('columnheader', { name: /Price \/ reward/ })
+    ).toBeInTheDocument();
+  });
+
   it('flags only a lapsed, unclaimed contract — not a finished one whose deadline has simply passed', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, ({ request }) => {

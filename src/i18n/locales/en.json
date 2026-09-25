@@ -3260,7 +3260,7 @@
     "emptyHint": "Reconnect to fetch this character's contracts.",
     "status": "Status",
     "type": "Type",
-    "price": "Price",
+    "price": "Price / reward",
     "expires": "Expires",
     "issuer": "Issuer",
     "exportCsv": "Export CSV",
