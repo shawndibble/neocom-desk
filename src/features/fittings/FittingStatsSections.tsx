@@ -102,7 +102,7 @@ function ResistCell({ resonance, tone }: { resonance: number; tone: DamageType }
   );
 }
 
-interface ResistRow {
+export interface ResistRow {
   key: string;
   label: string;
   sub?: string;
@@ -117,7 +117,7 @@ interface ResistRow {
  * name, a cell per damage type, EHP last — with an overheated row under any
  * layer heat changes, and the Reactive Armor Hardener's adapted resists.
  */
-function ResistTable({ rows }: { rows: ResistRow[] }) {
+export function ResistTable({ rows }: { rows: ResistRow[] }) {
   const { t } = useTranslation();
   return (
     <table className="w-full table-fixed border-collapse">
