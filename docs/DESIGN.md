@@ -58,7 +58,7 @@ worth more than a better picker on one control.
 | `accent-contrast` | `#04181f` | Text/icon color **on** accent fills (primary button label).                                                                               |
 | `selection`       | `#276c8d` | `::selection` fill only — a darkened `accent-dim` so highlighted `text` clears 4.5:1 (`accent-dim` itself is too light for that pairing). |
 | `success`         | `#5fd584` | Positive status: training active, order filled, "fresh data".                                                                             |
-| `warning`         | `#f5b94a` | Caution: stale data, low skill, expiring booster.                                                                                         |
+| `warning`         | `#f5b94a` | Caution: stale data, low skill, expiring booster; a fitting's overheated values.                                                          |
 | `danger`          | `#ff7369` | Errors, destructive actions, failed fetch.                                                                                                |
 
 ### ISK / market deltas

@@ -287,11 +287,16 @@ describe('computeFittingStats overheated values', () => {
     const heatedFit = calculateMock.mock.calls[1][0];
     expect(heatedFit.items.map((item) => item.state)).toEqual(['overload', 'active', 'active']);
     expect(stats.offense.weapons).toEqual([
-      expect.objectContaining({ typeId: 3186, count: 1, dps: 10, overheatedDps: 12 }),
-      expect.objectContaining({ typeId: 2488, count: 5, dps: 20, overheatedDps: null }),
+      expect.objectContaining({
+        typeId: 3186,
+        count: 1,
+        dps: 10,
+        overheated: { dps: 12, volley: 50 },
+      }),
+      expect.objectContaining({ typeId: 2488, count: 5, dps: 20, overheated: null }),
     ]);
     expect(stats.offense.dps).toBe(30);
-    expect(stats.offense.overheatedDps).toBe(32);
+    expect(stats.offense.overheated?.dps).toBe(32);
     expect(stats.ehp).toBe(1000);
     expect(stats.overheated?.ehp).toBe(1200);
   });
@@ -312,7 +317,27 @@ describe('computeFittingStats overheated values', () => {
 
     expect(calculateMock).toHaveBeenCalledTimes(1);
     expect(stats.overheated).toBeNull();
-    expect(stats.offense.overheatedDps).toBeNull();
+    expect(stats.offense.overheated).toBeNull();
+  });
+
+  it('skips the overheated calculation when asked to', async () => {
+    stubNetwork();
+    calculateMock.mockReset();
+    calculateMock.mockReturnValue({
+      ship: { attributes: new Map() },
+      items: [{ attributes: new Map(), state: 'active', max_state: 'overload' }],
+    });
+    const { computeFittingStats } = await freshModule();
+
+    const stats = await computeFittingStats(
+      { ...fitting, modules: [{ slot: 'high', slotIndex: 0, typeId: 3186, state: 'active' }] },
+      profile,
+      undefined,
+      { overheated: false }
+    );
+
+    expect(calculateMock).toHaveBeenCalledTimes(1);
+    expect(stats.overheated).toBeNull();
   });
 });
 

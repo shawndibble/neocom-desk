@@ -168,8 +168,12 @@ export interface WeaponRow {
   dps: number;
   volley: number;
   /** Null when the row can't overheat — drones never do. */
-  overheatedDps: number | null;
-  overheatedVolley: number | null;
+  overheated: DamageFigures | null;
+}
+
+export interface DamageFigures {
+  dps: number;
+  volley: number;
 }
 
 export interface OffenseStats {
@@ -178,8 +182,7 @@ export interface OffenseStats {
   dps: number;
   volley: number;
   /** Null when no row can overheat. */
-  overheatedDps: number | null;
-  overheatedVolley: number | null;
+  overheated: DamageFigures | null;
 }
 
 /** Local repair and boost rates, HP/s. */
@@ -193,6 +196,9 @@ export interface OverheatedStats {
   ehp: number;
   maxVelocity: number;
   repair: LocalRepair;
+  shield: LayerDefense;
+  armor: LayerDefense;
+  hull: LayerDefense;
 }
 
 /** What the engine made of one fitted module. */

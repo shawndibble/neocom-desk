@@ -22,7 +22,7 @@ import {
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { getHubPrices } from '@/market/prices';
 import { checkCandidates, computeFittingStats } from './dogmaFittingEngine';
-import type { FittingCatalogue } from './useFittingCatalogue';
+import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 
 /** Keyed by Fitting then PilotProfile (both stable references across re-renders) so switching which module's panel is open doesn't repeat the whole-fit `calculate()` call. Evicted on failure so a transient error doesn't wedge every future attempt. */
 const baselineCache = new WeakMap<Fitting, WeakMap<PilotProfile, Promise<FittingStats>>>();
@@ -35,7 +35,7 @@ function getBaselineStats(fitting: Fitting, profile: PilotProfile): Promise<Fitt
   }
   const cached = byProfile.get(profile);
   if (cached) return cached;
-  const promise = computeFittingStats(fitting, profile);
+  const promise = computeFittingStats(fitting, profile, undefined, { overheated: false });
   byProfile.set(profile, promise);
   promise.catch(() => byProfile?.delete(profile));
   return promise;
@@ -61,10 +61,6 @@ interface UseModuleVariationsParams {
   catalogue: FittingCatalogue | null;
   engineReady: boolean;
   profile: PilotProfile | null;
-}
-
-function typeName(catalogue: FittingCatalogue | null, typeId: number): string {
-  return catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
 }
 
 interface ComputedEntry {
@@ -129,7 +125,9 @@ export function useModuleVariations({
       const settled = await Promise.allSettled(
         members.map(async (member): Promise<[number, ComputedEntry]> => {
           const swapped = swapModuleType(fitting, slot, slotIndex, member.typeId);
-          const after = await computeFittingStats(swapped, profile);
+          const after = await computeFittingStats(swapped, profile, undefined, {
+            overheated: false,
+          });
           const check = candidateChecks.get(member.typeId);
           return [
             member.typeId,
@@ -186,7 +184,7 @@ export function useModuleVariations({
 
   const rows: VariationRow[] = members.map((member) => ({
     typeId: member.typeId,
-    name: typeName(catalogue, member.typeId),
+    name: catalogueTypeName(catalogue, member.typeId),
     metaGroupName: member.metaGroupName,
     delta: fresh?.byTypeId.get(member.typeId)?.delta ?? null,
     fits: fresh?.byTypeId.get(member.typeId)?.fits ?? null,

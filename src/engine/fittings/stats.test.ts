@@ -5,6 +5,7 @@ import {
   extractOffense,
   extractOverheatedStats,
   overheatedOrNull,
+  weaponRowKey,
   type OffenseItem,
 } from './stats';
 import { DOGMA_ATTRIBUTE, ITEM_DOGMA_ATTRIBUTE } from './types';
@@ -304,21 +305,19 @@ describe('extractOffense', () => {
       ]
     );
 
-    expect(offense.weapons[0].overheatedDps).toBeCloseTo(61.6, 6);
-    expect(offense.weapons[0].overheatedVolley).toBeCloseTo(350, 6);
-    expect(offense.weapons[1].overheatedDps).toBeNull();
-    expect(offense.weapons[1].overheatedVolley).toBeNull();
+    expect(offense.weapons[0].overheated?.dps).toBeCloseTo(61.6, 6);
+    expect(offense.weapons[0].overheated?.volley).toBeCloseTo(350, 6);
+    expect(offense.weapons[1].overheated).toBeNull();
     // Rows that can't overheat count at their normal value in the overheated total.
-    expect(offense.overheatedDps).toBeCloseTo(181.6, 6);
-    expect(offense.overheatedVolley).toBeCloseTo(830, 6);
+    expect(offense.overheated?.dps).toBeCloseTo(181.6, 6);
+    expect(offense.overheated?.volley).toBeCloseTo(830, 6);
   });
 
   it('has no overheated values at all without an overheated calculation', () => {
     const offense = extractOffense([BLASTER], [weaponResult(26.8, 152)], null);
 
-    expect(offense.weapons[0].overheatedDps).toBeNull();
-    expect(offense.overheatedDps).toBeNull();
-    expect(offense.overheatedVolley).toBeNull();
+    expect(offense.weapons[0].overheated).toBeNull();
+    expect(offense.overheated).toBeNull();
   });
 
   it('has no overheated total when only drones fire', () => {
@@ -328,7 +327,17 @@ describe('extractOffense', () => {
       [weaponResult(24, 96, 'active', 'active')]
     );
 
-    expect(offense.overheatedDps).toBeNull();
+    expect(offense.overheated).toBeNull();
+  });
+
+  it('keys each row by drone-ness, type and charge', () => {
+    const offense = extractOffense(
+      [BLASTER, WARRIOR],
+      [weaponResult(1, 1), weaponResult(1, 1)],
+      null
+    );
+
+    expect(offense.weapons.map(weaponRowKey)).toEqual(['module:3186:230', 'drone:2488:']);
   });
 });
 
@@ -343,10 +352,24 @@ describe('local repair and overheated stats', () => {
     expect(stats.repair).toEqual({ shield: 40, armor: 63.2, hull: 0 });
   });
 
-  it('reads EHP, max velocity and repair rates off the overheated calculation', () => {
-    expect(
-      extractOverheatedStats(attrs({ ehp: 17204, maxVelocity: 1200, armorRepairRate: 81.8 }))
-    ).toEqual({ ehp: 17204, maxVelocity: 1200, repair: { shield: 0, armor: 81.8, hull: 0 } });
+  it('reads EHP, resists, max velocity and repair rates off the overheated calculation', () => {
+    const overheated = extractOverheatedStats(
+      attrs({
+        ehp: 17204,
+        maxVelocity: 1200,
+        armorRepairRate: 81.8,
+        shieldEmResonance: 0.3,
+        armorKineticResonance: 0.4,
+      })
+    );
+
+    expect(overheated).toMatchObject({
+      ehp: 17204,
+      maxVelocity: 1200,
+      repair: { shield: 0, armor: 81.8, hull: 0 },
+    });
+    expect(overheated.shield.emResonance).toBe(0.3);
+    expect(overheated.armor.kineticResonance).toBe(0.4);
   });
 });
 

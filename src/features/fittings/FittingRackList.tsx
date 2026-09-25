@@ -26,7 +26,7 @@ import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { checkCharges } from './dogmaFittingEngine';
 import type { AddTarget } from './addTarget';
 import { ImplantBasisControl } from './ImplantBasisControl';
-import type { FittingCatalogue } from './useFittingCatalogue';
+import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
 
 const STATES: readonly FittingItemState[] = ['offline', 'online', 'active', 'overload'];
@@ -86,10 +86,6 @@ function ResourceBar({ label, used, total }: ResourceBarProps) {
   );
 }
 
-function typeName(catalogue: FittingCatalogue | null, typeId: number): string {
-  return catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
-}
-
 export interface EditContext {
   fitting: Fitting;
   catalogue: FittingCatalogue | null;
@@ -120,7 +116,7 @@ export function ModuleRow({
   onOpenVariations,
 }: ModuleRowProps) {
   const { t } = useTranslation();
-  const name = typeName(catalogue, module.typeId);
+  const name = catalogueTypeName(catalogue, module.typeId);
   const { slot, slotIndex, typeId } = module;
   const shipTypeId = fitting.shipTypeId;
 
@@ -140,7 +136,7 @@ export function ModuleRow({
         : new Set(candidates);
     return candidates
       .filter((id) => accepted.has(id))
-      .map((id) => ({ id, name: typeName(catalogue, id) }))
+      .map((id) => ({ id, name: catalogueTypeName(catalogue, id) }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [chargeGroupIds, catalogue, engineReady, profile, shipTypeId, slot, typeId]);
   const loadedCharge = module.chargeTypeId;
@@ -197,7 +193,7 @@ export function ModuleRow({
         >
           <option value="">{t('fittings.edit.noCharge')}</option>
           {!loadedListed && loadedCharge !== undefined && (
-            <option value={loadedCharge}>{typeName(catalogue, loadedCharge)}</option>
+            <option value={loadedCharge}>{catalogueTypeName(catalogue, loadedCharge)}</option>
           )}
           {charges.map((charge) => (
             <option key={charge.id} value={charge.id}>
@@ -427,7 +423,7 @@ export function FittingRackList({
           <p className={RACK_LABEL_CLASS}>{t('fittings.list.drones')}</p>
           <div className="space-y-1.5">
             {drones.map((group) => {
-              const name = typeName(catalogue, group.typeId);
+              const name = catalogueTypeName(catalogue, group.typeId);
               return (
                 <div
                   key={group.typeId}

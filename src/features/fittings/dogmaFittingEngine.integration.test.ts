@@ -106,7 +106,7 @@ function vexorNavyIssueFit(): Fitting {
       { slot: 'low', slotIndex: 2, typeId: DRONE_DAMAGE_AMPLIFIER_II, state: 'online' },
       { slot: 'low', slotIndex: 3, typeId: DRONE_DAMAGE_AMPLIFIER_II, state: 'online' },
     ],
-    drones: [{ typeId: WARRIOR_II, quantity: 5, state: 'online' }],
+    drones: [{ typeId: WARRIOR_II, quantity: 5, state: 'active' }],
     cargo: [],
   };
 }
@@ -163,6 +163,22 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(stats.unknownItemTypeIds).toEqual([]);
   });
 
+  it('counts no drone DPS for drones left in the bay', () => {
+    const fitting = vexorNavyIssueFit();
+    fitting.drones = [{ typeId: WARRIOR_II, quantity: 5, state: 'online' }];
+    const profile = buildAllVProfile(ALL_TEST_SKILL_IDS);
+    const dogmaFit = fittingToDogmaFit(fitting, profile);
+
+    const calculation = calculate(dogmaFit);
+    const stats = extractFittingStats(
+      dogmaFit.items.map((item) => item.type_id),
+      calculation.ship.attributes,
+      calculation.items
+    );
+
+    expect(stats.droneDps).toBe(0);
+  });
+
   it('marks a type id the pinned data has nothing for as unknown, without failing the rest of the calculation', () => {
     const fitting = vexorNavyIssueFit();
     fitting.modules.push({ slot: 'rig', slotIndex: 0, typeId: 999_999_999, state: 'online' });
@@ -184,7 +200,6 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
 
   it('breaks Offense into per-weapon rows that sum to the engine total, overheated from its overload state', () => {
     const fitting = vexorNavyIssueFit();
-    fitting.drones = [{ typeId: WARRIOR_II, quantity: 5, state: 'active' }];
     const profile = buildAllVProfile(ALL_TEST_SKILL_IDS);
     const dogmaFit = fittingToDogmaFit(fitting, profile);
     const offenseItems = [
@@ -219,10 +234,10 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(offense.weapons[1].dps).toBeCloseTo(124.578, 2);
     expect(offense.weapons[0].dps).toBeCloseTo(40.32, 2);
     expect(offense.weapons[0].volley).toBeCloseTo(317.52, 2);
-    expect(offense.weapons[0].overheatedDps).toBeCloseTo(46.368, 2);
-    expect(offense.weapons[0].overheatedVolley).toBeCloseTo(365.148, 2);
-    expect(offense.weapons[1].overheatedDps).toBeNull();
-    expect(offense.overheatedDps).toBeCloseTo(170.946, 2);
+    expect(offense.weapons[0].overheated?.dps).toBeCloseTo(46.368, 2);
+    expect(offense.weapons[0].overheated?.volley).toBeCloseTo(365.148, 2);
+    expect(offense.weapons[1].overheated).toBeNull();
+    expect(offense.overheated?.dps).toBeCloseTo(170.946, 2);
   });
 });
 

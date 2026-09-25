@@ -150,7 +150,8 @@ export function loadDogmaEngine(
 export async function computeFittingStats(
   fitting: Fitting,
   profile: PilotProfile,
-  onProgress?: (progress: DogmaAssetProgress) => void
+  onProgress?: (progress: DogmaAssetProgress) => void,
+  { overheated: withOverheated = true }: { overheated?: boolean } = {}
 ): Promise<FittingStats> {
   await loadDogmaEngine(onProgress);
   const dogmaFit = fittingToDogmaFit(fitting, profile);
@@ -187,18 +188,20 @@ export async function computeFittingStats(
   // a multiplier applied here: the same fit again with every active module
   // that can overheat set to overload. Skipped when there is none, so a fit
   // with nothing to overheat costs one calculation and shows no overheated line.
-  let heatable = false;
-  const overheatedFit: Fit = {
-    ...dogmaFit,
-    items: dogmaFit.items.map((item, index) => {
-      const result = calculation.items[index];
-      if (index >= fitting.modules.length || result?.max_state !== 'overload') return item;
-      if (result.state !== 'active') return item;
-      heatable = true;
-      return { ...item, state: 'overload' };
-    }),
-  };
-  const overheatedCalculation = heatable ? calculate(overheatedFit) : null;
+  // Callers that never show heat (the variations diff) opt out of the cost.
+  const heatable = (index: number) =>
+    index < fitting.modules.length &&
+    calculation.items[index]?.max_state === 'overload' &&
+    calculation.items[index]?.state === 'active';
+  const overheatedCalculation =
+    withOverheated && dogmaFit.items.some((_, index) => heatable(index))
+      ? calculate({
+          ...dogmaFit,
+          items: dogmaFit.items.map((item, index) =>
+            heatable(index) ? { ...item, state: 'overload' } : item
+          ),
+        })
+      : null;
 
   // Drones follow the modules in `dogmaFit.items`.
   const offenseItems: OffenseItem[] = [

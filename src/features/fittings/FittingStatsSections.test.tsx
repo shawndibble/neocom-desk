@@ -52,8 +52,7 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
           count: 2,
           dps: 53.7,
           volley: 304,
-          overheatedDps: 61.7,
-          overheatedVolley: 350,
+          overheated: { dps: 61.7, volley: 350 },
         },
         {
           typeId: 2488,
@@ -61,17 +60,22 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
           count: 5,
           dps: 120,
           volley: 480,
-          overheatedDps: null,
-          overheatedVolley: null,
+          overheated: null,
         },
       ],
       dps: 173.7,
       volley: 784,
-      overheatedDps: 181.7,
-      overheatedVolley: 830,
+      overheated: { dps: 181.7, volley: 830 },
     },
     repair: { shield: 0, armor: 63.2, hull: 0 },
-    overheated: { ehp: 17400, maxVelocity: 200, repair: { shield: 0, armor: 81.8, hull: 0 } },
+    overheated: {
+      ehp: 17400,
+      maxVelocity: 200,
+      repair: { shield: 0, armor: 81.8, hull: 0 },
+      shield: { ...LAYER, emResonance: 0.4 },
+      armor: LAYER,
+      hull: LAYER,
+    },
     ...overrides,
   };
 }
@@ -124,8 +128,7 @@ describe('FittingStatsSections offense', () => {
           weapons: [],
           dps: 0,
           volley: 0,
-          overheatedDps: null,
-          overheatedVolley: null,
+          overheated: null,
         },
       })
     );
@@ -142,6 +145,9 @@ describe('FittingStatsSections overheated lines elsewhere', () => {
     expect(defense.getByText('17400 overheated')).toBeInTheDocument();
     expect(defense.getByText('Armor repair: 63.2 HP/s')).toBeInTheDocument();
     expect(defense.getByText('81.8 overheated')).toBeInTheDocument();
+    // Only the shield EM resist moves under heat.
+    expect(defense.getAllByText(/% overheated$/)).toHaveLength(1);
+    expect(defense.getByText('60% overheated')).toBeInTheDocument();
     expect(within(sectionBody('Navigation')).queryByText(/overheated/)).toBeNull();
   });
 
@@ -153,8 +159,7 @@ describe('FittingStatsSections overheated lines elsewhere', () => {
           weapons: [],
           dps: 0,
           volley: 0,
-          overheatedDps: null,
-          overheatedVolley: null,
+          overheated: null,
         },
       })
     );

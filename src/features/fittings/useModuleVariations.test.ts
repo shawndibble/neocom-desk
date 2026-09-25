@@ -54,7 +54,7 @@ const baseStats: FittingStats = {
   unknownItemTypeIds: [],
   slotCounts: { high: 4, medium: 4, low: 4, rig: 3, subsystem: 0 },
   modules: [],
-  offense: { weapons: [], dps: 0, volley: 0, overheatedDps: null, overheatedVolley: null },
+  offense: { weapons: [], dps: 0, volley: 0, overheated: null },
   repair: { shield: 0, armor: 0, hull: 0 },
   overheated: null,
 };

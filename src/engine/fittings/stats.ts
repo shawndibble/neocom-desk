@@ -3,6 +3,7 @@ import {
   DOGMA_ATTRIBUTE,
   ITEM_DOGMA_ATTRIBUTE,
   type CapacitorStatus,
+  type DamageFigures,
   type FittingItemState,
   type FittingModuleResult,
   type FittingStats,
@@ -23,6 +24,37 @@ interface ItemCalculationResult {
 
 function readAttribute(attributes: AttributeMap, attributeId: number): number {
   return attributes.get(attributeId)?.value ?? 0;
+}
+
+function defenseLayers(
+  shipAttributes: AttributeMap
+): Pick<FittingStats, 'shield' | 'armor' | 'hull'> {
+  return {
+    shield: layerDefense(
+      shipAttributes,
+      DOGMA_ATTRIBUTE.shieldCapacity,
+      DOGMA_ATTRIBUTE.shieldEmResonance,
+      DOGMA_ATTRIBUTE.shieldThermalResonance,
+      DOGMA_ATTRIBUTE.shieldKineticResonance,
+      DOGMA_ATTRIBUTE.shieldExplosiveResonance
+    ),
+    armor: layerDefense(
+      shipAttributes,
+      DOGMA_ATTRIBUTE.armorHp,
+      DOGMA_ATTRIBUTE.armorEmResonance,
+      DOGMA_ATTRIBUTE.armorThermalResonance,
+      DOGMA_ATTRIBUTE.armorKineticResonance,
+      DOGMA_ATTRIBUTE.armorExplosiveResonance
+    ),
+    hull: layerDefense(
+      shipAttributes,
+      DOGMA_ATTRIBUTE.hullHp,
+      DOGMA_ATTRIBUTE.hullEmResonance,
+      DOGMA_ATTRIBUTE.hullThermalResonance,
+      DOGMA_ATTRIBUTE.hullKineticResonance,
+      DOGMA_ATTRIBUTE.hullExplosiveResonance
+    ),
+  };
 }
 
 /** A resist bar's percentage from the engine's raw resonance (0-1, lower is tougher). */
@@ -113,30 +145,7 @@ export function extractFittingStats(
     capacitor: capacitorStatus(shipAttributes),
     capacitorCapacity: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorCapacity),
     capacitorRechargeTime: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorRechargeTime),
-    shield: layerDefense(
-      shipAttributes,
-      DOGMA_ATTRIBUTE.shieldCapacity,
-      DOGMA_ATTRIBUTE.shieldEmResonance,
-      DOGMA_ATTRIBUTE.shieldThermalResonance,
-      DOGMA_ATTRIBUTE.shieldKineticResonance,
-      DOGMA_ATTRIBUTE.shieldExplosiveResonance
-    ),
-    armor: layerDefense(
-      shipAttributes,
-      DOGMA_ATTRIBUTE.armorHp,
-      DOGMA_ATTRIBUTE.armorEmResonance,
-      DOGMA_ATTRIBUTE.armorThermalResonance,
-      DOGMA_ATTRIBUTE.armorKineticResonance,
-      DOGMA_ATTRIBUTE.armorExplosiveResonance
-    ),
-    hull: layerDefense(
-      shipAttributes,
-      DOGMA_ATTRIBUTE.hullHp,
-      DOGMA_ATTRIBUTE.hullEmResonance,
-      DOGMA_ATTRIBUTE.hullThermalResonance,
-      DOGMA_ATTRIBUTE.hullKineticResonance,
-      DOGMA_ATTRIBUTE.hullExplosiveResonance
-    ),
+    ...defenseLayers(shipAttributes),
     targeting: {
       maxTargetRange: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.maxTargetRange),
       maxLockedTargets: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.maxLockedTargets),
@@ -189,6 +198,18 @@ function isFiring(state: FittingItemState): boolean {
   return state === 'active' || state === 'overload';
 }
 
+function damageFigures(attributes: AttributeMap, quantity: number): DamageFigures {
+  return {
+    dps: readAttribute(attributes, ITEM_DOGMA_ATTRIBUTE.damagePerSecond) * quantity,
+    volley: readAttribute(attributes, ITEM_DOGMA_ATTRIBUTE.damageVolley) * quantity,
+  };
+}
+
+/** One Offense row per key: drone-ness, type and charge. */
+export function weaponRowKey(row: Pick<WeaponRow, 'isDrone' | 'typeId' | 'chargeTypeId'>): string {
+  return `${row.isDrone ? 'drone' : 'module'}:${row.typeId}:${row.chargeTypeId ?? ''}`;
+}
+
 /**
  * The Offense section: one row per weapon (grouped by type and charge) or
  * drone type, with the total as the sum of the rows. `items`/`results` (and
@@ -196,9 +217,7 @@ function isFiring(state: FittingItemState): boolean {
  * module overloaded — null when there was none) are index-parallel.
  *
  * Firing is read off the engine's reached state, not the requested one: an
- * online launcher still reports a volley, and the engine counts a drone
- * stack as engaged whatever state it was given — so do the rows, keeping
- * them in step with the ship-level drone DPS.
+ * online launcher still reports a volley.
  */
 export function extractOffense(
   items: readonly OffenseItem[],
@@ -209,13 +228,12 @@ export function extractOffense(
   items.forEach((item, index) => {
     const result = results[index];
     if (!result || !isFiring(result.state)) return;
-    const dps = readAttribute(result.attributes, ITEM_DOGMA_ATTRIBUTE.damagePerSecond);
-    const volley = readAttribute(result.attributes, ITEM_DOGMA_ATTRIBUTE.damageVolley);
-    if (dps === 0 && volley === 0) return;
+    const figures = damageFigures(result.attributes, item.quantity);
+    if (figures.dps === 0 && figures.volley === 0) return;
 
     const heated =
       !item.isDrone && result.max_state === 'overload' ? overheatedResults?.[index] : undefined;
-    const key = `${item.isDrone}:${item.typeId}:${item.chargeTypeId ?? ''}`;
+    const key = weaponRowKey(item);
     let row = rows.get(key);
     if (!row) {
       row = {
@@ -225,32 +243,34 @@ export function extractOffense(
         count: 0,
         dps: 0,
         volley: 0,
-        overheatedDps: heated ? 0 : null,
-        overheatedVolley: heated ? 0 : null,
+        overheated: heated ? { dps: 0, volley: 0 } : null,
       };
       rows.set(key, row);
     }
     row.count += item.quantity;
-    row.dps += dps * item.quantity;
-    row.volley += volley * item.quantity;
-    if (heated && row.overheatedDps !== null && row.overheatedVolley !== null) {
-      row.overheatedDps +=
-        readAttribute(heated.attributes, ITEM_DOGMA_ATTRIBUTE.damagePerSecond) * item.quantity;
-      row.overheatedVolley +=
-        readAttribute(heated.attributes, ITEM_DOGMA_ATTRIBUTE.damageVolley) * item.quantity;
+    row.dps += figures.dps;
+    row.volley += figures.volley;
+    if (heated && row.overheated) {
+      const heatedFigures = damageFigures(heated.attributes, item.quantity);
+      row.overheated.dps += heatedFigures.dps;
+      row.overheated.volley += heatedFigures.volley;
     }
   });
 
   const weapons = [...rows.values()];
   const sum = (value: (row: WeaponRow) => number) =>
     weapons.reduce((total, row) => total + value(row), 0);
-  const canOverheat = weapons.some((row) => row.overheatedDps !== null);
+  const canOverheat = weapons.some((row) => row.overheated !== null);
   return {
     weapons,
     dps: sum((row) => row.dps),
     volley: sum((row) => row.volley),
-    overheatedDps: canOverheat ? sum((row) => row.overheatedDps ?? row.dps) : null,
-    overheatedVolley: canOverheat ? sum((row) => row.overheatedVolley ?? row.volley) : null,
+    overheated: canOverheat
+      ? {
+          dps: sum((row) => row.overheated?.dps ?? row.dps),
+          volley: sum((row) => row.overheated?.volley ?? row.volley),
+        }
+      : null,
   };
 }
 
@@ -260,6 +280,7 @@ export function extractOverheatedStats(shipAttributes: AttributeMap): Overheated
     ehp: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.ehp),
     maxVelocity: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.maxVelocity),
     repair: localRepair(shipAttributes),
+    ...defenseLayers(shipAttributes),
   };
 }
 
