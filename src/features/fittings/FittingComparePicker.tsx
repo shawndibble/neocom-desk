@@ -61,6 +61,12 @@ export function FittingComparePicker({
     setTooLarge(false);
     try {
       const result = await loadFittingFromText(text);
+      if (result.shareCode !== null) {
+        onAdd(result.shareCode);
+        setText('');
+        onClose();
+        return;
+      }
       if (result.fitting === null) {
         setLoadError(result.error ?? 'unrecognised');
         return;
