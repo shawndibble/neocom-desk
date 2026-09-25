@@ -54,6 +54,7 @@ import { MINUTE_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { REPO_URL } from '@/lib/links';
+import { isPlayStoreApp } from '@/lib/playStoreApp';
 import type { DeadlineSeverity } from '@/engine/severity';
 
 /**
@@ -220,6 +221,8 @@ const PREVIEW = {
 export function Login() {
   const { t } = useTranslation();
   const [pending, setPending] = useState(false);
+  // Read once: a TWA launch referrer only exists on the first load.
+  const [inApp] = useState(isPlayStoreApp);
 
   // Wall-clock reads for illustrative "how fresh is this" values in the
   // static preview panel — same class of impurity Overview.tsx and
@@ -249,6 +252,18 @@ export function Login() {
   if (characterCount === undefined) return <BootScreen />;
   if (characterCount > 0) return <Navigate to="/characters" replace />;
 
+  if (inApp) {
+    return (
+      <main className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-bg px-6 py-10 text-center text-text">
+        <LogoMark className="size-20" />
+        <h1 className="text-2xl font-bold tracking-wide">{t('app.name')}</h1>
+        <SsoButton pending={pending} onClick={onLogin} label={t('login.button')} />
+        <CustomizeLink onClick={() => setCustomizing(true)} />
+        <CustomizePermissionsDialog open={customizing} onClose={() => setCustomizing(false)} />
+      </main>
+    );
+  }
+
   return (
     <main className="bg-bg text-text">
       <header className="border-b border-line">
@@ -270,7 +285,6 @@ export function Login() {
           <div className="mt-7 flex flex-col items-start gap-3">
             <SsoButton pending={pending} onClick={onLogin} label={t('login.button')} />
             <CustomizeLink onClick={() => setCustomizing(true)} />
-            <span className="text-xs text-text-dim">{t('login.trustLine')}</span>
           </div>
         </div>
 

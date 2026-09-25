@@ -1221,11 +1221,10 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Signing in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, corporation roles, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions. Want to share less from the start? Use Customize permissions, next to the Log in button, to choose exactly what you grant.",
+    "permissionsHint": "Signing in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, corporation roles, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions. Want to share less from the start? Use Log in with custom permissions, next to the Log in button, to choose exactly what you grant.",
     "writeExceptions": "It also asks for three permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; and replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client. Nothing else in the app writes to EVE.",
     "eyebrow": "Free · Open source · Runs in your browser",
     "heading": "Answers, not API dumps.",
-    "trustLine": "Your refresh token never leaves this device.",
     "previewLabel": "Example — signed-in view",
     "previewCorp": "Deep Space Transport",
     "answersHeading": "The questions it exists to answer",
@@ -3971,8 +3970,8 @@
       }
     },
     "customize": {
-      "linkLabel": "Customize permissions",
-      "title": "Customize permissions",
+      "linkLabel": "Log in with custom permissions",
+      "title": "Log in with custom permissions",
       "optInTag": "Opt-in",
       "selectAll": "Select all",
       "selectNone": "Select none",
