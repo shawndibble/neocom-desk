@@ -2974,7 +2974,9 @@
       "notLoaded": "{{name}}: not loaded yet, so their colonies aren't listed. Switch and refresh to cache them.",
       "switchTo": "Switch to {{name}}",
       "noColonies": "No colonies: {{names}}.",
-      "skipped": "Skipped, no planetary access granted: {{names}}."
+      "skipped": "Skipped, no planetary access granted: {{names}}.",
+      "summaryStopped": "{{count}} stopped",
+      "summaryNext": "next {{duration}}"
     }
   },
   "piPlan": {

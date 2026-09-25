@@ -99,6 +99,42 @@ export function colonyAttention(
   return 'healthy';
 }
 
+export interface AltGroupSummary {
+  /** Colonies with at least one already-expired extractor. */
+  stoppedCount: number;
+  /** Soonest expiry across the group's non-stopped colonies; null when none has one. */
+  nextExpiryMs: number | null;
+}
+
+/**
+ * One-line status for an alt colony group's header: how many of the group's
+ * colonies have already stopped, and when the next one (that hasn't) is due.
+ * Takes each colony's own already-computed `ColonyStatus` rather than raw
+ * pins, so a caller's one `colonyStatus` call per colony stays the only place
+ * programs are read.
+ *
+ * A stopped colony's own `soonestExpiryMs` is excluded from `nextExpiryMs`:
+ * it names the program that already expired (the min across the colony), not
+ * an upcoming one, so counting it as "next" would report a past timestamp as
+ * a future event.
+ */
+export function altGroupSummary(statuses: readonly ColonyStatus[]): AltGroupSummary {
+  let stoppedCount = 0;
+  let nextExpiryMs: number | null = null;
+  for (const status of statuses) {
+    if (status.idle) {
+      stoppedCount += 1;
+      continue;
+    }
+    if (status.soonestExpiryMs !== null) {
+      if (nextExpiryMs === null || status.soonestExpiryMs < nextExpiryMs) {
+        nextExpiryMs = status.soonestExpiryMs;
+      }
+    }
+  }
+  return { stoppedCount, nextExpiryMs };
+}
+
 /** Exported for callers that need the same ordering outside a sort (e.g. a table column's `sortValue`) without re-deriving it. */
 export const ATTENTION_RANK: Record<ColonyAttention, number> = {
   idle: 0,
