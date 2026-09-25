@@ -195,6 +195,24 @@ describe('FittingStartScreen', () => {
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
+  it('Enter on a row opens it and the arrow keys walk the list', async () => {
+    const workspace = renderScreen();
+    await userEvent.click(await screen.findByRole('button', { name: /Armor Drake/ }));
+    await userEvent.keyboard('{ArrowDown}');
+    expect(screen.getByText('preview of Kite')).toBeInTheDocument();
+    await userEvent.keyboard('{Enter}');
+    expect(workspace.openSaved).toHaveBeenCalledWith(expect.objectContaining({ id: 'r1' }));
+  });
+
+  it('tags In-game rows as well as saved ones, so a fitting in both shows which is which', async () => {
+    renderScreen();
+    const inGameRow = await screen.findByRole('button', { name: /PvP Rifter/ });
+    expect(within(inGameRow).getByText('In-game')).toBeInTheDocument();
+    expect(
+      within(await screen.findByRole('button', { name: /Kite/ })).getByText('Saved')
+    ).toBeInTheDocument();
+  });
+
   it('opens the hull search from New from hull', async () => {
     renderScreen();
     await screen.findByText('Armor Drake');
