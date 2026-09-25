@@ -40,7 +40,11 @@ export function FittingCompare() {
   const [codes, setCodes] = useCompareCodes();
   const slots = useCompareFittings(codes);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const profile = usePilotProfile(activeCharacterId);
+  const {
+    profile,
+    failed: profileFailed,
+    retry: retryProfile,
+  } = usePilotProfile(activeCharacterId);
   const fittings = useMemo(() => slots.map((slot) => slot?.fitting ?? null), [slots]);
   const stats = useCompareStats(fittings, profile);
   const canFly = useCompareCanFly(fittings, profile);
@@ -205,12 +209,19 @@ export function FittingCompare() {
           {!statsReady ? (
             <Panel title={t('fittings.compare.statsTitle')}>
               <p className="text-xs text-text-dim">
-                {anyError
-                  ? t('fittings.compare.fixErrorsHint')
-                  : anyStatsFailed
-                    ? t('fittings.compare.statsFailedHint')
-                    : t('fittings.stats.loadingIndeterminate')}
+                {profileFailed
+                  ? t('fittings.compare.profileFailed')
+                  : anyError
+                    ? t('fittings.compare.fixErrorsHint')
+                    : anyStatsFailed
+                      ? t('fittings.compare.statsFailedHint')
+                      : t('fittings.stats.loadingIndeterminate')}
               </p>
+              {profileFailed && (
+                <Button className="mt-2" onClick={retryProfile}>
+                  {t('fittings.compare.profileRetry')}
+                </Button>
+              )}
             </Panel>
           ) : (
             <>

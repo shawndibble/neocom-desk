@@ -572,6 +572,8 @@
       "fixErrorsHint": "Fix the Fitting with the error above to see the comparison.",
       "statsFailed": "Couldn't calculate stats",
       "statsFailedHint": "A Fitting's stats couldn't be calculated. Remove it to see the comparison.",
+      "profileFailed": "Couldn't load your pilot's skills and implants, so the comparison can't be calculated.",
+      "profileRetry": "Try again",
       "picker": {
         "title": "Compare with…",
         "myFittings": "My Fittings",
