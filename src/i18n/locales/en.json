@@ -2913,7 +2913,7 @@
     "lastUpdateTooltip": "When CCP last recalculated this colony — only changes when the colony is opened in the EVE client.",
     "attentionLabel": "Status",
     "attention": {
-      "idle": "Idle",
+      "idle": "Stopped",
       "expiring-soon": "Expiring soon",
       "decayed": "Decayed",
       "healthy": "Healthy",
@@ -2942,12 +2942,12 @@
     "state": {
       "active": "Active",
       "expiring-soon": "Expiring soon",
-      "expired": "Expired"
+      "expired": "Stopped"
     },
     "programDataUnavailable": "Program data unavailable",
     "unknownProduct": "Unknown product",
     "unknownSchematic": "Unknown schematic",
-    "expired": "Expired",
+    "expired": "Stopped",
     "expiresIn": "in {{duration}}",
     "extraction": {
       "statusLabel": "Status",
@@ -2968,6 +2968,7 @@
     },
     "summary": {
       "expiryLine": "{{product}} · {{duration}}",
+      "stoppedLine": "{{product}} · Stopped",
       "productCount": "{{name}} ×{{count}}"
     },
     "yield": {
