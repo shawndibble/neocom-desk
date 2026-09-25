@@ -7,32 +7,26 @@ import { requiredScopesForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import { requiredScopesForRoute, type AppRoutePath } from './routeScopes';
 
 /**
- * A Character's granted OAuth scopes, live from Dexie; `undefined` while
- * unknown. Defaults to the active Character; pass `characterId` for a figure
- * priced for someone else (a Build Plan's owner, one row of a multi-character
- * list). Only `scopes` is lifted out of the `TokenRecord` — the refresh token
- * never reaches React state or a log (ADR 0001).
+ * The active Character's granted OAuth scopes, live from Dexie; `undefined`
+ * while unknown. Only `scopes` is lifted out of the `TokenRecord` — the refresh
+ * token never reaches React state or a log (ADR 0001).
  */
-export function useGrantedScopes(characterId?: number | null): readonly string[] | undefined {
+export function useGrantedScopes(): readonly string[] | undefined {
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const targetId = characterId === undefined ? activeCharacterId : characterId;
-  const grant = useLiveQuery(async () => {
-    if (targetId === null) return undefined;
-    const token = await db.tokens.get(targetId);
+  const scopes = useLiveQuery(async () => {
+    if (activeCharacterId === null) return undefined;
+    const token = await db.tokens.get(activeCharacterId);
     // No token row means no grant at all — exactly what the gate is for, not a
     // reason to fall through as if everything were permitted.
-    return { characterId: targetId, scopes: token?.scopes ?? [] };
-  }, [targetId]);
+    return token?.scopes ?? [];
+  }, [activeCharacterId]);
 
   // "No active Character" is not "granted nothing": `hydrate()` is async, so
   // this is null for the first frames of every cold load, and answering `[]`
-  // would paint a re-auth banner over a perfectly healthy Character. An
-  // explicit `characterId` is already known, so it doesn't wait on that.
-  if (characterId === undefined && !hydrated) return undefined;
-  // `useLiveQuery` keeps its last result across a dep change, so a switch of
-  // Character would briefly answer with the previous one's grant.
-  return grant?.characterId === targetId ? grant.scopes : undefined;
+  // would paint a re-auth banner over a perfectly healthy Character.
+  if (!hydrated || activeCharacterId === null) return undefined;
+  return scopes;
 }
 
 /**
@@ -53,21 +47,41 @@ export function useLockedRoutes(paths: readonly AppRoutePath[]): ReadonlySet<App
 }
 
 /**
- * Whether a Character's grant (the active one's unless `characterId` is
- * given) covers every scope `endpoints` declares — for a figure that
- * degrades to a documented assumption rather than gating a whole page
- * (issue #1526). `undefined` while the grant is still unknown, so a caller
- * can hold its note back rather than flash it on a cold load, same as
- * `useGrantedScopes` itself.
+ * Whether the active Character's grant covers every scope `endpoints`
+ * declares — for a figure that degrades to a documented assumption rather
+ * than gating a whole page (issue #1526). `undefined` while the grant is
+ * still unknown, so a caller can hold its note back rather than flash it on
+ * a cold load, same as `useGrantedScopes` itself.
  */
-export function useEndpointsGranted(
-  endpoints: readonly EsiEndpointId[],
-  characterId?: number | null
-): boolean | undefined {
-  const granted = useGrantedScopes(characterId);
+export function useEndpointsGranted(endpoints: readonly EsiEndpointId[]): boolean | undefined {
+  const granted = useGrantedScopes();
   return useMemo(() => {
     if (granted === undefined) return undefined;
     const held = new Set(granted);
     return requiredScopesForEndpoints(endpoints).every((scope) => held.has(scope));
   }, [granted, endpoints]);
+}
+
+/**
+ * Which of `characterIds` hold a grant missing any scope `endpoints` declares
+ * — the per-Character twin of `useEndpointsGranted`, for a page that values
+ * each Character's figures under that Character's own modifiers (issue
+ * #1588). `undefined` until the tokens have loaded. Only the ids leave the
+ * query, so no `TokenRecord` reaches React state (ADR 0001).
+ */
+export function useCharactersLackingEndpoints(
+  characterIds: readonly number[],
+  endpoints: readonly EsiEndpointId[]
+): readonly number[] | undefined {
+  // Keyed by value: callers rebuild both arrays every render.
+  const idsKey = characterIds.join(',');
+  const endpointsKey = endpoints.join(',');
+  return useLiveQuery(async () => {
+    const required = requiredScopesForEndpoints(endpoints);
+    const tokens = await db.tokens.bulkGet([...characterIds]);
+    return characterIds.filter((_, i) => {
+      const held = new Set(tokens[i]?.scopes ?? []);
+      return required.some((scope) => !held.has(scope));
+    });
+  }, [idsKey, endpointsKey]);
 }

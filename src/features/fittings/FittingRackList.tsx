@@ -26,6 +26,7 @@ import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { checkCharges } from './dogmaFittingEngine';
 import type { AddTarget } from './addTarget';
 import { ImplantBasisControl } from './ImplantBasisControl';
+import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { catalogueTypeName, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
 
@@ -415,6 +416,9 @@ export function FittingRackList({
       }
     >
       <div className="space-y-3">
+        {implantBasis === 'clone' && canUseCloneBasis && (
+          <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
+        )}
         <div className="space-y-1.5">
           <ResourceBar
             label={t('fittings.list.cpu')}

@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { configureClipboard, type ClipboardWriter } from '@/lib/clipboard';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { BuildPlanRecord } from '@/db';
 import type { BlueprintType, TypeMap } from '@/sde/types';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
@@ -53,10 +54,11 @@ vi.mock('@/features/character/systemSecurity', () => ({
 
 // The build location search only renders once the scope is known to be
 // granted; without this the box under test is the re-auth offer instead.
-// `useEndpointsGranted` likewise keeps the standings note out of the way.
+const implantsGrant = vi.hoisted(() => ({ lacking: new Set<number>() }));
 vi.mock('@/app/useGrantedScopes', () => ({
   useGrantedScopes: () => ['esi-search.search_structures.v1'],
-  useEndpointsGranted: () => true,
+  useCharactersLackingEndpoints: (ids: readonly number[]) =>
+    ids.filter((id) => implantsGrant.lacking.has(id)),
 }));
 
 const BLUEPRINT: BlueprintType = {
@@ -1139,5 +1141,31 @@ describe('BuildPlanDetail item context menu', () => {
     fireEvent.contextMenu(within(dialog).getByText(text));
 
     expect(await viewInMarket()).toBeInTheDocument();
+  });
+});
+
+describe('BuildPlanDetail Character details implant note (issue #1588)', () => {
+  const NOTE = 'Assumes no implants';
+
+  beforeEach(() => {
+    useActiveCharacter.setState({ activeCharacterId: 5, hydrated: true });
+  });
+
+  afterEach(() => {
+    implantsGrant.lacking.clear();
+  });
+
+  it('notes that job time assumes no implants when the grant is missing', async () => {
+    implantsGrant.lacking.add(5);
+    render(<Harness />);
+
+    expect(await screen.findByText(NOTE)).toBeInTheDocument();
+  });
+
+  it('hides the note once Character details is granted', async () => {
+    render(<Harness />);
+
+    await screen.findByRole('button', { name: 'Edit setup' });
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
   });
 });

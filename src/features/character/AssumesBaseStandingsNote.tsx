@@ -1,17 +1,19 @@
 import { useTranslation } from 'react-i18next';
 import { ReauthBanner } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
-import { useEndpointsGranted } from '@/app/useGrantedScopes';
+import { useCharactersLackingEndpoints } from '@/app/useGrantedScopes';
 import { permissionsForEndpoints, type EsiEndpointId } from '@/esi/registry';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 
-/** Stable reference for `useEndpointsGranted` — a fresh array every render would defeat its memo. */
+/** Stable references for `useCharactersLackingEndpoints` — fresh arrays every render would re-run its query. */
 const STANDINGS_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterStandings'];
+const NO_IDS: readonly number[] = [];
 
 interface AssumesBaseStandingsNoteProps {
   /** Which figure is degraded, in the surface's own words. */
   hint: string;
   /** Whose standings price the figure; the active Character when omitted. */
-  characterId?: number | null;
+  characterId?: number;
   /** Prefixed onto the title where several characters' notes can stack. */
   characterName?: string;
   className?: string;
@@ -31,24 +33,30 @@ export function AssumesBaseStandingsNote({
   className,
 }: AssumesBaseStandingsNoteProps) {
   const { t } = useTranslation();
-  const granted = useEndpointsGranted(STANDINGS_ENDPOINTS, characterId);
-  if (granted !== false) return null;
+  const activeCharacterId = useActiveCharacter((state) =>
+    state.hydrated ? state.activeCharacterId : null
+  );
+  const id = characterId ?? activeCharacterId;
+  const lacking = useCharactersLackingEndpoints(id === null ? NO_IDS : [id], STANDINGS_ENDPOINTS);
+  // `includes(id)`, not `length`: right after `id` changes the query still
+  // holds the previous Character's answer for a frame.
+  if (id === null || !lacking?.includes(id)) return null;
   return (
     <div className={className}>
       <ReauthBanner
         variant="ghost"
         title={
           characterName
-            ? t('character.assumesBaseStandings.titleFor', { character: characterName })
-            : t('character.assumesBaseStandings.title')
+            ? t('reauth.standingsAssumedTitleFor', { character: characterName })
+            : t('reauth.standingsAssumedTitle')
         }
         hint={hint}
-        actionLabel={t('character.assumesBaseStandings.action')}
+        actionLabel={t('reauth.standingsAssumedAction')}
         // The figure's own Character: `beginEveLogin` otherwise merges in the
         // active Character's grant, and SSO issues exactly what was requested.
         onLogin={() =>
           void beginEveLogin({
-            characterId: characterId ?? undefined,
+            characterId: id,
             groups: permissionsForEndpoints(STANDINGS_ENDPOINTS),
           })
         }

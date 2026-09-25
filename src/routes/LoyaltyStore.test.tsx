@@ -120,6 +120,11 @@ function renderStore() {
   );
 }
 
+/** Every filter now sits behind the funnel (FilterBar, issue #1282). */
+function openFilters() {
+  fireEvent.click(screen.getByRole('button', { name: /^Filters/ }));
+}
+
 function offer(overrides: Partial<LoyaltyStoreOffer>): LoyaltyStoreOffer {
   return {
     isk_cost: 0,
@@ -181,6 +186,7 @@ const UNRESOLVED_BLUEPRINT_ROW: LoyaltyOfferRow = {
 describe('LoyaltyStore filters', () => {
   it('shows the filters inline on a pointer viewport', () => {
     renderStore();
+    openFilters();
     expect(screen.getByRole('combobox', { name: /Market hub/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Affordable/i })).toBeInTheDocument();
   });
@@ -246,6 +252,7 @@ describe('LoyaltyStore filters', () => {
   it('writes the affordable-only toggle to the URL, omitted again once it is back on', async () => {
     const user = userEvent.setup();
     renderStore();
+    openFilters();
 
     await user.click(screen.getByRole('button', { name: /Affordable/i }));
     await waitFor(() => expect(probe.search).toContain('affordableOnly=0'));

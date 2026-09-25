@@ -222,6 +222,15 @@ export default defineConfig({
             type: 'image/png',
             purpose: 'maskable',
           },
+          // Bubblewrap reads this as the Play Store app's status-bar
+          // notification icon (`monochromeIconUrl`, docs/ANDROID-TWA.md).
+          // 96px is exactly the xxxhdpi size of Android's 24dp small icon.
+          {
+            src: 'icons/badge-96.png',
+            sizes: '96x96',
+            type: 'image/png',
+            purpose: 'monochrome',
+          },
         ],
       },
       // navigateFallback/navigateFallbackDenylist are generateSW-only — the

@@ -49,7 +49,7 @@ import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { formatPercent } from './format';
 import { MobileOpportunityList } from './MobileOpportunityList';
 import { OPPORTUNITIES_DEFAULT_SORT, OPPORTUNITIES_SORT_KEY } from './opportunitiesUrl';
-import { ORDER_DEPTH_TONE, unitMargin } from './opportunityMetrics';
+import { ORDER_DEPTH_RANK, ORDER_DEPTH_TONE, unitMargin } from './opportunityMetrics';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { buildOpportunityCandidates, type OpportunityRow } from './opportunities';
 import { SkillGateMarker } from './SkillGateMarker';
@@ -300,6 +300,13 @@ export function OpportunitiesPanel({
     {
       id: 'blueprint',
       header: t('industry.opportunitiesBlueprint'),
+      // -1 means BPO/unlimited runs — sorts as the largest, not the smallest.
+      // `MAX_SAFE_INTEGER` rather than `Infinity`: two BPO rows would compare
+      // `Infinity - Infinity`, which is `NaN`.
+      sortValue: (row) =>
+        row.candidate.blueprint.runs === -1
+          ? Number.MAX_SAFE_INTEGER
+          : row.candidate.blueprint.runs,
       render: (row) => {
         const original = row.candidate.blueprint.runs === -1;
         return (
@@ -366,6 +373,7 @@ export function OpportunitiesPanel({
     {
       id: 'orderDepth',
       header: t('industry.opportunitiesOrderDepthLabel'),
+      sortValue: (row) => ORDER_DEPTH_RANK[row.orderDepth],
       render: (row) => (
         <span className="flex items-center gap-1">
           <StatChip

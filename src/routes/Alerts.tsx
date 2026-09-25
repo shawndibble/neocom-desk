@@ -257,7 +257,6 @@ export function Alerts() {
         onChange={setFilter}
         activeCount={activeAlertsFilterCount(filter)}
         title={t('alerts.filterTitle')}
-        collapsible
         search={
           <SearchInput
             value={filter.query}

@@ -53,6 +53,7 @@ import {
   autoBuildDepthContext,
 } from './planFacilityContext';
 import { useReactionFacilityDefaults, REACTION_FACILITY_PRESETS } from './reactionFacilityDefaults';
+import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { hydrateActivityFacilityDefaults } from './facilityDefaults';
 import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
@@ -1620,6 +1621,10 @@ export function BuildPlanDetail({
             <p className="text-xs text-danger">{error ?? t('industry.computeError')}</p>
           ) : (
             <>
+              {/* Reactions are exempt from every time implant — nothing to assume. */}
+              {activity !== 'reaction' && (
+                <ImplantsAssumedNote hint={t('industry.assumesNoImplantsHint')} />
+              )}
               {/*
               Lives here, not in the settings block above: it governs one number
               in one column of the table below it — the owned quantity "use

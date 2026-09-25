@@ -153,3 +153,13 @@ export function normalizeWhatIfSelection(raw: unknown): WhatIfImplantSelection {
   }
   return DEFAULT_WHAT_IF_SELECTION;
 }
+
+/**
+ * Whether a stored lens schedules on the clone's loaded implant set — the one
+ * case where a missing Character details grant silently means "no implants".
+ * An explicit None, preset or custom set is the pilot's own call (#1526).
+ */
+export function readsLoadedImplants(raw: unknown): boolean {
+  const selection = normalizeWhatIfSelection(raw);
+  return selection.kind === 'preset' && selection.preset === 'current';
+}

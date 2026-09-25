@@ -34,6 +34,7 @@ import * as Icon from '@/components/ui/icons';
 import { Caret } from '@/components/ui/Disclosure';
 import { fieldBaseClassName } from '@/components/ui/controlStyles';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
+import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import {
   appraisalNet,
   lpBeatsMarket,
@@ -222,6 +223,7 @@ export function AppraisalPanel({
   const totals = result?.appraisal.totals;
   const unmatched = result?.unmatched ?? [];
   const implantBonusPct = result?.implantBonusPct ?? 0;
+  const refinesOreOrIce = result?.refinesOreOrIce ?? false;
   const accountingLevel = result?.accountingLevel ?? null;
   const brokerRelationsLevel = result?.brokerRelationsLevel ?? null;
   // Null while skills are loading, or with no active Character — falls back
@@ -623,6 +625,12 @@ export function AppraisalPanel({
                   className="border-b border-line px-3"
                   hint={t('market.appraisal.assumesBaseStandingsHint')}
                 />
+              )}
+
+              {hasRefine && refinesOreOrIce && (
+                <div className="border-b border-line px-3 empty:hidden">
+                  <ImplantsAssumedNote hint={t('market.appraisal.refineAssumesNoImplantsHint')} />
+                </div>
               )}
 
               {totals.unpricedRows > 0 && (

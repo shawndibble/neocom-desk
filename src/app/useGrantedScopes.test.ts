@@ -3,16 +3,13 @@ import { renderHook, waitFor } from '@testing-library/react';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_REGISTRY } from '@/esi/registry';
-import { useEndpointsGranted } from './useGrantedScopes';
+import { useCharactersLackingEndpoints, useEndpointsGranted } from './useGrantedScopes';
 
 const CHARACTER_ID = 42;
 const OTHER_SCOPE = ESI_REGISTRY.getCharacterAssets.scope;
 const IMPLANTS_SCOPE = ESI_REGISTRY.getCharacterImplants.scope;
 
-async function seedGrant(
-  scopes: readonly string[],
-  characterId: number = CHARACTER_ID
-): Promise<void> {
+async function seedGrant(scopes: readonly string[], characterId = CHARACTER_ID): Promise<void> {
   await db.tokens.put({
     characterId,
     accessToken: 'access',
@@ -50,31 +47,43 @@ describe('useEndpointsGranted', () => {
     const { result } = renderHook(() => useEndpointsGranted(['getCharacterImplants']));
     await waitFor(() => expect(result.current).toBe(false));
   });
+});
 
-  describe('for an explicit character (issue #1589)', () => {
-    const OTHER_CHARACTER_ID = 99;
+describe('useCharactersLackingEndpoints', () => {
+  const ALT_ID = 43;
 
-    it('reads that character’s grant, not the active one’s', async () => {
-      await seedGrant([IMPLANTS_SCOPE]);
-      await seedGrant([OTHER_SCOPE], OTHER_CHARACTER_ID);
-      const { result } = renderHook(() =>
-        useEndpointsGranted(['getCharacterImplants'], OTHER_CHARACTER_ID)
-      );
-      await waitFor(() => expect(result.current).toBe(false));
-    });
+  it('lists only the characters whose own grant misses the endpoint’s scope', async () => {
+    await seedGrant([IMPLANTS_SCOPE]);
+    await seedGrant([OTHER_SCOPE], ALT_ID);
+    const { result } = renderHook(() =>
+      useCharactersLackingEndpoints([CHARACTER_ID, ALT_ID], ['getCharacterImplants'])
+    );
+    await waitFor(() => expect(result.current).toEqual([ALT_ID]));
+  });
 
-    it('does not wait on the active character’s hydration', async () => {
-      useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
-      await seedGrant([IMPLANTS_SCOPE], OTHER_CHARACTER_ID);
-      const { result } = renderHook(() =>
-        useEndpointsGranted(['getCharacterImplants'], OTHER_CHARACTER_ID)
-      );
-      await waitFor(() => expect(result.current).toBe(true));
-    });
+  it('checks each character’s own grant, not the active Character’s', async () => {
+    await seedGrant([OTHER_SCOPE]);
+    await seedGrant([IMPLANTS_SCOPE], ALT_ID);
+    const { result } = renderHook(() =>
+      useCharactersLackingEndpoints([ALT_ID], ['getCharacterImplants'])
+    );
+    await waitFor(() => expect(result.current).toEqual([]));
+  });
 
-    it('is undefined for no character at all', () => {
-      const { result } = renderHook(() => useEndpointsGranted(['getCharacterImplants'], null));
-      expect(result.current).toBeUndefined();
-    });
+  it('treats a character with no stored token as lacking the scope', async () => {
+    const { result } = renderHook(() =>
+      useCharactersLackingEndpoints([ALT_ID], ['getCharacterImplants'])
+    );
+    await waitFor(() => expect(result.current).toEqual([ALT_ID]));
+  });
+
+  it('drops a character once its grant gains the scope', async () => {
+    await seedGrant([OTHER_SCOPE], ALT_ID);
+    const { result } = renderHook(() =>
+      useCharactersLackingEndpoints([ALT_ID], ['getCharacterImplants'])
+    );
+    await waitFor(() => expect(result.current).toEqual([ALT_ID]));
+    await seedGrant([IMPLANTS_SCOPE], ALT_ID);
+    await waitFor(() => expect(result.current).toEqual([]));
   });
 });

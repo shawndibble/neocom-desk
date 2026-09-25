@@ -21,18 +21,28 @@ import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useTranslation } from 'react-i18next';
 import {
+  Button,
   DataAgeBadge,
   EmptyState,
+  FilterBar,
+  FilterChip,
+  FilterField,
   IconButton,
   PageHeader,
   Panel,
   SearchInput,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Spinner,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useCorpRouteGate } from '@/features/corp/useCorpRouteGate';
 import { CorpSubNav } from '@/features/corp/CorpSubNav';
 import {
+  CorpRosterColumnPicker,
   CorpRosterStats,
   CorpRosterSummary,
   CorpRosterTable,
@@ -62,13 +72,52 @@ import {
 import { downloadCsv } from '@/lib/downloadCsv';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useUrlParams } from '@/lib/useUrlState';
-import { boolParam, textParam } from '@/lib/urlState';
+import { boolParam, optionalIdParam, textParam } from '@/lib/urlState';
 
 /** Same debounce shape as `CorpAssets.tsx`/`Assets.tsx`: the input stays responsive, only the filter waits. */
 const SEARCH_DEBOUNCE_MS = 250;
 
 /** The roster's filters, in the URL (ADR 0015); the table's sort is `CorpRosterTable`'s `?sort=`. */
-const FILTER_PARAMS = { q: textParam(), dark: boolParam() };
+const FILTER_PARAMS = {
+  q: textParam(),
+  dark: boolParam(),
+  ship: optionalIdParam(),
+  loc: optionalIdParam(),
+};
+
+/** The funnel's share of the filters — everything but the search box, which acts immediately. */
+interface RosterFilter {
+  dark: boolean;
+  ship: number | null;
+  loc: number | null;
+}
+
+/** "Any" sentinel for the ship/location selects: Radix reads `''` as "nothing selected". */
+const ANY = '__any';
+
+interface RosterOption {
+  id: number;
+  label: string;
+}
+
+/**
+ * The distinct ids one field takes across the roster, labelled the way the
+ * table prints them. Built from the whole roster, not the filtered rows, so
+ * picking a ship does not empty the location list of every other choice.
+ */
+function rosterOptions(
+  rows: readonly RosterRow[],
+  pick: (row: RosterRow) => { id: number | null; name: string | null }
+): RosterOption[] {
+  const byId = new Map<number, string>();
+  for (const row of rows) {
+    const { id, name } = pick(row);
+    if (id !== null && !byId.has(id)) byId.set(id, label(name, id));
+  }
+  return [...byId]
+    .map(([id, text]) => ({ id, label: text }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
 
 interface MembersSnapshot {
   corporationId: number | null;
@@ -174,24 +223,45 @@ function CorpMembersView() {
     }));
   }, [data, darkAfterDays]);
 
-  // Search + dark-only filter (issue #421, AC2/AC3): AND-composed, same
-  // stacking rule as Mail's search-and-label filters (CONTEXT.md round 55).
-  // The stat strip's dark count stays computed from the full roster — only
-  // the table narrows.
-  // Both in the URL (ADR 0015); the dark *threshold* is a synced setting and
+  // Search + dark-only/ship/location filters (issue #421, AC2/AC3):
+  // AND-composed, same stacking rule as Mail's search-and-label filters
+  // (CONTEXT.md round 55). The stat strip's dark count stays computed from the
+  // full roster — only the table narrows.
+  // All in the URL (ADR 0015); the dark *threshold* is a synced setting and
   // stays out of it.
   const [filterParams, setFilterParams] = useUrlParams(FILTER_PARAMS);
   const search = filterParams.q;
   const darkOnly = filterParams.dark;
+  const { ship, loc } = filterParams;
+  const rosterFilter = useMemo<RosterFilter>(
+    () => ({ dark: darkOnly, ship, loc }),
+    [darkOnly, ship, loc]
+  );
+  const activeFilterCount = (darkOnly ? 1 : 0) + (ship !== null ? 1 : 0) + (loc !== null ? 1 : 0);
+  const shipOptions = useMemo(
+    () => rosterOptions(rows, (row) => ({ id: row.shipTypeId, name: row.shipName })),
+    [rows]
+  );
+  const locationOptions = useMemo(
+    () => rosterOptions(rows, (row) => ({ id: row.locationId, name: row.locationName })),
+    [rows]
+  );
+  const darkCount = rows.filter((row) => row.standing.isDark).length;
   const [debouncedSearch, setDebouncedSearch] = useState(search);
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(id);
   }, [search]);
-  const visibleRows = useMemo(() => {
-    const searched = filterRosterRows(rows, debouncedSearch);
-    return darkOnly ? searched.filter((row) => row.standing.isDark) : searched;
-  }, [rows, debouncedSearch, darkOnly]);
+  const visibleRows = useMemo(
+    () =>
+      filterRosterRows(rows, debouncedSearch).filter(
+        (row) =>
+          (!darkOnly || row.standing.isDark) &&
+          (ship === null || row.shipTypeId === ship) &&
+          (loc === null || row.locationId === loc)
+      ),
+    [rows, debouncedSearch, darkOnly, ship, loc]
+  );
 
   // Row context menu (issue #421, AC1): the shared Public Info Modal is the
   // one entry point, same as every other list with a Show Info action.
@@ -229,19 +299,79 @@ function CorpMembersView() {
         <Spinner />
       ) : (
         <div className="space-y-2">
-          <SearchInput
-            value={search}
-            onChange={(e) => setFilterParams({ q: e.target.value })}
-            placeholder={t('corp.members.searchPlaceholder')}
-          />
+          <FilterBar
+            value={rosterFilter}
+            onChange={(next) => setFilterParams(next)}
+            activeCount={activeFilterCount}
+            search={
+              <SearchInput
+                value={search}
+                onChange={(e) => setFilterParams({ q: e.target.value })}
+                placeholder={t('corp.members.searchPlaceholder')}
+                className="min-w-48 flex-1"
+              />
+            }
+            actions={<CorpRosterColumnPicker />}
+          >
+            {(draft, setDraft) => (
+              <>
+                <FilterChip
+                  label={t('corp.members.dark', { days: darkAfterDays })}
+                  count={darkCount}
+                  selected={draft.dark}
+                  onToggle={() => setDraft({ ...draft, dark: !draft.dark })}
+                  tooltip={t('corp.members.darkHint', { days: darkAfterDays })}
+                />
+                <FilterField label={t('corp.members.shipFilterLabel')}>
+                  <Select
+                    value={draft.ship === null ? ANY : String(draft.ship)}
+                    onValueChange={(value) =>
+                      setDraft({ ...draft, ship: value === ANY ? null : Number(value) })
+                    }
+                  >
+                    <SelectTrigger aria-label={t('corp.members.shipFilterLabel')} className="w-44">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ANY}>{t('corp.members.shipFilterAll')}</SelectItem>
+                      {shipOptions.map((option) => (
+                        <SelectItem key={option.id} value={String(option.id)}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FilterField>
+                <FilterField label={t('corp.members.locationFilterLabel')}>
+                  <Select
+                    value={draft.loc === null ? ANY : String(draft.loc)}
+                    onValueChange={(value) =>
+                      setDraft({ ...draft, loc: value === ANY ? null : Number(value) })
+                    }
+                  >
+                    <SelectTrigger
+                      aria-label={t('corp.members.locationFilterLabel')}
+                      className="w-56"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ANY}>{t('corp.members.locationFilterAll')}</SelectItem>
+                      {locationOptions.map((option) => (
+                        <SelectItem key={option.id} value={String(option.id)}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FilterField>
+              </>
+            )}
+          </FilterBar>
           <Panel padded={false}>
             <div className="space-y-2 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <CorpRosterStats
-                  rows={rows}
-                  darkOnly={darkOnly}
-                  onToggleDarkOnly={() => setFilterParams({ dark: !darkOnly })}
-                />
+                <CorpRosterStats rows={rows} />
                 <IconButton
                   size="sm"
                   icon={<Icon.Download />}
@@ -255,7 +385,25 @@ function CorpMembersView() {
                 names={data?.labels.characters ?? EMPTY_MEMBER_LABELS.characters}
               />
             </div>
-            <CorpRosterTable rows={visibleRows} rowContextMenu={memberRowContextMenu} />
+            {rows.length > 0 && visibleRows.length === 0 ? (
+              // The roster has members; the search/filters hid them all. The
+              // table's own empty state says EVE sent nothing, which would be wrong here.
+              <EmptyState
+                title={t('corp.members.noFilterMatches')}
+                hint={t('corp.members.noFilterMatchesHint')}
+                className="py-8"
+                action={
+                  <Button
+                    size="sm"
+                    onClick={() => setFilterParams({ q: '', dark: false, ship: null, loc: null })}
+                  >
+                    {t('corp.members.resetFilters')}
+                  </Button>
+                }
+              />
+            ) : (
+              <CorpRosterTable rows={visibleRows} rowContextMenu={memberRowContextMenu} />
+            )}
           </Panel>
         </div>
       )}

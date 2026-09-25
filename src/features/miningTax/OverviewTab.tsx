@@ -33,6 +33,7 @@ import { permissionsForEndpoints } from '@/esi/registry';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { formatVolume } from '@/features/market/format';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
+import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
@@ -232,6 +233,14 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
         };
       });
   }, [characterRows, range, today, basis, buybackRate]);
+  // Each row refines under its own Character's modifiers, so the implant
+  // note is per Character too — one for each shown miner lacking the grant.
+  const refiningCharacters = useMemo(() => {
+    if (!showRefining) return [];
+    const byId = new Map<number, string>();
+    for (const row of visibleRows) byId.set(row.characterId, row.characterName);
+    return [...byId].map(([characterId, characterName]) => ({ characterId, characterName }));
+  }, [showRefining, visibleRows]);
   const coverage = useMemo(() => {
     let oldestSaved: string | null = null;
     for (const row of characterRows) {
@@ -531,6 +540,18 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
               </ul>
             </div>
           )}
+
+          <div className="empty:hidden">
+            {refiningCharacters.map((c) => (
+              <ImplantsAssumedNote
+                key={c.characterId}
+                characterId={c.characterId}
+                hint={t('miningTax.overview.refineAssumesNoImplantsHint', {
+                  character: c.characterName,
+                })}
+              />
+            ))}
+          </div>
 
           {visibleRows.length === 0 ? (
             <EmptyState
