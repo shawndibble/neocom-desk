@@ -20,3 +20,8 @@ e2e-output/
 
 # Brainstorming visual companion mockups
 .superpowers/
+
+# Bubblewrap TWA project: only the config is tracked (docs/ANDROID-TWA.md).
+# The keystore and generated Gradle project must never be committed.
+twa/*
+!twa/twa-manifest.json
