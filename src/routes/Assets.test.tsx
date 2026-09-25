@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
@@ -444,8 +444,13 @@ describe('Assets', () => {
   it('notes inline that jumps away are unavailable when the location scope was never granted (#1590)', async () => {
     render(<App />);
     expect(await screen.findByText(JITA)).toBeInTheDocument();
-    expect(await screen.findByText('Jumps away unavailable')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Grant Character details' })).toBeInTheDocument();
+    const note = (await screen.findByText('Jumps away unavailable')).closest('div');
+    expect(note).not.toBeNull();
+    // Scoped: the standings scope is also missing in this fixture, so the
+    // shell's own GrantNote renders a second, identically-labelled button.
+    expect(
+      within(note as HTMLElement).getByRole('button', { name: 'Grant Character details' })
+    ).toBeInTheDocument();
   });
 
   it('omits the jumps-away note once the location scope is granted (#1590)', async () => {
