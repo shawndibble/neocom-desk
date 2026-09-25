@@ -4574,6 +4574,7 @@
     "updateHint": "Neocom Desk normally updates itself in the background. Update now checks for a new version right away and reloads the app.",
     "updateAction": "Update now",
     "updateWorking": "Updating…",
+    "updateFailed": "Could not check for a new version. Check your connection and try again.",
     "deviceTitle": "Log out",
     "deviceCharacters_one": "{{count}} character is logged in on this browser.",
     "deviceCharacters_other": "{{count}} characters are logged in on this browser.",
