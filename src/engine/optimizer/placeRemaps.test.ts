@@ -1062,9 +1062,13 @@ describe('placeRemaps with Boosters', () => {
         startDate: START,
       },
     });
-    expect(performance.now() - start).toBeLessThan(3000);
+    // 10 s, not 3 s: measured ~1.0 s on the dev machine but 3.08 s on a
+    // shared CI runner (test-shard 4, 2026-09-25), which failed the old
+    // bound with nothing wrong. A rewrite walking every step per segment is
+    // an order of magnitude slower, so this still catches it.
+    expect(performance.now() - start).toBeLessThan(10_000);
     expect(result.segments.length).toBeGreaterThanOrEqual(1);
-  });
+  }, 30_000);
 });
 
 /**
