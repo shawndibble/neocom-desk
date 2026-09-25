@@ -47,6 +47,13 @@ const CONTRACTS = [
 test.describe('contracts history — detail opener', () => {
   test.beforeEach(async ({ page }) => {
     await signInAndGoto(page);
+    // Opening a detail fetches its items, which the list's `contracts*` glob
+    // doesn't cover (`*` stops at a `/`): unmocked, whichever contract sorts
+    // first (the three tie on issue date) could reach the real ESI.
+    await page.route(
+      `https://esi.evetech.net/characters/${CHARACTER_ID}/contracts/*/items*`,
+      (route) => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
+    );
     await page.route(`https://esi.evetech.net/characters/${CHARACTER_ID}/contracts*`, (route) =>
       route.fulfill({
         status: 200,
