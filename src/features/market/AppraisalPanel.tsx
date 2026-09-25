@@ -36,6 +36,7 @@ import { Caret } from '@/components/ui/Disclosure';
 import { fieldBaseClassName } from '@/components/ui/controlStyles';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
+import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { permissionsForEndpoints, type EsiEndpointId } from '@/esi/registry';
 import {
   appraisalNet,
@@ -229,6 +230,7 @@ export function AppraisalPanel({
   const totals = result?.appraisal.totals;
   const unmatched = result?.unmatched ?? [];
   const implantBonusPct = result?.implantBonusPct ?? 0;
+  const refinesOreOrIce = result?.refinesOreOrIce ?? false;
   const accountingLevel = result?.accountingLevel ?? null;
   const brokerRelationsLevel = result?.brokerRelationsLevel ?? null;
   // Null while skills are loading, or with no active Character — falls back
@@ -636,6 +638,12 @@ export function AppraisalPanel({
                       void beginEveLogin({ groups: permissionsForEndpoints(STANDINGS_ENDPOINTS) })
                     }
                   />
+                </div>
+              )}
+
+              {hasRefine && refinesOreOrIce && (
+                <div className="border-b border-line px-3 empty:hidden">
+                  <ImplantsAssumedNote hint={t('market.appraisal.refineAssumesNoImplantsHint')} />
                 </div>
               )}
 

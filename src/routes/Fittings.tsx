@@ -31,6 +31,7 @@ import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPanel';
 import { FittingViewToggle } from '@/features/fittings/FittingViewToggle';
 import { ImplantBasisControl } from '@/features/fittings/ImplantBasisControl';
+import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import {
   resolveFittingView,
   useFittingViewPreference,
@@ -334,6 +335,9 @@ export function Fittings() {
                 implantSet={fitting.implantSet}
                 onImplantSetChange={workspace.setImplantSet}
               />
+              {workspace.implantBasis === 'clone' && workspace.canUseCloneBasis && (
+                <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
+              )}
               {gaps && gaps.missing.length > 0 && activeCharacterId !== null && (
                 <MissingSkillsChip
                   entries={gaps.missing}

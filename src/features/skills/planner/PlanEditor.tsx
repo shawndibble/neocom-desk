@@ -24,7 +24,6 @@ import {
   IconButton,
   Modal,
   Panel,
-  ReauthBanner,
   Select,
   SelectContent,
   SelectItem,
@@ -36,9 +35,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { useIsDesktop } from '@/lib/useIsDesktop';
-import { beginEveLogin } from '@/app/loginFlow';
-import { permissionsForEndpoints, type EsiEndpointId } from '@/esi/registry';
-import { useEndpointsGranted } from '@/app/useGrantedScopes';
+import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { stepKey, type StepKey } from '@/engine/skillPlanSchedule';
 import {
   milestoneKey,
@@ -135,6 +132,7 @@ import { remapBudget, type RemapAvailability } from './remapAvailability';
 import {
   whatIfImplants,
   normalizeWhatIfSelection,
+  readsLoadedImplants,
   setWhatIfBonus,
   toCustomSelection,
   MAX_IMPLANT_BONUS,
@@ -217,9 +215,6 @@ interface PlanEditorProps {
 }
 
 const NO_QUEUE: readonly SkillQueueEntry[] = [];
-
-/** Stable reference for `useEndpointsGranted` — a fresh array every render would defeat its memo. */
-const IMPLANTS_ENDPOINTS: readonly EsiEndpointId[] = ['getCharacterImplants'];
 
 /** An Optimize Remaps result, with each segment's first step held by key rather than index. */
 type OptimizeRun = PlaceRemapsResult & {
@@ -414,8 +409,7 @@ export function PlanEditor({
   // Training time assumes no implants only when it is actually reading the
   // (possibly empty) loaded set — an explicit "no implants" or custom What-If
   // choice is the pilot's own call, not a permission gap (issue #1526).
-  const implantsAssumed = whatIf.kind === 'preset' && whatIf.preset === 'current';
-  const implantsGranted = useEndpointsGranted(IMPLANTS_ENDPOINTS);
+  const implantsAssumed = readsLoadedImplants(whatIf);
 
   // An in-game cerebral accelerator is baked into the attributes ESI reports
   // and cannot be read back out of any endpoint, so `attributeBaseline`
@@ -1870,17 +1864,7 @@ export function PlanEditor({
           trainedKnown={trainedSkillsKnown}
         />
 
-        {implantsAssumed && implantsGranted === false && (
-          <ReauthBanner
-            variant="ghost"
-            title={t('plans.assumesNoImplantsTitle')}
-            hint={t('plans.assumesNoImplantsHint')}
-            actionLabel={t('plans.assumesNoImplantsAction')}
-            onLogin={() =>
-              void beginEveLogin({ groups: permissionsForEndpoints(IMPLANTS_ENDPOINTS) })
-            }
-          />
-        )}
+        {implantsAssumed && <ImplantsAssumedNote hint={t('plans.assumesNoImplantsHint')} />}
 
         {/* Plan Milestones (CONTEXT.md) whose entry was removed from the plan
             entirely — no row exists to flag any more, so they surface here
