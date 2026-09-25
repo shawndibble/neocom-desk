@@ -87,6 +87,7 @@ export function SkillPlans() {
           result={attributesResult}
           implantBonuses={implants}
           attributeBaseline={attributeBaseline}
+          remapInfo={remapInfo}
           className={isDesktop ? '' : 'hidden'}
         />
       </div>
