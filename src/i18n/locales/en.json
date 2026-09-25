@@ -4457,7 +4457,6 @@
     "title": "Settings",
     "tabs": {
       "display": "Display",
-      "mobileTabs": "Mobile tabs",
       "shortcuts": "Shortcuts",
       "permissions": "Permissions",
       "industry": "Industry",
@@ -4466,7 +4465,6 @@
       "corporation": "Corporation",
       "notifications": "Notifications",
       "data": "Data & storage",
-      "device": "This device",
       "activity": "Activity Log",
       "faq": "FAQ"
     },
@@ -4483,7 +4481,7 @@
     "characterDefaultsTitle": "Character defaults",
     "piDefaultsTitle": "Planetary Industry",
     "corpUnavailable": "Corporation defaults appear once the active character can see a corporation.",
-    "deviceTitle": "This device",
+    "deviceTitle": "Log out",
     "deviceCharacters_one": "{{count}} character is logged in on this browser.",
     "deviceCharacters_other": "{{count}} characters are logged in on this browser.",
     "deviceCharactersNone": "No characters are logged in on this browser.",
@@ -4595,6 +4593,7 @@
       },
       "extractorExpiringHint": "Delivered up to 72 hours ahead, even with the app closed, once installed and enabled for notifications — open the app at least that often to keep it current. The Planetary Industry page always shows the real expiry.",
       "marketOrderUndercutStationOnlyHint": "Only checks your order's own station, and only while the app is open — it does not compare prices across the wider system or region.",
+      "corpGroup": "Corp notifications",
       "corpEventBestEffortHint": "Best-effort: fires only while the app is open. Not a substitute for in-game alerts.",
       "scheduledPushBadge": "Arrives even with the app closed — the backend schedules this one up to 72 hours ahead. Needs notification permission, and on iPhone and iPad the app installed to the home screen. Every other event needs the app open.",
       "extractorExpiringLeadTimeLabel": "Warn this far before an extractor expires:",

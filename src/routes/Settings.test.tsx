@@ -391,6 +391,14 @@ async function notificationsPanel(): Promise<HTMLElement> {
   return section as HTMLElement;
 }
 
+/** The All Characters section starts collapsed, like a Character's own; open it and return the panel. */
+async function openAllCharacters(): Promise<HTMLElement> {
+  const panel = await notificationsPanel();
+  const toggle = await within(panel).findByRole('button', { name: /^all characters$/i });
+  if (toggle.getAttribute('aria-expanded') !== 'true') fireEvent.click(toggle);
+  return panel;
+}
+
 describe('Settings — Notifications (issue #170)', () => {
   beforeEach(async () => {
     await db.tokens.put({
@@ -702,6 +710,89 @@ describe('Settings — Notifications (issue #170)', () => {
     ).not.toBeDisabled();
   });
 
+  it("orders a character's events: ordinary ones, Quickbar price alerts, then Corp notifications, then EVE notifications last", async () => {
+    render(<App />);
+    const pilotOneButton = await within(await notificationsPanel()).findByRole('button', {
+      name: /pilot one/i,
+    });
+    const text = pilotOneButton.closest('div')!.parentElement!.textContent ?? '';
+    const at = (label: string) => {
+      const index = text.indexOf(label);
+      expect(index, label).toBeGreaterThanOrEqual(0);
+      return index;
+    };
+
+    expect(at('Wallet Balance Changed')).toBeLessThan(at('Quickbar Price Alert'));
+    expect(at('Quickbar Price Alert')).toBeLessThan(at('Corp notifications'));
+    expect(at('Corp notifications')).toBeLessThan(at('Structure Fuel Low'));
+    expect(at('Member Joined')).toBeLessThan(at('EVE Notifications'));
+    expect(at('Corp notifications')).toBeLessThan(at('EVE Notifications'));
+  });
+
+  it('asks for the Corporation permission once, on the Corp notifications header, not on every corp row', async () => {
+    const corpScopes = new Set(
+      NOTIFICATION_EVENTS.filter((event) => event.corpCapability !== undefined).map(
+        (event) => event.scope
+      )
+    );
+    await db.tokens.put({
+      characterId: CHAR_2_ID,
+      accessToken: 'a',
+      refreshToken: 'r',
+      expiresAt: Date.now() + 1000 * 60 * 60,
+      scopes: ALL_NOTIFICATION_SCOPES.filter((scope) => !corpScopes.has(scope)),
+    });
+    const user = userEvent.setup();
+    render(<App />);
+    const pilotTwoButton = await within(await notificationsPanel()).findByRole('button', {
+      name: /pilot two/i,
+    });
+    await user.click(pilotTwoButton);
+    const pilotTwoSection = within(pilotTwoButton.closest('div')!.parentElement!);
+
+    expect(pilotTwoSection.getAllByText(/^Needs the .* permission$/)).toHaveLength(1);
+    expect(
+      pilotTwoSection.getAllByRole('button', {
+        name: /^Grant the .* permission for Corp notifications$/,
+      })
+    ).toHaveLength(1);
+    // The rows themselves are still listed, and still disabled.
+    expect(
+      pilotTwoSection.getByRole('checkbox', { name: 'Member Joined, device notifications' })
+    ).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it("lets the All Characters section collapse and expand like a character's own", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const panel = within(await notificationsPanel());
+    const toggle = await panel.findByRole('button', { name: /^all characters$/i });
+
+    // Collapsed to start, with the select-all column still in its header.
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      panel.queryByRole('checkbox', {
+        name: 'Skill Level Complete for every character, device notifications',
+      })
+    ).not.toBeInTheDocument();
+    expect(
+      panel.getByRole('checkbox', { name: 'Toggle device notifications for every character' })
+    ).toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      panel.getByRole('checkbox', {
+        name: 'Skill Level Complete for every character, device notifications',
+      })
+    ).toBeInTheDocument();
+    // One header in the All Characters section, one in Pilot One's (the active, open one).
+    expect(panel.getAllByText('Corp notifications')).toHaveLength(2);
+
+    await user.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
   it('search filters rows by event-type name across every character section', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -897,7 +988,7 @@ describe('Settings — Notifications (issue #170)', () => {
   describe('All Characters master row (issue #738)', () => {
     it('shows a master row above the character list, with the same per-event checkboxes', async () => {
       render(<App />);
-      const panel = within(await notificationsPanel());
+      const panel = within(await openAllCharacters());
 
       expect(await panel.findByText('All Characters')).toBeInTheDocument();
       expect(
@@ -909,7 +1000,7 @@ describe('Settings — Notifications (issue #170)', () => {
 
     it('is checked when known Characters agree, indeterminate once they disagree', async () => {
       render(<App />);
-      await notificationsPanel();
+      await openAllCharacters();
 
       const masterEventCheckbox = (await screen.findByRole('checkbox', {
         name: 'Skill Level Complete for every character, device notifications',
@@ -937,7 +1028,7 @@ describe('Settings — Notifications (issue #170)', () => {
     it("toggling one event's master checkbox writes that value to every known Character, even one whose own row is scope-disabled for it", async () => {
       const user = userEvent.setup();
       render(<App />);
-      await notificationsPanel();
+      await openAllCharacters();
 
       // Pilot Two has every notification scope except New Mail's (outer
       // beforeEach) — its own New Mail row renders disabled, but the master
@@ -956,7 +1047,7 @@ describe('Settings — Notifications (issue #170)', () => {
     it("the top select-all row broadcasts every event to every Character, same cascade as a Character's own select-all", async () => {
       const user = userEvent.setup();
       render(<App />);
-      await notificationsPanel();
+      await openAllCharacters();
 
       // Wallet Balance Changed/Market Order Filled default browser-off while
       // the rest default browser-on (CONTEXT.md round 45) — the grid starts
@@ -982,7 +1073,7 @@ describe('Settings — Notifications (issue #170)', () => {
     it("disables its browser column when the browser permission is denied, matching a Character's own row", async () => {
       stubNotification('denied');
       render(<App />);
-      await notificationsPanel();
+      await openAllCharacters();
 
       const masterSelectAllBrowser = await screen.findByRole('checkbox', {
         name: 'Toggle device notifications for every character',
@@ -1003,7 +1094,7 @@ describe('Settings — Notifications (issue #170)', () => {
       const user = userEvent.setup();
       const confirmSpy = vi.spyOn(window, 'confirm');
       render(<App />);
-      await notificationsPanel();
+      await openAllCharacters();
 
       const selectAllCharacters = await screen.findByRole('checkbox', {
         name: 'Toggle device notifications for every character',
@@ -1067,6 +1158,7 @@ describe('Settings — Notifications (issue #170)', () => {
 
     it('an All Characters browser broadcast rebuilds once', async () => {
       const user = await renderPanelWithFakeTimers();
+      await openAllCharacters();
 
       await user.click(
         screen.getByRole('checkbox', {
@@ -1512,7 +1604,7 @@ describe('Reset saved view preferences', () => {
 describe('Settings — phone tab bar', () => {
   it("writes the pilot's four, device-local and in the rail's order", async () => {
     const user = userEvent.setup();
-    window.history.pushState({}, '', '/settings/mobileTabs');
+    window.history.pushState({}, '', '/settings/display');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1535,7 +1627,7 @@ describe('Settings — phone tab bar', () => {
 
   it('holds the old bar until a replacement is picked, so it is never short', async () => {
     const user = userEvent.setup();
-    window.history.pushState({}, '', '/settings/mobileTabs');
+    window.history.pushState({}, '', '/settings/display');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1549,7 +1641,7 @@ describe('Settings — phone tab bar', () => {
 
   it('goes inert at four rather than guessing which tab a fifth pick replaces', async () => {
     const user = userEvent.setup();
-    window.history.pushState({}, '', '/settings/mobileTabs');
+    window.history.pushState({}, '', '/settings/display');
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
@@ -1577,7 +1669,7 @@ describe('Settings — phone tab bar', () => {
   });
 
   it('puts the default four back', async () => {
-    window.history.pushState({}, '', '/settings/mobileTabs');
+    window.history.pushState({}, '', '/settings/display');
     await db.settings.put({
       key: MOBILE_TABS_KEY,
       value: ['/mail', '/wallet', '/overview', '/assets'],
@@ -1615,7 +1707,6 @@ describe('Settings — sections rail', () => {
         .map((link) => link.textContent)
     ).toEqual([
       'Display',
-      'Mobile tabs',
       'Shortcuts',
       'Permissions',
       'Industry',
@@ -1624,7 +1715,6 @@ describe('Settings — sections rail', () => {
       // Corporation is absent: this character has no corp access.
       'Notifications',
       'Data & storage',
-      'This device',
       'Activity Log',
       'FAQ',
     ]);
@@ -1681,7 +1771,7 @@ describe('Settings — This device', () => {
       scopes: [],
     });
     await db.settings.put({ key: ASSUMED_ME_SETTING_KEY, value: 7 });
-    window.history.pushState({}, '', '/settings/device');
+    window.history.pushState({}, '', '/settings/dataAge');
     render(<App />);
 
     expect(
@@ -1703,7 +1793,7 @@ describe('Settings — This device', () => {
 
   it('leaves everything in place when the dialog is cancelled', async () => {
     const user = userEvent.setup();
-    window.history.pushState({}, '', '/settings/device');
+    window.history.pushState({}, '', '/settings/dataAge');
     render(<App />);
 
     await user.click(await screen.findByRole('button', { name: /^log out$/i }));
@@ -1719,7 +1809,7 @@ describe('Settings — review follow-ups', () => {
   it('keeps the dialog open and says so when logging out fails', async () => {
     const user = userEvent.setup();
     vi.spyOn(db.characters, 'delete').mockRejectedValueOnce(new Error('disk full'));
-    window.history.pushState({}, '', '/settings/device');
+    window.history.pushState({}, '', '/settings/dataAge');
     render(<App />);
 
     await user.click(await screen.findByRole('button', { name: /^log out$/i }));

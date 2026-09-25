@@ -6,7 +6,7 @@ import { SETTINGS_TABS } from '@/app/pageTabs';
 import { usePageTab } from '@/lib/usePageTab';
 import { tabPath } from '@/lib/pageTabs';
 import { visibleSettingsGroups, type SettingsSectionId } from '@/features/settings/sections';
-import { SettingsNav } from '@/features/settings/SettingsNav';
+import { SettingsNav, SettingsSectionSelect } from '@/features/settings/SettingsNav';
 import { DevicePanel } from '@/features/settings/DevicePanel';
 import {
   Button,
@@ -1164,29 +1164,33 @@ export function Settings() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader title={t('settings.title')} />
+      <PageHeader
+        title={t('settings.title')}
+        actions={<SettingsSectionSelect groups={groups} value={section} onChange={setSection} />}
+      />
       <div className="space-y-4 md:grid md:grid-cols-[11rem_minmax(0,1fr)] md:gap-6 md:space-y-0">
-        <SettingsNav groups={groups} value={section} onChange={setSection} />
+        <SettingsNav groups={groups} value={section} />
         <div className="min-w-0 space-y-4">
           {section === 'display' && (
-            <Panel title={t('settings.displayTitle')}>
-              <div className="space-y-2">
-                <p className="text-xs text-text-dim">{t('settings.fontScaleHint')}</p>
-                <div
-                  role="group"
-                  aria-label={t('settings.fontScaleLabel')}
-                  className="flex flex-wrap gap-2"
-                >
-                  {FONT_SCALE_STEPS.map((step) => (
-                    <FilterChip
-                      key={step}
-                      label={t(FONT_SCALE_LABEL_KEYS[step])}
-                      selected={scale === step}
-                      onToggle={() => void setScale(step)}
-                    />
-                  ))}
-                </div>
-                {/*
+            <>
+              <Panel title={t('settings.displayTitle')}>
+                <div className="space-y-2">
+                  <p className="text-xs text-text-dim">{t('settings.fontScaleHint')}</p>
+                  <div
+                    role="group"
+                    aria-label={t('settings.fontScaleLabel')}
+                    className="flex flex-wrap gap-2"
+                  >
+                    {FONT_SCALE_STEPS.map((step) => (
+                      <FilterChip
+                        key={step}
+                        label={t(FONT_SCALE_LABEL_KEYS[step])}
+                        selected={scale === step}
+                        onToggle={() => void setScale(step)}
+                      />
+                    ))}
+                  </div>
+                  {/*
                   EVE runs on UTC and so does every timer other players quote,
                   which is why one column already rendered it before this was
                   settable. The Calendar grids are deliberately excluded — they
@@ -1194,20 +1198,21 @@ export function Settings() {
                   rendered string would file a late-evening event under the wrong
                   day.
                 */}
-                <div className="border-t border-line pt-3">
-                  <ChipRow
-                    label={t('settings.timeFormatLabel')}
-                    hint={t('settings.timeFormatHint')}
-                    options={TIME_FORMATS}
-                    selected={timeFormat}
-                    onSelect={(format) => void setTimeFormat(format)}
-                    labelFor={(format) => t(`settings.timeFormat.${format}`)}
-                  />
+                  <div className="border-t border-line pt-3">
+                    <ChipRow
+                      label={t('settings.timeFormatLabel')}
+                      hint={t('settings.timeFormatHint')}
+                      options={TIME_FORMATS}
+                      selected={timeFormat}
+                      onSelect={(format) => void setTimeFormat(format)}
+                      labelFor={(format) => t(`settings.timeFormat.${format}`)}
+                    />
+                  </div>
                 </div>
-              </div>
-            </Panel>
+              </Panel>
+              <MobileTabsPanel />
+            </>
           )}
-          {section === 'mobileTabs' && <MobileTabsPanel />}
           {section === 'shortcuts' && (
             <Panel title={t('shortcuts.title')}>
               {/* `max-w-md` inside the full-width page frame: a description and its
@@ -1266,9 +1271,9 @@ export function Settings() {
               <ExportPanel />
               <ImportPanel />
               <DataAttributionPanel />
+              <DevicePanel />
             </>
           )}
-          {section === 'device' && <DevicePanel />}
           {section === 'activity' && <ActivityLogPanel />}
           {/* `/settings/faq` is the link to hand someone who asks what the app stores. */}
           {section === 'faq' && <FaqPanel />}

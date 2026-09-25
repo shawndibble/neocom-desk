@@ -20,8 +20,9 @@
  * Character's expanded content actually produces.
  */
 import { NOTIFICATION_FAMILIES, eveTypesByFamily } from './eventSelection';
-import { isCorpEventId, type NotificationEventId } from './events';
+import type { NotificationEventId } from './events';
 import { eventEntry } from './eventEntries';
+import { layoutNotificationEvents } from './notificationLayout';
 
 export interface CharacterSectionHeightInput {
   expanded: boolean;
@@ -52,6 +53,7 @@ type InternalRowKind =
   | 'permission-hint-touch'
   | 'threshold-controls'
   | 'threshold-controls-with-hint'
+  | 'corp-group-header'
   | 'corp-best-effort-hint'
   | 'eve-types-hint'
   | 'eve-family-header'
@@ -82,6 +84,8 @@ const ROW_HEIGHT: Record<InternalRowKind, number> = {
   // corp wallet's two side by side — without and with its hint line.
   'threshold-controls': 44,
   'threshold-controls-with-hint': 52,
+  // The "Corp notifications" header row, same shape as an EVE family header.
+  'corp-group-header': 30,
   'corp-best-effort-hint': 42,
   'eve-types-hint': 42,
   'eve-family-header': 30,
@@ -101,25 +105,43 @@ export function estimateCharacterSectionHeight(input: CharacterSectionHeightInpu
 
   height += ROW_HEIGHT['column-captions'];
 
-  for (const eventId of input.visibleEventIds) {
-    height += ROW_HEIGHT.event;
+  const layout = layoutNotificationEvents(input.visibleEventIds);
+
+  const rowsFor = (eventId: NotificationEventId, permissionLine: boolean) => {
+    let rows = ROW_HEIGHT.event;
     const rowEnabled = input.rowEnabledFor(eventId);
 
     // Mirrors `NotificationsPanel.tsx`'s row: both read the Event Entry.
     const { rowHintKey, thresholds } = eventEntry(eventId);
-    if (input.missingPermissionFor(eventId)) {
-      height += ROW_HEIGHT[input.touchViewport ? 'permission-hint-touch' : 'permission-hint'];
+    if (permissionLine && input.missingPermissionFor(eventId)) {
+      rows += ROW_HEIGHT[input.touchViewport ? 'permission-hint-touch' : 'permission-hint'];
     }
-    if (rowHintKey !== null) height += ROW_HEIGHT['row-hint'];
+    if (rowHintKey !== null) rows += ROW_HEIGHT['row-hint'];
     if (thresholds !== null && rowEnabled) {
-      height +=
+      rows +=
         ROW_HEIGHT[
           thresholds.hintKey === null ? 'threshold-controls' : 'threshold-controls-with-hint'
         ];
     }
-    if (isCorpEventId(eventId)) height += ROW_HEIGHT['corp-best-effort-hint'];
+    return rows;
+  };
 
-    if (eventId === 'eveNotification' && input.hasEveNotificationScope) {
+  for (const eventId of layout.ordinary) height += rowsFor(eventId, true);
+
+  // The corp events share one header, one Needs-permission line and one
+  // best-effort hint: they all need the same Permission and all run only
+  // while the app is open, so per-row copies said the same thing five times.
+  if (layout.corp.length > 0) {
+    height += ROW_HEIGHT['corp-group-header'] + ROW_HEIGHT['corp-best-effort-hint'];
+    if (layout.corp.some((eventId) => input.missingPermissionFor(eventId))) {
+      height += ROW_HEIGHT[input.touchViewport ? 'permission-hint-touch' : 'permission-hint'];
+    }
+    for (const eventId of layout.corp) height += rowsFor(eventId, false);
+  }
+
+  if (layout.eve !== null) {
+    height += rowsFor(layout.eve, true);
+    if (input.hasEveNotificationScope) {
       height += ROW_HEIGHT['eve-types-hint'];
       for (const family of NOTIFICATION_FAMILIES) {
         const types = eveTypesByFamily(family);
