@@ -13,7 +13,8 @@ import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from '@/components/ui';
 import { cx } from '@/lib/cx';
-import { formatIskAuto } from '@/lib/isk';
+import { formatIsk, formatIskAuto } from '@/lib/isk';
+import { CopyablePrice } from './CopyablePrice';
 import { orderRowSummary } from './orderRowSummary';
 import type { OpenOrderRow } from './openOrdersModel';
 
@@ -26,14 +27,30 @@ const SCOPE_KEY = {
 export function OrderRowSummaryText({
   row,
   interactive = true,
+  copyRelistPrice = false,
 }: {
   row: OpenOrderRow;
   /** Drops the match clause's `Tooltip` trigger, leaving plain text — same reasoning as `OrderProblemBadge`'s own `interactive` prop. */
   interactive?: boolean;
+  /** Appends "→ price" with a copy button to an undercut/outbid row — the desktop table only; the phone list's row is itself the tap target, so an inline button there would swallow it. */
+  copyRelistPrice?: boolean;
 }): ReactElement | null {
   const { t } = useTranslation();
   const summary = orderRowSummary(row);
   if (!summary) return null;
+  const relistPrice =
+    copyRelistPrice && (summary.kind === 'undercut' || summary.kind === 'outbid')
+      ? summary.suggestedPrice
+      : null;
+  const relistNode = relistPrice !== null && (
+    <>
+      {' '}
+      <span className="font-semibold text-text">
+        {t('market.orders.relistTo', { price: formatIsk(relistPrice, 2) })}
+        <CopyablePrice price={relistPrice} showValue={false} />
+      </span>
+    </>
+  );
 
   switch (summary.kind) {
     case 'undercut': {
@@ -90,6 +107,7 @@ export function OrderRowSummaryText({
               )}
             </>
           )}
+          {relistNode}
         </span>
       );
     }
@@ -121,6 +139,7 @@ export function OrderRowSummaryText({
             price: formatIskAuto(summary.rivalPrice),
             gap: formatIskAuto(summary.gapIsk),
           })}
+          {relistNode}
         </span>
       );
     case 'noCostBasis':

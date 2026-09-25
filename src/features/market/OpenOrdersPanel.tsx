@@ -12,6 +12,7 @@ import {
   FilterChip,
   IconButton,
   InfoTooltip,
+  MenuItem,
   Panel,
   SearchInput,
   Select,
@@ -93,6 +94,9 @@ import { stationPriceKey } from './stationPriceKey';
 import type { HubBuyPrice } from './orderExits';
 import { OrderBadgeLegend } from './OrderBadgeLegend';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
+import { orderRowSummary } from './orderRowSummary';
+import { priceClipboardText } from './priceClipboardText';
+import { writeToClipboard } from '@/lib/clipboard';
 import { OrderDetailModal } from './OrderDetailModal';
 import type { ReprocessingInput } from './orderExits';
 import {
@@ -660,9 +664,19 @@ export function OpenOrdersPanel({
       blueprintCatalog === null
         ? undefined
         : (blueprintCatalog.byProductTypeID.get(row.typeId)?.blueprintTypeID ?? null);
+    const summary = orderRowSummary(row);
+    const relistPrice =
+      summary?.kind === 'undercut' || summary?.kind === 'outbid' ? summary.suggestedPrice : null;
     return (
       <ItemContextMenu
         typeId={row.typeId}
+        extraItems={
+          relistPrice !== null && (
+            <MenuItem onSelect={() => void writeToClipboard(priceClipboardText(relistPrice))}>
+              {t('market.orders.copyNewPrice')}
+            </MenuItem>
+          )
+        }
         itemName={row.typeName}
         blueprintTypeID={blueprintTypeID}
         onAddToQuickbar={onAddToQuickbar}
@@ -745,7 +759,7 @@ export function OpenOrdersPanel({
             return (
               <span className="flex flex-col items-start gap-1">
                 {badge && <OrderProblemBadge kind={badge.kind} detail={badge.detail} />}
-                <OrderRowSummaryText row={row} />
+                <OrderRowSummaryText row={row} copyRelistPrice />
               </span>
             );
           },

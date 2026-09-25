@@ -4495,6 +4495,8 @@
       "floorWorking": "Where that price comes from",
       "outbidAt": "Outbid at {{price}}",
       "copyPrice": "Copy {{price}}",
+      "copyNewPrice": "Copy new price",
+      "relistTo": "→ {{price}}",
       "priceCopied": "Copied to clipboard",
       "assumesBaseStandingsHint": "Floor prices on this character's sell orders are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings."
     },
