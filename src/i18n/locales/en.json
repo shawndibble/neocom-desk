@@ -3615,8 +3615,8 @@
     },
     "groupedTitle": "{{title}} x{{count}}",
     "contextMenu": {
-      "browserOn": "Turn off browser notifications",
-      "browserOff": "Turn on browser notifications",
+      "browserOn": "Turn off device notifications",
+      "browserOff": "Turn on device notifications",
       "hideInFeed": "Hide in feed"
     },
     "eveTypeName": {
@@ -4513,14 +4513,14 @@
     "fontScaleExtraLarge": "Extra large",
     "notificationsTitle": "Notifications",
     "notifications": {
-      "hint": "Pick what each character is told about, and how. Browser raises a pop-up from your operating system; Overview adds a row to the Overview page inside the app. These choices stay on this device.",
+      "hint": "Pick what each character is told about, and how. Device raises a pop-up from your phone or computer; Overview adds a row to the Overview page inside the app. These choices stay on this device.",
       "blockedNotice": "Notifications are blocked — enable them in your browser's site settings, then return here.",
       "blockedNoticePlayApp": "Notifications are off for this app.",
       "androidSettingsHint": "Not getting notifications? Check they're on for this app.",
       "openAndroidSettings": "Open notification settings",
       "installRequiredNotice": "On iPhone and iPad, notifications only work once Neocom is installed to your home screen — Safari's Share menu, then \"Add to Home Screen.\" Open it from there and come back to turn them on.",
       "enableHint": "This device hasn't granted notification permission yet.",
-      "enableButton": "Turn on browser notifications",
+      "enableButton": "Turn on device notifications",
       "masterSwitchLabel": "Enable notifications",
       "searchPlaceholder": "Search events or characters",
       "noResults": "No matching events or characters",
@@ -4573,38 +4573,38 @@
       "corpWalletTransactionCeilingLabel": "Transaction ceiling (ISK):",
       "walletBalanceChangedThresholdLabel": "Notify on changes of at least:",
       "walletBalanceChangedThresholdHint": "Accepts shorthand: 10.5m, 10,500,000, or 10500000 (b = billion, m = million, t = thousand).",
-      "browserChannelLabel": "Browser notifications",
+      "browserChannelLabel": "Device notifications",
       "browserChannelHint": "Pop-ups from your operating system. Needs permission. Events with a known future time can arrive up to 72 hours ahead even with the app closed, once installed on iPhone and iPad; the rest need the app open.",
       "feedChannelLabel": "Overview notifications",
       "feedChannelHint": "A dismissible list on the Overview page. Works on every device.",
       "column": {
-        "browser": "Browser",
+        "browser": "Device",
         "feed": "Overview"
       },
       "selectAll": {
-        "browser": "Toggle all browser notifications for {{character}}",
+        "browser": "Toggle all device notifications for {{character}}",
         "feed": "Toggle all Overview notifications for {{character}}"
       },
       "toggleLabel": {
-        "browser": "{{event}}, browser notifications",
+        "browser": "{{event}}, device notifications",
         "feed": "{{event}}, Overview list"
       },
       "allCharactersLabel": "All Characters",
       "allCharactersHint": "Apply a setting to every character at once. This is a one-time broadcast, not a saved default — a character added later starts from its own defaults, and any character can still be edited independently afterward.",
       "selectAllCharacters": {
-        "browser": "Toggle browser notifications for every character",
+        "browser": "Toggle device notifications for every character",
         "feed": "Toggle Overview notifications for every character"
       },
       "toggleAllCharactersLabel": {
-        "browser": "{{event}} for every character, browser notifications",
+        "browser": "{{event}} for every character, device notifications",
         "feed": "{{event}} for every character, Overview list"
       },
       "selectAllCharactersFamily": {
-        "browser": "Toggle all browser notifications for {{family}} for every character",
+        "browser": "Toggle all device notifications for {{family}} for every character",
         "feed": "Toggle all Overview notifications for {{family}} for every character"
       },
       "columnEvent": "Event",
-      "eveTypesHint": "EVE’s own in-game notifications, grouped by family. These default to the Overview page only, except the attack and loss alerts, which also raise a browser pop-up — flip any of them per column.",
+      "eveTypesHint": "EVE’s own in-game notifications, grouped by family. These default to the Overview page only, except the attack and loss alerts, which also raise a device pop-up — flip any of them per column.",
       "family": {
         "structures": "Structures",
         "war": "War",
@@ -4614,11 +4614,11 @@
         "pi": "PI"
       },
       "selectAllFamily": {
-        "browser": "Toggle all browser notifications for {{family}}",
+        "browser": "Toggle all device notifications for {{family}}",
         "feed": "Toggle all Overview notifications for {{family}}"
       },
       "columnHint": {
-        "browser": "A pop-up from your browser, outside the app.",
+        "browser": "A pop-up from your phone or computer, outside the app.",
         "feed": "A row on the Overview page, inside the app."
       }
     },
