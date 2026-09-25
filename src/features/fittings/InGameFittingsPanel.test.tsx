@@ -66,14 +66,17 @@ describe('InGameFittingsPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Open' }));
     expect(onOpen).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: 'PvP Rifter',
-        shipTypeId: 587,
-        modules: [{ slot: 'high', slotIndex: 0, typeId: 484, state: 'active' }],
+        fitting: expect.objectContaining({
+          name: 'PvP Rifter',
+          shipTypeId: 587,
+          modules: [{ slot: 'high', slotIndex: 0, typeId: 484, state: 'active' }],
+        }),
+        unresolved: [],
       })
     );
   });
 
-  it("opens what it can and surfaces a note for items it can't map (fighter bay, service slot)", async () => {
+  it("opens what it can, handing the items it can't map (fighter bay, service slot) on as the Load's warnings", async () => {
     useEndpointsGrantedMock.mockReturnValue(true);
     loadInGameFittingsMock.mockResolvedValue({
       cached: {
@@ -98,14 +101,12 @@ describe('InGameFittingsPanel', () => {
 
     expect(onOpen).toHaveBeenCalledWith(
       expect.objectContaining({
-        modules: [{ slot: 'high', slotIndex: 0, typeId: 484, state: 'active' }],
+        fitting: expect.objectContaining({
+          modules: [{ slot: 'high', slotIndex: 0, typeId: 484, state: 'active' }],
+        }),
+        unresolved: [{ text: 'FighterBay', reason: 'unsupported slot' }],
       })
     );
-    expect(
-      await screen.findByText(
-        '1 item from "PvP Rifter" couldn\'t be loaded (fighter bay or service slot).'
-      )
-    ).toBeInTheDocument();
   });
 
   it('shows an empty state when the Character has no in-game Fittings', async () => {

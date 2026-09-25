@@ -133,60 +133,6 @@ describe('useFittingWorkspace editing', () => {
   });
 });
 
-describe('useFittingWorkspace loading a Loaded fittings-XML file (#1542)', () => {
-  it("clears the other Load path's unresolved list on each open, so a stale banner doesn't outlive the Fitting it described", async () => {
-    const view = await renderAt(RIFTER);
-
-    // An EFT paste with an unresolvable module leaves `unresolved` non-empty.
-    await act(() =>
-      view.result.current.workspace.loadFromInput(
-        ['[Rifter, Test]', 'Not A Real Module'].join('\n')
-      )
-    );
-    await waitFor(() => expect(view.result.current.workspace.unresolved).not.toEqual([]));
-
-    // A drone-bay entry (the previous Fitting had none) proves this is the
-    // newly-opened Fitting, not the still-open previous one.
-    const items = await view.result.current.workspace.loadFittingXmlDocument({
-      entries: [
-        {
-          name: 'Clean Rifter',
-          shipTypeName: 'Rifter',
-          hardware: [{ slot: 'drone bay', type: 'Hobgoblin I', qty: 2 }],
-        },
-      ],
-    });
-    await act(() => view.result.current.workspace.openFittingXmlEntry(items[0]!));
-
-    await waitFor(() =>
-      expect(view.result.current.workspace.fitting?.drones).toEqual([
-        { typeId: 2454, quantity: 2, state: 'online' },
-      ])
-    );
-    expect(view.result.current.workspace.unresolved).toEqual([]);
-    expect(view.result.current.workspace.fitXmlUnresolved).toEqual([]);
-
-    // And the reverse: a hull that resolves but carries an unresolvable item
-    // leaves `fitXmlUnresolved` non-empty; going back to a clean EFT paste
-    // must clear that stale banner too.
-    const dirtyItems = await view.result.current.workspace.loadFittingXmlDocument({
-      entries: [
-        {
-          name: 'Dirty Rifter',
-          shipTypeName: 'Rifter',
-          hardware: [{ slot: 'high slot 0', type: 'Not A Real Module' }],
-        },
-      ],
-    });
-    await act(() => view.result.current.workspace.openFittingXmlEntry(dirtyItems[0]!));
-    await waitFor(() => expect(view.result.current.workspace.fitXmlUnresolved).not.toEqual([]));
-
-    await act(() => view.result.current.workspace.loadFromInput('[Rifter, Test]'));
-    await waitFor(() => expect(view.result.current.workspace.fitting?.name).toBe('Rifter'));
-    expect(view.result.current.workspace.fitXmlUnresolved).toEqual([]);
-  });
-});
-
 describe('useFittingWorkspace saving (My Fittings)', () => {
   beforeEach(async () => {
     await db.fittings.clear();
@@ -245,7 +191,14 @@ describe('useFittingWorkspace saving (My Fittings)', () => {
     );
     await waitFor(() => expect(view.result.current.workspace.savedId).toBe('r1'));
 
-    await act(() => view.result.current.workspace.openFitting(RIFTER));
+    await act(() =>
+      view.result.current.workspace.openLoaded({
+        kind: 'fitting',
+        source: 'in-game',
+        fitting: RIFTER,
+        unresolved: [],
+      })
+    );
     await waitFor(() => expect(view.result.current.workspace.fitting?.name).toBe(RIFTER.name));
     expect(view.result.current.workspace.savedId).toBeNull();
   });

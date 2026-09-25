@@ -6,8 +6,10 @@
  * and carries no `chargeTypeId` — the same "nothing left to say otherwise"
  * reasoning as `eftLoader.ts`'s EFT-paste modules. `FighterBay`/`ServiceSlot*`
  * (carriers, structures) have no rack this app models, so they go to
- * `unresolved` rather than being dropped silently, same as `eftLoader.ts`.
+ * `unresolved` rather than being dropped silently, same as `eftLoader.ts` —
+ * and the result is a Load outcome like any other source's (`load.ts`).
  */
+import type { LoadedFitting, LoadWarning } from './load';
 import {
   sortFittingModules,
   type Fitting,
@@ -29,11 +31,6 @@ export interface EsiCharacterFitting {
   description: string;
   ship_type_id: number;
   items: EsiFittingItem[];
-}
-
-export interface EsiFittingUnresolvedItem {
-  flag: string;
-  typeId: number;
 }
 
 /**
@@ -66,14 +63,11 @@ const FLAG_PREFIX: Record<FittingSlotKind, string> = {
 
 const SLOT_FLAG = /^(Hi|Med|Lo|Rig|SubSystem)Slot(\d+)$/;
 
-export function esiFittingToFitting(esiFitting: EsiCharacterFitting): {
-  fitting: Fitting;
-  unresolved: EsiFittingUnresolvedItem[];
-} {
+export function esiFittingToFitting(esiFitting: EsiCharacterFitting): LoadedFitting {
   const modules: FittingModule[] = [];
   const drones: FittingDrone[] = [];
   const cargo: FittingCargoItem[] = [];
-  const unresolved: EsiFittingUnresolvedItem[] = [];
+  const unresolved: LoadWarning[] = [];
 
   for (const item of esiFitting.items) {
     const match = SLOT_FLAG.exec(item.flag);
@@ -94,10 +88,12 @@ export function esiFittingToFitting(esiFitting: EsiCharacterFitting): {
       cargo.push({ typeId: item.type_id, quantity: item.quantity });
       continue;
     }
-    unresolved.push({ flag: item.flag, typeId: item.type_id });
+    unresolved.push({ text: item.flag, reason: 'unsupported slot' });
   }
 
   return {
+    kind: 'fitting',
+    source: 'in-game',
     fitting: {
       name: esiFitting.name,
       shipTypeId: esiFitting.ship_type_id,

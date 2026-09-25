@@ -4,14 +4,16 @@
  * victim's fit). All of it is pure — fetching a killmail lives with the
  * caller; here a killmail is already an ESI `victim` object.
  *
- * Every loader returns an `EftLoadResult`, so `eftResultToFitting` and the
- * "lines that weren't recognised" list carry over unchanged. Like the EFT
+ * Every loader returns `LoadParts` (`load.ts`), the same as the EFT loader,
+ * so `toLoadOutcome` and the "lines that weren't recognised" list carry over
+ * unchanged. Like the EFT
  * loader, a rack comes from `FittingSlotMap`, never from position: DNA has no
  * slot information at all, and a killmail's flag says which slot but not
  * whether the item is a module or the charge loaded in it.
  */
 import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
-import type { EftLoadResult, EftSlotLookup, EftUnresolvedItem } from './eftLoader';
+import type { EftSlotLookup } from './eftLoader';
+import type { LoadParts, LoadWarning } from './load';
 import {
   FITTING_SLOT_KINDS,
   type FittingCargoItem,
@@ -69,7 +71,7 @@ export function classifyLoadInput(input: string): LoadInput {
   return classifyPlain(text);
 }
 
-function unresolved(text: string, reason: string): EftUnresolvedItem {
+function unresolved(text: string, reason: string): LoadWarning {
   return { line: 1, text, reason };
 }
 
@@ -82,14 +84,14 @@ function sortModules(modules: FittingModule[]): void {
 }
 
 /** DNA is `hullId:typeId;qty:typeId;qty::`, with no slot information. */
-export function loadDnaFitting(dna: string, slotByTypeId: EftSlotLookup): EftLoadResult {
+export function loadDnaFitting(dna: string, slotByTypeId: EftSlotLookup): LoadParts {
   const [hull, ...entries] = dna.split(':').filter((part) => part !== '');
   const hullTypeId = Number(hull);
   if (!Number.isInteger(hullTypeId)) {
     return { hullTypeId: null, unresolved: [unresolved(dna, 'unknown ship')] };
   }
 
-  const problems: EftUnresolvedItem[] = [];
+  const problems: LoadWarning[] = [];
   const modules: FittingModule[] = [];
   const drones: FittingDrone[] = [];
   const cargo: FittingCargoItem[] = [];
@@ -178,7 +180,7 @@ function mergeCargo(items: FittingCargoItem[]): FittingCargoItem[] {
 export function killmailVictimToLoadResult(
   victim: KillmailVictim,
   slotByTypeId: EftSlotLookup
-): EftLoadResult {
+): LoadParts {
   const modules: FittingModule[] = [];
   const drones: FittingDrone[] = [];
   const cargo: FittingCargoItem[] = [];

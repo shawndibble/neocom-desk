@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import type { LoadOutcome } from '@/engine/fittings/load';
 import type { FittingXmlListItem } from './useFittingWorkspace';
-import { FittingLoadCard } from './FittingLoadCard';
+import { FittingLoadCard, LoadWarnings } from './FittingLoadCard';
 
 const SINGLE_FIT = `<?xml version="1.0"?>
 <fittings>
@@ -24,37 +25,39 @@ const MULTI_FIT = `<?xml version="1.0"?>
 
 const RESOLVED: FittingXmlListItem = {
   name: '[Rifter, Solo PVP]',
-  hullTypeId: 587,
   hullName: 'Rifter',
-  hullError: null,
-  unresolved: [],
-  fitting: { name: '[Rifter, Solo PVP]', shipTypeId: 587, modules: [], drones: [], cargo: [] },
+  load: {
+    kind: 'fitting',
+    source: 'file',
+    fitting: { name: '[Rifter, Solo PVP]', shipTypeId: 587, modules: [], drones: [], cargo: [] },
+    unresolved: [],
+  },
 };
 
 const UNRESOLVED: FittingXmlListItem = {
   name: '[Not A Ship, Broken]',
-  hullTypeId: null,
   hullName: null,
-  hullError: 'unknown ship',
-  unresolved: [{ text: 'Not A Ship', reason: 'unknown ship' }],
-  fitting: null,
+  load: {
+    kind: 'failed',
+    source: 'file',
+    error: null,
+    unresolved: [{ text: 'Not A Ship', reason: 'unknown ship' }],
+  },
 };
 
 function renderCard(onLoadFittingXmlDocument: () => Promise<FittingXmlListItem[]>) {
-  const onOpenFittingXmlEntry = vi.fn().mockResolvedValue(undefined);
+  const onOpenLoaded = vi.fn().mockResolvedValue(undefined);
   render(
     <FittingLoadCard
       onLoad={vi.fn()}
-      unresolved={[]}
-      fitXmlUnresolved={[]}
+      lastLoad={null}
       shareError={null}
-      loadError={null}
       tooLargeToShare={false}
       onLoadFittingXmlDocument={onLoadFittingXmlDocument}
-      onOpenFittingXmlEntry={onOpenFittingXmlEntry}
+      onOpenLoaded={onOpenLoaded}
     />
   );
-  return { onOpenFittingXmlEntry };
+  return { onOpenLoaded };
 }
 
 async function pickFile(text: string, name = 'fit.xml') {
@@ -65,22 +68,22 @@ async function pickFile(text: string, name = 'fit.xml') {
 
 describe('FittingLoadCard — Loaded EVE-XML fittings file (#1542)', () => {
   it('opens a single-fit export directly, without showing the picker list', async () => {
-    const { onOpenFittingXmlEntry } = renderCard(async () => [RESOLVED]);
+    const { onOpenLoaded } = renderCard(async () => [RESOLVED]);
     await pickFile(SINGLE_FIT);
 
-    await waitFor(() => expect(onOpenFittingXmlEntry).toHaveBeenCalledWith(RESOLVED));
+    await waitFor(() => expect(onOpenLoaded).toHaveBeenCalledWith(RESOLVED.load));
     expect(screen.queryByText(/nothing here is saved/i)).not.toBeInTheDocument();
   });
 
   it('shows a temporary, unsaved picker list for a multi-fit export', async () => {
-    const { onOpenFittingXmlEntry } = renderCard(async () => [RESOLVED, UNRESOLVED]);
+    const { onOpenLoaded } = renderCard(async () => [RESOLVED, UNRESOLVED]);
     await pickFile(MULTI_FIT);
 
     await waitFor(() => expect(screen.getByText(/nothing here is saved/i)).toBeInTheDocument());
-    expect(onOpenFittingXmlEntry).not.toHaveBeenCalled();
+    expect(onOpenLoaded).not.toHaveBeenCalled();
 
     await userEvent.click(screen.getByRole('button', { name: /open \[rifter, solo pvp\]/i }));
-    expect(onOpenFittingXmlEntry).toHaveBeenCalledWith(RESOLVED);
+    expect(onOpenLoaded).toHaveBeenCalledWith(RESOLVED.load);
   });
 
   it("reports a malformed entry's own reason without an Open control, alongside the rest of the list", async () => {
@@ -95,10 +98,37 @@ describe('FittingLoadCard — Loaded EVE-XML fittings file (#1542)', () => {
   });
 
   it("shows the single entry's own error instead of opening nothing when a single-fit export fails to resolve", async () => {
-    const { onOpenFittingXmlEntry } = renderCard(async () => [UNRESOLVED]);
+    const { onOpenLoaded } = renderCard(async () => [UNRESOLVED]);
     await pickFile(SINGLE_FIT);
 
     await waitFor(() => expect(screen.getByText(/unknown ship/i)).toBeInTheDocument());
-    expect(onOpenFittingXmlEntry).not.toHaveBeenCalled();
+    expect(onOpenLoaded).not.toHaveBeenCalled();
+  });
+});
+
+describe('LoadWarnings', () => {
+  it("words a text Load's warnings by line, and an In-game Fitting's by item, one list per Load", () => {
+    const text: LoadOutcome = {
+      kind: 'failed',
+      source: 'text',
+      error: null,
+      unresolved: [{ line: 1, text: 'Not A Ship', reason: 'unknown ship' }],
+    };
+    const { rerender } = render(<LoadWarnings load={text} />);
+    expect(screen.getByText("1 line wasn't recognized")).toBeInTheDocument();
+    expect(screen.getByText('Line 1: "Not A Ship" — unknown ship')).toBeInTheDocument();
+
+    const inGame: LoadOutcome = {
+      kind: 'fitting',
+      source: 'in-game',
+      fitting: { name: 'Carrier', shipTypeId: 23757, modules: [], drones: [], cargo: [] },
+      unresolved: [{ text: 'FighterBay', reason: 'unsupported slot' }],
+    };
+    rerender(<LoadWarnings load={inGame} />);
+    expect(
+      screen.getByText("1 item couldn't be loaded (fighter bay or service slot)")
+    ).toBeInTheDocument();
+    expect(screen.getByText('"FighterBay" — unsupported slot')).toBeInTheDocument();
+    expect(screen.queryByText(/Not A Ship/)).not.toBeInTheDocument();
   });
 });

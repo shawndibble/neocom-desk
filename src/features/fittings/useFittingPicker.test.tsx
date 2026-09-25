@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { LoadedFitting } from '@/engine/fittings/load';
 import type { Fitting } from '@/engine/fittings/types';
 import { useFittingPicker } from './useFittingPicker';
 
@@ -9,6 +10,7 @@ vi.mock('@/engine/fittings/shareMapper', () => ({ fittingToShareInput: (f: Fitti
 vi.mock('./loadFittingFromText', () => ({ loadFittingFromText: load }));
 
 const fitting = { hullTypeId: 1 } as unknown as Fitting;
+const loaded: LoadedFitting = { kind: 'fitting', source: 'in-game', fitting, unresolved: [] };
 
 describe('useFittingPicker', () => {
   beforeEach(() => {
@@ -28,7 +30,7 @@ describe('useFittingPicker', () => {
     encode.mockResolvedValue({ ok: true, payload: 'enc' });
     const onPick = vi.fn();
     const { result } = renderHook(() => useFittingPicker(onPick));
-    await act(() => result.current.openFitting(fitting));
+    await act(() => result.current.openLoaded(loaded));
     expect(onPick).toHaveBeenCalledWith('enc');
   });
 
@@ -36,7 +38,7 @@ describe('useFittingPicker', () => {
     encode.mockResolvedValue({ ok: false });
     const onPick = vi.fn();
     const { result } = renderHook(() => useFittingPicker(onPick));
-    await act(() => result.current.openFitting(fitting));
+    await act(() => result.current.openLoaded(loaded));
     expect(onPick).not.toHaveBeenCalled();
     expect(result.current.tooLargeToShare).toBe(true);
   });
@@ -44,17 +46,13 @@ describe('useFittingPicker', () => {
   it('passes a pasted Share Link through unchanged and reports Load errors', async () => {
     const onPick = vi.fn();
     const { result } = renderHook(() => useFittingPicker(onPick));
-    load.mockResolvedValueOnce({ shareCode: 'code', fitting: null, unresolved: [], error: null });
+    load.mockResolvedValueOnce({ kind: 'share', code: 'code' });
     await act(() => result.current.loadFromInput('x'));
     expect(onPick).toHaveBeenCalledWith('code');
-    load.mockResolvedValueOnce({
-      shareCode: null,
-      fitting: null,
-      unresolved: [],
-      error: 'unrecognised',
-    });
+    const failed = { kind: 'failed', source: 'text', error: 'unrecognised', unresolved: [] };
+    load.mockResolvedValueOnce(failed);
     await act(() => result.current.loadFromInput('y'));
-    expect(result.current.loadError).toBe('unrecognised');
+    expect(result.current.lastLoad).toEqual(failed);
     expect(onPick).toHaveBeenCalledTimes(1);
   });
 });

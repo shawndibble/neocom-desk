@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadEftFitting, eftResultToFitting, type EftTypeLookup } from './eftLoader';
+import { loadEftFitting, type EftTypeLookup } from './eftLoader';
 import type { FittingSlotAssignment } from '@/sde/types';
 
 const TYPES: Record<string, number> = {
@@ -144,20 +144,5 @@ describe('loadEftFitting', () => {
     expect(result.unresolved).toEqual([
       { line: 10, text: '125mm Gatling AutoCannon I', reason: 'too many high slots' },
     ]);
-  });
-
-  it('builds a Fitting from a successful result, carrying the given name (not the pasted fit name)', () => {
-    const result = load('[Rifter, My Fit]\n1MN Afterburner I');
-    if (result.hullTypeId === null) throw new Error('expected a resolved hull');
-
-    const fitting = eftResultToFitting(result, 'Rifter');
-
-    expect(fitting).toEqual({
-      name: 'Rifter',
-      shipTypeId: 587,
-      modules: [{ slot: 'medium', slotIndex: 0, typeId: 439, state: 'active' }],
-      drones: [],
-      cargo: [],
-    });
   });
 });

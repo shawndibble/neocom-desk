@@ -445,14 +445,9 @@ export function Fittings() {
           {t('fittings.load.tooLargeToShare')}
         </p>
       )}
-      {(workspace.unresolved.length > 0 || workspace.fitXmlUnresolved.length > 0) && (
-        <div className="space-y-2">
-          <LoadWarnings
-            unresolved={workspace.unresolved}
-            fitXmlUnresolved={workspace.fitXmlUnresolved}
-          />
-        </div>
-      )}
+      {/* Only a Load that opened a Fitting describes this one; a failed Load's
+          warnings stay with the Load card that reported them. */}
+      {workspace.lastLoad?.kind === 'fitting' && <LoadWarnings load={workspace.lastLoad} />}
 
       {viewHydrated &&
         (addMode === 'sheet' ? (

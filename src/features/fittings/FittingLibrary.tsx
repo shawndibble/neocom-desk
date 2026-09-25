@@ -72,14 +72,12 @@ export function FittingLibrary({
     import: (
       <FittingLoadCard
         onLoad={workspace.loadFromInput}
-        unresolved={workspace.unresolved}
-        fitXmlUnresolved={workspace.fitXmlUnresolved}
+        lastLoad={workspace.lastLoad}
         shareError={workspace.shareError}
-        loadError={workspace.loadError}
         tooLargeToShare={workspace.tooLargeToShare}
         onLoadFittingXmlDocument={workspace.loadFittingXmlDocument}
-        onOpenFittingXmlEntry={async (item) => {
-          await workspace.openFittingXmlEntry(item);
+        onOpenLoaded={async (loaded) => {
+          await workspace.openLoaded(loaded);
           onOpened?.();
         }}
       />
@@ -99,7 +97,7 @@ export function FittingLibrary({
           key={inGameKey}
           characterId={characterId}
           onOpen={(loaded) => {
-            void workspace.openFitting(loaded);
+            void workspace.openLoaded(loaded);
             onOpened?.();
           }}
         />

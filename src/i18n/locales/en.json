@@ -96,6 +96,7 @@
       "unresolvedTitle_one": "{{count}} line wasn't recognized",
       "unresolvedTitle_other": "{{count}} lines weren't recognized",
       "unresolvedLine": "Line {{line}}: \"{{text}}\" — {{reason}}",
+      "unresolvedItem": "\"{{text}}\" — {{reason}}",
       "xml": {
         "browseLabel": "Load a fittings file (EVE XML)",
         "browse": "Browse",
@@ -111,8 +112,11 @@
         "listError": "Not recognized: {{reason}}",
         "open": "Open {{name}}",
         "unresolvedTitle_one": "{{count}} item in this Fitting wasn't recognized",
-        "unresolvedTitle_other": "{{count}} items in this Fitting weren't recognized",
-        "unresolvedLine": "\"{{text}}\" — {{reason}}"
+        "unresolvedTitle_other": "{{count}} items in this Fitting weren't recognized"
+      },
+      "inGame": {
+        "unresolvedTitle_one": "{{count}} item couldn't be loaded (fighter bay or service slot)",
+        "unresolvedTitle_other": "{{count}} items couldn't be loaded (fighter bay or service slot)"
       }
     },
     "inGame": {
@@ -123,9 +127,7 @@
       "reauthAction": "Log in again with EVE Online",
       "emptyTitle": "No in-game Fittings",
       "emptyHint": "Fittings saved on this Character in EVE will show up here.",
-      "openAction": "Open",
-      "unresolvedNote_one": "{{count}} item from \"{{name}}\" couldn't be loaded (fighter bay or service slot).",
-      "unresolvedNote_other": "{{count}} items from \"{{name}}\" couldn't be loaded (fighter bay or service slot)."
+      "openAction": "Open"
     },
     "saveToEve": {
       "action": "Save to EVE",
