@@ -439,20 +439,21 @@ function colonyIdle(entry: ColonySnapshotEntry, nowMs: number): boolean {
  * `diffCharacterNotTraining` compares `headStatus(prev)` against
  * `headStatus(next)` — a colony missing from `prev.colonies` (first time
  * this character's poll has seen it) is treated as not-previously-idle, so a
- * colony discovered already idle still fires once.
+ * colony discovered already idle still fires once. `prev === undefined` (a
+ * character's first-ever poll, e.g. a newly added alt) is an empty snapshot,
+ * so every colony already idle fires once rather than never.
  */
 export function diffPlanetaryExtractionDone(
   characterId: number,
   prev: PlanetarySnapshot | undefined,
   next: PlanetarySnapshot
 ): PlanetaryNotificationFire[] {
-  if (!prev) return [];
-  const prevByPlanet = new Map(prev.colonies.map((c) => [c.planetId, c]));
+  const prevByPlanet = new Map((prev?.colonies ?? []).map((c) => [c.planetId, c]));
   const fires: PlanetaryNotificationFire[] = [];
   for (const colony of next.colonies) {
     if (!colonyIdle(colony, next.nowMs)) continue;
     const prevColony = prevByPlanet.get(colony.planetId);
-    if (prevColony && colonyIdle(prevColony, prev.nowMs)) continue;
+    if (prev && prevColony && colonyIdle(prevColony, prev.nowMs)) continue;
     fires.push({
       eventId: 'planetaryExtractionDone',
       characterId,

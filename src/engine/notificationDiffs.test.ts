@@ -663,9 +663,11 @@ function planetarySnapshot(
 }
 
 describe('diffPlanetaryExtractionDone', () => {
-  it('fires nothing on the first-ever poll', () => {
-    const next = planetarySnapshot([colonyEntry(1, [T0 - 1000])], T0);
-    expect(diffPlanetaryExtractionDone(1, undefined, next)).toEqual([]);
+  it('fires once for a colony already idle on the first-ever poll', () => {
+    const next = planetarySnapshot([colonyEntry(1, [T0 - 1000]), colonyEntry(2, [T0 + 1000])], T0);
+    expect(diffPlanetaryExtractionDone(1, undefined, next)).toEqual([
+      { eventId: 'planetaryExtractionDone', characterId: 1, planetId: 1, expiryTimeMs: T0 - 1000 },
+    ]);
   });
 
   it('fires when a colony newly goes idle', () => {

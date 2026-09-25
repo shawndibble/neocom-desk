@@ -565,14 +565,14 @@ describe('runForegroundPoll', () => {
     expect(loadColonyExtractors).toHaveBeenCalled();
   });
 
-  it('persists a colony snapshot on the first poll but fires nothing (no baseline yet)', async () => {
+  it('persists a colony snapshot on the first poll but fires nothing while the colony is still running', async () => {
     let savedColonies: ColonyPollerState | null = null;
     const deps = baseDeps({
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, PLANETS_SCOPE]),
       loadColonyExtractors: async () => [
         {
           planetId: 40000001,
-          extractors: [{ pinId: 1, expiryTimeMs: 2000, thresholdMs: 21_600_000 }],
+          extractors: [{ pinId: 1, expiryTimeMs: 4_000_000_000_000, thresholdMs: 21_600_000 }],
         },
       ],
       saveColonyState: async (state) => {
@@ -585,7 +585,7 @@ describe('runForegroundPoll', () => {
     expect(savedColonies![CHAR.characterId].colonies).toEqual([
       {
         planetId: 40000001,
-        extractors: [{ pinId: 1, expiryTimeMs: 2000, thresholdMs: 21_600_000 }],
+        extractors: [{ pinId: 1, expiryTimeMs: 4_000_000_000_000, thresholdMs: 21_600_000 }],
       },
     ]);
   });
