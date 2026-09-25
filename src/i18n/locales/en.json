@@ -2063,6 +2063,7 @@
     "retention": "This device keeps the last 300 alerts, and syncs 30 days of them between your devices."
   },
   "common": {
+    "unknownType": "Type {{id}}",
     "columnsButton": "Columns",
     "columnsMenuTitle": "Columns",
     "resetColumns": "Reset to default",
@@ -2579,7 +2580,8 @@
       "allLocations_other": "All locations · {{count}}",
       "locationCount_one": "{{count}} location",
       "locationCount_other": "{{count}} locations",
-      "totalValue": "Total Assets Value: {{value}}"
+      "totalValueLabel": "Total value",
+      "totalValueFiltered": "{{value}} (filtered)"
     },
     "unresolved": {
       "heading_one": "Location unresolved · {{count}}",

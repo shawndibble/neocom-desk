@@ -17,6 +17,7 @@ interface MyFittingsPanelProps {
 
 /** Each saved code's hull name; null when the code no longer decodes. */
 function useHullNames(records: readonly FittingRecord[] | undefined): Map<string, string | null> {
+  const { t } = useTranslation();
   const [hulls, setHulls] = useState<Map<string, string | null>>(new Map());
   useEffect(() => {
     if (!records) return;
@@ -29,7 +30,8 @@ function useHullNames(records: readonly FittingRecord[] | undefined): Map<string
         next.set(
           record.id,
           decoded.ok
-            ? (types[String(decoded.value.hullTypeId)]?.name ?? `Type ${decoded.value.hullTypeId}`)
+            ? (types[String(decoded.value.hullTypeId)]?.name ??
+                t('common.unknownType', { id: decoded.value.hullTypeId }))
             : null
         );
       }
@@ -38,7 +40,7 @@ function useHullNames(records: readonly FittingRecord[] | undefined): Map<string
     return () => {
       cancelled = true;
     };
-  }, [records]);
+  }, [records, t]);
   return hulls;
 }
 
