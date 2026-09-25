@@ -88,18 +88,18 @@ export function FittingPreview({
   const canFly = useCompareCanFly(fittings, profile);
   const shareCode = useShareCode(row, fitting);
 
-  const s = stats.values[0];
-  const numbers: { label: string; value: string }[] = s
+  const figures = stats.values[0];
+  const numbers: { label: string; value: string }[] = figures
     ? [
-        { label: t('fittings.start.preview.dps'), value: formatCompactNumber(s.offense.dps) },
-        { label: t('fittings.start.preview.ehp'), value: formatCompactNumber(s.ehp) },
+        { label: t('fittings.start.preview.dps'), value: formatCompactNumber(figures.offense.dps) },
+        { label: t('fittings.start.preview.ehp'), value: formatCompactNumber(figures.ehp) },
         {
           label: t('fittings.start.preview.cpu'),
-          value: `${formatCompactNumber(s.cpuUsed)} / ${formatCompactNumber(s.cpuTotal)}`,
+          value: `${formatCompactNumber(figures.cpuUsed)} / ${formatCompactNumber(figures.cpuTotal)}`,
         },
         {
           label: t('fittings.start.preview.powergrid'),
-          value: `${formatCompactNumber(s.powergridUsed)} / ${formatCompactNumber(s.powergridTotal)}`,
+          value: `${formatCompactNumber(figures.powergridUsed)} / ${formatCompactNumber(figures.powergridTotal)}`,
         },
       ]
     : [];
@@ -113,14 +113,16 @@ export function FittingPreview({
           </div>
           <div className="min-w-56 flex-1 space-y-3">
             <p className="text-sm text-text-dim">
-              {row.hull} ·{' '}
+              {row.hull ?? t('fittings.myFittings.unknownHull')} ·{' '}
               {row.source === 'saved'
                 ? t('fittings.start.sourceSaved')
                 : t('fittings.start.sourceInGame')}
             </p>
-            {stats.failed[0] ? (
+            {row.source === 'saved' && row.hull === null ? (
+              <p className="text-xs text-warning">{t('fittings.start.preview.unreadable')}</p>
+            ) : stats.failed[0] ? (
               <p className="text-xs text-warning">{t('fittings.start.preview.statsFailed')}</p>
-            ) : s ? (
+            ) : figures ? (
               <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm tabular-nums">
                 {numbers.map((n) => (
                   <div key={n.label} className="contents">

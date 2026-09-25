@@ -59,12 +59,13 @@ export function FittingStartScreen({
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hullOpen, setHullOpen] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
+  // A share link that won't open lands on Import, where its message is.
+  const [importOpen, setImportOpen] = useState(workspace.shareError !== null);
   const [renaming, setRenaming] = useState<FittingRecord | null>(null);
   const [deleting, setDeleting] = useState<FittingRecord | null>(null);
 
-  // A share link that won't open lands on Import, where its message is
-  // (adjusted during render, not in an effect).
+  // The same when the error arrives once this screen is up (adjusted during
+  // render, not in an effect).
   const [seenShareError, setSeenShareError] = useState(workspace.shareError);
   if (workspace.shareError !== seenShareError) {
     setSeenShareError(workspace.shareError);
@@ -72,7 +73,7 @@ export function FittingStartScreen({
   }
 
   const saved = useSavedFittings(characterId);
-  const inGame = useInGameFittings(characterId ?? 0);
+  const inGame = useInGameFittings(characterId);
   const hasCharacter = characterId !== null;
   const { refresh: refreshInGame } = inGame;
   // Save to EVE landed: pick up the fitting that just arrived.
@@ -116,8 +117,13 @@ export function FittingStartScreen({
       <p className="text-xs text-warning">{t('common.loadFailedHint')}</p>
     ) : null;
 
+  // Saved Fittings still being read or their hulls decoded, or In-game ones still loading:
+  // "No fittings yet" must not flash before either lands.
+  const savedPending =
+    hasCharacter && (saved.records === undefined || saved.hulls.size < saved.records.length);
   const loading =
-    hasCharacter && (inGame.granted === undefined || (inGame.loading && !inGame.result));
+    savedPending ||
+    (hasCharacter && (inGame.granted === undefined || (inGame.loading && !inGame.result)));
 
   return (
     <div className="space-y-3">
@@ -160,7 +166,7 @@ export function FittingStartScreen({
         <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-[minmax(18rem,22rem)_minmax(0,1fr)]">
           <nav
             aria-label={t('fittings.start.listLabel')}
-            className="max-h-[36rem] overflow-y-auto border border-line bg-panel"
+            className="max-h-72 overflow-y-auto border border-line bg-panel lg:max-h-[36rem]"
           >
             {searching && (
               <p className="border-b border-line px-3 py-2 text-xs text-text-dim" role="status">

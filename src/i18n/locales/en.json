@@ -307,7 +307,8 @@
       "emptyTitle": "No fittings yet",
       "emptyHint": "Start one from a hull, or import an EFT block, a link or a fittings file.",
       "noMatches": "No saved or In-game fitting matches that search.",
-      "matches": "{{count}} matching fittings",
+      "matches_one": "{{count}} matching fitting",
+      "matches_other": "{{count}} matching fittings",
       "pickToPreview": "Pick a fitting to preview it.",
       "preview": {
         "open": "Open fitting",
@@ -319,6 +320,7 @@
         "cpu": "CPU",
         "powergrid": "Powergrid",
         "calculating": "Calculating…",
+        "unreadable": "This saved fitting can no longer be read. You can rename or delete it.",
         "statsFailed": "Stats unavailable",
         "canFly": "You can fly this",
         "missingSkills": "Missing skills",

@@ -121,10 +121,14 @@ describe('FittingStartScreen', () => {
   it('lists saved and In-game fittings together under their hull', async () => {
     renderScreen();
 
-    const list = await screen.findByRole('navigation', { name: 'Your fittings' });
-    const rifter = (await within(list).findByRole('heading', { name: 'Rifter' })).closest(
-      'section'
-    ) as HTMLElement;
+    const list = await screen.findByRole(
+      'navigation',
+      { name: 'Your fittings' },
+      { timeout: 5000 }
+    );
+    const rifter = (
+      await within(list).findByRole('heading', { name: 'Rifter' }, { timeout: 5000 })
+    ).closest('section') as HTMLElement;
     expect(within(rifter).getByText('Kite')).toBeInTheDocument();
     expect(within(rifter).getByText('PvP Rifter')).toBeInTheDocument();
     expect(within(list).getByText('Armor Drake')).toBeInTheDocument();
@@ -180,6 +184,11 @@ describe('FittingStartScreen', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Import' }));
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Load' })).toBeInTheDocument();
+  });
+
+  it('opens Import by itself when a share link is already broken on arrival', async () => {
+    renderScreen({ ...makeWorkspace(), shareError: 'invalid' });
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
   });
 
   it('opens the hull search from New from hull', async () => {

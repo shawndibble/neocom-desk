@@ -20,6 +20,9 @@ import { loadInGameFittings } from './inGameFittings';
 export type LibraryRow = MyFittingRow &
   ({ source: 'saved'; record: FittingRecord } | { source: 'inGame'; inGame: CharacterFitting });
 
+/** A saved Fitting's row, for callers that only list those. */
+export type SavedRow = Extract<LibraryRow, { source: 'saved' }>;
+
 /** Each saved code's hull name; null when the code no longer decodes. */
 function useHullNames(records: readonly FittingRecord[] | undefined): Map<string, string | null> {
   const { t } = useTranslation();
@@ -66,7 +69,7 @@ export function useSavedFittings(characterId: number | null) {
 export function savedRows(
   records: readonly FittingRecord[] | undefined,
   hulls: ReadonlyMap<string, string | null>
-): LibraryRow[] {
+): SavedRow[] {
   return (records ?? [])
     .filter((record) => hulls.has(record.id))
     .map((record) => ({
@@ -79,7 +82,7 @@ export function savedRows(
 }
 
 /** The Character's In-game Fittings: fetch, grant, refresh. Nothing loads until the endpoint is granted. */
-export function useInGameFittings(characterId: number) {
+export function useInGameFittings(characterId: number | null) {
   const { t } = useTranslation();
   const granted = useEndpointsGranted(['getCharacterFittings']);
   const [result, setResult] = useState<CachedResult<CharacterFitting[]> | null>(null);
@@ -92,6 +95,7 @@ export function useInGameFittings(characterId: number) {
   const requestIdRef = useRef(0);
 
   async function refresh() {
+    if (characterId === null) return;
     const requestId = ++requestIdRef.current;
     setLoading(true);
     setError(false);
@@ -123,7 +127,7 @@ export function useInGameFittings(characterId: number) {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset for a new Character/grant, not a render-time derivation
     setResult(null);
     setError(false);
-    if (granted === true) void refresh();
+    if (granted === true && characterId !== null) void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh() reads characterId via closure; a Character switch is the only thing that should re-fetch.
   }, [characterId, granted]);
 

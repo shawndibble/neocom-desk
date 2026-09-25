@@ -57,7 +57,7 @@ export function MyFittingsPanel({ characterId, onOpen }: MyFittingsPanelProps) {
                         type="button"
                         className="min-h-11 min-w-0 flex-1 truncate text-left text-sm text-text hover:text-accent"
                         aria-label={t('fittings.myFittings.open', { name: row.name })}
-                        onClick={() => row.source === 'saved' && onOpen(row.record)}
+                        onClick={() => onOpen(row.record)}
                       >
                         {row.name}
                       </button>
@@ -67,7 +67,7 @@ export function MyFittingsPanel({ characterId, onOpen }: MyFittingsPanelProps) {
                         label={t('fittings.myFittings.rename', { name: row.name })}
                         tooltip={t('fittings.myFittings.confirmRename')}
                         onClick={() => {
-                          if (row.source === 'saved') setRenaming(row.record);
+                          setRenaming(row.record);
                         }}
                       />
                       <IconButton
@@ -76,7 +76,7 @@ export function MyFittingsPanel({ characterId, onOpen }: MyFittingsPanelProps) {
                         icon={<Icon.Close />}
                         label={t('fittings.myFittings.delete', { name: row.name })}
                         tooltip={t('fittings.myFittings.confirmDelete')}
-                        onClick={() => row.source === 'saved' && setDeleting(row.record)}
+                        onClick={() => setDeleting(row.record)}
                       />
                     </li>
                   ))}
