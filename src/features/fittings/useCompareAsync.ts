@@ -55,7 +55,9 @@ export function useCompareAsync<T>(
       return {
         // A stale entry (older profile/context) still shows until its recompute lands.
         values: fittings.map((fitting, i) => {
-          const entry = entries[i] ?? (fitting === null ? undefined : cache.get(fitting));
+          const stale = fitting === null ? undefined : cache.get(fitting);
+          // Only a different context keeps its old value; a different pilot's numbers never do.
+          const entry = entries[i] ?? (stale?.profile === profile ? stale : undefined);
           return entry && 'value' in entry ? entry.value : null;
         }),
         failed: entries.map((entry) => entry !== null && 'failed' in entry),
