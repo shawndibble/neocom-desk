@@ -5,6 +5,8 @@ import { systemAdvice } from './advisorModel';
 
 const DAY_MS = 86_400_000;
 const INSTALL = Date.parse('2026-09-01T00:00:00Z');
+/** Mid-program for every fixture extractor below (`extractorPin`'s 14-day program), so the existing fixtures read as still running unless a test says otherwise. */
+const NOW = INSTALL + 3 * DAY_MS;
 
 const pi = piFixture({
   raw: [
@@ -70,6 +72,7 @@ describe('systemAdvice', () => {
   it('reads a built colony off its own pins and programs, with no estimate anywhere', () => {
     const [advice] = systemAdvice(
       {
+        nowMs: NOW,
         planets: [{ planetId: 40_000_001, name: 'Ashab III', typeId: 11 }],
         colonies: [colony(40_000_001, 'temperate')],
         details: new Map([
@@ -107,9 +110,32 @@ describe('systemAdvice', () => {
     expect(advice.colony.production).toEqual([{ schematicId: 133, count: 1 }]);
   });
 
+  /**
+   * `expiryMs` was already measured per extractor but nothing downstream
+   * read it, so a program that ran out kept contributing its last-known
+   * sustained rate to "earning now" forever.
+   */
+  it('earns 0 from an extractor past its own expiry, and reports it stopped', () => {
+    const stoppedAt = INSTALL + 14 * DAY_MS;
+    const nowMs = stoppedAt + 5 * 3_600_000;
+    const [advice] = systemAdvice(
+      {
+        nowMs,
+        planets: [{ planetId: 40_000_001, name: 'Ashab III', typeId: 11 }],
+        colonies: [colony(40_000_001, 'temperate')],
+        details: new Map([[40_000_001, detail([extractorPin(1, 2073)])]]),
+      },
+      pi
+    );
+    if (advice.kind !== 'built') throw new Error('unreachable');
+    expect(advice.colony.extractedPerHour).toEqual([]);
+    expect(advice.colony.stoppedExtraction).toEqual({ count: 1, hoursStopped: 5 });
+  });
+
   it('sums two extractors on one product rather than reporting the last one', () => {
     const [advice] = systemAdvice(
       {
+        nowMs: NOW,
         planets: [{ planetId: 40_000_001, name: null, typeId: 11 }],
         colonies: [colony(40_000_001, 'temperate')],
         details: new Map([[40_000_001, detail([extractorPin(1, 2073), extractorPin(2, 2073)])]]),
@@ -125,6 +151,7 @@ describe('systemAdvice', () => {
   it('leaves an extractor with no install-time baseline unmeasured instead of at zero', () => {
     const [advice] = systemAdvice(
       {
+        nowMs: NOW,
         planets: [{ planetId: 40_000_001, name: null, typeId: 11 }],
         colonies: [colony(40_000_001, 'temperate')],
         details: new Map([
@@ -153,6 +180,7 @@ describe('systemAdvice', () => {
   it('lists what an unbuilt planet could extract, and never a yield for it', () => {
     const [advice] = systemAdvice(
       {
+        nowMs: NOW,
         planets: [{ planetId: 40_000_002, name: 'Ashab II', typeId: 2016 }],
         colonies: [],
         details: new Map(),
@@ -178,6 +206,7 @@ describe('systemAdvice', () => {
     // overstate the un-upgraded one.
     const advice = systemAdvice(
       {
+        nowMs: NOW,
         planets: [
           { planetId: 40_000_001, name: 'Ashab III', typeId: 11 },
           { planetId: 40_000_004, name: 'Ashab IV', typeId: 2014 },
@@ -200,6 +229,7 @@ describe('systemAdvice', () => {
   it('keeps a planet whose type never resolved distinct from one that takes no colony', () => {
     const advice = systemAdvice(
       {
+        nowMs: NOW,
         planets: [
           // Type lookup failed — we do not know what this is.
           { planetId: 40_000_007, name: 'Ashab VII', typeId: null },
@@ -219,6 +249,7 @@ describe('systemAdvice', () => {
     // colony never depends on the /universe/planets lookup succeeding.
     const [advice] = systemAdvice(
       {
+        nowMs: NOW,
         planets: [{ planetId: 40_000_001, name: null, typeId: null }],
         colonies: [colony(40_000_001, 'temperate')],
         details: new Map([[40_000_001, detail([extractorPin(1, 2073)])]]),
@@ -234,6 +265,7 @@ describe('systemAdvice', () => {
       // 30889 is Planet (Shattered): a real planet in a real system that the
       // payload maps to no PlanetType, because none of the eight fits it.
       {
+        nowMs: NOW,
         planets: [{ planetId: 40_000_003, name: 'Ashab X', typeId: 30_889 }],
         colonies: [],
         details: new Map(),
@@ -246,6 +278,7 @@ describe('systemAdvice', () => {
   it('puts built colonies first, so the planets with real numbers lead', () => {
     const advice = systemAdvice(
       {
+        nowMs: NOW,
         planets: [
           { planetId: 40_000_002, name: 'Ashab II', typeId: 2016 },
           { planetId: 40_000_003, name: 'Ashab X', typeId: 30_889 },
@@ -262,6 +295,7 @@ describe('systemAdvice', () => {
   it('keeps a colony whose detail never loaded, flagged rather than dropped', () => {
     const [advice] = systemAdvice(
       {
+        nowMs: NOW,
         planets: [{ planetId: 40_000_001, name: null, typeId: 11 }],
         colonies: [colony(40_000_001, 'temperate')],
         details: new Map(),
@@ -283,6 +317,7 @@ describe('link cost', () => {
     // stops claiming headroom it cannot stand behind.
     const advice = systemAdvice(
       {
+        nowMs: NOW,
         planets: [{ planetId: 40_000_001, name: 'Somewhere I', typeId: 11 }],
         colonies: [colony(40_000_001, 'temperate')],
         details: new Map([
@@ -304,6 +339,7 @@ describe('link cost', () => {
   it('reports zero links for a colony that has none', () => {
     const advice = systemAdvice(
       {
+        nowMs: NOW,
         planets: [{ planetId: 40_000_001, name: 'Somewhere I', typeId: 11 }],
         colonies: [colony(40_000_001, 'temperate')],
         details: new Map([[40_000_001, detail([extractorPin(1, 2073)])]]),

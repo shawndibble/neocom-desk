@@ -30,6 +30,7 @@ import type {
   PlanetPin,
 } from '@/esi/endpoints';
 import type { PiData, PiRawResource } from '@/sde/types';
+import { extractorState } from '@/engine/pi/colonyStatus';
 import { hasYieldBaseline, sustainedRatePerHour } from '@/engine/pi/extraction';
 import type { PinLoad } from '@/engine/pi/types';
 import { colonyBudget } from './colonyBudget';
@@ -94,6 +95,8 @@ export interface BuiltColonyAdvice {
    * no rate, and no card may print one.
    */
   extractedPerHour: { typeId: number; unitsPerHour: number }[];
+  /** Set when an extractor's own program has expired. `hoursStopped` is the longest-idle one — the figure a pilot needs first. */
+  stoppedExtraction: { count: number; hoursStopped: number } | null;
   /** One entry per distinct schematic running, with its pin count. */
   production: FactoryPinGroup[];
   /**
@@ -146,6 +149,8 @@ export interface SystemAdviceInput {
    * colony's link cost unknown rather than free — see `engine/pi/linkCost.ts`.
    */
   planetRadiusKm?: ReadonlyMap<number, number>;
+  /** The clock a stopped extractor's `expiryMs` is judged against. */
+  nowMs: number;
 }
 
 function measureExtractors(pins: readonly PlanetPin[]): MeasuredExtractor[] {
@@ -171,18 +176,28 @@ export function builtAdvice(
   planet: CharacterPlanet,
   detail: CharacterPlanetDetail | undefined,
   pi: PiData,
-  planetRadiusKm: number | null
+  planetRadiusKm: number | null,
+  nowMs: number
 ): BuiltColonyAdvice {
   const pins = detail?.pins ?? [];
   const extractors = measureExtractors(pins);
 
-  // Summed per product, and only over extractors that could be projected.
-  // Order follows first appearance so two extractors on one resource read as
-  // one line rather than reordering the card between refreshes.
+  // Summed per product, over extractors that could be projected and are
+  // still running — a stopped one's last-known rate would overstate what it
+  // earns now, so it goes to `stoppedCount`/`maxHoursStopped` instead. Order
+  // follows first appearance so two extractors on one resource read as one
+  // line rather than reordering the card between refreshes.
   const order: number[] = [];
   const perProduct = new Map<number, number>();
+  let stoppedCount = 0;
+  let maxHoursStopped = 0;
   for (const extractor of extractors) {
-    const { productTypeId, ratePerHour } = extractor;
+    const { productTypeId, ratePerHour, expiryMs } = extractor;
+    if (expiryMs !== null && extractorState(expiryMs, nowMs) === 'expired') {
+      stoppedCount += 1;
+      maxHoursStopped = Math.max(maxHoursStopped, (nowMs - expiryMs) / 3_600_000);
+      continue;
+    }
     if (productTypeId === null || ratePerHour === null) continue;
     if (!perProduct.has(productTypeId)) order.push(productTypeId);
     perProduct.set(productTypeId, (perProduct.get(productTypeId) ?? 0) + ratePerHour);
@@ -199,6 +214,8 @@ export function builtAdvice(
       typeId,
       unitsPerHour: perProduct.get(typeId) as number,
     })),
+    stoppedExtraction:
+      stoppedCount === 0 ? null : { count: stoppedCount, hoursStopped: maxHoursStopped },
     production: groupFactoryPins(pins),
     linkCount: detail?.links.length ?? 0,
     hasUnverifiedExtractors: hasUnverifiedExtractors(pins),
@@ -254,7 +271,8 @@ export function systemAdvice(input: SystemAdviceInput, pi: PiData): PlanetAdvice
           colony,
           input.details.get(planet.planetId),
           pi,
-          input.planetRadiusKm?.get(planet.planetId) ?? null
+          input.planetRadiusKm?.get(planet.planetId) ?? null,
+          input.nowMs
         ),
       };
     }
