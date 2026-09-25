@@ -62,4 +62,50 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     }));
     expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
   });
+
+  test('switches to the Ring view, keeps 44px slots, and remembers the choice across a reload', async ({
+    page,
+  }) => {
+    await signInAndGoto(page, './fittings');
+    await page.route(/\/universe\/types\/\d+$/, async (route) => {
+      const typeId = Number(/\/universe\/types\/(\d+)$/.exec(route.request().url())![1]);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          type_id: typeId,
+          name: `Type ${typeId}`,
+          description: '',
+          group_id: 46,
+          published: true,
+          dogma_attributes: [],
+        }),
+      });
+    });
+    await page.setViewportSize(PHONE);
+
+    await page.getByLabel('Paste EFT fit text').fill(RIFTER_EFT);
+    await page.getByRole('button', { name: 'Load', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'List' })).toBeVisible();
+
+    const ringToggle = page.getByRole('button', { name: 'Ring', exact: true });
+    const toggleBox = await ringToggle.boundingBox();
+    expect(toggleBox!.height).toBeGreaterThanOrEqual(44);
+    await ringToggle.click();
+
+    await expect(page.getByRole('heading', { name: 'Ring' })).toBeVisible();
+    const slot = page.getByLabel(/^High slots 1,/);
+    await expect(slot).toBeVisible();
+    const slotBox = await slot.boundingBox();
+    expect(slotBox!.width).toBeGreaterThanOrEqual(44);
+    expect(slotBox!.height).toBeGreaterThanOrEqual(44);
+
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'Ring' })).toBeVisible();
+    const doc = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
+  });
 });
