@@ -4649,8 +4649,8 @@
       "chokepointDetail": "One end sits in a system haulers are most often killed in. That is about traffic, not security status — and not a prediction."
     },
     "courierNoFilterMatchesUnplacedHint": "Some hauls end at a structure this app cannot place, so they carry no space band and a narrowed Destination space filter leaves them out. Select every band to see them again.",
-    "loadingOffers": "Loading public contracts…",
-    "loadingCourier": "Loading courier contracts…",
+    "loadingOffers": "Loading public contracts, this may take a moment.",
+    "loadingCourier": "Loading courier contracts, this may take a moment.",
     "namingTypes": "Loading item names…",
     "refreshingInBackground": "Refreshing in the background…",
     "courierNoFilterMatches": "No courier contracts match your filters.",

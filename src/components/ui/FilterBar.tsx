@@ -96,6 +96,12 @@ interface FilterBarProps<T> {
    * editing behaves exactly as it did inline. Only its visibility is new.
    */
   collapsible?: boolean;
+  /**
+   * View controls that sit beside the filter trigger on every surface — a
+   * table's column picker, say. Not part of the draft: they act immediately
+   * and never move into the sheet.
+   */
+  actions?: ReactNode;
   /** Wrapper class for the row. */
   className?: string;
 }
@@ -126,6 +132,7 @@ export function FilterBar<T>({
   title,
   children,
   collapsible = false,
+  actions,
   className = '',
 }: FilterBarProps<T>) {
   const isNarrow = useIsNarrow();
@@ -136,6 +143,7 @@ export function FilterBar<T>({
         <div className={cx('flex flex-wrap items-center gap-2', className)}>
           {search}
           {children(value, onChange)}
+          {actions}
         </div>
       );
     }
@@ -144,6 +152,7 @@ export function FilterBar<T>({
         search={search}
         activeCount={activeCount}
         title={title}
+        actions={actions}
         className={className}
       >
         {children(value, onChange)}
@@ -158,6 +167,7 @@ export function FilterBar<T>({
       search={search}
       activeCount={activeCount}
       title={title}
+      actions={actions}
       className={className}
     >
       {children}
@@ -222,12 +232,14 @@ function CollapsibleFilterRow({
   search,
   activeCount,
   title,
+  actions,
   children,
   className = '',
 }: {
   search?: ReactNode;
   activeCount: number;
   title?: string;
+  actions?: ReactNode;
   children: ReactNode;
   className?: string;
 }) {
@@ -243,6 +255,7 @@ function CollapsibleFilterRow({
           haspopup="true"
           onClick={() => setOpen((was) => !was)}
         />
+        {actions}
       </div>
       {open && (
         <div
@@ -270,6 +283,7 @@ function FilterSheet<T>({
   search,
   activeCount = 0,
   title,
+  actions,
   children,
   className = '',
 }: FilterBarProps<T>) {
@@ -300,6 +314,7 @@ function FilterSheet<T>({
             setOpen(true);
           }}
         />
+        {actions}
       </div>
       <Modal
         open={open}
