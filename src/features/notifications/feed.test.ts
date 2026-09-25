@@ -11,7 +11,10 @@ import {
   rowsWithinSyncWindow,
   FEED_SYNC_WINDOW_MAX_ROWS,
   FEED_SYNC_WINDOW_MS,
-  feedHasOccurrence,
+  rowSuppressesToast,
+  feedSuppressesToast,
+  markFeedNotifiedHere,
+  TOAST_STALE_AFTER_MS,
   deleteFeedForCharacter,
 } from './feed';
 
@@ -393,21 +396,84 @@ describe('dismissing', () => {
   });
 });
 
-describe('feedHasOccurrence', () => {
-  it('is false for an occurrence never recorded', async () => {
-    expect(await feedHasOccurrence('never-seen')).toBe(false);
+describe('rowSuppressesToast', () => {
+  const NOW = 1_756_000_000_000;
+  const row = {
+    id: 'occurrence-1',
+    characterId: 1,
+    eventId: 'newMail',
+    title: 't',
+    body: 'b',
+    firedAt: NOW - 60_000,
+  };
+
+  it('is false with no row', () => {
+    expect(rowSuppressesToast(undefined, NOW)).toBe(false);
   });
 
-  it('is true once that Occurrence Key has been recorded', async () => {
-    await recordFeedEntry({
+  it('is false for a fresh row another device synced in', () => {
+    expect(rowSuppressesToast(row, NOW)).toBe(false);
+  });
+
+  it('is true once this device has notified for it', () => {
+    expect(rowSuppressesToast({ ...row, notifiedHereAt: NOW - 1 }, NOW)).toBe(true);
+  });
+
+  it('is true once dismissed on any device', () => {
+    expect(rowSuppressesToast({ ...row, dismissedAt: NOW - 1 }, NOW)).toBe(true);
+  });
+
+  it('is true once the row is older than the stale window', () => {
+    expect(rowSuppressesToast({ ...row, firedAt: NOW - TOAST_STALE_AFTER_MS - 1 }, NOW)).toBe(true);
+    expect(rowSuppressesToast({ ...row, firedAt: NOW - TOAST_STALE_AFTER_MS }, NOW)).toBe(false);
+  });
+});
+
+describe('feedSuppressesToast', () => {
+  const entry = {
+    id: 'occurrence-1',
+    characterId: 1,
+    eventId: 'newMail',
+    title: 't',
+    body: 'b',
+    firedAt: 1000,
+  };
+
+  it('is false for an occurrence never recorded', async () => {
+    expect(await feedSuppressesToast('never-seen', 2000)).toBe(false);
+  });
+
+  it('is false for a recorded occurrence this device has not notified for', async () => {
+    await recordFeedEntry(entry);
+    expect(await feedSuppressesToast('occurrence-1', 2000)).toBe(false);
+  });
+
+  it('is true once markFeedNotifiedHere has run for that key', async () => {
+    await recordFeedEntry(entry);
+    await markFeedNotifiedHere(['occurrence-1'], 1500);
+    expect(await feedSuppressesToast('occurrence-1', 2000)).toBe(true);
+  });
+});
+
+describe('markFeedNotifiedHere', () => {
+  it('survives a later merge of the same row, as a sync pull does', async () => {
+    const entry = {
       id: 'occurrence-1',
       characterId: 1,
       eventId: 'newMail',
       title: 't',
       body: 'b',
       firedAt: 1000,
-    });
-    expect(await feedHasOccurrence('occurrence-1')).toBe(true);
+    };
+    await recordFeedEntry(entry);
+    await markFeedNotifiedHere(['occurrence-1'], 1500);
+    await recordFeedEntry({ ...entry, title: 'updated' });
+    expect((await db.notificationFeed.get('occurrence-1'))?.notifiedHereAt).toBe(1500);
+  });
+
+  it('creates no row for a key the feed does not hold', async () => {
+    await markFeedNotifiedHere(['missing'], 1500);
+    expect(await db.notificationFeed.get('missing')).toBeUndefined();
   });
 });
 

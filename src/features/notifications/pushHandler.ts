@@ -153,6 +153,8 @@ export async function handlePush(env: PushEnv, rawText: string | null, now: numb
           title: payload.title,
           body: payload.body,
           firedAt: now,
+          // So this device's Foreground Poller does not toast it a second time.
+          notifiedHereAt: now,
           ...(payload.eveType !== undefined ? { eveType: payload.eveType } : {}),
         });
 
