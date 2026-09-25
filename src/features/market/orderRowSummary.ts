@@ -51,7 +51,8 @@ export type OrderRowSummary =
       suggestedPrice: number | null;
     }
   | { kind: 'noCostBasis' }
-  | { kind: 'best' };
+  | { kind: 'best' }
+  | { kind: 'topBid' };
 
 /** `suggestedPrice` is already the legal undercut price (or null) — the margin is judged there, never against the rival's raw (tied) price. */
 function matchOutcome(row: OpenOrderRow, suggestedPrice: number | null): MatchOutcome | null {
@@ -126,7 +127,7 @@ export function orderRowSummary(row: OpenOrderRow): OrderRowSummary | null {
     case 'healthy':
     default:
       if (!row.isBuyOrder && row.costBasis === null) return { kind: 'noCostBasis' };
-      if (row.station.bestPrice !== null) return { kind: 'best' };
+      if (row.station.bestPrice !== null) return { kind: row.isBuyOrder ? 'topBid' : 'best' };
       return null;
   }
 }

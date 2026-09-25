@@ -1173,3 +1173,53 @@ describe('OrderDetailModal', () => {
     });
   });
 });
+
+describe('OrderDetailModal — buy order copy (#1733)', () => {
+  const BUY_ROW: OpenOrderRow = { ...BASE_ROW, isBuyOrder: true };
+
+  it('reads fills-in, fills-as-listed and who-bids-higher instead of the sell-side wording', () => {
+    renderModal({ row: BUY_ROW });
+
+    expect(screen.getByText('Fills in')).toBeInTheDocument();
+    expect(screen.getByText('If it fills as listed')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Who bids higher, and where/ })).toBeInTheDocument();
+    expect(screen.queryByText('Sells out in')).not.toBeInTheDocument();
+    expect(screen.queryByText('If it sells as listed')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Who is cheaper/)).not.toBeInTheDocument();
+  });
+
+  it('renders no cost-basis or better-exit section for a buy order', () => {
+    renderModal({ row: BUY_ROW });
+    expandAll();
+
+    expect(screen.queryByText("We don't know what this cost you")).not.toBeInTheDocument();
+    expect(screen.queryByText('Is there a better exit?')).not.toBeInTheDocument();
+  });
+
+  it('keeps the sell-side wording and sections for a sell order', () => {
+    renderModal();
+
+    expect(screen.getByText('Sells out in')).toBeInTheDocument();
+    expect(screen.getByText('If it sells as listed')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Who is cheaper, and where/ })).toBeInTheDocument();
+    expect(screen.getByText("We don't know what this cost you")).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Is there a better exit\?/ })).toBeInTheDocument();
+  });
+
+  it.each([
+    ['sell', BASE_ROW, 'Sells out in'],
+    ['buy', { ...BASE_ROW, isBuyOrder: true }, 'Fills in'],
+  ] as const)(
+    'renders the past-expiry warning inside its own card for a %s order',
+    (_side, base, label) => {
+      const history: PriceHistoryResult = {
+        points: [historyPoint(1, 30), historyPoint(2, 30), historyPoint(3, 30)],
+        fetchedAt: Date.now(),
+      };
+      renderModal({ row: { ...base, volumeRemain: 1000, volumeTotal: 1000 }, history });
+
+      const card = screen.getByText(label).closest('div') as HTMLElement;
+      expect(within(card).getByText('Runs past the day this order expires')).toBeInTheDocument();
+    }
+  );
+});

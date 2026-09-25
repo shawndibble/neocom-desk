@@ -4213,6 +4213,9 @@
         "best": "Best price",
         "bestHelp": "Nobody is cheaper where this order sits, and it sells for more than it cost you.",
         "bestAction": "Nothing. This one is doing fine.",
+        "topBid": "Top bid",
+        "topBidHelp": "This is a buy order and nobody bids higher where it sits, so sellers come to you first.",
+        "topBidAction": "Nothing. This one is doing fine.",
         "noCostBasis": "No cost basis",
         "noCostBasisHelp": "Nothing is linked to this order and your wallet buys don't cover it, so we can't work out your lowest safe price.",
         "noCostBasisAction": "Link the build that made this, or let your wallet cover every unit. A build needs a build plan on the Industry page first."
@@ -4233,7 +4236,8 @@
         "expiringUnknown": "{{units}} still unsold",
         "outbid": "A rival bids {{price}} ISK, {{gap}} over you",
         "noCostBasis": "Link a build or buy with this character and we can work out your lowest safe price",
-        "best": "Nobody is cheaper where this order sits"
+        "best": "Nobody is cheaper where this order sits",
+        "topBid": "Nobody bids higher where this order sits"
       },
       "groupSummaryIsk": "{{isk}} ISK listed",
       "groupSummaryWorst": "worst -{{pct}}%",
@@ -4261,7 +4265,7 @@
         "outbid": "Outbid buy order",
         "outbidHint": "Someone bids higher on your buy order, so sellers go to them first.",
         "healthy": "Healthy",
-        "healthyHint": "Nothing wrong here. Nobody is cheaper, and they sell for more than they cost."
+        "healthyHint": "Nothing wrong here. Nobody beats your price."
       },
       "floorLabel": "Never sell below",
       "floorHelp": "Change an order's price and you pay the broker fee all over again (discounted by your Relist Discount), so this is the lowest price worth editing to. Leave the order alone and it sells, the fee is already paid, so you break even a little lower.",
@@ -4284,6 +4288,8 @@
       "sellsOutHelp": "Units left divided by the item's average daily volume in the region, shared by your place in the queue.",
       "sellsOutUnknown": "Can't tell yet",
       "sellsOutNoSales": "Nothing has sold in the last 30 days",
+      "fillsIn": "Fills in",
+      "fillsInHelp": "Units left to buy divided by the item's average daily volume in the region, shared by your place in the queue.",
       "sellsOutPastExpiry": "Runs past the day this order expires",
       "expiresIn": "Expires in",
       "details": "Details",
@@ -4335,6 +4341,7 @@
       "statOrderExpires": "Order expires",
       "statExpiresCaption": "{{date}} · listed {{listed}}",
       "statIfSellsAsListed": "If it sells as listed",
+      "statIfFillsAsListed": "If it fills as listed",
       "statPerUnitAfterFees": "a unit, after fees",
       "exitsTitle": "Is there a better exit?",
       "exitShortHold": "Hold",
@@ -4402,6 +4409,7 @@
       "scopeClear": "Nobody cheaper here",
       "quickAnswer": "Quick answer",
       "whoIsCheaper": "Who is cheaper, and where",
+      "whoBidsHigher": "Who bids higher, and where",
       "floorWorking": "Where that price comes from",
       "outbidAt": "Outbid at {{price}}",
       "copyPrice": "Copy {{price}}",

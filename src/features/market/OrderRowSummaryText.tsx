@@ -127,6 +127,8 @@ export function OrderRowSummaryText({
       return (
         <span className="text-xs text-text-dim">{t('market.orders.rowSummary.noCostBasis')}</span>
       );
+    case 'topBid':
+      return <span className="text-xs text-text-dim">{t('market.orders.rowSummary.topBid')}</span>;
     case 'best':
     default:
       return <span className="text-xs text-text-dim">{t('market.orders.rowSummary.best')}</span>;

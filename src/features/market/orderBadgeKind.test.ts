@@ -264,3 +264,16 @@ describe('orderBadgeFor', () => {
     expect(orderBadgeFor(row)).toBeNull();
   });
 });
+
+describe('orderBadgeFor — buy orders (#1733)', () => {
+  it('badges a healthy buy row as topBid, never as the sell-side best price', () => {
+    const row: OpenOrderRow = {
+      ...BASE_ROW,
+      isBuyOrder: true,
+      problem: 'healthy',
+      problems: ['healthy'],
+      station: { bestPrice: 480, beatsMe: false, gapIsk: 20, gapPct: 4 },
+    };
+    expect(orderBadgeFor(row)).toEqual({ kind: 'topBid' });
+  });
+});

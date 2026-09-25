@@ -37,6 +37,7 @@ export const ORDER_BADGE_KINDS: readonly OrderBadgeKind[] = [
   'outbid',
   'frequentlyUndercut',
   'best',
+  'topBid',
   'noCostBasis',
 ];
 
@@ -74,7 +75,7 @@ export function orderBadgeFor(row: OpenOrderRow): OrderBadgeChoice | null {
       // `openOrdersModel.ts` already gates `frequentlyUndercut` on that.
       if (row.frequentlyUndercut) return { kind: 'frequentlyUndercut' };
       if (!row.isBuyOrder && row.costBasis === null) return { kind: 'noCostBasis' };
-      if (row.station.bestPrice !== null) return { kind: 'best' };
+      if (row.station.bestPrice !== null) return { kind: row.isBuyOrder ? 'topBid' : 'best' };
       return null;
   }
 }

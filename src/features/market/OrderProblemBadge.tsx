@@ -23,6 +23,7 @@ export type OrderBadgeKind =
   | 'outbid'
   | 'frequentlyUndercut'
   | 'best'
+  | 'topBid'
   | 'noCostBasis';
 
 type BadgeTone = 'danger-strong' | 'danger' | 'warning' | 'accent' | 'success' | 'neutral';
@@ -46,6 +47,7 @@ const KIND_TONE: Record<OrderBadgeKind, BadgeTone> = {
   outbid: 'neutral',
   frequentlyUndercut: 'neutral',
   best: 'success',
+  topBid: 'success',
   noCostBasis: 'neutral',
 };
 
