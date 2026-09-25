@@ -207,6 +207,20 @@ describe('computeFittingStats', () => {
     expect(stats.applied).toEqual({ weapons: [], droneControlRange: 20000 });
   });
 
+  it('adds the weather to what a fit already takes in, rather than replacing it', async () => {
+    const { withWeather } = await freshModule();
+    const fit = {
+      name: 'x',
+      ship: { type_id: 1 },
+      items: [],
+      incoming: { effects: [{ fromFleet: true }], buffs: [{ id: 10 }] },
+    } as unknown as Parameters<typeof withWeather>[0];
+    expect(withWeather(fit, 47390).incoming).toEqual({
+      effects: [{ fromFleet: true }, { fromBeacon: 47390 }],
+      buffs: [{ id: 10 }],
+    });
+  });
+
   it("hands the engine a weather's beacon as what the fit takes in — and nothing without one", async () => {
     stubNetwork();
     calculateMock.mockReturnValue({
@@ -223,7 +237,7 @@ describe('computeFittingStats', () => {
       { incoming?: unknown }[],
       { incoming?: unknown }[],
     ];
-    expect(inWeather.incoming).toEqual({ effects: [{ fromBeacon: 47390 }] });
+    expect(inWeather.incoming).toEqual({ effects: [{ fromBeacon: 47390 }], buffs: [] });
     expect(clear.incoming).toBeUndefined();
   });
 

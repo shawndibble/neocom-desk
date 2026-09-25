@@ -22,7 +22,7 @@ describe('AbyssalWeatherPicker', () => {
   it('says what the weather picked does, at its strength', () => {
     useAbyssalWeather.setState({ weatherTypeId: 47383 });
     render(<AbyssalWeatherPicker />);
-    expect(screen.getByText('Capacitor recharges 50% faster · EM resists −70%')).toBeTruthy();
+    expect(screen.getByText('Capacitor recharge time −50% · EM resists −70%')).toBeTruthy();
   });
 
   it('goes back to normal space', async () => {

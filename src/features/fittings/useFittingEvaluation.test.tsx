@@ -74,6 +74,7 @@ beforeEach(() => {
   );
   damage.hydrated = true;
   damage.selected = GURISTAS;
+  useAbyssalWeather.setState({ weatherTypeId: null });
 });
 
 describe('useFittingEvaluation', () => {
@@ -138,8 +139,9 @@ describe('useFittingEvaluation', () => {
     await evaluateFitting(SLASHER, CLONE, GURISTAS, 47390);
     // Main stats, the variant's baseline, the variant, and another Fitting.
     expect(calls().map((call) => call[4]?.weatherTypeId)).toEqual([47390, 47390, 47390, 47390]);
+    // The stats say which weather they were worked out in, so a heading can't name another.
+    expect(result.current.statsWeatherTypeId).toBe(47390);
 
-    useAbyssalWeather.setState({ weatherTypeId: null });
     engine.computeFittingStats.mockClear();
     await evaluateFitting(SLASHER, CLONE, GURISTAS, null);
     expect(calls()[0][4]?.weatherTypeId).toBeUndefined();

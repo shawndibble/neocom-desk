@@ -17,7 +17,20 @@ export interface AbyssalWeather {
   typeId: number;
   kind: AbyssalWeatherKind;
   level: 1 | 2 | 3;
+  /** Its level-scaled penalty, percent: to one damage type's resists, or Dark's turret range. */
+  penaltyPercent: 30 | 50 | 70;
 }
+
+/** In the order the game's filament tiers list them. */
+export const ABYSSAL_WEATHER_KINDS: readonly AbyssalWeatherKind[] = [
+  'dark',
+  'electrical',
+  'exotic',
+  'firestorm',
+  'gamma',
+];
+
+const PENALTY_PERCENT = { 1: 30, 2: 50, 3: 70 } as const;
 
 /** The first of each kind's three consecutive beacon type ids. */
 const FIRST_TYPE_ID: Readonly<Record<AbyssalWeatherKind, number>> = {
@@ -28,11 +41,14 @@ const FIRST_TYPE_ID: Readonly<Record<AbyssalWeatherKind, number>> = {
   firestorm: 47390, // infernal_weather_1
 };
 
-/** In the order the game's filament tiers list them. */
-export const ABYSSAL_WEATHER: readonly AbyssalWeather[] = (
-  ['dark', 'electrical', 'exotic', 'firestorm', 'gamma'] as const
-).flatMap((kind) =>
-  ([1, 2, 3] as const).map((level) => ({ typeId: FIRST_TYPE_ID[kind] + level - 1, kind, level }))
+/** Each kind at each strength, kinds in `ABYSSAL_WEATHER_KINDS` order. */
+export const ABYSSAL_WEATHER: readonly AbyssalWeather[] = ABYSSAL_WEATHER_KINDS.flatMap((kind) =>
+  ([1, 2, 3] as const).map((level) => ({
+    typeId: FIRST_TYPE_ID[kind] + level - 1,
+    kind,
+    level,
+    penaltyPercent: PENALTY_PERCENT[level],
+  }))
 );
 
 export function abyssalWeatherById(typeId: number): AbyssalWeather | undefined {

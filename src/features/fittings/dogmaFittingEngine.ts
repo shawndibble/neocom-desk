@@ -171,7 +171,17 @@ export function loadDogmaEngine(
  */
 export function withWeather(fit: Fit, weatherTypeId?: number): Fit {
   if (weatherTypeId === undefined) return fit;
-  return { ...fit, incoming: beacon(weatherTypeId) };
+  const weather = beacon(weatherTypeId);
+  // Beside whatever the fit already takes in, not instead of it.
+  const incoming = fit.incoming ?? {};
+  return {
+    ...fit,
+    incoming: {
+      ...incoming,
+      effects: [...(incoming.effects ?? []), ...(weather.effects ?? [])],
+      buffs: [...(incoming.buffs ?? []), ...(weather.buffs ?? [])],
+    },
+  };
 }
 
 /**

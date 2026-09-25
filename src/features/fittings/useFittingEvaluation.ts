@@ -66,6 +66,8 @@ export interface FittingEvaluation {
    */
   stats: FittingStats | null;
   statsFitting: Fitting | null;
+  /** The Abyssal weather `stats` were worked out in (null: normal space) — which lags a new pick until it lands. */
+  statsWeatherTypeId: number | null;
   statsProgress: DogmaAssetProgress | null;
   statsError: boolean;
   /** Calculates again after `statsError` — the engine refetches its assets if those failed. */
@@ -165,7 +167,11 @@ export function useFittingEvaluation({
     [profile, implantSet, implantBasis]
   );
 
-  const [stats, setStats] = useState<{ fitting: Fitting; stats: FittingStats } | null>(null);
+  const [stats, setStats] = useState<{
+    fitting: Fitting;
+    stats: FittingStats;
+    weatherTypeId: number | null;
+  } | null>(null);
   const [statsProgress, setStatsProgress] = useState<DogmaAssetProgress | null>(null);
   const [statsError, setStatsError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -204,7 +210,7 @@ export function useFittingEvaluation({
         );
         if (cancelled) return;
         setEngineReady(true);
-        setStats({ fitting, stats: result });
+        setStats({ fitting, stats: result, weatherTypeId });
       } catch {
         if (!cancelled) setStatsError(true);
       }
@@ -237,6 +243,7 @@ export function useFittingEvaluation({
   return {
     stats: stats?.stats ?? null,
     statsFitting: stats?.fitting ?? null,
+    statsWeatherTypeId: stats?.weatherTypeId ?? null,
     statsProgress,
     statsError,
     retry,

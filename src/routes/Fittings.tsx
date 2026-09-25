@@ -8,7 +8,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Button, Disclosure, Modal, PageHeader, Panel, SlideOver, Tabs } from '@/components/ui';
 import { AddRow } from '@/components/ui/icons';
 import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
-import { usePickedWeatherName } from '@/features/fittings/abyssalWeatherSelection';
+import { useWeatherName } from '@/features/fittings/abyssalWeatherSelection';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -145,7 +145,8 @@ export function Fittings() {
   const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
   const alpha = useFittingAlpha(workspace.fitting);
   const hardpointsUsed = useFittingHardpoints(workspace.fitting);
-  const weatherName = usePickedWeatherName();
+  // The weather the numbers on screen are in — which lags a new pick until they land.
+  const weatherName = useWeatherName(workspace.statsWeatherTypeId);
   const [saveToEveOpen, setSaveToEveOpen] = useState(false);
   // The item whose info (the Market's item detail) is open — a List name click.
   const [infoItem, setInfoItem] = useState<{ typeId: number; name: string } | null>(null);

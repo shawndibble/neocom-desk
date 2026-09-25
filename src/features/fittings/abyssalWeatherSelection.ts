@@ -6,8 +6,9 @@
  * of a fit ("how does it do in an Electrical 3?"), not part of the fit.
  */
 import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { create } from 'zustand';
-import { abyssalWeatherById } from '@/engine/fittings/abyssalWeather';
+import { abyssalWeatherById, type AbyssalWeather } from '@/engine/fittings/abyssalWeather';
 
 interface AbyssalWeatherSelection {
   /** A weather beacon's type id (`ABYSSAL_WEATHER`), or null for normal space. */
@@ -20,14 +21,17 @@ export const useAbyssalWeather = create<AbyssalWeatherSelection>((set) => ({
   setWeather: (weatherTypeId) => set({ weatherTypeId }),
 }));
 
-/** "Electrical 3" for the weather picked, null in normal space — for a heading to say where the numbers are. */
-export function usePickedWeatherName(): string | null {
-  const { t } = useTranslation();
-  const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
-  const picked = weatherTypeId === null ? undefined : abyssalWeatherById(weatherTypeId);
-  if (!picked) return null;
+/** "Electrical 3": a weather by kind and strength, as the picker and the stats heading both say it. */
+export function abyssalWeatherLabel(t: TFunction, weather: AbyssalWeather): string {
   return t('fittings.weather.option', {
-    kind: t(`fittings.weather.kind.${picked.kind}`),
-    level: picked.level,
+    kind: t(`fittings.weather.kind.${weather.kind}`),
+    level: weather.level,
   });
+}
+
+/** The name of weather `weatherTypeId`, null for normal space — for a heading to say where the numbers are. */
+export function useWeatherName(weatherTypeId: number | null): string | null {
+  const { t } = useTranslation();
+  const weather = weatherTypeId === null ? undefined : abyssalWeatherById(weatherTypeId);
+  return weather ? abyssalWeatherLabel(t, weather) : null;
 }
