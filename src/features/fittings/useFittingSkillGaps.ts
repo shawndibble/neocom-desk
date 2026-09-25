@@ -12,25 +12,9 @@ import {
   fittingRequirementTypeIds,
   type SkillGaps,
 } from '@/engine/fittings/skillGaps';
-import type { RequiredSkill } from '@/engine/import/fitToSkills';
 import type { Fitting } from '@/engine/fittings/types';
-import { loadUniverseType } from '@/features/skills/data';
-import { extractRequiredSkills } from '@/features/skills/dogma';
 import { loadActivePilotProfile } from './fittingPilotProfile';
-
-const requirementCache = new Map<number, readonly RequiredSkill[]>();
-
-async function loadRequirements(typeId: number): Promise<readonly RequiredSkill[]> {
-  const cached = requirementCache.get(typeId);
-  if (cached) return cached;
-  const result = await loadUniverseType(typeId);
-  // An unfetchable type is left uncached and treated as "no requirements"
-  // rather than blocking the rest of the Fitting's gaps.
-  if (!result) return [];
-  const required = extractRequiredSkills(result.data.dogma_attributes);
-  requirementCache.set(typeId, required);
-  return required;
-}
+import { loadRequirements } from './skillRequirements';
 
 export function useFittingSkillGaps(
   fitting: Fitting | null,

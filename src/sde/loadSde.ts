@@ -36,6 +36,11 @@ export const loadSkillAttributeModifiers = cached<SkillAttributeModifierMap>(
 );
 export const loadBlueprints = cached<BlueprintMap>('blueprints.json');
 export const loadTypes = cached<TypeMap>('types.json');
+/** A type's name, or a `Type {id}` placeholder for one the pinned SDE doesn't have. */
+export async function typeName(typeId: number): Promise<string> {
+  const types = await loadTypes();
+  return types[String(typeId)]?.name ?? `Type ${typeId}`;
+}
 export const loadPi = cached<PiData>('pi.json');
 /**
  * What each market-listed type reprocesses into (issue #537), for the

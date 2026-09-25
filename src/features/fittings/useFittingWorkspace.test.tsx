@@ -11,11 +11,13 @@ import { addModule, removeModule, setDroneCounts } from '@/engine/fittings/fitti
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { useFittingWorkspace } from './useFittingWorkspace';
 
+const TYPES: Record<string, { name: string; groupID: number; volume: number }> = {
+  '587': { name: 'Rifter', groupID: 25, volume: 0 },
+  '2454': { name: 'Hobgoblin I', groupID: 87, volume: 5 },
+};
 vi.mock('@/sde/loadSde', () => ({
-  loadTypes: async () => ({
-    '587': { name: 'Rifter', groupID: 25, volume: 0 },
-    '2454': { name: 'Hobgoblin I', groupID: 87, volume: 5 },
-  }),
+  loadTypes: async () => TYPES,
+  typeName: async (typeId: number) => TYPES[String(typeId)]?.name ?? `Type ${typeId}`,
   loadSkills: async () => [],
   loadFittingSlots: async () => ({}),
 }));

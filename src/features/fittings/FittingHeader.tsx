@@ -24,6 +24,8 @@ interface FittingHeaderProps {
   /** In-game Fittings need a Character. */
   hasCharacter: boolean;
   onLibrary: (tab: LibraryTab) => void;
+  /** Opens Fitting vs Fitting compare (#1547) for this Fitting. */
+  onCompare: () => void;
   /** The Fitting's Jita price, for Export; null while it loads. */
   price: Appraisal | null;
   /** What its numbers are worked out under — implants, missing skills. */
@@ -100,6 +102,7 @@ export function FittingHeader({
   subtitle,
   hasCharacter,
   onLibrary,
+  onCompare,
   price,
   context,
   view,
@@ -144,6 +147,9 @@ export function FittingHeader({
       )}
     </>
   );
+  const compareItem = (
+    <DropdownMenuItem onSelect={onCompare}>{t('fittings.compare.entryButton')}</DropdownMenuItem>
+  );
 
   if (compact) {
     return (
@@ -151,7 +157,13 @@ export function FittingHeader({
         fitting={fitting}
         price={price}
         identity={identity}
-        libraryItems={libraryItems}
+        libraryItems={
+          <>
+            {libraryItems}
+            <DropdownMenuSeparator />
+            {compareItem}
+          </>
+        }
         save={save}
         context={context}
       />
@@ -175,6 +187,7 @@ export function FittingHeader({
           </DropdownMenuContent>
         </DropdownMenu>
         {view}
+        <Button onClick={onCompare}>{t('fittings.compare.entryButton')}</Button>
         <FittingExportMenu fitting={fitting} price={price} />
         {save}
       </div>
