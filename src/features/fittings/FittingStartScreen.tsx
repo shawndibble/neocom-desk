@@ -167,6 +167,18 @@ export function FittingStartScreen({
           <nav
             aria-label={t('fittings.start.listLabel')}
             className="max-h-72 overflow-y-auto border border-line bg-panel lg:max-h-[36rem]"
+            onKeyDown={(event) => {
+              // Arrow keys walk the list: selection and focus move together.
+              if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return;
+              const from = visible.findIndex((row) => row.id === selected?.id);
+              const next = visible[from + (event.key === 'ArrowDown' ? 1 : -1)];
+              if (!next) return;
+              event.preventDefault();
+              setSelectedId(next.id);
+              event.currentTarget
+                .querySelector<HTMLElement>(`[data-row-id="${CSS.escape(next.id)}"]`)
+                ?.focus();
+            }}
           >
             {searching && (
               <p className="border-b border-line px-3 py-2 text-xs text-text-dim" role="status">
@@ -188,17 +200,24 @@ export function FittingStartScreen({
                       <li key={row.id}>
                         <button
                           type="button"
+                          data-row-id={row.id}
                           aria-pressed={isSelected}
                           onClick={() => setSelectedId(row.id)}
                           onDoubleClick={() => open(row)}
+                          onKeyDown={(event) => {
+                            // Enter opens, as a double-click does; Space still selects.
+                            if (event.key !== 'Enter') return;
+                            event.preventDefault();
+                            open(row);
+                          }}
                           className={`flex min-h-11 w-full items-center gap-2 border-l-2 px-3 text-left text-sm hover:bg-panel-2 md:min-h-9 ${isSelected ? 'border-accent bg-panel-2 text-accent' : 'border-transparent'}`}
                         >
                           <span className="min-w-0 flex-1 truncate">{row.name}</span>
-                          {row.source === 'saved' && (
-                            <span className="shrink-0 border border-line-bright px-1.5 text-[0.625rem] tracking-widest text-text-dim uppercase">
-                              {t('fittings.start.sourceSaved')}
-                            </span>
-                          )}
+                          <span className="shrink-0 border border-line-bright px-1.5 text-[0.625rem] tracking-widest text-text-dim uppercase">
+                            {row.source === 'saved'
+                              ? t('fittings.start.sourceSaved')
+                              : t('fittings.start.sourceInGame')}
+                          </span>
                         </button>
                       </li>
                     );
@@ -240,9 +259,10 @@ export function FittingStartScreen({
       <Modal
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        title={t('fittings.header.import')}
+        title={t('fittings.start.importButton')}
       >
         <FittingLoadCard
+          bare
           onLoad={workspace.loadFromInput}
           lastLoad={workspace.lastLoad}
           shareError={workspace.shareError}
