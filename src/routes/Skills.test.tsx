@@ -281,6 +281,37 @@ describe('Skills', () => {
     expect(screen.queryByText('264,000')).not.toBeInTheDocument();
   });
 
+  it('marks only the in-progress skill with a "Training → level · time" chip', async () => {
+    const day = 86_400_000;
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 2,
+            queue_position: 0,
+            finished_level: 4,
+            start_date: new Date(Date.now() - day).toISOString(),
+            finish_date: new Date(Date.now() + 4 * day + 60_000).toISOString(),
+          },
+          {
+            skill_id: 2,
+            queue_position: 1,
+            finished_level: 5,
+            start_date: new Date(Date.now() + 4 * day).toISOString(),
+            finish_date: new Date(Date.now() + 9 * day).toISOString(),
+          },
+        ])
+      )
+    );
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Expand all' }));
+    // Level IV is the one training; V is queued behind it and must not show.
+    expect(await screen.findAllByText(/^Training → IV · 4d 0h$/)).toHaveLength(1);
+    expect(screen.queryByText(/Training → V/)).not.toBeInTheDocument();
+  });
+
   it('credits the level but not the SP when ESI withheld level_end_sp', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>

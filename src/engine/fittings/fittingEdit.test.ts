@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   addDrones,
   addDronesWithinBay,
@@ -58,6 +58,40 @@ describe('addModule', () => {
   it('does not mutate its input', () => {
     addModule(base, 'medium', 0, 438);
     expect(base.modules).toHaveLength(2);
+  });
+
+  it('copies an already-loaded charge from a sibling of the same type', () => {
+    const next = addModule(base, 'medium', 0, 2889);
+    expect(next.modules.find((m) => m.slot === 'medium' && m.slotIndex === 0)).toEqual({
+      slot: 'medium',
+      slotIndex: 0,
+      typeId: 2889,
+      state: 'active',
+      chargeTypeId: 185,
+    });
+  });
+
+  it('falls back to the first default-charge candidate when no sibling has one', () => {
+    const next = addModule(base, 'medium', 0, 438, () => [77, 88]);
+    expect(next.modules.find((m) => m.slot === 'medium' && m.slotIndex === 0)?.chargeTypeId).toBe(
+      77
+    );
+  });
+
+  it('prefers a sibling copy over the default-charge candidates, without asking for them', () => {
+    const candidates = vi.fn(() => [999]);
+    const next = addModule(base, 'medium', 0, 2889, candidates);
+    expect(next.modules.find((m) => m.slot === 'medium' && m.slotIndex === 0)?.chargeTypeId).toBe(
+      185
+    );
+    expect(candidates).not.toHaveBeenCalled();
+  });
+
+  it('stays chargeless with no sibling charge and no candidates', () => {
+    const next = addModule(base, 'medium', 0, 438);
+    expect(
+      next.modules.find((m) => m.slot === 'medium' && m.slotIndex === 0)?.chargeTypeId
+    ).toBeUndefined();
   });
 });
 
