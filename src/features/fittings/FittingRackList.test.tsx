@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@/i18n';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
-import { FittingRackList as EditableRackList } from './FittingRackList';
+import { DroneSection, FittingRackList as EditableRackList } from './FittingRackList';
 
 type RackListProps = Parameters<typeof EditableRackList>[0];
 
@@ -98,5 +98,50 @@ describe('FittingRackList', () => {
     expect(screen.getByText('Drones')).toBeTruthy();
     // The two modules' removes, and the drones'.
     expect(screen.getAllByRole('button', { name: /^Remove/ })).toHaveLength(3);
+  });
+});
+
+describe('DroneSection', () => {
+  const withDrones: Fitting = {
+    ...fitting,
+    drones: [
+      { typeId: 2486, quantity: 2, state: 'active' },
+      { typeId: 2486, quantity: 3, state: 'online' },
+    ],
+  };
+  const stats = { ...statsWith(10), droneCapacity: 25, droneBandwidthTotal: 25 };
+
+  it('carries its own bandwidth and bay bars on the Ring, and the launched and bay counts', () => {
+    render(
+      <DroneSection
+        fitting={withDrones}
+        catalogue={null}
+        stats={stats}
+        edit={() => {}}
+        target={null}
+        onSelectTarget={() => {}}
+        budget
+        hideLabel
+      />
+    );
+    expect(screen.getByRole('meter', { name: 'Drone bandwidth' })).toBeTruthy();
+    expect(screen.getByRole('meter', { name: 'Drone bay (m³)' })).toBeTruthy();
+    expect(screen.getByLabelText('In space')).toHaveValue(2);
+    expect(screen.getByLabelText('In bay')).toHaveValue(3);
+    expect(screen.queryByText('Drones')).toBeNull();
+  });
+
+  it('is nothing on a hull without a drone bay', () => {
+    const { container } = render(
+      <DroneSection
+        fitting={fitting}
+        catalogue={null}
+        stats={{ ...stats, droneCapacity: 0, droneBandwidthTotal: 0 }}
+        edit={() => {}}
+        target={null}
+        onSelectTarget={() => {}}
+      />
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 });

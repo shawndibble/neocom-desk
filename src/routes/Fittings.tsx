@@ -5,7 +5,7 @@ import { formatIskCompact } from '@/lib/isk';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Button, Modal, PageHeader, Panel, SlideOver, Tabs } from '@/components/ui';
+import { Button, Disclosure, Modal, PageHeader, Panel, SlideOver, Tabs } from '@/components/ui';
 import { AddRow } from '@/components/ui/icons';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { useIsDesktop } from '@/lib/useIsDesktop';
@@ -33,7 +33,12 @@ import { LoadWarnings } from '@/features/fittings/FittingLoadCard';
 import { FittingLibrary, type LibraryTab } from '@/features/fittings/FittingLibrary';
 import { SaveToEveDialog } from '@/features/fittings/SaveToEveDialog';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
-import { FittingRackList, ModuleRow, RackSlots } from '@/features/fittings/FittingRackList';
+import {
+  DroneSection,
+  FittingRackList,
+  ModuleRow,
+  RackSlots,
+} from '@/features/fittings/FittingRackList';
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPanel';
@@ -107,7 +112,10 @@ export function Fittings() {
   // Below desktop the Ring, the List and the stats are one set of tabs.
   const [phoneTab, setPhoneTab] = useState<'editor' | 'stats'>('editor');
   // Phone Ring: the rack whose slots sheet is open (scope decision `20260924-205720`).
-  const [rackSheet, setRackSheet] = useState<FittingSlotKind | null>(null);
+  const [rackSheet, setRackSheet] = useState<FittingSlotKind | 'drone' | null>(null);
+  // The module dialog's variations start folded: a tap on a module is
+  // mostly for its state and ammo.
+  const [variationsOpen, setVariationsOpen] = useState(false);
   // The filled slot whose module panel is open.
   const [moduleSlot, setModuleSlot] = useState<{ slot: FittingSlotKind; slotIndex: number } | null>(
     null
@@ -147,6 +155,11 @@ export function Fittings() {
   }
   const slotCounts = stats?.slotCounts ?? null;
   const dronesShown = fitting !== null && showsDrones(stats, fitting.drones.length);
+  const droneCounts = { inSpace: 0, inBay: 0 };
+  for (const drone of fitting?.drones ?? []) {
+    if (drone.state === 'active') droneCounts.inSpace += drone.quantity;
+    else droneCounts.inBay += drone.quantity;
+  }
   // Removing a droneless hull's last (pasted) drone takes the Drones rack
   // away, so a browser still aimed at it lets go.
   if (target?.kind === 'drone' && !dronesShown) setTarget(null);
@@ -306,25 +319,57 @@ export function Fittings() {
 
   const editor =
     view === 'ring' ? (
-      <FittingRing
-        fitting={fitting}
-        stats={stats}
-        unusableModuleKeys={gaps?.unusableModuleKeys}
-        typeName={typeName}
-        onSlotSelect={selectSlot}
-        // Drag is pointer-only: a touch tablet taps a slot and picks instead.
-        onDropType={
-          isDesktop
-            ? (rack, index, typeId) => edit((f) => addModule(f, rack, index, typeId))
-            : undefined
-        }
-        onMoveModule={
-          isDesktop ? (rack, from, to) => edit((f) => moveModule(f, rack, from, to)) : undefined
-        }
-        compact={isPhone}
-        onRackOpen={setRackSheet}
-        actions={addButton}
-      />
+      <div className="min-w-0 space-y-3">
+        <FittingRing
+          fitting={fitting}
+          stats={stats}
+          unusableModuleKeys={gaps?.unusableModuleKeys}
+          typeName={typeName}
+          onSlotSelect={selectSlot}
+          // Drag is pointer-only: a touch tablet taps a slot and picks instead.
+          onDropType={
+            isDesktop
+              ? (rack, index, typeId) => edit((f) => addModule(f, rack, index, typeId))
+              : undefined
+          }
+          onMoveModule={
+            isDesktop ? (rack, from, to) => edit((f) => moveModule(f, rack, from, to)) : undefined
+          }
+          compact={isPhone}
+          onRackOpen={setRackSheet}
+          actions={addButton}
+          droneButton={
+            dronesShown ? (
+              <Button
+                size="md"
+                className="w-full justify-between"
+                onClick={() => setRackSheet('drone')}
+              >
+                <span>{t('fittings.list.drones')}</span>
+                <span className="text-xs font-normal text-text-dim tabular-nums">
+                  {t('fittings.ring.droneCount', droneCounts)}
+                </span>
+              </Button>
+            ) : undefined
+          }
+        />
+        {/* The phone overview has its Drones button among the rack buttons instead. */}
+        {!isPhone && dronesShown && (
+          <Panel title={t('fittings.list.drones')}>
+            <DroneSection
+              fitting={fitting}
+              catalogue={catalogue}
+              stats={stats}
+              edit={edit}
+              target={target}
+              onSelectTarget={selectTarget}
+              onShowInfo={showInfo}
+              budget
+              hideLabel
+            />
+          </Panel>
+        )}
+      </div>
     ) : (
       <FittingRackList
         fitting={fitting}
@@ -537,7 +582,11 @@ export function Fittings() {
       <Modal
         open={openModule !== null}
         onClose={() => setModuleSlot(null)}
-        title={t(`fittings.list.rack.${moduleSlot?.slot ?? 'high'}`)}
+        title={
+          openModule
+            ? catalogueTypeName(catalogue, openModule.typeId)
+            : t(`fittings.list.rack.${moduleSlot?.slot ?? 'high'}`)
+        }
         placement={isPhone ? 'sheet' : 'wide'}
       >
         {openModule && (
@@ -553,12 +602,17 @@ export function Fittings() {
               edit={edit}
               onShowInfo={showInfo}
             />
-            <div>
-              <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('fittings.variations.title')}
-              </p>
-              <FittingVariationsPanel rows={variationRows} onSelect={swapVariation} />
-            </div>
+            <Disclosure
+              label={t('fittings.variations.swapTitle')}
+              trailing={variationRows.length > 0 ? String(variationRows.length) : undefined}
+              expanded={variationsOpen}
+              onToggle={() => setVariationsOpen((open) => !open)}
+              className="rounded-xs border border-line"
+            >
+              <div className="p-2">
+                <FittingVariationsPanel rows={variationRows} onSelect={swapVariation} />
+              </div>
+            </Disclosure>
           </div>
         )}
       </Modal>
@@ -566,10 +620,31 @@ export function Fittings() {
         <Modal
           open={rackSheet !== null}
           onClose={() => setRackSheet(null)}
-          title={t(`fittings.list.rack.${rackSheet ?? 'high'}`)}
+          title={
+            rackSheet === 'drone'
+              ? t('fittings.list.drones')
+              : t(`fittings.list.rack.${rackSheet ?? 'high'}`)
+          }
           placement="sheet"
         >
-          {rackSheet && (
+          {rackSheet === 'drone' && (
+            <DroneSection
+              fitting={fitting}
+              catalogue={catalogue}
+              stats={stats}
+              edit={edit}
+              target={target}
+              onSelectTarget={(next) => {
+                // One sheet at a time: the Add sheet takes over.
+                setRackSheet(null);
+                selectTarget(next);
+              }}
+              onShowInfo={showInfo}
+              budget
+              hideLabel
+            />
+          )}
+          {rackSheet && rackSheet !== 'drone' && (
             <RackSlots
               rack={rackSheet}
               hideLabel

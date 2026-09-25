@@ -67,6 +67,8 @@ interface FittingRingProps {
    */
   compact?: boolean;
   onRackOpen?: (rack: FittingSlotKind) => void;
+  /** The phone overview's Drones button, among the rack buttons. */
+  droneButton?: ReactNode;
   /** The panel header's controls — the page's "+ Add module". */
   actions?: ReactNode;
 }
@@ -369,6 +371,7 @@ export function FittingRing({
   onMoveModule,
   compact = false,
   onRackOpen,
+  droneButton,
   actions,
 }: FittingRingProps) {
   const { t } = useTranslation();
@@ -608,6 +611,7 @@ export function FittingRing({
                   </Button>
                 );
               })}
+              {droneButton}
             </div>
           </>
         )}
