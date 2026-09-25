@@ -16,7 +16,7 @@ import {
   useNotificationPreferences,
   hydrateNotificationPreferences,
   isFeedChannelEnabled,
-} from './preferences';
+} from './preferencesStore';
 
 /**
  * Re-derives the badge from what the Overview would actually show: the same
