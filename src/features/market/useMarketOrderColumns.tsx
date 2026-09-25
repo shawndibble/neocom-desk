@@ -128,6 +128,11 @@ export function useMarketOrderColumns({
       location: {
         id: 'location',
         header: t('market.location'),
+        // Table mode only — a long station name was squeezing this column
+        // and wrapping rows across several lines. The stacked-card media
+        // query overrides `white-space`/width below `sm`, so phone keeps
+        // the full, untruncated name.
+        className: 'sm:max-w-[10rem] truncate',
         sortValue: (o) =>
           resolveOrderLocation(o, npcStationMap, solarSystemMap).stationName ?? undefined,
         render: (o) => (
