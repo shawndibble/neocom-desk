@@ -1187,6 +1187,38 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
   });
 
+  it("grants a lapsed alt's own grant, not the active Character's, and names them", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    await seedSecondCharacter();
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_B}/industry/jobs`, () =>
+        HttpResponse.json({ error: 'token is not valid for scope' }, { status: 403 })
+      )
+    );
+    const { beginEveLogin } = await import('@/app/loginFlow');
+    vi.mocked(beginEveLogin).mockClear();
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    await user.click(await screen.findByRole('button', { name: 'This character' }));
+    await user.click(await screen.findByRole('button', { name: 'All characters' }));
+
+    expect(await screen.findByText('Pilot Two — Log in again to see jobs')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Log in again with EVE Online' }));
+    expect(beginEveLogin).toHaveBeenCalledWith({ characterId: CHAR_B, groups: ['industry'] });
+  });
+
   it('clears the spinner when the cross-character fan-out itself fails, rather than spinning forever', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(NOW);

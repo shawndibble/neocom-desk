@@ -857,11 +857,17 @@ export function OpenOrdersPanel({
           <ReauthBanner
             key={entry.characterId}
             variant="ghost"
-            title={`${entry.characterName} — ${t('orders.reauthTitle')}`}
+            title={t('reauth.titleFor', {
+              character: entry.characterName,
+              title: t('orders.reauthTitle'),
+            })}
             hint={t('orders.reauthHint')}
             actionLabel={t('orders.reauthAction')}
             onLogin={() =>
-              void beginEveLogin({ groups: permissionsForEndpoints(['getCharacterOrders']) })
+              void beginEveLogin({
+                characterId: entry.characterId,
+                groups: permissionsForEndpoints(['getCharacterOrders']),
+              })
             }
           />
         ))}

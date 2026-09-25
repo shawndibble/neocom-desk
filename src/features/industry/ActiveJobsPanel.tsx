@@ -891,11 +891,15 @@ export function ActiveJobsPanel({
             <ReauthBanner
               key={entry.characterId}
               variant="ghost"
-              title={`${entry.characterName} — ${t('industry.jobsReauthTitle')}`}
+              title={t('reauth.titleFor', {
+                character: entry.characterName,
+                title: t('industry.jobsReauthTitle'),
+              })}
               hint={t('industry.jobsReauthHint')}
               actionLabel={t('industry.jobsReauthAction')}
               onLogin={() =>
                 void beginEveLogin({
+                  characterId: entry.characterId,
                   groups: permissionsForEndpoints(['getCharacterIndustryJobs']),
                 })
               }
