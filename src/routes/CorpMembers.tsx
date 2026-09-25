@@ -279,6 +279,7 @@ function CorpMembersView() {
     <div className="space-y-4">
       <PageHeader
         title={t('corp.members.title')}
+        subNav={<CorpSubNav flush />}
         meta={
           data?.fetchedAt ? (
             <DataAgeBadge date={data.fetchedAt} note={t('corp.dataAgeNote')} />
@@ -293,7 +294,6 @@ function CorpMembersView() {
           />
         }
       />
-      <CorpSubNav />
 
       {snapshot.loading && data === null ? (
         <Spinner />

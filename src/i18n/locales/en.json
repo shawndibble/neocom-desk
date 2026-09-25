@@ -4934,7 +4934,7 @@
       "leftName": "Left · {{name}}"
     },
     "members": {
-      "title": "Members",
+      "title": "Corp members",
       "refresh": "Refresh member list",
       "tableLabel": "Corporation members",
       "columnMember": "Member",
@@ -4968,7 +4968,7 @@
       }
     },
     "assets": {
-      "title": "Assets",
+      "title": "Corp assets",
       "refresh": "Refresh corp assets",
       "empty": "No corporation assets",
       "emptyHint": "EVE reported no assets for this corporation.",
