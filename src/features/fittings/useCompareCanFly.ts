@@ -9,11 +9,19 @@ import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 import { loadRequirements } from './skillRequirements';
 import { useCompareAsync, type CompareAsyncResult } from './useCompareAsync';
 
-async function computeOne(fitting: Fitting, profile: PilotProfile): Promise<boolean> {
+/** Whether a pilot with these trained skills can fly the whole Fitting. */
+export async function fittingCanFly(
+  fitting: Fitting,
+  skillLevels: PilotProfile['skillLevels']
+): Promise<boolean> {
   const typeIds = fittingRequirementTypeIds(fitting);
   const required = await Promise.all(typeIds.map(loadRequirements));
   const byType = new Map(typeIds.map((id, i) => [id, required[i]]));
-  return computeSkillGaps(fitting, byType, profile.skillLevels).missing.length === 0;
+  return computeSkillGaps(fitting, byType, skillLevels).missing.length === 0;
+}
+
+function computeOne(fitting: Fitting, profile: PilotProfile): Promise<boolean> {
+  return fittingCanFly(fitting, profile.skillLevels);
 }
 
 /** Per compare slot: whether the Character can fly it, or `failed` when its skill requirements couldn't be loaded. */
