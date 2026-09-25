@@ -29,14 +29,13 @@ beforeEach(async () => {
 });
 
 describe('StandingsScopeNotice', () => {
-  it('prompts a re-login when the grant predates the standings scope', async () => {
+  it('offers to grant the missing standings scope, not a re-login', async () => {
     await grant(['esi-characters.read_contacts.v1']);
     render(<StandingsScopeNotice />);
 
-    await userEvent.click(
-      await screen.findByRole('button', { name: /log in to share standings/i })
-    );
+    await userEvent.click(await screen.findByRole('button', { name: /grant character details/i }));
 
+    expect(screen.queryByText(/logged in before/i)).not.toBeInTheDocument();
     expect(beginEveLogin).toHaveBeenCalledTimes(1);
   });
 

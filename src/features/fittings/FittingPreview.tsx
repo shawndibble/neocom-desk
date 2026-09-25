@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel, Tabs, TypeIcon } from '@/components/ui';
+import { Button, Panel } from '@/components/ui';
 import { encodeFittingShare } from '@/engine/fitting/fittingShare';
 import { esiFittingToFitting } from '@/engine/fittings/esiFittingMapper';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
-import { typeRenderUrl } from '@/lib/eveImages';
 import {
   DefensePanel,
   FitMeters,
@@ -29,23 +28,19 @@ interface FittingPreviewProps {
   onCompare: (code: string) => void;
   onRename: () => void;
   onDelete: () => void;
+  /** Keeps edited notes on a saved fitting. */
+  onSaveNotes: (notes: string) => void;
 }
 
-type PreviewTab = 'offense' | 'defense' | 'skills' | 'notes';
-
-/** A hull's 3D render; the plain icon where the image server has none. */
-function HullArt({ typeId }: { typeId: number }) {
-  const [failedFor, setFailedFor] = useState<number | null>(null);
-  if (failedFor === typeId) return <TypeIcon typeId={typeId} size={128} width={64} height={64} />;
+/** One boxed part of the preview, headed like the editor's panels. */
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <img
-      src={typeRenderUrl(typeId, 256)}
-      alt=""
-      width={256}
-      height={256}
-      className="h-full w-full object-contain"
-      onError={() => setFailedFor(typeId)}
-    />
+    <section className="border border-line">
+      <h3 className="border-b border-line bg-panel-2 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        {title}
+      </h3>
+      <div className="p-3">{children}</div>
+    </section>
   );
 }
 
@@ -78,16 +73,17 @@ function useShareCode(row: LibraryRow, fitting: Fitting | null): string | null |
   return encoded?.fitting === fitting ? encoded.code : undefined;
 }
 
-/** What a row has to say for itself beyond its stats: an In-game Fitting's description. */
+/** A saved fitting's notes, or an In-game one's description. */
 function rowNotes(row: LibraryRow): string {
-  return row.source === 'inGame' ? row.inGame.description.trim() : '';
+  return row.source === 'saved' ? (row.record.notes ?? '') : row.inGame.description.trim();
 }
 
 /**
  * The selected Fitting on the Start screen (scope decision `20260925-152418`):
- * the Ring (hover a slot for its module), what the fit asks of the hull, then
- * Offense / Defense / Skills / Notes one at a time — worked out for this one
- * Fitting only, so a long list costs nothing until a row is picked.
+ * the Ring (hover a slot for its module) with Skills beneath it, and to its
+ * right what the fit asks of the hull with the Offense, Defense and Notes boxes —
+ * worked out for this one Fitting only, so a long list costs nothing until a
+ * row is picked.
  */
 export function FittingPreview({
   row,
@@ -97,6 +93,7 @@ export function FittingPreview({
   onCompare,
   onRename,
   onDelete,
+  onSaveNotes,
 }: FittingPreviewProps) {
   const { t } = useTranslation();
   const fitting = usePreviewFitting(row);
@@ -104,20 +101,11 @@ export function FittingPreview({
   const fittings = useMemo(() => [fitting], [fitting]);
   const compared = useCompareStats(fittings, profile);
   const shareCode = useShareCode(row, fitting);
-  const [tab, setTab] = useState<PreviewTab>('offense');
 
   const stats = compared.values[0];
   const unreadable = row.source === 'saved' && row.hull === null;
   const notes = rowNotes(row);
   const typeName = (typeId: number) => catalogueTypeName(catalogue, typeId);
-  const tabs = [
-    { id: 'offense', label: t('fittings.start.preview.tabOffense') },
-    { id: 'defense', label: t('fittings.start.preview.tabDefense') },
-    { id: 'skills', label: t('fittings.start.preview.tabSkills') },
-    ...(notes === '' ? [] : [{ id: 'notes', label: t('fittings.start.preview.tabNotes') }]),
-  ];
-  const shownTab = tabs.some((entry) => entry.id === tab) ? tab : 'offense';
-
   return (
     <Panel title={row.name}>
       <div className="flex flex-col gap-4">
@@ -155,56 +143,55 @@ export function FittingPreview({
         {unreadable ? (
           <p className="text-xs text-warning">{t('fittings.start.preview.unreadable')}</p>
         ) : (
-          <>
-            <div className="flex flex-wrap items-start gap-4">
-              <div className="w-64 max-w-full shrink-0">
-                {fitting && (
-                  <FittingRing
-                    fitting={fitting}
-                    stats={stats ?? null}
-                    moduleResults={stats?.modules ?? null}
-                    typeName={typeName}
-                    compact
-                    bare
-                  />
-                )}
-              </div>
-              <div className="min-w-56 flex-1 space-y-3">
-                {stats ? (
-                  <FitMeters stats={stats} />
-                ) : compared.failed[0] ? (
-                  <p className="text-xs text-warning">{t('fittings.start.preview.statsFailed')}</p>
-                ) : (
-                  <p className="text-xs text-text-dim">{t('fittings.start.preview.calculating')}</p>
-                )}
-                <div className="flex h-20 w-32 items-center justify-center border border-line bg-panel-2">
-                  {fitting && <HullArt typeId={fitting.shipTypeId} />}
-                </div>
-              </div>
+          <div className="grid items-start gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+            <div className="min-w-0 space-y-4">
+              {fitting && (
+                <FittingRing
+                  fitting={fitting}
+                  stats={stats ?? null}
+                  moduleResults={stats?.modules ?? null}
+                  typeName={typeName}
+                  compact
+                  bare
+                />
+              )}
+              <Section title={t('fittings.start.preview.sectionSkills')}>
+                {fitting && <SkillsPanel fitting={fitting} characterId={characterId} />}
+              </Section>
             </div>
-
-            <Tabs
-              tabs={tabs}
-              value={shownTab}
-              onChange={(id) => setTab(id as PreviewTab)}
-              label={t('fittings.start.preview.tabsLabel')}
-            />
-            <div>
-              {shownTab === 'skills' ? (
-                fitting && <SkillsPanel fitting={fitting} characterId={characterId} />
-              ) : shownTab === 'notes' ? (
-                <NotesPanel text={notes} />
-              ) : stats ? (
-                shownTab === 'offense' ? (
-                  <OffensePanel stats={stats} typeName={typeName} />
-                ) : (
-                  <DefensePanel stats={stats} />
-                )
+            <div className="min-w-0 space-y-4">
+              {stats ? (
+                <FitMeters stats={stats} />
+              ) : compared.failed[0] ? (
+                <p className="text-xs text-warning">{t('fittings.start.preview.statsFailed')}</p>
               ) : (
                 <p className="text-xs text-text-dim">{t('fittings.start.preview.calculating')}</p>
               )}
+              <Section title={t('fittings.start.preview.sectionOffense')}>
+                {stats ? (
+                  <OffensePanel stats={stats} typeName={typeName} />
+                ) : (
+                  <p className="text-xs text-text-dim">{t('fittings.start.preview.calculating')}</p>
+                )}
+              </Section>
+              <Section title={t('fittings.start.preview.sectionDefense')}>
+                {stats ? (
+                  <DefensePanel stats={stats} />
+                ) : (
+                  <p className="text-xs text-text-dim">{t('fittings.start.preview.calculating')}</p>
+                )}
+              </Section>
+              {/* A saved fitting always offers Notes (to write them); an In-game one only when it has a description. */}
+              {(row.source === 'saved' || notes !== '') && (
+                <Section title={t('fittings.start.preview.sectionNotes')}>
+                  <NotesPanel
+                    text={notes}
+                    onSave={row.source === 'saved' ? onSaveNotes : undefined}
+                  />
+                </Section>
+              )}
             </div>
-          </>
+          </div>
         )}
       </div>
     </Panel>

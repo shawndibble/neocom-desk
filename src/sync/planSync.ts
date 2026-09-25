@@ -1032,6 +1032,8 @@ const fittingSpec: CollectionSpec<FittingRecord, RemoteFittingDoc> = {
     characterId: f.characterId,
     name: f.name,
     code: f.code,
+    // Firestore rejects `undefined`, so "no notes" travels as an empty string.
+    notes: f.notes ?? '',
     updatedAt: f.updatedAt,
     ownerHash,
     deleted: false,
@@ -1041,6 +1043,7 @@ const fittingSpec: CollectionSpec<FittingRecord, RemoteFittingDoc> = {
     characterId: r.characterId,
     name: r.name,
     code: r.code,
+    ...(r.notes ? { notes: r.notes } : {}),
     updatedAt: r.updatedAt,
   }),
   bulkPutLocal: (records) => db.fittings.bulkPut(records),

@@ -25,18 +25,23 @@ vi.mock('./FittingPreview', () => ({
     row,
     onOpen,
     onCompare,
+    onSaveNotes,
   }: {
     row: { name: string };
     onOpen: () => void;
     onCompare: (code: string) => void;
+    onSaveNotes: (notes: string) => void;
   }) => (
     <div>
       <p>preview of {row.name}</p>
+      <button onClick={() => onSaveNotes('Kite first.')}>Save notes</button>
       <button onClick={onOpen}>Open fitting</button>
       <button onClick={() => onCompare('1.abc')}>Compare</button>
     </div>
   ),
 }));
+
+vi.mock('@/sync', () => ({ scheduleSync: vi.fn(), markFittingDeleted: vi.fn() }));
 
 const navigateMock = vi.hoisted(() => vi.fn());
 vi.mock('react-router-dom', async (importOriginal) => ({
@@ -180,6 +185,17 @@ describe('FittingStartScreen', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Kite/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Compare' }));
     expect(navigateMock).toHaveBeenCalledWith('/fittings/compare?f=1.abc');
+  });
+
+  it('keeps edited notes on a saved fitting, and only there', async () => {
+    renderScreen();
+    await userEvent.click(await screen.findByRole('button', { name: /Kite/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save notes' }));
+    await vi.waitFor(async () => expect((await db.fittings.get('r1'))?.notes).toBe('Kite first.'));
+
+    await userEvent.click(screen.getByRole('button', { name: /Armor Drake/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save notes' }));
+    expect(await db.fittings.count()).toBe(1);
   });
 
   it('opens Import in a dialog, with the Load card', async () => {

@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { FittingStats, LayerDefense } from '@/engine/fittings/types';
 import { DefensePanel, FitMeters, NotesPanel, OffensePanel } from './FittingPreviewPanels';
@@ -117,8 +118,35 @@ describe('FitMeters', () => {
 });
 
 describe('NotesPanel', () => {
-  it('keeps the line breaks of a note', () => {
+  it('keeps the line breaks of a read-only note', () => {
     render(<NotesPanel text={'first\nsecond'} />);
     expect(screen.getByText(/first/)).toHaveClass('whitespace-pre-wrap');
+  });
+
+  it('shows notes that change underneath it while nothing is being typed, and saves only real edits', async () => {
+    const onSave = vi.fn();
+    const { rerender } = render(<NotesPanel text="Old." onSave={onSave} />);
+    rerender(<NotesPanel text="Synced from another device." onSave={onSave} />);
+    const box = screen.getByRole('textbox', { name: 'Notes' });
+    expect(box).toHaveValue('Synced from another device.');
+
+    await userEvent.click(box);
+    await userEvent.tab();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('saves edited notes when the field loses focus, and only if they changed', async () => {
+    const onSave = vi.fn();
+    render(<NotesPanel text="Overheat late." onSave={onSave} />);
+    const box = screen.getByRole('textbox', { name: 'Notes' });
+    expect(box).toHaveAttribute('maxlength', '500');
+
+    await userEvent.click(box);
+    await userEvent.tab();
+    expect(onSave).not.toHaveBeenCalled();
+
+    await userEvent.type(box, ' Kite first.');
+    await userEvent.tab();
+    expect(onSave).toHaveBeenCalledWith('Overheat late. Kite first.');
   });
 });

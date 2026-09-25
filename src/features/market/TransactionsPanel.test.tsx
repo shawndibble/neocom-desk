@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { TransactionsPanel } from './TransactionsPanel';
 import { loadWalletTransactions } from '@/features/character/wallet';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { downloadCsv } from '@/lib/downloadCsv';
 import type { WalletTransaction } from '@/esi/endpoints';
 
 vi.mock('@/features/character/wallet', () => ({ loadWalletTransactions: vi.fn() }));
@@ -15,7 +17,10 @@ vi.mock('@/lib/downloadCsv', () => ({ downloadCsv: vi.fn() }));
 const mockedLoadTransactions = vi.mocked(loadWalletTransactions);
 const mockedTypeNames = vi.mocked(loadTypeNames);
 
-const TYPE_NAMES = new Map([[2048, 'Damage Control II']]);
+const TYPE_NAMES = new Map([
+  [2048, 'Damage Control II'],
+  [34, 'Tritanium'],
+]);
 
 function transaction(overrides: Partial<WalletTransaction> = {}): WalletTransaction {
   return {
@@ -33,13 +38,13 @@ function transaction(overrides: Partial<WalletTransaction> = {}): WalletTransact
   };
 }
 
-function renderPanel() {
+function renderPanel(url = '/market/history/transactions') {
   const onAddToQuickbar = vi.fn();
   const onShowInfo = vi.fn();
   const onRequestBlueprintCatalog = vi.fn();
   const onViewChange = vi.fn();
   render(
-    <MemoryRouter initialEntries={['/market/history/transactions']}>
+    <MemoryRouter initialEntries={[url]}>
       <TransactionsPanel
         onViewChange={onViewChange}
         blueprintCatalog={null}
@@ -89,6 +94,77 @@ describe('TransactionsPanel — the row as an item', () => {
 
     fireEvent.contextMenu(await screen.findByRole('row', { name: /Damage Control II/ }));
     expect(onRequestBlueprintCatalog).toHaveBeenCalled();
+  });
+});
+
+describe('TransactionsPanel — desktop filter and totals', () => {
+  function load(data: WalletTransaction[]) {
+    mockedLoadTransactions.mockResolvedValue({
+      data,
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated: false,
+    });
+  }
+  const FILLS = [
+    transaction({ transaction_id: 1, date: '2026-09-20T12:00:00Z' }),
+    transaction({
+      transaction_id: 2,
+      date: '2026-09-10T12:00:00Z',
+      type_id: 34,
+      is_buy: true,
+      quantity: 10,
+      unit_price: 5,
+    }),
+  ];
+
+  it('narrows the rows by item search and totals only what is left', async () => {
+    load(FILLS);
+    renderPanel();
+    await screen.findByRole('row', { name: /Damage Control II/ });
+    expect(screen.getByRole('row', { name: /Tritanium/ })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByPlaceholderText(/Search item/), 'trit');
+
+    expect(screen.queryByRole('row', { name: /Damage Control II/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /Tritanium/ })).toBeInTheDocument();
+    const strip = screen.getByRole('region', { name: 'Totals for the transactions shown' });
+    expect(within(strip).getAllByText('-50')).toHaveLength(2);
+  });
+
+  it('narrows the rows by side from the URL', async () => {
+    load(FILLS);
+    renderPanel('/market/history/transactions?txn.side=buy');
+
+    expect(await screen.findByRole('row', { name: /Tritanium/ })).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /Damage Control II/ })).not.toBeInTheDocument();
+  });
+
+  it('narrows the rows by date range from the URL', async () => {
+    load(FILLS);
+    renderPanel('/market/history/transactions?txn.start=2026-09-15');
+
+    expect(await screen.findByRole('row', { name: /Damage Control II/ })).toBeInTheDocument();
+    expect(screen.queryByRole('row', { name: /Tritanium/ })).not.toBeInTheDocument();
+  });
+
+  it('says so when the filter matches nothing, rather than showing a blank table', async () => {
+    load(FILLS);
+    renderPanel('/market/history/transactions?txn.q=nothing-like-this');
+
+    expect(await screen.findByText('No transactions match this filter.')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Totals for the transactions shown' })).toBeNull();
+  });
+
+  it('exports the filtered rows', async () => {
+    load(FILLS);
+    renderPanel('/market/history/transactions?txn.side=buy');
+    await screen.findByRole('row', { name: /Tritanium/ });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+
+    const exported = vi.mocked(downloadCsv).mock.calls[0][1] as WalletTransaction[];
+    expect(exported.map((txn) => txn.transaction_id)).toEqual([2]);
   });
 });
 

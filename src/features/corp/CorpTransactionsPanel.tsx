@@ -95,7 +95,7 @@ const SIDE_LABEL: Record<TransactionSide, string> = {
   sell: 'wallet.sell',
 };
 
-function TransactionsFilterBar({
+export function TransactionsFilterBar({
   filter,
   onChange,
   actions,

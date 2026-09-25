@@ -25,6 +25,14 @@ export function clampFittingName(name: string): string {
   return Array.from(name).slice(0, IN_GAME_FITTING_NAME_MAX).join('');
 }
 
+/** ESI's limit on a saved fitting's description. */
+export const IN_GAME_FITTING_DESCRIPTION_MAX = 500;
+
+/** Same code-point clamp as the name, for the description. */
+export function clampFittingDescription(description: string): string {
+  return Array.from(description).slice(0, IN_GAME_FITTING_DESCRIPTION_MAX).join('');
+}
+
 export interface SaveToEveInput {
   characterId: number;
   fitting: Fitting;
@@ -54,7 +62,11 @@ function messageOf(err: unknown): string {
 
 export async function saveFittingToEve(input: SaveToEveInput): Promise<SaveToEveResult> {
   const { characterId, fitting, name, description, overwriteFittingId } = input;
-  const payload = fittingToEsiFitting(fitting, clampFittingName(name), description);
+  const payload = fittingToEsiFitting(
+    fitting,
+    clampFittingName(name),
+    clampFittingDescription(description)
+  );
 
   let fittingId: number;
   try {
