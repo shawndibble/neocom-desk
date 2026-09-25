@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, PageHeader, Panel } from '@/components/ui';
+import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { moduleKey } from '@/engine/fittings/skillGaps';
@@ -18,6 +19,7 @@ import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
 import { MyFittingsPanel } from '@/features/fittings/MyFittingsPanel';
 import { FittingLoadCard } from '@/features/fittings/FittingLoadCard';
 import { InGameFittingsPanel } from '@/features/fittings/InGameFittingsPanel';
+import { SaveToEveDialog } from '@/features/fittings/SaveToEveDialog';
 import { FittingRackList, ModuleRow } from '@/features/fittings/FittingRackList';
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
@@ -67,6 +69,11 @@ export function Fittings() {
   );
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   const gaps = useFittingSkillGaps(workspace.fitting, activeCharacterId);
+  const [saveToEveOpen, setSaveToEveOpen] = useState(false);
+  // Bumped on a successful Save to EVE so InGameFittingsPanel remounts and
+  // refetches, picking up the fitting that just landed (or the overwrite).
+  const [inGameFittingsKey, setInGameFittingsKey] = useState(0);
+  const canSaveToEve = useEndpointsGranted(['postCharacterFitting']);
 
   const { fitting, stats, edit } = workspace;
   const slotCounts = stats?.slotCounts ?? null;
@@ -194,6 +201,19 @@ export function Fittings() {
                   ? t('fittings.myFittings.save')
                   : t('fittings.myFittings.update')}
               </Button>
+              <Button
+                disabled={activeCharacterId === null || canSaveToEve !== true}
+                title={
+                  activeCharacterId === null
+                    ? t('fittings.saveToEve.needCharacter')
+                    : canSaveToEve === false
+                      ? t('fittings.saveToEve.needPermission')
+                      : undefined
+                }
+                onClick={() => setSaveToEveOpen(true)}
+              >
+                {t('fittings.saveToEve.action')}
+              </Button>
               {viewHydrated && (
                 <FittingViewToggle value={view} onChange={(next) => void setView(next)} />
               )}
@@ -210,11 +230,21 @@ export function Fittings() {
       />
       {activeCharacterId !== null && (
         <InGameFittingsPanel
+          key={inGameFittingsKey}
           characterId={activeCharacterId}
           onOpen={(loaded) => void workspace.openFitting(loaded)}
         />
       )}
       <MyFittingsPanel characterId={activeCharacterId} onOpen={workspace.openSaved} />
+      {fitting && activeCharacterId !== null && (
+        <SaveToEveDialog
+          open={saveToEveOpen}
+          onClose={() => setSaveToEveOpen(false)}
+          characterId={activeCharacterId}
+          fitting={fitting}
+          onSaved={() => setInGameFittingsKey((key) => key + 1)}
+        />
+      )}
       {fitting && viewHydrated && (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <div className="space-y-3">
