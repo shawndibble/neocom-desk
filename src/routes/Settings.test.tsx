@@ -21,7 +21,8 @@ import { isEventEnabledFor } from '@/features/notifications/eventSelection';
 import { rebuildProjection } from '@/features/notifications/projectionRebuild';
 import { PROJECTION_REBUILD_DELAY_MS } from '@/features/notifications/projectionRebuildScheduler';
 import { App } from '@/app/App';
-import { PLAY_STORE_PACKAGE } from '@/lib/playStoreApp';
+import { PLAY_STORE_PACKAGE, androidNotificationSettingsUrl } from '@/lib/playStoreApp';
+import { assignLocation } from '@/app/navigation';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeFormat, DEFAULT_TIME_FORMAT, TIME_FORMAT_SETTING_KEY } from '@/lib/timeFormat';
 import { useMarketHub } from '@/features/market/hub';
@@ -51,6 +52,8 @@ vi.mock('virtual:pwa-register/react', () => ({
     updateServiceWorker: vi.fn(),
   }),
 }));
+
+vi.mock('@/app/navigation', () => ({ assignLocation: vi.fn() }));
 
 vi.mock('@/sde/loadSde', () => ({
   loadSkills: vi.fn(async () => []),
@@ -532,6 +535,10 @@ describe('Settings — Notifications (issue #170)', () => {
     await notificationsPanel();
 
     expect(await screen.findByText(/notifications are blocked/i)).toBeInTheDocument();
+    // Android settings exist only behind the Play Store app's shell.
+    expect(
+      screen.queryByRole('button', { name: /open notification settings/i })
+    ).not.toBeInTheDocument();
     // JS cannot re-request a denied grant, so nothing that would need one is offered.
     expect(
       screen.queryByRole('button', { name: /turn on browser notifications/i })
@@ -550,22 +557,45 @@ describe('Settings — Notifications (issue #170)', () => {
     ).toHaveAttribute('aria-disabled', 'true');
   });
 
-  it('points the Play Store app at Android app settings, not browser site settings, while denied', async () => {
+  describe('in the Play Store app', () => {
     // In the TWA, Chrome delegates the grant to the Android app's own
-    // notification toggle, so "site settings" names a screen that can't fix it.
-    vi.spyOn(document, 'referrer', 'get').mockReturnValue(`android-app://${PLAY_STORE_PACKAGE}`);
-    onTestFinished(() => {
-      vi.restoreAllMocks();
-      window.sessionStorage.clear();
+    // notification toggle, so the fix lives in Android settings, not site settings.
+    beforeEach(() => {
+      vi.spyOn(document, 'referrer', 'get').mockReturnValue(`android-app://${PLAY_STORE_PACKAGE}`);
+      vi.mocked(assignLocation).mockClear();
+      onTestFinished(() => {
+        vi.restoreAllMocks();
+        window.sessionStorage.clear();
+      });
     });
-    stubNotification('denied');
-    render(<App />);
-    await notificationsPanel();
 
-    expect(
-      await screen.findByText(/settings → apps → neocom desk → notifications/i)
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/site settings/i)).not.toBeInTheDocument();
+    it('opens Android notification settings from the blocked notice, never naming site settings', async () => {
+      stubNotification('denied');
+      const user = userEvent.setup();
+      render(<App />);
+      await notificationsPanel();
+
+      expect(await screen.findByText(/notifications are off for this app/i)).toBeInTheDocument();
+      expect(screen.queryByText(/site settings/i)).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: /open notification settings/i }));
+      expect(assignLocation).toHaveBeenCalledWith(
+        androidNotificationSettingsUrl(window.location.href)
+      );
+    });
+
+    it('still offers the settings button when the grant reads granted', async () => {
+      // A grant Chrome made before the app took over can read 'granted' while
+      // the app's own toggle is off.
+      stubNotification('granted');
+      render(<App />);
+      await notificationsPanel();
+
+      expect(
+        await screen.findByRole('button', { name: /open notification settings/i })
+      ).toBeInTheDocument();
+      expect(screen.queryByText(/notifications are off for this app/i)).not.toBeInTheDocument();
+    });
   });
 
   it('offers an Enable button that makes the browser request, and no request without it', async () => {
