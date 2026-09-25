@@ -37,8 +37,9 @@ test('picking a Character from the More sheet returns to the page you switched f
   // Navigate away from Overview via the More sheet, so switching characters
   // has somewhere other than Overview to prove it returns to.
   await mobileNav.getByRole('button', { name: 'More' }).click();
-  await page.getByRole('dialog', { name: 'More' }).getByRole('link', { name: 'Mail' }).click();
-  await expect(page).toHaveURL(/\/mail$/);
+  await page.getByRole('dialog', { name: 'More' }).getByRole('link', { name: 'Wallet' }).click();
+  await expect(page).toHaveURL(/\/wallet(\/|$)/);
+  const walletUrl = page.url();
 
   // Switch characters via the More sheet's portrait+name row.
   await mobileNav.getByRole('button', { name: 'More' }).click();
@@ -49,7 +50,7 @@ test('picking a Character from the More sheet returns to the page you switched f
   await expect(page).toHaveURL(/\/characters$/);
 
   await page.getByRole('button', { name: `Select ${CHARACTER_NAME}` }).click();
-  await expect(page).toHaveURL(/\/mail$/);
+  await expect(page).toHaveURL(walletUrl);
 });
 
 test('New Group, density, and view-mode controls share one row at 390px', async ({ page }) => {
