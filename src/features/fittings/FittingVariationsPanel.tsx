@@ -99,7 +99,14 @@ export function FittingVariationsPanel({ rows, onSelect }: FittingVariationsPane
         <BoolCell
           value={row.fits}
           yes={t('fittings.variations.fitsYes')}
-          no={t('fittings.variations.fitsNo')}
+          no={
+            row.overage
+              ? t('fittings.variations.stillOverBy', {
+                  amount: row.overage.amount.toFixed(1),
+                  resource: t(`fittings.list.${row.overage.resource}`),
+                })
+              : t('fittings.variations.fitsNo')
+          }
           loading={t('common.loading')}
         />
       ),
