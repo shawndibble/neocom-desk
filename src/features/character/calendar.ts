@@ -8,8 +8,7 @@ import {
   type CalendarRsvpResponse,
 } from '@/esi/endpoints';
 import { loadWithCacheStatus, readCached, writeCached, type StatusResult } from '@/esi/cache';
-import { isAuthFailure } from '@/esi/client';
-import { emitEsiAuthFailure } from '@/esi/authFailureSignal';
+import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
 import { parseInstant } from '@/engine/esiInstant';
 import { stillRunning, type CalendarRetentionEntry } from '@/engine/character/calendarRetention';
 
@@ -162,7 +161,8 @@ export function loadCalendarEvent(
 /**
  * Pushes an RSVP write to ESI. Errors are otherwise swallowed — same
  * contract as `mail.ts`'s `markMailReadOnEsi` — but an auth failure still
- * signals the app-wide reauth banner (`emitEsiAuthFailure`): a token that
+ * signals the app-wide reauth banner (`reportWriteAuthFailure`, which asks for
+ * this endpoint's Permission only when the grant lacks it): a token that
  * predates this scope's addition (same shape as `organize_mail`, issue
  * #741) would otherwise fail silently on every click with no way for the
  * user to learn a re-login would fix it.
@@ -192,7 +192,7 @@ export async function respondToCalendarEvent(
   try {
     await putCharacterCalendarResponse(characterId, eventId, response);
   } catch (err) {
-    if (isAuthFailure(err)) emitEsiAuthFailure(characterId, 'putCharacterCalendarResponse');
+    await reportWriteAuthFailure(characterId, err, 'putCharacterCalendarResponse');
     return false;
   }
 

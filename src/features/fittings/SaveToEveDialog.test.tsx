@@ -106,6 +106,23 @@ describe('SaveToEveDialog', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  it('offers to grant the Fittings permission, in place of a bare error, when the grant lacks it', async () => {
+    saveFittingToEveMock.mockResolvedValue({
+      ok: false,
+      message: 'Forbidden',
+      needsPermission: true,
+    });
+    render(
+      <SaveToEveDialog open onClose={vi.fn()} characterId={1} fitting={FITTING} onSaved={vi.fn()} />
+    );
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText(/needs the Fittings permission/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /grant fittings permission/i })).toBeInTheDocument();
+    expect(screen.queryByText(/Couldn't save/)).not.toBeInTheDocument();
+  });
+
   it('reports a failed overwrite delete instead of silently closing, since the pilot now has both fittings', async () => {
     saveFittingToEveMock.mockResolvedValue({
       ok: true,

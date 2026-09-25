@@ -9,7 +9,7 @@ import { db } from '@/db';
 import { emitEsiAuthFailure } from './authFailureSignal';
 import { EsiError, isAuthFailure } from './client';
 import { isCachePurgePending } from './cachePurge';
-import { ESI_REGISTRY, isScopeRequired, type EsiEndpointId } from './registry';
+import { grantHoldsEndpointScope } from './grantScope';
 import type { TruncatableResult } from './paginated';
 
 export interface CachedResult<T> {
@@ -528,11 +528,7 @@ export async function loadWithCacheStatus<T>(
  */
 async function isWorthReportingToShell(characterId: number, err: unknown): Promise<boolean> {
   if (!(err instanceof EsiError) || err.endpointId === undefined) return true;
-  const spec = ESI_REGISTRY[err.endpointId as EsiEndpointId] as
-    (typeof ESI_REGISTRY)[EsiEndpointId] | undefined;
-  if (!spec || !isScopeRequired(spec.scope)) return true;
-  const token = await db.tokens.get(characterId);
-  return (token?.scopes ?? []).includes(spec.scope);
+  return grantHoldsEndpointScope(characterId, err.endpointId);
 }
 
 async function loadWithCacheStatusLive<T>(

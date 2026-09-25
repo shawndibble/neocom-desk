@@ -24,6 +24,7 @@ import {
 } from '@/esi/cache';
 import { isAuthFailure } from '@/esi/client';
 import { emitEsiAuthFailure } from '@/esi/authFailureSignal';
+import { reportWriteAuthFailure } from '@/esi/writeAuthFailure';
 import { mergeMailHeaderPage, MAIL_HEADERS_PAGE_SIZE } from '@/engine/mail';
 
 const KEYS = {
@@ -127,8 +128,8 @@ export function loadMailBody(
  * always happens regardless. Errors are otherwise swallowed — nothing for a
  * caller to react to, just another chance next time this mail reopens — but
  * an auth failure still signals the app-wide reauth banner
- * (`emitEsiAuthFailure`), same as every other read-through loader in this
- * file: a stale grant (e.g. a token that predates `organize_mail`'s addition,
+ * (`reportWriteAuthFailure`, which asks for this endpoint's Permission only
+ * when the grant lacks it): a stale grant (e.g. a token that predates `organize_mail`'s addition,
  * issue #741) would otherwise fail silently on every open with no way for the
  * user to learn a re-login would fix it.
  *
@@ -144,7 +145,7 @@ export async function markMailReadOnEsi(characterId: number, mailId: number): Pr
   try {
     await putCharacterMail(characterId, mailId, { read: true });
   } catch (err) {
-    if (isAuthFailure(err)) emitEsiAuthFailure(characterId, 'putCharacterMail');
+    await reportWriteAuthFailure(characterId, err, 'putCharacterMail');
     return;
   }
   const headers = await readCached<MailHeader[]>(characterId, KEYS.headers);
@@ -183,7 +184,7 @@ export async function sendMail(
     if (result.data === null) throw new Error('ESI did not answer with a mail id.');
     mailId = result.data;
   } catch (err) {
-    if (isAuthFailure(err)) emitEsiAuthFailure(characterId, 'postCharacterMail');
+    await reportWriteAuthFailure(characterId, err, 'postCharacterMail');
     throw err;
   }
   await db.esiCache.delete([characterId, KEYS.headers]);
