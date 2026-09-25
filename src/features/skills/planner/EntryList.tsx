@@ -509,8 +509,9 @@ const EntryRow = memo(function EntryRow({
   // them necessary.
   const nameSpan = (
     <span className={NAME_CELL}>
-      <span className="truncate">
-        {name} {ROMAN[entry.targetLevel - 1]}
+      <span className="truncate">{name}</span>
+      <span className="shrink-0">
+        {ROMAN[entry.targetLevel - 1]}
         {boosted && <BoosterMark />}
         {alphaCapped && <AlphaCapMark />}
       </span>
@@ -695,8 +696,9 @@ const PrereqRow = memo(function PrereqRow({
 
   const nameSpan = (
     <span className={NAME_CELL}>
-      <span className="truncate">
-        {name} {ROMAN[row.step.level - 1]}
+      <span className="truncate">{name}</span>
+      <span className="shrink-0">
+        {ROMAN[row.step.level - 1]}
         <span className="ml-2 text-[0.625rem] uppercase">{t('plans.prereq')}</span>
         {boosted && <BoosterMark />}
         {alphaCapped && <AlphaCapMark />}
