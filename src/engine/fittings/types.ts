@@ -168,6 +168,57 @@ export interface FittingStats {
   slotCounts: Record<FittingSlotKind, number>;
   /** Index-parallel to `Fitting.modules`. */
   modules: FittingModuleResult[];
+  offense: OffenseStats;
+  repair: LocalRepair;
+  /**
+   * The same fit recalculated by the engine with every active module that
+   * can overheat set to overload; null when no module can (nothing to show).
+   */
+  overheated: OverheatedStats | null;
+}
+
+/** One Offense row: every firing copy of a weapon (same charge) or one drone type. */
+export interface WeaponRow {
+  typeId: number;
+  chargeTypeId?: number;
+  isDrone: boolean;
+  /** Modules in the group, or drones in the stack. */
+  count: number;
+  /** Without reload. */
+  dps: number;
+  volley: number;
+  /** Null when the row can't overheat — drones never do. */
+  overheated: DamageFigures | null;
+}
+
+export interface DamageFigures {
+  dps: number;
+  volley: number;
+}
+
+export interface OffenseStats {
+  weapons: WeaponRow[];
+  /** Sum of the rows. */
+  dps: number;
+  volley: number;
+  /** Null when no row can overheat. */
+  overheated: DamageFigures | null;
+}
+
+/** Local repair and boost rates, HP/s. */
+export interface LocalRepair {
+  shield: number;
+  armor: number;
+  hull: number;
+}
+
+export interface OverheatedStats {
+  ehp: number;
+  maxVelocity: number;
+  repair: LocalRepair;
+  shield: LayerDefense;
+  armor: LayerDefense;
+  hull: LayerDefense;
 }
 
 /** What the engine made of one fitted module. */
@@ -216,6 +267,11 @@ export const DOGMA_ATTRIBUTE = {
   droneDamagePerSecond: -14,
   capacitorStablePercentage: -72,
   capacitorDepletesIn: -7,
+  // Local repair rates, HP/s (same `patches/ids.yaml`, 2026-09-24; a live
+  // run showed a Medium Armor Repairer II's rate rise under overload).
+  armorRepairRate: -45,
+  hullRepairRate: -46,
+  shieldBoostRate: -47,
   // Everything below is a plain SDE attribute (verified 2026-09-24 the same
   // way as the block above, plus a live run of the pinned engine against a
   // Rifter — see git history for the probe): calculate() returns the ship's
@@ -283,6 +339,12 @@ export const ITEM_DOGMA_ATTRIBUTE = {
   chargeGroup4: 609,
   chargeGroup5: 610,
   chargeSize: 128,
+  // Patched per-item damage (EVEShipFit/sde-patched `patches/ids.yaml`,
+  // `damagePerSecondWithoutReload`/`damageVolley`), verified 2026-09-24 by a
+  // live run of the pinned engine: a drone stack reports them per drone, and
+  // an online (not firing) launcher still reports its volley.
+  damagePerSecond: -12,
+  damageVolley: -21,
   // "resistanceShiftAmount" — only the Reactive Armor Hardener family carries
   // it (6 on a RAH, absent on a Damage Control II; live run of the pinned
   // engine, 2026-09-24). Marks the module whose own armor resonances

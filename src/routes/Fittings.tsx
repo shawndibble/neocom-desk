@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, PageHeader, SlideOver, Tabs } from '@/components/ui';
+import { Button, Modal, PageHeader, Panel, SlideOver, Tabs } from '@/components/ui';
 import { AddRow } from '@/components/ui/icons';
 import { useEndpointsGranted } from '@/app/useGrantedScopes';
 import { useIsDesktop } from '@/lib/useIsDesktop';
@@ -36,9 +36,17 @@ import {
 } from '@/features/fittings/fittingViewPreference';
 import { MissingSkillsChip } from '@/features/fittings/MissingSkillsChip';
 import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
-import { useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
+import { catalogueTypeName, useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
 import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
 import { useModuleVariations } from '@/features/fittings/useModuleVariations';
+import { useMediaQuery } from '@/lib/useMediaQuery';
+
+/**
+ * Wide enough for browser | Ring | stats side by side: the 12rem nav, a 20rem
+ * browser, a Ring column wide enough for its corner readouts (~41rem), and
+ * 22rem of stats, with gaps and page padding.
+ */
+const THREE_COLUMN_QUERY = '(min-width: 100rem)';
 
 /**
  * The Fittings section (scope decision `20260924-215855`).
@@ -46,11 +54,12 @@ import { useModuleVariations } from '@/features/fittings/useModuleVariations';
  * With nothing open it is a Start screen: pick a hull to fit from scratch,
  * or Load / open an existing Fitting. With a Fitting open it is the editor:
  * a header (a Fittings menu to open another, then this one's identity and
- * controls), the headline numbers, then the Ring or List beside the stats
- * sections — side by side when wide, stacked below that, and tabs on a phone.
- * Adding modules is a slide-over from the right (a sheet on a phone), opened
- * by an empty slot or "+ Add module"; on a pointer, items drag from it
- * straight onto the Ring.
+ * controls), the headline numbers, then three columns as in the game's own
+ * window: the module browser (the Add panel), the Ring or List, and the
+ * stats sections. Too narrow for all three, the browser becomes a slide-out
+ * from the left, opened by an empty slot or "+ Add module"; narrower still
+ * (below desktop) it is the mobile layout — Fitting / Stats tabs, Add as a
+ * sheet. On a pointer, browser items drag straight onto the Ring.
  */
 export function Fittings() {
   const { t } = useTranslation();
@@ -58,10 +67,16 @@ export function Fittings() {
   const catalogue = useFittingCatalogue();
   const isDesktop = useIsDesktop();
   const isPhone = useIsPhone();
+  const threeColumns = useMediaQuery(THREE_COLUMN_QUERY);
+  const addMode: 'docked' | 'slideOut' | 'sheet' = threeColumns
+    ? 'docked'
+    : isDesktop
+      ? 'slideOut'
+      : 'sheet';
   const [target, setTarget] = useState<AddTarget | null>(null);
-  // The Add panel: a slide-over, or a sheet on a phone. Opened by an empty
-  // slot, or by "+ Add module" — which works before the ship data (and so the
-  // empty slots) exists.
+  // The slide-out or sheet Add panel is open (the docked one always is).
+  // Opened by an empty slot, or by "+ Add module" — which works before the
+  // ship data (and so the empty slots) exists.
   const [addOpen, setAddOpen] = useState(false);
   const storedView = useFittingViewPreference((state) => state.value);
   const viewHydrated = useFittingViewPreference((state) => state.hydrated);
@@ -114,12 +129,12 @@ export function Fittings() {
   function handleAdd(typeId: number, rack: CandidateRack) {
     if (rack === 'drone') {
       edit((f) => addDrones(f, typeId, 1), `drone-add-${typeId}`);
-      if (isPhone) closeAdd();
+      if (addMode === 'sheet') closeAdd();
       return;
     }
     if (slotCounts === null) return;
     const count = slotCounts[rack];
-    // The slide-over stays on the rack's next empty slot, so a row of modules
+    // The browser stays on the rack's next empty slot, so a row of modules
     // goes in one click each. An item for another rack (fits-this-slot off)
     // goes in that rack's first free slot and leaves the chosen one be.
     const onTarget = target?.kind === 'slot' && target.slot === rack;
@@ -135,7 +150,7 @@ export function Fittings() {
       }
       return next;
     });
-    if (isPhone) closeAdd();
+    if (addMode === 'sheet') closeAdd();
     else setTarget(after.target);
   }
 
@@ -169,7 +184,7 @@ export function Fittings() {
       profile={workspace.profile}
       canPlace={canPlace}
       onAdd={handleAdd}
-      showGroups={!isPhone}
+      showGroups={addMode !== 'sheet'}
       dragToRing={isDesktop && view === 'ring'}
     />
   );
@@ -216,12 +231,14 @@ export function Fittings() {
     );
   }
 
-  const addButton = (
-    <Button size="sm" onClick={() => selectTarget(null)}>
-      <AddRow aria-hidden />
-      {t('fittings.add.openButton')}
-    </Button>
-  );
+  // The docked browser is always there; the others open on demand.
+  const addButton =
+    addMode === 'docked' ? undefined : (
+      <Button size="sm" onClick={() => selectTarget(null)}>
+        <AddRow aria-hidden />
+        {t('fittings.add.openButton')}
+      </Button>
+    );
 
   const editor =
     view === 'ring' ? (
@@ -267,16 +284,16 @@ export function Fittings() {
       statsProgress={workspace.statsProgress}
       statsError={workspace.statsError}
       price={workspace.price}
+      typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
       damageProfiles={workspace.damageProfiles}
     />
   );
 
   return (
-    // On a pointer-width screen the open slide-over pushes the page aside
-    // rather than covering it, so every Ring slot stays a drop target. (It
-    // can't get out of the way mid-drag instead: moving or hiding a drag's
-    // source element cancels the drag.) Narrower, it overlays, and drag is off.
-    <div className={`space-y-3 ${addOpen && isDesktop ? 'lg:pr-[26rem]' : ''}`}>
+    // The open slide-out pushes the page aside rather than covering it, so
+    // every Ring slot stays a drop target. (It can't get out of the way
+    // mid-drag instead: moving or hiding a drag's source element cancels it.)
+    <div className={`space-y-3 ${addOpen && addMode === 'slideOut' ? 'pl-[26rem]' : ''}`}>
       <section className="border border-line bg-panel">
         <FittingHeader
           fitting={fitting}
@@ -348,7 +365,7 @@ export function Fittings() {
       </section>
 
       {viewHydrated &&
-        (isPhone ? (
+        (addMode === 'sheet' ? (
           <div className="space-y-3">
             <Tabs
               tabs={[
@@ -362,7 +379,26 @@ export function Fittings() {
             {phoneTab === 'fitting' ? editor : statsSections}
           </div>
         ) : (
-          <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
+          <div
+            // Docked: browser | Ring | stats. Otherwise Ring beside stats when
+            // wide, but stacked while the slide-out has pushed the page aside,
+            // so the Ring keeps the width rather than the stats.
+            className={`grid items-start gap-3 ${
+              addMode === 'docked'
+                ? 'grid-cols-[20rem_minmax(0,1fr)_minmax(22rem,26rem)]'
+                : addOpen
+                  ? 'grid-cols-1'
+                  : 'grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]'
+            }`}
+          >
+            {addMode === 'docked' && (
+              <Panel
+                title={addTitle}
+                className="sticky top-3 max-h-[calc(100vh-1.5rem)] overflow-y-auto"
+              >
+                {addPanel}
+              </Panel>
+            )}
             {editor}
             {statsSections}
           </div>
@@ -441,12 +477,20 @@ export function Fittings() {
           )}
         </Modal>
       )}
-      {isPhone ? (
+      {addMode === 'sheet' && (
         <Modal open={addOpen} onClose={closeAdd} placement="sheet" title={addTitle}>
           {addPanel}
         </Modal>
-      ) : (
-        <SlideOver open={addOpen} onClose={closeAdd} title={addTitle}>
+      )}
+      {addMode === 'slideOut' && (
+        <SlideOver
+          side="left"
+          // Clears the app's 12rem nav, so it slides out where the docked column sits.
+          className="md:left-48"
+          open={addOpen}
+          onClose={closeAdd}
+          title={addTitle}
+        >
           {addPanel}
         </SlideOver>
       )}

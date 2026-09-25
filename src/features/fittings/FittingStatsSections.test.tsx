@@ -47,7 +47,51 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     unknownItemTypeIds: [],
     slotCounts: { high: 3, medium: 3, low: 4, rig: 3, subsystem: 0 },
     modules: [],
+    offense: { weapons: [], dps: 0, volley: 0, overheated: null },
+    repair: { shield: 0, armor: 0, hull: 0 },
+    overheated: null,
     ...overrides,
+  };
+}
+
+const NAMES: Record<number, string> = {
+  3186: 'Neutron Blaster Cannon II',
+  230: 'Antimatter Charge M',
+  2488: 'Warrior II',
+};
+const typeName = (typeId: number) => NAMES[typeId] ?? `#${typeId}`;
+
+/** Two blasters that overheat, five drones, an armor rep, and a shield hardener under heat. */
+function heatedStats(): FittingStats {
+  const base = stats();
+  return {
+    ...base,
+    offense: {
+      weapons: [
+        {
+          typeId: 3186,
+          chargeTypeId: 230,
+          isDrone: false,
+          count: 2,
+          dps: 53.7,
+          volley: 304,
+          overheated: { dps: 61.7, volley: 350 },
+        },
+        { typeId: 2488, isDrone: true, count: 5, dps: 120, volley: 480, overheated: null },
+      ],
+      dps: 173.7,
+      volley: 784,
+      overheated: { dps: 181.7, volley: 830 },
+    },
+    repair: { shield: 0, armor: 63.2, hull: 0 },
+    overheated: {
+      ehp: 17400,
+      maxVelocity: base.navigation.maxVelocity,
+      repair: { shield: 0, armor: 81.8, hull: 0 },
+      shield: { ...base.shield, emResonance: 0.4 },
+      armor: base.armor,
+      hull: base.hull,
+    },
   };
 }
 
@@ -65,7 +109,7 @@ function damageProfiles(overrides: Partial<DamageProfiles> = {}): DamageProfiles
   };
 }
 
-function renderSections(fittingStats: FittingStats, profiles: DamageProfiles) {
+function renderSections(fittingStats: FittingStats, profiles: DamageProfiles = damageProfiles()) {
   render(
     <FittingStatsSections
       stats={fittingStats}
@@ -73,9 +117,67 @@ function renderSections(fittingStats: FittingStats, profiles: DamageProfiles) {
       statsError={false}
       price={null}
       damageProfiles={profiles}
+      typeName={typeName}
     />
   );
 }
+
+function sectionBody(title: string): HTMLElement {
+  return screen.getByRole('heading', { name: title }).closest('section')!;
+}
+
+describe('FittingStatsSections offense', () => {
+  it('lists each weapon group and drone type with its DPS and volley, and the total', () => {
+    renderSections(heatedStats());
+    const offense = within(sectionBody('Offense'));
+
+    expect(offense.getByText('2× Neutron Blaster Cannon II')).toBeInTheDocument();
+    expect(offense.getByText('Antimatter Charge M')).toBeInTheDocument();
+    expect(offense.getByText('5× Warrior II')).toBeInTheDocument();
+    expect(offense.getByText('53.7 DPS')).toBeInTheDocument();
+    expect(offense.getByText('120.0 DPS')).toBeInTheDocument();
+    // The total, once in the section header and once as the Total row.
+    expect(offense.getAllByText('173.7 DPS')).toHaveLength(2);
+    expect(offense.getByText('784 volley')).toBeInTheDocument();
+  });
+
+  it('shows overheated values beside weapons that overheat, and says drones do not', () => {
+    renderSections(heatedStats());
+    const offense = within(sectionBody('Offense'));
+
+    expect(offense.getByText('61.7 overheated')).toBeInTheDocument();
+    expect(offense.getByText('350 overheated')).toBeInTheDocument();
+    expect(offense.getByText('181.7 overheated')).toBeInTheDocument();
+    expect(offense.getByText("Drones don't overheat")).toBeInTheDocument();
+  });
+
+  it('says so when nothing is firing', () => {
+    renderSections(stats());
+
+    expect(within(sectionBody('Offense')).getByText('Nothing is firing.')).toBeInTheDocument();
+  });
+});
+
+describe('FittingStatsSections overheated lines elsewhere', () => {
+  it('shows overheated EHP and repair in Defense, and none in Navigation when speed is unchanged', () => {
+    renderSections(heatedStats());
+
+    const defense = within(sectionBody('Defense'));
+    expect(defense.getByText('17400 overheated')).toBeInTheDocument();
+    expect(defense.getByText('Armor repair: 63.2 HP/s')).toBeInTheDocument();
+    expect(defense.getByText('81.8 overheated')).toBeInTheDocument();
+    // Only the shield EM resist moves under heat.
+    expect(defense.getAllByText(/% overheated$/)).toHaveLength(1);
+    expect(defense.getByText('60% overheated')).toBeInTheDocument();
+    expect(within(sectionBody('Navigation')).queryByText(/overheated/)).toBeNull();
+  });
+
+  it('shows no overheated line anywhere when no module can overheat', () => {
+    renderSections(stats());
+
+    expect(screen.queryByText(/overheated/)).toBeNull();
+  });
+});
 
 describe('FittingStatsSections — Defense', () => {
   it('shows each layer with its raw HP and its EHP under the profile', () => {

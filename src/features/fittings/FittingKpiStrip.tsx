@@ -10,13 +10,13 @@ interface FittingKpiStripProps {
 /**
  * The headline numbers under the Fitting's header (scope decision
  * `20260924-215855`): what the stats sections below go into in detail, at a
- * glance. Firepower is drone DPS and says so — per-weapon offense is a
- * ticket of its own.
+ * glance. DPS is the Offense section's total — weapons and drones, without
+ * reload or overheat.
  */
 export function FittingKpiStrip({ stats, price }: FittingKpiStripProps) {
   const { t } = useTranslation();
   const cells: { label: string; value: string | null; tone?: 'success' | 'danger' }[] = [
-    { label: t('fittings.kpi.droneDps'), value: stats ? stats.droneDps.toFixed(0) : null },
+    { label: t('fittings.kpi.dps'), value: stats ? stats.offense.dps.toFixed(0) : null },
     { label: t('fittings.kpi.ehp'), value: stats ? stats.ehp.toFixed(0) : null },
     {
       label: t('fittings.kpi.capacitor'),

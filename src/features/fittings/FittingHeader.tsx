@@ -64,7 +64,7 @@ export function FittingHeader({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        <div className="flex min-w-0 flex-1 items-center gap-2">
+        <div className="flex min-w-48 flex-1 items-center gap-2">
           <TypeIcon typeId={fitting.shipTypeId} size={64} width={36} height={36} />
           <div className="min-w-0">
             <h1 className="truncate text-base font-semibold">{fitting.name}</h1>

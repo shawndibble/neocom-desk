@@ -11,12 +11,19 @@ interface SlideOverProps {
   onClose: () => void;
   title: ReactNode;
   children: ReactNode;
-  /** Extra classes on the panel itself, e.g. to let the pointer through while something drags out of it. */
+  /** Which edge it slides over. */
+  side?: 'left' | 'right';
+  /** Extra classes on the panel itself, e.g. an offset to clear a sidebar. */
   className?: string;
 }
 
+const SIDE_CLASS = {
+  left: 'left-0 border-r',
+  right: 'right-0 border-l',
+} as const;
+
 /**
- * A non-modal panel that slides over the right edge of the page, on Radix's
+ * A non-modal panel that slides over one edge of the page, on Radix's
  * `Dialog` with `modal={false}` (docs/adr/0008) for its Escape handling,
  * focus management and labelling.
  *
@@ -25,7 +32,14 @@ interface SlideOverProps {
  * steering what the panel shows (the Fitting editor retargets its Add panel
  * from the Ring behind it) and take drops dragged out of it.
  */
-export function SlideOver({ open, onClose, title, children, className }: SlideOverProps) {
+export function SlideOver({
+  open,
+  onClose,
+  title,
+  children,
+  side = 'right',
+  className,
+}: SlideOverProps) {
   const { t } = useTranslation();
   return (
     <DialogPrimitive.Root
@@ -40,7 +54,8 @@ export function SlideOver({ open, onClose, title, children, className }: SlideOv
           onInteractOutside={(event) => event.preventDefault()}
           aria-describedby={undefined}
           className={cx(
-            'fixed top-0 right-0 bottom-0 z-40 flex w-full max-w-[25rem] flex-col border-l border-line-bright bg-panel shadow-2xl',
+            'fixed top-0 bottom-0 z-40 flex w-full max-w-[25rem] flex-col border-line-bright bg-panel shadow-2xl',
+            SIDE_CLASS[side],
             className
           )}
         >
