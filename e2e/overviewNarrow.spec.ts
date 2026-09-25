@@ -58,6 +58,29 @@ for (const size of [
     const firstCard = await opens.first().boundingBox();
     expect(alerts!.y).toBeGreaterThan(firstCard!.y);
   });
+
+  // The summary strip's three values need nearly all of its row at 1024px, so
+  // a font a hair wider than this machine's (CI's) used to push one under its
+  // cell and truncate the wallet's ten-figure balance. The row now wraps
+  // before any value truncates; widening every glyph a little stands in for
+  // that other font, so this holds on any machine rather than by font luck.
+  test(`summary strip wraps rather than truncating a value, even in a wider font, at ${size.width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(size);
+    await signInAndGoto(page, './overview');
+    await page.addStyleTag({ content: 'main * { letter-spacing: 0.04em !important; }' });
+    const strip = page.locator('main section').first();
+    await expect(strip.getByText(/ISK$/)).toBeVisible();
+
+    const truncated = await strip.evaluate((section) =>
+      [...section.querySelectorAll<HTMLElement>('*')]
+        .filter((el) => el.children.length === 0 && el.scrollWidth > el.clientWidth + 1)
+        .filter((el) => getComputedStyle(el).textOverflow === 'ellipsis')
+        .map((el) => el.textContent)
+    );
+    expect(truncated).toEqual([]);
+  });
 }
 
 for (const width of [1280, 1440]) {

@@ -121,9 +121,12 @@ test.describe('Opportunities — ranked phone list', () => {
 
     const trigger = page.getByRole('button', { name: /Sort by ISK\/hour/ });
     await expect(trigger).toBeVisible();
-    const box = await trigger.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box!.height).toBeGreaterThanOrEqual(44);
+    // Polled, not read once: the list re-renders as the ranking lands, and a
+    // trigger remounted between the visibility check and the measurement
+    // reads as a null box — a CI-only flake, not a short target.
+    await expect
+      .poll(async () => (await trigger.boundingBox())?.height ?? 0)
+      .toBeGreaterThanOrEqual(44);
   });
 
   test('the selection checkbox is pinned with a real ~44px target', async ({ page }) => {
