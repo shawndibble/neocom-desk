@@ -81,6 +81,7 @@ export const loadAppraisalShared = named(
   () => import('@/routes/AppraisalShared'),
   'AppraisalShared'
 );
+export const loadFittingShared = named(() => import('@/routes/FittingShared'), 'FittingShared');
 export const loadErrorProbe = named(() => import('@/routes/ErrorProbe'), 'ErrorProbe');
 
 /**

@@ -9,6 +9,7 @@ import {
   clearRetryBudget,
   type LoginFailureReason,
 } from '@/auth/session';
+import { takeLoginReturnTo } from '@/auth/loginReturnTo';
 import { beginAddCharacterLogin, retryLastLogin, retryLastLoginOnce } from '@/app/loginFlow';
 import { Button, Panel, Spinner } from '@/components/ui';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -85,7 +86,11 @@ export function Callback() {
           // A Character nobody has selected yet is worth far less than the
           // session; /characters is where one is picked anyway.
         }
-        navigate('/characters', { replace: true });
+        // A Fitting Share Link's "Open in Neocom Desk" (#1544) stashed where
+        // to land before sending this login to SSO; every other entry point
+        // leaves nothing there, so this is the ordinary `/characters` most of
+        // the time.
+        navigate(takeLoginReturnTo() ?? '/characters', { replace: true });
       })
       .catch(async (err: unknown) => {
         if (err instanceof SsoRejection) {
