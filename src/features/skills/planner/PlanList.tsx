@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, EmptyState, IconButton, Modal, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import type { SkillPlanRecord } from '@/db';
+import type { CharacterRecord, SkillPlanRecord } from '@/db';
 import { formatDuration } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 
@@ -18,6 +18,9 @@ interface PlanListProps {
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, name: string) => void;
+  /** The account's other characters; "Copy to character" shows only when there are any. */
+  otherCharacters?: readonly Pick<CharacterRecord, 'characterId' | 'name'>[];
+  onCopyToCharacter?: (id: string, characterId: number) => void;
   /** Per-plan schedule figures by plan id; rows without an entry show name only. */
   stats?: ReadonlyMap<string, PlanRowStats>;
 }
@@ -26,12 +29,14 @@ function PlanRow({
   plan,
   onOpen,
   onDuplicate,
+  onRequestCopy,
   onRequestDelete,
   onRename,
   stats,
 }: {
   plan: SkillPlanRecord;
   stats: PlanRowStats | undefined;
+  onRequestCopy: ((plan: SkillPlanRecord) => void) | null;
   onRequestDelete: (plan: SkillPlanRecord) => void;
 } & Pick<PlanListProps, 'onOpen' | 'onDuplicate' | 'onRename'>) {
   const { t } = useTranslation();
@@ -95,6 +100,14 @@ function PlanRow({
         label={`${t('plans.duplicate')} ${plan.name}`}
         onClick={() => onDuplicate(plan.id)}
       />
+      {onRequestCopy && (
+        <IconButton
+          size="sm"
+          icon={<Icon.AllCharacters />}
+          label={`${t('plans.copyToCharacter')} ${plan.name}`}
+          onClick={() => onRequestCopy(plan)}
+        />
+      )}
       <IconButton
         size="sm"
         icon={<Icon.Close />}
@@ -107,9 +120,20 @@ function PlanRow({
 }
 
 /** Skill Plan CRUD list: create, open (navigates to the editor), duplicate, delete (confirm), rename inline. */
-export function PlanList({ plans, onOpen, onDuplicate, onDelete, onRename, stats }: PlanListProps) {
+export function PlanList({
+  plans,
+  onOpen,
+  onDuplicate,
+  onDelete,
+  onRename,
+  otherCharacters = [],
+  onCopyToCharacter,
+  stats,
+}: PlanListProps) {
   const { t } = useTranslation();
   const [deletingPlan, setDeletingPlan] = useState<SkillPlanRecord | null>(null);
+  const [copyingPlan, setCopyingPlan] = useState<SkillPlanRecord | null>(null);
+  const canCopy = otherCharacters.length > 0 && onCopyToCharacter !== undefined;
 
   return (
     <div className="space-y-2">
@@ -123,6 +147,7 @@ export function PlanList({ plans, onOpen, onDuplicate, onDelete, onRename, stats
               plan={plan}
               onOpen={onOpen}
               onDuplicate={onDuplicate}
+              onRequestCopy={canCopy ? setCopyingPlan : null}
               onRequestDelete={setDeletingPlan}
               onRename={onRename}
               stats={stats?.get(plan.id)}
@@ -130,6 +155,36 @@ export function PlanList({ plans, onOpen, onDuplicate, onDelete, onRename, stats
           ))}
         </ul>
       )}
+      <Modal
+        open={copyingPlan !== null}
+        onClose={() => setCopyingPlan(null)}
+        title={t('plans.copyToCharacter')}
+      >
+        <p className="text-xs text-text-dim">
+          {t('plans.copyToCharacterHint', { name: copyingPlan?.name ?? '' })}
+        </p>
+        <ul className="mt-3 space-y-1">
+          {otherCharacters.map((character) => (
+            <li key={character.characterId}>
+              <Button
+                size="sm"
+                className="w-full justify-start"
+                onClick={() => {
+                  if (copyingPlan) onCopyToCharacter?.(copyingPlan.id, character.characterId);
+                  setCopyingPlan(null);
+                }}
+              >
+                {character.name}
+              </Button>
+            </li>
+          ))}
+        </ul>
+        <div className="mt-3 flex justify-end">
+          <Button size="sm" onClick={() => setCopyingPlan(null)}>
+            {t('plans.cancel')}
+          </Button>
+        </div>
+      </Modal>
       <Modal
         open={deletingPlan !== null}
         onClose={() => setDeletingPlan(null)}

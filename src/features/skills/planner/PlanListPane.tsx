@@ -118,11 +118,12 @@ export function PlanListPane({
     navigate(`/skills/plans/${plan.id}`);
   }
 
-  async function handleDuplicate(id: string) {
-    const source = plans?.find((p) => p.id === id);
-    if (!source) return;
-    const copy: SkillPlanRecord = {
-      ...newPlan(activeCharacterId, t('plans.copySuffix', { name: source.name })),
+  const characters = useLiveQuery(async () => db.characters.toArray(), []);
+  const otherCharacters = (characters ?? []).filter((c) => c.characterId !== activeCharacterId);
+
+  function copyOf(source: SkillPlanRecord, characterId: number): SkillPlanRecord {
+    return {
+      ...newPlan(characterId, t('plans.copySuffix', { name: source.name })),
       entries: source.entries,
       remapCount: source.remapCount,
       ...(source.markers ? { markers: source.markers } : {}),
@@ -134,9 +135,24 @@ export function PlanListPane({
       ...(source.boosters === undefined && source.booster ? { booster: source.booster } : {}),
       ...(source.milestones ? { milestones: source.milestones } : {}),
     };
+  }
+
+  async function handleDuplicate(id: string) {
+    const source = plans?.find((p) => p.id === id);
+    if (!source) return;
+    const copy = copyOf(source, activeCharacterId);
     await db.skillPlans.add(copy);
     syncAfterEdit();
     navigate(`/skills/plans/${copy.id}`);
+  }
+
+  // Stays on the current character: the copy belongs to the chosen one, so
+  // there is no editor route to open for it from here.
+  async function handleCopyToCharacter(id: string, characterId: number) {
+    const source = plans?.find((p) => p.id === id);
+    if (!source) return;
+    await db.skillPlans.add(copyOf(source, characterId));
+    if (isSyncConfigured()) scheduleSync(characterId);
   }
 
   async function handleDelete(id: string) {
@@ -196,6 +212,8 @@ export function PlanListPane({
             stats={stats}
             onOpen={(id) => navigate(`/skills/plans/${id}`)}
             onDuplicate={(id) => void handleDuplicate(id)}
+            otherCharacters={otherCharacters}
+            onCopyToCharacter={(id, characterId) => void handleCopyToCharacter(id, characterId)}
             onDelete={(id) => void handleDelete(id)}
             onRename={(id, name) => void handleRename(id, name)}
           />
