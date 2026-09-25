@@ -7,8 +7,8 @@ import { typeName } from '@/sde/loadSde';
 
 export interface FittingCompareModulesSummaryProps {
   entries: readonly ModuleDiffEntry[];
-  /** Which columns to render — matches the table's own phone window. */
-  visible: readonly number[];
+  /** Which columns to render, as positions in `entry.counts` (null: stats failed, shown as a dash) — matches the table's own phone window. */
+  visible: readonly (number | null)[];
 }
 
 export function FittingCompareModulesSummary({
@@ -47,8 +47,8 @@ export function FittingCompareModulesSummary({
             {names.get(entry.typeId) ?? `Type ${entry.typeId}`}
           </span>
           <span className="flex shrink-0 gap-3 tabular-nums text-text-dim">
-            {visible.map((index) => (
-              <span key={index}>{entry.counts[index] ?? 0}</span>
+            {visible.map((position, column) => (
+              <span key={column}>{position === null ? '—' : (entry.counts[position] ?? 0)}</span>
             ))}
           </span>
         </li>

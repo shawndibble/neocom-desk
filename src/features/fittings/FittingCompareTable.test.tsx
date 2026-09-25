@@ -10,8 +10,8 @@ const ROWS: CompareRow[] = [
 ];
 
 const COLUMNS = [
-  { index: 0, header: 'Fit A' },
-  { index: 1, header: 'Fit B' },
+  { index: 0, statsIndex: 0, header: 'Fit A' },
+  { index: 1, statsIndex: 1, header: 'Fit B' },
 ];
 
 describe('FittingCompareTable', () => {
@@ -31,6 +31,21 @@ describe('FittingCompareTable', () => {
     render(<FittingCompareTable rows={ROWS} columns={COLUMNS} differencesOnly={true} />);
     // The best cell's accessible text includes "(Best)" beyond the raw number.
     expect(screen.getByText('(Best)')).toBeInTheDocument();
+  });
+
+  it('shows a dash for a column whose stats failed and maps the rest by stats position', () => {
+    const columns = [
+      { index: 0, statsIndex: null, header: 'Broken' },
+      { index: 1, statsIndex: 0, header: 'Fit B' },
+      { index: 2, statsIndex: 1, header: 'Fit C' },
+    ];
+    const rows: CompareRow[] = [
+      { key: 'ehp', values: [1000, 2000], differs: true, bestIndices: [1] },
+    ];
+    render(<FittingCompareTable rows={rows} columns={columns} differencesOnly={false} />);
+    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getByText('2000', { exact: false })).toBeInTheDocument();
+    expect(screen.getAllByText('(Best)')).toHaveLength(1);
   });
 
   it('shows a message when nothing differs and differences-only is on', () => {
