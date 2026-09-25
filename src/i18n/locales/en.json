@@ -643,6 +643,7 @@
       "modulesTitle": "Modules that differ",
       "noDifferences": "Nothing differs between the compared Fittings.",
       "statColumn": "Stat",
+      "moduleColumn": "Module",
       "best": "(Best)",
       "fixErrorsHint": "Fix the Fitting with the error above to see the comparison.",
       "statsFailed": "Couldn't calculate stats",
