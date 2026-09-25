@@ -2192,6 +2192,7 @@
   },
   "alerts": {
     "title": "Alerts",
+    "switchedTo": "Switched to {{name}}",
     "settings": "Notification settings",
     "dismissAll": "Dismiss all",
     "byType": "By type",

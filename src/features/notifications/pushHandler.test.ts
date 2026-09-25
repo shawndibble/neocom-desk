@@ -148,7 +148,7 @@ describe('handlePush', () => {
     expect(options.tag).toBe(
       notificationTagFor({ characterId: VALID_PAYLOAD.characterId, eventId: VALID_PAYLOAD.eventId })
     );
-    expect(options.data).toEqual({ url: '/industry' });
+    expect(options.data).toEqual({ url: '/industry?character=12345' });
   });
 
   it('records a feed entry keyed by the Occurrence Key, marked as notified on this device', async () => {
