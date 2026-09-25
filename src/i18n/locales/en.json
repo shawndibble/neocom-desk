@@ -178,7 +178,21 @@
       "title": "Ring",
       "slotFitted": "{{rack}} {{index}}, {{state}}",
       "slotEmpty": "{{rack}} {{index}}, empty",
-      "openStats": "Stats"
+      "openStats": "Stats",
+      "tooltipFitted": "{{rack}} {{index}}: {{name}} ({{state}})",
+      "tooltipCharge": "Loaded: {{name}}",
+      "tooltipCantUse": "Can’t use: missing skills",
+      "tooltipEmpty": "{{rack}} {{index}}: empty. Click to add, or drop a module here.",
+      "tooltipEmptyClick": "{{rack}} {{index}}: empty. Tap to add.",
+      "tooltipEmptyCompact": "{{rack}} {{index}}: empty",
+      "readoutCpu": "{{used}} / {{total}} tf",
+      "readoutPowergrid": "{{used}} / {{total}} MW",
+      "readoutCalibration": "{{used}} / {{total}}",
+      "readoutDroneBandwidth": "{{used}} / {{total}} Mbit/s",
+      "rackHint": "Tap a rack to edit its slots",
+      "rackCount": "{{fitted}} / {{total}}",
+      "rackCantUse_one": "{{count}} can’t use",
+      "rackCantUse_other": "{{count}} can’t use"
     },
     "edit": {
       "stateLabel": "State of {{name}}",
