@@ -7,6 +7,7 @@ import {
   fittingToChatLink,
   fittingToDna,
   fittingToEft,
+  fittingToEveXml,
   fittingToMultibuy,
 } from './fittingExport';
 import type { Fitting } from './types';
@@ -159,5 +160,43 @@ describe('fittingToMultibuy', () => {
     expect(entries.find((e) => e.name === '200mm AutoCannon II')?.quantity).toBe(2);
     expect(entries.find((e) => e.name === 'Rifter')?.quantity).toBe(1);
     expect(entries).toHaveLength(8);
+  });
+});
+
+describe('fittingToEveXml', () => {
+  it("writes the game's fittings XML: hi/med/low/rig slots, drone bay, and cargo with the loaded charges", () => {
+    expect(fittingToEveXml(FITTING, nameFor)).toBe(
+      [
+        '<?xml version="1.0" ?>',
+        '<fittings>',
+        '  <fitting name="Brawler">',
+        '    <description value=""/>',
+        '    <shipType value="Rifter"/>',
+        '    <hardware slot="low slot 0" type="Damage Control II"/>',
+        '    <hardware slot="med slot 0" type="5MN Microwarpdrive II"/>',
+        '    <hardware slot="hi slot 0" type="200mm AutoCannon II"/>',
+        '    <hardware slot="hi slot 1" type="200mm AutoCannon II"/>',
+        '    <hardware slot="rig slot 0" type="Small Core Defense Field Extender I"/>',
+        '    <hardware qty="5" slot="drone bay" type="Hobgoblin II"/>',
+        '    <hardware qty="100" slot="cargo" type="Nanite Repair Paste"/>',
+        '    <hardware qty="2" slot="cargo" type="EMP S"/>',
+        '  </fitting>',
+        '</fittings>',
+        '',
+      ].join('\n')
+    );
+  });
+
+  it('escapes what XML attributes cannot hold', () => {
+    const odd: Fitting = {
+      ...FITTING,
+      name: 'Tom & "Jerry" <3>',
+      modules: [],
+      drones: [],
+      cargo: [],
+    };
+    expect(fittingToEveXml(odd, nameFor)).toContain(
+      '<fitting name="Tom &amp; &quot;Jerry&quot; &lt;3&gt;">'
+    );
   });
 });

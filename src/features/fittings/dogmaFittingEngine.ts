@@ -8,6 +8,7 @@ import wasmInit, {
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import {
+  extractDroneLimits,
   extractFittingStats,
   extractModuleResult,
   extractOffense,
@@ -257,6 +258,7 @@ export async function computeFittingStats(
 
   return {
     ...baseStats,
+    ...extractDroneLimits(dogmaFit.items, calculation.items, calculation.character.attributes),
     calibrationUsed,
     droneBandwidthUsed,
     modules,

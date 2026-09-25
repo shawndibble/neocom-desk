@@ -79,6 +79,16 @@ describe('loadText', () => {
     expect(src.catalog).not.toHaveBeenCalled();
   });
 
+  it('says how to bring an EVE Workbench fit across, since its link cannot be read from here', async () => {
+    const src = sources();
+    const outcome = await loadText(
+      'https://eveworkbench.com/fit/69dfd552-9a17-4628-92de-9f07c28ac659',
+      src
+    );
+    expect(outcome).toMatchObject({ kind: 'failed', error: 'eve-workbench' });
+    expect(src.catalog).not.toHaveBeenCalled();
+  });
+
   it('opens EFT text under the hull name, with the lines it could not place', async () => {
     const outcome = await loadText(
       ['[Rifter, My Fit]', '125mm Gatling AutoCannon I', 'Not A Real Module'].join('\n'),

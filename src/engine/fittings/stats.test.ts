@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   alignTimeSeconds,
   showsDrones,
+  extractDroneLimits,
   extractFittingStats,
   extractModuleResult,
   extractOffense,
@@ -208,7 +209,8 @@ describe('extractFittingStats', () => {
         maxVelocity: 391.4625,
         agility: 3.2,
         mass: 1067000,
-        warpSpeed: 3,
+        baseWarpSpeed: 1,
+        warpSpeedMultiplier: 3,
       }),
       []
     );
@@ -494,5 +496,39 @@ describe('showsDrones', () => {
   it('waits for the ship data before offering drones, rather than flashing them', () => {
     expect(showsDrones(null, 0)).toBe(false);
     expect(showsDrones(null, 1)).toBe(true);
+  });
+});
+
+describe('extractDroneLimits', () => {
+  it("reads the pilot's max active drones and each drone type's bandwidth, launched or not", () => {
+    const limits = extractDroneLimits(
+      [
+        { type_id: 2454, slot: { type: 'drone_bay' } },
+        { type_id: 3001, slot: { type: 'high' } },
+        { type_id: 2185, slot: { type: 'drone_bay' } },
+      ],
+      [
+        { attributes: new Map([[1272, { value: 5 }]]) },
+        { attributes: new Map([[1272, { value: 99 }]]) },
+        { attributes: new Map([[1272, { value: 10 }]]) },
+      ],
+      new Map([[352, { value: 5 }]])
+    );
+    expect(limits).toEqual({ maxActiveDrones: 5, droneBandwidthByType: { 2454: 5, 2185: 10 } });
+  });
+
+  it('allows no drones in space when the character has no Drones skill', () => {
+    expect(extractDroneLimits([], [], new Map()).maxActiveDrones).toBe(0);
+  });
+});
+
+describe('extractFittingStats — warp speed', () => {
+  it('is base warp speed (1281) times the hull’s warp speed multiplier (600), in AU/s', () => {
+    // Literal ids: a Rifter's base is 1 and its multiplier 5 — the base alone is 1 on every hull.
+    const ship = new Map([
+      [1281, { value: 1 }],
+      [600, { value: 5 }],
+    ]);
+    expect(extractFittingStats([], ship, []).navigation.warpSpeed).toBe(5);
   });
 });

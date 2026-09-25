@@ -7,13 +7,14 @@ import { encodeFittingShare } from '@/engine/fitting/fittingShare';
 import {
   fittingToChatLink,
   fittingToEft,
+  fittingToEveXml,
   fittingToMultibuy,
 } from '@/engine/fittings/fittingExport';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import { loadTypes } from '@/sde/loadSde';
 
-export type FittingExportKind = 'shareLink' | 'eft' | 'chatLink' | 'multibuy';
+export type FittingExportKind = 'shareLink' | 'eft' | 'chatLink' | 'multibuy' | 'eveXml';
 
 /** The Fittings page's own URL with the Fitting in `?f=` — what the address bar holds while it's open. */
 export function fittingShareUrl(payload: string): string {
@@ -35,5 +36,6 @@ export async function exportFitting(
 
   const types = await loadTypes();
   const nameFor = (typeId: number) => types[String(typeId)]?.name ?? `Type ${typeId}`;
+  if (kind === 'eveXml') return fittingToEveXml(fitting, nameFor);
   return kind === 'eft' ? fittingToEft(fitting, nameFor) : fittingToMultibuy(fitting, nameFor);
 }

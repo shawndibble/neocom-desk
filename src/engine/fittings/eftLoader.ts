@@ -19,7 +19,8 @@
  * here loads `'active'`, since there is no signal left to say otherwise. A
  * drone-bay stack loads `'online'` (carried, not deployed): an EFT paste
  * describes what a fit *carries*, not which drones happen to be in space
- * right now.
+ * right now. The workspace then launches what the pilot can field once the
+ * stats are in (scope decision `20260925-113331`).
  */
 import { parseEftFit, type EftItem } from '@/engine/import/eftFit';
 import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';

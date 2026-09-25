@@ -23,6 +23,8 @@ const base: FittingStats = {
   droneDps: 50,
   droneBandwidthUsed: 25,
   droneBandwidthTotal: 50,
+  maxActiveDrones: 0,
+  droneBandwidthByType: {},
   droneCapacity: 75,
   ehp: 20000,
   capacitor: { stable: true, stablePercentage: 62 },

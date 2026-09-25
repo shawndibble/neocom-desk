@@ -53,6 +53,28 @@ describe('loadEveFitXmlEntry', () => {
     expect(result.unresolved).toEqual([]);
   });
 
+  it("reads the game's own slot names — 'hi slot N', 'med slot N' and 'cargo' — as pyfa writes them too", () => {
+    const result = loadEveFitXmlEntry(
+      entry({
+        hardware: [
+          { slot: 'hi slot 0', type: '125mm Gatling AutoCannon II' },
+          { slot: 'med slot 1', type: 'Damage Control I' },
+          { slot: 'cargo', type: 'Nanite Repair Paste', qty: 50 },
+        ],
+      }),
+      typeByName
+    );
+
+    expect(result.unresolved).toEqual([]);
+    expect(result.hullTypeId).toBe(587);
+    if (result.hullTypeId === null) return;
+    expect(result.modules).toEqual([
+      { slot: 'high', slotIndex: 0, typeId: 2881, state: 'active' },
+      { slot: 'medium', slotIndex: 1, typeId: 2046, state: 'active' },
+    ]);
+    expect(result.cargo).toEqual([{ typeId: 28668, quantity: 50 }]);
+  });
+
   it('defaults a missing qty to 1 for drones and cargo', () => {
     const result = loadEveFitXmlEntry(
       entry({ hardware: [{ slot: 'drone bay', type: 'Hobgoblin I' }] }),

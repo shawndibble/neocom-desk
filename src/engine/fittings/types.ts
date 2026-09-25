@@ -152,6 +152,10 @@ export interface FittingStats {
   droneDps: number;
   droneBandwidthUsed: number;
   droneBandwidthTotal: number;
+  /** Drones the pilot can control at once — the Drones skill's count; 0 without it. */
+  maxActiveDrones: number;
+  /** Mbit/s one drone of each type in the Fitting draws, whether launched or not. */
+  droneBandwidthByType: Record<number, number>;
   droneCapacity: number;
   ehp: number;
   capacitor: CapacitorStatus;
@@ -310,7 +314,10 @@ export const DOGMA_ATTRIBUTE = {
   maxVelocity: 37,
   agility: 70,
   mass: 4,
-  warpSpeed: 1281,
+  // The warp speed is base × multiplier: the base (1281) is 1 on every hull,
+  // and the hull's own speed — plus any rig's bonus — is in the multiplier.
+  baseWarpSpeed: 1281,
+  warpSpeedMultiplier: 600,
   droneBandwidth: 1271,
   droneCapacity: 283,
   calibration: 1132,
@@ -323,6 +330,18 @@ export const DOGMA_ATTRIBUTE = {
   lowSlots: 12,
   rigSlots: 1137,
   subsystemSlots: 1367,
+} as const;
+
+/** What a failed stats calculation was about: the pilot's skills, or the ship data and its calculation. */
+export type StatsErrorReason = 'skills' | 'shipData';
+
+/**
+ * Read off the calculation's character result: "Max Active Drones", which
+ * the Drones skill raises by one a level. Verified 2026-09-25 against the
+ * pinned engine (Drones 0/3/5 → absent/3/5).
+ */
+export const CHARACTER_DOGMA_ATTRIBUTE = {
+  maxActiveDrones: 352,
 } as const;
 
 /**

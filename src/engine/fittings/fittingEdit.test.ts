@@ -4,6 +4,7 @@ import {
   addDronesWithinBay,
   addModule,
   cargoGroups,
+  launchDrones,
   droneBayUsed,
   droneCountMax,
   droneRoom,
@@ -400,5 +401,61 @@ describe('cargoGroups', () => {
       { typeId: 209, quantity: 150 },
       { typeId: 3001, quantity: 1 },
     ]);
+  });
+});
+
+describe('launchDrones', () => {
+  const bandwidth: Record<number, number> = { 2185: 10, 2454: 5 };
+  const bandwidthOf = (typeId: number) => bandwidth[typeId] ?? 0;
+  const carrying = (drones: Fitting['drones']): Fitting => ({ ...base, drones });
+
+  it('launches from the bay in listed order until the bandwidth runs out', () => {
+    const fit = carrying([
+      { typeId: 2185, quantity: 3, state: 'online' },
+      { typeId: 2454, quantity: 5, state: 'online' },
+    ]);
+    expect(
+      droneGroups(launchDrones(fit, { bandwidthTotal: 25, maxActive: 5, bandwidthOf }))
+    ).toEqual([
+      { typeId: 2185, inSpace: 2, inBay: 1 },
+      { typeId: 2454, inSpace: 1, inBay: 4 },
+    ]);
+  });
+
+  it('stops at the pilot’s max active drones, and launches none without the skill', () => {
+    const fit = carrying([{ typeId: 2454, quantity: 8, state: 'online' }]);
+    expect(
+      droneTotals(launchDrones(fit, { bandwidthTotal: 125, maxActive: 5, bandwidthOf }))
+    ).toEqual({
+      inSpace: 5,
+      inBay: 3,
+    });
+    expect(launchDrones(fit, { bandwidthTotal: 125, maxActive: 0, bandwidthOf })).toBe(fit);
+  });
+
+  it('counts drones already in space against both limits', () => {
+    const fit = carrying([
+      { typeId: 2185, quantity: 1, state: 'active' },
+      { typeId: 2185, quantity: 2, state: 'online' },
+    ]);
+    expect(
+      droneGroups(launchDrones(fit, { bandwidthTotal: 20, maxActive: 5, bandwidthOf }))
+    ).toEqual([{ typeId: 2185, inSpace: 2, inBay: 1 }]);
+  });
+
+  it('keeps a drone of unknown (infinite) bandwidth in the bay', () => {
+    const fit = carrying([{ typeId: 9999, quantity: 3, state: 'online' }]);
+    expect(
+      launchDrones(fit, {
+        bandwidthTotal: 125,
+        maxActive: 5,
+        bandwidthOf: () => Number.POSITIVE_INFINITY,
+      })
+    ).toBe(fit);
+  });
+
+  it('returns the same Fitting when nothing can launch', () => {
+    const fit = carrying([{ typeId: 2185, quantity: 2, state: 'online' }]);
+    expect(launchDrones(fit, { bandwidthTotal: 5, maxActive: 5, bandwidthOf })).toBe(fit);
   });
 });

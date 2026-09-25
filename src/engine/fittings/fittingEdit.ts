@@ -208,6 +208,54 @@ export function setDroneCounts(
   return { ...fitting, drones };
 }
 
+/** What a pilot can have in space at once: the hull's bandwidth, and the Drones skill's count. */
+export interface DroneLaunchLimits {
+  /** Mbit/s the hull has. */
+  bandwidthTotal: number;
+  /** Drones the pilot can control at once (0 without the Drones skill). */
+  maxActive: number;
+  /** Mbit/s one drone of a type draws. */
+  bandwidthOf: (typeId: number) => number;
+}
+
+/**
+ * Launches drones from the bay, in the order the Fitting lists them, as far
+ * as bandwidth and the pilot's drone count allow — counting any already in
+ * space against both. The same Fitting back when none can launch.
+ */
+export function launchDrones(fitting: Fitting, limits: DroneLaunchLimits): Fitting {
+  const groups = droneGroups(fitting);
+  // Only drones already out draw bandwidth — and skipping the rest keeps an
+  // unknown (infinite) one in the bay from turning the sum into NaN.
+  let bandwidthLeft =
+    limits.bandwidthTotal -
+    groups.reduce(
+      (sum, group) =>
+        group.inSpace > 0 ? sum + group.inSpace * limits.bandwidthOf(group.typeId) : sum,
+      0
+    );
+  let countLeft = limits.maxActive - groups.reduce((sum, group) => sum + group.inSpace, 0);
+  let next = fitting;
+  for (const group of groups) {
+    if (countLeft <= 0) break;
+    const each = limits.bandwidthOf(group.typeId);
+    const byBandwidth = !Number.isFinite(each)
+      ? 0
+      : each > 0
+        ? Math.floor(bandwidthLeft / each)
+        : Number.POSITIVE_INFINITY;
+    const launched = Math.max(0, Math.min(group.inBay, countLeft, byBandwidth));
+    if (launched === 0) continue;
+    next = setDroneCounts(next, group.typeId, {
+      inSpace: group.inSpace + launched,
+      inBay: group.inBay - launched,
+    });
+    bandwidthLeft -= launched * each;
+    countLeft -= launched;
+  }
+  return next;
+}
+
 /** Puts `quantity` more of `typeId` in the bay. */
 export function addDrones(fitting: Fitting, typeId: number, quantity: number): Fitting {
   const current = droneGroups(fitting).find((group) => group.typeId === typeId);
