@@ -1163,6 +1163,14 @@ export function Wallet() {
     );
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
+  // Personal transactions live under Market › History. Only a wallet with no
+  // corp side to switch to is sent there: a corp-capable pilot who flips the
+  // owner to Personal keeps the Balance fallback (and the switch back). Gated
+  // on `urlOwner` too, since corp access resolves asynchronously and a corp
+  // deep link must not bounce out before the switch becomes available.
+  if (tab === 'transactions' && !corpAvailable && urlOwner !== 'corporation') {
+    return <Navigate to="/market/history/transactions" replace />;
+  }
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -1481,26 +1489,33 @@ export function Wallet() {
           padded={false}
           title={t('wallet.journalTab')}
           actions={
-            journalResult ? (
-              <span className="flex items-center gap-2">
-                <IconButton
-                  size="sm"
-                  icon={<Icon.Download />}
-                  label={t('wallet.exportCsvJournal')}
-                  disabled={filteredJournal.length === 0}
-                  onClick={() =>
-                    downloadCsv(
-                      'wallet-journal',
-                      [...filteredJournal].sort(byDateDesc),
-                      walletJournalCsvColumns(t),
-                      new Date(),
-                      journalTruncated
-                    )
-                  }
-                />
-                <DataAgeBadge date={journalResult.fetchedAt} />
-              </span>
-            ) : undefined
+            <span className="flex items-center gap-2">
+              {!showingCorp && (
+                <Link to="/market/history/transactions" className="text-xs hover:text-accent">
+                  {t('wallet.transactionsLink')}
+                </Link>
+              )}
+              {journalResult && (
+                <>
+                  <IconButton
+                    size="sm"
+                    icon={<Icon.Download />}
+                    label={t('wallet.exportCsvJournal')}
+                    disabled={filteredJournal.length === 0}
+                    onClick={() =>
+                      downloadCsv(
+                        'wallet-journal',
+                        [...filteredJournal].sort(byDateDesc),
+                        walletJournalCsvColumns(t),
+                        new Date(),
+                        journalTruncated
+                      )
+                    }
+                  />
+                  <DataAgeBadge date={journalResult.fetchedAt} />
+                </>
+              )}
+            </span>
           }
         >
           {!journalResult || journal.length === 0 ? (

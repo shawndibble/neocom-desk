@@ -242,6 +242,19 @@ describe('Wallet', () => {
     expect(screen.getByRole('tab', { name: 'Journal' })).toHaveAttribute('aria-selected', 'true');
   });
 
+  it('redirects /wallet/transactions to Market › History for a personal owner (issue #1749)', async () => {
+    window.history.pushState({}, '', '/wallet/transactions');
+    render(<App />);
+    await waitFor(() => expect(window.location.pathname).toBe('/market/history/transactions'));
+  });
+
+  it('links the personal Journal header to Market › History › Transactions (issue #1749)', async () => {
+    window.history.pushState({}, '', '/wallet/journal');
+    render(<App />);
+    const link = await screen.findByRole('link', { name: 'Transactions →' });
+    expect(link).toHaveAttribute('href', '/market/history/transactions');
+  });
+
   it('scrolls to and pulses the journal line a wallet alert pointed at', async () => {
     const scrollIntoView = vi
       .spyOn(Element.prototype, 'scrollIntoView')
