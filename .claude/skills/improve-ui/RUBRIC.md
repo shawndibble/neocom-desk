@@ -89,7 +89,7 @@ it is filed `ready-for-human` with the trade stated. The user asked for this
 axis, and only a human can overrule DESIGN.md's density rule.
 
 ```
-grep -rnE '(p|m)[xytblrse]?-\[|gap(-[xy])?-\[|space-[xy]-\[' src --include='*.tsx'
+grep -rnE '\b(p|m)[xytblrse]?-\[|\bgap(-[xy])?-\[|\bspace-[xy]-\[' src --include='*.tsx'
 grep -rhoE '\b(gap|space-y)-[0-9.]+\b' src/routes --include='*.tsx' | sort | uniq -c | sort -rn
 ```
 
@@ -115,7 +115,7 @@ Look for:
   bars differ in height, so their first rows start at different y positions.
 
 ```
-grep -rnE '<(Button|button|Select|SelectTrigger|TextInput|SearchInput|input)[^>]*h-[0-9]' src/routes src/features --include='*.tsx'
+grep -rnE '<(Button|button|Select|SelectTrigger|TextInput|SearchInput|input)\b[^>]*\bh-[0-9]' src/routes src/features --include='*.tsx'
 grep -rn "align: 'right'" src --include='*.tsx' | head
 ```
 
