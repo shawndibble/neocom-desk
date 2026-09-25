@@ -423,6 +423,22 @@ describe('Assets', () => {
     expect(screen.queryByText(/no assets cached/i)).not.toBeInTheDocument();
   });
 
+  it('notes inline that jumps away are unavailable when the location scope was never granted (#1590)', async () => {
+    render(<App />);
+    expect(await screen.findByText(JITA)).toBeInTheDocument();
+    expect(await screen.findByText('Jumps away unavailable')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grant Character details' })).toBeInTheDocument();
+  });
+
+  it('omits the jumps-away note once the location scope is granted (#1590)', async () => {
+    await db.tokens.update(CHAR_ID, {
+      scopes: ['esi-assets.read_assets.v1', 'esi-location.read_location.v1'],
+    });
+    render(<App />);
+    expect(await screen.findByText(JITA)).toBeInTheDocument();
+    expect(screen.queryByText('Jumps away unavailable')).not.toBeInTheDocument();
+  });
+
   it('caps what is fetched and says so, when a character has more asset pages than the fetch cap', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/assets`, ({ request }) => {
