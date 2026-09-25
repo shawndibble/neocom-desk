@@ -60,6 +60,7 @@ import { loadCorporationDivisions } from '@/features/corp/wallet';
 import { hangarDivisions } from '@/features/corp/divisions';
 import {
   buildCorpAssetTree,
+  corpAssetLocationId,
   type CorpAssetGroupId,
   type CorpAssetInput,
 } from '@/engine/corp/assetDivisions';
@@ -229,9 +230,14 @@ function typeDisplayName(typeId: number, typeNames: ReadonlyMap<number, string>)
 function nodeLabel(
   node: AssetTreeNode,
   typeNames: ReadonlyMap<number, string>,
+  locationNames: ReadonlyMap<number, string>,
   t: Translate
 ): string {
   if (node.kind === 'bay') return t(`assets.bay.${node.bay}`);
+  const locationId = corpAssetLocationId(node);
+  if (locationId !== null) {
+    return locationNames.get(locationId) ?? t('corp.assets.unknownLocation', { locationId });
+  }
   return typeDisplayName(node.asset.type_id, typeNames);
 }
 
@@ -257,6 +263,7 @@ interface CorpAssetMatch {
 function searchCorpAssetGroups(
   groups: readonly AssetTreeGroup<CorpAssetGroupId>[],
   typeNames: ReadonlyMap<number, string>,
+  locationNames: ReadonlyMap<number, string>,
   divisionNames: ReadonlyMap<number, string | null>,
   t: Translate,
   query: string
@@ -280,7 +287,7 @@ function searchCorpAssetGroups(
       walk(
         groupId,
         node.children,
-        [...trail, nodeLabel(node, typeNames, t)],
+        [...trail, nodeLabel(node, typeNames, locationNames, t)],
         [...segments, assetNodeSegment(node)]
       );
     }
@@ -342,6 +349,7 @@ function CorpAssetsView() {
 
   const groups = data?.groups ?? null;
   const typeNames = data?.labels.types ?? EMPTY_CORP_ASSET_LABELS.types;
+  const locationNames = data?.labels.locations ?? EMPTY_CORP_ASSET_LABELS.locations;
   const divisionNames = data?.divisionNames ?? EMPTY_DIVISION_NAMES;
 
   const resolved = useMemo(
@@ -365,9 +373,9 @@ function CorpAssetsView() {
   const searchMatches = useMemo(
     () =>
       searchActive && groups
-        ? searchCorpAssetGroups(groups, typeNames, divisionNames, t, debouncedSearch)
+        ? searchCorpAssetGroups(groups, typeNames, locationNames, divisionNames, t, debouncedSearch)
         : [],
-    [searchActive, groups, typeNames, divisionNames, t, debouncedSearch]
+    [searchActive, groups, typeNames, locationNames, divisionNames, t, debouncedSearch]
   );
 
   const rows = useMemo<BrowseRow[]>(() => {
@@ -512,7 +520,7 @@ function CorpAssetsView() {
       : corpAssetHref(null, [], query);
   const currentLabel =
     resolved.trail.length > 0
-      ? nodeLabel(resolved.trail[resolved.trail.length - 1], typeNames, t)
+      ? nodeLabel(resolved.trail[resolved.trail.length - 1], typeNames, locationNames, t)
       : resolved.group
         ? groupLabel(t, resolved.group.id, divisionNames)
         : '';
@@ -716,6 +724,7 @@ function CorpAssetsView() {
                           row={row}
                           t={t}
                           typeNames={typeNames}
+                          locationNames={locationNames}
                           divisionNames={divisionNames}
                           selectMode={selectMode}
                           selectedIds={selectedIds}
@@ -753,6 +762,7 @@ interface BrowseRowViewProps {
   row: BrowseRow;
   t: Translate;
   typeNames: ReadonlyMap<number, string>;
+  locationNames: ReadonlyMap<number, string>;
   divisionNames: ReadonlyMap<number, string | null>;
   selectMode: boolean;
   selectedIds: ReadonlySet<number>;
@@ -815,6 +825,7 @@ function NodeRowView({
   node,
   t,
   typeNames,
+  locationNames,
   selectMode,
   selectedIds,
   onToggleSelection,
@@ -826,7 +837,7 @@ function NodeRowView({
   query,
   priceByTypeId,
 }: BrowseRowViewProps & { node: AssetTreeNode }) {
-  const label = nodeLabel(node, typeNames, t);
+  const label = nodeLabel(node, typeNames, locationNames, t);
 
   if (node.kind !== 'item') {
     return (

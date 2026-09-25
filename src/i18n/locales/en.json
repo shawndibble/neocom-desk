@@ -5000,6 +5000,7 @@
       "loadFailedTitle": "Could not load corp assets",
       "loadFailedHint": "The corporation asset read failed and nothing is cached yet. Try refreshing.",
       "searchPlaceholder": "Search items…",
+      "unknownLocation": "Location #{{locationId}}",
       "flag": {
         "officeFolder": "Office",
         "corpDeliveries": "Deliveries",
