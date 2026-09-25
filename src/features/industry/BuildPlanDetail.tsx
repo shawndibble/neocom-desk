@@ -58,6 +58,7 @@ import { hydrateActivityFacilityDefaults } from './facilityDefaults';
 import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
+import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import type { BuildPlanRecord } from '@/db';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
@@ -1147,6 +1148,12 @@ export function BuildPlanDetail({
           skillGate={topLevelSkillGate}
           nameForSkill={(typeID) => nameForType(catalog, typeID)}
           nameForCharacter={(characterId) => characterNames.get(characterId) ?? t('common.unknown')}
+        />
+      )}
+      {result && !error && result.revenue !== null && (
+        <AssumesBaseStandingsNote
+          characterId={plan.characterId}
+          hint={t('industry.assumesBaseStandingsHint')}
         />
       )}
 

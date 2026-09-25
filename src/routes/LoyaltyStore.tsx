@@ -48,6 +48,7 @@ import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, textParam } from '@/lib/urlState';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
+import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { useMarketHub } from '@/features/market/hub';
 import { usePriceBasis, type PriceBasis } from '@/features/loyalty/priceBasis';
 import { TRADE_HUBS } from '@/market/hubs';
@@ -514,22 +515,30 @@ export function LoyaltyStore() {
           hint={rows.length === 0 ? t('loyaltyStore.emptyHint') : t('loyaltyStore.noMatchHint')}
         />
       ) : (
-        <DataTable
-          label={t('loyaltyStore.title')}
-          columns={columns}
-          rows={filteredRows}
-          rowKey={(row) => row.offer.offer_id}
-          density="compact"
-          sort={offersSortProps.sort}
-          onSortChange={offersSortProps.onSortChange}
-          onRowClick={selectRow}
-          rowContextMenu={rowContextMenu}
-          rowMoreActions
-          selectedRowKey={selectedRow?.offer.offer_id ?? null}
-          rowClassName={(row) =>
-            row.offer.offer_id === selectedRow?.offer.offer_id ? 'bg-panel-2' : undefined
-          }
-        />
+        <>
+          {priceBasis === 'sell' && (
+            <AssumesBaseStandingsNote
+              className="border-b border-line px-3"
+              hint={t('loyaltyStore.assumesBaseStandingsHint')}
+            />
+          )}
+          <DataTable
+            label={t('loyaltyStore.title')}
+            columns={columns}
+            rows={filteredRows}
+            rowKey={(row) => row.offer.offer_id}
+            density="compact"
+            sort={offersSortProps.sort}
+            onSortChange={offersSortProps.onSortChange}
+            onRowClick={selectRow}
+            rowContextMenu={rowContextMenu}
+            rowMoreActions
+            selectedRowKey={selectedRow?.offer.offer_id ?? null}
+            rowClassName={(row) =>
+              row.offer.offer_id === selectedRow?.offer.offer_id ? 'bg-panel-2' : undefined
+            }
+          />
+        </>
       )}
     </Panel>
   );

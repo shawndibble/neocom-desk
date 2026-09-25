@@ -51,7 +51,10 @@
     "standingsAction": "Log in to share standings",
     "dismiss": "Dismiss",
     "implantsAssumedTitle": "Assumes no implants",
-    "implantsAssumedAction": "Grant Character details"
+    "implantsAssumedAction": "Grant Character details",
+    "standingsAssumedTitle": "Assumes base standings",
+    "standingsAssumedTitleFor": "{{character}} — Assumes base standings",
+    "standingsAssumedAction": "Grant Character details"
   },
   "fittings": {
     "myFittings": {
@@ -1491,7 +1494,9 @@
     "skillGateBestOn": "Best on {{character}}",
     "skillGateFilterChip": "Hide skill-gated",
     "skillGateFilterChipCount_one": "{{count}} row hidden",
-    "skillGateFilterChipCount_other": "{{count}} rows hidden"
+    "skillGateFilterChipCount_other": "{{count}} rows hidden",
+    "assumesBaseStandingsHint": "Broker fees in these profit figures are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
+    "productionLogAssumesBaseStandingsHint": "Broker fees on watched sell orders are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings."
   },
   "login": {
     "button": "Log in with EVE Online",
@@ -3393,7 +3398,8 @@
     "unpriceable": "Can't be priced at this hub — a material or the product has no listed sell price.",
     "unpriceableRequiredItem": "Can't be priced at this hub — a required item has no listed sell price.",
     "viewInMarket": "View in Market",
-    "planInIndustry": "Plan in Industry"
+    "planInIndustry": "Plan in Industry",
+    "assumesBaseStandingsHint": "Broker fees on sell-order profits are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings."
   },
   "orders": {
     "openTab": "Open",
@@ -3827,9 +3833,7 @@
       "instantNetHelp": "Selling into buy orders here, after {{tax}}% sales tax. No broker fee: filling an order lists nothing. Always at 100% of market.",
       "listNet": "You receive, listing",
       "listNetHelp": "Listing one price step under the cheapest seller here, after {{tax}}% sales tax and a {{broker}}% broker fee, 100 ISK minimum per row. Always at 100% of market.",
-      "assumesBaseStandingsTitle": "Assumes base standings",
       "assumesBaseStandingsHint": "The broker fee above is calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings.",
-      "assumesBaseStandingsAction": "Grant Character details",
       "refineTotal": "Refine total",
       "refineTotalHelp": "What refining the list with the active Character's own reprocessing skills would fetch, sold into buy orders at this hub. Assumes an NPC station's 50% base rate and no ore-specialisation skill — neither is modelled — so a trained miner's real yield runs higher than shown.",
       "refineImplantHint": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
@@ -4169,7 +4173,8 @@
       "floorWorking": "Where that price comes from",
       "outbidAt": "Outbid at {{price}}",
       "copyPrice": "Copy {{price}}",
-      "priceCopied": "Copied to clipboard"
+      "priceCopied": "Copied to clipboard",
+      "assumesBaseStandingsHint": "Floor prices on this character's sell orders are calculated at 0 standing. Grant Character details for this character's actual faction and corporation standings."
     },
     "emptySellBlueprintHint": "Copies of this blueprint are traded on contract, not on the market.",
     "searchBpcContracts": "Search BPC contracts"
