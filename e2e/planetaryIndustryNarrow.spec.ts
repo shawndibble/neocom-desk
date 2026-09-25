@@ -353,6 +353,24 @@ test.describe('PI Plan — stacked Sensitivity card', () => {
       .locator('tbody tr')
       .evaluateAll((rows) => rows.map((row) => row.getBoundingClientRect().height));
     expect(heights.length).toBeGreaterThan(1);
+    console.log(
+      'HEIGHTS',
+      JSON.stringify(heights),
+      JSON.stringify(
+        await chain
+          .locator('tbody tr')
+          .evaluateAll((rows) =>
+            rows.map((r) =>
+              Array.from(r.children).map(
+                (c) =>
+                  Math.round(c.getBoundingClientRect().height) +
+                  ':' +
+                  Math.round(c.getBoundingClientRect().width)
+              )
+            )
+          )
+      )
+    );
     for (const h of heights) expect(h).toBeCloseTo(heights[0], 0);
 
     // The cell is its own line: role and hub read are two spans, never one string.
@@ -362,7 +380,7 @@ test.describe('PI Plan — stacked Sensitivity card', () => {
       .locator('> span')
       .evaluateAll((els) => els.map((el) => el.textContent));
     expect(spans).toHaveLength(2);
-    expect(spans[1]).toMatch(/^Hub says /);
+    expect(spans[1]).toMatch(/^Hub: /);
 
     const overflow = await chain.evaluate((table) => {
       const box = table.parentElement as HTMLElement;
