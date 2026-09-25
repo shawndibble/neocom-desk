@@ -43,7 +43,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     });
     await page.setViewportSize(PHONE);
 
-    await page.getByLabel('Paste EFT fit text').fill(RIFTER_EFT);
+    await page.getByLabel('Link or text').fill(RIFTER_EFT);
     const loadButton = page.getByRole('button', { name: 'Load', exact: true });
     const box = await loadButton.boundingBox();
     expect(box).not.toBeNull();
@@ -84,7 +84,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     });
     await page.setViewportSize(PHONE);
 
-    await page.getByLabel('Paste EFT fit text').fill(RIFTER_EFT);
+    await page.getByLabel('Link or text').fill(RIFTER_EFT);
     await page.getByRole('button', { name: 'Load', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'List' })).toBeVisible();
 

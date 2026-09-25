@@ -20,7 +20,7 @@
  * Mounts under a Router: every item row is a Build Plan context-menu
  * trigger (#931), and so is each line of the detail modal's contents.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -219,6 +219,8 @@ interface ContractSearchFilterBarProps {
   regionOptions: RegionOption[];
   /** The Jump Range filter's origin — computed above this bar since `FilterBar` unmounts its children. */
   currentSystem: CurrentSystemState;
+  /** The table's column picker, drawn beside the filter trigger. */
+  actions?: ReactNode;
 }
 
 function ContractSearchFilterBar({
@@ -226,6 +228,7 @@ function ContractSearchFilterBar({
   onChange,
   regionOptions,
   currentSystem,
+  actions,
 }: ContractSearchFilterBarProps) {
   const { t } = useTranslation();
   // Counted off the controls, not off the parsed engine filter: a half-typed
@@ -249,6 +252,7 @@ function ContractSearchFilterBar({
       // System: six controls beside the search box wrap to two rows above
       // the table they exist to narrow — the same call the Courier bar makes.
       collapsible
+      actions={actions}
       className="border-b border-line px-3 py-2"
       search={
         <SearchInput
@@ -530,6 +534,9 @@ export function ContractSearchPanel({
    * and never because a name lookup behind it has not answered.
    */
   const modeLoading = active.loading;
+  const modeLoadingLabel = t(
+    mode === 'courier' ? 'contractSearch.loadingCourier' : 'contractSearch.loadingOffers'
+  );
   const modeError = active.error;
   /** Last cycle's rows are on screen and this cycle's are on the way (#963). */
   const revalidating = active.data?.revalidating ?? false;
@@ -964,13 +971,13 @@ export function ContractSearchPanel({
             )}
             {modeLoading && modeRowCount === 0 ? (
               <div className="flex flex-col items-center gap-2 py-16">
-                <Spinner
-                  label={t(
-                    mode === 'courier'
-                      ? 'contractSearch.loadingCourier'
-                      : 'contractSearch.loadingOffers'
-                  )}
-                />
+                <Spinner label={modeLoadingLabel} />
+                {/* Visible copy of the spinner's own label — the first sync is
+                    slow enough that a bare arc reads as stuck. Hidden from
+                    assistive tech, which already hears the status. */}
+                <p aria-hidden="true" className="text-text-dim">
+                  {modeLoadingLabel}
+                </p>
               </div>
             ) : modeError ? (
               <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
@@ -1004,6 +1011,16 @@ export function ContractSearchPanel({
                   onChange={changeFilter}
                   regionOptions={regionOptions}
                   currentSystem={currentSystem}
+                  actions={
+                    <ColumnPickerMenu
+                      available={CONTRACT_SEARCH_ITEMS_COLUMN_IDS}
+                      visible={visibleItemsColumns}
+                      columnsById={itemsColumnsById}
+                      onToggle={toggleItemsColumn}
+                      buttonLabel={t('contractSearch.columnsButton')}
+                      menuTitle={t('contractSearch.columnsMenuTitle')}
+                    />
+                  }
                 />
 
                 {/*
@@ -1106,16 +1123,6 @@ export function ContractSearchPanel({
                   )
                 ) : (
                   <>
-                    <div className="flex justify-end px-3 pb-2">
-                      <ColumnPickerMenu
-                        available={CONTRACT_SEARCH_ITEMS_COLUMN_IDS}
-                        visible={visibleItemsColumns}
-                        columnsById={itemsColumnsById}
-                        onToggle={toggleItemsColumn}
-                        buttonLabel={t('contractSearch.columnsButton')}
-                        menuTitle={t('contractSearch.columnsMenuTitle')}
-                      />
-                    </div>
                     <DataTable
                       label={t('contractSearch.title')}
                       columns={columns}

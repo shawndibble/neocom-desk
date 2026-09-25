@@ -10,6 +10,7 @@
  * compile error.
  */
 import { uniqueTransactions } from './uniqueTransactions';
+import type { KillmailVictim } from '@/engine/fittings/linkLoader';
 import { esiFetch, recordEsiActivity, outcomeForError, attachEndpointId } from './client';
 import type { EsiResult } from './client';
 import { fetchAllPagesStatus } from './paginated';
@@ -344,6 +345,24 @@ export function getAlliancePublicInfo(
   return esiFetch<AlliancePublicInfo>(`/alliances/${allianceId}`, {
     ...options,
     endpointId: 'getAlliancePublicInfo',
+  });
+}
+
+// --- GET /killmails/{killmail_id}/{killmail_hash} (public) ---
+
+export interface Killmail {
+  killmail_id: number;
+  victim: KillmailVictim;
+}
+
+export function getKillmail(
+  killmailId: number,
+  killmailHash: string,
+  options: EndpointOptions = {}
+): Promise<EsiResult<Killmail>> {
+  return esiFetch<Killmail>(`/killmails/${killmailId}/${killmailHash}`, {
+    ...options,
+    endpointId: 'getKillmail',
   });
 }
 

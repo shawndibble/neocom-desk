@@ -3,12 +3,13 @@ import { useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
 import { fieldBaseClassName } from '@/components/ui/controlStyles';
 import type { EftUnresolvedItem } from '@/engine/fittings/eftLoader';
-import type { ShareDecodeError } from './useFittingWorkspace';
+import type { LoadError, ShareDecodeError } from './useFittingWorkspace';
 
 interface FittingLoadCardProps {
   onLoad: (text: string) => Promise<void>;
   unresolved: EftUnresolvedItem[];
   shareError: ShareDecodeError | null;
+  loadError: LoadError | null;
   tooLargeToShare: boolean;
 }
 
@@ -16,6 +17,7 @@ export function FittingLoadCard({
   onLoad,
   unresolved,
   shareError,
+  loadError,
   tooLargeToShare,
 }: FittingLoadCardProps) {
   const { t } = useTranslation();
@@ -57,6 +59,11 @@ export function FittingLoadCard({
         {shareError && (
           <p role="alert" className="text-xs text-danger">
             {t(`fittings.load.shareError.${shareError}`)}
+          </p>
+        )}
+        {loadError && (
+          <p role="alert" className="text-xs text-danger">
+            {t(`fittings.load.loadError.${loadError}`)}
           </p>
         )}
         {tooLargeToShare && (

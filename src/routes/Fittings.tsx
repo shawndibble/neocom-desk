@@ -202,9 +202,10 @@ export function Fittings() {
         }
       />
       <FittingLoadCard
-        onLoad={workspace.loadFromEftText}
+        onLoad={workspace.loadFromInput}
         unresolved={workspace.unresolved}
         shareError={workspace.shareError}
+        loadError={workspace.loadError}
         tooLargeToShare={workspace.tooLargeToShare}
       />
       {activeCharacterId !== null && (

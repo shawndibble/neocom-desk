@@ -72,12 +72,17 @@
     },
     "load": {
       "title": "Load",
-      "pasteLabel": "Paste EFT fit text",
+      "pasteLabel": "Link or text",
       "pastePlaceholder": "[Rifter, My Fit]\n125mm Gatling AutoCannon I\n...",
       "button": "Load",
       "shareError": {
         "invalid": "That link isn't a valid Fitting.",
         "unsupported-version": "That link was made by a newer version of Neocom Desk."
+      },
+      "loadError": {
+        "unrecognised": "That isn't something Load can read. Paste EFT fit text, an in-game fitting link or DNA string, an eveship.fit link, or a zKillboard killmail link.",
+        "killmail-not-found": "That killmail couldn't be found on zKillboard.",
+        "killmail-failed": "The killmail couldn't be fetched from ESI. Try again in a moment."
       },
       "tooLargeToShare": "This Fitting is loaded, but too large to carry in a link — reloading this page will lose it.",
       "unresolvedTitle_one": "{{count}} line wasn't recognized",
@@ -4722,8 +4727,8 @@
       "chokepointDetail": "One end sits in a system haulers are most often killed in. That is about traffic, not security status — and not a prediction."
     },
     "courierNoFilterMatchesUnplacedHint": "Some hauls end at a structure this app cannot place, so they carry no space band and a narrowed Destination space filter leaves them out. Select every band to see them again.",
-    "loadingOffers": "Loading public contracts…",
-    "loadingCourier": "Loading courier contracts…",
+    "loadingOffers": "Loading public contracts, this may take a moment.",
+    "loadingCourier": "Loading courier contracts, this may take a moment.",
     "namingTypes": "Loading item names…",
     "refreshingInBackground": "Refreshing in the background…",
     "courierNoFilterMatches": "No courier contracts match your filters.",
