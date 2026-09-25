@@ -274,6 +274,8 @@
       "waitingForShipData": "Ship data is still downloading. You can search now; adding, and the fits-this-hull and can-fly filters, switch on once it's ready.",
       "loadingCatalogue": "Loading items…",
       "noResults": "No matching items.",
+      "hiddenByCanFly_one": "{{count}} more hidden by Can fly — show it",
+      "hiddenByCanFly_other": "{{count}} more hidden by Can fly — show them",
       "missingSkills": "Missing skills",
       "openButton": "Add module",
       "tab": {
