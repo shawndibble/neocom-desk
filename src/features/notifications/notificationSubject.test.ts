@@ -38,3 +38,15 @@ describe('notificationUrlForSubject', () => {
     expect(notificationUrlForSubject('newMail', 42)).toEqual('/mail');
   });
 });
+
+describe('notificationUrlForSubject character', () => {
+  it('appends the alerted Character to a subject route', () => {
+    expect(notificationUrlForSubject('industryJobComplete', 9, 42)).toEqual(
+      '/industry?highlight=9&character=42'
+    );
+  });
+
+  it('appends it to a subject-less route too', () => {
+    expect(notificationUrlForSubject('newMail', undefined, 42)).toEqual('/mail?character=42');
+  });
+});
