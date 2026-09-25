@@ -43,34 +43,36 @@ export function HullPicker({ catalogue, onStart }: HullPickerProps) {
       ) : shown.length === 0 ? (
         <p className="text-xs text-text-dim">{t('fittings.start.noHulls')}</p>
       ) : (
-        <div className="max-h-[32rem] columns-1 gap-4 overflow-y-auto sm:columns-2 xl:columns-3">
-          {shown.map((hullClass) => (
-            <section key={hullClass.id} className="mb-3 break-inside-avoid">
-              <h3 className="mb-1 flex justify-between text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                <span>{hullClass.name}</span>
-                <span className="tabular-nums">{hullClass.hulls.length}</span>
-              </h3>
-              <ul>
-                {hullClass.hulls.map((hull) => {
-                  const isSelected = selected?.typeId === hull.typeId;
-                  return (
-                    <li key={hull.typeId}>
-                      <button
-                        type="button"
-                        aria-pressed={isSelected}
-                        title={hull.group}
-                        onClick={() => setSelected(hull)}
-                        onDoubleClick={() => onStart(hull)}
-                        className={`flex min-h-11 w-full md:min-h-9 items-center border-l-2 px-2 text-left text-sm hover:bg-panel-2 ${isSelected ? 'border-accent bg-panel-2 text-accent' : 'border-transparent'}`}
-                      >
-                        {hull.name}
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
+        <div data-testid="hull-list" className="max-h-[32rem] overflow-y-auto">
+          <div className="columns-1 gap-4 sm:columns-2 xl:columns-3">
+            {shown.map((hullClass) => (
+              <section key={hullClass.id} className="mb-3 break-inside-avoid">
+                <h3 className="mb-1 flex justify-between text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                  <span>{hullClass.name}</span>
+                  <span className="tabular-nums">{hullClass.hulls.length}</span>
+                </h3>
+                <ul>
+                  {hullClass.hulls.map((hull) => {
+                    const isSelected = selected?.typeId === hull.typeId;
+                    return (
+                      <li key={hull.typeId}>
+                        <button
+                          type="button"
+                          aria-pressed={isSelected}
+                          title={hull.group}
+                          onClick={() => setSelected(hull)}
+                          onDoubleClick={() => onStart(hull)}
+                          className={`flex min-h-11 w-full md:min-h-9 items-center border-l-2 px-2 text-left text-sm hover:bg-panel-2 ${isSelected ? 'border-accent bg-panel-2 text-accent' : 'border-transparent'}`}
+                        >
+                          {hull.name}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            ))}
+          </div>
         </div>
       )}
       <div className="flex flex-wrap items-center gap-3 border-t border-line pt-3">
