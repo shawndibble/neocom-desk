@@ -230,6 +230,7 @@ export function FittingStartScreen({
             <FittingPreview
               key={selected.id}
               row={selected}
+              catalogue={catalogue}
               characterId={characterId}
               onOpen={() => open(selected)}
               onCompare={(code) => void navigate(`/fittings/compare?f=${encodeURIComponent(code)}`)}

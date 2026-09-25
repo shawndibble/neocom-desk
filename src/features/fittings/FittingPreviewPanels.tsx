@@ -1,0 +1,232 @@
+import { useTranslation } from 'react-i18next';
+import { formatCompactNumber } from '@/lib/compactNumber';
+import { formatDuration } from '@/lib/duration';
+import type { Fitting, FittingStats } from '@/engine/fittings/types';
+import { ResistTable, type ResistRow } from './FittingStatsSections';
+import { MissingSkillsChip } from './MissingSkillsChip';
+import { useFittingSkillGaps } from './useFittingSkillGaps';
+
+/** One resource meter: what is used of what the hull has, red-flagged past the limit. */
+function Meter({
+  label,
+  used,
+  total,
+  unit,
+}: {
+  label: string;
+  used: number;
+  total: number;
+  unit?: string;
+}) {
+  const over = used > total;
+  const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
+  return (
+    <div className="grid grid-cols-[6rem_1fr_auto] items-center gap-2 text-xs">
+      <span className="text-text-dim">{label}</span>
+      <div
+        role="meter"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-valuenow={Math.min(used, total)}
+        className="h-1.5 bg-line"
+      >
+        <div
+          className={`h-full ${over ? 'bg-danger' : 'bg-accent-dim'}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className={`tabular-nums ${over ? 'text-danger' : ''}`}>
+        {formatCompactNumber(used)} / {formatCompactNumber(total)}
+        {unit ? ` ${unit}` : ''}
+      </span>
+    </div>
+  );
+}
+
+/** CPU, powergrid, calibration and drone bandwidth: what the fit asks of the hull. */
+export function FitMeters({ stats }: { stats: FittingStats }) {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-1.5">
+      <Meter
+        label={t('fittings.start.preview.cpu')}
+        used={stats.cpuUsed}
+        total={stats.cpuTotal}
+        unit="tf"
+      />
+      <Meter
+        label={t('fittings.start.preview.powergrid')}
+        used={stats.powergridUsed}
+        total={stats.powergridTotal}
+        unit="MW"
+      />
+      {stats.calibrationTotal > 0 && (
+        <Meter
+          label={t('fittings.start.preview.calibration')}
+          used={stats.calibrationUsed}
+          total={stats.calibrationTotal}
+        />
+      )}
+      {stats.droneBandwidthTotal > 0 && (
+        <Meter
+          label={t('fittings.start.preview.droneBandwidth')}
+          used={stats.droneBandwidthUsed}
+          total={stats.droneBandwidthTotal}
+          unit="Mbit/s"
+        />
+      )}
+    </div>
+  );
+}
+
+function Facts({ items }: { items: { label: string; value: string }[] }) {
+  return (
+    <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm tabular-nums sm:grid-cols-[auto_1fr_auto_1fr]">
+      {items.map((item) => (
+        <div key={item.label} className="contents">
+          <dt className="text-text-dim">{item.label}</dt>
+          <dd className="text-right sm:text-left">{item.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** Damage: the totals, the missile/turret and drone split, and every weapon with its ammo. */
+export function OffensePanel({
+  stats,
+  typeName,
+}: {
+  stats: FittingStats;
+  typeName: (typeId: number) => string;
+}) {
+  const { t } = useTranslation();
+  const { offense } = stats;
+  if (offense.weapons.length === 0) {
+    return <p className="text-xs text-text-dim">{t('fittings.start.preview.noWeapons')}</p>;
+  }
+  const guns = offense.weapons.filter((row) => !row.isDrone).reduce((sum, row) => sum + row.dps, 0);
+  const drones = offense.weapons
+    .filter((row) => row.isDrone)
+    .reduce((sum, row) => sum + row.dps, 0);
+  const items = [
+    { label: t('fittings.start.preview.totalDps'), value: formatCompactNumber(offense.dps) },
+    { label: t('fittings.start.preview.volley'), value: formatCompactNumber(offense.volley) },
+    { label: t('fittings.start.preview.weaponsDps'), value: formatCompactNumber(guns) },
+    { label: t('fittings.start.preview.dronesDps'), value: formatCompactNumber(drones) },
+    ...(offense.overheated
+      ? [
+          {
+            label: t('fittings.start.preview.overheatedDps'),
+            value: formatCompactNumber(offense.overheated.dps),
+          },
+        ]
+      : []),
+  ];
+  return (
+    <div className="space-y-3">
+      <Facts items={items} />
+      <table className="w-full border-collapse text-xs">
+        <thead>
+          <tr className="text-left text-[0.6875rem] tracking-widest text-text-dim uppercase">
+            <th className="pb-1 font-semibold">{t('fittings.start.preview.weapon')}</th>
+            <th className="pb-1 font-semibold">{t('fittings.start.preview.ammo')}</th>
+            <th className="pb-1 text-right font-semibold">{t('fittings.start.preview.dps')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {offense.weapons.map((row) => (
+            <tr key={`${row.typeId}-${row.chargeTypeId ?? 0}`} className="border-t border-line">
+              <td className="py-1.5 pr-2">
+                {typeName(row.typeId)} ×{row.count}
+              </td>
+              <td className="py-1.5 pr-2 text-text-dim">
+                {row.chargeTypeId === undefined ? '—' : typeName(row.chargeTypeId)}
+              </td>
+              <td className="py-1.5 text-right tabular-nums">{formatCompactNumber(row.dps)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Resists per layer, EHP, and how the ship moves and sits on the capacitor. */
+export function DefensePanel({ stats }: { stats: FittingStats }) {
+  const { t } = useTranslation();
+  const rows: ResistRow[] = [
+    { key: 'shield', label: t('fittings.stats.shield'), layer: stats.shield },
+    { key: 'armor', label: t('fittings.stats.armor'), layer: stats.armor },
+    { key: 'hull', label: t('fittings.stats.hull'), layer: stats.hull },
+  ].map(({ key, label, layer }) => ({
+    key,
+    label,
+    sub: formatCompactNumber(layer.hp),
+    resonances: layer,
+    ehp: layer.ehp,
+  }));
+  const capacitor = stats.capacitor.stable
+    ? t('fittings.start.preview.capStable', { pct: Math.round(stats.capacitor.stablePercentage) })
+    : t('fittings.start.preview.capDepletes', {
+        time: formatDuration(stats.capacitor.depletesInSeconds),
+      });
+  return (
+    <div className="space-y-3">
+      <ResistTable rows={rows} />
+      <Facts
+        items={[
+          { label: t('fittings.start.preview.ehp'), value: formatCompactNumber(stats.ehp) },
+          {
+            label: t('fittings.start.preview.speed'),
+            value: `${formatCompactNumber(stats.navigation.maxVelocity)} m/s`,
+          },
+          { label: t('fittings.start.preview.capacitor'), value: capacitor },
+          {
+            label: t('fittings.start.preview.signature'),
+            value: `${formatCompactNumber(stats.targeting.signatureRadius)} m`,
+          },
+        ]}
+      />
+    </div>
+  );
+}
+
+/** Whether the Character can fly it, and what is missing with the time to train it. */
+export function SkillsPanel({
+  fitting,
+  characterId,
+}: {
+  fitting: Fitting;
+  characterId: number | null;
+}) {
+  const { t } = useTranslation();
+  const gaps = useFittingSkillGaps(fitting, characterId);
+  if (characterId === null) {
+    return (
+      <p className="text-xs text-text-dim">{t('fittings.start.preview.skillsNeedCharacter')}</p>
+    );
+  }
+  if (gaps === null) {
+    return <p className="text-xs text-text-dim">{t('fittings.start.preview.calculating')}</p>;
+  }
+  if (gaps.missing.length === 0) {
+    return <p className="text-sm text-success">{t('fittings.start.preview.canFly')}</p>;
+  }
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-text-dim">{t('fittings.start.preview.skillsHint')}</p>
+      <MissingSkillsChip
+        entries={gaps.missing}
+        characterId={characterId}
+        fittingName={fitting.name}
+      />
+    </div>
+  );
+}
+
+/** A fitting's own notes, read-only. */
+export function NotesPanel({ text }: { text: string }) {
+  return <p className="text-sm whitespace-pre-wrap">{text}</p>;
+}
