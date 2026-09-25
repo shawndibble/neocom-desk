@@ -924,6 +924,44 @@ describe('ActiveJobsPanel: table columns', () => {
     const resorted = within(container.querySelector('tbody')!).getAllByRole('row');
     expect(within(resorted[0]).getByText('Widget Beta')).toBeInTheDocument();
   });
+
+  it('offers a phone sort bar that re-sorts the jobs like the header buttons', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+
+    const job = (id: number, runs: number, endMin: number) => ({
+      job_id: id,
+      activity_id: 1,
+      blueprint_type_id: id === 1 ? 100 : 200,
+      product_type_id: id === 1 ? 100 : 200,
+      facility_id: 60003760,
+      station_id: 60003760,
+      runs,
+      start_date: new Date(NOW.getTime() - 60 * 60_000).toISOString(),
+      end_date: new Date(NOW.getTime() + endMin * 60_000).toISOString(),
+      status: 'active',
+    });
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([job(1, 250, 60), job(2, 3, 180)])));
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const { container } = render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+      </MemoryRouter>
+    );
+
+    await expandJobs(user);
+    const first = () => within(container.querySelector('tbody')!).getAllByRole('row')[0];
+    expect(within(first()).getByText('Widget Alpha')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Sort by' }), 'runs:asc');
+    expect(within(first()).getByText('Widget Beta')).toBeInTheDocument();
+  });
 });
 
 describe('ActiveJobsPanel: cross-character view (issue #607)', () => {

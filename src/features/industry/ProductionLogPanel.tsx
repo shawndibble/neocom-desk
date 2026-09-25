@@ -604,6 +604,7 @@ export function ProductionLogPanel({
                 label={t('industry.byItem')}
                 sort={knownSort(itemSort, columns)}
                 onSortChange={setItemSort}
+                mobileSort
                 density="compact"
               />
             </div>
@@ -628,6 +629,7 @@ export function ProductionLogPanel({
                   label={t('industry.allProductionRuns')}
                   sort={knownSort(runSort, runColumns)}
                   onSortChange={setRunSort}
+                  mobileSort
                   density="compact"
                   onRowClick={
                     onOpenRun ? (r) => r.planExists && onOpenRun(r.run.buildPlanId) : undefined
