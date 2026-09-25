@@ -31,7 +31,7 @@ export async function resolveFittingShareView(
   const fitting = shareToFitting(decoded.value, name);
 
   const allVProfile = buildAllVProfile(skills.map((skill) => skill.typeID));
-  const profile = applyImplantBasis(allVProfile, fitting, 'fitting');
+  const profile = applyImplantBasis(allVProfile, fitting.implantSet, 'fitting');
 
   return { ok: true, fitting, profile };
 }

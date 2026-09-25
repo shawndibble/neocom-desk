@@ -256,7 +256,7 @@ export function Fittings() {
     typeId: openModule?.typeId ?? 0,
     catalogue,
     engineReady: workspace.engineReady,
-    profile: workspace.profile,
+    profile: workspace.statsProfile,
     damageProfile: workspace.damageProfiles.selected,
   });
   function swapVariation(typeId: number) {

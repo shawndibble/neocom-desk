@@ -62,7 +62,7 @@ export function useOverlayFitting({
         const fitting = shareToFitting(decoded.value, record.name);
         const stats = await computeFittingStats(
           fitting,
-          applyImplantBasis(profile, fitting, defaultImplantBasis(fitting)),
+          applyImplantBasis(profile, fitting.implantSet, defaultImplantBasis(fitting)),
           undefined,
           damageProfile
         );

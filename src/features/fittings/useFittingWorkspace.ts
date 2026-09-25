@@ -16,7 +16,7 @@
  * but only affects the profile `computeFittingStats` sees; `profile` itself
  * (exposed to fit checks/candidates) always stays the active Character's own.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { db } from '@/db';
 import { saveFitting } from './myFittings';
 import { useDamageProfiles, type DamageProfiles } from './damageProfiles';
@@ -156,8 +156,15 @@ export interface FittingWorkspace {
   statsError: boolean;
   /** The ship data (dogma engine) is loaded, so slot and fit checks can run. */
   engineReady: boolean;
-  /** Skills and implants the stats and fit checks use; null while loading. */
+  /** The active Character's own skills and clone, for fit checks; null while loading. */
   profile: PilotProfile | null;
+  /**
+   * `profile` under the implant basis: exactly the pilot the stats run
+   * under, so anything evaluating variants of the open Fitting (Variations)
+   * agrees with them. One object until the profile, the Fitting's carried set
+   * or the basis changes.
+   */
+  statsProfile: PilotProfile | null;
   /** The Damage Profile the stats' EHP is measured against, and the pilot's custom ones (synced). */
   damageProfiles: DamageProfiles;
   price: Appraisal | null;
@@ -457,6 +464,15 @@ export function useFittingWorkspace(): FittingWorkspace {
   // The pilot the stats and fit checks run under; loaded once per Character,
   // not once per edit. A failed load is reported as a stats error.
   const { profile, failed: profileFailed } = usePilotProfile(activeCharacterId);
+  // Swaps in the Fitting's own carried implants/boosters where the resolved
+  // basis is "fitting" — `profile` (exposed as-is to fit checks/candidates,
+  // which only care about skills) stays untouched. Keyed on the carried set,
+  // not the Fitting, so an edit that leaves the set alone keeps the object.
+  const implantSet = fitting?.implantSet;
+  const statsProfile = useMemo(
+    () => (profile === null ? null : applyImplantBasis(profile, implantSet, implantBasis)),
+    [profile, implantSet, implantBasis]
+  );
 
   // A different hull (or none) is a different Fitting: drop the old numbers at
   // once rather than show them under the new one's header — a swap from one
@@ -477,16 +493,12 @@ export function useFittingWorkspace(): FittingWorkspace {
     setStatsError(false);
     // Waits for the stored Damage Profile, so a pilot who picked Guristas
     // doesn't get a uniform calculation thrown away a moment later.
-    if (fitting === null || profile === null || !damageProfilesHydrated) return;
+    if (fitting === null || statsProfile === null || !damageProfilesHydrated) return;
     void (async () => {
       try {
-        // Swaps in the Fitting's own carried implants/boosters where the
-        // resolved basis is "fitting" — `profile` (exposed as-is to fit
-        // checks/candidates, which only care about skills) stays untouched.
-        const effectiveProfile = applyImplantBasis(profile, fitting, implantBasis);
         const result = await computeFittingStats(
           fitting,
-          effectiveProfile,
+          statsProfile,
           (progress) => {
             if (!cancelled) setStatsProgress(progress);
           },
@@ -502,7 +514,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     return () => {
       cancelled = true;
     };
-  }, [fitting, profile, implantBasis, damageProfile, damageProfilesHydrated]);
+  }, [fitting, statsProfile, damageProfile, damageProfilesHydrated]);
 
   // Price: independent of the dogma engine, so it can — and should — resolve
   // well before stats do.
@@ -540,6 +552,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     statsError: statsError || profileFailed,
     engineReady,
     profile,
+    statsProfile,
     damageProfiles,
     price,
     savedId,
