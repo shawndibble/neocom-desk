@@ -12,6 +12,7 @@ export const KIND_LABEL: Record<CharacterBoardItemKind, string> = {
   skillTraining: 'calendar.kind.skillTraining',
   industryJob: 'calendar.kind.industryJob',
   planetExtraction: 'calendar.kind.planetExtraction',
+  moonChunk: 'calendar.kind.moonChunk',
   contractExpiry: 'calendar.kind.contractExpiry',
   orderExpiry: 'calendar.kind.orderExpiry',
   skillPlan: 'calendar.kind.skillPlan',

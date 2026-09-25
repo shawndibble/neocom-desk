@@ -15,6 +15,8 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { CHARACTER_ID, CORPORATION_ID, SCOPES } from './support/fixtureData';
+import { scopesForGroup } from '../src/esi/scopes';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
@@ -64,4 +66,39 @@ test('"Show all days" keeps its plain text-link size at and above md (1280px)', 
   // touch-tier height.
   expect(height).toBeGreaterThanOrEqual(10);
   expect(height).toBeLessThanOrEqual(20);
+});
+
+test('a Station Manager sees a moon chunk on the phone rail, without overflow', async ({
+  page,
+}) => {
+  const now = Date.now();
+  // Registered after `installEsiMock` (the `page` fixture's setup), so these win.
+  await page.route('https://esi.evetech.net/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    const json = (body: unknown) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+    if (path === `/characters/${CHARACTER_ID}/roles`) return json({ roles: ['Station_Manager'] });
+    if (path === `/corporations/${CORPORATION_ID}/structures`) return json([]);
+    if (path === `/corporation/${CORPORATION_ID}/mining/extractions`) {
+      return json([
+        {
+          structure_id: 1,
+          moon_id: 40000001,
+          extraction_start_time: new Date(now).toISOString(),
+          chunk_arrival_time: new Date(now + 6 * 3_600_000).toISOString(),
+          natural_decay_time: new Date(now + 2 * 86_400_000).toISOString(),
+        },
+      ]);
+    }
+    await route.fallback();
+  });
+
+  await page.setViewportSize(PHONE);
+  await signInAndGoto(page, './calendar', [...SCOPES, ...scopesForGroup('corp')]);
+
+  await expect(page.getByText('Moon 40000001')).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
 });

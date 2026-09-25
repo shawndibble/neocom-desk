@@ -45,6 +45,24 @@ export function fitsResourceBudget(stats: FittingStats): boolean {
   );
 }
 
+export interface ResourceBudgetOverage {
+  resource: 'cpu' | 'powergrid' | 'calibration';
+  amount: number;
+}
+
+/** The first of CPU/PG/calibration a Fitting is over budget on, or null when none is — the same check `fitsResourceBudget` passes/fails on. */
+export function firstResourceOverage(stats: FittingStats): ResourceBudgetOverage | null {
+  const checks = [
+    { resource: 'cpu', amount: resourceOverage(stats.cpuUsed, stats.cpuTotal) },
+    { resource: 'powergrid', amount: resourceOverage(stats.powergridUsed, stats.powergridTotal) },
+    {
+      resource: 'calibration',
+      amount: resourceOverage(stats.calibrationUsed, stats.calibrationTotal),
+    },
+  ] as const;
+  return checks.find((check) => check.amount > 0) ?? null;
+}
+
 export function computeSkillGaps(
   fitting: Fitting,
   requirementsByType: ReadonlyMap<number, readonly RequiredSkill[]>,

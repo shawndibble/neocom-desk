@@ -147,9 +147,10 @@ here — they go one per file in `docs/context/decisions/`.
   leave a late-night op sitting in yesterday's cell until the small hours. Drawn at one of two densities — a month, or the
   fortnight around today.
 - **Character**: One EVE Online character. The unit of login (EVE SSO) and of API data. App supports many Characters side by side from day one.
-- **Character Board Item**: One clock on the `/calendar` board, from any of seven
+- **Character Board Item**: One clock on the `/calendar` board, from any of eight
   sources — a calendar event, a skill-queue completion, an industry job
-  delivery, a PI extractor program end, a contract expiry, a market-order
+  delivery, a PI extractor program end, a moon chunk arrival or decay (corp role
+  holders only), a contract expiry, a market-order
   expiry, or a projected step of the chosen Skill Plan (a forecast, marked
   as such). The character-side counterpart of a **Corp Board Item**, and
   deliberately the same shape: heterogeneous sources in, one deadline-ordered
@@ -167,7 +168,7 @@ here — they go one per file in `docs/context/decisions/`.
   finished queue entry while training continues, and from **Skill Queue
   Ending**, which warns ahead of this state rather than reporting it once
   reached.
-- **Clock Kind**: Which of the seven sources a **Character Board Item** came
+- **Clock Kind**: Which of the eight sources a **Character Board Item** came
   from. The `/calendar` page's one colour scale names this and nothing else —
   a **nominal** palette (`--color-kind-*`, DESIGN.md §1), unlike every other
   colour in the app, which encodes a magnitude or a status. Carried by the

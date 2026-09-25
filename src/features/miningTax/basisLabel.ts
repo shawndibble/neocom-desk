@@ -1,5 +1,10 @@
 import type { TFunction } from 'i18next';
-import { basisSide, isNowBasis, type PriceBasis } from '@/engine/miningTax/priceBasis';
+import {
+  basisSide,
+  isNowBasis,
+  type DaysBySource,
+  type PriceBasis,
+} from '@/engine/miningTax/priceBasis';
 
 /** "Jita buy", "Jita sell", "Now · Jita buy" — the basis as the Value button and summary name it. */
 export function basisLabel(t: TFunction, basis: PriceBasis): string {
@@ -32,4 +37,22 @@ export function basisSummary(t: TFunction, basis: PriceBasis, buybackRate: numbe
   return rated
     ? t('miningTax.overview.basis.summaryDayRated', { percent: buybackRate, price })
     : t('miningTax.overview.basis.summaryDay', { price });
+}
+
+/**
+ * How many shown days actually priced on each source (issue #1760): "4 of 6
+ * days use saved prices, 1 daily avg, 1 live". Empty under a now basis, where
+ * every day is live by definition, and when no day is shown.
+ */
+export function basisUsage(t: TFunction, basis: PriceBasis, counts: DaysBySource): string {
+  if (isNowBasis(basis) || counts.total === 0) return '';
+  const parts = [
+    t('miningTax.overview.basis.usageSaved', { count: counts.saved, total: counts.total }),
+  ];
+  if (counts.average > 0) {
+    parts.push(t('miningTax.overview.basis.usageAverage', { count: counts.average }));
+  }
+  if (counts.live > 0) parts.push(t('miningTax.overview.basis.usageLive', { count: counts.live }));
+  if (counts.none > 0) parts.push(t('miningTax.overview.basis.usageNone', { count: counts.none }));
+  return parts.join(', ');
 }
