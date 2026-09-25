@@ -9,6 +9,10 @@ import {
   ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   EmptyState,
   FilterBar,
   FilterField,
@@ -32,6 +36,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
+import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -782,6 +787,7 @@ export function Characters() {
   } | null>(null);
   const [deferredNoticeName, setDeferredNoticeName] = useState<string | null>(null);
   const [refreshingAll, setRefreshingAll] = useState(false);
+  const [customizingPermissions, setCustomizingPermissions] = useState(false);
 
   const charactersById = useMemo(
     () => new Map((characters ?? []).map((character) => [character.characterId, character])),
@@ -1158,10 +1164,36 @@ export function Characters() {
               The add-a-character branch, not a re-auth: SSO decides who comes
               back, so unioning with the *active* Character's grant would ask
               the newcomer to consent to scopes aimed at somebody else (#295).
+              The arrow reuses the login page's own Customize dialog, so
+              adding several alts with one hand-picked grant stays one click each.
             */}
-            <Button variant="primary" size="md" onClick={() => void beginAddCharacterLogin()}>
-              {t('characters.add')}
-            </Button>
+            <div className="flex">
+              <Button
+                variant="primary"
+                size="md"
+                className="rounded-r-none"
+                onClick={() => void beginAddCharacterLogin()}
+              >
+                {t('characters.add')}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    className="rounded-l-none border-l-0 px-2"
+                    aria-label={t('characters.addMenuLabel')}
+                  >
+                    <Icon.Expanded aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => setCustomizingPermissions(true)}>
+                    {t('characters.addWithPermissions')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </>
         }
       />
@@ -1384,6 +1416,11 @@ export function Characters() {
           </Button>
         </div>
       </Modal>
+
+      <CustomizePermissionsDialog
+        open={customizingPermissions}
+        onClose={() => setCustomizingPermissions(false)}
+      />
     </div>
   );
 }
