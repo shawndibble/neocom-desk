@@ -800,7 +800,7 @@ export function ActiveJobsPanel({
    * every panel's title), so the wrapper here carries its own.
    */
   const jobsMeta = (
-    <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+    <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 max-md:basis-full">
       {showCharacterFilter && (
         <CharacterFilterControl
           characters={jobsFilterCandidates}
@@ -864,6 +864,7 @@ export function ActiveJobsPanel({
     <Panel
       title={t('industry.jobsTitle')}
       meta={jobsMeta}
+      wrapMeta
       actions={
         <span className="flex items-center gap-2">
           {/* In `actions` (rather than `meta`, beside "N running · N done") so
