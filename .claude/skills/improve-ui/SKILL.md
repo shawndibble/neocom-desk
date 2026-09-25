@@ -28,7 +28,7 @@ Otherwise take the least-recently-audited surfaces from the ledger.
   consistency, and whether the surface has the features it needs.
 - **The phone lane** covers everything below `md`. It belongs to
   `/improve-mobile-ux`, which has its own rubric, ledger, tickets and ledger
-  PR. Step 3 runs it on the same surfaces.
+  PR. Step 4 runs it on the same surfaces.
 
 A finding that exists only below `md` goes to the phone lane, never here. A
 finding true at every width stays here, and its ticket says what happens at
@@ -47,8 +47,8 @@ git -C <main-repo> fetch origin main
 git -C <main-repo> worktree add --detach ../neocom-desk.worktrees/improve-ui-<slug> origin/main
 ```
 
-Then run `npm ci` and `npm run verify-hooks -- --fix` inside it. The worktree
-stays detached until step 10 puts it on the ledger branch.
+Then run `npm ci` inside it; this worktree is for rendering only. Step 10
+commits the ledger from a worktree of its own.
 
 ## 1. Fix the ground truth
 
@@ -97,25 +97,12 @@ surfaces people live in, the ones that are data-dense and opened daily
 those, prefer surfaces this ledger has never audited or last audited before a
 large rework landed (`git log --since` on the route and its feature folder).
 
-## 3. Launch the phone lane
-
-Spawn one sub-agent (`subagent_type: "general-purpose"`, background) with this
-prompt, adapted:
-
-> Read `.claude/skills/improve-mobile-ux/SKILL.md` and follow it exactly, as if
-> the user had typed `/improve-mobile-ux <surfaces>`. Its `$ARGUMENTS` are:
-> `<surfaces>`. It runs unattended; decide and record rather than ask. Report
-> back each filed issue URL with its verdict, and each dropped finding with
-> its reason.
-
-That run owns its tickets, its ledger and its ledger PR. Do not wait on it.
-Carry on to step 4 and collect its report in step 11.
-
-## 4. See it
+## 3. See it
 
 Layout, whitespace and alignment are judged by eye, so render the surfaces.
 Follow `/improve-mobile-ux` step 4 for the mechanics: a throwaway spec in this
-worktree's `e2e/`, `E2E_SKIP_BUILT=1`, `--reporter=list`, and a free port 5199. Capture each surface:
+worktree's `e2e/`, `E2E_SKIP_BUILT=1`, `--reporter=list`, and a check that
+the suite's fixed port 5199 is free. Capture each surface:
 
 - at **1440×900** (the main desktop read) and **1024×768** (the narrowest
   pointer layout, where side-by-side panels are tightest);
@@ -127,6 +114,25 @@ worktree's `e2e/`, `E2E_SKIP_BUILT=1`, `--reporter=list`, and a free port 5199. 
 If rendering fails, audit from code and mark each finding `code-read only` so
 the hostile reviewer weighs it accordingly. A finding the picture contradicts
 is dead.
+
+Every render for this run happens here, before step 4. Port 5199 is
+hard-coded, `--strictPort`, with `reuseExistingServer` switched on, so while
+the phone lane is rendering, any screenshot this lane takes could come from
+the other worktree's server.
+
+## 4. Launch the phone lane
+
+Your screenshots are taken, so spawn one sub-agent (`subagent_type:
+"general-purpose"`, background) with this prompt, adapted:
+
+> Read `.claude/skills/improve-mobile-ux/SKILL.md` and follow it exactly, as if
+> the user had typed `/improve-mobile-ux <surfaces>`. Its `$ARGUMENTS` are:
+> `<surfaces>`. It runs unattended; decide and record rather than ask. Report
+> back each filed issue URL with its verdict, and each dropped finding with
+> its reason.
+
+That run owns its tickets, its ledger and its ledger PR. Carry on to step 5
+without waiting for it, and collect its report in step 11.
 
 ## 5. Audit against the rubric
 
@@ -211,7 +217,7 @@ Every rework, and every tweak that moves or regroups something, gets a mockup
 before it gets a ticket. A tweak that only realigns an edge or changes one
 gap skips this step.
 
-Use the `design` skill (or the Artifact tool's `design` quickstart). Constrain
+Use the `ui-ux-pro-max:design` skill (or the Artifact tool's `design` quickstart). Constrain
 it to DESIGN.md tokens and the primitives in `src/components/ui/`; a mockup
 with its own visual language is not an integration plan. Draw the surface as
 it is today beside what it becomes, at 1440 wide, plus a 390-wide frame
@@ -286,21 +292,20 @@ the DESIGN.md rule at stake and both sides of the trade.
 ## 10. Curate the ledger
 
 [LEDGER.md](LEDGER.md) is a reference for the next run, not a run log. Update
-it in place, keyed by topic. Record no dates and no run metadata. Keep it
-under about 150 lines; compress when a section outgrows that. Its sections are
-listed at the top of the file.
+it in place, following the rules and sections in the file's own header.
 
 Commit it through one shared PR on the fixed branch
 **`chore/improve-ui-ledger`**. Follow `/improve-mobile-ux` step 9 for the
-mechanics, with this skill's branch and file substituted. They cover: reusing
-an already-open PR, `open-pr.mjs`, `--merge --auto` (not squash), `npx prettier
---check` before pushing, and up to 3 `drive-ci.mjs` rounds.
+mechanics, with this skill's branch and file substituted. They cover: a fresh
+sibling worktree on that branch, reusing an already-open PR, `open-pr.mjs`,
+`--merge --auto` (not squash), `npx prettier --check` before pushing, and up
+to 3 `drive-ci.mjs` rounds.
 
-Remove the worktree when done, merged or not.
+Remove both worktrees when done, merged or not.
 
 ## 11. Report
 
-Collect the phone lane's report from step 3. If it is still running, say so;
+Collect the phone lane's report from step 4. If it is still running, say so;
 never summarise a result you have not received.
 
 Keep the terminal report short:

@@ -22,16 +22,16 @@ an interactive skill would put to the user, you decide and record in the ticket.
 "assets"). Otherwise take the least-recently-audited surfaces from the ledger.
 
 Reference: [RUBRIC.md](RUBRIC.md) — the audit axes, the greps that find each
-violation, and the standing kill-tests. Read it in step 2; it is what turns
+violation, and the standing kill-tests. Read it in step 3; it is what turns
 "feels cramped" into a finding an agent can act on.
 Reference: [LEDGER.md](LEDGER.md) — surfaces already audited, findings already
-filed, findings already killed. Read it in step 1; curate it in step 8.
+filed, findings already killed. Read it in step 1; curate it in step 9.
 
 Auditing writes no application code and needs no worktree: read the main
 checkout and leave it untouched — Shawn keeps a dev server there and another
 agent may be working in it. The mutations a run makes are `gh issue create`
 calls and a curated `LEDGER.md` update. Both the optional render pass (step 4)
-and the ledger commit (step 8) need a sibling worktree.
+and the ledger commit (step 9) need a sibling worktree.
 
 ## 1. Fix the ground truth
 

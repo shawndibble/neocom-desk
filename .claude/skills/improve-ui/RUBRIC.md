@@ -80,12 +80,16 @@ Look for:
   every other one uses the shared spacing. Here the rule favours the added
   gap, because it restores the rhythm.
 
-A finding that genuinely argues for **more** room than DESIGN.md allows is not
-killed. It goes to the hostile reviewer as `ESCALATE` and is filed
-`ready-for-human`, with the trade stated.
+A finding that genuinely argues for **more** room than DESIGN.md allows
+bypasses the "taste without a cost" and "unprovable" kill-tests below. Those
+two would drop almost every breathing-room finding before anyone weighs it.
+Instead it goes straight to the hostile reviewer, pre-marked `ESCALATE`. The
+finding names the screenshot region and what the eye struggles with there, and
+it is filed `ready-for-human` with the trade stated. The user asked for this
+axis, and only a human can overrule DESIGN.md's density rule.
 
 ```
-grep -rn '\(p\|m\|gap\|space-[xy]\)-\[' src --include='*.tsx'
+grep -rnE '(p|m)[xytblrse]?-\[|gap(-[xy])?-\[|space-[xy]-\[' src --include='*.tsx'
 grep -rhoE '\b(gap|space-y)-[0-9.]+\b' src/routes --include='*.tsx' | sort | uniq -c | sort -rn
 ```
 
@@ -111,7 +115,7 @@ Look for:
   bars differ in height, so their first rows start at different y positions.
 
 ```
-grep -rn 'h-[0-9]' src/routes src/features --include='*.tsx' | grep -E 'Select|Input|button' | grep -v controlStyles
+grep -rnE '<(Button|button|Select|SelectTrigger|TextInput|SearchInput|input)[^>]*h-[0-9]' src/routes src/features --include='*.tsx'
 grep -rn "align: 'right'" src --include='*.tsx' | head
 ```
 
