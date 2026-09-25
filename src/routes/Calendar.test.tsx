@@ -186,7 +186,62 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/calendar');
 });
 
+const CORP_ID = 98000001;
+const CORP = 'https://esi.evetech.net/corporation';
+
+/** A Character holding the corp scopes and answering the reads the moon-chunk gate makes. */
+async function grantCorpScopes(roles: string[]) {
+  await db.tokens.update(CHAR_ID, {
+    scopes: [
+      'esi-calendar.read_calendar_events.v1',
+      'esi-characters.read_corporation_roles.v1',
+      'esi-industry.read_corporation_mining.v1',
+    ],
+  });
+  server.use(
+    http.get(ESI, () => HttpResponse.json({ corporation_id: CORP_ID })),
+    http.get(`${ESI}/roles`, () => HttpResponse.json({ roles })),
+    http.get(`${CORP}/${CORP_ID}/mining/extractions`, () =>
+      HttpResponse.json([
+        {
+          structure_id: 1001,
+          moon_id: 40000001,
+          extraction_start_time: TODAY.toISOString(),
+          chunk_arrival_time: new Date(TODAY.getTime() + 6 * 3_600_000).toISOString(),
+          natural_decay_time: new Date(TODAY.getTime() + 2 * 86_400_000).toISOString(),
+        },
+      ])
+    )
+  );
+}
+
 describe('Calendar', () => {
+  it('puts a moon chunk on the board for a Character who can read extractions', async () => {
+    await grantCorpScopes(['Station_Manager']);
+    render(<App />);
+
+    expect(await screen.findByText('Moon 40000001')).toBeInTheDocument();
+    expect(screen.getByText(/arrives/i)).toBeInTheDocument();
+  });
+
+  it('asks for no extractions, and shows no moon-chunk row, without the corp role', async () => {
+    const extractionRequests = vi.fn();
+    await grantCorpScopes([]);
+    server.use(
+      http.get(`${CORP}/${CORP_ID}/mining/extractions`, () => {
+        extractionRequests();
+        return HttpResponse.json([]);
+      })
+    );
+    render(<App />);
+
+    expect(await screen.findByText('Fleet Op')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /filter event types/i }));
+    expect(await screen.findByRole('menuitemcheckbox', { name: /industry jobs/i })).toBeVisible();
+    expect(screen.queryByRole('menuitemcheckbox', { name: /moon chunks/i })).toBeNull();
+    expect(extractionRequests).not.toHaveBeenCalled();
+  });
+
   it('shows the calendar map and the coming-up rail together', async () => {
     render(<App />);
 
@@ -376,6 +431,7 @@ describe('Calendar', () => {
         'skillTraining',
         'industryJob',
         'planetExtraction',
+        'moonChunk',
         'contractExpiry',
         'orderExpiry',
         'skillPlan',

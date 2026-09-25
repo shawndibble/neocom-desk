@@ -109,13 +109,14 @@ describe('countsByDay', () => {
       skillTraining: [clock('skill', day)],
       industryJobs: [clock('job', day)],
       planetExtractions: [clock('planet', day)],
+      moonChunks: [clock('moon', day)],
       contractExpiries: [clock('contract', day)],
       orderExpiries: [clock('order', day)],
       skillPlan: [clock('plan', day)],
     });
 
     expect(countsByDay(board).get(local(2026, 9, 11, 0, 0))).toEqual({
-      count: 7,
+      count: 8,
       kinds: [...CHARACTER_BOARD_ITEM_KINDS],
     });
   });

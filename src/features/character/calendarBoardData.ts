@@ -1,5 +1,5 @@
 /**
- * The Calendar page's six ESI reads and its one Skill Plan projection, and the one snapshot they collapse into.
+ * The Calendar page's six ESI reads, its one gated corp read and its one Skill Plan projection, and the one snapshot they collapse into.
  *
  * Fetch + cache only — the ESI-shape-to-board-source conversion lives next
  * door in `calendarBoardSources.ts`, and the ranking lives in
@@ -31,6 +31,7 @@ import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
 import { loadCharacterPlanets, readCachedColonyDetails } from '@/features/pi/data';
 import { readCachedPlanetNames } from '@/features/pi/names';
 import { loadSkillPlanBoard, type SkillPlanChoice } from './calendarSkillPlan';
+import { loadMoonChunks } from './calendarMoonChunks';
 import {
   toCalendarEventSources,
   toContractExpirySources,
@@ -47,6 +48,8 @@ export interface CalendarBoardData {
   skillTraining?: BoardClockSource[];
   industryJobs?: BoardClockSource[];
   planetExtractions?: BoardClockSource[];
+  /** Corp moon drills. Left `undefined` unless the Character holds the corp role and scope to read them. */
+  moonChunks?: BoardClockSource[];
   contractExpiries?: BoardClockSource[];
   orderExpiries?: BoardClockSource[];
   /** Projected steps of the chosen Skill Plan. Left `undefined` when none is chosen or it could not be costed. */
@@ -114,6 +117,7 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     contractsResult,
     ordersResult,
     skillPlanBoard,
+    moonChunkRead,
   ] = await Promise.all([
     loadCalendarEvents(characterId),
     loadCharacterSkillQueueWithStatus(characterId),
@@ -122,6 +126,7 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     loadContracts(characterId),
     loadOrders(characterId),
     loadSkillPlanBoard(characterId, loadedAtMs),
+    loadMoonChunks(characterId, loadedAtMs),
   ]);
 
   const events = readRows(eventsResult);
@@ -190,6 +195,7 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     { kind: 'skillTraining', result: queueResult, rows: queue },
     { kind: 'industryJob', result: jobsResult, rows: jobs },
     { kind: 'planetExtraction', result: planetsResult, rows: planets },
+    { kind: 'moonChunk', result: moonChunkRead.result, rows: moonChunkRead.sources },
     { kind: 'contractExpiry', result: contractsResult, rows: contracts },
     { kind: 'orderExpiry', result: ordersResult, rows: orders },
     // Not an ESI read: no cache metadata, and nothing to re-authorise.
@@ -214,6 +220,7 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
     skillTraining: queue && toSkillTrainingSources(queue, typeName),
     industryJobs: jobs && toIndustryJobSources(jobs, typeName),
     planetExtractions: planets && toPlanetExtractionSources(colonies),
+    moonChunks: moonChunkRead.sources,
     contractExpiries: contracts && toContractExpirySources(contracts),
     orderExpiries: orders && toOrderExpirySources(orders, typeName),
     skillPlan: planSchedule && toSkillPlanSources(planSchedule, queue ?? [], typeName),
