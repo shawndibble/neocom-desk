@@ -654,8 +654,6 @@
       "summary": "Raw DPS {{raw}} · applied {{applied}} at {{km}} km",
       "assumptions": "Our own calculation, not the engine's: your ship stationary, the target moving fully transversal at the profile's speed. Drones only apply inside drone control range.",
       "noWeapons": "No weapons are running — set a turret or launcher active, or launch drones.",
-      "noCharge_one": "{{count}} weapon has no charge loaded — load one in Charges.",
-      "noCharge_other": "{{count}} weapons have no charge loaded — load one in Charges.",
       "loading": "Loading graphs…",
       "overlayLabel": "Compare with",
       "overlayNone": "No overlay",

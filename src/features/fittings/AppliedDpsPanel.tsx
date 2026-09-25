@@ -132,7 +132,7 @@ export function AppliedDpsPanel({
         </>
       ) : chargelessWeaponCount > 0 ? (
         <p className="text-xs text-text-dim">
-          {t('fittings.appliedDps.noCharge', { count: chargelessWeaponCount })}
+          {t('fittings.stats.offenseNoCharge', { count: chargelessWeaponCount })}
         </p>
       ) : (
         <p className="text-xs text-text-dim">{t('fittings.appliedDps.noWeapons')}</p>

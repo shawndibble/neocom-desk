@@ -475,6 +475,32 @@ describe('extractOffense', () => {
 
     expect(offense.chargelessWeaponCount).toBe(0);
   });
+
+  it('does not count a charge-taking module as chargeless when a charge is already loaded', () => {
+    // e.g. a mining laser with a crystal fitted: it deals no damage (not a
+    // weapon), so it must not be mistaken for a weapon missing its charge.
+    const offense = extractOffense(
+      [{ typeId: 4001, chargeTypeId: 5001, quantity: 1, isDrone: false }],
+      [chargeSlotResult('active')],
+      null
+    );
+
+    expect(offense.chargelessWeaponCount).toBe(0);
+  });
+
+  it('counts only the chargeless row when a chargeless-active and a genuinely-inactive weapon both sit empty', () => {
+    const offense = extractOffense(
+      [
+        { ...BLASTER, chargeTypeId: undefined },
+        { ...BLASTER, chargeTypeId: undefined },
+      ],
+      [chargeSlotResult('active'), chargeSlotResult('online')],
+      null
+    );
+
+    expect(offense.weapons).toEqual([]);
+    expect(offense.chargelessWeaponCount).toBe(1);
+  });
 });
 
 describe('local repair and overheated stats', () => {
