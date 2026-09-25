@@ -90,7 +90,7 @@ interface Snapshot {
 }
 
 const STATUS_TONE: Record<Contract['status'], string> = {
-  outstanding: 'text-accent',
+  outstanding: 'text-text',
   in_progress: 'text-warning',
   finished_issuer: 'text-success',
   finished_contractor: 'text-success',
