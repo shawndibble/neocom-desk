@@ -61,3 +61,26 @@ export function useEndpointsGranted(endpoints: readonly EsiEndpointId[]): boolea
     return requiredScopesForEndpoints(endpoints).every((scope) => held.has(scope));
   }, [granted, endpoints]);
 }
+
+/**
+ * Which of `characterIds` hold a grant missing any scope `endpoints` declares
+ * — the per-Character twin of `useEndpointsGranted`, for a page that values
+ * each Character's figures under that Character's own modifiers (issue
+ * #1588). `undefined` until the tokens have loaded. Only the ids leave the
+ * query, so no `TokenRecord` reaches React state (ADR 0001).
+ */
+export function useCharactersLackingEndpoints(
+  characterIds: readonly number[],
+  endpoints: readonly EsiEndpointId[]
+): readonly number[] | undefined {
+  const idsKey = characterIds.join(',');
+  return useLiveQuery(async () => {
+    const required = requiredScopesForEndpoints(endpoints);
+    const tokens = await db.tokens.bulkGet([...characterIds]);
+    return characterIds.filter((_, i) => {
+      const held = new Set(tokens[i]?.scopes ?? []);
+      return required.some((scope) => !held.has(scope));
+    });
+    // `idsKey` stands in for `characterIds`, which callers rebuild every render.
+  }, [idsKey, endpoints]);
+}

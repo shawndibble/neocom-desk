@@ -72,6 +72,7 @@ function outcome(overrides: Partial<AppraisalOutcome> = {}): AppraisalOutcome {
     appraisal: APPRAISAL,
     unmatched: [],
     implantBonusPct: 0,
+    refinesOreOrIce: false,
     accountingLevel: null,
     brokerRelationsLevel: null,
     ...overrides,
@@ -183,6 +184,7 @@ describe('AppraisalPanel', () => {
         appraisal: NET_APPRAISAL,
         unmatched: [],
         implantBonusPct: 0,
+        refinesOreOrIce: false,
         accountingLevel: 0,
         brokerRelationsLevel: 0,
         ...overrides,
@@ -414,6 +416,7 @@ describe('AppraisalPanel', () => {
         },
         unmatched: [],
         implantBonusPct: 0,
+        refinesOreOrIce: false,
         accountingLevel: null,
         brokerRelationsLevel: null,
         ...overrides,
@@ -490,6 +493,54 @@ describe('AppraisalPanel', () => {
         .parentElement?.parentElement;
       expect(buyCell?.className).not.toContain('text-accent');
     });
+
+    describe('Character details implant note (issue #1588)', () => {
+      const IMPLANTS_SCOPE = ESI_REGISTRY.getCharacterImplants.scope;
+      const NOTE = 'Assumes no implants';
+
+      async function seedGrant(scopes: readonly string[]): Promise<void> {
+        await db.tokens.put({
+          characterId: 7,
+          accessToken: 'access',
+          refreshToken: 'refresh',
+          expiresAt: Date.now() + 60_000,
+          scopes: [...scopes],
+        });
+      }
+
+      beforeEach(() => {
+        useActiveCharacter.setState({ activeCharacterId: 7, hydrated: true });
+      });
+
+      afterEach(async () => {
+        await db.tokens.clear();
+      });
+
+      it('shows the note when ore is refined without the Character details scope', async () => {
+        await seedGrant([]);
+        renderPanel({
+          controller: controller({ result: refineOutcome({ refinesOreOrIce: true }) }),
+        });
+
+        expect(await screen.findByText(NOTE)).toBeInTheDocument();
+      });
+
+      it('hides the note once Character details is granted', async () => {
+        await seedGrant([IMPLANTS_SCOPE]);
+        renderPanel({
+          controller: controller({ result: refineOutcome({ refinesOreOrIce: true }) }),
+        });
+
+        await waitFor(() => expect(screen.queryByText(NOTE)).not.toBeInTheDocument());
+      });
+
+      it('hides the note on a scrap-only refine — no refining implant touches it', async () => {
+        await seedGrant([]);
+        renderPanel({ controller: controller({ result: refineOutcome() }) });
+
+        await waitFor(() => expect(screen.queryByText(NOTE)).not.toBeInTheDocument());
+      });
+    });
   });
 
   describe('LP store acquisition', () => {
@@ -535,6 +586,7 @@ describe('AppraisalPanel', () => {
         },
         unmatched: [],
         implantBonusPct: 0,
+        refinesOreOrIce: false,
         accountingLevel: null,
         brokerRelationsLevel: null,
         ...overrides,

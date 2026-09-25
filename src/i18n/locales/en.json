@@ -49,7 +49,9 @@
     "standingsTitle": "Broker fees are assuming 0 standings",
     "standingsHint": "This character logged in before the app asked to read standings, so every NPC-station broker fee is calculated as if you had none. Log in again to share them and get accurate fees.",
     "standingsAction": "Log in to share standings",
-    "dismiss": "Dismiss"
+    "dismiss": "Dismiss",
+    "implantsAssumedTitle": "Assumes no implants",
+    "implantsAssumedAction": "Grant Character details"
   },
   "fittings": {
     "myFittings": {
@@ -423,7 +425,8 @@
       "add": "Add",
       "remove": "Remove {{name}}",
       "notFound": "No item found with that exact name.",
-      "full": "This set is already full."
+      "full": "This set is already full.",
+      "assumesNoneHint": "My clone stats are calculated without this character's fitted implants. Grant Character details for accurate stats."
     }
   },
   "skills": {
@@ -637,9 +640,7 @@
     "whatIfPerAttribute": "Implant bonus per attribute",
     "whatIfAttributeBonus": "{{attribute}} implant bonus",
     "whatIfMarketLink": "View attribute enhancer implants in Market",
-    "assumesNoImplantsTitle": "Assumes no implants",
     "assumesNoImplantsHint": "Training time is calculated without this character's fitted implants. Grant Character details for an accurate estimate.",
-    "assumesNoImplantsAction": "Grant Character details",
     "booster": "Booster",
     "boosterAdd": "Add accelerator",
     "boosterRemove": "Remove accelerator",
@@ -1022,6 +1023,7 @@
     "subBuildSummary": "Building {{count}} of this plan's own material(s) here: {{total}}, already reflected in the totals above — anything those jobs build in turn is inside that figure.",
     "subBuildSummaryComparison": "Buying them ready-made instead would cost {{planned}}.",
     "subBuildTimeNote": "The sub-jobs add {{time}} of job time before the main run can start.",
+    "assumesNoImplantsHint": "Job time is calculated without this character's fitted implants, so a manufacturing time implant isn't counted. Grant Character details for an accurate estimate.",
     "buildRecipe": {
       "action": "Build it",
       "actionFor": "Build it: {{material}}",
@@ -2240,6 +2242,7 @@
       "compareChartTitle": "Raw vs. refined value by type",
       "compareChartTitleRawOnly": "Value by ore type",
       "refiningHiddenNote": "Refining hidden. Raw value only.",
+      "refineAssumesNoImplantsHint": "{{character}}'s refine value is calculated without their fitted implants, so a refining implant isn't counted. Grant Character details for an accurate estimate.",
       "dateColumn": "Date",
       "typeColumn": "Type",
       "totalColumn": "Total",
@@ -3779,6 +3782,7 @@
       "refineTotal": "Refine total",
       "refineTotalHelp": "What refining the list with the active Character's own reprocessing skills would fetch, sold into buy orders at this hub. Assumes an NPC station's 50% base rate and no ore-specialisation skill — neither is modelled — so a trained miner's real yield runs higher than shown.",
       "refineImplantHint": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
+      "refineAssumesNoImplantsHint": "Refine value is calculated without this character's fitted implants, so a refining implant isn't counted. Grant Character details for an accurate estimate.",
       "refinePartialHint": "At least one material has no price at this hub, so this total is a floor rather than the full value.",
       "refineUnpriced_one": "{{count}} refine value has an unpriced material, so it is a floor rather than the full total.",
       "refineUnpriced_other": "{{count}} refine values have an unpriced material, so they are floors rather than the full total.",
@@ -4066,6 +4070,7 @@
       "exitReprocess": "Reprocess and sell the materials, {{price}} a unit",
       "exitReprocessAssumption": "Assumes a {{rate}}% station and no station tax, valued against the buy orders here.",
       "exitReprocessImplant": "Includes the active clone's fitted refining implant, +{{pct}}% to ore and ice yield.",
+      "exitReprocessAssumesNoImplants": "Calculated without {{character}}'s fitted implants, so a refining implant isn't counted. Grant Character details for an accurate estimate.",
       "exitReprocessPartial": "At least one material has no buy order here, so this total is a floor.",
       "exitReprocessLeftOver_one": "{{count}} unit is short of a full refining batch and returns nothing.",
       "exitReprocessLeftOver_other": "{{count}} units are short of a full refining batch and return nothing.",

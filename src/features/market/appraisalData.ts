@@ -67,6 +67,12 @@ export interface AppraisalOutcome {
    * actually saw the bonus even though the character has it (issue #1227).
    */
   implantBonusPct: number;
+  /**
+   * Some refined row is ore or ice — the only material a refining implant
+   * touches — whether or not one was read. Lets the page say it assumed no
+   * implants without saying so over a scrap-only paste (issue #1588).
+   */
+  refinesOreOrIce: boolean;
   /** The active Character's own skill level, or null with no active Character. Feeds `appraisalNet`. */
   accountingLevel: number | null;
   /** Same as `accountingLevel`, for Broker Relations. */
@@ -167,6 +173,7 @@ export async function appraisePaste(
   );
 
   let implantApplied = false;
+  let refinesOreOrIce = false;
   const items: AppraisalItem[] = matched.map((match) => {
     const aggregate = prices.get(match.typeId);
     const reprocessing = reprocessingByTypeId.get(match.typeId);
@@ -193,13 +200,11 @@ export async function appraisePaste(
             ),
           })
         : undefined;
-    if (
-      refine &&
-      reprocessing &&
-      modifiers &&
-      appliedRefiningImplantPct(modifiers, reprocessing.specialisationSkillID) > 0
-    ) {
-      implantApplied = true;
+    if (refine && reprocessing && modifiers) {
+      if (reprocessing.specialisationSkillID !== undefined) refinesOreOrIce = true;
+      if (appliedRefiningImplantPct(modifiers, reprocessing.specialisationSkillID) > 0) {
+        implantApplied = true;
+      }
     }
     const lpForType = lpMatches?.matchesByTypeId.get(match.typeId);
     const lpOption = lpForType
@@ -220,6 +225,7 @@ export async function appraisePaste(
     appraisal: buildAppraisal(items, pricePercent),
     unmatched,
     implantBonusPct: implantApplied ? (modifiers?.refiningImplantPct ?? 0) : 0,
+    refinesOreOrIce,
     accountingLevel: modifiers ? (modifiers.skills[SKILL_IDS.accounting] ?? 0) : null,
     brokerRelationsLevel: modifiers ? (modifiers.skills[SKILL_IDS.brokerRelations] ?? 0) : null,
   };
