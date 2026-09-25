@@ -4942,6 +4942,8 @@
       "columnShip": "Ship",
       "columnLocation": "Location",
       "columnJoined": "Joined",
+      "columnRoles": "Roles",
+      "you": "You",
       "never": "Never",
       "total": "Members",
       "dark": "Dark {{days}}d+",
