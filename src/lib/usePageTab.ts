@@ -9,7 +9,8 @@
  */
 import { useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { tabFromPathname, tabPath, type PageTabs } from './pageTabs';
+import { isIndexPath, tabFromPathname, tabPath, type PageTabs } from './pageTabs';
+import { useMediaQuery } from './useMediaQuery';
 
 export function usePageTab<Id extends string>(page: PageTabs<Id>): [Id, (id: Id) => void] {
   const location = useLocation();
@@ -25,4 +26,18 @@ export function usePageTab<Id extends string>(page: PageTabs<Id>): [Id, (id: Id)
   );
 
   return [tab, selectTab];
+}
+
+/**
+ * Whether `page`'s index state is showing (`PageTabs.index`): the bare base
+ * path below the index's breakpoint. Follows a resize across the breakpoint.
+ * Always false for a page that declares no index.
+ */
+export function useIsPageIndex(page: PageTabs): boolean {
+  const { pathname } = useLocation();
+  // Subscribes to the breakpoint; `isIndexPath` is what answers, so the first
+  // render and a later change agree. The never-matching fallback query is
+  // only for a page with no index, which has nothing to track.
+  useMediaQuery(page.index?.hiddenFrom ?? 'not all');
+  return isIndexPath(page, pathname);
 }

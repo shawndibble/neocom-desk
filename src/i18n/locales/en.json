@@ -4486,7 +4486,19 @@
       "data": "Data & device"
     },
     "navLabel": "Settings sections",
-    "sectionSelectLabel": "Settings section",
+    "backToList": "Settings",
+    "summary": {
+      "display": "{{size}} text, {{format}}",
+      "on": "On",
+      "off": "Off",
+      "industry": "{{facility}}, ME {{me}}, TE {{te}}",
+      "charactersCurrent": "Current character",
+      "charactersAll": "All characters",
+      "charactersSome_one": "{{count}} character",
+      "charactersSome_other": "{{count}} characters",
+      "corporation_one": "Dark after {{count}} day",
+      "corporation_other": "Dark after {{count}} days"
+    },
     "industryDefaultsTitle": "Industry defaults",
     "marketDefaultsTitle": "Market defaults",
     "characterDefaultsTitle": "Character defaults",

@@ -27,15 +27,38 @@ export interface PageTabs<Id extends string = string> {
   readonly tabs: readonly PageTab<Id>[];
   /** Where the bare base path, or an unknown segment, lands. */
   readonly defaultTab: Id;
+  /**
+   * Opt-in index state: below `hiddenFrom` (a media query, e.g. `(min-width:
+   * 48rem)`), the bare base path renders the page as its own list of tabs
+   * instead of redirecting to `defaultTab`. From `hiddenFrom` up it redirects
+   * as ever. Absent, the bare path always redirects.
+   */
+  readonly index?: { readonly hiddenFrom: string };
 }
 
 /** `defaultTab` defaults to the first tab — the one the bar shows leftmost. */
 export function definePageTabs<const Id extends string>(
   base: string,
   tabs: readonly [PageTab<Id>, ...PageTab<Id>[]],
-  defaultTab: Id = tabs[0].id
+  defaultTab: Id = tabs[0].id,
+  index?: PageTabs<Id>['index']
 ): PageTabs<Id> {
-  return { base, tabs, defaultTab };
+  return index ? { base, tabs, defaultTab, index } : { base, tabs, defaultTab };
+}
+
+/** Whether `pathname` is exactly the page's bare base path (a trailing slash is tolerated). */
+function isBasePath(page: PageTabs, pathname: string): boolean {
+  return pathname === page.base || pathname === `${page.base}/`;
+}
+
+/**
+ * Whether the page's index state is showing right now: it declares one, the
+ * viewport is below its `hiddenFrom` query, and `pathname` is the bare base.
+ * Reads the viewport synchronously, so it is right on the first render.
+ */
+export function isIndexPath(page: PageTabs, pathname: string): boolean {
+  if (!page.index || !isBasePath(page, pathname)) return false;
+  return typeof window !== 'undefined' && !window.matchMedia(page.index.hiddenFrom).matches;
 }
 
 export function tabPath<Id extends string>(page: PageTabs<Id>, id: Id): string {

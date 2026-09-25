@@ -3,15 +3,6 @@ import { Link } from 'react-router-dom';
 import { SETTINGS_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import { cx } from '@/lib/cx';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui';
 import type { SettingsGroup, SettingsSectionId } from './sections';
 
 const LABEL_KEYS = new Map<string, string>(SETTINGS_TABS.tabs.map((tab) => [tab.id, tab.labelKey]));
@@ -25,7 +16,7 @@ interface SettingsNavProps {
  * Settings' own navigation from `md` up: a grouped rail beside the app rail.
  * Its entries are real links, so a section can be opened in a new tab or
  * bookmarked. A phone has no room for a second column and gets
- * `SettingsSectionSelect` in the page header instead.
+ * `SettingsIndex` at `/settings` instead.
  */
 export function SettingsNav({ groups, value }: SettingsNavProps) {
   const { t } = useTranslation();
@@ -67,33 +58,70 @@ export function SettingsNav({ groups, value }: SettingsNavProps) {
   );
 }
 
-interface SettingsSectionSelectProps extends SettingsNavProps {
-  onChange: (id: SettingsSectionId) => void;
+interface SettingsIndexProps {
+  groups: readonly SettingsGroup[];
+  /** One-line current value per section, where there is a cheap one. */
+  summaries: Partial<Record<SettingsSectionId, string>>;
 }
 
-/** The phone's section switcher: one grouped select, meant for the page header's right-hand side. */
-export function SettingsSectionSelect({ groups, value, onChange }: SettingsSectionSelectProps) {
+/**
+ * The phone's Settings: a full-screen grouped list at `/settings`, each row a
+ * push to its section so Back returns here. `SettingsNav` is the same
+ * grouping for `md` up.
+ */
+export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
   const { t } = useTranslation();
 
   return (
-    <div className="md:hidden">
-      <Select value={value} onValueChange={(id) => onChange(id as SettingsSectionId)}>
-        <SelectTrigger aria-label={t('settings.sectionSelectLabel')} className="w-44">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent align="end">
-          {groups.map((group) => (
-            <SelectGroup key={group.id}>
-              <SelectLabel>{t(group.labelKey)}</SelectLabel>
-              {group.sections.map((id) => (
-                <SelectItem key={id} value={id}>
-                  {t(LABEL_KEYS.get(id) ?? id)}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <nav aria-label={t('settings.navLabel')} className="space-y-4">
+      {groups.map((group) => (
+        <section key={group.id} aria-labelledby={`settings-index-${group.id}`}>
+          <h2
+            id={`settings-index-${group.id}`}
+            className="px-1 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
+          >
+            {t(group.labelKey)}
+          </h2>
+          <ul className="divide-y divide-line border border-line bg-panel">
+            {group.sections.map((id) => {
+              const summary = summaries[id];
+              return (
+                <li key={id}>
+                  <Link
+                    to={tabPath(SETTINGS_TABS, id)}
+                    className="flex min-h-11 items-center justify-between gap-3 px-3 py-2 text-sm hover:bg-panel-2"
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-text">{t(LABEL_KEYS.get(id) ?? id)}</span>
+                      {summary && (
+                        <span className="block truncate text-xs text-text-dim">{summary}</span>
+                      )}
+                    </span>
+                    <span aria-hidden="true" className="text-text-dim">
+                      ›
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </nav>
+  );
+}
+
+/** On a phone, a section's way back to the list; the page header's right-hand side. */
+export function SettingsBackLink() {
+  const { t } = useTranslation();
+
+  return (
+    <Link
+      to={SETTINGS_TABS.base}
+      className="inline-flex min-h-11 items-center gap-1 px-2 text-xs text-text-dim hover:text-text md:hidden"
+    >
+      <span aria-hidden="true">‹</span>
+      {t('settings.backToList')}
+    </Link>
   );
 }

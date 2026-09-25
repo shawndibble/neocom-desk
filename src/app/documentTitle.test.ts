@@ -70,3 +70,9 @@ describe('documentTitleFor', () => {
     expect(new Set(distinct).size).toBe(distinct.length);
   });
 });
+
+describe('documentTitleFor Settings index', () => {
+  it('titles the bare /settings list as Settings', () => {
+    expect(documentTitleFor('/settings', t)).toBe('Settings — Neocom Desk');
+  });
+});

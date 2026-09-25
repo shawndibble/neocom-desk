@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { definePageTabs, isWithinPage, tabFromPathname, tabPath } from './pageTabs';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { definePageTabs, isIndexPath, isWithinPage, tabFromPathname, tabPath } from './pageTabs';
 
 const page = definePageTabs('/contacts', [
   { id: 'character', labelKey: 'a' },
@@ -47,5 +47,38 @@ describe('tabPath / isWithinPage', () => {
     expect(isWithinPage(page, '/contacts')).toBe(true);
     expect(isWithinPage(page, '/contacts/across')).toBe(true);
     expect(isWithinPage(page, '/contactsx')).toBe(false);
+  });
+});
+
+describe('isIndexPath', () => {
+  const indexed = definePageTabs(
+    '/settings',
+    [
+      { id: 'display', labelKey: 'a' },
+      { id: 'faq', labelKey: 'b' },
+    ],
+    undefined,
+    { hiddenFrom: '(min-width: 48rem)' }
+  );
+
+  function stubViewport(wide: boolean) {
+    vi.stubGlobal('window', { matchMedia: (media: string) => ({ media, matches: wide }) });
+  }
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('shows the index on the bare base path below the breakpoint only', () => {
+    stubViewport(false);
+    expect(isIndexPath(indexed, '/settings')).toBe(true);
+    expect(isIndexPath(indexed, '/settings/')).toBe(true);
+    expect(isIndexPath(indexed, '/settings/faq')).toBe(false);
+    expect(isIndexPath(indexed, '/settings/nope')).toBe(false);
+    stubViewport(true);
+    expect(isIndexPath(indexed, '/settings')).toBe(false);
+  });
+
+  it('is never on for a page that declares no index', () => {
+    stubViewport(false);
+    expect(isIndexPath(page, '/contacts')).toBe(false);
   });
 });
