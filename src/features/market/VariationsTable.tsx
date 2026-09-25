@@ -181,6 +181,7 @@ export function VariationsTable({
         onRowClick={(row) => onSelect(row.typeId)}
         rowContextMenu={rowContextMenu}
         rowMoreActions
+        mobileSort
       />
     </div>
   );

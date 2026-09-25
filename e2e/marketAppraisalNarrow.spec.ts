@@ -266,4 +266,44 @@ test.describe('Market Appraisal — stacked result card', () => {
     // not this one.
     for (const cell of cells) expect(cell.width).toBeLessThan(contentWidth * 0.9);
   });
+
+  test('offers a phone sort bar that reorders the stacked cards at 390px', async ({ page }) => {
+    await page.setViewportSize(PHONE);
+    await appraise(page, SIX_COLUMN_PASTE);
+
+    const rowKeys = () =>
+      page
+        .locator('table[aria-label="Appraisal"] tbody tr[data-row-key]')
+        .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-row-key')));
+    // Paste order: no `defaultSort`, so the bar starts on its "no sort" label.
+    expect(await rowKeys()).toEqual([String(VELDSPAR), String(TRITANIUM)]);
+
+    const sortBy = page.getByLabel('Sort by', { exact: true });
+    await expect(sortBy).toBeAttached();
+    // Sell total: Veldspar 26.8M against Tritanium 19.3M.
+    await sortBy.selectOption({ label: 'Sell total ↑' });
+    await expect.poll(rowKeys).toEqual([String(TRITANIUM), String(VELDSPAR)]);
+    await sortBy.selectOption({ label: 'Sell total ↓' });
+    await expect.poll(rowKeys).toEqual([String(VELDSPAR), String(TRITANIUM)]);
+
+    // The paired-card layout is untouched by the bar.
+    const { cells } = await readRow(page, VELDSPAR);
+    expect(labelLines(cells)).toEqual([
+      ['Item'],
+      ['Qty', 'Buy each'],
+      ['Sell each', 'Buy total'],
+      ['Sell total', 'Refine total'],
+    ]);
+  });
+
+  test('has no phone sort bar at 640px or 1280px', async ({ page }) => {
+    for (const width of [640, DESKTOP.width]) {
+      await page.setViewportSize({ width, height: DESKTOP.height });
+      await appraise(page, SIX_COLUMN_PASTE);
+      await expect(page.getByLabel('Sort by', { exact: true })).toBeHidden();
+      await expect(
+        page.getByRole('columnheader', { name: /Sell total/ }).getByRole('button')
+      ).toBeVisible();
+    }
+  });
 });
