@@ -2150,6 +2150,11 @@
       "unknownProduct": "Unnamed job",
       "checking": "Checking…",
       "reauth": "Log in again to see this.",
+      "word": {
+        "unpaid": "Unpaid",
+        "ready": "Ready",
+        "reauth": "Log in again"
+      },
       "slotsUsed": "{{used}} of {{total}} slots used",
       "industryRunning_one": "{{count}} running",
       "industryRunning_other": "{{count}} running",
