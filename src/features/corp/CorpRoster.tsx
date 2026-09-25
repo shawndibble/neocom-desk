@@ -17,13 +17,13 @@ import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useUrlSort } from '@/lib/useUrlState';
 import {
+  ColumnPickerMenu,
   DataTable,
   EmptyState,
-  FilterChip,
   StatChip,
-  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
+import { useColumnVisibility } from '@/lib/columnVisibility';
 import { formatAge } from '@/lib/age';
 import {
   DASH,
@@ -33,6 +33,11 @@ import {
   type RosterDiff,
 } from '@/engine/corp/members';
 import { useDarkThreshold } from './darkThreshold';
+import {
+  CORP_ROSTER_COLUMN_IDS,
+  useVisibleCorpRosterColumns,
+  type CorpRosterColumnId,
+} from './corpRosterColumns';
 
 /** One member, joined to every name the page managed to resolve. */
 export interface RosterRow {
@@ -83,21 +88,11 @@ export function CorpRosterSummary({
 }
 
 /**
- * The two figures the page exists to produce, as a stat strip. The dark count
- * doubles as the "dark only" filter toggle (issue #421, AC3): a `FilterChip`
- * rather than the `StatChip` it replaces, since `StatChip` is deliberately
- * the non-interactive readout (`components/ui/FilterChip.tsx`) and this is
- * the one figure a director actually wants to click through to.
+ * The two figures the page exists to produce, as a stat strip. Readouts only:
+ * the "dark only" toggle (issue #421, AC3) lives with the page's other filters
+ * behind the funnel; the count stays here, always on screen.
  */
-export function CorpRosterStats({
-  rows,
-  darkOnly,
-  onToggleDarkOnly,
-}: {
-  rows: readonly RosterRow[];
-  darkOnly: boolean;
-  onToggleDarkOnly: () => void;
-}) {
+export function CorpRosterStats({ rows }: { rows: readonly RosterRow[] }) {
   const { t } = useTranslation();
   // Label only — `rows` arrive with `standing` already computed against this
   // same preference in CorpMembers.tsx, so the chip's text and the set it
@@ -107,14 +102,11 @@ export function CorpRosterStats({
   return (
     <div className="flex flex-wrap gap-2">
       <StatChip label={t('corp.members.total')} value={rows.length} />
-      <Tooltip content={t('corp.members.darkHint', { days: darkAfterDays })}>
-        <FilterChip
-          label={t('corp.members.dark', { days: darkAfterDays })}
-          count={dark}
-          selected={darkOnly}
-          onToggle={onToggleDarkOnly}
-        />
-      </Tooltip>
+      <StatChip
+        label={t('corp.members.dark', { days: darkAfterDays })}
+        value={dark}
+        tooltip={t('corp.members.darkHint', { days: darkAfterDays })}
+      />
     </div>
   );
 }
@@ -122,16 +114,10 @@ export function CorpRosterStats({
 /** Longest silence first — the view's whole point (see the module note). */
 const ROSTER_SORT = { columnId: 'lastSeen', direction: 'desc' } as const;
 
-export function CorpRosterTable({
-  rows,
-  rowContextMenu,
-}: {
-  rows: readonly RosterRow[];
-  /** Row context menu (issue #421): Show Info + Copy Character Name. */
-  rowContextMenu?: (row: RosterRow, tr: ReactElement) => ReactElement;
-}) {
+/** Every roster column, hidden or not — the table and its column picker both read it. */
+function useRosterColumns(): DataTableColumn<RosterRow>[] {
   const { t } = useTranslation();
-  const columns = useMemo<DataTableColumn<RosterRow>[]>(
+  return useMemo<DataTableColumn<RosterRow>[]>(
     () => [
       {
         id: 'member',
@@ -187,12 +173,66 @@ export function CorpRosterTable({
     ],
     [t]
   );
+}
+
+/**
+ * The roster's column picker, for the page's filter row. Reads the same store
+ * as `CorpRosterTable`, so the two agree without the page threading state.
+ */
+export function CorpRosterColumnPicker() {
+  const { t } = useTranslation();
+  const columns = useRosterColumns();
+  const { visible, toggle, reset } = useColumnVisibility(
+    useVisibleCorpRosterColumns,
+    CORP_ROSTER_COLUMN_IDS
+  );
+  const columnsById = useMemo(
+    () =>
+      Object.fromEntries(columns.map((column) => [column.id, column])) as Record<
+        CorpRosterColumnId,
+        DataTableColumn<RosterRow>
+      >,
+    [columns]
+  );
+  return (
+    <ColumnPickerMenu
+      available={CORP_ROSTER_COLUMN_IDS}
+      visible={visible}
+      columnsById={columnsById}
+      onToggle={toggle}
+      onReset={reset}
+      buttonLabel={t('common.columnsButton')}
+      menuTitle={t('common.columnsMenuTitle')}
+      resetLabel={t('common.resetColumns')}
+    />
+  );
+}
+
+export function CorpRosterTable({
+  rows,
+  rowContextMenu,
+}: {
+  rows: readonly RosterRow[];
+  /** Row context menu (issue #421): Show Info + Copy Character Name. */
+  rowContextMenu?: (row: RosterRow, tr: ReactElement) => ReactElement;
+}) {
+  const { t } = useTranslation();
+  const columns = useRosterColumns();
+  const { isVisible } = useColumnVisibility(useVisibleCorpRosterColumns, CORP_ROSTER_COLUMN_IDS);
+  const shownColumns = useMemo(
+    () =>
+      columns.filter(
+        (column) => column.id === 'member' || isVisible(column.id as CorpRosterColumnId)
+      ),
+    [columns, isVisible]
+  );
 
   // The roster row a `corpMemberJoined` alert pointed at, if any. Its sibling
   // `corpMemberLeft` deliberately has no highlight — that member is gone from
   // this table, so there would be nothing to scroll to.
   const highlightedMemberId = useHighlightParam();
   // In the URL (ADR 0015) as `?sort=`; the one table on `/corp/members`.
+  // Validated against every column, so a sort on a hidden one survives.
   const sortProps = useUrlSort(
     'sort',
     ROSTER_SORT,
@@ -205,7 +245,7 @@ export function CorpRosterTable({
 
   return (
     <DataTable
-      columns={columns}
+      columns={shownColumns}
       rows={rows}
       rowContextMenu={rowContextMenu}
       rowKey={(row) => row.characterId}

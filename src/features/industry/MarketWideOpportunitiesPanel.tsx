@@ -35,6 +35,7 @@ import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from '
 import type { MarketWideResultRow } from './marketWideOpportunities';
 import { useMarketWideOpportunities } from './useMarketWideOpportunities';
 import { SkillGateMarker } from './SkillGateMarker';
+import { ORDER_DEPTH_RANK } from './opportunityMetrics';
 import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 import { boolParam } from '@/lib/urlState';
 
@@ -163,6 +164,7 @@ export function MarketWideOpportunitiesPanel({
     {
       id: 'orderDepth',
       header: t('industry.opportunitiesOrderDepthLabel'),
+      sortValue: (row) => ORDER_DEPTH_RANK[row.orderDepth],
       render: (row) => (
         <StatChip
           label={t('industry.opportunitiesOrderDepthLabel')}
@@ -284,6 +286,7 @@ export function MarketWideOpportunitiesPanel({
               rowKey={(row) => row.productTypeID}
               rowContextMenu={rowContextMenu}
               label={t('industry.marketOpportunitiesTitle')}
+              mobileSort
               {...sortProps}
             />
           </div>

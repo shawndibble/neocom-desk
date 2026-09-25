@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
@@ -93,5 +93,25 @@ describe('CorpTransactionsPanel — filtered to zero', () => {
     expect(
       screen.getByText('Clear the search or widen the side and date filters.')
     ).toBeInTheDocument();
+  });
+});
+
+describe('CorpTransactionsPanel — column picker', () => {
+  it('sits in the filter row and hides an optional column, never the item', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    expect(screen.queryByRole('menuitemcheckbox', { name: 'Item' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Unit price' }));
+    await user.keyboard('{Escape}');
+
+    const table = screen.getByRole('table', { name: 'Transactions' });
+    expect(within(table).queryByRole('columnheader', { name: 'Unit price' })).toBeNull();
+    expect(within(table).getByRole('columnheader', { name: 'Item' })).toBeInTheDocument();
+
+    // Shared device-local store: put it back for the next test.
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Reset to default' }));
   });
 });

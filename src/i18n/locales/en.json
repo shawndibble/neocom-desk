@@ -264,6 +264,7 @@
       "section": {
         "capacitor": "Capacitor",
         "offense": "Offense",
+        "appliedDps": "Applied DPS",
         "defense": "Defense",
         "targeting": "Targeting",
         "navigation": "Navigation",
@@ -408,6 +409,45 @@
         "triglavian": "Triglavian",
         "sleepers": "Sleepers"
       }
+    },
+    "targetProfile": {
+      "label": "Target profile",
+      "manage": "Manage targets",
+      "manageTitle": "Custom target profiles",
+      "builtInGroup": "Built-in",
+      "customGroup": "Custom",
+      "empty": "No custom profiles yet.",
+      "add": "New profile",
+      "edit": "Edit {{name}}",
+      "delete": "Delete {{name}}",
+      "nameLabel": "Name",
+      "signatureLabel": "Signature radius (m)",
+      "velocityLabel": "Speed (m/s)",
+      "summary": "{{signature}} m sig · {{velocity}} m/s",
+      "save": "Save",
+      "cancel": "Cancel",
+      "errorName": "Give the profile a name.",
+      "errorValues": "Enter a signature radius above zero and a speed of zero or more.",
+      "builtin": {
+        "frigate": "NPC frigate",
+        "cruiser": "NPC cruiser",
+        "battleship": "NPC battleship"
+      }
+    },
+    "appliedDps": {
+      "summary": "Raw DPS {{raw}} · applied {{applied}} at {{km}} km",
+      "assumptions": "Our own calculation, not the engine's: your ship stationary, the target moving fully transversal at the profile's speed. Drones only apply inside drone control range.",
+      "noWeapons": "No weapons are running — set a turret or launcher active, or launch drones.",
+      "loading": "Loading graphs…",
+      "overlayLabel": "Compare with",
+      "overlayNone": "No overlay",
+      "thisFitting": "This fitting",
+      "vsRange": "Applied DPS vs range",
+      "vsSpeed": "Applied DPS vs target speed, at {{km}} km",
+      "rangeHeader": "Range",
+      "speedHeader": "Target speed",
+      "km": "{{value}} km",
+      "speed": "{{value}} m/s"
     },
     "implants": {
       "basis": {
@@ -1711,8 +1751,13 @@
     "cancel": "Cancel",
     "ok": "OK",
     "searchPlaceholder": "Search by name or corporation",
-    "noSearchMatches": "No characters match this search.",
-    "noSearchMatchesHint": "Clear the search to see every character.",
+    "noSearchMatches": "No characters match this search or filter.",
+    "noSearchMatchesHint": "Clear the search and filters to see every character.",
+    "filterQueueLabel": "Queue state",
+    "filterCorpLabel": "Corporation",
+    "allCorporations": "All corporations",
+    "filterStarredOnly": "Starred only",
+    "filterHasAlerts": "Has alerts",
     "viewModeLabel": "View",
     "viewCards": "Cards",
     "viewTable": "Table",
@@ -1855,6 +1900,9 @@
     "retention": "This device keeps the last 300 alerts, and syncs 30 days of them between your devices."
   },
   "common": {
+    "columnsButton": "Columns",
+    "columnsMenuTitle": "Columns",
+    "resetColumns": "Reset to default",
     "close": "Close",
     "save": "Save",
     "cancel": "Cancel",
@@ -4262,7 +4310,7 @@
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, which skill plan you're adding skills to from Fit Check and Market, and the fitting damage profiles you made along with which one fittings are measured against. Nothing else on this page leaves your device."
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, which skill plan you're adding skills to from Fit Check and Market, the fitting damage profiles you made along with which one fittings are measured against, and the fitting target profiles you made along with which one applied DPS is worked out against. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",
@@ -4611,9 +4659,16 @@
       "left_other": "{{count}} left: {{names}}",
       "empty": "No member activity",
       "emptyHint": "EVE reported no tracking rows for this corporation.",
+      "noFilterMatches": "No members match your search or filters.",
+      "noFilterMatchesHint": "Clear the search or reset the dark-only, ship and location filters to see every member.",
+      "resetFilters": "Reset filters",
       "noAccessTitle": "Member tracking needs Director",
       "noAccessHint": "EVE only opens the member list and its last-login dates to a Director. No other corporation role can see them, and granting access here will not change that.",
       "searchPlaceholder": "Search name, ship, location…",
+      "shipFilterLabel": "Ship",
+      "shipFilterAll": "Any ship",
+      "locationFilterLabel": "Location",
+      "locationFilterAll": "Any location",
       "exportCsv": "Export CSV",
       "contextMenu": {
         "showInfo": "Show Info",

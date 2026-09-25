@@ -194,6 +194,11 @@ export function Clones() {
       {
         id: 'location',
         header: t('clones.location'),
+        sortValue: (clone) =>
+          locationNames.get(clone.location_id) ??
+          t(clone.location_type === 'station' ? 'clones.stationLabel' : 'clones.structureLabel', {
+            id: clone.location_id,
+          }),
         render: (clone) =>
           locationNames.get(clone.location_id) ??
           t(clone.location_type === 'station' ? 'clones.stationLabel' : 'clones.structureLabel', {
@@ -203,6 +208,7 @@ export function Clones() {
       {
         id: 'implants',
         header: t('clones.implants'),
+        sortValue: (clone) => clone.implants.length,
         render: (clone) =>
           clone.implants.length === 0
             ? t('clones.noImplants')
@@ -328,6 +334,7 @@ export function Clones() {
                 columns={columns}
                 rows={clones}
                 rowKey={(clone) => clone.jump_clone_id}
+                mobileSort
               />
             )}
           </>

@@ -53,6 +53,7 @@ const baseStats: FittingStats = {
   },
   navigation: { maxVelocity: 250, agility: 3.5, mass: 10000000, warpSpeed: 3 },
   unknownItemTypeIds: [],
+  applied: { weapons: [], droneControlRange: 20000 },
   slotCounts: { high: 4, medium: 4, low: 4, rig: 3, subsystem: 0 },
   modules: [],
   offense: { weapons: [], dps: 0, volley: 0, overheated: null },

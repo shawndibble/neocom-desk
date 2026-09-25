@@ -161,6 +161,7 @@ describe('computeFittingStats', () => {
         ]),
       },
       items: [],
+      character: { attributes: new Map() },
     });
     const { computeFittingStats } = await freshModule();
 
@@ -171,6 +172,7 @@ describe('computeFittingStats', () => {
     expect(dogmaFit.ship).toEqual({ type_id: 17843 });
     expect(stats.cpuTotal).toBe(400);
     expect(stats.cpuUsed).toBe(300);
+    expect(stats.applied).toEqual({ weapons: [], droneControlRange: 20000 });
   });
 
   it('sums calibration cost across fitted rigs and bandwidth across active drones only', async () => {
@@ -192,6 +194,7 @@ describe('computeFittingStats', () => {
         { attributes: new Map([[1272, { value: 5 }]]) }, // active drone stack
         { attributes: new Map([[1272, { value: 5 }]]) }, // bay drone stack
       ],
+      character: { attributes: new Map() },
     });
     const { computeFittingStats } = await freshModule();
 
@@ -213,6 +216,7 @@ describe('computeFittingStats module results', () => {
         { attributes: new Map([[604, { value: 83 }]]), state: 'active', max_state: 'overload' },
         { attributes: new Map(), state: 'online', max_state: 'online' },
       ],
+      character: { attributes: new Map() },
     });
     const { computeFittingStats } = await freshModule();
 
@@ -267,6 +271,7 @@ describe('computeFittingStats overheated values', () => {
             max_state: 'active',
           },
         ],
+        character: { attributes: new Map() },
       };
     });
     const { computeFittingStats } = await freshModule();
@@ -307,6 +312,7 @@ describe('computeFittingStats overheated values', () => {
     calculateMock.mockReturnValue({
       ship: { attributes: new Map() },
       items: [{ attributes: new Map(), state: 'online', max_state: 'online' }],
+      character: { attributes: new Map() },
     });
     const { computeFittingStats } = await freshModule();
 
@@ -326,6 +332,7 @@ describe('computeFittingStats overheated values', () => {
     calculateMock.mockReturnValue({
       ship: { attributes: new Map() },
       items: [{ attributes: new Map(), state: 'active', max_state: 'overload' }],
+      character: { attributes: new Map() },
     });
     const { computeFittingStats } = await freshModule();
 

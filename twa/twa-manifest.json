@@ -1,0 +1,40 @@
+{
+  "packageId": "com.neocomdesk.app",
+  "host": "neocomdesk.com",
+  "name": "Neocom Desk",
+  "launcherName": "Neocom Desk",
+  "display": "standalone",
+  "orientation": "default",
+  "themeColor": "#0d1117",
+  "themeColorDark": "#0d1117",
+  "navigationColor": "#0d1117",
+  "navigationColorDark": "#0d1117",
+  "navigationDividerColor": "#0d1117",
+  "navigationDividerColorDark": "#0d1117",
+  "backgroundColor": "#0d1117",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://neocomdesk.com/icons/icon-512.png",
+  "maskableIconUrl": "https://neocomdesk.com/icons/icon-512-maskable.png",
+  "monochromeIconUrl": "https://neocomdesk.com/icons/badge-96.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "android"
+  },
+  "appVersionName": "1",
+  "appVersionCode": 1,
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://neocomdesk.com/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://neocomdesk.com/",
+  "minSdkVersion": 21
+}

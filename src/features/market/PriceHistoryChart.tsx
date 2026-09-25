@@ -242,26 +242,37 @@ export default function PriceHistoryChart({
 
   const columns = useMemo<DataTableColumn<ChartRow>[]>(
     () => [
-      { id: 'date', header: t('market.priceHistory.date'), render: (p) => p.date },
+      {
+        id: 'date',
+        header: t('market.priceHistory.date'),
+        render: (p) => p.date,
+        sortValue: (p) => p.date,
+      },
       {
         id: 'average',
         header: t('market.priceHistory.average'),
         render: (p) => formatIsk(p.average, 2),
+        sortValue: (p) => p.average,
       },
       {
         id: 'range',
         header: t('market.priceHistory.priceRange'),
         render: (p) => formatPriceRange(p.lowest, p.highest),
+        // Sorted by the day's high — the low half of the band has no column
+        // of its own to sort by instead.
+        sortValue: (p) => p.highest,
       },
       {
         id: 'volume',
         header: t('market.priceHistory.volume'),
         render: (p) => formatVolume(p.volume),
+        sortValue: (p) => p.volume,
       },
       {
         id: 'orderCount',
         header: t('market.priceHistory.orderCount'),
         render: (p) => formatVolume(p.orderCount),
+        sortValue: (p) => p.orderCount,
       },
     ],
     [t]
@@ -492,6 +503,13 @@ export default function PriceHistoryChart({
         // Four short figures a card: one per line would run the list twice as
         // long for no gain in legibility.
         stackColumns={2}
+        // `chartData` arrives oldest-first (`sortPriceHistory`), matching the
+        // chart's left-to-right X axis — keep that until a header is clicked.
+        defaultSort={{ columnId: 'date', direction: 'asc' }}
+        // The card collapse below `sm` hides the header row and its sort
+        // buttons with it — this is the table's first sortable column, so
+        // without the phone picker it would be unsortable there.
+        mobileSort
       />
     </div>
   );

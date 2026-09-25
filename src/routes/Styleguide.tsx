@@ -389,8 +389,9 @@ export function Styleguide() {
       <Section title="FilterBar">
         <Panel>
           <p className="pb-2 text-xs text-text-dim">
-            Inline here at desktop width. Narrow the window past 48rem and the filters collapse
-            behind a funnel trigger beside the search box, into an Apply/Cancel sheet.
+            Search, view actions and the funnel share one row at every width. The funnel opens a box
+            under the row here; narrow the window past 48rem and it opens an Apply/Cancel sheet
+            instead.
           </p>
           <FilterBar
             value={barFilter}

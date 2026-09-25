@@ -54,9 +54,9 @@ export function FilterField({ label, children, stretch = true, className = '' }:
 }
 
 interface FilterBarProps<T> {
-  /** The committed filter state. Inline, edits land here immediately. */
+  /** The committed filter state. In the pointer-width box, edits land here immediately. */
   value: T;
-  /** Commit: every edit inline, only Apply in the sheet. */
+  /** Commit: every edit in the pointer-width box, only Apply in the sheet. */
   onChange: (next: T) => void;
   /**
    * The search box. Stays in the row at every width — it is the page's primary
@@ -77,29 +77,14 @@ interface FilterBarProps<T> {
   title?: string;
   /**
    * The controls, written once. Called with the draft to read and a setter to
-   * edit it — inline those are `value`/`onChange` straight through, in the
+   * edit it — in the pointer-width box those are `value`/`onChange` straight through, in the
    * sheet they are local state committed on Apply.
    */
   children: (draft: T, setDraft: (next: T) => void) => ReactNode;
   /**
-   * Collapse the controls behind the funnel button on a POINTER-width screen
-   * too, instead of laying them out inline beside the search box.
-   *
-   * Off by default: most routes carry a handful of controls that read fine in
-   * the row, and hiding them behind a click would cost more than it saves.
-   * Opt in where the set is long enough that the row wraps and becomes the
-   * page — Market > Open Orders has a chip per problem plus three selects,
-   * which is two full rows above the worklist they exist to narrow.
-   *
-   * Unlike the narrow sheet there is no draft here: the row's controls are
-   * still bound straight to `value`/`onChange`, so opening the box and
-   * editing behaves exactly as it did inline. Only its visibility is new.
-   */
-  collapsible?: boolean;
-  /**
-   * View controls — a table's column picker, say — that sit right before the
-   * filter trigger (or after the inline controls, when there is no trigger).
-   * Not part of the draft: they act immediately and never move into the sheet.
+   * View controls — a table's column picker, say — that sit between the search
+   * box and the filter trigger, on the same line at every width. Not part of
+   * the draft: they act immediately and never move into the sheet.
    */
   actions?: ReactNode;
   /** Wrapper class for the row. */
@@ -107,8 +92,14 @@ interface FilterBarProps<T> {
 }
 
 /**
- * A page's filter controls: inline beside the search box on a pointer-width
- * screen, collapsed behind one trigger below `md`.
+ * A page's filter controls: one row of search box, view `actions` (a column
+ * picker) and a funnel trigger, at every width. The funnel reveals the
+ * controls — in a box under the row on a pointer-width screen, in a bottom
+ * sheet below `md`.
+ *
+ * Always behind the funnel, never laid out inline, so every searchable table
+ * reads the same: search, columns, filters, one line. Inline filters wrapped
+ * to a second row on most routes and pushed the picker away from the search.
  *
  * A row of selects, date fields and chips is fine at 1280px and is most of the
  * screen at 390px — Wallet's journal filters alone stack to four rows on a
@@ -131,22 +122,12 @@ export function FilterBar<T>({
   activeCount = 0,
   title,
   children,
-  collapsible = false,
   actions,
   className = '',
 }: FilterBarProps<T>) {
   const isNarrow = useIsNarrow();
 
   if (!isNarrow) {
-    if (!collapsible) {
-      return (
-        <div className={cx('flex flex-wrap items-center gap-2', className)}>
-          {search}
-          {children(value, onChange)}
-          {actions}
-        </div>
-      );
-    }
     return (
       <CollapsibleFilterRow
         search={search}
@@ -219,7 +200,7 @@ function FilterTrigger({
 }
 
 /**
- * The `collapsible` pointer-width half of `FilterBar`: search box and funnel
+ * The pointer-width half of `FilterBar`: search box and funnel
  * button on one line, the controls themselves on a line below that the
  * funnel shows and hides.
  *

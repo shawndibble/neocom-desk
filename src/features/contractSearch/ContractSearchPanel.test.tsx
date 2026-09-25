@@ -461,7 +461,7 @@ describe('ContractSearchPanel', () => {
 
   it('explains an unfiltered range with no current system even with the filter funnel closed', async () => {
     // A range set from a pasted link (or a prior session) must still explain
-    // itself with the sheet/row shut — `collapsible` unmounts the bar's own
+    // itself with the sheet/row shut — a closed funnel unmounts the bar's own
     // controls, so this note cannot live inside them.
     loadCharacterSolarSystemId.mockResolvedValue(null);
     renderWithRouter(['/?items.jumps=3']);
@@ -1216,10 +1216,10 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
   }
 
   /**
-   * Opens the funnel, since the courier bar is `collapsible`. At pointer width
-   * — which is what jsdom reports — that shows the controls on a line below
-   * the search box and each one commits as it is touched; the Apply/Cancel
-   * pair belongs to the narrow-width sheet.
+   * Opens the funnel, which every `FilterBar` hides its controls behind. At
+   * pointer width — which is what jsdom reports — that shows the controls on
+   * a line below the search box and each one commits as it is touched; the
+   * Apply/Cancel pair belongs to the narrow-width sheet.
    */
   async function openFilters(user: ReturnType<typeof userEvent.setup>) {
     await user.click(screen.getByRole('button', { name: 'Filters' }));

@@ -6,6 +6,7 @@ import {
   useState,
   type InputHTMLAttributes,
   type KeyboardEvent,
+  type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -320,6 +321,8 @@ interface BpcFilterBarProps {
   currentSystem: CurrentSystemState;
   /** The blueprint box's combobox wiring — role, expanded state, active option and arrow keys — owned by the panel, which renders the listbox. */
   searchComboboxProps: InputHTMLAttributes<HTMLInputElement>;
+  /** The column picker, inline between the search box and the funnel. */
+  actions?: ReactNode;
 }
 
 function BpcFilterBar({
@@ -334,6 +337,7 @@ function BpcFilterBar({
   onJumpsChange,
   currentSystem,
   searchComboboxProps,
+  actions,
 }: BpcFilterBarProps) {
   const { t } = useTranslation();
   const activeCount = [
@@ -369,10 +373,8 @@ function BpcFilterBar({
       value={compositeValue}
       onChange={handleCompositeChange}
       activeCount={activeCount}
-      // Six fields plus two chip groups wrap to three rows inline, above
-      // the table they exist to narrow.
-      collapsible
       className="border-b border-line px-3 py-2"
+      actions={actions}
       search={
         <SearchInput
           value={filter.typeQuery}
@@ -1366,25 +1368,15 @@ export function BpcSourcingPanel() {
         )
       }
       actions={
-        <>
-          <ColumnPickerMenu
-            available={BPC_SEARCH_COLUMN_IDS}
-            visible={visibleColumns}
-            columnsById={bpcColumnsById}
-            onToggle={toggleColumn}
-            buttonLabel={t('bpcContracts.columnsButton')}
-            menuTitle={t('bpcContracts.columnsMenuTitle')}
-          />
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('bpcContracts.refresh')}
-            onClick={() => {
-              refresh();
-              setMarketRefreshTick((tick) => tick + 1);
-            }}
-            disabled={loading}
-          />
-        </>
+        <IconButton
+          icon={<Icon.Refresh />}
+          label={t('bpcContracts.refresh')}
+          onClick={() => {
+            refresh();
+            setMarketRefreshTick((tick) => tick + 1);
+          }}
+          disabled={loading}
+        />
       }
     >
       {loading && !data ? (
@@ -1422,6 +1414,16 @@ export function BpcSourcingPanel() {
             onJumpsChange={(next) => setParams({ 'sourcing.jumps': next, 'sourcing.all': false })}
             currentSystem={currentSystem}
             searchComboboxProps={searchComboboxProps}
+            actions={
+              <ColumnPickerMenu
+                available={BPC_SEARCH_COLUMN_IDS}
+                visible={visibleColumns}
+                columnsById={bpcColumnsById}
+                onToggle={toggleColumn}
+                buttonLabel={t('bpcContracts.columnsButton')}
+                menuTitle={t('bpcContracts.columnsMenuTitle')}
+              />
+            }
           />
           {/* Outside the bar: collapsed, its controls unmount, and this is
               exactly when the pilot needs telling the range is not applied. */}
