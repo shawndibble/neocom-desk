@@ -18,8 +18,10 @@ test.describe('Fittings — hull picker', () => {
       await page.setViewportSize(viewport);
       await signInAndGoto(page, './fittings');
 
-      // The list renders once the static market catalogue has loaded; the hull
-      // picker is the default way in on the Start screen at every width.
+      // Nothing is listed until the player searches; "e" matches (nearly) every
+      // class, so the full list is what gets measured. The list renders once the
+      // static market catalogue has loaded.
+      await page.getByRole('searchbox', { name: 'Search hulls' }).fill('e');
       const list = page.getByTestId('hull-list');
       await expect(list).toBeVisible({ timeout: 30_000 });
 

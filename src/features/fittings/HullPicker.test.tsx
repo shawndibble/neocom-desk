@@ -21,9 +21,23 @@ const catalogue = {
 } as unknown as FittingCatalogue;
 
 describe('HullPicker', () => {
-  it('browses hulls by class and starts the one picked', () => {
+  const search = (value: string) =>
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search hulls' }), {
+      target: { value },
+    });
+
+  it('lists no hulls until there is a search', () => {
+    render(<HullPicker catalogue={catalogue} onStart={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'Vexor' })).toBeNull();
+    expect(screen.getByText('Search for a hull to begin.')).toBeTruthy();
+    search('  ');
+    expect(screen.queryByRole('button', { name: 'Vexor' })).toBeNull();
+  });
+
+  it('groups matches by class and starts the one picked', () => {
     const onStart = vi.fn();
     render(<HullPicker catalogue={catalogue} onStart={onStart} />);
+    search('r');
     expect(screen.getByRole('heading', { name: /Frigates/ })).toBeTruthy();
     expect(screen.getByRole('heading', { name: /Cruisers/ })).toBeTruthy();
 
@@ -36,9 +50,7 @@ describe('HullPicker', () => {
 
   it('narrows the classes to the hulls the search matches', () => {
     render(<HullPicker catalogue={catalogue} onStart={() => {}} />);
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search hulls' }), {
-      target: { value: 'rift' },
-    });
+    search('rift');
     expect(screen.getByRole('button', { name: 'Rifter' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Vexor' })).toBeNull();
     expect(screen.queryByRole('heading', { name: /Cruisers/ })).toBeNull();
@@ -47,6 +59,7 @@ describe('HullPicker', () => {
   it('starts a hull at once on double-click', () => {
     const onStart = vi.fn();
     render(<HullPicker catalogue={catalogue} onStart={onStart} />);
+    search('rift');
     fireEvent.doubleClick(screen.getByRole('button', { name: 'Rifter' }));
     expect(onStart).toHaveBeenCalledWith(expect.objectContaining({ typeId: 587 }));
   });
