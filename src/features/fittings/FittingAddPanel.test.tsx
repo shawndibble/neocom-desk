@@ -7,8 +7,10 @@ import { FittingAddPanel } from './FittingAddPanel';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
 const checkCandidates = vi.fn();
+const checkCharges = vi.fn();
 vi.mock('./dogmaFittingEngine', () => ({
   checkCandidates: (...args: unknown[]) => checkCandidates(...args),
+  checkCharges: (...args: unknown[]) => checkCharges(...args),
 }));
 
 const fitting: Fitting = { name: 'Rifter', shipTypeId: 587, modules: [], drones: [], cargo: [] };
@@ -16,13 +18,18 @@ const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boos
 
 const catalogue: FittingCatalogue = {
   types: {},
-  rackOf: { 1: 'low', 2: 'low', 3: 'medium' },
+  rackOf: { 1: 'low', 2: 'low', 3: 'medium', 4: 'medium' },
   marketTypes: [
     { typeId: 1, name: 'Damage Control I', marketGroupId: 10 },
     { typeId: 2, name: 'Damage Control II', marketGroupId: 10 },
     { typeId: 3, name: '1MN Afterburner II', marketGroupId: 20 },
+    { typeId: 4, name: 'Anchoring Array', marketGroupId: 30 },
   ],
-  groupsById: new Map(),
+  groupsById: new Map([
+    [10, { id: 10, name: 'Damage Controls', parentId: null, hasTypes: true }],
+    [20, { id: 20, name: 'Afterburners', parentId: null, hasTypes: true }],
+    [30, { id: 30, name: 'Structure Equipment', parentId: null, hasTypes: true }],
+  ]),
   childrenByParent: new Map(),
   parentOf: new Map(),
   typeIdsByGroup: new Map(),
@@ -40,7 +47,6 @@ function renderPanel(overrides: Partial<Parameters<typeof FittingAddPanel>[0]> =
       profile={profile}
       canPlace={() => true}
       onAdd={onAdd}
-      showGroups={false}
       {...overrides}
     />
   );
@@ -68,13 +74,62 @@ describe('FittingAddPanel', () => {
     });
     const { onAdd } = renderPanel();
 
+    // The hull check runs in the background; browsing waits for it.
+    const dc2 = await screen.findByRole('button', { name: /Damage Control II/ });
     expect(screen.queryByRole('button', { name: /Afterburner/ })).not.toBeInTheDocument();
     // Damage Control I doesn't fit the hull.
     expect(screen.queryByText('Damage Control I')).toBeNull();
-    const dc2 = screen.getByRole('button', { name: /Damage Control II/ });
     expect(dc2).toHaveTextContent('Missing skills');
 
     await user.click(dc2);
     expect(onAdd).toHaveBeenCalledWith(2, 'low');
+  });
+
+  it('browses only the groups holding something that fits the hull', async () => {
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(ids.map((id) => [id, { fitsHull: id !== 4, canFly: true }]));
+    });
+    renderPanel({ target: null });
+
+    expect(await screen.findByRole('button', { name: /Afterburners/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Damage Controls/ })).toBeInTheDocument();
+    // Structure modules never fit a ship, so their group never shows.
+    expect(screen.queryByText('Structure Equipment')).toBeNull();
+  });
+
+  it('loads a charge into every fitted module that takes it, from the Charges tab', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation(() => new Map());
+    checkCharges.mockImplementation(() => new Set([501]));
+    const onLoadCharge = vi.fn();
+    const withLauncher: Fitting = {
+      ...fitting,
+      modules: [
+        { slot: 'high', slotIndex: 0, typeId: 400, state: 'active' },
+        { slot: 'high', slotIndex: 1, typeId: 400, state: 'active' },
+      ],
+    };
+    renderPanel({
+      fitting: withLauncher,
+      target: null,
+      catalogue: {
+        ...catalogue,
+        types: {
+          400: { name: 'Light Missile Launcher II', groupID: 1 },
+          501: { name: 'Scourge Light Missile', groupID: 2 },
+        } as unknown as FittingCatalogue['types'],
+        typeIdsByGroup: new Map([[2, [501]]]),
+      },
+      moduleResults: [
+        { state: 'active', maxState: 'active', chargeGroupIds: [2] },
+        { state: 'active', maxState: 'active', chargeGroupIds: [2] },
+      ],
+      onLoadCharge,
+    });
+
+    await user.click(screen.getByRole('tab', { name: 'Charges' }));
+    expect(screen.getByText('2× Light Missile Launcher II')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Scourge Light Missile/ }));
+    expect(onLoadCharge).toHaveBeenCalledWith(400, 501);
   });
 });

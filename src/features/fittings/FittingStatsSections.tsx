@@ -1,11 +1,11 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CollapsiblePanel } from '@/components/ui';
+import { Caret } from '@/components/ui';
+import { formatIskCompact } from '@/lib/isk';
 import { overheatedOrNull, resistPct, weaponRowKey } from '@/engine/fittings/stats';
 import type {
   DamageFigures as DamageFiguresValue,
   FittingStats,
-  LayerDefense,
   LocalRepair,
   Resonances,
 } from '@/engine/fittings/types';
@@ -17,16 +17,23 @@ import { AppliedDpsPanel } from './AppliedDpsPanel';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
 
-const DMG_RESIST_CLASS = {
+const DMG_FILL_CLASS = {
   em: 'bg-dmg-em',
   thermal: 'bg-dmg-thermal',
   kinetic: 'bg-dmg-kinetic',
   explosive: 'bg-dmg-explosive',
 } as const;
 
-type DamageType = keyof typeof DMG_RESIST_CLASS;
+const DMG_TEXT_CLASS = {
+  em: 'text-dmg-em',
+  thermal: 'text-dmg-thermal',
+  kinetic: 'text-dmg-kinetic',
+  explosive: 'text-dmg-explosive',
+} as const;
 
-const RESIST_TYPES = Object.keys(DMG_RESIST_CLASS) as DamageType[];
+type DamageType = keyof typeof DMG_FILL_CLASS;
+
+const RESIST_TYPES = Object.keys(DMG_FILL_CLASS) as DamageType[];
 
 const RESONANCE_KEY = {
   em: 'emResonance',
@@ -34,6 +41,8 @@ const RESONANCE_KEY = {
   kinetic: 'kineticResonance',
   explosive: 'explosiveResonance',
 } as const satisfies Record<DamageType, keyof Resonances>;
+
+const MICRO_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
 /**
  * An overheated value beside its normal one, in the warning tone — the
@@ -57,83 +66,94 @@ function Overheated({
   );
 }
 
-function ResistBar({
-  type,
-  resonance,
-  overheatedResonance,
-}: {
-  type: DamageType;
-  resonance: number;
-  overheatedResonance: number | undefined;
-}) {
-  const { t } = useTranslation();
-  const pct = resistPct(resonance);
-  const overheatedPct = overheatedOrNull(
-    pct,
-    overheatedResonance === undefined ? undefined : resistPct(overheatedResonance),
-    0
-  );
+/** Label-over-value pairs, two to a row — the compact body most sections use. */
+function Facts({ items }: { items: { label: string; value: ReactNode }[] }) {
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="w-20 shrink-0 text-text-dim">{t(`fittings.stats.damageType.${type}`)}</span>
-      <div className="h-2 flex-1 overflow-hidden rounded-full bg-panel-2">
+    <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs tabular-nums">
+      {items.map((item) => (
+        <div key={item.label} className="min-w-0">
+          <dt className="text-[0.6875rem] text-text-dim">{item.label}</dt>
+          <dd>{item.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** One resist, as the game draws it: the damage type's colour filling the share resisted. */
+function ResistCell({ resonance, tone }: { resonance: number; tone: DamageType }) {
+  const pct = resistPct(resonance);
+  return (
+    <td className="px-0.5 py-0.5">
+      <div className="relative h-5 overflow-hidden rounded-xs bg-panel-2 text-center text-[0.6875rem] leading-5 tabular-nums">
         <div
-          className={`h-full rounded-full ${DMG_RESIST_CLASS[type]}`}
+          className={`absolute inset-y-0 left-0 opacity-45 ${DMG_FILL_CLASS[tone]}`}
           style={{ width: `${pct}%` }}
         />
+        <span className="relative">{pct.toFixed(0)}%</span>
       </div>
-      <span className="w-14 shrink-0 text-right text-text-dim">{pct.toFixed(0)}%</span>
-      {overheatedPct !== null && <Overheated value={overheatedPct} digits={0} unit="%" />}
-    </div>
+    </td>
   );
 }
 
-function ResistBars({
-  resonances,
-  overheated,
-}: {
+interface ResistRow {
+  key: string;
+  label: string;
+  sub?: string;
   resonances: Resonances;
-  overheated?: Resonances;
-}) {
-  return (
-    <>
-      {RESIST_TYPES.map((type) => (
-        <ResistBar
-          key={type}
-          type={type}
-          resonance={resonances[RESONANCE_KEY[type]]}
-          overheatedResonance={overheated?.[RESONANCE_KEY[type]]}
-        />
-      ))}
-    </>
-  );
+  ehp?: number;
+  /** Overheated / adapted rows read as a note on the row above. */
+  tone?: 'overheated' | 'note';
 }
 
-function LayerCard({
-  title,
-  layer,
-  overheated,
-  note,
-}: {
-  title: string;
-  layer: LayerDefense;
-  overheated: LayerDefense | undefined;
-  /** Under the bars — the armor card's "includes the adapted RAH" line. */
-  note?: string;
-}) {
+/**
+ * The Defense table (mockup A): a row per layer — its raw HP beneath the
+ * name, a cell per damage type, EHP last — with an overheated row under any
+ * layer heat changes, and the Reactive Armor Hardener's adapted resists.
+ */
+function ResistTable({ rows }: { rows: ResistRow[] }) {
   const { t } = useTranslation();
   return (
-    <div className="space-y-1 rounded-xs bg-panel-2 p-2">
-      <p className="text-xs font-semibold text-text-dim">
-        {t('fittings.stats.layerHeading', {
-          layer: title,
-          hp: layer.hp.toFixed(0),
-          ehp: layer.ehp.toFixed(0),
-        })}
-      </p>
-      <ResistBars resonances={layer} overheated={overheated} />
-      {note && <p className="text-xs text-text-dim">{note}</p>}
-    </div>
+    <table className="w-full table-fixed border-collapse">
+      <thead>
+        <tr>
+          <th className="w-[26%]" />
+          {RESIST_TYPES.map((type) => (
+            <th
+              key={type}
+              scope="col"
+              className={`pb-1 text-center text-[0.6875rem] font-semibold uppercase ${DMG_TEXT_CLASS[type]}`}
+            >
+              {t(`fittings.stats.damageTypeShort.${type}`)}
+            </th>
+          ))}
+          <th scope="col" className={`w-[18%] pb-1 text-right ${MICRO_LABEL}`}>
+            {t('fittings.stats.ehpColumn')}
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.key}>
+            <th
+              scope="row"
+              className={`pr-1 text-left align-middle text-xs font-normal ${row.tone ? 'text-warning' : ''}`}
+            >
+              <span className={row.tone ? '' : 'font-semibold'}>{row.label}</span>
+              {row.sub && (
+                <span className="block text-[0.6875rem] text-text-dim tabular-nums">{row.sub}</span>
+              )}
+            </th>
+            {RESIST_TYPES.map((type) => (
+              <ResistCell key={type} tone={type} resonance={row.resonances[RESONANCE_KEY[type]]} />
+            ))}
+            <td className="text-right text-xs tabular-nums">
+              {row.ehp === undefined ? '' : row.ehp.toFixed(0)}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
@@ -144,7 +164,7 @@ function DamageFigures({
 }: DamageFiguresValue & { overheated: DamageFiguresValue | null }) {
   const { t } = useTranslation();
   return (
-    <span className="shrink-0 text-right">
+    <span className="shrink-0 text-right tabular-nums">
       <span>{t('fittings.stats.weaponDps', { value: dps.toFixed(1) })}</span>
       <Overheated value={overheatedOrNull(dps, overheated?.dps, 1)} digits={1} />
       <span className="text-text-dim"> · </span>
@@ -157,10 +177,10 @@ function DamageFigures({
 const REPAIR_LAYERS: readonly (keyof LocalRepair)[] = ['shield', 'armor', 'hull'];
 
 const SECTIONS = [
-  'capacitor',
   'offense',
   'appliedDps',
   'defense',
+  'capacitor',
   'targeting',
   'navigation',
   'drones',
@@ -168,6 +188,50 @@ const SECTIONS = [
   'price',
 ] as const;
 type Section = (typeof SECTIONS)[number];
+
+/** Open at first: what a pilot reads on every fit. The rest is a click away, as in the game window. */
+const OPEN_BY_DEFAULT: ReadonlySet<Section> = new Set([
+  'offense',
+  'appliedDps',
+  'defense',
+  'capacitor',
+  'navigation',
+  'drones',
+]);
+
+function StatSection({
+  title,
+  meta,
+  expanded,
+  onToggle,
+  children,
+}: {
+  title: string;
+  meta: string | undefined;
+  expanded: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <section className="border-b border-line last:border-b-0">
+      <div className="flex items-center gap-2 pr-3 hover:bg-panel-2">
+        <h3 className="min-w-0 flex-1">
+          <button
+            type="button"
+            aria-expanded={expanded}
+            onClick={onToggle}
+            className="flex min-h-11 w-full items-center gap-2 pl-3 text-left text-sm font-semibold md:min-h-9"
+          >
+            <Caret expanded={expanded} />
+            {title}
+          </button>
+        </h3>
+        {meta && <span className="shrink-0 text-sm tabular-nums">{meta}</span>}
+      </div>
+      {expanded && <div className="space-y-2 px-3 pb-3">{children}</div>}
+    </section>
+  );
+}
 
 interface FittingStatsSectionsProps {
   stats: FittingStats | null;
@@ -180,8 +244,17 @@ interface FittingStatsSectionsProps {
   targetProfiles: TargetProfiles;
   /** A saved Fitting to overlay on the applied-DPS graphs; absent without a Character. */
   overlay?: OverlayFitting;
+  /** A line above the sections — whose skills the numbers are worked out under. */
+  heading?: ReactNode;
 }
 
+/**
+ * The stats column (scope decision `20260924-215855`, mockup A): one panel
+ * of collapsible sections, each row carrying its headline number, laid out
+ * like the game's fitting window. Every section keeps what its ticket put
+ * there — per-weapon offense and heat (#1548), damage profiles and the
+ * adapted RAH (#1545), target profiles and applied-DPS graphs (#1546).
+ */
 export function FittingStatsSections({
   stats,
   statsProgress,
@@ -191,16 +264,20 @@ export function FittingStatsSections({
   damageProfiles,
   targetProfiles,
   overlay,
+  heading,
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
   const profileName = useDamageProfileName()(damageProfiles.selected);
   // A RAH's resists move with the profile (the engine adapts it), so the
-  // armor bars do too — label that, and show the RAH's own adapted resists.
+  // armor row does too — label that, and show the RAH's own adapted resists.
   const adaptedHardeners = (stats?.modules ?? []).flatMap((module) =>
     module.adaptedResonances ? [module.adaptedResonances] : []
   );
   const [expanded, setExpanded] = useState<Record<Section, boolean>>(
-    () => Object.fromEntries(SECTIONS.map((section) => [section, true])) as Record<Section, boolean>
+    () =>
+      Object.fromEntries(
+        SECTIONS.map((section) => [section, OPEN_BY_DEFAULT.has(section)])
+      ) as Record<Section, boolean>
   );
   const toggle = (section: Section) =>
     setExpanded((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -221,48 +298,79 @@ export function FittingStatsSections({
   );
 
   const overheatedEhp = stats ? overheatedOrNull(stats.ehp, stats.overheated?.ehp, 0) : null;
+  const pctOf = (used: number, total: number) => (total > 0 ? (used / total) * 100 : 0);
 
   function section(id: Section, meta: string | undefined, body: ReactNode) {
     return (
-      <CollapsiblePanel
+      <StatSection
+        key={id}
         title={t(`fittings.stats.section.${id}`)}
         meta={meta}
         expanded={expanded[id]}
         onToggle={() => toggle(id)}
-        labels={{ show: t('fittings.stats.show'), hide: t('fittings.stats.hide') }}
       >
         {body}
-      </CollapsiblePanel>
+      </StatSection>
     );
   }
 
+  function resistRows(s: FittingStats): ResistRow[] {
+    const layers = [
+      {
+        key: 'shield',
+        label: t('fittings.stats.shield'),
+        layer: s.shield,
+        hot: s.overheated?.shield,
+      },
+      { key: 'armor', label: t('fittings.stats.armor'), layer: s.armor, hot: s.overheated?.armor },
+      { key: 'hull', label: t('fittings.stats.hull'), layer: s.hull, hot: s.overheated?.hull },
+    ];
+    const rows: ResistRow[] = [];
+    for (const { key, label, layer, hot } of layers) {
+      rows.push({
+        key,
+        label,
+        sub: t('fittings.stats.layerHp', { hp: layer.hp.toFixed(0) }),
+        resonances: layer,
+        ehp: layer.ehp,
+      });
+      const changed =
+        hot !== undefined &&
+        RESIST_TYPES.some(
+          (type) =>
+            overheatedOrNull(
+              resistPct(layer[RESONANCE_KEY[type]]),
+              resistPct(hot[RESONANCE_KEY[type]]),
+              0
+            ) !== null
+        );
+      if (changed && hot) {
+        rows.push({
+          key: `${key}-hot`,
+          label: t('fittings.stats.overheatedRow'),
+          resonances: hot,
+          tone: 'overheated',
+        });
+      }
+    }
+    adaptedHardeners.forEach((resonances, index) =>
+      rows.push({
+        key: `rah-${index}`,
+        label: t('fittings.stats.rahRow'),
+        sub: profileName,
+        resonances,
+        tone: 'note',
+      })
+    );
+    return rows;
+  }
+
   return (
-    <div className="space-y-2">
-      {section(
-        'capacitor',
-        stats
-          ? stats.capacitor.stable
-            ? t('fittings.stats.capacitorStable', {
-                pct: stats.capacitor.stablePercentage.toFixed(0),
-              })
-            : t('fittings.stats.capacitorDepletes', {
-                seconds: stats.capacitor.depletesInSeconds.toFixed(0),
-              })
-          : undefined,
-        stats ? (
-          <div className="space-y-1 text-xs">
-            <p>
-              {t('fittings.stats.capacitorCapacity', { value: stats.capacitorCapacity.toFixed(0) })}
-            </p>
-            <p>
-              {t('fittings.stats.capacitorRecharge', {
-                seconds: (stats.capacitorRechargeTime / 1000).toFixed(0),
-              })}
-            </p>
-          </div>
-        ) : (
-          placeholder
-        )
+    <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
+      {heading && (
+        <div className="flex items-center justify-between gap-2 border-b border-line px-3 py-2 text-xs text-text-dim">
+          {heading}
+        </div>
       )}
 
       {section(
@@ -272,7 +380,7 @@ export function FittingStatsSections({
           : undefined,
         stats ? (
           stats.offense.weapons.length > 0 ? (
-            <ul className="space-y-1 text-xs">
+            <ul className="space-y-1.5 text-xs">
               {stats.offense.weapons.map((row) => (
                 <li key={weaponRowKey(row)} className="flex flex-wrap justify-between gap-x-2">
                   <span className="min-w-0">
@@ -324,40 +432,16 @@ export function FittingStatsSections({
       {section(
         'defense',
         stats ? t('fittings.stats.defenseEhp', { value: stats.ehp.toFixed(0) }) : undefined,
-        <div className="space-y-2">
+        <>
           <DamageProfilePicker damageProfiles={damageProfiles} />
           {stats ? (
             <>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <LayerCard
-                  title={t('fittings.stats.shield')}
-                  layer={stats.shield}
-                  overheated={stats.overheated?.shield}
-                />
-                <LayerCard
-                  title={t('fittings.stats.armor')}
-                  layer={stats.armor}
-                  overheated={stats.overheated?.armor}
-                  note={
-                    adaptedHardeners.length > 0
-                      ? t('fittings.stats.armorIncludesRah', { profile: profileName })
-                      : undefined
-                  }
-                />
-                <LayerCard
-                  title={t('fittings.stats.hull')}
-                  layer={stats.hull}
-                  overheated={stats.overheated?.hull}
-                />
-              </div>
-              {adaptedHardeners.map((resonances, index) => (
-                <div key={index} className="space-y-1 rounded-xs bg-panel-2 p-2">
-                  <p className="text-xs font-semibold text-text-dim">
-                    {t('fittings.stats.rahAdapted', { profile: profileName })}
-                  </p>
-                  <ResistBars resonances={resonances} />
-                </div>
-              ))}
+              <ResistTable rows={resistRows(stats)} />
+              {adaptedHardeners.length > 0 && (
+                <p className="text-xs text-text-dim">
+                  {t('fittings.stats.armorIncludesRah', { profile: profileName })}
+                </p>
+              )}
               <ul className="space-y-1 text-xs text-text-dim">
                 {overheatedEhp !== null && (
                   <li>
@@ -385,33 +469,74 @@ export function FittingStatsSections({
           ) : (
             placeholder
           )}
-        </div>
+        </>
+      )}
+
+      {section(
+        'capacitor',
+        stats
+          ? stats.capacitor.stable
+            ? t('fittings.stats.capacitorStable', {
+                pct: stats.capacitor.stablePercentage.toFixed(0),
+              })
+            : t('fittings.stats.capacitorDepletes', {
+                seconds: stats.capacitor.depletesInSeconds.toFixed(0),
+              })
+          : undefined,
+        stats ? (
+          <Facts
+            items={[
+              {
+                label: t('fittings.stats.fact.capacity'),
+                value: t('fittings.stats.unit.gj', { value: stats.capacitorCapacity.toFixed(0) }),
+              },
+              {
+                label: t('fittings.stats.fact.recharge'),
+                value: t('fittings.stats.unit.seconds', {
+                  value: (stats.capacitorRechargeTime / 1000).toFixed(0),
+                }),
+              },
+            ]}
+          />
+        ) : (
+          placeholder
+        )
       )}
 
       {section(
         'targeting',
-        undefined,
+        stats
+          ? t('fittings.stats.unit.km', {
+              value: (stats.targeting.maxTargetRange / 1000).toFixed(1),
+            })
+          : undefined,
         stats ? (
-          <ul className="space-y-1 text-xs text-text-dim">
-            <li>
-              {t('fittings.stats.maxTargetRange', {
-                value: (stats.targeting.maxTargetRange / 1000).toFixed(1),
-              })}
-            </li>
-            <li>
-              {t('fittings.stats.maxLockedTargets', { value: stats.targeting.maxLockedTargets })}
-            </li>
-            <li>
-              {t('fittings.stats.scanResolution', {
-                value: stats.targeting.scanResolution.toFixed(0),
-              })}
-            </li>
-            <li>
-              {t('fittings.stats.signatureRadius', {
-                value: stats.targeting.signatureRadius.toFixed(0),
-              })}
-            </li>
-          </ul>
+          <Facts
+            items={[
+              {
+                label: t('fittings.stats.fact.targetRange'),
+                value: t('fittings.stats.unit.km', {
+                  value: (stats.targeting.maxTargetRange / 1000).toFixed(1),
+                }),
+              },
+              {
+                label: t('fittings.stats.fact.lockedTargets'),
+                value: String(stats.targeting.maxLockedTargets),
+              },
+              {
+                label: t('fittings.stats.fact.scanResolution'),
+                value: t('fittings.stats.unit.mm', {
+                  value: stats.targeting.scanResolution.toFixed(0),
+                }),
+              },
+              {
+                label: t('fittings.stats.fact.signature'),
+                value: t('fittings.stats.unit.metres', {
+                  value: stats.targeting.signatureRadius.toFixed(0),
+                }),
+              },
+            ]}
+          />
         ) : (
           placeholder
         )
@@ -423,26 +548,44 @@ export function FittingStatsSections({
           ? t('fittings.stats.maxVelocityMeta', { value: stats.navigation.maxVelocity.toFixed(0) })
           : undefined,
         stats ? (
-          <ul className="space-y-1 text-xs text-text-dim">
-            <li>
-              {t('fittings.stats.maxVelocity', { value: stats.navigation.maxVelocity.toFixed(0) })}
-              <Overheated
-                value={overheatedOrNull(
-                  stats.navigation.maxVelocity,
-                  stats.overheated?.maxVelocity,
-                  0
-                )}
-                digits={0}
-              />
-            </li>
-            <li>{t('fittings.stats.agility', { value: stats.navigation.agility.toFixed(3) })}</li>
-            <li>
-              {t('fittings.stats.mass', { value: (stats.navigation.mass / 1000).toFixed(0) })}
-            </li>
-            <li>
-              {t('fittings.stats.warpSpeed', { value: stats.navigation.warpSpeed.toFixed(1) })}
-            </li>
-          </ul>
+          <Facts
+            items={[
+              {
+                label: t('fittings.stats.fact.maxVelocity'),
+                value: (
+                  <>
+                    {t('fittings.stats.maxVelocityMeta', {
+                      value: stats.navigation.maxVelocity.toFixed(0),
+                    })}
+                    <Overheated
+                      value={overheatedOrNull(
+                        stats.navigation.maxVelocity,
+                        stats.overheated?.maxVelocity,
+                        0
+                      )}
+                      digits={0}
+                    />
+                  </>
+                ),
+              },
+              {
+                label: t('fittings.stats.fact.agility'),
+                value: stats.navigation.agility.toFixed(3),
+              },
+              {
+                label: t('fittings.stats.fact.mass'),
+                value: t('fittings.stats.unit.tonnes', {
+                  value: (stats.navigation.mass / 1000).toFixed(0),
+                }),
+              },
+              {
+                label: t('fittings.stats.fact.warpSpeed'),
+                value: t('fittings.stats.unit.auPerSecond', {
+                  value: stats.navigation.warpSpeed.toFixed(1),
+                }),
+              },
+            ]}
+          />
         ) : (
           placeholder
         )
@@ -450,18 +593,29 @@ export function FittingStatsSections({
 
       {section(
         'drones',
-        stats ? t('fittings.stats.droneDps', { value: stats.droneDps.toFixed(1) }) : undefined,
+        stats ? t('fittings.stats.weaponDps', { value: stats.droneDps.toFixed(1) }) : undefined,
         stats ? (
-          <ul className="space-y-1 text-xs text-text-dim">
-            <li>{t('fittings.stats.droneDps', { value: stats.droneDps.toFixed(1) })}</li>
-            <li>
-              {t('fittings.stats.droneBandwidthLine', {
-                used: stats.droneBandwidthUsed.toFixed(0),
-                total: stats.droneBandwidthTotal.toFixed(0),
-              })}
-            </li>
-            <li>{t('fittings.stats.droneCapacity', { value: stats.droneCapacity.toFixed(0) })}</li>
-          </ul>
+          <Facts
+            items={[
+              {
+                label: t('fittings.stats.fact.droneDps'),
+                value: stats.droneDps.toFixed(1),
+              },
+              {
+                label: t('fittings.stats.fact.bandwidth'),
+                value: t('fittings.stats.unit.bandwidth', {
+                  used: stats.droneBandwidthUsed.toFixed(0),
+                  total: stats.droneBandwidthTotal.toFixed(0),
+                }),
+              },
+              {
+                label: t('fittings.stats.fact.droneBay'),
+                value: t('fittings.stats.unit.cubicMetres', {
+                  value: stats.droneCapacity.toFixed(0),
+                }),
+              },
+            ]}
+          />
         ) : (
           placeholder
         )
@@ -469,33 +623,45 @@ export function FittingStatsSections({
 
       {section(
         'fitting',
-        undefined,
+        stats
+          ? t('fittings.stats.fittingMeta', {
+              cpu: pctOf(stats.cpuUsed, stats.cpuTotal).toFixed(0),
+              pg: pctOf(stats.powergridUsed, stats.powergridTotal).toFixed(0),
+            })
+          : undefined,
         stats ? (
-          <ul className="space-y-1 text-xs text-text-dim">
-            <li>
-              {t('fittings.stats.cpuLine', {
-                used: stats.cpuUsed.toFixed(1),
-                total: stats.cpuTotal.toFixed(1),
-              })}
-            </li>
-            <li>
-              {t('fittings.stats.powergridLine', {
-                used: stats.powergridUsed.toFixed(1),
-                total: stats.powergridTotal.toFixed(1),
-              })}
-            </li>
-            <li>
-              {t('fittings.stats.calibrationLine', {
-                used: stats.calibrationUsed.toFixed(0),
-                total: stats.calibrationTotal.toFixed(0),
-              })}
-            </li>
+          <>
+            <Facts
+              items={[
+                {
+                  label: t('fittings.stats.fact.cpu'),
+                  value: t('fittings.stats.unit.usedOfTotal', {
+                    used: stats.cpuUsed.toFixed(1),
+                    total: stats.cpuTotal.toFixed(1),
+                  }),
+                },
+                {
+                  label: t('fittings.stats.fact.powergrid'),
+                  value: t('fittings.stats.unit.usedOfTotal', {
+                    used: stats.powergridUsed.toFixed(1),
+                    total: stats.powergridTotal.toFixed(1),
+                  }),
+                },
+                {
+                  label: t('fittings.stats.fact.calibration'),
+                  value: t('fittings.stats.unit.usedOfTotal', {
+                    used: stats.calibrationUsed.toFixed(0),
+                    total: stats.calibrationTotal.toFixed(0),
+                  }),
+                },
+              ]}
+            />
             {stats.unknownItemTypeIds.length > 0 && (
-              <li className="text-warning">
+              <p className="text-xs text-warning">
                 {t('fittings.stats.unknownItems', { count: stats.unknownItemTypeIds.length })}
-              </li>
+              </p>
             )}
-          </ul>
+          </>
         ) : (
           placeholder
         )
@@ -504,18 +670,32 @@ export function FittingStatsSections({
       {section(
         'price',
         price
-          ? t('fittings.stats.priceSellMeta', { value: price.totals.sell.toFixed(0) })
+          ? t('fittings.stats.unit.isk', { value: formatIskCompact(price.totals.sell) })
           : undefined,
         price ? (
-          <ul className="space-y-1 text-xs text-text-dim">
-            <li>{t('fittings.stats.priceBuy', { value: price.totals.buy.toFixed(0) })}</li>
-            <li>{t('fittings.stats.priceSell', { value: price.totals.sell.toFixed(0) })}</li>
+          <>
+            <Facts
+              items={[
+                {
+                  label: t('fittings.stats.fact.sell'),
+                  value: t('fittings.stats.unit.isk', {
+                    value: formatIskCompact(price.totals.sell),
+                  }),
+                },
+                {
+                  label: t('fittings.stats.fact.buy'),
+                  value: t('fittings.stats.unit.isk', {
+                    value: formatIskCompact(price.totals.buy),
+                  }),
+                },
+              ]}
+            />
             {price.totals.unpricedRows > 0 && (
-              <li className="text-warning">
+              <p className="text-xs text-warning">
                 {t('fittings.stats.priceUnpriced', { count: price.totals.unpricedRows })}
-              </li>
+              </p>
             )}
-          </ul>
+          </>
         ) : (
           <p className="text-xs text-text-dim">{t('fittings.stats.priceLoading')}</p>
         )

@@ -1,87 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  classifyRuleBreaks,
-  groupsHoldingRack,
-  searchCandidates,
-  type CandidateEntry,
-} from './candidates';
-
-const entries: CandidateEntry[] = [
-  { typeId: 1, name: 'Damage Control I', marketGroupId: 10 },
-  { typeId: 2, name: 'Damage Control II', marketGroupId: 10 },
-  { typeId: 3, name: '1MN Afterburner II', marketGroupId: 20 },
-  { typeId: 4, name: 'Hobgoblin I', marketGroupId: 30 },
-  { typeId: 5, name: 'EMP S', marketGroupId: 40 },
-];
-const rackOf: Record<string, 'low' | 'medium' | 'drone'> = {
-  1: 'low',
-  2: 'low',
-  3: 'medium',
-  4: 'drone',
-};
-const metaOf: Record<number, number> = { 1: 1, 2: 2, 3: 2 };
-
-describe('searchCandidates', () => {
-  const baseOptions = {
-    query: '',
-    rack: null,
-    rackOf,
-    groupIds: null,
-    metaGroupId: null,
-    metaGroupOf: (typeId: number) => metaOf[typeId] ?? null,
-  };
-
-  it('only ever offers fittable things (a rack, or a drone), never ammo or anything else', () => {
-    expect(searchCandidates(entries, baseOptions).map((e) => e.typeId)).toEqual([3, 1, 2, 4]);
-  });
-
-  it('sorts by name and matches the query case-insensitively on any part of the name', () => {
-    expect(
-      searchCandidates(entries, { ...baseOptions, query: 'control' }).map((e) => e.typeId)
-    ).toEqual([1, 2]);
-  });
-
-  it('narrows to one rack when "fits this slot" is on', () => {
-    expect(
-      searchCandidates(entries, { ...baseOptions, rack: 'medium' }).map((e) => e.typeId)
-    ).toEqual([3]);
-  });
-
-  it('narrows to the chosen market groups and meta group', () => {
-    expect(
-      searchCandidates(entries, { ...baseOptions, groupIds: new Set([10]) }).map((e) => e.typeId)
-    ).toEqual([1, 2]);
-    expect(
-      searchCandidates(entries, { ...baseOptions, metaGroupId: 2 }).map((e) => e.typeId)
-    ).toEqual([3, 2]);
-  });
-
-  it('caps the result count', () => {
-    expect(searchCandidates(entries, baseOptions, 2)).toHaveLength(2);
-  });
-});
-
-describe('groupsHoldingRack', () => {
-  const parentOf = new Map<number, number | null>([
-    [1, null],
-    [5, 1],
-    [10, 5],
-    [20, 5],
-    [30, 1],
-  ]);
-
-  it('is every group holding an item of that rack, plus their ancestors', () => {
-    expect([...groupsHoldingRack(entries, 'low', rackOf, parentOf)].sort((a, b) => a - b)).toEqual([
-      1, 5, 10,
-    ]);
-  });
-
-  it('with no rack, covers every fittable item', () => {
-    expect([...groupsHoldingRack(entries, null, rackOf, parentOf)].sort((a, b) => a - b)).toEqual([
-      1, 5, 10, 20, 30,
-    ]);
-  });
-});
+import { browserTree, classifyRuleBreaks, type CandidateEntry } from './candidates';
 
 describe('classifyRuleBreaks', () => {
   it('passes an item that only overflows a resource', () => {
@@ -98,4 +16,65 @@ describe('classifyRuleBreaks', () => {
       expect(classifyRuleBreaks([rule]).fitsHull).toBe(false);
     }
   );
+});
+
+describe('browserTree', () => {
+  // Ship Equipment ─┬─ Hull & Armor ── Armor Plates ─┬─ 100mm (items 1, 2)
+  //                 │                                └─ 200mm (item 3)
+  //                 └─ Propulsion ── Afterburners (item 4)
+  // Drones ── Combat Drones ── Light (item 5)
+  const groupsById = new Map([
+    [1, { id: 1, name: 'Ship Equipment', parentId: null, hasTypes: false }],
+    [2, { id: 2, name: 'Hull & Armor', parentId: 1, hasTypes: false }],
+    [3, { id: 3, name: 'Armor Plates', parentId: 2, hasTypes: false }],
+    [31, { id: 31, name: '100mm', parentId: 3, hasTypes: true }],
+    [32, { id: 32, name: '200mm', parentId: 3, hasTypes: true }],
+    [4, { id: 4, name: 'Propulsion', parentId: 1, hasTypes: false }],
+    [41, { id: 41, name: 'Afterburners', parentId: 4, hasTypes: true }],
+    [5, { id: 5, name: 'Drones', parentId: null, hasTypes: false }],
+    [51, { id: 51, name: 'Combat Drones', parentId: 5, hasTypes: false }],
+    [52, { id: 52, name: 'Light', parentId: 51, hasTypes: true }],
+  ]);
+  const items: CandidateEntry[] = [
+    { typeId: 2, name: '100mm Steel Plates II', marketGroupId: 31 },
+    { typeId: 1, name: '100mm Steel Plates I', marketGroupId: 31 },
+    { typeId: 3, name: '200mm Steel Plates I', marketGroupId: 32 },
+    { typeId: 4, name: '1MN Afterburner II', marketGroupId: 41 },
+    { typeId: 5, name: 'Hobgoblin II', marketGroupId: 52 },
+    { typeId: 9, name: 'Unknown group', marketGroupId: 999 },
+  ];
+
+  it('keeps the market hierarchy, counting what passes under each branch', () => {
+    const tree = browserTree(items, () => true, groupsById);
+    expect(tree.map((n) => [n.label, n.count])).toEqual([
+      ['Drones · Combat Drones · Light', 1],
+      ['Ship Equipment', 4],
+    ]);
+    const ship = tree[1];
+    expect(ship.children.map((n) => n.label)).toEqual([
+      'Hull & Armor · Armor Plates',
+      'Propulsion · Afterburners',
+    ]);
+    const plates = ship.children[0];
+    expect(plates.children.map((n) => [n.label, n.count])).toEqual([
+      ['100mm', 2],
+      ['200mm', 1],
+    ]);
+    expect(plates.children[0].items.map((e) => e.name)).toEqual([
+      '100mm Steel Plates I',
+      '100mm Steel Plates II',
+    ]);
+  });
+
+  it('prunes branches with nothing that passes, merging the chains left behind', () => {
+    const tree = browserTree(items, (e) => e.typeId === 3, groupsById);
+    expect(tree).toHaveLength(1);
+    expect(tree[0].label).toBe('Ship Equipment · Hull & Armor · Armor Plates · 200mm');
+    expect(tree[0].items.map((e) => e.typeId)).toEqual([3]);
+    expect(tree[0].children).toEqual([]);
+  });
+
+  it('is empty when nothing passes', () => {
+    expect(browserTree(items, () => false, groupsById)).toEqual([]);
+  });
 });

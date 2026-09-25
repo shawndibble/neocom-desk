@@ -191,9 +191,10 @@ describe('FittingStatsSections overheated lines elsewhere', () => {
     expect(defense.getByText('17400 overheated')).toBeInTheDocument();
     expect(defense.getByText('Armor repair: 63.2 HP/s')).toBeInTheDocument();
     expect(defense.getByText('81.8 overheated')).toBeInTheDocument();
-    // Only the shield EM resist moves under heat.
-    expect(defense.getAllByText(/% overheated$/)).toHaveLength(1);
-    expect(defense.getByText('60% overheated')).toBeInTheDocument();
+    // Only the shield moves under heat, so one overheated row, under it.
+    const hotRows = defense.getAllByRole('row', { name: /^Overheated/ });
+    expect(hotRows).toHaveLength(1);
+    expect(within(hotRows[0]).getByText('60%')).toBeInTheDocument();
     expect(within(sectionBody('Navigation')).queryByText(/overheated/)).toBeNull();
   });
 
@@ -208,9 +209,15 @@ describe('FittingStatsSections — Defense', () => {
   it('shows each layer with its raw HP and its EHP under the profile', () => {
     renderSections(stats(), damageProfiles());
 
-    expect(screen.getByText('Shield — 450 HP · 514 EHP')).toBeInTheDocument();
-    expect(screen.getByText('Armor — 405 HP · 3234 EHP')).toBeInTheDocument();
-    expect(screen.getByText('Hull — 350 HP · 871 EHP')).toBeInTheDocument();
+    for (const [layer, hp, ehp] of [
+      ['Shield', '450 HP', '514'],
+      ['Armor', '405 HP', '3234'],
+      ['Hull', '350 HP', '871'],
+    ]) {
+      const row = within(screen.getByRole('row', { name: new RegExp(`^${layer}`) }));
+      expect(row.getByText(hp)).toBeInTheDocument();
+      expect(row.getByText(ehp)).toBeInTheDocument();
+    }
     expect(screen.getByText('4619 EHP')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Damage profile' })).toHaveTextContent('Guristas');
   });
@@ -235,7 +242,9 @@ describe('FittingStatsSections — Defense', () => {
       damageProfiles()
     );
 
-    expect(screen.getByText('Reactive Armor Hardener — adapted to Guristas')).toBeInTheDocument();
+    const rah = within(screen.getByRole('row', { name: /^Reactive Armor Hardener/ }));
+    expect(rah.getByText('Guristas')).toBeInTheDocument();
+    expect(rah.getByText('30%')).toBeInTheDocument();
     expect(
       screen.getByText('Includes the Reactive Armor Hardener, adapted to Guristas.')
     ).toBeInTheDocument();

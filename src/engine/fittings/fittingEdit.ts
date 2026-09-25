@@ -129,6 +129,20 @@ export function setModuleCharge(
   });
 }
 
+/** Loads `chargeTypeId` into every fitted module of `moduleTypeId` — the browser's Charges tab. */
+export function loadChargeIntoAll(
+  fitting: Fitting,
+  moduleTypeId: number,
+  chargeTypeId: number
+): Fitting {
+  return {
+    ...fitting,
+    modules: fitting.modules.map((module) =>
+      module.typeId === moduleTypeId ? { ...module, chargeTypeId } : module
+    ),
+  };
+}
+
 /** The lowest position in a rack of `slotCount` slots nothing occupies, or null when it's full. */
 export function firstFreeSlotIndex(
   fitting: Fitting,
