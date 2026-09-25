@@ -1198,7 +1198,8 @@ export function Settings() {
   const { hash } = useLocation();
   const navigate = useNavigate();
   const [section] = usePageTab(SETTINGS_TABS);
-  const isIndex = useIsPageIndex(SETTINGS_TABS);
+  // An old `#shortcuts` link is about to be carried on to its section: skip the list.
+  const isIndex = useIsPageIndex(SETTINGS_TABS) && !Object.hasOwn(LEGACY_HASH_SECTIONS, hash);
   const corpAccess = useCorpAccess();
   const groups = useMemo(
     () => visibleSettingsGroups({ corp: corpAccess.state === 'ready' }),
@@ -1212,7 +1213,6 @@ export function Settings() {
     navigate({ pathname: tabPath(SETTINGS_TABS, target) }, { replace: true });
   }, [hash, navigate]);
 
-  // The index waits out a legacy hash: the effect above is about to move on.
   if (isIndex) {
     return (
       <div className="mx-auto max-w-6xl space-y-4">

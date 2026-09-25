@@ -78,7 +78,7 @@ export function SettingsIndex({ groups, summaries }: SettingsIndexProps) {
         <section key={group.id} aria-labelledby={`settings-index-${group.id}`}>
           <h2
             id={`settings-index-${group.id}`}
-            className="px-1 pb-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase"
+            className="px-1 pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase"
           >
             {t(group.labelKey)}
           </h2>
