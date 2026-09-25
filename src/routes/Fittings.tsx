@@ -65,8 +65,8 @@ import { useMediaQuery } from '@/lib/useMediaQuery';
 
 /**
  * Wide enough for browser | Ring | stats side by side: the 12rem nav, a 20rem
- * browser, a Ring column wide enough for its corner readouts (~41rem), and
- * 22rem of stats, with gaps and page padding.
+ * browser, a Ring column that shows the ring at (or near) its 36rem cap, and
+ * 22-26rem of stats, with gaps and page padding.
  */
 const THREE_COLUMN_QUERY = '(min-width: 100rem)';
 
@@ -331,6 +331,7 @@ export function Fittings() {
         <FittingRing
           fitting={fitting}
           stats={stats}
+          moduleResults={moduleResults}
           unusableModuleKeys={gaps?.unusableModuleKeys}
           typeName={typeName}
           onSlotSelect={selectSlot}
@@ -345,6 +346,9 @@ export function Fittings() {
           }
           compact={isPhone}
           onRackOpen={setRackSheet}
+          selectedSlot={
+            target?.kind === 'slot' ? { rack: target.slot, index: target.slotIndex } : null
+          }
           actions={addButton}
           droneButton={
             dronesShown ? (
@@ -528,15 +532,22 @@ export function Fittings() {
           </div>
         ) : (
           <div
-            // Docked: browser | Ring | stats. Otherwise Ring beside stats when
-            // wide, but stacked while the slide-out has pushed the page aside,
-            // so the Ring keeps the width rather than the stats.
+            // Docked: browser | Ring | stats. Otherwise the editor beside the
+            // stats when wide, but stacked while the slide-out has pushed the
+            // page aside, so the editor keeps the width rather than the stats.
+            // The Ring goes beside them from the desktop breakpoint — it is
+            // capped and square, so it fits beside 22rem of stats there (scope
+            // decision `20260925-095734`); the stats hold at 22rem until xl,
+            // since a track with a max grows to it before a 1fr one gets
+            // anything. The List's rows want the width, so it waits for xl.
             className={`grid items-start gap-3 ${
               addMode === 'docked'
                 ? 'grid-cols-[20rem_minmax(0,1fr)_minmax(22rem,26rem)]'
                 : addOpen
                   ? 'grid-cols-1'
-                  : 'grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]'
+                  : view === 'ring'
+                    ? 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]'
+                    : 'grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]'
             }`}
           >
             {addMode === 'docked' && (

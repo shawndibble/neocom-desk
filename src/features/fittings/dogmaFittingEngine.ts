@@ -51,14 +51,30 @@ export interface DogmaAssetProgress {
   totalBytes: number | null;
 }
 
+/**
+ * Whether a response is the binary asset rather than an error or the app's
+ * own HTML page — which a host's SPA fallback (or a dev server that started
+ * before the copy below it landed) answers a missing file with, as a 200.
+ */
+function isEngineAsset(response: Response): boolean {
+  return response.ok && !(response.headers.get('content-type') ?? '').includes('text/html');
+}
+
 async function fetchWithProgress(
   url: string,
   onProgress: (loadedBytes: number, totalBytes: number | null) => void
 ): Promise<ArrayBuffer> {
   const cache = await caches.open(CACHE_NAME);
   const cached = await cache.match(url);
-  const response = cached ?? (await fetch(url));
-  if (!cached && response.ok) await cache.put(url, response.clone());
+  // An HTML page cached by an earlier load is refetched, not served forever.
+  const usable = cached && isEngineAsset(cached) ? cached : undefined;
+  const response = usable ?? (await fetch(url));
+  if (!isEngineAsset(response)) {
+    throw new Error(
+      `${url}: not the engine asset (${response.status}, ${response.headers.get('content-type') ?? 'no type'})`
+    );
+  }
+  if (!usable) await cache.put(url, response.clone());
 
   const totalHeader = response.headers.get('content-length');
   const totalBytes = totalHeader ? Number(totalHeader) : null;
@@ -162,7 +178,7 @@ export async function computeFittingStats(
   const dogmaFit = fittingToDogmaFit(fitting, profile, damageProfile);
   const calculation = calculate(dogmaFit);
   const baseStats = extractFittingStats(
-    dogmaFit.items.map((item) => item.type_id),
+    dogmaFit.items,
     calculation.ship.attributes,
     calculation.items
   );

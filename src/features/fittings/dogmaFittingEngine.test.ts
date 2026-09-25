@@ -91,6 +91,36 @@ describe('loadDogmaEngine', () => {
     expect(sdeArg).toEqual(SDE_BYTES);
   });
 
+  it("rejects a 200 that is the app's HTML fallback page, and never caches it", async () => {
+    const { fetchMock, cache } = stubNetwork();
+    fetchMock.mockImplementation(
+      async () =>
+        new Response('<!doctype html><title>Neocom Desk</title>', {
+          status: 200,
+          headers: { 'content-type': 'text/html' },
+        })
+    );
+    const { loadDogmaEngine } = await freshModule();
+
+    await expect(loadDogmaEngine()).rejects.toThrow(/esf_dogma_engine_bg\.wasm|sde\.dat/);
+    expect(cache.put).not.toHaveBeenCalled();
+    expect(wasmInitMock).not.toHaveBeenCalled();
+  });
+
+  it('refetches over a cached HTML page left by an earlier, poisoned load', async () => {
+    const { fetchMock, store } = stubNetwork();
+    const html = () =>
+      new Response('<!doctype html>', { status: 200, headers: { 'content-type': 'text/html' } });
+    store.set('/vendor/dogma/esf_dogma_engine_bg.wasm', html());
+    store.set('/vendor/dogma/sde.dat', html());
+    const { loadDogmaEngine } = await freshModule();
+
+    await loadDogmaEngine();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(new Uint8Array(wasmInitMock.mock.calls[0][0].module_or_path)).toEqual(WASM_BYTES);
+  });
+
   it('reports combined progress across both downloads as bytes stream in', async () => {
     stubNetwork();
     const { loadDogmaEngine } = await freshModule();

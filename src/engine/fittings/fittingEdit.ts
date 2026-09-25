@@ -12,6 +12,7 @@
 import {
   FITTING_SLOT_KINDS,
   type Fitting,
+  type FittingCargoItem,
   type FittingDrone,
   type FittingItemState,
   type FittingModule,
@@ -214,6 +215,37 @@ export function addDrones(fitting: Fitting, typeId: number, quantity: number): F
     inSpace: current?.inSpace ?? 0,
     inBay: (current?.inBay ?? 0) + quantity,
   });
+}
+
+/**
+ * Sets how many of `typeId` the cargo holds, as one stack where the type
+ * first appeared; zero or less removes it.
+ */
+export function setCargoQuantity(fitting: Fitting, typeId: number, quantity: number): Fitting {
+  const whole = wholeCount(quantity);
+  const cargo: FittingCargoItem[] = [];
+  let placed = false;
+  for (const item of fitting.cargo) {
+    if (item.typeId !== typeId) {
+      cargo.push(item);
+    } else if (!placed) {
+      if (whole > 0) cargo.push({ typeId, quantity: whole });
+      placed = true;
+    }
+  }
+  return { ...fitting, cargo };
+}
+
+/**
+ * One entry per cargo type, first-seen order, however many stacks it arrived
+ * as (a paste can list a type twice) — what the editor shows and edits.
+ */
+export function cargoGroups(fitting: Fitting): FittingCargoItem[] {
+  const groups = new Map<number, number>();
+  for (const item of fitting.cargo) {
+    groups.set(item.typeId, (groups.get(item.typeId) ?? 0) + item.quantity);
+  }
+  return [...groups].map(([typeId, quantity]) => ({ typeId, quantity }));
 }
 
 /**

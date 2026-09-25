@@ -23,6 +23,12 @@ interface ItemCalculationResult {
   attributes: { size: number };
 }
 
+/** An item as `calculate()` was given it — the engine's own `FitItem` fields this seam reads. */
+interface CalculatedItem {
+  type_id: number;
+  slot: { type: string };
+}
+
 function readAttribute(attributes: AttributeMap, attributeId: number): number {
   return attributes.get(attributeId)?.value ?? 0;
 }
@@ -122,15 +128,19 @@ function layerDefense(
  * (verified against a live run of the pinned engine, 2026-09-24) — that's how
  * this seam tells an unresolvable item apart from a genuinely inert one,
  * which still carries its base SDE attributes.
+ *
+ * Cargo is never unknown: the engine calculates nothing for a cargo item, so
+ * every one — a missile stack the launchers already fire, say — comes back
+ * empty however well the data knows it.
  */
-function isUnknownItem(result: ItemCalculationResult): boolean {
-  return result.attributes.size === 0;
+function isUnknownItem(item: CalculatedItem, result: ItemCalculationResult): boolean {
+  return item.slot.type !== 'cargo' && result.attributes.size === 0;
 }
 
 /**
  * Reads the stats this ticket's fitting stats card needs off a calculation
- * (ADR 0016's seam). `itemTypeIds`/`itemResults` must be the same
- * index-parallel arrays `calculate()` was given and returned.
+ * (ADR 0016's seam). `items`/`itemResults` must be the same index-parallel
+ * arrays `calculate()` was given and returned.
  *
  * Leaves out `calibrationUsed`/`droneBandwidthUsed`: unlike everything here,
  * those are summed from *item*-level attributes on whichever items actually
@@ -139,7 +149,7 @@ function isUnknownItem(result: ItemCalculationResult): boolean {
  * has `dogmaFit.items`' slot types to know which items those are.
  */
 export function extractFittingStats(
-  itemTypeIds: readonly number[],
+  items: readonly CalculatedItem[],
   shipAttributes: AttributeMap,
   itemResults: readonly ItemCalculationResult[]
 ): Omit<
@@ -176,7 +186,9 @@ export function extractFittingStats(
       mass: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.mass),
       warpSpeed: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.warpSpeed),
     },
-    unknownItemTypeIds: itemTypeIds.filter((_, index) => isUnknownItem(itemResults[index])),
+    unknownItemTypeIds: items
+      .filter((item, index) => isUnknownItem(item, itemResults[index]))
+      .map((item) => item.type_id),
     slotCounts: {
       high: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.hiSlots),
       medium: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.medSlots),

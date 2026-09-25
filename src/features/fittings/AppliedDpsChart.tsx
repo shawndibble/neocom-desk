@@ -165,13 +165,10 @@ function Graph({
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <DataTable
-        columns={columns}
-        rows={rows}
-        rowKey={(row) => String(row.x)}
-        label={label}
-        className="sr-only"
-      />
+      {/* On a wrapper: a <table> ignores sr-only's clip and still stretches the page. */}
+      <div className="sr-only">
+        <DataTable columns={columns} rows={rows} rowKey={(row) => String(row.x)} label={label} />
+      </div>
     </div>
   );
 }
