@@ -34,7 +34,7 @@ describe('StandingsScopeNotice', () => {
     render(<StandingsScopeNotice />);
 
     await userEvent.click(
-      await screen.findByRole('button', { name: /log in again with eve online/i })
+      await screen.findByRole('button', { name: /log in to share standings/i })
     );
 
     expect(beginEveLogin).toHaveBeenCalledTimes(1);

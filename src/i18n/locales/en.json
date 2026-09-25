@@ -48,7 +48,7 @@
     "staleGrantAction": "Log in again with EVE Online",
     "standingsTitle": "Broker fees are assuming 0 standings",
     "standingsHint": "This character logged in before the app asked to read standings, so every NPC-station broker fee is calculated as if you had none. Log in again to share them and get accurate fees.",
-    "standingsAction": "Log in again with EVE Online",
+    "standingsAction": "Log in to share standings",
     "dismiss": "Dismiss"
   },
   "fittings": {
