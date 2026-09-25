@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import {
@@ -71,6 +71,8 @@ import { useContractSearchMode } from '@/features/contractSearch/contractSearchM
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, optionalEnumParam, textParam } from '@/lib/urlState';
 import { CONTRACTS_TABS } from '@/app/pageTabs';
+import { tabPath } from '@/lib/pageTabs';
+import type { TabRouteDefaultState } from '@/app/TabRoute';
 
 interface Snapshot {
   contractsResult: CachedResult<Contract[]> | null;
@@ -334,17 +336,53 @@ export function Contracts() {
    * A bare `/contracts` visit always redirects to `CONTRACTS_TABS`' hardcoded
    * `search/items` (issue #1719) — the route/tab itself stays unpersisted
    * (decision `20260912-141100`), so this only steps in once, right after
-   * that redirect, to swap for the last-used mode. Guarded to run exactly
-   * once per mount: every later `search/items` landing is the pilot's own
-   * choice (via `setMode` or the tab switcher), not the generic default, and
-   * must not be overridden.
+   * that redirect, to swap for the last-used mode.
+   *
+   * `tabId` alone can't tell that redirect apart from an explicit, bookmarked
+   * or shared deep link to the literal `/contracts/search/items` path — both
+   * resolve to the exact same `tabId`. `TabRoute`'s own `state` marker
+   * (`tabRouteDefaulted`) is the one signal that distinguishes them, since
+   * only `TabRoute` knows which case produced this landing; a deep link never
+   * carries it, so `landedOnDefault` is false and this never touches it.
+   *
+   * `navigate` directly, not `setTabId`/`setMode`: those always push a new
+   * history entry (`usePageTab`'s own contract, so an explicit tab switch is
+   * a place Back returns to) — a *silent* restore on first paint is not such
+   * a place, and pushing one here would leave a phantom Items entry behind
+   * Courier for Back to bounce off of. `state: null` unconditionally, even
+   * when the mode already matches (`rememberedMode` is `'items'`): the marker
+   * would otherwise ride along on every subsequent URL-param write for the
+   * rest of this mount (`useUrlParams`'s writes forward `location.state`
+   * verbatim), long after this effect has stopped reading it.
    */
+  const location = useLocation();
+  const navigate = useNavigate();
+  const landedOnDefault = Boolean(
+    (location.state as TabRouteDefaultState | null)?.tabRouteDefaulted
+  );
   const appliedRememberedMode = useRef(false);
   useEffect(() => {
     if (appliedRememberedMode.current || !rememberedModeHydrated) return;
     appliedRememberedMode.current = true;
-    if (tabId === 'search/items' && rememberedMode === 'courier') setTabId('search/courier');
-  }, [rememberedModeHydrated, rememberedMode, tabId, setTabId]);
+    if (!landedOnDefault) return;
+    const restoredTabId = rememberedMode === 'courier' ? 'search/courier' : tabId;
+    navigate(
+      {
+        pathname: tabPath(CONTRACTS_TABS, restoredTabId),
+        search: location.search,
+        hash: location.hash,
+      },
+      { replace: true, state: null }
+    );
+  }, [
+    rememberedModeHydrated,
+    landedOnDefault,
+    rememberedMode,
+    tabId,
+    location.search,
+    location.hash,
+    navigate,
+  ]);
   const pageTabs = useMemo(
     () => [
       { id: 'search' as const, label: t('contracts.searchTab') },

@@ -651,6 +651,29 @@ describe('Contracts tab strip (issue #908)', () => {
     expect(window.location.pathname).toBe('/contracts/search/items');
   });
 
+  it('never overrides an explicit deep link to Search Items with a remembered Courier mode', async () => {
+    // `tabId` reads identically for this and a bare `/contracts` visit
+    // (issue #1719) — only `TabRoute`'s own `tabRouteDefaulted` marker tells
+    // them apart, and a URL that already names a real tab never gets one.
+    useContractSearchMode.setState({ value: 'courier', hydrated: true });
+    window.history.pushState({}, '', '/contracts/search/items');
+    render(<App />);
+    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    expect(window.location.pathname).toBe('/contracts/search/items');
+  });
+
+  it('restores the remembered Courier mode via replace, leaving no extra history entry', async () => {
+    useContractSearchMode.setState({ value: 'courier', hydrated: true });
+    window.history.pushState({}, '', '/contracts');
+    const historyLengthBeforeRender = window.history.length;
+    render(<App />);
+    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
+    await waitFor(() => expect(window.location.pathname).toBe('/contracts/search/courier'));
+    // Neither TabRoute's own redirect nor the mode restore push — Back from
+    // Courier must land wherever the pilot was before this page, not on Items.
+    expect(window.history.length).toBe(historyLengthBeforeRender);
+  });
+
   it('leaves the History tab alone regardless of the remembered Search mode', async () => {
     useContractSearchMode.setState({ value: 'courier', hydrated: true });
     // beforeEach above already deep-links to History; restated for clarity.
