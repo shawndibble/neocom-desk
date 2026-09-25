@@ -1845,7 +1845,9 @@ describe('ContractSearchPanel — progressive loading', () => {
     renderWithRouter();
 
     expect(
-      await screen.findByRole('status', { name: 'Loading public contracts…' })
+      await screen.findByRole('status', {
+        name: 'Loading public contracts, this may take a moment.',
+      })
     ).toBeInTheDocument();
     offers.settle(cachedSnapshot([TRIT_FORGE]));
   });
@@ -1857,7 +1859,9 @@ describe('ContractSearchPanel — progressive loading', () => {
     loadPublicContractOffers.mockReturnValue(offers.promise);
     renderWithRouter();
 
-    await screen.findByRole('status', { name: 'Loading public contracts…' });
+    await screen.findByRole('status', {
+      name: 'Loading public contracts, this may take a moment.',
+    });
     expect(screen.queryByText('No public contracts synced yet')).not.toBeInTheDocument();
 
     offers.settle(cachedSnapshot([]));
