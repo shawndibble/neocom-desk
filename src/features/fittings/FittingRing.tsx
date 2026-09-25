@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Panel, Tooltip, TypeIcon } from '@/components/ui';
+import { Button, Panel, Tooltip, TypeIcon } from '@/components/ui';
+import { AddRow, Warn } from '@/components/ui/icons';
 import {
   RING_INNER_RADIUS,
   RING_OUTER_RADIUS,
@@ -34,6 +35,8 @@ const FULL_WIDTH = 760;
 /** The phone overview drops the readouts, so its box is just the ring. */
 const COMPACT_WIDTH = 640;
 const HEIGHT = 640;
+
+const MICRO_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
 /** Where each rim gauge runs, degrees clockwise from 12 o'clock, and how many ticks it has. */
 const GAUGES = {
@@ -121,21 +124,21 @@ function Readout({
   label,
   used,
   total,
-  unit,
+  valueKey,
   flash,
   className,
 }: {
   label: string;
   used: number | null;
   total: number | null;
-  unit: string;
-  flash?: ReturnType<typeof useOverBudgetFlash>;
+  /** `{{used}} / {{total}}` with the resource's unit. */
+  valueKey: string;
+  flash: ReturnType<typeof useOverBudgetFlash>;
   className: string;
 }) {
   const { t } = useTranslation();
   const known = used !== null && total !== null;
-  const overBudget = flash?.overBudget ?? false;
-  const flashKey = flash?.flashKey ?? 0;
+  const { overBudget, flashKey } = flash;
   return (
     <div
       role="meter"
@@ -144,16 +147,14 @@ function Readout({
       aria-valuemax={known ? total : undefined}
       className={`text-xs tabular-nums ${className}`}
     >
-      <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-        {label}
-      </p>
+      <p className={MICRO_LABEL}>{label}</p>
       <p
         key={flashKey}
         className={`rounded-xs text-sm ${overBudget ? 'font-semibold text-danger' : 'text-text'} ${flashKey > 0 && overBudget ? 'flash-danger' : ''}`}
       >
-        {known ? `${used.toFixed(1)} / ${total.toFixed(1)} ${unit}` : '…'}
+        {known ? t(valueKey, { used: used.toFixed(1), total: total.toFixed(1) }) : '…'}
       </p>
-      {overBudget && flash && (
+      {overBudget && (
         <p className="text-danger">
           {t('fittings.list.overBy', { amount: flash.overage.toFixed(1) })}
         </p>
@@ -182,60 +183,88 @@ function ShipRender({ typeId }: { typeId: number }) {
   );
 }
 
-interface SlotTileProps {
+/** What a slot will take, given which drops the ring handles at all. */
+interface DropHandlers {
+  onDropType?: FittingRingProps['onDropType'];
+  onMoveModule?: FittingRingProps['onMoveModule'];
+}
+
+/**
+ * Whether the drag in progress lands on this slot: its own rack only — an Add
+ * panel item when drops are handled, a fitted module when moves are and it
+ * isn't this slot's own. The one rule both the highlight and the drop read.
+ */
+function acceptsDrop(
+  payload: FittingDragPayload | null,
+  slot: RingSlot,
+  handlers: DropHandlers
+): boolean {
+  if (payload === null || payload.rack !== slot.rack) return false;
+  if (payload.kind === 'type') return handlers.onDropType !== undefined;
+  return handlers.onMoveModule !== undefined && payload.index !== slot.index;
+}
+
+interface SlotTileProps extends DropHandlers {
   slot: RingSlot;
   cantUse: boolean;
-  style: CSSProperties;
+  /** Where the tile sits; its frame turns with the ring by `angle`, the icon stays upright. */
+  position: CSSProperties;
+  angle: number;
   compact: boolean;
   typeName?: (typeId: number) => string;
   onSelect?: (rack: FittingSlotKind, index: number) => void;
-  onDropType?: FittingRingProps['onDropType'];
-  onMoveModule?: FittingRingProps['onMoveModule'];
-  /** The drag in progress would land here. */
-  dropReady: boolean;
 }
 
-function accepts(payload: FittingDragPayload | null, props: SlotTileProps): boolean {
-  if (payload === null || payload.rack !== props.slot.rack) return false;
-  if (payload.kind === 'type') return props.onDropType !== undefined;
-  return props.onMoveModule !== undefined && payload.index !== props.slot.index;
-}
-
-function SlotTile(props: SlotTileProps) {
-  const { slot, cantUse, style, compact, typeName, onSelect, onDropType, onMoveModule, dropReady } =
-    props;
+function SlotTile({
+  slot,
+  cantUse,
+  position,
+  angle,
+  compact,
+  typeName,
+  onSelect,
+  onDropType,
+  onMoveModule,
+}: SlotTileProps) {
   const { t } = useTranslation();
   const [over, setOver] = useState(false);
+  const drag = useFittingDrag((state) => state.payload);
+  const handlers = { onDropType, onMoveModule };
   const { module } = slot;
+  const nameOf = (typeId: number) => typeName?.(typeId) ?? `#${typeId}`;
   const rackLabel = t(`fittings.list.rack.${slot.rack}`);
   const index = slot.index + 1;
   const state = module ? t(`fittings.list.moduleState.${module.state}`) : '';
   const label = module
     ? `${t('fittings.ring.slotFitted', { rack: rackLabel, index, state })}${cantUse ? `, ${t('fittings.list.cantUse')}` : ''}`
     : t('fittings.ring.slotEmpty', { rack: rackLabel, index });
-  const name = module ? (typeName?.(module.typeId) ?? `#${module.typeId}`) : '';
+  const emptyTooltipKey = compact
+    ? 'fittings.ring.tooltipEmptyCompact'
+    : onDropType
+      ? 'fittings.ring.tooltipEmpty'
+      : 'fittings.ring.tooltipEmptyClick';
   const tooltip = module
     ? [
-        t('fittings.ring.tooltipFitted', { rack: rackLabel, index, name, state }),
+        t('fittings.ring.tooltipFitted', {
+          rack: rackLabel,
+          index,
+          name: nameOf(module.typeId),
+          state,
+        }),
         module.chargeTypeId !== undefined
-          ? t('fittings.ring.tooltipCharge', {
-              name: typeName?.(module.chargeTypeId) ?? `#${module.chargeTypeId}`,
-            })
+          ? t('fittings.ring.tooltipCharge', { name: nameOf(module.chargeTypeId) })
           : null,
         cantUse ? t('fittings.ring.tooltipCantUse') : null,
       ]
         .filter(Boolean)
         .join('\n')
-    : t(compact ? 'fittings.ring.tooltipEmptyCompact' : 'fittings.ring.tooltipEmpty', {
-        rack: rackLabel,
-        index,
-      });
+    : t(emptyTooltipKey, { rack: rackLabel, index });
 
   const border = over
     ? 'border-accent ring-2 ring-accent/50'
     : cantUse
       ? 'border-danger'
-      : dropReady
+      : acceptsDrop(drag, slot, handlers)
         ? 'border-dashed border-accent'
         : module
           ? 'border-line-bright'
@@ -244,16 +273,17 @@ function SlotTile(props: SlotTileProps) {
   const interactive = !compact && onSelect !== undefined;
 
   function handleDragOver(event: DragEvent) {
-    if (!accepts(activeFittingDrag(event), props)) return;
+    const payload = activeFittingDrag(event);
+    if (!acceptsDrop(payload, slot, handlers)) return;
     event.preventDefault();
-    event.dataTransfer.dropEffect = activeFittingDrag(event)?.kind === 'type' ? 'copy' : 'move';
+    event.dataTransfer.dropEffect = payload?.kind === 'type' ? 'copy' : 'move';
     setOver(true);
   }
 
   function handleDrop(event: DragEvent) {
     const payload = activeFittingDrag(event);
     setOver(false);
-    if (payload === null || !accepts(payload, props)) return;
+    if (payload === null || !acceptsDrop(payload, slot, handlers)) return;
     event.preventDefault();
     if (payload.kind === 'type') onDropType?.(slot.rack, slot.index, payload.typeId);
     else onMoveModule?.(slot.rack, payload.index, slot.index);
@@ -265,8 +295,8 @@ function SlotTile(props: SlotTileProps) {
       <button
         type="button"
         aria-label={label}
-        className={`absolute flex items-center justify-center border bg-bg/90 ${border} ${interactive ? 'cursor-pointer hover:border-accent' : ''} ${draggable ? 'active:cursor-grabbing' : ''}`}
-        style={style}
+        className={`absolute border bg-bg ${border} ${interactive ? 'cursor-pointer hover:border-accent' : ''} ${draggable ? 'active:cursor-grabbing' : ''}`}
+        style={{ ...position, transform: `rotate(${angle.toFixed(1)}deg)` }}
         onClick={interactive ? () => onSelect(slot.rack, slot.index) : undefined}
         draggable={draggable}
         onDragStart={
@@ -277,34 +307,37 @@ function SlotTile(props: SlotTileProps) {
         }
         onDragEnd={draggable ? endFittingDrag : undefined}
         onDragOver={handleDragOver}
-        onDragLeave={() => setOver(false)}
+        // Moving onto the tile's own icon fires dragleave on the tile; only leaving it counts.
+        onDragLeave={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(false);
+        }}
         onDrop={handleDrop}
       >
-        {module && (
-          <TypeIcon
-            typeId={module.typeId}
-            size={64}
-            className={`h-4/5 w-4/5 ${module.state === 'offline' ? 'opacity-35 grayscale' : ''}`}
-          />
-        )}
-        {!module && (
-          <span aria-hidden="true" className="text-lg leading-none text-text-dim">
-            +
-          </span>
-        )}
-        {module?.chargeTypeId !== undefined && (
-          <span className="absolute -right-1 -bottom-1 h-2/5 w-2/5 border border-line bg-panel">
-            <TypeIcon typeId={module.chargeTypeId} size={32} className="h-full w-full" />
-          </span>
-        )}
-        {cantUse && (
-          <span
-            aria-hidden="true"
-            className="absolute -top-1.5 -right-1.5 rounded-xs bg-danger px-0.5 text-[0.625rem] leading-tight font-bold text-bg"
-          >
-            !
-          </span>
-        )}
+        {/* Counter-turned so the module reads upright wherever its tile sits, as in the game. */}
+        <span
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ transform: `rotate(${(-angle).toFixed(1)}deg)` }}
+        >
+          {module ? (
+            <TypeIcon
+              typeId={module.typeId}
+              size={64}
+              className={`h-[70%] w-[70%] ${module.state === 'offline' ? 'opacity-35 grayscale' : ''}`}
+            />
+          ) : (
+            <AddRow aria-hidden className="text-text-dim" />
+          )}
+          {module?.chargeTypeId !== undefined && (
+            <span className="absolute right-0 bottom-0 h-2/5 w-2/5 border border-line bg-panel">
+              <TypeIcon typeId={module.chargeTypeId} size={32} className="h-full w-full" />
+            </span>
+          )}
+          {cantUse && (
+            <span className="absolute top-0 right-0 flex bg-danger text-bg">
+              <Warn aria-hidden />
+            </span>
+          )}
+        </span>
       </button>
     </Tooltip>
   );
@@ -337,7 +370,6 @@ export function FittingRing({
   const { t } = useTranslation();
   const layout = stats?.slotCounts ?? null;
   const slots = buildRingSlots(fitting, layout);
-  const drag = useFittingDrag((state) => state.payload);
 
   const width = compact ? COMPACT_WIDTH : FULL_WIDTH;
   const cx = width / 2;
@@ -347,20 +379,25 @@ export function FittingRing({
   const cpuTotal = stats?.cpuTotal ?? null;
   const pgUsed = stats?.powergridUsed ?? null;
   const pgTotal = stats?.powergridTotal ?? null;
+  const calUsed = stats?.calibrationUsed ?? null;
+  const calTotal = stats?.calibrationTotal ?? null;
+  const bwUsed = stats?.droneBandwidthUsed ?? null;
+  const bwTotal = stats?.droneBandwidthTotal ?? null;
   const cpu = useOverBudgetFlash(cpuUsed, cpuTotal);
   const pg = useOverBudgetFlash(pgUsed, pgTotal);
+  const cal = useOverBudgetFlash(calUsed, calTotal);
+  const bw = useOverBudgetFlash(bwUsed, bwTotal);
 
   const cantUse = (slot: RingSlot) =>
     slot.module !== undefined && (unusableModuleKeys?.has(moduleKey(slot.module)) ?? false);
 
-  function tileStyle(angle: number): CSSProperties {
+  function tilePosition(angle: number): CSSProperties {
     const p = ringPoint(angle, RING_SLOT_RADIUS);
     return {
       left: pct(cx + p.x - RING_TILE / 2, width),
       top: pct(cy + p.y - RING_TILE / 2, HEIGHT),
       width: pct(RING_TILE, width),
       height: pct(RING_TILE, HEIGHT),
-      transform: `rotate(${angle.toFixed(1)}deg)`,
     };
   }
 
@@ -382,13 +419,14 @@ export function FittingRing({
     onDropType,
     onMoveModule,
   };
-  const dropReady = (slot: RingSlot) =>
-    drag !== null &&
-    drag.rack === slot.rack &&
-    (drag.kind === 'type' ? onDropType !== undefined : drag.index !== slot.index);
+  // The phone edits through a sheet per rack; a T3's subsystems get one too.
+  const sheetRacks: FittingSlotKind[] =
+    subsystems.length > 0 ? [...RING_RACKS, 'subsystem'] : [...RING_RACKS];
 
   const disc = RING_INNER_RADIUS;
-  // Corner readouts only once the ring is wide enough that they clear the rim.
+  // Corner readouts only once the ring is wide enough (650px) that they clear
+  // the rim. Tailwind only sees whole class names in source, so the
+  // `@min-[40.625rem]:` prefix is spelled out on each class, not composed.
   const corner = '@min-[40.625rem]:absolute';
 
   return (
@@ -409,7 +447,6 @@ export function FittingRing({
               }}
             >
               <ShipRender typeId={fitting.shipTypeId} />
-              <div className="absolute inset-0 rounded-full shadow-[inset_0_0_70px_24px_rgba(10,14,20,0.9)]" />
             </div>
             <svg
               viewBox={`0 0 ${width} ${HEIGHT}`}
@@ -427,18 +464,18 @@ export function FittingRing({
               <circle cx={cx} cy={cy} r={RING_INNER_RADIUS} className="fill-none stroke-line" />
               <RimGauge
                 gauge={GAUGES.calibration}
-                used={stats?.calibrationUsed ?? null}
-                total={stats?.calibrationTotal ?? null}
-                overBudget={false}
+                used={calUsed}
+                total={calTotal}
+                overBudget={cal.overBudget}
                 tone="dim"
                 cx={cx}
                 cy={cy}
               />
               <RimGauge
                 gauge={GAUGES.droneBandwidth}
-                used={stats?.droneBandwidthUsed ?? null}
-                total={stats?.droneBandwidthTotal ?? null}
-                overBudget={false}
+                used={bwUsed}
+                total={bwTotal}
+                overBudget={bw.overBudget}
                 tone="dim"
                 cx={cx}
                 cy={cy}
@@ -462,24 +499,30 @@ export function FittingRing({
                 cy={cy}
               />
             </svg>
-            {ghosts.map(({ rack, index }) => (
-              <span
-                key={`ghost-${rack}-${index}`}
-                aria-hidden="true"
-                className="absolute border border-line/60 bg-bg/40"
-                style={tileStyle(ringSlotAngle(rack, index))}
-              />
-            ))}
-            {ringSlots.map((slot) => (
-              <SlotTile
-                key={`${slot.rack}-${slot.index}`}
-                {...tileProps}
-                slot={slot}
-                cantUse={cantUse(slot)}
-                dropReady={dropReady(slot)}
-                style={tileStyle(ringSlotAngle(slot.rack, slot.index))}
-              />
-            ))}
+            {ghosts.map(({ rack, index }) => {
+              const angle = ringSlotAngle(rack, index);
+              return (
+                <span
+                  key={`ghost-${rack}-${index}`}
+                  aria-hidden="true"
+                  className="absolute border border-line/60 bg-bg/40"
+                  style={{ ...tilePosition(angle), transform: `rotate(${angle.toFixed(1)}deg)` }}
+                />
+              );
+            })}
+            {ringSlots.map((slot) => {
+              const angle = ringSlotAngle(slot.rack, slot.index);
+              return (
+                <SlotTile
+                  key={`${slot.rack}-${slot.index}`}
+                  {...tileProps}
+                  slot={slot}
+                  cantUse={cantUse(slot)}
+                  position={tilePosition(angle)}
+                  angle={angle}
+                />
+              );
+            })}
           </div>
 
           {!compact && (
@@ -488,16 +531,18 @@ export function FittingRing({
             >
               <Readout
                 label={t('fittings.list.calibration')}
-                used={stats?.calibrationUsed ?? null}
-                total={stats?.calibrationTotal ?? null}
-                unit=""
+                used={calUsed}
+                total={calTotal}
+                valueKey="fittings.ring.readoutCalibration"
+                flash={cal}
                 className={`${corner} @min-[40.625rem]:top-0 @min-[40.625rem]:left-0`}
               />
               <Readout
                 label={t('fittings.list.droneBandwidth')}
-                used={stats?.droneBandwidthUsed ?? null}
-                total={stats?.droneBandwidthTotal ?? null}
-                unit="Mbit/s"
+                used={bwUsed}
+                total={bwTotal}
+                valueKey="fittings.ring.readoutDroneBandwidth"
+                flash={bw}
                 className={`${corner} @min-[40.625rem]:top-0 @min-[40.625rem]:right-0 @min-[40.625rem]:text-right`}
               />
               {/* `contents` keeps the two as grid cells when narrow; wide, they stack in the corner. */}
@@ -508,7 +553,7 @@ export function FittingRing({
                   label={t('fittings.list.cpu')}
                   used={cpuUsed}
                   total={cpuTotal}
-                  unit="tf"
+                  valueKey="fittings.ring.readoutCpu"
                   flash={cpu}
                   className=""
                 />
@@ -516,7 +561,7 @@ export function FittingRing({
                   label={t('fittings.list.powergrid')}
                   used={pgUsed}
                   total={pgTotal}
-                  unit="MW"
+                  valueKey="fittings.ring.readoutPowergrid"
                   flash={pg}
                   className=""
                 />
@@ -529,16 +574,16 @@ export function FittingRing({
           <>
             <p className="text-center text-xs text-text-dim">{t('fittings.ring.rackHint')}</p>
             <div className="grid grid-cols-2 gap-2">
-              {RING_RACKS.map((rack) => {
-                const inRack = ringSlots.filter((slot) => slot.rack === rack);
+              {sheetRacks.map((rack) => {
+                const inRack = slots.filter((slot) => slot.rack === rack);
                 const fitted = inRack.filter((slot) => slot.module !== undefined).length;
                 const blocked = inRack.filter(cantUse).length;
                 return (
-                  <button
+                  <Button
                     key={rack}
-                    type="button"
+                    size="md"
+                    className={`w-full justify-between ${blocked > 0 ? 'border-danger' : ''}`}
                     onClick={() => onRackOpen(rack)}
-                    className={`flex min-h-12 items-center justify-between border bg-panel-2 px-3 text-sm font-semibold ${blocked > 0 ? 'border-danger' : 'border-line'}`}
                   >
                     <span>{t(`fittings.list.rack.${rack}`)}</span>
                     <span
@@ -550,7 +595,7 @@ export function FittingRing({
                       })}
                       {blocked > 0 && ` · ${t('fittings.ring.rackCantUse', { count: blocked })}`}
                     </span>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -559,9 +604,7 @@ export function FittingRing({
 
         {subsystems.length > 0 && (
           <div>
-            <p className="mb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('fittings.list.rack.subsystem')}
-            </p>
+            <p className={MICRO_LABEL}>{t('fittings.list.rack.subsystem')}</p>
             <div className="flex flex-wrap gap-2">
               {subsystems.map((slot) => (
                 <div key={slot.index} className="relative h-11 w-11">
@@ -569,8 +612,8 @@ export function FittingRing({
                     {...tileProps}
                     slot={slot}
                     cantUse={cantUse(slot)}
-                    dropReady={dropReady(slot)}
-                    style={{ inset: 0 }}
+                    position={{ inset: 0 }}
+                    angle={0}
                   />
                 </div>
               ))}

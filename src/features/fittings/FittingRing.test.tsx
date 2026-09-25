@@ -102,8 +102,21 @@ describe('FittingRing', () => {
     expect(onSlotSelect).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /^High slots\s*1 \/ 3$/ }));
     expect(onRackOpen).toHaveBeenCalledWith('high');
+    // A T3's subsystems get a sheet of their own.
+    fireEvent.click(screen.getByRole('button', { name: /^Subsystems\s*0 \/ 5$/ }));
+    expect(onRackOpen).toHaveBeenCalledWith('subsystem');
     // No corner readouts on the overview — the List bars carry those numbers.
     expect(screen.queryByRole('meter', { name: 'CPU' })).toBeNull();
+  });
+
+  it('flags over-used calibration, not just CPU and powergrid', () => {
+    render(
+      <FittingRing
+        fitting={fitting}
+        stats={{ ...statsWith(10), calibrationUsed: 450, calibrationTotal: 400 }}
+      />
+    );
+    expect(screen.getByText('Over by 50.0')).toBeTruthy();
   });
 
   it('states the overage in words and flashes the readout once when over budget', () => {

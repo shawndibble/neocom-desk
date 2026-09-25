@@ -276,8 +276,17 @@ export function Fittings() {
                 unusableModuleKeys={gaps?.unusableModuleKeys}
                 typeName={(typeId) => catalogue?.types[String(typeId)]?.name ?? `#${typeId}`}
                 onSlotSelect={selectSlot}
-                onDropType={(rack, index, typeId) => edit((f) => addModule(f, rack, index, typeId))}
-                onMoveModule={(rack, from, to) => edit((f) => moveModule(f, rack, from, to))}
+                // Drag is pointer-only: a touch tablet taps a slot and picks instead.
+                onDropType={
+                  isDesktop
+                    ? (rack, index, typeId) => edit((f) => addModule(f, rack, index, typeId))
+                    : undefined
+                }
+                onMoveModule={
+                  isDesktop
+                    ? (rack, from, to) => edit((f) => moveModule(f, rack, from, to))
+                    : undefined
+                }
                 compact={isPhone}
                 onRackOpen={setRackSheet}
               />
