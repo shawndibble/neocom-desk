@@ -10,6 +10,16 @@ export interface MarketFocusSearchState {
 }
 
 /**
+ * Router `location.state` shape a Fitting's Export menu navigates
+ * `/market/appraisal` with: the multibuy text to appraise on arrival. Shared
+ * so the producer (`features/fittings`) and the consumer (`routes/Market.tsx`)
+ * can't silently drift apart.
+ */
+export interface MarketAppraiseState {
+  readonly appraiseText: string;
+}
+
+/**
  * Marks an element that owns the keyboard while it is on screen but is not a
  * native `<dialog>` and carries no menu/listbox/dialog role the guard in
  * `app/useKeyboardShortcuts.ts` already recognises — today that means the
