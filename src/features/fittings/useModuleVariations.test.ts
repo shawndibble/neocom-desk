@@ -64,7 +64,7 @@ const fitting: Fitting = {
   cargo: [],
 };
 
-const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [] };
+const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] };
 
 const catalogue: FittingCatalogue = {
   types: {
@@ -153,7 +153,11 @@ describe('useModuleVariations', () => {
     checkCandidates.mockReturnValue(new Map([[101, { fitsHull: true, canFly: true }]]));
     getHubPrices.mockResolvedValue(new Map());
 
-    const otherProfile: PilotProfile = { skillLevels: new Map([[1, 5]]), implantTypeIds: [] };
+    const otherProfile: PilotProfile = {
+      skillLevels: new Map([[1, 5]]),
+      implantTypeIds: [],
+      boosterTypeIds: [],
+    };
     const { result, rerender } = renderHook(
       (p: PilotProfile) =>
         useModuleVariations({

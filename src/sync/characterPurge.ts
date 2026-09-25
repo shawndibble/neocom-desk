@@ -45,6 +45,7 @@ export const REMOTE_COLLECTIONS = [
   'stationPins',
   'planetRichness',
   'payees',
+  'fittings',
   'miningTaxAssignments',
   'settings',
   'notificationFeed',

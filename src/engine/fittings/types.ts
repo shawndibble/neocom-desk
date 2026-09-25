@@ -41,11 +41,17 @@ export interface FittingCargoItem {
   quantity: number;
 }
 
+/** An implant/booster set a Fitting carries, EVE's own slot order. */
+export interface FittingImplantSet {
+  implants: readonly number[];
+  boosters: readonly number[];
+}
+
 /**
  * One ship hull plus everything loaded into it (CONTEXT.md **Fitting**).
- * Implants are deliberately not here: for this ticket they always come from
- * the active Character's clone, via `PilotProfile` — a later ticket adds the
- * option for a Fitting to carry its own implant/booster set.
+ * `implantSet`, when carried, is what a "Fitting's" implant basis toggle
+ * reads from; `undefined` means stats fall back to the active Character's
+ * clone via `PilotProfile` instead.
  */
 export interface Fitting {
   name: string;
@@ -53,18 +59,24 @@ export interface Fitting {
   modules: FittingModule[];
   drones: FittingDrone[];
   cargo: FittingCargoItem[];
+  implantSet?: FittingImplantSet;
 }
 
 /**
  * The skills and implants a Fitting's stats are worked out under. Built from
  * the active Character (trained skills at Effective Skill Level, implants
  * from the active clone) or, for the logged-out share view, `buildAllVProfile`.
+ * `boosterTypeIds` is always empty from those two builders — ESI exposes no
+ * "active booster" read — and only becomes non-empty via `applyImplantBasis`
+ * switching to a Fitting's own carried set.
  */
 export interface PilotProfile {
   /** Effective Skill Level (CONTEXT.md) per skill type id. Missing = untrained. */
   skillLevels: Map<number, number>;
   /** Type ids of the implants in play, EVE's own implant-slot order. */
   implantTypeIds: readonly number[];
+  /** Type ids of the combat boosters in play, EVE's own booster-slot order. */
+  boosterTypeIds: readonly number[];
 }
 
 export type CapacitorStatus =

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -6,6 +6,7 @@ import '@/i18n';
 import { db } from '@/db';
 import { SCOPES } from '@/esi/scopes';
 import { assignLocation } from '@/app/navigation';
+import { PLAY_STORE_PACKAGE } from '@/lib/playStoreApp';
 import { Login } from './Login';
 
 vi.mock('@/app/navigation', () => ({ assignLocation: vi.fn() }));
@@ -64,6 +65,8 @@ function renderLogin() {
   );
 }
 
+afterEach(() => vi.restoreAllMocks());
+
 beforeEach(async () => {
   vi.mocked(assignLocation).mockClear();
   vi.stubEnv('VITE_EVE_CLIENT_ID', 'test-client-id');
@@ -73,6 +76,20 @@ beforeEach(async () => {
 });
 
 describe('Login', () => {
+  it('shows only logo, name and the sign-in button in the Play Store app', async () => {
+    vi.spyOn(document, 'referrer', 'get').mockReturnValue(`android-app://${PLAY_STORE_PACKAGE}`);
+    renderLogin();
+    expect(await screen.findAllByRole('button', { name: /log in with eve online/i })).toHaveLength(
+      1
+    );
+    expect(screen.queryByRole('heading', { name: /answers, not api dumps/i })).toBeNull();
+    expect(screen.getByRole('heading', { name: 'Neocom Desk' })).toBeInTheDocument();
+    expect(screen.queryByText(/signing in lets it read/i)).toBeNull();
+    expect(
+      screen.getByRole('button', { name: /log in with custom permissions/i })
+    ).toBeInTheDocument();
+  });
+
   it('shows the app name, hero heading and SSO button', async () => {
     renderLogin();
     expect(
@@ -313,13 +330,15 @@ describe('Login', () => {
     await waitFor(() => expect(assignLocation).toHaveBeenCalledTimes(1));
   });
 
-  it('opens the Customize permissions dialog from the link under the login button (#1522)', async () => {
+  it('opens the custom permissions dialog from the link under the login button (#1522)', async () => {
     const user = userEvent.setup();
     renderLogin();
-    const [firstLink] = await screen.findAllByRole('button', { name: /customize permissions/i });
+    const [firstLink] = await screen.findAllByRole('button', {
+      name: /log in with custom permissions/i,
+    });
     await user.click(firstLink);
 
-    const dialog = await screen.findByRole('dialog', { name: /customize permissions/i });
+    const dialog = await screen.findByRole('dialog', { name: /log in with custom permissions/i });
     expect(within(dialog).getByRole('checkbox', { name: 'Wallet' })).toBeChecked();
     expect(within(dialog).getByRole('checkbox', { name: /skills & skill queue/i })).toBeDisabled();
   });

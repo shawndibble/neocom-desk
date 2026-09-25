@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import 'fake-indexeddb/auto';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { db } from '@/db';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter, useLocation, useNavigate, useNavigationType } from 'react-router-dom';
@@ -13,6 +16,7 @@ vi.mock('@/sde/loadSde', () => ({
   loadSkills: async () => [],
   loadFittingSlots: async () => ({}),
 }));
+vi.mock('@/sync', () => ({ scheduleSync: vi.fn(), markFittingDeleted: vi.fn() }));
 vi.mock('./fittingPrice', () => ({ loadFittingPrice: async () => null }));
 const computeFittingStats = vi.fn(async (fitting: Fitting) => ({
   modules: fitting.modules.map(() => ({ state: 'online', maxState: 'online', chargeGroupIds: [] })),
@@ -148,5 +152,53 @@ describe('useFittingWorkspace editing', () => {
     await waitFor(() =>
       expect(view.result.current.workspace.statsFitting).toBe(view.result.current.workspace.fitting)
     );
+  });
+});
+
+describe('useFittingWorkspace saving (My Fittings)', () => {
+  beforeEach(async () => {
+    await db.fittings.clear();
+    useActiveCharacter.setState({ activeCharacterId: 7 });
+  });
+
+  it('never writes an unsaved edit to Dexie', async () => {
+    const view = await renderAt(RIFTER);
+    act(() => view.result.current.workspace.edit((f) => addModule(f, 'medium', 0, 438)));
+    await waitFor(() => expect(view.result.current.navigationType).toBe('PUSH'));
+    expect(await db.fittings.count()).toBe(0);
+  });
+
+  it('save stores the current code once, then updates the same record', async () => {
+    const view = await renderAt(RIFTER);
+    await act(() => view.result.current.workspace.save());
+    expect(await db.fittings.count()).toBe(1);
+    const first = (await db.fittings.toArray())[0]!;
+    expect(first).toMatchObject({ characterId: 7, name: 'Rifter' });
+
+    act(() => view.result.current.workspace.edit((f) => addModule(f, 'medium', 0, 438)));
+    await act(() => view.result.current.workspace.save());
+    const rows = await db.fittings.toArray();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.id).toBe(first.id);
+    expect(rows[0]!.code).not.toBe(first.code);
+  });
+
+  it('cannot save without a Character', async () => {
+    useActiveCharacter.setState({ activeCharacterId: null });
+    const view = await renderAt(RIFTER);
+    expect(view.result.current.workspace.canSave).toBe(false);
+  });
+
+  it('opens a saved Fitting under its saved name and keeps its record for the next save', async () => {
+    const view = await renderAt(RIFTER);
+    const encoded = await encodeFittingShare(
+      fittingToShareInput(addModule(RIFTER, 'medium', 0, 438))
+    );
+    if (!encoded.ok) throw new Error('encode failed');
+    act(() =>
+      view.result.current.workspace.openSaved({ id: 'r1', name: 'My kite', code: encoded.payload })
+    );
+    await waitFor(() => expect(view.result.current.workspace.fitting?.name).toBe('My kite'));
+    expect(view.result.current.workspace.savedId).toBe('r1');
   });
 });

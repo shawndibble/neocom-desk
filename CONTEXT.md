@@ -76,7 +76,7 @@ here — they go one per file in `docs/context/decisions/`.
   same 20260910 decision file.
 - **Base Grant**: What the plain "Log in" button asks a Character for: the
   **Core Grant** plus every **Permission** that is on by default. A user who
-  wants less picks it under "Customize permissions" instead, and the plain
+  wants less picks it under "Log in with custom permissions" instead, and the plain
   button asks for everything so nobody who takes it meets a later prompt.
   Distinct from the Core Grant, which is only the part that cannot be
   unchecked.

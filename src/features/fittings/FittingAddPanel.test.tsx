@@ -12,7 +12,7 @@ vi.mock('./dogmaFittingEngine', () => ({
 }));
 
 const fitting: Fitting = { name: 'Rifter', shipTypeId: 587, modules: [], drones: [], cargo: [] };
-const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [] };
+const profile: PilotProfile = { skillLevels: new Map(), implantTypeIds: [], boosterTypeIds: [] };
 
 const catalogue: FittingCatalogue = {
   types: {},

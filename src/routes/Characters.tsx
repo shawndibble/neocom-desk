@@ -1420,6 +1420,7 @@ export function Characters() {
       <CustomizePermissionsDialog
         open={customizingPermissions}
         onClose={() => setCustomizingPermissions(false)}
+        title={t('characters.customizePermissionsTitle')}
       />
     </div>
   );

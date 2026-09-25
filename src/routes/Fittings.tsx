@@ -15,6 +15,7 @@ import {
 } from '@/engine/fittings/fittingEdit';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
+import { MyFittingsPanel } from '@/features/fittings/MyFittingsPanel';
 import { FittingLoadCard } from '@/features/fittings/FittingLoadCard';
 import { FittingRackList, ModuleRow } from '@/features/fittings/FittingRackList';
 import { FittingRing } from '@/features/fittings/FittingRing';
@@ -32,13 +33,13 @@ import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
 import { useModuleVariations } from '@/features/fittings/useModuleVariations';
 
 /**
- * The Fittings section: paste EFT to Load a Fitting (#1532), then edit it in
- * the List view (#1533) — tap an empty slot to add there, from a docked Add
- * panel on desktop or a search sheet on phone. The Ring view (#1536) is the
- * same editor as a game-style ring — its Ring | List choice is device-local
- * (Ring on desktop, List on a phone) and on a phone the Ring's stats live in a
- * bottom sheet. Implants (#1535) and everything else the scope decision lists land in
- * their own tickets.
+ * The Fittings section: paste EFT to Load a Fitting, then edit it in the List
+ * view — tap an empty slot to add there, from a docked Add panel on desktop
+ * or a search sheet on phone. The Ring view is the same editor as a
+ * game-style ring — its Ring | List choice is device-local (Ring on desktop,
+ * List on a phone) and on a phone the Ring's stats live in a bottom sheet.
+ * The My clone vs Fitting's implant/booster toggle lives in List view's
+ * header; everything else the scope decision lists lands in its own ticket.
  */
 export function Fittings() {
   const { t } = useTranslation();
@@ -174,8 +175,28 @@ export function Fittings() {
       <PageHeader
         title={t('nav.fittings')}
         actions={
-          fitting && viewHydrated ? (
-            <FittingViewToggle value={view} onChange={(next) => void setView(next)} />
+          fitting ? (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="primary"
+                disabled={!workspace.canSave}
+                title={
+                  activeCharacterId === null
+                    ? t('fittings.myFittings.needCharacter')
+                    : workspace.tooLargeToShare
+                      ? t('fittings.myFittings.tooLarge')
+                      : undefined
+                }
+                onClick={() => void workspace.save()}
+              >
+                {workspace.savedId === null
+                  ? t('fittings.myFittings.save')
+                  : t('fittings.myFittings.update')}
+              </Button>
+              {viewHydrated && (
+                <FittingViewToggle value={view} onChange={(next) => void setView(next)} />
+              )}
+            </div>
           ) : undefined
         }
       />
@@ -185,6 +206,7 @@ export function Fittings() {
         shareError={workspace.shareError}
         tooLargeToShare={workspace.tooLargeToShare}
       />
+      <MyFittingsPanel characterId={activeCharacterId} onOpen={workspace.openSaved} />
       {fitting && viewHydrated && (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <div className="space-y-3">
@@ -220,6 +242,10 @@ export function Fittings() {
                 onSelectTarget={selectTarget}
                 unusableModuleKeys={gaps?.unusableModuleKeys}
                 onOpenVariations={(slot, slotIndex) => setModuleSlot({ slot, slotIndex })}
+                implantBasis={workspace.implantBasis}
+                canUseCloneBasis={workspace.canUseCloneBasis}
+                onImplantBasisChange={workspace.setImplantBasis}
+                onImplantSetChange={workspace.setImplantSet}
               />
             )}
             {statsInSheet && (

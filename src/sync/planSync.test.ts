@@ -659,9 +659,9 @@ describe('triggerSync: ownerHash-scoped reads', () => {
     await triggerSync(1);
     // plans + buildPlans + quickbars + stationPins + planetRichness +
     // productionRuns + productionSaleLinks + productionOrderWatches + payees +
-    // miningTaxAssignments + notificationFeed + settings, each read through a
+    // fittings + miningTaxAssignments + notificationFeed + settings, each read through a
     // where clause.
-    expect(vi.mocked(where)).toHaveBeenCalledTimes(12);
+    expect(vi.mocked(where)).toHaveBeenCalledTimes(13);
     expect(vi.mocked(where)).toHaveBeenCalledWith('ownerHash', '==', HASH);
     for (const call of vi.mocked(getDocs).mock.calls) {
       expect(call[0]).toMatchObject({ filters: [{ field: 'ownerHash', op: '==', value: HASH }] });
@@ -1857,7 +1857,7 @@ describe('sync orchestration', () => {
     await Promise.all([p1, p2]);
     // One getDocs per synced collection (see the collection-count comment in
     // the "debounces scheduleSync" test above).
-    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(12);
+    expect(order.filter((path) => path.includes('char:2'))).toHaveLength(13);
   });
 
   it('a queued sync still runs after the previous one fails', async () => {
@@ -1876,9 +1876,9 @@ describe('sync orchestration', () => {
     // stationPins + planetRichness + productionRuns + productionSaleLinks +
     // productionOrderWatches + payees + miningTaxAssignments +
     // notificationFeed + settings).
-    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(12));
+    await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(13));
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
-    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(12);
+    expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(13);
     expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
   });
 });
@@ -2146,7 +2146,7 @@ describe('triggerSync: incremental pull', () => {
 
     // mergeSettings' tombstones never expire and its absence semantics differ;
     // the allow-list bounds the doc count anyway.
-    expect(filtersFor(SETTINGS_PATH, readsSoFar() - 12)).toEqual([OWNER_FILTER]);
+    expect(filtersFor(SETTINGS_PATH, readsSoFar() - 13)).toEqual([OWNER_FILTER]);
     expect(await readCursor('sync.__pullCursor.1.settings')).toBeUndefined();
   });
 });

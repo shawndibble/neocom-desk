@@ -81,6 +81,16 @@ service cloud.firestore {
         allow delete: if isOwner();
       }
 
+      // My Fittings (issue #1538): saved Fitting share codes, per-character
+      // Editable Data synced exactly like plans.
+      match /fittings/{fittingId} {
+        allow get: if isOwner() && hashMatches();
+        allow list: if isOwner();
+        allow create: if isOwner() && incomingHashMatches();
+        allow update: if isOwner() && hashMatches() && incomingHashMatches();
+        allow delete: if isOwner();
+      }
+
       match /miningTaxAssignments/{assignmentId} {
         allow get: if isOwner() && hashMatches();
         allow list: if isOwner();

@@ -49,6 +49,27 @@
     "dismiss": "Dismiss"
   },
   "fittings": {
+    "myFittings": {
+      "title": "My Fittings",
+      "save": "Save to My Fittings",
+      "update": "Update saved Fitting",
+      "saved": "Saved",
+      "needCharacter": "Log in with a Character to save Fittings.",
+      "tooLarge": "This Fitting is too large to save.",
+      "searchLabel": "Search My Fittings",
+      "searchPlaceholder": "Search by name or hull",
+      "empty": "Nothing saved yet. Open a Fitting and choose Save to My Fittings.",
+      "noMatches": "No saved Fitting matches that search.",
+      "unknownHull": "Unknown hull",
+      "open": "Open {{name}}",
+      "rename": "Rename {{name}}",
+      "renameLabel": "Fitting name",
+      "confirmRename": "Rename",
+      "delete": "Delete {{name}}",
+      "deleteConfirm": "Delete \"{{name}}\"? This can't be undone.",
+      "confirmDelete": "Delete",
+      "cancel": "Cancel"
+    },
     "load": {
       "title": "Load",
       "pasteLabel": "Paste EFT fit text",
@@ -249,6 +270,24 @@
         "mass": "Mass {{value}} t",
         "warpSpeed": "Warp speed {{value}} AU/s"
       }
+    },
+    "implants": {
+      "basis": {
+        "label": "Implants from",
+        "clone": "My clone",
+        "fitting": "Fitting's"
+      },
+      "editSet": "Edit set",
+      "modalTitle": "Implants & boosters",
+      "implantsHeading": "Implants",
+      "boostersHeading": "Boosters",
+      "empty": "None",
+      "unknownType": "Type #{{typeId}}",
+      "addPlaceholder": "Item name",
+      "add": "Add",
+      "remove": "Remove {{name}}",
+      "notFound": "No item found with that exact name.",
+      "full": "This set is already full."
     }
   },
   "skills": {
@@ -1278,11 +1317,10 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Signing in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, corporation roles, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions. Want to share less from the start? Use Customize permissions, next to the Log in button, to choose exactly what you grant.",
+    "permissionsHint": "Signing in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, corporation roles, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions. Want to share less from the start? Use Log in with custom permissions, next to the Log in button, to choose exactly what you grant.",
     "writeExceptions": "It also asks for three permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; and replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client. Nothing else in the app writes to EVE.",
     "eyebrow": "Free · Open source · Runs in your browser",
     "heading": "Answers, not API dumps.",
-    "trustLine": "Your refresh token never leaves this device.",
     "previewLabel": "Example — signed-in view",
     "previewCorp": "Deep Space Transport",
     "answersHeading": "The questions it exists to answer",
@@ -1488,6 +1526,7 @@
     "add": "Add character",
     "addMenuLabel": "Add character options",
     "addWithPermissions": "Add with specific permissions…",
+    "customizePermissionsTitle": "Customize permissions",
     "emptyTitle": "No characters yet",
     "emptyHint": "Log in with EVE Online to add your first character.",
     "portraitAlt": "Portrait of {{name}}",
@@ -4028,8 +4067,8 @@
       }
     },
     "customize": {
-      "linkLabel": "Customize permissions",
-      "title": "Customize permissions",
+      "linkLabel": "Log in with custom permissions",
+      "title": "Log in with custom permissions",
       "optInTag": "Opt-in",
       "selectAll": "Select all",
       "selectNone": "Select none",
@@ -4060,6 +4099,7 @@
           "stationPins": "The stations and structures you pinned in Assets.",
           "piPicks": "The resources you chose to pull on each planet in the PI Advisor.",
           "miningTax": "Moon Mining payees and assignments.",
+          "fittings": "The Fittings you saved to My Fittings: name and share code.",
           "miningTaxNote": "The payees you named and the entries you assigned to them, including the ore and ISK figures snapshotted at that moment — that snapshot is the invoice, so it has to travel with it.",
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
