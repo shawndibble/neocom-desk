@@ -24,6 +24,8 @@ function formatValue(row: CompareRow, index: number, t: Translate): string {
 
 export interface FittingCompareColumn {
   index: number;
+  /** Position in each row's `values`; null when this Fitting's stats couldn't be calculated. */
+  statsIndex: number | null;
   header: ReactNode;
 }
 
@@ -59,7 +61,8 @@ export function FittingCompareTable({ rows, columns, differencesOnly }: FittingC
           <tr key={row.key} className="border-t border-line">
             <td className="p-2 text-text-dim">{t(`fittings.compare.stat.${row.key}`)}</td>
             {columns.map((column) => {
-              const best = row.bestIndices.includes(column.index);
+              const statsIndex = column.statsIndex;
+              const best = statsIndex !== null && row.bestIndices.includes(statsIndex);
               return (
                 <td
                   key={column.index}
@@ -71,7 +74,7 @@ export function FittingCompareTable({ rows, columns, differencesOnly }: FittingC
                       className="mr-1 inline-block h-3 w-3 align-middle text-success"
                     />
                   )}
-                  {formatValue(row, column.index, t)}
+                  {statsIndex === null ? '—' : formatValue(row, statsIndex, t)}
                   {best && <span className="sr-only"> {t('fittings.compare.best')}</span>}
                 </td>
               );
