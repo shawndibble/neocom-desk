@@ -7,6 +7,7 @@ import { BootScreen } from '@/app/BootScreen';
 import { buttonClassName, EmptyState, LogoMark, Panel, Spinner } from '@/components/ui';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import { writeToClipboard } from '@/lib/clipboard';
+import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
 import { resolveFittingShareView } from '@/features/fittings/resolveFittingShareView';
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
@@ -125,10 +126,11 @@ export function FittingShared() {
   // A visitor with a Character never gets the All-V view — the same link
   // opens in the editor, under their own pilot (CONTEXT.md **Share Link**).
   if (characterCount > 0) {
-    return <Navigate to={`/fittings?f=${encodeURIComponent(code)}`} replace />;
+    return <Navigate to={fittingEditLocation(code)} replace />;
   }
 
-  const returnPath = `/fittings?f=${encodeURIComponent(code)}`;
+  const editLocation = fittingEditLocation(code);
+  const returnPath = `${editLocation.pathname}${editLocation.search}`;
 
   async function copyEft() {
     if (state.status !== 'ready' || typeName === null) return;

@@ -25,6 +25,7 @@ describe('ColonyStrip', () => {
         rows={[row({ faults: 0, overflowing: false, hoursToFull: 72 })]}
         onOpenPlanet={() => {}}
         locked={null}
+        haulHours={24}
       />
     );
     expect(screen.getByRole('button', { name: 'Details for Efa II' })).toHaveAccessibleDescription(
@@ -33,7 +34,7 @@ describe('ColonyStrip', () => {
   });
 
   it('names the row by what it opens and describes the state it shows', () => {
-    render(<ColonyStrip rows={[row()]} onOpenPlanet={() => {}} locked={null} />);
+    render(<ColonyStrip rows={[row()]} onOpenPlanet={() => {}} locked={null} haulHours={24} />);
     const button = screen.getByRole('button', { name: 'Details for Efa II' });
     expect(button).toHaveAccessibleDescription(
       '82% of budget in use. 2 faults. Full in 30 h, before the next haul.'
@@ -46,6 +47,7 @@ describe('ColonyStrip', () => {
         rows={[row({ load: null, hoursToFull: null, faults: 0, overflowing: false })]}
         onOpenPlanet={() => {}}
         locked={null}
+        haulHours={24}
       />
     );
     expect(screen.getByRole('button', { name: 'Details for Efa II' })).toHaveAccessibleDescription(

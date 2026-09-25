@@ -319,6 +319,15 @@ describe('PlanetaryIndustry', () => {
     ).toBeInTheDocument();
   });
 
+  it('reads a colony with no readable extraction program as unknown, never blank', async () => {
+    // The fixture's one extractor pin carries no install-time baseline, so
+    // `colonyHoursToFull` cannot measure it — the row must still say so
+    // rather than showing nothing, which a pilot could misread as "safe".
+    render(<App />);
+    const panel = await colonyPanelFor(/Jita IV/);
+    expect(within(panel).getByText('Storage full in: unknown')).toBeInTheDocument();
+  });
+
   it('shows the empty state when there are no colonies', async () => {
     server.use(http.get(`${ESI}/characters/${CHAR_ID}/planets`, () => HttpResponse.json([])));
     render(<App />);
