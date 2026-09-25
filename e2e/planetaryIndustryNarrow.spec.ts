@@ -337,4 +337,37 @@ test.describe('PI Plan — stacked Sensitivity card', () => {
     // And no cell hoisted to title width — that is the stacked card's shape.
     for (const cell of cells) expect(cell.width).toBeLessThan(contentWidth * 0.9);
   });
+
+  test('keeps each Make-or-buy cell on one line at 1024px, with the role and hub read apart', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await openSensitivity(page, P3_PRODUCT, '10');
+
+    const chain = page.getByRole('table').filter({
+      has: page.getByRole('columnheader', { name: /Make or buy/ }),
+    });
+    await expect(chain).toBeVisible();
+
+    // No Make-or-buy cell wraps: the role and the hub read share one line.
+    const lineHeights = await chain
+      .locator('tbody tr td:nth-child(6) > span')
+      .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().height));
+    expect(lineHeights.length).toBeGreaterThan(1);
+    for (const h of lineHeights) expect(h).toBeLessThan(24);
+
+    // The cell is its own line: role and hub read are two spans, never one string.
+    const cells = chain.locator('tbody tr td:nth-child(6) > span');
+    const spans = await cells
+      .first()
+      .locator('> span')
+      .evaluateAll((els) => els.map((el) => el.textContent));
+    expect(spans).toHaveLength(2);
+    expect(spans[1]).toMatch(/^Hub: /);
+
+    // The sensitivity table's unanswered cells no longer speak of a rate.
+    const sensitivity = page.getByRole('table', { name: SENSITIVITY_TABLE });
+    await expect(sensitivity.getByText('Needs yield').first()).toBeVisible();
+    await expect(sensitivity.getByText(/needs a rate/i)).toHaveCount(0);
+  });
 });
