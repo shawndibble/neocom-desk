@@ -71,6 +71,7 @@ import {
   type FittingView,
 } from '@/features/fittings/fittingViewPreference';
 import { AlphaCloneChip } from '@/features/fittings/AlphaCloneChip';
+import { MasteryChip } from '@/features/fittings/MasteryChip';
 import { MissingSkillsChip } from '@/features/fittings/MissingSkillsChip';
 import { useFittingAlpha } from '@/features/fittings/useFittingAlpha';
 import { useFittingHardpoints } from '@/features/fittings/useFittingHardpoints';
@@ -568,6 +569,13 @@ function FittingsPage() {
                 <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
               )}
               <AlphaCloneChip blockers={alpha.blockers} skillName={alpha.skillName} />
+              {activeCharacterId !== null && (
+                <MasteryChip
+                  hullTypeId={fitting.shipTypeId}
+                  hullName={hullName}
+                  characterId={activeCharacterId}
+                />
+              )}
               {gaps && gaps.missing.length > 0 && activeCharacterId !== null && (
                 <MissingSkillsChip
                   entries={gaps.missing}

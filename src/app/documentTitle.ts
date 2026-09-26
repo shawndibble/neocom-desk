@@ -27,9 +27,10 @@ const ROUTE_TITLE_KEYS = {
   '/skills/plans': ['nav.skills', 'skills.plansTab'],
   '/skills/plans/:planId': ['nav.skills', 'skills.plansTab'],
   '/skills/compare': ['nav.skills', 'skills.compareTab'],
-  '/skills/ships': ['nav.skills', 'skills.shipsTab'],
   '/industry': ['nav.industry'],
   '/fittings': ['nav.fittings'],
+  // A redirect into Fittings, where Mastery now lives; titled only because every route must be.
+  '/skills/ships': ['nav.fittings'],
   '/fittings/edit': ['nav.fittings', 'fittings.editTitle'],
   '/fittings/compare': ['nav.fittings', 'fittings.compare.title'],
   '/industry/plans/:planId': ['nav.industry', 'industry.buildPlansTab'],
