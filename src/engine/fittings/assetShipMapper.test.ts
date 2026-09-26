@@ -48,6 +48,25 @@ describe('assetShipToFitting', () => {
     });
   });
 
+  it('reads a carrier’s launched and bay fighter squadrons, as an In-game Fitting’s are read', () => {
+    const TEMPLAR = 40556;
+    const DRAGONFLY = 40557;
+    const fitting = assetShipToFitting(
+      { typeId: 23757, name: 'My Archon' },
+      [
+        { typeId: TEMPLAR, quantity: 9, flag: 'FighterTube0' },
+        { typeId: TEMPLAR, quantity: 9, flag: 'FighterTube1' },
+        { typeId: DRAGONFLY, quantity: 6, flag: 'FighterBay' },
+      ],
+      () => false
+    );
+    expect(fitting.fighters).toEqual([
+      { typeId: TEMPLAR, quantity: 9, state: 'active' },
+      { typeId: TEMPLAR, quantity: 9, state: 'active' },
+      { typeId: DRAGONFLY, quantity: 6, state: 'online' },
+    ]);
+  });
+
   it('is an empty hull when nothing is inside', () => {
     expect(assetShipToFitting({ typeId: 587, name: 'Rifter' }, [], () => true)).toEqual({
       name: 'Rifter',

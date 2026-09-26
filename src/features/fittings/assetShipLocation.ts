@@ -1,6 +1,7 @@
 /**
  * Where "Open in Fittings" on an Assets ship goes: the Fittings editor, with
- * the ship as it sits in the hangar — slots, loaded charges, drones, cargo —
+ * the ship as it sits in the hangar — slots, loaded charges, drones,
+ * fighters, cargo —
  * as its Share Link. Null when it's too large for one.
  */
 import type { AssetTreeContainerNode, AssetTreeNode } from '@/engine/assetTree';

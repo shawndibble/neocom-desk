@@ -1,5 +1,6 @@
 import type { Fit, FitItem, Slot } from '@eveshipfit/dogma-engine';
 import { sideEffectsSwitchedOn } from './boosterSideEffects';
+import { fighterTubes } from './inventoryFlags';
 import { defaultTacticalMode, tacticalModesFor } from './tacticalModes';
 import type { DamageProfile, Fitting, FittingModule, PilotProfile } from './types';
 
@@ -17,12 +18,14 @@ function moduleToFitItem(module: FittingModule): FitItem {
 }
 
 function launchFighters(fitting: Fitting): FitItem[] {
-  let tube = 0;
-  return (fitting.fighters ?? []).map((fighter): FitItem =>
-    fighter.state === 'active'
+  const fighters = fitting.fighters ?? [];
+  const tubes = fighterTubes(fighters);
+  return fighters.map((fighter, index): FitItem => {
+    const tube = tubes[index];
+    return tube !== null
       ? {
           type_id: fighter.typeId,
-          slot: { type: 'fighter_tube', index: tube++ },
+          slot: { type: 'fighter_tube', index: tube },
           quantity: fighter.quantity,
           state: 'active',
         }
@@ -31,8 +34,8 @@ function launchFighters(fitting: Fitting): FitItem[] {
           slot: { type: 'fighter_bay' },
           quantity: fighter.quantity,
           state: 'offline',
-        }
-  );
+        };
+  });
 }
 
 /** An implant or booster, numbered from `SLOT_INDEX_START` — same shape either way, just the slot type and (for a booster) side effects. */

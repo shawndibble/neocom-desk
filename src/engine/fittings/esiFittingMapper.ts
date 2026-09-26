@@ -4,11 +4,13 @@
  * ESI's fitting item carries no charge or online/offline state (it is a
  * static loadout, not a live ship), so every resolved module loads `'active'`
  * and carries no `chargeTypeId` — the same "nothing left to say otherwise"
- * reasoning as `eftLoader.ts`'s EFT-paste modules. `FighterBay`/`ServiceSlot*`
- * (carriers, structures) have no rack this app models, so they go to
- * `unresolved` rather than being dropped silently, same as `eftLoader.ts` —
- * and the result is a Load outcome like any other source's (`load.ts`).
+ * reasoning as `eftLoader.ts`'s EFT-paste modules. Fighter squadrons read
+ * off `FighterTube*` (launched) and `FighterBay` (waiting). `ServiceSlot*`
+ * (structures) has no rack this app models, so it goes to `unresolved`
+ * rather than being dropped silently, same as `eftLoader.ts` — and the
+ * result is a Load outcome like any other source's (`load.ts`).
  */
+import { fighterFlagState, fighterTubes, slotFlag, slotFromFlag } from './inventoryFlags';
 import type { LoadedFitting, LoadWarning } from './load';
 import {
   sortFittingModules,
@@ -17,7 +19,6 @@ import {
   type FittingDrone,
   type FittingFighter,
   type FittingModule,
-  type FittingSlotKind,
 } from './types';
 
 export interface EsiFittingItem {
@@ -46,24 +47,6 @@ export interface NewEsiFitting {
   items: EsiFittingItem[];
 }
 
-const SLOT_PREFIX: Record<string, FittingSlotKind> = {
-  Hi: 'high',
-  Med: 'medium',
-  Lo: 'low',
-  Rig: 'rig',
-  SubSystem: 'subsystem',
-};
-
-const FLAG_PREFIX: Record<FittingSlotKind, string> = {
-  high: 'Hi',
-  medium: 'Med',
-  low: 'Lo',
-  rig: 'Rig',
-  subsystem: 'SubSystem',
-};
-
-const SLOT_FLAG = /^(Hi|Med|Lo|Rig|SubSystem)Slot(\d+)$/;
-const FIGHTER_TUBE_FLAG = /^FighterTube\d$/;
 /** `FighterTube0` to `FighterTube4`: the most tubes any hull has. */
 const ESI_FIGHTER_TUBES = 5;
 
@@ -75,26 +58,18 @@ export function esiFittingToFitting(esiFitting: EsiCharacterFitting): LoadedFitt
   const unresolved: LoadWarning[] = [];
 
   for (const item of esiFitting.items) {
-    const match = SLOT_FLAG.exec(item.flag);
-    if (match) {
-      modules.push({
-        slot: SLOT_PREFIX[match[1]],
-        slotIndex: Number(match[2]),
-        typeId: item.type_id,
-        state: 'active',
-      });
+    const at = slotFromFlag(item.flag);
+    if (at) {
+      modules.push({ ...at, typeId: item.type_id, state: 'active' });
       continue;
     }
     if (item.flag === 'DroneBay') {
       drones.push({ typeId: item.type_id, quantity: item.quantity, state: 'online' });
       continue;
     }
-    if (FIGHTER_TUBE_FLAG.test(item.flag) || item.flag === 'FighterBay') {
-      fighters.push({
-        typeId: item.type_id,
-        quantity: item.quantity,
-        state: item.flag === 'FighterBay' ? 'online' : 'active',
-      });
+    const fighterState = fighterFlagState(item.flag);
+    if (fighterState) {
+      fighters.push({ typeId: item.type_id, quantity: item.quantity, state: fighterState });
       continue;
     }
     if (item.flag === 'Cargo') {
@@ -136,7 +111,7 @@ export function fittingToEsiFitting(
   const items: EsiFittingItem[] = [];
   for (const module of fitting.modules) {
     items.push({
-      flag: `${FLAG_PREFIX[module.slot]}Slot${module.slotIndex}`,
+      flag: slotFlag(module.slot, module.slotIndex),
       quantity: 1,
       type_id: module.typeId,
     });
@@ -146,14 +121,16 @@ export function fittingToEsiFitting(
   }
   // Launched squadrons take the tubes in order, as the engine sees them; ESI
   // has five tubes, so a squadron past them waits in the bay.
-  let tube = 0;
-  for (const fighter of fitting.fighters ?? []) {
-    const flag =
-      fighter.state === 'active' && tube < ESI_FIGHTER_TUBES
-        ? `FighterTube${tube++}`
-        : 'FighterBay';
-    items.push({ flag, quantity: fighter.quantity, type_id: fighter.typeId });
-  }
+  const fighters = fitting.fighters ?? [];
+  const tubes = fighterTubes(fighters, ESI_FIGHTER_TUBES);
+  fighters.forEach((fighter, index) => {
+    const tube = tubes[index];
+    items.push({
+      flag: tube === null ? 'FighterBay' : `FighterTube${tube}`,
+      quantity: fighter.quantity,
+      type_id: fighter.typeId,
+    });
+  });
   for (const item of fitting.cargo) {
     items.push({ flag: 'Cargo', quantity: item.quantity, type_id: item.typeId });
   }
