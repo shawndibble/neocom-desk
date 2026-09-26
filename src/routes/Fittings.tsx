@@ -80,6 +80,7 @@ import { MissingSkillsChip } from '@/features/fittings/MissingSkillsChip';
 import { useFittingAlpha } from '@/features/fittings/useFittingAlpha';
 import { useFittingHardpoints } from '@/features/fittings/useFittingHardpoints';
 import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
+import { useHullFit } from '@/features/fittings/useHullFit';
 import { catalogueTypeName, useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
 import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
 import { useModuleVariations } from '@/features/fittings/useModuleVariations';
@@ -194,6 +195,16 @@ function FittingsPage() {
   const canSaveToEve = useEndpointsGranted(['postCharacterFitting']);
 
   const { fitting, stats, edit } = workspace;
+  // Warm the module browser's hull check in the background once the ship data,
+  // pilot and catalogue are in, so opening Add (or changing hull) needn't wait.
+  // The panel's own call finds the memoized results.
+  useHullFit(
+    catalogue,
+    fitting?.shipTypeId ?? null,
+    workspace.profile,
+    workspace.engineReady,
+    true
+  );
   if (library !== null && fitting !== libraryOver) {
     setLibrary(null);
     closeAdd();
