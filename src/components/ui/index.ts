@@ -17,6 +17,7 @@ export { Spinner } from './Spinner';
 export type { SpinnerSize } from './Spinner';
 export { Tooltip, InfoTooltip } from './Tooltip';
 export { IconButton } from './IconButton';
+export { textActionClassName } from './textActionClassName';
 export { iconButtonClassName } from './iconButtonClassName';
 export { ReauthBanner } from './ReauthBanner';
 export { SkillBar } from './SkillBar';
