@@ -48,7 +48,12 @@ import {
   type GroupMember,
 } from '@/features/miningTax/groupRows';
 import { resolveRowNames } from '@/features/miningTax/names';
-import { hubForPayee, loadUnitPricesByHub, pricesAtHub } from '@/features/miningTax/pricing';
+import {
+  hubForPayee,
+  loadDatedUnitPricesByHub,
+  pricesAtHubOnDate,
+  type DatedUnitPrices,
+} from '@/features/miningTax/pricing';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import {
@@ -105,21 +110,21 @@ interface Snapshot {
   systemNames: Map<number, string>;
   systemSecurity: Map<number, number>;
   typeNames: Map<number, string>;
-  /**
-   * Default-hub (Jita) prices only, for the two valuations with no Payee to
-   * name a hub: an entry's still-unassigned residual, in the table's Value
-   * column and in Dismiss. Anything billed to a Payee reads `pricesByHub`.
-   */
-  unitPrices: ReadonlyMap<number, number>;
-  /** Prices at every hub this ledger's Payees bill at, plus the default. Resolved per Payee by `pricesFor`. */
-  pricesByHub: ReadonlyMap<TradeHub['id'], ReadonlyMap<number, number>>;
-  /** Per hub, the ore types that hub quoted no buy order for — their price entry is 0, which is not the same claim as "worthless". */
+  /** Per-hub, per-date buy prices — the day the ore was mined, not "now" (issue #523 follow-up). Resolved per Payee/date by `pricesFor`. */
+  datedPrices: DatedUnitPrices;
+  /** Per hub, the ore types that hub quoted no buy price for on any date they appeared — their price entry is 0, which is not the same claim as "worthless". */
   unpricedByHub: ReadonlyMap<TradeHub['id'], ReadonlySet<number>>;
   /** Union of `unpricedByHub` — whether the banner has anything at all to say. */
   unpricedTypeIds: Set<number>;
 }
 
-async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): Promise<Snapshot> {
+const EMPTY_DATED_PRICES: DatedUnitPrices = {
+  byHubAndDate: new Map(),
+  unpricedByHub: new Map(),
+  unpriced: new Set(),
+};
+
+async function loadSnapshot(characterId: number, signal: RouteSnapshotSignal): Promise<Snapshot> {
   const result = await loadMoonMiningTaxSnapshot();
   if (signal.cancelled) {
     return {
@@ -128,8 +133,7 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
       systemNames: new Map(),
       systemSecurity: new Map(),
       typeNames: new Map(),
-      unitPrices: new Map(),
-      pricesByHub: new Map(),
+      datedPrices: EMPTY_DATED_PRICES,
       unpricedByHub: new Map(),
       unpricedTypeIds: new Set(),
     };
@@ -141,15 +145,18 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
   const payeeHubIds = [...result.payeesByCharacter.values()].flatMap((payees) =>
     payees.map((payee) => payee.hubId)
   );
+  const dates = [...new Set(result.rows.map((row) => row.entry.date))];
   const [
     { systemNames, systemSecurity, typeNames: rowTypeNames },
-    { byHub, unpricedByHub, unpriced: unpricedTypeIds },
+    datedPrices,
     unclassifiedTypeNames,
   ] = await Promise.all([
     resolveRowNames(result.rows),
-    loadUnitPricesByHub(
+    loadDatedUnitPricesByHub(
+      characterId,
       result.rows.flatMap((row) => row.entry.oreLines.map((line) => line.typeId)),
-      payeeHubIds
+      payeeHubIds,
+      dates
     ),
     loadTypeNames(unclassifiedTypeIds),
   ]);
@@ -160,10 +167,9 @@ async function loadSnapshot(_characterId: number, signal: RouteSnapshotSignal): 
     systemNames,
     systemSecurity,
     typeNames,
-    unitPrices: pricesAtHub(byHub, undefined),
-    pricesByHub: byHub,
-    unpricedByHub,
-    unpricedTypeIds,
+    datedPrices,
+    unpricedByHub: datedPrices.unpricedByHub,
+    unpricedTypeIds: datedPrices.unpriced,
   };
 }
 
@@ -504,7 +510,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   async function handleDismiss(row: MoonMiningTaxRow) {
     const { estimatedValue } = computeAssignmentValue(
       row.unassignedOreLines,
-      data?.unitPrices ?? new Map(),
+      pricesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, undefined, row.entry.date),
       0
     );
     await dismissEntry({
@@ -519,13 +525,15 @@ export function TaxTab({ tabBar }: TaxTabProps) {
 
   /**
    * The seam every value-computing dialog reads: prices at whichever hub a
-   * Payee bills at. A lookup rather than one map, because the dialogs are
-   * where the Payee is chosen — assigning to a different Payee, or splitting
-   * ore over to a second one, re-values the same ore against a different order
-   * book, and this is what lets that happen without another fetch.
+   * Payee bills at, on the date the ore was actually mined (issue #523
+   * follow-up decision doc) — not "now". A lookup rather than one map,
+   * because the dialogs are where the Payee (and so the hub) is chosen —
+   * assigning to a different Payee, or splitting ore over to a second one,
+   * re-values the same ore against a different order book, and this is what
+   * lets that happen without another fetch.
    */
-  function pricesFor(hubId: string | undefined): ReadonlyMap<number, number> {
-    return pricesAtHub(data?.pricesByHub ?? new Map(), hubId);
+  function pricesFor(hubId: string | undefined, date: string): ReadonlyMap<number, number> {
+    return pricesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, hubId, date);
   }
 
   function payeeName(payeeId: string | undefined): string {
@@ -551,8 +559,11 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   function estimatedValueOf(dr: DisplayRow): number {
     return dr.assignment
       ? allMembers(dr).reduce((sum, m) => sum + m.assignment.estimatedValue, 0)
-      : computeAssignmentValue(dr.row.unassignedOreLines, data?.unitPrices ?? new Map(), 0)
-          .estimatedValue;
+      : computeAssignmentValue(
+          dr.row.unassignedOreLines,
+          pricesAtHubOnDate(data?.datedPrices ?? EMPTY_DATED_PRICES, undefined, dr.row.entry.date),
+          0
+        ).estimatedValue;
   }
 
   function taxOwedOf(dr: DisplayRow): number {
@@ -1313,7 +1324,6 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           systemSecurity={data.systemSecurity.get(detailTarget.row.entry.solarSystemId)}
           typeNames={data.typeNames}
           payees={allPayees}
-          unitPrices={data.unitPrices}
           pricesFor={pricesFor}
           busy={busy}
           onAssigned={handleAssignedFromDetail}

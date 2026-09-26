@@ -31,13 +31,14 @@ interface AssignDialogProps {
   typeNames: ReadonlyMap<number, string>;
   /**
    * Unit prices at the trade hub a Payee bills at (`PayeeRecord.hubId`;
-   * `undefined` means the default, Jita). A lookup rather than one map,
-   * because *which* prices apply is decided by this dialog's own Payee
-   * selection: the pilot picking a different Payee re-values the same ore. The
-   * parent route's snapshot has already fetched every hub its Payees use for
-   * every ore line across every row, so this never re-fetches.
+   * `undefined` means the default, Jita), on a given date. A lookup rather
+   * than one map, because *which* prices apply is decided by this dialog's
+   * own Payee selection: the pilot picking a different Payee re-values the
+   * same ore. The parent route's snapshot has already fetched every hub its
+   * Payees use, for every ore line, across every date any row needs, so this
+   * never re-fetches.
    */
-  pricesFor: (hubId: string | undefined) => ReadonlyMap<number, number>;
+  pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   /** True while a sibling action (Mark as paid / Resolve / Undo) is in flight, so this form's own submit can't race it. */
   busy: boolean;
   onAssigned: () => void;
@@ -192,7 +193,7 @@ export function AssignDialog({
   const hub = hubForPayee(selectedPayee?.hubId);
   const computed = computeAssignmentValue(
     selectedLines,
-    pricesFor(selectedPayee?.hubId),
+    pricesFor(selectedPayee?.hubId, row.entry.date),
     Number.isFinite(pctValue) ? pctValue : 0
   );
   const estimatedValue =

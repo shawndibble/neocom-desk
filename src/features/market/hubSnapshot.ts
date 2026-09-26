@@ -10,11 +10,20 @@
  * `ensureSignedIn` exactly as `syncedContracts.ts` already does.
  *
  * A day's `source` tag decides which price-basis tier it feeds
- * (`priceBasis.ts`): 'fuzzwork' is real Jita station data, fed as `saved`
- * alongside the per-browser Dexie snapshot (`priceSnapshots.ts`); 'adam4eve'
- * is a real buy/sell split but region-wide, fed as the weaker `historical`
- * tier. Only `DEFAULT_TRADE_HUB` (Jita) is read — the Overview's pricing
- * never reads the other 4 hubs the server also captures.
+ * (`priceBasis.ts`): 'fuzzwork' is real station data, fed as `saved`
+ * (alongside the per-browser Dexie snapshot for Jita — `priceSnapshots.ts`
+ * has no equivalent for the other 4 hubs); 'adam4eve' is a real buy/sell
+ * split but region-wide, fed as the weaker `historical` tier. The Adam4EVE
+ * backfill only ever covers Jita (`functions/src/index.ts`'s `BACKFILL_HUB`),
+ * so a non-Jita hub's `historical` map is always empty for a day older than
+ * this job's first run — expected, not a bug.
+ *
+ * `hub` defaults to `DEFAULT_TRADE_HUB` (Jita) — the Mining Yield Overview's
+ * only caller — but the Firestore read itself doesn't depend on which hub is
+ * asked for (every doc carries all 5), so the cache is shared across hubs;
+ * only which station's bucket gets pulled out of each doc changes. The
+ * Moon Mining Tax ledger (issue #523 follow-up) reads other hubs, since a
+ * Payee can bill at any of the 5.
  */
 import {
   collection,
@@ -29,7 +38,7 @@ import { getSyncFirestore } from '@/sync/firebaseApp';
 import { ensureSignedIn } from '@/sync/syncAuth';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { GLOBAL_CACHE_CHARACTER_ID, STALE_AFTER, loadWithCache } from '@/esi/cache';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { DEFAULT_TRADE_HUB, type TradeHub } from '@/market/hubs';
 import type { SidePrices } from '@/engine/miningTax/priceBasis';
 
 const COLLECTION = 'marketHistory';
@@ -65,7 +74,8 @@ const EMPTY_RANGE: HubSnapshotRange = { saved: new Map(), historical: new Map() 
 export async function loadHubSnapshotRange(
   characterId: number,
   startDate: string,
-  endDate: string
+  endDate: string,
+  hub: TradeHub = DEFAULT_TRADE_HUB
 ): Promise<HubSnapshotRange> {
   if (!isSyncConfigured() || startDate > endDate) return EMPTY_RANGE;
 
@@ -97,7 +107,7 @@ export async function loadHubSnapshotRange(
 
   if (!cached) return EMPTY_RANGE;
 
-  const stationKey = String(DEFAULT_TRADE_HUB.stationId);
+  const stationKey = String(hub.stationId);
   const result: HubSnapshotRange = { saved: new Map(), historical: new Map() };
   for (const [date, doc] of Object.entries(cached.data)) {
     const stationPrices = doc.hubs?.[stationKey];

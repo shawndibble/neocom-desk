@@ -18,7 +18,7 @@ import { linesOwnedBy } from '@/engine/miningTax/ownership';
 import { planSplit } from '@/engine/miningTax/split';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
 import { loadPayees } from './payees';
-import { hubForPayee, loadUnitPrices } from './pricing';
+import { hubForPayee, loadUnitPricesOnDate } from './pricing';
 
 /**
  * Thrown when a new Assignment would claim ore an existing one already does
@@ -247,14 +247,17 @@ export interface JoinMemberInput {
  * that every already-assigned member shares one Payee and tax % (the
  * decision doc's merge rule) — this function does not re-check it. A
  * still-unassigned member gets a brand new Assignment created against
- * `payeeId`/`taxPct`, valued from its own `oreLines` at `unitPrices` — never
- * a blended or split value across members.
+ * `payeeId`/`taxPct`, valued from its own `oreLines` at `pricesOn(m.date)` —
+ * never a blended or split value across members. `pricesOn` rather than one
+ * flat map: a join can combine members with *different* mined dates (that is
+ * its whole purpose — one moon-mining session spanning midnight UTC), so one
+ * shared map would misprice whichever member's date it wasn't fetched for.
  */
 export async function joinAssignments(
   members: readonly JoinMemberInput[],
   payeeId: string,
   taxPct: number,
-  unitPrices: ReadonlyMap<number, number>
+  pricesOn: (date: string) => ReadonlyMap<number, number>
 ): Promise<MiningTaxAssignmentRecord[]> {
   const groupId =
     members.map((m) => m.assignment?.groupId).find((id) => id !== undefined) ?? crypto.randomUUID();
@@ -262,7 +265,7 @@ export async function joinAssignments(
   const records: MiningTaxAssignmentRecord[] = members.map((m) => {
     if (m.assignment) return { ...m.assignment, groupId, updatedAt: now };
     const oreLines = m.oreLines ?? [];
-    const { estimatedValue, taxOwed } = computeAssignmentValue(oreLines, unitPrices, taxPct);
+    const { estimatedValue, taxOwed } = computeAssignmentValue(oreLines, pricesOn(m.date), taxPct);
     return {
       id: crypto.randomUUID(),
       characterId: m.characterId,
@@ -375,7 +378,9 @@ export interface SplitInput {
  * ore to a *different* Payee by construction, and two Payees can bill at two
  * different trade hubs — pricing both sides from one book would misstate
  * whichever bill it did not come from. They are the same map whenever the two
- * Payees share a hub, which is the ordinary case.
+ * Payees share a hub, which is the ordinary case. Both are resolved at the
+ * *original* Assignment's mined date (`splitAssignment`'s own doc comment) —
+ * a split only changes who is billed, never when the ore was mined.
  */
 export interface SplitPrices {
   /** The original Payee's hub — what the units staying put are worth. */
@@ -392,9 +397,10 @@ export interface SplitPrices {
  * the fact, and the paid figure stays with the kept side — and its remaining
  * units.
  *
- * Both sides are re-priced at the current buy orders of their own Payee's hub
- * rather than apportioning the original's possibly hand-edited value: two
- * independently priced obligations is the same rule "join entries" chose.
+ * Both sides are re-priced at their own Payee's hub, at the original entry's
+ * mined date (`SplitPrices`'s own doc comment), rather than apportioning the
+ * original's possibly hand-edited value: two independently priced obligations
+ * is the same rule "join entries" chose.
  */
 export async function splitAssignment(
   original: MiningTaxAssignmentRecord,
@@ -465,6 +471,11 @@ export async function deleteAssignment(assignment: MiningTaxAssignmentRecord): P
  * only the record, and a fresh invoice moment billed at some other hub's book
  * would restate a bill the landlord never quoted. A dismissal (no Payee) and
  * an Assignment whose Payee has since been deleted both fall back to Jita.
+ *
+ * Priced at `assignment.date` — the entry's mined date, not "now" (issue #523
+ * follow-up decision doc): a re-review is re-snapshotting the *same* mined
+ * ore's value, and the day it was mined didn't change just because the pilot
+ * came back to reconcile it later.
  */
 export async function resolveNeedsReview(
   assignment: MiningTaxAssignmentRecord,
@@ -476,9 +487,11 @@ export async function resolveNeedsReview(
     assignment.payeeId === undefined
       ? undefined
       : (await loadPayees(assignment.characterId)).find((p) => p.id === assignment.payeeId);
-  const { prices } = await loadUnitPrices(
+  const { prices } = await loadUnitPricesOnDate(
+    assignment.characterId,
     relevantFresh.map((line) => line.typeId),
-    hubForPayee(payee?.hubId)
+    hubForPayee(payee?.hubId),
+    assignment.date
   );
   const { estimatedValue, taxOwed } = computeAssignmentValue(
     relevantFresh,

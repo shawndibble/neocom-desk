@@ -21,12 +21,13 @@ const syncMock = vi.hoisted(() => ({
 }));
 vi.mock('@/sync', () => syncMock);
 
-// Only `loadUnitPrices` is stubbed: `hubForPayee` is pure hub lookup, and the
-// point of these tests is *which* hub the real resolver hands the fetch.
-const pricingMock = vi.hoisted(() => ({ loadUnitPrices: vi.fn() }));
+// Only `loadUnitPricesOnDate` is stubbed: `hubForPayee` is pure hub lookup,
+// and the point of these tests is *which* hub/date the real resolver hands
+// the fetch.
+const pricingMock = vi.hoisted(() => ({ loadUnitPricesOnDate: vi.fn() }));
 vi.mock('./pricing', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./pricing')>()),
-  loadUnitPrices: pricingMock.loadUnitPrices,
+  loadUnitPricesOnDate: pricingMock.loadUnitPricesOnDate,
 }));
 
 const CHAR_A = 1;
@@ -37,7 +38,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   await db.miningTaxAssignments.clear();
   await db.payees.clear();
-  pricingMock.loadUnitPrices.mockResolvedValue({
+  pricingMock.loadUnitPricesOnDate.mockResolvedValue({
     prices: new Map([
       [TYPE_A, 10],
       [TYPE_B, 4],
@@ -68,7 +69,7 @@ describe('createAssignment', () => {
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
     // No internal price lookup — the Assign dialog already resolved (and
     // possibly corrected) the value before calling this.
-    expect(pricingMock.loadUnitPrices).not.toHaveBeenCalled();
+    expect(pricingMock.loadUnitPricesOnDate).not.toHaveBeenCalled();
   });
 
   it('stores a pilot-corrected value verbatim, even when it disagrees with the Jita price', async () => {
@@ -412,7 +413,7 @@ describe('joinAssignments', () => {
       ],
       'payee-1',
       10,
-      prices
+      () => prices
     );
 
     expect(a.groupId).toBeDefined();
@@ -426,6 +427,43 @@ describe('joinAssignments', () => {
     expect(await db.miningTaxAssignments.get(a.id)).toEqual(a);
     expect(await db.miningTaxAssignments.get(b.id)).toEqual(b);
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+  });
+
+  it("prices each still-unassigned member at its OWN mined date, not a shared one (a join's whole point is combining different dates)", async () => {
+    const pricesByDate = new Map([
+      ['2026-09-04', new Map([[TYPE_A, 10]])],
+      ['2026-09-05', new Map([[TYPE_A, 40]])],
+    ]);
+    const pricesOn = vi.fn((date: string) => pricesByDate.get(date) ?? new Map());
+
+    const [a, b] = await joinAssignments(
+      [
+        {
+          characterId: CHAR_A,
+          date: '2026-09-04',
+          solarSystemId: 1,
+          assignment: null,
+          oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+        },
+        {
+          characterId: CHAR_A,
+          date: '2026-09-05',
+          solarSystemId: 1,
+          assignment: null,
+          oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+        },
+      ],
+      'payee-1',
+      10,
+      pricesOn
+    );
+
+    expect(pricesOn).toHaveBeenCalledWith('2026-09-04');
+    expect(pricesOn).toHaveBeenCalledWith('2026-09-05');
+    // Same type, same quantity, two different mined dates — a shared price
+    // would give these the same value. A per-date one must not.
+    expect(a.estimatedValue).toBe(1000); // 100 * 10
+    expect(b.estimatedValue).toBe(4000); // 100 * 40
   });
 
   it('tags an already-assigned member with the shared groupId, leaving its own fields untouched', async () => {
@@ -454,7 +492,7 @@ describe('joinAssignments', () => {
       ],
       existing.payeeId as string,
       existing.taxPct,
-      prices
+      () => prices
     );
 
     expect(taggedExisting.groupId).toBeDefined();
@@ -498,7 +536,7 @@ describe('joinAssignments', () => {
       ],
       'payee-1',
       10,
-      prices
+      () => prices
     );
 
     expect(created.groupId).toBe('existing-group');
@@ -535,7 +573,7 @@ describe('joinAssignments', () => {
       ],
       'payee-1',
       10,
-      prices
+      () => prices
     );
 
     expect(a.groupId).toBe(b.groupId);
@@ -647,9 +685,11 @@ describe('resolveNeedsReview', () => {
     // Accepting growth is a fresh invoice moment, and the invoice is still
     // billed at the hub this Payee bills at — re-pricing at Jita would quietly
     // restate the bill at a book the landlord never quoted.
-    expect(pricingMock.loadUnitPrices).toHaveBeenCalledWith(
+    expect(pricingMock.loadUnitPricesOnDate).toHaveBeenCalledWith(
+      CHAR_A,
       expect.anything(),
-      expect.objectContaining({ id: 'hek' })
+      expect.objectContaining({ id: 'hek' }),
+      assignment.date
     );
   });
 
@@ -669,18 +709,22 @@ describe('resolveNeedsReview', () => {
     await db.miningTaxAssignments.put(dismissed);
 
     await resolveNeedsReview(dismissed, freshEntry, [dismissed]);
-    expect(pricingMock.loadUnitPrices).toHaveBeenCalledWith(
+    expect(pricingMock.loadUnitPricesOnDate).toHaveBeenCalledWith(
+      CHAR_A,
       expect.anything(),
-      expect.objectContaining({ id: 'jita' })
+      expect.objectContaining({ id: 'jita' }),
+      dismissed.date
     );
 
     // A dangling payeeId (the Payee was deleted after the Assignment) resolves
     // the same way rather than throwing partway through a re-snapshot.
-    pricingMock.loadUnitPrices.mockClear();
+    pricingMock.loadUnitPricesOnDate.mockClear();
     await resolveNeedsReview({ ...dismissed, payeeId: 'gone' }, freshEntry, [dismissed]);
-    expect(pricingMock.loadUnitPrices).toHaveBeenCalledWith(
+    expect(pricingMock.loadUnitPricesOnDate).toHaveBeenCalledWith(
+      CHAR_A,
       expect.anything(),
-      expect.objectContaining({ id: 'jita' })
+      expect.objectContaining({ id: 'jita' }),
+      dismissed.date
     );
   });
 
@@ -984,7 +1028,7 @@ describe('double-assignment guard', () => {
         ],
         'payee-1',
         5,
-        new Map([[TYPE_A, 10]])
+        () => new Map([[TYPE_A, 10]])
       )
     ).rejects.toBeInstanceOf(AlreadyAssignedError);
     expect(await db.miningTaxAssignments.count()).toBe(1);
