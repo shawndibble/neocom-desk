@@ -778,8 +778,8 @@
     },
     "appliedDps": {
       "summary": "Raw DPS {{raw}} · applied {{applied}} at {{km}} km",
-      "assumptions": "Our own calculation, not the engine's: your ship stationary, the target moving fully transversal at the profile's speed. Drones only apply inside drone control range.",
-      "noWeapons": "No weapons are running — set a turret or launcher active, or launch drones.",
+      "assumptions": "Our own calculation, not the engine's: your ship stationary, the target moving fully transversal at the profile's speed. Drones only apply inside drone control range. Fighters fly to the target and are counted at full damage at any range — their hit chance isn't modelled.",
+      "noWeapons": "No weapons are running — set a turret or launcher active, or launch drones or fighters.",
       "loading": "Loading graphs…",
       "overlayLabel": "Compare with",
       "overlayNone": "No overlay",

@@ -34,6 +34,20 @@ export const APPLIED_DPS_ATTRIBUTE = {
   explosiveDamage: 116,
   kineticDamage: 117,
   thermalDamage: 118,
+  // A fighter's standard attack, the one its `dps` above is: a live run of
+  // the pinned engine (Templar I in a Thanatos tube, 2026-09-25) gave `dps`
+  // equal to fighterAbilityAttackMissileDamagePerSecond (-55), with its
+  // damage on fighterAbilityAttackMissileDamage* (ids read by name off the
+  // pinned `sde.dat`'s dogma attributes). A few attacks carry the
+  // fighterAbilityAttackTurretDamage* ones instead.
+  fighterAttackEmDamage: 2227,
+  fighterAttackThermalDamage: 2228,
+  fighterAttackKineticDamage: 2229,
+  fighterAttackExplosiveDamage: 2230,
+  fighterTurretEmDamage: 2171,
+  fighterTurretThermalDamage: 2172,
+  fighterTurretKineticDamage: 2173,
+  fighterTurretExplosiveDamage: 2174,
 } as const;
 
 /** The base drone control range with no skills trained. */
@@ -68,13 +82,35 @@ function trackingOf(attributes: AttributeMap) {
   };
 }
 
+const PLAIN_DAMAGE = {
+  em: APPLIED_DPS_ATTRIBUTE.emDamage,
+  thermal: APPLIED_DPS_ATTRIBUTE.thermalDamage,
+  kinetic: APPLIED_DPS_ATTRIBUTE.kineticDamage,
+  explosive: APPLIED_DPS_ATTRIBUTE.explosiveDamage,
+};
+const FIGHTER_ATTACK_DAMAGE = {
+  em: APPLIED_DPS_ATTRIBUTE.fighterAttackEmDamage,
+  thermal: APPLIED_DPS_ATTRIBUTE.fighterAttackThermalDamage,
+  kinetic: APPLIED_DPS_ATTRIBUTE.fighterAttackKineticDamage,
+  explosive: APPLIED_DPS_ATTRIBUTE.fighterAttackExplosiveDamage,
+};
+const FIGHTER_TURRET_DAMAGE = {
+  em: APPLIED_DPS_ATTRIBUTE.fighterTurretEmDamage,
+  thermal: APPLIED_DPS_ATTRIBUTE.fighterTurretThermalDamage,
+  kinetic: APPLIED_DPS_ATTRIBUTE.fighterTurretKineticDamage,
+  explosive: APPLIED_DPS_ATTRIBUTE.fighterTurretExplosiveDamage,
+};
+
 /** The damage split by type, as shares; nothing when the item carries no damage at all. */
-function damageSplit(attributes: AttributeMap | undefined): { damage?: DamageSplit } {
+function damageSplit(
+  attributes: AttributeMap | undefined,
+  ids: Record<keyof DamageSplit, number> = PLAIN_DAMAGE
+): { damage?: DamageSplit } {
   if (!attributes) return {};
-  const em = read(attributes, APPLIED_DPS_ATTRIBUTE.emDamage);
-  const thermal = read(attributes, APPLIED_DPS_ATTRIBUTE.thermalDamage);
-  const kinetic = read(attributes, APPLIED_DPS_ATTRIBUTE.kineticDamage);
-  const explosive = read(attributes, APPLIED_DPS_ATTRIBUTE.explosiveDamage);
+  const em = read(attributes, ids.em);
+  const thermal = read(attributes, ids.thermal);
+  const kinetic = read(attributes, ids.kinetic);
+  const explosive = read(attributes, ids.explosive);
   const total = em + thermal + kinetic + explosive;
   if (total <= 0) return {};
   return {
@@ -116,7 +152,8 @@ function moduleWeapon(result: ItemResultLike): AppliedWeapon | null {
  * `items`/`results` must be the index-parallel `dogmaFit.items` and
  * `calculation.items`. A drone stack counts only when the Fitting launched it
  * (`item.state === 'active'`) — the engine itself reports bay drones as
- * active too. A module counts only while running (active or overloaded).
+ * active too. A module counts only while running (active or overloaded), a
+ * fighter squadron only while launched (in a tube).
  */
 export function extractAppliedDpsInputs(
   items: readonly FitItemLike[],
@@ -140,7 +177,20 @@ export function extractAppliedDpsInputs(
       });
       return;
     }
-    if (item.slot.type === 'cargo') return;
+    if (item.slot.type === 'fighter_tube') {
+      // A tube holds a launched squadron; the bay's (`fighter_bay`) don't fight.
+      if (item.state !== 'active') return;
+      const perFighter = read(result.attributes, APPLIED_DPS_ATTRIBUTE.dps);
+      if (perFighter <= 0) return;
+      const split = damageSplit(result.attributes, FIGHTER_ATTACK_DAMAGE);
+      weapons.push({
+        kind: 'fighter',
+        dps: perFighter * (item.quantity ?? 1),
+        ...(split.damage ? split : damageSplit(result.attributes, FIGHTER_TURRET_DAMAGE)),
+      });
+      return;
+    }
+    if (item.slot.type === 'cargo' || item.slot.type === 'fighter_bay') return;
     const weapon = moduleWeapon(result);
     if (weapon) weapons.push(weapon);
   });

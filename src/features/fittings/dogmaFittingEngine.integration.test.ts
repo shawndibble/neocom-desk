@@ -905,6 +905,19 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(offense.weapons).toEqual([
       expect.objectContaining({ typeId: TEMPLAR_I, count: 6, isFighter: true }),
     ]);
+    // Applied DPS takes the launched squadron at the same DPS, its attack all EM.
+    const applied = extractAppliedDpsInputs(
+      dogmaFit.items,
+      calculation.items,
+      calculation.character.attributes
+    );
+    expect(applied.weapons).toEqual([
+      {
+        kind: 'fighter',
+        dps: expect.closeTo(offense.dps, 6),
+        damage: { em: 1, thermal: 0, kinetic: 0, explosive: 0 },
+      },
+    ]);
   });
 
   it('reads applied-DPS inputs: running turrets, loaded launchers, launched drones only', () => {
