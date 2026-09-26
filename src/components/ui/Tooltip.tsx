@@ -114,6 +114,8 @@ export function Tooltip({
   const openAtTouchStart = useRef<boolean | undefined>(undefined);
   /** `null` until a tap opens the tooltip; then the echoed click has a deadline to beat. */
   const touchOpenedAt = useRef<number | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const mouseHovering = useRef(false);
 
   function cancelLongPress() {
     clearTimeout(longPressTimer.current);
@@ -209,8 +211,33 @@ export function Tooltip({
    * touch reveal too keeps a timeout-free bubble from getting stuck open.
    */
   function handleOpenChange(open: boolean) {
+    if (open && isNonKeyboardFocusOpen()) return;
     setHoverOpen(open);
     if (!open) setTouchOpen(false);
+  }
+
+  /**
+   * Radix opens on any focus, including a dialog handing focus back to its
+   * trigger on close — which pops the bubble over whatever sits beside it.
+   * Only `:focus-visible` (keyboard) focus should open it; a hovering mouse
+   * still does, since its focus is not what opened it.
+   */
+  function isNonKeyboardFocusOpen() {
+    const el = triggerRef.current;
+    if (!el || mouseHovering.current || document.activeElement !== el) return false;
+    try {
+      return !el.matches(':focus-visible');
+    } catch {
+      return false;
+    }
+  }
+
+  function handlePointerEnter(event: PointerEvent) {
+    mouseHovering.current = event.pointerType === 'mouse';
+  }
+
+  function handlePointerLeave() {
+    mouseHovering.current = false;
   }
 
   useEffect(() => cancelLongPress, []);
@@ -227,6 +254,9 @@ export function Tooltip({
       <TooltipPrimitive.Root open={hoverOpen || touchOpen} onOpenChange={handleOpenChange}>
         <TooltipPrimitive.Trigger
           asChild
+          ref={triggerRef}
+          onPointerEnter={handlePointerEnter}
+          onPointerLeave={handlePointerLeave}
           onPointerDown={handlePointerDown}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
