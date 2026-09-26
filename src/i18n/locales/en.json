@@ -457,7 +457,8 @@
         "price": "Price",
         "support": "Support out",
         "mining": "Mining",
-        "projected": "Projected effects"
+        "projected": "Projected effects",
+        "fighters": "Fighters"
       },
       "capacitorStable": "Stable at {{pct}}%",
       "capacitorDepletes": "Depletes in {{seconds}}s",
@@ -530,7 +531,10 @@
         "miningHold": "Mining hold",
         "jumpRange": "Jump range",
         "jumpFuel": "Jump fuel",
-        "sensorStrength": "Sensor strength"
+        "sensorStrength": "Sensor strength",
+        "fighterDps": "Fighter DPS",
+        "fighterTubes": "Tubes",
+        "fighterBay": "Fighter bay"
       },
       "unit": {
         "gj": "{{value}} GJ",
@@ -551,7 +555,8 @@
         "sensor": "{{value}} {{type}}",
         "fuelPerLightYear": "{{value}} {{fuel}}/ly",
         "cubicMetresPerSecond": "{{value}} m³/s",
-        "cubicMetresPerHour": "{{value}} m³/h"
+        "cubicMetresPerHour": "{{value}} m³/h",
+        "cubicMetresUsed": "{{used}} / {{total}} m³"
       },
       "tank": {
         "passiveShield": "Passive shield regen: {{value}} HP/s",
@@ -627,7 +632,8 @@
         "fillsIn": "{{hold}} full in",
         "note": "Yield includes expected critical successes; a crystal's bonus counts only on its own ore.",
         "fillTime": "{{time}} ({{capacity}} m³)"
-      }
+      },
+      "fightersNoOverheat": "Fighters don't overheat"
     },
     "variations": {
       "title": "Variations",
@@ -976,6 +982,24 @@
     },
     "mode": {
       "label": "Tactical mode"
+    },
+    "fighters": {
+      "title": "Fighters",
+      "tubes": "{{used}} of {{total}} tubes",
+      "classes": "light {{light}} · support {{support}} · heavy {{heavy}}",
+      "none": "No fighters.",
+      "class": {
+        "light": "Light fighter",
+        "support": "Support fighter",
+        "heavy": "Heavy fighter"
+      },
+      "size": "{{count}}/{{full}}",
+      "fewer": "One fewer {{name}}",
+      "more": "One more {{name}}",
+      "launched": "Launched",
+      "remove": "Remove {{name}}",
+      "search": "Find a fighter",
+      "add": "Add {{name}}"
     }
   },
   "skills": {

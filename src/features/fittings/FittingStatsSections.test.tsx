@@ -709,3 +709,28 @@ describe('FittingStatsSections — Mining', () => {
     expect(mining.getByText('5m (11500 m³)')).toBeInTheDocument();
   });
 });
+
+describe('FittingStatsSections — Fighters', () => {
+  it('shows fighter DPS, tubes and the bay on a hull with tubes', () => {
+    const neutral = stats().fighters;
+    renderSections(
+      stats({
+        fighters: {
+          ...neutral,
+          dps: 822.7,
+          tubes: { used: 2, total: 4 },
+          bay: { used: 36000, total: 93750 },
+        },
+      })
+    );
+    const fighters = within(sectionBody('Fighters'));
+    expect(fighters.getAllByText('822.7 DPS').length).toBeGreaterThan(0);
+    expect(fighters.getByText('2 / 4')).toBeInTheDocument();
+    expect(fighters.getByText('36000 / 93750 m³')).toBeInTheDocument();
+  });
+
+  it('has no Fighters section on a hull without tubes', () => {
+    renderSections(stats());
+    expect(screen.queryByRole('heading', { name: 'Fighters' })).toBeNull();
+  });
+});

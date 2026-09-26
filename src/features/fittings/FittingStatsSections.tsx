@@ -168,6 +168,7 @@ type Section =
   | 'targeting'
   | 'navigation'
   | 'drones'
+  | 'fighters'
   | 'fitting'
   | 'price';
 
@@ -182,6 +183,7 @@ const OPEN_BY_DEFAULT: ReadonlySet<Section> = new Set([
   'mining',
   'navigation',
   'drones',
+  'fighters',
 ]);
 
 function StatSection({
@@ -527,7 +529,11 @@ export function FittingStatsSections({
                     )}
                     {row.isDrone && (
                       <span className="block text-text-dim">
-                        {t('fittings.stats.dronesNoOverheat')}
+                        {t(
+                          row.isFighter
+                            ? 'fittings.stats.fightersNoOverheat'
+                            : 'fittings.stats.dronesNoOverheat'
+                        )}
                       </span>
                     )}
                   </span>
@@ -758,6 +764,35 @@ export function FittingStatsSections({
           ) : (
             placeholder
           )
+        )}
+
+      {stats &&
+        stats.fighters.tubes.total > 0 &&
+        section(
+          'fighters',
+          t('fittings.stats.weaponDps', { value: stats.fighters.dps.toFixed(1) }),
+          <Facts
+            items={[
+              {
+                label: t('fittings.stats.fact.fighterDps'),
+                value: stats.fighters.dps.toFixed(1),
+              },
+              {
+                label: t('fittings.stats.fact.fighterTubes'),
+                value: t('fittings.stats.unit.usedOfTotal', {
+                  used: stats.fighters.tubes.used.toFixed(0),
+                  total: stats.fighters.tubes.total.toFixed(0),
+                }),
+              },
+              {
+                label: t('fittings.stats.fact.fighterBay'),
+                value: t('fittings.stats.unit.cubicMetresUsed', {
+                  used: stats.fighters.bay.used.toFixed(0),
+                  total: stats.fighters.bay.total.toFixed(0),
+                }),
+              },
+            ]}
+          />
         )}
 
       {section(
