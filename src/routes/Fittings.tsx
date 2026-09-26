@@ -54,11 +54,7 @@ import {
 } from '@/engine/fittings/fittingEdit';
 import { buildVariationIndex, getVariations } from '@/engine/market/variations';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
-import {
-  chargeGroupIdsFor,
-  checkCharges,
-  shipCargoCapacity,
-} from '@/features/fittings/dogmaFittingEngine';
+import { chargeGroupIdsFor, checkCharges } from '@/features/fittings/dogmaFittingEngine';
 import {
   FittingItemActionsProvider,
   type FittingItemActions,
@@ -262,15 +258,9 @@ function FittingsPage() {
   // The cargo item whose quantity dialog is open, and what's being typed there.
   const [cargoQuantityFor, setCargoQuantityFor] = useState<number | null>(null);
   const [cargoQuantityDraft, setCargoQuantityDraft] = useState('');
-  // The hold as fitted (a cargo expander counts); null until the engine can say.
-  const cargoCapacity = useMemo(() => {
-    if (fitting === null || !workspace.engineReady || workspace.profile === null) return null;
-    try {
-      return shipCargoCapacity(fitting, workspace.profile);
-    } catch {
-      return null;
-    }
-  }, [fitting, workspace.engineReady, workspace.profile]);
+  // The hold as fitted (a cargo expander counts), read off the stats already
+  // worked out under the conditions (All V, skill overrides…); null before them.
+  const cargoCapacity = stats?.holds.cargo ?? null;
   const variationIndex = useMemo(
     () =>
       catalogue === null

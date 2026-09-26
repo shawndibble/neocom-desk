@@ -26,6 +26,7 @@ import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes, type AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { extractMining, miningYield } from '@/engine/fittings/mining';
 import {
+  DOGMA_ATTRIBUTE,
   ITEM_DOGMA_ATTRIBUTE,
   type Fitting,
   type FittingSlotKind,
@@ -565,20 +566,6 @@ export function chargeGroupIdsFor(
   return items[0] ? extractModuleResult(items[0]).chargeGroupIds : [];
 }
 
-/** `capacity` (m3): a ship's cargo hold, a module's charge room. */
-const CAPACITY_ATTRIBUTE = 38;
-
-/**
- * The hull's cargo hold in m3 as fitted — the whole Fitting calculated, so
- * an expanded cargohold or a rig counts. Standalone rather than part of
- * `computeFittingStats`, so the editor's cargo bar doesn't wait on the stats.
- */
-export function shipCargoCapacity(fitting: Fitting, profile: PilotProfile): number {
-  assertReady();
-  const { ship } = calculate(fittingToDogmaFit(fitting, profile));
-  return ship.attributes.get(CAPACITY_ATTRIBUTE)?.value ?? 0;
-}
-
 /** m3 of charge a module holds — over a charge's volume, how many one load is. 0 when it holds none. */
 export function moduleChargeCapacity(
   shipTypeId: number,
@@ -589,5 +576,6 @@ export function moduleChargeCapacity(
     ship: { type_id: shipTypeId },
     items: [{ type_id: module.typeId, slot: { type: module.slot, index: 0 }, state: 'online' }],
   });
-  return items[0]?.attributes.get(CAPACITY_ATTRIBUTE)?.value ?? 0;
+  // `capacity` is one attribute for both: a ship's cargo hold, a module's charge room.
+  return items[0]?.attributes.get(DOGMA_ATTRIBUTE.cargoCapacity)?.value ?? 0;
 }
