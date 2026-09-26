@@ -16,7 +16,7 @@ import { isCompletingSoon, isJobDone } from '@/features/industry/jobs';
 import type { IndustryJob } from '@/esi/endpoints';
 import { openOrderProblemCounts } from '@/features/market/openOrdersModel';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
-import type { MiningTaxBoardData, PlanetaryBoardData } from './boardData';
+import type { ContractsBoardData, MiningTaxBoardData, PlanetaryBoardData } from './boardData';
 
 /**
  * A lapsed grant is `warning`, never `clear`.
@@ -81,4 +81,12 @@ export function industrySeverity(
     .map((job) => jobSeverity(job, nowMs));
   if (jobs.some((job) => isJobDone(job, nowMs))) severities.push('warning');
   return worstSeverity(severities);
+}
+
+/** A courier past its deliver-by forfeits the collateral, so it is the one `critical`; anything else due inside a day is `warning`. */
+export function contractsSeverity(data: ContractsBoardData | null): DeadlineSeverity | null {
+  if (data === null) return null;
+  if (data.needsReauth) return UNREADABLE;
+  if (data.summary.overdue > 0) return 'critical';
+  return data.summary.dueSoon > 0 ? 'warning' : 'clear';
 }

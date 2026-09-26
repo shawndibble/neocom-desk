@@ -15,6 +15,8 @@ export interface SkillRowProps {
   addLabel?: string;
   /** Small provenance chips, rendered between the name and the level bar. Omit for none. */
   tags?: ReactNode;
+  /** Set when the target plan already covers this row — renders as a static badge in place of the Add button. */
+  inPlanLabel?: string;
 }
 
 /** No outer padding/border/margin — the caller's own wrapper controls spacing, since the Ships panel and Market's Required Skills each frame this row differently (dividers vs. plain stack). */
@@ -26,7 +28,19 @@ export function SkillRow({
   onAdd,
   addLabel,
   tags,
+  inPlanLabel,
 }: SkillRowProps) {
+  const trailing =
+    status === 'trained' ? null : inPlanLabel ? (
+      <span className="text-text-dim">{inPlanLabel}</span>
+    ) : (
+      onAdd && (
+        <Button size="sm" variant="ghost" onClick={onAdd}>
+          {addLabel}
+        </Button>
+      )
+    );
+
   return (
     <div className="flex items-center gap-3 text-xs">
       <SkillStatusIcon status={status} />
@@ -36,11 +50,7 @@ export function SkillRow({
       {timeLabel !== undefined && (
         <span className="w-16 text-right text-text-dim tabular-nums">{timeLabel}</span>
       )}
-      {status !== 'trained' && onAdd && (
-        <Button size="sm" variant="ghost" onClick={onAdd}>
-          {addLabel}
-        </Button>
-      )}
+      {trailing}
     </div>
   );
 }

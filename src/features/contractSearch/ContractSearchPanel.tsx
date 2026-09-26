@@ -1115,6 +1115,23 @@ export function ContractSearchPanel({
                       title={t('contractSearch.noFilterMatches')}
                       hint={t('contractSearch.noFilterMatchesHint')}
                       className="py-8"
+                      action={
+                        <Button
+                          size="sm"
+                          onClick={() =>
+                            changeFilter({
+                              typeQuery: '',
+                              regionId: null,
+                              maxPrice: '',
+                              minQuantity: '',
+                              saleKind: null,
+                              jumps: DEFAULT_JUMP_RANGE,
+                            })
+                          }
+                        >
+                          {t('common.resetFilters')}
+                        </Button>
+                      }
                     />
                   )
                 ) : (

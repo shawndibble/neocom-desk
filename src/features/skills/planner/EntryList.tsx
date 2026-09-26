@@ -591,6 +591,7 @@ const EntryRow = memo(function EntryRow({
 
   return (
     <li
+      id={`plan-entry-${row.id}`}
       ref={setNodeRef}
       style={style}
       className={`border-b border-line px-2 py-1.5 text-xs last:border-b-0 ${

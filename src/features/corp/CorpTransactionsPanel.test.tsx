@@ -94,6 +94,26 @@ describe('CorpTransactionsPanel — filtered to zero', () => {
       screen.getByText('Clear the search or widen the side and date filters.')
     ).toBeInTheDocument();
   });
+
+  it('offers "Reset filters" when a filter is active and resets it on click', async () => {
+    const user = userEvent.setup();
+    const onFilterChange = vi.fn();
+    renderPanel({
+      filteredTransactions: [],
+      filter: { ...EMPTY_WALLET_TRANSACTION_FILTER, side: 'buy' },
+      onFilterChange,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+    expect(onFilterChange).toHaveBeenCalledWith(EMPTY_WALLET_TRANSACTION_FILTER);
+  });
+
+  it('omits "Reset filters" when no filter is active', () => {
+    renderPanel({ filteredTransactions: [] });
+
+    expect(screen.queryByRole('button', { name: 'Reset filters' })).not.toBeInTheDocument();
+  });
 });
 
 describe('CorpTransactionsPanel — column picker', () => {

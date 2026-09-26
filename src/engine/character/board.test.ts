@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildCharacterBoard,
   isProjectedKind,
+  pastDeadlineLabelKey,
   type BoardCalendarEventSource,
   type BoardClockSource,
   type CharacterBoardSources,
@@ -106,6 +107,21 @@ describe('buildCharacterBoard', () => {
   it('names Skill Plan steps, and only them, as projected', () => {
     expect(isProjectedKind('skillPlan')).toBe(true);
     expect(isProjectedKind('skillTraining')).toBe(false);
+  });
+
+  /**
+   * A calendar event past its deadline is running, not late. An industry job
+   * past its deadline is finished and waiting for pickup — ESI has no signal
+   * for a job genuinely overdue, so it reads the same "ready to deliver" copy
+   * the detail line already uses, never "Overdue". Every other kind has no
+   * such distinction: past its deadline simply means late.
+   */
+  it('picks the past-deadline word per kind', () => {
+    expect(pastDeadlineLabelKey('calendarEvent')).toBe('calendar.started');
+    expect(pastDeadlineLabelKey('industryJob')).toBe('calendar.detail.industryJob.ready');
+    expect(pastDeadlineLabelKey('skillTraining')).toBe('calendar.overdue');
+    expect(pastDeadlineLabelKey('contractExpiry')).toBe('calendar.overdue');
+    expect(pastDeadlineLabelKey('orderExpiry')).toBe('calendar.overdue');
   });
 
   it('carries the RSVP state and importance of a calendar event, and nothing else', () => {

@@ -1092,7 +1092,11 @@
       "addAllToPlan": "Add all to Skill Plan",
       "createPlanAndAdd": "Create Skill Plan and add",
       "add": "Add",
-      "trained": "Trained"
+      "trained": "Trained",
+      "inPlan": "In plan",
+      "addedToast_one": "Added {{count}} skill to {{plan}}",
+      "addedToast_other": "Added {{count}} skills to {{plan}}",
+      "addedToastUndo": "Undo"
     },
     "requiredSkills": {
       "title": "Required Skills",
@@ -1463,7 +1467,8 @@
       "namePlaceholder": "Goal name (e.g. \"Fly Loki\")",
       "save": "Save",
       "cancel": "Cancel"
-    }
+    },
+    "jumpToAdded": "Jump to it"
   },
   "skillCompare": {
     "pickCharacters": "Characters to compare",
@@ -2496,6 +2501,19 @@
       "noColonies": "No colonies",
       "alertTypes_one": "{{count}} type",
       "alertTypes_other": "{{count}} types",
+      "contracts": "Contracts",
+      "contractsInProgress_one": "{{count}} haul in progress",
+      "contractsInProgress_other": "{{count}} hauls in progress",
+      "contractsNextDue": "next due {{duration}}",
+      "contractsListingIn": "listing expires in {{duration}}",
+      "contractsOverdue_one": "{{count}} overdue",
+      "contractsOverdue_other": "{{count}} overdue",
+      "contractsNothingDue": "Nothing due",
+      "contractsCourierDue": "Courier due",
+      "contractsCourierOverdue": "Courier overdue",
+      "contractsListingExpires": "Listing expires",
+      "contractsInProgressTile": "In progress",
+      "contractsDueTile": "Due < 24h",
       "everythingElse": "Everything else",
       "foldedRowLabel": "{{domain}}: {{summary}}"
     }
@@ -4210,6 +4228,10 @@
         "title": "Structure fuel low",
         "body": "{{character}}: {{structure}} has less than {{days}} days of fuel remaining."
       },
+      "courierDeliveryDue": {
+        "title": "Courier delivery due",
+        "body": "{{character}}'s courier contract must be delivered in under {{hours}} hours."
+      },
       "skillQueueEnding": {
         "title": "Skill queue ending soon",
         "body": "{{character}}'s skill queue will run dry in under {{hours}} hours."
@@ -5132,6 +5154,7 @@
         "contractAccepted": "Contract Accepted",
         "contractCompleted": "Contract Completed",
         "contractFailed": "Contract Failed",
+        "courierDeliveryDue": "Courier Delivery Due",
         "walletBalanceChanged": "Wallet Balance Changed",
         "eveNotification": "EVE Notifications",
         "structureFuelLow": "Structure Fuel Low",
@@ -5149,6 +5172,9 @@
       "extractorExpiringLeadTimeLabel": "Warn this far before an extractor expires:",
       "extractorExpiringLeadTimeOption_one": "{{count}} hour",
       "extractorExpiringLeadTimeOption_other": "{{count}} hours",
+      "courierDeliveryDueLeadTimeLabel": "Warn this far before a courier delivery is due:",
+      "courierDeliveryDueLeadTimeOption_one": "{{count}} hour",
+      "courierDeliveryDueLeadTimeOption_other": "{{count}} hours",
       "skillQueueEndingLeadTimeLabel": "Warn this far before the skill queue runs dry:",
       "skillQueueEndingLeadTimeOption_one": "{{count}} hour",
       "skillQueueEndingLeadTimeOption_other": "{{count}} hours",

@@ -1,13 +1,28 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, FilterChip, SearchInput } from '@/components/ui';
-import { tappableRowClassName } from '@/components/ui/controlStyles';
+import { inlineLinkClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import type { SkillType } from '@/sde/types';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import { rankedSearch } from '@/lib/rankedSearch';
 import { SkillRequirementsList } from '../SkillRequirementsList';
 import { buildSkillRequirements } from '../skillRequirements';
 import type { SkillCatalog } from '../skillMap';
+import { entryId } from './reorder';
+
+/** DOM id EntryList puts on each plan row — how the picker finds one to jump to. */
+function planEntryElementId(skillTypeID: number, targetLevel: number): string {
+  return `plan-entry-${entryId({ skillTypeID, targetLevel })}`;
+}
+
+/** Vertically on-screen right now — good enough for "does the pilot need a jump link". */
+function isVerticallyInViewport(el: Element): boolean {
+  const rect = el.getBoundingClientRect();
+  return rect.top >= 0 && rect.bottom <= window.innerHeight;
+}
+
+/** How long the visible confirmation stays up before fading back to sr-only. */
+const ANNOUNCEMENT_VISIBLE_MS = 5000;
 
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 const MAX_RESULTS = 20;
@@ -53,7 +68,39 @@ export function SkillPicker({
   const [selected, setSelected] = useState<number | null>(null);
   const [activeGroups, setActiveGroups] = useState<Set<string>>(new Set());
   const [announcement, setAnnouncement] = useState('');
+  // Sighted confirmation is shown only for a few seconds after a pick, then
+  // this same `role="status"` text goes back to sr-only — one live region,
+  // not a second one layered on top.
+  const [announcementVisible, setAnnouncementVisible] = useState(false);
+  const [jumpTargetId, setJumpTargetId] = useState<string | null>(null);
+  // Id of a just-added row not yet found in the DOM. Cleared once found;
+  // re-picking before that replaces it, so an older pick has nothing left to
+  // resolve into.
+  const [pendingJumpElementId, setPendingJumpElementId] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  const hideAnnouncementTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (hideAnnouncementTimer.current) clearTimeout(hideAnnouncementTimer.current);
+    },
+    []
+  );
+
+  // `planEntries` changes on the same render pass `EntryList` mounts the new
+  // row (both read off the same parent state), so re-checking whenever it
+  // changes needs no polling: the row exists by the time this reruns, or a
+  // newer pick has already replaced `pendingJumpElementId`.
+  useEffect(() => {
+    if (!pendingJumpElementId) return;
+    const el = document.getElementById(pendingJumpElementId);
+    if (!el) return;
+    // Measuring committed DOM layout, not deriving from render-time props —
+    // there's no non-effect way to know where the row actually landed.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setJumpTargetId(isVerticallyInViewport(el) ? null : el.id);
+    setPendingJumpElementId(null);
+  }, [pendingJumpElementId, planEntries]);
 
   useEffect(() => {
     const id = setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
@@ -111,6 +158,13 @@ export function SkillPicker({
     setAnnouncement('');
     window.setTimeout(() => {
       setAnnouncement(t('plans.addedAnnouncement', { skill: skillName, level: levelLabel }));
+      setAnnouncementVisible(true);
+      setJumpTargetId(null);
+      setPendingJumpElementId(planEntryElementId(skillTypeID, targetLevel));
+      if (hideAnnouncementTimer.current) clearTimeout(hideAnnouncementTimer.current);
+      hideAnnouncementTimer.current = setTimeout(() => {
+        setAnnouncementVisible(false);
+      }, ANNOUNCEMENT_VISIBLE_MS);
     }, 0);
     searchRef.current?.focus();
   }
@@ -130,8 +184,27 @@ export function SkillPicker({
           aria-label={t('plans.addSkill')}
           className="flex-1"
         />
-        <span role="status" aria-live="polite" className="sr-only">
+        <span
+          role="status"
+          aria-live="polite"
+          className={
+            announcementVisible ? 'flex items-center gap-1.5 text-xs text-text-dim' : 'sr-only'
+          }
+        >
           {announcement}
+          {announcementVisible && jumpTargetId && (
+            <button
+              type="button"
+              className={inlineLinkClassName}
+              onClick={() =>
+                document
+                  .getElementById(jumpTargetId)
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+              }
+            >
+              {t('plans.jumpToAdded')}
+            </button>
+          )}
         </span>
         {controls && (
           <div className="flex flex-wrap items-center gap-2 text-xs whitespace-nowrap text-text-dim">

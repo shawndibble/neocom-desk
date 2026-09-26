@@ -175,7 +175,7 @@ describe('domain.diff: events derived from their entries (issue #1285)', () => {
       colonies: ['planetaryExtractionDone', 'planetaryExtractorExpiring'],
       mail: ['newMail'],
       calendar: ['newCalendarEvent', 'calendarEventStarting'],
-      contracts: ['contractAccepted', 'contractCompleted', 'contractFailed'],
+      contracts: ['contractAccepted', 'contractCompleted', 'contractFailed', 'courierDeliveryDue'],
       wallet: ['walletBalanceChanged'],
       marketOrders: ['marketOrderFilled'],
       marketOrderUndercut: ['marketOrderUndercut'],
@@ -441,7 +441,7 @@ describe('projection wiring', () => {
     });
   });
 
-  it('gives exactly the six fixed-future-timestamp domains a projection', () => {
+  it('gives exactly the seven fixed-future-timestamp domains a projection', () => {
     const withProjection = POLL_DOMAINS.filter((domain) => domain.projection !== undefined).map(
       (domain) => domain.id
     );
@@ -449,6 +449,7 @@ describe('projection wiring', () => {
       [
         'calendar',
         'colonies',
+        'contracts',
         'eveNotification',
         'industryJobs',
         'skillQueue',
@@ -500,6 +501,36 @@ describe('projection wiring', () => {
     const rows = await skillQueueDomain.projection!(7, 'Kestrel', snapshot, T0);
     const ending = rows.find((r) => r.eventId === 'skillQueueEnding');
     expect(ending?.fireAt).toEqual(finishMs - 12 * HOUR_MS);
+  });
+
+  it("projects courierDeliveryDue at the Character's current lead time, not the one baked into the baseline (issue #1713)", async () => {
+    useNotificationPreferences.setState({
+      value: withCharacterEventThreshold(
+        DEFAULT_NOTIFICATION_PREFERENCES,
+        7,
+        'courierDeliveryDueLeadHours',
+        12
+      ),
+      hydrated: true,
+    });
+    const deadlineMs = T0 + 20 * HOUR_MS;
+    const snapshot = {
+      entries: [
+        {
+          contractId: 5,
+          status: 'in_progress' as const,
+          issuerId: 1,
+          acceptorId: 7,
+          deliveryDeadlineMs: deadlineMs,
+          dueLeadMs: 6 * HOUR_MS,
+        },
+      ],
+      nowMs: T0,
+    };
+    const rows = await contractDomain.projection!(7, 'Kestrel', snapshot, T0);
+    expect(rows.map((r) => [r.eventId, r.fireAt])).toEqual([
+      ['courierDeliveryDue', deadlineMs - 12 * HOUR_MS],
+    ]);
   });
 
   it('resolves item names for industry jobs', async () => {

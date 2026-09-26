@@ -129,6 +129,13 @@ export function occurrenceKey(fire: OccurrenceFire, nowMs: number): string {
     case 'contractCompleted':
     case 'contractFailed':
       return [characterId, fire.eventId, fire.contractId].join(':');
+    // The deadline and the threshold it crossed (issue #1713), on
+    // `planetaryExtractorExpiring`'s precedent: `diffCourierDeliveryDue` can
+    // re-fire for the same contract after a lower-then-raised lead time.
+    case 'courierDeliveryDue':
+      return [characterId, fire.eventId, fire.contractId, fire.deadlineMs, fire.thresholdMs].join(
+        ':'
+      );
     case 'marketOrderFilled':
       return [characterId, fire.eventId, fire.orderId].join(':');
     // The order's own price is the extra part: a relist at a new price is a
@@ -216,6 +223,8 @@ export function occurrenceFiredAt(fire: OccurrenceFire, nowMs: number): number {
     case 'contractAccepted':
     case 'contractCompleted':
     case 'contractFailed':
+    // falls through: a future deadline, not the moment the contract failed.
+    case 'courierDeliveryDue':
     case 'marketOrderFilled':
     case 'newMail':
     case 'structureReinforcementExit':

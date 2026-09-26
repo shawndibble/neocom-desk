@@ -142,17 +142,28 @@ const KIND_RANK = new Map<CharacterBoardItemKind, number>(
 );
 
 /**
- * Kinds whose deadline is a *start*, not an end — so being past it means the
- * thing is happening, not that it is late.
+ * The i18n key a row reads once its deadline has passed. Every kind defaults
+ * to "Overdue" — a deadline in the past that no one has acted on — but two
+ * kinds mean something else entirely there:
  *
- * Only calendar events, and only because the calendar layer now keeps a
- * started event on the board until local midnight
- * (`engine/character/calendarRetention.ts`); before that, no row could ever
- * outlive its own clock this way. Stated here because this module is where
- * kinds and what they mean meet — the rail only picks the word.
+ * A calendar event's deadline is a *start*, not an end, so being past it means
+ * the event is happening, not that it is late (the calendar layer keeps a
+ * started event on the board until local midnight,
+ * `engine/character/calendarRetention.ts`).
+ *
+ * An industry job's deadline is its finish time, and ESI carries no separate
+ * "this job is overdue" signal — a job past `end_date` is simply finished and
+ * waiting for pickup. It reads the same `calendar.detail.industryJob.ready`
+ * copy the detail line already uses when the job's status is `ready`, so the
+ * headline and the detail line never disagree.
+ *
+ * Stated here because this module is where kinds and what they mean meet —
+ * the rail only picks the word.
  */
-export function runsPastItsDeadline(kind: CharacterBoardItemKind): boolean {
-  return kind === 'calendarEvent';
+export function pastDeadlineLabelKey(kind: CharacterBoardItemKind): string {
+  if (kind === 'calendarEvent') return 'calendar.started';
+  if (kind === 'industryJob') return 'calendar.detail.industryJob.ready';
+  return 'calendar.overdue';
 }
 
 /**

@@ -839,6 +839,16 @@ describe('BpcSourcingPanel source multiselect', () => {
         'Clear the item search or widen the region, ME/TE/runs, price, source and space filters.'
       )
     ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+    const resetTable = await screen.findByRole('table', { name: 'BPC Search' });
+    expect(within(resetTable).getByText('Rifter Blueprint')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Contracts' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Owned' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('shows a dedicated empty state when every source is deselected', async () => {

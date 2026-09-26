@@ -17,11 +17,13 @@
  * Map, its segment in the Day Ticker and its swatch in the filter menu, so one
  * glance down the rail sorts six kinds of clock apart.
  */
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { CharacterBoardItem, CharacterBoardItemKind } from '@/engine/character/board';
-import { isProjectedKind, runsPastItsDeadline } from '@/engine/character/board';
+import { isProjectedKind, pastDeadlineLabelKey } from '@/engine/character/board';
 import { formatDuration } from '@/lib/duration';
 import { formatTimeOfDay } from '@/lib/timestamp';
+import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import * as Icon from '@/components/ui/icons';
 import { RESPONSE_KEY, RESPONSE_TEXT_TONE } from './calendarResponseTone';
 import { EventContextMenu } from './EventContextMenu';
@@ -58,10 +60,15 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
   // *late* for every other — a job sat undelivered, an order lapsed. Which
   // kinds are which is `board.ts`'s to say; this only picks the word.
   const countdown = overdue
-    ? t(runsPastItsDeadline(item.kind) ? 'calendar.started' : 'calendar.overdue')
+    ? t(pastDeadlineLabelKey(item.kind))
     : t('calendar.due', { duration: formatDuration(item.remainingMs / 1000) });
 
   const openable = item.kind === 'calendarEvent' && onSelectEvent !== undefined;
+  /** The one other kind with a fixed destination — no callback needed, unlike a calendar event's modal. */
+  const contractHref =
+    item.kind === 'contractExpiry'
+      ? `/contracts/history?${HIGHLIGHT_PARAM}=${item.sourceId}`
+      : null;
 
   const body = (
     <>
@@ -107,6 +114,17 @@ export function CharacterBoardRow({ item, onSelectEvent }: CharacterBoardRowProp
       </span>
     </>
   );
+
+  if (contractHref) {
+    return (
+      <Link
+        to={contractHref}
+        className="flex min-h-11 w-full items-start gap-2.5 px-3 py-2 text-left transition-colors hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent"
+      >
+        {body}
+      </Link>
+    );
+  }
 
   if (!openable) {
     return <div className="flex min-h-11 items-start gap-2.5 px-3 py-2">{body}</div>;
