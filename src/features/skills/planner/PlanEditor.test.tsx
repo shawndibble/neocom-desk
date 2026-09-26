@@ -301,7 +301,7 @@ describe('PlanEditor tools pane', () => {
     expect(within(attributesSection).getByText('Intelligence')).toBeInTheDocument();
     expect(within(attributesSection).getByLabelText('What-if implants')).toBeInTheDocument();
     // No accelerator configured, so the Booster section is its empty state:
-    // just the affordance to add one, not a permanently-visible checkbox.
+    // just the affordance to add one.
     expect(
       within(attributesSection).getByRole('button', { name: 'Add accelerator' })
     ).toBeInTheDocument();
@@ -1336,7 +1336,7 @@ describe('a cerebral accelerator detected in the ESI sheet', () => {
     renderEditor(vi.fn(), { attributeBaseline: ACCELERATED });
     await openTools(user);
 
-    expect(screen.getByLabelText<HTMLInputElement>('Booster').checked).toBe(true);
+    expect(screen.getByRole('button', { name: 'Remove accelerator' })).toBeInTheDocument();
     expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('12');
     expect(screen.getByText(/\+12 cerebral accelerator/i)).toBeInTheDocument();
   });
@@ -1442,8 +1442,8 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
   });
 
   it('saves the whole Booster answer the moment a row is added', async () => {
-    // No checkbox exists until a row does — "Add accelerator" is the
-    // empty-state affordance a list uses instead of one always-present box.
+    // No row exists until one is added — "Add accelerator" is the
+    // empty-state affordance.
     const user = userEvent.setup();
     const { onUpdate } = renderEditor();
     await openTools(user);
@@ -1495,7 +1495,7 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     });
     await openTools(user);
 
-    expect(screen.getByLabelText<HTMLInputElement>('Booster').checked).toBe(true);
+    expect(screen.getByRole('button', { name: 'Remove accelerator' })).toBeInTheDocument();
     expect(screen.getByLabelText<HTMLInputElement>('Bonus').value).toBe('6');
     expect(screen.getByLabelText<HTMLInputElement>('Expires').value).toBe('2099-06-02T13:45');
   });
@@ -1600,7 +1600,10 @@ describe('PlanEditor persists the lenses the plan is costed under', () => {
     });
     await openTools(user);
 
-    expect(screen.getByLabelText<HTMLInputElement>('Booster').checked).toBe(false);
+    // The unticked legacy row reads as no row at all, and the detected
+    // accelerator still does not prefill over that answer.
+    expect(screen.queryByRole('button', { name: 'Remove accelerator' })).toBeNull();
+    expect(screen.queryByLabelText('Bonus')).toBeNull();
   });
 });
 
@@ -1618,7 +1621,7 @@ describe('a character with no accelerator', () => {
     renderEditor(vi.fn(), attributeBaseline === undefined ? {} : { attributeBaseline });
     await openTools(user);
 
-    expect(screen.queryByLabelText('Booster')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove accelerator' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Add accelerator' })).toBeInTheDocument();
     expect(screen.queryByText(/cerebral accelerator/i)).toBeNull();
     expect(screen.queryByText(/costed as if you had none/i)).toBeNull();
@@ -1641,7 +1644,7 @@ describe('an attribute sheet nothing explains', () => {
     expect(screen.getByText(/totalling 160/i)).toBeInTheDocument();
     // No accelerator was recovered, so nothing is prefilled either — the
     // list stays empty, same as the no-accelerator case above.
-    expect(screen.queryByLabelText('Booster')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove accelerator' })).toBeNull();
   });
 });
 

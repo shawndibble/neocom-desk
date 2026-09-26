@@ -1453,6 +1453,7 @@
     "whatIfMarketLink": "View attribute enhancer implants in Market",
     "assumesNoImplantsHint": "Training time is calculated without this character's fitted implants. Grant Character details for an accurate estimate.",
     "booster": "Booster",
+    "boosterRowLabel": "Accelerator {{position}}",
     "boosterAdd": "Add accelerator",
     "boosterRemove": "Remove accelerator",
     "boosterMarketLink": "View cerebral accelerators in Market",

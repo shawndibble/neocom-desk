@@ -31,7 +31,7 @@ const ROW = (overrides: Partial<PlanBooster> = {}): PlanBooster => ({
 describe('BoosterList empty state', () => {
   it('shows only the add affordance when there are no rows', () => {
     renderList([]);
-    expect(screen.queryByLabelText('Booster')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove accelerator' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Add accelerator' })).toBeInTheDocument();
   });
 

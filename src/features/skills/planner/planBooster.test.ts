@@ -200,6 +200,12 @@ describe('normalizePlanBoosters', () => {
     expect(normalizePlanBoosters(undefined, legacy)).toEqual([legacy]);
   });
 
+  it('drops rows an older build saved unticked — a listed row is a live one', () => {
+    const live = booster({ enabled: true, bonus: 4, expiresAt: 1000 });
+    expect(normalizePlanBoosters([booster({ enabled: false, bonus: 3 }), live])).toEqual([live]);
+    expect(normalizePlanBoosters(undefined, booster({ enabled: false, bonus: 7 }))).toEqual([]);
+  });
+
   it('is empty when both boosters and legacy are absent', () => {
     expect(normalizePlanBoosters(undefined, undefined)).toEqual([]);
   });
@@ -301,9 +307,9 @@ describe('resolvePlanBoosters', () => {
     expect(resolvePlanBoosters([], undefined, 12)).toEqual([]);
   });
 
-  it('does not overrule a stored legacy "no booster" — unticking the box is an answer', () => {
+  it('does not overrule a stored legacy "no booster" — an unticked row is an answer', () => {
     const answered = booster({ enabled: false, bonus: 12, expiresAt: null });
-    expect(resolvePlanBoosters(undefined, answered, 12)).toEqual([answered]);
+    expect(resolvePlanBoosters(undefined, answered, 12)).toEqual([]);
   });
 
   it('is empty when nothing is stored and no accelerator is detected', () => {

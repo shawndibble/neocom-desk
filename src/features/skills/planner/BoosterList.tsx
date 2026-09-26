@@ -17,7 +17,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Button, IconButton, TextInput, Checkbox } from '@/components/ui';
+import { Button, IconButton, TextInput } from '@/components/ui';
 import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { PlanBooster } from '@/db';
@@ -89,6 +89,8 @@ function useInstantField(
 
 interface BoosterRowProps {
   row: PlanBooster;
+  /** 1-based position, naming the row among its siblings. */
+  position: number;
   rowKey: string;
   detectedAccelerator: number | null;
   /** Whether this row shows its Starts field. */
@@ -100,6 +102,7 @@ interface BoosterRowProps {
 
 function BoosterRow({
   row,
+  position,
   rowKey,
   detectedAccelerator,
   showStart,
@@ -130,15 +133,13 @@ function BoosterRow({
   );
 
   // eslint-disable-next-line react-hooks/purity -- display-only "expired" hint, same as PlanEditor's own clock read
-  const expired = row.enabled && row.expiresAt !== null && row.expiresAt <= Date.now();
+  const expired = row.expiresAt !== null && row.expiresAt <= Date.now();
 
   return (
     <div className="space-y-2 border-l border-line pl-2">
       <div className="flex items-center justify-between gap-2">
-        <label className="flex items-center gap-1.5">
-          <Checkbox checked={row.enabled} onChange={(e) => patch({ enabled: e.target.checked })} />
-          {t('plans.booster')}
-        </label>
+        {/* No on/off box: a listed row is live, and the X is how it goes off. */}
+        <span>{t('plans.boosterRowLabel', { position })}</span>
         <IconButton
           icon={<Icon.Close size={Icon.ICON_SIZE.sm} />}
           label={t('plans.boosterRemove')}
@@ -148,72 +149,64 @@ function BoosterRow({
           tone="danger"
         />
       </div>
-      {row.enabled && (
-        <>
-          <label className="flex items-center justify-between gap-2">
-            {t('plans.boosterBonus')}
-            <TextInput
-              size="md"
-              type="number"
-              min={1}
-              max={MAX_BOOSTER_BONUS}
-              value={row.bonus}
-              onChange={(e) => patch({ bonus: clampBoosterBonus(Number(e.target.value)) })}
-              className="field-no-spinner w-16 text-center"
-            />
-          </label>
-          {showStart && (
-            <label className="flex items-center justify-between gap-2">
-              {t('plans.boosterStartsAt')}
-              <TextInput
-                size="md"
-                type="datetime-local"
-                placeholder={t('plans.boosterStartsNow')}
-                value={startsAtField.inputValue}
-                onChange={(e) => startsAtField.onChange(e.target.value)}
-                onBlur={startsAtField.onBlur}
-                className="min-w-0 flex-1"
-              />
-            </label>
-          )}
-          <label className="flex items-center justify-between gap-2">
-            {t('plans.boosterExpiresAt')}
-            <TextInput
-              size="md"
-              type="datetime-local"
-              value={expiresAtField.inputValue}
-              onChange={(e) => expiresAtField.onChange(e.target.value)}
-              onBlur={expiresAtField.onBlur}
-              className="min-w-0 flex-1"
-            />
-          </label>
-          <div
-            role="group"
-            aria-label={t('plans.boosterQuickPicks')}
-            className="flex flex-wrap gap-1"
-          >
-            {BOOSTER_QUICK_PICKS.map(({ hours }) => (
-              <button
-                key={hours}
-                type="button"
-                onClick={() =>
-                  patch({ expiresAt: boosterExpiryFromNow(hours, row.startsAt ?? Date.now()) })
-                }
-                className={`${tappableRowClassName} rounded-xs border border-line px-1.5 text-[0.6875rem] text-text-dim hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
-              >
-                {hours % 24 === 0
-                  ? t('plans.boosterQuickPickDays', { days: hours / 24 })
-                  : t('plans.boosterQuickPickHours', { hours })}
-              </button>
-            ))}
-          </div>
-          {(rejected || overlaps) && <p className="text-warning">{t('plans.boosterOverlap')}</p>}
-          {detectedAccelerator !== null && row.expiresAt === null && (
-            <p className="text-warning">{t('plans.boosterDetectedNoExpiry')}</p>
-          )}
-          {expired && <p className="text-warning">{t('plans.boosterExpired')}</p>}
-        </>
+      <label className="flex items-center justify-between gap-2">
+        {t('plans.boosterBonus')}
+        <TextInput
+          size="md"
+          type="number"
+          min={1}
+          max={MAX_BOOSTER_BONUS}
+          value={row.bonus}
+          onChange={(e) => patch({ bonus: clampBoosterBonus(Number(e.target.value)) })}
+          className="field-no-spinner w-16 text-center"
+        />
+      </label>
+      {showStart && (
+        <label className="flex items-center justify-between gap-2">
+          {t('plans.boosterStartsAt')}
+          <TextInput
+            size="md"
+            type="datetime-local"
+            placeholder={t('plans.boosterStartsNow')}
+            value={startsAtField.inputValue}
+            onChange={(e) => startsAtField.onChange(e.target.value)}
+            onBlur={startsAtField.onBlur}
+            className="min-w-0 flex-1"
+          />
+        </label>
       )}
+      <label className="flex items-center justify-between gap-2">
+        {t('plans.boosterExpiresAt')}
+        <TextInput
+          size="md"
+          type="datetime-local"
+          value={expiresAtField.inputValue}
+          onChange={(e) => expiresAtField.onChange(e.target.value)}
+          onBlur={expiresAtField.onBlur}
+          className="min-w-0 flex-1"
+        />
+      </label>
+      <div role="group" aria-label={t('plans.boosterQuickPicks')} className="flex flex-wrap gap-1">
+        {BOOSTER_QUICK_PICKS.map(({ hours }) => (
+          <button
+            key={hours}
+            type="button"
+            onClick={() =>
+              patch({ expiresAt: boosterExpiryFromNow(hours, row.startsAt ?? Date.now()) })
+            }
+            className={`${tappableRowClassName} rounded-xs border border-line px-1.5 text-[0.6875rem] text-text-dim hover:border-line-bright hover:text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent`}
+          >
+            {hours % 24 === 0
+              ? t('plans.boosterQuickPickDays', { days: hours / 24 })
+              : t('plans.boosterQuickPickHours', { hours })}
+          </button>
+        ))}
+      </div>
+      {(rejected || overlaps) && <p className="text-warning">{t('plans.boosterOverlap')}</p>}
+      {detectedAccelerator !== null && row.expiresAt === null && (
+        <p className="text-warning">{t('plans.boosterDetectedNoExpiry')}</p>
+      )}
+      {expired && <p className="text-warning">{t('plans.boosterExpired')}</p>}
     </div>
   );
 }
@@ -269,6 +262,7 @@ export function BoosterList({ boosters, detectedAccelerator, onChange }: Booster
             key={index}
             rowKey={`booster-${index}`}
             row={row}
+            position={index + 1}
             detectedAccelerator={detectedAccelerator}
             // A start only matters for an accelerator queued behind another.
             showStart={index > 0 || row.startsAt !== null}
