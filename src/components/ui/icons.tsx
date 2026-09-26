@@ -87,6 +87,7 @@ import { Plus } from '@phosphor-icons/react/dist/csr/Plus';
 import { Prohibit } from '@phosphor-icons/react/dist/csr/Prohibit';
 import { Queue } from '@phosphor-icons/react/dist/csr/Queue';
 import { Receipt } from '@phosphor-icons/react/dist/csr/Receipt';
+import { Rocket } from '@phosphor-icons/react/dist/csr/Rocket';
 import { Scales } from '@phosphor-icons/react/dist/csr/Scales';
 import { ShareNetwork } from '@phosphor-icons/react/dist/csr/ShareNetwork';
 import { ShieldCheck } from '@phosphor-icons/react/dist/csr/ShieldCheck';
@@ -279,6 +280,8 @@ export const CollapseAll = withWeight(CaretDoubleUp);
 export const Skills = withWeight(GraduationCap);
 /** Manufacturing build plans. */
 export const Industry = withWeight(Factory);
+/** Fittings and the Ship Tree. */
+export const Ships = withWeight(Rocket);
 /** Live order books. */
 export const Market = withWeight(ChartLineUp);
 /** Balance and open orders. */

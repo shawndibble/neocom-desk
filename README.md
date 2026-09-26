@@ -23,11 +23,16 @@ Live: https://neocomdesk.com
   a production log, opportunities, and an active jobs panel.
 - **BPC sourcing** — search every publicly contracted blueprint copy by
   ME/TE, runs, price, region and jump range, flagging BPOs that may beat it.
+- **Ships** — build a Fitting against a ship's real skills/implants (DPS,
+  tank, EHP, cap stability, against a damage/target profile you set), save it
+  to My Fittings with a share code, and compare fits side by side. The Ship
+  Tree maps every hull by faction, map or ladder view, flagging which you can
+  fly.
 - **Market** — item price lookup at any region or all regions: SDE-backed
   search, jump-range and security filters, a quickbar of saved items,
-  side-by-side compare, live order books, price history, price alerts, and
-  an Appraisal of pasted items or EFT fits (net of fees, with LP store
-  acquisition).
+  side-by-side compare, live order books, price history, price alerts, an
+  Appraisal of pasted items or EFT fits (net of fees, with LP store
+  acquisition), and Hauling Opportunities ranking routes by expected profit.
 - **Open Orders** — every character's market orders filed under what is
   wrong with them (undercut, below the relist floor, expiring), with each
   exit priced net of fees.
