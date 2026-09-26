@@ -21,6 +21,8 @@ export interface ItemContextMenuProps {
   itemName: string;
   /** Undefined while the blueprint catalog hasn't been checked yet; null once checked and no blueprint produces this item. */
   blueprintTypeID: number | null | undefined;
+  /** The product the Build Plan action opens when it isn't `typeId` itself � a blueprint row (Assets) plans what it builds. */
+  planProductTypeID?: number;
   onAddToQuickbar: (typeId: number, itemName: string) => void;
   /** False with no active character — the Quickbar has nobody to save the item under. */
   quickbarAvailable: boolean;
@@ -83,6 +85,7 @@ function useItemMenuItems(
     typeId,
     itemName,
     blueprintTypeID,
+    planProductTypeID,
     onAddToQuickbar,
     quickbarAvailable,
     onShowInfo,
@@ -145,7 +148,8 @@ function useItemMenuItems(
       <MenuItem
         disabled={!blueprintTypeID}
         onSelect={() => {
-          if (blueprintTypeID) navigate(`${industryTabHref('plans')}?product=${typeId}`);
+          if (blueprintTypeID)
+            navigate(`${industryTabHref('plans')}?product=${planProductTypeID ?? typeId}`);
         }}
       >
         {buildPlanLabel}
