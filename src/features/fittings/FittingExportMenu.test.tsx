@@ -96,8 +96,8 @@ describe('FittingExportMenu', () => {
     setup();
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Export' }));
-    expect(await screen.findByText('Sell orders: 2000 ISK')).toBeInTheDocument();
-    expect(screen.getByText('Buy orders: 1000 ISK')).toBeInTheDocument();
+    expect(await screen.findByText('Jita sell: 2,000 ISK')).toBeInTheDocument();
+    expect(screen.getByText('Jita buy: 1,000 ISK')).toBeInTheDocument();
     await user.click(screen.getByRole('menuitem', { name: 'Appraise in Market' }));
     const at = await screen.findByTestId('at');
     expect(at).toHaveTextContent('/market/appraisal');
