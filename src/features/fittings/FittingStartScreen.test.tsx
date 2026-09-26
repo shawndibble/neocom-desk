@@ -80,7 +80,7 @@ function makeWorkspace(): FittingLibrarySource {
   };
 }
 
-function renderScreen(workspace = makeWorkspace(), onStartHull = vi.fn()) {
+function renderScreen(workspace = makeWorkspace(), onStartHull = vi.fn(), pageTitle?: string) {
   render(
     <MemoryRouter>
       <FittingStartScreen
@@ -89,6 +89,7 @@ function renderScreen(workspace = makeWorkspace(), onStartHull = vi.fn()) {
         characterId={7}
         inGameKey={0}
         onStartHull={onStartHull}
+        pageTitle={pageTitle}
       />
     </MemoryRouter>
   );
@@ -123,6 +124,14 @@ beforeEach(async () => {
 });
 
 describe('FittingStartScreen', () => {
+  it('puts the In-game refresh in the page header, beside the title, not in the search row', async () => {
+    renderScreen(makeWorkspace(), vi.fn(), 'Fittings');
+
+    const refresh = await screen.findByRole('button', { name: /refresh/i }, { timeout: 5000 });
+    const header = screen.getByRole('heading', { level: 1, name: 'Fittings' }).closest('header');
+    expect(header).toContainElement(refresh);
+  });
+
   it('lists saved and In-game fittings together under their hull', async () => {
     renderScreen();
 
