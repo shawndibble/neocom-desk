@@ -44,20 +44,21 @@ describe('SummaryStrip idle training', () => {
 });
 
 describe('SummaryStrip cached-data line', () => {
-  const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000);
+  const now = Date.now();
+  const daysAgo = (days: number) => new Date(now - days * 86_400_000);
 
   it('says the data is cached, with its age, when a read came from cache', () => {
-    renderStrip({ fetchedAt: daysAgo(2), fromCache: true });
+    renderStrip({ fetchedAt: daysAgo(2), fromCache: true, now });
     expect(screen.getByText(/Showing cached data · 2d ago/)).toBeInTheDocument();
   });
 
   it('shows it for data older than an hour even when not from cache', () => {
-    renderStrip({ fetchedAt: daysAgo(1) });
+    renderStrip({ fetchedAt: daysAgo(1), now });
     expect(screen.getByText(/Showing cached data/)).toBeInTheDocument();
   });
 
   it('renders nothing when the data is fresh', () => {
-    renderStrip({ fetchedAt: new Date() });
+    renderStrip({ fetchedAt: new Date(now), now });
     expect(screen.queryByText(/Showing cached data/)).not.toBeInTheDocument();
   });
 });
