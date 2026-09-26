@@ -31,7 +31,9 @@ import {
   setDroneCounts,
   setModuleCharge,
   setModuleState,
+  setModulesState,
   swapModuleType,
+  unloadCharges,
   type DroneBay,
   type DroneLaunchLimits,
 } from '@/engine/fittings/fittingEdit';
@@ -261,6 +263,8 @@ export function useEditorItemActions({
             charges,
             setState: (rack, index, state) => edit((f) => setModuleState(f, rack, index, state)),
             unloadCharge: (rack, index) => edit((f) => setModuleCharge(f, rack, index, null)),
+            setGroupState: (at, state) => edit((f) => setModulesState(f, at, state)),
+            unloadGroup: (at) => edit((f) => unloadCharges(f, at)),
             copyToAllOfType: (rack, index) => edit((f) => copyToAllOfType(f, rack, index)),
             variantsOf: (typeId) =>
               variationIndex === null

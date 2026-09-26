@@ -29,6 +29,23 @@ function isAt(module: FittingModule, slot: FittingSlotKind, slotIndex: number): 
   return module.slot === slot && module.slotIndex === slotIndex;
 }
 
+/** Where a module sits: its rack and position. */
+export type ModuleAt = Pick<FittingModule, 'slot' | 'slotIndex'>;
+
+function isAnyOf(module: FittingModule, at: readonly ModuleAt[]): boolean {
+  return at.some((where) => isAt(module, where.slot, where.slotIndex));
+}
+
+/** `module` as it is, with no charge (nor the count of one). */
+function unloaded(module: FittingModule): FittingModule {
+  return {
+    slot: module.slot,
+    slotIndex: module.slotIndex,
+    typeId: module.typeId,
+    state: module.state,
+  };
+}
+
 function updateModule(
   fitting: Fitting,
   slot: FittingSlotKind,
@@ -137,15 +154,29 @@ export function setModuleCharge(
   slotIndex: number,
   chargeTypeId: number | null
 ): Fitting {
-  return updateModule(fitting, slot, slotIndex, (module) => {
-    const unloaded: FittingModule = {
-      slot: module.slot,
-      slotIndex: module.slotIndex,
-      typeId: module.typeId,
-      state: module.state,
-    };
-    return chargeTypeId === null ? unloaded : { ...unloaded, chargeTypeId };
-  });
+  return updateModule(fitting, slot, slotIndex, (module) =>
+    chargeTypeId === null ? unloaded(module) : { ...unloaded(module), chargeTypeId }
+  );
+}
+
+/** Every module at `at` takes `state` — a weapon group's, in one edit. */
+export function setModulesState(
+  fitting: Fitting,
+  at: readonly ModuleAt[],
+  state: FittingItemState
+): Fitting {
+  return {
+    ...fitting,
+    modules: fitting.modules.map((module) => (isAnyOf(module, at) ? { ...module, state } : module)),
+  };
+}
+
+/** Every module at `at` unloads its charge — a weapon group's, in one edit. */
+export function unloadCharges(fitting: Fitting, at: readonly ModuleAt[]): Fitting {
+  return {
+    ...fitting,
+    modules: fitting.modules.map((module) => (isAnyOf(module, at) ? unloaded(module) : module)),
+  };
 }
 
 /** Loads `chargeTypeId` into every fitted module of `moduleTypeId`, cargo untouched — `loadChargeIntoCompatible` narrowed to one type. */
@@ -177,8 +208,8 @@ export interface ChargeLoad {
    * the charge didn't come out of the hold.
    */
   fromCargo?: boolean;
-  /** Just this module (an Alt-drop, "Load into…"), rather than every one that takes it. */
-  only?: { slot: FittingSlotKind; slotIndex: number };
+  /** Just this module (an Alt-drop, "Load into…") or these (a weapon group), rather than every one that takes it. */
+  only?: ModuleAt | readonly ModuleAt[];
 }
 
 export interface ChargeLoadResult {
@@ -207,8 +238,9 @@ export function loadChargeIntoCompatible(
   chargeTypeId: number,
   { accepts, chargesPerLoad = () => 1, fromCargo = false, only }: ChargeLoad
 ): ChargeLoadResult {
+  const onlyAt = only === undefined ? undefined : 'slot' in only ? [only] : only;
   const takes = (module: FittingModule) =>
-    (only === undefined || isAt(module, only.slot, only.slotIndex)) && accepts(module);
+    (onlyAt === undefined || isAnyOf(module, onlyAt)) && accepts(module);
   const perLoad = (module: FittingModule, typeId: number) =>
     Math.max(1, Math.floor(chargesPerLoad(module, typeId)));
   let cargo = fitting.cargo;
@@ -229,13 +261,7 @@ export function loadChargeIntoCompatible(
       return module;
     }
     // Rebuilt, not spread, so a quantity recorded for the charge it held never sticks to the new one.
-    const next: FittingModule = {
-      slot: module.slot,
-      slotIndex: module.slotIndex,
-      typeId: module.typeId,
-      state: module.state,
-      chargeTypeId,
-    };
+    const next: FittingModule = { ...unloaded(module), chargeTypeId };
     loaded += 1;
     changed = true;
     if (!fromCargo) return next;

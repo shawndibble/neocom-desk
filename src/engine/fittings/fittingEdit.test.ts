@@ -28,7 +28,9 @@ import {
   setDroneCounts,
   setModuleCharge,
   setModuleState,
+  setModulesState,
   swapModuleType,
+  unloadCharges,
 } from './fittingEdit';
 import type { Fitting, FittingModule } from './types';
 import type { DroneBay } from './fittingEdit';
@@ -176,6 +178,37 @@ describe('setModuleState / setModuleCharge', () => {
     const unloaded = setModuleCharge(base, 'high', 0, null).modules[0];
     expect(unloaded).toEqual({ slot: 'high', slotIndex: 0, typeId: 2889, state: 'active' });
     expect('chargeTypeId' in unloaded).toBe(false);
+  });
+});
+
+describe('setModulesState / unloadCharges', () => {
+  const three: Fitting = {
+    ...base,
+    modules: [
+      { slot: 'high', slotIndex: 0, typeId: 2889, state: 'active', chargeTypeId: 185 },
+      { slot: 'high', slotIndex: 1, typeId: 2889, state: 'active', chargeTypeId: 185 },
+      { slot: 'high', slotIndex: 2, typeId: 2889, state: 'active', chargeTypeId: 185 },
+    ],
+  };
+  const group = [
+    { slot: 'high' as const, slotIndex: 0 },
+    { slot: 'high' as const, slotIndex: 1 },
+  ];
+
+  it('sets every addressed module’s state in one edit, and leaves the rest', () => {
+    const next = setModulesState(three, group, 'offline');
+    expect(next.modules.map((m) => m.state)).toEqual(['offline', 'offline', 'active']);
+    expect(next.modules[2]).toBe(three.modules[2]);
+  });
+
+  it('unloads every addressed module’s charge', () => {
+    const fit: Fitting = {
+      ...three,
+      modules: three.modules.map((m) => ({ ...m, chargeTypeId: 186, chargeQuantity: 10 })),
+    };
+    const next = unloadCharges(fit, group);
+    expect(next.modules.map((m) => m.chargeTypeId)).toEqual([undefined, undefined, 186]);
+    expect(next.modules[0]).not.toHaveProperty('chargeQuantity');
   });
 });
 
@@ -547,6 +580,23 @@ describe('loadChargeIntoCompatible', () => {
     // Not from cargo: the hold is untouched.
     expect(result.fitting.cargo).toEqual(launchers.cargo);
     expect(launchers.modules[0].chargeTypeId).toBeUndefined();
+  });
+
+  it('loads only the modules asked for, a weapon group at a time', () => {
+    const result = loadChargeIntoCompatible(launchers, 24519, {
+      accepts,
+      only: [
+        { slot: 'high', slotIndex: 0 },
+        { slot: 'high', slotIndex: 2 },
+      ],
+    });
+    expect(result.fitting.modules.map((m) => m.chargeTypeId)).toEqual([
+      24519,
+      209,
+      24519,
+      undefined,
+    ]);
+    expect(result).toMatchObject({ loaded: 2, wanted: 2 });
   });
 
   it('loads only the one module asked for', () => {

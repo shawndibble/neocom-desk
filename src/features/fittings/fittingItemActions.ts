@@ -5,6 +5,7 @@
  */
 import { createContext, useContext, useState, type DragEvent, type MouseEvent } from 'react';
 import type { CandidateRack } from '@/engine/fittings/candidates';
+import type { ModuleAt } from '@/engine/fittings/fittingEdit';
 import type { FittingItemState, FittingModule, FittingSlotKind } from '@/engine/fittings/types';
 import {
   acceptsDrop,
@@ -27,6 +28,10 @@ export interface FittingItemActions {
 
   setState: (rack: FittingSlotKind, index: number, state: FittingItemState) => void;
   unloadCharge: (rack: FittingSlotKind, index: number) => void;
+  /** A weapon group's state (the stats' Offense rows), in one edit. */
+  setGroupState: (at: readonly ModuleAt[], state: FittingItemState) => void;
+  /** A weapon group's charges out, in one edit. */
+  unloadGroup: (at: readonly ModuleAt[]) => void;
   copyToAllOfType: (rack: FittingSlotKind, index: number) => void;
   /** A type's meta variants (itself left out), for "Swap for meta variant ▸". */
   variantsOf: (typeId: number) => { typeId: number; name: string }[];

@@ -14,6 +14,11 @@ import { db } from '@/db';
 import { useStatsSectionsPreference } from './statsSectionsPreference';
 import { useOverheatAll } from './statsConditions';
 import { configureClipboard } from '@/lib/clipboard';
+import { fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import type { Fitting } from '@/engine/fittings/types';
+import { FittingItemActionsProvider } from './fittingItemActions';
+import { fakeItemActions } from './__fixtures__/itemActions';
 
 beforeEach(async () => {
   await db.settings.clear();
@@ -166,6 +171,79 @@ function renderSections(
 function sectionBody(title: string): HTMLElement {
   return screen.getByRole('heading', { name: title }).closest('section')!;
 }
+
+describe('FittingStatsSections offense weapon menu', () => {
+  const blasters: Fitting = {
+    name: 'Brutix',
+    shipTypeId: 16229,
+    modules: [
+      { slot: 'high', slotIndex: 0, typeId: 3186, state: 'active', chargeTypeId: 230 },
+      { slot: 'high', slotIndex: 1, typeId: 3186, state: 'active', chargeTypeId: 230 },
+      // Same blaster, other charge: another row, not this one.
+      { slot: 'high', slotIndex: 2, typeId: 3186, state: 'active', chargeTypeId: 231 },
+    ],
+    drones: [],
+    cargo: [{ typeId: 229, quantity: 1000 }],
+  };
+
+  function renderWithActions() {
+    const actions = fakeItemActions({
+      names: { ...NAMES, 229: 'Null M' },
+      cargoCharges: [229, 230],
+    });
+    render(
+      <MemoryRouter>
+        <FittingItemActionsProvider value={actions}>
+          <FittingStatsSections
+            stats={heatedStats()}
+            statsProgress={null}
+            statsError={false}
+            price={null}
+            damageProfiles={damageProfiles()}
+            targetProfiles={targetProfiles()}
+            typeName={typeName}
+            fitting={blasters}
+          />
+        </FittingItemActionsProvider>
+      </MemoryRouter>
+    );
+    return actions;
+  }
+
+  const group = [
+    { slot: 'high', slotIndex: 0 },
+    { slot: 'high', slotIndex: 1 },
+  ];
+
+  it('changes the charge of just that weapon group, from cargo', async () => {
+    const actions = renderWithActions();
+    const offense = within(sectionBody('Offense'));
+    fireEvent.pointerDown(
+      offense.getByRole('button', { name: 'More actions for 2× Neutron Blaster Cannon II' }),
+      { button: 0, pointerType: 'mouse' }
+    );
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Change charge' }));
+    // The charge it already holds isn't offered again.
+    expect(screen.queryByRole('menuitem', { name: 'Antimatter Charge M' })).toBeNull();
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Null M' }));
+    expect(actions.charges.load).toHaveBeenCalledWith(229, { fromCargo: true, only: group });
+  });
+
+  it('sets the group’s state, and opens on a right-click of the row too', async () => {
+    const actions = renderWithActions();
+    fireEvent.contextMenu(within(sectionBody('Offense')).getByText('2× Neutron Blaster Cannon II'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'State' }));
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Online' }));
+    expect(actions.setGroupState).toHaveBeenCalledWith(group, 'online');
+  });
+
+  it('gives drone rows no weapon menu', () => {
+    renderWithActions();
+    expect(
+      screen.queryByRole('button', { name: 'More actions for 5× Warrior II' })
+    ).not.toBeInTheDocument();
+  });
+});
 
 describe('FittingStatsSections offense', () => {
   it('lists each weapon group and drone type with its DPS and volley, and the total', () => {

@@ -1,6 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Caret, Tooltip } from '@/components/ui';
+import { Button, Caret, RowMoreActions, Tooltip } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
 import {
   alignTimeSeconds,
@@ -10,9 +10,14 @@ import {
 } from '@/engine/fittings/stats';
 import type {
   DamageFigures as DamageFiguresValue,
+  Fitting,
+  FittingItemState,
+  FittingModule,
+  FittingModuleResult,
   FittingStats,
   Resonances,
   StatsErrorReason,
+  WeaponRow,
 } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import type { DogmaAssetProgress } from './dogmaFittingEngine';
@@ -34,6 +39,8 @@ import { ProjectedEffectsPanel } from './ProjectedEffectsPanel';
 import { useProjectedSources } from './statsConditions';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
+import { FittingItemMenu, WeaponMenuItems } from './FittingItemMenu';
+import { useFittingItemActions } from './fittingItemActions';
 
 const DMG_FILL_CLASS = {
   em: 'bg-dmg-em',
@@ -280,6 +287,128 @@ interface FittingStatsSectionsProps {
   conditions?: ReactNode;
   /** The hull takes drones (`showsDrones`) — else there is no Drones section. */
   showDrones?: boolean;
+  /**
+   * The open Fitting, and its modules' results when they line up with it:
+   * with the editor's item actions, each Offense weapon row gets the item
+   * menu for its group (change charge, state, show info).
+   */
+  fitting?: Fitting | null;
+  moduleResults?: FittingModuleResult[] | null;
+}
+
+const FIRING: readonly FittingItemState[] = ['active', 'overload'];
+const STATE_ORDER: readonly FittingItemState[] = ['offline', 'online', 'active', 'overload'];
+
+/**
+ * The fitted modules an Offense row stands for — its type, holding its
+ * charge, firing — with the state they share and the highest all can reach.
+ */
+function weaponGroup(
+  row: WeaponRow,
+  fitting: Fitting,
+  moduleResults: FittingModuleResult[] | null
+): { modules: FittingModule[]; shownState?: FittingItemState; maxState?: FittingItemState } {
+  const members = fitting.modules.flatMap((module, index) => {
+    const result = moduleResults?.[index];
+    const state = result?.state ?? module.state;
+    return module.typeId === row.typeId &&
+      module.chargeTypeId === row.chargeTypeId &&
+      FIRING.includes(state)
+      ? [{ module, state, maxState: result?.maxState }]
+      : [];
+  });
+  const states = new Set(members.map((member) => member.state));
+  const maxStates = members.map((member) => member.maxState);
+  const maxState = maxStates.every((state) => state !== undefined)
+    ? maxStates.reduce<FittingItemState | undefined>(
+        (lowest, state) =>
+          lowest === undefined || STATE_ORDER.indexOf(state!) < STATE_ORDER.indexOf(lowest)
+            ? state
+            : lowest,
+        undefined
+      )
+    : undefined;
+  return {
+    modules: members.map((member) => member.module),
+    ...(states.size === 1 ? { shownState: [...states][0] } : {}),
+    ...(maxState === undefined ? {} : { maxState }),
+  };
+}
+
+/** The Offense section's rows — a weapon group, drone stack or squadron each — and their total. */
+function OffenseRows({
+  stats,
+  typeName,
+  fitting,
+  moduleResults,
+}: {
+  stats: FittingStats;
+  typeName: (typeId: number) => string;
+  fitting: Fitting | null;
+  moduleResults: FittingModuleResult[] | null;
+}) {
+  const { t } = useTranslation();
+  const actions = useFittingItemActions();
+  return (
+    <ul className="space-y-1.5 text-xs">
+      {stats.offense.weapons.map((row) => {
+        const group =
+          actions !== null && fitting !== null && !row.isDrone
+            ? weaponGroup(row, fitting, moduleResults)
+            : null;
+        const name = t('fittings.stats.weaponRow', {
+          count: row.count,
+          name: typeName(row.typeId),
+        });
+        const hasMenu = group !== null && group.modules.length > 0;
+        const content = (
+          <>
+            <span className="min-w-0 flex-1">
+              <span>{name}</span>
+              {row.chargeTypeId !== undefined && (
+                <span className="block text-text-dim">{typeName(row.chargeTypeId)}</span>
+              )}
+              {row.isDrone && (
+                <span className="block text-text-dim">
+                  {t(
+                    row.isFighter
+                      ? 'fittings.stats.fightersNoOverheat'
+                      : 'fittings.stats.dronesNoOverheat'
+                  )}
+                </span>
+              )}
+            </span>
+            <DamageFigures {...row} />
+            {hasMenu && <RowMoreActions />}
+          </>
+        );
+        const rowClass = 'flex flex-wrap items-center justify-between gap-x-2';
+        return hasMenu ? (
+          <FittingItemMenu
+            key={weaponRowKey(row)}
+            name={name}
+            items={
+              <WeaponMenuItems
+                modules={group.modules}
+                shownState={group.shownState}
+                maxState={group.maxState}
+              />
+            }
+          >
+            <li className={rowClass}>{content}</li>
+          </FittingItemMenu>
+        ) : (
+          <li key={weaponRowKey(row)} className={rowClass}>
+            {content}
+          </li>
+        );
+      })}
+      <li className="flex justify-between gap-x-2 border-t border-line pt-1 font-semibold">
+        <span>{t('fittings.stats.offenseTotal')}</span>
+        <DamageFigures {...stats.offense} />
+      </li>
+    </ul>
+  );
 }
 
 /**
@@ -303,6 +432,8 @@ export function FittingStatsSections({
   heading,
   conditions,
   showDrones = true,
+  fitting = null,
+  moduleResults = null,
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
   const profileName = useDamageProfileName()(damageProfiles.selected);
@@ -519,37 +650,12 @@ export function FittingStatsSections({
           : undefined,
         stats ? (
           stats.offense.weapons.length > 0 ? (
-            <ul className="space-y-1.5 text-xs">
-              {stats.offense.weapons.map((row) => (
-                <li key={weaponRowKey(row)} className="flex flex-wrap justify-between gap-x-2">
-                  <span className="min-w-0">
-                    <span>
-                      {t('fittings.stats.weaponRow', {
-                        count: row.count,
-                        name: typeName(row.typeId),
-                      })}
-                    </span>
-                    {row.chargeTypeId !== undefined && (
-                      <span className="block text-text-dim">{typeName(row.chargeTypeId)}</span>
-                    )}
-                    {row.isDrone && (
-                      <span className="block text-text-dim">
-                        {t(
-                          row.isFighter
-                            ? 'fittings.stats.fightersNoOverheat'
-                            : 'fittings.stats.dronesNoOverheat'
-                        )}
-                      </span>
-                    )}
-                  </span>
-                  <DamageFigures {...row} />
-                </li>
-              ))}
-              <li className="flex justify-between gap-x-2 border-t border-line pt-1 font-semibold">
-                <span>{t('fittings.stats.offenseTotal')}</span>
-                <DamageFigures {...stats.offense} />
-              </li>
-            </ul>
+            <OffenseRows
+              stats={stats}
+              typeName={typeName}
+              fitting={fitting}
+              moduleResults={moduleResults}
+            />
           ) : stats.offense.chargelessWeaponCount > 0 ? (
             <p className="text-xs text-text-dim">
               {t('fittings.stats.offenseNoCharge', { count: stats.offense.chargelessWeaponCount })}

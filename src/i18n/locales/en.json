@@ -969,7 +969,9 @@
       "loaded_other": "Loaded {{name}} into {{count}} modules.",
       "loadRanOut_one": "Loaded {{name}} into {{loaded}} of {{count}} module — cargo ran out.",
       "loadRanOut_other": "Loaded {{name}} into {{loaded}} of {{count}} modules — cargo ran out.",
-      "loadNone": "Nothing fitted takes {{name}}."
+      "loadNone": "Nothing fitted takes {{name}}.",
+      "changeCharge": "Change charge",
+      "launch": "Launch"
     },
     "libraryMenu": {
       "open": "Open",

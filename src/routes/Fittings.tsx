@@ -489,6 +489,8 @@ function FittingsPage() {
       targetProfiles={targetProfiles}
       overlay={overlay}
       showDrones={dronesShown}
+      fitting={fitting}
+      moduleResults={moduleResults}
       conditions={<AbyssalWeatherPicker />}
       heading={
         <>

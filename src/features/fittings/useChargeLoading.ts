@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { loadChargeIntoCompatible } from '@/engine/fittings/fittingEdit';
+import { loadChargeIntoCompatible, type ModuleAt } from '@/engine/fittings/fittingEdit';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import type {
   Fitting,
@@ -39,8 +39,8 @@ interface ChargeLoadingParams {
 export interface LoadChargeOptions {
   /** Out of the Fitting's cargo: debited, and what it replaces goes back. */
   fromCargo?: boolean;
-  /** Only this module (an Alt-drop, "Load into…"). */
-  only?: Pick<FittingModule, 'slot' | 'slotIndex'>;
+  /** Only this module (an Alt-drop, "Load into…"), or these (a weapon group). */
+  only?: ModuleAt | readonly ModuleAt[];
 }
 
 export interface ChargeLoading {

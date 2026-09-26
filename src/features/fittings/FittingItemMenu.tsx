@@ -222,6 +222,80 @@ export function ModuleMenuItems({
   );
 }
 
+/**
+ * A weapon group's actions — a stats Offense row, every module of one type
+ * holding one charge: change the charge they hold (from cargo), their state,
+ * and what the weapon is. Each is one edit for the whole group.
+ */
+export function WeaponMenuItems({
+  modules,
+  shownState,
+  maxState,
+}: {
+  /** The group's modules — one type, one charge. */
+  modules: readonly FittingModule[];
+  /** The state they share; undefined when they differ, so the radio ticks nothing. */
+  shownState?: FittingItemState;
+  /** The highest they can reach; every state until known. */
+  maxState?: FittingItemState;
+}) {
+  const { t } = useTranslation();
+  const actions = useFittingItemActions();
+  const first = modules[0];
+  if (actions === null || first === undefined) return null;
+  const at = modules.map(({ slot, slotIndex }) => ({ slot, slotIndex }));
+  const name = actions.typeName(first.typeId);
+  const inCargo = actions.charges.cargoChargesFor(first).filter((id) => id !== first.chargeTypeId);
+  return (
+    <>
+      <MenuSub>
+        <MenuSubTrigger disabled={inCargo.length === 0}>
+          {inCargo.length === 0
+            ? t('fittings.item.noCargoCharge')
+            : t('fittings.item.changeCharge')}
+        </MenuSubTrigger>
+        <MenuSubContent>
+          {inCargo.map((chargeTypeId) => (
+            <MenuItem
+              key={chargeTypeId}
+              onSelect={() => actions.charges.load(chargeTypeId, { fromCargo: true, only: at })}
+            >
+              {actions.typeName(chargeTypeId)}
+            </MenuItem>
+          ))}
+        </MenuSubContent>
+      </MenuSub>
+      {first.chargeTypeId !== undefined && (
+        <MenuItem onSelect={() => actions.unloadGroup(at)}>
+          {t('fittings.ring.menu.unload', { name: actions.typeName(first.chargeTypeId) })}
+        </MenuItem>
+      )}
+      {first.slot !== 'subsystem' && (
+        <MenuSub>
+          <MenuSubTrigger>{t('fittings.item.state')}</MenuSubTrigger>
+          <MenuSubContent>
+            <MenuRadioGroup
+              value={shownState ?? ''}
+              onValueChange={(value) => actions.setGroupState(at, value as FittingItemState)}
+            >
+              {reachableModuleStates(maxState ?? 'overload', shownState ?? 'offline').map(
+                (option) => (
+                  <MenuRadioItem key={option} value={option}>
+                    {t(`fittings.ring.menu.state.${option}`)}
+                  </MenuRadioItem>
+                )
+              )}
+            </MenuRadioGroup>
+          </MenuSubContent>
+        </MenuSub>
+      )}
+      <MenuSeparator />
+      <ShowInfoMenuItem typeId={first.typeId} itemName={name} onShowInfo={actions.showInfo} />
+      <ViewInMarketMenuItem typeId={first.typeId} />
+    </>
+  );
+}
+
 /** An empty slot's actions: something recent, the copied module, a whole rack of the last one. */
 export function EmptySlotMenuItems({ rack, index }: { rack: FittingSlotKind; index: number }) {
   const { t } = useTranslation();
