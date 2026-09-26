@@ -35,10 +35,8 @@ async function answerAnyType(page: Page) {
   });
 }
 
-// Three different hulls, not three named variants of one hull: a compare column's header shows
-// the hull's own name (`typeName(hullTypeId)`), never the custom name typed into the EFT header —
-// a Share Link code carries no fit name at all, see `shareMapper.ts`. Distinct hulls give each
-// column genuinely distinguishing text to assert on.
+// A compare column's header shows the fit's own name — a Share Link carries it since
+// version 2 (#1718), so the name typed into the EFT header survives the round trip.
 const FIT_A = ['[Rifter, Fit A]', '125mm Gatling AutoCannon I'].join('\n');
 const FIT_B = ['[Merlin, Fit B]', '125mm Gatling AutoCannon I'].join('\n');
 const FIT_C = ['[Punisher, Fit C]', '125mm Gatling AutoCannon I'].join('\n');
@@ -66,11 +64,11 @@ test.describe('Fitting Compare at 390px', () => {
     const STATS_TIMEOUT = { timeout: 20_000 };
 
     await addFitting(page, FIT_A);
-    await expect(page.getByText('Rifter')).toBeVisible(STATS_TIMEOUT);
+    await expect(page.getByText('Fit A')).toBeVisible(STATS_TIMEOUT);
 
     await addFitting(page, FIT_B);
-    await expect(page.getByText('Rifter')).toBeVisible(STATS_TIMEOUT);
-    await expect(page.getByText('Merlin')).toBeVisible(STATS_TIMEOUT);
+    await expect(page.getByText('Fit A')).toBeVisible(STATS_TIMEOUT);
+    await expect(page.getByText('Fit B')).toBeVisible(STATS_TIMEOUT);
     await expect(page.getByText('Show differences only')).toBeVisible();
 
     // A third slot brings phone paging into play (2 of 3 columns shown at a time).
@@ -82,12 +80,12 @@ test.describe('Fitting Compare at 390px', () => {
     const nextBox = await next.boundingBox();
     expect(nextBox!.height).toBeGreaterThanOrEqual(44);
 
-    await expect(page.getByText('Rifter')).toBeVisible(STATS_TIMEOUT);
-    await expect(page.getByText('Punisher')).not.toBeVisible();
+    await expect(page.getByText('Fit A')).toBeVisible(STATS_TIMEOUT);
+    await expect(page.getByText('Fit C')).not.toBeVisible();
 
     await next.click();
-    await expect(page.getByText('Punisher')).toBeVisible();
-    await expect(page.getByText('Rifter')).not.toBeVisible();
+    await expect(page.getByText('Fit C')).toBeVisible();
+    await expect(page.getByText('Fit A')).not.toBeVisible();
     expect(await prev.isDisabled()).toBe(false);
 
     // No sideways scroll at 390px — the usual narrow-width regression.
