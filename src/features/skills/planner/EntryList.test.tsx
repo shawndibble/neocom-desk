@@ -204,7 +204,7 @@ describe('EntryList drag handles mention keyboard reordering (#408)', () => {
 describe('EntryList empty state', () => {
   it('shows the empty-entries message when there are no rows', () => {
     render(<EntryList rows={[]} bandsAt={new Map()} {...defaultProps} />);
-    expect(screen.getByText('No entries yet. Add a skill below.')).toBeInTheDocument();
+    expect(screen.getByText('No entries yet. Add a skill to get started.')).toBeInTheDocument();
   });
 });
 

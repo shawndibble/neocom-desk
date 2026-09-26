@@ -373,7 +373,7 @@ describe('PlanetaryIndustry', () => {
 
     // The banner is not a substitute for the panel: both render.
     expect(await screen.findByText('Log in again to see your colonies')).toBeInTheDocument();
-    const toggle = await screen.findByRole('button', { name: /show alt colonies/i });
+    const toggle = await screen.findByRole('button', { name: /show \d+ alt/i });
 
     const user = userEvent.setup();
     await user.click(toggle);
@@ -561,7 +561,7 @@ describe('PlanetaryIndustry', () => {
     const { unmount } = render(<App />);
     await colonyPanelFor(/Jita IV/);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
+    await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
 
     // Grouped by character: the active Character's own group heading plus
     // the alt's, each above that character's colony rows. Scoped to the
@@ -598,7 +598,7 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     await colonyPanelFor(/Jita IV/);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
+    await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
 
     expect(scopelessFetch).not.toHaveBeenCalled();
     expect(screen.getByText(/Scopeless Alt/)).toHaveTextContent(/no planetary access/i);
@@ -673,7 +673,7 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     await colonyPanelFor(/Jita IV/);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
+    await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
 
     const unread = screen.getByText(/^Unread Alt:/);
     const empty = screen.getByText(/Empty Alt/);
@@ -689,7 +689,7 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     await colonyPanelFor(/Jita IV/);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
+    await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
 
     // One row, and one action, per not-loaded character.
     expect(screen.getByRole('button', { name: 'Switch to Other Unread' })).toBeInTheDocument();
@@ -713,7 +713,7 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     await colonyPanelFor(/Jita IV/);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
+    await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
     await user.click(screen.getByRole('button', { name: 'Switch to Alt Two' }));
 
     await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(ALT_ID));
@@ -768,7 +768,7 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     await colonyPanelFor(/Jita IV/);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
+    await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
 
     // One planet already stopped, the other's soonest expiry is what "next"
     // reports — the stopped planet's own (already past) expiry must not leak
@@ -835,7 +835,7 @@ describe('PlanetaryIndustry', () => {
     render(<App />);
     await colonyPanelFor(/Jita IV/);
     const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /show alt colonies/i }));
+    await user.click(screen.getByRole('button', { name: /show \d+ alt/i }));
 
     const panel = coloniesPanel();
     // The planet name resolves via the public per-planet lookup instead of

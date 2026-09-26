@@ -668,7 +668,9 @@ describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {
     render(<App />);
 
     const panel = (await screen.findByText('Your entries')).closest('section')!;
-    expect(within(panel).getByText('No entries yet. Add a skill below.')).toBeInTheDocument();
+    expect(
+      within(panel).getByText('No entries yet. Add a skill to get started.')
+    ).toBeInTheDocument();
   });
 
   // #112: the merged list no longer shows a banner distinguishing "all
@@ -691,7 +693,9 @@ describe('SkillPlans editor: computed queue honesty (UX-REVIEW #9)', () => {
     render(<App />);
 
     const panel = (await screen.findByText('Your entries')).closest('section')!;
-    expect(within(panel).queryByText('No entries yet. Add a skill below.')).not.toBeInTheDocument();
+    expect(
+      within(panel).queryByText('No entries yet. Add a skill to get started.')
+    ).not.toBeInTheDocument();
     // No priority-band divider (single band, #1415). Waits for the row's own duration to actually settle at zero
     // (post the async ESI "already trained" skills fetch) rather than just
     // for some listitem to exist, which could be a transient pre-recompute state.
@@ -1766,7 +1770,7 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
     render(<App />);
 
     const panel = (await screen.findByText('Your entries')).closest('section')!;
-    await within(panel).findByText('No entries yet. Add a skill below.');
+    await within(panel).findByText('No entries yet. Add a skill to get started.');
     expect(within(panel).queryByText(/Finishes/)).not.toBeInTheDocument();
   });
 });

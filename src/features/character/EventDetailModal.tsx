@@ -169,8 +169,8 @@ export function EventDetailModal({
               className={`size-4 shrink-0 ${KIND_TEXT.calendarEvent}`}
               aria-hidden="true"
             />
-            {formatCalendarTimestamp(new Date(state.detail.data.date))} ·{' '}
-            {t('calendar.importance', { value: state.detail.data.importance })}
+            {formatCalendarTimestamp(new Date(state.detail.data.date))}
+            {state.detail.data.importance > 0 && <> · {t('calendar.important')}</>}
           </p>
           <p className="rounded-xs border border-line bg-panel-2 p-2 whitespace-pre-wrap text-text-dim">
             {stripEveMarkup(state.detail.data.text)}
