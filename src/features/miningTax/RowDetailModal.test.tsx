@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import type { MiningTaxAssignmentRecord } from '@/db';
+import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { RowDetailModal } from './RowDetailModal';
 import type { MoonMiningTaxRow } from './snapshot';
 
@@ -27,9 +27,14 @@ const row: MoonMiningTaxRow = {
   unassignedOreLines: [{ typeId: VELDSPAR, quantity: 250 }],
 };
 
+const payees: PayeeRecord[] = [
+  { id: 'p1', characterId: 1, name: 'Corp One', defaultTaxPct: 10, updatedAt: 1 },
+];
+
 function renderModal(
   status: 'unassigned' | 'needs-review',
-  assignment: MiningTaxAssignmentRecord | null
+  assignment: MiningTaxAssignmentRecord | null,
+  onSplit?: () => void
 ) {
   const noop = vi.fn();
   render(
@@ -43,7 +48,7 @@ function renderModal(
         systemName="Jita"
         systemSecurity={0.9}
         typeNames={typeNames}
-        payees={[]}
+        payees={payees}
         pricesFor={() => new Map()}
         busy={false}
         onAssigned={noop}
@@ -51,6 +56,7 @@ function renderModal(
         onMarkPaid={noop}
         onResolve={noop}
         onUndo={noop}
+        onSplit={onSplit}
       />
     </MemoryRouter>
   );
@@ -81,5 +87,30 @@ describe('RowDetailModal item names', () => {
     const links = screen.getAllByRole('link', { name: 'Scordite' });
     expect(links.length).toBeGreaterThanOrEqual(2);
     for (const link of links) expect(link.getAttribute('href')).toContain(String(SCORDITE));
+  });
+});
+
+describe('RowDetailModal split', () => {
+  it('offers Split on a needs-review row', () => {
+    const onSplit = vi.fn();
+    renderModal(
+      'needs-review',
+      {
+        id: 'a1',
+        characterId: 1,
+        date: '2026-09-08',
+        solarSystemId: 30000142,
+        payeeId: 'p1',
+        oreLines: [{ typeId: SCORDITE, quantity: 10 }],
+        taxPct: 10,
+        estimatedValue: 100,
+        taxOwed: 10,
+        status: 'needs-review',
+        reviewDiff: [{ typeId: SCORDITE, before: 10, after: 12 }],
+      } as MiningTaxAssignmentRecord,
+      onSplit
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Split' }));
+    expect(onSplit).toHaveBeenCalledTimes(1);
   });
 });

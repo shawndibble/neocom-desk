@@ -12,6 +12,10 @@
  * — only `status`/`reviewDiff` move; `resolveNeedsReview` (assignments.ts) is
  * the one place `oreLines` itself re-snapshots.
  *
+ * Unpaid, ungrouped growth skips the flag: it is absorbed straight into the
+ * Assignment (`resolveNeedsReview`), since an unsettled obligation has no paid
+ * history to protect. Paid, dismissed and joined-group growth still flags.
+ *
  * Run once per character after loading its fresh ledger (see
  * `snapshot.ts`), not on every render — `sameDiffs` skips the write (and the
  * `scheduleSync` it would otherwise trigger) when nothing actually changed.
@@ -20,6 +24,7 @@ import { db, type MiningTaxAssignmentRecord } from '@/db';
 import { scheduleSync } from '@/sync';
 import { diffAssignedOreLines } from '@/engine/miningTax/needsReview';
 import { computeOwnership, type Ownership } from '@/engine/miningTax/ownership';
+import { resolveNeedsReview } from './assignments';
 import type { MiningLedgerEntry, QuantityDiff } from '@/engine/miningTax/types';
 
 function sameDiffs(a: readonly QuantityDiff[] | undefined, b: readonly QuantityDiff[]): boolean {
@@ -61,6 +66,7 @@ export async function reconcileAssignments(
   }
   const now = Date.now();
   const updates: MiningTaxAssignmentRecord[] = [];
+  const absorbs: { assignment: MiningTaxAssignmentRecord; key: string }[] = [];
 
   for (const assignment of assignments) {
     const key = `${assignment.date}:${assignment.solarSystemId}`;
@@ -72,7 +78,27 @@ export async function reconcileAssignments(
     const diffs = diffAssignedOreLines(assignment.oreLines, relevantFresh);
     if (diffs.length === 0) continue;
     if (assignment.status === 'needs-review' && sameDiffs(assignment.reviewDiff, diffs)) continue;
+    // Unpaid, ungrouped growth has no settled history to protect, so it folds
+    // straight in — the pilot then splits it from the ordinary row if the
+    // new ore belongs to another Payee.
+    if (assignment.status === 'outstanding' && !assignment.groupId) {
+      absorbs.push({ assignment, key });
+      continue;
+    }
     updates.push({ ...assignment, status: 'needs-review', reviewDiff: diffs, updatedAt: now });
+  }
+
+  for (const { assignment, key } of absorbs) {
+    try {
+      await resolveNeedsReview(assignment, freshByKey.get(key)!, siblingsByKey.get(key)!);
+    } catch {
+      // Re-pricing can fail (no prices yet); fall back to surfacing the growth.
+      const diffs = diffAssignedOreLines(
+        assignment.oreLines,
+        ownershipByKey.get(key)!.ownedLines.get(assignment.id)!
+      );
+      updates.push({ ...assignment, status: 'needs-review', reviewDiff: diffs, updatedAt: now });
+    }
   }
 
   if (updates.length > 0) {

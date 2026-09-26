@@ -920,6 +920,24 @@ describe('splitAssignment', () => {
     expect(created.status).toBe('outstanding');
   });
 
+  it('splits a needs-review original: the kept side re-opens as outstanding, diff cleared', async () => {
+    const original = await seedOriginal({
+      status: 'needs-review',
+      paidAt: 5,
+      reviewDiff: [{ typeId: TYPE_A, before: 0, after: 100 }],
+    });
+    const { kept, created } = await splitAssignment(
+      original,
+      { moves: [{ typeId: TYPE_A, quantity: 100 }], payeeId: 'payee-2', taxPct: 8 },
+      atOneHub
+    );
+    expect(kept.status).toBe('outstanding');
+    expect(kept.reviewDiff).toBeUndefined();
+    expect(kept.paidAt).toBeUndefined();
+    expect(created.status).toBe('outstanding');
+    expect((await db.miningTaxAssignments.get('orig'))?.reviewDiff).toBeUndefined();
+  });
+
   it('refuses to move more than the original holds, or everything', async () => {
     const original = await seedOriginal();
     await expect(

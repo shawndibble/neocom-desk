@@ -422,6 +422,13 @@ export async function splitAssignment(
   };
   delete kept.collectsGrowth;
   if (input.collector === 'original') kept.collectsGrowth = true;
+  if (original.status === 'needs-review') {
+    // Splitting is how the growth gets settled, so the kept side re-opens
+    // exactly as `resolveNeedsReview` would leave it.
+    kept.status = 'outstanding';
+    delete kept.reviewDiff;
+    delete kept.paidAt;
+  }
 
   const createdValue = computeAssignmentValue(movedLines, prices.moved, input.taxPct);
   const created: MiningTaxAssignmentRecord = {
