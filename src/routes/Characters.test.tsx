@@ -143,6 +143,96 @@ describe('Characters', () => {
     );
   });
 
+  it("marks the active Character's card with aria-current and an Active label, and only that card (#1793)", async () => {
+    useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
+    const pilotTwoCard = screen.getByText('Pilot Two').closest('li') as HTMLElement;
+    expect(pilotOneCard).toHaveAttribute('aria-current', 'true');
+    expect(within(pilotOneCard).getByText('Active')).toBeInTheDocument();
+    expect(pilotTwoCard).not.toHaveAttribute('aria-current');
+    expect(within(pilotTwoCard).queryByText('Active')).not.toBeInTheDocument();
+  });
+
+  it('shows an Alerts chip only for a Character with alerts, none for a healthy card (#1793)', async () => {
+    await db.notificationFeed.put({
+      id: 'feed-1',
+      characterId: 91,
+      eventId: 'newMail',
+      title: 'New mail',
+      body: 'body',
+      firedAt: Date.now(),
+    });
+
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
+    const pilotTwoCard = screen.getByText('Pilot Two').closest('li') as HTMLElement;
+    await within(pilotOneCard).findByText('1');
+    expect(within(pilotOneCard).getByText('Alerts')).toBeInTheDocument();
+    expect(within(pilotTwoCard).queryByText('Alerts')).not.toBeInTheDocument();
+  });
+
+  it('shows a warning-tone "PI Stopped" chip for a Character whose colony has expired, none for a healthy card (#1793)', async () => {
+    const roster: RosterEntry[] = [
+      {
+        characterId: 91,
+        name: 'Pilot One',
+        wallet: null,
+        queue: null,
+        correctedTotalSp: 1_000_000,
+        skills: null,
+      },
+      {
+        characterId: 92,
+        name: 'Pilot Two',
+        wallet: null,
+        queue: null,
+        correctedTotalSp: 1_000_000,
+        skills: null,
+      },
+    ];
+    const attention: AttentionEntry[] = [
+      {
+        characterId: 91,
+        jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
+        jobCountsFetchedAt: new Date(),
+        piAttention: 'idle',
+        piSoonestExpiryMs: Date.now() - 3_600_000,
+        piFetchedAt: new Date(),
+      },
+      {
+        characterId: 92,
+        jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
+        jobCountsFetchedAt: new Date(),
+        piAttention: undefined,
+        piSoonestExpiryMs: undefined,
+        piFetchedAt: null,
+      },
+    ];
+    const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue(roster);
+    const attentionSpy = vi
+      .spyOn(rosterAttentionModule, 'loadRosterAttention')
+      .mockResolvedValue(attention);
+
+    try {
+      renderCharacters();
+      await screen.findByText('Pilot One');
+
+      const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
+      const pilotTwoCard = screen.getByText('Pilot Two').closest('li') as HTMLElement;
+      await within(pilotOneCard).findByText('Stopped');
+      expect(within(pilotOneCard).getByText('PI')).toBeInTheDocument();
+      expect(within(pilotTwoCard).queryByText('PI')).not.toBeInTheDocument();
+    } finally {
+      snapshotSpy.mockRestore();
+      attentionSpy.mockRestore();
+    }
+  });
+
   it('shows one combined data-age badge per card — the oldest of the fetched fields, not one each', async () => {
     const now = Date.now();
     // Pilot One: both fields cached, at deliberately different ages. Three

@@ -229,10 +229,48 @@ interface CharacterCardProps {
   groups: readonly CharacterGroup[];
   groupId: string | null;
   starred: boolean;
+  isActive: boolean;
+  alertCount: number;
+  attention: AttentionEntry | undefined;
   onSelect: (characterId: number) => void;
   onToggleStar: (characterId: number) => void;
   onMoveToGroup: (characterId: number, groupId: string | null) => void;
   onRemove: (characterId: number, name: string) => void;
+}
+
+const NOW_TICK_MS = 60_000;
+
+/** `Date.now()` is impure, so the card's countdown reads it only inside this hook's `useState` initializer / interval — never directly in `CharacterCard`'s render body (react-hooks/purity). Same shape as `PlanSlotLine.tsx`'s own `useNow`. */
+function useNow(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), NOW_TICK_MS);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+
+type PiCardAttention = { kind: 'stopped' } | { kind: 'expiring'; expiryMs: number };
+
+/**
+ * Card view's narrower PI signal (decision `20260925-230353`): only the two
+ * "you must act now" attention states reach a card — `decayed`/`healthy`/
+ * `unknown` stay table-only, so a healthy pilot's card never grows a chip.
+ */
+function piCardAttention(
+  attention: AttentionEntry | undefined,
+  nowMs: number
+): PiCardAttention | null {
+  const piAttention = attention?.piAttention;
+  if (piAttention === undefined) return null;
+  const expiryMs = attention?.piSoonestExpiryMs;
+  // Same "expired always wins" rule as the table's `pi` column: a stale
+  // cached category can still say `expiring-soon` after the real clock has
+  // already passed the expiry it was computed from.
+  if (expiryMs != null && expiryMs <= nowMs) return { kind: 'stopped' };
+  if (piAttention === 'idle') return { kind: 'stopped' };
+  if (piAttention === 'expiring-soon' && expiryMs != null) return { kind: 'expiring', expiryMs };
+  return null;
 }
 
 /**
@@ -263,6 +301,9 @@ function CharacterCard({
   groups,
   groupId,
   starred,
+  isActive,
+  alertCount,
+  attention,
   onSelect,
   onToggleStar,
   onMoveToGroup,
@@ -273,9 +314,16 @@ function CharacterCard({
   // complaint — three "Xm ago"s in a row): the oldest of whichever fields
   // this character has cached, so the card never overstates its freshness.
   const lastSynced = characterLastSynced(stats, queue);
+  const now = useNow();
+  const piChip = piCardAttention(attention, now);
 
   return (
-    <li className="flex flex-col gap-2 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm transition-colors hover:border-line-bright hover:bg-panel-2">
+    <li
+      aria-current={isActive ? 'true' : undefined}
+      className={`flex flex-col gap-2 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm transition-colors hover:border-line-bright hover:bg-panel-2 ${
+        isActive ? 'border-l-2 border-l-accent' : ''
+      }`}
+    >
       <div className="flex flex-wrap items-start gap-2">
         <button
           type="button"
@@ -298,6 +346,11 @@ function CharacterCard({
                 the corp/alliance lines below, which are separate rows. */}
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="truncate text-sm font-semibold">{character.name}</span>
+              {isActive && (
+                <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+                  {t('characters.activeLabel')}
+                </span>
+              )}
               {lastSynced && (
                 <DataAgeBadge date={lastSynced} dotOnly alwaysVisible className="shrink-0" />
               )}
@@ -380,6 +433,20 @@ function CharacterCard({
             label={t('characters.queueState')}
             tone={queueChipTone(queue.state, notTrainingAlertEnabled)}
             value={t(`characters.queueStates.${queue.state}`)}
+          />
+        )}
+        {alertCount > 0 && (
+          <StatChip label={t('characters.column.alerts')} tone="warning" value={alertCount} />
+        )}
+        {piChip && (
+          <StatChip
+            label={t('characters.column.pi')}
+            tone="warning"
+            value={
+              piChip.kind === 'stopped'
+                ? t('pi.attention.idle')
+                : formatDuration((piChip.expiryMs - now) / 1000)
+            }
           />
         )}
       </div>
@@ -821,6 +888,7 @@ export function Characters() {
   const publicInfo = usePublicInfo((state) => state.byCharacterId);
   const loadPublicInfoMany = usePublicInfo((state) => state.loadMany);
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
 
   const groupsValue = useOverviewGroups((state) => state.value);
   const groupsHydrated = useOverviewGroups((state) => state.hydrated);
@@ -1226,6 +1294,9 @@ export function Characters() {
               groups={groupsValue.groups}
               groupId={groupIdByCharacterId.get(characterId) ?? null}
               starred={isCharacterStarred(starred, characterId)}
+              isActive={activeCharacterId === characterId}
+              alertCount={alertCounts.get(characterId) ?? 0}
+              attention={attentionById.get(characterId)}
               onSelect={(id) => void select(id)}
               onToggleStar={(id) => void handleToggleStar(id)}
               onMoveToGroup={(id, groupId) => void handleMoveToGroup(id, groupId)}

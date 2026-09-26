@@ -8,9 +8,11 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { CHARACTER_NAME } from './support/fixtureData';
+import { CHARACTER_ID, CHARACTER_NAME } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
+const PLANET_ID = 40_000_002;
+const DAY_MS = 24 * 3_600_000;
 
 /**
  * Both tests here start the same way. `support/login.ts`'s helper lands on
@@ -98,6 +100,93 @@ test('the table view shows Last synced age text at 390px (#1783)', async ({ page
   const age = page.locator('table td time').first();
   await expect(age).toBeVisible();
   await expect(age).not.toHaveText('');
+});
+
+/**
+ * The Characters card view's active marker and non-zero attention chip
+ * (#1793). The ticket named `e2e/charactersNarrow.spec.ts`, which doesn't
+ * exist — this file is the actual narrow-width Characters spec, so the
+ * coverage lands here instead.
+ *
+ * The sole logged-in Character becomes the active one on first login
+ * (`Callback.tsx`), so no second character is needed to prove the marker is
+ * selective — jsdom-based unit tests already cover that in
+ * `Characters.test.tsx`. The PI colony's extractor expired a day ago, so the
+ * attention chip reads a fixed "Stopped" rather than a countdown a slow CI
+ * run could shift across a minute boundary.
+ */
+test('the active card shows aria-current and an Active label, and a stopped PI colony shows a warning chip, at 390px (#1793)', async ({
+  page,
+}) => {
+  const installedAt = new Date(Date.now() - 15 * DAY_MS).toISOString();
+  const expiresAt = new Date(Date.now() - DAY_MS).toISOString();
+
+  // Registered before any navigation — unlike the other tests in this file,
+  // this one needs the colony fixture in place for the very first `/planets`
+  // fetch (the Overview board's own prefetch on login), not only for the
+  // later "Refresh all" click. Otherwise that first fetch caches the default
+  // mock's empty list, and "Refresh all" reusing the cached response's own
+  // `[]` (rather than a fresh network round trip) leaves the card with
+  // nothing to flag.
+  await page.route('https://esi.evetech.net/**', async (route) => {
+    const { pathname } = new URL(route.request().url());
+    const json = (body: unknown) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+
+    if (pathname === `/characters/${CHARACTER_ID}/planets`) {
+      return json([
+        {
+          solar_system_id: 30_000_142,
+          planet_id: PLANET_ID,
+          planet_type: 'temperate',
+          owner_id: CHARACTER_ID,
+          upgrade_level: 5,
+          num_pins: 3,
+          last_update: installedAt,
+        },
+      ]);
+    }
+    if (pathname === `/characters/${CHARACTER_ID}/planets/${PLANET_ID}`) {
+      return json({
+        links: [],
+        pins: [
+          { pin_id: 1, type_id: 2254, latitude: 1, longitude: 1 },
+          {
+            pin_id: 2,
+            type_id: 3068,
+            latitude: 1.1,
+            longitude: 1.1,
+            extractor_details: {
+              product_type_id: 2073,
+              cycle_time: 1800,
+              qty_per_cycle: 6965,
+              head_radius: 0.01,
+              heads: [{ head_id: 0, latitude: 1.1, longitude: 1.1 }],
+            },
+            install_time: installedAt,
+            expiry_time: expiresAt,
+            last_cycle_start: installedAt,
+          },
+        ],
+      });
+    }
+    // The Overview board's own colony card reads the planet's name/type
+    // alongside its status — not asserted here, but needs an answer so the
+    // real-network guard (`support/testBase.ts`) doesn't fail the test.
+    if (pathname === `/universe/planets/${PLANET_ID}`) {
+      return json({ name: 'Efa II', type_id: 11, system_id: 30_000_142 });
+    }
+    return route.fallback();
+  });
+
+  await landOnCharactersAtPhoneWidth(page);
+
+  const card = page.getByText(CHARACTER_NAME).locator('xpath=ancestor::li[1]');
+  await expect(card).toHaveAttribute('aria-current', 'true');
+  await expect(card.getByText('Active')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Refresh all' }).click();
+  await expect(card.getByText('Stopped')).toBeVisible();
 });
 
 /**
