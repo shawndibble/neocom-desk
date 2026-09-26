@@ -15,6 +15,7 @@ import {
   TextInput,
   Checkbox,
   Radio,
+  SegmentedControl,
 } from '@/components/ui';
 import { MINING_YIELD_RANGES, type MiningYieldRange } from '@/engine/miningTax/yieldRange';
 import { basisSide, isNowBasis, type PriceBasis } from '@/engine/miningTax/priceBasis';
@@ -36,26 +37,17 @@ interface RangeControlProps {
 export function RangeControl({ value, onChange, fill = false }: RangeControlProps) {
   const { t } = useTranslation();
   return (
-    <div
-      role="group"
-      aria-label={t('miningTax.overview.dateRangeStat')}
-      className={`flex overflow-hidden rounded-xs border border-line ${fill ? 'w-full' : ''}`}
-    >
-      {MINING_YIELD_RANGES.map((range) => {
-        const active = range === value;
-        return (
-          <button
-            key={range}
-            type="button"
-            aria-pressed={active}
-            onClick={() => onChange(range)}
-            className={`border-r border-line px-3 text-xs last:border-r-0 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent ${fill ? 'h-11 flex-1' : 'h-9'} ${active ? 'bg-panel-2 text-accent shadow-[inset_0_-2px_0_var(--color-accent)]' : 'text-text-dim hover:text-text'}`}
-          >
-            {t(`miningTax.overview.range.${range}`)}
-          </button>
-        );
-      })}
-    </div>
+    <SegmentedControl
+      label={t('miningTax.overview.dateRangeStat')}
+      options={MINING_YIELD_RANGES.map((range) => ({
+        value: range,
+        label: t(`miningTax.overview.range.${range}`),
+      }))}
+      value={value}
+      onChange={onChange}
+      fill={fill}
+      uppercase={false}
+    />
   );
 }
 

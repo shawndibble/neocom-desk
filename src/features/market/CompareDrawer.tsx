@@ -28,13 +28,13 @@ import {
   IconButton,
   IskAmount,
   RowMoreActions,
+  SegmentedControl,
   Spinner,
   TypeIcon,
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { controlHeightClassName } from '@/components/ui/controlStyles';
-import { cx } from '@/lib/cx';
 import { KEYBOARD_OVERLAY_ATTRIBUTE } from '@/lib/shortcuts';
 import { useCompareSet } from './compareSet';
 import { useCompareRows, type CompareRow } from './useCompareRows';
@@ -412,32 +412,21 @@ export function CompareDrawer({
               <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('market.compare.handle', { count: items.length })}
               </h2>
-              {/* A hand-rolled toggle, not `HistoryViewSelect`'s select-on-desktop
+              {/* An always-visible segmented toggle, not `HistoryViewSelect`'s select-on-desktop
                   pattern: that one earns the select because its two options are
                   a nuance most readers don't know they need (a tooltip explains
                   the distinction); Prices vs Attributes needs no such
                   explanation, so the compact always-visible toggle is right at
                   every width, not just on a phone. */}
-              <span
-                role="group"
-                aria-label={t('market.compare.viewLabel')}
-                className="flex gap-0.5 rounded-xs border border-line bg-panel p-px"
-              >
-                {(['prices', 'attributes'] as const).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    aria-pressed={view === option}
-                    onClick={() => setView(option)}
-                    className={cx(
-                      `${controlHeightClassName.md} rounded-xs px-2 text-[0.6875rem] font-semibold tracking-widest uppercase focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent`,
-                      view === option ? 'bg-panel-2 text-text' : 'text-text-dim hover:text-text'
-                    )}
-                  >
-                    {t(`market.compare.${VIEW_LABEL_KEYS[option]}`)}
-                  </button>
-                ))}
-              </span>
+              <SegmentedControl
+                label={t('market.compare.viewLabel')}
+                options={(['prices', 'attributes'] as const).map((option) => ({
+                  value: option,
+                  label: t(`market.compare.${VIEW_LABEL_KEYS[option]}`),
+                }))}
+                value={view}
+                onChange={setView}
+              />
               {view === 'prices' && (
                 <span className="text-[0.6875rem] text-text-dim">
                   {t('market.compare.pricesFrom', { place: sourceLabel })}
