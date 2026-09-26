@@ -1181,6 +1181,15 @@ export function BuildPlanDetail({
               <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('industry.groupBlueprint')}
               </h3>
+              {bpcCoverage && (
+                <div className="mt-2">
+                  <BpcCoverageWarning
+                    coverage={bpcCoverage}
+                    blueprintName={nameForType(catalog, plan.blueprintTypeID)}
+                    onSetRuns={(runs) => update({ runs })}
+                  />
+                </div>
+              )}
               <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <label className="flex flex-col gap-1 text-xs">
                   {t('industry.runs')}
@@ -1195,12 +1204,6 @@ export function BuildPlanDetail({
                     parse={(raw) => parseOrKeep(plan.runs, raw, (n) => Math.max(1, Math.round(n)))}
                     onCommit={(runs) => update({ runs })}
                   />
-                  {bpcCoverage && (
-                    <BpcCoverageWarning
-                      coverage={bpcCoverage}
-                      onSetRuns={(runs) => update({ runs })}
-                    />
-                  )}
                 </label>
 
                 {/*

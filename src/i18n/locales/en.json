@@ -1767,7 +1767,7 @@
     "heroIskPerHour": "{{value}} ISK/hour",
     "heroBreakEven": "break-even {{value}}/unit",
     "heroNoPrices": "No price data yet",
-    "bpcCoverageWarning": "Your BPC covers {{covered}} of {{needed}} runs",
+    "bpcCoverageWarning": "{{name}}: your BPC covers {{covered}} of {{needed}} runs",
     "bpcCoverageSetRuns": "Set runs to {{count}}",
     "costsAndRevenue": "Costs & revenue",
     "showDetails": "Show details",

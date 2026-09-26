@@ -55,14 +55,14 @@ export function BpcCoverageWarning({
   onSetRuns,
 }: {
   coverage: { coveredRuns: number; neededRuns: number };
-  blueprintName?: string;
+  blueprintName: string;
   onSetRuns?: (runs: number) => void;
 }) {
   const { t } = useTranslation();
   return (
     <p className="text-xs text-warning" role="status">
-      {blueprintName ? `${blueprintName}: ` : ''}
       {t('industry.bpcCoverageWarning', {
+        name: blueprintName,
         covered: coverage.coveredRuns,
         needed: coverage.neededRuns,
       })}
@@ -221,7 +221,7 @@ export function PlanVerdictHero({
                 )}
               </p>
             )}
-            {!pricesLoading && pricesReady && profit === null && bpcCoverage ? (
+            {!pricesLoading && pricesReady && profit === null && bpcCoverage && blueprintName ? (
               <BpcCoverageWarning
                 coverage={bpcCoverage}
                 blueprintName={blueprintName}
