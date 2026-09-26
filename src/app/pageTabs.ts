@@ -103,6 +103,7 @@ export const MARKET_TABS = definePageTabs('/market', [
   { id: 'history', labelKey: 'market.sections.history' },
   { id: 'history/transactions', labelKey: 'market.sections.transactions' },
   { id: 'appraisal', labelKey: 'market.sections.appraisal' },
+  { id: 'hauling', labelKey: 'market.sections.hauling' },
 ]);
 
 export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
