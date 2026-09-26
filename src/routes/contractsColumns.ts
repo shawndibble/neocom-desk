@@ -6,10 +6,17 @@
  */
 import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 
-export const CONTRACTS_HISTORY_COLUMN_IDS = ['status', 'issuer', 'price', 'expires'] as const;
+export const CONTRACTS_HISTORY_COLUMN_IDS = [
+  'status',
+  'issuer',
+  'price',
+  'issued',
+  'expires',
+] as const;
 export type ContractsHistoryColumnId = (typeof CONTRACTS_HISTORY_COLUMN_IDS)[number];
 
 export const contractsHistoryColumnsStore = createColumnVisibilitySetting({
-  key: 'contractsHistoryVisibleColumns',
+  // `.v2`: a stored pre-Issued list would otherwise hide the new column.
+  key: 'contractsHistoryVisibleColumns.v2',
   ids: CONTRACTS_HISTORY_COLUMN_IDS,
 });
