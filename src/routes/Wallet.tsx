@@ -1509,7 +1509,10 @@ export function Wallet() {
           actions={
             <span className="flex items-center gap-2">
               {!showingCorp && (
-                <Link to="/market/history/transactions" className="text-xs hover:text-accent">
+                <Link
+                  to="/market/history/transactions"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs hover:text-accent md:min-h-0 md:min-w-0"
+                >
                   {t('wallet.transactionsLink')}
                 </Link>
               )}
