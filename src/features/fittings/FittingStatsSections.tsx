@@ -28,6 +28,7 @@ import {
   withSectionExpanded,
 } from './statsSectionsPreference';
 import { CapacitorFacts, TankFacts } from './FittingTankStats';
+import { SupportFacts } from './FittingSupportStats';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
 
@@ -158,6 +159,7 @@ type Section =
   | 'appliedDps'
   | 'defense'
   | 'capacitor'
+  | 'support'
   | 'targeting'
   | 'navigation'
   | 'drones'
@@ -170,6 +172,8 @@ const OPEN_BY_DEFAULT: ReadonlySet<Section> = new Set([
   'appliedDps',
   'defense',
   'capacitor',
+  // Only there at all when the fit has something to show in it.
+  'support',
   'navigation',
   'drones',
 ]);
@@ -410,6 +414,16 @@ export function FittingStatsSections({
     return rows;
   }
 
+  /** Support out's headline: remote repair handed out, else how many modules reach another ship. */
+  function supportMeta(s: FittingStats): string {
+    const { remoteRepair, rows } = s.support;
+    const repair = remoteRepair.shield + remoteRepair.armor + remoteRepair.hull;
+    if (repair > 0) return t('fittings.stats.unit.hpPerSecond', { value: repair.toFixed(1) });
+    return t('fittings.stats.support.modules', {
+      count: rows.reduce((sum, row) => sum + row.count, 0),
+    });
+  }
+
   /** Holds, jump drive and sensors: what the hull carries, beside what the fit asks of it. */
   function resourceFacts(s: FittingStats): Fact[] {
     const facts: Fact[] = [
@@ -578,6 +592,14 @@ export function FittingStatsSections({
           : undefined,
         stats ? <CapacitorFacts stats={stats} /> : placeholder
       )}
+
+      {stats &&
+        stats.support.rows.length > 0 &&
+        section(
+          'support',
+          supportMeta(stats),
+          <SupportFacts support={stats.support} typeName={typeName} />
+        )}
 
       {section(
         'targeting',

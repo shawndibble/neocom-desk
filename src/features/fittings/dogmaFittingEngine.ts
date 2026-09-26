@@ -20,6 +20,7 @@ import {
   type OffenseItem,
 } from '@/engine/fittings/stats';
 import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
+import { extractSupport } from '@/engine/fittings/support';
 import {
   ITEM_DOGMA_ATTRIBUTE,
   type Fitting,
@@ -298,6 +299,7 @@ export async function computeFittingStats(
     applied,
     capacitorBudget: extractCapacitorBudget(dogmaFit.items, shown.items, shown.ship.attributes),
     tank: extractTank(dogmaFit.items, shown.items, shown.ship.attributes, baseStats),
+    support: extractSupport(dogmaFit.items, shown.items),
     lockedTargets,
     allOverheated,
   };

@@ -7,6 +7,7 @@
  */
 import type { AppliedDpsInputs } from './appliedDps';
 import type { CapacitorBudget } from './tank';
+import type { SupportStats } from './support';
 
 export type FittingSlotKind = 'high' | 'medium' | 'low' | 'rig' | 'subsystem';
 
@@ -215,6 +216,8 @@ export interface FittingStats {
   /** Peak recharge against what the running modules draw (`tank.ts`). */
   capacitorBudget: CapacitorBudget;
   tank: TankStats;
+  /** What the running modules do to another ship (`support.ts`). */
+  support: SupportStats;
   sensor: SensorStats;
   holds: HoldStats;
   /** Null on a hull without a jump drive. */

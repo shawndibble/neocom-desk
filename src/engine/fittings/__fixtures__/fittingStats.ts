@@ -7,9 +7,23 @@ import type { FittingStats } from '../types';
  */
 export function neutralExtendedStats(): Pick<
   FittingStats,
-  'capacitorBudget' | 'tank' | 'sensor' | 'holds' | 'jumpDrive' | 'lockedTargets' | 'allOverheated'
+  | 'capacitorBudget'
+  | 'tank'
+  | 'support'
+  | 'sensor'
+  | 'holds'
+  | 'jumpDrive'
+  | 'lockedTargets'
+  | 'allOverheated'
 > {
   return {
+    support: {
+      rows: [],
+      remoteRepair: { shield: 0, armor: 0, hull: 0 },
+      capTransfer: 0,
+      neutralizer: 0,
+      nosferatu: 0,
+    },
     sensor: { strength: 0, type: null },
     holds: { cargo: 0, fleetHangar: 0, miningHold: 0 },
     jumpDrive: null,

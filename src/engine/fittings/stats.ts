@@ -249,6 +249,7 @@ export function extractFittingStats(
   | 'applied'
   | 'capacitorBudget'
   | 'tank'
+  | 'support'
   | 'lockedTargets'
   | 'allOverheated'
 > {

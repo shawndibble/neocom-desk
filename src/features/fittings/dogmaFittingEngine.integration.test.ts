@@ -14,6 +14,7 @@ import {
   extractOffense,
 } from '@/engine/fittings/stats';
 import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
+import { extractSupport } from '@/engine/fittings/support';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
 import type { Fitting } from '@/engine/fittings/types';
 
@@ -70,6 +71,11 @@ const MEDIUM_REMOTE_ARMOR_REPAIRER_II = 26913;
 const MEDIUM_ANCILLARY_ARMOR_REPAIRER = 33101;
 const NANITE_REPAIR_PASTE = 28668;
 const MEDIUM_ANCILLARY_SHIELD_BOOSTER = 32772;
+const MEDIUM_REMOTE_SHIELD_BOOSTER_II = 3598;
+const MEDIUM_REMOTE_CAPACITOR_TRANSMITTER_II = 12221;
+const STASIS_WEBIFIER_II = 527;
+const WARP_SCRAMBLER_II = 448;
+const MULTISPECTRUM_ECM_II = 2567;
 
 const PARTIAL_SKILLS = new Map([
   [3332, 3], // Gallente Cruiser
@@ -479,6 +485,66 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(tank.burst.shield).toBeGreaterThan(0);
     // Passive regeneration peaks at 2.5 × shield HP over the shield recharge time.
     expect(tank.passiveShield).toBeCloseTo((2.5 * stats.shield.hp) / (read(479) / 1000), 6);
+  });
+
+  it('reads what the support modules hand out, each by its own kind', () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Caracal support out',
+      shipTypeId: CARACAL,
+      modules: [
+        { slot: 'high', slotIndex: 0, typeId: MEDIUM_REMOTE_ARMOR_REPAIRER_II, state: 'active' },
+        { slot: 'high', slotIndex: 1, typeId: MEDIUM_REMOTE_SHIELD_BOOSTER_II, state: 'active' },
+        {
+          slot: 'high',
+          slotIndex: 2,
+          typeId: MEDIUM_REMOTE_CAPACITOR_TRANSMITTER_II,
+          state: 'active',
+        },
+        { slot: 'medium', slotIndex: 0, typeId: MEDIUM_ENERGY_NEUTRALIZER_II, state: 'active' },
+        { slot: 'medium', slotIndex: 1, typeId: MEDIUM_ENERGY_NOSFERATU_II, state: 'active' },
+        { slot: 'medium', slotIndex: 2, typeId: STASIS_WEBIFIER_II, state: 'active' },
+        { slot: 'medium', slotIndex: 3, typeId: WARP_SCRAMBLER_II, state: 'active' },
+        { slot: 'medium', slotIndex: 4, typeId: MULTISPECTRUM_ECM_II, state: 'active' },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(SUPPORT_SKILL_IDS));
+    const calculation = calculate(dogmaFit);
+    const support = extractSupport(dogmaFit.items, calculation.items);
+
+    expect(support.rows.map((row) => row.kind)).toEqual([
+      'remoteArmor',
+      'remoteShield',
+      'capTransfer',
+      'neutralizer',
+      'nosferatu',
+      'web',
+      'warpDisruption',
+      'ecm',
+    ]);
+    // The engine's outgoing projections carry the same figures it hands a target.
+    const outgoing = calculation.outgoing?.effects ?? [];
+    const projected = (typeId: number, attributeId: number) => {
+      const effect = outgoing.find((e) => e.type_id === typeId);
+      const values = effect?.attributes;
+      return values instanceof Map ? values.get(attributeId) : values?.[attributeId];
+    };
+    expect(support.remoteRepair.armor).toBeCloseTo(
+      projected(MEDIUM_REMOTE_ARMOR_REPAIRER_II, -45)!,
+      6
+    );
+    expect(support.remoteRepair.shield).toBeCloseTo(
+      projected(MEDIUM_REMOTE_SHIELD_BOOSTER_II, -47)!,
+      6
+    );
+    expect(support.neutralizer).toBeCloseTo(projected(MEDIUM_ENERGY_NEUTRALIZER_II, -66)!, 6);
+    // A Medium Energy Nosferatu II drains 36 GJ every 5 s.
+    expect(support.nosferatu).toBeCloseTo(36 / 5, 6);
+    // Stasis Webifier II −60%, Warp Scrambler II two points.
+    expect(support.rows.find((row) => row.kind === 'web')?.amount).toBeCloseTo(60, 6);
+    expect(support.rows.find((row) => row.kind === 'warpDisruption')?.amount).toBe(2);
+    expect(support.rows.find((row) => row.kind === 'ecm')?.amount).toBeGreaterThan(0);
   });
 
   it('runs an ancillary armor repairer at three times its dry rate on paste, and an ancillary shield booster on charges draws no capacitor', () => {

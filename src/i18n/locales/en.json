@@ -454,7 +454,8 @@
         "navigation": "Navigation",
         "drones": "Drones",
         "fitting": "Fitting",
-        "price": "Price"
+        "price": "Price",
+        "support": "Support out"
       },
       "capacitorStable": "Stable at {{pct}}%",
       "capacitorDepletes": "Depletes in {{seconds}}s",
@@ -589,6 +590,28 @@
         "ladar": "Ladar",
         "magnetometric": "Magnetometric",
         "gravimetric": "Gravimetric"
+      },
+      "support": {
+        "range": "{{optimal}} km",
+        "rangeFalloff": "{{optimal}} + {{falloff}} km",
+        "modules_one": "{{count}} module",
+        "modules_other": "{{count}} modules",
+        "kind": {
+          "remoteShield": "{{value}} HP/s shield",
+          "remoteArmor": "{{value}} HP/s armor",
+          "remoteHull": "{{value}} HP/s hull",
+          "neutralizer": "{{value}} GJ/s neutralized",
+          "nosferatu": "{{value}} GJ/s drained",
+          "capTransfer": "{{value}} GJ/s transferred",
+          "web": "−{{value}}% speed",
+          "warpDisruption_one": "{{value}} point",
+          "warpDisruption_other": "{{value}} points",
+          "ecm": "{{value}} jam strength",
+          "targetPainter": "+{{value}}% signature",
+          "trackingDisruptor": "−{{value}}% tracking",
+          "sensorDampener": "−{{value}}% lock range",
+          "guidanceDisruptor": "−{{value}}% explosion velocity"
+        }
       }
     },
     "variations": {

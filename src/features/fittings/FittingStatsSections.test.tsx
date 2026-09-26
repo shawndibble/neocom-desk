@@ -635,3 +635,40 @@ describe('FittingStatsSections — resources', () => {
     expect(fitting.getByText('3000 #16274/ly')).toBeInTheDocument();
   });
 });
+
+describe('FittingStatsSections — Support out', () => {
+  it('lists what each support module hands out, at its range', () => {
+    const neutral = stats().support;
+    renderSections(
+      stats({
+        support: {
+          ...neutral,
+          rows: [
+            {
+              kind: 'remoteArmor',
+              typeId: 26913,
+              count: 2,
+              amount: 85.3,
+              optimal: 10500,
+              falloff: 3000,
+            },
+            { kind: 'web', typeId: 527, count: 1, amount: 60, optimal: 10000, falloff: 0 },
+            { kind: 'warpDisruption', typeId: 448, count: 1, amount: 2, optimal: 9000, falloff: 0 },
+          ],
+          remoteRepair: { shield: 0, armor: 85.3, hull: 0 },
+        },
+      })
+    );
+    const support = within(sectionBody('Support out'));
+    expect(support.getAllByText('85.3 HP/s')).toHaveLength(1);
+    expect(support.getByText('85.3 HP/s armor')).toBeInTheDocument();
+    expect(support.getByText('10.5 + 3.0 km')).toBeInTheDocument();
+    expect(support.getByText('−60% speed')).toBeInTheDocument();
+    expect(support.getByText('2 points')).toBeInTheDocument();
+  });
+
+  it('has no Support out section when nothing reaches another ship', () => {
+    renderSections(stats());
+    expect(screen.queryByRole('heading', { name: 'Support out' })).toBeNull();
+  });
+});
