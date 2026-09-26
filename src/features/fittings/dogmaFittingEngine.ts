@@ -328,12 +328,44 @@ export async function computeFittingStats(
   const heatedCalculation = heatedFit === null ? null : calculate(heatedFit);
 
   // "Overheat all": every figure is the heated one, with no second number
-  // beside it. The editor's state controls still read the unheated result —
-  // they show what the pilot set, not the what-if.
+  // beside it — but the unheated figures ride along (`unheated`, off the
+  // calculation already made), so the page marks only what heat changed.
+  // The editor's state controls still read the unheated result — they show
+  // what the pilot set, not the what-if.
   const allOverheated = overheatAll && heatedCalculation !== null;
-  const shown = allOverheated ? heatedCalculation : calculation;
-  const beside = allOverheated || !withOverheated ? null : heatedCalculation;
+  if (allOverheated) {
+    const unheated = statsFrom(fitting, dogmaFit, calculation, calculation, null);
+    return {
+      ...statsFrom(fitting, dogmaFit, calculation, heatedCalculation, null),
+      allOverheated: true,
+      unheated: { ...unheated, allOverheated: false, unheated: null },
+    };
+  }
+  return {
+    ...statsFrom(
+      fitting,
+      dogmaFit,
+      calculation,
+      calculation,
+      withOverheated ? heatedCalculation : null
+    ),
+    allOverheated: false,
+    unheated: null,
+  };
+}
 
+/**
+ * Every figure off `shown`, with `beside`'s heated ones next to them (null
+ * for none). The modules' own results always come off `calculation`, the fit
+ * as the pilot set it.
+ */
+function statsFrom(
+  fitting: Fitting,
+  dogmaFit: Fit,
+  calculation: ReturnType<typeof calculate>,
+  shown: ReturnType<typeof calculate>,
+  beside: ReturnType<typeof calculate> | null
+): Omit<FittingStats, 'allOverheated' | 'unheated'> {
   const baseStats = extractFittingStats(dogmaFit.items, shown.ship.attributes, shown.items);
 
   // Calibration and drone bandwidth have no single ship-level "used" id the
@@ -401,7 +433,6 @@ export async function computeFittingStats(
     mining: miningYield(extractMining(dogmaFit.items, shown.items)),
     fighters: extractFighterStats(shown.ship.attributes),
     lockedTargets,
-    allOverheated,
   };
 }
 
