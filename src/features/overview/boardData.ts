@@ -215,8 +215,6 @@ export interface ContractsBoardData {
   route: string | null;
   needsReauth: boolean;
   fetchedAt: Date | null;
-  /** The instant the summary was computed against. */
-  loadedAt: number;
 }
 
 /**
@@ -240,5 +238,5 @@ export async function loadContractsBoard(characterId: number): Promise<Contracts
       route = null;
     }
   }
-  return { summary, route, needsReauth, fetchedAt: cached ? cached.fetchedAt : null, loadedAt };
+  return { summary, route, needsReauth, fetchedAt: cached ? cached.fetchedAt : null };
 }

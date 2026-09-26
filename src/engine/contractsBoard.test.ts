@@ -53,6 +53,12 @@ describe('summarizeContractsBoard', () => {
     expect(s.soonest).toMatchObject({ contractId: 5, kind: 'courier', atMs: NOW + 23 * H });
   });
 
+  it('ignores a courier the pilot issued that someone else is hauling', () => {
+    const s = summarizeContractsBoard([courier({ issuer_id: ME, acceptor_id: 999 })], ME, NOW);
+    expect(s.inProgress).toBe(0);
+    expect(s.soonest).toBeNull();
+  });
+
   it('counts a courier due beyond 24h as in progress but not due soon', () => {
     const s = summarizeContractsBoard([courier({ days_to_complete: 7 })], ME, NOW);
     expect(s.inProgress).toBe(1);

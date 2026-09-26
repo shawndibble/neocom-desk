@@ -46,7 +46,8 @@ export function summarizeContractsBoard(
   };
 
   for (const c of contracts) {
-    if (c.type === 'courier' && c.status === 'in_progress') {
+    // Only hauls this pilot is carrying: the feed also lists couriers they issued for someone else to deliver.
+    if (c.type === 'courier' && c.status === 'in_progress' && c.acceptor_id === characterId) {
       // Keep the offer expiry rather than guess, as the other courier surfaces do.
       const atMs = courierDeliveryDeadlineMs(c) ?? parseInstant(c.date_expired);
       inProgress += 1;
