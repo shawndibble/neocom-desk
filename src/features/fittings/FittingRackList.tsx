@@ -1,7 +1,15 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, IconButton, NativeSelect, Panel, TextInput, TypeIcon } from '@/components/ui';
-import { AddRow, Close, Compare } from '@/components/ui/icons';
+import {
+  Button,
+  IconButton,
+  NativeSelect,
+  Panel,
+  RowMoreActions,
+  TextInput,
+  TypeIcon,
+} from '@/components/ui';
+import { AddRow, Close, Compare, DragHandle } from '@/components/ui/icons';
 import {
   cargoGroups,
   droneBayUsed,
@@ -30,6 +38,15 @@ import { moduleKey } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { checkCharges } from './dogmaFittingEngine';
+import { endFittingDrag, startFittingDrag, type FittingDragPayload } from './fittingDrag';
+import {
+  CargoMenuItems,
+  DroneMenuItems,
+  EmptySlotMenuItems,
+  FittingItemMenu,
+  ModuleMenuItems,
+} from './FittingItemMenu';
+import { useFittingDropTarget, useFittingItemActions } from './fittingItemActions';
 import type { AddTarget } from './addTarget';
 import { catalogueTypeName, catalogueVolume, type FittingCatalogue } from './useFittingCatalogue';
 import type { FittingChange } from './useFittingWorkspace';
@@ -107,6 +124,12 @@ export interface ModuleRowProps extends EditContext {
   onOpenVariations?: (slot: FittingSlotKind, slotIndex: number) => void;
   /** The name opens the item's info (the Market's item detail). */
   onShowInfo?: ShowInfo;
+  /**
+   * A row of the List (or a rack sheet): a drop target, dragged by its grip
+   * on a pointer, with Move up / down / to slot in its menu. Off in the
+   * module dialog, which shows one module alone.
+   */
+  inRack?: boolean;
 }
 
 /** Opens an item's info — the Market's item detail — by type and name. */
@@ -145,8 +168,16 @@ export function ModuleRow({
   edit,
   onOpenVariations,
   onShowInfo,
+  inRack = false,
 }: ModuleRowProps) {
   const { t } = useTranslation();
+  const actions = useFittingItemActions();
+  const drop = useFittingDropTarget({
+    kind: 'slot',
+    rack: module.slot,
+    index: module.slotIndex,
+    filled: true,
+  });
   const name = catalogueTypeName(catalogue, module.typeId);
   const { slot, slotIndex, typeId } = module;
   const shipTypeId = fitting.shipTypeId;
@@ -176,6 +207,28 @@ export function ModuleRow({
 
   return (
     <SlotCard
+      menu={
+        actions && {
+          name,
+          items: (
+            <ModuleMenuItems
+              module={module}
+              shownState={shownState}
+              maxState={maxState}
+              withMove={inRack}
+            />
+          ),
+        }
+      }
+      drop={inRack ? drop : undefined}
+      grip={
+        inRack && actions?.dropHandlers.moveModule
+          ? {
+              payload: { kind: 'slot', rack: slot, index: slotIndex },
+              label: t('fittings.item.dragToMove', { name }),
+            }
+          : undefined
+      }
       identity={
         <>
           <TypeIcon typeId={typeId} size={32} width={24} height={24} />
@@ -250,41 +303,89 @@ const SLOT_NAME_CLASS =
   'line-clamp-2 min-w-0 flex-1 text-left text-sm break-words @min-[34rem]:truncate @min-[34rem]:text-xs';
 
 /**
- * A fitted module's or drone's card. In a narrow column (a phone) the name
- * gets the first line to itself — two lines if it needs them — with remove
- * in the top-right corner as on the app's other cards, and the controls
- * below; with room, it is one line, remove last.
+ * A fitted module's, drone's or cargo item's card. In a narrow column (a
+ * phone) the name gets the first line to itself — two lines if it needs
+ * them — with its menu and remove in the top-right corner as on the app's
+ * other cards, and the controls below; with room, it is one line, remove
+ * last. With `menu`, right-click (or touch-and-hold) anywhere on it opens the
+ * item's menu, and a ⋮ button opens the same.
  */
 function SlotCard({
   identity,
   removeLabel,
   onRemove,
   children,
+  menu,
+  drop,
+  grip,
 }: {
   identity: ReactNode;
   removeLabel: string;
   onRemove: () => void;
   children: ReactNode;
+  menu?: { name: string; items: ReactNode } | null;
+  /** From `useFittingDropTarget`: the card takes the List's drags. */
+  drop?: ReturnType<typeof useFittingDropTarget>;
+  /** A pointer's drag handle for the card, and what dragging it carries. */
+  grip?: { payload: FittingDragPayload; label: string };
 }) {
-  return (
-    <div className="@container rounded-xs bg-panel-2">
+  const highlight = drop?.over
+    ? 'ring-2 ring-accent/60'
+    : drop?.lights === 'lit' || drop?.accepts
+      ? 'outline-1 outline-dashed outline-accent'
+      : '';
+  const card = (
+    <div
+      className={`@container rounded-xs bg-panel-2 ${highlight} ${drop?.lights === 'dim' ? 'opacity-40' : ''}`}
+      {...drop?.props}
+    >
       <div className="relative flex flex-wrap items-center gap-x-2 gap-y-1.5 p-1.5 @min-[34rem]:flex-nowrap">
-        <div className="flex min-h-9 min-w-0 basis-full items-center gap-2 pr-11 @min-[34rem]:min-h-0 @min-[34rem]:flex-1 @min-[34rem]:basis-0 @min-[34rem]:pr-0">
+        <div
+          className={`flex min-h-9 min-w-0 basis-full items-center gap-2 @min-[34rem]:min-h-0 @min-[34rem]:flex-1 @min-[34rem]:basis-0 @min-[34rem]:pr-0 ${menu ? 'pr-22' : 'pr-11'}`}
+        >
+          {grip && (
+            <span
+              draggable
+              role="img"
+              aria-label={grip.label}
+              title={grip.label}
+              onDragStart={(event) => startFittingDrag(event, grip.payload)}
+              onDragEnd={endFittingDrag}
+              className="flex h-6 w-4 shrink-0 cursor-grab items-center justify-center text-text-dim active:cursor-grabbing"
+            >
+              <DragHandle aria-hidden />
+            </span>
+          )}
           {identity}
         </div>
-        <div className="flex min-w-0 basis-full items-center gap-2 @min-[34rem]:basis-auto">
+        {/* The controls keep their own right-click and press-and-hold (a count
+            box's paste or text selection) rather than opening the item's menu. */}
+        <div
+          className="flex min-w-0 basis-full items-center gap-2 @min-[34rem]:basis-auto"
+          onContextMenu={menu ? (event) => event.stopPropagation() : undefined}
+          onPointerDown={menu ? (event) => event.stopPropagation() : undefined}
+        >
           {children}
         </div>
-        <IconButton
-          icon={<Close />}
-          tone="danger"
-          variant="plain"
-          label={removeLabel}
-          onClick={onRemove}
-          className="absolute top-0 right-0 @min-[34rem]:static"
-        />
+        <div className="absolute top-0 right-0 flex @min-[34rem]:static">
+          {menu && <RowMoreActions />}
+          <IconButton
+            icon={<Close />}
+            tone="danger"
+            variant="plain"
+            label={removeLabel}
+            onClick={onRemove}
+          />
+        </div>
       </div>
     </div>
+  );
+  return menu ? (
+    <FittingItemMenu name={menu.name} items={menu.items}>
+      {card}
+    </FittingItemMenu>
+  ) : (
+    card
   );
 }
 
@@ -339,21 +440,75 @@ function AddSlotButton({
   label,
   selected,
   onClick,
+  drop,
 }: {
   label: string;
   selected: boolean;
   onClick: () => void;
+  /** From `useFittingDropTarget`: an Add panel module, or a module moved along its rack, lands here. */
+  drop?: ReturnType<typeof useFittingDropTarget>;
 }) {
   return (
     <Button
       align="start"
-      className={`w-full border border-dashed ${selected ? 'border-accent bg-accent/10' : 'border-line'}`}
+      className={`w-full border border-dashed ${selected || drop?.over ? 'border-accent bg-accent/10' : drop?.accepts ? 'border-accent' : 'border-line'}`}
       aria-pressed={selected}
       onClick={onClick}
+      {...drop?.props}
     >
       <AddRow aria-hidden />
       {label}
     </Button>
+  );
+}
+
+/**
+ * An empty List slot: tap to add there, drop a module on it. With the
+ * editor's actions it has the Ring's empty-slot menu too (Add module ▸,
+ * Paste, Fill rack), on right-click, touch-and-hold or its ⋮.
+ */
+function EmptySlot({
+  rack,
+  slotIndex,
+  ...button
+}: {
+  rack: FittingSlotKind;
+  slotIndex: number;
+  label: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const actions = useFittingItemActions();
+  const drop = useFittingDropTarget({ kind: 'slot', rack, index: slotIndex, filled: false });
+  const slot = <AddSlotButton {...button} drop={drop} />;
+  if (actions === null) return slot;
+  return (
+    <FittingItemMenu
+      name={button.label}
+      items={<EmptySlotMenuItems rack={rack} index={slotIndex} />}
+    >
+      {/* The ⋮ sits beside the slot's button, never inside it. */}
+      <div className="flex items-center gap-1">
+        {slot}
+        <RowMoreActions />
+      </div>
+    </FittingItemMenu>
+  );
+}
+
+/**
+ * A rack's heading, which takes drops too: a module goes in the rack's first
+ * free slot, a charge into every module that takes it.
+ */
+function RackHeading({ rack, label }: { rack: FittingSlotKind; label: string }) {
+  const drop = useFittingDropTarget({ kind: 'rack', rack });
+  return (
+    <p
+      className={`${RACK_LABEL_CLASS} rounded-xs ${drop.over ? 'bg-accent/15 text-accent' : drop.accepts ? 'text-accent outline-1 outline-dashed outline-accent' : ''}`}
+      {...drop.props}
+    >
+      {label}
+    </p>
   );
 }
 
@@ -400,7 +555,7 @@ export function RackSlots({
   const rackLabel = t(`fittings.list.rack.${rack}`);
   return (
     <div>
-      {!hideLabel && <p className={RACK_LABEL_CLASS}>{rackLabel}</p>}
+      {!hideLabel && <RackHeading rack={rack} label={rackLabel} />}
       <div className="space-y-1.5">
         {Array.from({ length: slotCount }, (_, slotIndex) => {
           const entry = bySlot.get(slotIndex);
@@ -414,14 +569,17 @@ export function RackSlots({
                 cantUse={unusableModuleKeys?.has(moduleKey(entry.module)) ?? false}
                 onOpenVariations={onOpenVariations}
                 onShowInfo={onShowInfo}
+                inRack
               />
             );
           }
           // Before ship data, a gap below a fitted module is just a gap — no Add yet.
           if (slotCounts === null) return null;
           return (
-            <AddSlotButton
+            <EmptySlot
               key={slotIndex}
+              rack={rack}
+              slotIndex={slotIndex}
               label={t('fittings.edit.emptySlot', { rack: rackLabel })}
               selected={
                 target?.kind === 'slot' && target.slot === rack && target.slotIndex === slotIndex
@@ -468,6 +626,8 @@ export function DroneSection({
   variant = 'list',
 }: DroneSectionProps) {
   const { t } = useTranslation();
+  const actions = useFittingItemActions();
+  const drop = useFittingDropTarget({ kind: 'drones' });
   const drones = droneGroups(fitting);
   const droneVolume = (typeId: number) => catalogueVolume(catalogue, typeId);
   // Before the ship data the bay's size is unknown, so nothing is capped yet.
@@ -475,7 +635,11 @@ export function DroneSection({
     stats === null ? null : { capacity: stats.droneCapacity, volumeOf: droneVolume };
   if (!showsDrones(stats, drones.length)) return null;
   return (
-    <div className="space-y-1.5">
+    // A drone dragged here (from the bay below, or the Add panel) launches.
+    <div
+      className={`space-y-1.5 rounded-xs ${drop.over ? 'ring-2 ring-accent/60' : drop.accepts ? 'outline-1 outline-dashed outline-accent' : ''}`}
+      {...drop.props}
+    >
       {variant === 'list' && <p className={RACK_LABEL_CLASS}>{t('fittings.list.drones')}</p>}
       {variant === 'panel' && (
         <div className="space-y-1.5">
@@ -500,6 +664,26 @@ export function DroneSection({
           return (
             <SlotCard
               key={group.typeId}
+              menu={
+                actions && {
+                  name,
+                  items: (
+                    <DroneMenuItems
+                      typeId={group.typeId}
+                      inSpace={group.inSpace}
+                      inBay={group.inBay}
+                    />
+                  ),
+                }
+              }
+              grip={
+                group.inBay > 0 && actions?.dropHandlers.launchDrone
+                  ? {
+                      payload: { kind: 'drone', typeId: group.typeId },
+                      label: t('fittings.item.dragToLaunch', { name }),
+                    }
+                  : undefined
+              }
               identity={
                 <>
                   <TypeIcon typeId={group.typeId} size={32} width={24} height={24} />
@@ -587,7 +771,6 @@ export function FittingRackList({
   const drones = droneGroups(fitting);
   const dronesShown = showsDrones(stats, drones.length);
   const droneVolume = (typeId: number) => catalogueVolume(catalogue, typeId);
-  const cargo = cargoGroups(fitting);
 
   return (
     <Panel title={t('fittings.list.title')} actions={actions}>
@@ -653,43 +836,85 @@ export function FittingRackList({
           onShowInfo={onShowInfo}
         />
 
-        {/* What a pasted fit carries besides its slots and drones: ammo, filaments, a depot. */}
-        {cargo.length > 0 && (
-          <div>
-            <p className={RACK_LABEL_CLASS}>{t('fittings.list.cargo')}</p>
-            <div className="space-y-1.5">
-              {cargo.map((item) => {
-                const name = catalogueTypeName(catalogue, item.typeId);
-                return (
-                  <SlotCard
-                    key={item.typeId}
-                    identity={
-                      <>
-                        <TypeIcon typeId={item.typeId} size={32} width={24} height={24} />
-                        <SlotName typeId={item.typeId} name={name} onShowInfo={onShowInfo} />
-                      </>
-                    }
-                    removeLabel={t('fittings.edit.remove', { name })}
-                    onRemove={() => edit((f) => setCargoQuantity(f, item.typeId, 0))}
-                  >
-                    <CountInput
-                      label={t('fittings.edit.quantity')}
-                      value={item.quantity}
-                      min={1}
-                      onCommit={(quantity) =>
-                        edit(
-                          (f) => setCargoQuantity(f, item.typeId, quantity),
-                          `cargo-${item.typeId}`
-                        )
-                      }
-                    />
-                  </SlotCard>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* What a fit carries besides its slots and drones: ammo, paste, filaments, a depot. */}
+        <CargoSection fitting={fitting} catalogue={catalogue} edit={edit} onShowInfo={onShowInfo} />
       </div>
     </Panel>
+  );
+}
+
+/**
+ * The cargo hold: how full it is, each item with its count — a charge drags
+ * onto the modules that take it, and its menu loads it — and "Add cargo".
+ * The List's Cargo section; the Ring shows the same items as tiles.
+ */
+export function CargoSection({
+  fitting,
+  catalogue,
+  edit,
+  onShowInfo,
+}: Pick<EditContext, 'fitting' | 'catalogue' | 'edit'> & { onShowInfo?: ShowInfo }) {
+  const { t } = useTranslation();
+  const actions = useFittingItemActions();
+  const cargo = cargoGroups(fitting);
+  if (cargo.length === 0 && actions === null) return null;
+  const draggable = actions?.dropHandlers.loadCharge ?? false;
+  return (
+    <div className="space-y-1.5">
+      <p className={RACK_LABEL_CLASS}>{t('fittings.list.cargo')}</p>
+      {actions && (
+        <ResourceBar
+          label={t('fittings.list.cargoHold')}
+          used={actions.cargoUsed}
+          total={actions.cargoCapacity}
+        />
+      )}
+      {cargo.map((item) => {
+        const name = catalogueTypeName(catalogue, item.typeId);
+        return (
+          <SlotCard
+            key={item.typeId}
+            menu={actions && { name, items: <CargoMenuItems typeId={item.typeId} /> }}
+            grip={
+              draggable && actions
+                ? {
+                    payload: {
+                      kind: 'charge',
+                      typeId: item.typeId,
+                      fromCargo: true,
+                      targets: actions.charges.targetsFor(item.typeId),
+                    },
+                    label: t('fittings.item.dragToLoad', { name }),
+                  }
+                : undefined
+            }
+            identity={
+              <>
+                <TypeIcon typeId={item.typeId} size={32} width={24} height={24} />
+                <SlotName typeId={item.typeId} name={name} onShowInfo={onShowInfo} />
+              </>
+            }
+            removeLabel={t('fittings.edit.remove', { name })}
+            onRemove={() => edit((f) => setCargoQuantity(f, item.typeId, 0))}
+          >
+            <CountInput
+              label={t('fittings.edit.quantity')}
+              value={item.quantity}
+              min={1}
+              onCommit={(quantity) =>
+                edit((f) => setCargoQuantity(f, item.typeId, quantity), `cargo-${item.typeId}`)
+              }
+            />
+          </SlotCard>
+        );
+      })}
+      {actions && (
+        <AddSlotButton
+          label={t('fittings.item.addCargo')}
+          selected={false}
+          onClick={actions.openAddCargo}
+        />
+      )}
+    </div>
   );
 }

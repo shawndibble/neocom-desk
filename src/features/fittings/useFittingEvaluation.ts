@@ -25,13 +25,21 @@ import {
 import type { DamageProfile, Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
-import { useAbyssalWeather } from './abyssalWeatherSelection';
+import {
+  pilotUnder,
+  statsOptions,
+  useStatsConditions,
+  type StatsConditions,
+} from './statsConditions';
 import { useDamageProfiles, type DamageProfiles } from './damageProfiles';
 import {
   computeFittingStats,
+  explainModule,
   isDogmaEngineReady,
   type DogmaAssetProgress,
+  type StatsOptions,
 } from './dogmaFittingEngine';
+import type { AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { loadFittingPrice } from './fittingPrice';
 
 /**
@@ -80,39 +88,64 @@ export interface FittingEvaluation {
   price: Appraisal | null;
   /** Null until the pilot, the Damage Profile and the engine are all ready. */
   variants: VariantEvaluator | null;
+  /**
+   * What changed each attribute of the open Fitting's module at
+   * `moduleIndex` ("Affected by"), under exactly what its stats are worked
+   * out under. Null until the pilot, the Damage Profile and the engine are ready.
+   */
+  explainModule: ((moduleIndex: number) => Promise<AffectedAttribute[]>) | null;
 }
 
-/** The engine's weather option: none for normal space. */
-function weatherOption(weatherTypeId: number | null): { weatherTypeId?: number } {
-  return weatherTypeId === null ? {} : { weatherTypeId };
+/**
+ * What a Fitting is worked out under, beside the Fitting itself: the pilot
+ * (skills, and the implants the basis picked), the Damage Profile and the
+ * session's conditions. One object, so every calculation below takes the
+ * same three together and none can forget one.
+ */
+interface EvaluationBasis {
+  pilot: PilotProfile;
+  /** Absent: the engine's uniform default. */
+  damageProfile?: DamageProfile;
+  conditions: StatsConditions;
 }
 
-function withoutOverheat(
+/**
+ * Runs `calculate` with the basis's pilot under its skill overrides and the
+ * engine options its conditions ask for. `pilotUnder` is awaited only when
+ * it hands back a Promise (All V loads the skill list): otherwise `calculate`
+ * starts in the same tick, as it did before overrides existed.
+ */
+async function underBasis<T>(
+  { pilot, conditions }: EvaluationBasis,
+  calculate: (pilot: PilotProfile, options: StatsOptions) => Promise<T>
+): Promise<T> {
+  const under = pilotUnder(pilot, conditions);
+  return calculate(under instanceof Promise ? await under : under, statsOptions(conditions));
+}
+
+/** `fitting`'s stats under `basis`; `extra` adds engine options (no overheat) or a progress callback. */
+function statsUnder(
   fitting: Fitting,
-  pilot: PilotProfile,
-  damageProfile: DamageProfile,
-  weatherTypeId: number | null
+  basis: EvaluationBasis,
+  extra: { overheated?: boolean; onProgress?: (progress: DogmaAssetProgress) => void } = {}
 ): Promise<FittingStats> {
-  return computeFittingStats(fitting, pilot, undefined, damageProfile, {
-    overheated: false,
-    ...weatherOption(weatherTypeId),
-  });
+  return underBasis(basis, (pilot, options) =>
+    computeFittingStats(fitting, pilot, extra.onProgress, basis.damageProfile, {
+      ...(extra.overheated === undefined ? {} : { overheated: extra.overheated }),
+      ...options,
+    })
+  );
 }
 
-function variantEvaluator(
-  fitting: Fitting,
-  pilot: PilotProfile,
-  damageProfile: DamageProfile,
-  weatherTypeId: number | null
-): VariantEvaluator {
+function variantEvaluator(fitting: Fitting, basis: EvaluationBasis): VariantEvaluator {
   // Dropped on failure so a transient error doesn't wedge every later compare.
   let baseline: Promise<FittingStats> | null = null;
   return {
     fitting,
-    profile: pilot,
+    profile: basis.pilot,
     async compare(variant) {
       if (baseline === null) {
-        const pending = withoutOverheat(fitting, pilot, damageProfile, weatherTypeId);
+        const pending = statsUnder(fitting, basis, { overheated: false });
         baseline = pending;
         pending.catch(() => {
           if (baseline === pending) baseline = null;
@@ -120,7 +153,7 @@ function variantEvaluator(
       }
       const [before, after] = await Promise.all([
         baseline,
-        withoutOverheat(variant, pilot, damageProfile, weatherTypeId),
+        statsUnder(variant, basis, { overheated: false }),
       ]);
       return { before, after };
     },
@@ -130,23 +163,21 @@ function variantEvaluator(
 /**
  * A Fitting other than the open one (Fitting Compare, the applied-DPS
  * overlay), on the basis it would open on: its own carried set when it
- * carries one, else the pilot's clone — in the same Abyssal weather as the
- * open one (`useAbyssalWeather`, passed in so a caller re-runs when it changes).
+ * carries one, else the pilot's clone — under the same conditions as the
+ * open one (`useStatsConditions`, passed in so a caller re-runs when they change).
  */
 export function evaluateFitting(
   fitting: Fitting,
   profile: PilotProfile,
   damageProfile: DamageProfile | undefined,
-  weatherTypeId: number | null
+  conditions: StatsConditions
 ): Promise<FittingStats> {
   const pilot = applyImplantBasis(profile, fitting.implantSet, defaultImplantBasis(fitting));
-  return computeFittingStats(
-    fitting,
+  return statsUnder(fitting, {
     pilot,
-    undefined,
-    damageProfile,
-    weatherOption(weatherTypeId)
-  );
+    conditions,
+    ...(damageProfile === undefined ? {} : { damageProfile }),
+  });
 }
 
 /** The open Fitting's stats, price and Variations evaluator. */
@@ -157,7 +188,7 @@ export function useFittingEvaluation({
 }: FittingEvaluationInput): FittingEvaluation {
   const damageProfiles = useDamageProfiles();
   const damageProfile = damageProfiles.hydrated ? damageProfiles.selected : null;
-  const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
+  const conditions = useStatsConditions();
 
   // Keyed on the carried set, not the Fitting: an edit that leaves the set
   // alone keeps this object, and with it `variants` and its baseline.
@@ -199,18 +230,18 @@ export function useFittingEvaluation({
     if (fitting === null || pilot === null || damageProfile === null) return;
     void (async () => {
       try {
-        const result = await computeFittingStats(
+        const result = await statsUnder(
           fitting,
-          pilot,
-          (progress) => {
-            if (!cancelled) setStatsProgress(progress);
-          },
-          damageProfile,
-          weatherOption(weatherTypeId)
+          { pilot, damageProfile, conditions },
+          {
+            onProgress: (progress) => {
+              if (!cancelled) setStatsProgress(progress);
+            },
+          }
         );
         if (cancelled) return;
         setEngineReady(true);
-        setStats({ fitting, stats: result, weatherTypeId });
+        setStats({ fitting, stats: result, weatherTypeId: conditions.weatherTypeId });
       } catch {
         if (!cancelled) setStatsError(true);
       }
@@ -218,7 +249,7 @@ export function useFittingEvaluation({
     return () => {
       cancelled = true;
     };
-  }, [fitting, pilot, damageProfile, weatherTypeId, attempt]);
+  }, [fitting, pilot, damageProfile, conditions, attempt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -236,8 +267,19 @@ export function useFittingEvaluation({
     () =>
       fitting === null || pilot === null || damageProfile === null || !engineReady
         ? null
-        : variantEvaluator(fitting, pilot, damageProfile, weatherTypeId),
-    [fitting, pilot, damageProfile, weatherTypeId, engineReady]
+        : variantEvaluator(fitting, { pilot, damageProfile, conditions }),
+    [fitting, pilot, damageProfile, conditions, engineReady]
+  );
+
+  const explain = useMemo(
+    () =>
+      fitting === null || pilot === null || damageProfile === null || !engineReady
+        ? null
+        : (moduleIndex: number) =>
+            underBasis({ pilot, damageProfile, conditions }, (under, options) =>
+              explainModule(fitting, under, moduleIndex, damageProfile, options)
+            ),
+    [fitting, pilot, damageProfile, conditions, engineReady]
   );
 
   return {
@@ -251,5 +293,6 @@ export function useFittingEvaluation({
     damageProfiles,
     price,
     variants,
+    explainModule: explain,
   };
 }

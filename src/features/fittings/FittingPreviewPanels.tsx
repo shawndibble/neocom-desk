@@ -21,7 +21,13 @@ function Meter({
   total: number;
   unit?: string;
 }) {
+  const { t } = useTranslation();
   const over = used > total;
+  // A unitless meter (calibration) leaves no gap where the unit would go.
+  const reading = (key: string) =>
+    t(key, { used: formatCompactNumber(used), total: formatCompactNumber(total), unit: unit ?? '' })
+      .replace(/\s+/g, ' ')
+      .trim();
   const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
   return (
     <div className="grid grid-cols-[6rem_1fr_auto] items-center gap-2 text-xs">
@@ -32,7 +38,9 @@ function Meter({
         aria-valuemin={0}
         aria-valuemax={total}
         aria-valuenow={Math.min(used, total)}
-        aria-valuetext={`${formatCompactNumber(used)} / ${formatCompactNumber(total)}${unit ? ` ${unit}` : ''}${over ? ' (over)' : ''}`}
+        aria-valuetext={reading(
+          over ? 'fittings.start.preview.meterOver' : 'fittings.start.preview.meter'
+        )}
         className="h-1.5 bg-line"
       >
         <div
@@ -41,8 +49,7 @@ function Meter({
         />
       </div>
       <span className={`tabular-nums ${over ? 'text-danger' : ''}`}>
-        {formatCompactNumber(used)} / {formatCompactNumber(total)}
-        {unit ? ` ${unit}` : ''}
+        {reading('fittings.start.preview.meter')}
       </span>
     </div>
   );
@@ -57,13 +64,13 @@ export function FitMeters({ stats }: { stats: FittingStats }) {
         label={t('fittings.start.preview.cpu')}
         used={stats.cpuUsed}
         total={stats.cpuTotal}
-        unit="tf"
+        unit={t('fittings.start.preview.unit.teraflops')}
       />
       <Meter
         label={t('fittings.start.preview.powergrid')}
         used={stats.powergridUsed}
         total={stats.powergridTotal}
-        unit="MW"
+        unit={t('fittings.start.preview.unit.megawatts')}
       />
       {stats.calibrationTotal > 0 && (
         <Meter
@@ -77,7 +84,7 @@ export function FitMeters({ stats }: { stats: FittingStats }) {
           label={t('fittings.start.preview.droneBandwidth')}
           used={stats.droneBandwidthUsed}
           total={stats.droneBandwidthTotal}
-          unit="Mbit/s"
+          unit={t('fittings.start.preview.unit.megabits')}
         />
       )}
     </div>
@@ -184,12 +191,16 @@ export function DefensePanel({ stats }: { stats: FittingStats }) {
           { label: t('fittings.start.preview.ehp'), value: formatCompactNumber(stats.ehp) },
           {
             label: t('fittings.start.preview.speed'),
-            value: `${formatCompactNumber(stats.navigation.maxVelocity)} m/s`,
+            value: t('fittings.start.preview.unit.speed', {
+              value: formatCompactNumber(stats.navigation.maxVelocity),
+            }),
           },
           { label: t('fittings.start.preview.capacitor'), value: capacitor },
           {
             label: t('fittings.start.preview.signature'),
-            value: `${formatCompactNumber(stats.targeting.signatureRadius)} m`,
+            value: t('fittings.start.preview.unit.metres', {
+              value: formatCompactNumber(stats.targeting.signatureRadius),
+            }),
           },
         ]}
       />

@@ -1,18 +1,12 @@
-import { useState, type CSSProperties, type DragEvent, type ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
 import {
-  Button,
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuRadioGroup,
-  ContextMenuRadioItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-  Panel,
-  Tooltip,
-  TypeIcon,
-} from '@/components/ui';
+  useState,
+  type CSSProperties,
+  type DragEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
+import { useTranslation } from 'react-i18next';
+import { Button, Panel, Tooltip, TypeIcon } from '@/components/ui';
 import { AddRow, Warn } from '@/components/ui/icons';
 import {
   RING_GAUGES,
@@ -34,7 +28,7 @@ import {
   type RingRack,
   type RingSlot,
 } from '@/engine/fittings/ringLayout';
-import { cargoGroups, reachableModuleStates } from '@/engine/fittings/fittingEdit';
+import { cargoGroups } from '@/engine/fittings/fittingEdit';
 import type { HardpointKind } from '@/engine/fittings/hardpoints';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
@@ -47,14 +41,30 @@ import type {
   HardpointCounts,
 } from '@/engine/fittings/types';
 import { formatCompactNumber } from '@/lib/compactNumber';
+import { SustainedTankReadout } from './FittingTankStats';
 import { typeIconUrl, typeRenderUrl } from '@/lib/eveImages';
 import {
+  acceptsDrop,
   activeFittingDrag,
+  chargeDragLights,
+  dropEffectFor,
   endFittingDrag,
   startFittingDrag,
   useFittingDrag,
   type FittingDragPayload,
 } from './fittingDrag';
+import {
+  CargoMenuItems,
+  EmptySlotMenuItems,
+  FittingItemMenu,
+  ModuleMenuItems,
+} from './FittingItemMenu';
+import {
+  deleteKeyHandler,
+  openItemMenu,
+  useFittingItemActions,
+  type FittingItemActions,
+} from './fittingItemActions';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
 
 /**
@@ -86,16 +96,6 @@ const TONE_STROKE = { accent: 'stroke-accent', dim: 'stroke-text-dim' } as const
 /** Wide enough to be easy to hover without reaching the tiles inside it. */
 const GAUGE_HIT_WIDTH = 22;
 
-/** What a fitted tile's right-click menu does; the page's own edits. */
-export interface RingModuleActions {
-  setState: (rack: FittingSlotKind, index: number, state: FittingItemState) => void;
-  unloadCharge: (rack: FittingSlotKind, index: number) => void;
-  showInfo: (typeId: number, name: string) => void;
-  /** The module dialog, where its variations are. */
-  openVariations: (rack: FittingSlotKind, index: number) => void;
-  remove: (rack: FittingSlotKind, index: number) => void;
-}
-
 interface FittingRingProps {
   fitting: Fitting;
   stats: FittingStats | null;
@@ -126,12 +126,6 @@ interface FittingRingProps {
   droneButton?: ReactNode;
   /** The slot the Add panel is filling, marked on the ring as it is in the List. */
   selectedSlot?: { rack: FittingSlotKind; index: number } | null;
-  /**
-   * A fitted tile's right-click menu. The page passes it only on a fine
-   * pointer: on touch, Radix opens it on long-press, which is the tooltip's
-   * gesture there. The module dialog is the keyboard and touch way to the same.
-   */
-  moduleActions?: RingModuleActions;
   /** The turrets and launchers the high slots take; null (no pips filled) until known. */
   hardpointsUsed?: HardpointCounts | null;
   /** The panel header's controls — the page's "+ Add module". */
@@ -418,19 +412,22 @@ interface DropHandlers {
   onMoveModule?: FittingRingProps['onMoveModule'];
 }
 
-/**
- * Whether the drag in progress lands on this slot: its own rack only — an Add
- * panel item when drops are handled, a fitted module when moves are and it
- * isn't this slot's own. The one rule both the highlight and the drop read.
- */
-function acceptsDrop(
+/** A slot as a drop target, given which drops the ring handles — the one rule the highlight and the drop both read. */
+function slotAccepts(
   payload: FittingDragPayload | null,
   slot: RingSlot,
-  handlers: DropHandlers
+  handlers: DropHandlers,
+  actions: FittingItemActions | null
 ): boolean {
-  if (payload === null || payload.rack !== slot.rack) return false;
-  if (payload.kind === 'type') return handlers.onDropType !== undefined;
-  return handlers.onMoveModule !== undefined && payload.index !== slot.index;
+  return acceptsDrop(
+    payload,
+    { kind: 'slot', rack: slot.rack, index: slot.index, filled: slot.module !== undefined },
+    {
+      addType: handlers.onDropType !== undefined,
+      moveModule: handlers.onMoveModule !== undefined,
+      loadCharge: actions?.dropHandlers.loadCharge ?? false,
+    }
+  );
 }
 
 interface SlotTileProps extends DropHandlers {
@@ -442,13 +439,16 @@ interface SlotTileProps extends DropHandlers {
   selected?: boolean;
   /** The highest state the module can reach, for its menu; every state until known. */
   maxState?: FittingItemState;
-  actions?: RingModuleActions;
   /** Where the tile sits; its frame turns with the ring by `angle`, the icon stays upright. */
   position: CSSProperties;
   angle: number;
   compact: boolean;
   typeName?: (typeId: number) => string;
   onSelect?: (rack: FittingSlotKind, index: number) => void;
+  /** The ring's one tab stop (a roving tabindex); the arrow keys walk the rest. */
+  tabbable: boolean;
+  onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
+  onFocus?: () => void;
 }
 
 function SlotTile({
@@ -457,7 +457,6 @@ function SlotTile({
   reachedState,
   selected,
   maxState,
-  actions,
   position,
   angle,
   compact,
@@ -465,10 +464,14 @@ function SlotTile({
   onSelect,
   onDropType,
   onMoveModule,
+  tabbable,
+  onKeyDown,
+  onFocus,
 }: SlotTileProps) {
   const { t } = useTranslation();
   const [over, setOver] = useState(false);
   const drag = useFittingDrag((state) => state.payload);
+  const actions = useFittingItemActions();
   const handlers = { onDropType, onMoveModule };
   const { module } = slot;
   const nameOf = (typeId: number) => typeName?.(typeId) ?? `#${typeId}`;
@@ -504,35 +507,47 @@ function SlotTile({
   // Only an empty tile on the full ring is a "fill this slot" target, as the
   // List's empty-slot buttons are; a fitted one opens its module instead.
   const pressed = !compact && module === undefined ? selected : undefined;
+  // A charge drag lights every module that takes it and dims the rest.
+  const lights = chargeDragLights(drag, slot.rack, slot.index);
 
   const border =
     over || pressed
       ? 'border-accent ring-2 ring-accent/50'
       : cantUse
         ? 'border-danger'
-        : acceptsDrop(drag, slot, handlers)
+        : slotAccepts(drag, slot, handlers, actions)
           ? 'border-dashed border-accent'
           : module
             ? 'border-line-bright'
             : 'border-dashed border-line-bright';
   const draggable = !compact && module !== undefined && onMoveModule !== undefined;
   const interactive = !compact && onSelect !== undefined;
+  const menu = !compact && actions !== null;
+  const onDelete = deleteKeyHandler(
+    menu && module !== undefined ? () => actions.remove(slot.rack, slot.index) : undefined
+  );
 
   function handleDragOver(event: DragEvent) {
     const payload = activeFittingDrag(event);
-    if (!acceptsDrop(payload, slot, handlers)) return;
+    if (payload === null || !slotAccepts(payload, slot, handlers, actions)) return;
     event.preventDefault();
-    event.dataTransfer.dropEffect = payload?.kind === 'type' ? 'copy' : 'move';
+    event.dataTransfer.dropEffect = dropEffectFor(payload);
     setOver(true);
   }
 
   function handleDrop(event: DragEvent) {
     const payload = activeFittingDrag(event);
     setOver(false);
-    if (payload === null || !acceptsDrop(payload, slot, handlers)) return;
+    if (payload === null || !slotAccepts(payload, slot, handlers, actions)) return;
     event.preventDefault();
     if (payload.kind === 'type') onDropType?.(slot.rack, slot.index, payload.typeId);
-    else onMoveModule?.(slot.rack, payload.index, slot.index);
+    else if (payload.kind === 'slot') onMoveModule?.(slot.rack, payload.index, slot.index);
+    else
+      actions?.drop(
+        payload,
+        { kind: 'slot', rack: slot.rack, index: slot.index, filled: true },
+        event.altKey
+      );
     endFittingDrag();
   }
 
@@ -541,9 +556,16 @@ function SlotTile({
       type="button"
       aria-label={label}
       aria-pressed={pressed}
-      className={`absolute border bg-bg ${border} ${interactive ? 'cursor-pointer hover:border-accent' : ''} ${draggable ? 'active:cursor-grabbing' : ''}`}
+      data-ring-slot={`${slot.rack}-${slot.index}`}
+      tabIndex={tabbable ? 0 : -1}
+      className={`absolute border bg-bg ${border} ${lights === 'dim' ? 'opacity-35' : ''} ${interactive ? 'cursor-pointer hover:border-accent' : ''} ${draggable ? 'active:cursor-grabbing' : ''}`}
       style={{ ...position, transform: `rotate(${angle.toFixed(1)}deg)` }}
       onClick={interactive ? () => onSelect(slot.rack, slot.index) : undefined}
+      onKeyDown={(event) => {
+        onDelete?.(event);
+        if (!event.defaultPrevented) onKeyDown?.(event);
+      }}
+      onFocus={onFocus}
       draggable={draggable}
       onDragStart={
         draggable
@@ -587,78 +609,101 @@ function SlotTile({
     </button>
   );
 
-  if (compact || module === undefined || actions === undefined || shownState === undefined) {
+  if (!menu || (module !== undefined && shownState === undefined)) {
     return (
       <Tooltip content={tooltip} openOnTap={compact}>
         {tile}
       </Tooltip>
     );
   }
-  const { rack } = slot;
-  const slotIndex = slot.index;
-  const name = nameOf(module.typeId);
-  // A subsystem can't be put offline, so its menu has no states to pick.
-  const hasStates = rack !== 'subsystem';
   return (
-    <ContextMenu>
-      <Tooltip content={tooltip}>
-        <ContextMenuTrigger asChild>{tile}</ContextMenuTrigger>
-      </Tooltip>
-      <ContextMenuContent>
-        {hasStates && (
-          <>
-            <ContextMenuRadioGroup
-              value={shownState}
-              onValueChange={(value) =>
-                actions.setState(rack, slotIndex, value as FittingItemState)
-              }
-            >
-              {reachableModuleStates(maxState ?? 'overload', shownState).map((option) => (
-                <ContextMenuRadioItem key={option} value={option}>
-                  {t(`fittings.ring.menu.state.${option}`)}
-                </ContextMenuRadioItem>
-              ))}
-            </ContextMenuRadioGroup>
-            <ContextMenuSeparator />
-          </>
-        )}
-        {module.chargeTypeId !== undefined && (
-          <ContextMenuItem onSelect={() => actions.unloadCharge(rack, slotIndex)}>
-            {t('fittings.ring.menu.unload', { name: nameOf(module.chargeTypeId) })}
-          </ContextMenuItem>
-        )}
-        <ContextMenuItem onSelect={() => actions.showInfo(module.typeId, name)}>
-          {t('fittings.ring.menu.info')}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => actions.openVariations(rack, slotIndex)}>
-          {t('fittings.ring.menu.variations')}
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem className="text-danger" onSelect={() => actions.remove(rack, slotIndex)}>
-          {t('fittings.ring.menu.remove', { name })}
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+    <FittingItemMenu
+      name={module ? nameOf(module.typeId) : label}
+      tooltip={tooltip}
+      items={
+        module && shownState ? (
+          <ModuleMenuItems module={module} shownState={shownState} maxState={maxState} withMove />
+        ) : (
+          <EmptySlotMenuItems rack={slot.rack} index={slot.index} />
+        )
+      }
+    >
+      {tile}
+    </FittingItemMenu>
   );
 }
 
-/** A cargo item beneath the ring: its icon, a count, and a tooltip naming it. */
+/**
+ * A cargo item beneath the ring: its icon, a count, and a tooltip naming it.
+ * With the editor's actions, a click (or Enter) opens its menu — load it,
+ * change its count, remove it — and on a pointer it drags onto the modules
+ * that take it.
+ */
 function CargoTile({ typeId, count, tooltip }: { typeId: number; count: number; tooltip: string }) {
+  const actions = useFittingItemActions();
   const shown = formatCompactNumber(count);
+  // The badge's count is visible text, so it belongs in the name (WCAG 2.5.3).
+  const name = shown === String(count) ? tooltip : `${tooltip} (${shown})`;
+  const draggable = actions?.dropHandlers.loadCharge ?? false;
+  const tile = (
+    <button
+      type="button"
+      aria-label={name}
+      aria-haspopup={actions ? 'menu' : undefined}
+      className={`relative h-11 w-11 shrink-0 border border-line-bright bg-bg ${actions ? 'cursor-pointer hover:border-accent' : ''}`}
+      onClick={actions ? openItemMenu : undefined}
+      draggable={draggable}
+      onDragStart={
+        draggable && actions
+          ? (event) =>
+              startFittingDrag(event, {
+                kind: 'charge',
+                typeId,
+                fromCargo: true,
+                targets: actions.charges.targetsFor(typeId),
+              })
+          : undefined
+      }
+      onDragEnd={draggable ? endFittingDrag : undefined}
+    >
+      <TypeIcon typeId={typeId} size={64} className="h-full w-full" />
+      <span className="absolute right-0 bottom-0 bg-bg/85 px-0.5 text-[0.625rem] leading-tight font-semibold text-text tabular-nums">
+        {shown}
+      </span>
+    </button>
+  );
+  if (actions === null) {
+    return (
+      <Tooltip content={tooltip} openOnTap>
+        {tile}
+      </Tooltip>
+    );
+  }
   return (
-    <Tooltip content={tooltip} openOnTap>
-      <button
-        type="button"
-        // The badge's count is visible text, so it belongs in the name (WCAG 2.5.3).
-        aria-label={shown === String(count) ? tooltip : `${tooltip} (${shown})`}
-        className="relative h-11 w-11 shrink-0 border border-line-bright bg-bg"
-      >
-        <TypeIcon typeId={typeId} size={64} className="h-full w-full" />
-        <span className="absolute right-0 bottom-0 bg-bg/85 px-0.5 text-[0.625rem] leading-tight font-semibold text-text tabular-nums">
-          {shown}
-        </span>
-      </button>
-    </Tooltip>
+    <FittingItemMenu name={tooltip} tooltip={tooltip} items={<CargoMenuItems typeId={typeId} />}>
+      {tile}
+    </FittingItemMenu>
+  );
+}
+
+/** The hold's m3 used of what it takes, flashing once as it goes over — as the drone bay's bar does. */
+function CargoHoldReadout({ actions }: { actions: FittingItemActions }) {
+  const { t } = useTranslation();
+  const { cargoUsed: used, cargoCapacity: total } = actions;
+  const { overBudget, flashKey, overage } = useOverBudgetFlash(used, total);
+  if (used === null || total === null) return null;
+  return (
+    <p
+      key={flashKey}
+      role="meter"
+      aria-label={t('fittings.list.cargoHold')}
+      aria-valuenow={used}
+      aria-valuemax={total}
+      className={`rounded-xs text-xs tabular-nums ${overBudget ? 'font-semibold text-danger' : 'text-text-dim'} ${flashKey > 0 && overBudget ? 'flash-danger' : ''}`}
+    >
+      {t('fittings.item.cargoHold', { used: used.toFixed(1), total: total.toFixed(1) })}
+      {overBudget && ` · ${t('fittings.list.overBy', { amount: overage.toFixed(1) })}`}
+    </p>
   );
 }
 
@@ -691,12 +736,14 @@ export function FittingRing({
   onRackOpen,
   droneButton,
   selectedSlot,
-  moduleActions,
   hardpointsUsed,
   actions,
   bare = false,
 }: FittingRingProps) {
   const { t } = useTranslation();
+  const itemActions = useFittingItemActions();
+  // The tile last focused, the ring's tab stop.
+  const [focusKey, setFocusKey] = useState<string | null>(null);
   const layout = stats?.slotCounts ?? null;
   const slots = buildRingSlots(fitting, layout);
   const centre = RING_VIEW / 2;
@@ -782,6 +829,38 @@ export function FittingRing({
       index,
     }))
   );
+
+  // One tab stop for the whole ring, not one per tile: the arrow keys walk
+  // the slots in ring order (highs, mids, lows, rigs, then subsystems),
+  // Home and End jump to either end.
+  const order = [...ringSlots, ...subsystems].map((slot) => `${slot.rack}-${slot.index}`);
+  const tabStop = focusKey !== null && order.includes(focusKey) ? focusKey : order[0];
+  function roving(slot: RingSlot) {
+    const key = `${slot.rack}-${slot.index}`;
+    return {
+      tabbable: key === tabStop,
+      onFocus: () => setFocusKey(key),
+      onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => {
+        const at = order.indexOf(key);
+        const next =
+          event.key === 'ArrowRight' || event.key === 'ArrowDown'
+            ? order[(at + 1) % order.length]
+            : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+              ? order[(at - 1 + order.length) % order.length]
+              : event.key === 'Home'
+                ? order[0]
+                : event.key === 'End'
+                  ? order[order.length - 1]
+                  : undefined;
+        if (next === undefined) return;
+        event.preventDefault();
+        setFocusKey(next);
+        event.currentTarget.ownerDocument
+          .querySelector<HTMLElement>(`[data-ring-slot="${next}"]`)
+          ?.focus();
+      },
+    };
+  }
 
   const tileProps = {
     compact,
@@ -880,8 +959,8 @@ export function FittingRing({
                 cantUse={cantUse(slot)}
                 reachedState={reachedState(slot)}
                 maxState={maxStateOf(slot)}
-                actions={moduleActions}
                 selected={isSelected(slot)}
+                {...roving(slot)}
                 position={tilePosition(angle)}
                 angle={angle}
               />
@@ -914,6 +993,7 @@ export function FittingRing({
             )}
             <Readout gauge="powergrid" budget={budgets.powergrid} align="start" />
             <Readout gauge="cpu" budget={budgets.cpu} align="end" />
+            <SustainedTankReadout stats={stats ?? null} className="col-span-2 text-center" />
           </div>
         )}
 
@@ -962,8 +1042,8 @@ export function FittingRing({
                     cantUse={cantUse(slot)}
                     reachedState={reachedState(slot)}
                     maxState={maxStateOf(slot)}
-                    actions={moduleActions}
                     selected={isSelected(slot)}
+                    {...roving(slot)}
                     position={{ inset: 0 }}
                     angle={0}
                   />
@@ -974,9 +1054,12 @@ export function FittingRing({
         )}
 
         {/* What the ring has no slot for; the drones get a panel of their own beneath it. */}
-        {cargo.length > 0 && (
+        {(cargo.length > 0 || (itemActions !== null && !compact)) && (
           <div>
-            <p className={MICRO_LABEL}>{t('fittings.list.cargo')}</p>
+            <div className="flex items-baseline justify-between gap-2">
+              <p className={MICRO_LABEL}>{t('fittings.list.cargo')}</p>
+              {itemActions && <CargoHoldReadout actions={itemActions} />}
+            </div>
             <div className="flex flex-wrap gap-2">
               {cargo.map((item) => (
                 <CargoTile
@@ -989,6 +1072,18 @@ export function FittingRing({
                   })}
                 />
               ))}
+              {itemActions && !compact && (
+                <Tooltip content={t('fittings.item.addCargo')}>
+                  <button
+                    type="button"
+                    aria-label={t('fittings.item.addCargo')}
+                    onClick={itemActions.openAddCargo}
+                    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center border border-dashed border-line-bright bg-bg text-text-dim hover:border-accent"
+                  >
+                    <AddRow aria-hidden />
+                  </button>
+                </Tooltip>
+              )}
             </div>
           </div>
         )}

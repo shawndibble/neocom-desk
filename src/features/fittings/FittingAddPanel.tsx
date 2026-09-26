@@ -5,8 +5,10 @@ import {
   FilterChip,
   IconButton,
   NativeSelect,
+  RowMoreActions,
   SearchInput,
   Tabs,
+  TextInput,
   TypeIcon,
 } from '@/components/ui';
 import { Close } from '@/components/ui/icons';
@@ -17,7 +19,7 @@ import {
   type CandidateEntry,
   type CandidateRack,
 } from '@/engine/fittings/candidates';
-import { targetRack, type AddTarget } from './addTarget';
+import type { AddTarget } from './addTarget';
 import type {
   Fitting,
   FittingModuleResult,
@@ -26,10 +28,12 @@ import type {
 } from '@/engine/fittings/types';
 import { checkCharges, type CandidateCheck } from './dogmaFittingEngine';
 import { endFittingDrag, startFittingDrag } from './fittingDrag';
+import { AddItemMenuItems, FittingItemMenu } from './FittingItemMenu';
+import { useFittingItemActions } from './fittingItemActions';
 import { useHullFit } from './useHullFit';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
-type BrowserTab = 'modules' | 'charges' | 'drones';
+type BrowserTab = 'modules' | 'charges' | 'drones' | 'cargo';
 
 interface FittingAddPanelProps {
   fitting: Fitting;
@@ -45,9 +49,11 @@ interface FittingAddPanelProps {
   onClearTarget?: () => void;
   /** Index-parallel to `fitting.modules` — which charges each fitted module takes. */
   moduleResults?: FittingModuleResult[] | null;
-  /** The Charges tab: load a charge into every fitted module of a type. */
-  onLoadCharge?: (moduleTypeId: number, chargeTypeId: number) => void;
-  /** Items drag onto the Ring's slots (pointer only — scope decision `20260924-205720`). */
+  /** The Charges tab: load a charge into every fitted module that takes it. */
+  onLoadCharge?: (chargeTypeId: number) => void;
+  /** The Cargo tab: puts `quantity` of any item in the hold. */
+  onAddCargo?: (typeId: number, quantity: number) => void;
+  /** Items drag onto the Ring's slots and the List's racks (pointer only — scope decision `20260924-205720`). */
   dragToRing?: boolean;
   /** The hull takes drones (`showsDrones`) — else there is no Drones tab. */
   showDrones?: boolean;
@@ -108,7 +114,8 @@ interface ItemRowProps {
 
 function ItemRow({ entry, rack, check, placeable, draggable, onAdd }: ItemRowProps) {
   const { t } = useTranslation();
-  return (
+  const actions = useFittingItemActions();
+  const row = (
     <li
       draggable={draggable}
       onDragStart={
@@ -117,7 +124,7 @@ function ItemRow({ entry, rack, check, placeable, draggable, onAdd }: ItemRowPro
           : undefined
       }
       onDragEnd={draggable ? endFittingDrag : undefined}
-      className={draggable ? 'cursor-grab active:cursor-grabbing' : undefined}
+      className={`flex items-center ${draggable ? 'cursor-grab active:cursor-grabbing' : ''}`}
     >
       <button
         type="button"
@@ -133,7 +140,18 @@ function ItemRow({ entry, rack, check, placeable, draggable, onAdd }: ItemRowPro
           </span>
         )}
       </button>
+      {actions && <RowMoreActions />}
     </li>
+  );
+  return actions ? (
+    <FittingItemMenu
+      name={entry.name}
+      items={<AddItemMenuItems typeId={entry.typeId} rack={rack} />}
+    >
+      {row}
+    </FittingItemMenu>
+  ) : (
+    row
   );
 }
 
@@ -157,6 +175,7 @@ export function FittingAddPanel({
   onClearTarget,
   moduleResults,
   onLoadCharge,
+  onAddCargo,
   dragToRing = false,
   showDrones = true,
 }: FittingAddPanelProps) {
@@ -168,7 +187,8 @@ export function FittingAddPanel({
   const [toggled, setToggled] = useState<ReadonlySet<number>>(new Set());
 
   // The tab follows the target (a drone target opens Drones), until the pilot picks one.
-  const targetTab: BrowserTab = target?.kind === 'drone' ? 'drones' : 'modules';
+  const targetTab: BrowserTab =
+    target?.kind === 'drone' ? 'drones' : target?.kind === 'cargo' ? 'cargo' : 'modules';
   const [pickedTab, setPickedTab] = useState<BrowserTab>(targetTab);
   const tab: BrowserTab = pickedTab === 'drones' && !showDrones ? 'modules' : pickedTab;
   const [tabFor, setTabFor] = useState(target);
@@ -178,7 +198,7 @@ export function FittingAddPanel({
   }
 
   const hullFit = useHullFit(catalogue, fitting.shipTypeId, profile, engineReady);
-  const slotRack = target?.kind === 'slot' && fitsSlot ? targetRack(target) : null;
+  const slotRack = target?.kind === 'slot' && fitsSlot ? target.slot : null;
 
   const trimmed = query.trim().toLowerCase();
   const results = useMemo(() => {
@@ -281,7 +301,7 @@ export function FittingAddPanel({
         rack={rack}
         check={hullFit?.get(entry.typeId) ?? null}
         placeable={engineReady && canPlace(rack, entry.typeId)}
-        draggable={dragToRing && engineReady && rack !== 'drone'}
+        draggable={dragToRing && engineReady}
         onAdd={onAdd}
       />
     );
@@ -294,6 +314,7 @@ export function FittingAddPanel({
           { id: 'modules', label: t('fittings.add.tab.modules') },
           { id: 'charges', label: t('fittings.add.tab.charges') },
           ...(showDrones ? [{ id: 'drones', label: t('fittings.add.tab.drones') }] : []),
+          ...(onAddCargo ? [{ id: 'cargo', label: t('fittings.add.tab.cargo') }] : []),
         ]}
         value={tab}
         onChange={(id) => setPickedTab(id as BrowserTab)}
@@ -327,7 +348,10 @@ export function FittingAddPanel({
           profile={profile}
           moduleResults={moduleResults ?? null}
           onLoadCharge={onLoadCharge}
+          dragToFit={dragToRing}
         />
+      ) : tab === 'cargo' && onAddCargo ? (
+        <CargoTab catalogue={catalogue} onAddCargo={onAddCargo} />
       ) : (
         <>
           <SearchInput
@@ -416,7 +440,9 @@ interface ChargesTabProps {
   engineReady: boolean;
   profile: PilotProfile | null;
   moduleResults: FittingModuleResult[] | null;
-  onLoadCharge?: (moduleTypeId: number, chargeTypeId: number) => void;
+  onLoadCharge?: (chargeTypeId: number) => void;
+  /** A charge drags onto the modules that take it. */
+  dragToFit: boolean;
 }
 
 /** Per fitted module type that takes charges: what it has loaded, and every charge it takes. */
@@ -427,8 +453,10 @@ function ChargesTab({
   profile,
   moduleResults,
   onLoadCharge,
+  dragToFit,
 }: ChargesTabProps) {
   const { t } = useTranslation();
+  const actions = useFittingItemActions();
   const weapons = useMemo(() => {
     if (moduleResults === null) return [];
     const byType = new Map<
@@ -504,13 +532,30 @@ function ChargesTab({
           <ul>
             {(options.get(weapon.typeId) ?? []).map((chargeTypeId) => {
               const loaded = weapon.loaded.has(chargeTypeId);
-              return (
-                <li key={chargeTypeId}>
+              const draggable = dragToFit && actions !== null;
+              const row = (
+                <li
+                  key={chargeTypeId}
+                  className="flex items-center"
+                  draggable={draggable}
+                  onDragStart={
+                    draggable
+                      ? (event) =>
+                          startFittingDrag(event, {
+                            kind: 'charge',
+                            typeId: chargeTypeId,
+                            fromCargo: false,
+                            targets: actions.charges.targetsFor(chargeTypeId),
+                          })
+                      : undefined
+                  }
+                  onDragEnd={draggable ? endFittingDrag : undefined}
+                >
                   <button
                     type="button"
                     aria-pressed={loaded}
                     disabled={!onLoadCharge}
-                    onClick={() => onLoadCharge?.(weapon.typeId, chargeTypeId)}
+                    onClick={() => onLoadCharge?.(chargeTypeId)}
                     className={`flex min-h-11 w-full items-center gap-2 border-l-2 px-2 text-left text-xs hover:bg-panel-2 md:min-h-9 ${loaded ? 'border-accent text-accent' : 'border-transparent'}`}
                   >
                     <TypeIcon typeId={chargeTypeId} size={32} width={20} height={20} />
@@ -519,12 +564,97 @@ function ChargesTab({
                       <span className="shrink-0 text-[0.6875rem]">{t('fittings.add.loaded')}</span>
                     )}
                   </button>
+                  {actions && <RowMoreActions />}
                 </li>
+              );
+              return actions ? (
+                <FittingItemMenu
+                  key={chargeTypeId}
+                  name={name(chargeTypeId)}
+                  items={<AddItemMenuItems typeId={chargeTypeId} />}
+                >
+                  {row}
+                </FittingItemMenu>
+              ) : (
+                row
               );
             })}
           </ul>
         </section>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Add cargo: any market item, found by name, in the quantity asked — the
+ * hold takes what the ring has no slot for (ammo, paste, filaments, a depot).
+ */
+function CargoTab({
+  catalogue,
+  onAddCargo,
+}: {
+  catalogue: FittingCatalogue | null;
+  onAddCargo: (typeId: number, quantity: number) => void;
+}) {
+  const { t } = useTranslation();
+  const [query, setQuery] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const trimmed = query.trim().toLowerCase();
+  const results = useMemo(() => {
+    if (catalogue === null || trimmed === '') return [];
+    return catalogue.marketTypes
+      .filter((entry) => entry.name.toLowerCase().includes(trimmed))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, CANDIDATE_LIMIT);
+  }, [catalogue, trimmed]);
+  const count = Math.floor(Number(quantity));
+  const valid = Number.isFinite(count) && count >= 1;
+  return (
+    <div className="space-y-2">
+      <SearchInput
+        aria-label={t('fittings.add.cargoSearchLabel')}
+        placeholder={t('fittings.add.cargoSearchPlaceholder')}
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+      />
+      <label className="flex items-center gap-2 text-xs text-text-dim">
+        {t('fittings.edit.quantity')}
+        <TextInput
+          type="number"
+          min={1}
+          size="sm"
+          className="w-24"
+          value={quantity}
+          onChange={(event) => setQuantity(event.target.value)}
+        />
+      </label>
+      {catalogue === null ? (
+        <p className="text-xs text-text-dim">{t('fittings.add.loadingCatalogue')}</p>
+      ) : trimmed === '' ? (
+        <p className="text-xs text-text-dim">{t('fittings.add.cargoHint')}</p>
+      ) : results.length === 0 ? (
+        <p className="text-xs text-text-dim">{t('fittings.add.noResults')}</p>
+      ) : (
+        <ul>
+          {results.map((entry) => (
+            <li key={entry.typeId}>
+              <button
+                type="button"
+                disabled={!valid}
+                onClick={() => onAddCargo(entry.typeId, count)}
+                className="flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs hover:bg-panel-2 disabled:opacity-40 md:min-h-9"
+              >
+                <TypeIcon typeId={entry.typeId} size={32} width={24} height={24} />
+                <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+                <span className="shrink-0 text-text-dim tabular-nums">
+                  {t('fittings.add.cargoAddCount', { count: valid ? count : 0 })}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

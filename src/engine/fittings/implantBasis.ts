@@ -26,5 +26,8 @@ export function applyImplantBasis(
     skillLevels: profile.skillLevels,
     implantTypeIds: implantSet?.implants ?? [],
     boosterTypeIds: implantSet?.boosters ?? [],
+    ...(implantSet?.boosterSideEffects?.length
+      ? { boosterSideEffects: implantSet.boosterSideEffects }
+      : {}),
   };
 }

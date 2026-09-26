@@ -65,6 +65,8 @@ export {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuCheckboxItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubTrigger,
@@ -72,6 +74,9 @@ export {
 } from './DropdownMenu';
 export {
   MenuItem,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
   MenuSub,
   MenuSubTrigger,
   MenuSubContent,

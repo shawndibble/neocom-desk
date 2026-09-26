@@ -7,6 +7,8 @@ import {
   EmptyState,
   IconButton,
   Modal,
+  RowActionsMenu,
+  RowMoreActions,
   SearchInput,
   Spinner,
 } from '@/components/ui';
@@ -20,7 +22,9 @@ import { FittingLoadCard } from './FittingLoadCard';
 import { FittingPreview } from './FittingPreview';
 import { HullPicker } from './HullPicker';
 import { setFittingNotes } from './myFittings';
+import { FittingExportNotice } from './FittingExportMenu';
 import { DeleteFittingModal, RenameFittingModal } from './SavedFittingModals';
+import { useLibraryRowActions } from './useLibraryRowActions';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { FittingLibrarySource } from './useFittingPicker';
 import {
@@ -105,6 +109,13 @@ export function FittingStartScreen({
     onOpened?.();
   }
 
+  const rowActions = useLibraryRowActions({
+    characterId,
+    onOpen: open,
+    onRename: (row) => setRenaming(row.record),
+    onDelete: (row) => setDeleting(row.record),
+  });
+
   const inGameStatus =
     hasCharacter && inGame.granted === false ? (
       <GrantBanner
@@ -156,6 +167,7 @@ export function FittingStartScreen({
       </div>
 
       {inGameStatus}
+      <FittingExportNotice notice={rowActions.notice} />
 
       {loading && rows.length === 0 ? (
         <div className="flex justify-center py-8">
@@ -198,29 +210,32 @@ export function FittingStartScreen({
                   {group.rows.map((row) => {
                     const isSelected = selected?.id === row.id;
                     return (
-                      <li key={row.id}>
-                        <button
-                          type="button"
-                          data-row-id={row.id}
-                          aria-pressed={isSelected}
-                          onClick={() => setSelectedId(row.id)}
-                          onDoubleClick={() => open(row)}
-                          onKeyDown={(event) => {
-                            // Enter opens, as a double-click does; Space still selects.
-                            if (event.key !== 'Enter') return;
-                            event.preventDefault();
-                            open(row);
-                          }}
-                          className={`flex min-h-11 w-full items-center gap-2 border-l-2 px-3 text-left text-sm hover:bg-panel-2 md:min-h-9 ${isSelected ? 'border-accent bg-panel-2 text-accent' : 'border-transparent'}`}
-                        >
-                          <span className="min-w-0 flex-1 truncate">{row.name}</span>
-                          <span className="shrink-0 border border-line-bright px-1.5 text-[0.625rem] tracking-widest text-text-dim uppercase">
-                            {row.source === 'saved'
-                              ? t('fittings.start.sourceSaved')
-                              : t('fittings.start.sourceInGame')}
-                          </span>
-                        </button>
-                      </li>
+                      <RowActionsMenu key={row.id} name={row.name} items={rowActions.itemsFor(row)}>
+                        <li className="flex items-center">
+                          <button
+                            type="button"
+                            data-row-id={row.id}
+                            aria-pressed={isSelected}
+                            onClick={() => setSelectedId(row.id)}
+                            onDoubleClick={() => open(row)}
+                            onKeyDown={(event) => {
+                              // Enter opens, as a double-click does; Space still selects.
+                              if (event.key !== 'Enter') return;
+                              event.preventDefault();
+                              open(row);
+                            }}
+                            className={`flex min-h-11 w-full items-center gap-2 border-l-2 px-3 text-left text-sm hover:bg-panel-2 md:min-h-9 ${isSelected ? 'border-accent bg-panel-2 text-accent' : 'border-transparent'}`}
+                          >
+                            <span className="min-w-0 flex-1 truncate">{row.name}</span>
+                            <span className="shrink-0 border border-line-bright px-1.5 text-[0.625rem] tracking-widest text-text-dim uppercase">
+                              {row.source === 'saved'
+                                ? t('fittings.start.sourceSaved')
+                                : t('fittings.start.sourceInGame')}
+                            </span>
+                          </button>
+                          <RowMoreActions />
+                        </li>
+                      </RowActionsMenu>
                     );
                   })}
                 </ul>
@@ -282,6 +297,7 @@ export function FittingStartScreen({
       </Modal>
       <RenameFittingModal record={renaming} onClose={() => setRenaming(null)} />
       <DeleteFittingModal record={deleting} onClose={() => setDeleting(null)} />
+      {rowActions.dialog}
     </div>
   );
 }

@@ -3,14 +3,21 @@ import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it } from 'vitest';
 import wasmInit, { calculate } from '@eveshipfit/dogma-engine';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
-import { withWeather } from './dogmaFittingEngine';
+import { toProjectedEffects, withIncoming, withWeather } from './dogmaFittingEngine';
 import {
+  extractCapacitorBudget,
+  extractLockedTargets,
+  extractFighterStats,
+  extractTank,
   extractDroneLimits,
   extractFittingStats,
   extractModuleResult,
   extractOffense,
 } from '@/engine/fittings/stats';
 import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
+import { extractSupport } from '@/engine/fittings/support';
+import { affectedAttributes } from '@/engine/fittings/affectedBy';
+import { extractMining, miningYield } from '@/engine/fittings/mining';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
 import type { Fitting } from '@/engine/fittings/types';
 
@@ -52,6 +59,43 @@ const REACTIVE_ARMOR_HARDENER = 4403;
 const CARACAL = 621;
 const HEAVY_MISSILE_LAUNCHER_II = 2410;
 const SCOURGE_HEAVY_MISSILE = 209;
+// Looked up by exact name in the pinned `sde.dat`, 2026-09-25.
+const HURRICANE = 24702;
+const MAELSTROM = 24694;
+const HULK = 22544;
+const THANATOS = 23911;
+const MEDIUM_SHIELD_BOOSTER_II = 10850;
+const MEDIUM_CAPACITOR_BOOSTER_II = 2024;
+const CAP_BOOSTER_400 = 11287;
+const CAP_BOOSTER_150 = 11283;
+const MEDIUM_ENERGY_NEUTRALIZER_II = 12267;
+const MEDIUM_ENERGY_NOSFERATU_II = 12259;
+const MEDIUM_REMOTE_ARMOR_REPAIRER_II = 26913;
+const MEDIUM_ANCILLARY_ARMOR_REPAIRER = 33101;
+const NANITE_REPAIR_PASTE = 28668;
+const MEDIUM_ANCILLARY_SHIELD_BOOSTER = 32772;
+const MEDIUM_REMOTE_SHIELD_BOOSTER_II = 3598;
+const MEDIUM_REMOTE_CAPACITOR_TRANSMITTER_II = 12221;
+const STASIS_WEBIFIER_II = 527;
+const WARP_SCRAMBLER_II = 448;
+const MULTISPECTRUM_ECM_II = 2567;
+const MODULATED_STRIP_MINER_II = 17912;
+const SIMPLE_ASTEROID_MINING_CRYSTAL_TYPE_A_II = 60281;
+const MINING_DRONE_II = 10250;
+const GYROSTABILIZER_II = 519;
+const AFTERBURNER_1MN_II = 438;
+const CLAYMORE = 22468;
+const SKIRMISH_COMMAND_BURST_II = 43556;
+const RAPID_DEPLOYMENT_CHARGE = 42840;
+/** Leadership, Skirmish Command, Command Burst Specialist, Wing/Fleet Command, Command Ships. */
+const SVIPUL = 34562;
+const SVIPUL_PROPULSION_MODE = 34566;
+const STANDARD_BLUE_PILL_BOOSTER = 9950;
+const TEMPLAR_I = 23055;
+const CENOBITE_I = 37599;
+/** Fighters, Light Fighters, Support Fighters, Fighter Hangar Management. */
+const FIGHTER_SKILL_IDS = [23069, 40572, 40573, 24613];
+const COMMAND_SKILL_IDS = [3348, 3349, 3354, 11574, 24764, 23950];
 
 const PARTIAL_SKILLS = new Map([
   [3332, 3], // Gallente Cruiser
@@ -416,6 +460,466 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(extractModuleResult(calculation.items[1])).not.toHaveProperty('adaptedResonances');
   });
 
+  it('splits the capacitor budget the way the engine nets it, and keeps remote reps out of the local tank', () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Caracal support',
+      shipTypeId: CARACAL,
+      modules: [
+        { slot: 'medium', slotIndex: 0, typeId: MEDIUM_SHIELD_BOOSTER_II, state: 'active' },
+        {
+          slot: 'medium',
+          slotIndex: 1,
+          typeId: MEDIUM_CAPACITOR_BOOSTER_II,
+          state: 'active',
+          chargeTypeId: CAP_BOOSTER_400,
+        },
+        { slot: 'medium', slotIndex: 2, typeId: MEDIUM_ENERGY_NEUTRALIZER_II, state: 'active' },
+        { slot: 'medium', slotIndex: 3, typeId: MEDIUM_ENERGY_NOSFERATU_II, state: 'active' },
+        { slot: 'high', slotIndex: 0, typeId: MEDIUM_REMOTE_ARMOR_REPAIRER_II, state: 'active' },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(SUPPORT_SKILL_IDS));
+    const calculation = calculate(dogmaFit);
+    const ship = calculation.ship.attributes;
+    const read = (id: number) => ship.get(id)?.value ?? 0;
+    const stats = extractFittingStats(dogmaFit.items, ship, calculation.items);
+    const budget = extractCapacitorBudget(dogmaFit.items, calculation.items, ship);
+    const tank = extractTank(dogmaFit.items, calculation.items, ship, stats);
+
+    // Peak recharge is 2.5 × capacity over the recharge time, in seconds.
+    expect(budget.peakRecharge).toBeCloseTo(
+      (2.5 * stats.capacitorCapacity) / (stats.capacitorRechargeTime / 1000),
+      6
+    );
+    // The split adds back up to the engine's own net peak load (-4).
+    expect(budget.drain - budget.boosterInjection - budget.nosferatuGain).toBeCloseTo(read(-4), 6);
+    // A Cap Booster 400 every 12 s; the Medium Energy Nosferatu II's 36 GJ every 5 s.
+    expect(budget.boosterInjection).toBeCloseTo(400 / 12, 6);
+    expect(budget.nosferatuGain).toBeCloseTo(36 / 5, 6);
+    expect(budget.delta).toBeCloseTo(read(-5), 6);
+
+    // The remote armor repairer repairs someone else: the local tank has no armor.
+    expect(tank.burst.armor).toBe(0);
+    expect(tank.burst.shield).toBeGreaterThan(0);
+    // Passive regeneration peaks at 2.5 × shield HP over the shield recharge time.
+    expect(tank.passiveShield).toBeCloseTo((2.5 * stats.shield.hp) / (read(479) / 1000), 6);
+  });
+
+  it('reads what the support modules hand out, each by its own kind', () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Caracal support out',
+      shipTypeId: CARACAL,
+      modules: [
+        { slot: 'high', slotIndex: 0, typeId: MEDIUM_REMOTE_ARMOR_REPAIRER_II, state: 'active' },
+        { slot: 'high', slotIndex: 1, typeId: MEDIUM_REMOTE_SHIELD_BOOSTER_II, state: 'active' },
+        {
+          slot: 'high',
+          slotIndex: 2,
+          typeId: MEDIUM_REMOTE_CAPACITOR_TRANSMITTER_II,
+          state: 'active',
+        },
+        { slot: 'medium', slotIndex: 0, typeId: MEDIUM_ENERGY_NEUTRALIZER_II, state: 'active' },
+        { slot: 'medium', slotIndex: 1, typeId: MEDIUM_ENERGY_NOSFERATU_II, state: 'active' },
+        { slot: 'medium', slotIndex: 2, typeId: STASIS_WEBIFIER_II, state: 'active' },
+        { slot: 'medium', slotIndex: 3, typeId: WARP_SCRAMBLER_II, state: 'active' },
+        { slot: 'medium', slotIndex: 4, typeId: MULTISPECTRUM_ECM_II, state: 'active' },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(SUPPORT_SKILL_IDS));
+    const calculation = calculate(dogmaFit);
+    const support = extractSupport(dogmaFit.items, calculation.items);
+
+    expect(support.rows.map((row) => row.kind)).toEqual([
+      'remoteArmor',
+      'remoteShield',
+      'capTransfer',
+      'neutralizer',
+      'nosferatu',
+      'web',
+      'warpDisruption',
+      'ecm',
+    ]);
+    // The engine's outgoing projections carry the same figures it hands a target.
+    const outgoing = calculation.outgoing?.effects ?? [];
+    const projected = (typeId: number, attributeId: number) => {
+      const effect = outgoing.find((e) => e.type_id === typeId);
+      const values = effect?.attributes;
+      return values instanceof Map ? values.get(attributeId) : values?.[attributeId];
+    };
+    expect(support.remoteRepair.armor).toBeCloseTo(
+      projected(MEDIUM_REMOTE_ARMOR_REPAIRER_II, -45)!,
+      6
+    );
+    expect(support.remoteRepair.shield).toBeCloseTo(
+      projected(MEDIUM_REMOTE_SHIELD_BOOSTER_II, -47)!,
+      6
+    );
+    expect(support.neutralizer).toBeCloseTo(projected(MEDIUM_ENERGY_NEUTRALIZER_II, -66)!, 6);
+    // A Medium Energy Nosferatu II drains 36 GJ every 5 s.
+    expect(support.nosferatu).toBeCloseTo(36 / 5, 6);
+    // Stasis Webifier II −60%, Warp Scrambler II two points.
+    expect(support.rows.find((row) => row.kind === 'web')?.amount).toBeCloseTo(60, 6);
+    expect(support.rows.find((row) => row.kind === 'warpDisruption')?.amount).toBe(2);
+    expect(support.rows.find((row) => row.kind === 'ecm')?.amount).toBeGreaterThan(0);
+  });
+
+  it('mines more with a crystal loaded, and counts launched mining drones', () => {
+    const hulk = (modules: Fitting['modules'], drones: Fitting['drones'] = []): Fitting => ({
+      name: 'Hulk',
+      shipTypeId: HULK,
+      modules,
+      drones,
+      cargo: [],
+    });
+    const strip = (slotIndex: number, chargeTypeId?: number) => ({
+      slot: 'high' as const,
+      slotIndex,
+      typeId: MODULATED_STRIP_MINER_II,
+      state: 'active' as const,
+      ...(chargeTypeId === undefined ? {} : { chargeTypeId }),
+    });
+    const mine = (fitting: Fitting) => {
+      const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(MINING_SKILL_IDS));
+      const calculation = calculate(dogmaFit);
+      return miningYield(extractMining(dogmaFit.items, calculation.items));
+    };
+
+    const bare = mine(hulk([strip(0)]));
+    const crystal = mine(hulk([strip(0, SIMPLE_ASTEROID_MINING_CRYSTAL_TYPE_A_II)]));
+    expect(bare.rows).toHaveLength(1);
+    expect(bare.perSecond).toBeGreaterThan(0);
+    // The crystal raises the yield and the residue chance alike.
+    expect(crystal.perSecond).toBeGreaterThan(bare.perSecond);
+    expect(crystal.wastePct).toBeGreaterThan(bare.wastePct);
+    expect(crystal.rows[0].chargeTypeId).toBe(SIMPLE_ASTEROID_MINING_CRYSTAL_TYPE_A_II);
+
+    const withDrones = mine(
+      hulk([strip(0)], [{ typeId: MINING_DRONE_II, quantity: 5, state: 'active' }])
+    );
+    const drones = withDrones.rows.find((row) => row.isDrone);
+    expect(drones?.count).toBe(5);
+    expect(withDrones.perSecond).toBeCloseTo(bare.perSecond + drones!.perSecond, 9);
+    // Left in the bay, they mine nothing.
+    expect(
+      mine(hulk([strip(0)], [{ typeId: MINING_DRONE_II, quantity: 5, state: 'online' }])).perSecond
+    ).toBeCloseTo(bare.perSecond, 9);
+  });
+
+  it('runs an ancillary armor repairer at three times its dry rate on paste, and an ancillary shield booster on charges draws no capacitor', () => {
+    const run = (module: Fitting['modules'][number]) => {
+      const dogmaFit = fittingToDogmaFit(
+        { name: 'AAR', shipTypeId: HURRICANE, modules: [module], drones: [], cargo: [] },
+        buildAllVProfile(SUPPORT_SKILL_IDS)
+      );
+      const calculation = calculate(dogmaFit);
+      const stats = extractFittingStats(
+        dogmaFit.items,
+        calculation.ship.attributes,
+        calculation.items
+      );
+      return {
+        tank: extractTank(dogmaFit.items, calculation.items, calculation.ship.attributes, stats),
+        budget: extractCapacitorBudget(
+          dogmaFit.items,
+          calculation.items,
+          calculation.ship.attributes
+        ),
+      };
+    };
+    const aar = {
+      slot: 'low',
+      slotIndex: 0,
+      typeId: MEDIUM_ANCILLARY_ARMOR_REPAIRER,
+      state: 'active',
+    } as const;
+    const loaded = run({ ...aar, chargeTypeId: NANITE_REPAIR_PASTE });
+    const dry = run(aar);
+
+    expect(loaded.tank.burst.armor).toBeCloseTo(dry.tank.burst.armor * 3, 6);
+    expect(loaded.tank.ancillary).toEqual([
+      expect.objectContaining({ isLoaded: true, loaded: loaded.tank.burst.armor }),
+    ]);
+    expect(loaded.tank.ancillary[0].empty).toBeCloseTo(dry.tank.burst.armor, 6);
+    expect(dry.tank.ancillary[0].loaded).toBeCloseTo(loaded.tank.burst.armor, 6);
+    // 0.32 m³ of paste at 0.01 m³, four a cycle: 8 cycles (9 s each, skills
+    // taking a quarter off 12 s), then 60 s reloading.
+    expect(loaded.tank.sustained.armor).toBeCloseTo((loaded.tank.burst.armor * 72) / 132, 6);
+
+    const asb = {
+      slot: 'medium',
+      slotIndex: 0,
+      typeId: MEDIUM_ANCILLARY_SHIELD_BOOSTER,
+      state: 'active',
+    } as const;
+    expect(run({ ...asb, chargeTypeId: CAP_BOOSTER_150 }).budget.drain).toBe(0);
+    expect(run(asb).budget.drain).toBeGreaterThan(0);
+  });
+
+  it('caps locked targets at the lower of the hull and the pilot, who starts at two', () => {
+    const maelstrom: Fitting = {
+      name: 'M',
+      shipTypeId: MAELSTROM,
+      modules: [],
+      drones: [],
+      cargo: [],
+    };
+    const locks = (skills: [number, number][]) => {
+      const dogmaFit = fittingToDogmaFit(maelstrom, buildPilotProfile(new Map(skills), []));
+      const calculation = calculate(dogmaFit);
+      return extractLockedTargets(calculation.ship.attributes, calculation.character.attributes);
+    };
+    // A Maelstrom locks 7; Target Management (3429) / Advanced (3430) add one a level to two.
+    expect(locks([])).toEqual({ ship: 7, pilot: 2, effective: 2 });
+    expect(locks([[3429, 1]])).toEqual({ ship: 7, pilot: 3, effective: 3 });
+    expect(
+      locks([
+        [3429, 5],
+        [3430, 5],
+      ])
+    ).toEqual({ ship: 7, pilot: 12, effective: 7 });
+  });
+
+  it('reads the sensor strength and type, the holds and the jump drive off the hull', () => {
+    const read = (shipTypeId: number) => {
+      const dogmaFit = fittingToDogmaFit(
+        { name: 'H', shipTypeId, modules: [], drones: [], cargo: [] },
+        buildPilotProfile(new Map(), [])
+      );
+      const calculation = calculate(dogmaFit);
+      return extractFittingStats(dogmaFit.items, calculation.ship.attributes, calculation.items);
+    };
+    const caracal = read(CARACAL);
+    expect(caracal.sensor.type).toBe('gravimetric');
+    expect(caracal.sensor.strength).toBeGreaterThan(0);
+    expect(caracal.holds.cargo).toBeGreaterThan(0);
+    expect(caracal.jumpDrive).toBeNull();
+    // A Hulk has a mining hold; a Thanatos (carrier) a fleet hangar and a jump drive.
+    expect(read(HULK).holds.miningHold).toBe(11500);
+    const thanatos = read(THANATOS);
+    expect(thanatos.holds.fleetHangar).toBeGreaterThan(0);
+    expect(thanatos.jumpDrive?.rangeLightYears).toBeGreaterThan(0);
+    expect(thanatos.jumpDrive?.fuelPerLightYear).toBeGreaterThan(0);
+  });
+
+  it('names what affects a module: its skills, the hull, a damage mod (penalised) and its charge', () => {
+    const fitting: Fitting = {
+      name: 'Rifter',
+      shipTypeId: RIFTER,
+      modules: [
+        { slot: 'high', slotIndex: 0, typeId: 2889, state: 'active', chargeTypeId: 185 },
+        { slot: 'low', slotIndex: 0, typeId: GYROSTABILIZER_II, state: 'online' },
+        { slot: 'low', slotIndex: 1, typeId: GYROSTABILIZER_II, state: 'online' },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(
+      fitting,
+      buildPilotProfile(
+        new Map([
+          [3300, 5],
+          [3302, 5],
+          [3310, 5],
+          [3315, 5],
+        ]),
+        []
+      )
+    );
+    const calculation = calculate(dogmaFit, { sources: true });
+    const rows = affectedAttributes(calculation.items[0].attributes, {
+      shipTypeId: RIFTER,
+      itemTypeIds: dogmaFit.items.map((item) => item.type_id),
+      chargeTypeIds: dogmaFit.items.map((item) => item.charge?.type_id),
+      projectedTypeIds: [],
+    });
+
+    // Damage multiplier (64): Surgical Strike, the Rifter's bonus, two Gyrostabilizers.
+    const damage = rows.find((row) => row.attributeId === 64)!;
+    expect(damage.value).toBeGreaterThan(damage.base);
+    const kinds = damage.sources.map((source) => [source.kind, source.typeId]);
+    expect(kinds).toContainEqual(['skill', 3315]);
+    expect(kinds).toContainEqual(['item', GYROSTABILIZER_II]);
+    // The second Gyrostabilizer is stacking-penalised.
+    expect(
+      damage.sources.some(
+        (source) => source.typeId === GYROSTABILIZER_II && source.penalty !== null
+      )
+    ).toBe(true);
+    // Rate of fire (51): Rapid Firing.
+    expect(rows.find((row) => row.attributeId === 51)!.sources).toContainEqual(
+      expect.objectContaining({ kind: 'skill', typeId: 3310 })
+    );
+    // Nothing negative: the patched, derived ids are never listed.
+    expect(rows.every((row) => row.attributeId > 0)).toBe(true);
+  });
+
+  it('takes in what another Fitting projects: its web, its remote reps, its command burst', () => {
+    const allV = buildAllVProfile([...SUPPORT_SKILL_IDS, ...COMMAND_SKILL_IDS]);
+    const target: Fitting = {
+      name: 'Rifter',
+      shipTypeId: RIFTER,
+      modules: [{ slot: 'medium', slotIndex: 0, typeId: AFTERBURNER_1MN_II, state: 'active' }],
+      drones: [],
+      cargo: [],
+    };
+    const targetFit = fittingToDogmaFit(target, allV);
+    const projectedOnto = (source: Fitting) => {
+      const projection = toProjectedEffects(calculate(fittingToDogmaFit(source, allV)).outgoing);
+      const calculation = calculate(withIncoming(targetFit, projection));
+      return { projection, ship: calculation.ship.attributes };
+    };
+    const alone = calculate(targetFit).ship.attributes;
+    const speed = (ship: typeof alone) => ship.get(37)!.value;
+
+    const webber = projectedOnto({
+      name: 'Webber',
+      shipTypeId: RIFTER,
+      modules: [{ slot: 'medium', slotIndex: 0, typeId: STASIS_WEBIFIER_II, state: 'active' }],
+      drones: [],
+      cargo: [],
+    });
+    expect(speed(webber.ship)).toBeCloseTo(speed(alone) * 0.4, 3);
+
+    const logi = projectedOnto({
+      name: 'Logi',
+      shipTypeId: CARACAL,
+      modules: [
+        { slot: 'high', slotIndex: 0, typeId: MEDIUM_REMOTE_ARMOR_REPAIRER_II, state: 'active' },
+      ],
+      drones: [],
+      cargo: [],
+    });
+    const handedOut = logi.projection.effects[0].attributes[-45];
+    expect(handedOut).toBeGreaterThan(0);
+    expect(logi.ship.get(-45)?.value).toBeCloseTo(handedOut, 6);
+
+    const booster = projectedOnto({
+      name: 'Booster',
+      shipTypeId: CLAYMORE,
+      modules: [
+        {
+          slot: 'high',
+          slotIndex: 0,
+          typeId: SKIRMISH_COMMAND_BURST_II,
+          state: 'active',
+          chargeTypeId: RAPID_DEPLOYMENT_CHARGE,
+        },
+      ],
+      drones: [],
+      cargo: [],
+    });
+    expect(booster.projection.buffs.length).toBeGreaterThan(0);
+    // Rapid Deployment: the afterburner's speed bonus is up.
+    expect(speed(booster.ship)).toBeGreaterThan(speed(alone));
+  });
+
+  it('adds nothing when nothing is projected', () => {
+    const fit = fittingToDogmaFit(
+      { name: 'R', shipTypeId: RIFTER, modules: [], drones: [], cargo: [] },
+      buildPilotProfile(new Map(), [])
+    );
+    expect(withIncoming(fit, { buffs: [], effects: [] })).toBe(fit);
+    expect(withIncoming(fit, undefined)).toBe(fit);
+  });
+
+  it('flies a Tactical Destroyer in its mode, and switches a booster side effect on', () => {
+    const svipul = (mode?: number): Fitting => ({
+      name: 'Svipul',
+      shipTypeId: SVIPUL,
+      modules: [],
+      drones: [],
+      cargo: [],
+      ...(mode === undefined ? {} : { mode }),
+    });
+    const read = (fitting: Fitting, profile = buildPilotProfile(new Map(), [])) => {
+      const dogmaFit = fittingToDogmaFit(fitting, profile);
+      const calculation = calculate(dogmaFit);
+      return extractFittingStats(dogmaFit.items, calculation.ship.attributes, calculation.items);
+    };
+    const bare = calculate({ ship: { type_id: SVIPUL }, items: [] }).ship.attributes;
+    // Defense Mode by default: a third off incoming damage on every layer.
+    expect(read(svipul()).shield.emResonance).toBeCloseTo(bare.get(271)!.value * (2 / 3), 6);
+    // Propulsion Mode: more agile, no resist bonus.
+    expect(read(svipul(SVIPUL_PROPULSION_MODE)).navigation.agility).toBeLessThan(
+      read(svipul()).navigation.agility
+    );
+    expect(read(svipul(SVIPUL_PROPULSION_MODE)).shield.emResonance).toBeCloseTo(
+      bare.get(271)!.value,
+      6
+    );
+
+    const bluePill = (sideEffects?: number[]) => ({
+      skillLevels: new Map<number, number>(),
+      implantTypeIds: [],
+      boosterTypeIds: [STANDARD_BLUE_PILL_BOOSTER],
+      ...(sideEffects ? { boosterSideEffects: sideEffects } : {}),
+    });
+    const rifter = { name: 'R', shipTypeId: RIFTER, modules: [], drones: [], cargo: [] };
+    // Its Shield Capacity side effect: −20% with no Neurotoxin skills.
+    expect(read(rifter, bluePill([2737])).shield.hp).toBeCloseTo(
+      read(rifter, bluePill()).shield.hp * 0.8,
+      6
+    );
+  });
+
+  it('launches fighter squadrons from the tubes, and reads their DPS and the tubes they take', () => {
+    const fitting: Fitting = {
+      name: 'Thanatos',
+      shipTypeId: THANATOS,
+      modules: [],
+      drones: [],
+      cargo: [],
+      fighters: [
+        { typeId: TEMPLAR_I, quantity: 6, state: 'active' },
+        { typeId: TEMPLAR_I, quantity: 6, state: 'online' },
+        { typeId: CENOBITE_I, quantity: 3, state: 'active' },
+      ],
+    };
+    const dogmaFit = fittingToDogmaFit(
+      fitting,
+      buildAllVProfile([...SUPPORT_SKILL_IDS, ...FIGHTER_SKILL_IDS])
+    );
+    const calculation = calculate(dogmaFit);
+    const fighters = extractFighterStats(calculation.ship.attributes);
+
+    expect(fighters.tubes).toEqual({ used: 2, total: 4 });
+    expect(fighters.light).toEqual({ used: 1, total: 3 });
+    expect(fighters.support).toEqual({ used: 1, total: 2 });
+    expect(fighters.dps).toBeGreaterThan(0);
+    // Offense rows add up to the engine's own fighter DPS; the bay squadron doesn't fight.
+    const offense = extractOffense(
+      fitting.fighters!.map((f) => ({
+        typeId: f.typeId,
+        quantity: f.quantity,
+        isDrone: true,
+        isFighter: true,
+      })),
+      calculation.items,
+      null
+    );
+    expect(offense.dps).toBeCloseTo(fighters.dps, 6);
+    expect(offense.weapons).toEqual([
+      expect.objectContaining({ typeId: TEMPLAR_I, count: 6, isFighter: true }),
+    ]);
+    // Applied DPS takes the launched squadron at the same DPS, its attack all EM.
+    const applied = extractAppliedDpsInputs(
+      dogmaFit.items,
+      calculation.items,
+      calculation.character.attributes
+    );
+    expect(applied.weapons).toEqual([
+      {
+        kind: 'fighter',
+        dps: expect.closeTo(offense.dps, 6),
+        damage: { em: 1, thermal: 0, kinetic: 0, explosive: 0 },
+      },
+    ]);
+  });
+
   it('reads applied-DPS inputs: running turrets, loaded launchers, launched drones only', () => {
     const vexor = vexorNavyIssueFit();
     vexor.drones = [{ typeId: WARRIOR_II, quantity: 5, state: 'active' }];
@@ -479,8 +983,15 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
         explosionRadius: expect.closeTo(140, 3),
         explosionVelocity: expect.closeTo(85, 3),
         damageReductionFactor: expect.closeTo(0.682, 3),
+        // Scourge is all kinetic.
+        damage: { em: 0, thermal: 0, kinetic: 1, explosive: 0 },
       },
     ]);
+    // Antimatter splits thermal and kinetic; Warriors are all explosive.
+    expect(blaster.damage?.thermal).toBeGreaterThan(0);
+    expect(blaster.damage?.kinetic).toBeGreaterThan(0);
+    expect(blaster.damage?.em).toBe(0);
+    expect(warriors.damage).toEqual({ em: 0, thermal: 0, kinetic: 0, explosive: 1 });
     expect(caracalInputs.droneControlRange).toBe(20000);
   });
 });
@@ -494,3 +1005,9 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
  * lands in the engine's `character.skills` map correctly.
  */
 const ALL_TEST_SKILL_IDS = [...PARTIAL_SKILLS.keys()];
+
+/** Every skill from 3300 to 3499 — the core ship, weapon, engineering and electronics skills — for the support and tank fits. */
+const SUPPORT_SKILL_IDS = Array.from({ length: 200 }, (_, i) => 3300 + i);
+
+/** The core skills plus the mining ones outside 3300-3499 (Mining Barge, Exhumers). */
+const MINING_SKILL_IDS = [...SUPPORT_SKILL_IDS, 17940, 22551];

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { InGameFittingsPanel } from './InGameFittingsPanel';
 import type { CharacterFitting } from '@/esi/endpoints';
@@ -36,7 +37,11 @@ beforeEach(() => {
 describe('InGameFittingsPanel', () => {
   it('shows a re-auth banner and never fetches when the fittings scope is missing', async () => {
     useEndpointsGrantedMock.mockReturnValue(false);
-    render(<InGameFittingsPanel characterId={1} onOpen={vi.fn()} />);
+    render(
+      <MemoryRouter>
+        <InGameFittingsPanel characterId={1} onOpen={vi.fn()} />
+      </MemoryRouter>
+    );
 
     expect(await screen.findByText('Allow fittings access')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Log in again with EVE Online' }));
@@ -58,7 +63,11 @@ describe('InGameFittingsPanel', () => {
       needsReauth: false,
     });
     const onOpen = vi.fn();
-    render(<InGameFittingsPanel characterId={1} onOpen={onOpen} />);
+    render(
+      <MemoryRouter>
+        <InGameFittingsPanel characterId={1} onOpen={onOpen} />
+      </MemoryRouter>
+    );
 
     expect(await screen.findByText('Rifter')).toBeInTheDocument();
     expect(screen.getByText('PvP Rifter')).toBeInTheDocument();
@@ -76,7 +85,7 @@ describe('InGameFittingsPanel', () => {
     );
   });
 
-  it("opens what it can, handing the items it can't map (fighter bay, service slot) on as the Load's warnings", async () => {
+  it("opens what it can, handing the items it can't map (a service slot) on as the Load's warnings", async () => {
     useEndpointsGrantedMock.mockReturnValue(true);
     loadInGameFittingsMock.mockResolvedValue({
       cached: {
@@ -84,7 +93,7 @@ describe('InGameFittingsPanel', () => {
           cachedFitting({
             items: [
               { flag: 'HiSlot0', quantity: 1, type_id: 484 },
-              { flag: 'FighterBay', quantity: 1, type_id: 99 },
+              { flag: 'ServiceSlot0', quantity: 1, type_id: 99 },
             ],
           }),
         ],
@@ -95,7 +104,11 @@ describe('InGameFittingsPanel', () => {
       needsReauth: false,
     });
     const onOpen = vi.fn();
-    render(<InGameFittingsPanel characterId={1} onOpen={onOpen} />);
+    render(
+      <MemoryRouter>
+        <InGameFittingsPanel characterId={1} onOpen={onOpen} />
+      </MemoryRouter>
+    );
 
     await userEvent.click(await screen.findByRole('button', { name: 'Open' }));
 
@@ -104,7 +117,7 @@ describe('InGameFittingsPanel', () => {
         fitting: expect.objectContaining({
           modules: [{ slot: 'high', slotIndex: 0, typeId: 484, state: 'active' }],
         }),
-        unresolved: [{ text: 'FighterBay', reason: 'unsupported slot' }],
+        unresolved: [{ text: 'ServiceSlot0', reason: 'unsupported slot' }],
       })
     );
   });
@@ -115,7 +128,11 @@ describe('InGameFittingsPanel', () => {
       cached: { data: [], fetchedAt: new Date(), fromCache: false, truncated: false },
       needsReauth: false,
     });
-    render(<InGameFittingsPanel characterId={1} onOpen={vi.fn()} />);
+    render(
+      <MemoryRouter>
+        <InGameFittingsPanel characterId={1} onOpen={vi.fn()} />
+      </MemoryRouter>
+    );
 
     expect(await screen.findByText('No in-game Fittings')).toBeInTheDocument();
   });
