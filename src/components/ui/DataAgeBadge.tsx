@@ -29,6 +29,12 @@ interface DataAgeBadgeProps {
    * age is still there, and the layout doesn't pay for it.
    */
   dotOnly?: boolean;
+  /**
+   * Shows the badge below `md` too. For a surface where the age *is* the
+   * content rather than header chrome competing with a title � the
+   * Characters page's "Last synced" column and card dot.
+   */
+  alwaysVisible?: boolean;
   className?: string;
 }
 
@@ -49,7 +55,13 @@ function toneFor(ms: number): string {
  * information for every view at once, so mobile loses nothing by dropping it
  * here (see docs/context/decisions for the write-up).
  */
-export function DataAgeBadge({ date, note, dotOnly = false, className = '' }: DataAgeBadgeProps) {
+export function DataAgeBadge({
+  date,
+  note,
+  dotOnly = false,
+  alwaysVisible = false,
+  className = '',
+}: DataAgeBadgeProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const [now, setNow] = useState(() => Date.now());
@@ -71,7 +83,9 @@ export function DataAgeBadge({ date, note, dotOnly = false, className = '' }: Da
     <time
       dateTime={date.toISOString()}
       title={title}
-      className={`hidden items-center gap-1.5 text-[0.6875rem] tabular-nums md:inline-flex ${toneFor(ms)} ${className}`}
+      className={`items-center gap-1.5 text-[0.6875rem] tabular-nums ${
+        alwaysVisible ? 'inline-flex' : 'hidden md:inline-flex'
+      } ${toneFor(ms)} ${className}`}
     >
       <span aria-hidden="true" className="size-1.5 rounded-full bg-current" />
       {!dotOnly && age}
