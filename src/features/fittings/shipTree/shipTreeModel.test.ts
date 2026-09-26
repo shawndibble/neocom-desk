@@ -7,6 +7,7 @@ import {
   DEFAULT_FACTION_ID,
   factionNameOf,
   flyableCount,
+  inGameFactionOrder,
   ladderSections,
   masteryTierEntries,
   ownedBlueprintSummary,
@@ -168,5 +169,13 @@ describe('ownedBlueprintSummary', () => {
       copies: 2,
     });
     expect(ownedBlueprintSummary([], 10)).toEqual({ originals: 0, copies: 0 });
+  });
+});
+
+describe('inGameFactionOrder', () => {
+  it("sorts factions as the game's own panel does, unknown ones last", () => {
+    const f = (id: number) => ({ id, name: String(id), description: '' });
+    const ordered = inGameFactionOrder([f(1), f(500001), f(500014), f(500003), f(500029)]);
+    expect(ordered.map((x) => x.id)).toEqual([500003, 500001, 500014, 500029, 1]);
   });
 });

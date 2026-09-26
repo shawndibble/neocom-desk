@@ -86,12 +86,14 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
 
   return (
     <>
-      <FactionBar
-        data={source.data}
-        factionID={factionID}
-        statuses={source.statuses}
-        onFaction={onFaction}
-      />
+      {(view === 'ladder' || isPhone) && (
+        <FactionBar
+          data={source.data}
+          factionID={factionID}
+          statuses={source.statuses}
+          onFaction={onFaction}
+        />
+      )}
       {view === 'map' ? (
         <ShipTreeMap
           source={source}
@@ -100,6 +102,7 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
           onFaction={onFaction}
           onOpenShip={setSelected}
           viewSwitch={viewSwitch}
+          showFactionGrid={!isPhone}
         />
       ) : (
         <ShipTreeLadder

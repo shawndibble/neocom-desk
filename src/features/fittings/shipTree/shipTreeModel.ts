@@ -29,6 +29,24 @@ export function resolveFactionID(data: ShipTreeData | null, requested: number): 
 }
 
 /** A faction's name, or '' for one the tree doesn't list. */
+/**
+ * The in-game Ship Tree panel's faction order: empires and ORE, then the
+ * pirates, then the rest — read off an in-game screenshot.
+ */
+const IN_GAME_FACTION_ORDER = [
+  500003, 500001, 500004, 500002, 500014, 500010, 500019, 500012, 500011, 500020, 500016, 500018,
+  500026, 500027, 500006, 500017, 500029,
+];
+
+/** Factions in the in-game panel's order; any the game panel doesn't list go last, as given. */
+export function inGameFactionOrder<T extends { id: number }>(factions: readonly T[]): T[] {
+  const rank = (id: number) => {
+    const i = IN_GAME_FACTION_ORDER.indexOf(id);
+    return i === -1 ? IN_GAME_FACTION_ORDER.length : i;
+  };
+  return [...factions].sort((a, b) => rank(a.id) - rank(b.id));
+}
+
 export function factionNameOf(factions: readonly ShipTreeFaction[], factionID: number): string {
   return factions.find((f) => f.id === factionID)?.name ?? '';
 }

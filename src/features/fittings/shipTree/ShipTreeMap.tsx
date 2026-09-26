@@ -21,6 +21,7 @@ import { cx } from '@/lib/cx';
 import type { ShipTreeFaction, ShipTreeShip } from '@/sde/types';
 import { ClassNode } from './ClassNode';
 import { HoverCard } from './HoverCard';
+import { FactionGrid } from './FactionGrid';
 import { Legend } from './Legend';
 import { MapLines } from './MapLines';
 import { MapSearch } from './MapSearch';
@@ -42,6 +43,10 @@ import type { ShipTreeSource } from './useShipTreeData';
 const BUTTON_STEP = 1.2;
 const toolButton = 'rounded-xs border border-line px-2 py-1 text-xs hover:border-line-bright';
 
+/** The faction panel's 14.5rem plus its 0.75rem inset and a gap. */
+const FACTION_PANEL_SPACE = 256;
+const MIN_FIT_WIDTH = 480;
+
 export function ShipTreeMap({
   source,
   tree,
@@ -49,6 +54,7 @@ export function ShipTreeMap({
   onFaction,
   onOpenShip,
   viewSwitch,
+  showFactionGrid,
 }: {
   source: ShipTreeSource;
   tree: FactionTree;
@@ -56,6 +62,8 @@ export function ShipTreeMap({
   onFaction: (factionID: number) => void;
   onOpenShip: (ship: ShipTreeShip) => void;
   viewSwitch: ReactNode;
+  /** The in-canvas faction panel; a phone's map is too small and keeps the bar above. */
+  showFactionGrid: boolean;
 }) {
   const { t } = useTranslation();
   const { data, statuses, trainedLevel, skillName } = source;
@@ -63,6 +71,11 @@ export function ShipTreeMap({
   const [showNames, setShowNames] = useState(false);
   const [hover, setHover] = useState<{ ship: ShipTreeShip; rect: DOMRect } | null>(null);
   const [viewport, setViewport] = useState<Size>({ width: 0, height: 0 });
+  // Fit beside the faction panel when the canvas is wide enough to spare it.
+  const fitInset =
+    showFactionGrid && viewport.width - FACTION_PANEL_SPACE >= MIN_FIT_WIDTH
+      ? FACTION_PANEL_SPACE
+      : 0;
   // A camera the reader moved, for the faction they moved it on; any other
   // faction starts from Fit (or centred on the hull search picked there).
   const [moved, setMoved] = useState<{ factionID: number; cam: Camera } | null>(null);
@@ -81,7 +94,7 @@ export function ShipTreeMap({
     return ship ? (nodeById.get(ship.treeGroupID) ?? null) : null;
   }, [focusShip, data, nodeById]);
 
-  const fitted = fitCamera(world, viewport);
+  const fitted = fitCamera(world, viewport, fitInset);
   const cam =
     moved?.factionID === factionID
       ? moved.cam
@@ -180,7 +193,6 @@ export function ShipTreeMap({
           {t('ships.tree.flyableCount', { flyable, total })}
         </span>
         <span className="flex-1" />
-        <Legend />
         <button
           type="button"
           onClick={() => setShowNames((v) => !v)}
@@ -222,7 +234,7 @@ export function ShipTreeMap({
           type="button"
           onClick={() => {
             setFocus(null);
-            moveTo(fitCamera(world, viewport));
+            moveTo(fitCamera(world, viewport, fitInset));
           }}
           title={t('ships.tree.fitLabel')}
           className={toolButton}
@@ -281,6 +293,20 @@ export function ShipTreeMap({
             onSelect={selectShip}
             onHover={hoverShip}
           />
+        </div>
+        {showFactionGrid && (
+          <FactionGrid
+            data={data}
+            factionID={factionID}
+            statuses={statuses}
+            onFaction={switchFaction}
+          />
+        )}
+        <div
+          className="isis-overlay pointer-events-none absolute right-3 bottom-3 z-10 px-2.5 py-1.5"
+          data-testid="ship-tree-legend"
+        >
+          <Legend className="max-w-[16rem]" />
         </div>
       </div>
       {hover && hover.ship.factionID === factionID && (
