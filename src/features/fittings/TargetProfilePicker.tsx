@@ -301,7 +301,7 @@ export function TargetProfilePicker({ targetProfiles }: { targetProfiles: Target
     <div className="flex flex-wrap items-center gap-2 text-xs">
       <span className="text-text-dim">{label}</span>
       <Select value={selected.id} onValueChange={targetProfiles.select}>
-        <SelectTrigger aria-label={label} className="w-48">
+        <SelectTrigger aria-label={label} size="sm" className="w-40">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

@@ -228,6 +228,17 @@ export function FittingCompare() {
     header: headerFor(index),
   }));
 
+  const differencesToggle = (
+    <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
+      <Checkbox
+        checked={showDifferencesOnly}
+        disabled={count < 2}
+        onChange={() => setDifferencesOnly((v) => !v)}
+      />
+      {t('fittings.compare.differencesOnly')}
+    </label>
+  );
+
   return (
     <div className="space-y-3">
       <PageHeader
@@ -243,9 +254,16 @@ export function FittingCompare() {
         }
       />
 
-      <DamageProfilePicker damageProfiles={damageProfiles} />
-      <AbyssalWeatherPicker />
-      <TargetProfilePicker targetProfiles={targetProfiles} />
+      {/* One wrapping toolbar from `md` up (label + select stay adjacent per group); phones keep the stacked rows. */}
+      <div
+        data-testid="compare-controls"
+        className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-center md:gap-x-3 md:gap-y-2"
+      >
+        <DamageProfilePicker damageProfiles={damageProfiles} />
+        <AbyssalWeatherPicker />
+        <TargetProfilePicker targetProfiles={targetProfiles} />
+        {!isPhone && count > 0 && differencesToggle}
+      </div>
 
       {count === 0 ? (
         <EmptyState
@@ -278,15 +296,7 @@ export function FittingCompare() {
             </div>
           )}
 
-          <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs font-semibold md:min-h-0">
-            <Checkbox
-              checked={showDifferencesOnly}
-              disabled={count < 2}
-              onChange={() => setDifferencesOnly((v) => !v)}
-            />
-            {t('fittings.compare.differencesOnly')}
-          </label>
-
+          {isPhone && differencesToggle}
           {!statsReady ? (
             <Panel title={t('fittings.compare.statsTitle')}>
               <p className={profileFailed ? 'text-xs text-danger' : 'text-xs text-text-dim'}>
