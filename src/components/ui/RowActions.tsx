@@ -10,18 +10,7 @@
  * publishes its items; a `RowMoreActions` anywhere under it — a cell in the
  * row, or `DataTable`'s `rowMoreActions` column — draws the button.
  */
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useId,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-  type ComponentProps,
-  type ReactElement,
-} from 'react';
-import { cx } from '@/lib/cx';
+import { useContext, type ComponentProps, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ContextMenu,
@@ -61,81 +50,16 @@ export function MenuItem(props: ComponentProps<typeof ContextMenuItem>) {
   );
 }
 
-/**
- * Below `md` a submenu opens in place, under its trigger, rather than as a
- * panel beside the menu: on a phone the parent menu already takes most of
- * the width, so a side panel had no room on either side — it squeezed to a
- * sliver or ran over its parent. Written as a `max-width` query so a
- * browser without media queries (jsdom) keeps the side panel.
- */
-const NARROW_MENU_QUERY = '(max-width: 47.99rem)';
-
-function subscribeNarrow(onChange: () => void): () => void {
-  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return () => {};
-  const query = window.matchMedia(NARROW_MENU_QUERY);
-  query.addEventListener('change', onChange);
-  return () => query.removeEventListener('change', onChange);
-}
-
-function isNarrow(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    typeof window.matchMedia === 'function' &&
-    window.matchMedia(NARROW_MENU_QUERY).matches
-  );
-}
-
-/** An in-place submenu's state, from its `MenuSub` to its trigger and content. */
-const InlineSubContext = createContext<{ open: boolean; toggle: () => void; id: string } | null>(
-  null
-);
-
 export function MenuSub(props: ComponentProps<typeof ContextMenuSub>) {
-  const kind = useContext(MenuKindContext);
-  const narrow = useSyncExternalStore(subscribeNarrow, isNarrow, () => false);
-  const [open, setOpen] = useState(false);
-  const id = useId();
-  const toggle = useCallback(() => setOpen((was) => !was), []);
-  const inline = useMemo(() => ({ open, toggle, id }), [open, toggle, id]);
-  if (narrow) {
-    return <InlineSubContext.Provider value={inline}>{props.children}</InlineSubContext.Provider>;
-  }
-  // A side-panel submenu: nothing under it reads the in-place state.
-  return (
-    <InlineSubContext.Provider value={null}>
-      {kind === 'dropdown' ? <DropdownMenuSub {...props} /> : <ContextMenuSub {...props} />}
-    </InlineSubContext.Provider>
+  return useContext(MenuKindContext) === 'dropdown' ? (
+    <DropdownMenuSub {...props} />
+  ) : (
+    <ContextMenuSub {...props} />
   );
 }
 
 export function MenuSubTrigger(props: ComponentProps<typeof ContextMenuSubTrigger>) {
-  const kind = useContext(MenuKindContext);
-  const inline = useContext(InlineSubContext);
-  if (inline) {
-    const { children, disabled, className } = props;
-    return (
-      <MenuItem
-        disabled={disabled}
-        aria-expanded={inline.open}
-        aria-controls={inline.open ? inline.id : undefined}
-        className={cx('justify-between', inline.open && 'bg-panel-2', className)}
-        // Opens in place and keeps the menu up, rather than selecting.
-        onSelect={(event) => {
-          event.preventDefault();
-          inline.toggle();
-        }}
-      >
-        {children}
-        <span
-          aria-hidden="true"
-          className={cx('text-text-dim transition-transform', inline.open && 'rotate-90')}
-        >
-          ›
-        </span>
-      </MenuItem>
-    );
-  }
-  return kind === 'dropdown' ? (
+  return useContext(MenuKindContext) === 'dropdown' ? (
     <DropdownMenuSubTrigger {...props} />
   ) : (
     <ContextMenuSubTrigger {...props} />
@@ -143,24 +67,7 @@ export function MenuSubTrigger(props: ComponentProps<typeof ContextMenuSubTrigge
 }
 
 export function MenuSubContent(props: ComponentProps<typeof ContextMenuSubContent>) {
-  const kind = useContext(MenuKindContext);
-  const inline = useContext(InlineSubContext);
-  if (inline) {
-    if (!inline.open) return null;
-    return (
-      // Its own items only: a submenu nested in it takes its own state.
-      <InlineSubContext.Provider value={null}>
-        <div
-          id={inline.id}
-          role="group"
-          className={cx('ml-2 border-l border-line pl-1', props.className)}
-        >
-          {props.children}
-        </div>
-      </InlineSubContext.Provider>
-    );
-  }
-  return kind === 'dropdown' ? (
+  return useContext(MenuKindContext) === 'dropdown' ? (
     <DropdownMenuSubContent {...props} />
   ) : (
     <ContextMenuSubContent {...props} />

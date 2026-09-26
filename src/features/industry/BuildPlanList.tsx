@@ -617,7 +617,7 @@ function GroupHeader({
                 icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
                 label={t('industry.moreActionsLabel', { name: group.name })}
                 variant="plain"
-                size="sm"
+                size="row"
               />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

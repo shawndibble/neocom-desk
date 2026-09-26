@@ -10,6 +10,15 @@ import {
   RowActionsMenu,
   RowMoreActions,
 } from './RowActions';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from './DropdownMenu';
 
 function Row({ onInto }: { onInto: () => void }) {
   return (
@@ -85,6 +94,65 @@ describe('RowActions submenus', () => {
 
     expect(onInto).toHaveBeenCalledOnce();
     expect(screen.queryAllByRole('menu')).toHaveLength(0);
+  });
+
+  it('works an in-place submenu from the keyboard as the side panel does', async () => {
+    narrowViewport();
+    const user = userEvent.setup();
+    render(<Row onInto={() => {}} />);
+    openMore();
+    const load = await screen.findByRole('menuitem', { name: 'Load charge from cargo' });
+    expect(load).toHaveAttribute('aria-haspopup', 'menu');
+
+    // ArrowRight opens it and moves into it; ArrowLeft closes it and returns.
+    load.focus();
+    await user.keyboard('{ArrowRight}');
+    const scourge = await screen.findByRole('menuitem', { name: 'Scourge Heavy Missile' });
+    expect(scourge).toHaveFocus();
+    expect(load).toHaveAttribute('aria-expanded', 'true');
+
+    // A nested one: ArrowRight in, ArrowLeft back to its own trigger only.
+    await user.keyboard('{ArrowRight}');
+    expect(await screen.findByRole('menuitem', { name: 'Into this module' })).toHaveFocus();
+    await user.keyboard('{ArrowLeft}');
+    expect(scourge).toHaveFocus();
+    expect(screen.queryByRole('menuitem', { name: 'Into this module' })).toBeNull();
+    expect(load).toHaveAttribute('aria-expanded', 'true');
+
+    await user.keyboard('{ArrowLeft}');
+    expect(load).toHaveFocus();
+    expect(load).toHaveAttribute('aria-expanded', 'false');
+
+    // Enter opens it too, and Escape still closes the whole menu.
+    await user.keyboard('{Enter}');
+    expect(load).toHaveAttribute('aria-expanded', 'true');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  it('opens a plain DropdownMenuSub in place on a phone too', async () => {
+    narrowViewport();
+    const user = userEvent.setup();
+    render(
+      <DropdownMenu>
+        <DropdownMenuTrigger>Plan actions</DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>Move to group</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              <DropdownMenuItem>Group A</DropdownMenuItem>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Plan actions' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    await user.click(await screen.findByRole('menuitem', { name: 'Move to group' }));
+    expect(screen.getByRole('menuitem', { name: 'Group A' })).toBeInTheDocument();
+    expect(screen.getAllByRole('menu')).toHaveLength(1);
   });
 
   it('keeps the menu up while a submenu opens in place, all in one panel', async () => {

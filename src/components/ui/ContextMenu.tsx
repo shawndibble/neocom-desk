@@ -1,6 +1,8 @@
 import { ContextMenu as ContextMenuPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
+import { InlineCaret, InlineSubContent, InlineSubRoot, SidePanelSubRoot } from './inlineSubmenu';
+import { inlineTriggerProps, useInlineSub, useInlineSubmenus } from './inlineSubmenuState';
 import { usePortalContainer } from './portalContainer';
 import {
   MENU_COLLISION_PADDING,
@@ -17,7 +19,16 @@ import {
  */
 export const ContextMenu = ContextMenuPrimitive.Root;
 export const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
-export const ContextMenuSub = ContextMenuPrimitive.Sub;
+/** A submenu: a panel beside the menu, or — on a phone — its items in place (`inlineSubmenu.tsx`). */
+export function ContextMenuSub(props: ComponentProps<typeof ContextMenuPrimitive.Sub>) {
+  const inline = useInlineSubmenus();
+  if (inline) return <InlineSubRoot>{props.children}</InlineSubRoot>;
+  return (
+    <SidePanelSubRoot>
+      <ContextMenuPrimitive.Sub {...props} />
+    </SidePanelSubRoot>
+  );
+}
 
 export function ContextMenuContent({
   className,
@@ -77,6 +88,15 @@ export function ContextMenuSubTrigger({
   children,
   ...props
 }: ComponentProps<typeof ContextMenuPrimitive.SubTrigger>) {
+  const inline = useInlineSub();
+  if (inline) {
+    return (
+      <ContextMenuItem {...inlineTriggerProps(inline, className)} disabled={props.disabled}>
+        {children}
+        <InlineCaret open={inline.open} />
+      </ContextMenuItem>
+    );
+  }
   return (
     <ContextMenuPrimitive.SubTrigger
       className={cx(menuItemClassName, 'justify-between data-[state=open]:bg-panel-2', className)}
@@ -98,6 +118,14 @@ export function ContextMenuSubContent({
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
   // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
   const container = usePortalContainer();
+  const inline = useInlineSub();
+  if (inline) {
+    return (
+      <InlineSubContent inline={inline} className={className}>
+        {props.children}
+      </InlineSubContent>
+    );
+  }
   return (
     <ContextMenuPrimitive.Portal container={container}>
       <ContextMenuPrimitive.SubContent
