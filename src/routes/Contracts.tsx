@@ -73,7 +73,7 @@ import type { CharacterAffiliation, Contract } from '@/esi/endpoints';
 import { usePageTab } from '@/lib/usePageTab';
 import { useContractSearchMode } from '@/features/contractSearch/contractSearchModePref';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
-import { boolParam, optionalEnumParam, textParam } from '@/lib/urlState';
+import { optionalEnumParam, textParam } from '@/lib/urlState';
 import { CONTRACTS_TABS } from '@/app/pageTabs';
 import { tabPath } from '@/lib/pageTabs';
 import type { TabRouteDefaultState } from '@/app/TabRoute';
@@ -107,9 +107,6 @@ const STATUS_TONE: Record<Contract['status'], string> = {
   deleted: 'text-text-dim',
   reversed: 'text-danger',
 };
-
-/** Rows shown before "show all" (same precedent as the market order book). */
-const ROW_CAP = 50;
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
@@ -238,7 +235,6 @@ const HISTORY_FILTER_PARAMS = {
   'history.q': textParam(),
   'history.status': optionalEnumParam(CONTRACT_STATUSES),
   'history.type': optionalEnumParam(CONTRACT_TYPES),
-  'history.all': boolParam(),
 };
 /**
  * History had no controlled sort before this — rows sorted by `date_issued`
@@ -286,8 +282,6 @@ export function Contracts() {
       'history.status': next.status,
       'history.type': next.type,
     });
-  const showAll = historyParams['history.all'];
-  const setShowAll = (next: boolean) => setHistoryParams({ 'history.all': next });
   // The contract a `contractAccepted` alert pointed at, if any.
   const highlightedContractId = useHighlightParam();
 
@@ -518,15 +512,6 @@ export function Contracts() {
     () => filterContracts(contracts, filter, issuerNames),
     [contracts, filter, issuerNames]
   );
-  // A contract an alert pointed at must be rendered to be scrolled to, and it
-  // can sit past the cap — an accepted contract is not necessarily a recent
-  // one. Uncapping is the honest fix: the alternative, splicing it into a
-  // capped list, would show it out of the order the table claims to be in.
-  const highlightBeyondCap =
-    highlightedContractId !== null &&
-    filteredContracts.findIndex((c) => c.contract_id === highlightedContractId) >= ROW_CAP;
-  const visibleContracts =
-    showAll || highlightBeyondCap ? filteredContracts : filteredContracts.slice(0, ROW_CAP);
 
   if (!hydrated) {
     return (
@@ -699,24 +684,15 @@ export function Contracts() {
               />
             )
           ) : (
-            <>
-              <DataTable
-                label={t('contracts.title')}
-                columns={columns}
-                rows={visibleContracts}
-                rowKey={(contract) => contract.contract_id}
-                highlightRowKey={highlightedContractId}
-                rowContextMenu={contractRowContextMenu}
-                {...historySortProps}
-              />
-              {!showAll && filteredContracts.length > ROW_CAP && (
-                <div className="px-3 py-2">
-                  <Button size="sm" onClick={() => setShowAll(true)}>
-                    {t('contracts.showAll', { count: filteredContracts.length })}
-                  </Button>
-                </div>
-              )}
-            </>
+            <DataTable
+              label={t('contracts.title')}
+              columns={columns}
+              rows={filteredContracts}
+              rowKey={(contract) => contract.contract_id}
+              highlightRowKey={highlightedContractId}
+              rowContextMenu={contractRowContextMenu}
+              {...historySortProps}
+            />
           )}
         </Panel>
       )}

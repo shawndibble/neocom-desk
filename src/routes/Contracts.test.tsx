@@ -322,7 +322,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
 
   it('offers one-click Reset filters when the filters match no contract', async () => {
     const user = userEvent.setup();
-    window.history.pushState({}, '', '/contracts/history?history.all=1');
+    window.history.pushState({}, '', '/contracts/history');
     render(<App />);
     await screen.findByText('Rifter fit');
 
@@ -354,7 +354,6 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
       expect(params.has('history.q')).toBe(false);
       expect(params.has('history.status')).toBe(false);
       expect(params.has('history.type')).toBe(false);
-      expect(params.get('history.all')).toBe('1');
     });
   });
 
