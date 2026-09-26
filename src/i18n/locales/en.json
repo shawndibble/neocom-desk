@@ -2676,8 +2676,8 @@
     "journalItemBought": "Bought {{quantity}} × {{unitPrice}} = {{total}}",
     "journalItemSold": "Sold {{quantity}} × {{unitPrice}} = {{total}}",
     "journalContractLink": "Contract →",
-    "journalFilteredSummary_one": "{{count}} entry · net {{net}}",
-    "journalFilteredSummary_other": "{{count}} entries · net {{net}}"
+    "journalFilteredSummary_one": "{{count}} entry · net <net>{{net}}</net>",
+    "journalFilteredSummary_other": "{{count}} entries · net <net>{{net}}</net>"
   },
   "miningTax": {
     "title": "Mining",
