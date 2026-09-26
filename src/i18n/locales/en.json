@@ -891,6 +891,25 @@
         "sensorStrength": "Sensor strength",
         "cargoCapacity": "Cargo hold (m³)"
       }
+    },
+    "skillOverrides": {
+      "label": "Skills",
+      "base": {
+        "character": "Own skills",
+        "all0": "All 0",
+        "allV": "All V"
+      },
+      "custom": "Set levels…",
+      "customCount_one": "{{count}} level set",
+      "customCount_other": "{{count}} levels set",
+      "customTitle": "Skill levels for these stats",
+      "customHint": "Set single skills on top of the choice above. Only these stats change: what you can fly still follows your Character's real skills.",
+      "search": "Find a skill",
+      "loading": "Loading skills…",
+      "add": "Set {{name}}",
+      "levelOf": "{{name}} level",
+      "remove": "Clear {{name}}",
+      "done": "Done"
     }
   },
   "skills": {

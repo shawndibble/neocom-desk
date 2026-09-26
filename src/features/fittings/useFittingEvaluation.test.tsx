@@ -33,7 +33,7 @@ vi.mock('./damageProfiles', () => ({
 
 const { useFittingEvaluation, evaluateFitting } = await import('./useFittingEvaluation');
 const { useAbyssalWeather } = await import('./abyssalWeatherSelection');
-const { useOverheatAll } = await import('./statsConditions');
+const { useOverheatAll, useSkillOverrides } = await import('./statsConditions');
 
 const RIFTER: Fitting = {
   name: 'Rifter',
@@ -157,6 +157,21 @@ describe('useFittingEvaluation', () => {
     await result.current.variants!.compare(addModule(RIFTER, 'medium', 0, 438));
     expect(calls().map((call) => call[4]?.overheatAll)).toEqual([true, true, true]);
     useOverheatAll.setState({ overheatAll: false });
+  });
+
+  it('works the stats out under the skill overrides, and the variants too', async () => {
+    useSkillOverrides.setState({ skills: { base: 'all0', levels: { 3300: 4 } } });
+    const { result } = render({ fitting: RIFTER });
+    await waitFor(() => expect(result.current.variants).not.toBeNull());
+    await result.current.variants!.compare(addModule(RIFTER, 'medium', 0, 438));
+    expect(calls().map((call) => [...call[1].skillLevels])).toEqual([
+      [[3300, 4]],
+      [[3300, 4]],
+      [[3300, 4]],
+    ]);
+    // The fit checks still run on the Character's real skills.
+    expect(result.current.variants!.profile.skillLevels).not.toEqual(new Map([[3300, 4]]));
+    useSkillOverrides.setState({ skills: { base: 'character', levels: {} } });
   });
 
   it('reports a failed calculation as an error rather than loading forever', async () => {

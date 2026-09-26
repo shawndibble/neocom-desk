@@ -5,11 +5,13 @@ import type { FittingStats } from '@/engine/fittings/types';
 import { writeToClipboard } from '@/lib/clipboard';
 import { fittingStatsText } from './fittingStatsText';
 import { useOverheatAll } from './statsConditions';
+import { SkillOverridesControl } from './SkillOverridesControl';
 
 /**
  * The row above the stats sections: the "Overheat all" switch — every figure
  * on the page (and in Compare) switches to its overheated value, in amber —
- * and "Copy stats" for pasting the headline numbers into chat.
+ * the skills the numbers are worked out under, and "Copy stats" for pasting
+ * the headline numbers into chat.
  */
 export function StatsToolbar({ stats }: { stats: FittingStats }) {
   const { t } = useTranslation();
@@ -42,6 +44,7 @@ export function StatsToolbar({ stats }: { stats: FittingStats }) {
         />
         {t('fittings.stats.overheatAll')}
       </label>
+      <SkillOverridesControl />
       <span className="flex items-center gap-2">
         {notice && (
           <span role="status" className="text-text-dim">

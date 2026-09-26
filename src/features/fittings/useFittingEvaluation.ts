@@ -25,7 +25,12 @@ import {
 import type { DamageProfile, Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
-import { statsOptions, useStatsConditions, type StatsConditions } from './statsConditions';
+import {
+  pilotUnder,
+  statsOptions,
+  useStatsConditions,
+  type StatsConditions,
+} from './statsConditions';
 import { useDamageProfiles, type DamageProfiles } from './damageProfiles';
 import {
   computeFittingStats,
@@ -82,16 +87,30 @@ export interface FittingEvaluation {
   variants: VariantEvaluator | null;
 }
 
-function withoutOverheat(
+/**
+ * The pilot under the conditions' skill overrides. Awaited only when that
+ * needs a load, so with no overrides the engine is called in the same tick.
+ */
+async function overridden(pilot: PilotProfile, conditions: StatsConditions) {
+  return pilotUnder(pilot, conditions);
+}
+
+async function withoutOverheat(
   fitting: Fitting,
   pilot: PilotProfile,
   damageProfile: DamageProfile,
   conditions: StatsConditions
 ): Promise<FittingStats> {
-  return computeFittingStats(fitting, pilot, undefined, damageProfile, {
-    overheated: false,
-    ...statsOptions(conditions),
-  });
+  return computeFittingStats(
+    fitting,
+    await overridden(pilot, conditions),
+    undefined,
+    damageProfile,
+    {
+      overheated: false,
+      ...statsOptions(conditions),
+    }
+  );
 }
 
 function variantEvaluator(
@@ -128,14 +147,20 @@ function variantEvaluator(
  * carries one, else the pilot's clone — under the same conditions as the
  * open one (`useStatsConditions`, passed in so a caller re-runs when they change).
  */
-export function evaluateFitting(
+export async function evaluateFitting(
   fitting: Fitting,
   profile: PilotProfile,
   damageProfile: DamageProfile | undefined,
   conditions: StatsConditions
 ): Promise<FittingStats> {
   const pilot = applyImplantBasis(profile, fitting.implantSet, defaultImplantBasis(fitting));
-  return computeFittingStats(fitting, pilot, undefined, damageProfile, statsOptions(conditions));
+  return computeFittingStats(
+    fitting,
+    await overridden(pilot, conditions),
+    undefined,
+    damageProfile,
+    statsOptions(conditions)
+  );
 }
 
 /** The open Fitting's stats, price and Variations evaluator. */
@@ -188,9 +213,10 @@ export function useFittingEvaluation({
     if (fitting === null || pilot === null || damageProfile === null) return;
     void (async () => {
       try {
+        const under = pilotUnder(pilot, conditions);
         const result = await computeFittingStats(
           fitting,
-          pilot,
+          under instanceof Promise ? await under : under,
           (progress) => {
             if (!cancelled) setStatsProgress(progress);
           },
