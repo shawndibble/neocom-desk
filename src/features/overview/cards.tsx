@@ -111,6 +111,7 @@ export function OrdersCard({
         )
       }
       to="/market/orders"
+      help={t('overview.board.ordersHelp')}
       openLabel={t('overview.board.open')}
       footer={
         needsReauth ? (
@@ -175,6 +176,7 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
         />
       }
       to="/mining/tax"
+      help={t('overview.board.miningTaxHelp')}
       openLabel={t('overview.board.open')}
       footer={
         data === null
@@ -281,6 +283,7 @@ export function PlanetaryCard({ data }: { data: PlanetaryBoardData | null }) {
         />
       }
       to="/planetary-industry"
+      help={t('overview.board.planetaryHelp')}
       openLabel={t('overview.board.open')}
       footer={
         data === null

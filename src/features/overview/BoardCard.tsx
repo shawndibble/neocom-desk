@@ -11,7 +11,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Panel, SEVERITY_TEXT, SeverityIcon } from '@/components/ui';
+import { IconButton, Panel, SEVERITY_TEXT, SeverityIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { DeadlineSeverity } from '@/engine/severity';
 import type { AppRoutePath } from '@/app/routeScopes';
@@ -26,9 +26,15 @@ export interface BoardCardProps {
   children: ReactNode;
   /** Pinned to the card's bottom edge, so cards in a row line up however tall each one's body is. */
   footer?: ReactNode;
+  /**
+   * One plain-language line for the card's jargon, behind a single `?` in the
+   * header. One per card, never per tile: a veteran sees one small affordance,
+   * not a `?` beside every number.
+   */
+  help?: string;
 }
 
-export function BoardCard({ title, meta, to, openLabel, children, footer }: BoardCardProps) {
+export function BoardCard({ title, meta, to, openLabel, children, footer, help }: BoardCardProps) {
   return (
     /*
       Three things, and all three are load-bearing for one effect: cards in a
@@ -55,13 +61,16 @@ export function BoardCard({ title, meta, to, openLabel, children, footer }: Boar
         // already sized to 44px. `md:min-h-0` resets to that original,
         // content-hugging height at and above `md`, since desktop's box was
         // never meant to grow (issue #1070).
-        <Link
-          to={to}
-          className="flex min-h-11 items-center gap-1 rounded-xs whitespace-nowrap text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
-        >
-          {openLabel}
-          <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
-        </Link>
+        <div className="flex items-center gap-1">
+          {help && <IconButton size="sm" variant="plain" icon={<Icon.Info />} label={help} />}
+          <Link
+            to={to}
+            className="flex min-h-11 items-center gap-1 rounded-xs whitespace-nowrap text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
+          >
+            {openLabel}
+            <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
+          </Link>
+        </div>
       }
       padded={false}
     >
