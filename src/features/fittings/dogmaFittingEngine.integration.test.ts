@@ -15,6 +15,7 @@ import {
 } from '@/engine/fittings/stats';
 import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import { extractSupport } from '@/engine/fittings/support';
+import { affectedAttributes } from '@/engine/fittings/affectedBy';
 import { extractMining, miningYield } from '@/engine/fittings/mining';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
 import type { Fitting } from '@/engine/fittings/types';
@@ -80,6 +81,7 @@ const MULTISPECTRUM_ECM_II = 2567;
 const MODULATED_STRIP_MINER_II = 17912;
 const SIMPLE_ASTEROID_MINING_CRYSTAL_TYPE_A_II = 60281;
 const MINING_DRONE_II = 10250;
+const GYROSTABILIZER_II = 519;
 
 const PARTIAL_SKILLS = new Map([
   [3332, 3], // Gallente Cruiser
@@ -687,6 +689,58 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(thanatos.holds.fleetHangar).toBeGreaterThan(0);
     expect(thanatos.jumpDrive?.rangeLightYears).toBeGreaterThan(0);
     expect(thanatos.jumpDrive?.fuelPerLightYear).toBeGreaterThan(0);
+  });
+
+  it('names what affects a module: its skills, the hull, a damage mod (penalised) and its charge', () => {
+    const fitting: Fitting = {
+      name: 'Rifter',
+      shipTypeId: RIFTER,
+      modules: [
+        { slot: 'high', slotIndex: 0, typeId: 2889, state: 'active', chargeTypeId: 185 },
+        { slot: 'low', slotIndex: 0, typeId: GYROSTABILIZER_II, state: 'online' },
+        { slot: 'low', slotIndex: 1, typeId: GYROSTABILIZER_II, state: 'online' },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(
+      fitting,
+      buildPilotProfile(
+        new Map([
+          [3300, 5],
+          [3302, 5],
+          [3310, 5],
+          [3315, 5],
+        ]),
+        []
+      )
+    );
+    const calculation = calculate(dogmaFit, { sources: true });
+    const rows = affectedAttributes(calculation.items[0].attributes, {
+      shipTypeId: RIFTER,
+      itemTypeIds: dogmaFit.items.map((item) => item.type_id),
+      chargeTypeIds: dogmaFit.items.map((item) => item.charge?.type_id),
+      projectedTypeIds: [],
+    });
+
+    // Damage multiplier (64): Surgical Strike, the Rifter's bonus, two Gyrostabilizers.
+    const damage = rows.find((row) => row.attributeId === 64)!;
+    expect(damage.value).toBeGreaterThan(damage.base);
+    const kinds = damage.sources.map((source) => [source.kind, source.typeId]);
+    expect(kinds).toContainEqual(['skill', 3315]);
+    expect(kinds).toContainEqual(['item', GYROSTABILIZER_II]);
+    // The second Gyrostabilizer is stacking-penalised.
+    expect(
+      damage.sources.some(
+        (source) => source.typeId === GYROSTABILIZER_II && source.penalty !== null
+      )
+    ).toBe(true);
+    // Rate of fire (51): Rapid Firing.
+    expect(rows.find((row) => row.attributeId === 51)!.sources).toContainEqual(
+      expect.objectContaining({ kind: 'skill', typeId: 3310 })
+    );
+    // Nothing negative: the patched, derived ids are never listed.
+    expect(rows.every((row) => row.attributeId > 0)).toBe(true);
   });
 
   it('reads applied-DPS inputs: running turrets, loaded launchers, launched drones only', () => {

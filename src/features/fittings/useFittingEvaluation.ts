@@ -34,9 +34,11 @@ import {
 import { useDamageProfiles, type DamageProfiles } from './damageProfiles';
 import {
   computeFittingStats,
+  explainModule,
   isDogmaEngineReady,
   type DogmaAssetProgress,
 } from './dogmaFittingEngine';
+import type { AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { loadFittingPrice } from './fittingPrice';
 
 /**
@@ -85,6 +87,12 @@ export interface FittingEvaluation {
   price: Appraisal | null;
   /** Null until the pilot, the Damage Profile and the engine are all ready. */
   variants: VariantEvaluator | null;
+  /**
+   * What changed each attribute of the open Fitting's module at
+   * `moduleIndex` ("Affected by"), under exactly what its stats are worked
+   * out under. Null until the pilot, the Damage Profile and the engine are ready.
+   */
+  explainModule: ((moduleIndex: number) => Promise<AffectedAttribute[]>) | null;
 }
 
 /**
@@ -255,6 +263,21 @@ export function useFittingEvaluation({
     [fitting, pilot, damageProfile, conditions, engineReady]
   );
 
+  const explain = useMemo(
+    () =>
+      fitting === null || pilot === null || damageProfile === null || !engineReady
+        ? null
+        : async (moduleIndex: number) =>
+            explainModule(
+              fitting,
+              await overridden(pilot, conditions),
+              moduleIndex,
+              damageProfile,
+              statsOptions(conditions)
+            ),
+    [fitting, pilot, damageProfile, conditions, engineReady]
+  );
+
   return {
     stats: stats?.stats ?? null,
     statsFitting: stats?.fitting ?? null,
@@ -266,5 +289,6 @@ export function useFittingEvaluation({
     damageProfiles,
     price,
     variants,
+    explainModule: explain,
   };
 }

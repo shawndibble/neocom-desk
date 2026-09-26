@@ -21,6 +21,7 @@ import {
 } from '@/engine/fittings/stats';
 import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import { extractSupport } from '@/engine/fittings/support';
+import { affectedAttributes, type AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { extractMining, miningYield } from '@/engine/fittings/mining';
 import {
   ITEM_DOGMA_ATTRIBUTE,
@@ -305,6 +306,47 @@ export async function computeFittingStats(
     lockedTargets,
     allOverheated,
   };
+}
+
+/**
+ * "Affected by" for one fitted module (`engine/fittings/affectedBy.ts`):
+ * the same calculation the stats run, with the engine asked for its sources.
+ * Only ever on demand — the dialog asking — never on the stats themselves,
+ * where the extra bookkeeping would be paid on every edit for nothing.
+ */
+export async function explainModule(
+  fitting: Fitting,
+  profile: PilotProfile,
+  moduleIndex: number,
+  damageProfile?: DamageProfile,
+  { overheatAll = false, weatherTypeId }: StatsOptions = {}
+): Promise<AffectedAttribute[]> {
+  await loadDogmaEngine();
+  let dogmaFit = withWeather(fittingToDogmaFit(fitting, profile, damageProfile), weatherTypeId);
+  if (overheatAll) {
+    // As the stats do: every running module that can overheat, overloaded.
+    const plain = calculate(dogmaFit);
+    dogmaFit = {
+      ...dogmaFit,
+      items: dogmaFit.items.map((item, index) =>
+        index < fitting.modules.length &&
+        plain.items[index]?.max_state === 'overload' &&
+        plain.items[index]?.state === 'active'
+          ? { ...item, state: 'overload' }
+          : item
+      ),
+    };
+  }
+  const calculation = calculate(dogmaFit, { sources: true });
+  const result = calculation.items[moduleIndex];
+  if (!result) return [];
+  return affectedAttributes(result.attributes, {
+    shipTypeId: dogmaFit.ship.type_id,
+    ...(dogmaFit.ship.mode === undefined ? {} : { modeTypeId: dogmaFit.ship.mode }),
+    itemTypeIds: dogmaFit.items.map((item) => item.type_id),
+    chargeTypeIds: dogmaFit.items.map((item) => item.charge?.type_id),
+    projectedTypeIds: (dogmaFit.incoming?.effects ?? []).map((effect) => effect.type_id),
+  });
 }
 
 export interface CandidateCheck {

@@ -910,6 +910,36 @@
       "levelOf": "{{name}} level",
       "remove": "Clear {{name}}",
       "done": "Done"
+    },
+    "affectedBy": {
+      "title": "Affected by",
+      "loading": "Working out what affects it…",
+      "none": "Nothing changes this module's attributes.",
+      "failed": "Couldn't work out what affects this module.",
+      "change": "{{base}} → {{value}}",
+      "notApplied": "not running",
+      "penalty": "stacking penalty {{pct}}%",
+      "kind": {
+        "ship": "Hull",
+        "mode": "Mode",
+        "character": "Character",
+        "item": "Module",
+        "charge": "Charge",
+        "skill": "Skill",
+        "projected": "Projected",
+        "buff": "Fleet boost #{{id}}"
+      },
+      "operator": {
+        "pre_assign": "= {{value}}",
+        "post_assign": "= {{value}}",
+        "pre_mul": "×{{value}}",
+        "post_mul": "×{{value}}",
+        "pre_div": "÷{{value}}",
+        "post_div": "÷{{value}}",
+        "mod_add": "+{{value}}",
+        "mod_sub": "−{{value}}",
+        "post_percent": "{{value}}%"
+      }
     }
   },
   "skills": {
