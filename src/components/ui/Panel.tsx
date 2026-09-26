@@ -126,7 +126,7 @@ export const Panel = forwardRef<HTMLElement, PanelProps>(function Panel(
                   tabIndex={headingRef ? -1 : undefined}
                   className={`text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase ${
                     headingRef
-                      ? 'whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
+                      ? 'max-md:min-w-0 max-md:break-words md:whitespace-nowrap focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent'
                       : wrapMeta
                         ? 'max-md:shrink-0 max-md:whitespace-nowrap md:min-w-0 md:truncate'
                         : 'min-w-0 truncate'
