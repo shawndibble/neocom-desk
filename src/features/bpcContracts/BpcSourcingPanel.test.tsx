@@ -803,12 +803,11 @@ describe('BpcSourcingPanel source multiselect', () => {
 
   /**
    * The synced contract snapshot can run to six figures (ADR 0013), while a
-   * character's owned blueprints realistically number in the dozens. If the
-   * unified list concatenated contracts before owned rows, a > ROW_CAP
-   * contract set would silently push every owned row past the default
-   * (not-"show all") slice.
+   * character's owned blueprints realistically number in the dozens. The
+   * owned row sorts after every priced contract row, so it has to stay
+   * reachable by scrolling rather than fall past a cap (issue #1777).
    */
-  it('shows an owned row even when far more contract rows exist than the default row cap', async () => {
+  it('keeps an owned row reachable when far more contract rows exist than fit on screen', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot(
         Array.from({ length: 60 }, (_, i) => row({ contractId: i + 1, typeId: 638, price: i }))
@@ -820,7 +819,13 @@ describe('BpcSourcingPanel source multiselect', () => {
     render(<App />);
 
     const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
-    expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 1_000_000 });
+    try {
+      fireEvent.scroll(window);
+      expect(await within(table).findByText('Caracal Blueprint')).toBeInTheDocument();
+    } finally {
+      Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+    }
   });
 
   it('tags an owned row as Owned in the Item cell regardless of visible columns (issue #1782)', async () => {
@@ -1223,10 +1228,10 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       expect(within(table).getAllByRole('button', { name: /BPO on contract/ })).toHaveLength(1);
     });
 
-    it('badges a copy that is on screen even when the cheapest one is past the row cap', async () => {
+    it('badges the cheapest copy across the whole set, even when the snapshot lists it last', async () => {
       loadPublicBpcContracts.mockResolvedValue(
         cachedSnapshot(
-          // Cheapest last, so it falls past the default 50-row cap.
+          // Cheapest last in snapshot order; the price sort brings it to the top.
           Array.from({ length: 60 }, (_, i) =>
             row({ contractId: i + 1, price: (60 - i) * 1_000_000 })
           ),

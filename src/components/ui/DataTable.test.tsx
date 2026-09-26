@@ -930,3 +930,72 @@ describe('DataTable opt-in phone features', () => {
     });
   });
 });
+
+describe('DataTable virtualize', () => {
+  const many: Row[] = Array.from({ length: 1_000 }, (_, i) => ({
+    id: i + 1,
+    item: `Item ${i + 1}`,
+    amount: 1_000 - i,
+    expired: false,
+  }));
+  const sortableColumns: DataTableColumn<Row>[] = [
+    { id: 'item', header: 'Item', render: (row) => row.item },
+    { id: 'amount', header: 'Amount', render: (row) => row.amount, sortValue: (row) => row.amount },
+  ];
+  const mountedIds = () =>
+    Array.from(document.querySelectorAll('tbody tr[data-row-key]')).map((tr) =>
+      tr.getAttribute('data-row-key')
+    );
+
+  afterEach(() => {
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 });
+  });
+
+  it('mounts only a window of rows, sorted over the whole set first', () => {
+    render(
+      <DataTable
+        label="Offers"
+        columns={sortableColumns}
+        rows={many}
+        rowKey={(row) => row.id}
+        defaultSort={{ columnId: 'amount', direction: 'asc' }}
+        virtualize
+      />
+    );
+
+    const ids = mountedIds();
+    expect(ids.length).toBeGreaterThan(0);
+    expect(ids.length).toBeLessThan(100);
+    // Cheapest of all 1,000 leads, not the cheapest of some first slice.
+    expect(ids[0]).toBe('1000');
+    // The spacer standing in for the unmounted rows is not a table row to AT.
+    expect(screen.getAllByRole('row').length).toBe(ids.length + 1);
+  });
+
+  it('reaches the last row by scrolling the page', () => {
+    render(
+      <DataTable
+        label="Offers"
+        columns={sortableColumns}
+        rows={many}
+        rowKey={(row) => row.id}
+        virtualize
+      />
+    );
+    expect(mountedIds()).not.toContain('1000');
+
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 1_000_000 });
+    fireEvent.scroll(window);
+
+    expect(mountedIds()).toContain('1000');
+    expect(mountedIds()).not.toContain('1');
+  });
+
+  it('renders every row when not asked to virtualize', () => {
+    render(
+      <DataTable label="Offers" columns={sortableColumns} rows={many} rowKey={(row) => row.id} />
+    );
+
+    expect(mountedIds()).toHaveLength(1_000);
+  });
+});

@@ -528,6 +528,25 @@
       content: none;
     }
 
+    /*
+     * `DataTable`'s `virtualize` spacers stand in for rows scrolled out of
+     * the window, so their inline height is the whole box: no card padding,
+     * thumb-target floor, line-break pseudo, or labelled cell.
+     */
+    .dt-stack tr.dt-spacer,
+    .dt-stack.dt-stack-dense tr.dt-spacer {
+      padding: 0;
+      min-height: 0;
+    }
+
+    .dt-stack.dt-stack-dense tr.dt-spacer::before {
+      content: none;
+    }
+
+    .dt-stack tr.dt-spacer > td {
+      display: none;
+    }
+
     /* An expanded group's members: indented and on the panel fill, so where
        the group ends is visible without a closing row. */
     tr.dt-group-member {

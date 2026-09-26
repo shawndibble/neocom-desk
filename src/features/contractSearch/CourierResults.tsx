@@ -11,7 +11,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useIsPhone } from '@/lib/useIsPhone';
 import {
   Button,
   ColumnPickerMenu,
@@ -79,9 +78,6 @@ import {
   DEFAULT_COURIER_FILTER,
   useCourierFilterPref,
 } from '@/features/contractSearch/courierFilterPref';
-
-/** Rows shown before "show all" — the same cap the item results use. */
-const ROW_CAP = 50;
 
 /** The filter as the controls hold it: text fields stay strings until they are parsed into the engine's filter. */
 interface CourierUiFilter {
@@ -679,7 +675,6 @@ const COURIER_FILTER_PARAMS = {
   'courier.maxVolume': textParam(),
   'courier.minDays': textParam(),
   'courier.pref': enumParam(ROUTE_PREFERENCES, DEFAULT_ROUTE_PREFERENCE),
-  'courier.all': boolParam(),
 };
 const COURIER_SORT = { columnId: 'iskPerJump', direction: 'desc' } as const;
 
@@ -1024,11 +1019,6 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
     [rawUrlFilter, urlHasField, rememberedFilter]
   );
   const preference = params['courier.pref'];
-  const showAll = params['courier.all'];
-  const setShowAll = useCallback(
-    (value: boolean) => setParams({ 'courier.all': value }),
-    [setParams]
-  );
   const [selectedRow, setSelectedRow] = useState<CourierRouteRow | null>(null);
 
   // Where the character is (issue #940), owned here rather than by the control
@@ -1163,17 +1153,6 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   );
 
   /**
-   * Best rate first *before* the row cap: `DataTable` sorts only the rows it
-   * is handed, so capping an unranked set would leave the table claiming an
-   * ISK/jump sort over an arbitrary 50.
-   *
-   * Changing the preference changes every jump count and therefore this
-   * order, which is why the whole filtered set is ranked here rather than the
-   * visible page. Until the counts arrive the rate is unknown for every row,
-   * so the fallback order is by reward — the board stays useful mid-load
-   * instead of shuffling from an order that means nothing.
-   */
-  /**
    * How this haul's rate compares with the market's. `null` whenever either
    * half is unstatable — no distance, no cargo volume, or a corpus too small
    * for a median — so a row shows nothing rather than a figure computed
@@ -1214,6 +1193,12 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
 
   const ratedRows = useMemo(() => narrowToOverRate(matchingRows), [matchingRows, narrowToOverRate]);
 
+  /**
+   * Best rate first. Changing the preference changes every jump count and
+   * therefore this order. Until the counts arrive the rate is unknown for
+   * every row, so the fallback order is by reward — the board stays useful
+   * mid-load instead of shuffling from an order that means nothing.
+   */
   const displayRows = useMemo(() => {
     const ranked = [...ratedRows];
     if (jumps.kind !== 'known') return ranked.sort((a, b) => b.reward - a.reward);
@@ -1270,7 +1255,6 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
       'courier.maxCollateral': urlNext.maxCollateral,
       'courier.maxVolume': urlNext.maxVolume,
       'courier.minDays': urlNext.minDays,
-      'courier.all': false,
     });
 
     // `routeQuery` has no field on the stored shape — see `courierFilterPref.ts`.
@@ -1281,8 +1265,8 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
 
   /**
    * Go look at the way home: the same board, with only the two region fields
-   * swapped. Through `changeFilter` rather than `setUiFilter`, so the row cap
-   * resets the way it does for every other filter change.
+   * swapped. Through `changeFilter` rather than `setUiFilter`, so it is
+   * remembered the way every other filter change is.
    */
   function searchReverseLane(row: CourierRouteRow) {
     setSelectedRow(null);
@@ -1294,7 +1278,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   }
 
   function changePreference(next: RoutePreferenceKind) {
-    setParams({ 'courier.pref': next, 'courier.all': false });
+    setParams({ 'courier.pref': next });
   }
 
   const courierColumnsById = useMemo<Record<CourierColumnId, DataTableColumn<CourierRouteRow>>>(
@@ -1497,15 +1481,6 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
     columns.map((column) => column.id)
   );
 
-  // `DataTable` only groups by lane on phone (`groupBy` is a no-op at `sm`
-  // and up), and a collapsed lane costs nothing extra to render — so capping
-  // there just corrupts lane counts and can drop a whole lane past the cut.
-  // Desktop shows the flat, ungrouped list, where the cap still earns its
-  // keep against render cost.
-  const isPhone = useIsPhone();
-  const isCapped = !isPhone && !showAll;
-  const visibleRows = isCapped ? displayRows.slice(0, ROW_CAP) : displayRows;
-
   /**
    * Phone-only lane folding. Memoised because `DataTable` regroups whenever
    * this object's identity changes, and the jump counts it reads land after
@@ -1530,10 +1505,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
     [regionNames, jumps.kind, jumpsByContract, multipleFor]
   );
 
-  /**
-   * Counted over every haul the filters kept, not the capped page on screen:
-   * "50 hauls" when there are 214 would be the cap talking, not the board.
-   */
+  /** Counted over every haul the filters kept, not the rows mounted on screen. */
   const stackSummary = useMemo(
     () =>
       t('contractSearch.courierMobile.summary', {
@@ -1620,7 +1592,7 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
           <DataTable
             label={t('contractSearch.courierTitle')}
             columns={columns}
-            rows={visibleRows}
+            rows={displayRows}
             // One row per contract here — unlike the offers snapshot, where one
             // contract lists an item line per stack — so `contractId` alone is
             // a unique key.
@@ -1633,14 +1605,10 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
             mobileSort
             stackSummary={stackSummary}
             groupBy={groupBy}
+            // Every haul the filters keep, windowed rather than capped. Phone
+            // lane grouping renders unwindowed — collapsed lanes mount nothing.
+            virtualize
           />
-          {isCapped && displayRows.length > ROW_CAP && (
-            <div className="px-3 py-2">
-              <Button size="sm" onClick={() => setShowAll(true)}>
-                {t('contractSearch.showAll', { count: displayRows.length })}
-              </Button>
-            </div>
-          )}
         </>
       )}
       {selectedRow && reverseLane && (
