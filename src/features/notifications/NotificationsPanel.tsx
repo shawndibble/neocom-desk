@@ -983,7 +983,7 @@ const CharacterNotificationSection = memo(function CharacterNotificationSection(
       </div>
       {expanded && (
         <div className="bg-panel-2">
-          <ChannelColumnHeadings />
+          <ChannelColumnHeadings pinned />
           <ul className="divide-y divide-line">
             {layout.ordinary.map((eventId) => renderEvent(eventId, false))}
             {layout.corp.length > 0 && (
