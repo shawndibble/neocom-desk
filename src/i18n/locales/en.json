@@ -1416,9 +1416,10 @@
     "optimizeForMeTotal": "Total {{before}} → {{after}}",
     "remapSaves": "Remapping saves {{duration}}",
     "whatIfChip": {
-      "saves": "What-if {{lens}} · saves {{duration}} vs current",
-      "costs": "What-if {{lens}} · costs {{duration}} vs current",
-      "same": "What-if {{lens}} · same as current"
+      "label": "What-if {{lens}}",
+      "saves": "Saves {{duration}} vs current",
+      "costs": "Costs {{duration}} vs current",
+      "same": "Same as current"
     },
     "remapNoGain": "No remap improves this plan in its current order — keeping current attributes. Try \"Reorder only\" to group similar skills first, then optimize again.",
     "remapNoneAvailable": "This plan has 0 remaps to spend, so nothing was placed.",
@@ -1452,9 +1453,10 @@
     "whatIfMarketLink": "View attribute enhancer implants in Market",
     "assumesNoImplantsHint": "Training time is calculated without this character's fitted implants. Grant Character details for an accurate estimate.",
     "booster": "Booster",
+    "boosterRowLabel": "Accelerator {{position}}",
     "boosterAdd": "Add accelerator",
     "boosterRemove": "Remove accelerator",
-    "boosterMarketLink": "View boosters in Market",
+    "boosterMarketLink": "View cerebral accelerators in Market",
     "boosterBonus": "Bonus",
     "boosterStartsAt": "Starts",
     "boosterStartsNow": "Already running",
@@ -1576,9 +1578,6 @@
     "headerSavingsNone": "None",
     "headerTrained": "Trained",
     "headerTrainedSp": "{{trained}} / {{total}} SP",
-    "headerNextStep": "Next step",
-    "headerNextStepValue": "{{name}} {{level}}",
-    "headerNothingLeft": "Nothing left to train",
     "injectors": {
       "title": "Skill injectors",
       "ifInjectedNow": "If injected now:",
@@ -2136,8 +2135,8 @@
     "buildLocationHighlighted_one": "{{count}} result. {{name}} highlighted.",
     "buildLocationHighlighted_other": "{{count}} results. {{name}} highlighted.",
     "override": "Override",
-    "buildLocationGrantHint": "Sign in again to search your stations and structures and fill these in for you.",
-    "buildLocationGrant": "Sign in again",
+    "buildLocationGrantHint": "Log in again to search your stations and structures and fill these in for you.",
+    "buildLocationGrant": "Log in again",
     "breakdownTrigger": "Calculations?",
     "breakdown": {
       "title": "How this Build Plan is calculated",
@@ -2287,14 +2286,14 @@
   },
   "login": {
     "button": "Log in with EVE Online",
-    "permissionsHint": "Signing in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, your in-game fittings, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions. Want to share less from the start? Use Log in with custom permissions, next to the Log in button, to choose exactly what you grant.",
+    "permissionsHint": "Logging in lets it read your skills and training queue, wallet, assets, blueprints, industry jobs, mining ledger, market orders, contracts, mail, calendar, contacts, standings, clones and implants, planetary colonies, loyalty points, notifications, current location, your in-game fittings, and the player structures you can dock at — both their names and a search across them, which is how a build location is picked. EVE's consent screen lists the planetary scope as \"manage your planetary installations\" — Neocom Desk only reads that data and never writes to it. Corporation data (including your in-game corporation roles) and player-structure markets are separate grants, requested only if you open the pages that need them. Log in again after an update to pick up newly requested permissions. Want to share less from the start? Use Log in with custom permissions, next to the Log in button, to choose exactly what you grant.",
     "writeExceptions": "It also asks for four permissions that write, and uses each only when you act: opening a mail in this app also marks it read in EVE, so it won't show as unread again after a refresh; responding Accept, Decline, or Tentative to a calendar invite here also sends that response to EVE; replying to or forwarding a mail you write here sends it through your EVE account, the same as sending it from the game client; and saving a Fitting to EVE creates or replaces your in-game fitting there, the same as fitting it in the client. Nothing else in the app writes to EVE.",
     "eyebrow": "Free · Open source · Runs in your browser",
     "heading": "Answers, not API dumps.",
-    "previewLabel": "Example — signed-in view",
+    "previewLabel": "Example — logged-in view",
     "previewCorp": "Deep Space Transport",
     "answersHeading": "The questions it exists to answer",
-    "answersLead": "Each of these is a page you open after signing in, with the number you would have worked out by hand already worked out.",
+    "answersLead": "Each of these is a page you open after logging in, with the number you would have worked out by hand already worked out.",
     "answers": {
       "attention": {
         "question": "Which character needs my attention?",
@@ -2460,7 +2459,7 @@
       },
       "token": {
         "name": "Your refresh token stays in this browser",
-        "desc": "It lives in this browser's own storage and nowhere else — never on a server, never in a log. Signing in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it."
+        "desc": "It lives in this browser's own storage and nowhere else — never on a server, never in a log. Logging in to sync exchanges one short-lived access token and never the refresh token. Remove a character and it goes with it."
       },
       "offline": {
         "name": "Works when the connection doesn't",
@@ -2481,9 +2480,9 @@
     "completing": "Completing login…",
     "errorTitle": "Login failed",
     "errorMessage": "Something went wrong signing you in. Please try again.",
-    "errorSpent": "This sign-in link has already been used, or it was opened in a different browser tab or window. Start the sign-in again.",
-    "errorMismatch": "This sign-in could not be verified. Another sign-in may have started before this one finished. Start the sign-in again.",
-    "errorDenied": "Sign-in was cancelled on the EVE Online page. Nothing was added.",
+    "errorSpent": "This login link has already been used, or it was opened in a different browser tab or window. Log in again.",
+    "errorMismatch": "This login could not be verified. Another login may have started before this one finished. Log in again.",
+    "errorDenied": "Login was cancelled on the EVE Online page. Nothing was added.",
     "retry": "Try again"
   },
   "character": {
@@ -2544,9 +2543,9 @@
     "densitySpacious": "Spacious",
     "remove": "Remove",
     "removeButtonLabel": "Remove {{name}}",
-    "removeConfirm": "Remove {{name}}? This deletes their skill plans, build plans, quickbar and cached game data from this device, and — if a session can still be started as them — their synced plans, build plans, quickbar and settings too. If not, that remote data stays until you sign in as {{name}} again. This cannot be undone here.",
+    "removeConfirm": "Remove {{name}}? This deletes their skill plans, build plans, quickbar and cached game data from this device, and — if a session can still be started as them — their synced plans, build plans, quickbar and settings too. If not, that remote data stays until you log in as {{name}} again. This cannot be undone here.",
     "removeDeferredNoticeTitle": "Sync deferred",
-    "removeDeferredNotice": "{{name}}'s synced data couldn't be cleared right now — their session couldn't be re-established. It will be cleared automatically the next time you sign in as {{name}}.",
+    "removeDeferredNotice": "{{name}}'s synced data couldn't be cleared right now — their session couldn't be re-established. It will be cleared automatically the next time you log in as {{name}}.",
     "cancel": "Cancel",
     "ok": "OK",
     "searchPlaceholder": "Search by name or corporation…",
@@ -4081,6 +4080,7 @@
     "expiresColumn": "Expires",
     "startingBid": "Starting bid: {{price}}",
     "buyout": "Buyout: {{price}}",
+    "plexPrice": "{{plex}} PLEX",
     "wholeContractMarker": "Whole contract",
     "emptyTitle": "No public BPC listings synced yet",
     "emptyHint": "The public contract index refreshes on its own schedule — check back shortly.",
@@ -4111,6 +4111,10 @@
     "meTeLabel": "ME / TE",
     "runsLabel": "Runs",
     "qtyLabel": "Qty",
+    "excludeLabel": "Exclude",
+    "hideAuctions": "Auctions",
+    "hidePlex": "PLEX contracts",
+    "hidePlexTooltip": "Hide contracts asking for PLEX in return, rather than ISK.",
     "sourceLabel": "Source",
     "sourceContracts": "Contracts",
     "sourceContractSingular": "Contract",
@@ -4201,7 +4205,7 @@
     "tabAcrossCharacters": "Across characters",
     "acrossLabel": "Contacts across every character",
     "acrossCharacters": "On",
-    "acrossCharactersHeaderTooltip": "How many of your characters hold this contact, out of every character signed in on this device. Read from each character's cached contacts.",
+    "acrossCharactersHeaderTooltip": "How many of your characters hold this contact, out of every character logged in on this device. Read from each character's cached contacts.",
     "acrossCharactersCount": "{{count}} of {{total}}",
     "acrossStandings": "Standings",
     "acrossMissingOn": "Not a contact of: {{names}}",
@@ -5436,7 +5440,7 @@
           "corp": "Everything on the Corporation pages — wallet, members, structures, assets and moon extractions.",
           "market": "Market prices, order books and the LP store.",
           "miningHistory": "Up to 90 days of your mining ledger, kept past the 30 days EVE itself returns so the Mining Overview can show longer ranges.",
-          "login": "Your EVE sign-in.",
+          "login": "Your EVE login.",
           "loginNote": "The token that keeps you logged in is stored in this browser and nowhere else.",
           "preferences": "The rest of Settings — text size and time format, which answer for the screen you are looking at — and every sort, filter and expanded section a page remembers as you use it."
         },
@@ -5444,8 +5448,8 @@
         "notes": {
           "push": "Push notifications, if you turn them on: we store a token for this device, the character IDs it covers, and the alerts due in the next 72 hours — including their text, so they can be delivered while the app is closed. Each character is verified with EVE at that moment, and the token used for that check is discarded straight after.",
           "crashes": "Crash reports: when something goes wrong we receive the error and which page it happened on, so it can be fixed. IP addresses are switched off, request and response bodies are never captured, and your EVE tokens are stripped before anything is sent.",
-          "removal": "Removing a character deletes everything above from our servers. If its EVE login has already expired we cannot sign in to do that, so the deletion runs the next time you add that character back.",
-          "export": "Exporting a backup (Data tab) writes a password-encrypted file — including your sign-in tokens — to your device. This only happens when you press the button, and the file goes wherever you choose to put it; we never see it."
+          "removal": "Removing a character deletes everything above from our servers. If its EVE login has already expired we cannot log in to do that, so the deletion runs the next time you add that character back.",
+          "export": "Exporting a backup (Data tab) writes a password-encrypted file — including your login tokens — to your device. This only happens when you press the button, and the file goes wherever you choose to put it; we never see it."
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."
       },
@@ -5587,8 +5591,8 @@
     "clearCacheConfirm": "Cache cleared.",
     "backup": {
       "exportTitle": "Export backup",
-      "exportHint": "Download every character on this device — including sign-in tokens — as one password-encrypted file. Import it on another device to add these characters there without re-doing EVE SSO for each one.",
-      "passwordWarning": "The password is the only protection on this file — anyone who has both the file and the password can sign in as these characters. Choose one you can remember; there is no recovery if you lose it.",
+      "exportHint": "Download every character on this device — including login tokens — as one password-encrypted file. Import it on another device to add these characters there without re-doing EVE SSO for each one.",
+      "passwordWarning": "The password is the only protection on this file — anyone who has both the file and the password can log in as these characters. Choose one you can remember; there is no recovery if you lose it.",
       "passwordLabel": "Password",
       "exportButton": "Download backup",
       "exportDone": "Backup downloaded.",

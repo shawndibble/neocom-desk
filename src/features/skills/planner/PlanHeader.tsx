@@ -1,13 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Panel, StatChip, TextInput } from '@/components/ui';
+import { Panel, StatChip, TextInput, type StatChipTone } from '@/components/ui';
 import { formatDuration } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { romanLevel } from '@/engine/projection';
 import type { PlanProgress } from '@/engine/planProgress';
-import { doneByText } from './doneBy';
 import { MIN_MEANINGFUL_SAVINGS_SECONDS, type OptimizationBadge } from './planHeaderStats';
+import type { WhatIfVerdict } from './whatIfImplants';
+
+const WHAT_IF_TONE: Record<WhatIfVerdict['kind'], StatChipTone> = {
+  saves: 'success',
+  costs: 'warning',
+  same: 'default',
+};
 
 interface PlanHeaderProps {
   totalSeconds: number;
@@ -23,8 +28,11 @@ interface PlanHeaderProps {
   nextMilestone: { name: string; finish: Date } | null;
   /** Share of the plan already trained; omitted by callers with no plan basis. */
   progress?: PlanProgress;
-  /** The first step of the Skill Plan schedule, with what its "Done by" date needs. */
-  nextStep?: { name: string; level: number; cumulativeSeconds: number; startDate: Date } | null;
+  /**
+   * The What-If Implants lens against the clone's real implants; omitted or
+   * null while the plan is costed on the real implants.
+   */
+  whatIf?: { lens: string; verdict: WhatIfVerdict } | null;
   /** False until the character's trained skills have loaded: progress reads `—`, not 0%. */
   trainedKnown?: boolean;
   /**
@@ -40,7 +48,8 @@ interface PlanHeaderProps {
 
 /**
  * Plan-at-a-glance header: total time, skill count, projected finish, a live
- * remap-savings badge, and the next Plan Milestone still ahead.
+ * remap-savings badge, the next Plan Milestone still ahead, and the what-if
+ * lens's gain or loss.
  */
 export function PlanHeader({
   totalSeconds,
@@ -49,7 +58,7 @@ export function PlanHeader({
   badge,
   nextMilestone,
   progress,
-  nextStep = null,
+  whatIf = null,
   trainedKnown = true,
   name,
   onRename,
@@ -136,28 +145,6 @@ export function PlanHeader({
             }
           />
         )}
-        {progressFraction !== null && (
-          <StatChip
-            label={t('plans.headerNextStep')}
-            value={
-              !trainedKnown ? (
-                '—'
-              ) : nextStep ? (
-                <>
-                  {t('plans.headerNextStepValue', {
-                    name: nextStep.name,
-                    level: romanLevel(nextStep.level),
-                  })}{' '}
-                  <span className="text-text-dim">
-                    {doneByText(nextStep.cumulativeSeconds, nextStep.startDate)}
-                  </span>
-                </>
-              ) : (
-                t('plans.headerNothingLeft')
-              )
-            }
-          />
-        )}
         {nextMilestone && (
           <StatChip
             label={t('plans.milestone.next')}
@@ -183,6 +170,16 @@ export function PlanHeader({
                 )}
               </>
             }
+          />
+        )}
+        {whatIf && (
+          <StatChip
+            testId="what-if-chip"
+            label={t('plans.whatIfChip.label', { lens: whatIf.lens })}
+            tone={WHAT_IF_TONE[whatIf.verdict.kind]}
+            value={t(`plans.whatIfChip.${whatIf.verdict.kind}`, {
+              duration: formatDuration(whatIf.verdict.seconds),
+            })}
           />
         )}
       </div>

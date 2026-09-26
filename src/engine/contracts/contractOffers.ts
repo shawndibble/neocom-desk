@@ -36,6 +36,13 @@ export interface PublicContractOfferRow {
   me?: number;
   te?: number;
   runs?: number;
+  /**
+   * PLEX quantity the contract's issuer wants in return, when any (issue
+   * #1080's PLEX-for-item barter) — the same value on every offer row of one
+   * contract, since it describes the requested side, not this one line.
+   * Absent, not zero, when the contract asks for nothing PLEX.
+   */
+  requestedPlex?: number;
   /** Epoch ms. */
   dateExpired: number;
 }
@@ -126,6 +133,7 @@ function blueprintRows(
       te: offer.te ?? 0,
       runs: offer.runs ?? 0,
       quantity: offer.quantity,
+      ...(offer.requestedPlex === undefined ? {} : { requestedPlex: offer.requestedPlex }),
       dateExpired: offer.dateExpired,
       isMultiType: (distinctTypeCount.get(offer.contractId) ?? 1) > 1,
     });

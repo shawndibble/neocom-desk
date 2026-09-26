@@ -44,7 +44,7 @@ const MIN_BOOSTER_BONUS = 0;
 
 /**
  * What a plan with no Boosters at all is costed under. `bonus` is the common
- * accelerator tier, so ticking "add accelerator" lands on a sensible figure
+ * accelerator tier, so "Add accelerator" lands on a sensible figure
  * rather than on zero, and both instants stay null (already-running-with-no-
  * known-expiry is the state the row opens in) until the user says otherwise.
  */
@@ -160,11 +160,19 @@ export function hasOverlappingBoosters(boosters: readonly PlanBooster[]): boolea
  * `raw` and `legacy` are the plan's two stored fields as-is (`undefined` when
  * absent) — the presence check belongs to the caller (`resolvePlanBoosters`),
  * since only it knows whether "nothing stored" should prefill.
+ *
+ * A disabled row is dropped: the editor has no on/off box any more — a row
+ * that exists is a live one, and removing it is how it goes off — so a row an
+ * older build saved unticked would otherwise sit there unable to be turned
+ * back on. Junk rows (`DEFAULT_PLAN_BOOSTER`, disabled) go the same way.
  */
 export function normalizePlanBoosters(raw: unknown, legacy?: unknown): PlanBooster[] {
-  if (Array.isArray(raw)) return clampBoosterOverlaps(raw.map(normalizePlanBoosterRow));
-  if (legacy !== undefined) return clampBoosterOverlaps([normalizePlanBoosterRow(legacy)]);
-  return [];
+  const rows = Array.isArray(raw)
+    ? raw.map(normalizePlanBoosterRow)
+    : legacy !== undefined
+      ? [normalizePlanBoosterRow(legacy)]
+      : [];
+  return clampBoosterOverlaps(rows.filter((row) => row.enabled));
 }
 
 /**
@@ -176,8 +184,8 @@ export function normalizePlanBoosters(raw: unknown, legacy?: unknown): PlanBoost
  * The plan storing NOTHING in *either* field is what "the user has not
  * answered" means, and it is the whole gate: an answer that happens to read
  * like a default (including an explicitly empty `boosters: []`) is still an
- * answer. Unticking every row's box — "those accelerators are gone" — must
- * not prefill back over it on the next visit.
+ * answer. Removing every row — "those accelerators are gone" — must not
+ * prefill back over it on the next visit.
  *
  * The prefilled row's expiry is left null on purpose: no ESI endpoint exposes
  * a running booster's life, only the arithmetic that recovers its size, and a

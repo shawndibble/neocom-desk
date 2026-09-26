@@ -6,6 +6,7 @@ import {
   chunkRows,
   chunkDocId,
   compactContractOfferRow,
+  requestedPlexByContract,
   filterAndCompactPublicContractOffers,
   sortContractOfferRows,
   PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE,
@@ -216,6 +217,61 @@ describe('compactContractOfferRow', () => {
   it('rejects an item the issuer wants rather than offers', () => {
     expect(compactContractOfferRow(requested, parent)).toBeNull();
   });
+
+  it('carries the requested-PLEX quantity through when the caller supplies one', () => {
+    expect(compactContractOfferRow(bpc, parent, 1000)?.requestedPlex).toBe(1000);
+  });
+
+  it('omits requestedPlex when the caller passes none, rather than writing zero', () => {
+    const row = compactContractOfferRow(bpc, parent);
+    expect(row).not.toHaveProperty('requestedPlex');
+  });
+});
+
+describe('requestedPlexByContract', () => {
+  const eligibleContracts = new Map([
+    [
+      '1',
+      {
+        contractId: 1,
+        regionId: 10000002,
+        locationId: 60003760,
+        price: 0,
+        isAuction: false,
+        dateExpired: Date.parse(FUTURE),
+      },
+    ],
+  ]);
+
+  it('sums the PLEX quantity a contract asks for, from its requested (not offered) lines', () => {
+    const items = parseContractItemsCsv(
+      itemsCsv([
+        // offered: a blueprint copy, not PLEX — never counted
+        'true,true,1,10,1,1001,3,18,32858,2026-09-01T11:31:43Z,1',
+        // requested: 1000 PLEX
+        '"",false,2,,1000,1002,,,44992,2026-09-01T11:31:43Z,1',
+        // requested: another 500 PLEX on the same contract
+        '"",false,3,,500,1003,,,44992,2026-09-01T11:31:43Z,1',
+        // requested but not PLEX — never counted
+        '"",false,4,,1,1004,,,35,2026-09-01T11:31:43Z,1',
+      ])
+    );
+    expect(requestedPlexByContract(items, eligibleContracts)).toEqual(new Map([['1', 1500]]));
+  });
+
+  it('omits a contract that asks for no PLEX', () => {
+    const items = parseContractItemsCsv(
+      itemsCsv(['"",false,2,,1,1002,,,35,2026-09-01T11:31:43Z,1'])
+    );
+    expect(requestedPlexByContract(items, eligibleContracts).has('1')).toBe(false);
+  });
+
+  it('ignores a requested-PLEX line on a contract that is not eligible', () => {
+    const items = parseContractItemsCsv(
+      itemsCsv(['"",false,2,,1000,1002,,,44992,2026-09-01T11:31:43Z,999'])
+    );
+    expect(requestedPlexByContract(items, eligibleContracts).size).toBe(0);
+  });
 });
 
 describe('filterAndCompactPublicContractOffers', () => {
@@ -284,6 +340,22 @@ describe('filterAndCompactPublicContractOffers', () => {
 
   it('is empty given no rows', () => {
     expect(filterAndCompactPublicContractOffers([], [], NOW)).toEqual([]);
+  });
+
+  it('carries a contract-wide requested-PLEX total onto every offer row of that contract', () => {
+    const plexItems = itemsCsv([
+      // offered: the blueprint copy from the mixed bundle above
+      'true,true,1,10,1,1001,3,18,32858,2026-09-01T11:31:43Z,1',
+      // requested: 1000 PLEX in return, on the same contract
+      '"",false,9,,1000,1009,,,44992,2026-09-01T11:31:43Z,1',
+    ]);
+    const plexRows = filterAndCompactPublicContractOffers(
+      parseContractsCsv(contracts),
+      parseContractItemsCsv(plexItems),
+      NOW
+    );
+    expect(plexRows).toHaveLength(1);
+    expect(plexRows[0]).toMatchObject({ contractId: 1, typeId: 32858, requestedPlex: 1000 });
   });
 
   it('sorts deterministically by contract then type, independent of input order', () => {
@@ -377,11 +449,17 @@ describe('public contract offers snapshot sizing', () => {
         buyout: 999999999999.99,
         isAuction: true,
         dateExpired: Date.parse(FUTURE),
-      }
+      },
+      2_100_000_000
     );
 
     // Every optional field populated, or it isn't the worst case.
-    expect(widest).toMatchObject({ buyout: expect.any(Number), isBlueprintCopy: true, runs: 300 });
+    expect(widest).toMatchObject({
+      buyout: expect.any(Number),
+      isBlueprintCopy: true,
+      runs: 300,
+      requestedPlex: 2_100_000_000,
+    });
     expect(
       PUBLIC_CONTRACT_OFFERS_CHUNK_SIZE * Buffer.byteLength(JSON.stringify(widest))
     ).toBeLessThan(1024 * 1024);

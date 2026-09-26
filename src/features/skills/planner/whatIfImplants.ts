@@ -203,15 +203,17 @@ export function isHypotheticalLens(selection: WhatIfImplantSelection): boolean {
   return !(selection.kind === 'preset' && selection.preset === 'current');
 }
 
+export interface WhatIfVerdict {
+  kind: 'saves' | 'costs' | 'same';
+  seconds: number;
+}
+
 /**
  * How a hypothetical lens compares with the real implants: `saves` when the
  * what-if plan finishes sooner, `costs` when later (e.g. "None" against a
  * fitted set), `same` when the difference is under a second.
  */
-export function whatIfVerdict(
-  currentSeconds: number,
-  whatIfSeconds: number
-): { kind: 'saves' | 'costs' | 'same'; seconds: number } {
+export function whatIfVerdict(currentSeconds: number, whatIfSeconds: number): WhatIfVerdict {
   const delta = Math.round(currentSeconds - whatIfSeconds);
   if (delta === 0) return { kind: 'same', seconds: 0 };
   return { kind: delta > 0 ? 'saves' : 'costs', seconds: Math.abs(delta) };

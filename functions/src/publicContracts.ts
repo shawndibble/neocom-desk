@@ -73,6 +73,15 @@ export function parseContractItemsCsv(csvText: string): ContractItemRecord[] {
 const SEARCHABLE_CONTRACT_TYPES = new Set(['item_exchange', 'auction']);
 
 /**
+ * PLEX's type id, checked against `contract_items.csv`'s requested (not
+ * offered) lines to flag a barter contract that wants PLEX in return (issue
+ * #1080's "unpriceable" barter, specialized). Not imported from `src/engine`
+ * — client and Functions are separate packages — so this is Functions' own
+ * copy of the same constant.
+ */
+const PLEX_TYPE_ID = 44992;
+
+/**
  * Everything the join needs from one contract, already converted — and
  * nothing else. `contracts.csv` carries 21 columns and `columns: true` builds
  * an object holding every one of them; keeping whole records alive as the
@@ -186,6 +195,16 @@ export interface PublicContractOfferRow {
   me?: number;
   te?: number;
   runs?: number;
+  /**
+   * How much PLEX the contract's issuer wants in return, when any — the sum
+   * of PLEX quantity across the contract's *requested* (`is_included:
+   * false`) lines, computed by `requestedPlexByContract`. The same value on
+   * every offer row of one contract, since the requested side belongs to the
+   * whole contract, not to any one for-sale line. Absent, not zero, when the
+   * contract asks for nothing PLEX — the same omit-don't-zero rule ME/TE/runs
+   * already follow.
+   */
+  requestedPlex?: number;
   /** Epoch ms. */
   dateExpired: number;
 }
@@ -199,11 +218,16 @@ export interface PublicContractOfferRow {
  * offer another). That filter stays: this snapshot answers "what can I buy",
  * and a line the issuer is asking for is not an offer at any price. Issue
  * #906 generalizes the *item type* — the `is_blueprint_copy` gate — not the
- * direction of the exchange.
+ * direction of the exchange. `requestedPlex`, from the requested side of the
+ * very same contract, rides along on the *offer* rows this function does
+ * publish (issue #1080's PLEX-for-item barter): a caller precomputes it per
+ * contract (`requestedPlexByContract`) since answering it needs every item
+ * line of the contract, not the one this call is narrowing.
  */
 export function compactContractOfferRow(
   item: ContractItemRecord,
-  contract: EligibleContract
+  contract: EligibleContract,
+  requestedPlex?: number
 ): PublicContractOfferRow | null {
   if (item.is_included !== 'true') return null;
 
@@ -224,8 +248,38 @@ export function compactContractOfferRow(
     ...(me === undefined ? {} : { me }),
     ...(te === undefined ? {} : { te }),
     ...(runs === undefined || runs < 0 ? {} : { runs }),
+    ...(requestedPlex ? { requestedPlex } : {}),
     dateExpired: contract.dateExpired,
   };
+}
+
+/**
+ * Total PLEX quantity requested per contract, keyed by `contract_id` (the raw
+ * CSV string, matching `eligibleContracts`' own keys) — the requested side of
+ * `compactContractOfferRow`'s `is_included` split. Computed over every item
+ * line up front, the same shape `distinctTypeCountByContract`
+ * (`contractOffers.ts`, client-side) uses for its own contract-wide tally,
+ * since a contract's requested lines are not guaranteed to sit next to its
+ * offered ones in the CSV.
+ *
+ * Only contracts already in `eligibleContracts` are tallied — an ineligible
+ * or lapsed contract publishes no offer rows for this to ride along on
+ * anyway.
+ */
+export function requestedPlexByContract(
+  items: readonly ContractItemRecord[],
+  eligibleContracts: ReadonlyMap<string, EligibleContract>
+): Map<string, number> {
+  const totals = new Map<string, number>();
+  for (const item of items) {
+    if (item.is_included === 'true') continue;
+    if (Number(item.type_id) !== PLEX_TYPE_ID) continue;
+    if (!eligibleContracts.has(item.contract_id)) continue;
+    const quantity = Number(item.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) continue;
+    totals.set(item.contract_id, (totals.get(item.contract_id) ?? 0) + quantity);
+  }
+  return totals;
 }
 
 /** One CSV column as a number, or absent when it is blank or unparsable. */
@@ -274,12 +328,13 @@ export function filterAndCompactPublicContractOffers(
     const eligible = eligibleContractFrom(contract, nowMs);
     if (eligible) eligibleContracts.set(contract.contract_id, eligible);
   }
+  const requestedPlex = requestedPlexByContract(items, eligibleContracts);
 
   const rows: PublicContractOfferRow[] = [];
   for (const item of items) {
     const contract = eligibleContracts.get(item.contract_id);
     if (!contract) continue;
-    const row = compactContractOfferRow(item, contract);
+    const row = compactContractOfferRow(item, contract, requestedPlex.get(item.contract_id));
     if (row) rows.push(row);
   }
 

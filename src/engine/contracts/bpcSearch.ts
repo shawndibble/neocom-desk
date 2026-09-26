@@ -31,6 +31,15 @@ export interface BpcContractRow {
    * `true` row's price as unknowable rather than as this blueprint's price.
    */
   isMultiType: boolean;
+  /**
+   * PLEX quantity the contract's issuer wants in return, when any (issue
+   * #1080's PLEX-for-item barter, #1105's Sourcing filter/price display).
+   * `price` on such a contract is `0` — it is a barter, not a giveaway — so a
+   * consumer that wants to show or filter on what the contract actually asks
+   * for reads this field instead of treating `0` as free. Absent, not zero,
+   * when the contract asks for nothing PLEX.
+   */
+  requestedPlex?: number;
 }
 
 export interface BpcSearchFilter {
@@ -59,6 +68,10 @@ export interface BpcSearchFilter {
    * known system fails any real range, same stance as `spaceKinds`.
    */
   allowedSystems?: ReadonlySet<number> | null;
+  /** Drops a contract row whose contract is an auction rather than a plain item_exchange. Never excludes an owned or market row — neither is ever an auction. */
+  hideAuctions?: boolean | null;
+  /** Drops a contract row whose contract asks for PLEX in return (`requestedPlex`). Never excludes an owned or market row — neither carries a request side to ask for PLEX at all. */
+  hidePlexRequests?: boolean | null;
 }
 
 export const EMPTY_BPC_SEARCH_FILTER: BpcSearchFilter = {
@@ -70,6 +83,8 @@ export const EMPTY_BPC_SEARCH_FILTER: BpcSearchFilter = {
   maxPrice: null,
   spaceKinds: null,
   allowedSystems: null,
+  hideAuctions: null,
+  hidePlexRequests: null,
 };
 
 /**
@@ -80,8 +95,14 @@ export const EMPTY_BPC_SEARCH_FILTER: BpcSearchFilter = {
  * real ceiling; with no buyout at all, the eventual price is simply unknown,
  * so the row passes rather than being disqualified on a number that says
  * nothing about it.
+ *
+ * A contract asking for PLEX (issue #1105) is checked first, ahead of the
+ * auction branch: its ISK `price` is `0`, which is not a real ceiling to
+ * judge — the same "unknown, so it passes" stance an auction with no buyout
+ * already takes, not the "definitely under any ceiling" a real `0` would be.
  */
 function priceForMaxFilter(row: BpcContractRow): number | null {
+  if (row.requestedPlex) return null;
   if (!row.isAuction) return row.price;
   return row.buyout ?? null;
 }
@@ -296,6 +317,10 @@ export function filterBpcSearchRows(
     if (row.source === 'market' && filter.maxPrice != null && row.price > filter.maxPrice) {
       return false;
     }
+    if (row.source === 'contract' && filter.hideAuctions && row.contract.isAuction) return false;
+    if (row.source === 'contract' && filter.hidePlexRequests && row.contract.requestedPlex) {
+      return false;
+    }
     return true;
   });
 }
@@ -325,6 +350,8 @@ export function filterBpcContracts(
       const price = priceForMaxFilter(row);
       if (price != null && price > filter.maxPrice) return false;
     }
+    if (filter.hideAuctions && row.isAuction) return false;
+    if (filter.hidePlexRequests && row.requestedPlex) return false;
     return true;
   });
 }

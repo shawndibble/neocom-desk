@@ -1589,7 +1589,7 @@ describe('SkillPlans editor: what-if implants and booster', () => {
 
     expect(await screen.findByLabelText('Expires')).toHaveValue('2099-01-01T00:00');
     expect(screen.getByRole('combobox', { name: 'What-if implants' })).toHaveTextContent('+5');
-    expect(screen.getByRole('checkbox', { name: 'Booster' })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Remove accelerator' })).toBeInTheDocument();
   });
 });
 

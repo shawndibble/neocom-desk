@@ -1522,7 +1522,7 @@ export function Wallet() {
               {!showingCorp && (
                 <Link
                   to="/market/history/transactions"
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs hover:text-accent md:min-h-0 md:min-w-0"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs text-accent hover:underline md:min-h-0 md:min-w-0"
                 >
                   {t('wallet.transactionsLink')}
                 </Link>
