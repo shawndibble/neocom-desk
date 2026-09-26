@@ -3805,6 +3805,7 @@
     "status": "Status",
     "type": "Type",
     "price": "Price / reward",
+    "issued": "Issued",
     "expires": "Expires",
     "issuer": "Issuer",
     "exportCsv": "Export CSV",

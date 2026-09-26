@@ -236,13 +236,8 @@ const HISTORY_FILTER_PARAMS = {
   'history.status': optionalEnumParam(CONTRACT_STATUSES),
   'history.type': optionalEnumParam(CONTRACT_TYPES),
 };
-/**
- * History had no controlled sort before this — rows sorted by `date_issued`
- * desc, which is not a column and so cannot be expressed as a `UrlSort`.
- * Expires desc is the closest existing column to "most recent activity
- * first" and is what an untouched view now shows.
- */
-const HISTORY_SORT = { columnId: 'expires', direction: 'desc' } as const;
+/** Newest-issued first — an untouched History view. */
+const HISTORY_SORT = { columnId: 'issued', direction: 'desc' } as const;
 
 /** Contracts: table with status chips, stale offers dimmed, detail on click. Read-only, cached for offline. */
 export function Contracts() {
@@ -445,6 +440,13 @@ export function Contracts() {
             t('common.unknown')
           );
         },
+      },
+      issued: {
+        id: 'issued',
+        header: t('contracts.issued'),
+        className: 'whitespace-nowrap text-text-dim',
+        sortValue: (contract) => new Date(contract.date_issued).getTime(),
+        render: (contract) => formatTimestamp(new Date(contract.date_issued), timeZone),
       },
       expires: {
         id: 'expires',

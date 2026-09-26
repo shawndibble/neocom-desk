@@ -498,6 +498,17 @@ describe('Contact standing cross-reference', () => {
     ).toHaveLength(2);
   });
 
+  it('shows an Issued column and sorts newest-issued first by default', async () => {
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    const issued = within(table).getByRole('columnheader', { name: /Issued/ });
+    expect(issued).toHaveAttribute('aria-sort', 'descending');
+    expect(
+      within(table).getByText(formatTimestamp(new Date(contractPage1[0].date_issued)))
+    ).toBeInTheDocument();
+  });
+
   it('carries the same standing tag into the contract detail modal', async () => {
     server.use(
       http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts/1/items`, () =>
