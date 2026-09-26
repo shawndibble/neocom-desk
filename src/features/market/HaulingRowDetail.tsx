@@ -18,7 +18,7 @@ import type { AppraisalNetFees } from '@/engine/market/appraisal';
 import { HAULING_THRESHOLDS, lotEconomics } from '@/engine/market/haulingMarket';
 import { formatIsk } from '@/lib/isk';
 import type { TradeHub } from '@/market/hubs';
-import type { HaulingViewRow } from './haulingView';
+import { formatDaysToSell, type HaulingViewRow } from './haulingView';
 
 const ORDER_LEVELS = 8;
 
@@ -82,7 +82,7 @@ export function HaulingRowDetail({ row, from, to, fees }: HaulingRowDetailProps)
   const lot = lotEconomics({
     buyLadder: row.buyLadder,
     expectedPrice: sale.price,
-    quantity: sale.demandCapUnits,
+    quantity: row.suggestedUnits,
     fees,
   });
   const avgBuy = lot.filled > 0 ? lot.cost / lot.filled : 0;
@@ -91,7 +91,7 @@ export function HaulingRowDetail({ row, from, to, fees }: HaulingRowDetailProps)
   const listedOnly = lotEconomics({
     buyLadder: row.buyLadder,
     expectedPrice: sale.lowestAsk,
-    quantity: sale.demandCapUnits,
+    quantity: row.suggestedUnits,
     fees,
   });
   const listedOnlyEach = listedOnly.filled > 0 ? listedOnly.profit / listedOnly.filled : 0;
@@ -113,7 +113,7 @@ export function HaulingRowDetail({ row, from, to, fees }: HaulingRowDetailProps)
   const markerAt = markerIndex === -1 ? orderRows.length : markerIndex;
   const reach = sale.price * (1 + HAULING_THRESHOLDS.crowdedBand);
 
-  const days = sale.daysToSell > 99 ? '99+' : Math.max(1, Math.round(sale.daysToSell));
+  const days = formatDaysToSell(sale.daysToSell);
   const usesRecent = sale.recentSalePrice <= sale.undercutPrice;
 
   return (

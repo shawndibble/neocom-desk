@@ -29,12 +29,14 @@ export type HaulingScanState =
 export function useHaulingScan(
   from: TradeHub,
   to: TradeHub,
-  categoryId: number
+  categoryId: number,
+  enabled = true
 ): { state: HaulingScanState; refresh: () => void } {
   const [state, setState] = useState<HaulingScanState>({ status: 'loading', progress: null });
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a new route or refresh restarts the scan
     setState({ status: 'loading', progress: null });
@@ -50,6 +52,7 @@ export function useHaulingScan(
           from,
           to,
           typeIds,
+          scope: categoryId,
           types,
           signal: controller.signal,
           onProgress: (progress) => {
@@ -64,7 +67,7 @@ export function useHaulingScan(
       }
     })();
     return () => controller.abort();
-  }, [from, to, categoryId, attempt]);
+  }, [from, to, categoryId, enabled, attempt]);
 
   const refresh = useCallback(() => {
     clearHaulingScanCache();

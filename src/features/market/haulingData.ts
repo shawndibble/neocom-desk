@@ -50,7 +50,7 @@ const MIN_RECENT_GAP = 1.03;
 const SCAN_CONCURRENCY = 4;
 const SCAN_CACHE_TTL_MS = 300_000;
 
-export type HaulingStage = 'prices' | 'history' | 'books' | 'volumes';
+export type HaulingStage = 'prices' | 'history' | 'books';
 
 export interface HaulingProgress {
   stage: HaulingStage;
@@ -82,6 +82,8 @@ export interface HaulingScanRequest {
   from: TradeHub;
   to: TradeHub;
   typeIds: readonly number[];
+  /** Which category the ids came from, so two categories can never share a cache entry. */
+  scope: number;
   types: TypeMap;
   /** ISO date the demand window ends on. */
   today?: string;
@@ -96,22 +98,24 @@ export function clearHaulingScanCache(): void {
 }
 
 function cacheKey(request: HaulingScanRequest): string {
-  const ids = request.typeIds;
-  return `${request.from.id}>${request.to.id}:${ids.length}:${ids[0] ?? 0}:${ids[ids.length - 1] ?? 0}`;
+  return `${request.from.id}>${request.to.id}:${request.scope}`;
 }
 
 function throwIfAborted(signal?: AbortSignal): void {
   if (signal?.aborted) throw new DOMException('Hauling scan aborted', 'AbortError');
 }
 
-async function resolveVolume(typeId: number, types: TypeMap): Promise<number> {
+/** m3 of one unit as hauled, or null when it cannot be told: a row with no volume must not become "0 m3", which would never fill a hold. */
+async function resolveVolume(typeId: number, types: TypeMap): Promise<number | null> {
   const known = types[String(typeId)];
-  if (known) return known.packagedVolume ?? known.volume;
+  const fromCatalogue = known ? (known.packagedVolume ?? known.volume) : undefined;
+  if (fromCatalogue !== undefined) return fromCatalogue > 0 ? fromCatalogue : null;
   try {
     const { data } = await getUniverseType(typeId);
-    return data?.packaged_volume ?? data?.volume ?? 0;
+    const volume = data?.packaged_volume ?? data?.volume;
+    return volume !== undefined && volume > 0 ? volume : null;
   } catch {
-    return 0;
+    return null;
   }
 }
 
@@ -175,7 +179,7 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
   withHistory.sort((a, b) => b.proxy - a.proxy);
   const shortlist = withHistory.slice(0, MAX_BOOK_CANDIDATES);
 
-  // 3. Order books for the shortlist only.
+  // 3. Order books, then hauled volume, for the shortlist only.
   const rows: HaulingScanRow[] = [];
   let booksDone = 0;
   onProgress?.({ stage: 'books', done: 0, total: shortlist.length });
@@ -191,11 +195,13 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
         dailyVolume: candidate.demand.dailyVolume,
         recentSalePrice: candidate.demand.recentSalePrice,
       });
-      if (sale !== null && buyLadder.length > 0) {
+      const unitVolumeM3 =
+        sale !== null && buyLadder.length > 0 ? await resolveVolume(candidate.typeId, types) : null;
+      if (sale !== null && buyLadder.length > 0 && unitVolumeM3 !== null) {
         rows.push({
           typeId: candidate.typeId,
           name: types[String(candidate.typeId)]?.name ?? `#${candidate.typeId}`,
-          unitVolumeM3: 0,
+          unitVolumeM3,
           buyLadder,
           destLadder,
           demand: candidate.demand,
@@ -207,15 +213,6 @@ export async function runHaulingScan(request: HaulingScanRequest): Promise<Hauli
     }
     booksDone += 1;
     onProgress?.({ stage: 'books', done: booksDone, total: shortlist.length });
-  });
-
-  // 4. Hauled volume, for the survivors only.
-  let volumesDone = 0;
-  onProgress?.({ stage: 'volumes', done: 0, total: rows.length });
-  await mapWithConcurrencyLimit(rows, SCAN_CONCURRENCY, async (row) => {
-    row.unitVolumeM3 = await resolveVolume(row.typeId, types);
-    volumesDone += 1;
-    onProgress?.({ stage: 'volumes', done: volumesDone, total: rows.length });
   });
 
   const scan: HaulingScan = { rows, scanned: ids.length, fetchedAt: Date.now() };

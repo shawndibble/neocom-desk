@@ -75,7 +75,7 @@ export interface PlanTripInput {
 }
 
 /** Units of `ladder` that cost less than a unit is worth after fees — past this every further unit loses money. */
-function profitableDepth(candidate: TripCandidate, fees: AppraisalNetFees): number {
+export function profitableDepth(candidate: TripCandidate, fees: AppraisalNetFees): number {
   const { accountingLevel, brokerRelationsLevel, standing } = fees;
   const feeRate =
     (salesTaxPct(accountingLevel) +
@@ -206,12 +206,12 @@ export function planTrip(input: PlanTripInput): TripPlan {
 
   const ordered = candidates.map((c) => lines.get(c.typeId)!);
   const shipped = ordered.filter((l) => l.quantity > 0);
-  const auto_ = ordered.filter((l) => l.limitedBy !== 'edited' && l.limitedBy !== 'none');
-  const binding = auto_.some((l) => l.limitedBy === 'space')
+  const autoLines = ordered.filter((l) => l.limitedBy !== 'edited' && l.limitedBy !== 'none');
+  const binding = autoLines.some((l) => l.limitedBy === 'space')
     ? 'space'
-    : auto_.some((l) => l.limitedBy === 'budget')
+    : autoLines.some((l) => l.limitedBy === 'budget')
       ? 'budget'
-      : auto_.some((l) => l.limitedBy === 'sales')
+      : autoLines.some((l) => l.limitedBy === 'sales')
         ? 'sales'
         : null;
 

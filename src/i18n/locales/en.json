@@ -4567,6 +4567,7 @@
       "errorTitle": "Couldn't scan the market",
       "errorHint": "Hub prices did not load. Check your connection and try again.",
       "retry": "Try again",
+      "emptyHiddenHint": "We looked at {{scanned}} items. Hidden by your filters: {{thin}} rarely sell, {{slow}} take too long to sell, {{low}} have a margin under your minimum.",
       "emptyTitle": "Nothing worth hauling on this route",
       "emptyHint": "We looked at {{scanned}} items. Try another category, or loosen the filters above.",
       "volumeEach": "{{m3}} m³ each",
@@ -4617,8 +4618,8 @@
         "sellsWithin": "Sells within",
         "marginOver": "Margin over",
         "demand": "Demand",
-        "steady": "Steady only",
-        "anyDemand": "Any",
+        "steady": "Hide rarely selling",
+        "anyDemand": "Show all",
         "anyTime": "Any time",
         "days_one": "{{count}} day",
         "days_other": "{{count}} days"
@@ -4647,8 +4648,7 @@
         "starting": "Starting the scan…",
         "prices": "Comparing hub prices ({{done}} of {{total}})…",
         "history": "Checking what sells ({{done}} of {{total}})…",
-        "books": "Reading the sell orders ({{done}} of {{total}})…",
-        "volumes": "Measuring cargo volume ({{done}} of {{total}})…"
+        "books": "Reading the sell orders ({{done}} of {{total}})…"
       },
       "cargo": {
         "label": "Cargo space",

@@ -49,6 +49,7 @@ import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { loadMarketGroups } from '@/sde/loadMarketSde';
 import type { MarketGroupNode } from '@/sde/marketTypes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+import { HAULING_THRESHOLDS } from '@/engine/market/haulingMarket';
 import { HaulingCargoControl } from './HaulingCargoControl';
 import { HaulingRowDetail } from './HaulingRowDetail';
 import { useHaulingBudget, useHaulingCargo } from './haulingCargo';
@@ -57,7 +58,12 @@ import {
   HAULING_CATEGORY_IDS,
   isHaulingCategoryId,
 } from './haulingCategories';
-import { filterHaulingRows, toViewRows, type HaulingViewRow } from './haulingView';
+import {
+  filterHaulingRows,
+  formatDaysToSell,
+  toViewRows,
+  type HaulingViewRow,
+} from './haulingView';
 import { useHaulingFees, useHaulingScan } from './useHaulingScan';
 
 const HUB_IDS = TRADE_HUBS.map((h) => h.id);
@@ -134,7 +140,7 @@ export function HaulingPanel() {
   }, [hydrateCargo, hydrateBudget, hydrateIntro]);
 
   const sameHub = from.id === to.id;
-  const { state, refresh } = useHaulingScan(from, to, categoryId);
+  const { state, refresh } = useHaulingScan(from, to, categoryId, from.id !== to.id);
   const fees = useHaulingFees(activeCharacterId, to);
 
   const viewRows = useMemo(
@@ -281,7 +287,8 @@ export function HaulingPanel() {
       headerTooltip: t('market.hauling.columns.marginTip'),
       align: 'right',
       className: 'tabular-nums whitespace-nowrap',
-      cellClassName: (row) => (row.marginPct >= params.margin ? 'text-success' : 'text-text-dim'),
+      cellClassName: (row) =>
+        row.marginPct >= HAULING_THRESHOLDS.lowMarginPct ? 'text-success' : 'text-text-dim',
       sortValue: (row) => row.marginPct,
       render: (row) => (
         <span className="flex flex-col items-end font-semibold">
@@ -302,8 +309,7 @@ export function HaulingPanel() {
       align: 'right',
       className: 'tabular-nums',
       sortValue: (row) => row.sale.daysToSell,
-      render: (row) =>
-        row.sale.daysToSell > 99 ? '99+' : Math.max(1, Math.round(row.sale.daysToSell)),
+      render: (row) => formatDaysToSell(row.sale.daysToSell),
     },
     {
       id: 'demand',
@@ -352,23 +358,17 @@ export function HaulingPanel() {
         if (!line) return null;
         return (
           <span className="flex flex-col items-end gap-0.5">
-            <TextInput
-              size="sm"
-              inputMode="numeric"
-              aria-label={t('market.hauling.bringRow', { item: row.name })}
-              className="w-24 text-right tabular-nums"
-              value={
-                line.quantity === 0 && overrides.get(row.typeId)?.selected === false
-                  ? ''
-                  : String(line.quantity)
-              }
-              onChange={(event) => {
-                const raw = event.target.value.replace(/[^\d]/g, '');
+            <BringInput
+              label={t('market.hauling.bringRow', { item: row.name })}
+              value={overrides.get(row.typeId)?.selected === false ? '' : String(line.quantity)}
+              onCommit={(quantity) =>
                 patchOverride(
                   row.typeId,
-                  raw === '' ? { quantity: 0 } : { quantity: Number(raw), selected: true }
-                );
-              }}
+                  quantity === 0
+                    ? { selected: false, quantity: undefined }
+                    : { selected: true, quantity }
+                )
+              }
             />
             <span className="text-[0.6875rem] text-text-dim">{limitText(line)}</span>
           </span>
@@ -568,7 +568,24 @@ export function HaulingPanel() {
           {shown.length === 0 ? (
             <EmptyState
               title={t('market.hauling.emptyTitle')}
-              hint={t('market.hauling.emptyHint', { scanned: state.scan.scanned })}
+              hint={
+                hidden.thin + hidden.slow + hidden.lowMargin > 0
+                  ? t('market.hauling.emptyHiddenHint', {
+                      scanned: state.scan.scanned,
+                      thin: hidden.thin,
+                      slow: hidden.slow,
+                      low: hidden.lowMargin,
+                    })
+                  : t('market.hauling.emptyHint', { scanned: state.scan.scanned })
+              }
+              action={
+                <Button
+                  size="sm"
+                  onClick={() => setParams({ days: 14, margin: 3, demand: 'steady' })}
+                >
+                  {t('common.resetFilters')}
+                </Button>
+              }
             />
           ) : (
             <>
@@ -728,5 +745,38 @@ function HubField({
         </SelectContent>
       </Select>
     </label>
+  );
+}
+
+/**
+ * The quantity to bring, typed by hand. Keeps what is being typed in its own
+ * state so the box can be emptied and retyped: the planned quantity it would
+ * otherwise echo back is clamped and re-sized on every keystroke. Emptying it
+ * or typing 0 unticks the row.
+ */
+function BringInput({
+  label,
+  value,
+  onCommit,
+}: {
+  label: string;
+  value: string;
+  onCommit: (quantity: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <TextInput
+      size="sm"
+      inputMode="numeric"
+      aria-label={label}
+      className="w-24 text-right tabular-nums"
+      value={draft ?? value}
+      onChange={(event) => {
+        const raw = event.target.value.replace(/[^\d]/g, '');
+        setDraft(raw);
+        onCommit(raw === '' ? 0 : Number(raw));
+      }}
+      onBlur={() => setDraft(null)}
+    />
   );
 }

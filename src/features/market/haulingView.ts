@@ -6,7 +6,7 @@
  */
 import type { AppraisalNetFees } from '@/engine/market/appraisal';
 import { haulingFlags, lotEconomics, type HaulingFlag } from '@/engine/market/haulingMarket';
-import type { TripCandidate } from '@/engine/market/haulingPlan';
+import { profitableDepth, type TripCandidate } from '@/engine/market/haulingPlan';
 import type { HaulingScanRow } from './haulingData';
 
 export interface HaulingViewRow extends HaulingScanRow {
@@ -15,6 +15,8 @@ export interface HaulingViewRow extends HaulingScanRow {
   /** Profit per unit on that load. */
   profitPerUnit: number;
   flags: HaulingFlag[];
+  /** Units the margin is worked on: a week of sales, capped at what is profitable to buy. The plan sizes from the same figure. */
+  suggestedUnits: number;
   /** What the trip planner sizes. */
   candidate: TripCandidate;
 }
@@ -24,14 +26,24 @@ export function toViewRows(
   fees: AppraisalNetFees
 ): HaulingViewRow[] {
   return rows.map((row) => {
+    const candidate: TripCandidate = {
+      typeId: row.typeId,
+      name: row.name,
+      unitVolumeM3: row.unitVolumeM3,
+      buyLadder: row.buyLadder,
+      expectedPrice: row.sale.price,
+      demandCapUnits: row.sale.demandCapUnits,
+    };
+    const suggestedUnits = Math.min(row.sale.demandCapUnits, profitableDepth(candidate, fees));
     const economics = lotEconomics({
       buyLadder: row.buyLadder,
       expectedPrice: row.sale.price,
-      quantity: row.sale.demandCapUnits,
+      quantity: suggestedUnits,
       fees,
     });
     return {
       ...row,
+      suggestedUnits,
       marginPct: economics.marginPct,
       profitPerUnit: economics.filled > 0 ? economics.profit / economics.filled : 0,
       flags: haulingFlags({
@@ -39,14 +51,7 @@ export function toViewRows(
         demand: row.demand.demand,
         marginPct: economics.marginPct,
       }),
-      candidate: {
-        typeId: row.typeId,
-        name: row.name,
-        unitVolumeM3: row.unitVolumeM3,
-        buyLadder: row.buyLadder,
-        expectedPrice: row.sale.price,
-        demandCapUnits: row.sale.demandCapUnits,
-      },
+      candidate,
     };
   });
 }
@@ -81,4 +86,9 @@ export function filterHaulingRows(
   }
   shown.sort((a, b) => b.marginPct - a.marginPct);
   return { shown, hidden };
+}
+
+/** Days to sell as a column shows it: whole days, at least one, capped so an outlier cannot widen the column. */
+export function formatDaysToSell(days: number): string {
+  return days > 99 ? '99+' : String(Math.max(1, Math.round(days)));
 }

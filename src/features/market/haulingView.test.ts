@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterHaulingRows, toViewRows } from './haulingView';
+import { filterHaulingRows, formatDaysToSell, toViewRows } from './haulingView';
 import type { HaulingScanRow } from './haulingData';
 
 const FEES = {
@@ -101,5 +101,32 @@ describe('filterHaulingRows', () => {
     });
     expect(shown.map((r) => r.typeId)).toEqual([1]);
     expect(hidden.thin).toBe(1);
+  });
+});
+
+describe('suggested units', () => {
+  it('stops at what is profitable to buy, the same cap the plan applies', () => {
+    const [row] = toViewRows(
+      [
+        scanRow({
+          typeId: 1,
+          buyLadder: [
+            { price: 100, units: 10, orders: 1 },
+            { price: 900, units: 500, orders: 1 }, // dearer than the 150 it would sell for
+          ],
+        }),
+      ],
+      FEES
+    );
+    expect(row!.suggestedUnits).toBe(10);
+    expect(row!.candidate.demandCapUnits).toBe(70);
+  });
+});
+
+describe('formatDaysToSell', () => {
+  it('is whole days, at least one, and capped', () => {
+    expect(formatDaysToSell(0.2)).toBe('1');
+    expect(formatDaysToSell(6.6)).toBe('7');
+    expect(formatDaysToSell(400)).toBe('99+');
   });
 });
