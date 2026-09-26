@@ -42,6 +42,7 @@ import {
   diffContractAccepted,
   diffContractCompleted,
   diffContractFailed,
+  diffCourierDeliveryDue,
   diffWalletBalanceChanged,
   diffMarketOrderFilled,
   diffMarketOrderUndercut,
@@ -399,6 +400,14 @@ export const NOTIFICATION_EVENT_ENTRIES = {
     copy: contractCopy,
     projection: null,
     thresholds: null,
+    rowHintKey: null,
+  }),
+  courierDeliveryDue: defineEvent({
+    source: SNAPSHOT_SOURCES.contracts,
+    diff: diffCourierDeliveryDue,
+    copy: contractCopy,
+    projection: { push: contractCopy.push, everyOccurrence: true },
+    thresholds: { fields: [THRESHOLD_FIELDS.courierDeliveryDueLeadHours], hintKey: null },
     rowHintKey: null,
   }),
   walletBalanceChanged: defineEvent({
