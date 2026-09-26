@@ -223,7 +223,7 @@ function WarningLine({ to, children }: { to?: string; children: ReactNode }) {
   const content = (
     <>
       <SeverityIcon severity="warning" />
-      <span className="truncate">{children}</span>
+      <span className="md:truncate">{children}</span>
     </>
   );
   return to ? (
