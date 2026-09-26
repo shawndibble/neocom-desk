@@ -1,7 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Panel } from '@/components/ui';
-import { fieldBaseClassName } from '@/components/ui/controlStyles';
+import { Button, Panel, TextArea } from '@/components/ui';
 import type { LoadedFitting, LoadOutcome } from '@/engine/fittings/load';
 import type { FittingXmlDocument } from '@/engine/import/eveFitXml';
 import { parseFittingXmlFile, type FittingXmlDocumentErrorCode } from './fittingXmlDocument';
@@ -134,13 +133,14 @@ export function FittingLoadCard({
         <label className="block text-xs text-text-dim" htmlFor="fitting-load-text">
           {t('fittings.load.pasteLabel')}
         </label>
-        <textarea
+        <TextArea
           id="fitting-load-text"
           value={text}
           onChange={(e) => setText(e.target.value)}
           rows={10}
           placeholder={t('fittings.load.pastePlaceholder')}
-          className={`${fieldBaseClassName} w-full p-2 font-mono text-xs`}
+          mono
+          className="text-xs"
         />
         <Button
           size="md"

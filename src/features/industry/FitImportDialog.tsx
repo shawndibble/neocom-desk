@@ -10,8 +10,7 @@
  */
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, Checkbox } from '@/components/ui';
-import { fieldBaseClassName } from '@/components/ui/controlStyles';
+import { Button, Modal, Checkbox, TextArea } from '@/components/ui';
 import { readFromClipboard } from '@/lib/clipboard';
 import type { FitToBuildPlansResult } from '@/engine/import/fitToBuildPlans';
 import type { BlueprintCatalog } from './blueprintCatalog';
@@ -63,7 +62,7 @@ export function FitImportDialog({ catalog, onApply, onClose }: FitImportDialogPr
         <label className="block text-xs text-text-dim" htmlFor="fit-import-text">
           {t('industry.fitImportPaste')}
         </label>
-        <textarea
+        <TextArea
           id="fit-import-text"
           value={text}
           onChange={(e) => {
@@ -71,7 +70,8 @@ export function FitImportDialog({ catalog, onApply, onClose }: FitImportDialogPr
             setPreview(null);
           }}
           rows={10}
-          className={`${fieldBaseClassName} w-full p-2 font-mono text-xs`}
+          mono
+          className="text-xs"
         />
 
         <div className="flex flex-wrap items-center gap-2">

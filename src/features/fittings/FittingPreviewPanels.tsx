@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { fieldBaseClassName } from '@/components/ui/controlStyles';
+import { TextArea } from '@/components/ui';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import { formatDuration } from '@/lib/duration';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
@@ -262,13 +262,13 @@ export function NotesPanel({ text, onSave }: { text: string; onSave?: (text: str
       <label className="block text-xs text-text-dim" htmlFor="fitting-notes">
         {t('fittings.start.preview.notesLabel')}
       </label>
-      <textarea
+      <TextArea
         id="fitting-notes"
         value={draft ?? text}
         rows={5}
         maxLength={IN_GAME_FITTING_DESCRIPTION_MAX}
         placeholder={t('fittings.start.preview.notesPlaceholder')}
-        className={`${fieldBaseClassName} w-full p-2 text-sm`}
+        className="text-sm"
         onChange={(event) => setDraft(event.target.value)}
         onBlur={() => {
           if (draft !== null && draft !== text) onSave(draft);
