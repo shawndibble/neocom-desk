@@ -42,6 +42,7 @@ import { useExpiringWindowHours } from '@/features/pi/expiringWindow';
 import { useDarkThreshold } from '@/features/corp/darkThreshold';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { VIEW_PREFERENCE_KEYS } from '@/lib/viewPreferenceKeys';
+import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { DEFAULT_MOBILE_TABS, MOBILE_TABS_KEY, useMobileTabs } from '@/lib/mobileTabs';
 import { SINGLE_KEY_SHORTCUTS_SETTING_KEY, useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 
@@ -1604,7 +1605,37 @@ describe('Reset saved view preferences', () => {
 });
 
 describe('Settings — phone tab bar', () => {
+  // `NARROW_QUERY` is `md`'s max-width form, so the suite's never-matching
+  // `matchMedia` stub reads as a laptop; these tests need the phone.
+  function setViewport(narrow: boolean): void {
+    const real = window.matchMedia;
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: narrow && media === NARROW_QUERY,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+    onTestFinished(() => {
+      window.matchMedia = real;
+    });
+  }
+
+  it('is absent from Display at md and up, where there is no bottom bar', async () => {
+    setViewport(false);
+    window.history.pushState({}, '', '/settings/display');
+    render(<App />);
+    await screen.findByRole('heading', { level: 1, name: /settings/i });
+    await screen.findByText(/time format/i);
+    expect(screen.queryByRole('heading', { name: /phone tab bar/i })).toBeNull();
+  });
+
   it("writes the pilot's four, device-local and in the rail's order", async () => {
+    setViewport(true);
     const user = userEvent.setup();
     window.history.pushState({}, '', '/settings/display');
     render(<App />);
@@ -1628,6 +1659,7 @@ describe('Settings — phone tab bar', () => {
   });
 
   it('holds the old bar until a replacement is picked, so it is never short', async () => {
+    setViewport(true);
     const user = userEvent.setup();
     window.history.pushState({}, '', '/settings/display');
     render(<App />);
@@ -1642,6 +1674,7 @@ describe('Settings — phone tab bar', () => {
   });
 
   it('goes inert at four rather than guessing which tab a fifth pick replaces', async () => {
+    setViewport(true);
     const user = userEvent.setup();
     window.history.pushState({}, '', '/settings/display');
     render(<App />);
@@ -1676,6 +1709,7 @@ describe('Settings — phone tab bar', () => {
       key: MOBILE_TABS_KEY,
       value: ['/mail', '/wallet', '/overview', '/assets'],
     });
+    setViewport(true);
     const user = userEvent.setup();
     render(<App />);
     await screen.findByRole('heading', { level: 1, name: /settings/i });

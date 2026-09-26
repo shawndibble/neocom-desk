@@ -44,6 +44,7 @@ import {
 } from '@/lib/mobileTabs';
 import { useTimeFormat, useTimeZone, TIME_FORMATS } from '@/lib/timeFormat';
 import { VIEW_PREFERENCE_KEYS } from '@/lib/viewPreferenceKeys';
+import { useIsNarrow } from '@/lib/useIsNarrow';
 import { formatAge } from '@/lib/age';
 import { formatTimestamp } from '@/lib/timestamp';
 import { SHORTCUTS } from '@/lib/shortcuts';
@@ -606,8 +607,10 @@ function useHydratedStore<T>(store: LocalSettingStore<T>): boolean {
  *
  * Device-local, like the text scale above it and unlike everything in
  * `DefaultsPanel`: this answers for a screen — the one that has a tab bar at
- * all — not for the pilot. The panel renders on a desktop too, because the
- * phone is where it is read and a laptop is where it is comfortably set.
+ * all — not for the pilot. Because it cannot leave this device, setting it on a
+ * laptop changes nothing on the phone, so `Settings` mounts the panel only
+ * below `md` — the breakpoint `Layout` hides the bottom bar at, via the same
+ * `useIsNarrow` query, so the panel and the bar cannot drift apart.
  *
  * The chips edit a draft, and the preference is written only when the draft is
  * a full bar of `MOBILE_TAB_COUNT` — a short bar is not a state the nav has.
@@ -1204,6 +1207,7 @@ export function Settings() {
   const scale = useFontScale((state) => state.value);
   const setScale = useFontScale((state) => state.setValue);
   const timeFormat = useTimeFormat((state) => state.value);
+  const isNarrow = useIsNarrow();
   const setTimeFormat = useTimeFormat((state) => state.setValue);
   const singleKeyShortcuts = useSingleKeyShortcuts((state) => state.value);
   const setSingleKeyShortcuts = useSingleKeyShortcuts((state) => state.setValue);
@@ -1279,7 +1283,7 @@ export function Settings() {
                   </div>
                 </div>
               </Panel>
-              <MobileTabsPanel />
+              {isNarrow && <MobileTabsPanel />}
             </>
           )}
           {section === 'shortcuts' && (
