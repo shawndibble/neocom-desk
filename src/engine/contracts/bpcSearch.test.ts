@@ -146,6 +146,12 @@ describe('filterBpcContracts', () => {
     });
     expect(filtered.map((r) => r.contractId)).toEqual([1]);
   });
+
+  it('a maxPrice filter never excludes a PLEX-barter row — its 0 ISK price is not a real ceiling to judge', () => {
+    const rows = [row({ contractId: 1, price: 0, requestedPlex: 1_000_000 })];
+    const filtered = filterBpcContracts(rows, { ...EMPTY_BPC_SEARCH_FILTER, maxPrice: 1 });
+    expect(filtered.map((r) => r.contractId)).toEqual([1]);
+  });
 });
 
 function ownedInput(overrides: Partial<OwnedBlueprintInput> = {}): OwnedBlueprintInput {
@@ -433,6 +439,14 @@ describe('filterBpcSearchRows', () => {
     ];
     const filtered = filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, maxPrice: 1 });
     expect(filtered.map((r) => r.source)).toEqual(['owned']);
+  });
+
+  it('a maxPrice filter never excludes a PLEX-barter contract row — its 0 ISK price is not a real ceiling to judge', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, price: 0, requestedPlex: 1_000_000 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, maxPrice: 1 });
+    expect(filtered).toEqual(rows);
   });
 
   it('returns every row for the empty filter', () => {

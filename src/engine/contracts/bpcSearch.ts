@@ -95,8 +95,14 @@ export const EMPTY_BPC_SEARCH_FILTER: BpcSearchFilter = {
  * real ceiling; with no buyout at all, the eventual price is simply unknown,
  * so the row passes rather than being disqualified on a number that says
  * nothing about it.
+ *
+ * A contract asking for PLEX (issue #1105) is checked first, ahead of the
+ * auction branch: its ISK `price` is `0`, which is not a real ceiling to
+ * judge — the same "unknown, so it passes" stance an auction with no buyout
+ * already takes, not the "definitely under any ceiling" a real `0` would be.
  */
 function priceForMaxFilter(row: BpcContractRow): number | null {
+  if (row.requestedPlex) return null;
   if (!row.isAuction) return row.price;
   return row.buyout ?? null;
 }
