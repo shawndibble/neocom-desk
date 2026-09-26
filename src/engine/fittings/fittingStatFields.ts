@@ -67,8 +67,11 @@ export interface NumericField {
   digits: number;
   value: (stats: FittingStats) => number;
   /**
-   * Only Fitting Compare shows it: the Variations diff is worked out without
-   * heat, where this would only repeat another field.
+   * Only Fitting Compare shows it; a Variations swap's diff lists what it
+   * always has. Overheated DPS because Variations is worked out without heat
+   * (it would only repeat total DPS); the tank, cap-delta, sensor and hold
+   * rows because they restate a field the diff already shows (the repairs,
+   * the capacitor) or are no module swap's question (the hold).
    */
   compareOnly?: boolean;
 }
@@ -97,11 +100,21 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
   { key: 'shieldRepair', digits: 1, value: (s) => s.repair.shield },
   { key: 'armorRepair', digits: 1, value: (s) => s.repair.armor },
   { key: 'hullRepair', digits: 1, value: (s) => s.repair.hull },
-  { key: 'burstTank', digits: 1, value: (s) => s.tank.burstEffective },
-  { key: 'sustainedTank', digits: 1, value: (s) => s.tank.sustainedEffective },
+  { key: 'burstTank', digits: 1, value: (s) => s.tank.burstEffective, compareOnly: true },
+  {
+    key: 'sustainedTank',
+    digits: 1,
+    value: (s) => s.tank.sustainedEffective,
+    compareOnly: true,
+  },
   { key: 'capacitorCapacity', digits: 0, value: (s) => s.capacitorCapacity },
   { key: 'capacitorRechargeTime', digits: 0, value: (s) => s.capacitorRechargeTime / 1000 },
-  { key: 'capacitorDelta', digits: 1, value: (s) => s.capacitorBudget.delta },
+  {
+    key: 'capacitorDelta',
+    digits: 1,
+    value: (s) => s.capacitorBudget.delta,
+    compareOnly: true,
+  },
   { key: 'shieldHp', digits: 0, value: (s) => s.shield.hp },
   { key: 'shieldEmResonance', digits: 0, value: (s) => resistPct(s.shield.emResonance) },
   { key: 'shieldThermalResonance', digits: 0, value: (s) => resistPct(s.shield.thermalResonance) },
@@ -128,13 +141,13 @@ export const NUMERIC_FIELDS: readonly NumericField[] = [
   { key: 'maxTargetRange', digits: 1, value: (s) => s.targeting.maxTargetRange / 1000 },
   { key: 'maxLockedTargets', digits: 0, value: (s) => s.targeting.maxLockedTargets },
   { key: 'scanResolution', digits: 0, value: (s) => s.targeting.scanResolution },
-  { key: 'sensorStrength', digits: 1, value: (s) => s.sensor.strength },
+  { key: 'sensorStrength', digits: 1, value: (s) => s.sensor.strength, compareOnly: true },
   { key: 'signatureRadius', digits: 0, value: (s) => s.targeting.signatureRadius },
   { key: 'maxVelocity', digits: 0, value: (s) => s.navigation.maxVelocity },
   { key: 'agility', digits: 3, value: (s) => s.navigation.agility },
   { key: 'mass', digits: 0, value: (s) => s.navigation.mass / 1000 },
   { key: 'warpSpeed', digits: 1, value: (s) => s.navigation.warpSpeed },
-  { key: 'cargoCapacity', digits: 0, value: (s) => s.holds.cargo },
+  { key: 'cargoCapacity', digits: 0, value: (s) => s.holds.cargo, compareOnly: true },
 ];
 
 /** Same rounding every diff view compares/displays at, keyed by `StatChangeKey` including `capacitor`. */
