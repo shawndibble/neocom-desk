@@ -79,6 +79,14 @@ const MEDIUM_REMOTE_CAPACITOR_TRANSMITTER_II = 12221;
 const STASIS_WEBIFIER_II = 527;
 const WARP_SCRAMBLER_II = 448;
 const MULTISPECTRUM_ECM_II = 2567;
+// Looked up by exact name in the pinned `sde.dat`, 2026-09-25.
+const TRACKING_DISRUPTOR_II = 2109;
+const OPTIMAL_RANGE_DISRUPTION_SCRIPT = 29005;
+const REMOTE_SENSOR_DAMPENER_II = 1969;
+const SCAN_RESOLUTION_DAMPENING_SCRIPT = 29013;
+const GUIDANCE_DISRUPTOR_II = 37546;
+const MISSILE_RANGE_DISRUPTION_SCRIPT = 40334;
+const TARGET_PAINTER_II = 19806;
 const MODULATED_STRIP_MINER_II = 17912;
 const SIMPLE_ASTEROID_MINING_CRYSTAL_TYPE_A_II = 60281;
 const MINING_DRONE_II = 10250;
@@ -565,6 +573,63 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(support.rows.find((row) => row.kind === 'web')?.amount).toBeCloseTo(60, 6);
     expect(support.rows.find((row) => row.kind === 'warpDisruption')?.amount).toBe(2);
     expect(support.rows.find((row) => row.kind === 'ecm')?.amount).toBeGreaterThan(0);
+  });
+
+  it('keeps every scripted disruptor and dampener, each with all of its effects', () => {
+    const mid = (slotIndex: number, typeId: number, chargeTypeId?: number) => ({
+      slot: 'medium' as const,
+      slotIndex,
+      typeId,
+      state: 'active' as const,
+      ...(chargeTypeId === undefined ? {} : { chargeTypeId }),
+    });
+    const fitting: Fitting = {
+      name: 'Integration Test Caracal scripted EWAR',
+      shipTypeId: CARACAL,
+      modules: [
+        mid(0, TRACKING_DISRUPTOR_II, OPTIMAL_RANGE_DISRUPTION_SCRIPT),
+        mid(1, TRACKING_DISRUPTOR_II),
+        mid(2, REMOTE_SENSOR_DAMPENER_II, SCAN_RESOLUTION_DAMPENING_SCRIPT),
+        mid(3, GUIDANCE_DISRUPTOR_II, MISSILE_RANGE_DISRUPTION_SCRIPT),
+        mid(4, TARGET_PAINTER_II),
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(SUPPORT_SKILL_IDS));
+    const support = extractSupport(dogmaFit.items, calculate(dogmaFit).items);
+    const shape = support.rows.map((row) => [
+      row.kind,
+      row.effects.map((e) => [e.effect, Number(e.amount.toFixed(1))]),
+    ]);
+    // Before: the scripted disruptor, the dampener and the guidance
+    // disruptor each read one zeroed attribute and had no row at all.
+    expect(shape).toEqual([
+      [
+        'trackingDisruptor',
+        [
+          ['optimalRange', -34.4],
+          ['falloff', -34.4],
+        ],
+      ],
+      [
+        'trackingDisruptor',
+        [
+          ['optimalRange', -17.2],
+          ['falloff', -17.2],
+          ['trackingSpeed', -17.2],
+        ],
+      ],
+      ['sensorDampener', [['scanResolution', -30.6]]],
+      [
+        'guidanceDisruptor',
+        [
+          ['missileVelocity', -18],
+          ['missileFlightTime', -18],
+        ],
+      ],
+      ['targetPainter', []],
+    ]);
   });
 
   it('mines more with a crystal loaded, and counts launched mining drones', () => {

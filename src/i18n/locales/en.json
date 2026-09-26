@@ -631,6 +631,21 @@
           "trackingDisruptor": "−{{value}}% tracking",
           "sensorDampener": "−{{value}}% lock range",
           "guidanceDisruptor": "−{{value}}% explosion velocity"
+        },
+        "effect": {
+          "optimalRange": "{{value}}% optimal range",
+          "falloff": "{{value}}% falloff",
+          "trackingSpeed": "{{value}}% tracking",
+          "lockRange": "{{value}}% lock range",
+          "scanResolution": "{{value}}% scan resolution",
+          "missileVelocity": "{{value}}% missile velocity",
+          "missileFlightTime": "{{value}}% flight time",
+          "explosionVelocity": "{{value}}% explosion velocity",
+          "explosionRadius": "{{value}}% explosion radius",
+          "jamGravimetric": "{{value}} gravimetric",
+          "jamLadar": "{{value}} ladar",
+          "jamMagnetometric": "{{value}} magnetometric",
+          "jamRadar": "{{value}} radar"
         }
       },
       "mining": {
