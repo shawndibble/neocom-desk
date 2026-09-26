@@ -8,9 +8,11 @@
  */
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
-import { CHARACTER_NAME } from './support/fixtureData';
+import { CHARACTER_ID, CHARACTER_NAME } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
+const PLANET_ID = 40_000_002;
+const DAY_MS = 24 * 3_600_000;
 
 /**
  * Both tests here start the same way. `support/login.ts`'s helper lands on
@@ -121,6 +123,83 @@ test('the table view keeps the Name column pinned while scrolling right at 390px
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(PHONE.width);
   expect(box!.width).toBeLessThanOrEqual(130);
+});
+
+/**
+ * The sole logged-in Character is active on first login (`Callback.tsx`), so
+ * one Character proves the marker is selective; a second, non-active card is
+ * already covered in `Characters.test.tsx`. The colony's extractor expired a
+ * day ago, so the chip reads a fixed "Stopped" rather than a countdown a slow
+ * CI run could shift across a minute boundary.
+ */
+test('the active card shows aria-current and an Active label, and a stopped PI colony shows a warning chip, at 390px (#1793)', async ({
+  page,
+}) => {
+  const installedAt = new Date(Date.now() - 15 * DAY_MS).toISOString();
+  const expiresAt = new Date(Date.now() - DAY_MS).toISOString();
+
+  // Must register before the first navigation: Overview's own login-time
+  // prefetch hits `/planets` first, and "Refresh all" later reuses whatever
+  // that first call cached rather than a fresh round trip.
+  await page.route('https://esi.evetech.net/**', async (route) => {
+    const { pathname } = new URL(route.request().url());
+    const json = (body: unknown) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+
+    if (pathname === `/characters/${CHARACTER_ID}/planets`) {
+      return json([
+        {
+          solar_system_id: 30_000_142,
+          planet_id: PLANET_ID,
+          planet_type: 'temperate',
+          owner_id: CHARACTER_ID,
+          upgrade_level: 5,
+          num_pins: 3,
+          last_update: installedAt,
+        },
+      ]);
+    }
+    if (pathname === `/characters/${CHARACTER_ID}/planets/${PLANET_ID}`) {
+      return json({
+        links: [],
+        pins: [
+          { pin_id: 1, type_id: 2254, latitude: 1, longitude: 1 },
+          {
+            pin_id: 2,
+            type_id: 3068,
+            latitude: 1.1,
+            longitude: 1.1,
+            extractor_details: {
+              product_type_id: 2073,
+              cycle_time: 1800,
+              qty_per_cycle: 6965,
+              head_radius: 0.01,
+              heads: [{ head_id: 0, latitude: 1.1, longitude: 1.1 }],
+            },
+            install_time: installedAt,
+            expiry_time: expiresAt,
+            last_cycle_start: installedAt,
+          },
+        ],
+      });
+    }
+    // The Overview board's own colony card reads the planet's name/type
+    // alongside its status — not asserted here, but needs an answer so the
+    // real-network guard (`support/testBase.ts`) doesn't fail the test.
+    if (pathname === `/universe/planets/${PLANET_ID}`) {
+      return json({ name: 'Efa II', type_id: 11, system_id: 30_000_142 });
+    }
+    return route.fallback();
+  });
+
+  await landOnCharactersAtPhoneWidth(page);
+
+  const card = page.getByText(CHARACTER_NAME).locator('xpath=ancestor::li[1]');
+  await expect(card).toHaveAttribute('aria-current', 'true');
+  await expect(card.getByText('Active')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Refresh all' }).click();
+  await expect(card.getByText('Stopped')).toBeVisible();
 });
 
 /**

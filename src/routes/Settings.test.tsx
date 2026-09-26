@@ -981,7 +981,7 @@ describe('Settings — Notifications (issue #170)', () => {
     // would satisfy an unscoped query whether or not the caption changed.
     // "Browser" was wrong in the Play Store app, which has no browser in sight.
     expect((await panel.findAllByText(/^Device$/)).length).toBeGreaterThan(0);
-    expect(panel.getAllByText(/^Overview$/).length).toBeGreaterThan(0);
+    expect(panel.getAllByText(/^Alerts$/).length).toBeGreaterThan(0);
     expect(panel.queryByText(/^Browser$/)).not.toBeInTheDocument();
     expect(panel.queryByText(/^App$/)).not.toBeInTheDocument();
     expect(panel.queryByText(/^List$/)).not.toBeInTheDocument();

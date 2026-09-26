@@ -106,8 +106,6 @@ describe('EntryList Booster marks', () => {
     );
     const marks = screen.getAllByRole('img', { name: /booster speeds this skill up/i });
     expect(marks).toHaveLength(1);
-    // Anchored: an unanchored /Skill 1/ also matches the new "Move Skill 1
-    // up/down" tooltip text that used to sit elsewhere in the row.
     expect(screen.getByText(/^Skill 1\b/).closest('li')).toContainElement(marks[0]);
   });
 
@@ -204,7 +202,7 @@ describe('EntryList drag handles mention keyboard reordering (#408)', () => {
 describe('EntryList empty state', () => {
   it('shows the empty-entries message when there are no rows', () => {
     render(<EntryList rows={[]} bandsAt={new Map()} {...defaultProps} />);
-    expect(screen.getByText('No entries yet. Add a skill below.')).toBeInTheDocument();
+    expect(screen.getByText('No entries yet. Add a skill to get started.')).toBeInTheDocument();
   });
 });
 
@@ -491,85 +489,30 @@ describe('EntryList finish date (#20)', () => {
   });
 });
 
-describe('EntryList reorder affordance (#1493)', () => {
-  // See MoveMenu's own docstring for why this is a menu, not the twin
-  // Up/Down buttons #223 shipped and reverted.
+describe('EntryList reorder affordance', () => {
+  // Drag (or the handle's Space + arrow keys) is the only reorder path. A
+  // Move up/Move down button or menu on the row was tried twice (#223, #1493)
+  // and crowds the row on a phone — see docs/context/decisions.
   const rows: MergedRow[] = [
     entryRow(1, [0]),
     { kind: 'marker', id: markerRowId(0), markerIndex: 0 },
     entryRow(2, [1]),
   ];
 
-  it('offers a Move menu beside the drag handle, at every width', () => {
+  it('offers only the drag handle, at every width — no Move up/down control', () => {
     for (const desktop of [false, true]) {
       const restore = mockDesktop(desktop);
       try {
         const { unmount } = render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
 
         expect(screen.getByRole('button', { name: /reorder skill 1 i/i })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Move Skill 1 I' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Move Remap marker' })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Move Skill 2 I' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /^move /i })).not.toBeInTheDocument();
 
         unmount();
       } finally {
         restore();
       }
     }
-  });
-
-  it('moves an entry down onto the following row, the same drop a drag onto it would make', async () => {
-    const user = userEvent.setup();
-    const calls: Array<[string, string]> = [];
-    render(
-      <EntryList
-        rows={rows}
-        bandsAt={new Map()}
-        {...defaultProps}
-        onReorder={(activeId, overId) => calls.push([activeId, overId])}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Move Skill 1 I' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Move down' }));
-
-    expect(calls).toEqual([[entryId(entry(1, 1)), markerRowId(0)]]);
-  });
-
-  it('moves a marker up onto the preceding row', async () => {
-    const user = userEvent.setup();
-    const calls: Array<[string, string]> = [];
-    render(
-      <EntryList
-        rows={rows}
-        bandsAt={new Map()}
-        {...defaultProps}
-        onReorder={(activeId, overId) => calls.push([activeId, overId])}
-      />
-    );
-
-    await user.click(screen.getByRole('button', { name: 'Move Remap marker' }));
-    await user.click(screen.getByRole('menuitem', { name: 'Move up' }));
-
-    expect(calls).toEqual([[markerRowId(0), entryId(entry(1, 1))]]);
-  });
-
-  it('disables Move up on the first row and Move down on the last, rather than moving nowhere', async () => {
-    const user = userEvent.setup();
-    render(<EntryList rows={rows} bandsAt={new Map()} {...defaultProps} />);
-
-    await user.click(screen.getByRole('button', { name: 'Move Skill 1 I' }));
-    expect(screen.getByRole('menuitem', { name: 'Move up' })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
-    await user.keyboard('{Escape}');
-
-    await user.click(screen.getByRole('button', { name: 'Move Skill 2 I' }));
-    expect(screen.getByRole('menuitem', { name: 'Move down' })).toHaveAttribute(
-      'aria-disabled',
-      'true'
-    );
   });
 });
 

@@ -419,7 +419,7 @@ test.describe('PI Colonies — Switch to an alt (issue #1770)', () => {
     );
     await page.reload();
 
-    await page.getByRole('button', { name: /show alt colonies/i }).click();
+    await page.getByRole('button', { name: /show \d+ alt/i }).click();
     const action = page.getByRole('button', { name: 'Switch to Alt Hauler' });
     await expect(action).toBeVisible();
     expect((await action.boundingBox())!.height).toBeGreaterThanOrEqual(44);

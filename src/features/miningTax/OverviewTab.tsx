@@ -356,6 +356,7 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
         />
       ),
       sortValue: (row) => entryVolume(row, data?.typeVolumes ?? new Map()).m3,
+      stackAffix: { after: ` ${t('miningTax.overview.volumeUnit')}` },
     },
     rawValue: {
       id: 'rawValue',

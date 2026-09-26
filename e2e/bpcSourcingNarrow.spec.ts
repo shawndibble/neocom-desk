@@ -136,7 +136,7 @@ async function refuseSyncBackend(page: Page): Promise<void> {
 }
 
 async function priceWrapperAlignItems(page: Page): Promise<string> {
-  const table = page.getByRole('table', { name: 'BPC Search' });
+  const table = page.getByRole('table', { name: 'BPC Sourcing' });
   const priceCell = table.locator('tbody tr').first().locator('td[data-label="Price"]');
   await expect(priceCell).toContainText('Whole contract');
   return priceCell.evaluate((cell) => {
@@ -183,7 +183,7 @@ test.describe('BPC Sourcing — multi-type price cell alignment', () => {
 
     await page.goto('./industry/sourcing');
 
-    const table = page.getByRole('table', { name: 'BPC Search' });
+    const table = page.getByRole('table', { name: 'BPC Sourcing' });
     const priceCell = table.locator('tbody tr').first().locator('td[data-label="Price"]');
     await expect(priceCell).toBeVisible();
     await expect(priceCell).not.toContainText('Whole contract');
