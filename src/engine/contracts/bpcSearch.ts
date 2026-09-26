@@ -438,6 +438,12 @@ export interface BpcPriceSummary {
   offerCount: number;
   /** `null` for no offers — distinct from `0`, which would read as a free blueprint. */
   cheapest: number | null;
+  /**
+   * Cheapest ISK/run, not ISK/contract: a cheap-total offer can lose to a
+   * pricier one with more runs. `iskPerRun` returns `null` for anything with
+   * no real per-run rate (a BPO's `runs: -1` included), so it drops out here.
+   */
+  cheapestPerRun: number | null;
   median: number | null;
   bestMe: number | null;
   bestTe: number | null;
@@ -450,7 +456,14 @@ export interface BpcPriceSummary {
  */
 export function bpcPriceSummary(rows: readonly BpcContractRow[]): BpcPriceSummary {
   if (rows.length === 0) {
-    return { offerCount: 0, cheapest: null, median: null, bestMe: null, bestTe: null };
+    return {
+      offerCount: 0,
+      cheapest: null,
+      cheapestPerRun: null,
+      median: null,
+      bestMe: null,
+      bestTe: null,
+    };
   }
   // A zero/negative-price (barter) row still counts toward `offerCount` and
   // ME/TE — it is a real, buyable offer — but is excluded before
@@ -467,9 +480,14 @@ export function bpcPriceSummary(rows: readonly BpcContractRow[]): BpcPriceSummar
       : prices.length % 2 === 1
         ? prices[middle]
         : (prices[middle - 1] + prices[middle]) / 2;
+  const perRunRates = rows
+    .map((row) => iskPerRun(effectivePrice(row), row.runs, row.quantity, row.isMultiType))
+    .filter((rate): rate is number => rate !== null);
   return {
     offerCount: rows.length,
     cheapest: prices.length === 0 ? null : prices[0],
+    cheapestPerRun:
+      perRunRates.length === 0 ? null : perRunRates.reduce((best, rate) => Math.min(best, rate)),
     median,
     bestMe: rows.reduce((best, row) => Math.max(best, row.me), rows[0].me),
     bestTe: rows.reduce((best, row) => Math.max(best, row.te), rows[0].te),
