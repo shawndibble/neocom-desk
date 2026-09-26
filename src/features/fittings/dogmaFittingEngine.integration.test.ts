@@ -87,6 +87,9 @@ const CLAYMORE = 22468;
 const SKIRMISH_COMMAND_BURST_II = 43556;
 const RAPID_DEPLOYMENT_CHARGE = 42840;
 /** Leadership, Skirmish Command, Command Burst Specialist, Wing/Fleet Command, Command Ships. */
+const SVIPUL = 34562;
+const SVIPUL_PROPULSION_MODE = 34566;
+const STANDARD_BLUE_PILL_BOOSTER = 9950;
 const COMMAND_SKILL_IDS = [3348, 3349, 3354, 11574, 24764, 23950];
 
 const PARTIAL_SKILLS = new Map([
@@ -816,6 +819,46 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     );
     expect(withIncoming(fit, { buffs: [], effects: [] })).toBe(fit);
     expect(withIncoming(fit, undefined)).toBe(fit);
+  });
+
+  it('flies a Tactical Destroyer in its mode, and switches a booster side effect on', () => {
+    const svipul = (mode?: number): Fitting => ({
+      name: 'Svipul',
+      shipTypeId: SVIPUL,
+      modules: [],
+      drones: [],
+      cargo: [],
+      ...(mode === undefined ? {} : { mode }),
+    });
+    const read = (fitting: Fitting, profile = buildPilotProfile(new Map(), [])) => {
+      const dogmaFit = fittingToDogmaFit(fitting, profile);
+      const calculation = calculate(dogmaFit);
+      return extractFittingStats(dogmaFit.items, calculation.ship.attributes, calculation.items);
+    };
+    const bare = calculate({ ship: { type_id: SVIPUL }, items: [] }).ship.attributes;
+    // Defense Mode by default: a third off incoming damage on every layer.
+    expect(read(svipul()).shield.emResonance).toBeCloseTo(bare.get(271)!.value * (2 / 3), 6);
+    // Propulsion Mode: more agile, no resist bonus.
+    expect(read(svipul(SVIPUL_PROPULSION_MODE)).navigation.agility).toBeLessThan(
+      read(svipul()).navigation.agility
+    );
+    expect(read(svipul(SVIPUL_PROPULSION_MODE)).shield.emResonance).toBeCloseTo(
+      bare.get(271)!.value,
+      6
+    );
+
+    const bluePill = (sideEffects?: number[]) => ({
+      skillLevels: new Map<number, number>(),
+      implantTypeIds: [],
+      boosterTypeIds: [STANDARD_BLUE_PILL_BOOSTER],
+      ...(sideEffects ? { boosterSideEffects: sideEffects } : {}),
+    });
+    const rifter = { name: 'R', shipTypeId: RIFTER, modules: [], drones: [], cargo: [] };
+    // Its Shield Capacity side effect: −20% with no Neurotoxin skills.
+    expect(read(rifter, bluePill([2737])).shield.hp).toBeCloseTo(
+      read(rifter, bluePill()).shield.hp * 0.8,
+      6
+    );
   });
 
   it('reads applied-DPS inputs: running turrets, loaded launchers, launched drones only', () => {

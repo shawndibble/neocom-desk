@@ -1,4 +1,6 @@
 import type { Fit, FitItem, Slot } from '@eveshipfit/dogma-engine';
+import { sideEffectsSwitchedOn } from './boosterSideEffects';
+import { defaultTacticalMode, tacticalModesFor } from './tacticalModes';
 import type { DamageProfile, Fitting, FittingModule, PilotProfile } from './types';
 
 /** EVE numbers implant/booster slots starting at 1, not 0 (dogma-engine's own `Slot` doc). */
@@ -63,16 +65,27 @@ export function fittingToDogmaFit(
       state: 'offline',
     })),
     ...profile.implantTypeIds.map((typeId, index) => slottedItem(typeId, index, 'implant')),
-    // Side effects always off — no UI to roll or pick one, and an empty array
-    // is the engine's own "none" (`FitItem.booster_side_effects`'s doc).
+    // Only the side effects the pilot switched on, and only each booster's
+    // own; an empty array is the engine's own "none"
+    // (`FitItem.booster_side_effects`'s doc).
     ...profile.boosterTypeIds.map((typeId, index) =>
-      slottedItem(typeId, index, 'booster', { booster_side_effects: [] })
+      slottedItem(typeId, index, 'booster', {
+        booster_side_effects: sideEffectsSwitchedOn(typeId, profile.boosterSideEffects),
+      })
     ),
   ];
 
+  // A Tactical Destroyer always flies in a mode: the chosen one if it's the
+  // hull's own, else the hull's default. Any other hull has none.
+  const modes = tacticalModesFor(fitting.shipTypeId);
+  const mode =
+    fitting.mode !== undefined && modes.includes(fitting.mode)
+      ? fitting.mode
+      : defaultTacticalMode(fitting.shipTypeId);
+
   return {
     name: fitting.name,
-    ship: { type_id: fitting.shipTypeId },
+    ship: { type_id: fitting.shipTypeId, ...(mode === undefined ? {} : { mode }) },
     items,
     character: { skills: profile.skillLevels },
     ...(damageProfile

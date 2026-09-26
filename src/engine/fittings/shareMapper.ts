@@ -16,6 +16,10 @@
  *   and the editor both only ever set a stack fully active or fully bayed),
  *   which is what the round-trip test below actually needs to hold.
  *
+ * A Tactical Destroyer's mode and the booster side effects switched on ride
+ * the wire's two optional trailing sections; on the domain side the side
+ * effects live on the implant set, beside the boosters they belong to.
+ *
  * Fighters and implant sets are both real fields on the wire shape.
  * `implantSet` is threaded straight through both directions, `undefined` and
  * `{implants: [], boosters: []}` staying distinct the way
@@ -75,7 +79,18 @@ export function fittingToShareInput(fitting: Fitting): FittingShareInput {
     })),
     fighters: [],
     cargo: fitting.cargo.map((item) => ({ typeId: item.typeId, quantity: item.quantity })),
-    ...(fitting.implantSet === undefined ? {} : { implantSet: fitting.implantSet }),
+    ...(fitting.implantSet === undefined
+      ? {}
+      : {
+          implantSet: {
+            implants: fitting.implantSet.implants,
+            boosters: fitting.implantSet.boosters,
+          },
+        }),
+    ...(fitting.implantSet?.boosterSideEffects?.length
+      ? { boosterSideEffects: fitting.implantSet.boosterSideEffects }
+      : {}),
+    ...(fitting.mode === undefined ? {} : { mode: fitting.mode }),
   };
 }
 
@@ -100,6 +115,17 @@ export function shareToFitting(decoded: FittingShareInput, name: string): Fittin
       state: drone.active > 0 ? 'active' : 'online',
     })),
     cargo: decoded.cargo.map((item) => ({ typeId: item.typeId, quantity: item.quantity })),
-    ...(decoded.implantSet === undefined ? {} : { implantSet: decoded.implantSet }),
+    // Side effects ride with the boosters that carry them; with no set, there are none.
+    ...(decoded.implantSet === undefined
+      ? {}
+      : {
+          implantSet: {
+            ...decoded.implantSet,
+            ...(decoded.boosterSideEffects?.length
+              ? { boosterSideEffects: decoded.boosterSideEffects }
+              : {}),
+          },
+        }),
+    ...(decoded.mode === undefined ? {} : { mode: decoded.mode }),
   };
 }

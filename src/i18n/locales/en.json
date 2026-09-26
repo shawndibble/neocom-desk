@@ -796,7 +796,23 @@
       "remove": "Remove {{name}}",
       "notFound": "No item found with that exact name.",
       "full": "This set is already full.",
-      "assumesNoImplantsHint": "My clone stats are calculated without this character's fitted implants. Grant Character details for accurate stats."
+      "assumesNoImplantsHint": "My clone stats are calculated without this character's fitted implants. Grant Character details for accurate stats.",
+      "sideEffects": "Side effects",
+      "sideEffect": "{{what}} {{pct}}%",
+      "sideEffectName": {
+        "2735": "Armor HP",
+        "2736": "Armor repair amount",
+        "2737": "Shield capacity",
+        "2739": "Turret optimal range",
+        "2741": "Turret falloff",
+        "2745": "Capacitor capacity",
+        "2746": "Max velocity",
+        "2747": "Turret tracking",
+        "2748": "Missile velocity",
+        "2749": "Missile explosion velocity",
+        "2791": "Missile explosion radius",
+        "4970": "Shield boost amount"
+      }
     },
     "compare": {
       "entryButton": "Compare",
@@ -957,6 +973,9 @@
       "failed": "Couldn't work out what {{name}} projects.",
       "meta_one": "{{count}} ship",
       "meta_other": "{{count}} ships"
+    },
+    "mode": {
+      "label": "Tactical mode"
     }
   },
   "skills": {

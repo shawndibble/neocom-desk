@@ -62,6 +62,12 @@ export interface FittingCargoItem {
 export interface FittingImplantSet {
   implants: readonly number[];
   boosters: readonly number[];
+  /**
+   * The boosters' side effects switched on, by effect id
+   * (`boosterSideEffects.ts`); absent or empty: none, as a booster is
+   * assumed to roll none.
+   */
+  boosterSideEffects?: readonly number[];
 }
 
 /**
@@ -77,6 +83,11 @@ export interface Fitting {
   drones: FittingDrone[];
   cargo: FittingCargoItem[];
   implantSet?: FittingImplantSet;
+  /**
+   * A Tactical Destroyer's mode (`tacticalModes.ts`), by type id. Absent on a
+   * hull with modes means its default one; ignored on any other hull.
+   */
+  mode?: number;
 }
 
 /**
@@ -94,6 +105,8 @@ export interface PilotProfile {
   implantTypeIds: readonly number[];
   /** Type ids of the combat boosters in play, EVE's own booster-slot order. */
   boosterTypeIds: readonly number[];
+  /** The boosters' side effects switched on, by effect id; absent: none. */
+  boosterSideEffects?: readonly number[];
 }
 
 /**

@@ -165,3 +165,39 @@ describe('fittingToDogmaFit', () => {
     });
   });
 });
+
+describe('fittingToDogmaFit — Tactical Destroyer modes and booster side effects', () => {
+  const SVIPUL = 34562;
+
+  it('puts the chosen mode on the ship', () => {
+    const dogmaFit = fittingToDogmaFit(fitting({ shipTypeId: SVIPUL, mode: 34570 }), emptyProfile);
+    expect(dogmaFit.ship).toEqual({ type_id: SVIPUL, mode: 34570 });
+  });
+
+  it('flies a Tactical Destroyer with no mode chosen in its Defense Mode, as the game does', () => {
+    expect(fittingToDogmaFit(fitting({ shipTypeId: SVIPUL }), emptyProfile).ship).toEqual({
+      type_id: SVIPUL,
+      mode: 34564,
+    });
+  });
+
+  it('never gives a mode to a hull that has none', () => {
+    expect(fittingToDogmaFit(fitting({ mode: 34570 }), emptyProfile).ship).toEqual({
+      type_id: 17843,
+    });
+  });
+
+  it("switches on each booster's own side effects the pilot chose, and no other booster's", () => {
+    const dogmaFit = fittingToDogmaFit(fitting(), {
+      skillLevels: new Map(),
+      implantTypeIds: [],
+      // Standard Blue Pill, Standard Drop.
+      boosterTypeIds: [9950, 15466],
+      boosterSideEffects: [2737, 2749, 2741],
+    });
+    const booster = (typeId: number) => dogmaFit.items.find((item) => item.type_id === typeId);
+    // Shield capacity is a side effect of both; explosion velocity only the Blue Pill's.
+    expect(booster(9950)?.booster_side_effects).toEqual([2737, 2749]);
+    expect(booster(15466)?.booster_side_effects).toEqual([2737, 2741]);
+  });
+});

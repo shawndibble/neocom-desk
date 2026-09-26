@@ -120,3 +120,23 @@ describe('fittingToShareInput / shareToFitting', () => {
     expect(restored).toEqual(original);
   });
 });
+
+describe('fittingToShareInput / shareToFitting — mode and booster side effects', () => {
+  it('round-trips a Tactical Destroyer mode and the side effects on its boosters', async () => {
+    const original = fitting({
+      shipTypeId: 34562,
+      mode: 34566,
+      implantSet: { implants: [], boosters: [9950], boosterSideEffects: [2737] },
+    });
+    const encoded = await encodeFittingShare(fittingToShareInput(original));
+    if (!encoded.ok) throw new Error('encode failed');
+    const decoded = await decodeFittingShare(encoded.payload);
+    if (!decoded.ok) throw new Error('decode failed');
+    expect(shareToFitting(decoded.value, original.name)).toEqual(original);
+  });
+
+  it('drops side effects that arrive with no boosters to carry them', () => {
+    const input = { ...fittingToShareInput(fitting()), boosterSideEffects: [2737] };
+    expect(shareToFitting(input, 'Rifter')).toEqual(fitting());
+  });
+});

@@ -53,3 +53,14 @@ describe('applyImplantBasis', () => {
     expect(result.boosterTypeIds).toEqual([]);
   });
 });
+
+describe('applyImplantBasis — booster side effects', () => {
+  it('carries the set’s chosen side effects with its boosters', () => {
+    const result = applyImplantBasis(
+      cloneProfile,
+      { implants: [], boosters: [9950], boosterSideEffects: [2737] },
+      'fitting'
+    );
+    expect(result.boosterSideEffects).toEqual([2737]);
+  });
+});
