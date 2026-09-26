@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { Tooltip, InfoTooltip } from './Tooltip';
 import { Modal } from './Modal';
+import { MenuItem, RowActionsMenu } from './RowActions';
 
 describe('Tooltip', () => {
   /**
@@ -119,6 +120,24 @@ describe('Tooltip touch support', () => {
     // Focus still shows it.
     fireEvent.focus(trigger);
     expect(screen.getByRole('tooltip')).toHaveTextContent('One-line explanation.');
+  });
+
+  it('gives touch-and-hold to a surrounding row menu, for the tooltips of the controls in the row', () => {
+    vi.useFakeTimers();
+    render(
+      <RowActionsMenu name="Row" items={<MenuItem>Act</MenuItem>}>
+        <div>
+          <Tooltip content="One-line explanation.">
+            <button type="button">Trigger</button>
+          </Tooltip>
+        </div>
+      </RowActionsMenu>
+    );
+    fireEvent.touchStart(screen.getByRole('button', { name: 'Trigger' }));
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
   it('does not reveal the tooltip on a quick tap, and does not block the trigger tap action', () => {

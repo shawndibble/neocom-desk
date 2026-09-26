@@ -39,6 +39,7 @@ import {
 import { IconButton } from './IconButton';
 import * as Icon from './icons';
 import { MenuKindContext, RowActionsContext, type RowActions } from './rowActionsContext';
+import { TooltipHoldContext } from './tooltipHold';
 
 export function MenuItem(props: ComponentProps<typeof ContextMenuItem>) {
   return useContext(MenuKindContext) === 'dropdown' ? (
@@ -96,7 +97,11 @@ export function MenuRadioItem(props: ComponentProps<typeof ContextMenuRadioItem>
   );
 }
 
-/** Right-click menu around `trigger`, publishing the same items for `RowMoreActions`. */
+/**
+ * Right-click menu around `trigger`, publishing the same items for
+ * `RowMoreActions`. Touch-and-hold anywhere in the row opens it, so the
+ * tooltips of the controls inside give that gesture up (`tooltipHold.ts`).
+ */
 export function RowActionsMenu({
   name,
   items,
@@ -105,10 +110,12 @@ export function RowActionsMenu({
 }: RowActions & { children: ReactElement }) {
   return (
     <RowActionsContext.Provider value={{ name, items, onOpenChange }}>
-      <ContextMenu onOpenChange={onOpenChange}>
-        <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-        <ContextMenuContent>{items}</ContextMenuContent>
-      </ContextMenu>
+      <TooltipHoldContext.Provider value={false}>
+        <ContextMenu onOpenChange={onOpenChange}>
+          <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+          <ContextMenuContent>{items}</ContextMenuContent>
+        </ContextMenu>
+      </TooltipHoldContext.Provider>
     </RowActionsContext.Provider>
   );
 }

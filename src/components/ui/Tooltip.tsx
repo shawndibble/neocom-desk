@@ -1,5 +1,6 @@
 import {
   cloneElement,
+  useContext,
   isValidElement,
   useEffect,
   useRef,
@@ -13,6 +14,7 @@ import {
 import { Tooltip as TooltipPrimitive } from 'radix-ui';
 import { cx } from '@/lib/cx';
 import { usePortalContainer } from './portalContainer';
+import { TooltipHoldContext } from './tooltipHold';
 
 /** Matches Material UI's `enterTouchDelay` — long enough to not fire on an incidental brush, short enough to feel responsive. */
 const TOUCH_LONG_PRESS_MS = 500;
@@ -81,9 +83,12 @@ export function Tooltip({
   content,
   children,
   openOnTap = false,
-  holdToReveal = true,
+  holdToReveal: holdProp,
   className = '',
 }: TooltipProps) {
+  // Off by default inside a row menu, whose touch-and-hold is the menu's (see `tooltipHold.ts`).
+  const holdDefault = useContext(TooltipHoldContext);
+  const holdToReveal = holdProp ?? holdDefault;
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
   // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
   // A `<dialog>` opened with `showModal()` sits in the browser's top layer,
