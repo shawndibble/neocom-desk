@@ -1,7 +1,6 @@
 import { useTranslation } from 'react-i18next';
-import { overheatedOrNull } from '@/engine/fittings/stats';
 import type { FittingStats, LocalRepair } from '@/engine/fittings/types';
-import { Facts, HeatFigure, Overheated } from './StatFacts';
+import { Facts, HeatFigure } from './StatFacts';
 
 const REPAIR_LAYERS: readonly (keyof LocalRepair)[] = ['shield', 'armor', 'hull'];
 
@@ -13,8 +12,7 @@ function signed(value: number, digits: number): string {
 }
 
 /**
- * Local tank under Defense: each repairer layer at burst (with its
- * overheated rate), passive shield regeneration, and the whole tank burst
+ * Local tank under Defense: each repairer layer at burst, passive shield regeneration, and the whole tank burst
  * beside sustained in EHP/s — the sustained figure being our own estimate
  * (`engine/fittings/tank.ts`), so it says so.
  */
@@ -38,10 +36,6 @@ export function TankFacts({
               format={(s) =>
                 t(`fittings.stats.repair.${layer}`, { value: s.repair[layer].toFixed(1) })
               }
-            />
-            <Overheated
-              value={overheatedOrNull(stats.repair[layer], stats.overheated?.repair[layer], 1)}
-              digits={1}
             />
           </li>
         ))}

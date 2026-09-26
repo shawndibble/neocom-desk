@@ -516,9 +516,8 @@ function FittingsPage() {
       showDrones={dronesShown}
       fitting={fitting}
       moduleResults={moduleResults}
-      conditions={
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <TacticalModePicker fitting={fitting} onChange={edit} />
+      implants={
+        <>
           <ImplantBasisControl
             basis={workspace.implantBasis}
             canUseCloneBasis={workspace.canUseCloneBasis}
@@ -529,6 +528,11 @@ function FittingsPage() {
           {workspace.implantBasis === 'clone' && workspace.canUseCloneBasis && (
             <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
           )}
+        </>
+      }
+      conditions={
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <TacticalModePicker fitting={fitting} onChange={edit} />
           <AbyssalWeatherPicker />
           {gaps && gaps.missing.length > 0 && activeCharacterId !== null && (
             <MissingSkillsChip

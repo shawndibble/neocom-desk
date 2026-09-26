@@ -599,6 +599,7 @@
         "capacitor": "Capacitor",
         "offense": "Offense",
         "appliedDps": "Applied DPS",
+        "assumptions": "Implants & skills",
         "defense": "Defense",
         "targeting": "Targeting",
         "navigation": "Navigation",
@@ -619,7 +620,6 @@
       "offenseNone": "Nothing is firing.",
       "offenseNoCharge_one": "{{count}} weapon has no charge loaded — load one in Charges.",
       "offenseNoCharge_other": "{{count}} weapons have no charge loaded — load one in Charges.",
-      "overheated": "{{value}} overheated",
       "unheated": "Unheated: {{value}}",
       "dronesNoOverheat": "Drones don't overheat",
       "defenseEhp": "{{value}} EHP",
@@ -664,7 +664,6 @@
       "headingSkillsSet_one": "{{count}} skill set by hand",
       "headingSkillsSet_other": "{{count}} skills set by hand",
       "layerHp": "{{hp}} HP",
-      "overheatedRow": "Overheated",
       "rahRow": "Reactive Armor Hardener",
       "fittingMeta": "CPU {{cpu}}% · PG {{pg}}%",
       "fact": {

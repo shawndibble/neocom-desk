@@ -172,6 +172,29 @@ function sectionBody(title: string): HTMLElement {
   return screen.getByRole('heading', { name: title }).closest('section')!;
 }
 
+describe('FittingStatsSections implants & skills group', () => {
+  it('starts collapsed, holding the implant controls and the skills override', async () => {
+    render(
+      <FittingStatsSections
+        stats={stats()}
+        statsProgress={null}
+        statsError={false}
+        price={null}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={typeName}
+        implants={<span>Implant controls</span>}
+      />
+    );
+    const toggle = screen.getByRole('button', { name: 'Implants & skills' });
+
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Implant controls')).toBeNull();
+    await userEvent.click(toggle);
+    expect(screen.getByText('Implant controls')).toBeInTheDocument();
+  });
+});
+
 describe('FittingStatsSections offense weapon menu', () => {
   const blasters: Fitting = {
     name: 'Brutix',
@@ -273,13 +296,11 @@ describe('FittingStatsSections offense', () => {
     expect(offense.getByText('784 volley')).toBeInTheDocument();
   });
 
-  it('shows overheated values beside weapons that overheat, and says drones do not', () => {
+  it('shows no overheated values beside weapons — "Overheat all" does that — and says drones do not', () => {
     renderSections(heatedStats());
     const offense = within(sectionBody('Offense'));
 
-    expect(offense.getByText('61.7 overheated')).toBeInTheDocument();
-    expect(offense.getByText('350 overheated')).toBeInTheDocument();
-    expect(offense.getByText('181.7 overheated')).toBeInTheDocument();
+    expect(offense.queryByText(/overheated/)).toBeNull();
     expect(offense.getByText("Drones don't overheat")).toBeInTheDocument();
   });
 
@@ -303,18 +324,12 @@ describe('FittingStatsSections offense', () => {
 });
 
 describe('FittingStatsSections overheated lines elsewhere', () => {
-  it('shows overheated EHP and repair in Defense, and none in Navigation when speed is unchanged', () => {
+  it('shows no overheated EHP, repair or resist rows until "Overheat all" is on', () => {
     renderSections(heatedStats());
 
-    const defense = within(sectionBody('Defense'));
-    expect(defense.getByText('17400 overheated')).toBeInTheDocument();
-    expect(defense.getByText('Armor repair: 63.2 HP/s')).toBeInTheDocument();
-    expect(defense.getByText('81.8 overheated')).toBeInTheDocument();
-    // Only the shield moves under heat, so one overheated row, under it.
-    const hotRows = defense.getAllByRole('row', { name: /^Overheated/ });
-    expect(hotRows).toHaveLength(1);
-    expect(within(hotRows[0]).getByText('60%')).toBeInTheDocument();
+    expect(within(sectionBody('Defense')).queryByText(/overheated/i)).toBeNull();
     expect(within(sectionBody('Navigation')).queryByText(/overheated/)).toBeNull();
+    expect(screen.queryByRole('row', { name: /^Overheated/ })).toBeNull();
   });
 
   it('shows no overheated line anywhere when no module can overheat', () => {

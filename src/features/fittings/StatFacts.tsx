@@ -3,28 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { unheatedIfChanged } from '@/engine/fittings/stats';
 
 /**
- * An overheated value beside its normal one, in the warning tone — the
- * game marks heat the same way. Renders nothing when `value` is null.
- */
-export function Overheated({
-  value,
-  digits,
-  unit = '',
-}: {
-  value: number | null;
-  digits: number;
-  unit?: string;
-}) {
-  const { t } = useTranslation();
-  if (value === null) return null;
-  return (
-    <span className="ml-1 text-warning">
-      {t('fittings.stats.overheated', { value: `${value.toFixed(digits)}${unit}` })}
-    </span>
-  );
-}
-
-/**
  * One figure as `format` shows it. Under "Overheat all" it reads in the
  * warning tone — the game's own mark for heat — only when heat changed it as
  * shown, with the unheated figure on hover; a figure heat leaves as it is
