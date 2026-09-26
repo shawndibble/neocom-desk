@@ -153,11 +153,14 @@ describe('toIndustryJobSources', () => {
     ...overrides,
   });
 
+  const BEFORE_END = Date.parse('2026-09-01T00:00:00Z');
+  const AFTER_END = Date.parse('2026-09-07T22:00:01Z');
+
   it('names the product where there is one, and the blueprint otherwise', () => {
-    expect(toIndustryJobSources([job()], name)[0].subject).toBe('Type 2454');
-    expect(toIndustryJobSources([job({ product_type_id: undefined })], name)[0].subject).toBe(
-      'Type 1000'
-    );
+    expect(toIndustryJobSources([job()], name, BEFORE_END)[0].subject).toBe('Type 2454');
+    expect(
+      toIndustryJobSources([job({ product_type_id: undefined })], name, BEFORE_END)[0].subject
+    ).toBe('Type 1000');
   });
 
   /**
@@ -173,9 +176,28 @@ describe('toIndustryJobSources', () => {
         job({ job_id: 3, status: 'delivered' }),
         job({ job_id: 4, status: 'cancelled' }),
       ],
-      name
+      name,
+      BEFORE_END
     );
     expect(sources.map((source) => source.id)).toEqual(['1', '2']);
+  });
+
+  /**
+   * Issue #1715: a job past its deadline's headline already reads "ready to
+   * deliver" (`pastDeadlineLabelKey`) — an empty detail here stops the row
+   * saying it twice. Keyed on the deadline, not `job.status`: ESI can still
+   * report `active` for a moment after `end_date` passes, and that must not
+   * leave the headline and this line disagreeing.
+   */
+  it('clears the detail once the deadline has passed, regardless of status', () => {
+    expect(toIndustryJobSources([job({ status: 'ready' })], name, AFTER_END)[0].detail).toBe('');
+    expect(toIndustryJobSources([job({ status: 'active' })], name, AFTER_END)[0].detail).toBe('');
+  });
+
+  it('keeps the status as detail while the job is still running', () => {
+    expect(toIndustryJobSources([job({ status: 'active' })], name, BEFORE_END)[0].detail).toBe(
+      'active'
+    );
   });
 });
 
@@ -258,22 +280,46 @@ describe('toContractExpirySources', () => {
     ...overrides,
   });
 
-  it('uses the contract title when it has one', () => {
-    expect(toContractExpirySources([contract({ title: 'Jita run' })])[0].subject).toBe('Jita run');
+  // A distinguishable stand-in for `contracts.typeCourier` etc — proves the
+  // source actually calls the resolver rather than falling back to the raw
+  // ESI enum some other way.
+  const typeLabel = (type: Contract['type']) => `LABEL:${type}`;
+  const noRoute = () => undefined;
+
+  it('uses the contract title when it has one, even for an untitled-courier-shaped route', () => {
+    expect(
+      toContractExpirySources(
+        [contract({ title: 'Jita run' })],
+        typeLabel,
+        () => 'should not be used'
+      )[0].subject
+    ).toBe('Jita run');
   });
 
-  /** An untitled contract is the common case; its type is the only name it has. */
-  it('falls back to the contract type when it is untitled', () => {
-    expect(toContractExpirySources([contract()])[0].subject).toBe('courier');
+  /** An untitled contract is the common case; the translated type label is the fallback name. */
+  it('falls back to the translated type label when untitled and no route resolved', () => {
+    expect(toContractExpirySources([contract()], typeLabel, noRoute)[0].subject).toBe(
+      'LABEL:courier'
+    );
+  });
+
+  /** Issue #1715: an untitled courier's route beats the generic type label. */
+  it('prefers the resolved route over the type label for an untitled courier', () => {
+    const route = 'Jita IV - Moon 4 → Amarr VIII';
+    expect(toContractExpirySources([contract()], typeLabel, () => route)[0].subject).toBe(route);
   });
 
   it('keeps only contracts still open or being worked', () => {
-    const sources = toContractExpirySources([
-      contract({ contract_id: 1, status: 'outstanding' }),
-      contract({ contract_id: 2, status: 'in_progress' }),
-      contract({ contract_id: 3, status: 'finished' }),
-      contract({ contract_id: 4, status: 'deleted' }),
-    ]);
+    const sources = toContractExpirySources(
+      [
+        contract({ contract_id: 1, status: 'outstanding' }),
+        contract({ contract_id: 2, status: 'in_progress' }),
+        contract({ contract_id: 3, status: 'finished' }),
+        contract({ contract_id: 4, status: 'deleted' }),
+      ],
+      typeLabel,
+      noRoute
+    );
     expect(sources.map((source) => source.id)).toEqual(['1', '2']);
   });
 
@@ -281,46 +327,60 @@ describe('toContractExpirySources', () => {
 
   /** The under-warning case: accepted early in a long window, so the clock must shorten. */
   it('counts an accepted courier down to acceptance plus the allowed days', () => {
-    const [source] = toContractExpirySources([
-      contract({
-        status: 'in_progress',
-        date_accepted: ISO('2026-09-01T06:00:00Z'),
-        days_to_complete: 3,
-      }),
-    ]);
+    const [source] = toContractExpirySources(
+      [
+        contract({
+          status: 'in_progress',
+          date_accepted: ISO('2026-09-01T06:00:00Z'),
+          days_to_complete: 3,
+        }),
+      ],
+      typeLabel,
+      noRoute
+    );
     expect(source.deadlineMs).toBe(Date.parse('2026-09-04T06:00:00Z'));
     expect(source.deadlineMs).toBeLessThan(EXPIRY_MS);
   });
 
   /** The mirror case: accepted late, so delivery falls past the expiry — replaced, not capped. */
   it('lets an accepted courier run past the offer expiry', () => {
-    const [source] = toContractExpirySources([
-      contract({
-        status: 'in_progress',
-        date_accepted: ISO('2026-09-09T12:00:00Z'),
-        days_to_complete: 3,
-      }),
-    ]);
+    const [source] = toContractExpirySources(
+      [
+        contract({
+          status: 'in_progress',
+          date_accepted: ISO('2026-09-09T12:00:00Z'),
+          days_to_complete: 3,
+        }),
+      ],
+      typeLabel,
+      noRoute
+    );
     expect(source.deadlineMs).toBe(Date.parse('2026-09-12T12:00:00Z'));
     expect(source.deadlineMs).toBeGreaterThan(EXPIRY_MS);
   });
 
   it('uses the offer expiry for a courier nobody has accepted yet', () => {
-    const [source] = toContractExpirySources([
-      contract({ status: 'outstanding', days_to_complete: 3 }),
-    ]);
+    const [source] = toContractExpirySources(
+      [contract({ status: 'outstanding', days_to_complete: 3 })],
+      typeLabel,
+      noRoute
+    );
     expect(source.deadlineMs).toBe(EXPIRY_MS);
   });
 
   it('uses the offer expiry for an accepted non-courier contract', () => {
-    const [source] = toContractExpirySources([
-      contract({
-        type: 'item_exchange',
-        status: 'in_progress',
-        date_accepted: ISO('2026-09-01T06:00:00Z'),
-        days_to_complete: 3,
-      }),
-    ]);
+    const [source] = toContractExpirySources(
+      [
+        contract({
+          type: 'item_exchange',
+          status: 'in_progress',
+          date_accepted: ISO('2026-09-01T06:00:00Z'),
+          days_to_complete: 3,
+        }),
+      ],
+      typeLabel,
+      noRoute
+    );
     expect(source.deadlineMs).toBe(EXPIRY_MS);
   });
 
@@ -333,7 +393,11 @@ describe('toContractExpirySources', () => {
   ])(
     'falls back to the offer expiry for an accepted courier with %s',
     (_label, overrides: Partial<Contract>) => {
-      const [source] = toContractExpirySources([contract({ status: 'in_progress', ...overrides })]);
+      const [source] = toContractExpirySources(
+        [contract({ status: 'in_progress', ...overrides })],
+        typeLabel,
+        noRoute
+      );
       expect(source.deadlineMs).toBe(EXPIRY_MS);
     }
   );

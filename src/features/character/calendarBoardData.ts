@@ -4,7 +4,14 @@
  * Fetch + cache only — the ESI-shape-to-board-source conversion lives next
  * door in `calendarBoardSources.ts`, and the ranking lives in
  * `engine/character/board.ts`. Same three-layer split as the corp board's
- * `boardData` / `boardSources` / `board`.
+ * `boardData` / `boardSources` / `board`. The one exception is contract
+ * subject wording (`contractTypeLabel`/`contractRouteName` below): that needs
+ * i18next and the location-name cache, neither of which the pure sources file
+ * may import, so this layer resolves both and hands the sources file plain
+ * strings through a callback, the same shape `typeName` already uses for SDE
+ * names. `i18n.t` is the shared singleton, safe here only because
+ * `src/main.tsx` initialises it before any caller of this loader — including
+ * `routeWarm.ts`'s hover-triggered warm — can run.
  *
  * **Each source fails on its own.** Every loader here returns a `StatusResult`
  * rather than throwing on an auth failure, so a Character missing
@@ -15,15 +22,19 @@
  * industry jobs" in front of someone who was never allowed to ask.
  */
 
-import type { CalendarEventSummary } from '@/esi/endpoints';
+import i18n from 'i18next';
+import type { CalendarEventSummary, Contract } from '@/esi/endpoints';
 import type {
   BoardCalendarEventSource,
   BoardClockSource,
   CharacterBoardItemKind,
 } from '@/engine/character/board';
 import type { CachedResult, StatusResult } from '@/esi/cache';
+import { isActiveContractStatus } from '@/engine/contractStatus';
 import { loadCalendarEvents } from './calendar';
 import { loadContracts } from './contracts';
+import { loadContractLocationName } from './contractLocationName';
+import { CONTRACT_TYPE_KEY } from './contractLabels';
 import { loadOrders } from './orders';
 import { loadTypeNames } from './typeNames';
 import { loadCharacterSkillQueueWithStatus } from '@/features/skills/data';
@@ -107,6 +118,36 @@ function readRows<T>(result: StatusResult<T[]>): readonly T[] | undefined {
   return result.cached?.data;
 }
 
+/**
+ * Every untitled, still-open courier's start/end location name, resolved once
+ * for the whole board rather than once per row — `ContractIdentity` resolves
+ * the same way per rendered row (issue #1706), but this loader composes every
+ * row in one pass, so it batches instead. Filtered to `isActiveContractStatus`
+ * up front so a character's finished/cancelled courier history — which
+ * `toContractExpirySources` drops anyway — never spends a Dexie/ESI round trip
+ * on a name nothing will render.
+ */
+async function loadCourierRouteNames(
+  characterId: number,
+  contracts: readonly Contract[]
+): Promise<Map<number, string>> {
+  const locationIds = new Set<number>();
+  for (const contract of contracts) {
+    if (contract.type !== 'courier' || contract.title) continue;
+    if (!isActiveContractStatus(contract.status)) continue;
+    if (contract.start_location_id) locationIds.add(contract.start_location_id);
+    if (contract.end_location_id) locationIds.add(contract.end_location_id);
+  }
+  const names = new Map<number, string>();
+  await Promise.all(
+    [...locationIds].map(async (id) => {
+      const name = await loadContractLocationName(characterId, id);
+      if (name) names.set(id, name);
+    })
+  );
+  return names;
+}
+
 export async function loadCalendarBoard(characterId: number): Promise<CalendarBoardData> {
   const loadedAtMs = Date.now();
   const [
@@ -178,8 +219,22 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
   for (const entry of queue ?? []) typeIds.add(entry.skill_id);
   for (const job of jobs ?? []) typeIds.add(job.product_type_id ?? job.blueprint_type_id);
   for (const order of orders ?? []) typeIds.add(order.type_id);
-  const names = await loadTypeNames([...typeIds]);
+  const [names, courierRouteNames] = await Promise.all([
+    loadTypeNames([...typeIds]),
+    loadCourierRouteNames(characterId, contracts ?? []),
+  ]);
   const typeName = (typeId: number) => names.get(typeId) ?? `#${typeId}`;
+  const contractTypeLabel = (type: Contract['type']) => i18n.t(CONTRACT_TYPE_KEY[type]);
+  const contractRouteName = (contract: Contract): string | undefined => {
+    if (contract.type !== 'courier') return undefined;
+    const start = contract.start_location_id
+      ? courierRouteNames.get(contract.start_location_id)
+      : undefined;
+    const end = contract.end_location_id
+      ? courierRouteNames.get(contract.end_location_id)
+      : undefined;
+    return start && end ? i18n.t('contracts.courierRoute', { start, end }) : undefined;
+  };
 
   /**
    * One row per kind, and every derived answer read off it.
@@ -218,10 +273,11 @@ export async function loadCalendarBoard(characterId: number): Promise<CalendarBo
   return {
     calendarEvents: events && toCalendarEventSources(events),
     skillTraining: queue && toSkillTrainingSources(queue, typeName),
-    industryJobs: jobs && toIndustryJobSources(jobs, typeName),
+    industryJobs: jobs && toIndustryJobSources(jobs, typeName, loadedAtMs),
     planetExtractions: planets && toPlanetExtractionSources(colonies),
     moonChunks: moonChunkRead.sources,
-    contractExpiries: contracts && toContractExpirySources(contracts),
+    contractExpiries:
+      contracts && toContractExpirySources(contracts, contractTypeLabel, contractRouteName),
     orderExpiries: orders && toOrderExpirySources(orders, typeName),
     skillPlan: planSchedule && toSkillPlanSources(planSchedule, queue ?? [], typeName),
     skillPlanChoices: skillPlanBoard.choices,
