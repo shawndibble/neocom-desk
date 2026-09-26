@@ -6,9 +6,10 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import '@/i18n';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
-import { db } from '@/db';
-import type { TypeMap } from '@/sde/types';
+import { db, type BuildPlanRecord } from '@/db';
+import type { BlueprintMap, TypeMap } from '@/sde/types';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
@@ -19,8 +20,23 @@ const TYPES: TypeMap = {
   '300': { name: 'Widget Gamma', groupID: 1, volume: 1 },
 };
 
+// Blueprint 100 -> product 200 ("Widget Alpha" builds "Widget Beta"), for the
+// "Log production…" job-row action's create-a-plan path (issue #1787), which
+// resolves an unmatched job's blueprint through `loadBlueprintCatalog`.
+const BLUEPRINTS: BlueprintMap = {
+  '100': {
+    name: 'Widget Alpha Blueprint',
+    time: 600,
+    materials: [],
+    products: [{ typeID: 200, quantity: 1 }],
+    skills: [],
+    activity: 'manufacturing',
+  },
+};
+
 vi.mock('@/sde/loadSde', () => ({
   loadTypes: vi.fn(async () => TYPES),
+  loadBlueprints: vi.fn(async () => BLUEPRINTS),
   // The row context menu (issue #409) asks usePiPlannable, which reads this.
   loadPi: vi.fn(async () => ({ schematics: {}, raw: [] })),
 }));
@@ -856,6 +872,235 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
       expect(screen.queryByRole('group', { name: 'Filter jobs' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Reset filters' })).not.toBeInTheDocument();
     });
+  });
+});
+
+describe('ActiveJobsPanel: Log production from job (#1787)', () => {
+  function doneJob(overrides: Record<string, unknown> = {}) {
+    return {
+      job_id: 1,
+      activity_id: 1,
+      blueprint_type_id: 100,
+      product_type_id: 200,
+      facility_id: 60003760,
+      station_id: 60003760,
+      runs: 3,
+      cost: 5000,
+      start_date: new Date(NOW.getTime() - 120 * 60_000).toISOString(),
+      end_date: new Date(NOW.getTime() - 10 * 60_000).toISOString(),
+      status: 'active',
+      ...overrides,
+    };
+  }
+
+  function plan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
+    return {
+      id: crypto.randomUUID(),
+      characterId: CHAR_ID,
+      name: 'A plan',
+      blueprintTypeID: 100,
+      runs: 1,
+      me: 0,
+      te: 0,
+      facility: 'npcStation',
+      security: 'highsec',
+      hubId: 'jita',
+      updatedAt: Date.now(),
+      ...overrides,
+    };
+  }
+
+  /** Captures the router's current location so a test can assert where "Log production…" navigated. */
+  function LocationProbe({
+    onLocation,
+  }: {
+    onLocation: (loc: ReturnType<typeof useLocation>) => void;
+  }) {
+    onLocation(useLocation());
+    return null;
+  }
+
+  function renderPanel(onLocation: (loc: ReturnType<typeof useLocation>) => void) {
+    render(
+      <MemoryRouter>
+        <ActiveJobsPanel
+          characterId={CHAR_ID}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable={true}
+          onShowInfo={() => {}}
+        />
+        <LocationProbe onLocation={onLocation} />
+      </MemoryRouter>
+    );
+  }
+
+  beforeEach(async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(NOW);
+    await db.buildPlans.clear();
+  });
+
+  afterEach(() => {
+    // The cross-character test switches these globals; reset so later
+    // describe blocks in this file see the usual single-character defaults.
+    useActiveCharacter.setState({ activeCharacterId: null, hydrated: false });
+    useDefaultCharacterFilter.setState({ value: 'current', hydrated: false });
+  });
+
+  it('offers "Log production…" for a done manufacturing job with a product', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([doneJob()])));
+    renderPanel(() => {});
+
+    await expandJobs();
+    const row = screen.getByText('Widget Alpha').closest('tr')!;
+    fireEvent.contextMenu(row);
+
+    expect(await screen.findByText('Log production…')).toBeInTheDocument();
+  });
+
+  it('omits "Log production…" for a still-running job', async () => {
+    server.use(
+      http.get(jobsUrl(), () =>
+        HttpResponse.json([
+          doneJob({ end_date: new Date(NOW.getTime() + 60 * 60_000).toISOString() }),
+        ])
+      )
+    );
+    renderPanel(() => {});
+
+    await expandJobs();
+    const row = screen.getByText('Widget Alpha').closest('tr')!;
+    fireEvent.contextMenu(row);
+
+    await screen.findByText('Add to Quickbar');
+    expect(screen.queryByText('Log production…')).not.toBeInTheDocument();
+  });
+
+  it('omits "Log production…" for a done job with no product (research/copying/invention)', async () => {
+    server.use(
+      http.get(jobsUrl(), () =>
+        HttpResponse.json([doneJob({ activity_id: 8, product_type_id: undefined })])
+      )
+    );
+    renderPanel(() => {});
+
+    await expandJobs();
+    const row = screen.getByText('Widget Alpha').closest('tr')!;
+    fireEvent.contextMenu(row);
+
+    await screen.findByText('Add to Quickbar');
+    expect(screen.queryByText('Log production…')).not.toBeInTheDocument();
+  });
+
+  it('navigates straight to the single matching plan, seeded with the job’s runs and cost', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([doneJob()])));
+    const target = plan({ id: 'plan-1' });
+    await db.buildPlans.add(target);
+    let location: ReturnType<typeof useLocation> | undefined;
+    renderPanel((loc) => {
+      location = loc;
+    });
+
+    await expandJobs();
+    const row = screen.getByText('Widget Alpha').closest('tr')!;
+    fireEvent.contextMenu(row);
+    fireEvent.click(await screen.findByText('Log production…'));
+
+    await waitFor(() => expect(location?.pathname).toBe('/industry/plans/plan-1'));
+    expect(location?.state).toEqual({ logProductionFromJob: { runs: 3, jobFee: 5000 } });
+  });
+
+  it('offers to create a Build Plan when none builds the job’s blueprint yet, then navigates to it once created', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([doneJob()])));
+    let location: ReturnType<typeof useLocation> | undefined;
+    renderPanel((loc) => {
+      location = loc;
+    });
+
+    await expandJobs();
+    const row = screen.getByText('Widget Alpha').closest('tr')!;
+    fireEvent.contextMenu(row);
+    fireEvent.click(await screen.findByText('Log production…'));
+
+    expect(await screen.findByText('No build plan for Widget Beta')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create Build Plan' }));
+
+    await waitFor(() => expect(location?.pathname).toMatch(/^\/industry\/plans\/.+/));
+    expect(location?.state).toEqual({ logProductionFromJob: { runs: 3, jobFee: 5000 } });
+    const created = await db.buildPlans.toArray();
+    expect(created).toHaveLength(1);
+    expect(created[0].blueprintTypeID).toBe(100);
+    expect(created[0].characterId).toBe(CHAR_ID);
+  });
+
+  it('offers a picker when two or more plans build the job’s blueprint, navigating to whichever is picked', async () => {
+    server.use(http.get(jobsUrl(), () => HttpResponse.json([doneJob()])));
+    await db.buildPlans.bulkAdd([
+      plan({ id: 'plan-a', name: 'Plan A' }),
+      plan({ id: 'plan-b', name: 'Plan B' }),
+    ]);
+    let location: ReturnType<typeof useLocation> | undefined;
+    renderPanel((loc) => {
+      location = loc;
+    });
+
+    await expandJobs();
+    const row = screen.getByText('Widget Alpha').closest('tr')!;
+    fireEvent.contextMenu(row);
+    fireEvent.click(await screen.findByText('Log production…'));
+
+    expect(await screen.findByText('Log production against which plan?')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Plan B'));
+
+    await waitFor(() => expect(location?.pathname).toBe('/industry/plans/plan-b'));
+  });
+
+  it('switches the active character before navigating, for a job owned by a different character in the all-characters view', async () => {
+    const CHAR_B = 92;
+    const JOBS_SCOPE = 'esi-industry.read_character_jobs.v1';
+    await db.characters.bulkPut([
+      { characterId: CHAR_ID, name: 'Pilot One', ownerHash: 'oh1', addedAt: 1 },
+      { characterId: CHAR_B, name: 'Pilot Two', ownerHash: 'oh2', addedAt: 2 },
+    ]);
+    await db.tokens.bulkPut([
+      {
+        characterId: CHAR_ID,
+        accessToken: 'a',
+        refreshToken: 'r',
+        expiresAt: Date.now() + 6e5,
+        scopes: [JOBS_SCOPE],
+      },
+      {
+        characterId: CHAR_B,
+        accessToken: 'a',
+        refreshToken: 'r',
+        expiresAt: Date.now() + 6e5,
+        scopes: [JOBS_SCOPE],
+      },
+    ]);
+    useDefaultCharacterFilter.setState({ value: 'all', hydrated: true });
+    useActiveCharacter.setState({ activeCharacterId: CHAR_ID, hydrated: true });
+    server.use(
+      http.get(jobsUrl(), () => HttpResponse.json([])),
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_B}/industry/jobs`, () =>
+        HttpResponse.json([doneJob()])
+      )
+    );
+    const targetPlan = plan({ id: 'plan-b-owned', characterId: CHAR_B });
+    await db.buildPlans.add(targetPlan);
+
+    let location: ReturnType<typeof useLocation> | undefined;
+    renderPanel((loc) => {
+      location = loc;
+    });
+
+    await expandJobs();
+    const row = screen.getByText('Widget Alpha').closest('tr')!;
+    fireEvent.contextMenu(row);
+    fireEvent.click(await screen.findByText('Log production…'));
+
+    await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_B));
+    expect(location?.pathname).toBe('/industry/plans/plan-b-owned');
   });
 });
 

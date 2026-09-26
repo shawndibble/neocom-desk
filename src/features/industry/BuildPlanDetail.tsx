@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import { useTranslation } from 'react-i18next';
 import {
@@ -62,6 +62,7 @@ import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import type { BuildPlanRecord } from '@/db';
+import type { JobProductionSeed } from './logProductionFromJob';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
@@ -228,6 +229,24 @@ interface BuildPlanDetailProps {
    * route-agnostic; `IndustryPlanPage.tsx` supplies it.
    */
   onSearchBpcSourcing: (blueprintTypeID: number) => void;
+  /**
+   * A completed job's runs/cost, carried from Active Jobs' "Log
+   * production…" row action (issue #1787) via `IndustryPlanPage`'s
+   * navigation state — this is the one plan the pilot (or the dialog that
+   * resolved it) already picked as the job's target. Opens Log Production
+   * prefilled with the job's own numbers instead of the plan's live
+   * estimate. Absent for every other way this page is reached.
+   */
+  pendingLogProduction?: JobProductionSeed | null;
+  /**
+   * Identifies *which* navigation `pendingLogProduction` arrived with
+   * (`location.key`) — every `navigate()` call gets a fresh one, even to
+   * this same route, which is what lets a job whose matching plan is the
+   * one already open still open Log Production on a second click instead of
+   * being a no-op (issue #1787 review). Required whenever
+   * `pendingLogProduction` is set.
+   */
+  pendingLogProductionKey?: string;
 }
 
 /**
@@ -259,6 +278,8 @@ export function BuildPlanDetail({
   onShowInfo,
   groupSnapshot,
   onSearchBpcSourcing,
+  pendingLogProduction,
+  pendingLogProductionKey,
 }: BuildPlanDetailProps) {
   const { t } = useTranslation();
 
@@ -341,6 +362,37 @@ export function BuildPlanDetail({
   const costsExpanded = costsOpen ?? isDesktop;
   const [breakdownOpen, setBreakdownOpen] = useState(false);
   const [logRequest, setLogRequest] = useState(0);
+  /**
+   * `pendingLogProduction`'s application, keyed off `pendingLogProductionKey`
+   * (`location.key`) rather than mount alone: a job whose matching plan is
+   * the one already open navigates to this same route, which doesn't remount
+   * this component, so a mount-only effect would treat a second "Log
+   * production…" click as a no-op (issue #1787 review). Re-applying is keyed
+   * to the *navigation*, not the render, so an unrelated re-render can't
+   * replay it either. `logRequest`'s bump must still land as a genuine
+   * increase *after* `ProductionRunsPanel`'s own mount/last-seen baseline —
+   * that panel only opens on `logRequest > (whatever it last saw)` — which
+   * reading the current value here (rather than a functional update)
+   * guarantees.
+   */
+  const [jobLogSeed, setJobLogSeed] = useState<{
+    request: number;
+    quantity: number;
+    jobFee: number;
+  } | null>(null);
+  const appliedLogProductionKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pendingLogProduction || !blueprint) return;
+    if (appliedLogProductionKeyRef.current === pendingLogProductionKey) return;
+    appliedLogProductionKeyRef.current = pendingLogProductionKey ?? null;
+    const quantity = blueprint.products[0]
+      ? blueprint.products[0].quantity * pendingLogProduction.runs
+      : 0;
+    const nextRequest = logRequest + 1;
+    setJobLogSeed({ request: nextRequest, quantity, jobFee: pendingLogProduction.jobFee });
+    setLogRequest(nextRequest);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `logRequest` deliberately omitted: reapplying is gated on `pendingLogProductionKey` changing, not on `logRequest` itself, which this effect also writes
+  }, [pendingLogProduction, pendingLogProductionKey, blueprint]);
   // One source for both the index that is fetched and the name that labels it,
   // so the two can never disagree. A plan holding only half the pair (an id
   // with no name, or the reverse) builds at its hub — see `BuildPlanRecord`.
@@ -1870,13 +1922,23 @@ export function BuildPlanDetail({
         characterId={plan.characterId}
         buildPlanId={plan.id}
         defaults={
-          result
+          jobLogSeed && jobLogSeed.request === logRequest
             ? {
-                quantity: productQuantity ?? 0,
-                materialCost: result.materialCost,
-                jobFee: result.jobFee.total,
+                quantity: jobLogSeed.quantity,
+                // The job seed only speaks to quantity and job fee — material
+                // cost is a plan-level estimate, not something a job carries,
+                // so it still comes from the plan's own live result where
+                // that's ready (falling back to 0 only until pricing is).
+                materialCost: result?.materialCost ?? 0,
+                jobFee: jobLogSeed.jobFee,
               }
-            : null
+            : result
+              ? {
+                  quantity: productQuantity ?? 0,
+                  materialCost: result.materialCost,
+                  jobFee: result.jobFee.total,
+                }
+              : null
         }
         productTypeID={entry.productTypeID}
         productName={entry.productName}
