@@ -803,15 +803,22 @@ export function DataTable<T>({
                 }
               >
                 {sortable ? (
-                  <span className="flex items-center">
+                  <span
+                    className={cx(
+                      'flex items-center',
+                      column.align === 'center' && 'justify-center'
+                    )}
+                  >
                     <button
                       type="button"
                       onClick={() => toggleSort(column)}
                       className={cx(
                         headerTextClass[i],
-                        'inline-flex flex-1 items-center gap-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
-                        column.align === 'right' && 'justify-end',
-                        column.align === 'center' && 'justify-center'
+                        'inline-flex items-center gap-1 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
+                        // Only a right-aligned label fills the cell (it is
+                        // already pushed against the "?"); left/center ones
+                        // stay content-width so the "?" sits beside them.
+                        column.align === 'right' && 'flex-1 justify-end'
                       )}
                     >
                       {column.header}
