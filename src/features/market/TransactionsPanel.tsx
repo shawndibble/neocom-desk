@@ -9,10 +9,11 @@ import {
   IconButton,
   Panel,
   Spinner,
+  Tooltip,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { loadWalletTransactions } from '@/features/character/wallet';
+import { loadWalletJournal, loadWalletTransactions } from '@/features/character/wallet';
 import { ItemContextMenu } from './ItemContextMenu';
 import { TransactionsDayList } from './TransactionsDayList';
 import { TransactionsSummaryStrip } from './TransactionsSummaryStrip';
@@ -40,33 +41,46 @@ import {
   transactionTotal,
   walletTransactionsCsvColumns,
 } from '@/features/character/walletTransactionsCsv';
-import type { WalletTransaction } from '@/esi/endpoints';
+import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
+import { transactionMargins } from './transactionMargins';
 import { HistoryViewSelect, type HistoryView } from './HistoryViewSelect';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { highlightedTransactionId } from './transactionHighlight';
 
 /** Stable identity, so the fallback doesn't invalidate the column memo every render. */
 const NO_TYPE_NAMES: ReadonlyMap<number, string> = new Map();
+const NO_JOURNAL: readonly WalletJournalEntry[] = [];
 
 interface Snapshot {
   transactionsResult: CachedResult<WalletTransaction[]> | null;
   /** The fetch stopped at the transactions page cap; older history is missing. */
   transactionsTruncated: boolean;
   typeNames: Map<number, string>;
+  /** Only for the Margin column's sales tax lines; null when it couldn't be read. */
+  journal: WalletJournalEntry[] | null;
 }
 
 async function loadTransactionsSnapshot(
   characterId: number,
   signal: RouteSnapshotSignal
 ): Promise<Snapshot> {
-  const transactionsResult = await loadWalletTransactions(characterId);
+  // A journal that fails to load only blanks the Margin column, never the tab.
+  const [transactionsResult, journalResult] = await Promise.all([
+    loadWalletTransactions(characterId),
+    loadWalletJournal(characterId).catch(() => null),
+  ]);
   const transactionsTruncated = transactionsResult?.truncated ?? false;
   // Already superseded: skip the ESI name resolve, its result would be discarded.
   const typeIds = signal.cancelled
     ? []
     : [...new Set((transactionsResult?.data ?? []).map((txn) => txn.type_id))];
   const typeNames = await loadTypeNames(typeIds);
-  return { transactionsResult, transactionsTruncated, typeNames };
+  return {
+    transactionsResult,
+    transactionsTruncated,
+    typeNames,
+    journal: journalResult?.data ?? null,
+  };
 }
 
 /**
@@ -75,8 +89,9 @@ async function loadTransactionsSnapshot(
  * the corporation's fills live on the corp side of `/wallet`, beside the corp
  * journal they reconcile against (issue #570). Desktop carries the same
  * search / side / date filter bar as that panel, plus the Sold / Bought / Net
- * strip over the rows left (issue #1738); the phone day list keeps its own
- * strip and no filter bar.
+ * strip over the rows left (issue #1738), and a Margin column priced from
+ * the character's own wallet buys (issue #1740); the phone day list keeps its
+ * own strip and no filter bar or margin.
  */
 interface TransactionsPanelProps {
   /** Switches the History tab to its other view; the picker lives in this panel's header. */
@@ -119,6 +134,9 @@ export function TransactionsPanel({
     () => [...(transactionsResult?.data ?? [])].sort((a, b) => b.date.localeCompare(a.date)),
     [transactionsResult]
   );
+  const journal = data?.journal ?? NO_JOURNAL;
+  // Worked out over every fill, not the filtered rows — a filter must not change what a sale cost.
+  const margins = useMemo(() => transactionMargins(transactions, journal), [transactions, journal]);
 
   // One filter bar on this tab, so the scope key never changes and the
   // filter never needs `useUrlFilter`'s scope-reset.
@@ -197,8 +215,35 @@ export function TransactionsPanel({
         render: (txn) => formatIsk(transactionTotal(txn), 2),
         sortValue: (txn) => transactionTotal(txn),
       },
+      {
+        id: 'margin',
+        header: t('wallet.margin'),
+        headerTooltip: t('wallet.marginTooltip'),
+        align: 'right',
+        className: 'tabular-nums',
+        cellClassName: (txn) => {
+          const margin = margins.get(txn.transaction_id);
+          return margin ? iskToneClass(margin.margin) : 'text-text-dim';
+        },
+        render: (txn) => {
+          if (txn.is_buy) return null;
+          const margin = margins.get(txn.transaction_id);
+          if (!margin) return '—';
+          return (
+            <Tooltip
+              content={t('wallet.marginWorking', {
+                unitCost: formatIsk(margin.unitCost, 2),
+                salesTax: formatIsk(margin.salesTax, 2),
+              })}
+            >
+              <span>{formatIsk(margin.margin, 2)}</span>
+            </Tooltip>
+          );
+        },
+        sortValue: (txn) => margins.get(txn.transaction_id)?.margin,
+      },
     ],
-    [t, typeNames, timeZone, nameFor]
+    [t, typeNames, timeZone, nameFor, margins]
   );
 
   /** Same menu the Appraisal ledger carries — a transaction row names an item like any other. */
