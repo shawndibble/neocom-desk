@@ -347,3 +347,98 @@ export interface PiData {
    */
   planetTypeByTypeId: Record<string, PlanetType>;
 }
+
+/** One skill level a Ship Tree hull or class asks for. */
+export interface ShipTreeSkill {
+  skillTypeID: number;
+  level: number;
+}
+
+/**
+ * One bonus line from a hull's traits (Fuzzwork `invTraits`). `skillTypeID`
+ * null is a role bonus (flat, not per skill level); `bonus` null is a
+ * bonus with no number ("Can use one Command Burst module").
+ */
+export interface ShipTreeTrait {
+  skillTypeID: number | null;
+  bonus: number | null;
+  /** eveUnits display name, e.g. "%" — empty when the unit has none. */
+  unit: string;
+  /** Plain text, markup stripped. */
+  text: string;
+}
+
+/**
+ * A hull's unskilled fitting numbers, straight from its dogma attributes —
+ * what the Ship Info window's Fitting tab shows before the pilot's skills.
+ * Every field is 0 when the hull has none.
+ */
+export interface ShipTreeHullStats {
+  highSlots: number;
+  medSlots: number;
+  lowSlots: number;
+  rigSlots: number;
+  /** 0 on hulls without rigs; 1 small, 2 medium, 3 large, 4 capital (attr 1547). */
+  rigSize: number;
+  turretHardpoints: number;
+  launcherHardpoints: number;
+  cpu: number;
+  powergrid: number;
+  calibration: number;
+  /** m³. */
+  droneBay: number;
+  /** Mbit/s. */
+  droneBandwidth: number;
+}
+
+/** One hull on the Ship Tree. */
+export interface ShipTreeShip {
+  typeID: number;
+  name: string;
+  factionID: number;
+  /** shipTreeGroups id — the Ship Tree class, not the inventory group. */
+  treeGroupID: number;
+  techLevel: number;
+  metaLevel: number;
+  /** The hull's own required skills (Fuzzwork `shipSkills`). */
+  required: ShipTreeSkill[];
+  traits: ShipTreeTrait[];
+  stats: ShipTreeHullStats;
+  /** invTypes description, markup stripped. */
+  description: string;
+}
+
+/** A class prerequisite; `display` false is an implicit one the game doesn't draw. */
+export interface ShipTreeClassSkill extends ShipTreeSkill {
+  display: boolean;
+}
+
+/** One Ship Tree class (Frigate, Assault Frigate, Carrier…). */
+export interface ShipTreeGroup {
+  id: number;
+  name: string;
+  description: string;
+  /** Icon basename, lower-cased: `public/images/ship-tree/class/<icon>.png`. */
+  icon: string;
+  /** Faction id -> the skills that unlock this class for that faction. */
+  prereqsByFaction: Record<string, ShipTreeClassSkill[]>;
+}
+
+/** One faction tab on the Ship Tree. */
+export interface ShipTreeFaction {
+  id: number;
+  name: string;
+  description: string;
+}
+
+/**
+ * public/data/shipTree.json — the in-game Ship Tree's contents, built from
+ * Fuzzwork's `shipTree*`, `invTraits` and `shipSkills` tables. The tree's
+ * *shape* (which class hangs off which) is not in the SDE and lives in
+ * `engine/shipTree/templates.ts`.
+ */
+export interface ShipTreeData {
+  factions: ShipTreeFaction[];
+  groups: Record<string, ShipTreeGroup>;
+  ships: ShipTreeShip[];
+}
