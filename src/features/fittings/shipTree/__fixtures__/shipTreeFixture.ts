@@ -147,7 +147,11 @@ export const MASTERIES: MasteryMap = {
     [{ skillTypeID: SPACESHIP_COMMAND, level: 5 }],
   ],
   [CROW]: [
-    [{ skillTypeID: INTERCEPTORS, level: 1 }],
+    // Level 0: CCP lists the skill under the tier but asks for nothing yet.
+    [
+      { skillTypeID: INTERCEPTORS, level: 1 },
+      { skillTypeID: GALLENTE_FRIGATE, level: 0 },
+    ],
     [{ skillTypeID: INTERCEPTORS, level: 3 }],
     [],
     [],

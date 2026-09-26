@@ -20,3 +20,9 @@ export const useShipTreeViewPreference = createLocalSetting<ShipTreeView | null>
 export function resolveShipTreeView(stored: ShipTreeView | null, isPhone: boolean): ShipTreeView {
   return stored ?? (isPhone ? 'ladder' : 'map');
 }
+
+/** Ship Info › Skills & Mastery "Show missing": hide what's already trained. Device-local, sticks across hulls. */
+export const useShipInfoShowMissing = createLocalSetting<boolean>({
+  key: 'shipInfoShowMissing',
+  defaultValue: false,
+});

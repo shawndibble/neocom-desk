@@ -3,11 +3,12 @@
  * Mastery tiers I–V as in game — a button per tier, checked once trained,
  * V in gold — each listing that tier's skills. "Add tier N to plan" puts
  * everything still untrained for tiers I..N into the target Skill Plan.
+ * "Show missing" hides what's already trained, in both lists; it sticks.
  * No active Character: names and levels only, nothing to add.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Button, FilterChip } from '@/components/ui';
 import { Done } from '@/components/ui/icons';
 import { romanLevel } from '@/engine/projection';
 import type { PlanEntry } from '@/engine/types';
@@ -19,6 +20,7 @@ import type { TargetPlan } from '@/features/skills/useTargetPlan';
 import { cx } from '@/lib/cx';
 import type { ShipTreeShip } from '@/sde/types';
 import { masteryTierEntries, tierComplete } from './shipTreeModel';
+import { useShipInfoShowMissing } from './shipTreeViewPreference';
 import type { ShipTreeSource } from './useShipTreeData';
 
 const TIERS = [1, 2, 3, 4, 5] as const;
@@ -48,6 +50,16 @@ export function SkillsMasteryTab({
   const mastery = source.statuses.get(ship.typeID)?.mastery ?? 0;
   const tiers = source.masteries[String(ship.typeID)];
   const [tier, setTier] = useState(() => Math.min(5, mastery + 1));
+  const storedShowMissing = useShipInfoShowMissing((state) => state.value);
+  const setShowMissing = useShipInfoShowMissing((state) => state.setValue);
+  const hydrateShowMissing = useShipInfoShowMissing((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateShowMissing();
+  }, [hydrateShowMissing]);
+  // Without a Character nothing is trained, so there is nothing to hide.
+  const showMissing = hasCharacter && storedShowMissing;
+  const missing = (p: { skillTypeID: number; level: number }) =>
+    trainedLevel(p.skillTypeID) < p.level;
 
   const skillNames = useMemo(() => {
     const names: Record<number, string> = {};
@@ -56,7 +68,10 @@ export function SkillsMasteryTab({
   }, [ship, skillName]);
 
   const hasTiers = !!tiers && tiers.some((bundle) => bundle.length > 0);
-  const tierSkills = tiers?.[tier - 1] ?? [];
+  // Level 0: CCP lists the skill under the tier but asks for nothing yet.
+  const tierBundle = (tiers?.[tier - 1] ?? []).filter((p) => p.level > 0);
+  const tierSkills = showMissing ? tierBundle.filter(missing) : tierBundle;
+  const requiredSkills = showMissing ? ship.required.filter(missing) : ship.required;
   const toAdd = hasTiers ? masteryTierEntries(tiers, tier, trainedLevel) : [];
 
   async function addTier() {
@@ -67,8 +82,20 @@ export function SkillsMasteryTab({
 
   return (
     <div className="space-y-4 text-xs">
+      {hasCharacter && (
+        <div className="flex justify-end">
+          <FilterChip
+            label={t('ships.info.skills.showMissing')}
+            selected={showMissing}
+            onToggle={() => void setShowMissing(!showMissing)}
+          />
+        </div>
+      )}
+      {showMissing && requiredSkills.length === 0 && ship.required.length > 0 && (
+        <p className="text-text-dim">{t('ships.info.skills.requiredAllTrained')}</p>
+      )}
       <RequiredSkillsSection
-        requiredSkills={ship.required}
+        requiredSkills={requiredSkills}
         skillNames={skillNames}
         trainedSkills={trainedSkills}
         target={target}
@@ -118,7 +145,13 @@ export function SkillsMasteryTab({
               })}
             </div>
             {tierSkills.length === 0 ? (
-              <p className="text-text-dim">{t('ships.info.skills.tierEmpty')}</p>
+              <p className="text-text-dim">
+                {t(
+                  tierBundle.length > 0
+                    ? 'ships.info.skills.tierAllTrained'
+                    : 'ships.info.skills.tierEmpty'
+                )}
+              </p>
             ) : (
               <ul className="space-y-1">
                 {tierSkills.map((p) => {

@@ -14,7 +14,7 @@ import { FITTING_EDIT_PATH } from '../fittingRoutes';
 import { INTERCEPTORS, MERLIN } from './__fixtures__/shipTreeFixture';
 import { clearShipTreeCatalogCache } from './shipTreeCatalogs';
 import { ShipTreeTab } from './ShipTreeTab';
-import { useShipTreeViewPreference } from './shipTreeViewPreference';
+import { useShipInfoShowMissing, useShipTreeViewPreference } from './shipTreeViewPreference';
 
 vi.mock('@/engine/fitting/fittingShare', async (importOriginal) => {
   const real = await importOriginal<typeof import('@/engine/fitting/fittingShare')>();
@@ -155,6 +155,7 @@ beforeEach(async () => {
   clearShipTreeCatalogCache();
   useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
   await useShipTreeViewPreference.getState().setValue('map');
+  await useShipInfoShowMissing.getState().setValue(false);
   vi.mocked(target.addEntries).mockClear();
 });
 
@@ -230,6 +231,43 @@ describe('Ship Info window', () => {
       'Crow'
     );
     expect(await screen.findByText(/Added 1 skill to Crow/)).toBeVisible();
+  });
+
+  it('Skills & Mastery: a tier lists only the skills it asks a level of', async () => {
+    const { user, dialog } = await openShip(/^Crow/);
+    await user.click(within(dialog).getByRole('tab', { name: 'Skills & Mastery' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Tier I' }));
+    expect(within(dialog).queryByText(/Gallente Frigate/)).not.toBeInTheDocument();
+  });
+
+  it('Skills & Mastery: Show missing hides what the pilot already has trained', async () => {
+    const { user, dialog } = await openShip(/^Crow/);
+    await user.click(within(dialog).getByRole('tab', { name: 'Skills & Mastery' }));
+    expect(within(dialog).getByText('Caldari Frigate')).toBeVisible();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Show missing' }));
+    expect(within(dialog).getByRole('button', { name: 'Show missing' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    // Caldari Frigate IV is trained; Interceptors isn't, in the required list or tier I.
+    expect(within(dialog).queryByText('Caldari Frigate')).not.toBeInTheDocument();
+    expect(within(dialog).getAllByText(/^Interceptors/).length).toBeGreaterThan(0);
+  });
+
+  it('Skills & Mastery: Show missing on a fully trained hull says there is nothing left', async () => {
+    const { user, dialog } = await openShip(/^Merlin/);
+    await user.click(within(dialog).getByRole('tab', { name: 'Skills & Mastery' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Show missing' }));
+    expect(within(dialog).getByText('All required skills trained.')).toBeVisible();
+    expect(within(dialog).getByText('Every skill in this tier is trained.')).toBeVisible();
+  });
+
+  it('Skills & Mastery: no Show missing without a Character', async () => {
+    useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
+    const { user, dialog } = await openShip(/^Merlin/);
+    await user.click(within(dialog).getByRole('tab', { name: 'Skills & Mastery' }));
+    expect(within(dialog).queryByRole('button', { name: 'Show missing' })).not.toBeInTheDocument();
   });
 
   it('Skills & Mastery: a fully trained hull checks every tier', async () => {

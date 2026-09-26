@@ -160,6 +160,9 @@
       },
       "skills": {
         "masteryTitle": "Mastery",
+        "showMissing": "Show missing",
+        "requiredAllTrained": "All required skills trained.",
+        "tierAllTrained": "Every skill in this tier is trained.",
         "masteryLevel": "You have Mastery Level {{level}}",
         "masteryLevelNone": "You have no Mastery Level yet",
         "noMasteries": "No Mastery data for this hull.",
