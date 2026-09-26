@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Tooltip } from '@/components/ui';
+import { Button, Tooltip } from '@/components/ui';
 import type { AlphaBlocker } from '@/engine/fittings/alphaClone';
 import { romanLevel } from '@/engine/projection';
 
@@ -38,14 +38,9 @@ export function AlphaCloneChip({ blockers, skillName }: AlphaCloneChipProps) {
       ];
   return (
     <Tooltip content={lines.join('\n')} openOnTap>
-      <button
-        type="button"
-        className={`inline-flex min-h-11 items-center rounded-xs border px-2 text-[0.6875rem] font-semibold tracking-widest uppercase md:min-h-7 ${
-          ok ? 'border-success/60 text-success' : 'border-line-bright text-text-dim'
-        }`}
-      >
+      <Button variant={ok ? 'success' : 'ghost'}>
         {t(ok ? 'fittings.alpha.ok' : 'fittings.alpha.omega')}
-      </button>
+      </Button>
     </Tooltip>
   );
 }
