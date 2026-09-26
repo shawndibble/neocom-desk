@@ -303,6 +303,8 @@ export interface UniverseType {
   published: boolean;
   /** Absent for types with no volume (e.g. skills, some non-item types). */
   volume?: number;
+  /** m3 once packaged — what a hauler's hold actually carries. Absent where packaging changes nothing. */
+  packaged_volume?: number;
   /** Absent for types with no dogma (most non-item types). */
   dogma_attributes?: DogmaAttribute[];
   /** The type's dogma effects — e.g. `turretFitted` (42) / `launcherFitted` (40) on a weapon. */

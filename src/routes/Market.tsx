@@ -84,6 +84,7 @@ import { OpenOrdersPanel } from '@/features/market/OpenOrdersPanel';
 import { OrderHistoryPanel } from '@/features/market/OrderHistoryPanel';
 import { TransactionsPanel } from '@/features/market/TransactionsPanel';
 import { AppraisalPanel } from '@/features/market/AppraisalPanel';
+import { HaulingPanel } from '@/features/market/HaulingPanel';
 import { useAppraisal } from '@/features/market/useAppraisal';
 import { tradeHubStanding, useTradeHubStandings } from '@/features/market/useTradeHubStandings';
 import { useMarketPricePercent } from '@/features/market/pricePercent';
@@ -935,6 +936,7 @@ export function Market() {
           { id: 'orders', label: t('market.sections.openOrders') },
           { id: 'history', label: t('market.sections.history') },
           { id: 'appraisal', label: t('market.sections.appraisal') },
+          { id: 'hauling', label: t('market.sections.hauling') },
         ]}
       />
 
@@ -990,6 +992,8 @@ export function Market() {
           defaultCompareExpanded={expandCompareOnAppraisal}
         />
       )}
+
+      {tab === 'hauling' && <HaulingPanel />}
 
       {tab === 'browser' && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">

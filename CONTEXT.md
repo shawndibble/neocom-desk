@@ -924,6 +924,11 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   the same question for a corporation and shares the severity ladder but not
   the layout.
 - **Trade Hub**: A market station/region the user picks for price lookups in a Build Plan.
+- **Hauling Opportunities**: The Market page's Hauling tab (`/market/hauling`): items worth buying at one **Trade Hub** to sell at another, scanned per market category, priced at an **Expected Sell Price** and sized to a **Trip Plan**. Not a price-gap list — see `docs/context/decisions/` (Hauling Opportunities v1 scope).
+- **Expected Sell Price**: What a hauler should expect per unit at the destination hub if they list to sell: the lower of one tick under the cheapest listing and the volume-weighted median price the item sold at recently. Never above today's cheapest listing, and never the cheapest listing that every other user of a price-gap tool sees too. `estimateSale` in `src/engine/market/haulingMarket.ts`.
+- **Days to Sell**: How long the units listed within 1% of the **Expected Sell Price** (they will relist below the hauler), plus about one day's worth of the hauler's own, take to sell at the region's recent sales rate. Not **Traded Volume** (units sold), and not a promise for the whole load.
+- **Cargo Space**: The m³ a hauler can carry, chosen once per device as a ship's base hold, a saved **Fitting**'s exact hold or a typed number. Optional: without it a **Trip Plan** stops only at sales and profitable supply. Hauled volume is the packaged volume where a type has one.
+- **Trip Plan**: The suggested load for one hold on one route: a quantity per item capped by a week of sales, the units worth buying at all, the remaining **Cargo Space** and an optional ISK budget, with the limit that applied named on each line. A suggestion the user edits by unticking or typing a quantity; the multibuy list copies from it (`planTrip`, `multibuyText` in `src/engine/market/haulingPlan.ts`).
 - **Training Progress**: How much SP a Character has already banked toward
   the level it is training _right now_. Distinct from **Trained Skills**,
   which is levels finished. ESI reports it in two places that disagree:
