@@ -194,6 +194,8 @@ export interface FoldedRowProps {
   /** Null while the domain's read is still in flight — no glyph rather than a guessed one. */
   severity: DeadlineSeverity | null;
   to: string;
+  /** Tones the summary as a problem — for a summary that states one ("1 overdue"). */
+  danger?: boolean;
 }
 
 /**
@@ -210,7 +212,7 @@ export interface FoldedRowProps {
  * colonies have stopped" still tells you where to tap, and the reverse does
  * not.
  */
-export function FoldedRow({ domain, summary, severity, to }: FoldedRowProps) {
+export function FoldedRow({ domain, summary, severity, to, danger }: FoldedRowProps) {
   const { t } = useTranslation();
   return (
     <li className="border-b border-line last:border-b-0">
@@ -225,7 +227,11 @@ export function FoldedRow({ domain, summary, severity, to }: FoldedRowProps) {
           {severity && <SeverityIcon severity={severity} />}
         </span>
         <span className="min-w-0 flex-1 truncate text-xs">{domain}</span>
-        <span className="shrink-0 text-[0.6875rem] whitespace-nowrap text-text-dim">{summary}</span>
+        <span
+          className={`shrink-0 text-[0.6875rem] whitespace-nowrap ${danger ? 'text-danger' : 'text-text-dim'}`}
+        >
+          {summary}
+        </span>
         <Icon.Descend
           size={Icon.ICON_SIZE.sm}
           className="shrink-0 text-accent"

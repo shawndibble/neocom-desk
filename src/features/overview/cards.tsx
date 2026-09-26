@@ -29,10 +29,15 @@ import { BoardCard, FoldedRow, NumberTile, TileRow, TriageRow } from './BoardCar
 import {
   industrySeverity,
   jobSeverity,
+  contractsSeverity,
   miningTaxSeverity,
   planetarySeverity,
 } from './boardSeverity';
-import type { MiningTaxBoardData, PlanetaryBoardData } from './boardData';
+import { contractsDeadlineNote } from './boardSummary';
+import type { ContractsBoardData, MiningTaxBoardData, PlanetaryBoardData } from './boardData';
+
+/** The Contracts History table filtered to accepted contracts — the courier hauls the card counts. */
+export const CONTRACTS_IN_PROGRESS_HREF = '/contracts/history?history.status=in_progress';
 
 /** How many rows a card shows before deferring to its own page. */
 const ROW_LIMIT = 4;
@@ -202,6 +207,51 @@ export function MiningTaxCard({ data }: { data: MiningTaxBoardData | null }) {
           label={t('overview.board.unassigned')}
           value={data?.needsReauth ? UNKNOWN : (data?.unassignedCount ?? 0)}
           severity="watch"
+        />
+      </TileRow>
+    </BoardCard>
+  );
+}
+
+// --- Contracts ------------------------------------------------------------
+
+/**
+ * Only the contracts on a clock: accepted couriers, and the pilot's own
+ * listings in their last day. Everything longer-dated is deliberately absent —
+ * see `engine/contractsBoard`.
+ */
+export function ContractsCard({ data }: { data: ContractsBoardData | null }) {
+  const { t } = useTranslation();
+  const note = data === null || data.needsReauth ? null : contractsDeadlineNote(t, data);
+  return (
+    <BoardCard
+      title={t('overview.board.contracts')}
+      meta={
+        <SeverityWord
+          severity={contractsSeverity(data)}
+          warningLabel={data?.needsReauth ? REAUTH_WORD : undefined}
+        />
+      }
+      to={CONTRACTS_IN_PROGRESS_HREF}
+      openLabel={t('overview.board.open')}
+      footer={
+        data === null
+          ? t('overview.board.checking')
+          : data.needsReauth
+            ? t('overview.board.reauth')
+            : (note ?? t('overview.board.contractsNothingDue'))
+      }
+    >
+      <TileRow>
+        <NumberTile
+          label={t('overview.board.contractsInProgressTile')}
+          value={data?.needsReauth ? UNKNOWN : (data?.summary.inProgress ?? 0)}
+          severity="watch"
+        />
+        <NumberTile
+          label={t('overview.board.contractsDueTile')}
+          value={data?.needsReauth ? UNKNOWN : (data?.summary.dueSoon ?? 0)}
+          severity={data && data.summary.overdue > 0 ? 'critical' : 'warning'}
         />
       </TileRow>
     </BoardCard>
@@ -474,6 +524,7 @@ export interface FoldedDomain {
   summary: string;
   severity: DeadlineSeverity | null;
   to: string;
+  danger?: boolean;
 }
 
 /**
@@ -502,6 +553,7 @@ export function EverythingElseCard({ domains }: { domains: readonly FoldedDomain
             summary={entry.summary}
             severity={entry.severity}
             to={entry.to}
+            danger={entry.danger}
           />
         ))}
       </ul>

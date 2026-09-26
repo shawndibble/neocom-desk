@@ -53,6 +53,8 @@ import {
 import { SummaryStrip } from '@/features/overview/SummaryStrip';
 import {
   AlertsColumn,
+  CONTRACTS_IN_PROGRESS_HREF,
+  ContractsCard,
   EverythingElseCard,
   IndustryCard,
   MiningTaxCard,
@@ -61,11 +63,13 @@ import {
   type FoldedDomain,
 } from '@/features/overview/cards';
 import {
+  loadContractsBoard,
   loadIndustryBoard,
   loadMiningTaxBoard,
   loadPlanetaryBoard,
 } from '@/features/overview/boardData';
 import {
+  contractsSeverity,
   industrySeverity,
   miningTaxSeverity,
   ordersSeverity,
@@ -73,6 +77,8 @@ import {
 } from '@/features/overview/boardSeverity';
 import {
   alertsSummary,
+  contractsDeadlineNote,
+  contractsSummary,
   industrySummary,
   miningTaxSummary,
   ordersSummary,
@@ -192,6 +198,9 @@ export function Overview() {
   });
   const industrySnapshot = useRouteSnapshot(loadIndustryBoard, undefined, {
     cacheKey: 'overview:industry',
+  });
+  const contractsSnapshot = useRouteSnapshot(loadContractsBoard, undefined, {
+    cacheKey: 'overview:contracts',
   });
   const { hydrated, activeCharacterId } = walletSnapshot;
 
@@ -343,6 +352,17 @@ export function Overview() {
       to: '/skills/plans',
     });
   }
+  const contracts = contractsSnapshot.data;
+  const contractsNote = contracts ? contractsDeadlineNote(t, contracts) : null;
+  const soonestContract = contracts?.summary.soonest;
+  if (contracts && soonestContract && contractsNote !== null) {
+    deadlines.push({
+      at: soonestContract.atMs,
+      note: contractsNote,
+      severity: soonestContract.overdue ? 'critical' : 'warning',
+      to: CONTRACTS_IN_PROGRESS_HREF,
+    });
+  }
   const soonest = deadlines.sort((a, b) => a.at - b.at)[0] ?? null;
 
   const walletBalance = walletSnapshot.data?.result?.data ?? null;
@@ -412,7 +432,18 @@ export function Overview() {
       ? Number(a.severity === null) - Number(b.severity === null)
       : compareSeverity(a.severity, b.severity)
   );
-  const fullCards = isPhone ? ranked.slice(0, PHONE_FULL_COUNT) : cards;
+  /*
+   * Contracts sits outside the ranking, like Alerts: on a phone it is always a
+   * folded row (a courier is one line), and on desktop it takes the slot after
+   * Mining Tax. It is not a fifth domain competing for a phone's two full cards.
+   */
+  const contractsCard = {
+    key: 'contracts',
+    render: () => <ContractsCard data={contracts} />,
+  };
+  const fullCards = isPhone
+    ? ranked.slice(0, PHONE_FULL_COUNT)
+    : [...cards.slice(0, 2), contractsCard, ...cards.slice(2)];
 
   /*
    * Alerts leads the folded list instead of competing for a full card, and is
@@ -434,6 +465,14 @@ export function Overview() {
           summary: alertsSummary(t, visibleAlerts.length, alertGroups.length),
           severity: worstSeverity(alertGroups.map((group) => group.severity)),
           to: '/alerts',
+        },
+        {
+          key: 'contracts',
+          domain: t('overview.board.contracts'),
+          summary: contractsSummary(t, contracts, now),
+          severity: contractsSeverity(contracts),
+          to: CONTRACTS_IN_PROGRESS_HREF,
+          danger: (contracts?.summary.overdue ?? 0) > 0,
         },
         ...ranked.slice(PHONE_FULL_COUNT),
       ]
@@ -494,12 +533,14 @@ export function Overview() {
           planetarySnapshot.data?.fetchedAt,
           industrySnapshot.data?.fetchedAt,
           miningSnapshot.data?.fetchedAt,
+          contractsSnapshot.data?.fetchedAt,
         ])}
         onRefresh={() => {
           walletSnapshot.refresh();
           skillsQueueSnapshot.refresh();
           ordersSnapshot.refresh();
           miningSnapshot.refresh();
+          contractsSnapshot.refresh();
           planetarySnapshot.refresh();
           industrySnapshot.refresh();
         }}
@@ -508,7 +549,8 @@ export function Overview() {
           planetarySnapshot.loading ||
           industrySnapshot.loading ||
           ordersSnapshot.loading ||
-          miningSnapshot.loading
+          miningSnapshot.loading ||
+          contractsSnapshot.loading
         }
       />
 
