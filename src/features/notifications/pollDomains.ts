@@ -37,6 +37,7 @@ import { loadCharacterNotifications } from '@/features/character/notifications';
 import { loadStructureName } from '@/features/character/structures';
 import { loadCalendarEvents as loadCharacterCalendarEvents } from '@/features/character/calendar';
 import { loadContracts as loadCharacterContracts } from '@/features/character/contracts';
+import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
 import { loadWalletJournalWithStatus } from '@/features/character/wallet';
 import { loadOrders, loadOrderHistory } from '@/features/character/orders';
 import { UPWELL_STRUCTURE_ID_FLOOR } from '@/esi/locationIds';
@@ -131,6 +132,7 @@ import {
   projectIndustryJobs,
   projectColonies,
   projectCalendar,
+  projectContracts,
   projectStructureFuel,
   projectEveNotificationReinforcementExit,
   reinforcementExitStructureIds,
@@ -801,11 +803,30 @@ function isContractEntrySnapshot(raw: unknown): raw is ContractEntrySnapshot {
     typeof r.contractId === 'number' &&
     isContractStatus(r.status) &&
     typeof r.issuerId === 'number' &&
-    typeof r.acceptorId === 'number'
+    typeof r.acceptorId === 'number' &&
+    // Optional: a baseline written before `courierDeliveryDue` (issue #1713)
+    // lacks both, and must stay readable rather than reset every character.
+    (r.deliveryDeadlineMs === undefined || typeof r.deliveryDeadlineMs === 'number') &&
+    (r.dueLeadMs === undefined || typeof r.dueLeadMs === 'number')
   );
 }
 
-export const contractDomain = defineDomain<Contract, ContractSnapshot, ContractNotificationFire>({
+function toContractEntrySnapshot(contract: Contract, dueLeadMs: number): ContractEntrySnapshot {
+  const deliveryDeadlineMs = courierDeliveryDeadlineMs(contract);
+  return {
+    contractId: contract.contract_id,
+    status: contract.status,
+    issuerId: contract.issuer_id,
+    acceptorId: contract.acceptor_id,
+    ...(deliveryDeadlineMs === null ? {} : { deliveryDeadlineMs, dueLeadMs }),
+  };
+}
+
+export const contractDomain = defineDomain<
+  ContractEntrySnapshot,
+  ContractSnapshot,
+  ContractNotificationFire
+>({
   source: SNAPSHOT_SOURCES.contracts,
   stateKey: 'notifications.pollerState.contracts',
   entriesKey: 'entries',
@@ -818,17 +839,26 @@ export const contractDomain = defineDomain<Contract, ContractSnapshot, ContractN
     // them as newly appearing and false-fire contractAccepted (issue #174
     // review) — skip this poll entirely rather than save a partial baseline.
     if (result.cached.truncated) return null;
-    return result.cached.data;
+    const dueLeadMs = (await currentThresholds(characterId)).courierDeliveryDueLeadHours * HOUR_MS;
+    return result.cached.data.map((contract) => toContractEntrySnapshot(contract, dueLeadMs));
   },
-  toSnapshot: (contracts, nowMs) => ({
-    entries: contracts.map((contract) => ({
-      contractId: contract.contract_id,
-      status: contract.status,
-      issuerId: contract.issuer_id,
-      acceptorId: contract.acceptor_id,
-    })),
-    nowMs,
-  }),
+  toSnapshot: (entries, nowMs) => ({ entries: [...entries], nowMs }),
+  // Projects at the Character's *current* lead time, not the one baked into
+  // the baseline, for `skillQueueDomain.projection`'s reason (issue #1248).
+  projection: async (characterId, characterName, snapshot, nowMs) => {
+    const dueLeadMs = (await currentThresholds(characterId)).courierDeliveryDueLeadHours * HOUR_MS;
+    const entries = snapshot.entries.map((entry) =>
+      entry.deliveryDeadlineMs === undefined ? entry : { ...entry, dueLeadMs }
+    );
+    return projectContracts(
+      characterId,
+      characterName,
+      entries,
+      (fire, character, names) =>
+        NOTIFICATION_EVENT_ENTRIES.courierDeliveryDue.projection.push(fire, character, names),
+      nowMs
+    );
+  },
 });
 
 /* -------------------------------------------------------------------------- */

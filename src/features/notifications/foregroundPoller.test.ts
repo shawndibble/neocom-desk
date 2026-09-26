@@ -30,6 +30,7 @@ import type {
   PlanetarySnapshot,
   MailSnapshot,
   CalendarSnapshot,
+  ContractEntrySnapshot,
   ContractSnapshot,
   WalletSnapshot,
   WalletJournalEntrySnapshot,
@@ -132,8 +133,9 @@ function eveNotification(overrides: Partial<CharacterNotification> = {}): Charac
   };
 }
 
-function contract(overrides: Partial<Contract> = {}): Contract {
-  return {
+/** Built from ESI-shaped overrides, returned as the snapshot entry the domain's own `load` yields (issue #1713, same seam as `loadSkillQueue`). */
+function contract(overrides: Partial<Contract> = {}): ContractEntrySnapshot {
+  const esi: Contract = {
     contract_id: 1,
     issuer_id: 1,
     issuer_corporation_id: 1,
@@ -146,6 +148,12 @@ function contract(overrides: Partial<Contract> = {}): Contract {
     date_issued: '2026-01-01T00:00:00Z',
     date_expired: '2026-02-01T00:00:00Z',
     ...overrides,
+  };
+  return {
+    contractId: esi.contract_id,
+    status: esi.status,
+    issuerId: esi.issuer_id,
+    acceptorId: esi.acceptor_id,
   };
 }
 
@@ -176,7 +184,7 @@ interface DomainOverrides {
   loadCalendarEvents?: (characterId: number) => Promise<CalendarEventSummary[] | null>;
   prevCalendarState?: () => Promise<CalendarPollerState>;
   saveCalendarState?: (state: CalendarPollerState) => Promise<void>;
-  loadContracts?: (characterId: number) => Promise<Contract[] | null>;
+  loadContracts?: (characterId: number) => Promise<ContractEntrySnapshot[] | null>;
   prevContractState?: () => Promise<ContractPollerState>;
   saveContractState?: (state: ContractPollerState) => Promise<void>;
   loadWalletJournal?: (characterId: number) => Promise<WalletJournalEntrySnapshot[] | null>;
@@ -919,7 +927,7 @@ describe('runForegroundPoll', () => {
     const loadContracts = vi.fn(async () => []);
     const deps = baseDeps({
       grantedScopes: async () => new Set([SKILLQUEUE_SCOPE, CONTRACTS_SCOPE]),
-      eventPrefsFor: async () => ({ contractAccepted: false }),
+      eventPrefsFor: async () => ({ contractAccepted: false, courierDeliveryDue: false }),
       loadContracts,
     });
     await runForegroundPoll(deps);

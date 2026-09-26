@@ -20,6 +20,8 @@ export interface CharacterEventThresholds {
   extractorExpiringLeadHours?: number;
   /** Hours before the skill queue's tail entry finishes that trigger `skillQueueEnding` (issue #1410) — one of `SKILL_QUEUE_ENDING_LEAD_HOUR_OPTIONS`. */
   skillQueueEndingLeadHours?: number;
+  /** Hours before an accepted courier's deliver-by deadline that trigger `courierDeliveryDue` (issue #1713) — one of `COURIER_DELIVERY_DUE_LEAD_HOUR_OPTIONS`. */
+  courierDeliveryDueLeadHours?: number;
   /** ISK balance at or under which `corpWalletThreshold` fires its `balanceBelow` half. */
   corpWalletBalanceFloorIsk?: number;
   /** ISK amount a single journal entry must exceed to fire `corpWalletThreshold`'s `transactionAbove` half. */
@@ -43,9 +45,13 @@ export const EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS: readonly number[] = [24, 12, 
  */
 export const SKILL_QUEUE_ENDING_LEAD_HOUR_OPTIONS: readonly number[] = [48, 24, 12, 6];
 
+/** The lead times `courierDeliveryDue`'s inline control offers (issue #1713), all within the 72-hour Projection Horizon. */
+export const COURIER_DELIVERY_DUE_LEAD_HOUR_OPTIONS: readonly number[] = [24, 12, 6, 1];
+
 /** A week's warning is the issue's own justification: "a director planning a fuel run wants a week's warning." */
 export const DEFAULT_STRUCTURE_FUEL_LOW_DAYS = 7;
 export const DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS = 6;
+export const DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS = 6;
 export const DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK = 50_000_000;
 export const DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK = 100_000_000;
 export const DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK = 1_000_000;
@@ -113,6 +119,16 @@ export const THRESHOLD_FIELDS: { readonly [K in ThresholdKey]: ThresholdField<K>
       labelKey: 'settings.notifications.extractorExpiringLeadTimeLabel',
       options: EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS,
       optionKey: 'settings.notifications.extractorExpiringLeadTimeOption',
+    },
+  },
+  courierDeliveryDueLeadHours: {
+    key: 'courierDeliveryDueLeadHours',
+    defaultValue: DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS,
+    control: {
+      kind: 'choice',
+      labelKey: 'settings.notifications.courierDeliveryDueLeadTimeLabel',
+      options: COURIER_DELIVERY_DUE_LEAD_HOUR_OPTIONS,
+      optionKey: 'settings.notifications.courierDeliveryDueLeadTimeOption',
     },
   },
   skillQueueEndingLeadHours: {

@@ -45,6 +45,7 @@ describe('NOTIFICATION_EVENT_ENTRIES', () => {
     expect(Object.fromEntries(owners)).toEqual({
       extractorExpiringLeadHours: ['planetaryExtractorExpiring'],
       skillQueueEndingLeadHours: ['skillQueueEnding'],
+      courierDeliveryDueLeadHours: ['courierDeliveryDue'],
       walletBalanceChangedThresholdIsk: ['walletBalanceChanged'],
       structureFuelLowDays: ['structureFuelLow'],
       corpWalletBalanceFloorIsk: ['corpWalletThreshold'],
@@ -148,6 +149,35 @@ describe('one event through its entry', () => {
       'Kestrel: Keepstar was due to run out of fuel.'
     );
     expect(entry.thresholds.fields.map((field) => field.key)).toEqual(['structureFuelLowDays']);
+  });
+
+  it('courierDeliveryDue: fires as the deadline crosses its lead time, pushes hedged, owns its own lead-hours threshold', () => {
+    const entry = NOTIFICATION_EVENT_ENTRIES.courierDeliveryDue;
+    const LEAD = 6 * 3_600_000;
+    const contract = {
+      contractId: 9,
+      status: 'in_progress' as const,
+      issuerId: 1,
+      acceptorId: C,
+      deliveryDeadlineMs: T0 + LEAD + 5 * 60_000,
+      dueLeadMs: LEAD,
+    };
+    const fires = entry.diff(
+      C,
+      { entries: [contract], nowMs: T0 },
+      { entries: [contract], nowMs: T0 + 5 * 60_000 }
+    );
+    expect(fires).toHaveLength(1);
+    expect(entry.copy.poll(fires[0], PILOT, {}).body).toBe(
+      "Kestrel's courier contract must be delivered in under 6 hours."
+    );
+    expect(entry.copy.subjectOf?.(fires[0])).toBe(9);
+    expect(entry.projection.push(fires[0], PILOT, {}).body).toBe(
+      "Kestrel's courier contract was due for delivery in under 6 hours."
+    );
+    expect(entry.thresholds.fields.map((field) => field.key)).toEqual([
+      'courierDeliveryDueLeadHours',
+    ]);
   });
 
   it('skillQueueEnding: fires as the tail crosses its lead time, pushes hedged, owns its own lead-hours threshold', () => {
