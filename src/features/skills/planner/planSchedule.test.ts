@@ -107,14 +107,19 @@ describe('schedulePlan', () => {
     ]);
   });
 
-  it('costs a plan that mirrors the live queue in full, from now', () => {
+  it('pins a plan entry that is also the in-progress queue head to its real finish_date', () => {
+    const queueEnd = NOW + 2 * 3_600_000;
     const s = schedulePlan(
       { entries: [entry(10, 2)] },
-      inputs({ queueEntries: [queued(NOW + 2 * 3_600_000)] }),
+      inputs({ queueEntries: [queued(queueEnd)] }),
       NOW
     );
-    expect(s.startDate.getTime()).toBe(NOW);
+    // The queue's head (skill 10 level 1) is training right now and finishes
+    // at queueEnd regardless of also being a plan entry — the plan is costed
+    // as already trained to level 1 as of then, not recomputed from `now`.
+    expect(s.startDate.getTime()).toBe(queueEnd);
     expect(s.totalSeconds).toBeGreaterThan(0);
-    expect(s.scheduled).toHaveLength(2);
+    expect(s.scheduled).toHaveLength(1);
+    expect(s.scheduled[0]).toMatchObject({ skillTypeID: 10, level: 2 });
   });
 });
