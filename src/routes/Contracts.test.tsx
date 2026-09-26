@@ -429,7 +429,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     expect(screen.getByText(/incomplete data/i)).toBeInTheDocument();
     const requestsBeforeRetry = page2Requests;
 
-    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
 
     await waitFor(() => expect(page2Requests).toBeGreaterThan(requestsBeforeRetry));
   });
