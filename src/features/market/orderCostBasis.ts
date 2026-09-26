@@ -18,7 +18,7 @@ import {
   type WalletBuyUsed,
   type WalletTrade,
 } from '@/engine/market/walletCostBasis';
-import type { MarketOrder } from '@/esi/endpoints';
+import type { MarketOrder, WalletTransaction } from '@/esi/endpoints';
 
 /** Cost taken from a Production Run linked to the order (the original source). */
 export interface ProductionRunBasis {
@@ -104,6 +104,19 @@ export async function loadOrderCostBases(
   return result;
 }
 
+/** A character wallet fill in the shape the cost engines read. */
+export function toWalletTrade(t: WalletTransaction): WalletTrade {
+  return {
+    transactionId: t.transaction_id,
+    date: t.date,
+    typeId: t.type_id,
+    quantity: t.quantity,
+    unitPrice: t.unit_price,
+    isBuy: t.is_buy,
+    isPersonal: t.is_personal,
+  };
+}
+
 export interface WalletOrderCostBases {
   bases: Map<number, WalletBasis>;
   gaps: Map<number, WalletBasisGap>;
@@ -139,15 +152,7 @@ export async function loadWalletOrderCostBases(
   }
   if (!wallet) return out;
 
-  const trades: WalletTrade[] = wallet.data.map((t) => ({
-    transactionId: t.transaction_id,
-    date: t.date,
-    typeId: t.type_id,
-    quantity: t.quantity,
-    unitPrice: t.unit_price,
-    isBuy: t.is_buy,
-    isPersonal: t.is_personal,
-  }));
+  const trades = wallet.data.map(toWalletTrade);
   const truncated = wallet.truncated ?? false;
 
   for (const [typeId, typeOrders] of byType) {

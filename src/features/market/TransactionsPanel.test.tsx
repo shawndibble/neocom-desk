@@ -5,16 +5,20 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { TransactionsPanel } from './TransactionsPanel';
-import { loadWalletTransactions } from '@/features/character/wallet';
+import { loadWalletJournal, loadWalletTransactions } from '@/features/character/wallet';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { downloadCsv } from '@/lib/downloadCsv';
-import type { WalletTransaction } from '@/esi/endpoints';
+import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 
-vi.mock('@/features/character/wallet', () => ({ loadWalletTransactions: vi.fn() }));
+vi.mock('@/features/character/wallet', () => ({
+  loadWalletJournal: vi.fn(),
+  loadWalletTransactions: vi.fn(),
+}));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
 vi.mock('@/lib/downloadCsv', () => ({ downloadCsv: vi.fn() }));
 
 const mockedLoadTransactions = vi.mocked(loadWalletTransactions);
+const mockedLoadJournal = vi.mocked(loadWalletJournal);
 const mockedTypeNames = vi.mocked(loadTypeNames);
 
 const TYPE_NAMES = new Map([
@@ -62,6 +66,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
   mockedTypeNames.mockResolvedValue(TYPE_NAMES);
+  mockedLoadJournal.mockResolvedValue(null);
 });
 
 describe('TransactionsPanel — the row as an item', () => {
@@ -165,6 +170,72 @@ describe('TransactionsPanel — desktop filter and totals', () => {
 
     const exported = vi.mocked(downloadCsv).mock.calls[0][1] as WalletTransaction[];
     expect(exported.map((txn) => txn.transaction_id)).toEqual([2]);
+  });
+});
+
+describe('TransactionsPanel — margin', () => {
+  const BUY = transaction({
+    transaction_id: 1,
+    journal_ref_id: 11,
+    date: '2026-09-10T12:00:00Z',
+    is_buy: true,
+    quantity: 5,
+    unit_price: 400_000,
+  });
+  const SALE = transaction({ transaction_id: 2, journal_ref_id: 12, date: '2026-09-20T12:00:00Z' });
+  const BUILT = transaction({
+    transaction_id: 3,
+    journal_ref_id: 13,
+    date: '2026-09-21T12:00:00Z',
+    type_id: 34,
+  });
+  function taxFor(transactionId: number, amount: number): WalletJournalEntry {
+    return {
+      id: 900 + transactionId,
+      date: '2026-09-20T12:00:00Z',
+      ref_type: 'transaction_tax',
+      description: '',
+      amount,
+      context_id: transactionId,
+      context_id_type: 'market_transaction_id',
+    };
+  }
+  function load(journal: WalletJournalEntry[] | null) {
+    mockedLoadTransactions.mockResolvedValue({
+      data: [BUY, SALE, BUILT],
+      fetchedAt: new Date(),
+      fromCache: false,
+      truncated: false,
+    });
+    mockedLoadJournal.mockResolvedValue(
+      journal && { data: journal, fetchedAt: new Date(), fromCache: false, truncated: false }
+    );
+  }
+  /** Date, Item, Side, Qty, Unit price, Total, then Margin. */
+  function marginCell(row: HTMLElement) {
+    return within(row).getAllByRole('cell')[6];
+  }
+
+  it('shows a sale its margin over the wallet buys it used, less its sales tax', async () => {
+    load([taxFor(2, -49_766.4), taxFor(3, -100)]);
+    renderPanel();
+    const row = await screen.findByRole('row', { name: /Damage Control II.*Sell/ });
+    // 3 × 460,800 − 3 × 400,000 − 49,766.40
+    expect(marginCell(row)).toHaveTextContent('132,633.60');
+  });
+
+  it('shows a dash, never a zero-cost margin, for a sale no wallet buy covers', async () => {
+    load([taxFor(2, -49_766.4), taxFor(3, -100)]);
+    renderPanel();
+    const row = await screen.findByRole('row', { name: /Tritanium/ });
+    expect(marginCell(row)).toHaveTextContent('—');
+  });
+
+  it('shows a dash when the journal did not load, rather than a tax-free margin', async () => {
+    load(null);
+    renderPanel();
+    const row = await screen.findByRole('row', { name: /Damage Control II.*Sell/ });
+    expect(marginCell(row)).toHaveTextContent('—');
   });
 });
 
