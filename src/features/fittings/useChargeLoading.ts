@@ -164,25 +164,25 @@ export function useChargeLoading({
       const result = outcome as ReturnType<typeof loadChargeIntoCompatible> | null;
       if (result === null) return;
       const name = catalogueTypeName(catalogue, chargeTypeId);
-      setMessage(
+      // What this load did, apart from the modules that already held the charge.
+      const held = result.loaded - result.newlyLoaded;
+      const heldNote = held > 0 ? t('fittings.item.alreadyHeld', { count: held }) : null;
+      const said =
         result.wanted === 0
           ? t('fittings.item.loadNone', { name })
           : result.ranOut
             ? t('fittings.item.loadRanOut', {
                 name,
-                loaded: result.loaded,
-                count: result.wanted,
+                loaded: result.newlyLoaded,
+                count: result.wanted - held,
               })
             : result.newlyLoaded === 0
               ? t('fittings.item.loadAllHeld', { name })
-              : [
-                  t('fittings.item.loaded', { name, count: result.newlyLoaded }),
-                  result.loaded > result.newlyLoaded
-                    ? t('fittings.item.alreadyHeld', { count: result.loaded - result.newlyLoaded })
-                    : null,
-                ]
-                  .filter((part) => part !== null)
-                  .join(' ')
+              : t('fittings.item.loaded', { name, count: result.newlyLoaded });
+      setMessage(
+        result.wanted > 0 && (result.ranOut || result.newlyLoaded > 0) && heldNote
+          ? `${said} ${heldNote}`
+          : said
       );
     },
     [edit, accepts, chargesPerLoad, catalogue, t]

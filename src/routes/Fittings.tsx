@@ -792,7 +792,7 @@ function FittingsPage() {
                     <FittingAffectedByPanel
                       explain={workspace.explainModule}
                       moduleIndex={openModuleIndex}
-                      typeName={(id) => catalogueTypeName(catalogue, id)}
+                      typeName={typeName}
                     />
                   )}
                 </div>
