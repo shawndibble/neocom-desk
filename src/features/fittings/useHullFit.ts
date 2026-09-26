@@ -15,14 +15,18 @@ const SLICE_MS = 12;
  * only what fits the open ship). Every fittable market item is checked once
  * per hull and pilot, in slices that yield between them so the page stays
  * responsive (~0.3 ms an item, a few thousand items); `checkCandidates`
- * memoizes, so a return to the same hull is instant. Null until done, or
+ * memoizes, so a return to the same hull is instant — which is also how the
+ * Fittings route warms it up (`whenIdle`) as soon as the ship data, profile
+ * and catalogue are in, before the pilot opens the module browser. Null until done, or
  * while the ship data isn't loaded.
  */
 export function useHullFit(
   catalogue: FittingCatalogue | null,
-  shipTypeId: number,
+  shipTypeId: number | null,
   profile: PilotProfile | null,
-  engineReady: boolean
+  engineReady: boolean,
+  /** Start when the browser is idle (a background warm-up) rather than at once. */
+  whenIdle = false
 ): ReadonlyMap<number, CandidateCheck> | null {
   const [result, setResult] = useState<{
     catalogue: FittingCatalogue;
@@ -32,7 +36,7 @@ export function useHullFit(
   } | null>(null);
 
   useEffect(() => {
-    if (catalogue === null || profile === null || !engineReady) return;
+    if (catalogue === null || profile === null || shipTypeId === null || !engineReady) return;
     const byRack = new Map<CandidateRack, number[]>();
     for (const entry of catalogue.marketTypes) {
       const rack = catalogue.rackOf[String(entry.typeId)];
@@ -49,6 +53,7 @@ export function useHullFit(
     const checks = new Map<number, CandidateCheck>();
     let next = 0;
     let timer: ReturnType<typeof setTimeout>;
+    let idle: number | undefined;
     let cancelled = false;
     const slice = () => {
       if (cancelled) return;
@@ -62,12 +67,17 @@ export function useHullFit(
       if (next < jobs.length) timer = setTimeout(slice, 0);
       else setResult({ catalogue, shipTypeId, profile, checks });
     };
-    timer = setTimeout(slice, 0);
+    if (whenIdle && typeof requestIdleCallback === 'function') {
+      idle = requestIdleCallback(slice, { timeout: 2000 });
+    } else {
+      timer = setTimeout(slice, 0);
+    }
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      if (idle !== undefined) cancelIdleCallback(idle);
     };
-  }, [catalogue, shipTypeId, profile, engineReady]);
+  }, [catalogue, shipTypeId, profile, engineReady, whenIdle]);
 
   return result !== null &&
     result.catalogue === catalogue &&
