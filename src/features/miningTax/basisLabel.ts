@@ -49,6 +49,9 @@ export function basisUsage(t: TFunction, basis: PriceBasis, counts: DaysBySource
   const parts = [
     t('miningTax.overview.basis.usageSaved', { count: counts.saved, total: counts.total }),
   ];
+  if (counts.historical > 0) {
+    parts.push(t('miningTax.overview.basis.usageHistorical', { count: counts.historical }));
+  }
   if (counts.average > 0) {
     parts.push(t('miningTax.overview.basis.usageAverage', { count: counts.average }));
   }

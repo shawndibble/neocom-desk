@@ -7,17 +7,27 @@
  * daily Jita buy/sell snapshot each time the Overview loads, and prices each
  * type on each day from the best source it has, in this order:
  *
- *   saved snapshot for that day → ESI daily average → today's live price
- *   (the last only for today and yesterday, before ESI has published them).
+ *   saved snapshot for that day → Adam4EVE's historical buy/sell split →
+ *   ESI daily average → today's live price (the last only for today and
+ *   yesterday, before ESI has published them).
  *
  * The "now" bases skip all of that and value every day at today's live price.
+ *
+ * `historical` (issue #1279 follow-up) is a real buy/sell split, unlike the
+ * blended ESI average, but region-wide rather than station-level (Adam4EVE's
+ * `market_price_history` has no station filter) — weaker than `saved`
+ * (station-exact) and `live` (station-exact, just the wrong day), stronger
+ * than `average` (not even the right side of the book). It only ever covers a
+ * day the server's own hub-price job (`functions/src/marketSnapshot.ts`)
+ * hadn't captured live yet — a one-time backfill that runs itself out of work
+ * once that job has covered the retention window.
  */
 import { shiftDate } from './yieldRange';
 import { LEDGER_HISTORY_DAYS } from './ledgerHistory';
 
 export type PriceBasis = 'buy' | 'sell' | 'now-buy' | 'now-sell';
 export type PriceSide = 'buy' | 'sell';
-export type PriceSource = 'saved' | 'average' | 'live' | 'none';
+export type PriceSource = 'saved' | 'historical' | 'average' | 'live' | 'none';
 
 export const PRICE_BASES: readonly PriceBasis[] = ['buy', 'sell', 'now-buy', 'now-sell'];
 
@@ -30,6 +40,8 @@ export interface SidePrices {
 export interface UnitPriceInputs {
   /** This app's saved snapshot for the day, if one was taken. */
   saved?: SidePrices;
+  /** Adam4EVE's region-wide historical buy/sell split for the day, if the server ever had to backfill it. */
+  historical?: SidePrices;
   /** ESI market history's daily average for the day. */
   average?: number;
   /** Today's live book. */
@@ -69,6 +81,8 @@ export function resolveUnitPrice(
   }
   const saved = sidePrice(inputs.saved, side);
   if (saved !== undefined) return { price: saved, source: 'saved' };
+  const historical = sidePrice(inputs.historical, side);
+  if (historical !== undefined) return { price: historical, source: 'historical' };
   if (inputs.average !== undefined) return { price: inputs.average, source: 'average' };
   // Only while ESI has not published the day yet: an older day with no
   // history is a type that does not trade, not one waiting on downtime.
@@ -79,7 +93,8 @@ export function resolveUnitPrice(
 const SOURCE_RANK: Record<Exclude<PriceSource, 'none'>, number> = {
   saved: 0,
   live: 1,
-  average: 2,
+  historical: 2,
+  average: 3,
 };
 
 /**
@@ -100,6 +115,7 @@ export function weakestSource(sources: readonly PriceSource[]): PriceSource {
 export interface DaysBySource {
   total: number;
   saved: number;
+  historical: number;
   average: number;
   live: number;
   none: number;
@@ -114,7 +130,14 @@ export function countDaysBySource(
     list.push(row.source);
     byDate.set(row.date, list);
   }
-  const counts: DaysBySource = { total: byDate.size, saved: 0, average: 0, live: 0, none: 0 };
+  const counts: DaysBySource = {
+    total: byDate.size,
+    saved: 0,
+    historical: 0,
+    average: 0,
+    live: 0,
+    none: 0,
+  };
   for (const sources of byDate.values()) counts[weakestSource(sources)] += 1;
   return counts;
 }

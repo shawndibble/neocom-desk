@@ -43,6 +43,36 @@ describe('resolveUnitPrice — mined-day bases', () => {
     ).toEqual({ price: 100, source: 'average' });
   });
 
+  const historical = { buy: 80, sell: 120 };
+
+  it("uses Adam4EVE's historical buy/sell split ahead of the ESI average when nothing was saved", () => {
+    expect(resolveUnitPrice({ historical, average: 100 }, 'buy', '2026-09-10', TODAY)).toEqual({
+      price: 80,
+      source: 'historical',
+    });
+    expect(resolveUnitPrice({ historical, average: 100 }, 'sell', '2026-09-10', TODAY)).toEqual({
+      price: 120,
+      source: 'historical',
+    });
+  });
+
+  it('skips a historical side with no orders and uses the average instead', () => {
+    expect(
+      resolveUnitPrice(
+        { historical: { buy: null, sell: 120 }, average: 100 },
+        'buy',
+        '2026-09-10',
+        TODAY
+      )
+    ).toEqual({ price: 100, source: 'average' });
+  });
+
+  it('still prefers the saved snapshot over the historical split', () => {
+    expect(
+      resolveUnitPrice({ saved, historical, average: 100 }, 'buy', '2026-09-10', TODAY)
+    ).toEqual({ price: 90, source: 'saved' });
+  });
+
   it('falls back to the live price for today and yesterday, before ESI publishes history', () => {
     expect(resolveUnitPrice({ live }, 'buy', TODAY, TODAY)).toEqual({ price: 95, source: 'live' });
     expect(resolveUnitPrice({ live }, 'sell', '2026-09-21', TODAY)).toEqual({
@@ -92,11 +122,13 @@ describe('basisSide', () => {
 });
 
 describe('weakestSource', () => {
-  it('ranks saved, then live, then daily average, ignoring unpriced lines', () => {
+  it('ranks saved, then live, then historical, then daily average, ignoring unpriced lines', () => {
     expect(weakestSource(['saved', 'saved'])).toBe('saved');
     expect(weakestSource(['saved', 'live'])).toBe('live');
     expect(weakestSource(['live', 'average', 'saved'])).toBe('average');
     expect(weakestSource(['saved', 'none'])).toBe('saved');
+    expect(weakestSource(['live', 'historical'])).toBe('historical');
+    expect(weakestSource(['historical', 'average'])).toBe('average');
   });
 
   it('is none only when nothing was priced', () => {
@@ -113,8 +145,9 @@ describe('countDaysBySource', () => {
         { date: '2026-09-20', source: 'average' },
         { date: '2026-09-21', source: 'saved' },
         { date: '2026-09-22', source: 'live' },
+        { date: '2026-09-23', source: 'historical' },
       ])
-    ).toEqual({ total: 3, saved: 1, average: 1, live: 1, none: 0 });
+    ).toEqual({ total: 4, saved: 1, historical: 1, average: 1, live: 1, none: 0 });
   });
 });
 

@@ -35,11 +35,12 @@ export interface DailyRatePoint {
 /** Bar colour per price source — the same meaning as the table's tags. */
 const SOURCE_FILL: Record<PriceSource, string> = {
   saved: 'var(--color-accent)',
+  historical: 'var(--color-success)',
   average: 'var(--color-warning)',
   live: 'var(--color-accent-dim)',
   none: 'var(--color-line-bright)',
 };
-const LEGEND_SOURCES: PriceSource[] = ['saved', 'average', 'live'];
+const LEGEND_SOURCES: PriceSource[] = ['saved', 'historical', 'average', 'live'];
 
 export type TypeComparisonPoint = RankedType;
 
