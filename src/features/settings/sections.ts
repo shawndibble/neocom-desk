@@ -30,7 +30,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   {
     id: 'data',
     labelKey: 'settings.groups.data',
-    sections: ['dataAge', 'activity', 'faq'],
+    sections: ['dataAge', 'activity', 'faq', 'help'],
   },
 ];
 

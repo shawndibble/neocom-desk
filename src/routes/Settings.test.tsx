@@ -889,11 +889,22 @@ describe('Settings — Notifications (issue #170)', () => {
       screen.getByRole('heading', { name: /synced between your devices/i })
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /kept on this device only/i })).toBeInTheDocument();
+    // Bug reports, feedback, and thanks now live on their own Help & Support
+    // tab; the FAQ tab points there instead of carrying that content itself.
+    // Two matches: the rail's own nav link, and the FAQ body's pointer link.
+    expect(screen.getAllByRole('link', { name: /help & support/i })).toHaveLength(2);
+  });
 
-    // The tab carries all three questions, not just the first.
+  it('opens the Help & Support tab and shows all three questions', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await openTab(user, /^help & support$/i);
+
     expect(
-      screen.getByRole('heading', { name: /report a bug or ask for a feature/i })
+      await screen.findByRole('heading', { name: /report a bug or ask for a feature/i })
     ).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /join the community/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /discord/i })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /someone i can thank/i })).toBeInTheDocument();
   });
 
@@ -1753,6 +1764,7 @@ describe('Settings — sections rail', () => {
       'Data & storage',
       'Activity Log',
       'FAQ',
+      'Help & Support',
     ]);
     for (const group of ['App', 'Defaults', 'Alerts', 'Data & device']) {
       expect(within(nav).getByText(group)).toBeInTheDocument();
@@ -1822,7 +1834,7 @@ describe('Settings — phone list', () => {
     }
     // Corporation is absent: this character has no corp access.
     expect(within(nav).queryByRole('link', { name: /corporation/i })).not.toBeInTheDocument();
-    expect(within(nav).getAllByRole('link')).toHaveLength(10);
+    expect(within(nav).getAllByRole('link')).toHaveLength(11);
     expect(within(nav).getByRole('link', { name: /^display/i })).toHaveTextContent(
       /default text, my local time/i
     );

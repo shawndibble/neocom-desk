@@ -1,11 +1,19 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { REMOTE_COLLECTIONS } from '@/sync/characterPurge';
 import { SYNCED_SETTING_KEYS } from '@/sync/syncedSettings';
-import { ISSUES_URL } from '@/lib/links';
 import { FaqPanel } from './FaqPanel';
 import { WHAT_WE_STORE_GROUPS, WHAT_WE_STORE_NOTES } from './whatWeStore';
+
+function renderFaq() {
+  return render(
+    <MemoryRouter>
+      <FaqPanel />
+    </MemoryRouter>
+  );
+}
 
 /**
  * Which "What We Store" line accounts for each remote Firestore collection.
@@ -100,7 +108,7 @@ describe('FaqPanel — What We Store', () => {
     // is pinned to the words that account for it, in the same two-file spirit
     // as `syncedSettings.ts`: adding a key fails this until whoever added it
     // decides what the reader is told.
-    render(<FaqPanel />);
+    renderFaq();
     const shown = document.body.textContent ?? '';
     for (const key of SYNCED_SETTING_KEYS) {
       const phrase = SETTING_KEY_TO_PHRASE[key];
@@ -110,7 +118,7 @@ describe('FaqPanel — What We Store', () => {
   });
 
   it('renders every group and every line', () => {
-    render(<FaqPanel />);
+    renderFaq();
 
     expect(screen.getByRole('heading', { name: /what we store/i })).toBeInTheDocument();
     expect(
@@ -127,14 +135,14 @@ describe('FaqPanel — What We Store', () => {
     // the reader and unbounded by nature. The two groups account for what
     // exists; absence from both is the answer.
     expect(WHAT_WE_STORE_GROUPS).toHaveLength(2);
-    render(<FaqPanel />);
+    renderFaq();
     expect(screen.queryByRole('heading', { name: /never collected/i })).not.toBeInTheDocument();
   });
 
   it('states the three cases where something does leave the device', () => {
     // The section is worth less than nothing if it overclaims. These three are
     // the real exceptions, and each is named rather than implied.
-    render(<FaqPanel />);
+    renderFaq();
 
     expect(screen.getByText(/push notifications, if you turn them on/i)).toBeInTheDocument();
     expect(screen.getByText(/crash reports/i)).toBeInTheDocument();
@@ -146,34 +154,18 @@ describe('FaqPanel — What We Store', () => {
     // refresh token is already dead cannot be signed in as, so its remote docs
     // survive until it authenticates again. Saying "removed means deleted"
     // flatly would be the one outright false sentence in the section.
-    render(<FaqPanel />);
+    renderFaq();
     expect(screen.getByText(/next time you add that character back/i)).toBeInTheDocument();
   });
 
   it('does not claim EVE data is uploaded', () => {
-    render(<FaqPanel />);
+    renderFaq();
     expect(screen.getByText(/none of it is uploaded/i)).toBeInTheDocument();
   });
-});
 
-describe('FaqPanel — the other questions', () => {
-  it('points bug reports and feature requests at the issue tracker', () => {
-    render(<FaqPanel />);
-
-    expect(screen.getByRole('heading', { name: /report a bug or ask for a feature/i }));
-    const link = screen.getByRole('link', { name: /github\.com\/shawndibble\/neocom-desk/i });
-    expect(link).toHaveAttribute('href', ISSUES_URL);
-    // An external link opened in this tab loses whatever the pilot was doing.
-    expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
-  });
-
-  it('names the pilot to thank', () => {
-    render(<FaqPanel />);
-
-    expect(screen.getByRole('heading', { name: /someone i can thank/i })).toBeInTheDocument();
-    expect(screen.getByText('Mero Otichoda')).toBeInTheDocument();
-    // "Welcome" and "expected" are different claims, and the copy makes both.
-    expect(screen.getByText(/never expected/i)).toBeInTheDocument();
+  it('points to the Help & Support tab', () => {
+    renderFaq();
+    const link = screen.getByRole('link', { name: /help & support/i });
+    expect(link).toHaveAttribute('href', expect.stringContaining('/settings'));
   });
 });

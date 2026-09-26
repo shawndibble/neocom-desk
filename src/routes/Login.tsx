@@ -54,7 +54,7 @@ import {
 import { MINUTE_MS } from '@/lib/age';
 import { formatCountdown } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
-import { REPO_URL } from '@/lib/links';
+import { DISCORD_URL, REPO_URL } from '@/lib/links';
 import { isPlayStoreApp } from '@/lib/playStoreApp';
 import type { DeadlineSeverity } from '@/engine/severity';
 
@@ -576,6 +576,14 @@ export function Login() {
         </a>
         <a href="/privacy.html" className="hover:text-text hover:underline">
           {t('login.footerPrivacy')}
+        </a>
+        <a
+          href={DISCORD_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-text hover:underline"
+        >
+          {t('login.footerDiscord')}
         </a>
       </footer>
     </main>

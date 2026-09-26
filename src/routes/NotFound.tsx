@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LogoMark, buttonClassName } from '@/components/ui';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { DISCORD_URL } from '@/lib/links';
 
 /**
  * The `*` route. Replaces a silent `<Navigate to="/" replace />`, which sent a
@@ -22,6 +24,14 @@ export function NotFound() {
       <Link to="/" className={buttonClassName({ size: 'sm' })}>
         {t('notFound.home')}
       </Link>
+      <a
+        href={DISCORD_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={`text-xs ${inlineLinkClassName}`}
+      >
+        {t('notFound.discordHint')}
+      </a>
     </main>
   );
 }
