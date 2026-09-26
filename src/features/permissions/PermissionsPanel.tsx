@@ -17,12 +17,13 @@
  * knowable by asking ESI per Character, so a section per stored Character
  * would mean a read per stored Character on every visit to Settings.
  */
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
 import { useGrantedScopes } from '@/app/useGrantedScopes';
 import { PERMISSIONS, SCOPE_GROUPS, type ScopeGroup } from '@/esi/registry';
 import { isPermissionGranted } from '@/esi/scopes';
+import { AUTHORIZED_APPS_URL } from '@/lib/links';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useCorpAccess, type CorpAccessState } from '@/features/corp/useCorpAccess';
 import { corpRoleLabel } from '@/features/corp/roles';
@@ -68,7 +69,21 @@ export function PermissionsPanel() {
   return (
     <Panel title={t('settings.permissions.title')}>
       <div className="max-w-xl space-y-2">
-        <p className="text-xs text-text-dim">{t('settings.permissions.hint')}</p>
+        <p className="text-xs text-text-dim">
+          <Trans
+            i18nKey="settings.permissions.hint"
+            components={{
+              ccp: (
+                <a
+                  href={AUTHORIZED_APPS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent hover:underline"
+                />
+              ),
+            }}
+          />
+        </p>
         {activeCharacterId === null ? (
           <p className="text-xs text-text-dim">{t('settings.permissions.selectCharacter')}</p>
         ) : (

@@ -5022,7 +5022,7 @@
     "resetViewPrefsConfirm": "View preferences reset.",
     "permissions": {
       "title": "Permissions",
-      "hint": "What this character lets Neocom Desk read from EVE. Grant adds one permission and keeps the rest. To take one away, revoke it on EVE's own site.",
+      "hint": "What this character lets Neocom Desk read from EVE. Grant adds one permission and keeps the rest. To take one away, revoke it on <ccp>EVE's own site</ccp>.",
       "selectCharacter": "Select a character to see its permissions.",
       "checking": "Checking…",
       "granted": "Granted",
