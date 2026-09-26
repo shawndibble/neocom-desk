@@ -147,16 +147,37 @@ export function setModuleState(
   return updateModule(fitting, slot, slotIndex, (module) => ({ ...module, state }));
 }
 
-/** `null` unloads the charge. */
+/**
+ * `fitting.cargo` with back in it what the app took out of the hold for each
+ * of `modules` — the Fitting doesn't know how many a charge from anywhere else was.
+ */
+function withHeldChargesReturned(
+  fitting: Fitting,
+  modules: readonly FittingModule[]
+): Fitting['cargo'] {
+  let cargo = fitting.cargo;
+  for (const module of modules) {
+    if (module.chargeTypeId === undefined || module.chargeQuantity === undefined) continue;
+    cargo = addCargo({ ...fitting, cargo }, module.chargeTypeId, module.chargeQuantity).cargo;
+  }
+  return cargo;
+}
+
+/** `null` unloads the charge; what it held from cargo goes back into the hold. */
 export function setModuleCharge(
   fitting: Fitting,
   slot: FittingSlotKind,
   slotIndex: number,
   chargeTypeId: number | null
 ): Fitting {
-  return updateModule(fitting, slot, slotIndex, (module) =>
-    chargeTypeId === null ? unloaded(module) : { ...unloaded(module), chargeTypeId }
+  const module = fitting.modules.find((m) => isAt(m, slot, slotIndex));
+  if (module === undefined || (chargeTypeId !== null && module.chargeTypeId === chargeTypeId)) {
+    return fitting;
+  }
+  const updated = updateModule(fitting, slot, slotIndex, (m) =>
+    chargeTypeId === null ? unloaded(m) : { ...unloaded(m), chargeTypeId }
   );
+  return { ...updated, cargo: withHeldChargesReturned(fitting, [module]) };
 }
 
 /** Every module at `at` takes `state` — a weapon group's, in one edit. */
@@ -176,6 +197,10 @@ export function unloadCharges(fitting: Fitting, at: readonly ModuleAt[]): Fittin
   return {
     ...fitting,
     modules: fitting.modules.map((module) => (isAnyOf(module, at) ? unloaded(module) : module)),
+    cargo: withHeldChargesReturned(
+      fitting,
+      fitting.modules.filter((module) => isAnyOf(module, at))
+    ),
   };
 }
 
@@ -264,15 +289,14 @@ export function loadChargeIntoCompatible(
     const next: FittingModule = { ...unloaded(module), chargeTypeId };
     loaded += 1;
     changed = true;
-    if (!fromCargo) return next;
+    if (!fromCargo) {
+      cargo = withHeldChargesReturned({ ...fitting, cargo }, [module]);
+      return next;
+    }
     const taken = Math.min(left, perLoad(module, chargeTypeId));
     left -= taken;
     cargo = setCargoQuantity({ ...fitting, cargo }, chargeTypeId, left).cargo;
-    // Only what this app provably took out of the hold goes back into it —
-    // the Fitting doesn't know how many a charge from anywhere else was.
-    if (module.chargeTypeId !== undefined && module.chargeQuantity !== undefined) {
-      cargo = addCargo({ ...fitting, cargo }, module.chargeTypeId, module.chargeQuantity).cargo;
-    }
+    cargo = withHeldChargesReturned({ ...fitting, cargo }, [module]);
     return { ...next, chargeQuantity: taken };
   });
   return {

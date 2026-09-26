@@ -210,6 +210,46 @@ describe('setModulesState / unloadCharges', () => {
     expect(next.modules.map((m) => m.chargeTypeId)).toEqual([undefined, undefined, 186]);
     expect(next.modules[0]).not.toHaveProperty('chargeQuantity');
   });
+
+  it('gives back to the hold exactly what the app took out for the unloaded modules', () => {
+    const fit: Fitting = {
+      ...three,
+      cargo: [{ typeId: 186, quantity: 5 }],
+      modules: three.modules.map((m, i) => ({
+        ...m,
+        chargeTypeId: 186,
+        ...(i < 2 ? { chargeQuantity: 10 } : {}),
+      })),
+    };
+    const next = unloadCharges(fit, [...group, { slot: 'high' as const, slotIndex: 2 }]);
+    expect(next.cargo).toEqual([{ typeId: 186, quantity: 25 }]);
+  });
+});
+
+describe('a charge leaving a module for one that did not come from cargo', () => {
+  const held: Fitting = {
+    ...base,
+    cargo: [],
+    modules: [
+      {
+        slot: 'high',
+        slotIndex: 0,
+        typeId: 2889,
+        state: 'active',
+        chargeTypeId: 185,
+        chargeQuantity: 7,
+      },
+    ],
+  };
+
+  it('setModuleCharge returns the held quantity to the hold, for a swap and an unload alike', () => {
+    expect(setModuleCharge(held, 'high', 0, 186).cargo).toEqual([{ typeId: 185, quantity: 7 }]);
+    expect(setModuleCharge(held, 'high', 0, null).cargo).toEqual([{ typeId: 185, quantity: 7 }]);
+  });
+
+  it('setModuleCharge to the charge it already holds changes nothing', () => {
+    expect(setModuleCharge(held, 'high', 0, 185)).toEqual(held);
+  });
 });
 
 describe('swapModuleType', () => {
@@ -685,7 +725,8 @@ describe('loadChargeIntoCompatible', () => {
     };
     const result = loadChargeIntoCompatible(fit, 24519, { accepts });
     expect(result.fitting.modules.every((m) => m.chargeQuantity === undefined)).toBe(true);
-    expect(result.fitting.cargo).toEqual(fit.cargo);
+    // What the module held from cargo goes back, whatever replaces it.
+    expect(result.fitting.cargo).toEqual([...fit.cargo, { typeId: 209, quantity: 12 }]);
   });
 
   it('on a shortfall loads what it can, a part-load counting, and says the cargo ran out', () => {
