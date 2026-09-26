@@ -114,6 +114,8 @@ interface PlanVerdictHeroProps {
   skillGate?: SkillGateVerdict;
   nameForSkill?: (typeID: number) => string;
   nameForCharacter?: (characterId: number) => string;
+  /** Joins the hero's job time to the plan character's open job slots; omitted when the caller has none. */
+  slotLine?: ReactNode;
 }
 
 /**
@@ -144,6 +146,7 @@ export function PlanVerdictHero({
   skillGate,
   nameForSkill,
   nameForCharacter,
+  slotLine,
 }: PlanVerdictHeroProps) {
   const { t } = useTranslation();
 
@@ -236,6 +239,7 @@ export function PlanVerdictHero({
                     : qualifiers.join(' · ')}
               </p>
             )}
+            {slotLine}
           </div>
 
           {!pricesLoading && pricesReady && (

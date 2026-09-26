@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { DroneSection, FittingRackList as EditableRackList } from './FittingRackList';
+import { FITTING_DRAG_TYPE, useFittingDrag, type FittingDragPayload } from './fittingDrag';
+import { FittingItemActionsProvider, type FittingItemActions } from './fittingItemActions';
+import { fakeItemActions } from './__fixtures__/itemActions';
 
 type RackListProps = Parameters<typeof EditableRackList>[0];
 
@@ -217,5 +221,111 @@ describe('DroneSection', () => {
       />
     );
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('FittingRackList with the editor’s item actions', () => {
+  const names = { 10: 'Autocannon', 11: 'Damage Control', 21: 'Fusion S', 2488: 'Warrior II' };
+  const withSlots = {
+    ...statsWith(10),
+    slotCounts: { high: 3, medium: 0, low: 1, rig: 0, subsystem: 0 },
+    droneCapacity: 25,
+    droneBandwidthTotal: 25,
+  } as FittingStats;
+
+  function renderList(actions: FittingItemActions, fit: Fitting = fitting) {
+    return render(
+      <MemoryRouter>
+        <FittingItemActionsProvider value={actions}>
+          <FittingRackList fitting={fit} stats={withSlots} />
+        </FittingItemActionsProvider>
+      </MemoryRouter>
+    );
+  }
+
+  it('gives each module row a More actions button with the same menu, Move down included', async () => {
+    const actions = fakeItemActions({ names });
+    renderList(actions);
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for #10' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    expect(await screen.findByRole('menuitem', { name: 'Move up' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move down' }));
+    expect(actions.move).toHaveBeenCalledWith('high', 0, 1);
+  });
+
+  it('gives an empty slot the Ring’s empty-slot menu — Paste and Fill rack from its More actions', async () => {
+    const actions = fakeItemActions(
+      { names },
+      { recentFor: () => [10], clipboardFor: (rack) => (rack === 'high' ? 10 : null) }
+    );
+    renderList(actions);
+    const empties = screen.getAllByRole('button', { name: /More actions for Empty/ });
+    // High slots 1 and 2 are empty; low has none.
+    expect(empties).toHaveLength(2);
+    fireEvent.pointerDown(empties[0], { button: 0, pointerType: 'mouse' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Paste Autocannon' }));
+    expect(actions.addModule).toHaveBeenCalledWith('high', 1, 10);
+    fireEvent.pointerDown(empties[1], { button: 0, pointerType: 'mouse' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Fill rack with Autocannon' }));
+    expect(actions.fillRack).toHaveBeenCalledWith('high', 10);
+  });
+
+  it('opens the empty-slot menu on a right-click of the slot itself', async () => {
+    const actions = fakeItemActions({ names });
+    renderList(actions);
+    fireEvent.contextMenu(screen.getAllByRole('button', { name: /^Empty/ })[0]);
+    expect(
+      await screen.findByRole('menuitem', { name: 'Paste module (copy one first)' })
+    ).toBeTruthy();
+  });
+
+  it('takes a charge dropped on a rack heading, loading every module that takes it', () => {
+    const actions = fakeItemActions({ names, takes: { 21: ['high-0'] } });
+    renderList(actions);
+    const payload: FittingDragPayload = {
+      kind: 'charge',
+      typeId: 21,
+      fromCargo: true,
+      targets: ['high-0'],
+    };
+    useFittingDrag.setState({ payload });
+    fireEvent.drop(screen.getByText('Low slots'), {
+      dataTransfer: { types: [FITTING_DRAG_TYPE], dropEffect: 'none' },
+    });
+    expect(actions.drop).not.toHaveBeenCalled();
+    fireEvent.drop(screen.getByText('High slots'), {
+      dataTransfer: { types: [FITTING_DRAG_TYPE], dropEffect: 'none' },
+    });
+    expect(actions.drop).toHaveBeenCalledWith(payload, { kind: 'rack', rack: 'high' }, undefined);
+    useFittingDrag.setState({ payload: null });
+  });
+
+  it('launches a drone dragged from the bay onto the Drones rack', () => {
+    const actions = fakeItemActions({ names });
+    renderList(actions, {
+      ...fitting,
+      drones: [{ typeId: 2488, quantity: 5, state: 'online' }],
+    });
+    const payload: FittingDragPayload = { kind: 'drone', typeId: 2488 };
+    useFittingDrag.setState({ payload });
+    fireEvent.drop(screen.getByText('Drones'), {
+      dataTransfer: { types: [FITTING_DRAG_TYPE], dropEffect: 'none' },
+    });
+    expect(actions.drop).toHaveBeenCalledWith(payload, { kind: 'drones' }, undefined);
+    useFittingDrag.setState({ payload: null });
+  });
+
+  it('shows the cargo hold against its capacity, and offers Add cargo', () => {
+    const actions = fakeItemActions({ names }, { cargoUsed: 520, cargoCapacity: 450 });
+    renderList(actions, { ...fitting, cargo: [{ typeId: 21, quantity: 100 }] });
+    expect(screen.getByRole('meter', { name: 'Cargo hold (m³)' })).toBeTruthy();
+    expect(screen.getByText('Over by 70.0')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Add cargo' }));
+    expect(actions.openAddCargo).toHaveBeenCalled();
   });
 });

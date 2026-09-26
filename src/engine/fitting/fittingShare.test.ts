@@ -383,3 +383,111 @@ describe('fit name (version 2, #1718)', () => {
     });
   });
 });
+
+describe('trailing sections: Tactical Destroyer mode and booster side effects', () => {
+  it('round-trips a mode and the booster side effects switched on', async () => {
+    const input: FittingShareInput = {
+      ...minimalInput(),
+      hullTypeId: 34562,
+      implantSet: { implants: [], boosters: [9950] },
+      mode: 34564,
+      boosterSideEffects: [2737, 2749],
+    };
+    const encoded = await encodeFittingShare(input);
+    if (!encoded.ok) throw new Error('encode failed');
+    const decoded = await decodeFittingShare(encoded.payload);
+    expect(decoded).toEqual({ ok: true, value: { ...input } });
+  });
+
+  it('round-trips a mode alone', async () => {
+    const input: FittingShareInput = { ...minimalInput(), hullTypeId: 34562, mode: 34570 };
+    const encoded = await encodeFittingShare(input);
+    if (!encoded.ok) throw new Error('encode failed');
+    const decoded = await decodeFittingShare(encoded.payload);
+    expect(decoded.ok && decoded.value.mode).toBe(34570);
+    expect(decoded.ok && 'boosterSideEffects' in decoded.value).toBe(false);
+  });
+
+  it('writes a fit with neither exactly as before, so older links and older builds agree', async () => {
+    const decoded = await decodeFittingShare(
+      await packRawBody(['1', ';;;;', '', '', '', ''].join('|'))
+    );
+    expect(decoded).toEqual({
+      ok: true,
+      value: { hullTypeId: 1, modules: emptyModules, drones: [], fighters: [], cargo: [] },
+    });
+    const encoded = await encodeFittingShare(minimalInput());
+    const again = encoded.ok ? await decodeFittingShare(encoded.payload) : null;
+    expect(again?.ok && Object.keys(again.value)).not.toContain('mode');
+  });
+
+  it('reads a mode, then side effects, after the name, and nothing longer', async () => {
+    const withMode = await decodeFittingShare(
+      await packRawBody(['1', ';;;;', '', '', '', '', '', 'qvw'].join('|'), FITTING_SHARE_VERSION)
+    );
+    expect(withMode.ok && withMode.value.mode).toBe(parseInt('qvw', 36));
+    const withSideEffects = await decodeFittingShare(
+      await packRawBody(
+        ['1', ';;;;', '', '', '', '', '', '', '235,24l'].join('|'),
+        FITTING_SHARE_VERSION
+      )
+    );
+    expect(withSideEffects.ok && withSideEffects.value.boosterSideEffects).toEqual([
+      parseInt('235', 36),
+      parseInt('24l', 36),
+    ]);
+    expect(withSideEffects.ok && 'mode' in withSideEffects.value).toBe(false);
+    const tooLong = await decodeFittingShare(
+      await packRawBody(
+        ['1', ';;;;', '', '', '', '', '', '', '', ''].join('|'),
+        FITTING_SHARE_VERSION
+      )
+    );
+    expect(tooLong).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('keeps version 1 at exactly six sections', async () => {
+    const decoded = await decodeFittingShare(
+      await packRawBody(['1', ';;;;', '', '', '', '', 'qvw'].join('|'))
+    );
+    expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('rejects a malformed mode or side effect', async () => {
+    for (const body of [
+      ['1', ';;;;', '', '', '', '', '', 'x.y'],
+      ['1', ';;;;', '', '', '', '', '', '', '1,,2'],
+    ]) {
+      const decoded = await decodeFittingShare(
+        await packRawBody(body.join('|'), FITTING_SHARE_VERSION)
+      );
+      expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+    }
+  });
+});
+
+describe('fighters: launched or in the bay', () => {
+  it('marks only a bay squadron, so a launched one is written as it always was', async () => {
+    const input: FittingShareInput = {
+      ...minimalInput(),
+      fighters: [
+        { typeId: 23055, count: 6 },
+        { typeId: 23055, count: 6, inBay: true },
+      ],
+    };
+    const encoded = await encodeFittingShare(input);
+    if (!encoded.ok) throw new Error('encode failed');
+    expect(await decodeFittingShare(encoded.payload)).toEqual({ ok: true, value: { ...input } });
+    const bare = await decodeFittingShare(
+      await packRawBody(['1', ';;;;', '', 'hsv:6', '', ''].join('|'))
+    );
+    expect(bare.ok && bare.value.fighters).toEqual([{ typeId: parseInt('hsv', 36), count: 6 }]);
+  });
+
+  it('rejects a bay flag other than 0', async () => {
+    const decoded = await decodeFittingShare(
+      await packRawBody(['1', ';;;;', '', 'hsv:6:1', '', ''].join('|'))
+    );
+    expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+  });
+});

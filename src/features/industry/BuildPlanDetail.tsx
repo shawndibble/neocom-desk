@@ -120,6 +120,8 @@ import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { BuildPlanAutoBuildControl } from './BuildPlanAutoBuildControl';
 import { ResultsSummary } from './ResultsSummary';
 import { BpcCoverageWarning, PlanVerdictHero } from './PlanVerdictHero';
+import { PlanSlotLine } from './PlanSlotLine';
+import { categoryForActivity } from './planJobSlots';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ProductionRunsPanel } from './ProductionRunsPanel';
 import { BuildSystemInput } from './BuildSystemInput';
@@ -1214,6 +1216,13 @@ export function BuildPlanDetail({
           skillGate={topLevelSkillGate}
           nameForSkill={(typeID) => nameForType(catalog, typeID)}
           nameForCharacter={(characterId) => characterNames.get(characterId) ?? t('common.unknown')}
+          slotLine={
+            <PlanSlotLine
+              characterId={plan.characterId}
+              category={categoryForActivity(activity)}
+              seconds={result.seconds}
+            />
+          }
         />
       )}
       {result && !error && result.revenue !== null && (

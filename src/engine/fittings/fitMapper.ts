@@ -1,4 +1,7 @@
 import type { Fit, FitItem, Slot } from '@eveshipfit/dogma-engine';
+import { sideEffectsSwitchedOn } from './boosterSideEffects';
+import { fighterTubes } from './inventoryFlags';
+import { defaultTacticalMode, tacticalModesFor } from './tacticalModes';
 import type { DamageProfile, Fitting, FittingModule, PilotProfile } from './types';
 
 /** EVE numbers implant/booster slots starting at 1, not 0 (dogma-engine's own `Slot` doc). */
@@ -12,6 +15,27 @@ function moduleToFitItem(module: FittingModule): FitItem {
     state: module.state,
     ...(module.chargeTypeId === undefined ? {} : { charge: { type_id: module.chargeTypeId } }),
   };
+}
+
+function launchFighters(fitting: Fitting): FitItem[] {
+  const fighters = fitting.fighters ?? [];
+  const tubes = fighterTubes(fighters);
+  return fighters.map((fighter, index): FitItem => {
+    const tube = tubes[index];
+    return tube !== null
+      ? {
+          type_id: fighter.typeId,
+          slot: { type: 'fighter_tube', index: tube },
+          quantity: fighter.quantity,
+          state: 'active',
+        }
+      : {
+          type_id: fighter.typeId,
+          slot: { type: 'fighter_bay' },
+          quantity: fighter.quantity,
+          state: 'offline',
+        };
+  });
 }
 
 /** An implant or booster, numbered from `SLOT_INDEX_START` — same shape either way, just the slot type and (for a booster) side effects. */
@@ -56,6 +80,8 @@ export function fittingToDogmaFit(
       // 'offline', so a bay stack ('online' here) goes in as that.
       state: drone.state === 'active' ? 'active' : 'offline',
     })),
+    // Launched squadrons take the tubes in order; the rest wait in the bay.
+    ...launchFighters(fitting),
     ...fitting.cargo.map((item): FitItem => ({
       type_id: item.typeId,
       slot: { type: 'cargo' },
@@ -63,16 +89,27 @@ export function fittingToDogmaFit(
       state: 'offline',
     })),
     ...profile.implantTypeIds.map((typeId, index) => slottedItem(typeId, index, 'implant')),
-    // Side effects always off — no UI to roll or pick one, and an empty array
-    // is the engine's own "none" (`FitItem.booster_side_effects`'s doc).
+    // Only the side effects the pilot switched on, and only each booster's
+    // own; an empty array is the engine's own "none"
+    // (`FitItem.booster_side_effects`'s doc).
     ...profile.boosterTypeIds.map((typeId, index) =>
-      slottedItem(typeId, index, 'booster', { booster_side_effects: [] })
+      slottedItem(typeId, index, 'booster', {
+        booster_side_effects: sideEffectsSwitchedOn(typeId, profile.boosterSideEffects),
+      })
     ),
   ];
 
+  // A Tactical Destroyer always flies in a mode: the chosen one if it's the
+  // hull's own, else the hull's default. Any other hull has none.
+  const modes = tacticalModesFor(fitting.shipTypeId);
+  const mode =
+    fitting.mode !== undefined && modes.includes(fitting.mode)
+      ? fitting.mode
+      : defaultTacticalMode(fitting.shipTypeId);
+
   return {
     name: fitting.name,
-    ship: { type_id: fitting.shipTypeId },
+    ship: { type_id: fitting.shipTypeId, ...(mode === undefined ? {} : { mode }) },
     items,
     character: { skills: profile.skillLevels },
     ...(damageProfile

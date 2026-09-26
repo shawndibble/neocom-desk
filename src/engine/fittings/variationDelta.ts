@@ -36,6 +36,7 @@ function capacitorChange(before: FittingStats, after: FittingStats): StatChange 
 export function diffFittingStats(before: FittingStats, after: FittingStats): FittingStatsDelta {
   const changes: StatChange[] = [];
   for (const field of NUMERIC_FIELDS) {
+    if (field.compareOnly) continue;
     const b = round(field.value(before), field.digits);
     const a = round(field.value(after), field.digits);
     if (b !== a) changes.push({ key: field.key, before: b, after: a });

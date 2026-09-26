@@ -10,6 +10,7 @@ import {
   EmptyState,
   IconButton,
   IskAmount,
+  MenuItem,
   PageHeader,
   Panel,
   SearchInput,
@@ -96,6 +97,7 @@ import {
   SecurityValue,
 } from '@/features/character/assetBrowserRows';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
+import { assetShipEditLocation } from '@/features/fittings/assetShipLocation';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { addQuickbarItem } from '@/features/market/quickbar';
 import { useQuickbar } from '@/features/market/useQuickbar';
@@ -2044,12 +2046,31 @@ function NodeRowView({
   query,
 }: BrowseRowViewProps & { node: AssetTreeNode }) {
   const actions = useAssetItemActions();
+  const navigate = useNavigate();
   const label = nodeLabel(node);
   const badge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, characterBadges);
 
   if (node.kind !== 'item') {
     return (
       <ContainerRow
+        menu={
+          node.kind === 'ship'
+            ? {
+                name: label,
+                items: (
+                  <MenuItem
+                    onSelect={() =>
+                      void assetShipEditLocation(node, label).then((location) => {
+                        if (location) navigate(location);
+                      })
+                    }
+                  >
+                    {t('assets.openInFittings')}
+                  </MenuItem>
+                ),
+              }
+            : undefined
+        }
         href={assetHref(pathStationId, [...pathSegments, assetNodeSegment(node)], query)}
         label={label}
         itemCount={node.itemCount}

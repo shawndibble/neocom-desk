@@ -392,6 +392,64 @@ describe('computeFittingStats overheated values', () => {
     expect(stats.offense.overheated).toBeNull();
   });
 
+  it('reads every figure off the overloaded calculation when everything is overheated, keeping the editor’s module states', async () => {
+    stubNetwork();
+    calculateMock.mockReset();
+    calculateMock.mockImplementation((fit) => {
+      const heated = fit.items[0].state === 'overload';
+      return {
+        ship: { attributes: new Map([[EHP, { value: heated ? 1200 : 1000 }]]) },
+        items: [
+          {
+            attributes: new Map([[DPS, { value: heated ? 12 : 10 }]]),
+            state: heated ? 'overload' : 'active',
+            max_state: 'overload',
+          },
+        ],
+        character: { attributes: new Map() },
+      };
+    });
+    const { computeFittingStats } = await freshModule();
+
+    const stats = await computeFittingStats(
+      { ...fitting, modules: [{ slot: 'high', slotIndex: 0, typeId: 3186, state: 'active' }] },
+      profile,
+      undefined,
+      undefined,
+      { overheatAll: true }
+    );
+
+    expect(stats.allOverheated).toBe(true);
+    expect(stats.ehp).toBe(1200);
+    expect(stats.offense.dps).toBe(12);
+    // The heated figures are the figures now; there's no second number beside them.
+    expect(stats.overheated).toBeNull();
+    expect(stats.offense.overheated).toBeNull();
+    // The state control still shows what the pilot set.
+    expect(stats.modules[0].state).toBe('active');
+  });
+
+  it('is not overheated at all when nothing can overheat, whatever was asked', async () => {
+    stubNetwork();
+    calculateMock.mockReset();
+    calculateMock.mockReturnValue({
+      ship: { attributes: new Map() },
+      items: [{ attributes: new Map(), state: 'online', max_state: 'online' }],
+      character: { attributes: new Map() },
+    });
+    const { computeFittingStats } = await freshModule();
+
+    const stats = await computeFittingStats(
+      { ...fitting, modules: [{ slot: 'low', slotIndex: 0, typeId: 2048, state: 'online' }] },
+      profile,
+      undefined,
+      undefined,
+      { overheatAll: true }
+    );
+    expect(stats.allOverheated).toBe(false);
+    expect(calculateMock).toHaveBeenCalledTimes(1);
+  });
+
   it('skips the overheated calculation when asked to', async () => {
     stubNetwork();
     calculateMock.mockReset();

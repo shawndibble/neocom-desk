@@ -48,7 +48,13 @@ export function IskAmount({ value, revealOn, decimals = 2, className = '' }: Isk
   const { t } = useTranslation();
   const exact = t('common.iskExact', { amount: formatIsk(value, decimals) });
   return (
-    <Tooltip content={exact} openOnTap={revealOn === 'tap'}>
+    // A long-press reveal is the figure's own even inside a row menu: the
+    // exact value has no other way to a touch screen.
+    <Tooltip
+      content={exact}
+      openOnTap={revealOn === 'tap'}
+      holdToReveal={revealOn === 'longPress' ? true : undefined}
+    >
       <span
         tabIndex={0}
         className={cx(

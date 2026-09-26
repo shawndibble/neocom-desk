@@ -184,6 +184,21 @@ describe('FittingAddPanel', () => {
     await user.click(screen.getByRole('tab', { name: 'Charges' }));
     expect(screen.getByText('2× Light Missile Launcher II')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Scourge Light Missile/ }));
-    expect(onLoadCharge).toHaveBeenCalledWith(400, 501);
+    expect(onLoadCharge).toHaveBeenCalledWith(501);
+  });
+
+  it('adds any item to the cargo hold, in the quantity asked, from the Cargo tab', async () => {
+    const user = userEvent.setup();
+    const onAddCargo = vi.fn();
+    renderPanel({ target: { kind: 'cargo' }, onAddCargo });
+
+    // A cargo target opens on the Cargo tab, which searches every market item.
+    expect(screen.getByRole('tab', { name: 'Cargo', selected: true })).toBeInTheDocument();
+    await user.type(screen.getByLabelText('Search items to put in the cargo hold'), 'Anchoring');
+    const quantity = screen.getByLabelText('Quantity');
+    await user.clear(quantity);
+    await user.type(quantity, '3');
+    await user.click(screen.getByRole('button', { name: /Anchoring Array/ }));
+    expect(onAddCargo).toHaveBeenCalledWith(4, 3);
   });
 });

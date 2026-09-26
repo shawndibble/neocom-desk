@@ -3,6 +3,7 @@ import { compareFittingStats, modulesThatDiffer, compareWindow } from './fitting
 import { appliedDps, appliedDpsVsRange, bestRange, graphMaxRange } from './appliedDps';
 import type { AppliedDpsInputs } from './appliedDps';
 import type { Fitting, FittingStats } from './types';
+import { neutralExtendedStats } from './__fixtures__/fittingStats';
 
 function stats(overrides: Partial<FittingStats> = {}): FittingStats {
   return {
@@ -61,11 +62,40 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     applied: { weapons: [], droneControlRange: 20000 },
     repair: { shield: 0, armor: 0, hull: 0 },
     overheated: null,
+    ...neutralExtendedStats(),
     ...overrides,
   };
 }
 
 describe('compareFittingStats', () => {
+  it('compares the headline tank, capacitor, heat and hold figures, higher being better', () => {
+    const tank = neutralExtendedStats().tank;
+    const table = compareFittingStats([
+      stats({
+        tank: { ...tank, sustainedEffective: 50, burstEffective: 90 },
+        offense: {
+          weapons: [],
+          chargelessWeaponCount: 0,
+          dps: 100,
+          volley: 0,
+          overheated: { dps: 120, volley: 0 },
+        },
+      }),
+      stats({
+        tank: { ...tank, sustainedEffective: 80, burstEffective: 80 },
+        offense: { weapons: [], chargelessWeaponCount: 0, dps: 110, volley: 0, overheated: null },
+      }),
+    ]);
+    const row = (key: string) => table.rows.find((r) => r.key === key)!;
+    expect(row('sustainedTank')).toMatchObject({ values: [50, 80], bestIndices: [1] });
+    expect(row('burstTank')).toMatchObject({ values: [90, 80], bestIndices: [0] });
+    // A fit with nothing to overheat reads its plain DPS as its overheated DPS.
+    expect(row('overheatedDps')).toMatchObject({ values: [120, 110], bestIndices: [0] });
+    expect(row('capacitorDelta').differs).toBe(false);
+    expect(row('cargoCapacity').differs).toBe(false);
+    expect(row('sensorStrength').differs).toBe(false);
+  });
+
   it('marks a stat as not differing when every fitting rounds to the same value', () => {
     const table = compareFittingStats([stats(), stats()]);
     const ehpRow = table.rows.find((row) => row.key === 'ehp')!;

@@ -61,11 +61,10 @@ describe('esiFittingToFitting', () => {
     expect(fitting.shipTypeId).toBe(587);
   });
 
-  it('flags an unsupported flag (FighterBay, ServiceSlot, Invalid) as unresolved rather than dropping it silently', () => {
+  it('flags an unsupported flag (ServiceSlot, Invalid) as unresolved rather than dropping it silently', () => {
     const { fitting, unresolved } = esiFittingToFitting(
       esiFitting({
         items: [
-          { flag: 'FighterBay', quantity: 1, type_id: 1 },
           { flag: 'ServiceSlot0', quantity: 1, type_id: 2 },
           { flag: 'Invalid', quantity: 1, type_id: 3 },
         ],
@@ -73,7 +72,6 @@ describe('esiFittingToFitting', () => {
     );
     expect(fitting.modules).toEqual([]);
     expect(unresolved).toEqual([
-      { text: 'FighterBay', reason: 'unsupported slot' },
       { text: 'ServiceSlot0', reason: 'unsupported slot' },
       { text: 'Invalid', reason: 'unsupported slot' },
     ]);

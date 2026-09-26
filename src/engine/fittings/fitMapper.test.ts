@@ -165,3 +165,71 @@ describe('fittingToDogmaFit', () => {
     });
   });
 });
+
+describe('fittingToDogmaFit — Tactical Destroyer modes and booster side effects', () => {
+  const SVIPUL = 34562;
+
+  it('puts the chosen mode on the ship', () => {
+    const dogmaFit = fittingToDogmaFit(fitting({ shipTypeId: SVIPUL, mode: 34570 }), emptyProfile);
+    expect(dogmaFit.ship).toEqual({ type_id: SVIPUL, mode: 34570 });
+  });
+
+  it('flies a Tactical Destroyer with no mode chosen in its Defense Mode, as the game does', () => {
+    expect(fittingToDogmaFit(fitting({ shipTypeId: SVIPUL }), emptyProfile).ship).toEqual({
+      type_id: SVIPUL,
+      mode: 34564,
+    });
+  });
+
+  it('never gives a mode to a hull that has none', () => {
+    expect(fittingToDogmaFit(fitting({ mode: 34570 }), emptyProfile).ship).toEqual({
+      type_id: 17843,
+    });
+  });
+
+  it("switches on each booster's own side effects the pilot chose, and no other booster's", () => {
+    const dogmaFit = fittingToDogmaFit(fitting(), {
+      skillLevels: new Map(),
+      implantTypeIds: [],
+      // Standard Blue Pill, Standard Drop.
+      boosterTypeIds: [9950, 15466],
+      boosterSideEffects: [2737, 2749, 2741],
+    });
+    const booster = (typeId: number) => dogmaFit.items.find((item) => item.type_id === typeId);
+    // Shield capacity is a side effect of both; explosion velocity only the Blue Pill's.
+    expect(booster(9950)?.booster_side_effects).toEqual([2737, 2749]);
+    expect(booster(15466)?.booster_side_effects).toEqual([2737, 2741]);
+  });
+});
+
+describe('fittingToDogmaFit — fighters', () => {
+  it('launches each squadron into the next tube, keeps the rest in the bay, after the drones and before cargo', () => {
+    const dogmaFit = fittingToDogmaFit(
+      fitting({
+        shipTypeId: 23911,
+        drones: [{ typeId: 2488, quantity: 5, state: 'online' }],
+        fighters: [
+          { typeId: 23055, quantity: 6, state: 'active' },
+          { typeId: 23055, quantity: 6, state: 'online' },
+          { typeId: 37599, quantity: 3, state: 'active' },
+        ],
+        cargo: [{ typeId: 34, quantity: 1 }],
+      }),
+      emptyProfile
+    );
+    expect(dogmaFit.items.map((item) => item.slot)).toEqual([
+      { type: 'drone_bay' },
+      { type: 'fighter_tube', index: 0 },
+      { type: 'fighter_bay' },
+      { type: 'fighter_tube', index: 1 },
+      { type: 'cargo' },
+    ]);
+    expect(dogmaFit.items[1]).toEqual({
+      type_id: 23055,
+      slot: { type: 'fighter_tube', index: 0 },
+      quantity: 6,
+      state: 'active',
+    });
+    expect(dogmaFit.items[2].state).toBe('offline');
+  });
+});

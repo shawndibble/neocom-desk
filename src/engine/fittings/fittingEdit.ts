@@ -29,6 +29,23 @@ function isAt(module: FittingModule, slot: FittingSlotKind, slotIndex: number): 
   return module.slot === slot && module.slotIndex === slotIndex;
 }
 
+/** Where a module sits: its rack and position. */
+export type ModuleAt = Pick<FittingModule, 'slot' | 'slotIndex'>;
+
+function isAnyOf(module: FittingModule, at: readonly ModuleAt[]): boolean {
+  return at.some((where) => isAt(module, where.slot, where.slotIndex));
+}
+
+/** `module` as it is, with no charge (nor the count of one). */
+function unloaded(module: FittingModule): FittingModule {
+  return {
+    slot: module.slot,
+    slotIndex: module.slotIndex,
+    typeId: module.typeId,
+    state: module.state,
+  };
+}
+
 function updateModule(
   fitting: Fitting,
   slot: FittingSlotKind,
@@ -130,36 +147,213 @@ export function setModuleState(
   return updateModule(fitting, slot, slotIndex, (module) => ({ ...module, state }));
 }
 
-/** `null` unloads the charge. */
+/**
+ * `fitting.cargo` with back in it what the app took out of the hold for each
+ * of `modules` — the Fitting doesn't know how many a charge from anywhere else was.
+ */
+function withHeldChargesReturned(
+  fitting: Fitting,
+  modules: readonly FittingModule[]
+): Fitting['cargo'] {
+  let cargo = fitting.cargo;
+  for (const module of modules) {
+    if (module.chargeTypeId === undefined || module.chargeQuantity === undefined) continue;
+    cargo = addCargo({ ...fitting, cargo }, module.chargeTypeId, module.chargeQuantity).cargo;
+  }
+  return cargo;
+}
+
+/** `null` unloads the charge; what it held from cargo goes back into the hold. */
 export function setModuleCharge(
   fitting: Fitting,
   slot: FittingSlotKind,
   slotIndex: number,
   chargeTypeId: number | null
 ): Fitting {
-  return updateModule(fitting, slot, slotIndex, (module) => {
-    const unloaded: FittingModule = {
-      slot: module.slot,
-      slotIndex: module.slotIndex,
-      typeId: module.typeId,
-      state: module.state,
-    };
-    return chargeTypeId === null ? unloaded : { ...unloaded, chargeTypeId };
-  });
+  const module = fitting.modules.find((m) => isAt(m, slot, slotIndex));
+  if (module === undefined || (chargeTypeId !== null && module.chargeTypeId === chargeTypeId)) {
+    return fitting;
+  }
+  const updated = updateModule(fitting, slot, slotIndex, (m) =>
+    chargeTypeId === null ? unloaded(m) : { ...unloaded(m), chargeTypeId }
+  );
+  return { ...updated, cargo: withHeldChargesReturned(fitting, [module]) };
 }
 
-/** Loads `chargeTypeId` into every fitted module of `moduleTypeId` — the browser's Charges tab. */
+/** Every module at `at` takes `state` — a weapon group's, in one edit. */
+export function setModulesState(
+  fitting: Fitting,
+  at: readonly ModuleAt[],
+  state: FittingItemState
+): Fitting {
+  return {
+    ...fitting,
+    modules: fitting.modules.map((module) => (isAnyOf(module, at) ? { ...module, state } : module)),
+  };
+}
+
+/** Every module at `at` unloads its charge — a weapon group's, in one edit. */
+export function unloadCharges(fitting: Fitting, at: readonly ModuleAt[]): Fitting {
+  return {
+    ...fitting,
+    modules: fitting.modules.map((module) => (isAnyOf(module, at) ? unloaded(module) : module)),
+    cargo: withHeldChargesReturned(
+      fitting,
+      fitting.modules.filter((module) => isAnyOf(module, at))
+    ),
+  };
+}
+
+/** Loads `chargeTypeId` into every fitted module of `moduleTypeId`, cargo untouched — `loadChargeIntoCompatible` narrowed to one type. */
 export function loadChargeIntoAll(
   fitting: Fitting,
   moduleTypeId: number,
   chargeTypeId: number
 ): Fitting {
+  return loadChargeIntoCompatible(fitting, chargeTypeId, {
+    accepts: (module) => module.typeId === moduleTypeId,
+  }).fitting;
+}
+
+/** How a charge goes in — which modules take it, and what one load of it costs the cargo. */
+export interface ChargeLoad {
+  /**
+   * Whether a fitted module takes the charge: its charge groups plus the
+   * engine's size check, which the caller resolves (this module never
+   * touches the engine). One rule for ammo, missiles, bombs, scripts,
+   * crystals, cap boosters and paste alike.
+   */
+  accepts: (module: FittingModule) => boolean;
+  /** Charges one full load of `chargeTypeId` puts in `module` (its capacity over the charge's volume); 1 when unset. */
+  chargesPerLoad?: (module: FittingModule, chargeTypeId: number) => number;
+  /**
+   * The charge comes out of the Fitting's own cargo: each load is debited
+   * from it and recorded on the module (`chargeQuantity`), and a charge the
+   * module held goes back into it — as many as were recorded, none when
+   * the charge didn't come out of the hold.
+   */
+  fromCargo?: boolean;
+  /** Just this module (an Alt-drop, "Load into…") or these (a weapon group), rather than every one that takes it. */
+  only?: ModuleAt | readonly ModuleAt[];
+}
+
+export interface ChargeLoadResult {
+  fitting: Fitting;
+  /** Modules holding the charge afterwards, of the `wanted` that take it — a part-load counts. */
+  loaded: number;
+  wanted: number;
+  /** The cargo emptied before every module that takes the charge had some. */
+  ranOut: boolean;
+}
+
+function cargoQuantity(cargo: readonly FittingCargoItem[], typeId: number): number {
+  return cargo.reduce((sum, item) => (item.typeId === typeId ? sum + item.quantity : sum), 0);
+}
+
+/**
+ * Loads `chargeTypeId` into every fitted module that takes it, whatever the
+ * module's type (two launcher types that fire the same missile both load),
+ * or into `only` one. From cargo, each module takes a full load while there
+ * is one and the rest when there isn't; one already holding the charge is
+ * left alone. The same Fitting back when nothing changed, so the caller's
+ * edit history gets no empty step.
+ */
+export function loadChargeIntoCompatible(
+  fitting: Fitting,
+  chargeTypeId: number,
+  { accepts, chargesPerLoad = () => 1, fromCargo = false, only }: ChargeLoad
+): ChargeLoadResult {
+  const onlyAt = only === undefined ? undefined : 'slot' in only ? [only] : only;
+  const takes = (module: FittingModule) =>
+    (onlyAt === undefined || isAnyOf(module, onlyAt)) && accepts(module);
+  const perLoad = (module: FittingModule, typeId: number) =>
+    Math.max(1, Math.floor(chargesPerLoad(module, typeId)));
+  let cargo = fitting.cargo;
+  let left = fromCargo ? cargoQuantity(cargo, chargeTypeId) : Number.POSITIVE_INFINITY;
+  let wanted = 0;
+  let loaded = 0;
+  let changed = false;
+  let ranOut = false;
+  const modules = fitting.modules.map((module) => {
+    if (!takes(module)) return module;
+    wanted += 1;
+    if (module.chargeTypeId === chargeTypeId) {
+      loaded += 1;
+      return module;
+    }
+    if (left <= 0) {
+      ranOut = true;
+      return module;
+    }
+    // Rebuilt, not spread, so a quantity recorded for the charge it held never sticks to the new one.
+    const next: FittingModule = { ...unloaded(module), chargeTypeId };
+    loaded += 1;
+    changed = true;
+    if (!fromCargo) {
+      cargo = withHeldChargesReturned({ ...fitting, cargo }, [module]);
+      return next;
+    }
+    const taken = Math.min(left, perLoad(module, chargeTypeId));
+    left -= taken;
+    cargo = setCargoQuantity({ ...fitting, cargo }, chargeTypeId, left).cargo;
+    cargo = withHeldChargesReturned({ ...fitting, cargo }, [module]);
+    return { ...next, chargeQuantity: taken };
+  });
+  return {
+    fitting: changed ? { ...fitting, modules, cargo } : fitting,
+    loaded,
+    wanted,
+    ranOut,
+  };
+}
+
+/** Every module of `slot`/`slotIndex`'s type takes on its state and charge (or its lack of one). */
+export function copyToAllOfType(
+  fitting: Fitting,
+  slot: FittingSlotKind,
+  slotIndex: number
+): Fitting {
+  const source = fitting.modules.find((module) => isAt(module, slot, slotIndex));
+  if (source === undefined) return fitting;
   return {
     ...fitting,
-    modules: fitting.modules.map((module) =>
-      module.typeId === moduleTypeId ? { ...module, chargeTypeId } : module
-    ),
+    modules: fitting.modules.map((module) => {
+      if (module.typeId !== source.typeId || module === source) return module;
+      const copy: FittingModule = {
+        slot: module.slot,
+        slotIndex: module.slotIndex,
+        typeId: module.typeId,
+        state: source.state,
+      };
+      return source.chargeTypeId === undefined
+        ? copy
+        : { ...copy, chargeTypeId: source.chargeTypeId };
+    }),
   };
+}
+
+export function removeAllOfType(fitting: Fitting, typeId: number): Fitting {
+  return { ...fitting, modules: fitting.modules.filter((module) => module.typeId !== typeId) };
+}
+
+/**
+ * Fits `typeId` into every empty slot of a rack of `slotCount` — "Fill rack
+ * with last used". Each lands as `addModule` would, charge and all. The same
+ * Fitting when the rack is already full.
+ */
+export function fillRack(
+  fitting: Fitting,
+  slot: FittingSlotKind,
+  slotCount: number,
+  typeId: number,
+  defaultChargeCandidates: () => readonly number[] = () => []
+): Fitting {
+  let next = fitting;
+  for (let index = firstFreeSlotIndex(next, slot, slotCount); index !== null;) {
+    next = addModule(next, slot, index, typeId, defaultChargeCandidates);
+    index = firstFreeSlotIndex(next, slot, slotCount);
+  }
+  return next;
 }
 
 /** The lowest position in a rack of `slotCount` slots nothing occupies, or null when it's full. */
@@ -239,9 +433,15 @@ export interface DroneLaunchLimits {
 /**
  * Launches drones from the bay, in the order the Fitting lists them, as far
  * as bandwidth and the pilot's drone count allow — counting any already in
- * space against both. The same Fitting back when none can launch.
+ * space against both. With `onlyTypeId`, only that type launches (a drone's
+ * "Launch all", or one dropped on the Drones rack). The same Fitting back
+ * when none can launch.
  */
-export function launchDrones(fitting: Fitting, limits: DroneLaunchLimits): Fitting {
+export function launchDrones(
+  fitting: Fitting,
+  limits: DroneLaunchLimits,
+  onlyTypeId?: number
+): Fitting {
   const groups = droneGroups(fitting);
   // Only drones already out draw bandwidth — and skipping the rest keeps an
   // unknown (infinite) one in the bay from turning the sum into NaN.
@@ -256,6 +456,7 @@ export function launchDrones(fitting: Fitting, limits: DroneLaunchLimits): Fitti
   let next = fitting;
   for (const group of groups) {
     if (countLeft <= 0) break;
+    if (onlyTypeId !== undefined && group.typeId !== onlyTypeId) continue;
     const each = limits.bandwidthOf(group.typeId);
     const byBandwidth = !Number.isFinite(each)
       ? 0
@@ -272,6 +473,13 @@ export function launchDrones(fitting: Fitting, limits: DroneLaunchLimits): Fitti
     countLeft -= launched;
   }
   return next;
+}
+
+/** Brings every `typeId` in space back to the bay; the same Fitting when none is out. */
+export function recallDrones(fitting: Fitting, typeId: number): Fitting {
+  const group = droneGroups(fitting).find((entry) => entry.typeId === typeId);
+  if (!group || group.inSpace === 0) return fitting;
+  return setDroneCounts(fitting, typeId, { inSpace: 0, inBay: group.inBay + group.inSpace });
 }
 
 const MODULE_STATES: readonly FittingItemState[] = ['offline', 'online', 'active', 'overload'];
@@ -315,6 +523,23 @@ export function setCargoQuantity(fitting: Fitting, typeId: number, quantity: num
     }
   }
   return { ...fitting, cargo };
+}
+
+/** Puts `quantity` more of `typeId` in the cargo, on its stack or as a new last one. */
+export function addCargo(fitting: Fitting, typeId: number, quantity: number): Fitting {
+  const whole = wholeCount(quantity);
+  if (whole === 0) return fitting;
+  const held = cargoQuantity(fitting.cargo, typeId);
+  if (held === 0) return { ...fitting, cargo: [...fitting.cargo, { typeId, quantity: whole }] };
+  return setCargoQuantity(fitting, typeId, held + whole);
+}
+
+/** m3 the cargo takes, every stack of it. */
+export function cargoVolumeUsed(
+  fitting: Pick<Fitting, 'cargo'>,
+  volumeOf: (typeId: number) => number
+): number {
+  return fitting.cargo.reduce((sum, item) => sum + volumeOf(item.typeId) * item.quantity, 0);
 }
 
 /**

@@ -14,7 +14,25 @@ import {
   type OverheatedStats,
   type WeaponRow,
   type Resonances,
+  type AncillaryRepairer,
+  type JumpDriveStats,
+  type LockedTargets,
+  type SensorStats,
+  type SensorType,
+  type TankStats,
+  type FighterStats,
+  CHARACTER_BASE_LOCKED_TARGETS,
 } from './types';
+import {
+  capacitorBudget,
+  sustainedRepair,
+  type CapacitorBudget,
+  type CapacitorUser,
+  type RepairLayer,
+  type Repairer,
+} from './tank';
+
+const REPAIR_LAYERS: readonly RepairLayer[] = ['shield', 'armor', 'hull'];
 
 interface AttributeMap {
   get(attributeId: number): { value: number } | undefined;
@@ -123,6 +141,48 @@ function layerDefense(
   };
 }
 
+const SENSOR_ATTRIBUTE: Record<SensorType, number> = {
+  radar: DOGMA_ATTRIBUTE.scanRadarStrength,
+  ladar: DOGMA_ATTRIBUTE.scanLadarStrength,
+  magnetometric: DOGMA_ATTRIBUTE.scanMagnetometricStrength,
+  gravimetric: DOGMA_ATTRIBUTE.scanGravimetricStrength,
+};
+
+function sensorStats(shipAttributes: AttributeMap): SensorStats {
+  const type =
+    (Object.keys(SENSOR_ATTRIBUTE) as SensorType[]).find(
+      (kind) => readAttribute(shipAttributes, SENSOR_ATTRIBUTE[kind]) > 0
+    ) ?? null;
+  return { strength: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.scanStrength), type };
+}
+
+/** A jump drive's range is what says a hull has one; every hull reads the fuel default. */
+function jumpDriveStats(shipAttributes: AttributeMap): JumpDriveStats | null {
+  const rangeLightYears = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.jumpDriveRange);
+  if (rangeLightYears <= 0) return null;
+  return {
+    rangeLightYears,
+    fuelTypeId: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.jumpDriveConsumptionType),
+    fuelPerLightYear: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.jumpDriveConsumptionAmount),
+  };
+}
+
+/**
+ * The hull's lock limit against the pilot's. The engine's own "effective"
+ * figure misses the pilot's base of two, so this adds it back to the skill
+ * bonus the character result carries (`CHARACTER_DOGMA_ATTRIBUTE`).
+ */
+export function extractLockedTargets(
+  shipAttributes: AttributeMap,
+  characterAttributes: AttributeMap
+): LockedTargets {
+  const ship = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.maxLockedTargets);
+  const pilot =
+    CHARACTER_BASE_LOCKED_TARGETS +
+    readAttribute(characterAttributes, CHARACTER_DOGMA_ATTRIBUTE.maxLockedTargets);
+  return { ship, pilot, effective: Math.min(ship, pilot) };
+}
+
 /**
  * What limits the drones in space: how many the pilot controls, and each
  * drone type's bandwidth (read even for a stack still in the bay, which draws
@@ -188,6 +248,13 @@ export function extractFittingStats(
   | 'offense'
   | 'overheated'
   | 'applied'
+  | 'capacitorBudget'
+  | 'tank'
+  | 'support'
+  | 'mining'
+  | 'fighters'
+  | 'lockedTargets'
+  | 'allOverheated'
 > {
   const cpuTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.cpuOutput);
   const powergridTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.powerOutput);
@@ -228,6 +295,13 @@ export function extractFittingStats(
     unknownItemTypeIds: items
       .filter((item, index) => isUnknownItem(item, itemResults[index]))
       .map((item) => item.type_id),
+    sensor: sensorStats(shipAttributes),
+    holds: {
+      cargo: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.cargoCapacity),
+      fleetHangar: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.fleetHangarCapacity),
+      miningHold: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.miningHoldCapacity),
+    },
+    jumpDrive: jumpDriveStats(shipAttributes),
     slotCounts: {
       high: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.hiSlots),
       medium: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.medSlots),
@@ -285,6 +359,7 @@ export interface OffenseItem {
   chargeTypeId?: number;
   quantity: number;
   isDrone: boolean;
+  isFighter?: boolean;
 }
 
 function isFiring(state: FittingItemState): boolean {
@@ -308,9 +383,26 @@ function damageFigures(attributes: AttributeMap, quantity: number): DamageFigure
   };
 }
 
-/** One Offense row per key: drone-ness, type and charge. */
-export function weaponRowKey(row: Pick<WeaponRow, 'isDrone' | 'typeId' | 'chargeTypeId'>): string {
-  return `${row.isDrone ? 'drone' : 'module'}:${row.typeId}:${row.chargeTypeId ?? ''}`;
+/** One Offense row per key: module, drone or fighter, type and charge. */
+export function weaponRowKey(
+  row: Pick<WeaponRow, 'isDrone' | 'isFighter' | 'typeId' | 'chargeTypeId'>
+): string {
+  const kind = row.isFighter ? 'fighter' : row.isDrone ? 'drone' : 'module';
+  return `${kind}:${row.typeId}:${row.chargeTypeId ?? ''}`;
+}
+
+/** Fighter tubes, class limits and bay off the ship; all 0 on a hull with no tubes. */
+export function extractFighterStats(shipAttributes: AttributeMap): FighterStats {
+  const read = (id: number) => readAttribute(shipAttributes, id);
+  const of = (used: number, total: number) => ({ used: read(used), total: read(total) });
+  return {
+    dps: read(DOGMA_ATTRIBUTE.fighterDamagePerSecond),
+    tubes: of(DOGMA_ATTRIBUTE.fighterTubesUsed, DOGMA_ATTRIBUTE.fighterTubes),
+    light: of(DOGMA_ATTRIBUTE.fighterLightSlotsUsed, DOGMA_ATTRIBUTE.fighterLightSlots),
+    support: of(DOGMA_ATTRIBUTE.fighterSupportSlotsUsed, DOGMA_ATTRIBUTE.fighterSupportSlots),
+    heavy: of(DOGMA_ATTRIBUTE.fighterHeavySlotsUsed, DOGMA_ATTRIBUTE.fighterHeavySlots),
+    bay: of(DOGMA_ATTRIBUTE.fighterCapacityUsed, DOGMA_ATTRIBUTE.fighterCapacity),
+  };
 }
 
 /**
@@ -345,6 +437,7 @@ export function extractOffense(
         typeId: item.typeId,
         chargeTypeId: item.chargeTypeId,
         isDrone: item.isDrone,
+        ...(item.isFighter ? { isFighter: true } : {}),
         count: 0,
         dps: 0,
         volley: 0,
@@ -377,6 +470,146 @@ export function extractOffense(
         }
       : null,
     chargelessWeaponCount,
+  };
+}
+
+/** A module (not a drone, implant or cargo) as `calculate()` was given it, with its charge. */
+interface ModuleItem extends CalculatedItem {
+  charge?: { type_id: number };
+}
+
+interface RunningResult {
+  attributes: AttributeMap;
+  state: FittingItemState;
+}
+
+const MODULE_SLOTS: ReadonlySet<string> = new Set(['high', 'medium', 'low', 'rig', 'subsystem']);
+
+/** The fitted modules that are running (active or overloaded), with their results. */
+function runningModules<I extends CalculatedItem, R extends RunningResult>(
+  items: readonly I[],
+  results: readonly R[]
+): { item: I; result: R }[] {
+  return items.flatMap((item, index) => {
+    const result = results[index];
+    return result && MODULE_SLOTS.has(item.slot.type) && isFiring(result.state)
+      ? [{ item, result }]
+      : [];
+  });
+}
+
+/** Peak recharge against every running module's draw (`tank.ts`'s `capacitorBudget`). */
+export function extractCapacitorBudget(
+  items: readonly CalculatedItem[],
+  results: readonly RunningResult[],
+  shipAttributes: AttributeMap
+): CapacitorBudget {
+  const users: CapacitorUser[] = runningModules(items, results).map(({ result }) => {
+    const read = (id: number) => readAttribute(result.attributes, id);
+    const injectionPerCharge = read(ITEM_DOGMA_ATTRIBUTE.capacitorInjectionAmount);
+    return {
+      capPerSecond: read(ITEM_DOGMA_ATTRIBUTE.capacitorPeakLoad),
+      ...(injectionPerCharge > 0 ? { injectionPerCharge } : {}),
+    };
+  });
+  return capacitorBudget(
+    users,
+    readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakRecharge)
+  );
+}
+
+const REPAIR_RATE_ATTRIBUTE: Record<RepairLayer, number> = {
+  shield: ITEM_DOGMA_ATTRIBUTE.shieldBoostRate,
+  armor: ITEM_DOGMA_ATTRIBUTE.armorRepairRate,
+  hull: ITEM_DOGMA_ATTRIBUTE.hullRepairRate,
+};
+
+/** EHP ÷ HP for a layer — how far the Damage Profile stretches one repaired HP. */
+function ehpPerHp(layer: LayerDefense): number {
+  return layer.hp > 0 ? layer.ehp / layer.hp : 1;
+}
+
+/**
+ * Burst and sustained local tank (`tank.ts`). A module with an optimal range
+ * repairs someone else — the engine gives a remote repairer the same rate
+ * attribute a local one has, and keeps it out of the ship's own total.
+ */
+export function extractTank(
+  items: readonly ModuleItem[],
+  results: readonly RunningResult[],
+  shipAttributes: AttributeMap,
+  layers: Pick<FittingStats, 'shield' | 'armor' | 'hull'>
+): TankStats {
+  const repairers: Repairer[] = [];
+  const ancillary: AncillaryRepairer[] = [];
+  for (const { item, result } of runningModules(items, results)) {
+    const read = (id: number) => readAttribute(result.attributes, id);
+    if (read(ITEM_DOGMA_ATTRIBUTE.maxRange) > 0) continue;
+    for (const layer of REPAIR_LAYERS) {
+      const rate = read(REPAIR_RATE_ATTRIBUTE[layer]);
+      if (rate <= 0) continue;
+      const chargeRate = read(ITEM_DOGMA_ATTRIBUTE.chargeRate) || 1;
+      repairers.push({
+        layer,
+        rate,
+        capPerSecond: read(ITEM_DOGMA_ATTRIBUTE.capacitorPeakLoad),
+        ...(item.charge
+          ? {
+              ancillary: {
+                cycles: Math.floor(read(ITEM_DOGMA_ATTRIBUTE.chargeAmount) / chargeRate + 1e-9),
+                cycleSeconds: read(ITEM_DOGMA_ATTRIBUTE.cycleTime) / 1000,
+                reloadSeconds: read(ITEM_DOGMA_ATTRIBUTE.reloadTime) / 1000,
+              },
+            }
+          : {}),
+      });
+      // The paste multiplier lands on the paste, not the module (a live run:
+      // the module's own `chargedRepairMultiplier` stays unset), so a loaded
+      // charge is what says the multiplier is in the rate.
+      const pasteMultiplier = read(ITEM_DOGMA_ATTRIBUTE.chargedArmorDamageMultiplier);
+      if (pasteMultiplier > 1) {
+        const isLoaded = item.charge !== undefined;
+        ancillary.push({
+          typeId: item.type_id,
+          layer,
+          loaded: isLoaded ? rate : rate * pasteMultiplier,
+          empty: isLoaded ? rate / pasteMultiplier : rate,
+          isLoaded,
+        });
+      }
+    }
+  }
+
+  // Remote repair landing on the ship (a projected logistics Fitting) is in
+  // the engine's ship-level rate but on no module here: it runs on someone
+  // else's capacitor, so it's sustained as it is.
+  const burst = localRepair(shipAttributes);
+  for (const layer of REPAIR_LAYERS) {
+    const own = repairers.filter((r) => r.layer === layer).reduce((sum, r) => sum + r.rate, 0);
+    const received = burst[layer] - own;
+    if (received > 1e-6) repairers.push({ layer, rate: received, capPerSecond: 0 });
+  }
+
+  const { sustained, capFraction } = sustainedRepair(repairers, {
+    peakRecharge: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakRecharge),
+    peakLoad: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakLoad),
+  });
+  const passiveShield = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.passiveShieldRechargeRate);
+  const passiveEffective = readAttribute(
+    shipAttributes,
+    DOGMA_ATTRIBUTE.passiveShieldEffectiveRechargeRate
+  );
+  const effective = (rates: LocalRepair) =>
+    REPAIR_LAYERS.reduce((sum, layer) => sum + rates[layer] * ehpPerHp(layers[layer]), 0) +
+    passiveEffective;
+  return {
+    burst,
+    sustained,
+    passiveShield,
+    burstEffective: effective(burst),
+    sustainedEffective: effective(sustained),
+    capFraction,
+    ancillary,
   };
 }
 

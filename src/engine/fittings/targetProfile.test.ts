@@ -7,6 +7,8 @@ import {
   parseCustomTargetProfiles,
   parseSelectedTargetProfileId,
   resolveTargetProfile,
+  NO_RESISTS,
+  targetResists,
 } from './targetProfile';
 
 describe('target profiles', () => {
@@ -56,6 +58,33 @@ describe('target profiles', () => {
         null,
       ])
     ).toEqual([{ id: 'custom:a', name: 'A', signatureRadius: 30, velocity: 2500 }]);
+  });
+
+  it('takes resists as a share (0-1) per damage type, and none as no resists at all', () => {
+    const resists = { em: 0.5, thermal: 0.4, kinetic: 0.3, explosive: 0.2 };
+    expect(isValidTargetProfile({ signatureRadius: 40, velocity: 0, resists })).toBe(true);
+    expect(
+      isValidTargetProfile({ signatureRadius: 40, velocity: 0, resists: { ...resists, em: 1.2 } })
+    ).toBe(false);
+    expect(
+      isValidTargetProfile({ signatureRadius: 40, velocity: 0, resists: { ...resists, em: -0.1 } })
+    ).toBe(false);
+    expect(targetResists({ signatureRadius: 40, velocity: 0 })).toEqual(NO_RESISTS);
+    expect(targetResists({ signatureRadius: 40, velocity: 0, resists })).toBe(resists);
+  });
+
+  it('keeps a synced profile’s resists, and still reads one saved before resists existed', () => {
+    const resists = { em: 0.5, thermal: 0.4, kinetic: 0.3, explosive: 0.2 };
+    expect(
+      parseCustomTargetProfiles([
+        { id: 'custom:a', name: 'A', signatureRadius: 30, velocity: 2500, resists },
+        { id: 'custom:b', name: 'Old', signatureRadius: 30, velocity: 2500 },
+        { id: 'custom:c', name: 'Bad', signatureRadius: 30, velocity: 1, resists: { em: 'x' } },
+      ])
+    ).toEqual([
+      { id: 'custom:a', name: 'A', signatureRadius: 30, velocity: 2500, resists },
+      { id: 'custom:b', name: 'Old', signatureRadius: 30, velocity: 2500 },
+    ]);
   });
 
   it('parses the selected id, defaulting non-strings', () => {

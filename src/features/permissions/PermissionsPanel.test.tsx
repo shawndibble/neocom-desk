@@ -10,6 +10,7 @@ import { beginEveLogin } from '@/app/loginFlow';
 import { ESI_REGISTRY, SCOPE_GROUPS } from '@/esi/registry';
 import { CORE_GRANT, SCOPES, scopesForGroup } from '@/esi/scopes';
 import { loadCharacterRoles } from '@/features/corp/roles';
+import { AUTHORIZED_APPS_URL } from '@/lib/links';
 import { PermissionsPanel } from './PermissionsPanel';
 
 vi.mock('@/features/corp/roles', async (importOriginal) => ({
@@ -49,6 +50,15 @@ beforeEach(() => {
   useActiveCharacter.setState({ activeCharacterId: CHARACTER_ID, hydrated: true });
   mockedGrantedScopes.mockReturnValue([]);
   mockedLoadRoles.mockResolvedValue(rolesResolvingTo([]));
+});
+
+describe('PermissionsPanel — revoking', () => {
+  it("links the revoke hint to CCP's authorized-apps page", () => {
+    render(<PermissionsPanel />);
+    const link = screen.getByRole('link', { name: "EVE's own site" });
+    expect(link).toHaveAttribute('href', AUTHORIZED_APPS_URL);
+    expect(link).toHaveAttribute('target', '_blank');
+  });
 });
 
 describe('PermissionsPanel — every Permission', () => {

@@ -13,7 +13,7 @@
 
 import type { ReactElement, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { IconButton, IskAmount, RowMoreActions } from '@/components/ui';
+import { IconButton, IskAmount, RowActionsMenu, RowMoreActions } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import { formatVolume } from '@/features/market/format';
@@ -208,6 +208,8 @@ interface ContainerRowProps {
   selectionState: SelectionState;
   onToggleSelection: () => void;
   t: Translate;
+  /** A ship's own actions (Open in Fittings), on right-click and a More actions button. */
+  menu?: { name: string; items: ReactNode };
 }
 
 /** A ship, bay or container inside the current level — descends one more step. */
@@ -222,8 +224,9 @@ export function ContainerRow({
   selectionState,
   onToggleSelection,
   t,
+  menu,
 }: ContainerRowProps) {
-  return (
+  const row = (
     <div className="flex items-center gap-2 border-b border-line pl-3 hover:bg-panel-2">
       {selectMode && (
         <SelectionCheckbox
@@ -250,7 +253,15 @@ export function ContainerRow({
         </span>
         <Icon.Descend size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-faint" />
       </Link>
+      {menu && <RowMoreActions className="mr-1" />}
     </div>
+  );
+  return menu ? (
+    <RowActionsMenu name={menu.name} items={menu.items}>
+      {row}
+    </RowActionsMenu>
+  ) : (
+    row
   );
 }
 
