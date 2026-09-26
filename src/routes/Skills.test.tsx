@@ -308,8 +308,38 @@ describe('Skills', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Expand all' }));
     // Level IV is the one training; V is queued behind it and must not show.
-    expect(await screen.findAllByText(/^Training → IV · 4d 0h$/)).toHaveLength(1);
+    // One chip on the row, one on its group's header.
+    expect(await screen.findAllByText(/^Training → IV · 4d 0h$/)).toHaveLength(2);
     expect(screen.queryByText(/Training → V/)).not.toBeInTheDocument();
+  });
+
+  it('shows the training chip on the collapsed header of only the group holding it', async () => {
+    const day = 86_400_000;
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/skillqueue`, () =>
+        HttpResponse.json([
+          {
+            skill_id: 2,
+            queue_position: 0,
+            finished_level: 4,
+            start_date: new Date(Date.now() - day).toISOString(),
+            finish_date: new Date(Date.now() + 4 * day + 60_000).toISOString(),
+          },
+        ])
+      )
+    );
+
+    render(<App />);
+
+    const chips = await screen.findAllByText(/^Training → IV · 4d 0h$/);
+    expect(chips).toHaveLength(1);
+    const header = chips[0].closest('button');
+    expect(header).toHaveAttribute('aria-expanded', 'false');
+    for (const other of screen
+      .getAllByRole('button', { expanded: false })
+      .filter((button) => button !== header)) {
+      expect(other).not.toHaveTextContent(/Training →/);
+    }
   });
 
   it('credits the level but not the SP when ESI withheld level_end_sp', async () => {
