@@ -41,6 +41,13 @@ describe('CustomizePermissionsDialog', () => {
     expect(screen.getByText(`Optional · ${DEFAULT_ON_GROUPS.length} of 14`)).toBeInTheDocument();
   });
 
+  it('explains the dialog and tags each Core row as Required', async () => {
+    render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
+    await screen.findByRole('checkbox', { name: 'Wallet' });
+    expect(screen.getByText(/add more later in Settings › Permissions/i)).toBeInTheDocument();
+    expect(screen.getAllByText('Required')).toHaveLength(2);
+  });
+
   it('tags Corporation and Structure markets as opt-in', async () => {
     render(<CustomizePermissionsDialog open onClose={vi.fn()} />);
     await screen.findByRole('checkbox', { name: 'Wallet' });
