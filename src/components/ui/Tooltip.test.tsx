@@ -53,19 +53,22 @@ describe('Tooltip', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('One-line explanation.');
   });
 
-  it('does not reveal on a focus that is not :focus-visible, e.g. a dialog restoring focus', () => {
+  it('does not reveal on focus that follows a pointer press, e.g. a dialog restoring focus', () => {
     render(
       <Tooltip content="One-line explanation.">
         <button type="button">Trigger</button>
       </Tooltip>
     );
     const trigger = screen.getByRole('button', { name: 'Trigger' });
-    const matches = vi.spyOn(trigger, 'matches').mockImplementation(() => false);
 
+    fireEvent.pointerDown(document.body);
     act(() => trigger.focus());
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
 
-    matches.mockRestore();
+    trigger.blur();
+    fireEvent.keyDown(document.body, { key: 'Tab' });
+    act(() => trigger.focus());
+    expect(screen.getByRole('tooltip')).toHaveTextContent('One-line explanation.');
   });
 
   it('sizes the bubble to its content, capped — short text gets no dead space', async () => {

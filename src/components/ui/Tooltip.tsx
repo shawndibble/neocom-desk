@@ -23,6 +23,21 @@ const TOUCH_MOVE_TOLERANCE_PX = 10;
 /** Generous bound on a device's touchendâ†’click echo delay; the tests confirm a later, real click still closes the tooltip normally once this expires. */
 const TOUCH_CLICK_ECHO_MS = 700;
 
+/**
+ * Whether the latest input was a pointer press rather than a key. jsdom has no
+ * `:focus-visible`, and the browser's own heuristic is invisible to a
+ * controlled `open`, so track it: a focus that follows a tap or click is not
+ * keyboard navigation.
+ */
+let lastInputWasPointer = false;
+let modalityTracked = false;
+function trackInputModality() {
+  if (modalityTracked || typeof document === 'undefined') return;
+  modalityTracked = true;
+  document.addEventListener('pointerdown', () => (lastInputWasPointer = true), true);
+  document.addEventListener('keydown', () => (lastInputWasPointer = false), true);
+}
+
 interface TooltipProps {
   /**
    * Tooltip content. Usually one line of plain language, where a literal `
@@ -219,17 +234,12 @@ export function Tooltip({
   /**
    * Radix opens on any focus, including a dialog handing focus back to its
    * trigger on close — which pops the bubble over whatever sits beside it.
-   * Only `:focus-visible` (keyboard) focus should open it; a hovering mouse
-   * still does, since its focus is not what opened it.
+   * Only keyboard-driven focus should open it (`:focus-visible` semantics); a
+   * hovering mouse still does, since its focus is not what opened it.
    */
   function isNonKeyboardFocusOpen() {
     const el = triggerRef.current;
-    if (!el || mouseHovering.current || document.activeElement !== el) return false;
-    try {
-      return !el.matches(':focus-visible');
-    } catch {
-      return false;
-    }
+    return !!el && !mouseHovering.current && document.activeElement === el && lastInputWasPointer;
   }
 
   function handlePointerEnter(event: PointerEvent) {
@@ -240,7 +250,10 @@ export function Tooltip({
     mouseHovering.current = false;
   }
 
-  useEffect(() => cancelLongPress, []);
+  useEffect(() => {
+    trackInputModality();
+    return cancelLongPress;
+  }, []);
 
   const trigger =
     isValidElement(children) && className
