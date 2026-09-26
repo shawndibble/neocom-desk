@@ -2401,6 +2401,11 @@
         "desc": "Build plans for manufacturing and reactions: materials, job fees, facility rigs and taxes at live hub prices. A production log tracks what each run really made, Opportunities ranks the blueprints you own and scans the market for what is profitable to build, and BPC Search covers every public blueprint-copy contract by ME/TE, runs, price and jumps.",
         "tag": "Manufacturing"
       },
+      "ships": {
+        "name": "Ships",
+        "desc": "Build a Fitting against a ship's actual skills and implants, with DPS, tank and cap against a target profile you set, save it to My Fittings with a share code, and compare fits side by side. The Ship Tree maps every hull by faction and race, ladder or map view, showing which you can already fly.",
+        "tag": "Fitting & Ship Tree"
+      },
       "miningTax": {
         "name": "Mining",
         "desc": "Your output, ISK/hr and raw-vs-refined value over time, plus a tax ledger for moons you mine in someone else’s space: each day’s ore in each system assigned to the payee you owe, tax and ISK snapshotted at assignment, splits, settle-up and payment matching.",
@@ -2413,7 +2418,7 @@
       },
       "market": {
         "name": "Market",
-        "desc": "Order books for any region or all of them, filtered by jump range and security, with price history, side-by-side compare, price alerts, and an appraisal of pasted items or fits net of fees. Built on public price data, so it works whatever you did or didn't grant.",
+        "desc": "Order books for any region or all of them, filtered by jump range and security, with price history, side-by-side compare, price alerts, an appraisal of pasted items or fits net of fees, and Hauling Opportunities ranking routes by expected profit. Built on public price data, so it works whatever you did or didn't grant.",
         "tag": "No scope needed"
       },
       "orders": {
