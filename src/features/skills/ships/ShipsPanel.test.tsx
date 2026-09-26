@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
@@ -94,6 +94,10 @@ async function attachFit(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('ShipsPanel', () => {
+  afterEach(() => {
+    vi.mocked(loadKnownRequirements).mockResolvedValue([]);
+  });
+
   it('picking a ship shows its Mastery skills, tagged by tier', async () => {
     const user = userEvent.setup();
     renderPanel(fakeTarget());
@@ -206,7 +210,6 @@ describe('ShipsPanel', () => {
       [{ skillTypeID: 3301, targetLevel: 3 }],
       'Vexor'
     );
-    vi.mocked(loadKnownRequirements).mockResolvedValue([]);
   });
 
   it('says "You can fly this" once every required skill is trained', async () => {
@@ -216,7 +219,6 @@ describe('ShipsPanel', () => {
     await pickVexor(user);
 
     expect(await screen.findByText('You can fly this')).toBeInTheDocument();
-    vi.mocked(loadKnownRequirements).mockResolvedValue([]);
   });
 
   it('pasting text that is not an EFT fit shows the inline error', async () => {

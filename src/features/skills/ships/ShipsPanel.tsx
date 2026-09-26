@@ -129,9 +129,11 @@ export function ShipsPanel({
   useEffect(() => {
     if (selectedTypeID === undefined) return;
     let cancelled = false;
-    void loadKnownRequirements(selectedTypeID).then((skills) => {
-      if (!cancelled) setRequiredFor({ typeID: selectedTypeID, skills: skills ?? NO_REQUIRED });
-    });
+    void loadKnownRequirements(selectedTypeID)
+      .catch(() => null)
+      .then((skills) => {
+        if (!cancelled) setRequiredFor({ typeID: selectedTypeID, skills: skills ?? NO_REQUIRED });
+      });
     return () => {
       cancelled = true;
     };
@@ -473,7 +475,7 @@ export function ShipsPanel({
           {requiredEntries.length > 0 && (
             <div className="space-y-1 border-t border-line p-3">
               <p
-                className={`text-sm font-semibold ${requiredMissing.length === 0 ? 'text-success' : 'text-text'}`}
+                className={`text-base font-semibold ${requiredMissing.length === 0 ? 'text-success' : 'text-text'}`}
               >
                 {requiredMissing.length === 0
                   ? t('skills.ships.canFly')
