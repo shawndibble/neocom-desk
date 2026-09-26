@@ -25,6 +25,7 @@ import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes, type AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { extractMining, miningYield } from '@/engine/fittings/mining';
+import { projectsNothing } from '@/engine/fittings/projection';
 import {
   DOGMA_ATTRIBUTE,
   ITEM_DOGMA_ATTRIBUTE,
@@ -212,7 +213,7 @@ export interface StatsOptions {
  * leaves it as it is.
  */
 export function withIncoming(fit: Fit, projected?: ProjectedEffects): Fit {
-  if (!projected || (projected.buffs.length === 0 && projected.effects.length === 0)) return fit;
+  if (!projected || projectsNothing(projected)) return fit;
   const incoming = fit.incoming ?? {};
   return {
     ...fit,
@@ -265,6 +266,32 @@ export function toProjectedEffects(outgoing: Projection | undefined): ProjectedE
 }
 
 /**
+ * `dogmaFit` with every running module that can overheat set to overload,
+ * as `calculation` (the fit as it stands) reports them; null when none can.
+ * Modules come first in the fit's items, so only the first `moduleCount` are
+ * modules — drones and fighters after them never overheat.
+ */
+function overloadHeatable(
+  dogmaFit: Fit,
+  moduleCount: number,
+  calculation: ReturnType<typeof calculate>
+): Fit | null {
+  const heatable = dogmaFit.items.map(
+    (_, index) =>
+      index < moduleCount &&
+      calculation.items[index]?.max_state === 'overload' &&
+      calculation.items[index]?.state === 'active'
+  );
+  if (!heatable.includes(true)) return null;
+  return {
+    ...dogmaFit,
+    items: dogmaFit.items.map((item, index) =>
+      heatable[index] ? { ...item, state: 'overload' } : item
+    ),
+  };
+}
+
+/**
  * Works out a Fitting's stats under a pilot's skills and implants, with EHP
  * measured against `damageProfile` (the engine's uniform default without
  * one), inside `weather` when there is one. Loads the engine first if this
@@ -294,21 +321,11 @@ export async function computeFittingStats(
   // a multiplier applied here: the same fit again with every active module
   // that can overheat set to overload. Skipped when there is none, so a fit
   // with nothing to overheat costs one calculation and shows no overheated line.
-  const heatable = dogmaFit.items.map(
-    (_, index) =>
-      index < fitting.modules.length &&
-      calculation.items[index]?.max_state === 'overload' &&
-      calculation.items[index]?.state === 'active'
-  );
-  const heatedCalculation =
-    (withOverheated || overheatAll) && heatable.includes(true)
-      ? calculate({
-          ...dogmaFit,
-          items: dogmaFit.items.map((item, index) =>
-            heatable[index] ? { ...item, state: 'overload' } : item
-          ),
-        })
+  const heatedFit =
+    withOverheated || overheatAll
+      ? overloadHeatable(dogmaFit, fitting.modules.length, calculation)
       : null;
+  const heatedCalculation = heatedFit === null ? null : calculate(heatedFit);
 
   // "Overheat all": every figure is the heated one, with no second number
   // beside it. The editor's state controls still read the unheated result —
@@ -408,17 +425,7 @@ export async function explainModule(
   );
   if (overheatAll) {
     // As the stats do: every running module that can overheat, overloaded.
-    const plain = calculate(dogmaFit);
-    dogmaFit = {
-      ...dogmaFit,
-      items: dogmaFit.items.map((item, index) =>
-        index < fitting.modules.length &&
-        plain.items[index]?.max_state === 'overload' &&
-        plain.items[index]?.state === 'active'
-          ? { ...item, state: 'overload' }
-          : item
-      ),
-    };
+    dogmaFit = overloadHeatable(dogmaFit, fitting.modules.length, calculate(dogmaFit)) ?? dogmaFit;
   }
   const calculation = calculate(dogmaFit, { sources: true });
   const result = calculation.items[moduleIndex];

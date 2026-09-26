@@ -21,3 +21,8 @@ export function combineProjections(sources: readonly ProjectionSource[]): Projec
   }
   return combined;
 }
+
+/** Nothing to take in — no buff and no effect — so a fit is left as it is. */
+export function projectsNothing(projected: ProjectedEffects | undefined): boolean {
+  return !projected || (projected.buffs.length === 0 && projected.effects.length === 0);
+}

@@ -23,6 +23,7 @@ import { db, type FittingRecord } from '@/db';
 import { decodeFittingShare } from '@/engine/fitting/fittingShare';
 import { applyImplantBasis, defaultImplantBasis } from '@/engine/fittings/implantBasis';
 import { buildAllVProfile } from '@/engine/fittings/pilotProfile';
+import { projectsNothing } from '@/engine/fittings/projection';
 import { shareToFitting } from '@/engine/fittings/shareMapper';
 import { loadSkills } from '@/sde/loadSde';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -44,10 +45,6 @@ async function projectionOf(record: FittingRecord): Promise<ProjectedSource | nu
     count: 1,
     projection: await computeOutgoing(fitting, pilot),
   };
-}
-
-function projectsNothing(source: ProjectedSource): boolean {
-  return source.projection.buffs.length === 0 && source.projection.effects.length === 0;
 }
 
 export function ProjectedEffectsPanel() {
@@ -108,7 +105,7 @@ export function ProjectedEffectsPanel() {
             >
               <span className="min-w-0 flex-1 basis-40">
                 <span className="block truncate text-sm">{source.name}</span>
-                {projectsNothing(source) && (
+                {projectsNothing(source.projection) && (
                   <span className="block text-warning">{t('fittings.projected.nothing')}</span>
                 )}
               </span>

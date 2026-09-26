@@ -4,6 +4,7 @@
  * set to a level on top of either those or the Character's own. Implants and
  * boosters are the pilot's as ever. Pure.
  */
+import { allVSkillLevels } from './pilotProfile';
 import type { PilotProfile } from './types';
 
 export type SkillBase = 'character' | 'all0' | 'allV';
@@ -38,7 +39,7 @@ export function applySkillOverrides(
     overrides.base === 'character'
       ? new Map(profile.skillLevels)
       : overrides.base === 'allV'
-        ? new Map(allSkillTypeIds.map((typeId) => [typeId, 5]))
+        ? allVSkillLevels(allSkillTypeIds)
         : new Map<number, number>();
   for (const [typeId, level] of Object.entries(overrides.levels)) {
     const clamped = clampLevel(level);

@@ -20,8 +20,13 @@ export function buildPilotProfile(
  */
 export function buildAllVProfile(allSkillTypeIds: readonly number[]): PilotProfile {
   return {
-    skillLevels: new Map(allSkillTypeIds.map((typeId) => [typeId, 5])),
+    skillLevels: allVSkillLevels(allSkillTypeIds),
     implantTypeIds: [],
     boosterTypeIds: [],
   };
+}
+
+/** Every skill at level V — the one way "All V" is built, whether a whole profile or a skill override's base. */
+export function allVSkillLevels(allSkillTypeIds: readonly number[]): Map<number, number> {
+  return new Map(allSkillTypeIds.map((typeId) => [typeId, 5]));
 }

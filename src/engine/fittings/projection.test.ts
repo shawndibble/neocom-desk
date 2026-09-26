@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { combineProjections } from './projection';
+import { combineProjections, projectsNothing } from './projection';
 
 const logi = {
   buffs: [],
@@ -32,5 +32,14 @@ describe('combineProjections', () => {
       buffs: [],
       effects: [],
     });
+  });
+});
+
+describe('projectsNothing', () => {
+  it('is true with no buff and no effect, or nothing at all', () => {
+    expect(projectsNothing({ buffs: [], effects: [] })).toBe(true);
+    expect(projectsNothing(undefined)).toBe(true);
+    expect(projectsNothing(logi)).toBe(false);
+    expect(projectsNothing(booster)).toBe(false);
   });
 });

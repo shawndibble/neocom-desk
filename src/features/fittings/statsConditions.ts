@@ -17,7 +17,7 @@ import {
   hasSkillOverrides,
   type SkillOverrides,
 } from '@/engine/fittings/skillOverrides';
-import { combineProjections } from '@/engine/fittings/projection';
+import { combineProjections, projectsNothing } from '@/engine/fittings/projection';
 import type { PilotProfile, ProjectedEffects } from '@/engine/fittings/types';
 import { loadSkills } from '@/sde/loadSde';
 import { useAbyssalWeather } from './abyssalWeatherSelection';
@@ -86,12 +86,11 @@ export function useStatsConditions(): StatsConditions {
   const sources = useProjectedSources((state) => state.sources);
   return useMemo(() => {
     const projected = combineProjections(sources);
-    const projects = projected.buffs.length > 0 || projected.effects.length > 0;
     return {
       weatherTypeId,
       overheatAll,
       ...(hasSkillOverrides(skills) ? { skills } : {}),
-      ...(projects ? { projected } : {}),
+      ...(projectsNothing(projected) ? {} : { projected }),
     };
   }, [weatherTypeId, overheatAll, skills, sources]);
 }
