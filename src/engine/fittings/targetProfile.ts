@@ -8,13 +8,10 @@
  * target that resists nothing — the same numbers it gave then.
  */
 
+import type { PerDamageType } from './types';
+
 /** A target's resist to each damage type, as a share (0–1) of that damage it shrugs off. */
-export interface TargetResists {
-  em: number;
-  thermal: number;
-  kinetic: number;
-  explosive: number;
-}
+export type TargetResists = PerDamageType;
 
 export const NO_RESISTS: TargetResists = { em: 0, thermal: 0, kinetic: 0, explosive: 0 };
 

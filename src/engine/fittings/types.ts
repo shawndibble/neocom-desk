@@ -148,16 +148,23 @@ export type CapacitorStatus =
   { stable: true; stablePercentage: number } | { stable: false; depletesInSeconds: number };
 
 /**
- * The incoming damage mix EHP is measured against (a Damage Profile,
- * CONTEXT.md) — relative weights, not fractions; only the ratio matters. Our
- * own shape rather than the engine's (ADR 0016: nothing here imports it).
+ * One number for each of EVE's four damage types. What the number means is
+ * the named type's to say: `DamageProfile` (weights), `TargetResists`
+ * (shares resisted), `DamageSplit` (shares of a weapon's damage).
  */
-export interface DamageProfile {
+export interface PerDamageType {
   em: number;
   thermal: number;
   kinetic: number;
   explosive: number;
 }
+
+/**
+ * The incoming damage mix EHP is measured against (a Damage Profile,
+ * CONTEXT.md) — relative weights, not fractions; only the ratio matters. Our
+ * own shape rather than the engine's (ADR 0016: nothing here imports it).
+ */
+export type DamageProfile = PerDamageType;
 
 /** Four resonances (0-1; a resist bar shows `1 - resonance`). */
 export interface Resonances {
