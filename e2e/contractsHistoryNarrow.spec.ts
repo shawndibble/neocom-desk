@@ -116,7 +116,7 @@ test.describe('contracts history — untitled courier route (issue #1706)', () =
     );
     await page.goto('./contracts/history');
     const opener = page.getByRole('table').first().locator('tbody tr td:first-child button');
-    await expect(opener).toContainText(/Jita.+ → .+Amarr/);
+    await expect(opener).toContainText(/Jita.+ → Amarr/);
     await expect(opener).toContainText('Collateral');
     const box = await opener.boundingBox();
     expect(box?.width ?? 0).toBeLessThanOrEqual(PHONE.width);
