@@ -12,15 +12,15 @@ const DESKTOP_SIZES = [
   { width: 1024, height: 768 },
 ];
 
-test('Display has no Phone tab bar panel at md and up', async ({ page }) => {
-  for (const size of DESKTOP_SIZES) {
+for (const size of DESKTOP_SIZES) {
+  test(`Display has no Phone tab bar panel at ${size.width}px`, async ({ page }) => {
     await page.setViewportSize(size);
     await signInAndGoto(page, './settings/display');
     await page.waitForURL(/\/settings\/display$/);
     await expect(page.getByText(/time format/i).first()).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Phone tab bar' })).toHaveCount(0);
-  }
-});
+  });
+}
 
 test('Display shows the Phone tab bar panel at 390px', async ({ page }) => {
   await page.setViewportSize(PHONE);
