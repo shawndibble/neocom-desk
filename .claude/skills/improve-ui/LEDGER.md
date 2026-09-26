@@ -60,6 +60,7 @@ Issue number, size (tweak/rework), verdict, one line.
 | #1952 | tweak | NARROW  | PI Colonies rows: shared column tracks so bars align and rows never wrap at md+.  |
 | #1953 | tweak | SHIP    | DataTable header info icon hugs its label on left/center-aligned columns.         |
 | #1954 | tweak | NARROW  | Contracts History: Issued column, default sort issued desc.                       |
+| #1961 | tweak | NARROW  | Wallet Journal: tone the filtered net with isk-pos/isk-neg (tone only, one line). |
 
 ## Killed findings
 
@@ -69,6 +70,7 @@ What was killed, and why. This is what stops a re-pitch.
 - Industry vs other routes' content width differing at 1440: documented tiering (see Contract).
 - Overview Alerts card showing a tall empty area beside two short card rows when there are no alerts: empty-state artefact of grid `stretch`, which the code comment defends on purpose.
 - Wallet journal lacks a net total: shipped in #1721.
+- Contracts History outstanding/in-progress count strip: Overview's ContractsCard carries the deadline summary and rows flag lapsed contracts; a read-only chip row would duplicate it.
 - Open Orders panel has an untitled header bar: the tab already names it.
 - Skills Trained: mark the group holding the in-progress skill on its collapsed header. Groups start collapsed by decision (`20260901-092551-skills-pages-rework`), #1724 chips the row, Plans and Overview show the queue.
 - PI Colonies empty state is a bare "No planetary colonies" with no link to the Plan tab: bare fetched-and-empty titles are `CachedEmptyState`'s contract, and the Advisor tab already points at Plan. Cost too small.
