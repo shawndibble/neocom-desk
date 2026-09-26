@@ -935,7 +935,7 @@ export function BuildPlanList({
               <span className="hidden w-8 shrink-0 text-right sm:block">
                 {t('industry.runsColumn')}
               </span>
-              <span className="w-9 shrink-0" aria-hidden="true" />
+              <span className="w-9 shrink-0 md:w-7" aria-hidden="true" />
             </div>
             <ul className="rounded-xs border border-line">
               {/* A group's header and its members are siblings in this one list,
