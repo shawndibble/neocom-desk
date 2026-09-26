@@ -1,7 +1,7 @@
 import { cx } from '@/lib/cx';
 
 export type IconButtonVariant = 'ghost' | 'plain';
-export type IconButtonTone = 'default' | 'danger' | 'positive';
+export type IconButtonTone = 'default' | 'danger' | 'positive' | 'warning';
 export type IconButtonSize = 'md' | 'sm' | 'row';
 
 export interface IconButtonClassNameOptions {
@@ -11,7 +11,7 @@ export interface IconButtonClassNameOptions {
    * around every line of a list.
    */
   variant?: IconButtonVariant;
-  /** `danger` is the destructive treatment; `positive` the "worth doing" one. */
+  /** `danger` is the destructive treatment; `positive` the "worth doing" one, `warning` the caution one. */
   tone?: IconButtonTone;
   /**
    * `md` (default) is the toolbar size; `sm` is for controls nested in a
@@ -68,13 +68,15 @@ export function iconButtonClassName({
           )
         : tone === 'positive'
           ? cx('text-isk-pos', variant === 'ghost' && 'border-line')
-          : cx(
-              'text-text-dim',
-              variant === 'ghost' && 'border-line',
-              !disabled && 'hover:text-text',
-              variant === 'ghost' && 'bg-panel-2',
-              variant === 'ghost' && !disabled && 'hover:border-line-bright'
-            ),
+          : tone === 'warning'
+            ? cx('text-warning', variant === 'ghost' && 'border-line')
+            : cx(
+                'text-text-dim',
+                variant === 'ghost' && 'border-line',
+                !disabled && 'hover:text-text',
+                variant === 'ghost' && 'bg-panel-2',
+                variant === 'ghost' && !disabled && 'hover:border-line-bright'
+              ),
     className
   );
 }

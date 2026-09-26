@@ -53,6 +53,11 @@ interface IconButtonProps extends Omit<
    * dense row; `row` is `sm` on a pointer but the 44px touch tier below `md`.
    */
   size?: IconButtonSize;
+  /**
+   * A plain tap reveals the tooltip (see `Tooltip`), for an icon whose only
+   * job is to explain. Leave off when the tap does something.
+   */
+  openOnTap?: boolean;
   className?: string;
 }
 
@@ -84,13 +89,14 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
     variant = 'ghost',
     tone = 'default',
     size = 'md',
+    openOnTap,
     className = '',
     ...rest
   },
   ref
 ) {
   return (
-    <Tooltip content={tooltip ?? label}>
+    <Tooltip content={tooltip ?? label} openOnTap={openOnTap}>
       <button
         {...rest}
         ref={ref}

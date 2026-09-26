@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   FilterChip,
+  IconButton,
   Popover,
   PopoverContent,
   PopoverTrigger,
   sortRows,
   Toast,
 } from '@/components/ui';
+import { Skills } from '@/components/ui/icons';
 import { romanLevel } from '@/engine/projection';
 import type { PlanEntry } from '@/engine/types';
 import { formatDuration } from '@/lib/duration';
@@ -113,7 +115,11 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button>{t('fittings.mastery.chip')}</Button>
+          <IconButton
+            icon={<Skills />}
+            label={t('fittings.mastery.chip')}
+            tooltip={t('fittings.mastery.tooltip', { name: hullName })}
+          />
         </PopoverTrigger>
         <PopoverContent align="start" className="w-96 max-w-[calc(100vw-2rem)] p-3">
           <div className="space-y-2">

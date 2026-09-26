@@ -503,7 +503,29 @@ function FittingsPage() {
       showDrones={dronesShown}
       fitting={fitting}
       moduleResults={moduleResults}
-      conditions={<AbyssalWeatherPicker />}
+      conditions={
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <TacticalModePicker fitting={fitting} onChange={edit} />
+          <ImplantBasisControl
+            basis={workspace.implantBasis}
+            canUseCloneBasis={workspace.canUseCloneBasis}
+            onBasisChange={workspace.setImplantBasis}
+            implantSet={fitting.implantSet}
+            onImplantSetChange={workspace.setImplantSet}
+          />
+          {workspace.implantBasis === 'clone' && workspace.canUseCloneBasis && (
+            <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
+          )}
+          <AbyssalWeatherPicker />
+          {gaps && gaps.missing.length > 0 && activeCharacterId !== null && (
+            <MissingSkillsChip
+              entries={gaps.missing}
+              characterId={activeCharacterId}
+              fittingName={fitting.name}
+            />
+          )}
+        </div>
+      }
       heading={
         <>
           <span>
@@ -565,30 +587,12 @@ function FittingsPage() {
           compact={addMode === 'sheet' || (addMode === 'slideOut' && addOpen)}
           context={
             <>
-              <TacticalModePicker fitting={fitting} onChange={edit} />
-              <ImplantBasisControl
-                basis={workspace.implantBasis}
-                canUseCloneBasis={workspace.canUseCloneBasis}
-                onBasisChange={workspace.setImplantBasis}
-                implantSet={fitting.implantSet}
-                onImplantSetChange={workspace.setImplantSet}
-              />
-              {workspace.implantBasis === 'clone' && workspace.canUseCloneBasis && (
-                <ImplantsAssumedNote hint={t('fittings.implants.assumesNoImplantsHint')} />
-              )}
               <AlphaCloneChip blockers={alpha.blockers} skillName={alpha.skillName} />
               {activeCharacterId !== null && (
                 <MasteryChip
                   hullTypeId={fitting.shipTypeId}
                   hullName={hullName}
                   characterId={activeCharacterId}
-                />
-              )}
-              {gaps && gaps.missing.length > 0 && activeCharacterId !== null && (
-                <MissingSkillsChip
-                  entries={gaps.missing}
-                  characterId={activeCharacterId}
-                  fittingName={fitting.name}
                 />
               )}
             </>

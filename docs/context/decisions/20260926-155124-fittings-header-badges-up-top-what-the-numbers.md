@@ -1,0 +1,6 @@
+# Scope decisions — Fittings header: badges up top, what the numbers assume in the stats panel
+
+_Recorded 2026-09-26. Supersedes the header part of `20260924-215855` (implants and missing skills in the header)._
+
+- **The Fitting's header holds the Fitting and what you do with it; what its numbers assume lives in the stats panel.** The header grew to two or three rows with implants, Alpha/Omega, Mastery and missing skills beside the actions, on desktop as well as on a phone. Implants, the Tactical Destroyer mode, the Abyssal weather and the missing-skills chip now sit together in a conditions row at the top of the stats panel, under "Stats as …". The header keeps identity, the Fittings menu, Compare, Export and Save, so it is one row on desktop; below desktop it is the identity line, then the badges, Save and ⋮.
+- **Alpha/Omega and Mastery are icon badges in the header.** α (green) when an Alpha can fly the Fitting, Ω (warning yellow) when it needs Omega; a graduation cap for Mastery. The verdict is the accessible name, so colour is never the only signal. The Alpha/Omega tooltip opens on a plain tap on touch, since the badge does nothing else; Mastery's tap opens its popover, so its tooltip stays hover, focus and touch-and-hold.
