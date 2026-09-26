@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it } from 'vitest';
 import wasmInit, { calculate } from '@eveshipfit/dogma-engine';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
-import { withWeather } from './dogmaFittingEngine';
+import { toProjectedEffects, withIncoming, withWeather } from './dogmaFittingEngine';
 import {
   extractCapacitorBudget,
   extractLockedTargets,
@@ -82,6 +82,12 @@ const MODULATED_STRIP_MINER_II = 17912;
 const SIMPLE_ASTEROID_MINING_CRYSTAL_TYPE_A_II = 60281;
 const MINING_DRONE_II = 10250;
 const GYROSTABILIZER_II = 519;
+const AFTERBURNER_1MN_II = 438;
+const CLAYMORE = 22468;
+const SKIRMISH_COMMAND_BURST_II = 43556;
+const RAPID_DEPLOYMENT_CHARGE = 42840;
+/** Leadership, Skirmish Command, Command Burst Specialist, Wing/Fleet Command, Command Ships. */
+const COMMAND_SKILL_IDS = [3348, 3349, 3354, 11574, 24764, 23950];
 
 const PARTIAL_SKILLS = new Map([
   [3332, 3], // Gallente Cruiser
@@ -741,6 +747,75 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     );
     // Nothing negative: the patched, derived ids are never listed.
     expect(rows.every((row) => row.attributeId > 0)).toBe(true);
+  });
+
+  it('takes in what another Fitting projects: its web, its remote reps, its command burst', () => {
+    const allV = buildAllVProfile([...SUPPORT_SKILL_IDS, ...COMMAND_SKILL_IDS]);
+    const target: Fitting = {
+      name: 'Rifter',
+      shipTypeId: RIFTER,
+      modules: [{ slot: 'medium', slotIndex: 0, typeId: AFTERBURNER_1MN_II, state: 'active' }],
+      drones: [],
+      cargo: [],
+    };
+    const targetFit = fittingToDogmaFit(target, allV);
+    const projectedOnto = (source: Fitting) => {
+      const projection = toProjectedEffects(calculate(fittingToDogmaFit(source, allV)).outgoing);
+      const calculation = calculate(withIncoming(targetFit, projection));
+      return { projection, ship: calculation.ship.attributes };
+    };
+    const alone = calculate(targetFit).ship.attributes;
+    const speed = (ship: typeof alone) => ship.get(37)!.value;
+
+    const webber = projectedOnto({
+      name: 'Webber',
+      shipTypeId: RIFTER,
+      modules: [{ slot: 'medium', slotIndex: 0, typeId: STASIS_WEBIFIER_II, state: 'active' }],
+      drones: [],
+      cargo: [],
+    });
+    expect(speed(webber.ship)).toBeCloseTo(speed(alone) * 0.4, 3);
+
+    const logi = projectedOnto({
+      name: 'Logi',
+      shipTypeId: CARACAL,
+      modules: [
+        { slot: 'high', slotIndex: 0, typeId: MEDIUM_REMOTE_ARMOR_REPAIRER_II, state: 'active' },
+      ],
+      drones: [],
+      cargo: [],
+    });
+    const handedOut = logi.projection.effects[0].attributes[-45];
+    expect(handedOut).toBeGreaterThan(0);
+    expect(logi.ship.get(-45)?.value).toBeCloseTo(handedOut, 6);
+
+    const booster = projectedOnto({
+      name: 'Booster',
+      shipTypeId: CLAYMORE,
+      modules: [
+        {
+          slot: 'high',
+          slotIndex: 0,
+          typeId: SKIRMISH_COMMAND_BURST_II,
+          state: 'active',
+          chargeTypeId: RAPID_DEPLOYMENT_CHARGE,
+        },
+      ],
+      drones: [],
+      cargo: [],
+    });
+    expect(booster.projection.buffs.length).toBeGreaterThan(0);
+    // Rapid Deployment: the afterburner's speed bonus is up.
+    expect(speed(booster.ship)).toBeGreaterThan(speed(alone));
+  });
+
+  it('adds nothing when nothing is projected', () => {
+    const fit = fittingToDogmaFit(
+      { name: 'R', shipTypeId: RIFTER, modules: [], drones: [], cargo: [] },
+      buildPilotProfile(new Map(), [])
+    );
+    expect(withIncoming(fit, { buffs: [], effects: [] })).toBe(fit);
+    expect(withIncoming(fit, undefined)).toBe(fit);
   });
 
   it('reads applied-DPS inputs: running turrets, loaded launchers, launched drones only', () => {

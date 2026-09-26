@@ -538,11 +538,20 @@ export function extractTank(
     }
   }
 
+  // Remote repair landing on the ship (a projected logistics Fitting) is in
+  // the engine's ship-level rate but on no module here: it runs on someone
+  // else's capacitor, so it's sustained as it is.
+  const burst = localRepair(shipAttributes);
+  for (const layer of REPAIR_LAYERS) {
+    const own = repairers.filter((r) => r.layer === layer).reduce((sum, r) => sum + r.rate, 0);
+    const received = burst[layer] - own;
+    if (received > 1e-6) repairers.push({ layer, rate: received, capPerSecond: 0 });
+  }
+
   const { sustained, capFraction } = sustainedRepair(repairers, {
     peakRecharge: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakRecharge),
     peakLoad: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakLoad),
   });
-  const burst = localRepair(shipAttributes);
   const passiveShield = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.passiveShieldRechargeRate);
   const passiveEffective = readAttribute(
     shipAttributes,

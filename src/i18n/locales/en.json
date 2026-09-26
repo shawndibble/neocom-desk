@@ -456,7 +456,8 @@
         "fitting": "Fitting",
         "price": "Price",
         "support": "Support out",
-        "mining": "Mining"
+        "mining": "Mining",
+        "projected": "Projected effects"
       },
       "capacitorStable": "Stable at {{pct}}%",
       "capacitorDepletes": "Depletes in {{seconds}}s",
@@ -940,6 +941,22 @@
         "mod_sub": "−{{value}}",
         "post_percent": "{{value}}%"
       }
+    },
+    "projected": {
+      "hint": "Another saved Fitting's command bursts, remote repair, webs, neutralizers and the like, landing on this one. Each is worked out at all skills V.",
+      "add": "Project a saved fitting",
+      "addPlaceholder": "Pick a fitting…",
+      "needsCharacter": "Save fittings to My Fittings to project them onto this one.",
+      "none": "Nothing projected.",
+      "nothing": "Projects nothing (no running burst or remote module)",
+      "count_one": "{{count}} ship",
+      "count_other": "{{count}} ships",
+      "fewer": "One fewer {{name}}",
+      "more": "One more {{name}}",
+      "remove": "Stop projecting {{name}}",
+      "failed": "Couldn't work out what {{name}} projects.",
+      "meta_one": "{{count}} ship",
+      "meta_other": "{{count}} ships"
     }
   },
   "skills": {

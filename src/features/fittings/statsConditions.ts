@@ -1,8 +1,9 @@
 /**
  * The conditions every number on the Fittings pages is worked out under,
  * beyond the pilot and the Damage Profile: the Abyssal weather
- * (`abyssalWeatherSelection.ts`), the "Overheat all" switch and any skill
- * overrides ("what if my skills were…" — `engine/fittings/skillOverrides.ts`). One set for
+ * (`abyssalWeatherSelection.ts`), the "Overheat all" switch, any skill
+ * overrides ("what if my skills were…" — `engine/fittings/skillOverrides.ts`)
+ * and what other saved Fittings project onto it (bursts, remote reps, webs…). One set for
  * the session, read by the editor, its Variations, the applied-DPS overlay
  * and Fitting Compare alike, so no two numbers on screen are in different
  * conditions. Neither is saved or put in a Share Link: each is a question
@@ -16,7 +17,8 @@ import {
   hasSkillOverrides,
   type SkillOverrides,
 } from '@/engine/fittings/skillOverrides';
-import type { PilotProfile } from '@/engine/fittings/types';
+import { combineProjections } from '@/engine/fittings/projection';
+import type { PilotProfile, ProjectedEffects } from '@/engine/fittings/types';
 import { loadSkills } from '@/sde/loadSde';
 import { useAbyssalWeather } from './abyssalWeatherSelection';
 import type { StatsOptions } from './dogmaFittingEngine';
@@ -46,12 +48,34 @@ export const useSkillOverrides = create<SkillOverridesSelection>((set) => ({
   setSkills: (skills) => set({ skills }),
 }));
 
+/** One saved Fitting projecting onto the open one, and how many ships of it. */
+export interface ProjectedSource {
+  /** The My Fittings record it came from. */
+  id: string;
+  name: string;
+  count: number;
+  /** What one ship of it projects, worked out when it was added. */
+  projection: ProjectedEffects;
+}
+
+interface ProjectedSourcesSelection {
+  sources: ProjectedSource[];
+  setSources: (sources: ProjectedSource[]) => void;
+}
+
+export const useProjectedSources = create<ProjectedSourcesSelection>((set) => ({
+  sources: [],
+  setSources: (sources) => set({ sources }),
+}));
+
 export interface StatsConditions {
   /** An Abyssal weather beacon's type id, or null for normal space. */
   weatherTypeId: number | null;
   overheatAll: boolean;
   /** Absent: the pilot's own skills. */
   skills?: SkillOverrides;
+  /** Absent: nothing projected onto the Fitting. */
+  projected?: ProjectedEffects;
 }
 
 /** The session's conditions, one stable object while none of them changes. */
@@ -59,10 +83,17 @@ export function useStatsConditions(): StatsConditions {
   const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
   const overheatAll = useOverheatAll((state) => state.overheatAll);
   const skills = useSkillOverrides((state) => state.skills);
-  return useMemo(
-    () => ({ weatherTypeId, overheatAll, ...(hasSkillOverrides(skills) ? { skills } : {}) }),
-    [weatherTypeId, overheatAll, skills]
-  );
+  const sources = useProjectedSources((state) => state.sources);
+  return useMemo(() => {
+    const projected = combineProjections(sources);
+    const projects = projected.buffs.length > 0 || projected.effects.length > 0;
+    return {
+      weatherTypeId,
+      overheatAll,
+      ...(hasSkillOverrides(skills) ? { skills } : {}),
+      ...(projects ? { projected } : {}),
+    };
+  }, [weatherTypeId, overheatAll, skills, sources]);
 }
 
 /**
@@ -91,5 +122,6 @@ export function statsOptions(conditions: StatsConditions): StatsOptions {
   return {
     ...(conditions.weatherTypeId === null ? {} : { weatherTypeId: conditions.weatherTypeId }),
     ...(conditions.overheatAll ? { overheatAll: true } : {}),
+    ...(conditions.projected ? { incoming: conditions.projected } : {}),
   };
 }

@@ -659,6 +659,20 @@ describe('extractTank', () => {
     expect(tank.sustainedEffective).toBeCloseTo(50, 6);
   });
 
+  it('counts remote repair received (projected onto the ship) as sustained, drawing none of its capacitor', () => {
+    const rep = running(3530, { armorRepairRate: 30, capacitorPeakLoad: 10 });
+    const tank = extractTank(
+      [rep.item],
+      [rep.result],
+      // 30 HP/s of its own, 200 HP/s landing from a logistics ship.
+      attrs({ armorRepairRate: 230, capacitorPeakRecharge: 5, capacitorPeakLoad: 10 }),
+      layers
+    );
+    expect(tank.burst.armor).toBe(230);
+    // Its own rep gets half the capacitor it needs; the incoming reps all land.
+    expect(tank.sustained.armor).toBeCloseTo(15 + 200, 6);
+  });
+
   it('spreads a loaded ancillary armor repairer over its reload and gives its empty rate', () => {
     const aar = running(
       33101,

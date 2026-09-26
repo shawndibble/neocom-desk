@@ -30,6 +30,8 @@ import {
 import { CapacitorFacts, TankFacts } from './FittingTankStats';
 import { SupportFacts } from './FittingSupportStats';
 import { MiningFacts } from './FittingMiningStats';
+import { ProjectedEffectsPanel } from './ProjectedEffectsPanel';
+import { useProjectedSources } from './statsConditions';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
 
@@ -162,6 +164,7 @@ type Section =
   | 'capacitor'
   | 'support'
   | 'mining'
+  | 'projected'
   | 'targeting'
   | 'navigation'
   | 'drones'
@@ -321,6 +324,9 @@ export function FittingStatsSections({
       isPhone,
       openByDefault: OPEN_BY_DEFAULT.has(section),
     });
+  const projectedShips = useProjectedSources((state) =>
+    state.sources.reduce((sum, source) => sum + source.count, 0)
+  );
   const toggle = (section: Section) =>
     // From the store's current value, never this render's possibly stale copy.
     void setSections(
@@ -613,6 +619,12 @@ export function FittingStatsSections({
           }),
           <MiningFacts stats={stats} typeName={typeName} />
         )}
+
+      {section(
+        'projected',
+        projectedShips > 0 ? t('fittings.projected.meta', { count: projectedShips }) : undefined,
+        <ProjectedEffectsPanel />
+      )}
 
       {section(
         'targeting',

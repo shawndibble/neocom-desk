@@ -96,6 +96,21 @@ export interface PilotProfile {
   boosterTypeIds: readonly number[];
 }
 
+/**
+ * What one Fitting hands another: command-burst buffs and projected module
+ * effects (remote repair, webs, neutralizers…) — the engine's own
+ * "outgoing"/"incoming" projection, in our own shape (ADR 0016: nothing here
+ * imports the engine's types). A buff is a `dbuffCollections` id and its
+ * strength; an effect is the projecting type, its dogma effect and every
+ * attribute value the effect reads.
+ */
+export interface ProjectedEffects {
+  buffs: { id: number; value: number }[];
+  effects: { typeId: number; effectId: number; attributes: Record<number, number> }[];
+}
+
+export const NO_PROJECTED_EFFECTS: ProjectedEffects = { buffs: [], effects: [] };
+
 export type CapacitorStatus =
   { stable: true; stablePercentage: number } | { stable: false; depletesInSeconds: number };
 

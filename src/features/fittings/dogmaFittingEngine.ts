@@ -4,6 +4,7 @@ import wasmInit, {
   load_sde,
   type Fit,
   type FitItem,
+  type Projection,
   type Violation,
 } from '@eveshipfit/dogma-engine';
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
@@ -30,6 +31,7 @@ import {
   type FittingStats,
   type PilotProfile,
   type DamageProfile,
+  type ProjectedEffects,
 } from '@/engine/fittings/types';
 
 /**
@@ -198,6 +200,66 @@ export interface StatsOptions {
   overheatAll?: boolean;
   /** An Abyssal weather's beacon type id. */
   weatherTypeId?: number;
+  /** What other Fittings project onto this one. */
+  incoming?: ProjectedEffects;
+}
+
+/**
+ * The fit taking in what other Fittings project onto it (`computeOutgoing`),
+ * beside whatever it already takes in (an Abyssal weather). Nothing projected
+ * leaves it as it is.
+ */
+export function withIncoming(fit: Fit, projected?: ProjectedEffects): Fit {
+  if (!projected || (projected.buffs.length === 0 && projected.effects.length === 0)) return fit;
+  const incoming = fit.incoming ?? {};
+  return {
+    ...fit,
+    incoming: {
+      ...incoming,
+      effects: [
+        ...(incoming.effects ?? []),
+        ...projected.effects.map((effect) => ({
+          type_id: effect.typeId,
+          effect_id: effect.effectId,
+          attributes: effect.attributes,
+        })),
+      ],
+      buffs: [...(incoming.buffs ?? []), ...projected.buffs],
+    },
+  };
+}
+
+/** A Map or a plain record of attribute values, as the engine may hand either back. */
+function attributeRecord(
+  values: Map<number, number> | Record<number, number> | undefined
+): Record<number, number> {
+  if (!values) return {};
+  return values instanceof Map ? Object.fromEntries(values) : { ...values };
+}
+
+/**
+ * What a Fitting projects onto another ship — its running command bursts'
+ * buffs and its running remote modules' effects — as the engine reports it,
+ * worked out under `profile`.
+ */
+export async function computeOutgoing(
+  fitting: Fitting,
+  profile: PilotProfile
+): Promise<ProjectedEffects> {
+  await loadDogmaEngine();
+  return toProjectedEffects(calculate(fittingToDogmaFit(fitting, profile)).outgoing);
+}
+
+/** The engine's outgoing projection in our own shape. */
+export function toProjectedEffects(outgoing: Projection | undefined): ProjectedEffects {
+  return {
+    buffs: (outgoing?.buffs ?? []).map((buff) => ({ id: buff.id, value: buff.value })),
+    effects: (outgoing?.effects ?? []).map((effect) => ({
+      typeId: effect.type_id,
+      effectId: effect.effect_id,
+      attributes: attributeRecord(effect.attributes),
+    })),
+  };
 }
 
 /**
@@ -211,11 +273,19 @@ export async function computeFittingStats(
   profile: PilotProfile,
   onProgress?: (progress: DogmaAssetProgress) => void,
   damageProfile?: DamageProfile,
-  { overheated: withOverheated = true, overheatAll = false, weatherTypeId }: StatsOptions = {}
+  {
+    overheated: withOverheated = true,
+    overheatAll = false,
+    weatherTypeId,
+    incoming,
+  }: StatsOptions = {}
 ): Promise<FittingStats> {
   await loadDogmaEngine(onProgress);
   // The overheated recalculation below spreads this fit, so it keeps the weather too.
-  const dogmaFit = withWeather(fittingToDogmaFit(fitting, profile, damageProfile), weatherTypeId);
+  const dogmaFit = withIncoming(
+    withWeather(fittingToDogmaFit(fitting, profile, damageProfile), weatherTypeId),
+    incoming
+  );
   const calculation = calculate(dogmaFit);
 
   // Overheated values come from the engine itself (its overload state), not
@@ -319,10 +389,13 @@ export async function explainModule(
   profile: PilotProfile,
   moduleIndex: number,
   damageProfile?: DamageProfile,
-  { overheatAll = false, weatherTypeId }: StatsOptions = {}
+  { overheatAll = false, weatherTypeId, incoming }: StatsOptions = {}
 ): Promise<AffectedAttribute[]> {
   await loadDogmaEngine();
-  let dogmaFit = withWeather(fittingToDogmaFit(fitting, profile, damageProfile), weatherTypeId);
+  let dogmaFit = withIncoming(
+    withWeather(fittingToDogmaFit(fitting, profile, damageProfile), weatherTypeId),
+    incoming
+  );
   if (overheatAll) {
     // As the stats do: every running module that can overheat, overloaded.
     const plain = calculate(dogmaFit);
