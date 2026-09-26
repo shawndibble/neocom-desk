@@ -586,3 +586,100 @@ describe('BuildPlanList: "More actions" button for a group header (#1498)', () =
     expect(screen.getByRole('textbox', { name: 'Rename group' })).toBeInTheDocument();
   });
 });
+
+describe('BuildPlanList sort and owned tag', () => {
+  const PLANS = [
+    plan({ id: 'a', name: 'Merlin run' }),
+    plan({ id: 'b', name: 'Astero' }),
+    plan({ id: 'c', name: 'Bantam' }),
+  ];
+  const stat = (profit: number | null, iskPerHour: number | null, marginPct: number | null) => ({
+    profit,
+    verdict: 'build' as const,
+    runs: 1,
+    iskPerHour,
+    marginPct,
+  });
+
+  function renderSortable(
+    ownedBlueprints: React.ComponentProps<typeof BuildPlanList>['ownedBlueprints'] = []
+  ) {
+    return render(
+      <BuildPlanList
+        plans={PLANS}
+        catalog={CATALOG}
+        selectedId={null}
+        onSelect={() => {}}
+        onCreate={() => {}}
+        onDuplicate={() => {}}
+        onDelete={() => {}}
+        onRename={() => {}}
+        {...NOOP_COMPARE_PROPS}
+        {...NOOP_GROUP_PROPS}
+        statsByPlanId={
+          new Map([
+            ['a', stat(100, 5, 10)],
+            ['b', stat(300, 1, 30)],
+            ['c', stat(null, null, null)],
+          ])
+        }
+        ownedBlueprints={ownedBlueprints}
+      />
+    );
+  }
+
+  const order = () =>
+    screen
+      .getAllByRole('button', { name: /^(Merlin run|Astero|Bantam)$/ })
+      .map((b) => b.textContent);
+
+  it('sorts by profit on click, reverses on a second click, and returns to manual order on a third', async () => {
+    const user = userEvent.setup();
+    renderSortable();
+    expect(order()).toEqual(['Merlin run', 'Astero', 'Bantam']);
+
+    await user.click(screen.getByRole('button', { name: 'Sort by Profit' }));
+    expect(order()).toEqual(['Astero', 'Merlin run', 'Bantam']);
+
+    await user.click(screen.getByRole('button', { name: 'Sort by Profit' }));
+    expect(order()).toEqual(['Merlin run', 'Astero', 'Bantam']);
+
+    await user.click(screen.getByRole('button', { name: 'Sort by Profit' }));
+    expect(order()).toEqual(['Merlin run', 'Astero', 'Bantam']);
+  });
+
+  it('offers ISK/h and Margin as further sortable columns', async () => {
+    const user = userEvent.setup();
+    renderSortable();
+    await user.click(screen.getByRole('button', { name: 'Sort by ISK/h' }));
+    expect(order()).toEqual(['Merlin run', 'Astero', 'Bantam']);
+    await user.click(screen.getByRole('button', { name: 'Sort by Margin' }));
+    expect(order()).toEqual(['Astero', 'Merlin run', 'Bantam']);
+  });
+
+  it('tags a picker result the pilot owns instead of showing the raw type id', async () => {
+    renderSortable([
+      {
+        item_id: 1,
+        type_id: 638,
+        runs: -1,
+        material_efficiency: 0,
+        time_efficiency: 0,
+        quantity: 1,
+        location_id: 1,
+        location_flag: 'Hangar',
+      },
+    ]);
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Add build plan' }), 'Rift');
+    const result = await screen.findByRole('button', { name: /Rifter/ });
+    expect(within(result).getByText('Owned')).toBeInTheDocument();
+    expect(result).not.toHaveTextContent('#638');
+  });
+
+  it('shows no tag on a blueprint the pilot does not own', async () => {
+    renderSortable();
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Add build plan' }), 'Rift');
+    const result = await screen.findByRole('button', { name: /Rifter/ });
+    expect(within(result).queryByText('Owned')).not.toBeInTheDocument();
+  });
+});
