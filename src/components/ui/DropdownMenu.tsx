@@ -6,6 +6,7 @@ import {
   MENU_COLLISION_PADDING,
   menuContentClassName,
   menuItemClassName,
+  menuScrollClassName,
   menuSubContentClassName,
 } from './menuStyles';
 
@@ -21,6 +22,7 @@ export const DropdownMenuSub = DropdownMenuPrimitive.Sub;
 export function DropdownMenuContent({
   className,
   sideOffset = 4,
+  collisionPadding = MENU_COLLISION_PADDING,
   ...props
 }: ComponentProps<typeof DropdownMenuPrimitive.Content>) {
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
@@ -30,7 +32,8 @@ export function DropdownMenuContent({
     <DropdownMenuPrimitive.Portal container={container}>
       <DropdownMenuPrimitive.Content
         sideOffset={sideOffset}
-        className={cx(menuContentClassName, className)}
+        collisionPadding={collisionPadding}
+        className={cx(menuContentClassName, menuScrollClassName, className)}
         {...props}
       />
     </DropdownMenuPrimitive.Portal>

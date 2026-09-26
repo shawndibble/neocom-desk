@@ -6,6 +6,7 @@ import {
   MENU_COLLISION_PADDING,
   menuContentClassName,
   menuItemClassName,
+  menuScrollClassName,
   menuSubContentClassName,
 } from './menuStyles';
 
@@ -20,6 +21,7 @@ export const ContextMenuSub = ContextMenuPrimitive.Sub;
 
 export function ContextMenuContent({
   className,
+  collisionPadding = MENU_COLLISION_PADDING,
   ...props
 }: ComponentProps<typeof ContextMenuPrimitive.Content>) {
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
@@ -27,7 +29,11 @@ export function ContextMenuContent({
   const container = usePortalContainer();
   return (
     <ContextMenuPrimitive.Portal container={container}>
-      <ContextMenuPrimitive.Content className={cx(menuContentClassName, className)} {...props} />
+      <ContextMenuPrimitive.Content
+        collisionPadding={collisionPadding}
+        className={cx(menuContentClassName, menuScrollClassName, className)}
+        {...props}
+      />
     </ContextMenuPrimitive.Portal>
   );
 }
