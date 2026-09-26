@@ -16,7 +16,7 @@ import { Link } from 'react-router-dom';
 import { IconButton, IskAmount, RowActionsMenu, RowMoreActions } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
-import { formatVolume } from '@/features/market/format';
+import { formatUnitVolume } from '@/lib/volume';
 import { securityStatusColor } from '@/engine/securityStatus';
 import { formatBadge } from './assetBrowserFormat';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
@@ -303,7 +303,8 @@ export function ItemRow({
   onToggleSelection,
   t,
 }: ItemRowProps) {
-  const volumeText = unitVolume === undefined ? t('assets.unknownValue') : formatVolume(unitVolume);
+  const volumeText =
+    unitVolume === undefined ? t('assets.unknownValue') : formatUnitVolume(unitVolume);
   return (
     <div className="flex items-center gap-2 border-b border-line pl-3 hover:bg-panel-2">
       {selectMode && (
