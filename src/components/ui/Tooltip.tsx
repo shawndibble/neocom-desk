@@ -23,6 +23,33 @@ const TOUCH_MOVE_TOLERANCE_PX = 10;
 /** Generous bound on a device's touchend→click echo delay; the tests confirm a later, real click still closes the tooltip normally once this expires. */
 const TOUCH_CLICK_ECHO_MS = 700;
 
+/**
+ * Whether the latest input was a pointer press rather than a key. jsdom has no
+ * `:focus-visible`, and the browser's own heuristic is invisible to a
+ * controlled `open`, so track it: a focus that follows a tap or click is not
+ * keyboard navigation.
+ */
+const inputModality = { pointer: false };
+let modalityTracked = false;
+function trackInputModality() {
+  if (modalityTracked || typeof document === 'undefined') return;
+  modalityTracked = true;
+  document.addEventListener(
+    'pointerdown',
+    () => {
+      inputModality.pointer = true;
+    },
+    true
+  );
+  document.addEventListener(
+    'keydown',
+    () => {
+      inputModality.pointer = false;
+    },
+    true
+  );
+}
+
 interface TooltipProps {
   /**
    * Tooltip content. Usually one line of plain language, where a literal `
@@ -114,6 +141,8 @@ export function Tooltip({
   const openAtTouchStart = useRef<boolean | undefined>(undefined);
   /** `null` until a tap opens the tooltip; then the echoed click has a deadline to beat. */
   const touchOpenedAt = useRef<number | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const mouseHovering = useRef(false);
 
   function cancelLongPress() {
     clearTimeout(longPressTimer.current);
@@ -209,11 +238,34 @@ export function Tooltip({
    * touch reveal too keeps a timeout-free bubble from getting stuck open.
    */
   function handleOpenChange(open: boolean) {
+    if (open && isNonKeyboardFocusOpen()) return;
     setHoverOpen(open);
     if (!open) setTouchOpen(false);
   }
 
-  useEffect(() => cancelLongPress, []);
+  /**
+   * Radix opens on any focus, including a dialog handing focus back to its
+   * trigger on close — which pops the bubble over whatever sits beside it.
+   * Only keyboard-driven focus should open it (`:focus-visible` semantics); a
+   * hovering mouse still does, since its focus is not what opened it.
+   */
+  function isNonKeyboardFocusOpen() {
+    const el = triggerRef.current;
+    return !!el && !mouseHovering.current && document.activeElement === el && inputModality.pointer;
+  }
+
+  function handlePointerEnter(event: PointerEvent) {
+    mouseHovering.current = event.pointerType === 'mouse';
+  }
+
+  function handlePointerLeave() {
+    mouseHovering.current = false;
+  }
+
+  useEffect(() => {
+    trackInputModality();
+    return cancelLongPress;
+  }, []);
 
   const trigger =
     isValidElement(children) && className
@@ -227,6 +279,9 @@ export function Tooltip({
       <TooltipPrimitive.Root open={hoverOpen || touchOpen} onOpenChange={handleOpenChange}>
         <TooltipPrimitive.Trigger
           asChild
+          ref={triggerRef}
+          onPointerEnter={handlePointerEnter}
+          onPointerLeave={handlePointerLeave}
           onPointerDown={handlePointerDown}
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}

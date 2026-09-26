@@ -43,6 +43,8 @@ test('collapses the filters behind a trigger at 390px and commits on Apply', asy
 
   await dialog.getByRole('button', { name: 'Apply' }).click();
   await expect(dialog).toBeHidden();
+  // Focus returns to the funnel; that must not pop its tooltip over the neighbours.
+  await expect(page.getByRole('tooltip')).toHaveCount(0);
   // One filter away from its default, stated as a number on the trigger.
   await expect(page.getByRole('button', { name: 'Filters (1 active)' })).toBeVisible();
 
