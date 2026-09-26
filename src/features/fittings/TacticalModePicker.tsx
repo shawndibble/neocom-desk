@@ -5,7 +5,11 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
-import { defaultTacticalMode, tacticalModesFor } from '@/engine/fittings/tacticalModes';
+import {
+  defaultTacticalMode,
+  tacticalModeKind,
+  tacticalModesFor,
+} from '@/engine/fittings/tacticalModes';
 import type { Fitting } from '@/engine/fittings/types';
 
 /**
@@ -23,12 +27,10 @@ function withMode(fitting: Fitting, mode: number): Fitting {
 export function TacticalModePicker({
   fitting,
   onChange,
-  typeName,
 }: {
   fitting: Fitting;
   /** The editor's `edit()`: applies a change to the open Fitting. */
   onChange: (change: (fitting: Fitting) => Fitting) => void;
-  typeName: (typeId: number) => string;
 }) {
   const { t } = useTranslation();
   const modes = tacticalModesFor(fitting.shipTypeId);
@@ -52,7 +54,7 @@ export function TacticalModePicker({
         <SelectContent>
           {modes.map((mode) => (
             <SelectItem key={mode} value={String(mode)}>
-              {typeName(mode)}
+              {t(`fittings.mode.kind.${tacticalModeKind(mode) ?? 'defense'}`)}
             </SelectItem>
           ))}
         </SelectContent>

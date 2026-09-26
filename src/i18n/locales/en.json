@@ -1068,7 +1068,15 @@
       "meta_other": "{{count}} ships"
     },
     "mode": {
-      "label": "Tactical mode"
+      "label": "Tactical mode",
+      "kind": {
+        "defense": "Defense Mode",
+        "propulsion": "Propulsion Mode",
+        "sharpshooter": "Sharpshooter Mode",
+        "primary": "Primary Mode",
+        "secondary": "Secondary Mode",
+        "tertiary": "Tertiary Mode"
+      }
     },
     "fighters": {
       "title": "Fighters",

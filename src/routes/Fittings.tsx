@@ -63,6 +63,7 @@ import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPan
 import { FittingAffectedByPanel } from '@/features/fittings/FittingAffectedByPanel';
 import { FittingFightersPanel } from '@/features/fittings/FittingFightersPanel';
 import { TacticalModePicker } from '@/features/fittings/TacticalModePicker';
+import { tacticalModeKind } from '@/engine/fittings/tacticalModes';
 import { ImplantBasisControl } from '@/features/fittings/ImplantBasisControl';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import {
@@ -209,7 +210,13 @@ function FittingsPage() {
   if (target?.kind === 'drone' && !dronesShown) setTarget(null);
   // Module results only line up with the Fitting they were calculated for.
   const moduleResults = stats !== null && workspace.statsFitting === fitting ? stats.modules : null;
-  const typeName = (typeId: number) => catalogue?.types[String(typeId)]?.name ?? `#${typeId}`;
+  // The catalogue carries no tactical modes (an Affected-by source can be one).
+  const typeName = (typeId: number) => {
+    const name = catalogue?.types[String(typeId)]?.name;
+    if (name !== undefined) return name;
+    const mode = tacticalModeKind(typeId);
+    return mode !== undefined ? t(`fittings.mode.kind.${mode}`) : `#${typeId}`;
+  };
 
   const charges = useChargeLoading({
     fitting,
@@ -554,7 +561,7 @@ function FittingsPage() {
           compact={addMode === 'sheet' || (addMode === 'slideOut' && addOpen)}
           context={
             <>
-              <TacticalModePicker fitting={fitting} onChange={edit} typeName={typeName} />
+              <TacticalModePicker fitting={fitting} onChange={edit} />
               <ImplantBasisControl
                 basis={workspace.implantBasis}
                 canUseCloneBasis={workspace.canUseCloneBasis}
