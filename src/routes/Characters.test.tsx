@@ -80,6 +80,7 @@ afterEach(() => server.resetHandlers());
 beforeEach(async () => {
   await db.characters.clear();
   await db.settings.clear();
+  await db.notificationFeed.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
   usePublicInfo.setState({ byCharacterId: {} });
   useOverviewGroups.setState({ value: { groups: [], updatedAt: 0 }, hydrated: false });
@@ -227,6 +228,97 @@ describe('Characters', () => {
       await within(pilotOneCard).findByText('Stopped');
       expect(within(pilotOneCard).getByText('PI')).toBeInTheDocument();
       expect(within(pilotTwoCard).queryByText('PI')).not.toBeInTheDocument();
+    } finally {
+      snapshotSpy.mockRestore();
+      attentionSpy.mockRestore();
+    }
+  });
+
+  it('shows both an Alerts chip and a PI chip on the same card when both apply (#1793)', async () => {
+    await db.notificationFeed.put({
+      id: 'feed-both',
+      characterId: 91,
+      eventId: 'newMail',
+      title: 'New mail',
+      body: 'body',
+      firedAt: Date.now(),
+    });
+    const roster: RosterEntry[] = [
+      {
+        characterId: 91,
+        name: 'Pilot One',
+        wallet: null,
+        queue: null,
+        correctedTotalSp: 1_000_000,
+        skills: null,
+      },
+    ];
+    const attention: AttentionEntry[] = [
+      {
+        characterId: 91,
+        jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
+        jobCountsFetchedAt: new Date(),
+        piAttention: 'idle',
+        piSoonestExpiryMs: Date.now() - 3_600_000,
+        piFetchedAt: new Date(),
+      },
+    ];
+    const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue(roster);
+    const attentionSpy = vi
+      .spyOn(rosterAttentionModule, 'loadRosterAttention')
+      .mockResolvedValue(attention);
+
+    try {
+      renderCharacters();
+      await screen.findByText('Pilot One');
+
+      const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
+      await within(pilotOneCard).findByText('Stopped');
+      expect(within(pilotOneCard).getByText('Alerts')).toBeInTheDocument();
+      expect(within(pilotOneCard).getByText('1')).toBeInTheDocument();
+      expect(within(pilotOneCard).getByText('PI')).toBeInTheDocument();
+    } finally {
+      snapshotSpy.mockRestore();
+      attentionSpy.mockRestore();
+    }
+  });
+
+  it('never shows a PI chip for a "decayed" colony, even once a stale cached expiry has passed (#1793)', async () => {
+    const roster: RosterEntry[] = [
+      {
+        characterId: 91,
+        name: 'Pilot One',
+        wallet: null,
+        queue: null,
+        correctedTotalSp: 1_000_000,
+        skills: null,
+      },
+    ];
+    const attention: AttentionEntry[] = [
+      {
+        characterId: 91,
+        jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
+        jobCountsFetchedAt: new Date(),
+        // `decayed` still carries a real `piSoonestExpiryMs` (a program that
+        // hasn't stopped, just fallen past its efficient window) — this must
+        // stay table-only even once the clock has passed that expiry,
+        // unlike `idle`/`expiring-soon`.
+        piAttention: 'decayed',
+        piSoonestExpiryMs: Date.now() - 3_600_000,
+        piFetchedAt: new Date(),
+      },
+    ];
+    const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue(roster);
+    const attentionSpy = vi
+      .spyOn(rosterAttentionModule, 'loadRosterAttention')
+      .mockResolvedValue(attention);
+
+    try {
+      renderCharacters();
+      const pilotOneCard = (await screen.findByText('Pilot One')).closest('li') as HTMLElement;
+      await within(pilotOneCard).findByText('SP');
+      expect(within(pilotOneCard).queryByText('PI')).not.toBeInTheDocument();
+      expect(within(pilotOneCard).queryByText('Stopped')).not.toBeInTheDocument();
     } finally {
       snapshotSpy.mockRestore();
       attentionSpy.mockRestore();

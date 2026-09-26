@@ -42,6 +42,7 @@ import { isSyncConfigured } from '@/app/syncStatus';
 import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
+import { useNow } from '@/lib/useNow';
 import { loadRosterSnapshot, type RosterEntry } from '@/features/character/roster';
 import { loadRosterAttention, type AttentionEntry } from '@/features/character/rosterAttention';
 import { useAlertCountsByCharacter } from '@/features/notifications/alertCountsByCharacter';
@@ -232,22 +233,12 @@ interface CharacterCardProps {
   isActive: boolean;
   alertCount: number;
   attention: AttentionEntry | undefined;
+  /** One clock shared by every card (`useNow()` called once in `Characters`), not one interval per card — a large roster would otherwise re-render every card every tick regardless of whether it has anything counting down. */
+  now: number;
   onSelect: (characterId: number) => void;
   onToggleStar: (characterId: number) => void;
   onMoveToGroup: (characterId: number, groupId: string | null) => void;
   onRemove: (characterId: number, name: string) => void;
-}
-
-const NOW_TICK_MS = 60_000;
-
-/** `Date.now()` is impure, so the card's countdown reads it only inside this hook's `useState` initializer / interval — never directly in `CharacterCard`'s render body (react-hooks/purity). Same shape as `PlanSlotLine.tsx`'s own `useNow`. */
-function useNow(): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), NOW_TICK_MS);
-    return () => clearInterval(id);
-  }, []);
-  return now;
 }
 
 type PiCardAttention = { kind: 'stopped' } | { kind: 'expiring'; expiryMs: number };
@@ -256,21 +247,25 @@ type PiCardAttention = { kind: 'stopped' } | { kind: 'expiring'; expiryMs: numbe
  * Card view's narrower PI signal (decision `20260925-230353`): only the two
  * "you must act now" attention states reach a card — `decayed`/`healthy`/
  * `unknown` stay table-only, so a healthy pilot's card never grows a chip.
+ * The category gate runs *before* the expiry check, unlike the table's `pi`
+ * column: a `decayed` colony also carries a real `piSoonestExpiryMs`, and
+ * without the gate a long-stale cached entry whose expiry the clock has
+ * since passed would surface here as "Stopped" — exactly the state this
+ * decision says must stay table-only.
  */
 function piCardAttention(
   attention: AttentionEntry | undefined,
   nowMs: number
 ): PiCardAttention | null {
   const piAttention = attention?.piAttention;
-  if (piAttention === undefined) return null;
+  if (piAttention !== 'idle' && piAttention !== 'expiring-soon') return null;
   const expiryMs = attention?.piSoonestExpiryMs;
   // Same "expired always wins" rule as the table's `pi` column: a stale
   // cached category can still say `expiring-soon` after the real clock has
   // already passed the expiry it was computed from.
   if (expiryMs != null && expiryMs <= nowMs) return { kind: 'stopped' };
   if (piAttention === 'idle') return { kind: 'stopped' };
-  if (piAttention === 'expiring-soon' && expiryMs != null) return { kind: 'expiring', expiryMs };
-  return null;
+  return expiryMs != null ? { kind: 'expiring', expiryMs } : null;
 }
 
 /**
@@ -304,6 +299,7 @@ function CharacterCard({
   isActive,
   alertCount,
   attention,
+  now,
   onSelect,
   onToggleStar,
   onMoveToGroup,
@@ -314,7 +310,6 @@ function CharacterCard({
   // complaint — three "Xm ago"s in a row): the oldest of whichever fields
   // this character has cached, so the card never overstates its freshness.
   const lastSynced = characterLastSynced(stats, queue);
-  const now = useNow();
   const piChip = piCardAttention(attention, now);
 
   return (
@@ -889,6 +884,10 @@ export function Characters() {
   const loadPublicInfoMany = usePublicInfo((state) => state.loadMany);
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  // One shared clock for every card's PI countdown, not one `setInterval` per
+  // card — a large roster would otherwise re-render every card on every tick
+  // regardless of whether it has anything counting down.
+  const now = useNow();
 
   const groupsValue = useOverviewGroups((state) => state.value);
   const groupsHydrated = useOverviewGroups((state) => state.hydrated);
@@ -1297,6 +1296,7 @@ export function Characters() {
               isActive={activeCharacterId === characterId}
               alertCount={alertCounts.get(characterId) ?? 0}
               attention={attentionById.get(characterId)}
+              now={now}
               onSelect={(id) => void select(id)}
               onToggleStar={(id) => void handleToggleStar(id)}
               onMoveToGroup={(id, groupId) => void handleMoveToGroup(id, groupId)}
