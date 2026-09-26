@@ -215,7 +215,7 @@ describe('Login', () => {
    */
   it("previews the Overview board using the board's own labels", async () => {
     renderLogin();
-    const preview = within(await screen.findByRole('group', { name: /signed-in view/i }));
+    const preview = within(await screen.findByRole('group', { name: /logged-in view/i }));
 
     // The summary strip: the three cells the real strip carries.
     for (const label of ['Next deadline', 'Training now', 'Wallet']) {
@@ -242,7 +242,7 @@ describe('Login', () => {
 
   it('renders no unresolved i18n keys anywhere on the page', async () => {
     const { container } = renderLogin();
-    await screen.findByRole('group', { name: /signed-in view/i });
+    await screen.findByRole('group', { name: /logged-in view/i });
 
     // An i18next miss renders the key verbatim. Real copy on this page never
     // contains a dotted path under one of the app's namespaces, so anything
@@ -278,7 +278,7 @@ describe('Login', () => {
 
   it('never calls the app read-only, since the Base Grant carries write scopes', async () => {
     const { container } = renderLogin();
-    await screen.findByRole('group', { name: /signed-in view/i });
+    await screen.findByRole('group', { name: /logged-in view/i });
     expect(container.textContent ?? '').not.toMatch(
       /read-only access|it never writes|read-only, and/i
     );

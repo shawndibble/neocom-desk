@@ -81,7 +81,7 @@ describe('BuildLocationPicker', () => {
     renderPicker();
 
     expect(screen.queryByLabelText('Build location')).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Sign in again' }));
+    await user.click(screen.getByRole('button', { name: 'Log in again' }));
 
     expect(beginEveLogin).toHaveBeenCalledWith({ characterId: 91 });
   });
