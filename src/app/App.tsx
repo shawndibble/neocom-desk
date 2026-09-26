@@ -31,6 +31,7 @@ import { ScopeGate } from './ScopeGate';
 import { TabRoute } from './TabRoute';
 import { PAGE_TABS, routePatternFor } from './pageTabs';
 import { AuthFailureRedirect } from './AuthFailureNotice';
+import { LegacyShipsRedirect } from '@/features/fittings/LegacyShipsRedirect';
 import { PublicInfoModal } from '@/components/PublicInfoModal';
 import { SkillDetailModal } from '@/components/SkillDetailModal';
 import { getAccessTokenReportingFailures } from './tokenProvider';
@@ -57,7 +58,7 @@ const SkillCompare = lazy(routeChunks.loadSkillCompare);
 const Industry = lazy(routeChunks.loadIndustry);
 const IndustryPlanPage = lazy(routeChunks.loadIndustryPlanPage);
 const IndustryGroupPage = lazy(routeChunks.loadIndustryGroupPage);
-const Fittings = lazy(routeChunks.loadFittings);
+const Ships = lazy(routeChunks.loadShips);
 const FittingCompare = lazy(routeChunks.loadFittingCompare);
 const Corp = lazy(routeChunks.loadCorp);
 const CorpMembers = lazy(routeChunks.loadCorpMembers);
@@ -125,14 +126,18 @@ const ROUTE_ELEMENTS = {
   '/skills/plans': <SkillPlans />,
   '/skills/plans/:planId': <SkillPlanEditor />,
   '/skills/compare': <SkillCompare />,
-  // Mastery moved into Fittings; keep old bookmarks landing there.
-  '/skills/ships': <Navigate to="/fittings" replace />,
+  // The old Skills › Ships page is gone; old bookmarks land on the Ship Tree.
+  '/skills/ships': <LegacyShipsRedirect />,
   '/industry': <Industry />,
   '/industry/plans/:planId': <IndustryPlanPage />,
   '/industry/groups/:groupId': <IndustryGroupPage />,
-  '/fittings': <Fittings />,
-  '/fittings/edit': <Fittings />,
-  '/fittings/compare': <FittingCompare />,
+  // A tabbed page (`pageTabs.ts`): the Fittings tab, the editor below it and
+  // the Ship Tree are all this one route.
+  '/ships': <Ships />,
+  '/ships/fittings/compare': <FittingCompare />,
+  // The section was `/fittings` before it became Ships. Every Share Link ever
+  // copied is `/fittings?f=`, so these redirects are for good.
+  '/fittings/*': <LegacyShipsRedirect />,
   '/market': <Market />,
   '/wallet': <Wallet />,
   '/wallet/loyalty/:corporationId': <LoyaltyStore />,

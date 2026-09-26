@@ -50,6 +50,30 @@ describe('pageKeyFor', () => {
   });
 });
 
+describe('a tabbed page with a page of its own below one tab (Ships’ Fitting editor)', () => {
+  it('keeps the editor inside the tabbed page, so it mounts with the library', () => {
+    expect(tabbedPagePathFor('/ships/fittings/edit')).toBe('/ships/fittings/edit');
+    expect(isTabRedirectPath('/ships/fittings/edit')).toBe(false);
+  });
+
+  it('keys the editor as its own page, so opening a Fitting fades like a page change', () => {
+    expect(pageKeyFor('/ships/fittings')).toBe('/ships');
+    expect(pageKeyFor('/ships/tree')).toBe('/ships');
+    expect(pageKeyFor('/ships/fittings/edit')).toBe('/ships/fittings/edit');
+  });
+
+  it('leaves Compare, its own route, out of the tabbed page', () => {
+    expect(tabbedPagePathFor('/ships/fittings/compare')).toBeNull();
+    expect(pageKeyFor('/ships/fittings/compare')).toBe('/ships/fittings/compare');
+  });
+
+  it('redirects the bare page and an unknown segment to the default tab', () => {
+    expect(isTabRedirectPath('/ships')).toBe(true);
+    expect(isTabRedirectPath('/ships/nope')).toBe(true);
+    expect(routePatternFor('/ships')).toBe('/ships/*');
+  });
+});
+
 describe('tabbedPagePathFor', () => {
   it('reports the tab path, or the page for a path about to redirect', () => {
     expect(tabbedPagePathFor('/contacts/across')).toBe('/contacts/across');

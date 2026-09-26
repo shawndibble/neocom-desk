@@ -19,6 +19,14 @@ export interface PageTab<Id extends string = string> {
   readonly id: Id;
   /** i18next key for the tab's label. */
   readonly labelKey: string;
+  /**
+   * Not one of the bar's tabs but a page of its own below one (Ships' Fitting
+   * editor, `/ships/fittings/edit`, below the Fittings tab). It mounts with
+   * the tabbed page, so the page's state carries across into it, but the
+   * route fade and route focus treat arriving there as a page change, and
+   * `tabBarTabs` leaves it out of the bar.
+   */
+  readonly standalone?: boolean;
 }
 
 export interface PageTabs<Id extends string = string> {
@@ -59,6 +67,11 @@ function isBasePath(page: PageTabs, pathname: string): boolean {
 export function isIndexPath(page: PageTabs, pathname: string): boolean {
   if (!page.index || !isBasePath(page, pathname)) return false;
   return typeof window !== 'undefined' && !window.matchMedia(page.index.hiddenFrom).matches;
+}
+
+/** The tabs a page's `Tabs` bar shows: every declared tab but a `standalone` one. */
+export function tabBarTabs<Id extends string>(page: PageTabs<Id>): readonly PageTab<Id>[] {
+  return page.tabs.filter((tab) => !tab.standalone);
 }
 
 export function tabPath<Id extends string>(page: PageTabs<Id>, id: Id): string {

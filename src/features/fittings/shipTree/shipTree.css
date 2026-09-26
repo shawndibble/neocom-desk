@@ -1,0 +1,472 @@
+/*
+ * The Ship Tree's ISIS replica (scope decision 20260926-135538). A game-art
+ * surface copied from in-game screenshots, so it keeps the game's palette
+ * rather than the app's tokens — a documented exception, scoped to this
+ * file: docs/DESIGN.md §1 "Ship Tree (ISIS)" lists what it allows (its own
+ * palette, the hard-stop corner-bracket and grid gradients, the radial
+ * render mask, the Mastery V glow, the label shadow, the badge ring's 1.5px
+ * border). The two golds are app tokens (`--color-mastery-elite`,
+ * `--color-omega`) because the app chrome around the tree uses them too.
+ */
+
+.isis-viewport {
+  background-color: #080e13;
+  background-image:
+    linear-gradient(#ffffff06 1px, transparent 1px),
+    linear-gradient(90deg, #ffffff06 1px, transparent 1px);
+}
+
+.isis-tile {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border: 1px solid #26343d;
+  background: #0d151c;
+  display: block;
+  cursor: pointer;
+  isolation: isolate;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+.isis-tile::before {
+  content: '';
+  position: absolute;
+  z-index: 3;
+  inset: 5px;
+  pointer-events: none;
+  opacity: 0.7;
+  background:
+    linear-gradient(#6b7f8a, #6b7f8a) left top/6px 1px no-repeat,
+    linear-gradient(#6b7f8a, #6b7f8a) left top/1px 6px no-repeat,
+    linear-gradient(#6b7f8a, #6b7f8a) right top/6px 1px no-repeat,
+    linear-gradient(#6b7f8a, #6b7f8a) right top/1px 6px no-repeat,
+    linear-gradient(#6b7f8a, #6b7f8a) left bottom/6px 1px no-repeat,
+    linear-gradient(#6b7f8a, #6b7f8a) left bottom/1px 6px no-repeat,
+    linear-gradient(#6b7f8a, #6b7f8a) right bottom/6px 1px no-repeat,
+    linear-gradient(#6b7f8a, #6b7f8a) right bottom/1px 6px no-repeat;
+}
+.isis-tile > img {
+  position: absolute;
+  left: 8px;
+  top: 6px;
+  width: 80px;
+  height: 64px;
+  object-fit: cover;
+  opacity: 0.95;
+  mix-blend-mode: screen;
+  filter: grayscale(1) contrast(1.6) brightness(1.15);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 50%, #000 30%, transparent 72%);
+  mask-image: radial-gradient(ellipse at 50% 50%, #000 30%, transparent 72%);
+  pointer-events: none;
+}
+.isis-tile:hover {
+  border-color: #8fb5c6;
+  background: #1a2a34;
+}
+.isis-tile:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+.isis-tile.selected {
+  border-color: #b7ddef;
+  background: #1d313d;
+}
+.isis-tile.locked {
+  background: #0a1015;
+  border-color: #1a242b;
+}
+.isis-tile.locked > img {
+  opacity: 0.22;
+}
+.isis-tile.locked::before {
+  opacity: 0.25;
+}
+.isis-tile.elite {
+  background: #1f1b10;
+  border-color: #5e4a1c;
+}
+.isis-tile.elite::before {
+  opacity: 1;
+  background:
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) left top/8px 2px
+      no-repeat,
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) left top/2px 8px
+      no-repeat,
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) right top/8px 2px
+      no-repeat,
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) right top/2px 8px
+      no-repeat,
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) left bottom/8px 2px
+      no-repeat,
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) left bottom/2px 8px
+      no-repeat,
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) right bottom/8px 2px
+      no-repeat,
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) right bottom/2px 8px
+      no-repeat;
+}
+.isis-tile.elite > img {
+  filter: grayscale(1) sepia(1) saturate(2.2) hue-rotate(-8deg) contrast(1.3) brightness(1.05);
+}
+
+.isis-tech {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  width: 34px;
+  height: 34px;
+  padding: 3px 0 0 5px;
+  text-align: left;
+  font: 700 11px/1 sans-serif;
+  color: #fff3d6;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+.isis-tech.t2 {
+  background: #b06d0e;
+}
+.isis-tech.t3 {
+  background: #b3441b;
+}
+.isis-tech.faction {
+  background: #1c6a20;
+  color: #dfffd0;
+}
+.isis-tile.locked .isis-tech {
+  opacity: 0.45;
+}
+
+.isis-badge {
+  position: absolute;
+  left: 50%;
+  bottom: 9px;
+  z-index: 4;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  color: #c9d6dc;
+}
+.isis-badge .ring {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  border-radius: 11px;
+  border: 1.5px solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 700 10px/1 sans-serif;
+  letter-spacing: 0.02em;
+  background: #0b1217;
+}
+.isis-badge svg {
+  display: block;
+}
+.isis-tile.locked .isis-badge {
+  color: #3f4e57;
+}
+.isis-tile.elite .isis-badge {
+  color: var(--color-mastery-elite);
+}
+.isis-tile.elite .isis-badge .ring {
+  background: #2a2110;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-mastery-elite) 40%, transparent);
+}
+
+.isis-name {
+  position: absolute;
+  left: 50%;
+  top: -1px;
+  z-index: 5;
+  transform: translateX(-50%);
+  width: 102px;
+  text-align: center;
+  font-size: 11px;
+  line-height: 13px;
+  color: #b9ccd6;
+  background: #081018c0;
+  padding: 1px 0;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.isis-label {
+  position: absolute;
+  left: 46px;
+  top: -24px;
+  margin: 0;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 16px;
+  color: #e4eef2;
+  text-shadow: 0 1px 2px #000;
+}
+.isis-label.locked {
+  color: #6f808b;
+}
+.isis-rule {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -6px;
+  height: 3px;
+  border-top: 1px solid #8aa3ae99;
+  border-bottom: 1px solid #8aa3ae33;
+}
+.isis-rule-b {
+  position: absolute;
+  left: 46px;
+  right: 0;
+  height: 1px;
+  background: #8aa3ae55;
+}
+
+.isis-class {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  cursor: default;
+}
+.isis-icon {
+  height: 40px;
+  width: 40px;
+  background: #0a1117;
+  border: 1px solid #4d636f;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #cfe6f0;
+}
+.isis-icon::before,
+.isis-icon::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-color: #dcecf3;
+  border-style: solid;
+}
+.isis-icon::before {
+  top: -1px;
+  left: -1px;
+  border-width: 1px 0 0 1px;
+}
+.isis-icon::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 1px 1px 0;
+}
+.isis-class.locked .isis-icon {
+  border-color: #27353e;
+}
+.isis-icon img {
+  opacity: 0.95;
+}
+.isis-class.locked .isis-icon img {
+  opacity: 0.3;
+}
+.isis-class.locked .isis-icon::before,
+.isis-class.locked .isis-icon::after {
+  border-color: #556773;
+}
+
+.isis-blocks {
+  display: flex;
+  gap: 1px;
+  padding: 1px;
+  border: 1px solid #2d3f49;
+  background: #070c10;
+}
+.isis-blocks i {
+  display: block;
+  width: 6px;
+  height: 5px;
+  background: #1b2a32;
+}
+.isis-blocks i.on {
+  background: #a9def2;
+}
+
+.isis-grid {
+  display: grid;
+  gap: 3px;
+  margin-left: 46px;
+}
+
+.isis-emblem {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  margin: -18px 0 0 -18px;
+  border-radius: 50%;
+  border: 1px solid #3d505b;
+  background: #0b1419;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0.85;
+}
+.isis-emblem img {
+  filter: grayscale(1) brightness(1.6);
+  opacity: 0.8;
+}
+.isis-emblem:hover img {
+  filter: none;
+  opacity: 1;
+}
+.isis-emblem:hover {
+  border-color: #bfe3f1;
+  opacity: 1;
+}
+
+/*
+ * The ladder's 44px thumbnail: the map tile's marks at phone size — same
+ * tech corner, tone and winged badge, scaled down.
+ */
+.isis-tile.isis-thumb {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  cursor: inherit;
+}
+.isis-tile.isis-thumb::before {
+  inset: 3px;
+}
+.isis-tile.isis-thumb > img {
+  left: 2px;
+  top: 1px;
+  width: 38px;
+  height: 32px;
+}
+.isis-thumb .isis-tech {
+  width: 18px;
+  height: 18px;
+  padding: 1px 0 0 2px;
+  font-size: 7px;
+}
+.isis-thumb .isis-badge {
+  bottom: 1px;
+  transform: translateX(-50%) scale(0.6);
+  transform-origin: 50% 100%;
+}
+
+/* A small Ω hexagon chip for the ladder, in the map's gold. */
+.isis-omega-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 18px;
+  flex-shrink: 0;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  background: #7a6120;
+  color: var(--color-omega);
+  font: 700 12px/1 serif;
+  position: relative;
+}
+.isis-omega-chip span {
+  position: absolute;
+  inset: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  background: #15130b;
+}
+
+/* The ladder's miniature class icon. */
+.isis-class-mini {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+.isis-class-mini img {
+  width: 18px;
+  height: 18px;
+}
+.isis-icon.locked {
+  border-color: #27353e;
+}
+.isis-icon.locked img {
+  opacity: 0.3;
+}
+.isis-icon.locked::before,
+.isis-icon.locked::after {
+  border-color: #556773;
+}
+
+/* The map's SVG connectors: lit pipes over the dim ones, and the Ω hexagon. */
+.isis-pipe-glow,
+.isis-pipe-lit,
+.isis-pipe-core,
+.isis-pipe-dim,
+.isis-pipe-dim-core {
+  fill: none;
+}
+.isis-pipe-glow {
+  stroke: #9fc3d3;
+  stroke-opacity: 0.25;
+  stroke-width: 10px;
+}
+.isis-pipe-lit {
+  stroke: #c6dde6;
+  stroke-width: 6px;
+}
+.isis-pipe-core {
+  stroke: #56707c;
+  stroke-width: 2.4px;
+}
+.isis-pipe-dim {
+  stroke: #3b4b55;
+  stroke-width: 4px;
+}
+.isis-pipe-dim-core {
+  stroke: #070d12;
+  stroke-width: 2px;
+}
+.isis-omega-hex {
+  fill: #15130b;
+  stroke: #7a6120;
+  stroke-width: 1.5px;
+}
+.isis-omega-glyph {
+  fill: var(--color-omega);
+  font: 700 15px serif;
+}
+
+/* The in-game hover card and the bonus list inside it. */
+.isis-hover-card {
+  border-color: #3d525e;
+  background: #05090cf2;
+  color: #c9d6dc;
+}
+.isis-hover-render {
+  border-color: #2a3a44;
+}
+.isis-hover-name,
+.isis-trait-value {
+  color: #fff;
+}
+.isis-hover-class {
+  color: #8aa0ab;
+}
+.isis-hover-hint {
+  color: #6f808b;
+}
+.isis-trait-skill {
+  color: #6fb7d8;
+}

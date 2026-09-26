@@ -7,6 +7,7 @@ import { mkdir, readFile, writeFile, stat } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { flattenMarketWideTree, MARKET_WIDE_MAX_DEPTH } from './lib/flattenMarketWideTree.mjs';
+import { buildShipTree } from './lib/shipTree.mjs';
 
 const BASE_URL = 'https://www.fuzzwork.co.uk/dump/latest/csv/';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -55,6 +56,13 @@ const FILES = [
   // Which skill boosts which item attribute; see `skillAttributeModifiers.json` below.
   'dgmEffects.csv',
   'dgmTypeEffects.csv',
+  // Ship Tree bake (shipTree.json); see `lib/shipTree.mjs`.
+  'invTraits.csv',
+  'chrFactions.csv',
+  'shipSkills.csv',
+  'shipTreeGroups.csv',
+  'shipTreeGroupPreReqSkills.csv',
+  'shipTreeFactions.csv',
 ];
 
 const MARKET_OUT_DIR = join(OUT_DIR, 'market');
@@ -137,6 +145,16 @@ const MASTERY_TIER_COUNT = 5;
 // (wrong column, wrong category filter) lands at 0, not slightly off.
 const MASTERY_SHIPS_MIN = 350;
 const MASTERY_SHIPS_MAX = 700;
+// Ship Tree hulls/factions/classes, as counted against the dump on
+// 2026-09-26: 360 hulls, 17 factions, 52 classes. Same idea as
+// MASTERY_SHIPS_MIN/MAX above — a broken join (wrong category filter, wrong
+// CSV column) lands at 0 or wildly off, not slightly off.
+const SHIP_TREE_HULLS_MIN = 300;
+const SHIP_TREE_HULLS_MAX = 450;
+const SHIP_TREE_FACTIONS_MIN = 15;
+const SHIP_TREE_FACTIONS_MAX = 22;
+const SHIP_TREE_CLASSES_MIN = 45;
+const SHIP_TREE_CLASSES_MAX = 65;
 // dgmEffects.csv's `modifierInfo` JSON column names one of six `func` kinds;
 // only these two ever gate on a required skill (the others key on a
 // location/group instead) — see `skillAttributeModifiers.json` below.
@@ -1896,6 +1914,23 @@ async function main() {
     ]),
   ].sort((a, b) => a - b);
 
+  // --- shipTree.json: the in-game Ship Tree's contents. Pure join logic
+  // lives in `lib/shipTree.mjs` so it's testable without this whole download
+  // pipeline; this just hands it the raw parsed rows it asks for. ---
+  const shipTree = buildShipTree({
+    invTypes: raw['invTypes.csv'],
+    invGroups: raw['invGroups.csv'],
+    invTraits: raw['invTraits.csv'],
+    eveUnits: raw['eveUnits.csv'],
+    chrFactions: raw['chrFactions.csv'],
+    shipSkills: raw['shipSkills.csv'],
+    shipTreeGroups: raw['shipTreeGroups.csv'],
+    shipTreeGroupPreReqSkills: raw['shipTreeGroupPreReqSkills.csv'],
+    shipTreeFactions: raw['shipTreeFactions.csv'],
+    dgmTypeAttributes: raw['dgmTypeAttributes.csv'],
+    dgmAttributeTypes: raw['dgmAttributeTypes.csv'],
+  });
+
   // --- write outputs (compact) ---
   await mkdir(OUT_DIR, { recursive: true });
   await mkdir(MARKET_OUT_DIR, { recursive: true });
@@ -1926,6 +1961,7 @@ async function main() {
     ['oreAndIceTypeIds.json', oreAndIceTypeIds],
     ['gasCloudTypeIds.json', gasCloudTypeIds],
     ['compressedOreTypeIds.json', compressedOreTypeIds],
+    ['shipTree.json', shipTree],
   ];
   console.log('Writing outputs...');
   for (const [name, data] of outputs) {
@@ -2145,6 +2181,30 @@ async function main() {
     }
     console.log(`  mastery skill refs pointing outside skills.json: ${masteryBadSkillId}`);
     if (masteryBadSkillId) process.exitCode = 1;
+  }
+  {
+    const hullCount = shipTree.ships.length;
+    const factionCount = shipTree.factions.length;
+    const classCount = Object.keys(shipTree.groups).length;
+    console.log(`  ship tree: ${hullCount} hulls, ${factionCount} factions, ${classCount} classes`);
+    if (hullCount < SHIP_TREE_HULLS_MIN || hullCount > SHIP_TREE_HULLS_MAX) {
+      console.error(
+        `  FAIL: ${hullCount} Ship Tree hulls, outside the plausible ${SHIP_TREE_HULLS_MIN}-${SHIP_TREE_HULLS_MAX} range`
+      );
+      process.exitCode = 1;
+    }
+    if (factionCount < SHIP_TREE_FACTIONS_MIN || factionCount > SHIP_TREE_FACTIONS_MAX) {
+      console.error(
+        `  FAIL: ${factionCount} Ship Tree factions, outside the plausible ${SHIP_TREE_FACTIONS_MIN}-${SHIP_TREE_FACTIONS_MAX} range`
+      );
+      process.exitCode = 1;
+    }
+    if (classCount < SHIP_TREE_CLASSES_MIN || classCount > SHIP_TREE_CLASSES_MAX) {
+      console.error(
+        `  FAIL: ${classCount} Ship Tree classes, outside the plausible ${SHIP_TREE_CLASSES_MIN}-${SHIP_TREE_CLASSES_MAX} range`
+      );
+      process.exitCode = 1;
+    }
   }
   {
     const attributeCount = Object.keys(skillAttributeModifiers).length;

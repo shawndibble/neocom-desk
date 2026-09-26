@@ -28,11 +28,11 @@ const ROUTE_TITLE_KEYS = {
   '/skills/plans/:planId': ['nav.skills', 'skills.plansTab'],
   '/skills/compare': ['nav.skills', 'skills.compareTab'],
   '/industry': ['nav.industry'],
-  '/fittings': ['nav.fittings'],
-  // A redirect into Fittings, where Mastery now lives; titled only because every route must be.
-  '/skills/ships': ['nav.fittings'],
-  '/fittings/edit': ['nav.fittings', 'fittings.editTitle'],
-  '/fittings/compare': ['nav.fittings', 'fittings.compare.title'],
+  '/ships': ['nav.ships'],
+  // Redirects into Ships (the Tree, and the section's old paths); titled only because every route must be.
+  '/skills/ships': ['nav.ships'],
+  '/fittings/*': ['nav.ships'],
+  '/ships/fittings/compare': ['nav.ships', 'fittings.compare.title'],
   '/industry/plans/:planId': ['nav.industry', 'industry.buildPlansTab'],
   '/industry/groups/:groupId': ['nav.industry', 'industry.buildPlansTab'],
   '/market': ['nav.market'],

@@ -19,6 +19,7 @@ import { fittingToShareInput, shareToFitting } from '@/engine/fittings/shareMapp
 import type { Fitting } from '@/engine/fittings/types';
 import { writeToClipboard } from '@/lib/clipboard';
 import { exportFitting } from './fittingExportText';
+import { fittingCompareHref } from './fittingRoutes';
 import { saveFitting } from './myFittings';
 import { SaveToEveDialog } from './SaveToEveDialog';
 import type { LibraryRow } from './useLibraryFittings';
@@ -110,7 +111,7 @@ export function useLibraryRowActions({
           onSelect={() =>
             void withFitting(row, ({ code }) => {
               if (code === null) setNotice(t('fittings.export.tooLarge'));
-              else navigate(`/fittings/compare?f=${encodeURIComponent(code)}`);
+              else navigate(fittingCompareHref(`f=${encodeURIComponent(code)}`));
             })
           }
         >

@@ -59,7 +59,7 @@ export const ROUTE_REQUIREMENTS = {
   // Reads each compared character's already-cached skills endpoint (same one
   // the trained view itself uses); no scope of its own to gate on.
   '/skills/compare': UNGATED,
-  // A redirect into Fittings, where Mastery now lives (App.tsx); no scope of its own.
+  // A redirect onto the Ship Tree, in the Ships section (App.tsx); no scope of its own.
   '/skills/ships': UNGATED,
   // Section index: renders nothing of its own, it redirects to the plan list
   // (App.tsx) — planning is what the Skills section opens on.
@@ -88,13 +88,17 @@ export const ROUTE_REQUIREMENTS = {
   // (`useEndpointsGranted`/`ReauthBanner`) rather than the whole route — same
   // reasoning as Clones' `getCharacterClones`. Saving to My Fittings or to
   // EVE (#1538/#1540) will need their own scope too.
-  '/fittings': UNGATED,
-  // Fitting vs Fitting compare: same reasoning as `/fittings` above — every
+  // The Ships section: the Fittings tab, its editor (`/ships/fittings/edit`,
+  // a standalone tab — `features/fittings/shipsTabs.ts`) and the Ship Tree,
+  // which reads the skills the rest of the app already caches.
+  '/ships': UNGATED,
+  // Fitting vs Fitting compare: same reasoning as `/ships` above — every
   // compared Fitting's decode, stats and skill-gap check is local/SDE + the
   // pinned dogma engine, no ESI endpoint of its own.
-  // The editor half of `/fittings` (an open Fitting), ungated for the same reason.
-  '/fittings/edit': UNGATED,
-  '/fittings/compare': UNGATED,
+  '/ships/fittings/compare': UNGATED,
+  // The section's old paths, before it became Ships: redirects only
+  // (`LegacyShipsRedirect`), every Share Link ever copied among them.
+  '/fittings/*': UNGATED,
   // Detail routes off the index (same reasoning as `/skills/plans/:planId`
   // above): each mixes the same blueprints/jobs/skills reads the index does,
   // gated at the panel level, not the route.

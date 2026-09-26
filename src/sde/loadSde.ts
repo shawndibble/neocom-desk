@@ -6,6 +6,7 @@ import type {
   PiData,
   ReprocessingMap,
   SkillAttributeModifierMap,
+  ShipTreeData,
   SkillType,
   TypeMap,
 } from './types';
@@ -104,3 +105,6 @@ export const loadCompressedOreTypeIds = cached<Record<string, number>>('compress
 export const loadMarketWideTrees = cached<MarketWideTreeMap>('marketWideTrees.json');
 /** See `FittingSlotMap` — which rack an EFT-loaded item goes in. */
 export const loadFittingSlots = cached<FittingSlotMap>('fittingSlots.json');
+
+/** The Ship Tree's classes, factions and hulls — see `ShipTreeData`. */
+export const loadShipTree = cached<ShipTreeData>('shipTree.json');

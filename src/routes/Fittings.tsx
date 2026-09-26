@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import { fittingsRedirect } from '@/features/fittings/fittingRoutes';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { fittingCompareHref, fittingsRedirect } from '@/features/fittings/fittingRoutes';
+import { ShipsTabBar } from '@/features/fittings/ShipsTabBar';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { formatIskCompact } from '@/lib/isk';
@@ -361,7 +362,11 @@ function FittingsPage() {
     damageProfile: workspace.damageProfiles.selected,
   });
 
-  const renderLibrary = (layout: 'page' | 'tabs', initialTab?: LibraryTab) => (
+  const renderLibrary = (
+    layout: 'page' | 'tabs',
+    initialTab?: LibraryTab,
+    pageTabs?: ReactNode
+  ) => (
     <FittingLibrary
       workspace={workspace}
       catalogue={catalogue}
@@ -373,17 +378,25 @@ function FittingsPage() {
       onOpened={() => setLibrary(null)}
       layout={layout}
       initialTab={initialTab}
-      pageTitle={t('nav.fittings')}
+      pageTitle={t('nav.ships')}
+      pageTabs={pageTabs}
     />
   );
 
   if (fitting === null) {
     return (
       <div className="space-y-3">
-        {/* Desktop's Start screen renders the header itself: it owns the In-game data age and refresh. */}
-        {isPhone && <PageHeader title={t('nav.fittings')} />}
+        {/* Desktop's Start screen renders the header and the Ships tabs itself: it owns the In-game data age and refresh. */}
+        {isPhone && (
+          <>
+            <PageHeader title={t('nav.ships')} />
+            <ShipsTabBar />
+          </>
+        )}
         {/* A broken share link's message is on the Import tab; start there. */}
-        {renderLibrary(isPhone ? 'tabs' : 'page', workspace.shareError ? 'import' : undefined)}
+        {isPhone
+          ? renderLibrary('tabs', workspace.shareError ? 'import' : undefined)
+          : renderLibrary('page', workspace.shareError ? 'import' : undefined, <ShipsTabBar />)}
       </div>
     );
   }
@@ -577,10 +590,10 @@ function FittingsPage() {
                 savedRecord.code,
                 currentShareCode,
               ]);
-              navigate(`/fittings/compare?${params.toString()}`);
+              navigate(fittingCompareHref(params.toString()));
               return;
             }
-            navigate(`/fittings/compare${location.search}`);
+            navigate(fittingCompareHref(location.search));
           }}
           price={workspace.price}
           // The open slide-out takes 26rem off the page, too little for the one-row header.

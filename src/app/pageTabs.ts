@@ -17,6 +17,7 @@ import {
 } from '@/lib/pageTabs';
 import { matchPath } from 'react-router-dom';
 import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
+import { SHIPS_TABS } from '@/features/fittings/shipsTabs';
 import { ROUTE_REQUIREMENTS, type AppRoutePath } from './routeScopes';
 
 export const CONTACTS_TABS = definePageTabs('/contacts', [
@@ -109,6 +110,7 @@ export const PAGE_TABS: Partial<Record<AppRoutePath, PageTabs>> = {
   '/contacts': CONTACTS_TABS,
   '/contracts': CONTRACTS_TABS,
   '/industry': INDUSTRY_TABS,
+  '/ships': SHIPS_TABS,
   '/settings': SETTINGS_TABS,
   '/market': MARKET_TABS,
   '/planetary-industry': PI_TABS,
@@ -142,10 +144,15 @@ export function routePatternFor(path: AppRoutePath): string {
  * `pathname` collapsed to its tabbed page, if in one — the identity of
  * "which page is this" once tabs are paths. Includes the bare path and an
  * unknown segment, so the redirect to the default tab does not fade twice.
- * Anything else passes through.
+ * A `standalone` tab keeps its own path. Anything else passes through.
  */
 export function pageKeyFor(pathname: string): string {
-  return tabbedPageFor(pathname)?.base ?? pathname;
+  const page = tabbedPageFor(pathname);
+  if (page === null) return pathname;
+  const id = tabFromPathname(page, pathname);
+  const tab = page.tabs.find((candidate) => candidate.id === id);
+  // A standalone tab is a page of its own, only mounted with this one.
+  return tab?.standalone ? tabPath(page, tab.id) : page.base;
 }
 
 /**

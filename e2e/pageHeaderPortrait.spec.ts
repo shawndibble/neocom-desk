@@ -10,7 +10,7 @@ import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID, CHARACTER_NAME } from './support/fixtureData';
 
-const ROUTES = ['./mail', './calendar', './market', './fittings'];
+const ROUTES = ['./mail', './calendar', './market', './ships/fittings'];
 const WIDTHS = [390, 320];
 
 async function expectAvatarTopRight(page: Page): Promise<{ headerHeight: number }> {

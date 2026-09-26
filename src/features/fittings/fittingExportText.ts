@@ -13,14 +13,19 @@ import {
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
 import type { Fitting } from '@/engine/fittings/types';
 import { loadTypes } from '@/sde/loadSde';
+import { FITTINGS_PATH } from './fittingRoutes';
 
 export type FittingExportKind = 'shareLink' | 'eft' | 'chatLink' | 'multibuy' | 'eveXml';
 
-/** The Fittings page's own URL with the Fitting in `?f=` — what the address bar holds while it's open. */
+/**
+ * The Fittings tab's own URL with the Fitting in `?f=`, which opens it in the
+ * editor. Links copied before the section became Ships read `/fittings?f=`
+ * and still open (`legacyShipsLocation`).
+ */
 export function fittingShareUrl(payload: string): string {
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   const query = new URLSearchParams({ f: payload }).toString();
-  return `${window.location.origin}${base}/fittings?${query}`;
+  return `${window.location.origin}${base}${FITTINGS_PATH}?${query}`;
 }
 
 /** The text to copy, or null when a Share Link can't be made (the Fitting is too large to encode). */

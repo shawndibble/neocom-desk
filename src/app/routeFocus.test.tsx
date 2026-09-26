@@ -24,6 +24,12 @@ describe('focusKeyFor', () => {
     expect(focusKeyFor('/overview')).not.toBe(focusKeyFor('/mail'));
   });
 
+  it('treats opening a Fitting as a new page, and Ships’ tabs as one', () => {
+    expect(focusKeyFor('/ships/fittings')).toBe(focusKeyFor('/ships/tree'));
+    expect(focusKeyFor('/ships/fittings/edit')).not.toBe(focusKeyFor('/ships/fittings'));
+    expect(focusKeyFor('/ships/fittings/compare')).not.toBe(focusKeyFor('/ships/fittings/edit'));
+  });
+
   it('keeps a :param route one page across its params, apart from its list', () => {
     expect(focusKeyFor('/skills/plans/1')).toBe(focusKeyFor('/skills/plans/2'));
     expect(focusKeyFor('/skills/plans/1')).not.toBe(focusKeyFor('/skills/plans'));

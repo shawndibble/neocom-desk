@@ -56,6 +56,15 @@ describe('parseMobileTabs', () => {
     ]);
   });
 
+  it('keeps a stored Fittings choice as Ships (the section was renamed)', () => {
+    expect(parseMobileTabs(['/overview', '/alerts', '/industry', '/fittings'])).toEqual([
+      '/overview',
+      '/alerts',
+      '/industry',
+      '/ships',
+    ]);
+  });
+
   it('still rejects a stored /moon-mining choice alongside its own replacement, as a duplicate', () => {
     expect(parseMobileTabs(['/overview', '/skills', '/mining', '/moon-mining'])).toBeNull();
   });

@@ -61,7 +61,9 @@ async function renderAt(fitting: Fitting) {
   const encoded = await encodeFittingShare(fittingToShareInput(fitting));
   if (!encoded.ok) throw new Error('encode failed');
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <MemoryRouter initialEntries={[`/fittings?f=${encoded.payload}`]}>{children}</MemoryRouter>
+    <MemoryRouter initialEntries={[`/ships/fittings?f=${encoded.payload}`]}>
+      {children}
+    </MemoryRouter>
   );
   const view = renderHook(
     () => ({
@@ -150,7 +152,7 @@ describe('useFittingWorkspace editing', () => {
 describe('useFittingWorkspace — the editor has its own path', () => {
   function renderAtStart() {
     const wrapper = ({ children }: { children: ReactNode }) => (
-      <MemoryRouter initialEntries={['/fittings']}>{children}</MemoryRouter>
+      <MemoryRouter initialEntries={['/ships/fittings']}>{children}</MemoryRouter>
     );
     return renderHook(
       () => ({
@@ -171,29 +173,29 @@ describe('useFittingWorkspace — the editor has its own path', () => {
     unresolved: [],
   };
 
-  it('opening a Fitting from the Start screen pushes /fittings/edit, so Back returns to the library', async () => {
+  it('opening a Fitting from the Start screen pushes /ships/fittings/edit, so Back returns to the library', async () => {
     const view = renderAtStart();
     expect(view.result.current.workspace.fitting).toBeNull();
 
     await act(() => view.result.current.workspace.openLoaded(inGame));
     await waitFor(() => expect(view.result.current.workspace.fitting).not.toBeNull());
-    expect(view.result.current.location.pathname).toBe('/fittings/edit');
+    expect(view.result.current.location.pathname).toBe('/ships/fittings/edit');
     expect(view.result.current.location.search).toMatch(/^\?f=/);
     expect(view.result.current.navigationType).toBe('PUSH');
 
     act(() => view.result.current.navigate(-1));
-    await waitFor(() => expect(view.result.current.location.pathname).toBe('/fittings'));
+    await waitFor(() => expect(view.result.current.location.pathname).toBe('/ships/fittings'));
     await waitFor(() => expect(view.result.current.workspace.fitting).toBeNull());
   });
 
-  it('opening a saved Fitting lands on /fittings/edit too', async () => {
+  it('opening a saved Fitting lands on /ships/fittings/edit too', async () => {
     const encoded = await encodeFittingShare(fittingToShareInput(NAKED));
     if (!encoded.ok) throw new Error('encode failed');
     const view = renderAtStart();
     act(() =>
       view.result.current.workspace.openSaved({ id: 'r1', name: 'Kite', code: encoded.payload })
     );
-    await waitFor(() => expect(view.result.current.location.pathname).toBe('/fittings/edit'));
+    await waitFor(() => expect(view.result.current.location.pathname).toBe('/ships/fittings/edit'));
     expect(view.result.current.navigationType).toBe('PUSH');
   });
 
@@ -206,7 +208,7 @@ describe('useFittingWorkspace — the editor has its own path', () => {
     await act(() => view.result.current.workspace.openLoaded(inGame));
     expect(view.result.current.location.search).toBe(url);
     act(() => view.result.current.navigate(-1));
-    await waitFor(() => expect(view.result.current.location.pathname).toBe('/fittings'));
+    await waitFor(() => expect(view.result.current.location.pathname).toBe('/ships/fittings'));
   });
 });
 
@@ -319,7 +321,7 @@ describe('useFittingWorkspace — drones on Load', () => {
       fittingToShareInput(addModule(RIFTER, 'medium', 0, 438))
     );
     if (!encoded.ok) throw new Error('encode failed');
-    act(() => view.result.current.navigate(`/fittings?f=${encoded.payload}`));
+    act(() => view.result.current.navigate(`/ships/fittings?f=${encoded.payload}`));
     await waitFor(() => expect(view.result.current.workspace.fitting?.modules).toHaveLength(2));
     const loadedOver = view.result.current.location.search;
 

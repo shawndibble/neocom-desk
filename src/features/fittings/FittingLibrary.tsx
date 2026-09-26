@@ -34,6 +34,8 @@ interface FittingLibraryProps {
   initialTab?: LibraryTab;
   /** The route's title, for the `page` layout, which renders the page header itself. */
   pageTitle?: string;
+  /** The page's tab bar, for the `page` layout, drawn right under its header. */
+  pageTabs?: ReactNode;
 }
 
 /**
@@ -52,6 +54,7 @@ export function FittingLibrary({
   layout,
   initialTab = 'new',
   pageTitle,
+  pageTabs,
 }: FittingLibraryProps) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<LibraryTab>(initialTab);
@@ -119,6 +122,7 @@ export function FittingLibrary({
         onStartHull={onStartHull}
         onOpened={onOpened}
         pageTitle={pageTitle}
+        pageTabs={pageTabs}
       />
     );
   }

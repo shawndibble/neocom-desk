@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -26,6 +26,7 @@ import { setFittingNotes } from './myFittings';
 import { FittingExportNotice } from './FittingExportMenu';
 import { DeleteFittingModal, RenameFittingModal } from './SavedFittingModals';
 import { useLibraryRowActions } from './useLibraryRowActions';
+import { fittingCompareHref } from './fittingRoutes';
 import type { FittingCatalogue } from './useFittingCatalogue';
 import type { FittingLibrarySource } from './useFittingPicker';
 import {
@@ -46,6 +47,8 @@ interface FittingStartScreenProps {
   onOpened?: () => void;
   /** The route's title. This screen renders the page header itself, since the In-game data age and refresh in it come from a hook only this screen holds. */
   pageTitle?: string;
+  /** The page's tab bar (Ships' Fittings / Tree), drawn right under the header. */
+  pageTabs?: ReactNode;
 }
 
 /**
@@ -62,6 +65,7 @@ export function FittingStartScreen({
   onStartHull,
   onOpened,
   pageTitle,
+  pageTabs,
 }: FittingStartScreenProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -164,6 +168,7 @@ export function FittingStartScreen({
           }
         />
       )}
+      {pageTabs}
       <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-64 flex-1">
           <SearchInput
@@ -262,7 +267,9 @@ export function FittingStartScreen({
               catalogue={catalogue}
               characterId={characterId}
               onOpen={() => open(selected)}
-              onCompare={(code) => void navigate(`/fittings/compare?f=${encodeURIComponent(code)}`)}
+              onCompare={(code) =>
+                void navigate(fittingCompareHref(`f=${encodeURIComponent(code)}`))
+              }
               onRename={() => selected.source === 'saved' && setRenaming(selected.record)}
               onDelete={() => selected.source === 'saved' && setDeleting(selected.record)}
               onSaveNotes={(notes) =>

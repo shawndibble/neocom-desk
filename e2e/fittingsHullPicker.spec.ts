@@ -16,7 +16,7 @@ test.describe('Fittings — hull picker', () => {
   for (const viewport of WIDTHS) {
     test(`scrolls vertically to the last class at ${viewport.width}px`, async ({ page }) => {
       await page.setViewportSize(viewport);
-      await signInAndGoto(page, './fittings');
+      await signInAndGoto(page, './ships/fittings');
 
       // On a desktop the picker is behind the Start screen's "New from hull"
       // button; a phone shows it as the first tab.

@@ -44,7 +44,7 @@ test.describe('Open Fitting Ring column stays in view', () => {
       page,
     }) => {
       await page.setViewportSize({ width, height });
-      await signInAndGoto(page, './fittings');
+      await signInAndGoto(page, './ships/fittings');
       await answerAnyType(page);
       await openRifter(page);
 

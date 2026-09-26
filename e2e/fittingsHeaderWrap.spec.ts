@@ -54,7 +54,7 @@ async function headerMetrics(page: Page) {
 test.describe('Open Fitting header action group', () => {
   test('keeps the four action buttons on one line at 1024x768', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
-    await signInAndGoto(page, './fittings');
+    await signInAndGoto(page, './ships/fittings');
     await answerAnyType(page);
     await openRifter(page);
 
@@ -65,7 +65,7 @@ test.describe('Open Fitting header action group', () => {
 
   test('is a single row at 1440x900', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await signInAndGoto(page, './fittings');
+    await signInAndGoto(page, './ships/fittings');
     await answerAnyType(page);
     await openRifter(page);
 
