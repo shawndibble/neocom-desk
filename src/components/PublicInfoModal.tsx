@@ -14,6 +14,7 @@
  * corp) never puts the Alliance tab into `loading`, so it never appears,
  * which is what keeps that case tab-hidden rather than tab-with-an-error.
  */
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Modal, Spinner, Tabs, type TabItem } from '@/components/ui';
@@ -164,12 +165,7 @@ function ZkillRow({ href }: { href: string }) {
     <>
       <dt className="text-text-dim uppercase">{t('publicInfo.killboard')}</dt>
       <dd>
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-accent hover:underline"
-        >
+        <a href={href} target="_blank" rel="noopener noreferrer" className={inlineLinkClassName}>
           {t('publicInfo.zkillboard')}
         </a>
       </dd>
@@ -229,7 +225,7 @@ function CharacterTab({
         <dt className="text-text-dim uppercase">{t('publicInfo.corporation')}</dt>
         <dd>
           {onOpenCorporation ? (
-            <button type="button" onClick={onOpenCorporation} className="text-accent underline">
+            <button type="button" onClick={onOpenCorporation} className={inlineLinkClassName}>
               {corporationName ?? `#${data.corporation_id}`}
             </button>
           ) : (
@@ -242,7 +238,7 @@ function CharacterTab({
             <dt className="text-text-dim uppercase">{t('publicInfo.alliance')}</dt>
             <dd>
               {onOpenAlliance ? (
-                <button type="button" onClick={onOpenAlliance} className="text-accent underline">
+                <button type="button" onClick={onOpenAlliance} className={inlineLinkClassName}>
                   {allianceName ?? `#${data.alliance_id}`}
                 </button>
               ) : (
@@ -296,7 +292,7 @@ function CorporationTab({
             <dt className="text-text-dim uppercase">{t('publicInfo.alliance')}</dt>
             <dd>
               {onOpenAlliance ? (
-                <button type="button" onClick={onOpenAlliance} className="text-accent underline">
+                <button type="button" onClick={onOpenAlliance} className={inlineLinkClassName}>
                   {allianceName ?? `#${data.alliance_id}`}
                 </button>
               ) : (
