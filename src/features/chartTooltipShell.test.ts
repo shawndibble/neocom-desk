@@ -23,6 +23,6 @@ describe('chart tooltip shell', () => {
     const source = readFileSync(path, 'utf8');
     expect(source).toContain('shadow-black/50');
     expect(source).not.toContain('tooltipContentStyle');
-    expect(source).not.toMatch(/style=\{\{\s*background/);
+    expect(source).not.toContain('contentStyle=');
   });
 });
