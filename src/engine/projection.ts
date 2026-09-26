@@ -36,7 +36,7 @@
  * functions of their arguments — no i18next, no lookups — which keeps this
  * module as pure as before.
  *
- * 9 of the 22 Notification Events carry a timestamp fixed far enough in
+ * 10 of the 23 Notification Events carry a timestamp fixed far enough in
  * advance to be worth projecting; the rest are inherently "as it happens"
  * (new mail, a filled order, a wallet change) and have no seat here. EVE's
  * own notifications are mostly the same "as it happens" case — except a
@@ -47,6 +47,8 @@
 import {
   type SkillQueueEntrySnapshot,
   type IndustryJobEntrySnapshot,
+  type ContractEntrySnapshot,
+  type ContractNotificationFire,
   type ColonySnapshotEntry,
   type CalendarEventEntrySnapshot,
   type StructureFuelEntrySnapshot,
@@ -83,6 +85,7 @@ export const PROJECTABLE_EVENT_IDS = [
   'skillLevelComplete',
   'characterNotTraining',
   'skillQueueEnding',
+  'courierDeliveryDue',
   'industryJobComplete',
   'planetaryExtractionDone',
   'planetaryExtractorExpiring',
@@ -101,7 +104,8 @@ export type ProjectionWording = 'assert' | 'hedge';
  * hedges when an ordinary in-game action, taken while the app is closed,
  * routinely falsifies that prediction before it lands.
  *
- * Four do. `structureFuelLow` is falsified by a refuel. Both planetary
+ * Five do. `courierDeliveryDue` (issue #1713) is falsified by delivering the
+ * haul — the very thing it prompts. `structureFuelLow` is falsified by a refuel. Both planetary
  * events are falsified by the move a pilot makes on every reset run —
  * stopping an extractor program and installing a new one. `skillQueueEnding`
  * (issue #1410) is falsified the same way by topping up the skill queue in
@@ -128,6 +132,7 @@ export function projectionWording(eventId: ProjectableEventId): ProjectionWordin
     case 'planetaryExtractionDone':
     case 'planetaryExtractorExpiring':
     case 'skillQueueEnding':
+    case 'courierDeliveryDue':
       return 'hedge';
     case 'skillLevelComplete':
     case 'characterNotTraining':
@@ -412,6 +417,42 @@ export function projectColonies(
         )
       );
     }
+  }
+  return rows;
+}
+
+/**
+ * `courierDeliveryDue` (issue #1713): one row per accepted courier the
+ * Character holds, at `deliveryDeadlineMs - dueLeadMs`. Both are already
+ * baked into the entry (`pollDomains.ts`'s `contractDomain`), so this is pure
+ * snapshot arithmetic. A contract without a derivable deadline projects
+ * nothing — `courierDeliveryDeadlineMs` returned `null` for it upstream.
+ */
+export function projectContracts(
+  characterId: number,
+  characterName: string,
+  entries: readonly ContractEntrySnapshot[],
+  copy: PushCopy<ContractNotificationFire, Record<string, never>>,
+  nowMs: number,
+  horizonMs: number = PROJECTION_HORIZON_MS
+): ProjectionRow[] {
+  const rows: ProjectionRow[] = [];
+  for (const entry of entries) {
+    const { deliveryDeadlineMs, dueLeadMs } = entry;
+    if (entry.status !== 'in_progress' || entry.acceptorId !== characterId) continue;
+    if (deliveryDeadlineMs === undefined || dueLeadMs === undefined) continue;
+    const fireAt = deliveryDeadlineMs - dueLeadMs;
+    if (!inHorizon(fireAt, nowMs, horizonMs)) continue;
+    const fire: ContractNotificationFire = {
+      eventId: 'courierDeliveryDue',
+      characterId,
+      contractId: entry.contractId,
+      deadlineMs: deliveryDeadlineMs,
+      thresholdMs: dueLeadMs,
+    };
+    rows.push(
+      buildRow(characterId, 'courierDeliveryDue', fire, fireAt, copy(fire, characterName, {}))
+    );
   }
   return rows;
 }

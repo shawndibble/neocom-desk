@@ -14,6 +14,7 @@ describe('THRESHOLD_FIELDS', () => {
     expect(THRESHOLD_KEYS).toEqual([
       'structureFuelLowDays',
       'extractorExpiringLeadHours',
+      'courierDeliveryDueLeadHours',
       'skillQueueEndingLeadHours',
       'corpWalletBalanceFloorIsk',
       'corpWalletTransactionCeilingIsk',
@@ -45,6 +46,7 @@ describe('defaultedThresholds', () => {
       structureFuelLowDays: 7,
       extractorExpiringLeadHours: 6,
       skillQueueEndingLeadHours: 24,
+      courierDeliveryDueLeadHours: 6,
       corpWalletBalanceFloorIsk: 50_000_000,
       corpWalletTransactionCeilingIsk: 100_000_000,
       walletBalanceChangedThresholdIsk: 1_000_000,
