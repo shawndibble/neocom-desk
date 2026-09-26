@@ -24,10 +24,13 @@ import {
   CHARACTER_BASE_LOCKED_TARGETS,
 } from './types';
 import {
+  boosterReloadShortfall,
   capacitorBudget,
+  capacitorStatusAtDrain,
   sustainedRepair,
   type CapacitorBudget,
   type CapacitorUser,
+  type Magazine,
   type RepairLayer,
   type Repairer,
 } from './tank';
@@ -39,7 +42,9 @@ interface AttributeMap {
 }
 
 interface ItemCalculationResult {
-  attributes: { size: number };
+  attributes: AttributeMap & { size: number };
+  /** The state reached; absent, the item counts as not running. */
+  state?: FittingItemState;
 }
 
 /** An item as `calculate()` was given it — the engine's own `FitItem` fields this seam reads. */
@@ -100,6 +105,34 @@ function capacitorStatus(shipAttributes: AttributeMap): CapacitorStatus {
     };
   }
   return { stable: false, depletesInSeconds };
+}
+
+/**
+ * The capacitor headline. The engine's own stable level / time to empty
+ * counts a cap booster at one charge a cycle with no reload, so a fit it
+ * holds up can read "stable" beside a negative Delta. Where a cap booster
+ * loses injection to its reloads, the headline is worked out from the same
+ * reload-averaged drain as the Delta instead (`capacitorStatusAtDrain`), so
+ * the two agree; every other fit keeps the engine's per-cycle figure.
+ */
+function reloadAwareCapacitorStatus(
+  items: readonly CalculatedItem[],
+  shipAttributes: AttributeMap,
+  itemResults: readonly ItemCalculationResult[]
+): CapacitorStatus {
+  const results = itemResults.map((result) => ({
+    attributes: result.attributes,
+    state: result.state ?? 'offline',
+  }));
+  if (boosterReloadShortfall(capacitorUsers(items, results)) <= 0) {
+    return capacitorStatus(shipAttributes);
+  }
+  const budget = extractCapacitorBudget(items, results, shipAttributes);
+  return capacitorStatusAtDrain(
+    readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorCapacity),
+    readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorRechargeTime) / 1000,
+    budget.peakRecharge - budget.delta
+  );
 }
 
 function localRepair(shipAttributes: AttributeMap): LocalRepair {
@@ -275,7 +308,7 @@ export function extractFittingStats(
     },
     ehp: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.ehp),
     repair: localRepair(shipAttributes),
-    capacitor: capacitorStatus(shipAttributes),
+    capacitor: reloadAwareCapacitorStatus(items, shipAttributes, itemResults),
     capacitorCapacity: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorCapacity),
     capacitorRechargeTime: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorRechargeTime),
     ...defenseLayers(shipAttributes),
@@ -368,13 +401,17 @@ function isFiring(state: FittingItemState): boolean {
 }
 
 /**
- * Whether a module type has a charge slot at all, regardless of whether one
- * is loaded — true for turrets/launchers, but also e.g. an Ancillary Shield
- * Booster or a mining laser. Combine with `chargeTypeId === undefined` to
- * mean "this slot is empty", not "this slot is a weapon".
+ * Whether a module fires only with a charge loaded: a turret or launcher,
+ * which carries a rate of fire, and not a module whose charge is optional
+ * (a strip miner's crystal, a cap booster's, a disruptor's script) — those
+ * take a charge too, but run without one. Combine with
+ * `chargeTypeId === undefined` to mean "this weapon is empty".
  */
-function acceptsCharge(attributes: AttributeMap): boolean {
-  return chargeGroupIds(attributes).length > 0;
+function needsChargeToFire(attributes: AttributeMap): boolean {
+  return (
+    chargeGroupIds(attributes).length > 0 &&
+    readAttribute(attributes, ITEM_DOGMA_ATTRIBUTE.rateOfFire) > 0
+  );
 }
 
 function damageFigures(attributes: AttributeMap, quantity: number): DamageFigures {
@@ -423,7 +460,11 @@ export function extractOffense(
     if (!result || !isFiring(result.state)) return;
     const figures = damageFigures(result.attributes, item.quantity);
     if (figures.dps === 0 && figures.volley === 0) {
-      if (!item.isDrone && item.chargeTypeId === undefined && acceptsCharge(result.attributes)) {
+      if (
+        !item.isDrone &&
+        item.chargeTypeId === undefined &&
+        needsChargeToFire(result.attributes)
+      ) {
         chargelessWeaponCount += 1;
       }
       return;
@@ -499,22 +540,43 @@ function runningModules<I extends CalculatedItem, R extends RunningResult>(
   });
 }
 
+/**
+ * A loaded module's magazine: the charges the engine says it holds, over
+ * what one cycle uses, and its reload. The same for an ancillary repairer
+ * and a cap booster.
+ */
+function magazineOf(read: (id: number) => number): Magazine {
+  const chargeRate = read(ITEM_DOGMA_ATTRIBUTE.chargeRate) || 1;
+  return {
+    cycles: Math.floor(read(ITEM_DOGMA_ATTRIBUTE.chargeAmount) / chargeRate + 1e-9),
+    cycleSeconds: read(ITEM_DOGMA_ATTRIBUTE.cycleTime) / 1000,
+    reloadSeconds: read(ITEM_DOGMA_ATTRIBUTE.reloadTime) / 1000,
+  };
+}
+
+/** Every running module's capacitor use, a cap booster's with its magazine. */
+function capacitorUsers(
+  items: readonly CalculatedItem[],
+  results: readonly RunningResult[]
+): CapacitorUser[] {
+  return runningModules(items, results).map(({ result }) => {
+    const read = (id: number) => readAttribute(result.attributes, id);
+    const injectionPerCharge = read(ITEM_DOGMA_ATTRIBUTE.capacitorInjectionAmount);
+    return {
+      capPerSecond: read(ITEM_DOGMA_ATTRIBUTE.capacitorPeakLoad),
+      ...(injectionPerCharge > 0 ? { injectionPerCharge, magazine: magazineOf(read) } : {}),
+    };
+  });
+}
+
 /** Peak recharge against every running module's draw (`tank.ts`'s `capacitorBudget`). */
 export function extractCapacitorBudget(
   items: readonly CalculatedItem[],
   results: readonly RunningResult[],
   shipAttributes: AttributeMap
 ): CapacitorBudget {
-  const users: CapacitorUser[] = runningModules(items, results).map(({ result }) => {
-    const read = (id: number) => readAttribute(result.attributes, id);
-    const injectionPerCharge = read(ITEM_DOGMA_ATTRIBUTE.capacitorInjectionAmount);
-    return {
-      capPerSecond: read(ITEM_DOGMA_ATTRIBUTE.capacitorPeakLoad),
-      ...(injectionPerCharge > 0 ? { injectionPerCharge } : {}),
-    };
-  });
   return capacitorBudget(
-    users,
+    capacitorUsers(items, results),
     readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakRecharge)
   );
 }
@@ -549,20 +611,11 @@ export function extractTank(
     for (const layer of REPAIR_LAYERS) {
       const rate = read(REPAIR_RATE_ATTRIBUTE[layer]);
       if (rate <= 0) continue;
-      const chargeRate = read(ITEM_DOGMA_ATTRIBUTE.chargeRate) || 1;
       repairers.push({
         layer,
         rate,
         capPerSecond: read(ITEM_DOGMA_ATTRIBUTE.capacitorPeakLoad),
-        ...(item.charge
-          ? {
-              ancillary: {
-                cycles: Math.floor(read(ITEM_DOGMA_ATTRIBUTE.chargeAmount) / chargeRate + 1e-9),
-                cycleSeconds: read(ITEM_DOGMA_ATTRIBUTE.cycleTime) / 1000,
-                reloadSeconds: read(ITEM_DOGMA_ATTRIBUTE.reloadTime) / 1000,
-              },
-            }
-          : {}),
+        ...(item.charge ? { ancillary: magazineOf(read) } : {}),
       });
       // The paste multiplier lands on the paste, not the module (a live run:
       // the module's own `chargedRepairMultiplier` stays unset), so a loaded
@@ -593,7 +646,10 @@ export function extractTank(
 
   const { sustained, capFraction } = sustainedRepair(repairers, {
     peakRecharge: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakRecharge),
-    peakLoad: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakLoad),
+    // The engine's load nets cap boosters in at their no-reload rate.
+    peakLoad:
+      readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakLoad) +
+      boosterReloadShortfall(capacitorUsers(items, results)),
   });
   const passiveShield = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.passiveShieldRechargeRate);
   const passiveEffective = readAttribute(

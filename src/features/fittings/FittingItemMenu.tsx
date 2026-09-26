@@ -106,6 +106,7 @@ export function ModuleMenuItems({
   shownState,
   maxState,
   withMove = false,
+  takesCharges,
 }: {
   module: FittingModule;
   /** The state it reached (what the radio ticks). */
@@ -114,6 +115,12 @@ export function ModuleMenuItems({
   maxState?: FittingItemState;
   /** Move up / down / to slot — the List's keyboard and touch way to reorder. */
   withMove?: boolean;
+  /**
+   * Whether the module takes a charge at all (its charge groups); false drops
+   * the "Load charge" entries a Damage Control would only show disabled.
+   * Unknown (undefined) until its calculation says, when they stay.
+   */
+  takesCharges?: boolean;
 }) {
   const { t } = useTranslation();
   const actions = useFittingItemActions();
@@ -146,7 +153,7 @@ export function ModuleMenuItems({
           </MenuSubContent>
         </MenuSub>
       )}
-      <ModuleChargeItems actions={actions} module={module} />
+      {takesCharges !== false && <ModuleChargeItems actions={actions} module={module} />}
       {module.chargeTypeId !== undefined && (
         <>
           <MenuItem
@@ -470,6 +477,36 @@ export function CargoMenuItems({ typeId }: { typeId: number }) {
       <MenuItem className="text-danger" onSelect={() => actions.removeCargo(typeId)}>
         {t('fittings.ring.menu.remove', { name })}
       </MenuItem>
+    </>
+  );
+}
+
+/**
+ * An Add panel Cargo result's actions: put the asked quantity in the hold,
+ * then — once the type is in it — everything the List's cargo row offers
+ * (`CargoMenuItems`), so the two can't drift; before that, what any Add
+ * panel item offers.
+ */
+export function AddCargoMenuItems({
+  typeId,
+  count,
+  inHold,
+  onAddCargo,
+}: {
+  typeId: number;
+  /** The quantity the tab asks for; below 1, adding is off. */
+  count: number;
+  inHold: boolean;
+  onAddCargo: (typeId: number, quantity: number) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <MenuItem disabled={count < 1} onSelect={() => onAddCargo(typeId, count)}>
+        {t('fittings.add.cargoAddMenu', { count: Math.max(count, 0) })}
+      </MenuItem>
+      <MenuSeparator />
+      {inHold ? <CargoMenuItems typeId={typeId} /> : <AddItemMenuItems typeId={typeId} />}
     </>
   );
 }

@@ -215,6 +215,25 @@ export function loadChargeIntoAll(
   }).fitting;
 }
 
+/**
+ * Relative slack on capacity ÷ volume. The engine reports a module's
+ * capacity as the SDE's float32 (a Medium Ancillary Armor Repairer's 0.32 m3
+ * is 0.3199999928…, 31.99999928 pastes of 0.01 m3), which is off by about
+ * 1e-7 relative; no real load is anywhere near that close under a whole
+ * charge, so a far wider margin is still safe.
+ */
+const CHARGE_FIT_TOLERANCE = 1e-5;
+
+/**
+ * Charges one full load puts in a module: its charge capacity over the
+ * charge's volume, whole charges only, float32 noise forgiven. At least one,
+ * and one when either figure is unknown.
+ */
+export function chargesPerLoad(capacity: number, volume: number): number {
+  if (!(capacity > 0) || !(volume > 0)) return 1;
+  return Math.max(1, Math.floor((capacity / volume) * (1 + CHARGE_FIT_TOLERANCE)));
+}
+
 /** How a charge goes in — which modules take it, and what one load of it costs the cargo. */
 export interface ChargeLoad {
   /**
@@ -241,6 +260,8 @@ export interface ChargeLoadResult {
   fitting: Fitting;
   /** Modules holding the charge afterwards, of the `wanted` that take it — a part-load counts. */
   loaded: number;
+  /** Of `loaded`, the ones this load put it in — not those already holding it. */
+  newlyLoaded: number;
   wanted: number;
   /** The cargo emptied before every module that takes the charge had some. */
   ranOut: boolean;
@@ -272,6 +293,7 @@ export function loadChargeIntoCompatible(
   let left = fromCargo ? cargoQuantity(cargo, chargeTypeId) : Number.POSITIVE_INFINITY;
   let wanted = 0;
   let loaded = 0;
+  let newlyLoaded = 0;
   let changed = false;
   let ranOut = false;
   const modules = fitting.modules.map((module) => {
@@ -288,6 +310,7 @@ export function loadChargeIntoCompatible(
     // Rebuilt, not spread, so a quantity recorded for the charge it held never sticks to the new one.
     const next: FittingModule = { ...unloaded(module), chargeTypeId };
     loaded += 1;
+    newlyLoaded += 1;
     changed = true;
     if (!fromCargo) {
       cargo = withHeldChargesReturned({ ...fitting, cargo }, [module]);
@@ -302,6 +325,7 @@ export function loadChargeIntoCompatible(
   return {
     fitting: changed ? { ...fitting, modules, cargo } : fitting,
     loaded,
+    newlyLoaded,
     wanted,
     ranOut,
   };

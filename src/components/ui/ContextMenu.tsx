@@ -1,8 +1,16 @@
 import { ContextMenu as ContextMenuPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
+import { InlineCaret, InlineSubContent, InlineSubRoot, SidePanelSubRoot } from './inlineSubmenu';
+import { inlineTriggerProps, useInlineSub, useInlineSubmenus } from './inlineSubmenuState';
 import { usePortalContainer } from './portalContainer';
-import { menuContentClassName, menuItemClassName } from './menuStyles';
+import {
+  MENU_COLLISION_PADDING,
+  menuContentClassName,
+  menuItemClassName,
+  menuScrollClassName,
+  menuSubContentClassName,
+} from './menuStyles';
 
 /**
  * Right-click menu. Wraps `radix-ui`'s ContextMenu — see docs/adr/0004 for
@@ -11,10 +19,20 @@ import { menuContentClassName, menuItemClassName } from './menuStyles';
  */
 export const ContextMenu = ContextMenuPrimitive.Root;
 export const ContextMenuTrigger = ContextMenuPrimitive.Trigger;
-export const ContextMenuSub = ContextMenuPrimitive.Sub;
+/** A submenu: a panel beside the menu, or — on a phone — its items in place (`inlineSubmenu.tsx`). */
+export function ContextMenuSub(props: ComponentProps<typeof ContextMenuPrimitive.Sub>) {
+  const inline = useInlineSubmenus();
+  if (inline) return <InlineSubRoot>{props.children}</InlineSubRoot>;
+  return (
+    <SidePanelSubRoot>
+      <ContextMenuPrimitive.Sub {...props} />
+    </SidePanelSubRoot>
+  );
+}
 
 export function ContextMenuContent({
   className,
+  collisionPadding = MENU_COLLISION_PADDING,
   ...props
 }: ComponentProps<typeof ContextMenuPrimitive.Content>) {
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
@@ -22,7 +40,11 @@ export function ContextMenuContent({
   const container = usePortalContainer();
   return (
     <ContextMenuPrimitive.Portal container={container}>
-      <ContextMenuPrimitive.Content className={cx(menuContentClassName, className)} {...props} />
+      <ContextMenuPrimitive.Content
+        collisionPadding={collisionPadding}
+        className={cx(menuContentClassName, menuScrollClassName, className)}
+        {...props}
+      />
     </ContextMenuPrimitive.Portal>
   );
 }
@@ -66,6 +88,15 @@ export function ContextMenuSubTrigger({
   children,
   ...props
 }: ComponentProps<typeof ContextMenuPrimitive.SubTrigger>) {
+  const inline = useInlineSub();
+  if (inline) {
+    return (
+      <ContextMenuItem {...inlineTriggerProps(inline, className)} disabled={props.disabled}>
+        {children}
+        <InlineCaret open={inline.open} />
+      </ContextMenuItem>
+    );
+  }
   return (
     <ContextMenuPrimitive.SubTrigger
       className={cx(menuItemClassName, 'justify-between data-[state=open]:bg-panel-2', className)}
@@ -81,14 +112,27 @@ export function ContextMenuSubTrigger({
 
 export function ContextMenuSubContent({
   className,
+  collisionPadding = MENU_COLLISION_PADDING,
   ...props
 }: ComponentProps<typeof ContextMenuPrimitive.SubContent>) {
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
   // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
   const container = usePortalContainer();
+  const inline = useInlineSub();
+  if (inline) {
+    return (
+      <InlineSubContent inline={inline} className={className}>
+        {props.children}
+      </InlineSubContent>
+    );
+  }
   return (
     <ContextMenuPrimitive.Portal container={container}>
-      <ContextMenuPrimitive.SubContent className={cx(menuContentClassName, className)} {...props} />
+      <ContextMenuPrimitive.SubContent
+        collisionPadding={collisionPadding}
+        className={cx(menuSubContentClassName, className)}
+        {...props}
+      />
     </ContextMenuPrimitive.Portal>
   );
 }

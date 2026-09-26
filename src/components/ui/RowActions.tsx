@@ -153,7 +153,7 @@ export function RowMoreActions({ className }: { className?: string }) {
           icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
           label={t('common.moreActionsLabel', { name: actions.name })}
           variant="plain"
-          size="sm"
+          size="row"
           className={className}
         />
       </DropdownMenuTrigger>

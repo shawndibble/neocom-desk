@@ -101,6 +101,11 @@ describe('ContextMenu', () => {
 
     await user.keyboard('{ArrowDown}{ArrowDown}{ArrowRight}');
     expect(await screen.findByRole('menuitem', { name: 'Copy name' })).toBeInTheDocument();
+    // Never wider than the room on the side it opens to (a phone's parent
+    // menu leaves little), so it can't run off the screen over its parent.
+    const submenu = screen.getByRole('menuitem', { name: 'Copy name' }).closest('[role="menu"]');
+    expect(submenu).toHaveClass('max-w-[var(--radix-popper-available-width)]');
+    expect(submenu).not.toHaveClass('min-w-40');
 
     await user.keyboard('{ArrowDown}{Enter}');
     expect(onCopyName).toHaveBeenCalledTimes(1);

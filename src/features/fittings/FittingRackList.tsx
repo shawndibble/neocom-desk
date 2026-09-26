@@ -9,6 +9,7 @@ import {
   TextInput,
   TypeIcon,
 } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow, Close, Compare, DragHandle } from '@/components/ui/icons';
 import {
   cargoGroups,
@@ -149,7 +150,7 @@ function SlotName({
   return (
     <button
       type="button"
-      className={`${SLOT_NAME_CLASS} cursor-pointer text-accent underline-offset-2 hover:underline`}
+      className={`${SLOT_NAME_CLASS} ${tappableRowClassName} cursor-pointer text-accent underline-offset-2 hover:underline`}
       onClick={() => onShowInfo(typeId, name)}
     >
       {name}
@@ -216,6 +217,7 @@ export function ModuleRow({
               shownState={shownState}
               maxState={maxState}
               withMove={inRack}
+              takesCharges={chargeGroupIds === undefined ? undefined : chargeGroupIds.length > 0}
             />
           ),
         }
@@ -245,7 +247,7 @@ export function ModuleRow({
     >
       <NativeSelect
         size="sm"
-        className="w-28 shrink-0"
+        className={`w-28 shrink-0 ${TOUCH_SELECT_CLASS}`}
         aria-label={t('fittings.edit.stateLabel', { name })}
         value={shownState}
         onChange={(event) =>
@@ -261,7 +263,7 @@ export function ModuleRow({
       {(charges.length > 0 || loadedCharge !== undefined) && (
         <NativeSelect
           size="sm"
-          className="min-w-0 flex-1 @min-[34rem]:w-56 @min-[34rem]:flex-none"
+          className={`min-w-0 flex-1 @min-[34rem]:w-56 @min-[34rem]:flex-none ${TOUCH_SELECT_CLASS}`}
           aria-label={t('fittings.edit.chargeLabel', { name })}
           value={loadedCharge ?? ''}
           onChange={(event) =>
@@ -298,6 +300,12 @@ export function ModuleRow({
     </SlotCard>
   );
 }
+
+/**
+ * A List select's touch tier: 44px below `md`, its own `sm` height above.
+ * `NativeSelect` puts `className` on its wrapper, hence the child selector.
+ */
+const TOUCH_SELECT_CLASS = '[&>select]:min-h-11 md:[&>select]:min-h-7';
 
 const SLOT_NAME_CLASS =
   'line-clamp-2 min-w-0 flex-1 text-left text-sm break-words @min-[34rem]:truncate @min-[34rem]:text-xs';

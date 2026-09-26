@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AffectedAttribute, AffectedSource } from '@/engine/fittings/affectedBy';
+import { displayAttributeValue, displaySourceValue } from '@/engine/fittings/attributeUnits';
 import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import type { AttributeDictionary } from '@/sde/marketTypes';
 
@@ -18,12 +19,16 @@ function formatNumber(value: number): string {
 
 function SourceLine({
   source,
+  unitId,
   typeName,
 }: {
   source: AffectedSource;
+  /** The attribute's unit: an assigned or added value is in it. */
+  unitId: number | undefined;
   typeName: (typeId: number) => string;
 }) {
   const { t } = useTranslation();
+  const shown = formatNumber(displaySourceValue(source.operator, source.value, unitId));
   const who =
     source.typeId !== null
       ? typeName(source.typeId)
@@ -39,8 +44,8 @@ function SourceLine({
       </span>
       <span className="shrink-0 text-right tabular-nums">
         {t(`fittings.affectedBy.operator.${source.operator}`, {
-          value: formatNumber(source.value),
-          defaultValue: formatNumber(source.value),
+          value: shown,
+          defaultValue: shown,
         })}
         {source.penalty !== null && (
           <span className="block text-text-dim">
@@ -111,21 +116,25 @@ export function FittingAffectedByPanel({
     <ul className="space-y-2 text-xs">
       {named.map((row) => {
         const entry = dictionary[row.attributeId]!;
-        const unit = entry.unit ? ` ${entry.unit}` : '';
+        // As the game shows it: a rate of fire in seconds, not milliseconds; a resonance as a resistance.
+        const shown = (value: number) => {
+          const display = displayAttributeValue(value, entry.unitId, entry.unit);
+          return `${formatNumber(display.value)}${display.unit ? ` ${display.unit}` : ''}`;
+        };
         return (
           <li key={row.attributeId} className="space-y-1 rounded-xs bg-panel-2 p-2">
             <div className="flex justify-between gap-2 font-semibold">
               <span className="min-w-0">{entry.name}</span>
               <span className="shrink-0 tabular-nums">
                 {t('fittings.affectedBy.change', {
-                  base: `${formatNumber(row.base)}${unit}`,
-                  value: `${formatNumber(row.value)}${unit}`,
+                  base: shown(row.base),
+                  value: shown(row.value),
                 })}
               </span>
             </div>
             <ul className="space-y-0.5">
               {row.sources.map((source, index) => (
-                <SourceLine key={index} source={source} typeName={typeName} />
+                <SourceLine key={index} source={source} unitId={entry.unitId} typeName={typeName} />
               ))}
             </ul>
           </li>

@@ -1,8 +1,16 @@
 import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
+import { InlineCaret, InlineSubContent, InlineSubRoot, SidePanelSubRoot } from './inlineSubmenu';
+import { inlineTriggerProps, useInlineSub, useInlineSubmenus } from './inlineSubmenuState';
 import { usePortalContainer } from './portalContainer';
-import { menuContentClassName, menuItemClassName } from './menuStyles';
+import {
+  MENU_COLLISION_PADDING,
+  menuContentClassName,
+  menuItemClassName,
+  menuScrollClassName,
+  menuSubContentClassName,
+} from './menuStyles';
 
 /**
  * Click-triggered menu. Wraps `radix-ui`'s DropdownMenu — see docs/adr/0004
@@ -11,11 +19,21 @@ import { menuContentClassName, menuItemClassName } from './menuStyles';
  */
 export const DropdownMenu = DropdownMenuPrimitive.Root;
 export const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
-export const DropdownMenuSub = DropdownMenuPrimitive.Sub;
+/** A submenu: a panel beside the menu, or — on a phone — its items in place (`inlineSubmenu.tsx`). */
+export function DropdownMenuSub(props: ComponentProps<typeof DropdownMenuPrimitive.Sub>) {
+  const inline = useInlineSubmenus();
+  if (inline) return <InlineSubRoot>{props.children}</InlineSubRoot>;
+  return (
+    <SidePanelSubRoot>
+      <DropdownMenuPrimitive.Sub {...props} />
+    </SidePanelSubRoot>
+  );
+}
 
 export function DropdownMenuContent({
   className,
   sideOffset = 4,
+  collisionPadding = MENU_COLLISION_PADDING,
   ...props
 }: ComponentProps<typeof DropdownMenuPrimitive.Content>) {
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
@@ -25,7 +43,8 @@ export function DropdownMenuContent({
     <DropdownMenuPrimitive.Portal container={container}>
       <DropdownMenuPrimitive.Content
         sideOffset={sideOffset}
-        className={cx(menuContentClassName, className)}
+        collisionPadding={collisionPadding}
+        className={cx(menuContentClassName, menuScrollClassName, className)}
         {...props}
       />
     </DropdownMenuPrimitive.Portal>
@@ -86,6 +105,15 @@ export function DropdownMenuSubTrigger({
   children,
   ...props
 }: ComponentProps<typeof DropdownMenuPrimitive.SubTrigger>) {
+  const inline = useInlineSub();
+  if (inline) {
+    return (
+      <DropdownMenuItem {...inlineTriggerProps(inline, className)} disabled={props.disabled}>
+        {children}
+        <InlineCaret open={inline.open} />
+      </DropdownMenuItem>
+    );
+  }
   return (
     <DropdownMenuPrimitive.SubTrigger
       className={cx(menuItemClassName, 'justify-between data-[state=open]:bg-panel-2', className)}
@@ -101,15 +129,25 @@ export function DropdownMenuSubTrigger({
 
 export function DropdownMenuSubContent({
   className,
+  collisionPadding = MENU_COLLISION_PADDING,
   ...props
 }: ComponentProps<typeof DropdownMenuPrimitive.SubContent>) {
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
   // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
   const container = usePortalContainer();
+  const inline = useInlineSub();
+  if (inline) {
+    return (
+      <InlineSubContent inline={inline} className={className}>
+        {props.children}
+      </InlineSubContent>
+    );
+  }
   return (
     <DropdownMenuPrimitive.Portal container={container}>
       <DropdownMenuPrimitive.SubContent
-        className={cx(menuContentClassName, className)}
+        collisionPadding={collisionPadding}
+        className={cx(menuSubContentClassName, className)}
         {...props}
       />
     </DropdownMenuPrimitive.Portal>

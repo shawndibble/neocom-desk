@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { capacitorBudget, sustainedRepair, type CapacitorUser, type Repairer } from './tank';
+import {
+  boosterReloadShortfall,
+  capacitorBudget,
+  capacitorStatusAtDrain,
+  reloadDuty,
+  sustainedRepair,
+  type CapacitorUser,
+  type Repairer,
+} from './tank';
+
+describe('reloadDuty', () => {
+  it('is the share of the time a magazine keeps the module running, reloads counted', () => {
+    // Three 12 s cycles, then a 10 s reload: 36 of every 46 s.
+    expect(reloadDuty({ cycles: 3, cycleSeconds: 12, reloadSeconds: 10 })).toBeCloseTo(36 / 46, 9);
+  });
+
+  it('is 1 with no magazine, or one too small for a whole cycle', () => {
+    expect(reloadDuty(undefined)).toBe(1);
+    expect(reloadDuty({ cycles: 0, cycleSeconds: 12, reloadSeconds: 10 })).toBe(1);
+  });
+});
 
 describe('capacitorBudget', () => {
   const users: CapacitorUser[] = [
@@ -21,6 +41,28 @@ describe('capacitorBudget', () => {
     expect(budget.nosferatuGain).toBeCloseTo(7.2, 6);
     // Recharge + booster + nos − drain.
     expect(budget.delta).toBeCloseTo(35.84 + 33.333 + 7.2 - 29.375, 3);
+  });
+
+  it('averages a cap booster over its reload, as an ancillary repairer is', () => {
+    // Medium Capacitor Booster II, Navy Cap Booster 400: three 400 GJ charges
+    // 12 s apart, then 10 s reloading — 1200 GJ every 46 s, not 400 every 12.
+    const magazine = { cycles: 3, cycleSeconds: 12, reloadSeconds: 10 };
+    const budget = capacitorBudget(
+      [{ capPerSecond: 20 }, { capPerSecond: -400 / 12, injectionPerCharge: 400, magazine }],
+      30
+    );
+    expect(budget.boosterInjection).toBeCloseTo(1200 / 46, 6);
+    expect(budget.delta).toBeCloseTo(30 + 1200 / 46 - 20, 6);
+  });
+
+  it('keeps the charge interval to hold peak an average that counts reloads in', () => {
+    const magazine = { cycles: 3, cycleSeconds: 12, reloadSeconds: 10 };
+    const budget = capacitorBudget(
+      [{ capPerSecond: 60 }, { capPerSecond: -400 / 12, injectionPerCharge: 400, magazine }],
+      40
+    );
+    // Still 20 GJ/s short without it: one 400 GJ charge per 20 s on average.
+    expect(budget.secondsPerBoosterCharge).toBeCloseTo(20, 6);
   });
 
   it('says how often a cap booster must inject to hold peak when the rest runs the cap dry', () => {
@@ -66,6 +108,24 @@ describe('capacitorBudget', () => {
 
   it('gives the delta as a share of peak recharge', () => {
     expect(capacitorBudget([{ capPerSecond: 30 }], 40).deltaPct).toBeCloseTo(25, 6);
+  });
+});
+
+describe('boosterReloadShortfall', () => {
+  it('is the injection a reloading cap booster loses against the engine’s no-reload rate', () => {
+    const magazine = { cycles: 3, cycleSeconds: 12, reloadSeconds: 10 };
+    expect(
+      boosterReloadShortfall([
+        { capPerSecond: 20 },
+        { capPerSecond: -400 / 12, injectionPerCharge: 400, magazine },
+        { capPerSecond: -7.2 },
+      ])
+    ).toBeCloseTo(400 / 12 - 1200 / 46, 6);
+  });
+
+  it('is 0 with no cap booster, or one without a magazine', () => {
+    expect(boosterReloadShortfall([{ capPerSecond: -7.2 }])).toBe(0);
+    expect(boosterReloadShortfall([{ capPerSecond: -400 / 12, injectionPerCharge: 400 }])).toBe(0);
   });
 });
 
@@ -120,5 +180,50 @@ describe('sustainedRepair', () => {
       ancillary: { cycles: 0, cycleSeconds: 12, reloadSeconds: 60 },
     };
     expect(sustainedRepair([aar], { peakRecharge: 30, peakLoad: 0 }).sustained.armor).toBe(26);
+  });
+});
+
+describe('capacitorStatusAtDrain', () => {
+  // 1000 GJ, 200 s recharge: peak recharge 2.5 × 1000 / 200 = 12.5 GJ/s at 25%.
+  const capacity = 1000;
+  const recharge = 200;
+
+  it('settles where the recharge curve meets a drain it can carry', () => {
+    // 10(√s − s)·C/τ = D → √s = (1 + √(1 − 4D·τ/10C)) / 2.
+    const status = capacitorStatusAtDrain(capacity, recharge, 10);
+    const root = (1 + Math.sqrt(1 - (4 * 10 * recharge) / (10 * capacity))) / 2;
+    expect(status).toEqual({
+      stable: true,
+      stablePercentage: expect.closeTo(root * root * 100, 6),
+    });
+  });
+
+  it('is stable at 100% with no net drain, and exactly at 25% at peak', () => {
+    expect(capacitorStatusAtDrain(capacity, recharge, -5)).toEqual({
+      stable: true,
+      stablePercentage: 100,
+    });
+    expect(capacitorStatusAtDrain(capacity, recharge, 12.5)).toEqual({
+      stable: true,
+      stablePercentage: expect.closeTo(25, 6),
+    });
+  });
+
+  it('runs dry past peak, in the time the recharge curve buys from full', () => {
+    const status = capacitorStatusAtDrain(capacity, recharge, 20);
+    // Numerical check of ∫₀¹ C ds / (D − 10C/τ·(√s − s)).
+    let seconds = 0;
+    const steps = 200000;
+    for (let i = 0; i < steps; i++) {
+      const s = (i + 0.5) / steps;
+      seconds += capacity / steps / (20 - ((10 * capacity) / recharge) * (Math.sqrt(s) - s));
+    }
+    expect(status.stable).toBe(false);
+    expect(!status.stable && status.depletesInSeconds).toBeCloseTo(seconds, 2);
+  });
+
+  it('is capacity over drain when recharge barely matters', () => {
+    const status = capacitorStatusAtDrain(capacity, recharge, 10000);
+    expect(!status.stable && status.depletesInSeconds).toBeCloseTo(capacity / 10000, 3);
   });
 });

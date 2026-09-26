@@ -609,6 +609,12 @@ export const ITEM_DOGMA_ATTRIBUTE = {
   chargeGroup4: 609,
   chargeGroup5: 610,
   chargeSize: 128,
+  // "speed", shown as Rate of fire (ms). In the pinned `sde.dat`
+  // (2026-09-25) every turret and launcher carries it and no module that
+  // takes a charge only optionally does — no mining laser, strip miner, gas
+  // or ice harvester, cap booster, ancillary repairer or scripted module —
+  // so it marks a module that needs its charge to fire.
+  rateOfFire: 51,
   // Patched per-item damage (EVEShipFit/sde-patched `patches/ids.yaml`,
   // `damagePerSecondWithoutReload`/`damageVolley`), verified 2026-09-24 by a
   // live run of the pinned engine: a drone stack reports them per drone, and

@@ -231,7 +231,7 @@ export function BpcOfferMoreActions({
           icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
           label={t('industry.moreActionsLabel', { name: itemName ?? `#${typeId}` })}
           variant="plain"
-          size="sm"
+          size="row"
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">{items}</DropdownMenuContent>

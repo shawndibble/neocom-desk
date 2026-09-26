@@ -305,6 +305,8 @@
       "cargoSearchLabel": "Search items to put in the cargo hold",
       "cargoSearchPlaceholder": "Search any item — ammo, paste, filaments…",
       "cargoHint": "Search for anything to carry: ammo, nanite paste, cap boosters, filaments, a depot.",
+      "cargoAddMenu_one": "Add {{count}} to cargo",
+      "cargoAddMenu_other": "Add {{count}} to cargo",
       "cargoAddCount_one": "+{{count}}",
       "cargoAddCount_other": "+{{count}}"
     },
@@ -520,8 +522,17 @@
       },
       "ehpColumn": "EHP",
       "incomplete": "incomplete",
-      "headingCharacter": "Stats as {{name}}, own skills",
-      "headingAllV": "Stats at all skills V",
+      "headingCharacter": {
+        "character": "Stats as {{name}}, own skills",
+        "allV": "Stats as {{name}}, all skills V",
+        "all0": "Stats as {{name}}, all skills 0"
+      },
+      "headingNoCharacter": {
+        "allV": "Stats at all skills V",
+        "all0": "Stats at all skills 0"
+      },
+      "headingSkillsSet_one": "{{count}} skill set by hand",
+      "headingSkillsSet_other": "{{count}} skills set by hand",
       "layerHp": "{{hp}} HP",
       "overheatedRow": "Overheated",
       "rahRow": "Reactive Armor Hardener",
@@ -585,7 +596,7 @@
         "burst": "Burst tank",
         "sustained": "Sustained",
         "capLimited": "Cap-limited: repairers get {{pct}}% of the capacitor they need",
-        "estimateNote": "Sustained is our estimate: what the capacitor can feed at peak recharge, cap boosters counted without reloads, ancillary repairers with theirs."
+        "estimateNote": "Sustained is our estimate: what the capacitor can feed at peak recharge, with cap boosters and ancillary repairers averaged over their reloads."
       },
       "cap": {
         "peakRecharge": "Peak recharge",
@@ -637,10 +648,22 @@
           "warpDisruption_one": "{{value}} point",
           "warpDisruption_other": "{{value}} points",
           "ecm": "{{value}} jam strength",
-          "targetPainter": "+{{value}}% signature",
-          "trackingDisruptor": "−{{value}}% tracking",
-          "sensorDampener": "−{{value}}% lock range",
-          "guidanceDisruptor": "−{{value}}% explosion velocity"
+          "targetPainter": "+{{value}}% signature"
+        },
+        "effect": {
+          "optimalRange": "{{value}}% optimal range",
+          "falloff": "{{value}}% falloff",
+          "trackingSpeed": "{{value}}% tracking",
+          "lockRange": "{{value}}% lock range",
+          "scanResolution": "{{value}}% scan resolution",
+          "missileVelocity": "{{value}}% missile velocity",
+          "missileFlightTime": "{{value}}% flight time",
+          "explosionVelocity": "{{value}}% explosion velocity",
+          "explosionRadius": "{{value}}% explosion radius",
+          "jamGravimetric": "{{value}} gravimetric",
+          "jamLadar": "{{value}} ladar",
+          "jamMagnetometric": "{{value}} magnetometric",
+          "jamRadar": "{{value}} radar"
         }
       },
       "mining": {
@@ -648,10 +671,10 @@
         "crystal": "Crystal: {{name}}",
         "total": "Total",
         "perHour": "Per hour",
-        "residue": "Residue",
-        "residueValue": "−{{pct}}% expected ({{value}} m³/s)",
+        "residue": "Residue (ore destroyed)",
+        "residueValue": "{{value}} m³/s, {{pct}}% of yield on top",
         "fillsIn": "{{hold}} full in",
-        "note": "Yield includes expected critical successes; a crystal's bonus counts only on its own ore.",
+        "note": "Yield includes expected critical successes; a crystal's bonus counts only on its own ore. Residue is extra ore the asteroid loses on top of what you mine: it doesn't reduce your yield.",
         "fillTime": "{{time}} ({{capacity}} m³)"
       },
       "fightersNoOverheat": "Fighters don't overheat"
@@ -980,6 +1003,9 @@
       "loadRanOut_one": "Loaded {{name}} into {{loaded}} of {{count}} module — cargo ran out.",
       "loadRanOut_other": "Loaded {{name}} into {{loaded}} of {{count}} modules — cargo ran out.",
       "loadNone": "Nothing fitted takes {{name}}.",
+      "loadAllHeld": "Every module that takes {{name}} already holds it.",
+      "alreadyHeld_one": "{{count}} already held it.",
+      "alreadyHeld_other": "{{count}} already held it.",
       "changeCharge": "Change charge",
       "noCharges": "No other charge fits this",
       "launch": "Launch"
@@ -1063,7 +1089,15 @@
       "meta_other": "{{count}} ships"
     },
     "mode": {
-      "label": "Tactical mode"
+      "label": "Tactical mode",
+      "kind": {
+        "defense": "Defense Mode",
+        "propulsion": "Propulsion Mode",
+        "sharpshooter": "Sharpshooter Mode",
+        "primary": "Primary Mode",
+        "secondary": "Secondary Mode",
+        "tertiary": "Tertiary Mode"
+      }
     },
     "fighters": {
       "title": "Fighters",

@@ -83,6 +83,76 @@ describe('useChargeLoading', () => {
     expect(result.current.message).toBe('Loaded Scourge Heavy Missile into 2 modules.');
   });
 
+  it('says how many modules it loaded, and how many already held the charge', () => {
+    const holding: Fitting = {
+      ...fitting,
+      modules: fitting.modules.map((m, index) => (index === 0 ? { ...m, chargeTypeId: HEAVY } : m)),
+    };
+    const { result } = renderHook(() =>
+      useChargeLoading({
+        fitting: holding,
+        catalogue,
+        moduleResults: [launcher, launcher, passive],
+        engineReady: true,
+        profile,
+        edit: (change) => void change(holding),
+      })
+    );
+    act(() => result.current.load(HEAVY, { fromCargo: true }));
+    expect(result.current.message).toBe(
+      'Loaded Scourge Heavy Missile into 1 module. 1 already held it.'
+    );
+  });
+
+  it('counts only the modules this load reached when the cargo runs out', () => {
+    // Three launchers take it; one already holds it; 50 in the hold fill one more (40) and part of a third.
+    const three: Fitting = {
+      ...fitting,
+      modules: [
+        { slot: 'high', slotIndex: 0, typeId: 2410, state: 'active', chargeTypeId: HEAVY },
+        { slot: 'high', slotIndex: 1, typeId: 2410, state: 'active' },
+        { slot: 'high', slotIndex: 2, typeId: 2410, state: 'active' },
+        { slot: 'high', slotIndex: 3, typeId: 2410, state: 'active' },
+      ],
+      cargo: [{ typeId: HEAVY, quantity: 50 }],
+    };
+    const { result } = renderHook(() =>
+      useChargeLoading({
+        fitting: three,
+        catalogue,
+        moduleResults: [launcher, launcher, launcher, launcher],
+        engineReady: true,
+        profile,
+        edit: (change) => void change(three),
+      })
+    );
+    act(() => result.current.load(HEAVY, { fromCargo: true }));
+    expect(result.current.message).toBe(
+      'Loaded Scourge Heavy Missile into 2 of 3 modules — cargo ran out. 1 already held it.'
+    );
+  });
+
+  it('says so when every module that takes the charge already holds it', () => {
+    const holding: Fitting = {
+      ...fitting,
+      modules: fitting.modules.map((m, index) => (index < 2 ? { ...m, chargeTypeId: HEAVY } : m)),
+    };
+    const { result } = renderHook(() =>
+      useChargeLoading({
+        fitting: holding,
+        catalogue,
+        moduleResults: [launcher, launcher, passive],
+        engineReady: true,
+        profile,
+        edit: (change) => void change(holding),
+      })
+    );
+    act(() => result.current.load(HEAVY, { fromCargo: true }));
+    expect(result.current.message).toBe(
+      'Every module that takes Scourge Heavy Missile already holds it.'
+    );
+  });
+
   it('says when nothing fitted takes the charge', () => {
     const { result } = setup();
     act(() =>

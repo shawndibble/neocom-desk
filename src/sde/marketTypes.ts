@@ -77,6 +77,12 @@ export interface AttributeDictionaryEntry {
   name: string;
   unit: string | null;
   category: string;
+  /**
+   * The SDE unit id behind `unit`, which says how to read the raw value
+   * ("%" alone could be a share, a resonance or a modifier; "s" is
+   * milliseconds). Absent for an attribute with no unit.
+   */
+  unitId?: number;
 }
 
 export type AttributeDictionary = Readonly<Record<number, AttributeDictionaryEntry>>;

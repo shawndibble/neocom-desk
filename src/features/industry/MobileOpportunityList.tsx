@@ -252,7 +252,7 @@ export function MobileOpportunityList({
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <IconButton
-                        size="sm"
+                        size="row"
                         icon={<Icon.More />}
                         label={t('industry.moreActionsLabel', {
                           name: row.candidate.catalogEntry.productName,

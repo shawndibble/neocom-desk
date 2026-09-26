@@ -439,6 +439,8 @@ interface SlotTileProps extends DropHandlers {
   selected?: boolean;
   /** The highest state the module can reach, for its menu; every state until known. */
   maxState?: FittingItemState;
+  /** Whether the module takes a charge, for its menu; undefined until known. */
+  takesCharges?: boolean;
   /** Where the tile sits; its frame turns with the ring by `angle`, the icon stays upright. */
   position: CSSProperties;
   angle: number;
@@ -457,6 +459,7 @@ function SlotTile({
   reachedState,
   selected,
   maxState,
+  takesCharges,
   position,
   angle,
   compact,
@@ -622,7 +625,13 @@ function SlotTile({
       tooltip={tooltip}
       items={
         module && shownState ? (
-          <ModuleMenuItems module={module} shownState={shownState} maxState={maxState} withMove />
+          <ModuleMenuItems
+            module={module}
+            shownState={shownState}
+            maxState={maxState}
+            takesCharges={takesCharges}
+            withMove
+          />
         ) : (
           <EmptySlotMenuItems rack={slot.rack} index={slot.index} />
         )
@@ -806,6 +815,10 @@ export function FittingRing({
   const resultOf = (slot: RingSlot) =>
     slot.module && moduleResults ? moduleResults[fitting.modules.indexOf(slot.module)] : undefined;
   const maxStateOf = (slot: RingSlot) => resultOf(slot)?.maxState;
+  const takesChargesOf = (slot: RingSlot) => {
+    const groups = resultOf(slot)?.chargeGroupIds;
+    return groups === undefined ? undefined : groups.length > 0;
+  };
   const reachedState = (slot: RingSlot) => resultOf(slot)?.state;
 
   function tilePosition(angle: number): CSSProperties {
@@ -959,6 +972,7 @@ export function FittingRing({
                 cantUse={cantUse(slot)}
                 reachedState={reachedState(slot)}
                 maxState={maxStateOf(slot)}
+                takesCharges={takesChargesOf(slot)}
                 selected={isSelected(slot)}
                 {...roving(slot)}
                 position={tilePosition(angle)}
@@ -1042,6 +1056,7 @@ export function FittingRing({
                     cantUse={cantUse(slot)}
                     reachedState={reachedState(slot)}
                     maxState={maxStateOf(slot)}
+                    takesCharges={takesChargesOf(slot)}
                     selected={isSelected(slot)}
                     {...roving(slot)}
                     position={{ inset: 0 }}

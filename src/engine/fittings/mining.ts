@@ -69,6 +69,14 @@ export interface MiningStats {
 export function miningYield(miners: readonly MinerInput[]): MiningStats {
   const rows = miners.map((miner): MiningRow => {
     const base = miner.amount * miner.quantity;
+    // A critical success's `miningCritBonusYield` (5969) is read as *extra*
+    // yield on top of the cycle's, so a crit mines 1 + bonus times the
+    // amount and a cycle averages 1 + chance × bonus. The pinned SDE names
+    // it "Critical Success Bonus Yield" (unit 127, absolute percent: 2 shows
+    // as 200%), which reads as a bonus on top rather than a total multiplier
+    // (that would be 1 + chance × (bonus − 1)). The SDE carries no longer
+    // description and the engine computes no yield of its own to check
+    // against, so this rests on the name alone — checked 2026-09-25.
     const perCycle = base * (1 + miner.critChance * miner.critBonus);
     const cycle = miner.cycleSeconds > 0 ? miner.cycleSeconds : Infinity;
     return {

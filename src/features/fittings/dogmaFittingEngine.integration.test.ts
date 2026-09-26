@@ -18,6 +18,7 @@ import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes } from '@/engine/fittings/affectedBy';
 import { extractMining, miningYield } from '@/engine/fittings/mining';
+import { capacitorStatusAtDrain } from '@/engine/fittings/tank';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
 import type { Fitting } from '@/engine/fittings/types';
 
@@ -68,6 +69,7 @@ const MEDIUM_SHIELD_BOOSTER_II = 10850;
 const MEDIUM_CAPACITOR_BOOSTER_II = 2024;
 const CAP_BOOSTER_400 = 11287;
 const CAP_BOOSTER_150 = 11283;
+const NAVY_CAP_BOOSTER_400 = 32006;
 const MEDIUM_ENERGY_NEUTRALIZER_II = 12267;
 const MEDIUM_ENERGY_NOSFERATU_II = 12259;
 const MEDIUM_REMOTE_ARMOR_REPAIRER_II = 26913;
@@ -79,6 +81,14 @@ const MEDIUM_REMOTE_CAPACITOR_TRANSMITTER_II = 12221;
 const STASIS_WEBIFIER_II = 527;
 const WARP_SCRAMBLER_II = 448;
 const MULTISPECTRUM_ECM_II = 2567;
+// Looked up by exact name in the pinned `sde.dat`, 2026-09-25.
+const TRACKING_DISRUPTOR_II = 2109;
+const OPTIMAL_RANGE_DISRUPTION_SCRIPT = 29005;
+const REMOTE_SENSOR_DAMPENER_II = 1969;
+const SCAN_RESOLUTION_DAMPENING_SCRIPT = 29013;
+const GUIDANCE_DISRUPTOR_II = 37546;
+const MISSILE_RANGE_DISRUPTION_SCRIPT = 40334;
+const TARGET_PAINTER_II = 19806;
 const MODULATED_STRIP_MINER_II = 17912;
 const SIMPLE_ASTEROID_MINING_CRYSTAL_TYPE_A_II = 60281;
 const MINING_DRONE_II = 10250;
@@ -493,18 +503,137 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       (2.5 * stats.capacitorCapacity) / (stats.capacitorRechargeTime / 1000),
       6
     );
-    // The split adds back up to the engine's own net peak load (-4).
-    expect(budget.drain - budget.boosterInjection - budget.nosferatuGain).toBeCloseTo(read(-4), 6);
-    // A Cap Booster 400 every 12 s; the Medium Energy Nosferatu II's 36 GJ every 5 s.
-    expect(budget.boosterInjection).toBeCloseTo(400 / 12, 6);
+    // Two Cap Booster 400s a load (40 m3 of 16 m3 charges), one every 12 s,
+    // then a 10 s reload: 800 GJ every 34 s. The engine's own net peak load
+    // (-4) and delta (-5) count the booster at 400 every 12 s, no reload.
+    const reloadShortfall = 400 / 12 - 800 / 34;
+    expect(budget.boosterInjection).toBeCloseTo(800 / 34, 6);
+    expect(budget.drain - budget.boosterInjection - budget.nosferatuGain).toBeCloseTo(
+      read(-4) + reloadShortfall,
+      6
+    );
+    // The Medium Energy Nosferatu II's 36 GJ every 5 s.
     expect(budget.nosferatuGain).toBeCloseTo(36 / 5, 6);
-    expect(budget.delta).toBeCloseTo(read(-5), 6);
+    expect(budget.delta).toBeCloseTo(read(-5) - reloadShortfall, 6);
 
     // The remote armor repairer repairs someone else: the local tank has no armor.
     expect(tank.burst.armor).toBe(0);
     expect(tank.burst.shield).toBeGreaterThan(0);
     // Passive regeneration peaks at 2.5 × shield HP over the shield recharge time.
     expect(tank.passiveShield).toBeCloseTo((2.5 * stats.shield.hp) / (read(479) / 1000), 6);
+  });
+
+  it('averages a Navy Cap Booster 400 over its reload: 26.1 GJ/s, not 33.3', () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Caracal cap booster',
+      shipTypeId: CARACAL,
+      modules: [
+        {
+          slot: 'medium',
+          slotIndex: 0,
+          typeId: MEDIUM_CAPACITOR_BOOSTER_II,
+          state: 'active',
+          chargeTypeId: NAVY_CAP_BOOSTER_400,
+        },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(SUPPORT_SKILL_IDS));
+    const calculation = calculate(dogmaFit);
+    const budget = extractCapacitorBudget(
+      dogmaFit.items,
+      calculation.items,
+      calculation.ship.attributes
+    );
+    // Three 12 m3 charges in 40 m3, 12 s apart, then 10 s reloading.
+    expect(budget.boosterInjection).toBeCloseTo(1200 / 46, 6);
+  });
+
+  it('never calls a fit stable that its cap booster only holds up by never reloading', () => {
+    // Medium Capacitor Booster II + Navy Cap Booster 400, a shield booster and
+    // five neutralizers: the engine counts the booster at 33.3 GJ/s with no
+    // reload and says stable; averaged over its reload (26.1) the cap drains.
+    const caracal = (neuts: number): Fitting => ({
+      name: 'Integration Test Caracal booster-dependent',
+      shipTypeId: CARACAL,
+      modules: [
+        {
+          slot: 'medium',
+          slotIndex: 0,
+          typeId: MEDIUM_CAPACITOR_BOOSTER_II,
+          state: 'active',
+          chargeTypeId: NAVY_CAP_BOOSTER_400,
+        },
+        { slot: 'medium', slotIndex: 1, typeId: MEDIUM_SHIELD_BOOSTER_II, state: 'active' },
+        ...Array.from({ length: neuts }, (_, slotIndex) => ({
+          slot: 'high' as const,
+          slotIndex,
+          typeId: MEDIUM_ENERGY_NEUTRALIZER_II,
+          state: 'active' as const,
+        })),
+      ],
+      drones: [],
+      cargo: [],
+    });
+    const run = (neuts: number) => {
+      const dogmaFit = fittingToDogmaFit(caracal(neuts), buildAllVProfile(SUPPORT_SKILL_IDS));
+      const calculation = calculate(dogmaFit);
+      const ship = calculation.ship.attributes;
+      return {
+        engineStable: (ship.get(-7)?.value ?? 0) < 0,
+        stats: extractFittingStats(dogmaFit.items, ship, calculation.items),
+        budget: extractCapacitorBudget(dogmaFit.items, calculation.items, ship),
+      };
+    };
+
+    const five = run(5);
+    expect(five.engineStable).toBe(true);
+    expect(five.budget.delta).toBeLessThan(0);
+    expect(five.stats.capacitor.stable).toBe(false);
+    const drain = five.budget.peakRecharge - five.budget.delta;
+    expect(five.stats.capacitor).toEqual(
+      capacitorStatusAtDrain(
+        five.stats.capacitorCapacity,
+        five.stats.capacitorRechargeTime / 1000,
+        drain
+      )
+    );
+
+    // Four still hold, at the level the reload-averaged drain settles at.
+    const four = run(4);
+    expect(four.budget.delta).toBeGreaterThan(0);
+    expect(four.stats.capacitor.stable).toBe(true);
+    expect(four.stats.capacitor).toEqual(
+      capacitorStatusAtDrain(
+        four.stats.capacitorCapacity,
+        four.stats.capacitorRechargeTime / 1000,
+        four.budget.peakRecharge - four.budget.delta
+      )
+    );
+  });
+
+  it('leaves the engine capacitor figure alone on a fit with no cap booster', () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Caracal no booster',
+      shipTypeId: CARACAL,
+      modules: [
+        { slot: 'medium', slotIndex: 0, typeId: MEDIUM_SHIELD_BOOSTER_II, state: 'active' },
+        { slot: 'high', slotIndex: 0, typeId: MEDIUM_ENERGY_NEUTRALIZER_II, state: 'active' },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(SUPPORT_SKILL_IDS));
+    const calculation = calculate(dogmaFit);
+    const ship = calculation.ship.attributes;
+    const stats = extractFittingStats(dogmaFit.items, ship, calculation.items);
+    const depletes = ship.get(-7)?.value ?? 0;
+    expect(stats.capacitor).toEqual(
+      depletes < 0
+        ? { stable: true, stablePercentage: ship.get(-72)?.value }
+        : { stable: false, depletesInSeconds: depletes }
+    );
   });
 
   it('reads what the support modules hand out, each by its own kind', () => {
@@ -565,6 +694,108 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(support.rows.find((row) => row.kind === 'web')?.amount).toBeCloseTo(60, 6);
     expect(support.rows.find((row) => row.kind === 'warpDisruption')?.amount).toBe(2);
     expect(support.rows.find((row) => row.kind === 'ecm')?.amount).toBeGreaterThan(0);
+  });
+
+  it('keeps every scripted disruptor and dampener, each with all of its effects', () => {
+    const mid = (slotIndex: number, typeId: number, chargeTypeId?: number) => ({
+      slot: 'medium' as const,
+      slotIndex,
+      typeId,
+      state: 'active' as const,
+      ...(chargeTypeId === undefined ? {} : { chargeTypeId }),
+    });
+    const fitting: Fitting = {
+      name: 'Integration Test Caracal scripted EWAR',
+      shipTypeId: CARACAL,
+      modules: [
+        mid(0, TRACKING_DISRUPTOR_II, OPTIMAL_RANGE_DISRUPTION_SCRIPT),
+        mid(1, TRACKING_DISRUPTOR_II),
+        mid(2, REMOTE_SENSOR_DAMPENER_II, SCAN_RESOLUTION_DAMPENING_SCRIPT),
+        mid(3, GUIDANCE_DISRUPTOR_II, MISSILE_RANGE_DISRUPTION_SCRIPT),
+        mid(4, TARGET_PAINTER_II),
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(SUPPORT_SKILL_IDS));
+    const support = extractSupport(dogmaFit.items, calculate(dogmaFit).items);
+    const shape = support.rows.map((row) => [
+      row.kind,
+      row.effects.map((e) => [e.effect, Number(e.amount.toFixed(1))]),
+    ]);
+    // Before: the scripted disruptor, the dampener and the guidance
+    // disruptor each read one zeroed attribute and had no row at all.
+    expect(shape).toEqual([
+      [
+        'trackingDisruptor',
+        [
+          ['optimalRange', -34.4],
+          ['falloff', -34.4],
+        ],
+      ],
+      [
+        'trackingDisruptor',
+        [
+          ['optimalRange', -17.2],
+          ['falloff', -17.2],
+          ['trackingSpeed', -17.2],
+        ],
+      ],
+      ['sensorDampener', [['scanResolution', -30.6]]],
+      [
+        'guidanceDisruptor',
+        [
+          ['missileVelocity', -18],
+          ['missileFlightTime', -18],
+        ],
+      ],
+      ['targetPainter', []],
+    ]);
+  });
+
+  it('warns of an empty weapon, never of a strip miner running without a crystal', () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Hulk empty slots',
+      shipTypeId: HULK,
+      modules: [
+        { slot: 'high', slotIndex: 0, typeId: MODULATED_STRIP_MINER_II, state: 'active' },
+        {
+          slot: 'medium',
+          slotIndex: 0,
+          typeId: MEDIUM_CAPACITOR_BOOSTER_II,
+          state: 'active',
+        },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const empty = (typeId: number) => ({ typeId, quantity: 1, isDrone: false });
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(MINING_SKILL_IDS));
+    const hulk = extractOffense(
+      [empty(MODULATED_STRIP_MINER_II), empty(MEDIUM_CAPACITOR_BOOSTER_II)],
+      calculate(dogmaFit).items,
+      null
+    );
+    expect(hulk.chargelessWeaponCount).toBe(0);
+
+    const caracal = fittingToDogmaFit(
+      {
+        name: 'Integration Test Caracal empty launcher',
+        shipTypeId: CARACAL,
+        modules: [
+          { slot: 'high', slotIndex: 0, typeId: HEAVY_MISSILE_LAUNCHER_II, state: 'active' },
+        ],
+        drones: [],
+        cargo: [],
+      },
+      buildAllVProfile(SUPPORT_SKILL_IDS)
+    );
+    const launcher = extractOffense(
+      [empty(HEAVY_MISSILE_LAUNCHER_II)],
+      calculate(caracal).items,
+      null
+    );
+    expect(launcher.chargelessWeaponCount).toBe(1);
   });
 
   it('mines more with a crystal loaded, and counts launched mining drones', () => {

@@ -767,6 +767,7 @@ describe('FittingStatsSections — Overheat all and Copy stats', () => {
       amount: 15,
       optimal: 10000,
       falloff: 0,
+      effects: [],
     };
     const scram = {
       kind: 'warpDisruption' as const,
@@ -775,6 +776,7 @@ describe('FittingStatsSections — Overheat all and Copy stats', () => {
       amount: 2,
       optimal: 9000,
       falloff: 0,
+      effects: [],
     };
     const base = stats();
     const unheated: FittingStats = {
@@ -873,9 +875,26 @@ describe('FittingStatsSections — Support out', () => {
               amount: 85.3,
               optimal: 10500,
               falloff: 3000,
+              effects: [],
             },
-            { kind: 'web', typeId: 527, count: 1, amount: 60, optimal: 10000, falloff: 0 },
-            { kind: 'warpDisruption', typeId: 448, count: 1, amount: 2, optimal: 9000, falloff: 0 },
+            {
+              kind: 'web',
+              typeId: 527,
+              count: 1,
+              amount: 60,
+              optimal: 10000,
+              falloff: 0,
+              effects: [],
+            },
+            {
+              kind: 'warpDisruption',
+              typeId: 448,
+              count: 1,
+              amount: 2,
+              optimal: 9000,
+              falloff: 0,
+              effects: [],
+            },
           ],
           remoteRepair: { shield: 0, armor: 85.3, hull: 0 },
         },
@@ -887,6 +906,86 @@ describe('FittingStatsSections — Support out', () => {
     expect(support.getByText('10.5 + 3.0 km')).toBeInTheDocument();
     expect(support.getByText('−60% speed')).toBeInTheDocument();
     expect(support.getByText('2 points')).toBeInTheDocument();
+  });
+
+  it('lists every effect of a scripted disruptor, and each strength of a racial jammer', () => {
+    const neutral = stats().support;
+    renderSections(
+      stats({
+        support: {
+          ...neutral,
+          rows: [
+            {
+              kind: 'trackingDisruptor',
+              typeId: 2109,
+              count: 1,
+              amount: 34.38,
+              optimal: 48000,
+              falloff: 24000,
+              effects: [
+                { effect: 'optimalRange', amount: -34.38 },
+                { effect: 'falloff', amount: -34.38 },
+              ],
+            },
+            {
+              kind: 'trackingDisruptor',
+              typeId: 2104,
+              count: 1,
+              amount: 34.38,
+              optimal: 48000,
+              falloff: 24000,
+              effects: [
+                { effect: 'optimalRange', amount: -0.3 },
+                { effect: 'falloff', amount: -34.38 },
+              ],
+            },
+            {
+              kind: 'guidanceDisruptor',
+              typeId: 37546,
+              count: 1,
+              amount: 12,
+              optimal: 48000,
+              falloff: 24000,
+              effects: [
+                { effect: 'explosionVelocity', amount: -12 },
+                { effect: 'explosionRadius', amount: 12 },
+              ],
+            },
+            {
+              kind: 'ecm',
+              typeId: 1957,
+              count: 1,
+              amount: 4,
+              optimal: 23040,
+              falloff: 0,
+              effects: [
+                { effect: 'jamGravimetric', amount: 1.3 },
+                { effect: 'jamLadar', amount: 4 },
+              ],
+            },
+            {
+              kind: 'ecm',
+              typeId: 2567,
+              count: 1,
+              amount: 2.6,
+              optimal: 23040,
+              falloff: 0,
+              effects: [
+                { effect: 'jamGravimetric', amount: 2.6 },
+                { effect: 'jamLadar', amount: 2.6 },
+              ],
+            },
+          ],
+        },
+      })
+    );
+    const support = within(sectionBody('Support out'));
+    expect(support.getByText('−34% optimal range, −34% falloff')).toBeInTheDocument();
+    expect(support.getByText('−12% explosion velocity, +12% explosion radius')).toBeInTheDocument();
+    expect(support.getByText('1.30 gravimetric, 4.00 ladar')).toBeInTheDocument();
+    // An effect under half a percent reads 0%, not −0%.
+    expect(support.getByText('0% optimal range, −34% falloff')).toBeInTheDocument();
+    expect(support.getByText('2.60 jam strength')).toBeInTheDocument();
   });
 
   it('has no Support out section when nothing reaches another ship', () => {
@@ -926,7 +1025,10 @@ describe('FittingStatsSections — Mining', () => {
     expect(mining.getByText('1122 m³ / 32.5 s')).toBeInTheDocument();
     expect(mining.getAllByText('34.5 m³/s').length).toBeGreaterThan(0);
     expect(mining.getByText('124.2K m³/h')).toBeInTheDocument();
-    expect(mining.getByText('−36.8% expected (12.7 m³/s)')).toBeInTheDocument();
+    // Residue is lost on top of the yield, never read as a cut from it.
+    expect(mining.getByText('Residue (ore destroyed)')).toBeInTheDocument();
+    expect(mining.getByText('12.7 m³/s, 36.8% of yield on top')).toBeInTheDocument();
+    expect(mining.queryByText(/−36.8%/)).toBeNull();
     expect(mining.getByText('Mining hold full in')).toBeInTheDocument();
     expect(mining.getByText('5m (11500 m³)')).toBeInTheDocument();
   });

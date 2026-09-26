@@ -12,7 +12,11 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { loadChargeIntoCompatible, type ModuleAt } from '@/engine/fittings/fittingEdit';
+import {
+  chargesPerLoad as chargesInCapacity,
+  loadChargeIntoCompatible,
+  type ModuleAt,
+} from '@/engine/fittings/fittingEdit';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import type {
   Fitting,
@@ -120,9 +124,7 @@ export function useChargeLoading({
         capacity = moduleChargeCapacity(shipTypeId, module);
         caches.capacity.set(key, capacity);
       }
-      const volume = catalogueVolume(catalogue, chargeTypeId);
-      // A tiny tolerance, so 1.2 m3 of 0.03 m3 missiles is forty, not 39.999….
-      return volume > 0 && capacity > 0 ? Math.max(1, Math.floor(capacity / volume + 1e-9)) : 1;
+      return chargesInCapacity(capacity, catalogueVolume(catalogue, chargeTypeId));
     },
     [shipTypeId, engineReady, catalogue, caches]
   );
@@ -162,16 +164,25 @@ export function useChargeLoading({
       const result = outcome as ReturnType<typeof loadChargeIntoCompatible> | null;
       if (result === null) return;
       const name = catalogueTypeName(catalogue, chargeTypeId);
-      setMessage(
+      // What this load did, apart from the modules that already held the charge.
+      const held = result.loaded - result.newlyLoaded;
+      const heldNote = held > 0 ? t('fittings.item.alreadyHeld', { count: held }) : null;
+      const said =
         result.wanted === 0
           ? t('fittings.item.loadNone', { name })
           : result.ranOut
             ? t('fittings.item.loadRanOut', {
                 name,
-                loaded: result.loaded,
-                count: result.wanted,
+                loaded: result.newlyLoaded,
+                count: result.wanted - held,
               })
-            : t('fittings.item.loaded', { name, count: result.loaded })
+            : result.newlyLoaded === 0
+              ? t('fittings.item.loadAllHeld', { name })
+              : t('fittings.item.loaded', { name, count: result.newlyLoaded });
+      setMessage(
+        result.wanted > 0 && (result.ranOut || result.newlyLoaded > 0) && heldNote
+          ? `${said} ${heldNote}`
+          : said
       );
     },
     [edit, accepts, chargesPerLoad, catalogue, t]

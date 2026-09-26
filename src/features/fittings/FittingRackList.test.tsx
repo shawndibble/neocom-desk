@@ -112,6 +112,8 @@ describe('FittingRackList', () => {
     );
     const passive = screen.getByLabelText('State of #11') as HTMLSelectElement;
     expect(passive.value).toBe('online');
+    // A thumb gets 44px below md (DESIGN.md §3); a pointer keeps the sm height.
+    expect(passive.parentElement).toHaveClass('[&>select]:min-h-11', 'md:[&>select]:min-h-7');
     expect([...passive.options].map((option) => option.value)).toEqual(['offline', 'online']);
   });
 
@@ -243,9 +245,49 @@ describe('FittingRackList with the editor’s item actions', () => {
     );
   }
 
+  it('offers no charge entries on a module that takes no charge, and keeps them on one that does', async () => {
+    const actions = fakeItemActions({ names });
+    render(
+      <MemoryRouter>
+        <FittingItemActionsProvider value={actions}>
+          <FittingRackList
+            fitting={fitting}
+            stats={withSlots}
+            moduleResults={[
+              { state: 'active', maxState: 'overload', chargeGroupIds: [83] },
+              { state: 'online', maxState: 'online', chargeGroupIds: [] },
+            ]}
+          />
+        </FittingItemActionsProvider>
+      </MemoryRouter>
+    );
+    // The Damage Control takes no charge: no "No charge in cargo fits this".
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for #11' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    expect(await screen.findByRole('menuitem', { name: /Show info/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'No charge in cargo fits this' })).toBeNull();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+
+    // The autocannon does, with none in the hold: the entry is there, disabled.
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for #10' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    expect(
+      await screen.findByRole('menuitem', { name: 'No charge in cargo fits this' })
+    ).toHaveAttribute('aria-disabled', 'true');
+  });
+
   it('gives each module row a More actions button with the same menu, Move down included', async () => {
     const actions = fakeItemActions({ names });
     renderList(actions);
+    // 44px for a thumb below md, the dense row size for a pointer.
+    expect(screen.getByRole('button', { name: 'More actions for #10' })).toHaveClass(
+      'size-11',
+      'md:size-7'
+    );
     fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for #10' }), {
       button: 0,
       pointerType: 'mouse',
