@@ -60,3 +60,6 @@ export const fieldSizeClassName: Record<ControlSize, string> = {
  * `min-h-*`, not `h-*`, so a row whose text wraps grows instead of clipping.
  */
 export const tappableRowClassName = 'min-h-11 md:min-h-7';
+
+/** An inline text action beside a status message — an Undo, a "jump to it". */
+export const inlineLinkClassName = 'text-accent font-medium underline';

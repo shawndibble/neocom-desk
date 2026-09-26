@@ -14,6 +14,7 @@ import {
   sortRows,
   Spinner,
   StatChip,
+  UndoToast,
 } from '@/components/ui';
 import { fieldBaseClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { formatDuration } from '@/lib/duration';
@@ -34,6 +35,7 @@ import { previewClipboardImport } from '../planner/clipboardImport';
 import { loadMasteries, loadTypes } from '@/sde/loadSde';
 import type { MasteryMap, SkillPrereq } from '@/sde/types';
 import { SkillRow } from '../SkillRow';
+import { isEntryCovered } from '../planner/reorder';
 import type { TargetPlan } from '../useTargetPlan';
 import { TargetPlanPicker } from '../TargetPlanPicker';
 import { buildShipsWithMastery, type ShipOption } from './shipCatalog';
@@ -92,6 +94,18 @@ export function ShipsPanel({
   const [hideCompleted, setHideCompleted] = useState(false);
   const [showMastery, setShowMastery] = useState(true);
   const [showFit, setShowFit] = useState(true);
+
+  const [addedToast, setAddedToast] = useState<{
+    planId: string;
+    planName: string;
+    entries: readonly PlanEntry[];
+  } | null>(null);
+  // Matches Market's compareUndo toast — same "Added N · Undo", same lifetime.
+  useEffect(() => {
+    if (!addedToast) return;
+    const timer = setTimeout(() => setAddedToast(null), 8000);
+    return () => clearTimeout(timer);
+  }, [addedToast]);
 
   // True-current value for `handleCheckFit`'s async closure, where `selected` is frozen.
   const selectedRef = useRef(selected);
@@ -223,6 +237,25 @@ export function ShipsPanel({
   const untrained = visibleRows.filter((row) => row.status !== 'trained');
   const totalSeconds = untrained.reduce((sum, row) => sum + row.seconds, 0);
   const planNameFallback = selected?.name ?? fitResult?.shipName ?? t('plans.newPlanName');
+
+  // The plan Add actually targets — same resolution `addEntries` itself uses
+  // (existing target plan, or none yet) — for the per-row "In plan" check.
+  const targetPlanEntries = target.plans?.find((p) => p.id === target.targetPlanId)?.entries ?? [];
+  function isInTargetPlan(row: UnifiedShipRow): boolean {
+    return isEntryCovered(targetPlanEntries, row.skillTypeID, row.targetLevel);
+  }
+
+  async function handleAdd(entries: readonly PlanEntry[]) {
+    const result = await target.addEntries(entries, planNameFallback);
+    if (result.added.length === 0) return;
+    setAddedToast({ planId: result.planId, planName: result.planName, entries: result.added });
+  }
+
+  function handleUndoAdd() {
+    if (!addedToast) return;
+    void target.removeEntries(addedToast.planId, addedToast.entries);
+    setAddedToast(null);
+  }
 
   function tagsFor(row: UnifiedShipRow): ReactNode[] {
     const chips: ReactNode[] = [];
@@ -392,28 +425,37 @@ export function ShipsPanel({
             {visibleRows.length === 0 ? (
               <EmptyState title={t('skills.ships.emptyTitle')} hint={t('skills.ships.emptyHint')} />
             ) : (
-              visibleRows.map((row) => (
-                <div key={row.skillTypeID} className="border-b border-line py-1.5 last:border-b-0">
-                  <SkillRow
-                    name={row.name}
-                    status={row.status}
-                    currentLevel={row.currentLevel}
-                    tags={tagsFor(row)}
-                    timeLabel={
-                      row.status === 'trained'
-                        ? t('skills.fitCheck.trained')
-                        : formatDuration(row.seconds)
-                    }
-                    addLabel={t('skills.fitCheck.add')}
-                    onAdd={() =>
-                      void target.addEntries(
-                        [{ skillTypeID: row.skillTypeID, targetLevel: row.targetLevel }],
-                        planNameFallback
-                      )
-                    }
-                  />
-                </div>
-              ))
+              visibleRows.map((row) => {
+                const planned = isInTargetPlan(row);
+                return (
+                  <div
+                    key={row.skillTypeID}
+                    className="border-b border-line py-1.5 last:border-b-0"
+                  >
+                    <SkillRow
+                      name={row.name}
+                      status={row.status}
+                      currentLevel={row.currentLevel}
+                      tags={tagsFor(row)}
+                      timeLabel={
+                        row.status === 'trained'
+                          ? t('skills.fitCheck.trained')
+                          : formatDuration(row.seconds)
+                      }
+                      addLabel={t('skills.fitCheck.add')}
+                      inPlanLabel={planned ? t('skills.fitCheck.inPlan') : undefined}
+                      onAdd={
+                        planned
+                          ? undefined
+                          : () =>
+                              void handleAdd([
+                                { skillTypeID: row.skillTypeID, targetLevel: row.targetLevel },
+                              ])
+                      }
+                    />
+                  </div>
+                );
+              })
             )}
           </div>
           {untrained.length > 0 && target.plans !== undefined && (
@@ -423,12 +465,11 @@ export function ShipsPanel({
                 size="sm"
                 variant="primary"
                 onClick={() =>
-                  void target.addEntries(
+                  void handleAdd(
                     untrained.map((row) => ({
                       skillTypeID: row.skillTypeID,
                       targetLevel: row.targetLevel,
-                    })),
-                    planNameFallback
+                    }))
                   )
                 }
               >
@@ -439,6 +480,16 @@ export function ShipsPanel({
             </div>
           )}
         </>
+      )}
+      {addedToast && (
+        <UndoToast
+          message={t('skills.fitCheck.addedToast', {
+            count: addedToast.entries.length,
+            plan: addedToast.planName,
+          })}
+          undoLabel={t('skills.fitCheck.addedToastUndo')}
+          onUndo={handleUndoAdd}
+        />
       )}
     </Panel>
   );

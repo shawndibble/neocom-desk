@@ -162,6 +162,69 @@ describe('SkillPicker', () => {
     );
   });
 
+  it('shows the pick confirmation visibly (not just to a screen reader) (#1704)', async () => {
+    const user = userEvent.setup();
+    render(
+      <SkillPicker skills={SKILLS} catalog={CATALOG} trainedSkills={NO_TRAINED} onAdd={vi.fn()} />
+    );
+
+    const input = screen.getByRole('searchbox');
+    await user.type(input, 'frigate');
+    const firstItem = (await screen.findAllByRole('listitem'))[0];
+    if (!firstItem) throw new Error('expected at least one result');
+    await user.click(within(firstItem).getByRole('button', { name: /^Frigate/ }));
+    await user.click(screen.getByRole('button', { name: 'Level III' }));
+
+    await waitFor(() => expect(screen.getByRole('status')).not.toHaveClass('sr-only'));
+  });
+
+  it('offers a jump-to-it link when the added row is off-screen, that scrolls it into view (#1704)', async () => {
+    const user = userEvent.setup();
+    const scrollIntoView = vi.fn();
+    render(
+      <>
+        <SkillPicker skills={SKILLS} catalog={CATALOG} trainedSkills={NO_TRAINED} onAdd={vi.fn()} />
+        <div id="plan-entry-1-3" />
+      </>
+    );
+    const row = document.getElementById('plan-entry-1-3');
+    if (!row) throw new Error('expected the stand-in plan row to exist');
+    row.getBoundingClientRect = () =>
+      ({ top: 5000, bottom: 5050, left: 0, right: 0, width: 0, height: 50 }) as DOMRect;
+    row.scrollIntoView = scrollIntoView;
+
+    const input = screen.getByRole('searchbox');
+    await user.type(input, 'frigate');
+    const firstItem = (await screen.findAllByRole('listitem'))[0];
+    if (!firstItem) throw new Error('expected at least one result');
+    await user.click(within(firstItem).getByRole('button', { name: /^Frigate/ }));
+    await user.click(screen.getByRole('button', { name: 'Level III' }));
+
+    const jumpLink = await screen.findByRole('button', { name: /jump to it/i });
+    await user.click(jumpLink);
+    expect(scrollIntoView).toHaveBeenCalled();
+  });
+
+  it('offers no jump-to-it link when the added row is already on-screen (#1704)', async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <SkillPicker skills={SKILLS} catalog={CATALOG} trainedSkills={NO_TRAINED} onAdd={vi.fn()} />
+        <div id="plan-entry-1-3" />
+      </>
+    );
+
+    const input = screen.getByRole('searchbox');
+    await user.type(input, 'frigate');
+    const firstItem = (await screen.findAllByRole('listitem'))[0];
+    if (!firstItem) throw new Error('expected at least one result');
+    await user.click(within(firstItem).getByRole('button', { name: /^Frigate/ }));
+    await user.click(screen.getByRole('button', { name: 'Level III' }));
+
+    await waitFor(() => expect(screen.getByRole('status')).not.toHaveClass('sr-only'));
+    expect(screen.queryByRole('button', { name: /jump to it/i })).not.toBeInTheDocument();
+  });
+
   it('matches description text, not just name', async () => {
     const user = userEvent.setup();
     render(
