@@ -6,7 +6,8 @@ import type { AffectedAttribute } from '@/engine/fittings/affectedBy';
 vi.mock('@/sde/loadMarketSde', () => ({
   loadAttributeDictionary: async () => ({
     64: { name: 'Damage Modifier', unit: 'x', category: 'Turret' },
-    51: { name: 'Rate of fire', unit: 's', category: 'Turret' },
+    51: { name: 'Rate of fire', unit: 's', category: 'Turret', unitId: 101 },
+    267: { name: 'Armor EM Damage Resistance', unit: '%', category: 'Armor', unitId: 108 },
   }),
 }));
 
@@ -55,6 +56,61 @@ describe('FittingAffectedByPanel', () => {
     expect(screen.getByText('stacking penalty 87%')).toBeInTheDocument();
     expect(screen.getByText(/Fleet boost #12/)).toBeInTheDocument();
     expect(screen.getByText(/not running/)).toBeInTheDocument();
+  });
+
+  it('shows each attribute in the unit the game does: seconds, not milliseconds; a resistance, not a resonance', async () => {
+    const rateOfFire: AffectedAttribute = {
+      attributeId: 51,
+      base: 12000,
+      value: 9760,
+      sources: [
+        {
+          kind: 'skill',
+          typeId: 3315,
+          operator: 'post_percent',
+          value: -10,
+          penalty: null,
+          applied: true,
+        },
+        {
+          kind: 'item',
+          typeId: 519,
+          operator: 'mod_add',
+          value: 500,
+          penalty: null,
+          applied: true,
+        },
+      ],
+    };
+    const resistance: AffectedAttribute = {
+      attributeId: 267,
+      base: 0.5,
+      value: 0.4,
+      sources: [
+        {
+          kind: 'item',
+          typeId: 519,
+          operator: 'pre_mul',
+          value: 0.8,
+          penalty: null,
+          applied: true,
+        },
+      ],
+    };
+    render(
+      <FittingAffectedByPanel
+        explain={async () => [rateOfFire, resistance]}
+        moduleIndex={0}
+        typeName={typeName}
+      />
+    );
+    expect(await screen.findByText('12 s → 9.76 s')).toBeInTheDocument();
+    expect(screen.queryByText(/12000/)).toBeNull();
+    // A percentage stays a percentage; an added amount is in the attribute's own unit.
+    expect(screen.getByText('-10%')).toBeInTheDocument();
+    expect(screen.getByText('+0.5')).toBeInTheDocument();
+    expect(screen.getByText('50 % → 60 %')).toBeInTheDocument();
+    expect(screen.getByText('×0.8')).toBeInTheDocument();
   });
 
   it('waits for the engine, and says when nothing changes the module', async () => {

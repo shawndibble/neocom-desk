@@ -1857,6 +1857,10 @@ async function main() {
         unit: unitID === null ? null : (unitDisplayNames.get(unitID) ?? null),
         category:
           !categoryName || categoryName === 'NULL' ? OTHER_ATTRIBUTE_CATEGORY : categoryName,
+        // The unit's id, not only its display string: "%" alone can't say
+        // whether 0.75 means 75% or 25% (a resonance) or 1.1 means +10%, and
+        // "s" is milliseconds. Fittings' Affected by converts by it.
+        ...(unitID === null ? {} : { unitId: unitID }),
       };
     }
   }
