@@ -12,12 +12,15 @@ import {
 import { webPushSupport } from '@/sync/deviceRegistration';
 import { enableWebPush } from './webPush';
 import { useOnboardingBannerSlot } from '@/app/onboardingBannerSlot';
+import { useHasLeftFirstScreen } from './firstScreen';
 
 /**
  * The one-time notification explainer (issue #171). Mounted in `Layout`, so it
  * only ever appears behind `RequireCharacter` — never over `/login` or the
  * `/callback` spinner, even though a character row exists by the time that
- * spinner is up.
+ * spinner is up. It also waits for the player to leave that first screen
+ * (issue #1788, `firstScreen.ts`) so it never competes with the very first
+ * thing a new player looks at.
  *
  * Shown once ever per device (Install Prompt precedent, CONTEXT.md round 20):
  * Enable makes the single real `Notification.requestPermission()` call, "Not
@@ -42,6 +45,7 @@ export function NotificationPermissionPrompt() {
   // non-installed iOS Safari tab, so `permission` alone would read
   // 'unsupported' and hide the explainer entirely without this.
   const installRequired = webPushSupport() === 'requires-install';
+  const hasLeftFirstScreen = useHasLeftFirstScreen();
 
   const visible = shouldShowPermissionExplainer({
     hydrated,
@@ -49,6 +53,7 @@ export function NotificationPermissionPrompt() {
     hasCharacter: (characterCount ?? 0) > 0,
     permission,
     installRequired,
+    hasLeftFirstScreen,
   });
   // Eligibility above is unchanged; this only decides whether the shared
   // bottom slot is this banner's to use right now (issue #1124).

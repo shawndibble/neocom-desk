@@ -680,6 +680,7 @@ function buildColumns(
       id: 'name',
       header: t('characters.column.name'),
       primary: true,
+      stickyStart: true,
       sortValue: (row) => row.character.name,
       render: (row) => (
         <span className="flex min-w-0 items-center gap-2">

@@ -8,6 +8,7 @@ import { SoldSplitButton } from './SaleLinkingControls';
 import type { SaleLinking } from './useSaleLinking';
 import { iskToneClass } from '@/features/character/format';
 import { formatIsk } from '@/lib/isk';
+import { formatDateOnly } from '@/lib/timestamp';
 
 type T = (key: string) => string;
 
@@ -32,14 +33,17 @@ type T = (key: string) => string;
  * the two tables to reorder columns it already shipped with.
  */
 
-export function loggedAtColumn<Row extends ProductionRunSummary>(t: T): DataTableColumn<Row> {
+export function loggedAtColumn<Row extends ProductionRunSummary>(
+  t: T,
+  timeZone?: string
+): DataTableColumn<Row> {
   return {
     id: 'loggedAt',
     header: t('industry.productionRunColumnLogged'),
     primary: true,
     className: 'whitespace-nowrap',
     sortValue: (r) => r.run.loggedAt,
-    render: (r) => new Date(r.run.loggedAt).toLocaleDateString(),
+    render: (r) => formatDateOnly(new Date(r.run.loggedAt), timeZone),
   };
 }
 

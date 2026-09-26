@@ -497,8 +497,8 @@
       "unknownItemCount": "{{name}} ×{{count}}",
       "unknownItemsMore_one": "…and {{count}} more",
       "unknownItemsMore_other": "…and {{count}} more",
-      "priceBuy": "Buy orders: {{value}} ISK",
-      "priceSell": "Sell orders: {{value}} ISK",
+      "priceBuy": "Jita buy: {{value}} ISK",
+      "priceSell": "Jita sell: {{value}} ISK",
       "priceUnpriced_one": "{{count}} item has no price at this hub",
       "priceUnpriced_other": "{{count}} items have no price at this hub",
       "priceLoading": "Pricing…",
@@ -3095,8 +3095,8 @@
       "addToCompare": "Add to Compare",
       "copyNames": "Copy names"
     },
-    "itemCount_one": "{{count}} item",
-    "itemCount_other": "{{count}} items",
+    "itemCount_one": "{{count, number}} item",
+    "itemCount_other": "{{count, number}} items",
     "levelHeading": {
       "itemsSuffix": ", {{items}}"
     },
@@ -5499,8 +5499,8 @@
       "columnItem": "Item",
       "columnQuantity": "Quantity",
       "columnLocation": "Location",
-      "itemCount_one": "{{count}} item",
-      "itemCount_other": "{{count}} items",
+      "itemCount_one": "{{count, number}} item",
+      "itemCount_other": "{{count, number}} items",
       "levelHeading": {
         "itemsSuffix": ", {{items}}"
       },
