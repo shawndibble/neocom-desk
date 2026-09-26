@@ -10,6 +10,10 @@ export type SpaceKind = 'highsec' | 'lowsec' | 'nullsec' | 'wormhole';
 
 export const SPACE_KINDS: readonly SpaceKind[] = ['highsec', 'lowsec', 'nullsec', 'wormhole'];
 
+export function isSpaceKind(raw: unknown): raw is SpaceKind {
+  return typeof raw === 'string' && (SPACE_KINDS as readonly string[]).includes(raw);
+}
+
 /** EVE names every wormhole system `J` followed by exactly six digits — the SDE's `security_status` for these systems is not a reliable signal on its own. */
 const WORMHOLE_SYSTEM_NAME = /^j\d{6}$/i;
 
