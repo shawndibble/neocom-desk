@@ -195,11 +195,11 @@ describe('FittingStartScreen', () => {
       await screen.findByRole('button', { name: 'More actions for Armor Drake' })
     );
     expect(await screen.findByRole('menuitem', { name: 'Copy EFT' })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: 'Rename…' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Rename' })).not.toBeInTheDocument();
     await userEvent.keyboard('{Escape}');
 
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Kite' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'Rename…' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Rename' }));
     expect(await screen.findByLabelText('Fitting name')).toHaveValue('Kite');
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
 

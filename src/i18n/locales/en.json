@@ -991,8 +991,8 @@
       "copyEft": "Copy EFT",
       "copyShareLink": "Copy Share Link",
       "saveToEve": "Save to EVE…",
-      "rename": "Rename…",
-      "delete": "Delete…",
+      "rename": "Rename",
+      "delete": "Delete",
       "unreadable": "This saved fitting can no longer be read.",
       "duplicated": "Saved a copy of {{name}} to My Fittings.",
       "savedToEve": "Saved to EVE."
@@ -3025,7 +3025,7 @@
     "reauthHint": "Log in again to fetch this character's assets.",
     "reauthAction": "Log in again with EVE Online",
     "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this character has more.",
-    "fetchTruncatedRetry": "Retry",
+    "fetchTruncatedRetry": "Try again",
     "unknownValue": "-",
     "security": {
       "ariaLabel": "Security status: {{value}}"
@@ -3813,7 +3813,7 @@
     "noFilterMatchesHint": "Clear the search or reset the status/type filters to see every contract.",
     "noFilterMatchesResetHint": "No contract matches the current search and filters.",
     "staleTooltip": "Outstanding and past its deadline — lapsed and unclaimed.",
-    "fetchTruncatedRetry": "Retry",
+    "fetchTruncatedRetry": "Try again",
     "reauthTitle": "Log in again to see your contracts",
     "reauthHint": "Log in again to fetch this character's contracts.",
     "reauthAction": "Log in again with EVE Online",
