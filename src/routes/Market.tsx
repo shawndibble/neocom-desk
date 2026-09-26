@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { usePageTab } from '@/lib/usePageTab';
@@ -26,6 +25,7 @@ import {
   Spinner,
   Tabs,
   TextInput,
+  Toast,
   TypeIcon,
   RowMoreActions,
 } from '@/components/ui';
@@ -1442,24 +1442,13 @@ export function Market() {
       )}
 
       {compareUndo && (
-        <div
-          role="status"
-          className="bg-panel border-line text-text fixed bottom-32 left-1/2 z-40 flex -translate-x-1/2 items-center gap-3 rounded-md border px-4 py-2 text-sm shadow-lg md:bottom-16"
-        >
-          <span>
-            {t('market.compareUndo.added', {
-              count: compareUndo.count,
-              name: compareUndo.itemName,
-            })}
-          </span>
-          <button
-            type="button"
-            className={inlineLinkClassName}
-            onClick={handleUndoCompareVariations}
-          >
-            {t('market.compareUndo.undo')}
-          </button>
-        </div>
+        <Toast
+          message={t('market.compareUndo.added', {
+            count: compareUndo.count,
+            name: compareUndo.itemName,
+          })}
+          undo={{ label: t('market.compareUndo.undo'), onUndo: handleUndoCompareVariations }}
+        />
       )}
 
       {infoModalItem && (
