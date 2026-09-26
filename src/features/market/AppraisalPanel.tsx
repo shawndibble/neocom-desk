@@ -26,13 +26,13 @@ import {
   Panel,
   Spinner,
   StatChip,
+  TextArea,
   TextInput,
   type DataTableColumn,
   type IskRevealGesture,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { Caret } from '@/components/ui/Disclosure';
-import { fieldBaseClassName } from '@/components/ui/controlStyles';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import {
@@ -403,14 +403,15 @@ export function AppraisalPanel({
           <label className="block text-xs text-text-dim" htmlFor="market-appraisal-text">
             {t('market.appraisal.pasteLabel')}
           </label>
-          <textarea
+          <TextArea
             id="market-appraisal-text"
             value={text}
             onChange={(event) => setText(event.target.value)}
             rows={14}
             spellCheck={false}
             placeholder={t('market.appraisal.pastePlaceholder')}
-            className={`${fieldBaseClassName} w-full p-2 font-mono text-[0.6875rem]`}
+            mono
+            className="text-[0.6875rem]"
           />
 
           <div className="flex items-center gap-2">

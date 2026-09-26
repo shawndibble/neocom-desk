@@ -14,8 +14,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, IconButton, Spinner, TextInput } from '@/components/ui';
-import { fieldBaseClassName } from '@/components/ui/controlStyles';
+import { Button, IconButton, Spinner, TextArea, TextInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { cx } from '@/lib/cx';
 import {
@@ -476,7 +475,7 @@ export function MailComposeBox({
         className="w-full"
       />
 
-      <textarea
+      <TextArea
         aria-label={t('mail.bodyLabel')}
         value={body}
         onChange={(e) => {
@@ -484,7 +483,7 @@ export function MailComposeBox({
           setBody(e.target.value);
         }}
         rows={8}
-        className={`${fieldBaseClassName} w-full p-2 text-sm`}
+        className="text-sm"
       />
 
       {error && (

@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Modal, Tabs, type TabItem } from '@/components/ui';
-import { fieldBaseClassName } from '@/components/ui/controlStyles';
+import { Button, Modal, Tabs, TextArea, type TabItem } from '@/components/ui';
 import type { PlanEntry, TrainedSkill } from '@/engine/types';
 import { readFromClipboard } from '@/lib/clipboard';
 import type { PlanXmlDocumentErrorCode } from './planXmlDocument';
@@ -147,7 +146,7 @@ export function ImportClipboardDialog({
             <label className="block text-xs text-text-dim" htmlFor="clipboard-import-text">
               {t('plans.importPaste')}
             </label>
-            <textarea
+            <TextArea
               id="clipboard-import-text"
               value={text}
               onChange={(e) => {
@@ -155,7 +154,7 @@ export function ImportClipboardDialog({
                 setPreview(null);
               }}
               rows={8}
-              className={`${fieldBaseClassName} w-full p-2 text-xs`}
+              className="text-xs"
             />
 
             <div className="flex flex-wrap items-center gap-2">

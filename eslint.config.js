@@ -53,6 +53,10 @@ export default tseslint.config(
             "JSXOpeningElement[name.name='input'] > JSXAttribute[name.name='type'][value.value='radio']",
           message: 'Use Radio from src/components/ui instead of a raw <input type="radio">.',
         },
+        {
+          selector: "JSXOpeningElement[name.name='textarea']",
+          message: 'Use TextArea from src/components/ui instead of a raw <textarea>.',
+        },
       ],
       'no-restricted-imports': [
         'error',
