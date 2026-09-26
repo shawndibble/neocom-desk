@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -160,7 +160,13 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 export type PlanPatch = Partial<
   Pick<
     SkillPlanRecord,
-    'entries' | 'markers' | 'markerAttributes' | 'whatIfImplants' | 'boosters' | 'milestones'
+    | 'name'
+    | 'entries'
+    | 'markers'
+    | 'markerAttributes'
+    | 'whatIfImplants'
+    | 'boosters'
+    | 'milestones'
   >
 >;
 
@@ -251,6 +257,13 @@ export function PlanEditor({
 }: PlanEditorProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  // "New plan" navigates here with this flag so the name field takes focus for a rename.
+  const location = useLocation();
+  const focusName = (location.state as { focusName?: boolean } | null)?.focusName === true;
+  // Spent once the field has focus, so a reload or Back doesn't re-steal it.
+  useEffect(() => {
+    if (focusName) navigate(location.pathname, { replace: true, state: null });
+  }, [focusName, location.pathname, navigate]);
   // Which side the tools pane lands on — the same hook the rest of the app's two-column
   // layouts switch on, so this pane can never disagree with them.
   const isDesktop = useIsDesktop();
@@ -1927,6 +1940,9 @@ export function PlanEditor({
           progress={headerProgress}
           nextStep={headerNextStep}
           trainedKnown={trainedSkillsKnown}
+          name={plan.name}
+          onRename={(name) => onUpdate({ name })}
+          focusName={focusName}
         />
 
         {implantsAssumed && <ImplantsAssumedNote hint={t('plans.assumesNoImplantsHint')} />}

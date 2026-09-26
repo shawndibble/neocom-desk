@@ -103,3 +103,20 @@ describe('PlanList copy to character (#1729)', () => {
     expect(onCopy).toHaveBeenCalledWith('2', 9);
   });
 });
+
+describe('PlanList active plan (#1709)', () => {
+  it('marks only the open plan with aria-current', () => {
+    render(
+      <PlanList
+        plans={[plan('1', 'Alpha'), plan('2', 'Beta')]}
+        activePlanId="2"
+        onOpen={noop}
+        onDuplicate={noop}
+        onDelete={noop}
+        onRename={noop}
+      />
+    );
+    expect(screen.getByRole('button', { name: /^beta/i })).toHaveAttribute('aria-current', 'true');
+    expect(screen.getByRole('button', { name: /^alpha/i })).not.toHaveAttribute('aria-current');
+  });
+});

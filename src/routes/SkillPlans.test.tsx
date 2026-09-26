@@ -1265,7 +1265,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
       ],
       remapCount,
     });
-  const header = () => screen.getByText('Plan summary').closest('section')!;
+  const header = () => screen.getByRole('textbox', { name: 'Plan name' }).closest('section')!;
 
   it('shows total training time, skill count, and projected finish, plus a live savings badge', async () => {
     await db.skillPlans.add(seedTwoSkillPlan());
@@ -1746,7 +1746,7 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
     const items = await within(panel).findAllByRole('listitem');
     expect(items).toHaveLength(1);
 
-    const summary = screen.getByText('Plan summary').closest('section')!;
+    const summary = screen.getByRole('textbox', { name: 'Plan name' }).closest('section')!;
     const planFinishDate = within(summary)
       .getByText('Projected finish')
       .parentElement!.textContent!.replace('Projected finish', '')
