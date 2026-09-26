@@ -39,6 +39,7 @@ import {
 import { IconButton } from './IconButton';
 import * as Icon from './icons';
 import { MenuKindContext, RowActionsContext, type RowActions } from './rowActionsContext';
+import { Tooltip } from './Tooltip';
 import { TooltipHoldContext } from './tooltipHold';
 
 export function MenuItem(props: ComponentProps<typeof ContextMenuItem>) {
@@ -100,19 +101,32 @@ export function MenuRadioItem(props: ComponentProps<typeof ContextMenuRadioItem>
 /**
  * Right-click menu around `trigger`, publishing the same items for
  * `RowMoreActions`. Touch-and-hold anywhere in the row opens it, so the
- * tooltips of the controls inside give that gesture up (`tooltipHold.ts`).
+ * tooltips of the controls inside give that gesture up (`tooltipHold.ts`) —
+ * all but one that asks to keep it (`holdToReveal`, as `IskAmount` does).
+ *
+ * With `tooltip`, the trigger itself explains itself on hover and focus too
+ * (a Fittings Ring tile); its touch-and-hold is the menu's alone, so what the
+ * tooltip says must be reachable in the menu or elsewhere.
  */
 export function RowActionsMenu({
   name,
   items,
   onOpenChange,
+  tooltip,
   children,
-}: RowActions & { children: ReactElement }) {
+}: RowActions & { tooltip?: string; children: ReactElement }) {
+  const trigger = <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>;
   return (
     <RowActionsContext.Provider value={{ name, items, onOpenChange }}>
       <TooltipHoldContext.Provider value={false}>
         <ContextMenu onOpenChange={onOpenChange}>
-          <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+          {tooltip === undefined ? (
+            trigger
+          ) : (
+            // Around the menu's own trigger (a Radix primitive that merges
+            // props), never inside it: a component there would drop them.
+            <Tooltip content={tooltip}>{trigger}</Tooltip>
+          )}
           <ContextMenuContent>{items}</ContextMenuContent>
         </ContextMenu>
       </TooltipHoldContext.Provider>

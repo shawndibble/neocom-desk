@@ -140,6 +140,41 @@ describe('Tooltip touch support', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
+  it('gives a row menu’s own tooltip trigger to the menu on touch-and-hold, and still explains it on focus', () => {
+    vi.useFakeTimers();
+    render(
+      <RowActionsMenu
+        name="Tile"
+        items={<MenuItem>Act</MenuItem>}
+        tooltip="Heavy Missile Launcher II"
+      >
+        <button type="button">Tile</button>
+      </RowActionsMenu>
+    );
+    const tile = screen.getByRole('button', { name: 'Tile' });
+    fireEvent.touchStart(tile);
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    fireEvent.contextMenu(tile);
+    expect(screen.getByRole('menuitem', { name: 'Act' })).toBeInTheDocument();
+  });
+
+  it('shows a row menu trigger’s own tooltip on focus', () => {
+    render(
+      <RowActionsMenu
+        name="Tile"
+        items={<MenuItem>Act</MenuItem>}
+        tooltip="Heavy Missile Launcher II"
+      >
+        <button type="button">Tile</button>
+      </RowActionsMenu>
+    );
+    fireEvent.focus(screen.getByRole('button', { name: 'Tile' }));
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Heavy Missile Launcher II');
+  });
+
   it('does not reveal the tooltip on a quick tap, and does not block the trigger tap action', () => {
     vi.useFakeTimers();
     const onClick = vi.fn();

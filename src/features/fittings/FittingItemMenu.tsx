@@ -14,9 +14,6 @@
 import { useMemo, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuTrigger,
   MenuItem,
   MenuRadioGroup,
   MenuRadioItem,
@@ -24,9 +21,7 @@ import {
   MenuSub,
   MenuSubContent,
   MenuSubTrigger,
-  RowActionsContext,
   RowActionsMenu,
-  Tooltip,
 } from '@/components/ui';
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import { reachableModuleStates } from '@/engine/fittings/fittingEdit';
@@ -39,40 +34,27 @@ import { useFittingItemActions, type FittingItemActions } from './fittingItemAct
  * `items`, and a `RowMoreActions` anywhere under it draws the ⋮ button.
  *
  * With `tooltip`, the trigger explains itself on hover and focus too (a Ring
- * tile). Touch-and-hold then belongs to the menu alone — Radix opens a
- * context menu on a long-press, and the tooltip's own would open with it —
- * so the menu is touch's way to what the tile holds.
+ * tile). Touch-and-hold then belongs to the menu alone, so the menu is
+ * touch's way to what the tile holds (`RowActionsMenu`'s own `tooltip`).
  */
 export function FittingItemMenu({
   name,
   items,
   tooltip,
+  onOpenChange,
   children,
 }: {
   /** What the item is, for the ⋮ button's name ("More actions for …"). */
   name: string;
   items: ReactNode;
   tooltip?: string;
+  onOpenChange?: (open: boolean) => void;
   children: ReactElement;
 }) {
-  if (tooltip === undefined) {
-    return (
-      <RowActionsMenu name={name} items={items}>
-        {children}
-      </RowActionsMenu>
-    );
-  }
-  // The tooltip's trigger has to be the menu's own (a Radix primitive that
-  // merges props), not a component that would drop them.
   return (
-    <RowActionsContext.Provider value={{ name, items }}>
-      <ContextMenu>
-        <Tooltip content={tooltip} holdToReveal={false}>
-          <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-        </Tooltip>
-        <ContextMenuContent>{items}</ContextMenuContent>
-      </ContextMenu>
-    </RowActionsContext.Provider>
+    <RowActionsMenu name={name} items={items} tooltip={tooltip} onOpenChange={onOpenChange}>
+      {children}
+    </RowActionsMenu>
   );
 }
 
