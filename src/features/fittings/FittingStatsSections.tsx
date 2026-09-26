@@ -29,6 +29,7 @@ import {
 } from './statsSectionsPreference';
 import { CapacitorFacts, TankFacts } from './FittingTankStats';
 import { SupportFacts } from './FittingSupportStats';
+import { MiningFacts } from './FittingMiningStats';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
 
@@ -160,6 +161,7 @@ type Section =
   | 'defense'
   | 'capacitor'
   | 'support'
+  | 'mining'
   | 'targeting'
   | 'navigation'
   | 'drones'
@@ -174,6 +176,7 @@ const OPEN_BY_DEFAULT: ReadonlySet<Section> = new Set([
   'capacitor',
   // Only there at all when the fit has something to show in it.
   'support',
+  'mining',
   'navigation',
   'drones',
 ]);
@@ -599,6 +602,16 @@ export function FittingStatsSections({
           'support',
           supportMeta(stats),
           <SupportFacts support={stats.support} typeName={typeName} />
+        )}
+
+      {stats &&
+        stats.mining.rows.length > 0 &&
+        section(
+          'mining',
+          t('fittings.stats.unit.cubicMetresPerSecond', {
+            value: stats.mining.perSecond.toFixed(1),
+          }),
+          <MiningFacts stats={stats} typeName={typeName} />
         )}
 
       {section(

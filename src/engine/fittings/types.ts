@@ -8,6 +8,7 @@
 import type { AppliedDpsInputs } from './appliedDps';
 import type { CapacitorBudget } from './tank';
 import type { SupportStats } from './support';
+import type { MiningStats } from './mining';
 
 export type FittingSlotKind = 'high' | 'medium' | 'low' | 'rig' | 'subsystem';
 
@@ -218,6 +219,8 @@ export interface FittingStats {
   tank: TankStats;
   /** What the running modules do to another ship (`support.ts`). */
   support: SupportStats;
+  /** Yield of the running miners and launched mining drones (`mining.ts`). */
+  mining: MiningStats;
   sensor: SensorStats;
   holds: HoldStats;
   /** Null on a hull without a jump drive. */

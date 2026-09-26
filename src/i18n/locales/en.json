@@ -455,7 +455,8 @@
         "drones": "Drones",
         "fitting": "Fitting",
         "price": "Price",
-        "support": "Support out"
+        "support": "Support out",
+        "mining": "Mining"
       },
       "capacitorStable": "Stable at {{pct}}%",
       "capacitorDepletes": "Depletes in {{seconds}}s",
@@ -547,7 +548,9 @@
         "hpPerSecond": "{{value}} HP/s",
         "lightYears": "{{value}} ly",
         "sensor": "{{value}} {{type}}",
-        "fuelPerLightYear": "{{value}} {{fuel}}/ly"
+        "fuelPerLightYear": "{{value}} {{fuel}}/ly",
+        "cubicMetresPerSecond": "{{value}} m³/s",
+        "cubicMetresPerHour": "{{value}} m³/h"
       },
       "tank": {
         "passiveShield": "Passive shield regen: {{value}} HP/s",
@@ -612,6 +615,17 @@
           "sensorDampener": "−{{value}}% lock range",
           "guidanceDisruptor": "−{{value}}% explosion velocity"
         }
+      },
+      "mining": {
+        "perCycle": "{{value}} m³ / {{seconds}} s",
+        "crystal": "Crystal: {{name}}",
+        "total": "Total",
+        "perHour": "Per hour",
+        "residue": "Residue",
+        "residueValue": "−{{pct}}% expected ({{value}} m³/s)",
+        "fillsIn": "{{hold}} full in",
+        "note": "Yield includes expected critical successes; a crystal's bonus counts only on its own ore.",
+        "fillTime": "{{time}} ({{capacity}} m³)"
       }
     },
     "variations": {

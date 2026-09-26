@@ -250,6 +250,7 @@ export function extractFittingStats(
   | 'capacitorBudget'
   | 'tank'
   | 'support'
+  | 'mining'
   | 'lockedTargets'
   | 'allOverheated'
 > {

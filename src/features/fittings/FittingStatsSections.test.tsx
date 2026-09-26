@@ -672,3 +672,40 @@ describe('FittingStatsSections — Support out', () => {
     expect(screen.queryByRole('heading', { name: 'Support out' })).toBeNull();
   });
 });
+
+describe('FittingStatsSections — Mining', () => {
+  it('shows each miner with its crystal, the total, the residue and when the ore hold fills', () => {
+    renderSections(
+      stats({
+        holds: { cargo: 350, fleetHangar: 0, miningHold: 11500 },
+        mining: {
+          rows: [
+            {
+              typeId: 17912,
+              chargeTypeId: 60281,
+              isDrone: false,
+              count: 2,
+              perCycle: 1122,
+              cycleSeconds: 32.5,
+              perSecond: 34.5,
+              wastePerSecond: 12.7,
+            },
+          ],
+          perSecond: 34.5,
+          perHour: 124200,
+          wastePerSecond: 12.7,
+          wastePct: 36.8,
+        },
+      })
+    );
+    const mining = within(sectionBody('Mining'));
+    expect(mining.getByText('2× #17912')).toBeInTheDocument();
+    expect(mining.getByText('Crystal: #60281')).toBeInTheDocument();
+    expect(mining.getByText('1122 m³ / 32.5 s')).toBeInTheDocument();
+    expect(mining.getAllByText('34.5 m³/s').length).toBeGreaterThan(0);
+    expect(mining.getByText('124.2K m³/h')).toBeInTheDocument();
+    expect(mining.getByText('−36.8% expected (12.7 m³/s)')).toBeInTheDocument();
+    expect(mining.getByText('Mining hold full in')).toBeInTheDocument();
+    expect(mining.getByText('5m (11500 m³)')).toBeInTheDocument();
+  });
+});

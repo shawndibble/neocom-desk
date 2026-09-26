@@ -15,6 +15,7 @@ import {
 } from '@/engine/fittings/stats';
 import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import { extractSupport } from '@/engine/fittings/support';
+import { extractMining, miningYield } from '@/engine/fittings/mining';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
 import type { Fitting } from '@/engine/fittings/types';
 
@@ -76,6 +77,9 @@ const MEDIUM_REMOTE_CAPACITOR_TRANSMITTER_II = 12221;
 const STASIS_WEBIFIER_II = 527;
 const WARP_SCRAMBLER_II = 448;
 const MULTISPECTRUM_ECM_II = 2567;
+const MODULATED_STRIP_MINER_II = 17912;
+const SIMPLE_ASTEROID_MINING_CRYSTAL_TYPE_A_II = 60281;
+const MINING_DRONE_II = 10250;
 
 const PARTIAL_SKILLS = new Map([
   [3332, 3], // Gallente Cruiser
@@ -547,6 +551,48 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     expect(support.rows.find((row) => row.kind === 'ecm')?.amount).toBeGreaterThan(0);
   });
 
+  it('mines more with a crystal loaded, and counts launched mining drones', () => {
+    const hulk = (modules: Fitting['modules'], drones: Fitting['drones'] = []): Fitting => ({
+      name: 'Hulk',
+      shipTypeId: HULK,
+      modules,
+      drones,
+      cargo: [],
+    });
+    const strip = (slotIndex: number, chargeTypeId?: number) => ({
+      slot: 'high' as const,
+      slotIndex,
+      typeId: MODULATED_STRIP_MINER_II,
+      state: 'active' as const,
+      ...(chargeTypeId === undefined ? {} : { chargeTypeId }),
+    });
+    const mine = (fitting: Fitting) => {
+      const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(MINING_SKILL_IDS));
+      const calculation = calculate(dogmaFit);
+      return miningYield(extractMining(dogmaFit.items, calculation.items));
+    };
+
+    const bare = mine(hulk([strip(0)]));
+    const crystal = mine(hulk([strip(0, SIMPLE_ASTEROID_MINING_CRYSTAL_TYPE_A_II)]));
+    expect(bare.rows).toHaveLength(1);
+    expect(bare.perSecond).toBeGreaterThan(0);
+    // The crystal raises the yield and the residue chance alike.
+    expect(crystal.perSecond).toBeGreaterThan(bare.perSecond);
+    expect(crystal.wastePct).toBeGreaterThan(bare.wastePct);
+    expect(crystal.rows[0].chargeTypeId).toBe(SIMPLE_ASTEROID_MINING_CRYSTAL_TYPE_A_II);
+
+    const withDrones = mine(
+      hulk([strip(0)], [{ typeId: MINING_DRONE_II, quantity: 5, state: 'active' }])
+    );
+    const drones = withDrones.rows.find((row) => row.isDrone);
+    expect(drones?.count).toBe(5);
+    expect(withDrones.perSecond).toBeCloseTo(bare.perSecond + drones!.perSecond, 9);
+    // Left in the bay, they mine nothing.
+    expect(
+      mine(hulk([strip(0)], [{ typeId: MINING_DRONE_II, quantity: 5, state: 'online' }])).perSecond
+    ).toBeCloseTo(bare.perSecond, 9);
+  });
+
   it('runs an ancillary armor repairer at three times its dry rate on paste, and an ancillary shield booster on charges draws no capacitor', () => {
     const run = (module: Fitting['modules'][number]) => {
       const dogmaFit = fittingToDogmaFit(
@@ -731,3 +777,6 @@ const ALL_TEST_SKILL_IDS = [...PARTIAL_SKILLS.keys()];
 
 /** Every skill from 3300 to 3499 — the core ship, weapon, engineering and electronics skills — for the support and tank fits. */
 const SUPPORT_SKILL_IDS = Array.from({ length: 200 }, (_, i) => 3300 + i);
+
+/** The core skills plus the mining ones outside 3300-3499 (Mining Barge, Exhumers). */
+const MINING_SKILL_IDS = [...SUPPORT_SKILL_IDS, 17940, 22551];

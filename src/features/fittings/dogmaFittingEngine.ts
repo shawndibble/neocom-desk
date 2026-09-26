@@ -21,6 +21,7 @@ import {
 } from '@/engine/fittings/stats';
 import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import { extractSupport } from '@/engine/fittings/support';
+import { extractMining, miningYield } from '@/engine/fittings/mining';
 import {
   ITEM_DOGMA_ATTRIBUTE,
   type Fitting,
@@ -300,6 +301,7 @@ export async function computeFittingStats(
     capacitorBudget: extractCapacitorBudget(dogmaFit.items, shown.items, shown.ship.attributes),
     tank: extractTank(dogmaFit.items, shown.items, shown.ship.attributes, baseStats),
     support: extractSupport(dogmaFit.items, shown.items),
+    mining: miningYield(extractMining(dogmaFit.items, shown.items)),
     lockedTargets,
     allOverheated,
   };

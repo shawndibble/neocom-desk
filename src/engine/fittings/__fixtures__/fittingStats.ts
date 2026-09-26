@@ -10,6 +10,7 @@ export function neutralExtendedStats(): Pick<
   | 'capacitorBudget'
   | 'tank'
   | 'support'
+  | 'mining'
   | 'sensor'
   | 'holds'
   | 'jumpDrive'
@@ -17,6 +18,7 @@ export function neutralExtendedStats(): Pick<
   | 'allOverheated'
 > {
   return {
+    mining: { rows: [], perSecond: 0, perHour: 0, wastePerSecond: 0, wastePct: 0 },
     support: {
       rows: [],
       remoteRepair: { shield: 0, armor: 0, hull: 0 },
