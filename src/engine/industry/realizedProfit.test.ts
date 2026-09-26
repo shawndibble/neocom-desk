@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { realizedProfit } from '@/engine/industry/realizedProfit';
+import { realizedProfit, soldUnitsMargin } from '@/engine/industry/realizedProfit';
 
 describe('realizedProfit', () => {
   it('computes net revenue and profit for a fully-confirmed sale', () => {
@@ -64,5 +64,36 @@ describe('realizedProfit', () => {
     });
 
     expect(r.profit).toBeLessThan(0);
+  });
+});
+
+describe('soldUnitsMargin', () => {
+  it('reads a partial sale above unit cost as a positive margin, with the rest as unsold cost', () => {
+    // 10 units cost 1,000,000 (100k each); 4 sold for 600,000 net.
+    const m = soldUnitsMargin({
+      totalCost: 1_000_000,
+      quantity: 10,
+      quantitySold: 4,
+      netRevenue: 600_000,
+    });
+    expect(m.soldCost).toBe(400_000);
+    expect(m.margin).toBe(200_000);
+    expect(m.unsoldCost).toBe(600_000);
+  });
+
+  it('caps sold units at the units produced', () => {
+    const m = soldUnitsMargin({
+      totalCost: 1_000_000,
+      quantity: 10,
+      quantitySold: 12,
+      netRevenue: 1_500_000,
+    });
+    expect(m.soldCost).toBe(1_000_000);
+    expect(m.unsoldCost).toBe(0);
+  });
+
+  it('is null-safe for a run of zero units', () => {
+    const m = soldUnitsMargin({ totalCost: 0, quantity: 0, quantitySold: 0, netRevenue: 0 });
+    expect(m).toEqual({ soldCost: 0, margin: 0, unsoldCost: 0 });
   });
 });

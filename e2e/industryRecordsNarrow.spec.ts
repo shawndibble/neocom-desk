@@ -156,3 +156,18 @@ test.describe('Sold action buttons — stacked phone card', () => {
     expect(Math.abs(wrapperLeft - siblingTextLeft)).toBeLessThanOrEqual(2);
   });
 });
+
+test.describe('By item card — margin on units sold (issue #1785)', () => {
+  test('phone card shows Margin on units sold and Unsold cost rows', async ({ page }) => {
+    await signInAndGoto(page);
+    await seedFixtures(page);
+    await page.setViewportSize(PHONE);
+    await page.goto('./industry/records');
+
+    const row = page
+      .locator('tbody tr', { has: page.locator('td[data-label="Unsold cost"]') })
+      .first();
+    await expect(row.locator('td[data-label="Margin on units sold"]')).toBeVisible();
+    await expect(row.locator('td[data-label="Unsold cost"]')).toContainText('550,000');
+  });
+});
