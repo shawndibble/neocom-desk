@@ -52,7 +52,11 @@ export function ShipInfoWindow({
       <ShipInfoHeader ship={ship} source={source} />
       <Tabs
         label={t('ships.info.tabsLabel')}
-        tabs={TABS.map((id) => ({ id, label: t(`ships.info.tabs.${id}`) }))}
+        // A phone's sheet can't fit all four full labels; the tabpanel keeps the full name.
+        tabs={TABS.map((id) => ({
+          id,
+          label: t(isPhone ? `ships.info.tabsShort.${id}` : `ships.info.tabs.${id}`),
+        }))}
         value={tab}
         onChange={(id) => setTab(id as InfoTab)}
       />

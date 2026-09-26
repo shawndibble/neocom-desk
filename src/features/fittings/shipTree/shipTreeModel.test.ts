@@ -105,6 +105,8 @@ describe('techMark', () => {
     expect(techMark(ship({ techLevel: 3 }))).toBe('t3');
     expect(techMark(ship({ metaLevel: 6 }))).toBe('faction');
     expect(techMark(ship({ treeGroupID: 9 }))).toBe('faction');
+    // Guristas Mamba: meta 0 in the SDE, yet the game marks it like every pirate hull.
+    expect(techMark(ship({ factionID: 500010, metaLevel: 0 }))).toBe('faction');
     expect(techMark(ship({}))).toBeNull();
   });
 });

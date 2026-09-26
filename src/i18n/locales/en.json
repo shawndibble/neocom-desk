@@ -113,6 +113,12 @@
         "skills": "Skills & Mastery",
         "blueprint": "Blueprint"
       },
+      "tabsShort": {
+        "description": "Info",
+        "fitting": "Fitting",
+        "skills": "Skills",
+        "blueprint": "Blueprint"
+      },
       "subtitle": "{{faction}} · {{class}} · {{tech}}",
       "tech": "Tech {{level}}",
       "mastery": "Mastery {{level}}",

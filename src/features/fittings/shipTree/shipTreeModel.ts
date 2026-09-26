@@ -97,11 +97,25 @@ function isNested(def: ShipTreeNodeDef): boolean {
 
 export type TechMark = 't2' | 't3' | 'faction';
 
+/**
+ * Pirate factions: the game marks every hull of theirs ◇, including the
+ * Guristas Mamba, which the SDE gives meta level 0.
+ */
+const PIRATE_FACTION_IDS: ReadonlySet<number> = new Set([
+  500010, 500011, 500012, 500016, 500018, 500019, 500020,
+]);
+
 /** A tile's corner, always shown, as in game: II, III, or ◇ for Navy and faction hulls. */
 export function techMark(ship: ShipTreeShip): TechMark | null {
   if (ship.techLevel >= 3) return 't3';
   if (ship.techLevel === 2) return 't2';
-  if (ship.metaLevel >= 6 || STACKED_CLASSES.has(ship.treeGroupID)) return 'faction';
+  if (
+    ship.metaLevel >= 6 ||
+    STACKED_CLASSES.has(ship.treeGroupID) ||
+    PIRATE_FACTION_IDS.has(ship.factionID)
+  ) {
+    return 'faction';
+  }
   return null;
 }
 
