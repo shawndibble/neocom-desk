@@ -86,7 +86,7 @@ describe('Login', () => {
     );
     expect(screen.queryByRole('heading', { name: /answers, not api dumps/i })).toBeNull();
     expect(screen.getByRole('heading', { name: 'Neocom Desk' })).toBeInTheDocument();
-    expect(screen.queryByText(/signing in lets it read/i)).toBeNull();
+    expect(screen.queryByText(/logging in lets it read/i)).toBeNull();
     expect(
       screen.getByRole('button', { name: /log in with custom permissions/i })
     ).toBeInTheDocument();
@@ -270,7 +270,7 @@ describe('Login', () => {
       screen.getByRole('heading', { name: /your refresh token stays in this browser/i })
     ).toBeInTheDocument();
 
-    const permissions = screen.getByText(/signing in lets it read/i);
+    const permissions = screen.getByText(/logging in lets it read/i);
     for (const phrase of new Set(Object.values(READ_ONLY_PHRASES))) {
       expect(permissions).toHaveTextContent(phrase);
     }
@@ -288,7 +288,7 @@ describe('Login', () => {
     renderLogin();
     await screen.findByRole('heading', { name: /it writes only when you act/i });
 
-    const permissions = screen.getByText(/signing in lets it read/i);
+    const permissions = screen.getByText(/logging in lets it read/i);
     for (const phrase of Object.values(WRITE_SCOPE_PHRASES)) {
       expect(permissions).not.toHaveTextContent(phrase);
       expect(screen.getByText(new RegExp(phrase, 'i'))).toBeInTheDocument();
