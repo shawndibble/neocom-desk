@@ -237,7 +237,7 @@ export function FittingStartScreen({
                               event.preventDefault();
                               open(row);
                             }}
-                            className={`flex min-h-11 w-full items-center gap-2 border-l-2 px-3 text-left text-sm hover:bg-panel-2 md:min-h-9 ${isSelected ? 'border-accent bg-panel-2 text-accent' : 'border-transparent'}`}
+                            className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 border-l-2 px-3 text-left text-sm hover:bg-panel-2 md:min-h-9 ${isSelected ? 'border-accent bg-panel-2 text-accent' : 'border-transparent'}`}
                           >
                             <span className="min-w-0 flex-1 truncate">{row.name}</span>
                             <span className="shrink-0 border border-line-bright px-1.5 text-[0.625rem] tracking-widest text-text-dim uppercase">
@@ -246,7 +246,7 @@ export function FittingStartScreen({
                                 : t('fittings.start.sourceInGame')}
                             </span>
                           </button>
-                          <RowMoreActions />
+                          <RowMoreActions className="shrink-0" />
                         </li>
                       </RowActionsMenu>
                     );
