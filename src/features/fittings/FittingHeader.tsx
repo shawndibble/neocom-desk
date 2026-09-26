@@ -131,6 +131,7 @@ export function FittingHeader({
             {fitting.name}
           </h1>
           <IconButton
+            variant="plain"
             size="row"
             icon={<Rename />}
             label={t('fittings.header.rename')}
