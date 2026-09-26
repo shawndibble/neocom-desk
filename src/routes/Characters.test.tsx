@@ -324,6 +324,14 @@ describe('Characters', () => {
     expect(await screen.findByText('overview page')).toBeInTheDocument();
   });
 
+  it('shows a visible "Add" label on the Add button from sm up, hidden below sm (#1784)', async () => {
+    renderCharacters();
+    const addButton = await screen.findByRole('button', { name: 'Add character' });
+    const label = within(addButton).getByText('Add');
+    expect(label.tagName).toBe('SPAN');
+    expect(label).toHaveClass('hidden', 'sm:inline');
+  });
+
   it('add character starts an ADD-A-CHARACTER login, not a re-auth', async () => {
     // Not `beginEveLogin`: that unions with the active Character's grant, and
     // the character arriving here is by definition somebody else (#295).

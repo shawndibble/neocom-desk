@@ -1309,16 +1309,27 @@ export function BpcSourcingPanel() {
           // A BPO row is the BPO itself; only a copy gets the "BPO too" badge,
           // and only one copy per type (`bpoBadgeRows`).
           const bpo = badgedRows.has(row) ? bpoByType.get(row.typeId) : undefined;
-          if (!bpo) return name;
+          // An owned copy has no price column to mark it apart from a for-sale
+          // one, so the Item cell carries the tag instead — independent of
+          // which columns are visible.
+          const owned = row.source === 'owned';
+          if (!bpo && !owned) return name;
           return (
             <span className="flex min-w-0 flex-col items-start gap-1">
               <span>{name}</span>
-              <BpoBadge
-                bpo={bpo}
-                mayBeCheaper={row.source === 'contract' && bpoMayBeCheaper(bpo, row.contract)}
-                locationName={bpoLocationName(bpo)}
-                regionName={regionLabel(bpo.regionId)}
-              />
+              {owned && (
+                <span className="inline-flex w-fit items-center rounded-xs border border-line bg-panel-2 px-1.5 py-0.5 text-[0.6875rem] font-normal text-text-dim">
+                  {t('bpcContracts.sourceOwned')}
+                </span>
+              )}
+              {bpo && (
+                <BpoBadge
+                  bpo={bpo}
+                  mayBeCheaper={row.source === 'contract' && bpoMayBeCheaper(bpo, row.contract)}
+                  locationName={bpoLocationName(bpo)}
+                  regionName={regionLabel(bpo.regionId)}
+                />
+              )}
             </span>
           );
         },
@@ -1520,6 +1531,12 @@ export function BpcSourcingPanel() {
                   <StatChip
                     label={t('bpcContracts.cheapestLabel')}
                     value={<IskAmount value={summary.cheapest} revealOn="tap" />}
+                  />
+                )}
+                {summary.cheapestPerRun !== null && (
+                  <StatChip
+                    label={t('bpcContracts.cheapestPerRunLabel')}
+                    value={<IskAmount value={summary.cheapestPerRun} revealOn="tap" />}
                   />
                 )}
                 {summary.median !== null && (
