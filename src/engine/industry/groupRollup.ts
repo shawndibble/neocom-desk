@@ -41,6 +41,26 @@
  * saving ever reaches `materialCost`/`totalCost`, though: a built row's
  * netting is display-only (see `applyOwnedLedger` and `materialCost` below).
  *
+ * ## The ledger has no opinion about a blueprint (issue #1776)
+ *
+ * A member's synthetic Blueprint Acquisition row (issue #838 — see
+ * `acquisitionMaterialFor`) already carries its own true owned/remaining
+ * split, resolved against the character's actual blueprint copies, not
+ * against material stock. The Group Owned Overlay ledger is a *material*
+ * ledger — a pilot adds Tritanium counts to it, never "3 Rifter BPCs" — so a
+ * blueprint's typeID is never a key a pilot would put in it. Netting such a
+ * row against the ledger anyway defaults its ledger quantity to 0 (no entry)
+ * and overwrites the already-correct "owned" verdict with "still to buy 1",
+ * which is exactly the false positive this issue reports. `nettedAgainstLedger`
+ * skips any row whose typeID any member's own `acquisitionTier`-marked row
+ * names (see `acquisitionTypeIds`) instead of asking the ledger for an
+ * opinion it was never meant to have — read from each member's own
+ * pre-merge `tableMaterials`, not the merged result, because `mergeCostLines`
+ * drops the marker the moment two members need the same blueprint typeID
+ * (same rule `features/industry/subBuildPlan.ts`'s own per-plan merge
+ * already accepts), which would otherwise silently exclude that exact case
+ * from the fix.
+ *
  * ## What it deliberately does not do
  *
  * It does not resolve a mixture of trade hubs — reported instead, see
@@ -185,12 +205,39 @@ function applyOwnedLedger(line: MaterialCostLine, ledgerQuantity: number): Mater
   };
 }
 
+/**
+ * typeIDs of every Blueprint Acquisition row (issue #838), read from each
+ * member's own `tableMaterials` *before* the group merge — never from the
+ * merged result, since `mergeCostLines` drops the `acquisitionTier` marker
+ * the instant two members collide on the same blueprint typeID, which would
+ * silently un-skip exactly the case a group of two identical plans hits.
+ * `shoppingMaterials` has already lost the marker by the time it reaches this
+ * module regardless (`shoppingListMaterials`'s `costLine` strips it), but the
+ * same blueprint typeID appears in both member lists, so this set — built
+ * from `tableMaterials` alone — covers netting either merged list. Keyed by
+ * bare typeID, safe only because a blueprint typeID and a manufacturing
+ * input's typeID are disjoint namespaces in the SDE (a blueprint is never a
+ * material) — no ordinary material can collide with an entry here.
+ */
+function acquisitionTypeIds(members: readonly BuildGroupMember[]): ReadonlySet<number> {
+  const ids = new Set<number>();
+  for (const member of members) {
+    for (const m of member.tableMaterials) {
+      if (m.acquisitionTier !== undefined) ids.add(m.typeID);
+    }
+  }
+  return ids;
+}
+
 function nettedAgainstLedger(
   materials: readonly MaterialCostLine[],
-  ownedStock: ReadonlyMap<number, number> | undefined
+  ownedStock: ReadonlyMap<number, number> | undefined,
+  skipTypeIds: ReadonlySet<number>
 ): MaterialCostLine[] {
   if (!ownedStock) return [...materials];
-  return materials.map((m) => applyOwnedLedger(m, ownedStock.get(m.typeID) ?? 0));
+  return materials.map((m) =>
+    skipTypeIds.has(m.typeID) ? m : applyOwnedLedger(m, ownedStock.get(m.typeID) ?? 0)
+  );
 }
 
 /** Sum one figure across every member — null the moment any member's is null, a partial sum presented as a whole being worse than none. */
@@ -245,11 +292,10 @@ export function rollUpBuildGroup(
   { ownedStock }: RollUpBuildGroupOptions = {}
 ): BuildGroupRollup {
   const rawShoppingMaterials = mergeMaterials(members, (m) => m.shoppingMaterials);
-  const tableMaterials = nettedAgainstLedger(
-    mergeMaterials(members, (m) => m.tableMaterials),
-    ownedStock
-  );
-  const shoppingMaterials = nettedAgainstLedger(rawShoppingMaterials, ownedStock);
+  const rawTableMaterials = mergeMaterials(members, (m) => m.tableMaterials);
+  const acquisitionIds = acquisitionTypeIds(members);
+  const tableMaterials = nettedAgainstLedger(rawTableMaterials, ownedStock, acquisitionIds);
+  const shoppingMaterials = nettedAgainstLedger(rawShoppingMaterials, ownedStock, acquisitionIds);
 
   const shoppingByHub = shoppingListsByHub(members);
   const hubIds = shoppingByHub.map((block) => block.hubId);
