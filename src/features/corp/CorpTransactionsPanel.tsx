@@ -20,6 +20,7 @@
 import { useMemo, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Button,
   ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
@@ -44,6 +45,7 @@ import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
 import {
   activeWalletTransactionFilterCount,
+  EMPTY_WALLET_TRANSACTION_FILTER,
   type TransactionSide,
   type WalletTransactionFilter,
 } from '@/features/character/walletTransactionFilter';
@@ -355,6 +357,13 @@ export function CorpTransactionsPanel({
               title={t('wallet.transactionsNoFilterMatches')}
               hint={t('wallet.transactionsNoFilterMatchesHint')}
               className="py-8"
+              action={
+                activeWalletTransactionFilterCount(filter) > 0 || filter.text.trim() !== '' ? (
+                  <Button size="sm" onClick={() => onFilterChange(EMPTY_WALLET_TRANSACTION_FILTER)}>
+                    {t('common.resetFilters')}
+                  </Button>
+                ) : undefined
+              }
             />
           ) : (
             <DataTable

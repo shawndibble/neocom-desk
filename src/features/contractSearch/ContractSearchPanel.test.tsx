@@ -554,6 +554,27 @@ describe('ContractSearchPanel', () => {
     await user.type(screen.getByPlaceholderText('Search item name…'), 'zzzz');
 
     expect(await screen.findByText('No public contracts match your filters.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+    await waitFor(async () => expect(await bodyRows()).not.toHaveLength(0));
+    expect(screen.getByPlaceholderText('Search item name…')).toHaveValue('');
+  });
+
+  it('resets a non-search filter (max price) that empties the list', async () => {
+    const user = userEvent.setup();
+    renderWithRouter();
+    await bodyRows();
+
+    await user.click(screen.getByRole('button', { name: /filters/i }));
+    await user.type(screen.getByRole('spinbutton', { name: 'Max price' }), '1');
+
+    expect(await screen.findByText('No public contracts match your filters.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+    await waitFor(async () => expect(await bodyRows()).toHaveLength(3));
+    expect(screen.getByRole('spinbutton', { name: 'Max price' })).toHaveValue(null);
   });
 
   it('shows the not-configured state when the app has no sync backend', async () => {
@@ -1067,6 +1088,11 @@ describe('ContractSearchPanel — Courier mode', () => {
     await user.type(search, 'rens');
 
     expect(await screen.findByText('No courier contracts match your filters.')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+    await waitFor(async () => expect(await bodyRows()).not.toHaveLength(0));
+    expect(screen.getByPlaceholderText('Search pickup or drop-off…')).toHaveValue('');
   });
 
   it('reports an empty courier snapshot on its own terms, not as an empty offers one', async () => {
@@ -1346,6 +1372,11 @@ describe('ContractSearchPanel — Courier endpoint space', () => {
 
     expect(await screen.findByText(/match your filters/i)).toBeInTheDocument();
     expect(screen.queryByText(/cannot place/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+    await waitFor(async () => expect(await bodyRows()).toHaveLength(2));
+    expect(screen.getByLabelText('Min reward')).toHaveValue('');
   });
 });
 
