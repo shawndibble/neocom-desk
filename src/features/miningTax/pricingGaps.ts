@@ -7,6 +7,7 @@
  * all) and those valued at today's sell for want of a buy side — read at the
  * row's own Payee's hub and mined date, the same lookup that priced the row.
  */
+import type { MiningTaxAssignmentRecord } from '@/db';
 import type { DisplayRow } from './groupRows';
 
 export interface PricingGap {
@@ -18,8 +19,8 @@ export interface PricingGap {
 }
 
 export interface PricingGapLookups {
-  /** The hub a row bills at — its Payee's, or undefined (Jita) for an unassigned or dismissed row. */
-  hubIdOf: (row: DisplayRow) => string | undefined;
+  /** The hub an Assignment bills at — its Payee's, or undefined (Jita) for no Assignment or a dismissal. */
+  hubIdOf: (assignment: MiningTaxAssignmentRecord | null) => string | undefined;
   pricesAt: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   sellFallbackAt: (hubId: string | undefined, date: string) => ReadonlySet<number>;
 }
@@ -32,14 +33,27 @@ export function findPricingGaps(
   for (const row of rows) {
     // A dismissal owes no tax, so a missing price on it costs nobody anything.
     if (row.status === 'dismissed') continue;
-    const { date } = row.row.entry;
-    const hubId = hubIdOf(row);
-    const prices = pricesAt(hubId, date);
-    const sold = sellFallbackAt(hubId, date);
-    const lines = row.row.entry.oreLines;
-    const unpriced = lines.filter((l) => (prices.get(l.typeId) ?? 0) <= 0).map((l) => l.typeId);
-    const sellFallback = lines.filter((l) => sold.has(l.typeId)).map((l) => l.typeId);
-    if (unpriced.length > 0 || sellFallback.length > 0) gaps.push({ row, unpriced, sellFallback });
+    const unpriced = new Set<number>();
+    const sellFallback = new Set<number>();
+    // A joined group is one display row but several entries, each billed at
+    // its own Payee's hub; the link still opens the one combined row.
+    const members = [{ row: row.row, assignment: row.assignment }, ...(row.groupMembers ?? [])];
+    for (const member of members) {
+      const { date } = member.row.entry;
+      const hubId = hubIdOf(member.assignment);
+      const prices = pricesAt(hubId, date);
+      const sellPriced = sellFallbackAt(hubId, date);
+      // Only the ore this Assignment bills for: on an entry split across
+      // Payees the rest belongs to someone else, possibly at another hub.
+      const lines = member.assignment ? member.assignment.oreLines : member.row.unassignedOreLines;
+      for (const { typeId } of lines) {
+        if ((prices.get(typeId) ?? 0) <= 0) unpriced.add(typeId);
+        else if (sellPriced.has(typeId)) sellFallback.add(typeId);
+      }
+    }
+    if (unpriced.size > 0 || sellFallback.size > 0) {
+      gaps.push({ row, unpriced: [...unpriced], sellFallback: [...sellFallback] });
+    }
   }
   return gaps;
 }

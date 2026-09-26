@@ -11,6 +11,10 @@ function displayRow(key: string, date: string, status: DisplayRow['status'] = 'u
     status,
     assignment: null,
     row: {
+      unassignedOreLines: [
+        { typeId: A, quantity: 5 },
+        { typeId: B, quantity: 5 },
+      ],
       entry: {
         characterId: 1,
         date,
@@ -66,5 +70,32 @@ describe('findPricingGaps', () => {
       sellFallbackAt: () => new Set(),
     });
     expect(seen).toEqual([['hek', '2026-09-03']]);
+  });
+
+  it("checks only the ore an Assignment owns, not the whole entry's", () => {
+    const dr = displayRow('r1', '2026-09-01');
+    // A is the unpriced ore, but this Assignment only owns B.
+    (dr as { assignment: unknown }).assignment = { oreLines: [{ typeId: B, quantity: 5 }] };
+    expect(findPricingGaps([dr], lookups)).toEqual([]);
+  });
+
+  it('also reports a gap on a joined group’s non-primary member, at that member’s own hub', () => {
+    const primary = displayRow('g', '2026-09-03');
+    const other = displayRow('x', '2026-09-01');
+    (primary as { groupMembers: unknown }).groupMembers = [
+      { row: other.row, assignment: { payeeId: 'p2', oreLines: other.row.entry.oreLines } },
+    ];
+    const hubs: (string | undefined)[] = [];
+    const gaps = findPricingGaps([primary], {
+      ...lookups,
+      hubIdOf: (a) => {
+        hubs.push((a as { payeeId?: string } | null)?.payeeId);
+        return undefined;
+      },
+    });
+    expect(gaps).toHaveLength(1);
+    expect(gaps[0].row.key).toBe('g');
+    expect(gaps[0].unpriced).toEqual([A]);
+    expect(hubs).toEqual([undefined, 'p2']);
   });
 });

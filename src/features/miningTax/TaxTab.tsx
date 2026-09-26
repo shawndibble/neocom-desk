@@ -23,6 +23,7 @@ import {
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { beginGrant } from '@/app/grantAction';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -312,7 +313,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   const pricingGaps = useMemo(() => {
     if (!data) return [];
     return findPricingGaps(allDisplayRows, {
-      hubIdOf: (dr) => allPayees.find((p) => p.id === dr.assignment?.payeeId)?.hubId,
+      hubIdOf: (assignment) => allPayees.find((p) => p.id === assignment?.payeeId)?.hubId,
       pricesAt: (hubId, date) => pricesAtHubOnDate(data.datedPrices, hubId, date),
       sellFallbackAt: (hubId, date) => sellFallbackAtHubOnDate(data.datedPrices, hubId, date),
     });
@@ -572,7 +573,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             <li key={gap.row.key}>
               <button
                 type="button"
-                className="text-left text-accent underline underline-offset-2 hover:text-accent-hover"
+                className={`text-left ${inlineLinkClassName}`}
                 onClick={() => setDetailTarget(gap.row)}
               >
                 {t('miningTax.pricingGapEntry', {
