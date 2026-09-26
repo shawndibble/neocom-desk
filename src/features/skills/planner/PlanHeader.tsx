@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Panel, StatChip, TextInput } from '@/components/ui';
+import { Panel, StatChip } from '@/components/ui';
 import { formatDuration } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { formatCompactNumber } from '@/lib/compactNumber';
@@ -27,11 +26,8 @@ interface PlanHeaderProps {
   nextStep?: { name: string; level: number; cumulativeSeconds: number; startDate: Date } | null;
   /** False until the character's trained skills have loaded: progress reads `—`, not 0%. */
   trainedKnown?: boolean;
-  /** The open plan's name; when given it replaces the generic panel title as an editable field. */
+  /** The open plan's name; when given it replaces the generic panel title. Renamed from the plan list. */
   name?: string;
-  onRename?: (name: string) => void;
-  /** Focus (and select) the name field on mount, for a plan just created. */
-  focusName?: boolean;
 }
 
 /**
@@ -48,25 +44,8 @@ export function PlanHeader({
   nextStep = null,
   trainedKnown = true,
   name,
-  onRename,
-  focusName = false,
 }: PlanHeaderProps) {
   const { t } = useTranslation();
-  const nameRef = useRef<HTMLInputElement>(null);
-  // null while not editing, so the field shows `name` itself and follows a
-  // rename made elsewhere (the list) or a switch to another plan.
-  const [draftName, setDraftName] = useState<string | null>(null);
-  useEffect(() => {
-    if (!focusName) return;
-    nameRef.current?.focus();
-    nameRef.current?.select();
-  }, [focusName]);
-
-  function commitName() {
-    const next = draftName?.trim();
-    setDraftName(null);
-    if (next && next !== name) onRename?.(next);
-  }
   const savingsSeconds = badge?.savingsSeconds ?? 0;
   const progressFraction = progress?.fraction ?? null;
   const showsSavings = badge !== null && savingsSeconds >= MIN_MEANINGFUL_SAVINGS_SECONDS;
@@ -80,30 +59,7 @@ export function PlanHeader({
     // headline numbers, which should survive that. What retires #221/#229 is
     // that there is no second sticky panel below needing this one's rendered
     // height; nothing here has to stay in sync with anything.
-    <Panel
-      title={name === undefined ? t('plans.headerTitle') : undefined}
-      leading={
-        name === undefined ? undefined : (
-          <TextInput
-            ref={nameRef}
-            size="sm"
-            value={draftName ?? name}
-            aria-label={t('plans.headerName')}
-            onFocus={() => setDraftName(name ?? '')}
-            onChange={(e) => setDraftName(e.target.value)}
-            onBlur={commitName}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') e.currentTarget.blur();
-              if (e.key === 'Escape') {
-                setDraftName(null);
-              }
-            }}
-            className="w-56 max-w-full font-semibold"
-          />
-        )
-      }
-      className="lg:sticky lg:top-0 lg:z-10"
-    >
+    <Panel title={name ?? t('plans.headerTitle')} className="lg:sticky lg:top-0 lg:z-10">
       {/* A plain wrapping strip, like every other row of StatChips in the app. */}
       <div className="flex flex-wrap gap-2">
         <StatChip label={t('plans.headerTrainingTime')} value={formatDuration(totalSeconds)} />

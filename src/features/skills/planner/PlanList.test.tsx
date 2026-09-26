@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { PlanList } from './PlanList';
 import type { SkillPlanRecord } from '@/db';
@@ -83,12 +84,16 @@ describe('PlanList row stats (#1416)', () => {
 describe('PlanList copy to character (#1729)', () => {
   const props = { onOpen: noop, onDuplicate: noop, onDelete: noop, onRename: noop };
 
-  it('hides the action when the account has no other character', () => {
+  it('hides the action when the account has no other character', async () => {
+    const user = userEvent.setup();
     render(<PlanList {...props} plans={[plan('1', 'Alpha')]} onCopyToCharacter={noop} />);
-    expect(screen.queryByRole('button', { name: /copy to character/i })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'More actions for Alpha' }));
+    expect(screen.getByRole('menuitem', { name: 'Rename' })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /copy to character/i })).toBeNull();
   });
 
-  it('copies the plan to the chosen character', () => {
+  it('copies the plan to the chosen character', async () => {
+    const user = userEvent.setup();
     const onCopy = vi.fn();
     render(
       <PlanList
@@ -98,8 +103,9 @@ describe('PlanList copy to character (#1729)', () => {
         onCopyToCharacter={onCopy}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: /copy to character.* beta/i }));
-    fireEvent.click(screen.getByRole('button', { name: 'Alt One' }));
+    await user.click(screen.getByRole('button', { name: 'More actions for Beta' }));
+    await user.click(screen.getByRole('menuitem', { name: /copy to character/i }));
+    await user.click(screen.getByRole('button', { name: 'Alt One' }));
     expect(onCopy).toHaveBeenCalledWith('2', 9);
   });
 });
@@ -118,5 +124,44 @@ describe('PlanList active plan (#1709)', () => {
     );
     expect(screen.getByRole('button', { name: /^beta/i })).toHaveAttribute('aria-current', 'true');
     expect(screen.getByRole('button', { name: /^alpha/i })).not.toHaveAttribute('aria-current');
+  });
+});
+
+describe('PlanList row menu', () => {
+  it('renames from the menu', async () => {
+    const user = userEvent.setup();
+    const onRename = vi.fn();
+    render(
+      <PlanList
+        plans={[plan('1', 'Alpha')]}
+        onOpen={noop}
+        onDuplicate={noop}
+        onDelete={noop}
+        onRename={onRename}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'More actions for Alpha' }));
+    await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
+    const input = screen.getByRole('textbox', { name: 'Rename' });
+    await user.clear(input);
+    await user.type(input, 'Beta{Enter}');
+    expect(onRename).toHaveBeenCalledWith('1', 'Beta');
+  });
+
+  it('opens a just-created plan straight into rename', () => {
+    const started = vi.fn();
+    render(
+      <PlanList
+        plans={[plan('1', 'Alpha')]}
+        autoRenamePlanId="1"
+        onAutoRenameStarted={started}
+        onOpen={noop}
+        onDuplicate={noop}
+        onDelete={noop}
+        onRename={noop}
+      />
+    );
+    expect(screen.getByRole('textbox', { name: 'Rename' })).toHaveFocus();
+    expect(started).toHaveBeenCalled();
   });
 });

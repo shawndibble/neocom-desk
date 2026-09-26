@@ -1,6 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, EmptyState, IconButton, Modal, TextInput } from '@/components/ui';
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  EmptyState,
+  IconButton,
+  Modal,
+  TextInput,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { CharacterRecord, SkillPlanRecord } from '@/db';
 import { formatDuration } from '@/lib/duration';
@@ -25,6 +35,9 @@ interface PlanListProps {
   stats?: ReadonlyMap<string, PlanRowStats>;
   /** The plan open in the editor, marked in the list; omitted on the plain list route. */
   activePlanId?: string;
+  /** A just-created plan whose row opens straight into rename; reported back via `onAutoRenameStarted`. */
+  autoRenamePlanId?: string | null;
+  onAutoRenameStarted?: () => void;
 }
 
 function PlanRow({
@@ -36,16 +49,30 @@ function PlanRow({
   onRename,
   stats,
   active,
+  autoRename,
+  onAutoRenameStarted,
 }: {
   plan: SkillPlanRecord;
   active: boolean;
+  autoRename: boolean;
+  onAutoRenameStarted?: () => void;
   stats: PlanRowStats | undefined;
   onRequestCopy: ((plan: SkillPlanRecord) => void) | null;
   onRequestDelete: (plan: SkillPlanRecord) => void;
 } & Pick<PlanListProps, 'onOpen' | 'onDuplicate' | 'onRename'>) {
   const { t } = useTranslation();
-  const [renaming, setRenaming] = useState(false);
+  const [renaming, setRenaming] = useState(autoRename);
   const [draftName, setDraftName] = useState(plan.name);
+  // The new plan's row can mount before or after the flag arrives, so both
+  // orders must land in rename mode — adjusting state during render, not in an effect.
+  const [seenAutoRename, setSeenAutoRename] = useState(autoRename);
+  if (autoRename !== seenAutoRename) {
+    setSeenAutoRename(autoRename);
+    if (autoRename) setRenaming(true);
+  }
+  useEffect(() => {
+    if (autoRename) onAutoRenameStarted?.();
+  }, [autoRename, onAutoRenameStarted]);
 
   function commitRename() {
     setRenaming(false);
@@ -95,29 +122,33 @@ function PlanRow({
           )}
         </button>
       )}
-      {/* Same three controls as the Industry Build Plan list, from the same
-          icon set — the two plan lists are the same object in two features and
-          should not read as two different designs. The unicode glyphs these
-          replace sat in a 28px box, under the touch tier (DESIGN.md §3). */}
-      <IconButton
-        size="sm"
-        icon={<Icon.Rename />}
-        label={`${t('plans.rename')} ${plan.name}`}
-        onClick={() => setRenaming(true)}
-      />
-      <IconButton
-        size="sm"
-        icon={<Icon.Duplicate />}
-        label={`${t('plans.duplicate')} ${plan.name}`}
-        onClick={() => onDuplicate(plan.id)}
-      />
-      {onRequestCopy && (
-        <IconButton
-          size="sm"
-          icon={<Icon.AllCharacters />}
-          label={`${t('plans.copyToCharacter')} ${plan.name}`}
-          onClick={() => onRequestCopy(plan)}
-        />
+      {/* Rename, Duplicate and Copy live in one menu so the name keeps the row's
+          width (and the finish date under it stays on one line). Delete stays a
+          visible button: it is the destructive one. */}
+      {!renaming && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <IconButton
+              size="sm"
+              variant="plain"
+              icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
+              label={`${t('plans.moreActions')} ${plan.name}`}
+            />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => setRenaming(true)}>
+              {t('plans.rename')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onDuplicate(plan.id)}>
+              {t('plans.duplicate')}
+            </DropdownMenuItem>
+            {onRequestCopy && (
+              <DropdownMenuItem onSelect={() => onRequestCopy(plan)}>
+                {t('plans.copyToCharacter')}
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
       <IconButton
         size="sm"
@@ -141,6 +172,8 @@ export function PlanList({
   onCopyToCharacter,
   stats,
   activePlanId,
+  autoRenamePlanId = null,
+  onAutoRenameStarted,
 }: PlanListProps) {
   const { t } = useTranslation();
   const [deletingPlan, setDeletingPlan] = useState<SkillPlanRecord | null>(null);
@@ -164,6 +197,8 @@ export function PlanList({
               onRename={onRename}
               stats={stats?.get(plan.id)}
               active={plan.id === activePlanId}
+              autoRename={plan.id === autoRenamePlanId}
+              onAutoRenameStarted={onAutoRenameStarted}
             />
           ))}
         </ul>

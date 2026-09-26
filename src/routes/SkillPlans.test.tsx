@@ -271,7 +271,8 @@ describe('SkillPlans CRUD', () => {
     await db.skillPlans.add(seedPlan());
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'Rename Test plan' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions for Test plan' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Rename' }));
     const input = screen.getByRole('textbox', { name: 'Rename' });
     await user.clear(input);
     await user.type(input, 'PvP Fit{Enter}');
@@ -286,7 +287,8 @@ describe('SkillPlans CRUD', () => {
     await db.skillPlans.add(seedPlan());
     render(<App />);
 
-    await user.click(await screen.findByRole('button', { name: 'Duplicate Test plan' }));
+    await user.click(await screen.findByRole('button', { name: 'More actions for Test plan' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Duplicate' }));
 
     const copy = await waitFor(async () => {
       const all = await db.skillPlans.where('characterId').equals(CHAR_ID).toArray();
@@ -390,7 +392,7 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
     // is not built at all below `lg`: the tools move into the single column
     // as a collapsed disclosure, and rendering the list hidden beside them
     // would keep a live Dexie subscription alive for a pane nobody can see.
-    expect(screen.queryByText('Test plan')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Test plan' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /plan tools/i })).toBeInTheDocument();
     expect(await screen.findByRole('link', { name: 'Back to plans' })).toBeInTheDocument();
 
@@ -1269,7 +1271,7 @@ describe('SkillPlans editor: plan header (#21)', () => {
       ],
       remapCount,
     });
-  const header = () => screen.getByRole('textbox', { name: 'Plan name' }).closest('section')!;
+  const header = () => screen.getAllByText('Projected finish')[0].closest('section')!;
 
   it('shows total training time, skill count, and projected finish, plus a live savings badge', async () => {
     await db.skillPlans.add(seedTwoSkillPlan());
@@ -1750,7 +1752,7 @@ describe('SkillPlans editor: schedule timeline (#20)', () => {
     const items = await within(panel).findAllByRole('listitem');
     expect(items).toHaveLength(1);
 
-    const summary = screen.getByRole('textbox', { name: 'Plan name' }).closest('section')!;
+    const summary = screen.getAllByText('Projected finish')[0].closest('section')!;
     const planFinishDate = within(summary)
       .getByText('Projected finish')
       .parentElement!.textContent!.replace('Projected finish', '')

@@ -89,7 +89,6 @@ test('plan editor: the open plan name is visible in the header at 390px (#1709)'
   await page.setViewportSize(PHONE);
   await page.goto('./skills/plans/plan-7');
 
-  const nameField = page.getByRole('textbox', { name: 'Plan name' });
-  await expect(nameField).toBeVisible();
-  await expect(nameField).toHaveValue('Plan 7');
+  const summary = page.getByText('Projected finish').first().locator('xpath=ancestor::section[1]');
+  await expect(summary.getByText('Plan 7', { exact: true })).toBeVisible();
 });

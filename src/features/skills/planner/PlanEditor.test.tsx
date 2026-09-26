@@ -667,7 +667,7 @@ describe('PlanEditor tools pane', () => {
     });
     // A: 250 SP at 20 + 20/2 = 30 SP/min -> 500s. B: 250 SP at 27 + 21/2 =
     // 37.5 SP/min -> 400s. Total 900s = 15m, not the flat-attributes 1000s = 16m40s.
-    const summary = screen.getByRole('textbox', { name: 'Plan name' }).closest('section')!;
+    const summary = screen.getAllByText('Projected finish')[0].closest('section')!;
     expect(within(summary).getByText('15m')).toBeInTheDocument();
     expect(within(summary).queryByText('16m')).not.toBeInTheDocument();
     expect(within(summary).queryByText('17m')).not.toBeInTheDocument();
