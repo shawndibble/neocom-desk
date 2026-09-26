@@ -676,35 +676,137 @@ describe('FittingStatsSections — remembered layout', () => {
 });
 
 describe('FittingStatsSections — Overheat all and Copy stats', () => {
-  it('turns Overheat all on for every calculation, and reads every figure in the warning tone once it is', async () => {
+  /**
+   * `heatedStats()` as "Overheat all" hands it over: the heated figures are
+   * the figures, the unheated ones ride along. The blasters' DPS rises with
+   * heat but — as a launcher's does — their volley doesn't.
+   */
+  function allOverheatedStats(): FittingStats {
+    const base = heatedStats();
+    const unheated: FittingStats = {
+      ...base,
+      applied: { weapons: [blaster], droneControlRange: 20000 },
+      overheated: null,
+      offense: {
+        ...base.offense,
+        weapons: base.offense.weapons.map((row) => ({ ...row, overheated: null })),
+        overheated: null,
+      },
+    };
+    const [blasters, drones] = unheated.offense.weapons;
+    return {
+      ...unheated,
+      ehp: 17400,
+      repair: { shield: 0, armor: 81.8, hull: 0 },
+      shield: { ...base.shield, emResonance: 0.4 },
+      applied: { weapons: [{ ...blaster, dps: 115 }], droneControlRange: 20000 },
+      offense: {
+        ...unheated.offense,
+        weapons: [{ ...blasters, dps: 61.7 }, drones],
+        dps: 181.7,
+      },
+      allOverheated: true,
+      unheated,
+    };
+  }
+
+  const inWarningTone = (element: HTMLElement) => element.closest('.text-warning') !== null;
+
+  it('turns Overheat all on for every calculation', async () => {
     const user = userEvent.setup();
-    const { rerender } = renderSections(heatedStats());
+    renderSections(heatedStats());
     await user.click(screen.getByRole('checkbox', { name: 'Overheat all' }));
     expect(useOverheatAll.getState().overheatAll).toBe(true);
+  });
 
-    rerender(
-      <FittingStatsSections
-        stats={{
-          ...heatedStats(),
-          allOverheated: true,
-          overheated: null,
-          offense: {
-            ...heatedStats().offense,
-            weapons: heatedStats().offense.weapons.map((row) => ({ ...row, overheated: null })),
-            overheated: null,
-          },
-        }}
-        statsProgress={null}
-        statsError={false}
-        price={null}
-        damageProfiles={damageProfiles()}
-        targetProfiles={targetProfiles()}
-        typeName={typeName}
-      />
-    );
-    expect(screen.getByText('4619 EHP')).toHaveClass('text-warning');
+  it('reads only the figures heat changed in the warning tone, with their unheated value on hover', () => {
+    renderSections(allOverheatedStats());
+
+    // The Defense headline: heated, and what it reads unheated.
+    const ehp = screen.getByText('17400 EHP');
+    expect(inWarningTone(ehp)).toBe(true);
+    expect(ehp).toHaveAttribute('title', 'Unheated: 4619 EHP');
+    expect(inWarningTone(screen.getByText('Armor repair: 81.8 HP/s'))).toBe(true);
+
+    // Offense: the blasters' DPS moved, their volley and the drones didn't.
+    const offense = within(sectionBody('Offense'));
+    expect(inWarningTone(offense.getByText('61.7 DPS'))).toBe(true);
+    expect(inWarningTone(offense.getByText('304 volley'))).toBe(false);
+    expect(inWarningTone(offense.getByText('120.0 DPS'))).toBe(false);
+    // The total, in the body and as the section's headline.
+    expect(offense.getAllByText('181.7 DPS').every(inWarningTone)).toBe(true);
+
+    // Resists: only the shield's EM cell moved.
+    const shield = within(screen.getByRole('row', { name: /^Shield/ }));
+    expect(inWarningTone(shield.getByText('60%'))).toBe(true);
+    expect(shield.getAllByText('50%').some(inWarningTone)).toBe(false);
+    const armor = within(screen.getByRole('row', { name: /^Armor/ }));
+    expect(armor.getAllByText('50%').some(inWarningTone)).toBe(false);
+
+    // Applied DPS moves with the weapons' raw DPS.
+    expect(inWarningTone(screen.getByText(/^Raw DPS 115\.0/))).toBe(true);
+
+    // What heat never touches stays in the normal tone.
+    expect(screen.getAllByText('350 m/s').some(inWarningTone)).toBe(false);
+    expect(screen.getAllByText('20.0 km').some(inWarningTone)).toBe(false);
+    for (const section of ['Capacitor', 'Targeting', 'Navigation', 'Drones']) {
+      expect(sectionBody(section).querySelector('.text-warning')).toBeNull();
+    }
+
     // No second, "overheated" number beside the heated one.
     expect(screen.queryByText(/overheated$/)).toBeNull();
+  });
+
+  it('marks a heated support module’s amount or range, and the capacitor drain it costs, but not the rest', () => {
+    const neut = {
+      kind: 'neutralizer' as const,
+      typeId: 12267,
+      count: 1,
+      amount: 15,
+      optimal: 10000,
+      falloff: 0,
+    };
+    const scram = {
+      kind: 'warpDisruption' as const,
+      typeId: 448,
+      count: 1,
+      amount: 2,
+      optimal: 9000,
+      falloff: 0,
+    };
+    const base = stats();
+    const unheated: FittingStats = {
+      ...base,
+      support: { ...base.support, rows: [neut, scram], neutralizer: 15 },
+      capacitorBudget: { ...base.capacitorBudget, peakRecharge: 10, drain: 20, delta: -10 },
+    };
+    renderSections({
+      ...unheated,
+      support: {
+        ...unheated.support,
+        rows: [
+          { ...neut, amount: 17.6 },
+          { ...scram, optimal: 10800 },
+        ],
+        neutralizer: 17.6,
+      },
+      capacitorBudget: { ...unheated.capacitorBudget, drain: 23.5, delta: -13.5 },
+      allOverheated: true,
+      unheated,
+    });
+
+    const support = within(sectionBody('Support out'));
+    // The neutralizer drains harder, at the same range.
+    expect(inWarningTone(support.getByText('17.6 GJ/s neutralized'))).toBe(true);
+    expect(inWarningTone(support.getByText('10.0 km'))).toBe(false);
+    // The scrambler reaches further, with the same two points.
+    expect(inWarningTone(support.getByText('10.8 km'))).toBe(true);
+    expect(support.getByText('10.8 km')).toHaveAttribute('title', 'Unheated: 9.0 km');
+
+    const capacitor = within(sectionBody('Capacitor'));
+    expect(inWarningTone(capacitor.getByText('−23.5 GJ/s'))).toBe(true);
+    expect(inWarningTone(capacitor.getByText('10.0 GJ/s'))).toBe(false);
+    expect(inWarningTone(capacitor.getByText('250 GJ'))).toBe(false);
   });
 
   it('has nothing to overheat on a fit with no module that can', () => {

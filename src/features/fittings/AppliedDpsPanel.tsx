@@ -25,6 +25,7 @@ import {
   type AppliedDpsPoint,
 } from '@/engine/fittings/appliedDps';
 import type { AppliedDpsRow } from './AppliedDpsChart';
+import { HeatFigure } from './StatFacts';
 import { TargetProfilePicker } from './TargetProfilePicker';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
@@ -68,13 +69,22 @@ function OverlayPicker({ overlay }: { overlay: OverlayFitting }) {
   );
 }
 
+/** The applied-DPS inputs, with the unheated ones beside them under "Overheat all". */
+interface AppliedFigures {
+  applied: AppliedDpsInputs;
+  unheated: AppliedFigures | null;
+}
+
 export function AppliedDpsPanel({
   applied,
+  unheatedApplied = null,
   chargelessWeaponCount,
   targetProfiles,
   overlay,
 }: {
   applied: AppliedDpsInputs;
+  /** Under "Overheat all", the same inputs unheated — the summary reads heated only where heat changed it. */
+  unheatedApplied?: AppliedDpsInputs | null;
   /** Active turrets/launchers with no charge loaded — why `applied.weapons` may be empty. */
   chargelessWeaponCount: number;
   targetProfiles: TargetProfiles;
@@ -104,6 +114,20 @@ export function AppliedDpsPanel({
   }, [applied, target, overlayResult]);
 
   const hasWeapons = applied.weapons.length > 0;
+  const figures: AppliedFigures = {
+    applied,
+    unheated: unheatedApplied ? { applied: unheatedApplied, unheated: null } : null,
+  };
+  const maxRange = graphMaxRange(overlayResult ? [applied, overlayResult.applied] : [applied]);
+  // Each side at its own best range, as the summary would read it.
+  const summary = ({ applied: inputs }: AppliedFigures) => {
+    const atRange = bestRange(appliedDpsVsRange(inputs, target, maxRange));
+    return t('fittings.appliedDps.summary', {
+      raw: rawDps(inputs).toFixed(1),
+      applied: appliedDps(inputs, target, atRange).toFixed(1),
+      km: (atRange / 1000).toFixed(1),
+    });
+  };
 
   return (
     <div className="space-y-2">
@@ -112,11 +136,7 @@ export function AppliedDpsPanel({
       {hasWeapons ? (
         <>
           <p className="text-xs">
-            {t('fittings.appliedDps.summary', {
-              raw: rawDps(applied).toFixed(1),
-              applied: appliedDps(applied, target, graphs.atRange).toFixed(1),
-              km: (graphs.atRange / 1000).toFixed(1),
-            })}
+            <HeatFigure stats={figures} format={summary} />
           </p>
           <p className="text-xs text-text-dim">{t('fittings.appliedDps.assumptions')}</p>
           <Suspense

@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { overheatedOrNull } from '@/engine/fittings/stats';
 import type { FittingStats, LocalRepair } from '@/engine/fittings/types';
-import { Facts, Overheated } from './StatFacts';
+import { Facts, HeatFigure, Overheated } from './StatFacts';
 
 const REPAIR_LAYERS: readonly (keyof LocalRepair)[] = ['shield', 'armor', 'hull'];
 
@@ -33,7 +33,12 @@ export function TankFacts({
       <ul className="space-y-1 text-xs text-text-dim">
         {REPAIR_LAYERS.filter((layer) => stats.repair[layer] > 0).map((layer) => (
           <li key={layer}>
-            {t(`fittings.stats.repair.${layer}`, { value: stats.repair[layer].toFixed(1) })}
+            <HeatFigure
+              stats={stats}
+              format={(s) =>
+                t(`fittings.stats.repair.${layer}`, { value: s.repair[layer].toFixed(1) })
+              }
+            />
             <Overheated
               value={overheatedOrNull(stats.repair[layer], stats.overheated?.repair[layer], 1)}
               digits={1}
@@ -42,16 +47,28 @@ export function TankFacts({
         ))}
         {tank.passiveShield > 0 && (
           <li>
-            {t('fittings.stats.tank.passiveShield', { value: tank.passiveShield.toFixed(1) })}
+            <HeatFigure
+              stats={stats}
+              format={(s) =>
+                t('fittings.stats.tank.passiveShield', { value: s.tank.passiveShield.toFixed(1) })
+              }
+            />
           </li>
         )}
         {tank.ancillary.map((row, index) => (
           <li key={`${row.typeId}-${index}`}>
-            {t('fittings.stats.tank.ancillary', {
-              name: typeName(row.typeId),
-              loaded: row.loaded.toFixed(1),
-              empty: row.empty.toFixed(1),
-            })}
+            <HeatFigure
+              stats={stats}
+              format={(s) => {
+                // The same repairer unheated: the ancillary rows line up.
+                const same = s.tank.ancillary[index] ?? row;
+                return t('fittings.stats.tank.ancillary', {
+                  name: typeName(same.typeId),
+                  loaded: same.loaded.toFixed(1),
+                  empty: same.empty.toFixed(1),
+                });
+              }}
+            />
           </li>
         ))}
       </ul>
@@ -61,15 +78,29 @@ export function TankFacts({
             items={[
               {
                 label: t('fittings.stats.tank.burst'),
-                value: t('fittings.stats.unit.ehpPerSecond', {
-                  value: tank.burstEffective.toFixed(1),
-                }),
+                value: (
+                  <HeatFigure
+                    stats={stats}
+                    format={(s) =>
+                      t('fittings.stats.unit.ehpPerSecond', {
+                        value: s.tank.burstEffective.toFixed(1),
+                      })
+                    }
+                  />
+                ),
               },
               {
                 label: t('fittings.stats.tank.sustained'),
-                value: t('fittings.stats.unit.ehpPerSecond', {
-                  value: tank.sustainedEffective.toFixed(1),
-                }),
+                value: (
+                  <HeatFigure
+                    stats={stats}
+                    format={(s) =>
+                      t('fittings.stats.unit.ehpPerSecond', {
+                        value: s.tank.sustainedEffective.toFixed(1),
+                      })
+                    }
+                  />
+                ),
               },
             ]}
           />
@@ -92,29 +123,39 @@ export function CapacitorFacts({ stats }: { stats: FittingStats }) {
   const { t } = useTranslation();
   const budget = stats.capacitorBudget;
   const perSecond = (value: string) => t('fittings.stats.unit.gjPerSecond', { value });
+  const figure = (format: (s: FittingStats) => string) => (
+    <HeatFigure stats={stats} format={format} />
+  );
   return (
     <Facts
       items={[
         {
           label: t('fittings.stats.fact.capacity'),
-          value: t('fittings.stats.unit.gj', { value: stats.capacitorCapacity.toFixed(0) }),
+          value: figure((s) =>
+            t('fittings.stats.unit.gj', { value: s.capacitorCapacity.toFixed(0) })
+          ),
         },
         {
           label: t('fittings.stats.fact.recharge'),
-          value: t('fittings.stats.unit.seconds', {
-            value: (stats.capacitorRechargeTime / 1000).toFixed(0),
-          }),
+          value: figure((s) =>
+            t('fittings.stats.unit.seconds', {
+              value: (s.capacitorRechargeTime / 1000).toFixed(0),
+            })
+          ),
         },
         {
           label: t('fittings.stats.cap.peakRecharge'),
-          value: perSecond(budget.peakRecharge.toFixed(1)),
+          value: figure((s) => perSecond(s.capacitorBudget.peakRecharge.toFixed(1))),
         },
-        { label: t('fittings.stats.cap.drain'), value: perSecond(signed(-budget.drain, 1)) },
+        {
+          label: t('fittings.stats.cap.drain'),
+          value: figure((s) => perSecond(signed(-s.capacitorBudget.drain, 1))),
+        },
         ...(budget.boosterInjection > 0
           ? [
               {
                 label: t('fittings.stats.cap.boosters'),
-                value: perSecond(signed(budget.boosterInjection, 1)),
+                value: figure((s) => perSecond(signed(s.capacitorBudget.boosterInjection, 1))),
               },
             ]
           : []),
@@ -122,7 +163,7 @@ export function CapacitorFacts({ stats }: { stats: FittingStats }) {
           ? [
               {
                 label: t('fittings.stats.cap.nosferatu'),
-                value: perSecond(signed(budget.nosferatuGain, 1)),
+                value: figure((s) => perSecond(signed(s.capacitorBudget.nosferatuGain, 1))),
               },
             ]
           : []),
@@ -130,7 +171,7 @@ export function CapacitorFacts({ stats }: { stats: FittingStats }) {
           label: t('fittings.stats.cap.delta'),
           value: (
             <span className={budget.delta < 0 ? 'text-warning' : ''}>
-              {perSecond(signed(budget.delta, 1))}
+              {figure((s) => perSecond(signed(s.capacitorBudget.delta, 1)))}
             </span>
           ),
         },
@@ -138,9 +179,13 @@ export function CapacitorFacts({ stats }: { stats: FittingStats }) {
           ? [
               {
                 label: t('fittings.stats.cap.boosterCharge'),
-                value: t('fittings.stats.cap.chargeEvery', {
-                  seconds: budget.secondsPerBoosterCharge.toFixed(1),
-                }),
+                value: figure((s) =>
+                  s.capacitorBudget.secondsPerBoosterCharge === null
+                    ? ''
+                    : t('fittings.stats.cap.chargeEvery', {
+                        seconds: s.capacitorBudget.secondsPerBoosterCharge.toFixed(1),
+                      })
+                ),
               },
             ]
           : []),

@@ -6,6 +6,7 @@ import {
   alignTimeSeconds,
   overheatedOrNull,
   resistPct,
+  unheatedIfChanged,
   weaponRowKey,
 } from '@/engine/fittings/stats';
 import type {
@@ -24,7 +25,7 @@ import type { DogmaAssetProgress } from './dogmaFittingEngine';
 import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
 import { DamageProfilePicker } from './DamageProfilePicker';
 import { AppliedDpsPanel } from './AppliedDpsPanel';
-import { Facts, Overheated, type Fact } from './StatFacts';
+import { Facts, HeatFigure, Overheated, type Fact } from './StatFacts';
 import { StatsToolbar } from './StatsToolbar';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
@@ -70,7 +71,17 @@ const RESONANCE_KEY = {
 const MICRO_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
 
 /** One resist, as the game draws it: the damage type's colour filling the share resisted. */
-function ResistCell({ resonance, tone }: { resonance: number; tone: DamageType }) {
+function ResistCell({
+  resonance,
+  tone,
+  unheated,
+}: {
+  resonance: number;
+  tone: DamageType;
+  /** The unheated resist as shown, when heat changed it ("Overheat all"). */
+  unheated?: string;
+}) {
+  const { t } = useTranslation();
   const pct = resistPct(resonance);
   return (
     <td className="px-0.5 py-0.5">
@@ -79,7 +90,14 @@ function ResistCell({ resonance, tone }: { resonance: number; tone: DamageType }
           className={`absolute inset-y-0 left-0 opacity-45 ${DMG_FILL_CLASS[tone]}`}
           style={{ width: `${pct}%` }}
         />
-        <span className="relative">{pct.toFixed(0)}%</span>
+        <span
+          className={`relative ${unheated === undefined ? '' : 'text-warning'}`}
+          title={
+            unheated === undefined ? undefined : t('fittings.stats.unheated', { value: unheated })
+          }
+        >
+          {pct.toFixed(0)}%
+        </span>
       </div>
     </td>
   );
@@ -93,6 +111,8 @@ export interface ResistRow {
   ehp?: number;
   /** Overheated / adapted rows read as a note on the row above. */
   tone?: 'overheated' | 'note';
+  /** Under "Overheat all", each cell heat changed: its unheated value as shown. */
+  unheated?: Partial<Record<DamageType | 'ehp', string>>;
 }
 
 /**
@@ -134,9 +154,21 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
               )}
             </th>
             {RESIST_TYPES.map((type) => (
-              <ResistCell key={type} tone={type} resonance={row.resonances[RESONANCE_KEY[type]]} />
+              <ResistCell
+                key={type}
+                tone={type}
+                resonance={row.resonances[RESONANCE_KEY[type]]}
+                unheated={row.unheated?.[type]}
+              />
             ))}
-            <td className="text-right text-xs tabular-nums">
+            <td
+              className={`text-right text-xs tabular-nums ${row.unheated?.ehp === undefined ? '' : 'text-warning'}`}
+              title={
+                row.unheated?.ehp === undefined
+                  ? undefined
+                  : t('fittings.stats.unheated', { value: row.unheated.ehp })
+              }
+            >
               {row.ehp === undefined ? '' : row.ehp.toFixed(0)}
             </td>
           </tr>
@@ -146,18 +178,38 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
   );
 }
 
+type HeatedDamage = DamageFiguresValue & { overheated: DamageFiguresValue | null };
+
+/**
+ * A row's DPS and volley, each with its overheated value beside it — or,
+ * under "Overheat all", in the warning tone where heat changed it. `figures`
+ * picks the same row out of either calculation.
+ */
 function DamageFigures({
-  dps,
-  volley,
-  overheated,
-}: DamageFiguresValue & { overheated: DamageFiguresValue | null }) {
+  stats,
+  figures,
+}: {
+  stats: FittingStats;
+  figures: (stats: FittingStats) => HeatedDamage;
+}) {
   const { t } = useTranslation();
+  const { dps, volley, overheated } = figures(stats);
   return (
     <span className="shrink-0 text-right tabular-nums">
-      <span>{t('fittings.stats.weaponDps', { value: dps.toFixed(1) })}</span>
+      <span>
+        <HeatFigure
+          stats={stats}
+          format={(s) => t('fittings.stats.weaponDps', { value: figures(s).dps.toFixed(1) })}
+        />
+      </span>
       <Overheated value={overheatedOrNull(dps, overheated?.dps, 1)} digits={1} />
       <span className="text-text-dim"> · </span>
-      <span>{t('fittings.stats.weaponVolley', { value: volley.toFixed(0) })}</span>
+      <span>
+        <HeatFigure
+          stats={stats}
+          format={(s) => t('fittings.stats.weaponVolley', { value: figures(s).volley.toFixed(0) })}
+        />
+      </span>
       <Overheated value={overheatedOrNull(volley, overheated?.volley, 0)} digits={0} />
     </span>
   );
@@ -197,15 +249,13 @@ function StatSection({
   title,
   meta,
   warning,
-  hot = false,
   expanded,
   onToggle,
   children,
 }: {
   title: string;
-  meta: string | undefined;
-  /** Every figure is the overheated one ("Overheat all"): read in the warning tone, as the game marks heat. */
-  hot?: boolean;
+  /** The headline figure, on the row itself. */
+  meta: ReactNode;
   /** Shown on the row itself, so a warning inside a collapsed section isn't missed. */
   warning?: string;
   expanded: boolean;
@@ -227,15 +277,9 @@ function StatSection({
           </button>
         </h3>
         {warning && <span className="shrink-0 text-xs text-warning">{warning}</span>}
-        {meta && (
-          <span className={`shrink-0 text-sm tabular-nums ${hot ? 'text-warning' : ''}`}>
-            {meta}
-          </span>
-        )}
+        {meta && <span className="shrink-0 text-sm tabular-nums">{meta}</span>}
       </div>
-      {expanded && (
-        <div className={`space-y-2 px-3 pb-3 ${hot ? 'text-warning' : ''}`}>{children}</div>
-      )}
+      {expanded && <div className="space-y-2 px-3 pb-3">{children}</div>}
     </section>
   );
 }
@@ -378,7 +422,12 @@ function OffenseRows({
                 </span>
               )}
             </span>
-            <DamageFigures {...row} />
+            <DamageFigures
+              stats={stats}
+              figures={(s) =>
+                s.offense.weapons.find((other) => weaponRowKey(other) === weaponRowKey(row)) ?? row
+              }
+            />
             {hasMenu && <RowMoreActions />}
           </>
         );
@@ -405,7 +454,7 @@ function OffenseRows({
       })}
       <li className="flex justify-between gap-x-2 border-t border-line pt-1 font-semibold">
         <span>{t('fittings.stats.offenseTotal')}</span>
-        <DamageFigures {...stats.offense} />
+        <DamageFigures stats={stats} figures={(s) => s.offense} />
       </li>
     </ul>
   );
@@ -494,14 +543,20 @@ export function FittingStatsSections({
   const overheatedEhp = stats ? overheatedOrNull(stats.ehp, stats.overheated?.ehp, 0) : null;
   const pctOf = (used: number, total: number) => (total > 0 ? (used / total) * 100 : 0);
 
-  function section(id: Section, meta: string | undefined, body: ReactNode, warning?: string) {
+  /**
+   * A figure off the stats as `format` shows it, in the warning tone under
+   * "Overheat all" only where heat changed it; nothing until the stats are in.
+   */
+  const figure = (format: (s: FittingStats) => string) =>
+    stats ? <HeatFigure stats={stats} format={format} /> : undefined;
+
+  function section(id: Section, meta: ReactNode, body: ReactNode, warning?: string) {
     return (
       <StatSection
         key={id}
         title={t(`fittings.stats.section.${id}`)}
         meta={meta}
         warning={warning}
-        hot={stats?.allOverheated ?? false}
         expanded={isExpanded(id)}
         onToggle={() => toggle(id)}
       >
@@ -513,22 +568,41 @@ export function FittingStatsSections({
   function resistRows(s: FittingStats): ResistRow[] {
     const layers = [
       {
-        key: 'shield',
+        key: 'shield' as const,
         label: t('fittings.stats.shield'),
         layer: s.shield,
         hot: s.overheated?.shield,
       },
-      { key: 'armor', label: t('fittings.stats.armor'), layer: s.armor, hot: s.overheated?.armor },
-      { key: 'hull', label: t('fittings.stats.hull'), layer: s.hull, hot: s.overheated?.hull },
+      {
+        key: 'armor' as const,
+        label: t('fittings.stats.armor'),
+        layer: s.armor,
+        hot: s.overheated?.armor,
+      },
+      {
+        key: 'hull' as const,
+        label: t('fittings.stats.hull'),
+        layer: s.hull,
+        hot: s.overheated?.hull,
+      },
     ];
     const rows: ResistRow[] = [];
     for (const { key, label, layer, hot } of layers) {
+      // "Overheat all": the cells heat changed, with what they read unheated.
+      const unheated: NonNullable<ResistRow['unheated']> = {};
+      for (const type of RESIST_TYPES) {
+        const was = unheatedIfChanged(s, (x) => resistPct(x[key][RESONANCE_KEY[type]]).toFixed(0));
+        if (was !== null) unheated[type] = `${was}%`;
+      }
+      const wasEhp = unheatedIfChanged(s, (x) => x[key].ehp.toFixed(0));
+      if (wasEhp !== null) unheated.ehp = wasEhp;
       rows.push({
         key,
         label,
         sub: t('fittings.stats.layerHp', { hp: layer.hp.toFixed(0) }),
         resonances: layer,
         ehp: layer.ehp,
+        unheated,
       });
       const changed =
         hot !== undefined &&
@@ -576,43 +650,57 @@ export function FittingStatsSections({
     const facts: Fact[] = [
       {
         label: t('fittings.stats.fact.cargo'),
-        value: t('fittings.stats.unit.cubicMetres', { value: s.holds.cargo.toFixed(0) }),
+        value: figure((x) =>
+          t('fittings.stats.unit.cubicMetres', { value: x.holds.cargo.toFixed(0) })
+        ),
       },
     ];
     if (s.holds.fleetHangar > 0)
       facts.push({
         label: t('fittings.stats.fact.fleetHangar'),
-        value: t('fittings.stats.unit.cubicMetres', { value: s.holds.fleetHangar.toFixed(0) }),
+        value: figure((x) =>
+          t('fittings.stats.unit.cubicMetres', { value: x.holds.fleetHangar.toFixed(0) })
+        ),
       });
     if (s.holds.miningHold > 0)
       facts.push({
         label: t('fittings.stats.fact.miningHold'),
-        value: t('fittings.stats.unit.cubicMetres', { value: s.holds.miningHold.toFixed(0) }),
+        value: figure((x) =>
+          t('fittings.stats.unit.cubicMetres', { value: x.holds.miningHold.toFixed(0) })
+        ),
       });
     if (s.sensor.type !== null)
       facts.push({
         label: t('fittings.stats.fact.sensorStrength'),
-        value: t('fittings.stats.unit.sensor', {
-          value: s.sensor.strength.toFixed(1),
-          type: t(`fittings.stats.sensorType.${s.sensor.type}`),
-        }),
+        value: figure((x) =>
+          t('fittings.stats.unit.sensor', {
+            value: x.sensor.strength.toFixed(1),
+            type: t(`fittings.stats.sensorType.${x.sensor.type}`),
+          })
+        ),
       });
-    if (s.jumpDrive)
+    if (s.jumpDrive) {
+      const { fuelTypeId } = s.jumpDrive;
       facts.push(
         {
           label: t('fittings.stats.fact.jumpRange'),
-          value: t('fittings.stats.unit.lightYears', {
-            value: s.jumpDrive.rangeLightYears.toFixed(2),
-          }),
+          value: figure((x) =>
+            t('fittings.stats.unit.lightYears', {
+              value: (x.jumpDrive?.rangeLightYears ?? 0).toFixed(2),
+            })
+          ),
         },
         {
           label: t('fittings.stats.fact.jumpFuel'),
-          value: t('fittings.stats.unit.fuelPerLightYear', {
-            value: s.jumpDrive.fuelPerLightYear.toFixed(0),
-            fuel: typeName(s.jumpDrive.fuelTypeId),
-          }),
+          value: figure((x) =>
+            t('fittings.stats.unit.fuelPerLightYear', {
+              value: (x.jumpDrive?.fuelPerLightYear ?? 0).toFixed(0),
+              fuel: typeName(fuelTypeId),
+            })
+          ),
         }
       );
+    }
     return facts;
   }
 
@@ -646,7 +734,7 @@ export function FittingStatsSections({
       {section(
         'offense',
         stats && stats.offense.weapons.length > 0
-          ? t('fittings.stats.weaponDps', { value: stats.offense.dps.toFixed(1) })
+          ? figure((s) => t('fittings.stats.weaponDps', { value: s.offense.dps.toFixed(1) }))
           : undefined,
         stats ? (
           stats.offense.weapons.length > 0 ? (
@@ -674,6 +762,7 @@ export function FittingStatsSections({
         stats ? (
           <AppliedDpsPanel
             applied={stats.applied}
+            unheatedApplied={stats.unheated?.applied ?? null}
             chargelessWeaponCount={stats.offense.chargelessWeaponCount}
             targetProfiles={targetProfiles}
             overlay={overlay}
@@ -685,7 +774,7 @@ export function FittingStatsSections({
 
       {section(
         'defense',
-        stats ? t('fittings.stats.defenseEhp', { value: stats.ehp.toFixed(0) }) : undefined,
+        figure((s) => t('fittings.stats.defenseEhp', { value: s.ehp.toFixed(0) })),
         <>
           <DamageProfilePicker damageProfiles={damageProfiles} />
           {stats ? (
@@ -712,33 +801,31 @@ export function FittingStatsSections({
 
       {section(
         'capacitor',
-        stats
-          ? stats.capacitor.stable
+        figure((s) =>
+          s.capacitor.stable
             ? t('fittings.stats.capacitorStable', {
-                pct: stats.capacitor.stablePercentage.toFixed(0),
+                pct: s.capacitor.stablePercentage.toFixed(0),
               })
             : t('fittings.stats.capacitorDepletes', {
-                seconds: stats.capacitor.depletesInSeconds.toFixed(0),
+                seconds: s.capacitor.depletesInSeconds.toFixed(0),
               })
-          : undefined,
+        ),
         stats ? <CapacitorFacts stats={stats} /> : placeholder
       )}
 
       {stats &&
         stats.support.rows.length > 0 &&
-        section(
-          'support',
-          supportMeta(stats),
-          <SupportFacts support={stats.support} typeName={typeName} />
-        )}
+        section('support', figure(supportMeta), <SupportFacts stats={stats} typeName={typeName} />)}
 
       {stats &&
         stats.mining.rows.length > 0 &&
         section(
           'mining',
-          t('fittings.stats.unit.cubicMetresPerSecond', {
-            value: stats.mining.perSecond.toFixed(1),
-          }),
+          figure((s) =>
+            t('fittings.stats.unit.cubicMetresPerSecond', {
+              value: s.mining.perSecond.toFixed(1),
+            })
+          ),
           <MiningFacts stats={stats} typeName={typeName} />
         )}
 
@@ -750,38 +837,45 @@ export function FittingStatsSections({
 
       {section(
         'targeting',
-        stats
-          ? t('fittings.stats.unit.km', {
-              value: (stats.targeting.maxTargetRange / 1000).toFixed(1),
-            })
-          : undefined,
+        figure((s) =>
+          t('fittings.stats.unit.km', {
+            value: (s.targeting.maxTargetRange / 1000).toFixed(1),
+          })
+        ),
         stats ? (
           <Facts
             items={[
               {
                 label: t('fittings.stats.fact.targetRange'),
-                value: t('fittings.stats.unit.km', {
-                  value: (stats.targeting.maxTargetRange / 1000).toFixed(1),
-                }),
+                value: figure((s) =>
+                  t('fittings.stats.unit.km', {
+                    value: (s.targeting.maxTargetRange / 1000).toFixed(1),
+                  })
+                ),
               },
               {
                 label: t('fittings.stats.fact.lockedTargets'),
-                value:
-                  stats.lockedTargets.ship === stats.lockedTargets.pilot
-                    ? String(stats.targeting.maxLockedTargets)
-                    : t('fittings.stats.lockedTargetsValue', { ...stats.lockedTargets }),
+                value: figure((s) =>
+                  s.lockedTargets.ship === s.lockedTargets.pilot
+                    ? String(s.targeting.maxLockedTargets)
+                    : t('fittings.stats.lockedTargetsValue', { ...s.lockedTargets })
+                ),
               },
               {
                 label: t('fittings.stats.fact.scanResolution'),
-                value: t('fittings.stats.unit.mm', {
-                  value: stats.targeting.scanResolution.toFixed(0),
-                }),
+                value: figure((s) =>
+                  t('fittings.stats.unit.mm', {
+                    value: s.targeting.scanResolution.toFixed(0),
+                  })
+                ),
               },
               {
                 label: t('fittings.stats.fact.signature'),
-                value: t('fittings.stats.unit.metres', {
-                  value: stats.targeting.signatureRadius.toFixed(0),
-                }),
+                value: figure((s) =>
+                  t('fittings.stats.unit.metres', {
+                    value: s.targeting.signatureRadius.toFixed(0),
+                  })
+                ),
               },
             ]}
           />
@@ -792,9 +886,9 @@ export function FittingStatsSections({
 
       {section(
         'navigation',
-        stats
-          ? t('fittings.stats.maxVelocityMeta', { value: stats.navigation.maxVelocity.toFixed(0) })
-          : undefined,
+        figure((s) =>
+          t('fittings.stats.maxVelocityMeta', { value: s.navigation.maxVelocity.toFixed(0) })
+        ),
         stats ? (
           <Facts
             items={[
@@ -802,9 +896,11 @@ export function FittingStatsSections({
                 label: t('fittings.stats.fact.maxVelocity'),
                 value: (
                   <>
-                    {t('fittings.stats.maxVelocityMeta', {
-                      value: stats.navigation.maxVelocity.toFixed(0),
-                    })}
+                    {figure((s) =>
+                      t('fittings.stats.maxVelocityMeta', {
+                        value: s.navigation.maxVelocity.toFixed(0),
+                      })
+                    )}
                     <Overheated
                       value={overheatedOrNull(
                         stats.navigation.maxVelocity,
@@ -818,27 +914,31 @@ export function FittingStatsSections({
               },
               {
                 label: t('fittings.stats.fact.align'),
-                value: t('fittings.stats.unit.seconds', {
-                  value: alignTimeSeconds(stats.navigation.mass, stats.navigation.agility).toFixed(
-                    1
-                  ),
-                }),
+                value: figure((s) =>
+                  t('fittings.stats.unit.seconds', {
+                    value: alignTimeSeconds(s.navigation.mass, s.navigation.agility).toFixed(1),
+                  })
+                ),
               },
               {
                 label: t('fittings.stats.fact.agility'),
-                value: stats.navigation.agility.toFixed(3),
+                value: figure((s) => s.navigation.agility.toFixed(3)),
               },
               {
                 label: t('fittings.stats.fact.mass'),
-                value: t('fittings.stats.unit.tonnes', {
-                  value: (stats.navigation.mass / 1000).toFixed(0),
-                }),
+                value: figure((s) =>
+                  t('fittings.stats.unit.tonnes', {
+                    value: (s.navigation.mass / 1000).toFixed(0),
+                  })
+                ),
               },
               {
                 label: t('fittings.stats.fact.warpSpeed'),
-                value: t('fittings.stats.unit.auPerSecond', {
-                  value: stats.navigation.warpSpeed.toFixed(1),
-                }),
+                value: figure((s) =>
+                  t('fittings.stats.unit.auPerSecond', {
+                    value: s.navigation.warpSpeed.toFixed(1),
+                  })
+                ),
               },
             ]}
           />
@@ -850,30 +950,34 @@ export function FittingStatsSections({
       {showDrones &&
         section(
           'drones',
-          stats ? t('fittings.stats.weaponDps', { value: stats.droneDps.toFixed(1) }) : undefined,
+          figure((s) => t('fittings.stats.weaponDps', { value: s.droneDps.toFixed(1) })),
           stats ? (
             <Facts
               items={[
                 {
                   label: t('fittings.stats.fact.droneDps'),
-                  value: stats.droneDps.toFixed(1),
+                  value: figure((s) => s.droneDps.toFixed(1)),
                 },
                 {
                   label: t('fittings.stats.fact.bandwidth'),
-                  value: t('fittings.stats.unit.bandwidth', {
-                    used: stats.droneBandwidthUsed.toFixed(0),
-                    total: stats.droneBandwidthTotal.toFixed(0),
-                  }),
+                  value: figure((s) =>
+                    t('fittings.stats.unit.bandwidth', {
+                      used: s.droneBandwidthUsed.toFixed(0),
+                      total: s.droneBandwidthTotal.toFixed(0),
+                    })
+                  ),
                 },
                 {
                   label: t('fittings.stats.fact.droneBay'),
-                  value: t('fittings.stats.unit.cubicMetres', {
-                    value: stats.droneCapacity.toFixed(0),
-                  }),
+                  value: figure((s) =>
+                    t('fittings.stats.unit.cubicMetres', {
+                      value: s.droneCapacity.toFixed(0),
+                    })
+                  ),
                 },
                 {
                   label: t('fittings.stats.fact.maxActiveDrones'),
-                  value: String(stats.maxActiveDrones),
+                  value: figure((s) => String(s.maxActiveDrones)),
                 },
               ]}
             />
@@ -886,26 +990,30 @@ export function FittingStatsSections({
         stats.fighters.tubes.total > 0 &&
         section(
           'fighters',
-          t('fittings.stats.weaponDps', { value: stats.fighters.dps.toFixed(1) }),
+          figure((s) => t('fittings.stats.weaponDps', { value: s.fighters.dps.toFixed(1) })),
           <Facts
             items={[
               {
                 label: t('fittings.stats.fact.fighterDps'),
-                value: stats.fighters.dps.toFixed(1),
+                value: figure((s) => s.fighters.dps.toFixed(1)),
               },
               {
                 label: t('fittings.stats.fact.fighterTubes'),
-                value: t('fittings.stats.unit.usedOfTotal', {
-                  used: stats.fighters.tubes.used.toFixed(0),
-                  total: stats.fighters.tubes.total.toFixed(0),
-                }),
+                value: figure((s) =>
+                  t('fittings.stats.unit.usedOfTotal', {
+                    used: s.fighters.tubes.used.toFixed(0),
+                    total: s.fighters.tubes.total.toFixed(0),
+                  })
+                ),
               },
               {
                 label: t('fittings.stats.fact.fighterBay'),
-                value: t('fittings.stats.unit.cubicMetresUsed', {
-                  used: stats.fighters.bay.used.toFixed(0),
-                  total: stats.fighters.bay.total.toFixed(0),
-                }),
+                value: figure((s) =>
+                  t('fittings.stats.unit.cubicMetresUsed', {
+                    used: s.fighters.bay.used.toFixed(0),
+                    total: s.fighters.bay.total.toFixed(0),
+                  })
+                ),
               },
             ]}
           />
@@ -913,36 +1021,42 @@ export function FittingStatsSections({
 
       {section(
         'fitting',
-        stats
-          ? t('fittings.stats.fittingMeta', {
-              cpu: pctOf(stats.cpuUsed, stats.cpuTotal).toFixed(0),
-              pg: pctOf(stats.powergridUsed, stats.powergridTotal).toFixed(0),
-            })
-          : undefined,
+        figure((s) =>
+          t('fittings.stats.fittingMeta', {
+            cpu: pctOf(s.cpuUsed, s.cpuTotal).toFixed(0),
+            pg: pctOf(s.powergridUsed, s.powergridTotal).toFixed(0),
+          })
+        ),
         stats ? (
           <>
             <Facts
               items={[
                 {
                   label: t('fittings.stats.fact.cpu'),
-                  value: t('fittings.stats.unit.usedOfTotal', {
-                    used: stats.cpuUsed.toFixed(1),
-                    total: stats.cpuTotal.toFixed(1),
-                  }),
+                  value: figure((s) =>
+                    t('fittings.stats.unit.usedOfTotal', {
+                      used: s.cpuUsed.toFixed(1),
+                      total: s.cpuTotal.toFixed(1),
+                    })
+                  ),
                 },
                 {
                   label: t('fittings.stats.fact.powergrid'),
-                  value: t('fittings.stats.unit.usedOfTotal', {
-                    used: stats.powergridUsed.toFixed(1),
-                    total: stats.powergridTotal.toFixed(1),
-                  }),
+                  value: figure((s) =>
+                    t('fittings.stats.unit.usedOfTotal', {
+                      used: s.powergridUsed.toFixed(1),
+                      total: s.powergridTotal.toFixed(1),
+                    })
+                  ),
                 },
                 {
                   label: t('fittings.stats.fact.calibration'),
-                  value: t('fittings.stats.unit.usedOfTotal', {
-                    used: stats.calibrationUsed.toFixed(0),
-                    total: stats.calibrationTotal.toFixed(0),
-                  }),
+                  value: figure((s) =>
+                    t('fittings.stats.unit.usedOfTotal', {
+                      used: s.calibrationUsed.toFixed(0),
+                      total: s.calibrationTotal.toFixed(0),
+                    })
+                  ),
                 },
                 ...resourceFacts(stats),
               ]}

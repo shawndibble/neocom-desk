@@ -479,6 +479,7 @@
       "offenseNoCharge_one": "{{count}} weapon has no charge loaded — load one in Charges.",
       "offenseNoCharge_other": "{{count}} weapons have no charge loaded — load one in Charges.",
       "overheated": "{{value}} overheated",
+      "unheated": "Unheated: {{value}}",
       "dronesNoOverheat": "Drones don't overheat",
       "defenseEhp": "{{value}} EHP",
       "ehpLine": "Effective HP: {{value}}",
