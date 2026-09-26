@@ -50,6 +50,7 @@ const {
   nameForType,
   volumeForType,
   buildPlansByMaterialTypeID,
+  planTargetForItem,
 } = await import('./blueprintCatalog');
 
 function plan(overrides: Partial<BuildPlanRecord> = {}): BuildPlanRecord {
@@ -175,6 +176,24 @@ describe('buildPlansByMaterialTypeID', () => {
     const second = plan({ id: 'second' });
     const map = buildPlansByMaterialTypeID([first, second], catalog);
     expect(map.get(34)).toBe(first);
+  });
+});
+
+describe('planTargetForItem', () => {
+  it('resolves a plain item to itself, via the blueprint that produces it', async () => {
+    const catalog = await loadBlueprintCatalog();
+    expect(planTargetForItem(catalog, 587)).toEqual({ blueprintTypeID: 638, productTypeID: 587 });
+  });
+
+  it('resolves a blueprint to what it builds, never to the blueprint itself', async () => {
+    const catalog = await loadBlueprintCatalog();
+    expect(planTargetForItem(catalog, 638)).toEqual({ blueprintTypeID: 638, productTypeID: 587 });
+  });
+
+  it('is null for an item nothing builds and for a blueprint with no product', async () => {
+    const catalog = await loadBlueprintCatalog();
+    expect(planTargetForItem(catalog, 34)).toBeNull();
+    expect(planTargetForItem(catalog, 640)).toBeNull();
   });
 });
 
