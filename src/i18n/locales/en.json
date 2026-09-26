@@ -1129,6 +1129,7 @@
     "remapCapNote_one": "Evaluated with {{count}} remap. This plan allows more; placement beyond that is not available yet.",
     "remapCapNote_other": "Evaluated with {{count}} remaps. This plan allows more; placement beyond that is not available yet.",
     "headerTitle": "Plan summary",
+    "headerName": "Plan name",
     "headerTrainingTime": "Training time",
     "headerSkillCount": "Skills",
     "headerProjectedFinish": "Projected finish",
