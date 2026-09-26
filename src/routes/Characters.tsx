@@ -1303,6 +1303,8 @@ export function Characters() {
                   onClick={() => void beginAddCharacterLogin()}
                 >
                   <Icon.AddCharacter />
+                  {/* Icon-only below `sm`: no room beside the split trigger. */}
+                  <span className="hidden sm:inline">{t('characters.addLabel')}</span>
                 </Button>
               </Tooltip>
               <DropdownMenu>
