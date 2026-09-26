@@ -4,7 +4,7 @@ function escapeRegExp(value: string): string {
 
 /**
  * Most `notifications.fired.*` bodies say the Character's name themselves —
- * leading ("Name: …", "Name's …", "Name has …") or, for `marketOrderFilled`
+ * leading ("Name: …", "Name's …", "Name has …") or, for legacy `marketOrderFilled`
  * alone, trailing ("… from Name."). `AlertGroupRow`'s name column beside the
  * body already says it once; this strips whichever form the body used so the
  * row doesn't say it twice.
