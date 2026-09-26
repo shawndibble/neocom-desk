@@ -124,9 +124,26 @@ describe('loadUnitPricesOnDate', () => {
     expect(unpriced.size).toBe(0);
   });
 
-  it('treats a zero buyMax as unpriced too — an order book that quotes 0 prices nothing', async () => {
+  it("values an ore with no buy side at today's sell, flagged as a sell fallback and not unpriced", async () => {
     pricesMock.getHubPrices.mockResolvedValue(
       new Map([[VELDSPAR, { sellMin: 10, buyMax: 0, sellVolume: 0, buyVolume: 0 }]])
+    );
+
+    const { prices, unpriced, sellFallback } = await loadUnitPricesOnDate(
+      CHARACTER_ID,
+      [VELDSPAR],
+      getTradeHub('jita') as TradeHub,
+      DATE
+    );
+
+    expect(prices.get(VELDSPAR)).toBe(10);
+    expect(unpriced.size).toBe(0);
+    expect([...sellFallback]).toEqual([VELDSPAR]);
+  });
+
+  it('treats a zero buyMax and a zero sellMin as unpriced — an order book that quotes 0 prices nothing', async () => {
+    pricesMock.getHubPrices.mockResolvedValue(
+      new Map([[VELDSPAR, { sellMin: 0, buyMax: 0, sellVolume: 0, buyVolume: 0 }]])
     );
 
     const { unpriced } = await loadUnitPricesOnDate(
@@ -408,6 +425,7 @@ describe('pricesAtHubOnDate', () => {
       ['hek', new Map([[DATE, new Map([[ZEOLITES, 900]])]])],
     ]),
     unpricedByHub: new Map(),
+    sellFallbackByHubAndDate: new Map(),
     unpriced: new Set(),
   };
 
@@ -423,6 +441,7 @@ describe('pricesAtHubOnDate', () => {
     const jitaOnly: DatedUnitPrices = {
       byHubAndDate: new Map([['jita', new Map([[DATE, new Map([[ZEOLITES, 1343]])]])]]),
       unpricedByHub: new Map(),
+      sellFallbackByHubAndDate: new Map(),
       unpriced: new Set(),
     };
     expect(pricesAtHubOnDate(jitaOnly, 'hek', DATE).get(ZEOLITES)).toBe(1343);
@@ -432,6 +451,7 @@ describe('pricesAtHubOnDate', () => {
     const empty: DatedUnitPrices = {
       byHubAndDate: new Map(),
       unpricedByHub: new Map(),
+      sellFallbackByHubAndDate: new Map(),
       unpriced: new Set(),
     };
     expect(pricesAtHubOnDate(empty, 'hek', DATE).size).toBe(0);

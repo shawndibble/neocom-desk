@@ -23,6 +23,7 @@ import {
   type CharacterFilterValue,
 } from '@/features/character/characterFilterValue';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import { beginGrant } from '@/app/grantAction';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
@@ -52,6 +53,7 @@ import {
   hubForPayee,
   loadDatedUnitPricesByHub,
   pricesAtHubOnDate,
+  sellFallbackAtHubOnDate,
   type DatedUnitPrices,
 } from '@/features/miningTax/pricing';
 import { loadTypeNames } from '@/features/character/typeNames';
@@ -90,6 +92,7 @@ import { JoinAssignDialog } from '@/features/miningTax/JoinAssignDialog';
 import { PayeeManagerDialog } from '@/features/miningTax/PayeeManagerDialog';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
 import { SplitDialog } from '@/features/miningTax/SplitDialog';
+import { findPricingGaps, type PricingGap } from '@/features/miningTax/pricingGaps';
 import { linesOwnedBy } from '@/engine/miningTax/ownership';
 
 const ALL_STATUSES: readonly MiningTaxRowStatus[] = [
@@ -122,6 +125,7 @@ interface Snapshot {
 const EMPTY_DATED_PRICES: DatedUnitPrices = {
   byHubAndDate: new Map(),
   unpricedByHub: new Map(),
+  sellFallbackByHubAndDate: new Map(),
   unpriced: new Set(),
 };
 
@@ -303,6 +307,17 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     }
     return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
   }, [data]);
+
+  // Which entries the pricing banner is about, so it can link to them — the
+  // table only shows an entry's total, never per-ore prices.
+  const pricingGaps = useMemo(() => {
+    if (!data) return [];
+    return findPricingGaps(allDisplayRows, {
+      hubIdOf: (assignment) => allPayees.find((p) => p.id === assignment?.payeeId)?.hubId,
+      pricesAt: (hubId, date) => pricesAtHubOnDate(data.datedPrices, hubId, date),
+      sellFallbackAt: (hubId, date) => sellFallbackAtHubOnDate(data.datedPrices, hubId, date),
+    });
+  }, [data, allDisplayRows, allPayees]);
 
   // `payeeFilter` is URL-held, so a stale or hand-edited link can name Payee
   // ids nobody tracked has — the codec can't validate that itself (it has no
@@ -546,6 +561,34 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     if (!dr.assignment) return '—';
     if (dr.assignment.status === 'dismissed') return t('miningTax.dismissedLabel');
     return payeeName(dr.assignment.payeeId);
+  }
+
+  /** Buttons that open each affected entry, naming the ore at fault — the table itself never shows per-ore prices. */
+  function renderGapLinks(gaps: readonly PricingGap[], pick: (gap: PricingGap) => number[]) {
+    return (
+      <div className="space-y-0.5">
+        <p className="text-text-dim">{t('miningTax.pricingGapEntries')}</p>
+        <ul className="space-y-0.5">
+          {gaps.map((gap) => (
+            <li key={gap.row.key}>
+              <button
+                type="button"
+                className={`text-left ${inlineLinkClassName}`}
+                onClick={() => setDetailTarget(gap.row)}
+              >
+                {t('miningTax.pricingGapEntry', {
+                  date: gap.row.row.entry.date,
+                  system: systemName(gap.row),
+                  types: pick(gap)
+                    .map((typeId) => data?.typeNames.get(typeId) ?? `#${typeId}`)
+                    .join(', '),
+                })}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
   }
 
   function systemName(dr: DisplayRow): string {
@@ -954,6 +997,26 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                   ))}
               </ul>
               <p className="text-text-dim">{t('miningTax.unpricedHint')}</p>
+              {renderGapLinks(
+                pricingGaps.filter((g) => g.unpriced.length > 0),
+                (g) => g.unpriced
+              )}
+            </div>
+          )}
+
+          {pricingGaps.some((g) => g.sellFallback.length > 0) && (
+            <div
+              role="status"
+              className="space-y-1 rounded-xs border border-line bg-panel-2 p-2 text-xs"
+            >
+              <p className="font-semibold text-text uppercase">
+                {t('miningTax.sellFallbackTitle')}
+              </p>
+              <p className="text-text-dim">{t('miningTax.sellFallbackHint')}</p>
+              {renderGapLinks(
+                pricingGaps.filter((g) => g.sellFallback.length > 0),
+                (g) => g.sellFallback
+              )}
             </div>
           )}
 
