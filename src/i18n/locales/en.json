@@ -887,7 +887,17 @@
       "fitTag": "This Fit",
       "emptyTitle": "Nothing to show",
       "emptyHint": "Every skill here is already trained or filtered out — or this ship has no Mastery data and no fit attached.",
-      "fitAttachedFallback": "this fit"
+      "fitAttachedFallback": "this fit",
+      "canFly": "You can fly this",
+      "canFlyIn_one": "Can fly in {{time}} · {{count}} skill missing",
+      "canFlyIn_other": "Can fly in {{time}} · {{count}} skills missing",
+      "requiredGroup": "Required to fly",
+      "masteryGroup": "Mastery",
+      "addRequired": "Add required ({{count}})",
+      "addFit": "Add fit skills ({{count}})",
+      "addMastery": "Add Mastery {{roman}}",
+      "createAndAddMastery": "Create plan and add Mastery {{roman}}",
+      "chooseMasteryTier": "Choose a Mastery tier to add"
     }
   },
   "plans": {
