@@ -424,3 +424,41 @@ describe('loadRosterSnapshot({ live: true }) — failure isolation', () => {
     expect(b?.wallet?.data).toBe(2000);
   });
 });
+
+describe('loadRosterSnapshot({ live: true }) � onEntry', () => {
+  it('reports each character as soon as its own requests settle, before the slower one finishes', async () => {
+    await seedCharacter(CHAR_A, 'Pilot A');
+    await seedCharacter(CHAR_B, 'Pilot B');
+    let releaseB: () => void = () => {};
+    const gateB = new Promise<void>((resolve) => {
+      releaseB = resolve;
+    });
+    vi.mocked(loadWalletBalance).mockImplementation(async (characterId: number) => {
+      if (characterId === CHAR_B) await gateB;
+      return { data: 1, fetchedAt: new Date(1), fromCache: false, truncated: false };
+    });
+    vi.mocked(loadCharacterSkills).mockResolvedValue({
+      data: { skills: [], total_sp: 5 },
+      fetchedAt: new Date(1),
+      fromCache: false,
+      truncated: false,
+    });
+    vi.mocked(loadCharacterSkillQueue).mockResolvedValue({
+      data: [],
+      fetchedAt: new Date(1),
+      fromCache: false,
+      truncated: false,
+    });
+    const seen: number[] = [];
+
+    const done = loadRosterSnapshot({
+      live: true,
+      onEntry: (entry) => seen.push(entry.characterId),
+    });
+    await vi.waitFor(() => expect(seen).toEqual([CHAR_A]));
+    releaseB();
+    await done;
+
+    expect(seen).toEqual([CHAR_A, CHAR_B]);
+  });
+});
