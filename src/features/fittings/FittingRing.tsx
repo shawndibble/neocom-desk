@@ -41,6 +41,7 @@ import type {
   HardpointCounts,
 } from '@/engine/fittings/types';
 import { formatCompactNumber } from '@/lib/compactNumber';
+import { SustainedTankReadout } from './FittingTankStats';
 import { typeIconUrl, typeRenderUrl } from '@/lib/eveImages';
 import {
   acceptsDrop,
@@ -992,6 +993,7 @@ export function FittingRing({
             )}
             <Readout gauge="powergrid" budget={budgets.powergrid} align="start" />
             <Readout gauge="cpu" budget={budgets.cpu} align="end" />
+            <SustainedTankReadout stats={stats ?? null} className="col-span-2 text-center" />
           </div>
         )}
 

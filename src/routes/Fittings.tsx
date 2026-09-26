@@ -82,6 +82,9 @@ import {
 import { FittingRing } from '@/features/fittings/FittingRing';
 import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPanel';
+import { FittingAffectedByPanel } from '@/features/fittings/FittingAffectedByPanel';
+import { FittingFightersPanel } from '@/features/fittings/FittingFightersPanel';
+import { TacticalModePicker } from '@/features/fittings/TacticalModePicker';
 import { ImplantBasisControl } from '@/features/fittings/ImplantBasisControl';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import {
@@ -165,6 +168,7 @@ function FittingsPage() {
   // The module dialog's variations start folded: a tap on a module is
   // mostly for its state and ammo.
   const [variationsOpen, setVariationsOpen] = useState(false);
+  const [affectedOpen, setAffectedOpen] = useState(false);
   // The filled slot whose module panel is open.
   const [moduleSlot, setModuleSlot] = useState<{ slot: FittingSlotKind; slotIndex: number } | null>(
     null
@@ -608,7 +612,11 @@ function FittingsPage() {
       </Button>
     );
 
-  const editor =
+  const fightersShown =
+    fitting !== null &&
+    ((fitting.fighters?.length ?? 0) > 0 || (stats?.fighters.tubes?.total ?? 0) > 0);
+
+  const editorBody =
     view === 'ring' ? (
       <div className="min-w-0 space-y-3">
         <FittingRing
@@ -678,6 +686,22 @@ function FittingsPage() {
         actions={addButton}
       />
     );
+
+  const editor = (
+    <div className="min-w-0 space-y-3">
+      {editorBody}
+      {fightersShown && (
+        <Panel title={t('fittings.fighters.title')}>
+          <FittingFightersPanel
+            fitting={fitting}
+            stats={stats}
+            onChange={edit}
+            typeName={(typeId) => catalogueTypeName(catalogue, typeId)}
+          />
+        </Panel>
+      )}
+    </div>
+  );
 
   const statsSections = (
     <FittingStatsSections
@@ -755,6 +779,7 @@ function FittingsPage() {
           compact={addMode === 'sheet' || (addMode === 'slideOut' && addOpen)}
           context={
             <>
+              <TacticalModePicker fitting={fitting} onChange={edit} typeName={typeName} />
               <ImplantBasisControl
                 basis={workspace.implantBasis}
                 canUseCloneBasis={workspace.canUseCloneBasis}
@@ -971,6 +996,22 @@ function FittingsPage() {
               >
                 <div className="p-2">
                   <FittingVariationsPanel rows={variationRows} onSelect={swapVariation} />
+                </div>
+              </Disclosure>
+              <Disclosure
+                label={t('fittings.affectedBy.title')}
+                expanded={affectedOpen}
+                onToggle={() => setAffectedOpen((open) => !open)}
+                className="rounded-xs border border-line"
+              >
+                <div className="p-2">
+                  {affectedOpen && (
+                    <FittingAffectedByPanel
+                      explain={workspace.explainModule}
+                      moduleIndex={openModuleIndex}
+                      typeName={(id) => catalogueTypeName(catalogue, id)}
+                    />
+                  )}
                 </div>
               </Disclosure>
             </div>

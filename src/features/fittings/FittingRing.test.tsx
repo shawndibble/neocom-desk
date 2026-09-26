@@ -4,6 +4,7 @@ import { act, createEvent, fireEvent, render, screen, within } from '@testing-li
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
+import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import { FittingRing } from './FittingRing';
 import { FITTING_DRAG_TYPE, useFittingDrag, type FittingDragPayload } from './fittingDrag';
 import { FittingItemActionsProvider, type FittingItemActions } from './fittingItemActions';
@@ -35,6 +36,7 @@ function statsWith(cpuUsed: number): FittingStats {
     powergridTotal: 100,
     slotCounts: { high: 3, medium: 2, low: 1, rig: 0, subsystem: 5 },
     hardpoints: { turrets: 0, launchers: 0 },
+    ...neutralExtendedStats(),
   } as FittingStats;
 }
 

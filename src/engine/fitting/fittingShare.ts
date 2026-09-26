@@ -441,11 +441,13 @@ function parseMode(raw: string | undefined): number | undefined | null {
 
 function parseBody(body: string, version: string): DecodeFittingShareResult {
   const parts = body.split('|');
-  // Version 1: six sections. Version 2 adds the name; the optional mode and
-  // booster side effects trail either.
+  // Version 1: six sections. Version 2 adds the name, then the optional mode
+  // and booster side effects.
   const named = version === FITTING_SHARE_VERSION;
   const base = named ? 7 : 6;
-  if (parts.length < base || parts.length > base + 2) return { ok: false, reason: 'invalid' };
+  // Only version 2 carries the trailing sections; version 1 is exactly six.
+  const max = named ? base + 2 : base;
+  if (parts.length < base || parts.length > max) return { ok: false, reason: 'invalid' };
   const [hullStr, modulesStr, dronesStr, fightersStr, cargoStr, implantsStr] = parts;
   const nameStr = named ? parts[6] : '';
   const modeStr = parts[base];

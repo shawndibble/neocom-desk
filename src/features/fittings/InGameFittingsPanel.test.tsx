@@ -85,7 +85,7 @@ describe('InGameFittingsPanel', () => {
     );
   });
 
-  it("opens what it can, handing the items it can't map (fighter bay, service slot) on as the Load's warnings", async () => {
+  it("opens what it can, handing the items it can't map (a service slot) on as the Load's warnings", async () => {
     useEndpointsGrantedMock.mockReturnValue(true);
     loadInGameFittingsMock.mockResolvedValue({
       cached: {
@@ -93,7 +93,7 @@ describe('InGameFittingsPanel', () => {
           cachedFitting({
             items: [
               { flag: 'HiSlot0', quantity: 1, type_id: 484 },
-              { flag: 'FighterBay', quantity: 1, type_id: 99 },
+              { flag: 'ServiceSlot0', quantity: 1, type_id: 99 },
             ],
           }),
         ],
@@ -117,7 +117,7 @@ describe('InGameFittingsPanel', () => {
         fitting: expect.objectContaining({
           modules: [{ slot: 'high', slotIndex: 0, typeId: 484, state: 'active' }],
         }),
-        unresolved: [{ text: 'FighterBay', reason: 'unsupported slot' }],
+        unresolved: [{ text: 'ServiceSlot0', reason: 'unsupported slot' }],
       })
     );
   });
