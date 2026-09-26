@@ -434,7 +434,9 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
       // catalog arrives and `PlanEditor` replaces the loading layout, which
       // remounts `PlanListPane` in that slot — so the list is momentarily a
       // spinner at exactly the moment the editor appears.
-      const listPanel = (await screen.findByText('Test plan')).closest('section');
+      const listPanel = (await screen.findByRole('button', { name: /^Test plan/ })).closest(
+        'section'
+      );
       expect(listPanel).not.toHaveClass('hidden');
       expect(screen.queryByRole('link', { name: 'Back to plans' })).not.toBeInTheDocument();
     } finally {
