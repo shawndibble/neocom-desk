@@ -399,3 +399,53 @@ describe('pooledOwnedCopies / claimBlueprintTier (issue #860)', () => {
     ]);
   });
 });
+
+describe('selectBlueprintTier coverage (issue #1775)', () => {
+  const base = {
+    materialCostAtMe: costAtMe,
+    bpcOffers: [],
+    bpoSellPrice: null,
+    assumedMeForUnowned: 0,
+  };
+
+  it('reports the covered runs when an owned BPC falls short and nothing extends it', () => {
+    const result = selectBlueprintTier({
+      ...base,
+      ownedCopies: [{ me: 6, te: 12, runs: 10 }],
+      neededRuns: 20,
+    });
+    expect(result.line).toEqual({ unitPrice: null, owned: false });
+    expect(result.coverage).toEqual({ coveredRuns: 10, neededRuns: 20 });
+  });
+
+  it('reports no shortfall when a matching BPC Sourcing offer extends the tier', () => {
+    const result = selectBlueprintTier({
+      ...base,
+      ownedCopies: [{ me: 6, te: 12, runs: 10 }],
+      neededRuns: 20,
+      bpcOffers: [{ me: 6, te: 12, runs: 10, quantity: 1, price: 1_000_000 }],
+    });
+    expect(result.coverage).toBeUndefined();
+  });
+
+  it('reports no shortfall when a BPO can be bought instead', () => {
+    const result = selectBlueprintTier({
+      ...base,
+      ownedCopies: [{ me: 6, te: 12, runs: 10 }],
+      neededRuns: 20,
+      bpoSellPrice: 500_000,
+    });
+    expect(result.coverage).toBeUndefined();
+  });
+
+  it('reports no shortfall for an owned BPO, a fully covering BPC, or nothing owned', () => {
+    const needed = { ...base, neededRuns: 20 };
+    expect(
+      selectBlueprintTier({ ...needed, ownedCopies: [{ me: 6, te: 12, runs: -1 }] }).coverage
+    ).toBeUndefined();
+    expect(
+      selectBlueprintTier({ ...needed, ownedCopies: [{ me: 6, te: 12, runs: 20 }] }).coverage
+    ).toBeUndefined();
+    expect(selectBlueprintTier({ ...needed, ownedCopies: [] }).coverage).toBeUndefined();
+  });
+});
