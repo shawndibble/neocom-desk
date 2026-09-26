@@ -796,6 +796,23 @@ export function BpcSourcingPanel() {
     setParams({ 'sourcing.type': null, 'sourcing.q': '', 'sourcing.all': false });
   }
 
+  /** Includes the Dexie-backed space filter — unlike the sourcing.* params here, nothing else resets it. */
+  function resetSourcingFilters() {
+    changeFilter({
+      typeQuery: '',
+      regionId: null,
+      minMe: '',
+      minTe: '',
+      minRuns: '',
+      maxPrice: '',
+    });
+    setParams({
+      'sourcing.src': new Set(DEFAULT_SOURCE_TOGGLES),
+      'sourcing.jumps': DEFAULT_JUMP_RANGE,
+    });
+    void setSpaceFilter(SPACE_KINDS);
+  }
+
   /** Editing the text drops the pinned blueprint — otherwise the box would show one name while the table filtered on another. */
   function changeFilter(next: UiFilter) {
     if (next.typeQuery !== uiFilter.typeQuery) {
@@ -1632,6 +1649,11 @@ export function BpcSourcingPanel() {
               title={t('bpcContracts.noFilterMatches')}
               hint={t('bpcContracts.noFilterMatchesHint')}
               className="py-8"
+              action={
+                <Button size="sm" onClick={resetSourcingFilters}>
+                  {t('common.resetFilters')}
+                </Button>
+              }
             />
           ) : (
             <>

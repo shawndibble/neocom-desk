@@ -2,6 +2,7 @@ import { useCallback, useMemo, type ReactElement, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
+  Button,
   ColumnPickerMenu,
   DataAgeBadge,
   DataTable,
@@ -36,6 +37,7 @@ import { HistoryViewSelect, type HistoryView } from './HistoryViewSelect';
 import {
   activeHistoryFilterCount,
   DEFAULT_HISTORY_FILTER_PARAMS,
+  EMPTY_HISTORY_FILTER,
   filterHistory,
   HISTORY_FIELD_TO_PARAM,
   HISTORY_FILTER_PARAMS,
@@ -405,6 +407,13 @@ export function OrderHistoryPanel({
               title={t('orders.noResults')}
               hint={t('orders.noResultsHint')}
               className="py-8"
+              action={
+                activeHistoryFilterCount(filter) > 0 || filter.text.trim() !== '' ? (
+                  <Button size="sm" onClick={() => setFilter(EMPTY_HISTORY_FILTER)}>
+                    {t('common.resetFilters')}
+                  </Button>
+                ) : undefined
+              }
             />
           ) : isPhone ? (
             <OrderHistoryList

@@ -75,7 +75,10 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, enumParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
-import { useCourierFilterPref } from '@/features/contractSearch/courierFilterPref';
+import {
+  DEFAULT_COURIER_FILTER,
+  useCourierFilterPref,
+} from '@/features/contractSearch/courierFilterPref';
 
 /** Rows shown before "show all" — the same cap the item results use. */
 const ROW_CAP = 50;
@@ -1598,6 +1601,14 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
               : 'contractSearch.courierNoFilterMatchesHint'
           )}
           className="py-8"
+          action={
+            <Button
+              size="sm"
+              onClick={() => changeFilter({ routeQuery: '', ...DEFAULT_COURIER_FILTER })}
+            >
+              {t('common.resetFilters')}
+            </Button>
+          }
         />
       ) : (
         <>

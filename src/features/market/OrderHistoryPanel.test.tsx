@@ -128,6 +128,39 @@ describe('OrderHistoryPanel — filtered to zero', () => {
         'Clear the search or reset the buy/sell and status filters to see every order.'
       )
     ).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+    expect(await screen.findByRole('row', { name: /Damage Control II/ })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Search by item…')).toHaveValue('');
+  });
+
+  it('resets a non-search filter (a side chip) that empties the list', async () => {
+    mockedLoadHistory.mockResolvedValue({
+      cached: {
+        data: [historyOrder()],
+        fetchedAt: new Date(),
+        fromCache: false,
+        truncated: false,
+      },
+      needsReauth: false,
+    });
+    const user = userEvent.setup();
+    renderPanel();
+    await screen.findByRole('row', { name: /Damage Control II/ });
+
+    // The fixture is a sell order — the Buy chip alone empties the list.
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    await user.click(screen.getByRole('button', { name: 'Buy' }));
+
+    await waitFor(() =>
+      expect(screen.getByText('No orders match your filters.')).toBeInTheDocument()
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+    expect(await screen.findByRole('row', { name: /Damage Control II/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Buy' })).toHaveAttribute('aria-pressed', 'false');
   });
 });
 
