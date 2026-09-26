@@ -298,7 +298,9 @@ function CharacterCard({
                 the corp/alliance lines below, which are separate rows. */}
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="truncate text-sm font-semibold">{character.name}</span>
-              {lastSynced && <DataAgeBadge date={lastSynced} dotOnly className="shrink-0" />}
+              {lastSynced && (
+                <DataAgeBadge date={lastSynced} dotOnly alwaysVisible className="shrink-0" />
+              )}
             </span>
             <span className="block truncate text-xs text-text-dim">
               {info?.corporationName ?? t('common.unknown')}
@@ -674,7 +676,7 @@ function buildColumns(
       sortValue: (row) => characterLastSynced(row.stats, row.queue)?.getTime(),
       render: (row) => {
         const age = characterLastSynced(row.stats, row.queue);
-        return age ? <DataAgeBadge date={age} /> : t('common.unknown');
+        return age ? <DataAgeBadge date={age} alwaysVisible /> : t('common.unknown');
       },
     },
     training: {
@@ -1301,6 +1303,8 @@ export function Characters() {
                   onClick={() => void beginAddCharacterLogin()}
                 >
                   <Icon.AddCharacter />
+                  {/* Icon-only below `sm`: no room beside the split trigger. */}
+                  <span className="hidden sm:inline">{t('characters.addLabel')}</span>
                 </Button>
               </Tooltip>
               <DropdownMenu>

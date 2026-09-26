@@ -44,6 +44,15 @@ describe('DataAgeBadge', () => {
     expect(screen.getByText('5m ago').className).toContain('md:inline-flex');
   });
 
+  it('alwaysVisible shows the badge below md too, keeping the tone', () => {
+    const date = new Date(NOW.getTime() - 5 * 60_000);
+    render(<DataAgeBadge date={date} alwaysVisible />);
+    const cls = screen.getByText('5m ago').className;
+    expect(cls).not.toMatch(/(?:^|\s)hidden(?:\s|$)/);
+    expect(cls).toContain('inline-flex');
+    expect(cls).toContain('text-text-dim');
+  });
+
   it('says nothing beyond the timestamp when no note is given', () => {
     const date = new Date(NOW.getTime() - 5 * 60_000);
     render(<DataAgeBadge date={date} />);

@@ -18,7 +18,7 @@ import {
   sortRows,
   Spinner,
   StatChip,
-  UndoToast,
+  Toast,
 } from '@/components/ui';
 import { fieldBaseClassName, tappableRowClassName } from '@/components/ui/controlStyles';
 import { formatDuration } from '@/lib/duration';
@@ -607,13 +607,12 @@ export function ShipsPanel({
         </>
       )}
       {addedToast && (
-        <UndoToast
+        <Toast
           message={t('skills.fitCheck.addedToast', {
             count: addedToast.entries.length,
             plan: addedToast.planName,
           })}
-          undoLabel={t('skills.fitCheck.addedToastUndo')}
-          onUndo={handleUndoAdd}
+          undo={{ label: t('skills.fitCheck.addedToastUndo'), onUndo: handleUndoAdd }}
         />
       )}
     </Panel>

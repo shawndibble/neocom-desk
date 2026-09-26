@@ -10,7 +10,7 @@ export type { StatChipTone } from './statChipTone';
 export { DataAgeBadge } from './DataAgeBadge';
 export { CachedEmptyState } from './CachedEmptyState';
 export { EmptyState } from './EmptyState';
-export { UndoToast } from './UndoToast';
+export { Toast } from './Toast';
 export { Tabs } from './Tabs';
 export type { TabItem } from './Tabs';
 export { Spinner } from './Spinner';

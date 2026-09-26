@@ -106,6 +106,7 @@ import { writeToClipboard } from '@/lib/clipboard';
 import {
   buildPlansByMaterialTypeID,
   loadBlueprintCatalog,
+  planTargetForItem,
   type BlueprintCatalog,
 } from '@/features/industry/blueprintCatalog';
 
@@ -2086,10 +2087,12 @@ function NodeRowView({
 
   const { asset } = node;
   const estimatedValue = estimatedValueFor(asset, actions.priceByTypeId);
-  const blueprintTypeID =
+  const planTarget =
     actions.blueprintCatalog === null
       ? undefined
-      : (actions.blueprintCatalog.byProductTypeID.get(asset.type_id)?.blueprintTypeID ?? null);
+      : planTargetForItem(actions.blueprintCatalog, asset.type_id);
+  const blueprintTypeID =
+    planTarget === undefined ? undefined : (planTarget?.blueprintTypeID ?? null);
   const onViewInIndustryAsMaterial = actions.materialPlanMap?.has(asset.type_id)
     ? () => actions.onViewInIndustryAsMaterial(asset.type_id)
     : undefined;
@@ -2110,6 +2113,7 @@ function NodeRowView({
           typeId={asset.type_id}
           itemName={label}
           blueprintTypeID={blueprintTypeID}
+          planProductTypeID={planTarget?.productTypeID}
           onAddToQuickbar={actions.onAddToQuickbar}
           quickbarAvailable={actions.quickbarAvailable}
           onShowInfo={actions.onShowInfo}

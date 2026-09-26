@@ -109,6 +109,8 @@ export interface ResolvedBuildPlan {
   /** The ME/TE actually priced — the top-level acquisition's tier, else the plan's own. */
   resolvedMe: number;
   resolvedTe: number;
+  /** Set when the top-level owned BPC covers fewer runs than the plan asks for and nothing extends it (issue #1775). */
+  bpcCoverage: { coveredRuns: number; neededRuns: number } | null;
   /**
    * Every make-or-buy verdict's pricing context. Null until adjusted prices
    * and a system cost index land: a fee-free quote would call almost
@@ -218,6 +220,7 @@ export function resolveBuildPlan(
     groupError: null,
     makeOrBuyContext,
     materialPrices,
+    bpcCoverage: null,
   };
 
   const catalogEntry = sources.catalog.byBlueprintTypeID.get(plan.blueprintTypeID);
@@ -286,5 +289,6 @@ export function resolveBuildPlan(
     groupError,
     resolvedMe,
     resolvedTe,
+    bpcCoverage: topLevelAcquisition?.coverage ?? null,
   };
 }
