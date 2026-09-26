@@ -15,10 +15,10 @@ const SLICE_MS = 12;
  * only what fits the open ship). Every fittable market item is checked once
  * per hull and pilot, in slices that yield between them so the page stays
  * responsive (~0.3 ms an item, a few thousand items); `checkCandidates`
- * memoizes, so a return to the same hull is instant — which is also how the
+ * memoizes, so a return to the same hull is instant â€” which is also how the
  * Fittings route warms it up (`whenIdle`) as soon as the ship data, profile
- * and catalogue are in, before the pilot opens the module browser. Null until done, or
- * while the ship data isn't loaded.
+ * and catalogue are in, before the pilot opens the module browser. Null until
+ * done, or while the ship data isn't loaded.
  */
 export function useHullFit(
   catalogue: FittingCatalogue | null,
