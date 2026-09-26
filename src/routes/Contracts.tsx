@@ -63,6 +63,8 @@ import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatTimestamp } from '@/lib/timestamp';
+import { formatCountdown } from '@/lib/duration';
+import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -454,8 +456,21 @@ export function Contracts() {
         id: 'expires',
         header: t('contracts.expires'),
         className: 'whitespace-nowrap text-text-dim',
-        sortValue: (contract) => new Date(contract.date_expired).getTime(),
-        render: (contract) => formatTimestamp(new Date(contract.date_expired), timeZone),
+        // An accepted courier's clock is delivery, not the accept-by expiry.
+        sortValue: (contract) =>
+          courierDeliveryDeadlineMs(contract) ?? new Date(contract.date_expired).getTime(),
+        render: (contract) => {
+          const deadlineMs = courierDeliveryDeadlineMs(contract);
+          if (deadlineMs === null)
+            return formatTimestamp(new Date(contract.date_expired), timeZone);
+          const time = formatTimestamp(new Date(deadlineMs), timeZone);
+          const remainingMs = deadlineMs - Date.now();
+          return remainingMs <= 0 ? (
+            <span className="text-danger">{t('contracts.deliverOverdue', { time })}</span>
+          ) : (
+            t('contracts.deliverDue', { time, duration: formatCountdown(remainingMs / 1000) })
+          );
+        },
       },
     }),
     [t, issuerNames, timeZone, standingIndex, issuerAffiliations]

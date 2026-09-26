@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import '@/i18n';
 import { formatLocalDate } from '@/lib/localDate';
 import { PlanHeader } from './PlanHeader';
@@ -256,5 +256,47 @@ describe('PlanHeader progress chips (#1409)', () => {
     );
     expect(screen.getByText(/100%/)).toBeInTheDocument();
     expect(screen.getByText('Nothing left to train')).toBeInTheDocument();
+  });
+
+  describe('plan name (#1709)', () => {
+    const named = {
+      totalSeconds: 0,
+      skillCount: 0,
+      projectedFinish: null,
+      badge: null,
+      nextMilestone: null,
+    };
+
+    it('shows the plan name as an editable field instead of the generic title', () => {
+      render(<PlanHeader {...named} name="Titan pilot" onRename={() => {}} />);
+      expect(screen.getByRole('textbox', { name: 'Plan name' })).toHaveValue('Titan pilot');
+      expect(screen.queryByText('Plan summary')).not.toBeInTheDocument();
+    });
+
+    it('commits a trimmed rename on blur', () => {
+      const onRename = vi.fn();
+      render(<PlanHeader {...named} name="Titan pilot" onRename={onRename} />);
+      const input = screen.getByRole('textbox', { name: 'Plan name' });
+      fireEvent.focus(input);
+      fireEvent.change(input, { target: { value: '  Dread pilot ' } });
+      fireEvent.blur(input);
+      expect(onRename).toHaveBeenCalledWith('Dread pilot');
+    });
+
+    it('reverts an emptied name instead of saving it', () => {
+      const onRename = vi.fn();
+      render(<PlanHeader {...named} name="Titan pilot" onRename={onRename} />);
+      const input = screen.getByRole('textbox', { name: 'Plan name' });
+      fireEvent.focus(input);
+      fireEvent.change(input, { target: { value: '  ' } });
+      fireEvent.blur(input);
+      expect(onRename).not.toHaveBeenCalled();
+      expect(input).toHaveValue('Titan pilot');
+    });
+
+    it('focuses the field when arriving from New plan', () => {
+      render(<PlanHeader {...named} name="Untitled" onRename={() => {}} focusName />);
+      expect(screen.getByRole('textbox', { name: 'Plan name' })).toHaveFocus();
+    });
   });
 });
