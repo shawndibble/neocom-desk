@@ -4,7 +4,7 @@
  * fly it, gold at Mastery V only. `thumb` is the ladder's 44px version with
  * the same marks.
  */
-import type { FocusEvent, MouseEvent } from 'react';
+import { memo, type FocusEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { romanLevel } from '@/engine/projection';
 import { tileTone } from '@/engine/shipTree/rules';
@@ -17,7 +17,7 @@ import { techMark } from './shipTreeModel';
 
 const TECH_TEXT = { t2: 'II', t3: 'III', faction: '◇' } as const;
 
-export function Wing({ flip }: { flip?: boolean }) {
+function Wing({ flip }: { flip?: boolean }) {
   return (
     <svg
       width="14"
@@ -32,6 +32,28 @@ export function Wing({ flip }: { flip?: boolean }) {
   );
 }
 
+/**
+ * The winged Mastery badge: empty ring below Mastery I. Classes default to
+ * the tile corner's; the Ship Info header passes its own.
+ */
+export function MasteryBadge({
+  mastery,
+  className = 'isis-badge',
+  ringClassName = 'ring',
+}: {
+  mastery: number;
+  className?: string;
+  ringClassName?: string;
+}) {
+  return (
+    <span className={className} aria-hidden="true">
+      <Wing />
+      <span className={ringClassName}>{mastery ? romanLevel(mastery) : ''}</span>
+      <Wing flip />
+    </span>
+  );
+}
+
 /** The tile's inner marks, shared by the map tile and the ladder thumbnail. */
 function TileMarks({ ship, mastery }: { ship: ShipTreeShip; mastery: number }) {
   const mark = techMark(ship);
@@ -43,16 +65,12 @@ function TileMarks({ ship, mastery }: { ship: ShipTreeShip; mastery: number }) {
           {TECH_TEXT[mark]}
         </span>
       )}
-      <span className="isis-badge" aria-hidden="true">
-        <Wing />
-        <span className="ring">{mastery ? romanLevel(mastery) : ''}</span>
-        <Wing flip />
-      </span>
+      <MasteryBadge mastery={mastery} />
     </>
   );
 }
 
-export function IsisTile({
+export const IsisTile = memo(function IsisTile({
   ship,
   status,
   selected,
@@ -92,7 +110,7 @@ export function IsisTile({
       {showName && <span className="isis-name">{ship.name}</span>}
     </button>
   );
-}
+});
 
 /** The ladder's 44px thumbnail: decorative, the row around it carries the name. */
 export function IsisThumb({

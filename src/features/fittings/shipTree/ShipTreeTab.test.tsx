@@ -3,10 +3,23 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
+import { hullCountsFor, layoutShipTree } from '@/engine/shipTree/layout';
+import { classNeedsOmega } from '@/engine/shipTree/rules';
+import { CALDARI_FACTION_ID, treeFor } from '@/engine/shipTree/templates';
 import { loadShipTree } from '@/sde/loadSde';
 import type { TargetPlan } from '@/features/skills/useTargetPlan';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { CROW, HOOKBILL, IBIS, MERLIN, TENGU, WORM } from './__fixtures__/shipTreeFixture';
+import {
+  CATALOG,
+  CROW,
+  HOOKBILL,
+  IBIS,
+  MERLIN,
+  SHIP_TREE,
+  TENGU,
+  WORM,
+} from './__fixtures__/shipTreeFixture';
+import { clearShipTreeCatalogCache } from './shipTreeCatalogs';
 import { ShipTreeTab } from './ShipTreeTab';
 import { useShipTreeViewPreference } from './shipTreeViewPreference';
 
@@ -77,6 +90,7 @@ const tile = (container: HTMLElement, typeID: number) =>
   container.querySelector<HTMLElement>(`[data-ship="${typeID}"]`)!;
 
 beforeEach(async () => {
+  clearShipTreeCatalogCache();
   skills.known = true;
   useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
   await useShipTreeViewPreference.getState().setValue(null);
@@ -219,6 +233,26 @@ describe('ShipTreeTab — ladder', () => {
     expect(merlin.querySelector('[data-tone]')).toHaveAttribute('data-tone', 'elite');
     expect(merlin.querySelector('.ring')?.textContent).toBe('V');
     expect(merlin).toHaveTextContent('Can fly');
+  });
+
+  it("chips exactly the classes the map's layout puts an Ω before", async () => {
+    const { container } = renderTab();
+    await screen.findByRole('button', { name: /Merlin/ });
+    const chips = [...container.querySelectorAll('[data-omega]')].map((el) =>
+      Number(el.closest<HTMLElement>('details')!.dataset.class)
+    );
+    const factionID = CALDARI_FACTION_ID;
+    const counts = hullCountsFor(SHIP_TREE, factionID);
+    const alphaMax = (id: number) => CATALOG.engineSkills.get(id)?.alphaMaxLevel ?? 0;
+    const layout = layoutShipTree({
+      factionID,
+      defs: treeFor(factionID, new Set(counts.keys())),
+      hullCounts: counts,
+      needsOmega: (id) => classNeedsOmega(SHIP_TREE.groups[String(id)], factionID, alphaMax),
+      parentEmpires: () => [],
+    });
+    expect(layout.omegas.length).toBeGreaterThan(0);
+    expect(chips.sort()).toEqual(layout.omegas.map((o) => o.classId).sort());
   });
 
   it('opens every section while searching, even one the reader collapsed', async () => {

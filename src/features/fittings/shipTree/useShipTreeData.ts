@@ -15,9 +15,10 @@ import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import type { CloneState, TrainedSkill } from '@/engine/types';
 import { cloneStateFor, useCloneStates } from '@/features/skills/cloneState';
 import { usePlanEditorData } from '@/features/skills/planner/usePlanEditorData';
-import { loadSkillCatalog, type SkillCatalog } from '@/features/skills/skillMap';
+import type { SkillCatalog } from '@/features/skills/skillMap';
 import { loadMasteries, loadShipTree } from '@/sde/loadSde';
 import type { MasteryMap, ShipTreeData } from '@/sde/types';
+import { shipTreeSkillCatalog } from './shipTreeCatalogs';
 
 const NO_TRAINED: ReadonlyMap<number, TrainedSkill> = new Map();
 const NO_STATUSES: ReadonlyMap<number, ShipTreeHullStatus> = new Map();
@@ -49,7 +50,7 @@ export function useShipTreeData(characterId: number | null): ShipTreeSource | nu
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([loadShipTree(), loadSkillCatalog()])
+    Promise.all([loadShipTree(), shipTreeSkillCatalog()])
       .then(([tree, skills]) => {
         if (cancelled) return;
         setData(tree);

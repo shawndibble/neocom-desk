@@ -12,6 +12,7 @@ import type { TargetPlan } from '@/features/skills/useTargetPlan';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FITTING_EDIT_PATH } from '../fittingRoutes';
 import { INTERCEPTORS, MERLIN } from './__fixtures__/shipTreeFixture';
+import { clearShipTreeCatalogCache } from './shipTreeCatalogs';
 import { ShipTreeTab } from './ShipTreeTab';
 import { useShipTreeViewPreference } from './shipTreeViewPreference';
 
@@ -151,6 +152,7 @@ async function openShip(name: RegExp) {
 }
 
 beforeEach(async () => {
+  clearShipTreeCatalogCache();
   useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
   await useShipTreeViewPreference.getState().setValue('map');
   vi.mocked(target.addEntries).mockClear();

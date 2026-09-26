@@ -10,10 +10,9 @@ import { Button } from '@/components/ui';
 import { encodeFittingShare } from '@/engine/fitting/fittingShare';
 import { newFitting } from '@/engine/fittings/fittingEdit';
 import { fittingToShareInput } from '@/engine/fittings/shareMapper';
+import { formatAttributeValue } from '@/features/market/format';
 import type { ShipTreeShip } from '@/sde/types';
 import { fittingEditLocation } from '../fittingRoutes';
-
-const number = (value: number) => value.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
 /** T3 cruisers ship no slots of their own: the fitted subsystems add them. */
 function slotsFromSubsystems(ship: ShipTreeShip): boolean {
@@ -31,9 +30,9 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
   const rows: [string, string][] = [];
   if (!slotsFromSubsystems(ship)) {
     rows.push(
-      [t('ships.info.fitting.highSlots'), number(s.highSlots)],
-      [t('ships.info.fitting.medSlots'), number(s.medSlots)],
-      [t('ships.info.fitting.lowSlots'), number(s.lowSlots)]
+      [t('ships.info.fitting.highSlots'), formatAttributeValue(s.highSlots)],
+      [t('ships.info.fitting.medSlots'), formatAttributeValue(s.medSlots)],
+      [t('ships.info.fitting.lowSlots'), formatAttributeValue(s.lowSlots)]
     );
   }
   rows.push([
@@ -43,22 +42,31 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
           count: s.rigSlots,
           size: t(`ships.info.fitting.rigSize.${s.rigSize}`),
         })
-      : number(s.rigSlots),
+      : formatAttributeValue(s.rigSlots),
   ]);
   if (!slotsFromSubsystems(ship)) {
     rows.push(
-      [t('ships.info.fitting.turrets'), number(s.turretHardpoints)],
-      [t('ships.info.fitting.launchers'), number(s.launcherHardpoints)]
+      [t('ships.info.fitting.turrets'), formatAttributeValue(s.turretHardpoints)],
+      [t('ships.info.fitting.launchers'), formatAttributeValue(s.launcherHardpoints)]
     );
   }
   rows.push(
-    [t('ships.info.fitting.cpu'), t('ships.info.fitting.tf', { value: number(s.cpu) })],
-    [t('ships.info.fitting.powergrid'), t('ships.info.fitting.mw', { value: number(s.powergrid) })],
-    [t('ships.info.fitting.calibration'), number(s.calibration)],
-    [t('ships.info.fitting.droneBay'), t('ships.info.fitting.m3', { value: number(s.droneBay) })],
+    [
+      t('ships.info.fitting.cpu'),
+      t('ships.info.fitting.tf', { value: formatAttributeValue(s.cpu) }),
+    ],
+    [
+      t('ships.info.fitting.powergrid'),
+      t('ships.info.fitting.mw', { value: formatAttributeValue(s.powergrid) }),
+    ],
+    [t('ships.info.fitting.calibration'), formatAttributeValue(s.calibration)],
+    [
+      t('ships.info.fitting.droneBay'),
+      t('ships.info.fitting.m3', { value: formatAttributeValue(s.droneBay) }),
+    ],
     [
       t('ships.info.fitting.droneBandwidth'),
-      t('ships.info.fitting.mbit', { value: number(s.droneBandwidth) }),
+      t('ships.info.fitting.mbit', { value: formatAttributeValue(s.droneBandwidth) }),
     ]
   );
 

@@ -1914,10 +1914,9 @@ async function main() {
     ]),
   ].sort((a, b) => a - b);
 
-  // --- shipTree.json: the in-game Ship Tree's contents (issue's Ship Tree
-  // tab). Pure join logic lives in `lib/shipTree.mjs` so it's testable
-  // without this whole download pipeline; this just hands it the raw parsed
-  // rows it asks for. ---
+  // --- shipTree.json: the in-game Ship Tree's contents. Pure join logic
+  // lives in `lib/shipTree.mjs` so it's testable without this whole download
+  // pipeline; this just hands it the raw parsed rows it asks for. ---
   const shipTree = buildShipTree({
     invTypes: raw['invTypes.csv'],
     invGroups: raw['invGroups.csv'],

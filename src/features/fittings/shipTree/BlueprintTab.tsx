@@ -10,15 +10,12 @@ import { Link } from 'react-router-dom';
 import { Button, buttonClassName, Spinner, TypeIcon } from '@/components/ui';
 import { marketItemUrl } from '@/engine/market/urlState';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
-import {
-  loadBlueprintCatalog,
-  planTargetForItem,
-  type BlueprintCatalog,
-} from '@/features/industry/blueprintCatalog';
+import { planTargetForItem, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { ShipTreeShip } from '@/sde/types';
+import { shipTreeBlueprintCatalog } from './shipTreeCatalogs';
 import { ownedBlueprintSummary } from './shipTreeModel';
 
 export function BlueprintTab({
@@ -37,7 +34,7 @@ export function BlueprintTab({
 
   useEffect(() => {
     let cancelled = false;
-    loadBlueprintCatalog()
+    shipTreeBlueprintCatalog()
       .then((c) => {
         if (!cancelled) setCatalog(c);
       })

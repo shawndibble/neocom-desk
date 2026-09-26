@@ -49,6 +49,11 @@ export interface ShipTreeEdge {
   childId: number;
 }
 
+/** A gold Ω marker on the line into `classId`, the class that needs Omega. */
+export interface ShipTreeOmega extends Point {
+  classId: number;
+}
+
 /** A pirate class's link to one of its two parent empires. */
 export interface ShipTreeEmblem extends Point {
   factionID: number;
@@ -64,9 +69,9 @@ export interface ShipTreeLayout {
   nodes: ShipTreeNode[];
   edges: ShipTreeEdge[];
   /** Gold Ω markers — centre points on a line. */
-  omegas: Point[];
+  omegas: ShipTreeOmega[];
   emblems: ShipTreeEmblem[];
-  /** The capsule the tree starts from — its line runs right from root.x + 28. */
+  /** The capsule the tree starts from — its line runs right from root.x + CAPSULE_W. */
   root: Point;
   width: number;
   height: number;

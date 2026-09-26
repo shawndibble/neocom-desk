@@ -123,11 +123,50 @@ describe('SHIP_TREE_GEOMETRY', () => {
       COL_GAP: 96,
       CHAMFER: 30,
       MARGIN: 110,
+      MAX_COLS: 3,
+      CAPSULE_W: 28,
+      ROOT_LINE: 140,
+      ROOT_OMEGA_W: 90,
+      ROOT_FORK_W: 110,
+      ROOT_FORK_X: 70,
+      CORVETTE_Y: 200,
+      CORVETTE_ROOT_X: 175,
+      CORVETTE_TO_MAIN: 164,
+      CAP_JUNCTION: 60,
+      EMBLEM_ABOVE: 126,
+      EMBLEM_BELOW: 70,
+      EMBLEM_HALF: 20,
+      OMEGA_LABEL_CLEAR: 8,
+      INDUSTRY_Y_CORVETTE: 498,
+      INDUSTRY_Y: 280,
+      INDUSTRY_GAP: 60,
+      SHUTTLE_X: 204,
+      INDUSTRY_X: 250,
+      INDUSTRY_STEP: 150,
+      DROP_Y: 278,
+      DROP_OMEGA_RISE: 40,
+      STRAY_GAP: 200,
     });
   });
 });
 
 describe('Ω placement (real class data)', () => {
+  it.each(FACTION_IDS)('faction %i: each Ω is tagged with the class it sits before', (id) => {
+    const layout = layoutFor(id);
+    for (const o of layout.omegas) expect(o.classId).toBe(omegaClass(layout, o));
+  });
+
+  it('Caldari: Ω classIds', () => {
+    // Interceptor, Command Destroyer, Recon, Command Ship, Marauder,
+    // Dreadnought, Freighter, Transport Ship.
+    const ids = layoutFor(CALDARI).omegas.map((o) => o.classId);
+    expect(ids.sort((a, b) => a - b)).toEqual([10, 18, 24, 28, 32, 37, 40, 93]);
+  });
+
+  it('EDENCOM: the root-line Ω belongs to the first main class', () => {
+    expect(layoutFor(EDENCOM).omegas.map((o) => o.classId)).toEqual([FRIGATE]);
+  });
+
   it('Caldari: each hull trunk between Navy and first T2, before the Dread, Freighter and Transport Ship', () => {
     const layout = layoutFor(CALDARI);
     // Interceptor, Command Destroyer, Recon, Command Ship, Marauder,

@@ -8,6 +8,7 @@ import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import { cx } from '@/lib/cx';
 import type { ShipTreeData } from '@/sde/types';
 import { factionEmblemUrl } from './shipTreeAssets';
+import { flyableCount } from './shipTreeModel';
 
 export function FactionBar({
   data,
@@ -21,16 +22,19 @@ export function FactionBar({
   onFaction: (factionID: number) => void;
 }) {
   const { t } = useTranslation();
-  const counts = useMemo(() => {
-    const out = new Map<number, { total: number; flyable: number }>();
-    for (const ship of data.ships) {
-      const c = out.get(ship.factionID) ?? { total: 0, flyable: 0 };
-      c.total++;
-      if (statuses.get(ship.typeID)?.canFly) c.flyable++;
-      out.set(ship.factionID, c);
-    }
-    return out;
-  }, [data, statuses]);
+  const counts = useMemo(
+    () =>
+      new Map(
+        data.factions.map((f) => [
+          f.id,
+          flyableCount(
+            data.ships.filter((s) => s.factionID === f.id),
+            statuses
+          ),
+        ])
+      ),
+    [data, statuses]
+  );
   return (
     <div
       role="group"

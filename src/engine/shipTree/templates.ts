@@ -9,8 +9,29 @@
  */
 import type { ShipTreeNodeDef } from './types';
 
-export const EMPIRE_FACTION_IDS: ReadonlySet<number> = new Set([500001, 500002, 500003, 500004]);
+export const CALDARI_FACTION_ID = 500001;
+export const MINMATAR_FACTION_ID = 500002;
+export const AMARR_FACTION_ID = 500003;
+export const GALLENTE_FACTION_ID = 500004;
+export const EMPIRE_FACTION_IDS: ReadonlySet<number> = new Set([
+  CALDARI_FACTION_ID,
+  MINMATAR_FACTION_ID,
+  AMARR_FACTION_ID,
+  GALLENTE_FACTION_ID,
+]);
 export const ORE_FACTION_ID = 500014;
+
+/**
+ * Pirate factions: the game marks every hull of theirs ◇, including the
+ * Guristas Mamba, which the SDE gives meta level 0.
+ */
+export const PIRATE_FACTION_IDS: ReadonlySet<number> = new Set([
+  500010, 500011, 500012, 500016, 500018, 500019, 500020,
+]);
+
+/** Class ids (shipTreeGroups) the layout treats specially. */
+export const CORVETTE_CLASS_ID = 4;
+export const DREADNOUGHT_CLASS_ID = 32;
 
 /** Navy/faction classes sit straight above their parent, not stepped right. */
 export const STACKED_CLASSES: ReadonlySet<number> = new Set([

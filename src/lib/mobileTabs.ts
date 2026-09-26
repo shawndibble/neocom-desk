@@ -94,7 +94,6 @@ function isMobileTabPath(value: unknown): value is MobileTabPath {
 
 /** A path this settings value may still hold from before a route was renamed. */
 const LEGACY_PATH_REMAP: Record<string, MobileTabPath> = {
-  // #1304.
   '/moon-mining': '/mining',
   // Fittings became the Ships section (scope decision `20260926-135538`).
   '/fittings': '/ships',

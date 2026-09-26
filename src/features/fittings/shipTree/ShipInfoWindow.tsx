@@ -17,9 +17,10 @@ import { BlueprintTab } from './BlueprintTab';
 import { DescriptionTab } from './DescriptionTab';
 import { FittingTab } from './FittingTab';
 import { FlyDot } from './FlyDot';
-import { Wing } from './IsisTile';
+import { MasteryBadge } from './IsisTile';
 import { SkillsMasteryTab, type AddedToPlan } from './SkillsMasteryTab';
 import { flyLabel } from './flyLabel';
+import { factionNameOf } from './shipTreeModel';
 import type { ShipTreeSource } from './useShipTreeData';
 
 type InfoTab = 'description' | 'fitting' | 'skills' | 'blueprint';
@@ -124,7 +125,7 @@ function ShipInfoHeader({ ship, source }: { ship: ShipTreeShip; source: ShipTree
   const { t } = useTranslation();
   const status = source.statuses.get(ship.typeID);
   const mastery = status?.mastery ?? 0;
-  const faction = source.data.factions.find((f) => f.id === ship.factionID)?.name ?? '';
+  const faction = factionNameOf(source.data.factions, ship.factionID);
   const className = source.data.groups[String(ship.treeGroupID)]?.name ?? '';
   return (
     <div className="flex gap-3">
@@ -147,19 +148,14 @@ function ShipInfoHeader({ ship, source }: { ship: ShipTreeShip; source: ShipTree
           <span>{flyLabel(t, status)}</span>
         </div>
         <div className="flex items-center gap-2 text-text-dim">
-          <span
-            aria-hidden="true"
+          <MasteryBadge
+            mastery={mastery}
             className={cx(
               'inline-flex items-center gap-px',
               mastery >= 5 ? 'text-mastery-elite' : 'text-text-dim'
             )}
-          >
-            <Wing />
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full border border-current px-1 text-[0.625rem] font-bold">
-              {mastery ? romanLevel(mastery) : ''}
-            </span>
-            <Wing flip />
-          </span>
+            ringClassName="flex h-5 min-w-5 items-center justify-center rounded-full border border-current px-1 text-[0.625rem] font-bold"
+          />
           <span>
             {mastery
               ? t('ships.info.mastery', { level: romanLevel(mastery) })

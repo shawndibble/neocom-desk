@@ -17,7 +17,13 @@ import { SkillBlocks } from './SkillBlocks';
 import { classSkillTitle } from './classSkillTitle';
 import { flyLabel } from './flyLabel';
 import { classIconUrl, factionEmblemUrl } from './shipTreeAssets';
-import { ladderSections, omegaChipClasses, searchHulls, type LadderSection } from './shipTreeModel';
+import {
+  factionNameOf,
+  flyableCount,
+  ladderSections,
+  searchHulls,
+  type LadderSection,
+} from './shipTreeModel';
 import type { FactionTree } from './useFactionTree';
 import type { ShipTreeSource } from './useShipTreeData';
 
@@ -38,8 +44,8 @@ export function ShipTreeLadder({ source, tree, onFaction, onOpenShip, viewSwitch
 
   const sections = useMemo(() => ladderSections(tree.defs), [tree.defs]);
   const omegaChips = useMemo(
-    () => omegaChipClasses(tree.defs, tree.needsOmega),
-    [tree.defs, tree.needsOmega]
+    () => new Set(tree.layout.omegas.map((o) => o.classId)),
+    [tree.layout]
   );
   const elsewhere = useMemo(
     () =>
@@ -157,11 +163,10 @@ function LadderClass({
   const ships = all.filter(visible);
   const children = section.children.filter((c) => hasVisible(c, tree, visible));
   const unlocked = tree.unlocked(id);
-  const flyable = all.filter((s) => statuses.get(s.typeID)?.canFly).length;
+  const { flyable, total } = flyableCount(all, statuses);
   const skills = (group?.prereqsByFaction[String(tree.factionID)] ?? []).filter((p) => p.display);
   const empires = [...tree.parentEmpires(id)].reverse();
   const name = group?.name ?? '';
-  const factionName = (fid: number) => data.factions.find((f) => f.id === fid)?.name ?? '';
   // Top level starts open; the reader's own toggles stick. A search opens
   // everything over that, and clearing it puts their choice back. `open` is
   // controlled so a section they collapsed still opens for a search — React
@@ -188,7 +193,13 @@ function LadderClass({
           className={cx('isis-icon isis-class-mini', !unlocked && 'locked')}
           title={classSkillTitle(t, name, skills, trainedLevel, skillName)}
         >
-          <img src={classIconUrl(group?.icon ?? '')} alt="" draggable={false} />
+          <img
+            src={classIconUrl(group?.icon ?? '')}
+            alt=""
+            draggable={false}
+            loading="lazy"
+            decoding="async"
+          />
         </span>
         <span
           className={cx(
@@ -202,7 +213,7 @@ function LadderClass({
           <SkillBlocks skills={skills} trainedLevel={trainedLevel} />
         </span>
         <span className="ml-auto text-xs text-text-dim tabular-nums">
-          {t('ships.tree.flyableOfTotal', { flyable, total: all.length })}
+          {t('ships.tree.flyableOfTotal', { flyable, total })}
         </span>
       </summary>
       {empires.length === 2 && (
@@ -210,17 +221,27 @@ function LadderClass({
           <span>{t('ships.tree.needs')}</span>
           {empires.map((fid, i) => {
             const emblem = factionEmblemUrl(fid);
+            const factionName = factionNameOf(data.factions, fid);
             return (
               <span key={fid} className="flex items-center gap-1">
                 {i > 0 && <span aria-hidden="true">·</span>}
                 <button
                   type="button"
                   onClick={() => onFaction(fid)}
-                  aria-label={t('ships.tree.switchFaction', { name: factionName(fid) })}
+                  aria-label={t('ships.tree.switchFaction', { name: factionName })}
                   className="flex min-h-7 items-center gap-1 text-accent hover:underline"
                 >
-                  {emblem && <img src={emblem} alt="" width={14} height={14} />}
-                  {factionName(fid)}
+                  {emblem && (
+                    <img
+                      src={emblem}
+                      alt=""
+                      width={14}
+                      height={14}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  )}
+                  {factionName}
                 </button>
               </span>
             );

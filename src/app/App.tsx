@@ -126,8 +126,7 @@ const ROUTE_ELEMENTS = {
   '/skills/plans': <SkillPlans />,
   '/skills/plans/:planId': <SkillPlanEditor />,
   '/skills/compare': <SkillCompare />,
-  // The old Skills › Ships page (gone since #1911); old bookmarks land on the
-  // Ship Tree.
+  // The old Skills › Ships page is gone; old bookmarks land on the Ship Tree.
   '/skills/ships': <LegacyShipsRedirect />,
   '/industry': <Industry />,
   '/industry/plans/:planId': <IndustryPlanPage />,

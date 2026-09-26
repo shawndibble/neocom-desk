@@ -1,20 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import {
-  FACTION_IDS,
-  GROUPS,
-  alphaMaxLevel,
-  hullCounts,
-} from '@/engine/shipTree/__fixtures__/classData';
-import { classNeedsOmega } from '@/engine/shipTree/rules';
-import { layoutShipTree } from '@/engine/shipTree/layout';
 import { treeFor } from '@/engine/shipTree/templates';
+import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import type { ShipTreeData, ShipTreeShip } from '@/sde/types';
+import type { ShipTreeData, ShipTreeFaction, ShipTreeShip } from '@/sde/types';
 import {
   DEFAULT_FACTION_ID,
+  factionNameOf,
+  flyableCount,
   ladderSections,
   masteryTierEntries,
-  omegaChipClasses,
   ownedBlueprintSummary,
   resolveFactionID,
   searchHulls,
@@ -51,35 +45,23 @@ function ship(over: Partial<ShipTreeShip>): ShipTreeShip {
   };
 }
 
-describe('omegaChipClasses', () => {
-  it('puts a chip on exactly the classes the map draws an Ω before, for every faction', () => {
-    for (const factionID of FACTION_IDS) {
-      const counts = hullCounts(factionID);
-      const defs = treeFor(factionID, new Set(counts.keys()));
-      const needsOmega = (id: number) => classNeedsOmega(GROUPS.get(id), factionID, alphaMaxLevel);
-      const layout = layoutShipTree({
-        factionID,
-        defs,
-        hullCounts: counts,
-        needsOmega,
-        parentEmpires: () => [],
-      });
-      expect(omegaChipClasses(defs, needsOmega).size, `faction ${factionID}`).toBe(
-        layout.omegas.length
-      );
-    }
+describe('factionNameOf', () => {
+  const factions: ShipTreeFaction[] = [{ id: 500001, name: 'Caldari State', description: '' }];
+  it("names a listed faction, '' otherwise", () => {
+    expect(factionNameOf(factions, 500001)).toBe('Caldari State');
+    expect(factionNameOf(factions, 42)).toBe('');
   });
+});
 
-  it('marks only the first Omega class of a stack', () => {
-    const defs = treeFor(500001, new Set([4, 8, 9, 10, 11]));
-    const needsOmega = (id: number) => id === 10 || id === 11;
-    expect([...omegaChipClasses(defs, needsOmega)]).toEqual([10]);
-  });
-
-  it('lets the main-line Ω before the Dreadnought cover its capital trunk', () => {
-    const defs = treeFor(500001, new Set([4, 8, 26, 32, 33, 34]));
-    const needsOmega = (id: number) => id === 32 || id === 33 || id === 34;
-    expect([...omegaChipClasses(defs, needsOmega)]).toEqual([32]);
+describe('flyableCount', () => {
+  it('counts the hulls the pilot can fly out of all given', () => {
+    const statuses = new Map<number, ShipTreeHullStatus>([
+      [1, { canFly: true, secondsToFly: 0, mastery: 0 }],
+      [2, { canFly: false, secondsToFly: 60, mastery: 0 }],
+    ]);
+    const ships = [ship({ typeID: 1 }), ship({ typeID: 2 }), ship({ typeID: 3 })];
+    expect(flyableCount(ships, statuses)).toEqual({ flyable: 1, total: 3 });
+    expect(flyableCount([], statuses)).toEqual({ flyable: 0, total: 0 });
   });
 });
 

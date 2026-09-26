@@ -4,15 +4,22 @@
  * descends from, and how a hull's tile is toned.
  */
 import type { ShipTreeClassSkill, ShipTreeGroup } from '@/sde/types';
-import { EMPIRE_FACTION_IDS, ORE_FACTION_ID } from './templates';
+import {
+  AMARR_FACTION_ID,
+  CALDARI_FACTION_ID,
+  EMPIRE_FACTION_IDS,
+  GALLENTE_FACTION_ID,
+  MINMATAR_FACTION_ID,
+  ORE_FACTION_ID,
+} from './templates';
 import type { ShipTreeHullStatus, ShipTreeTileTone } from './types';
 
 /** An empire skill's name prefix -> that empire's faction id. */
 const EMPIRE_BY_PREFIX: Readonly<Record<string, number>> = {
-  Caldari: 500001,
-  Minmatar: 500002,
-  Amarr: 500003,
-  Gallente: 500004,
+  Caldari: CALDARI_FACTION_ID,
+  Minmatar: MINMATAR_FACTION_ID,
+  Amarr: AMARR_FACTION_ID,
+  Gallente: GALLENTE_FACTION_ID,
 };
 
 const prereqs = (

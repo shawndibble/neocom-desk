@@ -4,6 +4,7 @@
  * gold Ω hexagons, and the capsule root. The layout is already in world
  * coordinates, so everything is drawn as given.
  */
+import { useMemo } from 'react';
 import type { ShipTreeEdge, ShipTreeLayout } from '@/engine/shipTree/types';
 import { CAPSULE_ICON_URL } from './shipTreeAssets';
 
@@ -30,6 +31,12 @@ export function MapLines({
   lit: (edge: ShipTreeEdge) => boolean;
 }) {
   const { edges, emblems, omegas, root, width, height } = layout;
+  const [litEdges, dimEdges] = useMemo(() => {
+    const on: ShipTreeEdge[] = [];
+    const off: ShipTreeEdge[] = [];
+    for (const e of edges) (lit(e) ? on : off).push(e);
+    return [on, off];
+  }, [edges, lit]);
   return (
     <svg
       width={width}
@@ -46,12 +53,10 @@ export function MapLines({
           </g>
         );
       })}
-      {edges
-        .filter((e) => !lit(e))
-        .map((e) => (
-          <Pipe key={e.key} d={e.d} lit={false} />
-        ))}
-      {edges.filter(lit).map((e) => (
+      {dimEdges.map((e) => (
+        <Pipe key={e.key} d={e.d} lit={false} />
+      ))}
+      {litEdges.map((e) => (
         <Pipe key={e.key} d={e.d} lit />
       ))}
       {omegas.map((o, i) => (

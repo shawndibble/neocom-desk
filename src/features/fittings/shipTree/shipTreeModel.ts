@@ -1,75 +1,45 @@
 /**
  * The Ship Tree tab's view rules that sit on top of the engine
- * (`engine/shipTree`): which ladder classes carry an Ω chip, how the ladder
- * nests, a tile's tech corner, bonus grouping, search, and the Ship Info
- * window's Mastery and Blueprint read-outs. Pure — no React, no fetch.
+ * (`engine/shipTree`): how the ladder nests, flyable counts, a tile's tech
+ * corner, bonus grouping, search, and the Ship Info window's Mastery and
+ * Blueprint read-outs. Pure — no React, no fetch.
  */
-import { STACKED_CLASSES } from '@/engine/shipTree/templates';
-import type { ShipTreeNodeDef } from '@/engine/shipTree/types';
+import {
+  CALDARI_FACTION_ID,
+  PIRATE_FACTION_IDS,
+  STACKED_CLASSES,
+} from '@/engine/shipTree/templates';
+import type { ShipTreeHullStatus, ShipTreeNodeDef } from '@/engine/shipTree/types';
 import type { PlanEntry } from '@/engine/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import type { ShipTreeData, ShipTreeShip, ShipTreeTrait, SkillPrereq } from '@/sde/types';
+import type {
+  ShipTreeData,
+  ShipTreeFaction,
+  ShipTreeShip,
+  ShipTreeTrait,
+  SkillPrereq,
+} from '@/sde/types';
 
 /** Caldari State — the in-game tree's first tab. */
-export const DEFAULT_FACTION_ID = 500001;
-
-const CORVETTE = 4;
+export const DEFAULT_FACTION_ID = CALDARI_FACTION_ID;
 
 /** The faction the URL asked for when the tree has it, else the default. */
 export function resolveFactionID(data: ShipTreeData | null, requested: number): number {
   return data?.factions.some((f) => f.id === requested) ? requested : DEFAULT_FACTION_ID;
 }
 
-/**
- * The classes the map draws a gold Ω in front of — the same rule as
- * `layoutShipTree`, per trunk, so the ladder's chips and the map's
- * hexagons always agree:
- * - main line: a class needing Omega after one that doesn't (the first
- *   main class counts from the root when there is no Corvette; the
- *   Corvette's rise into the Frigate carries none);
- * - a stack (branches, and separately the capital trunk): its first Omega
- *   class, unless the parent already needs Omega;
- * - industry line: as the main line, its first class covered by the
- *   Corvette (or the root Ω);
- * - a drop: Omega where its parent isn't.
- */
-export function omegaChipClasses(
-  defs: readonly ShipTreeNodeDef[],
-  needsOmega: (classId: number) => boolean
-): Set<number> {
-  const chips = new Set<number>();
-  const kids = (id: number, lane: ShipTreeNodeDef['lane']) =>
-    defs.filter((d) => d.parent === id && d.lane === lane);
-  const stack = (parentId: number, children: readonly ShipTreeNodeDef[]) => {
-    let seen = needsOmega(parentId);
-    for (const child of children) {
-      if (!needsOmega(child.id) || seen) continue;
-      chips.add(child.id);
-      seen = true;
-    }
-  };
+/** A faction's name, or '' for one the tree doesn't list. */
+export function factionNameOf(factions: readonly ShipTreeFaction[], factionID: number): string {
+  return factions.find((f) => f.id === factionID)?.name ?? '';
+}
 
-  const corvette = defs.find((d) => d.id === CORVETTE && d.lane === 'main');
-  const mains = defs.filter((d) => d.lane === 'main' && d !== corvette);
-  const rootOmega = !corvette && mains[0] !== undefined && needsOmega(mains[0].id);
-  mains.forEach((def, i) => {
-    const prev = mains[i - 1];
-    if (prev ? needsOmega(def.id) && !needsOmega(prev.id) : rootOmega) chips.add(def.id);
-    stack(def.id, kids(def.id, 'branch'));
-    stack(def.id, kids(def.id, 'capital'));
-  });
-
-  const industry = defs.filter((d) => d.lane === 'industry');
-  industry.forEach((def, i) => {
-    const prev = industry[i - 1];
-    const covered = prev ? needsOmega(prev.id) : corvette ? needsOmega(CORVETTE) : rootOmega;
-    if (needsOmega(def.id) && !covered) chips.add(def.id);
-    stack(def.id, kids(def.id, 'branch'));
-    for (const drop of kids(def.id, 'drop')) {
-      if (needsOmega(drop.id) && !needsOmega(def.id)) chips.add(drop.id);
-    }
-  });
-  return chips;
+/** How many of `ships` the pilot can fly, out of how many. */
+export function flyableCount(
+  ships: readonly ShipTreeShip[],
+  statuses: ReadonlyMap<number, ShipTreeHullStatus>
+): { flyable: number; total: number } {
+  const flyable = ships.filter((s) => statuses.get(s.typeID)?.canFly).length;
+  return { flyable, total: ships.length };
 }
 
 export interface LadderSection {
@@ -96,14 +66,6 @@ function isNested(def: ShipTreeNodeDef): boolean {
 }
 
 export type TechMark = 't2' | 't3' | 'faction';
-
-/**
- * Pirate factions: the game marks every hull of theirs ◇, including the
- * Guristas Mamba, which the SDE gives meta level 0.
- */
-const PIRATE_FACTION_IDS: ReadonlySet<number> = new Set([
-  500010, 500011, 500012, 500016, 500018, 500019, 500020,
-]);
 
 /** A tile's corner, always shown, as in game: II, III, or ◇ for Navy and faction hulls. */
 export function techMark(ship: ShipTreeShip): TechMark | null {

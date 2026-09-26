@@ -16,7 +16,6 @@ import {
   type ReactNode,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { layoutShipTree, hullCountsFor } from '@/engine/shipTree/layout';
 import type { ShipTreeEdge, ShipTreeHullStatus, ShipTreeLayout } from '@/engine/shipTree/types';
 import { cx } from '@/lib/cx';
 import type { ShipTreeFaction, ShipTreeShip } from '@/sde/types';
@@ -36,6 +35,7 @@ import {
   type Size,
 } from './mapCamera';
 import { factionEmblemUrl } from './shipTreeAssets';
+import { factionNameOf, flyableCount } from './shipTreeModel';
 import type { FactionTree } from './useFactionTree';
 import type { ShipTreeSource } from './useShipTreeData';
 
@@ -70,17 +70,7 @@ export function ShipTreeMap({
   const viewportRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; cam: Camera } | null>(null);
 
-  const layout = useMemo(
-    () =>
-      layoutShipTree({
-        factionID,
-        defs: tree.defs,
-        hullCounts: hullCountsFor(data, factionID),
-        needsOmega: tree.needsOmega,
-        parentEmpires: tree.parentEmpires,
-      }),
-    [data, factionID, tree]
-  );
+  const layout = tree.layout;
   const nodeById = useMemo(() => new Map(layout.nodes.map((n) => [n.def.id, n])), [layout]);
   const world = useMemo(() => ({ width: layout.width, height: layout.height }), [layout]);
 
@@ -172,9 +162,14 @@ export function ShipTreeMap({
     onOpenShip(ship);
   }
 
-  const factionShips = data.ships.filter((s) => s.factionID === factionID);
-  const flyable = factionShips.filter((s) => statuses.get(s.typeID)?.canFly).length;
-  const factionName = (id: number) => data.factions.find((f) => f.id === id)?.name ?? '';
+  const { flyable, total } = useMemo(
+    () =>
+      flyableCount(
+        data.ships.filter((s) => s.factionID === factionID),
+        statuses
+      ),
+    [data, factionID, statuses]
+  );
 
   return (
     <div className="space-y-2">
@@ -182,7 +177,7 @@ export function ShipTreeMap({
         {viewSwitch}
         <MapSearch data={data} statuses={statuses} onPick={pickResult} />
         <span className="text-xs text-text-dim">
-          {t('ships.tree.flyableCount', { flyable, total: factionShips.length })}
+          {t('ships.tree.flyableCount', { flyable, total })}
         </span>
         <span className="flex-1" />
         <Legend />
@@ -239,7 +234,7 @@ export function ShipTreeMap({
       <div
         ref={viewportRef}
         role="region"
-        aria-label={t('ships.tree.mapLabel', { faction: factionName(factionID) })}
+        aria-label={t('ships.tree.mapLabel', { faction: factionNameOf(data.factions, factionID) })}
         data-testid="ship-tree-map"
         data-zoom={cam.z.toFixed(2)}
         className="isis-viewport relative h-[calc(100dvh-17rem)] min-h-[28rem] cursor-grab touch-none overflow-hidden rounded-xs border border-line active:cursor-grabbing"
@@ -332,23 +327,41 @@ const MapWorld = memo(function MapWorld({
 }) {
   const { t } = useTranslation();
   const lit = useCallback((e: ShipTreeEdge) => tree.unlocked(e.childId), [tree]);
-  const factionName = (id: number) => factions.find((f) => f.id === id)?.name ?? '';
+  // Only the class holding the selected hull gets it, so a new selection
+  // re-renders two classes, not all of them.
+  const selectedClassId = useMemo(() => {
+    for (const [classId, ships] of tree.hulls) {
+      if (ships.some((s) => s.typeID === selectedTypeID)) return classId;
+    }
+    return null;
+  }, [tree, selectedTypeID]);
   return (
     <>
       <MapLines layout={layout} lit={lit} />
       {layout.emblems.map((e, i) => {
         const emblem = factionEmblemUrl(e.factionID);
+        const name = factionNameOf(factions, e.factionID);
         return (
           <button
             key={`eb${i}`}
             type="button"
             className="isis-emblem"
             style={{ left: e.x, top: e.y }}
-            title={factionName(e.factionID)}
-            aria-label={t('ships.tree.switchFaction', { name: factionName(e.factionID) })}
+            title={name}
+            aria-label={t('ships.tree.switchFaction', { name })}
             onClick={() => onFaction(e.factionID)}
           >
-            {emblem && <img src={emblem} alt="" width={22} height={22} draggable={false} />}
+            {emblem && (
+              <img
+                src={emblem}
+                alt=""
+                width={22}
+                height={22}
+                draggable={false}
+                loading="lazy"
+                decoding="async"
+              />
+            )}
           </button>
         );
       })}
@@ -360,7 +373,7 @@ const MapWorld = memo(function MapWorld({
           statuses={statuses}
           trainedLevel={trainedLevel}
           skillName={skillName}
-          selectedTypeID={selectedTypeID}
+          selectedTypeID={n.def.id === selectedClassId ? selectedTypeID : null}
           showNames={showNames}
           onSelect={onSelect}
           onHover={onHover}

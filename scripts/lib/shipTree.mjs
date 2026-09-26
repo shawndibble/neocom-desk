@@ -1,8 +1,8 @@
-// Pure transform behind build-sde.mjs's Ship Tree bake (public/data/shipTree.json,
-// issue's Ship Tree tab). Takes the same {name: rows} shape build-sde.mjs's own
-// `raw` object holds — each value the array-of-arrays `parseCsv` returns
-// (header row first, then data rows, every cell a string) — so this is
-// testable with small hand-made fixtures, no download pipeline needed.
+// Pure transform behind build-sde.mjs's Ship Tree bake (public/data/shipTree.json).
+// Takes the same {name: rows} shape build-sde.mjs's own `raw` object holds —
+// each value the array-of-arrays `parseCsv` returns (header row first, then
+// data rows, every cell a string) — so this is testable with small hand-made
+// fixtures, no download pipeline needed.
 // Mirrors flattenMarketWideTree.mjs's split: the join logic lives here, the
 // CSV download/cache and output-writing stay in build-sde.mjs.
 //
@@ -197,8 +197,8 @@ export function buildShipTree(csv) {
   }
 
   // --- stats: dgmTypeAttributes, attribute ids resolved BY NAME against
-  // dgmAttributeTypes — never hard-coded, per issue's lesson learned on the
-  // throwaway prototype. ---
+  // dgmAttributeTypes — never hard-coded, a lesson from the throwaway
+  // prototype. ---
   {
     const attrIdByName = new Map();
     const h = indexHeader(dgmAttributeTypesRows);

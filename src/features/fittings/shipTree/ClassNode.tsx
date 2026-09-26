@@ -3,6 +3,7 @@
  * class icon (dim while locked) with one skill bar per displayed class
  * skill under it, and its hulls in up to three columns of 96px tiles.
  */
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SHIP_TREE_GEOMETRY } from '@/engine/shipTree/layout';
 import type { ShipTreeHullStatus, ShipTreeNode } from '@/engine/shipTree/types';
@@ -16,7 +17,7 @@ import type { FactionTree } from './useFactionTree';
 
 const { TILE } = SHIP_TREE_GEOMETRY;
 
-export function ClassNode({
+export const ClassNode = memo(function ClassNode({
   node,
   tree,
   statuses,
@@ -64,6 +65,8 @@ export function ClassNode({
             width={24}
             height={24}
             draggable={false}
+            loading="lazy"
+            decoding="async"
           />
         </span>
         <SkillBlocks skills={skills} trainedLevel={trainedLevel} />
@@ -84,4 +87,4 @@ export function ClassNode({
       <div className="isis-rule-b" style={{ top: node.h + 6 }} />
     </section>
   );
-}
+});
