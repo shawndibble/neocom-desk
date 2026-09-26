@@ -84,7 +84,7 @@ export interface SoldUnitsMarginInputs {
 }
 
 export interface SoldUnitsMargin {
-  /** Unit cost x confirmed units sold — the only cost the sold units can be charged. */
+  /** Unit cost x confirmed units sold â€” the only cost the sold units can be charged. */
   soldCost: number;
   /** Net revenue less `soldCost`: provable from confirmed sales alone, unlike `realizedProfit`'s conservative headline. */
   margin: number;

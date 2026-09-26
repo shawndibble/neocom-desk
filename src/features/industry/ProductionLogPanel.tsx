@@ -504,7 +504,7 @@ export function ProductionLogPanel({
       className: 'tabular-nums',
       cellClassName: (r) => (r.unitsSold > 0 ? iskToneClass(r.soldUnitsMargin) : 'text-text-dim'),
       sortValue: (r) => (r.unitsSold > 0 ? r.soldUnitsMargin : undefined),
-      render: (r) => (r.unitsSold > 0 ? formatIsk(r.soldUnitsMargin) : '—'),
+      render: (r) => (r.unitsSold > 0 ? formatIsk(r.soldUnitsMargin) : 'â€”'),
     },
     {
       id: 'unsoldCost',
