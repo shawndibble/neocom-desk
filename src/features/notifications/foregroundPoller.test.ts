@@ -1401,8 +1401,8 @@ describe('runForegroundPoll', () => {
     // Type 34 is Tritanium in the bundled SDE snapshot, so the name resolves
     // without an ESI round trip — the same path a real poll takes first.
     const [, , copy] = notify.mock.calls[0];
-    expect(copy?.title).toBe('Sell order filled');
-    expect(copy?.body).toBe('Someone bought 250 x Tritanium from Test Pilot.');
+    expect(copy?.title).toBe('Test Pilot — Sell order filled');
+    expect(copy?.body).toBe('Someone bought 250 x Tritanium.');
   });
 
   it('leaves the count out when a single unit sold — "1 x" is noise', async () => {
@@ -1428,7 +1428,7 @@ describe('runForegroundPoll', () => {
 
     await runForegroundPoll(deps);
 
-    expect(notify.mock.calls[0][2]?.body).toBe('Someone bought Tritanium from Test Pilot.');
+    expect(notify.mock.calls[0][2]?.body).toBe('Someone bought Tritanium.');
   });
 
   it('still delivers when the item name cannot be resolved', async () => {
@@ -1457,7 +1457,7 @@ describe('runForegroundPoll', () => {
     // An id we cannot name is no reason to hold the notification back — the
     // same best-effort rule the EVE-notification copy follows.
     expect(notify).toHaveBeenCalledTimes(1);
-    expect(notify.mock.calls[0][2]?.body).toBe('Someone bought 5 x #99999 from Test Pilot.');
+    expect(notify.mock.calls[0][2]?.body).toBe('Someone bought 5 x #99999.');
   });
 
   it('says nothing when a buy order fills — that is the trade you set up, not news', async () => {

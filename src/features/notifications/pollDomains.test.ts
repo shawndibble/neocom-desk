@@ -1261,7 +1261,7 @@ describe('copy wiring', () => {
       { eventId: 'marketOrderFilled', characterId: 1, orderId: 1, typeId: 35, quantity: 2 },
       'Kestrel'
     );
-    expect(copy.body).toEqual('Someone bought 2 x #35 from Kestrel.');
+    expect(copy.body).toEqual('Someone bought 2 x #35.');
   });
 
   it("resolves a new member's name", async () => {

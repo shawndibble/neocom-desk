@@ -4253,9 +4253,9 @@
         "bodyWithAmount": "{{character}}'s wallet balance changed by {{amount}} ISK."
       },
       "marketOrderFilled": {
-        "title": "Sell order filled",
-        "body": "Someone bought {{item}} from {{character}}.",
-        "bodyWithQuantity": "Someone bought {{quantity}} x {{item}} from {{character}}."
+        "title": "{{character}} — Sell order filled",
+        "body": "Someone bought {{item}}.",
+        "bodyWithQuantity": "Someone bought {{quantity}} x {{item}}."
       },
       "marketOrderUndercut": {
         "title": "Order undercut",
