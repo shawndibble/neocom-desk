@@ -37,6 +37,12 @@ its place by killing a whole class of finding.
 
 Issue number, size (tweak/rework), verdict, one line.
 
+- #1925 tweak SHIP: 1024 open-Fitting header buttons stack one per line.
+- #1926 tweak NARROW: Start preview "Empty in 0m" (preview-only branch; do not touch shared `formatDuration`).
+- #1927 tweak NARROW: Compare controls into one wrapping row.
+- #1928 tweak SHIP: Compare Stats/Modules fit columns share widths.
+- #1929 tweak NARROW: Ring column sticky at lg+.
+
 | Issue | Size  | Verdict | Finding                                                                           |
 | ----- | ----- | ------- | --------------------------------------------------------------------------------- |
 | #1680 | tweak | NARROW  | Overview: move the cards                                                          | alerts split from `lg` to `xl` so cards stop truncating at 1024-1279. |
@@ -46,6 +52,8 @@ Issue number, size (tweak/rework), verdict, one line.
 ## Killed findings
 
 What was killed, and why. This is what stops a re-pitch.
+
+- Stats panel preamble reflow (weather + toolbar to one row, Manage buttons inline): stats column is 22rem at lg so inline Manage only fits at xl; rest is rearrangement with no user cost.
 
 - Industry vs other routes' content width differing at 1440 — documented tiering (see Contract).
 - Overview Alerts card showing a tall empty area beside two short card rows when there are no alerts — empty-state artefact of grid `stretch`, which the code comment defends on purpose.
