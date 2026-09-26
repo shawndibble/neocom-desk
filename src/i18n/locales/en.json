@@ -4664,7 +4664,9 @@
     "customize": {
       "linkLabel": "Log in with custom permissions",
       "title": "Log in with custom permissions",
+      "intro": "Pick what to share. You can add more later in Settings › Permissions.",
       "optInTag": "Opt-in",
+      "requiredTag": "Required",
       "selectAll": "Select all",
       "selectNone": "Select none",
       "optionalCount": "Optional · {{count}} of {{total}}",
