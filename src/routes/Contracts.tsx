@@ -31,6 +31,7 @@ import {
 } from './contractsColumns';
 import { GrantBanner } from '@/app/GrantNote';
 import { loadContracts } from '@/features/character/contracts';
+import { contractAmount } from '@/features/character/contractAmount';
 import { ContractContextMenu } from '@/features/character/ContractContextMenu';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
 import { IssuerLink } from '@/features/character/IssuerLink';
@@ -438,15 +439,15 @@ export function Contracts() {
         header: t('contracts.price'),
         align: 'right',
         className: 'tabular-nums',
-        sortValue: (contract) => contract.price ?? contract.reward,
-        render: (contract) =>
-          contract.price !== undefined ? (
-            <IskAmount value={contract.price} revealOn="longPress" />
-          ) : contract.reward !== undefined ? (
-            <IskAmount value={contract.reward} revealOn="longPress" />
+        sortValue: (contract) => contractAmount(contract),
+        render: (contract) => {
+          const amount = contractAmount(contract);
+          return amount !== undefined ? (
+            <IskAmount value={amount} revealOn="longPress" />
           ) : (
             t('common.unknown')
-          ),
+          );
+        },
       },
       expires: {
         id: 'expires',

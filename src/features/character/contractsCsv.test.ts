@@ -56,6 +56,15 @@ describe('contractsCsvColumns', () => {
     expect(priceColumn.value(contract({ price: undefined, reward: undefined }))).toBeNull();
   });
 
+  it('exports a courier reward, not its price of 0', () => {
+    const priceColumn = contractsCsvColumns(t, nameFor).find(
+      (c) => c.header === 'contracts.price'
+    )!;
+    expect(priceColumn.value(contract({ type: 'courier', price: 0, reward: 45_000_000 }))).toBe(
+      45_000_000
+    );
+  });
+
   it('emits a blank cell (not a string) when neither price nor reward is present', () => {
     const columns = contractsCsvColumns(t, nameFor);
     const row = contract({ price: undefined, reward: undefined });
