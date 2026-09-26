@@ -62,6 +62,7 @@ import { FittingStatsSections } from '@/features/fittings/FittingStatsSections';
 import { FittingVariationsPanel } from '@/features/fittings/FittingVariationsPanel';
 import { FittingAffectedByPanel } from '@/features/fittings/FittingAffectedByPanel';
 import { FittingFightersPanel } from '@/features/fittings/FittingFightersPanel';
+import { StatsHeadingLabel } from '@/features/fittings/StatsHeadingLabel';
 import { TacticalModePicker } from '@/features/fittings/TacticalModePicker';
 import { tacticalModeKind } from '@/engine/fittings/tacticalModes';
 import { ImplantBasisControl } from '@/features/fittings/ImplantBasisControl';
@@ -502,11 +503,10 @@ function FittingsPage() {
       heading={
         <>
           <span>
-            {activeCharacterId === null
-              ? t('fittings.stats.headingAllV')
-              : characterName
-                ? t('fittings.stats.headingCharacter', { name: characterName })
-                : null}
+            <StatsHeadingLabel
+              hasCharacter={activeCharacterId !== null}
+              characterName={characterName ?? null}
+            />
             {weatherName && ` · ${t('fittings.weather.in', { weather: weatherName })}`}
           </span>
           {workspace.price && (

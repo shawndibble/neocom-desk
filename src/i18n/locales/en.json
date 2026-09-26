@@ -510,8 +510,17 @@
       },
       "ehpColumn": "EHP",
       "incomplete": "incomplete",
-      "headingCharacter": "Stats as {{name}}, own skills",
-      "headingAllV": "Stats at all skills V",
+      "headingCharacter": {
+        "character": "Stats as {{name}}, own skills",
+        "allV": "Stats as {{name}}, all skills V",
+        "all0": "Stats as {{name}}, all skills 0"
+      },
+      "headingNoCharacter": {
+        "allV": "Stats at all skills V",
+        "all0": "Stats at all skills 0"
+      },
+      "headingSkillsSet_one": "{{count}} skill set by hand",
+      "headingSkillsSet_other": "{{count}} skills set by hand",
       "layerHp": "{{hp}} HP",
       "overheatedRow": "Overheated",
       "rahRow": "Reactive Armor Hardener",
