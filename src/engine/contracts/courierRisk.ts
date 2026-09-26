@@ -37,7 +37,14 @@ export type CourierRiskKind =
    * `route/chokepoints.ts`'s named list. Reported for either end: a pickup
    * there is as exposed as a delivery.
    */
-  | 'gank-chokepoint';
+  | 'gank-chokepoint'
+  /**
+   * Asks far more in collateral than it pays (issue #1720) — the shape a haul
+   * built to be forfeited takes. Contract-scoped like `over-rate`, so the modal
+   * adds it from `asksFarMoreCollateralThanReward`. Modal-only: it earns no
+   * row marker (decision `20260912-172628`).
+   */
+  | 'high-collateral';
 
 /**
  * Every J-space system sits in the 11000000 region block, and the contract row
@@ -134,6 +141,17 @@ export function blocksCompletion(risks: readonly CourierRiskKind[]): boolean {
  */
 export function completableCourierRoutes(rows: readonly CourierRouteRow[]): CourierRouteRow[] {
   return rows.filter((row) => !blocksCompletion(courierRisks(row)));
+}
+
+/**
+ * Collateral at this many times the reward or more earns the `high-collateral`
+ * flag (issue #1720). Set well clear of honest high-value freight — a 1B load
+ * paying 25M is 40x — so the flag names an outlier rather than ordinary work.
+ */
+export const HIGH_COLLATERAL_RATIO = 50;
+
+export function asksFarMoreCollateralThanReward(ratio: number | null): boolean {
+  return ratio !== null && ratio >= HIGH_COLLATERAL_RATIO;
 }
 
 /**

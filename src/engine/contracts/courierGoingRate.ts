@@ -88,3 +88,13 @@ export function communityFloorReward(collateral: number, jumps: number | null): 
   if (!(collateral > 0) || jumps === null) return null;
   return (collateral / 1_000_000_000) * Math.max(jumps, 1) * 1_000_000;
 }
+
+/**
+ * The reward as a fraction of `communityFloorReward` (issue #1720), so a haul
+ * short of the floor can say by how much rather than set two figures side by
+ * side. No floor, no share.
+ */
+export function floorShare(reward: number, floor: number | null): number | null {
+  if (floor === null || !(floor > 0)) return null;
+  return reward / floor;
+}

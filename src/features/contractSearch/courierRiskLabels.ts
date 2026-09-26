@@ -27,6 +27,14 @@ export const MARKED_RISKS: readonly CourierRiskKind[] = [
   'gank-chokepoint',
 ];
 
+/**
+ * Which risks head the modal's list with a warning rather than a note: every
+ * marked risk, plus `high-collateral`, which warns in the modal but earns no
+ * row marker — decision `20260912-172628` keeps the collateral ratio off the
+ * row, where a card line below `sm` has no room for it (#1720).
+ */
+export const WARNING_RISKS: readonly CourierRiskKind[] = [...MARKED_RISKS, 'high-collateral'];
+
 /** Both registers for one risk, read together at every call site. */
 interface RiskCopy {
   /** The row has room for this much. */
@@ -55,5 +63,9 @@ export const RISK_COPY: Record<CourierRiskKind, RiskCopy> = {
   'over-rate': {
     short: 'contractSearch.risk.overRateShort',
     detail: 'contractSearch.risk.overRateDetail',
+  },
+  'high-collateral': {
+    short: 'contractSearch.risk.highCollateralShort',
+    detail: 'contractSearch.risk.highCollateralDetail',
   },
 };
