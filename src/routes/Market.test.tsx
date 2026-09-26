@@ -356,18 +356,21 @@ beforeEach(async () => {
   window.history.pushState({}, '', '/market');
 });
 
+// The Market Group, not the nav rail's "Ships" link: the group is a button.
+const SHIPS_GROUP = { name: 'Ships' } as const;
+
 describe('Market Browser', () => {
   it('filters the Market Group tree in place, hiding branches with no match', async () => {
     const user = userEvent.setup();
     render(<App />);
 
-    expect(await screen.findByText('Ships')).toBeInTheDocument();
+    expect(await screen.findByRole('button', SHIPS_GROUP)).toBeInTheDocument();
     expect(screen.getByText('Ore')).toBeInTheDocument();
 
     await user.type(screen.getByRole('searchbox'), 'rift');
 
     expect(await screen.findByText('Rifter')).toBeInTheDocument();
-    expect(screen.getByText('Ships')).toBeInTheDocument();
+    expect(screen.getByRole('button', SHIPS_GROUP)).toBeInTheDocument();
     expect(screen.queryByText('Ore')).not.toBeInTheDocument();
   });
 
@@ -385,7 +388,7 @@ describe('Market Browser', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    const ships = (await screen.findByText('Ships')).closest('button')!;
+    const ships = await screen.findByRole('button', SHIPS_GROUP);
     expect(ships).toHaveAttribute('aria-expanded', 'false');
     await user.click(ships);
     expect(ships).toHaveAttribute('aria-expanded', 'true');
@@ -395,11 +398,11 @@ describe('Market Browser', () => {
     const user = userEvent.setup();
     render(<App />);
 
-    await screen.findByText('Ships');
+    await screen.findByRole('button', SHIPS_GROUP);
     await user.type(screen.getByRole('searchbox'), 'ri');
 
     expect(screen.getByText('Type 3+ characters to search.')).toBeInTheDocument();
-    expect(screen.getByText('Ships')).toBeInTheDocument();
+    expect(screen.getByRole('button', SHIPS_GROUP)).toBeInTheDocument();
     expect(screen.getByText('Ore')).toBeInTheDocument(); // full, unfiltered tree — still explicit about why
 
     await user.type(screen.getByRole('searchbox'), 'ft');
@@ -416,11 +419,11 @@ describe('Market Browser', () => {
 
     // Collapsing "Ships" only hides its own contents — it must not touch the
     // search filter, so it stays a no-op on which items matched.
-    await user.click(screen.getByRole('button', { name: 'Ships' }));
+    await user.click(screen.getByRole('button', SHIPS_GROUP));
     expect(screen.queryByText('Rifter')).not.toBeInTheDocument();
-    expect(screen.getByText('Ships')).toBeInTheDocument();
+    expect(screen.getByRole('button', SHIPS_GROUP)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Ships' }));
+    await user.click(screen.getByRole('button', SHIPS_GROUP));
     expect(await screen.findByText('Rifter')).toBeInTheDocument();
   });
 
@@ -431,7 +434,7 @@ describe('Market Browser', () => {
     // Group 4 ("Destroyers") sits under group 1 ("Ships") — both must expand
     // for its items to show, with no click needed.
     expect(await screen.findByText('Merlin')).toBeInTheDocument();
-    expect(screen.getByText('Ships')).toBeInTheDocument();
+    expect(screen.getByRole('button', SHIPS_GROUP)).toBeInTheDocument();
     expect(screen.getByText('Destroyers')).toBeInTheDocument();
   });
 
@@ -439,7 +442,7 @@ describe('Market Browser', () => {
     window.history.pushState({}, '', '/market?group=999');
     render(<App />);
 
-    expect(await screen.findByText('Ships')).toBeInTheDocument();
+    expect(await screen.findByRole('button', SHIPS_GROUP)).toBeInTheDocument();
     expect(screen.queryByText('Merlin')).not.toBeInTheDocument();
   });
 
@@ -1676,7 +1679,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
   it('does not touch the URL while the user is still typing a search', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByText('Ships');
+    await screen.findByRole('button', SHIPS_GROUP);
     const pushSpy = vi.spyOn(window.history, 'pushState');
 
     await user.type(await screen.findByRole('searchbox'), 'rift');
@@ -1707,7 +1710,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
   it('remembers the last picked Trade Hub across a remount, per device, without touching the synced default', async () => {
     const user = userEvent.setup();
     const { unmount } = render(<App />);
-    await screen.findByText('Ships');
+    await screen.findByRole('button', SHIPS_GROUP);
 
     await user.click(screen.getByRole('combobox', { name: 'Trade Hub' }));
     await user.click(screen.getByRole('option', { name: 'Amarr' }));
@@ -1720,7 +1723,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
     unmount();
     window.history.pushState({}, '', '/market');
     render(<App />);
-    await screen.findByText('Ships');
+    await screen.findByRole('button', SHIPS_GROUP);
 
     expect(await screen.findByRole('combobox', { name: 'Trade Hub' })).toHaveTextContent('Amarr');
   });
@@ -1728,7 +1731,7 @@ describe('Shareable Market Browser URLs (issue #4)', () => {
   it('keeps its own Trade Hub when the synced Settings default changes underneath it', async () => {
     const user = userEvent.setup();
     render(<App />);
-    await screen.findByText('Ships');
+    await screen.findByRole('button', SHIPS_GROUP);
 
     await user.click(screen.getByRole('combobox', { name: 'Trade Hub' }));
     await user.click(screen.getByRole('option', { name: 'Amarr' }));
