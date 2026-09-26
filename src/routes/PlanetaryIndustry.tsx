@@ -1304,10 +1304,9 @@ export function PlanetaryIndustry() {
                 actions={
                   hasOtherCharacters ? (
                     <FilterChip
-                      label={t('pi.altColonies.toggleLabel')}
+                      label={t('pi.altColonies.toggleLabel', { count: otherCharacterCount })}
                       selected={showAltColonies}
                       onToggle={() => void setShowAltColonies(!showAltColonies)}
-                      count={otherCharacterCount}
                     />
                   ) : undefined
                 }

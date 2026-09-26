@@ -78,7 +78,29 @@ describe('EventDetailModal', () => {
     );
     render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
     expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
-    expect(screen.getByText(/Importance 1/)).toBeInTheDocument();
+    expect(screen.getByText(/High/)).toBeInTheDocument();
+  });
+
+  it('shows no importance word when the event is not important', async () => {
+    server.use(
+      http.get(`${ESI_BASE_URL}/characters/${CHAR_ID}/calendar/1`, () =>
+        HttpResponse.json({
+          event_id: 1,
+          title: 'Fleet Op',
+          date: '2026-09-01T18:00:00Z',
+          duration: 60,
+          importance: 0,
+          owner_id: 1,
+          owner_name: 'FC',
+          owner_type: 'character',
+          response: 'accepted',
+          text: 'Bring your <b>ship</b>',
+        })
+      )
+    );
+    render(<EventDetailModal characterId={CHAR_ID} event={EVENT} onClose={() => {}} />);
+    expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
+    expect(screen.queryByText(/High/)).not.toBeInTheDocument();
   });
 
   describe('load failure', () => {
@@ -105,7 +127,7 @@ describe('EventDetailModal', () => {
       await userEvent.setup().click(retry);
 
       expect(await screen.findByText('Bring your ship')).toBeInTheDocument();
-      expect(screen.getByText(/Importance 1/)).toBeInTheDocument();
+      expect(screen.getByText(/High/)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Accept' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Download \.ics/i })).toBeInTheDocument();
     });

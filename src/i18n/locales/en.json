@@ -1215,7 +1215,7 @@
     "emptyHint": "Create a plan to start training toward a goal.",
     "backToList": "Back to plans",
     "yourEntries": "Your entries",
-    "yourEntriesEmpty": "No entries yet. Add a skill below.",
+    "yourEntriesEmpty": "No entries yet. Add a skill to get started.",
     "columnPerLevel": "Training time",
     "columnCumulative": "Finish date",
     "columnTakes": "Takes",
@@ -1476,7 +1476,7 @@
   "skillCompare": {
     "pickCharacters": "Characters to compare",
     "noneSelectedTitle": "No characters selected",
-    "noneSelectedHint": "Select characters below to compare their trained skills.",
+    "noneSelectedHint": "Select characters to compare their trained skills.",
     "loading": "Loading skills…",
     "noDataTitle": "No skill data cached",
     "noDataHint": "Reconnect to fetch trained skills for these characters.",
@@ -2094,7 +2094,7 @@
     "heroTitle_other": "{{count}} runs · profit after fees",
     "needAfterOwned": "Need: {{quantity}}",
     "netProfit": "Net profit",
-    "bpcSearchTab": "BPC Search",
+    "bpcSearchTab": "BPC Sourcing",
     "opportunitiesTab": "Opportunities",
     "opportunitiesTitle": "Build Opportunities",
     "opportunitiesSortBy": "Sort by",
@@ -2799,7 +2799,8 @@
     "oreTagsRemoveError": "Couldn't remove the {{name}} tag. Try again.",
     "removeOreTagLabel": "Remove the {{name}} tag",
     "allPayees": "All payees",
-    "payeesSelected": "{{count}} payee(s)",
+    "payeesSelected_one": "{{count}} payee",
+    "payeesSelected_other": "{{count}} payees",
     "payeeOptionWithCharacter": "{{payee}} ({{character}})",
     "statusFilterLabel": "Status ({{count}})",
     "settledPayeesFilter": "Settled payees",
@@ -2861,9 +2862,11 @@
     "settleUpContractIdPlaceholder": "Optional",
     "settleUpRecordAction": "Record payment",
     "balancesLabel": "You owe",
-    "balancesAcross": "{{amount}} ISK across {{count}} payee(s)",
+    "balancesAcross_one": "{{amount}} ISK across {{count}} payee",
+    "balancesAcross_other": "{{amount}} ISK across {{count}} payees",
     "balancesNothing": "Nothing outstanding",
-    "balanceEntries": "{{count}} entries",
+    "balanceEntries_one": "{{count}} entry",
+    "balanceEntries_other": "{{count}} entries",
     "settleUpAction": "Settle up",
     "nothingToSettle": "Nothing to settle",
     "filterToPayee": "Show only {{payee}}'s entries",
@@ -2904,6 +2907,7 @@
     "unknownPayee": "Unknown Payee",
     "overview": {
       "volumeColumn": "Volume (m³)",
+      "volumeUnit": "m³",
       "volumeMissingLabel": "Volume incomplete",
       "volumeMissingTooltip": "No known volume for: {{types}}. Total is a partial sum.",
       "volumeStatWarning": "{{count}} ore type(s) have no known volume. Total is partial.",
@@ -3420,7 +3424,8 @@
       "decayedTooltip": "Every extractor here has fallen to under 35% of the output it managed in its first day. Extractor output decays from install, so a reset restores the opening rate — the Reset now column shows what a day of that is worth."
     },
     "altColonies": {
-      "toggleLabel": "Show alt colonies",
+      "toggleLabel_one": "Show {{count}} alt's colonies",
+      "toggleLabel_other": "Show {{count}} alts' colonies",
       "notLoaded": "{{name}}: not loaded yet, so their colonies aren't listed. Switch and refresh to cache them.",
       "switchTo": "Switch to {{name}}",
       "noColonies": "No colonies: {{names}}.",
@@ -3900,7 +3905,7 @@
     "noLongerListedHint": "It may have expired, been fulfilled, or been withdrawn since it was last synced."
   },
   "bpcContracts": {
-    "title": "BPC Search",
+    "title": "BPC Sourcing",
     "refresh": "Refresh",
     "searchPlaceholder": "Search blueprint name…",
     "regionLabel": "Region",
@@ -4648,7 +4653,7 @@
     },
     "quickbar": {
       "title": "Quickbar",
-      "empty": "No items yet — right-click an item and choose Add to Quickbar.",
+      "empty": "No items yet — open an item's menu (⋮) and choose Add to Quickbar.",
       "viewInAppraisal": "View in Appraisal",
       "removeItem": "Remove {{name}} from Quickbar",
       "reorderItem": "Reorder {{name}}"
@@ -5117,7 +5122,7 @@
         },
         "local": {
           "title": "Kept on this device only",
-          "description": "Everything Neocom Desk reads from EVE is cached in this browser and refetched from ESI when it goes stale. None of it is uploaded. Three things Neocom Desk writes back to your account: opening a mail here marks it read in EVE too, so it stays read after you reload; responding to a calendar invite here sends that response to EVE; and sending a reply or forward you compose in Mail sends that mail through your account. Nothing else — no orders, no colony changes, no mail you didn't write and send yourself — is ever written.",
+          "description": "Everything Neocom Desk reads from EVE is cached in this browser and refetched from ESI when it goes stale. None of it is uploaded. Four things Neocom Desk writes back to your account: opening a mail here marks it read in EVE too, so it stays read after you reload; responding to a calendar invite here sends that response to EVE; sending a reply or forward you compose in Mail sends that mail through your account; and saving a Fitting to EVE creates or replaces your in-game fitting there. Nothing else — no orders, no colony changes, no mail you didn't write and send yourself — is ever written.",
           "esi": "Your assets, wallet, contracts, mail, contacts, clones, calendar, skills, skill queue, industry jobs and colonies.",
           "corp": "Everything on the Corporation pages — wallet, members, structures, assets and moon extractions.",
           "market": "Market prices, order books and the LP store.",
@@ -5151,7 +5156,7 @@
     "fontScaleExtraLarge": "Extra large",
     "notificationsTitle": "Notifications",
     "notifications": {
-      "hint": "Pick what each character is told about, and how. Device raises a pop-up from your phone or computer; Overview adds a row to the Overview page inside the app. These choices stay on this device.",
+      "hint": "Pick what each character is told about, and how. Device raises a pop-up from your phone or computer; Alerts adds a row to the Alerts page inside the app. These choices stay on this device.",
       "blockedNotice": "Notifications are blocked — enable them in your browser's site settings, then return here.",
       "blockedNoticePlayApp": "Notifications are off for this app.",
       "openAndroidSettings": "Open notification settings",
@@ -5221,7 +5226,7 @@
       "feedChannelHint": "A dismissible list on the Overview page. Works on every device.",
       "column": {
         "browser": "Device",
-        "feed": "Overview"
+        "feed": "Alerts"
       },
       "selectAll": {
         "browser": "Toggle all device notifications for {{character}}",
