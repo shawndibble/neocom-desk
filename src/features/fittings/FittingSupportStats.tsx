@@ -20,9 +20,13 @@ const DIGITS: Record<SupportRow['kind'], number> = {
   guidanceDisruptor: 0,
 };
 
-/** A signed % reads −17 / +12, the way the kind labels already spell them. */
+/**
+ * A signed % reads −17 / +12, the way the kind labels already spell them;
+ * one that rounds to nothing is a plain 0, never −0.
+ */
 function signed(amount: number, digits: number): string {
   const text = Math.abs(amount).toFixed(digits);
+  if (Number(text) === 0) return text;
   return amount < 0 ? `−${text}` : `+${text}`;
 }
 

@@ -928,6 +928,18 @@ describe('FittingStatsSections — Support out', () => {
               ],
             },
             {
+              kind: 'trackingDisruptor',
+              typeId: 2104,
+              count: 1,
+              amount: 34.38,
+              optimal: 48000,
+              falloff: 24000,
+              effects: [
+                { effect: 'optimalRange', amount: -0.3 },
+                { effect: 'falloff', amount: -34.38 },
+              ],
+            },
+            {
               kind: 'guidanceDisruptor',
               typeId: 37546,
               count: 1,
@@ -971,6 +983,8 @@ describe('FittingStatsSections — Support out', () => {
     expect(support.getByText('−34% optimal range, −34% falloff')).toBeInTheDocument();
     expect(support.getByText('−12% explosion velocity, +12% explosion radius')).toBeInTheDocument();
     expect(support.getByText('1.30 gravimetric, 4.00 ladar')).toBeInTheDocument();
+    // An effect under half a percent reads 0%, not −0%.
+    expect(support.getByText('0% optimal range, −34% falloff')).toBeInTheDocument();
     expect(support.getByText('2.60 jam strength')).toBeInTheDocument();
   });
 

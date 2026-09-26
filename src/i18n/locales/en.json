@@ -639,10 +639,7 @@
           "warpDisruption_one": "{{value}} point",
           "warpDisruption_other": "{{value}} points",
           "ecm": "{{value}} jam strength",
-          "targetPainter": "+{{value}}% signature",
-          "trackingDisruptor": "−{{value}}% tracking",
-          "sensorDampener": "−{{value}}% lock range",
-          "guidanceDisruptor": "−{{value}}% explosion velocity"
+          "targetPainter": "+{{value}}% signature"
         },
         "effect": {
           "optimalRange": "{{value}}% optimal range",
