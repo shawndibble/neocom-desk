@@ -18,6 +18,7 @@ import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
 import { extractSupport } from '@/engine/fittings/support';
 import { affectedAttributes } from '@/engine/fittings/affectedBy';
 import { extractMining, miningYield } from '@/engine/fittings/mining';
+import { capacitorStatusAtDrain } from '@/engine/fittings/tank';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
 import type { Fitting } from '@/engine/fittings/types';
 
@@ -547,6 +548,92 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     );
     // Three 12 m3 charges in 40 m3, 12 s apart, then 10 s reloading.
     expect(budget.boosterInjection).toBeCloseTo(1200 / 46, 6);
+  });
+
+  it('never calls a fit stable that its cap booster only holds up by never reloading', () => {
+    // Medium Capacitor Booster II + Navy Cap Booster 400, a shield booster and
+    // five neutralizers: the engine counts the booster at 33.3 GJ/s with no
+    // reload and says stable; averaged over its reload (26.1) the cap drains.
+    const caracal = (neuts: number): Fitting => ({
+      name: 'Integration Test Caracal booster-dependent',
+      shipTypeId: CARACAL,
+      modules: [
+        {
+          slot: 'medium',
+          slotIndex: 0,
+          typeId: MEDIUM_CAPACITOR_BOOSTER_II,
+          state: 'active',
+          chargeTypeId: NAVY_CAP_BOOSTER_400,
+        },
+        { slot: 'medium', slotIndex: 1, typeId: MEDIUM_SHIELD_BOOSTER_II, state: 'active' },
+        ...Array.from({ length: neuts }, (_, slotIndex) => ({
+          slot: 'high' as const,
+          slotIndex,
+          typeId: MEDIUM_ENERGY_NEUTRALIZER_II,
+          state: 'active' as const,
+        })),
+      ],
+      drones: [],
+      cargo: [],
+    });
+    const run = (neuts: number) => {
+      const dogmaFit = fittingToDogmaFit(caracal(neuts), buildAllVProfile(SUPPORT_SKILL_IDS));
+      const calculation = calculate(dogmaFit);
+      const ship = calculation.ship.attributes;
+      return {
+        engineStable: (ship.get(-7)?.value ?? 0) < 0,
+        stats: extractFittingStats(dogmaFit.items, ship, calculation.items),
+        budget: extractCapacitorBudget(dogmaFit.items, calculation.items, ship),
+      };
+    };
+
+    const five = run(5);
+    expect(five.engineStable).toBe(true);
+    expect(five.budget.delta).toBeLessThan(0);
+    expect(five.stats.capacitor.stable).toBe(false);
+    const drain = five.budget.peakRecharge - five.budget.delta;
+    expect(five.stats.capacitor).toEqual(
+      capacitorStatusAtDrain(
+        five.stats.capacitorCapacity,
+        five.stats.capacitorRechargeTime / 1000,
+        drain
+      )
+    );
+
+    // Four still hold, at the level the reload-averaged drain settles at.
+    const four = run(4);
+    expect(four.budget.delta).toBeGreaterThan(0);
+    expect(four.stats.capacitor.stable).toBe(true);
+    expect(four.stats.capacitor).toEqual(
+      capacitorStatusAtDrain(
+        four.stats.capacitorCapacity,
+        four.stats.capacitorRechargeTime / 1000,
+        four.budget.peakRecharge - four.budget.delta
+      )
+    );
+  });
+
+  it('leaves the engine capacitor figure alone on a fit with no cap booster', () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Caracal no booster',
+      shipTypeId: CARACAL,
+      modules: [
+        { slot: 'medium', slotIndex: 0, typeId: MEDIUM_SHIELD_BOOSTER_II, state: 'active' },
+        { slot: 'high', slotIndex: 0, typeId: MEDIUM_ENERGY_NEUTRALIZER_II, state: 'active' },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(SUPPORT_SKILL_IDS));
+    const calculation = calculate(dogmaFit);
+    const ship = calculation.ship.attributes;
+    const stats = extractFittingStats(dogmaFit.items, ship, calculation.items);
+    const depletes = ship.get(-7)?.value ?? 0;
+    expect(stats.capacitor).toEqual(
+      depletes < 0
+        ? { stable: true, stablePercentage: ship.get(-72)?.value }
+        : { stable: false, depletesInSeconds: depletes }
+    );
   });
 
   it('reads what the support modules hand out, each by its own kind', () => {

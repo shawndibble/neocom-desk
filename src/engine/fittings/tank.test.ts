@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   boosterReloadShortfall,
   capacitorBudget,
+  capacitorStatusAtDrain,
   reloadDuty,
   sustainedRepair,
   type CapacitorUser,
@@ -179,5 +180,50 @@ describe('sustainedRepair', () => {
       ancillary: { cycles: 0, cycleSeconds: 12, reloadSeconds: 60 },
     };
     expect(sustainedRepair([aar], { peakRecharge: 30, peakLoad: 0 }).sustained.armor).toBe(26);
+  });
+});
+
+describe('capacitorStatusAtDrain', () => {
+  // 1000 GJ, 200 s recharge: peak recharge 2.5 × 1000 / 200 = 12.5 GJ/s at 25%.
+  const capacity = 1000;
+  const recharge = 200;
+
+  it('settles where the recharge curve meets a drain it can carry', () => {
+    // 10(√s − s)·C/τ = D → √s = (1 + √(1 − 4D·τ/10C)) / 2.
+    const status = capacitorStatusAtDrain(capacity, recharge, 10);
+    const root = (1 + Math.sqrt(1 - (4 * 10 * recharge) / (10 * capacity))) / 2;
+    expect(status).toEqual({
+      stable: true,
+      stablePercentage: expect.closeTo(root * root * 100, 6),
+    });
+  });
+
+  it('is stable at 100% with no net drain, and exactly at 25% at peak', () => {
+    expect(capacitorStatusAtDrain(capacity, recharge, -5)).toEqual({
+      stable: true,
+      stablePercentage: 100,
+    });
+    expect(capacitorStatusAtDrain(capacity, recharge, 12.5)).toEqual({
+      stable: true,
+      stablePercentage: expect.closeTo(25, 6),
+    });
+  });
+
+  it('runs dry past peak, in the time the recharge curve buys from full', () => {
+    const status = capacitorStatusAtDrain(capacity, recharge, 20);
+    // Numerical check of ∫₀¹ C ds / (D − 10C/τ·(√s − s)).
+    let seconds = 0;
+    const steps = 200000;
+    for (let i = 0; i < steps; i++) {
+      const s = (i + 0.5) / steps;
+      seconds += capacity / steps / (20 - ((10 * capacity) / recharge) * (Math.sqrt(s) - s));
+    }
+    expect(status.stable).toBe(false);
+    expect(!status.stable && status.depletesInSeconds).toBeCloseTo(seconds, 2);
+  });
+
+  it('is capacity over drain when recharge barely matters', () => {
+    const status = capacitorStatusAtDrain(capacity, recharge, 10000);
+    expect(!status.stable && status.depletesInSeconds).toBeCloseTo(capacity / 10000, 3);
   });
 });

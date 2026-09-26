@@ -23,7 +23,7 @@
  *   own peak load counts it at its charge-per-cycle rate with no reload, so
  *   `boosterReloadShortfall` is what the sustained tank adds back to it.
  */
-import type { LocalRepair } from './types';
+import type { CapacitorStatus, LocalRepair } from './types';
 
 /** A module's charges: how many whole cycles one load runs, and the reload after. */
 export interface Magazine {
@@ -167,4 +167,38 @@ export function sustainedRepair(
     sustained[repairer.layer] += rate;
   }
   return { sustained, capFraction };
+}
+
+/**
+ * Stable level, or time to empty, of a capacitor under a steady net drain
+ * (GJ/s — draw less nosferatu and reload-averaged cap booster injection),
+ * on the game's recharge curve: dC/dt = 10·C/τ·(√s − s) − drain, s the
+ * fraction full, which peaks at 2.5·C/τ at 25%. Closed form, not the
+ * engine's per-cycle simulation: once cap boosters are averaged over their
+ * reloads the drain is an average, and so is this — but it agrees with the
+ * capacitor Delta by construction (stable exactly when the drain is at most
+ * peak recharge). For a fit whose injection the engine counts with no reload.
+ *
+ * - Stable: 10/τ·(√s − s) = drain/C → √s = (1 + √(1 − 4·drain·τ/(10·C))) / 2.
+ * - Draining from full: t = ∫₀¹ C ds / (drain − 10C/τ·(√s − s)); with u = √s
+ *   and a² = drain·τ/(10·C) − ¼ that is (τ/10)·(2/a)·atan(1/(2a)).
+ */
+export function capacitorStatusAtDrain(
+  capacity: number,
+  rechargeSeconds: number,
+  drain: number
+): CapacitorStatus {
+  if (drain <= 0 || capacity <= 0 || rechargeSeconds <= 0) {
+    return { stable: true, stablePercentage: 100 };
+  }
+  const load = (drain * rechargeSeconds) / (10 * capacity);
+  if (load <= 0.25) {
+    const root = (1 + Math.sqrt(Math.max(0, 1 - 4 * load))) / 2;
+    return { stable: true, stablePercentage: root * root * 100 };
+  }
+  const a = Math.sqrt(load - 0.25);
+  return {
+    stable: false,
+    depletesInSeconds: (rechargeSeconds / 10) * (2 / a) * Math.atan(1 / (2 * a)),
+  };
 }

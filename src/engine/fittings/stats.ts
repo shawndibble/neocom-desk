@@ -26,6 +26,7 @@ import {
 import {
   boosterReloadShortfall,
   capacitorBudget,
+  capacitorStatusAtDrain,
   sustainedRepair,
   type CapacitorBudget,
   type CapacitorUser,
@@ -41,7 +42,9 @@ interface AttributeMap {
 }
 
 interface ItemCalculationResult {
-  attributes: { size: number };
+  attributes: AttributeMap & { size: number };
+  /** The state reached; absent, the item counts as not running. */
+  state?: FittingItemState;
 }
 
 /** An item as `calculate()` was given it — the engine's own `FitItem` fields this seam reads. */
@@ -102,6 +105,34 @@ function capacitorStatus(shipAttributes: AttributeMap): CapacitorStatus {
     };
   }
   return { stable: false, depletesInSeconds };
+}
+
+/**
+ * The capacitor headline. The engine's own stable level / time to empty
+ * counts a cap booster at one charge a cycle with no reload, so a fit it
+ * holds up can read "stable" beside a negative Delta. Where a cap booster
+ * loses injection to its reloads, the headline is worked out from the same
+ * reload-averaged drain as the Delta instead (`capacitorStatusAtDrain`), so
+ * the two agree; every other fit keeps the engine's per-cycle figure.
+ */
+function reloadAwareCapacitorStatus(
+  items: readonly CalculatedItem[],
+  shipAttributes: AttributeMap,
+  itemResults: readonly ItemCalculationResult[]
+): CapacitorStatus {
+  const results = itemResults.map((result) => ({
+    attributes: result.attributes,
+    state: result.state ?? 'offline',
+  }));
+  if (boosterReloadShortfall(capacitorUsers(items, results)) <= 0) {
+    return capacitorStatus(shipAttributes);
+  }
+  const budget = extractCapacitorBudget(items, results, shipAttributes);
+  return capacitorStatusAtDrain(
+    readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorCapacity),
+    readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorRechargeTime) / 1000,
+    budget.peakRecharge - budget.delta
+  );
 }
 
 function localRepair(shipAttributes: AttributeMap): LocalRepair {
@@ -277,7 +308,7 @@ export function extractFittingStats(
     },
     ehp: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.ehp),
     repair: localRepair(shipAttributes),
-    capacitor: capacitorStatus(shipAttributes),
+    capacitor: reloadAwareCapacitorStatus(items, shipAttributes, itemResults),
     capacitorCapacity: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorCapacity),
     capacitorRechargeTime: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorRechargeTime),
     ...defenseLayers(shipAttributes),
