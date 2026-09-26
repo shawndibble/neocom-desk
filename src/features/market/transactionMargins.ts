@@ -9,6 +9,7 @@
 import type { WalletJournalEntry, WalletTransaction } from '@/esi/endpoints';
 import { journalTransactionLinks } from '@/features/character/journalTransactionLink';
 import { realizedMargins, type RealizedMargin } from '@/engine/market/realizedMargin';
+import { toWalletTrade } from './orderCostBasis';
 
 export function transactionMargins(
   transactions: readonly WalletTransaction[],
@@ -16,8 +17,11 @@ export function transactionMargins(
 ): Map<number, RealizedMargin> {
   const linkFor = journalTransactionLinks(transactions);
   const salesTax = new Map<number, number>();
+  const seen = new Set<number>();
   for (const entry of journal) {
     if (entry.ref_type !== 'transaction_tax' || entry.amount === undefined) continue;
+    if (seen.has(entry.id)) continue;
+    seen.add(entry.id);
     const txn = linkFor(entry);
     if (!txn || txn.is_buy) continue;
     salesTax.set(
@@ -25,16 +29,5 @@ export function transactionMargins(
       (salesTax.get(txn.transaction_id) ?? 0) + Math.abs(entry.amount)
     );
   }
-  return realizedMargins(
-    transactions.map((t) => ({
-      transactionId: t.transaction_id,
-      date: t.date,
-      typeId: t.type_id,
-      quantity: t.quantity,
-      unitPrice: t.unit_price,
-      isBuy: t.is_buy,
-      isPersonal: t.is_personal,
-    })),
-    salesTax
-  );
+  return realizedMargins(transactions.map(toWalletTrade), salesTax);
 }

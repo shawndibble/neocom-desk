@@ -2656,7 +2656,7 @@
     "net": "Net",
     "transactionsSummaryLabel": "Totals for the transactions shown",
     "margin": "Margin",
-    "marginTooltip": "What a sale made against the wallet buys it used up, oldest first, less its sales tax. Broker fees aren't taken off. A dash means no wallet buy covers every unit sold — stock you built, or bought before this history starts — or the sale's tax isn't in your journal.",
+    "marginTooltip": "Sale total less the wallet buys it used up (oldest first) and its sales tax. Broker fees aren't taken off. A dash means no wallet buy covers it — stock you built, say — its tax isn't in your journal, or some of that item's stock came from outside this history.",
     "marginWorking": "Cost {{unitCost}} each from your wallet buys\nSales tax {{salesTax}}",
     "transactionsRange": "{{from}} – {{to}}",
     "exportCsvJournal": "Export CSV",

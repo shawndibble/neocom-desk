@@ -79,6 +79,29 @@ describe('realizedMargins', () => {
     expect(margins.has(sale.transactionId)).toBe(false);
   });
 
+  it('gives no sale of an item a margin once one sale of it outran the wallet buys', () => {
+    // That sale proves stock the wallet never saw; under FIFO it could have gone into any of them.
+    const buyA = trade({ quantity: 5, unitPrice: 100, date: '2026-01-01T00:00:00Z' });
+    const covered = trade({ isBuy: false, quantity: 5, date: '2026-01-02T00:00:00Z' });
+    const outran = trade({ isBuy: false, quantity: 5, date: '2026-01-03T00:00:00Z' });
+    const buyB = trade({ quantity: 5, unitPrice: 100, date: '2026-01-04T00:00:00Z' });
+    const later = trade({ isBuy: false, quantity: 5, date: '2026-01-05T00:00:00Z' });
+    const other = trade({ typeId: 35, quantity: 1, date: '2026-01-01T00:00:00Z' });
+    const otherSale = trade({
+      typeId: 35,
+      isBuy: false,
+      quantity: 1,
+      date: '2026-01-02T00:00:00Z',
+    });
+    const tax = new Map(
+      [covered, outran, later, otherSale].map((t) => [t.transactionId, 0] as const)
+    );
+    const margins = realizedMargins([buyA, covered, outran, buyB, later, other, otherSale], tax);
+    expect(margins.has(covered.transactionId)).toBe(false);
+    expect(margins.has(later.transactionId)).toBe(false);
+    expect(margins.has(otherSale.transactionId)).toBe(true);
+  });
+
   it('never counts a buy made after the sale', () => {
     const sale = trade({ date: '2026-01-01T00:00:00Z', isBuy: false, quantity: 2 });
     const buy = trade({ date: '2026-01-02T00:00:00Z', quantity: 10 });
