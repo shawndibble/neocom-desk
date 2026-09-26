@@ -164,6 +164,14 @@
       "chip_one": "Missing {{count}} skill · {{time}}",
       "chip_other": "Missing {{count}} skills · {{time}}"
     },
+    "mastery": {
+      "chip": "Mastery",
+      "title": "{{name}} Mastery",
+      "hideCompleted": "Hide completed",
+      "empty": "Nothing to show — every skill here is trained.",
+      "suggestedNote": "Suggested, not required — CCP's own bundles include some marginal skills. Not a hard gate to fly the ship.",
+      "total": "Total {{time}}"
+    },
     "list": {
       "title": "List",
       "cpu": "CPU",
@@ -1113,7 +1121,6 @@
     "trainedTab": "Trained",
     "plansTab": "Plans",
     "compareTab": "Compare",
-    "shipsTab": "Ships",
     "targetPlan": {
       "label": "Adding to"
     },
@@ -1201,36 +1208,6 @@
       "addToSkillPlan": "Add to Skill Plan",
       "noPlans": "No skill plans yet",
       "maxLevelTitle": "Already at level 5"
-    },
-    "ships": {
-      "title": "Ships",
-      "searchPlaceholder": "Search for a ship",
-      "noShipsMatch": "No ship named \"{{query}}\" has mastery data",
-      "suggestedNote": "Suggested, not required — CCP's own bundles include some marginal skills. Not a hard gate to fly the ship.",
-      "hideCompleted": "Hide completed",
-      "attachFit": "+ Attach a fit (optional)",
-      "attachFitHint": "Paste an EFT fit to see fit-specific skills too.",
-      "fitAttached": "Fit attached: {{name}}",
-      "removeFit": "Remove",
-      "filterMastery": "Mastery",
-      "filterFit": "This Fit",
-      "filterFitDisabledTooltip": "Attach a fit to filter by it",
-      "totalTime": "Total",
-      "masteryTag": "Mastery {{roman}}",
-      "fitTag": "This Fit",
-      "emptyTitle": "Nothing to show",
-      "emptyHint": "Every skill here is already trained or filtered out — or this ship has no Mastery data and no fit attached.",
-      "fitAttachedFallback": "this fit",
-      "canFly": "You can fly this",
-      "canFlyIn_one": "Can fly in {{time}} · {{count}} skill missing",
-      "canFlyIn_other": "Can fly in {{time}} · {{count}} skills missing",
-      "requiredGroup": "Required to fly",
-      "masteryGroup": "Mastery",
-      "addRequired": "Add required ({{count}})",
-      "addFit": "Add fit skills ({{count}})",
-      "addMastery": "Add Mastery {{roman}}",
-      "createAndAddMastery": "Create plan and add Mastery {{roman}}",
-      "chooseMasteryTier": "Choose a Mastery tier to add"
     }
   },
   "plans": {
