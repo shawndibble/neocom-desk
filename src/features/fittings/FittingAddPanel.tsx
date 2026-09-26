@@ -28,7 +28,7 @@ import type {
 } from '@/engine/fittings/types';
 import { checkCharges, type CandidateCheck } from './dogmaFittingEngine';
 import { endFittingDrag, startFittingDrag } from './fittingDrag';
-import { AddItemMenuItems, FittingItemMenu } from './FittingItemMenu';
+import { AddCargoMenuItems, AddItemMenuItems, FittingItemMenu } from './FittingItemMenu';
 import { useFittingItemActions } from './fittingItemActions';
 import { useHullFit } from './useHullFit';
 import type { FittingCatalogue } from './useFittingCatalogue';
@@ -351,7 +351,7 @@ export function FittingAddPanel({
           dragToFit={dragToRing}
         />
       ) : tab === 'cargo' && onAddCargo ? (
-        <CargoTab catalogue={catalogue} onAddCargo={onAddCargo} />
+        <CargoTab catalogue={catalogue} cargo={fitting.cargo} onAddCargo={onAddCargo} />
       ) : (
         <>
           <SearchInput
@@ -592,12 +592,17 @@ function ChargesTab({
  */
 function CargoTab({
   catalogue,
+  cargo,
   onAddCargo,
 }: {
   catalogue: FittingCatalogue | null;
+  /** What the hold already carries: those results get the List cargo row's menu. */
+  cargo: Fitting['cargo'];
   onAddCargo: (typeId: number, quantity: number) => void;
 }) {
   const { t } = useTranslation();
+  const actions = useFittingItemActions();
+  const inHold = useMemo(() => new Set(cargo.map((item) => item.typeId)), [cargo]);
   const [query, setQuery] = useState('');
   const [quantity, setQuantity] = useState('1');
   const trimmed = query.trim().toLowerCase();
@@ -637,22 +642,43 @@ function CargoTab({
         <p className="text-xs text-text-dim">{t('fittings.add.noResults')}</p>
       ) : (
         <ul>
-          {results.map((entry) => (
-            <li key={entry.typeId}>
-              <button
-                type="button"
-                disabled={!valid}
-                onClick={() => onAddCargo(entry.typeId, count)}
-                className="flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs hover:bg-panel-2 disabled:opacity-40 md:min-h-9"
+          {results.map((entry) => {
+            const row = (
+              <li key={entry.typeId} className="flex items-center">
+                <button
+                  type="button"
+                  disabled={!valid}
+                  onClick={() => onAddCargo(entry.typeId, count)}
+                  className="flex min-h-11 w-full items-center gap-2 px-2 text-left text-xs hover:bg-panel-2 disabled:opacity-40 md:min-h-9"
+                >
+                  <TypeIcon typeId={entry.typeId} size={32} width={24} height={24} />
+                  <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+                  <span className="shrink-0 text-text-dim tabular-nums">
+                    {t('fittings.add.cargoAddCount', { count: valid ? count : 0 })}
+                  </span>
+                </button>
+                {actions && <RowMoreActions />}
+              </li>
+            );
+            return actions ? (
+              <FittingItemMenu
+                key={entry.typeId}
+                name={entry.name}
+                items={
+                  <AddCargoMenuItems
+                    typeId={entry.typeId}
+                    count={valid ? count : 0}
+                    inHold={inHold.has(entry.typeId)}
+                    onAddCargo={onAddCargo}
+                  />
+                }
               >
-                <TypeIcon typeId={entry.typeId} size={32} width={24} height={24} />
-                <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-                <span className="shrink-0 text-text-dim tabular-nums">
-                  {t('fittings.add.cargoAddCount', { count: valid ? count : 0 })}
-                </span>
-              </button>
-            </li>
-          ))}
+                {row}
+              </FittingItemMenu>
+            ) : (
+              row
+            );
+          })}
         </ul>
       )}
     </div>

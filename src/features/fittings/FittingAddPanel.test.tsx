@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
 import { FittingAddPanel } from './FittingAddPanel';
+import { FittingItemActionsProvider } from './fittingItemActions';
+import { fakeItemActions } from './__fixtures__/itemActions';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
 const checkCandidates = vi.fn();
@@ -200,5 +203,87 @@ describe('FittingAddPanel', () => {
     await user.type(quantity, '3');
     await user.click(screen.getByRole('button', { name: /Anchoring Array/ }));
     expect(onAddCargo).toHaveBeenCalledWith(4, 3);
+  });
+
+  it('gives each Cargo tab result the List cargo row’s menu once it is in the hold', async () => {
+    const user = userEvent.setup();
+    const onAddCargo = vi.fn();
+    const actions = fakeItemActions({ names: { 4: 'Anchoring Array', 3: '1MN Afterburner II' } });
+    const holding: Fitting = { ...fitting, cargo: [{ typeId: 4, quantity: 2 }] };
+    render(
+      <MemoryRouter>
+        <FittingItemActionsProvider value={actions}>
+          <FittingAddPanel
+            fitting={holding}
+            catalogue={catalogue}
+            target={{ kind: 'cargo' }}
+            engineReady
+            profile={profile}
+            canPlace={() => true}
+            onAdd={vi.fn()}
+            onAddCargo={onAddCargo}
+          />
+        </FittingItemActionsProvider>
+      </MemoryRouter>
+    );
+    await user.type(screen.getByLabelText('Search items to put in the cargo hold'), 'Anchoring');
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'More actions for Anchoring Array' }),
+      {
+        button: 0,
+        pointerType: 'mouse',
+      }
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Add 1 to cargo' }));
+    expect(onAddCargo).toHaveBeenCalledWith(4, 1);
+
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'More actions for Anchoring Array' }),
+      {
+        button: 0,
+        pointerType: 'mouse',
+      }
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Change quantity…' }));
+    expect(actions.changeCargoQuantity).toHaveBeenCalledWith(4);
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'More actions for Anchoring Array' }),
+      {
+        button: 0,
+        pointerType: 'mouse',
+      }
+    );
+    await user.click(await screen.findByRole('menuitem', { name: 'Remove Anchoring Array' }));
+    expect(actions.removeCargo).toHaveBeenCalledWith(4);
+  });
+
+  it('offers no quantity change or removal for a result not in the hold yet', async () => {
+    const user = userEvent.setup();
+    const actions = fakeItemActions({ names: { 3: '1MN Afterburner II' } });
+    render(
+      <MemoryRouter>
+        <FittingItemActionsProvider value={actions}>
+          <FittingAddPanel
+            fitting={fitting}
+            catalogue={catalogue}
+            target={{ kind: 'cargo' }}
+            engineReady
+            profile={profile}
+            canPlace={() => true}
+            onAdd={vi.fn()}
+            onAddCargo={vi.fn()}
+          />
+        </FittingItemActionsProvider>
+      </MemoryRouter>
+    );
+    await user.type(screen.getByLabelText('Search items to put in the cargo hold'), 'Afterburner');
+    fireEvent.pointerDown(
+      screen.getByRole('button', { name: 'More actions for 1MN Afterburner II' }),
+      { button: 0, pointerType: 'mouse' }
+    );
+    expect(await screen.findByRole('menuitem', { name: 'Add 1 to cargo' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: /Show info/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'Change quantity…' })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: /^Remove/ })).toBeNull();
   });
 });

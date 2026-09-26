@@ -297,6 +297,8 @@
       "cargoSearchLabel": "Search items to put in the cargo hold",
       "cargoSearchPlaceholder": "Search any item — ammo, paste, filaments…",
       "cargoHint": "Search for anything to carry: ammo, nanite paste, cap boosters, filaments, a depot.",
+      "cargoAddMenu_one": "Add {{count}} to cargo",
+      "cargoAddMenu_other": "Add {{count}} to cargo",
       "cargoAddCount_one": "+{{count}}",
       "cargoAddCount_other": "+{{count}}"
     },
