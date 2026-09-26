@@ -60,6 +60,16 @@ function singleTypeContractRow() {
   return { ...multiTypeContractRow(), contractId: 5_000_002, isMultiType: false };
 }
 
+/** Repro numbers: a 1-run copy priced under a 10-run copy that's cheaper per run. */
+function cheapestPerRunOffers() {
+  const base = singleTypeContractRow();
+  return [
+    { ...base, contractId: 7_000_001, price: 6_000_000, runs: 1 },
+    { ...base, contractId: 7_000_002, price: 9_500_000, runs: 10 },
+    { ...base, contractId: 7_000_003, price: 12_000_000, runs: 10 },
+  ];
+}
+
 /** Same shape `syncedContracts.ts` writes into `esi/cache.ts`'s `esiCache` store. */
 async function seedBpcSnapshot(page: Page, rows: unknown[]): Promise<void> {
   await page.evaluate(
@@ -185,5 +195,44 @@ test.describe('BPC Sourcing — multi-type price cell alignment', () => {
     expect(wrapperCount, 'a non-multi-type row should render a plain value, no flex wrapper').toBe(
       0
     );
+  });
+});
+
+test.describe('BPC Sourcing — cheapest-per-run chip (issue #1782)', () => {
+  test('shows ISK/run beside total price, wrapping like the other summary chips at phone width', async ({
+    page,
+  }) => {
+    await stubSyncConfigured(page);
+    await refuseSyncBackend(page);
+    // The selected blueprint also triggers a region market-BPO lookup
+    // (issue #1241's `bpoSourcesByType`) — irrelevant to this chip, but the
+    // shared network guard fails any unmocked ESI request, so it needs an
+    // answer, not just a network refusal.
+    await page.route(/\/markets\/\d+\/orders/, async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+    });
+    await page.setViewportSize(PHONE);
+
+    await signInAndGoto(page);
+    await seedBpcSnapshot(page, cheapestPerRunOffers());
+
+    await page.goto(`./industry/sourcing?sourcing.type=${BLUEPRINT_TYPE_ID}`);
+
+    // Total price still headlines the 1-run copy (6M); the per-run chip
+    // points at the 10-run copy that's actually cheaper (950K/run) — the two
+    // chips must disagree, which is the bug this ticket fixes.
+    const cheapestChip = page.getByText('Cheapest', { exact: true }).locator('..');
+    const perRunChip = page.getByText('Cheapest per run', { exact: true }).locator('..');
+    await expect(cheapestChip).toContainText('6M');
+    await expect(perRunChip).toContainText('950K');
+
+    // Same wrapping strip as the existing chips (`StatChip`'s fixed height +
+    // `shrink-0` moves the whole chip to its own line rather than squeezing
+    // it) — so neither chip should overflow the 390px viewport.
+    for (const chip of [cheapestChip, perRunChip]) {
+      const box = await chip.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x + box!.width).toBeLessThanOrEqual(PHONE.width);
+    }
   });
 });

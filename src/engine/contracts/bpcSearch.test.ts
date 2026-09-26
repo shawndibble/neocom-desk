@@ -555,6 +555,7 @@ describe('bpcPriceSummary', () => {
     expect(summary).toEqual({
       offerCount: 3,
       cheapest: 1_000_000,
+      cheapestPerRun: 200_000,
       median: 3_000_000,
       bestMe: 10,
       bestTe: 20,
@@ -575,6 +576,7 @@ describe('bpcPriceSummary', () => {
     expect(bpcPriceSummary([])).toEqual({
       offerCount: 0,
       cheapest: null,
+      cheapestPerRun: null,
       median: null,
       bestMe: null,
       bestTe: null,
@@ -590,6 +592,7 @@ describe('bpcPriceSummary', () => {
     expect(summary).toEqual({
       offerCount: 3,
       cheapest: 1_000_000,
+      cheapestPerRun: 200_000,
       median: 2_000_000,
       bestMe: 10,
       bestTe: 18,
@@ -601,6 +604,32 @@ describe('bpcPriceSummary', () => {
     expect(summary.cheapest).toBeNull();
     expect(summary.median).toBeNull();
     expect(summary.offerCount).toBe(2);
+  });
+
+  it('ranks a 10-run copy over a cheaper-looking 1-run copy once ISK/run is the yardstick (issue #1782)', () => {
+    const summary = bpcPriceSummary([
+      row({ contractId: 1, price: 6_000_000, runs: 1, quantity: 1 }),
+      row({ contractId: 2, price: 9_500_000, runs: 10, quantity: 1 }),
+      row({ contractId: 3, price: 12_000_000, runs: 10, quantity: 1 }),
+    ]);
+    expect(summary.cheapest).toBe(6_000_000);
+    expect(summary.cheapestPerRun).toBe(950_000);
+  });
+
+  it('excludes an unlimited-run (BPO, runs: -1) row from the per-run comparison entirely', () => {
+    const summary = bpcPriceSummary([
+      row({ contractId: 1, price: 1, runs: -1, quantity: 1 }),
+      row({ contractId: 2, price: 5_000_000, runs: 5, quantity: 1 }),
+    ]);
+    expect(summary.cheapestPerRun).toBe(1_000_000);
+  });
+
+  it('reports cheapestPerRun as null when no row yields a finite rate', () => {
+    const summary = bpcPriceSummary([
+      row({ price: 5_000_000, runs: -1 }),
+      row({ price: 5_000_000, isMultiType: true }),
+    ]);
+    expect(summary.cheapestPerRun).toBeNull();
   });
 });
 

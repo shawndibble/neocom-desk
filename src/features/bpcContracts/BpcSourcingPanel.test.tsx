@@ -565,6 +565,31 @@ describe('BpcSourcingPanel', () => {
     expect(screen.queryByRole('listbox', { name: 'Matching blueprints' })).not.toBeInTheDocument();
   });
 
+  it('ranks the cheapest-per-run chip above total contract price (issue #1782)', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, typeId: 638, price: 6_000_000, runs: 1 }),
+        row({ contractId: 2, typeId: 638, price: 9_500_000, runs: 10 }),
+        row({ contractId: 3, typeId: 638, price: 12_000_000, runs: 10 }),
+      ])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('table', { name: 'BPC Search' });
+
+    await user.type(screen.getByPlaceholderText('Search blueprint name…'), 'Rifter');
+    const suggestions = screen.getByRole('listbox', { name: 'Matching blueprints' });
+    await user.click(within(suggestions).getByRole('option'));
+
+    // The two chips disagree: total price picks the 1-run copy, per-run picks the 10-run one.
+    expect(screen.getByText('Cheapest').parentElement).toContainElement(
+      screen.getAllByText('6,000,000.00 ISK', { selector: '.sr-only' })[0]
+    );
+    expect(screen.getByText('Cheapest per run').parentElement).toContainElement(
+      screen.getAllByText('950,000.00 ISK', { selector: '.sr-only' })[0]
+    );
+  });
+
   it('compares the cheapest offer per region for the picked blueprint', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([
@@ -796,6 +821,20 @@ describe('BpcSourcingPanel source multiselect', () => {
 
     const table = await screen.findByRole('table', { name: 'BPC Search' });
     expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+  });
+
+  it('tags an owned row as Owned in the Item cell regardless of visible columns (issue #1782)', async () => {
+    loadPublicBpcContracts.mockResolvedValue(cachedSnapshot([]));
+    loadCharacterBlueprints.mockResolvedValue(
+      ownedResult([ownedBlueprint({ item_id: 1, type_id: 870 })])
+    );
+    render(<App />);
+
+    const table = await screen.findByRole('table', { name: 'BPC Search' });
+    const ownedRow = (await within(table).findByText('Caracal Blueprint')).closest(
+      'tr'
+    ) as HTMLElement;
+    expect(within(ownedRow).getByText('Owned')).toBeInTheDocument();
   });
 
   it('renders an owned BPO original (runs -1) as unlimited runs, not -1', async () => {

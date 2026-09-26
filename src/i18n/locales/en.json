@@ -3619,6 +3619,7 @@
     "suggestionsHighlighted_other": "{{count}} matching blueprints. {{name}} highlighted.",
     "suggestionBestMeTe": "Best ME {{me}} / TE {{te}}",
     "cheapestLabel": "Cheapest",
+    "cheapestPerRunLabel": "Cheapest per run",
     "medianLabel": "Median",
     "bestMeTeLabel": "Best ME / TE",
     "clearBlueprint": "Clear blueprint filter: {{name}}",
