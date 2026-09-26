@@ -367,6 +367,7 @@
         "capacitor": "Capacitor",
         "capStable": "Stable at {{pct}}%",
         "capDepletes": "Empty in {{time}}",
+        "capDepletesSeconds": "Empty in {{seconds}}s",
         "signature": "Signature",
         "skillsNeedCharacter": "Pick a Character to see which skills this needs.",
         "skillsHint": "You can't fly this yet. Add the missing skills to a Skill Plan:",

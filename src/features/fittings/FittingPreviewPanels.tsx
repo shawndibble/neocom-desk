@@ -178,11 +178,16 @@ export function DefensePanel({ stats }: { stats: FittingStats }) {
     resonances: layer,
     ehp: layer.ehp,
   }));
+  // formatDuration floors to whole minutes, so a sub-minute depletion needs seconds.
+  const depletes = (cap: { depletesInSeconds: number }): string => {
+    const seconds = Math.round(cap.depletesInSeconds);
+    return seconds < 60
+      ? t('fittings.start.preview.capDepletesSeconds', { seconds: Math.max(0, seconds) })
+      : t('fittings.start.preview.capDepletes', { time: formatDuration(seconds) });
+  };
   const capacitor = stats.capacitor.stable
     ? t('fittings.start.preview.capStable', { pct: Math.round(stats.capacitor.stablePercentage) })
-    : t('fittings.start.preview.capDepletes', {
-        time: formatDuration(stats.capacitor.depletesInSeconds),
-      });
+    : depletes(stats.capacitor);
   return (
     <div className="space-y-3">
       <ResistTable rows={rows} />
