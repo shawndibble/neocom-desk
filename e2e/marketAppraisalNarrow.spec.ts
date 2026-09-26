@@ -36,6 +36,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { expectNoPageOverflow } from './support/overflow';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
@@ -150,6 +151,44 @@ async function readRow(page: Page, typeId: number): Promise<RowGeometry> {
   }, typeId);
 }
 
+interface Box {
+  top: number;
+  left: number;
+  right: number;
+  bottom: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * The kebab's own box, pinned to the card's top-right corner (#1708): a
+ * zero-width `.dt-actions` cell used to leave it clipped past the card's
+ * right edge. Checked against the row's box rather than the viewport so a
+ * regression that merely moved the clipping elsewhere (off the card, still
+ * on the page) still fails here. No `toBeVisible` wait first, unlike
+ * `readRow` above — every caller here runs this right after a `readRow` on
+ * the same key, which already proved the row present.
+ */
+async function readActionsButton(page: Page, typeId: number): Promise<{ row: Box; button: Box }> {
+  return page.evaluate((key) => {
+    const toBox = (rect: DOMRect): Box => ({
+      top: rect.top,
+      left: rect.left,
+      right: rect.right,
+      bottom: rect.bottom,
+      width: rect.width,
+      height: rect.height,
+    });
+    const table = document.querySelector('table[aria-label="Appraisal"]')!;
+    const row = table.querySelector(`tbody tr[data-row-key="${key}"]`) as HTMLElement;
+    const button = row.querySelector('td.dt-actions button') as HTMLElement;
+    return {
+      row: toBox(row.getBoundingClientRect()),
+      button: toBox(button.getBoundingClientRect()),
+    };
+  }, typeId);
+}
+
 /**
  * Cells clustered into the lines they actually render on, top-to-bottom then
  * left-to-right. A 1px tolerance rather than an exact match: grid stretches
@@ -208,11 +247,17 @@ test.describe('Market Appraisal — stacked result card', () => {
 
     // And the halved card still costs the page no sideways scroll, which is
     // the risk a two-track grid runs on a 390px screen.
-    const doc = await page.evaluate(() => ({
-      scrollWidth: document.documentElement.scrollWidth,
-      clientWidth: document.documentElement.clientWidth,
-    }));
-    expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
+    await expectNoPageOverflow(page);
+
+    // The kebab itself: a real 44px touch target, pinned inside the card's
+    // own right edge rather than clipped past it (#1708).
+    const { row, button } = await readActionsButton(page, VELDSPAR);
+    expect(button.width).toBeGreaterThanOrEqual(44);
+    expect(button.height).toBeGreaterThanOrEqual(44);
+    expect(button.left).toBeGreaterThanOrEqual(row.left);
+    expect(button.right).toBeLessThanOrEqual(row.right);
+    expect(button.top).toBeGreaterThanOrEqual(row.top);
+    expect(button.bottom).toBeLessThanOrEqual(row.bottom);
   });
 
   test('pairs its five value columns and lands the odd trailing cell cleanly at 390px', async ({
@@ -245,6 +290,10 @@ test.describe('Market Appraisal — stacked result card', () => {
     // flow, not pinned into the default card's 6.5rem gutter — which inside a
     // ~160px cell would leave the figure nowhere to render.
     expect(trailing.labelPosition).toBe('static');
+
+    // The odd trailing cell is the shape most likely to crowd the pinned
+    // kebab out to the side — still no sideways scroll (#1708).
+    await expectNoPageOverflow(page);
   });
 
   test('still renders one real table row per item at 1280px', async ({ page }) => {
