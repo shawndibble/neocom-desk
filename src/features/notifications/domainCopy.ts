@@ -286,9 +286,28 @@ export const calendarCopy: DomainCopy<CalendarFire, CalendarNames> & {
 
 /* Contracts --------------------------------------------------------------- */
 
-export const contractCopy: DomainCopy<ContractNotificationFire, NoNames> = {
-  // Same shape for all three transitions (issue #1091).
-  poll: (fire, character) => simple(fire.eventId, { character }),
+export const contractCopy: DomainCopy<ContractNotificationFire, NoNames> & {
+  readonly push: PushCopy<ContractNotificationFire, NoNames>;
+} = {
+  // Same shape for the three transitions (issue #1091); the lead-time warning names its window (issue #1713).
+  poll: (fire, character) =>
+    simple(fire.eventId, {
+      character,
+      hours: Math.round((fire.thresholdMs ?? 0) / HOUR_MS),
+    }),
+  /**
+   * Only `courierDeliveryDue` projects, and it hedges: delivering the haul —
+   * the action the warning exists to prompt — falsifies the prediction before
+   * the push fires (`engine/projection.ts`'s `projectionWording`).
+   */
+  push: (fire, character) => {
+    assertProjectionWording('courierDeliveryDue', 'hedge');
+    const hours = Math.round((fire.thresholdMs ?? 0) / HOUR_MS);
+    return {
+      title: 'Courier delivery due',
+      body: `${character}'s courier contract was due for delivery in under ${hours} hours.`,
+    };
+  },
   // The contract row. Still listed — the filter defaults to every status.
   subjectOf: (fire) => fire.contractId,
 };

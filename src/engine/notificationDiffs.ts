@@ -848,6 +848,22 @@ export interface ContractEntrySnapshot {
    */
   issuerId: number;
   acceptorId: number;
+  /**
+   * The accepted courier's deliver-by instant (`courierDeliveryDeadlineMs`,
+   * issue #1713), absent for any contract that has none (not a courier, not
+   * in progress, or no derivable window). Optional so a baseline persisted
+   * before this field existed still validates (`ColonyExtractorSnapshot.installTimeMs`'s
+   * precedent) — `diffCourierDeliveryDue` reads a missing value as "no
+   * deadline", and the next poll fills it in.
+   */
+  deliveryDeadlineMs?: number;
+  /**
+   * The Character's `courierDeliveryDueLeadHours` threshold, in ms, as it
+   * stood when this poll ran — baked in per entry for the same reason
+   * `SkillQueueEntrySnapshot.endingLeadMs` is (`DomainDiff` is synchronous
+   * and cannot read a preference). Only set alongside `deliveryDeadlineMs`.
+   */
+  dueLeadMs?: number;
 }
 
 export interface ContractSnapshot {
@@ -856,9 +872,13 @@ export interface ContractSnapshot {
 }
 
 export interface ContractNotificationFire {
-  eventId: 'contractAccepted' | 'contractCompleted' | 'contractFailed';
+  eventId: 'contractAccepted' | 'contractCompleted' | 'contractFailed' | 'courierDeliveryDue';
   characterId: number;
   contractId: number;
+  /** `courierDeliveryDue` only (issue #1713): the deliver-by instant the warning is about. */
+  deadlineMs?: number;
+  /** `courierDeliveryDue` only: the lead time, in ms, that it crossed. */
+  thresholdMs?: number;
 }
 
 /**
@@ -884,6 +904,56 @@ export function diffContractAccepted(
     if (entry.status !== 'in_progress') continue;
     if (prevStatusById.get(entry.contractId) === 'in_progress') continue;
     fires.push({ eventId: 'contractAccepted', characterId, contractId: entry.contractId });
+  }
+  return fires;
+}
+
+/**
+ * Fires once an accepted courier's deliver-by deadline falls within the
+ * Character's configured lead time (issue #1713), so a hauler can act before
+ * the collateral is forfeited — `contractFailed` only ever arrives after.
+ * Judged against `deliveryDeadlineMs` (`courierDeliveryDeadlineMs`), never
+ * `date_expired`. Only contracts the Character themselves accepted qualify:
+ * `getCharacterContracts` also returns contracts merely offered to them.
+ *
+ * Window-crossing, on `diffSkillQueueEnding`'s precedent: "inside the window
+ * now" uses this poll's `dueLeadMs`, "was already inside" uses the
+ * *previous* entry's own, so raising or lowering the lead time takes effect
+ * on the very next poll in both directions. A deadline already passed fires
+ * nothing — that is `contractFailed`'s to report. `prev === undefined` fires
+ * nothing, this module's rule throughout.
+ */
+export function diffCourierDeliveryDue(
+  characterId: number,
+  prev: ContractSnapshot | undefined,
+  next: ContractSnapshot
+): ContractNotificationFire[] {
+  if (!prev) return [];
+  const prevById = new Map(prev.entries.map((entry) => [entry.contractId, entry]));
+  const fires: ContractNotificationFire[] = [];
+  for (const entry of next.entries) {
+    const { deliveryDeadlineMs, dueLeadMs } = entry;
+    if (entry.status !== 'in_progress' || entry.acceptorId !== characterId) continue;
+    if (deliveryDeadlineMs === undefined || dueLeadMs === undefined) continue;
+    const remainingNow = deliveryDeadlineMs - next.nowMs;
+    if (remainingNow <= 0 || remainingNow > dueLeadMs) continue;
+    const before = prevById.get(entry.contractId);
+    if (
+      before !== undefined &&
+      before.status === 'in_progress' &&
+      before.deliveryDeadlineMs === deliveryDeadlineMs &&
+      before.dueLeadMs !== undefined &&
+      deliveryDeadlineMs - prev.nowMs <= before.dueLeadMs
+    ) {
+      continue;
+    }
+    fires.push({
+      eventId: 'courierDeliveryDue',
+      characterId,
+      contractId: entry.contractId,
+      deadlineMs: deliveryDeadlineMs,
+      thresholdMs: dueLeadMs,
+    });
   }
   return fires;
 }

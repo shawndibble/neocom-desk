@@ -33,6 +33,7 @@ import {
 import type { NotificationEventId } from './events';
 import {
   DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
+  DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS,
   DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
   DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
   defaultedThresholds,
@@ -67,9 +68,11 @@ export {
   STRUCTURE_FUEL_LOW_DAY_OPTIONS,
   EXTRACTOR_EXPIRING_LEAD_HOUR_OPTIONS,
   SKILL_QUEUE_ENDING_LEAD_HOUR_OPTIONS,
+  COURIER_DELIVERY_DUE_LEAD_HOUR_OPTIONS,
   DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
   DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
   DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
+  DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS,
   DEFAULT_CORP_WALLET_BALANCE_FLOOR_ISK,
   DEFAULT_CORP_WALLET_TRANSACTION_CEILING_ISK,
   DEFAULT_WALLET_BALANCE_CHANGED_THRESHOLD_ISK,
@@ -79,7 +82,7 @@ export {
  * The slice of preferences the uploaded Projection reads (`projectionRebuild.ts`),
  * normalized so "absent" and "set to the default" compare equal: the master
  * switch, the browser gate, each Character's browser-channel opinions, and
- * the three thresholds a projecting domain uses. Feed flags and the wallet
+ * the four thresholds a projecting domain uses. Feed flags and the wallet
  * thresholds feed no projection, so they are left out.
  */
 const DEFAULT_PROJECTION_ENTRY = JSON.stringify([
@@ -88,6 +91,7 @@ const DEFAULT_PROJECTION_ENTRY = JSON.stringify([
   DEFAULT_STRUCTURE_FUEL_LOW_DAYS,
   DEFAULT_EXTRACTOR_EXPIRING_LEAD_HOURS,
   DEFAULT_SKILL_QUEUE_ENDING_LEAD_HOURS,
+  DEFAULT_COURIER_DELIVERY_DUE_LEAD_HOURS,
 ]);
 
 function projectionInputs(value: NotificationPreferencesValue): string {
@@ -119,14 +123,19 @@ function projectionInputs(value: NotificationPreferencesValue): string {
           isEveTypeEnabledFor({}, type, 'browser')
       )
       .sort();
-    const { structureFuelLowDays, extractorExpiringLeadHours, skillQueueEndingLeadHours } =
-      characterEventThresholds(value, characterId);
+    const {
+      structureFuelLowDays,
+      extractorExpiringLeadHours,
+      skillQueueEndingLeadHours,
+      courierDeliveryDueLeadHours,
+    } = characterEventThresholds(value, characterId);
     const entry = JSON.stringify([
       eventsOffDefault,
       eveTypesOffDefault,
       structureFuelLowDays,
       extractorExpiringLeadHours,
       skillQueueEndingLeadHours,
+      courierDeliveryDueLeadHours,
     ]);
     // An all-default Character reads the same as an absent one.
     if (entry !== DEFAULT_PROJECTION_ENTRY) characters[id] = entry;
