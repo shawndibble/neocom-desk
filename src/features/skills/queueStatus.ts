@@ -308,7 +308,15 @@ export function projectQueueEnd(
   const pending = classifySkillQueue(entries, nowMs)
     .filter((row) => row.secondsRemaining !== null)
     .map((row) => row.entry);
-  const firstPlanned = pending.findIndex((e) => (planned.get(e.skill_id) ?? 0) >= e.finished_level);
+  // pending[0], if present, is always the level training right now (ESI has
+  // already started it) — it finishes at its own finish_date regardless of
+  // whether the plan also lists it, so the dedup search below only looks at
+  // levels queued behind it that have not started yet.
+  const searchStart = pending.length > 0 ? 1 : 0;
+  const dedupOffset = pending
+    .slice(searchStart)
+    .findIndex((e) => (planned.get(e.skill_id) ?? 0) >= e.finished_level);
+  const firstPlanned = dedupOffset === -1 ? -1 : dedupOffset + searchStart;
   const queued = firstPlanned === -1 ? pending : pending.slice(0, firstPlanned);
   const startMs = queued.reduce((max, e) => Math.max(max, finishMs(e) ?? max), nowMs);
   return {
