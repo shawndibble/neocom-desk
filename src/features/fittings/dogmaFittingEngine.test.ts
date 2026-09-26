@@ -370,6 +370,8 @@ describe('computeFittingStats overheated values', () => {
     expect(stats.offense.overheated?.dps).toBe(32);
     expect(stats.ehp).toBe(1000);
     expect(stats.overheated?.ehp).toBe(1200);
+    // Not everything overheated: there is nothing unheated to compare against.
+    expect(stats.unheated).toBeNull();
   });
 
   it('calculates once and reports no overheated values when no module can overheat', async () => {
@@ -427,6 +429,16 @@ describe('computeFittingStats overheated values', () => {
     expect(stats.offense.overheated).toBeNull();
     // The state control still shows what the pilot set.
     expect(stats.modules[0].state).toBe('active');
+    // Beside them, the same figures unheated — off the same two calculations,
+    // so each figure can say whether heat changed it.
+    expect(calculateMock).toHaveBeenCalledTimes(2);
+    expect(stats.unheated).toMatchObject({
+      ehp: 1000,
+      offense: { dps: 10, overheated: null },
+      overheated: null,
+      allOverheated: false,
+      unheated: null,
+    });
   });
 
   it('is not overheated at all when nothing can overheat, whatever was asked', async () => {

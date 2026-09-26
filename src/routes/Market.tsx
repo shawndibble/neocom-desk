@@ -1400,8 +1400,6 @@ export function Market() {
                       <div className="mt-3">
                         <VariationsTable
                           rows={variationsResult.rows}
-                          totalCount={variationsResult.totalCount}
-                          truncated={variationsResult.truncated}
                           prices={variationPrices}
                           onSelect={handleSelectItem}
                           onCompare={handleCompareVariations}

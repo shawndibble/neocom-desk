@@ -1114,10 +1114,73 @@ describe('Characters table view', () => {
       await user.click(await screen.findByRole('button', { name: /refresh all/i }));
 
       await waitFor(() => {
-        expect(snapshotSpy).toHaveBeenCalledWith({ live: true });
+        expect(snapshotSpy).toHaveBeenCalledWith(expect.objectContaining({ live: true }));
         expect(attentionSpy).toHaveBeenCalledWith({ live: true });
       });
     } finally {
+      snapshotSpy.mockRestore();
+      attentionSpy.mockRestore();
+    }
+  });
+
+  it('Refresh all updates the Last synced cell per character as soon as that character finishes, before the roster does (#1907)', async () => {
+    const user = userEvent.setup();
+    const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    const queueAt = (fetchedAt: Date): RosterEntry['queue'] => ({
+      data: [],
+      fetchedAt,
+      fromCache: false,
+      truncated: false,
+    });
+    const stale = [
+      {
+        ...pilotRosterEntry(91, 'Pilot One'),
+        correctedTotalSp: null,
+        queue: queueAt(threeHoursAgo),
+      },
+      {
+        ...pilotRosterEntry(92, 'Pilot Two'),
+        correctedTotalSp: null,
+        queue: queueAt(threeHoursAgo),
+      },
+    ];
+    let finishRoster: () => void = () => {};
+    const rosterGate = new Promise<void>((resolve) => {
+      finishRoster = resolve;
+    });
+    const snapshotSpy = vi
+      .spyOn(rosterModule, 'loadRosterSnapshot')
+      .mockImplementation(async (opts) => {
+        if (!opts?.live) return stale;
+        opts.onEntry?.({ ...stale[0], queue: queueAt(new Date()) });
+        await rosterGate;
+        return stale;
+      });
+    const attentionSpy = vi
+      .spyOn(rosterAttentionModule, 'loadRosterAttention')
+      .mockResolvedValue([]);
+
+    try {
+      renderCharacters();
+      await user.click(await screen.findByRole('button', { name: 'Table' }));
+      const table = await screen.findByRole('table');
+      const headers = within(table).getAllByRole('columnheader');
+      const column = headers.findIndex((header) => /last synced/i.test(header.textContent ?? ''));
+      expect(column).toBeGreaterThan(-1);
+      const cellText = (name: string) =>
+        within(within(table).getByText(name).closest('tr') as HTMLElement).getAllByRole('cell')[
+          column
+        ].textContent;
+      await waitFor(() => expect(cellText('Pilot One')).toMatch(/3h/));
+      const pilotTwoBefore = cellText('Pilot Two');
+
+      await user.click(screen.getByRole('button', { name: /refresh all/i }));
+
+      await waitFor(() => expect(cellText('Pilot One')).not.toMatch(/3h/));
+      expect(cellText('Pilot Two')).toBe(pilotTwoBefore);
+      finishRoster();
+    } finally {
+      finishRoster();
       snapshotSpy.mockRestore();
       attentionSpy.mockRestore();
     }

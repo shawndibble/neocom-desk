@@ -1545,7 +1545,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     // Solo: only Pilot One counts (3 open manufacturing).
     await screen.findByRole('button', { name: 'This character' });
     await waitFor(() => {
-      expect(container.querySelector('.cursor-help')!.textContent).toBe('Free slotsMfg3/Sci1/Rxn1');
+      expect(container.querySelector('.cursor-help')!.textContent).toBe('Free slots3/1/1');
     });
 
     await user.click(screen.getByRole('button', { name: 'This character' }));
@@ -1554,7 +1554,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     // Both: 4+2=6 max, 2 running -> 4 open. Science/reaction stay at the
     // untrained 1/1 for both characters (base slot only), summed to 2/2.
     await waitFor(() => {
-      expect(container.querySelector('.cursor-help')!.textContent).toBe('Free slotsMfg4/Sci2/Rxn2');
+      expect(container.querySelector('.cursor-help')!.textContent).toBe('Free slots4/2/2');
     });
   });
 });
@@ -1619,7 +1619,7 @@ describe('ActiveJobsPanel: open job-slot header (issue #679)', () => {
     expect(summaryEls[2]).toHaveClass('text-warning');
 
     const summaryTrigger = container.querySelector('.cursor-help')!;
-    expect(summaryTrigger.textContent).toBe('Free slotsMfg1/Sci1/Rxn1');
+    expect(summaryTrigger.textContent).toBe('Free slots1/1/1');
     fireEvent.focus(summaryTrigger);
     // Numerator is jobs *used* (max - open), not open — 3 running of 4
     // manufacturing, 0 of 1 science, 1 of 2 reaction.
@@ -1647,7 +1647,7 @@ describe('ActiveJobsPanel: open job-slot header (issue #679)', () => {
 
     await screen.findByText('None');
     const summaryTrigger = container.querySelector('.cursor-help')!;
-    expect(summaryTrigger.textContent).toBe('Free slotsMfg—/Sci—/Rxn—');
+    expect(summaryTrigger.textContent).toBe('Free slots—/—/—');
     fireEvent.focus(summaryTrigger);
     expect(screen.getByRole('tooltip')).toHaveTextContent('Mfg — · Sci — · Rxn —');
   });

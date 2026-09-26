@@ -932,6 +932,17 @@ export function Characters() {
     setTotalSpById(totalSpMap(roster));
   }
 
+  /** `applyRoster` for one character that just finished refreshing: merges into the maps rather than replacing them, so the rest of the roster keeps its rows. */
+  function mergeRosterEntry(entry: RosterEntry, now: number) {
+    const merge = <V,>(previous: Map<number, V>, fresh: Map<number, V>) =>
+      new Map([...previous, ...fresh]);
+    const one = [entry];
+    setStats((previous) => merge(previous, rosterSortStats(one)));
+    setQueueById((previous) => merge(previous, queueInfoMap(one, now)));
+    setJobSlotSkillsById((previous) => merge(previous, jobSlotSkillsMap(one, now)));
+    setTotalSpById((previous) => merge(previous, totalSpMap(one)));
+  }
+
   const [addingGroup, setAddingGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
@@ -1121,7 +1132,7 @@ export function Characters() {
     try {
       const now = Date.now();
       const [roster, attention] = await Promise.all([
-        loadRosterSnapshot({ live: true }),
+        loadRosterSnapshot({ live: true, now, onEntry: (entry) => mergeRosterEntry(entry, now) }),
         loadRosterAttention({ live: true }),
       ]);
       applyRoster(roster, now);

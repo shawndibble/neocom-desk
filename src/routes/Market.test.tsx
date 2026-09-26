@@ -953,10 +953,10 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.click(await screen.findByText('Merlin'));
     const table = await screen.findByRole('table', { name: 'Variations' });
 
-    // Click the Tier cell, not the Name cell.
+    // Click the row itself, not the Name cell.
     const kestrelRow = within(table).getByText('Kestrel').closest('tr');
     if (!kestrelRow) throw new Error('expected a Kestrel row');
-    await user.click(within(kestrelRow).getByText('—'));
+    await user.click(kestrelRow);
 
     const sellTable = await screen.findByRole('table', { name: 'Sell Orders' });
     expect(within(sellTable).getByText('1,500,000.00')).toBeInTheDocument();
@@ -1025,7 +1025,7 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     expect(screen.queryByText('Variations')).not.toBeInTheDocument();
   });
 
-  it('bounds a large Market Group at the cap and states the true total', async () => {
+  it('renders every sibling of a large Market Group, uncapped', async () => {
     const bigGroupId = 99;
     const selected: MarketTypeEntry = {
       typeId: 1999,
@@ -1055,7 +1055,8 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.click(await screen.findByText('Selected Widget'));
 
     expect(await screen.findByText('Variations')).toBeInTheDocument();
-    expect(screen.getByText('Showing 20 of 25')).toBeInTheDocument();
+    const table = await screen.findByRole('table', { name: 'Variations' });
+    expect(within(table).getAllByRole('row')).toHaveLength(26); // header + all 25 siblings, uncapped
   });
 
   it('fetches variation row prices a few at a time, never as one simultaneous burst (Sentry N+1 API Call)', async () => {

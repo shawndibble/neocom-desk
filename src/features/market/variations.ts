@@ -8,9 +8,6 @@
 import { getVariations, type VariationIndex } from '@/engine/market/variations';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
 
-/** Bounds the table so a large variation group or Market Group cannot grow it unusably long. */
-export const VARIATIONS_LIMIT = 20;
-
 export interface VariationRow {
   typeId: number;
   name: string;
@@ -19,11 +16,8 @@ export interface VariationRow {
 }
 
 export interface VariationsResult {
-  /** Rows to render, capped at VARIATIONS_LIMIT. */
+  /** Every row, uncapped — a variation group or Market Group runs to tens of rows at most. */
   rows: readonly VariationRow[];
-  /** True row count before the cap. */
-  totalCount: number;
-  truncated: boolean;
 }
 
 /** "Tech I"/"Tech II"/"Tech III" -> "T1"/"T2"/"T3"; every other meta group name passes through unchanged. */
@@ -38,15 +32,6 @@ export function tierLabel(metaGroupName: string): string {
     default:
       return metaGroupName;
   }
-}
-
-function cap(rows: readonly VariationRow[]): VariationsResult {
-  const truncated = rows.length > VARIATIONS_LIMIT;
-  return {
-    rows: truncated ? rows.slice(0, VARIATIONS_LIMIT) : rows,
-    totalCount: rows.length,
-    truncated,
-  };
 }
 
 function siblingRows(
@@ -73,6 +58,6 @@ export function getVariationRows(
     if (!type) continue;
     rows.push({ typeId: type.typeId, name: type.name, tier: tierLabel(member.metaGroupName) });
   }
-  if (rows.length > 0) return cap(rows);
-  return cap(siblingRows(typesByGroup, selected));
+  if (rows.length > 0) return { rows };
+  return { rows: siblingRows(typesByGroup, selected) };
 }

@@ -33,8 +33,6 @@ function tierSortValue(tier: string | null): string | undefined {
 
 export interface VariationsTableProps {
   rows: readonly VariationRow[];
-  totalCount: number;
-  truncated: boolean;
   /** Absent key = not yet requested; undefined value = still loading. */
   prices: ReadonlyMap<number, OrderBookSummary | undefined>;
   onSelect: (typeId: number) => void;
@@ -69,8 +67,6 @@ function priceCell(
 
 export function VariationsTable({
   rows,
-  totalCount,
-  truncated,
   prices,
   onSelect,
   onCompare,
@@ -107,6 +103,8 @@ export function VariationsTable({
     );
   }
 
+  // Sibling-fallback rows carry no meta-group classification, so the column would be all dashes.
+  const hasTier = rows.some((row) => row.tier !== null);
   const columns: DataTableColumn<VariationRow>[] = [
     {
       id: 'name',
@@ -123,13 +121,17 @@ export function VariationsTable({
         </span>
       ),
     },
-    {
-      id: 'tier',
-      header: t('market.variations.tier'),
-      className: 'text-text-dim',
-      sortValue: (row) => tierSortValue(row.tier),
-      render: (row) => row.tier ?? '—',
-    },
+    ...(hasTier
+      ? [
+          {
+            id: 'tier',
+            header: t('market.variations.tier'),
+            className: 'text-text-dim',
+            sortValue: (row: VariationRow) => tierSortValue(row.tier),
+            render: (row: VariationRow) => row.tier ?? '—',
+          },
+        ]
+      : []),
     {
       id: 'sell',
       header: t('market.variations.sell'),
@@ -166,11 +168,6 @@ export function VariationsTable({
           </Button>
         </span>
       </div>
-      {truncated && (
-        <p className="pb-1 text-[0.6875rem] text-warning uppercase">
-          {t('market.variations.capped', { limit: rows.length, total: totalCount })}
-        </p>
-      )}
       <DataTable
         columns={columns}
         rows={rows}
