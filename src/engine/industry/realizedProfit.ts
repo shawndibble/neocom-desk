@@ -73,3 +73,32 @@ export function realizedProfit(inputs: RealizedProfitInputs): RealizedProfitResu
     marginPct: inputs.grossRevenue > 0 ? (profit / inputs.grossRevenue) * 100 : null,
   };
 }
+
+export interface SoldUnitsMarginInputs {
+  totalCost: number;
+  /** Units the run produced. */
+  quantity: number;
+  /** Confirmed units sold so far. */
+  quantitySold: number;
+  netRevenue: number;
+}
+
+export interface SoldUnitsMargin {
+  /** Unit cost x confirmed units sold — the only cost the sold units can be charged. */
+  soldCost: number;
+  /** Net revenue less `soldCost`: provable from confirmed sales alone, unlike `realizedProfit`'s conservative headline. */
+  margin: number;
+  /** The cost still sitting in unsold units. */
+  unsoldCost: number;
+}
+
+/** A second, provable view beside `realizedProfit` (issue #1785): charges only the sold units' share of the run cost. */
+export function soldUnitsMargin(inputs: SoldUnitsMarginInputs): SoldUnitsMargin {
+  const soldUnits = Math.min(inputs.quantitySold, inputs.quantity);
+  const soldCost = inputs.quantity > 0 ? (inputs.totalCost / inputs.quantity) * soldUnits : 0;
+  return {
+    soldCost,
+    margin: inputs.netRevenue - soldCost,
+    unsoldCost: inputs.totalCost - soldCost,
+  };
+}

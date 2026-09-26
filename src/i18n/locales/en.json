@@ -1536,6 +1536,8 @@
     "unitsProduced": "Units produced",
     "unitsSold": "Units sold",
     "avgMargin": "Avg margin",
+    "soldUnitsMargin": "Margin on units sold",
+    "unsoldCost": "Unsold cost",
     "total": "Total",
     "buildPlansTab": "Build Plans",
     "recordsTab": "Records",
