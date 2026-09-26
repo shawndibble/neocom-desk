@@ -188,6 +188,15 @@ service cloud.firestore {
       allow read: if request.auth != null;
       allow write: if false;
     }
+    // Mining Yield Overview's server-side price history (issue #1279): one
+    // doc per UTC date, written only by the captureMiningPriceSnapshot
+    // scheduled function (admin privileges). Not per-Character sync data —
+    // it's public market history — so it gets the same rule as the two
+    // collections above: read by any signed-in client, never client-written.
+    match /marketHistory/{date} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
     // Everything else: implicit deny.
   }
 }

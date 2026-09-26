@@ -97,6 +97,7 @@ function dateRangeLabel(dates: readonly string[]): string {
 
 const SOURCE_TAG_CLASS: Record<PriceSource, string> = {
   saved: 'border-line-bright text-text-dim',
+  historical: 'border-success/50 text-success',
   average: 'border-warning/50 text-warning',
   live: 'border-accent-dim text-accent',
   none: 'border-line text-text-dim',

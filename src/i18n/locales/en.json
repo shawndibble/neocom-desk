@@ -2927,12 +2927,14 @@
       "daysMinedStat": "Days mined",
       "priceSourceHint": {
         "saved": "Jita price this app saved on the day mined, for the side you picked (buy or sell).",
+        "historical": "No Jita price was saved that day, so this uses a region-wide historical buy/sell split.",
         "average": "No price was saved that day, so this uses EVE's daily average: a mix of buy and sell trades.",
         "live": "Today's live Jita price. Used for Now, and for today or yesterday until EVE publishes that day.",
         "none": "No price found for this ore."
       },
       "priceSource": {
         "saved": "Saved",
+        "historical": "Historical",
         "average": "Daily avg",
         "live": "Live",
         "none": "No price"
@@ -2955,13 +2957,14 @@
         "sellHint": "Saved sell price on the day mined",
         "nowOption": "Now",
         "nowHint": "Today's live price, for every day",
-        "fallbackNote": "Days with no saved price use ESI's daily average, or today's live price before ESI publishes the day. Each row is marked.",
+        "fallbackNote": "Days with no saved price use a historical buy/sell split or ESI's daily average, or today's live price before ESI publishes the day. Each row is marked.",
         "summaryDay": "Valued at {{price}} on the day mined.",
         "summaryNow": "Valued at today's live {{price}} price for every day.",
         "summaryDayRated": "Valued at {{percent}}% of {{price}} on the day mined.",
         "summaryNowRated": "Valued at {{percent}}% of today's live {{price}} price for every day.",
         "usageSaved_one": "{{count}} of {{total}} day uses saved prices",
         "usageSaved_other": "{{count}} of {{total}} days use saved prices",
+        "usageHistorical": "{{count}} historical",
         "usageAverage": "{{count}} daily avg",
         "usageLive": "{{count}} live",
         "usageNone": "{{count}} unpriced"
