@@ -48,7 +48,7 @@ function Meter({
           style={{ width: `${pct}%` }}
         />
       </div>
-      <span className={`tabular-nums ${over ? 'text-danger' : ''}`}>
+      <span className={`whitespace-nowrap tabular-nums ${over ? 'text-danger' : ''}`}>
         {reading('fittings.start.preview.meter')}
       </span>
     </div>

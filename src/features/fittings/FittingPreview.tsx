@@ -143,53 +143,60 @@ export function FittingPreview({
         {unreadable ? (
           <p className="text-xs text-warning">{t('fittings.start.preview.unreadable')}</p>
         ) : (
-          <div className="grid items-start gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-            <div className="min-w-0 space-y-4">
-              {fitting && (
-                <FittingRing
-                  fitting={fitting}
-                  stats={stats ?? null}
-                  moduleResults={stats?.modules ?? null}
-                  typeName={typeName}
-                  compact
-                  bare
-                />
-              )}
-              <Section title={t('fittings.start.preview.sectionSkills')}>
-                {fitting && <SkillsPanel fitting={fitting} characterId={characterId} />}
-              </Section>
-            </div>
-            <div className="min-w-0 space-y-4">
-              {stats ? (
-                <FitMeters stats={stats} />
-              ) : compared.failed[0] ? (
-                <p className="text-xs text-warning">{t('fittings.start.preview.statsFailed')}</p>
-              ) : (
-                <p className="text-xs text-text-dim">{t('fittings.start.preview.calculating')}</p>
-              )}
-              <Section title={t('fittings.start.preview.sectionOffense')}>
-                {stats ? (
-                  <OffensePanel stats={stats} typeName={typeName} />
-                ) : (
-                  <p className="text-xs text-text-dim">{t('fittings.start.preview.calculating')}</p>
-                )}
-              </Section>
-              <Section title={t('fittings.start.preview.sectionDefense')}>
-                {stats ? (
-                  <DefensePanel stats={stats} />
-                ) : (
-                  <p className="text-xs text-text-dim">{t('fittings.start.preview.calculating')}</p>
-                )}
-              </Section>
-              {/* A saved fitting always offers Notes (to write them); an In-game one only when it has a description. */}
-              {(row.source === 'saved' || notes !== '') && (
-                <Section title={t('fittings.start.preview.sectionNotes')}>
-                  <NotesPanel
-                    text={notes}
-                    onSave={row.source === 'saved' ? onSaveNotes : undefined}
+          // Container query: the pane sits beside the list, far narrower than the viewport.
+          <div className="@container min-w-0">
+            <div className="grid items-start gap-4 @2xl:grid-cols-[16rem_minmax(0,1fr)]">
+              <div className="min-w-0 space-y-4">
+                {fitting && (
+                  <FittingRing
+                    fitting={fitting}
+                    stats={stats ?? null}
+                    moduleResults={stats?.modules ?? null}
+                    typeName={typeName}
+                    compact
+                    bare
                   />
+                )}
+                <Section title={t('fittings.start.preview.sectionSkills')}>
+                  {fitting && <SkillsPanel fitting={fitting} characterId={characterId} />}
                 </Section>
-              )}
+              </div>
+              <div className="min-w-0 space-y-4">
+                {stats ? (
+                  <FitMeters stats={stats} />
+                ) : compared.failed[0] ? (
+                  <p className="text-xs text-warning">{t('fittings.start.preview.statsFailed')}</p>
+                ) : (
+                  <p className="text-xs text-text-dim">{t('fittings.start.preview.calculating')}</p>
+                )}
+                <Section title={t('fittings.start.preview.sectionOffense')}>
+                  {stats ? (
+                    <OffensePanel stats={stats} typeName={typeName} />
+                  ) : (
+                    <p className="text-xs text-text-dim">
+                      {t('fittings.start.preview.calculating')}
+                    </p>
+                  )}
+                </Section>
+                <Section title={t('fittings.start.preview.sectionDefense')}>
+                  {stats ? (
+                    <DefensePanel stats={stats} />
+                  ) : (
+                    <p className="text-xs text-text-dim">
+                      {t('fittings.start.preview.calculating')}
+                    </p>
+                  )}
+                </Section>
+                {/* A saved fitting always offers Notes (to write them); an In-game one only when it has a description. */}
+                {(row.source === 'saved' || notes !== '') && (
+                  <Section title={t('fittings.start.preview.sectionNotes')}>
+                    <NotesPanel
+                      text={notes}
+                      onSave={row.source === 'saved' ? onSaveNotes : undefined}
+                    />
+                  </Section>
+                )}
+              </div>
             </div>
           </div>
         )}
