@@ -257,16 +257,18 @@ export function PlanEditor({
 }: PlanEditorProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  // "New plan" navigates here with this flag so the name field takes focus for a rename.
+  // Which side the tools pane lands on — the same hook the rest of the app's two-column
+  // layouts switch on, so this pane can never disagree with them.
+  const isDesktop = useIsDesktop();
+  // "New plan" navigates here with this flag. Wide screens have the list pane, whose row
+  // takes the rename (and spends the flag); narrow ones have no list, so the header field does.
   const location = useLocation();
-  const focusName = (location.state as { focusName?: boolean } | null)?.focusName === true;
+  const focusName =
+    !isDesktop && (location.state as { focusName?: boolean } | null)?.focusName === true;
   // Spent once the field has focus, so a reload or Back doesn't re-steal it.
   useEffect(() => {
     if (focusName) navigate(location.pathname, { replace: true, state: null });
   }, [focusName, location.pathname, navigate]);
-  // Which side the tools pane lands on — the same hook the rest of the app's two-column
-  // layouts switch on, so this pane can never disagree with them.
-  const isDesktop = useIsDesktop();
   const [copyConfirm, setCopyConfirm] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [importMenuOpen, setImportMenuOpen] = useState(false);
@@ -1941,7 +1943,7 @@ export function PlanEditor({
           nextStep={headerNextStep}
           trainedKnown={trainedSkillsKnown}
           name={plan.name}
-          onRename={(name) => onUpdate({ name })}
+          onRename={isDesktop ? undefined : (name) => onUpdate({ name })}
           focusName={focusName}
         />
 

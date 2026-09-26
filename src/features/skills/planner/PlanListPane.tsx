@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type SkillPlanRecord } from '@/db';
 import { Button, Panel, Spinner } from '@/components/ui';
@@ -62,6 +62,15 @@ export function PlanListPane({
 }: PlanListPaneProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  // "New plan" navigates with this flag so the new plan's row opens in rename mode.
+  const location = useLocation();
+  const focusName = (location.state as { focusName?: boolean } | null)?.focusName === true;
+  const autoRenamePlanId = focusName ? (activePlanId ?? null) : null;
+  // Spent once the row is in rename mode, so a reload or Back doesn't reopen it.
+  const spendFocusName = useCallback(
+    () => navigate(location.pathname, { replace: true, state: null }),
+    [navigate, location.pathname]
+  );
   const isDesktop = useIsDesktop();
 
   const plans = useLiveQuery(
@@ -117,7 +126,7 @@ export function PlanListPane({
     const plan = newPlan(activeCharacterId, t('plans.newPlanName'), remapInfo?.available ?? 0);
     await db.skillPlans.add(plan);
     syncAfterEdit();
-    // The flag lands the pilot on the editor's name field, ready to rename.
+    // The flag lands the pilot on the new plan's list row, ready to rename.
     navigate(`/skills/plans/${plan.id}`, { state: { focusName: true } });
   }
 
@@ -214,6 +223,8 @@ export function PlanListPane({
             plans={plans}
             stats={stats}
             activePlanId={activePlanId}
+            autoRenamePlanId={autoRenamePlanId}
+            onAutoRenameStarted={spendFocusName}
             onOpen={(id) => navigate(`/skills/plans/${id}`)}
             onDuplicate={(id) => void handleDuplicate(id)}
             otherCharacters={otherCharacters}

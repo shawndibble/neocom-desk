@@ -27,7 +27,11 @@ interface PlanHeaderProps {
   nextStep?: { name: string; level: number; cumulativeSeconds: number; startDate: Date } | null;
   /** False until the character's trained skills have loaded: progress reads `—`, not 0%. */
   trainedKnown?: boolean;
-  /** The open plan's name; when given it replaces the generic panel title as an editable field. */
+  /**
+   * The open plan's name; when given it replaces the generic panel title. Editable
+   * only when `onRename` is too — beside the plan list (wide screens) renaming lives
+   * in that list's row menu, so the header shows plain text there.
+   */
   name?: string;
   onRename?: (name: string) => void;
   /** Focus (and select) the name field on mount, for a plan just created. */
@@ -81,9 +85,9 @@ export function PlanHeader({
     // that there is no second sticky panel below needing this one's rendered
     // height; nothing here has to stay in sync with anything.
     <Panel
-      title={name === undefined ? t('plans.headerTitle') : undefined}
+      title={name === undefined || !onRename ? (name ?? t('plans.headerTitle')) : undefined}
       leading={
-        name === undefined ? undefined : (
+        name === undefined || !onRename ? undefined : (
           <TextInput
             ref={nameRef}
             size="sm"

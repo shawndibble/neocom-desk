@@ -158,7 +158,8 @@ test('a long plan scrolls the page, with the summary strip pinned above it', asy
   await expect(page.locator('div[class="lg:overflow-y-auto"]')).toHaveCount(0);
 
   const summaryPanel = page
-    .getByRole('textbox', { name: 'Plan name' })
+    .getByText('Projected finish')
+    .first()
     .locator('xpath=ancestor::section[1]');
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
   await page.waitForTimeout(100);
