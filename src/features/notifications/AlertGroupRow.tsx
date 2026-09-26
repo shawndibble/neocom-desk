@@ -209,7 +209,11 @@ function AlertFireRow({
         {formatAge(Math.max(0, Date.now() - entry.firedAt), t)}
       </time>
       <Link
-        to={notificationUrlForSubject(entry.eventId, entry.subjectId ?? entry.typeId)}
+        to={notificationUrlForSubject(
+          entry.eventId,
+          entry.subjectId ?? entry.typeId,
+          entry.characterId
+        )}
         className="order-4 min-w-0 basis-full rounded-xs text-xs text-text-dim hover:text-text focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:order-1 sm:flex-1 sm:basis-auto sm:truncate"
       >
         {body}

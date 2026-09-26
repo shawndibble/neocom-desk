@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import {
@@ -31,8 +31,10 @@ import {
 } from './contractsColumns';
 import { GrantBanner } from '@/app/GrantNote';
 import { loadContracts } from '@/features/character/contracts';
+import { contractAmount } from '@/features/character/contractAmount';
 import { ContractContextMenu } from '@/features/character/ContractContextMenu';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
+import { ContractIdentity } from '@/features/character/ContractIdentity';
 import { IssuerLink } from '@/features/character/IssuerLink';
 import { StandingTag } from '@/features/character/StandingTag';
 import { loadContacts } from '@/features/character/contacts';
@@ -61,15 +63,20 @@ import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatTimestamp } from '@/lib/timestamp';
+import { formatCountdown } from '@/lib/duration';
+import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { contractsCsvColumns } from '@/features/character/contractsCsv';
 import type { CharacterAffiliation, Contract } from '@/esi/endpoints';
 import { usePageTab } from '@/lib/usePageTab';
+import { useContractSearchMode } from '@/features/contractSearch/contractSearchModePref';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, optionalEnumParam, textParam } from '@/lib/urlState';
 import { CONTRACTS_TABS } from '@/app/pageTabs';
+import { tabPath } from '@/lib/pageTabs';
+import type { TabRouteDefaultState } from '@/app/TabRoute';
 
 interface Snapshot {
   contractsResult: CachedResult<Contract[]> | null;
@@ -315,7 +322,69 @@ export function Contracts() {
     (next: 'search' | 'history') => setTabId(next === 'history' ? 'history' : `search/${mode}`),
     [setTabId, mode]
   );
-  const setMode = useCallback((next: ContractMode) => setTabId(`search/${next}`), [setTabId]);
+  const rememberedMode = useContractSearchMode((state) => state.value);
+  const rememberedModeHydrated = useContractSearchMode((state) => state.hydrated);
+  const hydrateRememberedMode = useContractSearchMode((state) => state.hydrate);
+  const setRememberedMode = useContractSearchMode((state) => state.setValue);
+  useEffect(() => {
+    void hydrateRememberedMode();
+  }, [hydrateRememberedMode]);
+  const setMode = useCallback(
+    (next: ContractMode) => {
+      setTabId(`search/${next}`);
+      void setRememberedMode(next);
+    },
+    [setTabId, setRememberedMode]
+  );
+  /**
+   * A bare `/contracts` visit always redirects to `CONTRACTS_TABS`' hardcoded
+   * `search/items` (issue #1719) — the route/tab itself stays unpersisted
+   * (decision `20260912-141100`), so this only steps in once, right after
+   * that redirect, to swap for the last-used mode.
+   *
+   * `tabId` alone can't tell that redirect apart from an explicit, bookmarked
+   * or shared deep link to the literal `/contracts/search/items` path — both
+   * resolve to the exact same `tabId`. `TabRoute`'s own `state` marker
+   * (`tabRouteDefaulted`) is the one signal that distinguishes them, since
+   * only `TabRoute` knows which case produced this landing; a deep link never
+   * carries it, so `landedOnDefault` is false and this never touches it.
+   *
+   * `navigate` directly, not `setTabId`/`setMode`: those always push a new
+   * history entry (`usePageTab`'s own contract, so an explicit tab switch is
+   * a place Back returns to) — a *silent* restore on first paint is not such
+   * a place, and pushing one here would leave a phantom Items entry behind
+   * Courier for Back to bounce off of. Skipped entirely when the remembered
+   * mode already matches (`rememberedMode` is `'items'`, the hardcoded
+   * default) — nothing to change, and the only cost of leaving the marker in
+   * place is that it can ride along on a later URL-param write within this
+   * mount, which nothing here or elsewhere ever reads again.
+   */
+  const location = useLocation();
+  const navigate = useNavigate();
+  const landedOnDefault = Boolean(
+    (location.state as TabRouteDefaultState | null)?.tabRouteDefaulted
+  );
+  const appliedRememberedMode = useRef(false);
+  useEffect(() => {
+    if (appliedRememberedMode.current || !rememberedModeHydrated) return;
+    appliedRememberedMode.current = true;
+    if (!landedOnDefault || rememberedMode !== 'courier') return;
+    navigate(
+      {
+        pathname: tabPath(CONTRACTS_TABS, 'search/courier'),
+        search: location.search,
+        hash: location.hash,
+      },
+      { replace: true, state: null }
+    );
+  }, [
+    rememberedModeHydrated,
+    landedOnDefault,
+    rememberedMode,
+    location.search,
+    location.hash,
+    navigate,
+  ]);
   const pageTabs = useMemo(
     () => [
       { id: 'search' as const, label: t('contracts.searchTab') },
@@ -373,22 +442,35 @@ export function Contracts() {
         header: t('contracts.price'),
         align: 'right',
         className: 'tabular-nums',
-        sortValue: (contract) => contract.price ?? contract.reward,
-        render: (contract) =>
-          contract.price !== undefined ? (
-            <IskAmount value={contract.price} revealOn="longPress" />
-          ) : contract.reward !== undefined ? (
-            <IskAmount value={contract.reward} revealOn="longPress" />
+        sortValue: (contract) => contractAmount(contract),
+        render: (contract) => {
+          const amount = contractAmount(contract);
+          return amount !== undefined ? (
+            <IskAmount value={amount} revealOn="longPress" />
           ) : (
             t('common.unknown')
-          ),
+          );
+        },
       },
       expires: {
         id: 'expires',
         header: t('contracts.expires'),
         className: 'whitespace-nowrap text-text-dim',
-        sortValue: (contract) => new Date(contract.date_expired).getTime(),
-        render: (contract) => formatTimestamp(new Date(contract.date_expired), timeZone),
+        // An accepted courier's clock is delivery, not the accept-by expiry.
+        sortValue: (contract) =>
+          courierDeliveryDeadlineMs(contract) ?? new Date(contract.date_expired).getTime(),
+        render: (contract) => {
+          const deadlineMs = courierDeliveryDeadlineMs(contract);
+          if (deadlineMs === null)
+            return formatTimestamp(new Date(contract.date_expired), timeZone);
+          const time = formatTimestamp(new Date(deadlineMs), timeZone);
+          const remainingMs = deadlineMs - Date.now();
+          return remainingMs <= 0 ? (
+            <span className="text-danger">{t('contracts.deliverOverdue', { time })}</span>
+          ) : (
+            t('contracts.deliverDue', { time, duration: formatCountdown(remainingMs / 1000) })
+          );
+        },
       },
     }),
     [t, issuerNames, timeZone, standingIndex, issuerAffiliations]
@@ -405,7 +487,7 @@ export function Contracts() {
             onClick={() => setSelectedContract(contract)}
             className="flex min-h-11 w-full items-center text-left font-medium text-accent hover:underline md:block md:min-h-0 md:w-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            {contract.title || t(CONTRACT_TYPE_KEY[contract.type])}
+            <ContractIdentity contract={contract} characterId={activeCharacterId} />
           </button>
         ),
       },
@@ -413,7 +495,7 @@ export function Contracts() {
         (id) => optionalHistoryColumns[id]
       ),
     ],
-    [t, optionalHistoryColumns, historyColumnVisibility.isVisible]
+    [t, optionalHistoryColumns, historyColumnVisibility.isVisible, activeCharacterId]
   );
   // The full catalog, not just `columns`' currently-visible ids: a sort
   // picked while a column was shown should still resolve once the picker

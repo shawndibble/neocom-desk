@@ -212,6 +212,12 @@ export interface OffenseStats {
   volley: number;
   /** Null when no row can overheat. */
   overheated: DamageFigures | null;
+  /**
+   * Active turrets/launchers dropped from `weapons` because no charge is
+   * loaded — as opposed to genuinely not being active. Lets an empty-state
+   * hint blame the missing charge instead of "set active".
+   */
+  chargelessWeaponCount: number;
 }
 
 /** Local repair and boost rates, HP/s. */

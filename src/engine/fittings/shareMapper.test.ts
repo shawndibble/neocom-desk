@@ -88,8 +88,9 @@ describe('fittingToShareInput / shareToFitting', () => {
     expect(restored.implantSet).toBeUndefined();
   });
 
-  it('round-trips through the real encode/decode codec, name aside (the payload never carries it)', async () => {
+  it('round-trips through the real encode/decode codec, name included', async () => {
     const original = fitting({
+      name: 'Doctrine Rifter',
       shipTypeId: 587,
       modules: [{ slot: 'high', slotIndex: 0, typeId: 2456, state: 'active' }],
       drones: [{ typeId: 2454, quantity: 1, state: 'active' }],
@@ -102,8 +103,13 @@ describe('fittingToShareInput / shareToFitting', () => {
     expect(decoded.ok).toBe(true);
     if (!decoded.ok) return;
 
-    const restored = shareToFitting(decoded.value, original.name);
+    const restored = shareToFitting(decoded.value, 'Rifter');
     expect(restored).toEqual(original);
+  });
+
+  it('falls back to the given name for a decoded share that carries none (a version-1 link)', () => {
+    const nameless = { ...fittingToShareInput(fitting({ name: 'Anything' })), name: undefined };
+    expect(shareToFitting(nameless, 'Rifter').name).toBe('Rifter');
   });
 
   it('round-trips a carried implant set through the real encode/decode codec', async () => {

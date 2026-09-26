@@ -592,15 +592,37 @@ describe('projectQueueEnd', () => {
     expect(r.queuedLevels.map((e) => e.skill_id)).toEqual([101]);
   });
 
-  it('starts now when the plan lists the queue head', () => {
+  it('still waits on the rest of the lead when the plan lists the queue head', () => {
+    // 101 (the in-progress head) is also a plan entry, but 102 behind it is
+    // not, so 102 stays lead — the plan cannot start before the live queue
+    // gets to it either way.
     const queue = [
       entry({ queue_position: 1, finished_level: 3, finish_date: '2026-09-01T12:00:00Z' }),
       entry({ queue_position: 2, finished_level: 4, finish_date: '2026-09-11T12:00:00Z' }),
     ];
     const r = projectQueueEnd(trained, queue, NOW, [{ skillTypeID: 101, targetLevel: 3 }]);
+    expect(r.startMs).toBe(Date.parse('2026-09-11T12:00:00Z'));
+    expect(r.queuedLevels.map((e) => e.skill_id)).toEqual([101, 102]);
+    expect(r.trained.get(101)?.level).toBe(3);
+    expect(r.trained.get(102)?.level).toBe(4);
+  });
+
+  it('pins the in-progress head to its own finish_date even when the plan lists only the head', () => {
+    const end = '2026-09-01T12:00:00Z';
+    const queue = [entry({ queue_position: 1, finished_level: 3, finish_date: end })];
+    const r = projectQueueEnd(trained, queue, NOW, [{ skillTypeID: 101, targetLevel: 3 }]);
+    expect(r.startMs).toBe(Date.parse(end));
+    expect(r.queuedLevels.map((e) => e.skill_id)).toEqual([101]);
+    expect(r.trained.get(101)?.level).toBe(3);
+  });
+
+  it('starts now for a paused queue even when the plan lists the head', () => {
+    const r = projectQueueEnd(trained, [entry({ queue_position: 1 })], NOW, [
+      { skillTypeID: 101, targetLevel: 3 },
+    ]);
     expect(r.startMs).toBe(NOW);
+    expect(r.paused).toBe(true);
     expect(r.queuedLevels).toEqual([]);
-    expect(r.trained.get(101)?.level).toBe(2);
   });
 
   it('still waits on a queued level above the plan’s own target', () => {

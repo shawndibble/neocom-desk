@@ -13,7 +13,7 @@ import { definePageTabs } from '@/lib/pageTabs';
 import { usePageTab } from '@/lib/usePageTab';
 import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
-import { TabRoute } from './TabRoute';
+import { TabRoute, type TabRouteDefaultState } from './TabRoute';
 
 const PAGE = definePageTabs('/page', [
   { id: 'one', labelKey: 'one' },
@@ -44,11 +44,12 @@ function Page() {
 function Probe() {
   const location = useLocation();
   const navigationType = useNavigationType();
+  const defaulted = (location.state as TabRouteDefaultState | null)?.tabRouteDefaulted ?? false;
   return (
     <output data-testid="probe">
       {location.pathname}
       {location.search}
-      {location.hash}|{navigationType}
+      {location.hash}|{navigationType}|{String(defaulted)}
     </output>
   );
 }
@@ -81,18 +82,18 @@ afterEach(() => {
 describe('TabRoute', () => {
   it('replaces the bare page path with the default tab, keeping query and hash', () => {
     renderAt('/page?highlight=5#x');
-    expect(probe()).toBe('/page/one?highlight=5#x|REPLACE');
+    expect(probe()).toBe('/page/one?highlight=5#x|REPLACE|true');
     expect(screen.getByTestId('tab')).toHaveTextContent('one');
   });
 
   it('replaces an unknown tab segment with the default tab', () => {
     renderAt('/page/nope');
-    expect(probe()).toBe('/page/one|REPLACE');
+    expect(probe()).toBe('/page/one|REPLACE|true');
   });
 
   it('renders a declared tab as is', () => {
     renderAt('/page/two');
-    expect(probe()).toBe('/page/two|POP');
+    expect(probe()).toBe('/page/two|POP|false');
     expect(screen.getByTestId('tab')).toHaveTextContent('two');
   });
 });
@@ -102,9 +103,9 @@ describe('usePageTab', () => {
     const user = userEvent.setup();
     renderAt('/page/one?q=abc');
     await user.click(screen.getByRole('button', { name: 'two' }));
-    expect(probe()).toBe('/page/two?q=abc|PUSH');
+    expect(probe()).toBe('/page/two?q=abc|PUSH|false');
     await user.click(screen.getByRole('button', { name: 'back' }));
-    expect(probe()).toBe('/page/one?q=abc|POP');
+    expect(probe()).toBe('/page/one?q=abc|POP|false');
     expect(screen.getByTestId('tab')).toHaveTextContent('one');
   });
 
@@ -117,7 +118,7 @@ describe('usePageTab', () => {
     act(() => {
       vi.advanceTimersByTime(400);
     });
-    expect(probe()).toBe('/page/two?q=hi|REPLACE');
+    expect(probe()).toBe('/page/two?q=hi|REPLACE|false');
     expect(screen.getByLabelText('q')).toHaveValue('hi');
   });
 });
@@ -161,12 +162,12 @@ describe('TabRoute with an index state', () => {
 
   it('keeps the bare path below the breakpoint', () => {
     renderIndexed(false);
-    expect(probe()).toBe('/idx|POP');
+    expect(probe()).toBe('/idx|POP|false');
     expect(screen.getByText('content')).toBeInTheDocument();
   });
 
   it('still redirects to the default tab from the breakpoint up', () => {
     renderIndexed(true);
-    expect(probe()).toBe('/idx/one|REPLACE');
+    expect(probe()).toBe('/idx/one|REPLACE|true');
   });
 });

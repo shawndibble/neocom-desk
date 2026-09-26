@@ -53,9 +53,19 @@ export function filterWalletJournal(
     const day = entry.date.slice(0, 10);
     if (filter.startDate !== null && day < filter.startDate) return false;
     if (filter.endDate !== null && day > filter.endDate) return false;
-    if (text !== '' && !entry.description.toLowerCase().includes(text)) return false;
+    if (
+      text !== '' &&
+      !entry.description.toLowerCase().includes(text) &&
+      !(entry.reason ?? '').toLowerCase().includes(text)
+    )
+      return false;
     return true;
   });
+}
+
+/** Net ISK across a set of journal entries — a missing `amount` (a partial fetch) counts as zero. */
+export function journalNetTotal(entries: readonly WalletJournalEntry[]): number {
+  return entries.reduce((total, entry) => total + (entry.amount ?? 0), 0);
 }
 
 /**

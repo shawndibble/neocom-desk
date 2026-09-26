@@ -316,6 +316,11 @@ export function FittingStatsSections({
 }: FittingStatsSectionsProps) {
   const { t } = useTranslation();
   const profileName = useDamageProfileName()(damageProfiles.selected);
+  // A fit with nothing priceable totals 0 on both sides — that's "unknown",
+  // not a free ship, so the price section shows a dash instead of "0 ISK".
+  const nothingPriced = price !== null && price.totals.sell === 0 && price.totals.buy === 0;
+  const iskLabel = (value: number) =>
+    t('fittings.stats.unit.isk', { value: formatIskCompact(value) });
   // A RAH's resists move with the profile (the engine adapts it), so the
   // armor row does too — label that, and show the RAH's own adapted resists.
   const adaptedHardeners = (stats?.modules ?? []).flatMap((module) =>
@@ -475,6 +480,10 @@ export function FittingStatsSections({
                 <DamageFigures {...stats.offense} />
               </li>
             </ul>
+          ) : stats.offense.chargelessWeaponCount > 0 ? (
+            <p className="text-xs text-text-dim">
+              {t('fittings.stats.offenseNoCharge', { count: stats.offense.chargelessWeaponCount })}
+            </p>
           ) : (
             <p className="text-xs text-text-dim">{t('fittings.stats.offenseNone')}</p>
           )
@@ -489,6 +498,7 @@ export function FittingStatsSections({
         stats ? (
           <AppliedDpsPanel
             applied={stats.applied}
+            chargelessWeaponCount={stats.offense.chargelessWeaponCount}
             targetProfiles={targetProfiles}
             overlay={overlay}
           />
@@ -758,24 +768,18 @@ export function FittingStatsSections({
 
       {section(
         'price',
-        price
-          ? t('fittings.stats.unit.isk', { value: formatIskCompact(price.totals.sell) })
-          : undefined,
+        price ? (nothingPriced ? '—' : iskLabel(price.totals.sell)) : undefined,
         price ? (
           <>
             <Facts
               items={[
                 {
                   label: t('fittings.stats.fact.sell'),
-                  value: t('fittings.stats.unit.isk', {
-                    value: formatIskCompact(price.totals.sell),
-                  }),
+                  value: nothingPriced ? '—' : iskLabel(price.totals.sell),
                 },
                 {
                   label: t('fittings.stats.fact.buy'),
-                  value: t('fittings.stats.unit.isk', {
-                    value: formatIskCompact(price.totals.buy),
-                  }),
+                  value: nothingPriced ? '—' : iskLabel(price.totals.buy),
                 },
               ]}
             />

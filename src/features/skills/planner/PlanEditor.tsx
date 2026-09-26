@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -132,6 +132,9 @@ import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueR
 import { remapBudget, type RemapAvailability } from './remapAvailability';
 import {
   whatIfImplants,
+  DEFAULT_WHAT_IF_SELECTION,
+  isHypotheticalLens,
+  whatIfVerdict,
   normalizeWhatIfSelection,
   readsLoadedImplants,
   setWhatIfBonus,
@@ -157,7 +160,13 @@ const ROMAN = ['I', 'II', 'III', 'IV', 'V'] as const;
 export type PlanPatch = Partial<
   Pick<
     SkillPlanRecord,
-    'entries' | 'markers' | 'markerAttributes' | 'whatIfImplants' | 'boosters' | 'milestones'
+    | 'name'
+    | 'entries'
+    | 'markers'
+    | 'markerAttributes'
+    | 'whatIfImplants'
+    | 'boosters'
+    | 'milestones'
   >
 >;
 
@@ -248,6 +257,13 @@ export function PlanEditor({
 }: PlanEditorProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  // "New plan" navigates here with this flag so the name field takes focus for a rename.
+  const location = useLocation();
+  const focusName = (location.state as { focusName?: boolean } | null)?.focusName === true;
+  // Spent once the field has focus, so a reload or Back doesn't re-steal it.
+  useEffect(() => {
+    if (focusName) navigate(location.pathname, { replace: true, state: null });
+  }, [focusName, location.pathname, navigate]);
   // Which side the tools pane lands on — the same hook the rest of the app's two-column
   // layouts switch on, so this pane can never disagree with them.
   const isDesktop = useIsDesktop();
@@ -533,6 +549,50 @@ export function PlanEditor({
       plan.markers,
       plan.markerAttributes,
       plan.whatIfImplants,
+      plan.booster,
+      plan.boosters,
+      catalog,
+      trainedSkills,
+      queueEntries,
+      attributes,
+      attributeBaseline,
+      implants,
+      cloneState,
+      loadedAtMs,
+    ]
+  );
+  // The what-if chip's "vs current" figure: one more pass of the same costing
+  // against the clone's real implants, run only while the lens is hypothetical.
+  const hypotheticalLens = isHypotheticalLens(whatIf);
+  const currentLensTotalSeconds = useMemo(
+    () =>
+      hypotheticalLens
+        ? schedulePlan(
+            {
+              entries: plan.entries,
+              markers: plan.markers,
+              markerAttributes: plan.markerAttributes,
+              whatIfImplants: DEFAULT_WHAT_IF_SELECTION,
+              booster: plan.booster,
+              boosters: plan.boosters,
+            },
+            {
+              catalog,
+              trained: trainedSkills,
+              queueEntries,
+              attributes,
+              attributeBaseline,
+              implants,
+              cloneState,
+            },
+            loadedAtMs
+          ).totalSeconds
+        : null,
+    [
+      hypotheticalLens,
+      plan.entries,
+      plan.markers,
+      plan.markerAttributes,
       plan.booster,
       plan.boosters,
       catalog,
@@ -1880,9 +1940,32 @@ export function PlanEditor({
           progress={headerProgress}
           nextStep={headerNextStep}
           trainedKnown={trainedSkillsKnown}
+          name={plan.name}
+          onRename={(name) => onUpdate({ name })}
+          focusName={focusName}
         />
 
         {implantsAssumed && <ImplantsAssumedNote hint={t('plans.assumesNoImplantsHint')} />}
+
+        {currentLensTotalSeconds !== null && !error && (
+          <p
+            data-testid="what-if-chip"
+            className="inline-flex w-fit items-center rounded-xs border border-accent/60 px-1.5 py-0.5 text-xs text-accent"
+          >
+            {(() => {
+              const verdict = whatIfVerdict(currentLensTotalSeconds, totalSeconds);
+              return t(`plans.whatIfChip.${verdict.kind}`, {
+                lens:
+                  whatIf.kind === 'custom'
+                    ? t('plans.whatIfCustom')
+                    : whatIf.preset === 'none'
+                      ? t('plans.whatIfNone')
+                      : whatIf.preset,
+                duration: formatDuration(verdict.seconds),
+              });
+            })()}
+          </p>
+        )}
 
         {/* Plan Milestones (CONTEXT.md) whose entry was removed from the plan
             entirely — no row exists to flag any more, so they surface here

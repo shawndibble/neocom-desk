@@ -734,6 +734,7 @@ function FittingsPage() {
         <FittingHeader
           fitting={fitting}
           subtitle={subtitle}
+          onRename={workspace.rename}
           hasCharacter={activeCharacterId !== null}
           onLibrary={openLibrary}
           onCompare={() => {

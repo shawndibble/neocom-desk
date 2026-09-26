@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { masteryRowSortValue, mergeShipEntries, tagUnifiedRows } from './unifiedShipRows';
+import {
+  dropCoveredRows,
+  masteryRowSortValue,
+  mergeShipEntries,
+  nextUnmetMasteryTier,
+  tagUnifiedRows,
+} from './unifiedShipRows';
 import { buildFitCheckRows } from './fitCheckRows';
 import type { EngineSkill, PlanEntry, ScheduledStep, TrainedSkill } from '@/engine/types';
 import type { SkillPrereq } from '@/sde/types';
@@ -171,5 +177,46 @@ describe('masteryRowSortValue', () => {
       highestMasteryTier: null,
     });
     expect(fitOnly).toBeGreaterThan(tierV!);
+  });
+});
+
+describe('nextUnmetMasteryTier', () => {
+  const tiers: SkillPrereq[][] = [
+    [{ skillTypeID: 100, level: 1 }],
+    [{ skillTypeID: 100, level: 2 }],
+    [{ skillTypeID: 200, level: 3 }],
+    [],
+    [],
+  ];
+
+  it('returns the first tier with an unmet skill', () => {
+    const levels = new Map([[100, 1]]);
+    expect(nextUnmetMasteryTier(tiers, (id) => levels.get(id) ?? 0)).toBe(1);
+  });
+
+  it('returns null once every tier is met', () => {
+    const levels = new Map([
+      [100, 5],
+      [200, 5],
+    ]);
+    expect(nextUnmetMasteryTier(tiers, (id) => levels.get(id) ?? 0)).toBeNull();
+  });
+});
+
+describe('dropCoveredRows', () => {
+  it('drops rows the required group already asks for at that level or higher, keeps higher targets', () => {
+    const rows = [
+      { skillTypeID: 100, targetLevel: 3 },
+      { skillTypeID: 200, targetLevel: 5 },
+      { skillTypeID: 300, targetLevel: 1 },
+    ];
+    const required: PlanEntry[] = [
+      { skillTypeID: 100, targetLevel: 4 },
+      { skillTypeID: 200, targetLevel: 4 },
+    ];
+    expect(dropCoveredRows(rows, required)).toEqual([
+      { skillTypeID: 200, targetLevel: 5 },
+      { skillTypeID: 300, targetLevel: 1 },
+    ]);
   });
 });

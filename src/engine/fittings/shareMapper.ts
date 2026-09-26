@@ -24,9 +24,9 @@
  * and stay dropped in both directions; a fighter bay surviving a share round
  * trip is future tickets' scope, not a regression this mapper introduces.
  *
- * A `Fitting`'s name is deliberately not part of this mapping at all: the
- * share payload never carries it (`fittingShare.ts`'s own header comment), so
- * every caller must supply one on the way back — see `shareToFitting`.
+ * A `Fitting`'s name rides the version-2 payload (#1718). Version-1 links
+ * carry none, so `shareToFitting` still takes a fallback name — callers pass
+ * the hull name — used whenever the decoded share has no name of its own.
  */
 import type {
   FittingModuleEntry,
@@ -76,10 +76,11 @@ export function fittingToShareInput(fitting: Fitting): FittingShareInput {
     fighters: [],
     cargo: fitting.cargo.map((item) => ({ typeId: item.typeId, quantity: item.quantity })),
     ...(fitting.implantSet === undefined ? {} : { implantSet: fitting.implantSet }),
+    name: fitting.name,
   };
 }
 
-export function shareToFitting(decoded: FittingShareInput, name: string): Fitting {
+export function shareToFitting(decoded: FittingShareInput, fallbackName: string): Fitting {
   const modules: FittingModule[] = FITTING_SLOT_KINDS.flatMap((slot) =>
     decoded.modules[SLOT_TO_SHARE[slot]].map((entry): FittingModule => ({
       slot,
@@ -91,7 +92,7 @@ export function shareToFitting(decoded: FittingShareInput, name: string): Fittin
   );
 
   return {
-    name,
+    name: decoded.name ?? fallbackName,
     shipTypeId: decoded.hullTypeId,
     modules,
     drones: decoded.drones.map((drone) => ({

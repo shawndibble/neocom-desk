@@ -59,6 +59,16 @@ describe('toLoadOutcome', () => {
 });
 
 describe('loadText', () => {
+  it("names an EFT paste after its header's fit name", async () => {
+    const outcome = await loadText('[Rifter, PvE A]\n125mm Gatling AutoCannon I', sources());
+    expect(outcome).toMatchObject({ kind: 'fitting', fitting: { name: 'PvE A' } });
+  });
+
+  it.each(['[Rifter]', '[Rifter, ]'])('names %s after the hull', async (header) => {
+    const outcome = await loadText(header + '\n125mm Gatling AutoCannon I', sources());
+    expect(outcome).toMatchObject({ kind: 'fitting', fitting: { name: 'Rifter' } });
+  });
+
   it('passes a pasted Share Link through as its own code, reading nothing', async () => {
     const src = sources();
     expect(await loadText('https://app.example/fittings?f=abc123', src)).toEqual({
@@ -89,7 +99,7 @@ describe('loadText', () => {
     expect(src.catalog).not.toHaveBeenCalled();
   });
 
-  it('opens EFT text under the hull name, with the lines it could not place', async () => {
+  it('opens EFT text under its fit name, with the lines it could not place', async () => {
     const outcome = await loadText(
       ['[Rifter, My Fit]', '125mm Gatling AutoCannon I', 'Not A Real Module'].join('\n'),
       sources()
@@ -97,7 +107,7 @@ describe('loadText', () => {
     expect(outcome).toEqual({
       kind: 'fitting',
       source: 'text',
-      fitting: { name: 'Rifter', shipTypeId: 587, modules: RIFTER_MODULES, drones: [], cargo: [] },
+      fitting: { name: 'My Fit', shipTypeId: 587, modules: RIFTER_MODULES, drones: [], cargo: [] },
       unresolved: [{ line: 3, text: 'Not A Real Module', reason: 'unknown item' }],
     });
   });

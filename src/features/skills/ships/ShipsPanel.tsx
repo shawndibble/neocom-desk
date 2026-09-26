@@ -7,6 +7,10 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   EmptyState,
   FilterChip,
   Panel,
@@ -29,6 +33,8 @@ import type {
   TrainedSkill,
 } from '@/engine/types';
 import { loadUniverseType } from '../data';
+import { loadKnownRequirements } from '@/features/fittings/skillRequirements';
+import type { RequiredSkill } from '@/engine/import/fitToSkills';
 import { loadItemNameMap, loadSkillNameMap } from '../typeCatalog';
 import { previewClipboardImport } from '../planner/clipboardImport';
 import { loadMasteries, loadTypes } from '@/sde/loadSde';
@@ -38,11 +44,13 @@ import type { TargetPlan } from '../useTargetPlan';
 import { TargetPlanPicker } from '../TargetPlanPicker';
 import { buildShipsWithMastery, type ShipOption } from './shipCatalog';
 import { scheduleEntries } from './scheduleEntries';
-import { buildFitCheckRows } from './fitCheckRows';
+import { buildFitCheckRows, type FitCheckRow } from './fitCheckRows';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import {
+  dropCoveredRows,
   masteryRowSortValue,
   mergeShipEntries,
+  nextUnmetMasteryTier,
   tagUnifiedRows,
   type UnifiedShipRow,
 } from './unifiedShipRows';
@@ -50,6 +58,7 @@ import {
 const SEARCH_DEBOUNCE_MS = 250;
 const SEARCH_LIMIT = 20;
 const EMPTY_TIERS: readonly (readonly SkillPrereq[])[] = [[], [], [], [], []];
+const NO_REQUIRED: readonly RequiredSkill[] = [];
 /** Static provenance badge — matches the size DESIGN.md's type scale names for chips/badges. Neither tag is interactive/selected, so neither takes accent (DESIGN.md §6). */
 const SOURCE_TAG_CLASS =
   'rounded-xs border border-line px-1.5 py-0.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
@@ -92,6 +101,11 @@ export function ShipsPanel({
   const [hideCompleted, setHideCompleted] = useState(false);
   const [showMastery, setShowMastery] = useState(true);
   const [showFit, setShowFit] = useState(true);
+  // The hull's own required-to-fly skills, keyed by the ship they were loaded for so a stale result never shows under a newly picked hull.
+  const [requiredFor, setRequiredFor] = useState<{
+    typeID: number;
+    skills: readonly RequiredSkill[];
+  } | null>(null);
 
   // True-current value for `handleCheckFit`'s async closure, where `selected` is frozen.
   const selectedRef = useRef(selected);
@@ -110,6 +124,20 @@ export function ShipsPanel({
       setShips(buildShipsWithMastery(types, m));
     });
   }, []);
+
+  const selectedTypeID = selected?.typeID;
+  useEffect(() => {
+    if (selectedTypeID === undefined) return;
+    let cancelled = false;
+    void loadKnownRequirements(selectedTypeID)
+      .catch(() => null)
+      .then((skills) => {
+        if (!cancelled) setRequiredFor({ typeID: selectedTypeID, skills: skills ?? NO_REQUIRED });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedTypeID]);
 
   const results = useMemo(
     () =>
@@ -207,8 +235,32 @@ export function ShipsPanel({
     return tagUnifiedRows(built, merged.highestMasteryTier, merged.fromFit);
   }, [merged, skills, trainedSkills, scheduled]);
 
+  const requiredEntries: PlanEntry[] = useMemo(
+    () =>
+      selectedTypeID !== undefined && requiredFor?.typeID === selectedTypeID
+        ? requiredFor.skills
+            .filter((req) => req.level > 0)
+            .map((req) => ({ skillTypeID: req.skillTypeID, targetLevel: req.level }))
+        : [],
+    [requiredFor, selectedTypeID]
+  );
+
+  const requiredRows = useMemo(() => {
+    const schedule = scheduleEntries(requiredEntries, {
+      skills,
+      trainedSkills,
+      attributes,
+      implants,
+      cloneState,
+    });
+    return buildFitCheckRows(requiredEntries, skills, trainedSkills, schedule);
+  }, [requiredEntries, skills, trainedSkills, attributes, implants, cloneState]);
+
+  const requiredMissing = requiredRows.filter((row) => row.status !== 'trained');
+  const requiredSeconds = requiredMissing.reduce((sum, row) => sum + row.seconds, 0);
+
   const visibleRows = useMemo(() => {
-    const filtered = rows.filter((row) => {
+    const filtered = dropCoveredRows(rows, requiredEntries).filter((row) => {
       const bySource = (showMastery && row.highestMasteryTier !== null) || (showFit && row.fromFit);
       if (!bySource) return false;
       if (hideCompleted && row.status === 'trained') return false;
@@ -218,10 +270,12 @@ export function ShipsPanel({
     // tier; trained rows have no orderable time left, so `sortRows` sinks
     // them last.
     return sortRows(filtered, { sortValue: masteryRowSortValue }, 'asc');
-  }, [rows, showMastery, showFit, hideCompleted]);
+  }, [rows, requiredEntries, showMastery, showFit, hideCompleted]);
 
   const untrained = visibleRows.filter((row) => row.status !== 'trained');
   const totalSeconds = untrained.reduce((sum, row) => sum + row.seconds, 0);
+  const nextTier = nextUnmetMasteryTier(masteryTiers, (id) => trainedSkills.get(id)?.level ?? 0);
+  const untrainedFit = untrained.filter((row) => row.fromFit);
   const planNameFallback = selected?.name ?? fitResult?.shipName ?? t('plans.newPlanName');
 
   function tagsFor(row: UnifiedShipRow): ReactNode[] {
@@ -243,6 +297,36 @@ export function ShipsPanel({
     return chips;
   }
 
+  function addMasteryTier(tier: number) {
+    const entries = masteryTiers[tier]
+      .filter(({ skillTypeID, level }) => (trainedSkills.get(skillTypeID)?.level ?? 0) < level)
+      .map(({ skillTypeID, level }) => ({ skillTypeID, targetLevel: level }));
+    if (entries.length > 0) void target.addEntries(entries, planNameFallback);
+  }
+
+  function renderRow(row: FitCheckRow | UnifiedShipRow, tagged: boolean) {
+    return (
+      <div key={row.skillTypeID} className="border-b border-line py-1.5 last:border-b-0">
+        <SkillRow
+          name={row.name}
+          status={row.status}
+          currentLevel={row.currentLevel}
+          tags={tagged ? tagsFor(row as UnifiedShipRow) : undefined}
+          timeLabel={
+            row.status === 'trained' ? t('skills.fitCheck.trained') : formatDuration(row.seconds)
+          }
+          addLabel={t('skills.fitCheck.add')}
+          onAdd={() =>
+            void target.addEntries(
+              [{ skillTypeID: row.skillTypeID, targetLevel: row.targetLevel }],
+              planNameFallback
+            )
+          }
+        />
+      </div>
+    );
+  }
+
   if (!ships) {
     return (
       <div className="flex justify-center py-16">
@@ -257,32 +341,6 @@ export function ShipsPanel({
     <Panel
       title={t('skills.ships.title')}
       meta={hasContext && <span className="text-text-dim">{planNameFallback}</span>}
-      actions={
-        hasContext && (
-          <div className="flex flex-wrap items-center gap-2">
-            <FilterChip
-              label={t('skills.ships.filterMastery')}
-              selected={showMastery}
-              onToggle={() => setShowMastery((v) => !v)}
-            />
-            <FilterChip
-              label={t('skills.ships.filterFit')}
-              selected={showFit}
-              onToggle={() => setShowFit((v) => !v)}
-              disabled={!fitResult}
-              tooltip={!fitResult ? t('skills.ships.filterFitDisabledTooltip') : undefined}
-            />
-            <FilterChip
-              label={t('skills.ships.hideCompleted')}
-              selected={hideCompleted}
-              onToggle={() => setHideCompleted((v) => !v)}
-            />
-            {untrained.length > 0 && (
-              <StatChip label={t('skills.ships.totalTime')} value={formatDuration(totalSeconds)} />
-            )}
-          </div>
-        )
-      }
     >
       <div className="space-y-2 p-3">
         {hasContext && untrained.length > 0 && (
@@ -316,6 +374,32 @@ export function ShipsPanel({
           <p className="text-xs text-text-dim">
             {t('skills.ships.noShipsMatch', { query: debouncedQuery })}
           </p>
+        )}
+
+        {hasContext && (
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterChip
+              label={t('skills.ships.filterMastery')}
+              selected={showMastery}
+              onToggle={() => setShowMastery((v) => !v)}
+            />
+            <FilterChip
+              label={t('skills.ships.filterFit')}
+              selected={showFit}
+              onToggle={() => setShowFit((v) => !v)}
+              disabled={!fitResult}
+              tooltip={!fitResult ? t('skills.ships.filterFitDisabledTooltip') : undefined}
+            />
+            <FilterChip
+              label={t('skills.ships.hideCompleted')}
+              selected={hideCompleted}
+              onToggle={() => setHideCompleted((v) => !v)}
+            />
+            {untrained.length > 0 && (
+              <StatChip label={t('skills.ships.totalTime')} value={formatDuration(totalSeconds)} />
+            )}
+            <TargetPlanPicker target={target} />
+          </div>
         )}
 
         {fitResult ? (
@@ -388,58 +472,118 @@ export function ShipsPanel({
 
       {hasContext && (
         <>
-          <div className="space-y-1 border-t border-line p-3">
-            {visibleRows.length === 0 ? (
-              <EmptyState title={t('skills.ships.emptyTitle')} hint={t('skills.ships.emptyHint')} />
-            ) : (
-              visibleRows.map((row) => (
-                <div key={row.skillTypeID} className="border-b border-line py-1.5 last:border-b-0">
-                  <SkillRow
-                    name={row.name}
-                    status={row.status}
-                    currentLevel={row.currentLevel}
-                    tags={tagsFor(row)}
-                    timeLabel={
-                      row.status === 'trained'
-                        ? t('skills.fitCheck.trained')
-                        : formatDuration(row.seconds)
-                    }
-                    addLabel={t('skills.fitCheck.add')}
-                    onAdd={() =>
+          {requiredEntries.length > 0 && (
+            <div className="space-y-1 border-t border-line p-3">
+              <p
+                className={`text-base font-semibold ${requiredMissing.length === 0 ? 'text-success' : 'text-text'}`}
+              >
+                {requiredMissing.length === 0
+                  ? t('skills.ships.canFly')
+                  : t('skills.ships.canFlyIn', {
+                      time: formatDuration(requiredSeconds),
+                      count: requiredMissing.length,
+                    })}
+              </p>
+              <GroupHeader title={t('skills.ships.requiredGroup')}>
+                {requiredMissing.length > 0 && target.plans !== undefined && (
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() =>
                       void target.addEntries(
-                        [{ skillTypeID: row.skillTypeID, targetLevel: row.targetLevel }],
+                        requiredMissing.map((row) => ({
+                          skillTypeID: row.skillTypeID,
+                          targetLevel: row.targetLevel,
+                        })),
                         planNameFallback
                       )
                     }
-                  />
-                </div>
-              ))
-            )}
-          </div>
-          {untrained.length > 0 && target.plans !== undefined && (
-            <div className="flex items-center justify-end gap-2 border-t border-line p-3">
-              <TargetPlanPicker target={target} />
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() =>
-                  void target.addEntries(
-                    untrained.map((row) => ({
-                      skillTypeID: row.skillTypeID,
-                      targetLevel: row.targetLevel,
-                    })),
-                    planNameFallback
-                  )
-                }
-              >
-                {target.plans.length === 0
-                  ? t('skills.fitCheck.createPlanAndAdd')
-                  : t('skills.fitCheck.addAllToPlan')}
-              </Button>
+                  >
+                    {t('skills.ships.addRequired', { count: requiredMissing.length })}
+                  </Button>
+                )}
+              </GroupHeader>
+              {requiredRows.map((row) => renderRow(row, false))}
             </div>
           )}
+          <div className="space-y-1 border-t border-line p-3">
+            <GroupHeader title={t('skills.ships.masteryGroup')}>
+              {target.plans !== undefined && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {untrainedFit.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() =>
+                        void target.addEntries(
+                          untrainedFit.map((row) => ({
+                            skillTypeID: row.skillTypeID,
+                            targetLevel: row.targetLevel,
+                          })),
+                          planNameFallback
+                        )
+                      }
+                    >
+                      {t('skills.ships.addFit', { count: untrainedFit.length })}
+                    </Button>
+                  )}
+                  {nextTier !== null && (
+                    <div className="flex items-center">
+                      <Button
+                        size="sm"
+                        variant="primary"
+                        className="rounded-r-none"
+                        onClick={() => addMasteryTier(nextTier)}
+                      >
+                        {target.plans.length === 0
+                          ? t('skills.ships.createAndAddMastery', {
+                              roman: romanLevel(nextTier + 1),
+                            })
+                          : t('skills.ships.addMastery', { roman: romanLevel(nextTier + 1) })}
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            className="rounded-l-none border-l border-line"
+                            aria-label={t('skills.ships.chooseMasteryTier')}
+                          >
+                            ▾
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {masteryTiers.map((_, tier) => (
+                            <DropdownMenuItem key={tier} onSelect={() => addMasteryTier(tier)}>
+                              {t('skills.ships.masteryTag', { roman: romanLevel(tier + 1) })}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  )}
+                </div>
+              )}
+            </GroupHeader>
+            {visibleRows.length === 0 ? (
+              <EmptyState title={t('skills.ships.emptyTitle')} hint={t('skills.ships.emptyHint')} />
+            ) : (
+              visibleRows.map((row) => renderRow(row, true))
+            )}
+          </div>
         </>
       )}
     </Panel>
+  );
+}
+
+function GroupHeader({ title, children }: { title: string; children?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-1">
+      <h3 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+        {title}
+      </h3>
+      {children}
+    </div>
   );
 }

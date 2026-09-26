@@ -167,6 +167,16 @@ describe('EntryList prereq rows', () => {
     fireEvent.click(screen.getByRole('button', { name: /add skill 9 i to the plan/i }));
     expect(promoted).toEqual(['prereq-9-1']);
   });
+
+  it('keeps a prereq row’s level numeral out of the truncating name span (#1716)', () => {
+    render(<EntryList rows={prereqRows} bandsAt={new Map()} {...defaultProps} />);
+    const row = screen.getByText(/^Skill 9\b/).closest('li') as HTMLElement;
+    const numeral = within(row).getByText('I', { exact: true });
+    expect(numeral.parentElement).toHaveClass('shrink-0');
+    const nameEl = within(row).getByText('Skill 9', { exact: true });
+    expect(nameEl).toHaveClass('truncate');
+    expect(nameEl).not.toContainElement(numeral);
+  });
 });
 
 describe('EntryList drag handles mention keyboard reordering (#408)', () => {
@@ -710,7 +720,11 @@ describe('EntryList one row per level', () => {
       const restore = mockDesktop(desktop);
       try {
         render(<EntryList rows={[entryRow(1, [0], [4])]} bandsAt={new Map()} {...defaultProps} />);
-        expect(screen.getByText(/^Skill 1 IV$/)).toBeInTheDocument();
+        // Level numeral now lives in its own shrink-0 span, sibling to the
+        // truncating name span (#1716) — not one direct text-node run
+        // anymore, so match name and numeral separately within the row.
+        const row = screen.getByText(/^Skill 1\b/).closest('li');
+        expect(within(row as HTMLElement).getByText('IV', { exact: true })).toBeInTheDocument();
         // The retired per-level disclosure (#254) is gone outright, not just
         // hidden — unlike the row's own legitimate menus (priority, Plan
         // Milestone), there is no "levels trained" list left for anything to
@@ -730,8 +744,18 @@ describe('EntryList one row per level', () => {
         {...defaultProps}
       />
     );
-    expect(screen.getByText(/^Skill 1 IV$/)).toBeInTheDocument();
-    expect(screen.getByText(/^Skill 1 V$/)).toBeInTheDocument();
+    const rows = screen.getAllByText(/^Skill 1\b/).map((el) => el.closest('li') as HTMLElement);
+    expect(within(rows[0]).getByText('IV', { exact: true })).toBeInTheDocument();
+    expect(within(rows[1]).getByText('V', { exact: true })).toBeInTheDocument();
+  });
+
+  it('keeps the level numeral out of the truncating name span (#1716)', () => {
+    render(<EntryList rows={[entryRow(1, [0], [4])]} bandsAt={new Map()} {...defaultProps} />);
+    const numeral = screen.getByText('IV', { exact: true });
+    expect(numeral.parentElement).toHaveClass('shrink-0');
+    const nameEl = screen.getByText('Skill 1', { exact: true });
+    expect(nameEl).toHaveClass('truncate');
+    expect(nameEl).not.toContainElement(numeral);
   });
 
   it("leaves the drag handle as the row's only affordance besides remove", () => {

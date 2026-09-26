@@ -25,6 +25,7 @@
  * notification rather than derived at click time because the Service Worker
  * handling the click has no idea which fire produced it.
  */
+import { ALERT_CHARACTER_PARAM } from '@/lib/alertCharacterParam';
 import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import type { NotificationEventId } from './events';
 
@@ -186,10 +187,20 @@ export const SUBJECT_ROUTED_EVENT_IDS = Object.keys(SUBJECT_URLS) as Notificatio
  * A fire carrying no subject — an older build's row, or one Web Push wrote —
  * degrades to the event's own route rather than to the fallback.
  */
-export function notificationUrlForSubject(eventId: string, subjectId: number | undefined): string {
+export function notificationUrlForSubject(
+  eventId: string,
+  subjectId: number | undefined,
+  characterId?: number
+): string {
   const base = notificationUrlFor(eventId);
   const url = SUBJECT_URLS[eventId as NotificationEventId];
-  return url === undefined || subjectId === undefined ? base : url(base, subjectId);
+  const routed = url === undefined || subjectId === undefined ? base : url(base, subjectId);
+  // Names the Character the fire was about, so the shell can make it the active
+  // one on arrival (`AlertCharacterSwitch`) — pages read the active Character
+  // and would otherwise show whoever happened to be selected.
+  return characterId === undefined
+    ? routed
+    : withParam(routed, ALERT_CHARACTER_PARAM, String(characterId));
 }
 
 export function notificationTagFor(target: NotificationTarget): string {
@@ -206,7 +217,9 @@ export function notificationOptionsFor(
     badge: BADGE_URL,
     tag: notificationTagFor(target),
     renotify: true,
-    data: { url: notificationUrlForSubject(target.eventId, target.subjectId) },
+    data: {
+      url: notificationUrlForSubject(target.eventId, target.subjectId, target.characterId),
+    },
   };
 }
 

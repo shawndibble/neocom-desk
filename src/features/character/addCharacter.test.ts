@@ -87,7 +87,15 @@ describe('addCharacter', () => {
   it('returns the Character, so the callback route can activate it', async () => {
     mocks.completeLogin.mockResolvedValue(characterRecord(2));
 
-    expect(await addCharacter(PARAMS)).toMatchObject({ characterId: 2 });
+    expect(await addCharacter(PARAMS)).toMatchObject({ character: { characterId: 2 } });
+  });
+
+  it('reports a first-ever login only when the roster was empty beforehand', async () => {
+    mocks.completeLogin.mockResolvedValue(characterRecord(2));
+    expect((await addCharacter(PARAMS)).firstEver).toBe(true);
+
+    await db.characters.put(characterRecord(1));
+    expect((await addCharacter(PARAMS)).firstEver).toBe(false);
   });
 
   it('never lets a failed backfill cost the user their login', async () => {
@@ -98,7 +106,7 @@ describe('addCharacter', () => {
     mocks.completeLogin.mockResolvedValue(characterRecord(2));
     mocks.backfillAccountWideData.mockRejectedValue(new Error('Dexie is having a day'));
 
-    expect(await addCharacter(PARAMS)).toMatchObject({ characterId: 2 });
+    expect(await addCharacter(PARAMS)).toMatchObject({ character: { characterId: 2 } });
   });
 
   it('propagates a login failure rather than swallowing it', async () => {

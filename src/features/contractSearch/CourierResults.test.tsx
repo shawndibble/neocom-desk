@@ -1,13 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
 import type { CourierEndpoint, CourierRouteRow } from '@/engine/contracts/courierSearch';
 import { NARROW_QUERY } from '@/lib/useIsNarrow';
 import { PHONE_QUERY } from '@/lib/useIsPhone';
 import { localJumpCountsForRoutes } from '@/features/route/localRoute';
+import {
+  useCourierFilterPref,
+  DEFAULT_COURIER_FILTER,
+} from '@/features/contractSearch/courierFilterPref';
 
 const loadCharacterRegionId = vi.fn<(characterId: number) => Promise<number | null>>();
 vi.mock('@/features/contractSearch/characterRegion', () => ({
@@ -88,12 +92,28 @@ async function openFilters(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /^Filters/ }));
 }
 
-function renderBoard(characterId = CHARACTER_ID) {
+function renderBoard(characterId = CHARACTER_ID, initialEntries: string[] = ['/']) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <CourierResults rows={ROWS} regionNames={REGION_NAMES} characterId={characterId} />
     </MemoryRouter>
   );
+}
+
+/** Reads the URL `MemoryRouter` produced; unlike a real router it never touches `window.location`. */
+function LocationProbe() {
+  const { search } = useLocation();
+  return <span data-testid="location-search">{search}</span>;
+}
+
+function renderBoardWithProbe(initialEntries: string[] = ['/']) {
+  render(
+    <MemoryRouter initialEntries={initialEntries}>
+      <CourierResults rows={ROWS} regionNames={REGION_NAMES} characterId={CHARACTER_ID} />
+      <LocationProbe />
+    </MemoryRouter>
+  );
+  return () => screen.getByTestId('location-search').textContent ?? '';
 }
 
 const myRegionButton = () => screen.getByRole('button', { name: 'From my region' });
@@ -101,6 +121,9 @@ const myRegionButton = () => screen.getByRole('button', { name: 'From my region'
 beforeEach(() => {
   loadCharacterRegionId.mockReset();
   vi.mocked(localJumpCountsForRoutes).mockResolvedValue({ kind: 'unknown' });
+  // Pre-hydrated to no restriction: a change one case makes (e.g. the region
+  // shortcut) must never leak into the next as a remembered default (issue #1719).
+  useCourierFilterPref.setState({ value: DEFAULT_COURIER_FILTER, hydrated: true });
 });
 
 describe('CourierResults column picker', () => {
@@ -508,5 +531,123 @@ describe('CourierResults on a phone', () => {
     expect(screen.getByRole('button', { name: /^Amarr.*→ Jita/ })).toHaveTextContent('2 hauls');
     // Nothing left to reveal, so the cap-lifting control has no reason to show.
     expect(screen.queryByRole('button', { name: /^Show all/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('CourierResults remembered filter (issue #1719)', () => {
+  it('restores a remembered filter value when the URL carries none', async () => {
+    useCourierFilterPref.setState({
+      value: { ...DEFAULT_COURIER_FILTER, maxCollateral: '50000000' },
+      hydrated: true,
+    });
+    const user = userEvent.setup();
+    renderBoard(CHARACTER_ID, ['/']);
+
+    await openFilters(user);
+    expect(screen.getByLabelText('Max collateral')).toHaveValue('50000000');
+  });
+
+  it("lets a shared link's URL param win over a remembered filter value", async () => {
+    useCourierFilterPref.setState({
+      value: { ...DEFAULT_COURIER_FILTER, maxCollateral: '50000000' },
+      hydrated: true,
+    });
+    const user = userEvent.setup();
+    renderBoard(CHARACTER_ID, ['/?courier.maxCollateral=1000']);
+
+    await openFilters(user);
+    expect(screen.getByLabelText('Max collateral')).toHaveValue('1000');
+  });
+
+  it('remembers a filter change for the next visit', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+
+    await openFilters(user);
+    await user.type(screen.getByLabelText('Max collateral'), '50000000');
+
+    await waitFor(() =>
+      expect(useCourierFilterPref.getState().value.maxCollateral).toBe('50000000')
+    );
+  });
+
+  it('never remembers the free-text route search', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+
+    await user.type(screen.getByPlaceholderText('Search pickup or drop-off…'), 'jita');
+    await openFilters(user);
+    await user.type(screen.getByLabelText('Max collateral'), '1');
+
+    // `routeQuery` has no field on the stored shape at all — see `courierFilterPref.ts`.
+    expect(useCourierFilterPref.getState().value).not.toHaveProperty('routeQuery');
+    expect(useCourierFilterPref.getState().value).not.toHaveProperty('pref');
+  });
+
+  /** Guards `changedFields` — see its comment in CourierResults.tsx. */
+  it('never writes a remembered value into the URL when an unrelated field changes', async () => {
+    useCourierFilterPref.setState({
+      value: { ...DEFAULT_COURIER_FILTER, maxCollateral: '50000000' },
+      hydrated: true,
+    });
+    const user = userEvent.setup();
+    const currentSearch = renderBoardWithProbe(['/']);
+
+    await openFilters(user);
+    await user.type(screen.getByLabelText('Min reward'), '1');
+
+    await waitFor(() => expect(currentSearch()).toContain('courier.minReward'));
+    expect(currentSearch()).not.toContain('maxCollateral');
+  });
+
+  /**
+   * Symmetric case: a shared link's `originRegionId` must stay scoped to the
+   * URL and never leak into the remembered default just because the hauler
+   * happened to edit some other field while that link was open.
+   */
+  it('never overwrites the remembered default with a URL-only value when an unrelated field changes', async () => {
+    useCourierFilterPref.setState({ value: DEFAULT_COURIER_FILTER, hydrated: true });
+    const user = userEvent.setup();
+    renderBoard(CHARACTER_ID, ['/?courier.origin=10000002']);
+
+    await openFilters(user);
+    await user.type(screen.getByLabelText('Max collateral'), '1');
+
+    await waitFor(() => expect(useCourierFilterPref.getState().value.maxCollateral).toBe('1'));
+    expect(useCourierFilterPref.getState().value.originRegionId).toBeNull();
+  });
+});
+
+describe('CourierResults ISK filters', () => {
+  it('accepts shorthand in Min reward and echoes the parsed figure', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await openFilters(user);
+    const field = screen.getByRole('textbox', { name: 'Min reward' });
+    await user.type(field, '1b');
+    expect(field).toHaveValue('1b');
+    expect(screen.getByText('= 1,000,000,000 ISK')).toBeInTheDocument();
+  });
+
+  it('filters on the shorthand value, and plain digits still work', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await openFilters(user);
+    const field = screen.getByRole('textbox', { name: 'Min reward' });
+    // The one haul pays 5,000,000: 10m excludes it, 5m keeps it.
+    await user.type(field, '10m');
+    expect(screen.queryAllByText(/Jita/)).toHaveLength(0);
+    await user.clear(field);
+    await user.type(field, '5000000');
+    expect(screen.getByText('= 5,000,000 ISK')).toBeInTheDocument();
+    expect(screen.getAllByText(/Jita/).length).toBeGreaterThan(0);
+  });
+
+  it('shows no hint for an empty or unparseable field', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await openFilters(user);
+    await user.type(screen.getByRole('textbox', { name: 'Max collateral' }), '1x');
+    expect(screen.queryByText(/^= .* ISK$/)).not.toBeInTheDocument();
   });
 });

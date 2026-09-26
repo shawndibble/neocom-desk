@@ -4,6 +4,7 @@ import {
   EMPTY_WALLET_JOURNAL_FILTER,
   activeWalletJournalFilterCount,
   filterWalletJournal,
+  journalNetTotal,
   journalRefTypes,
   type WalletJournalFilter,
 } from './walletJournalFilter';
@@ -62,6 +63,15 @@ describe('filterWalletJournal', () => {
     expect(filterWalletJournal(rows, filter).map((r) => r.id)).toEqual([1]);
   });
 
+  it('matches free text against the reason too, case-insensitively', () => {
+    const rows = [
+      entry({ id: 1, description: 'Tax', reason: 'moon tax Aug' }),
+      entry({ id: 2, description: 'Tax', reason: 'office rental' }),
+    ];
+    const filter: WalletJournalFilter = { ...EMPTY_WALLET_JOURNAL_FILTER, text: 'MOON TAX' };
+    expect(filterWalletJournal(rows, filter).map((r) => r.id)).toEqual([1]);
+  });
+
   it('combines every active criterion with AND', () => {
     const rows = [
       entry({ id: 1, ref_type: 'bounty_prize', date: '2026-08-01T00:00:00Z', description: 'x' }),
@@ -113,5 +123,21 @@ describe('activeWalletJournalFilterCount', () => {
     expect(
       activeWalletJournalFilterCount({ ...EMPTY_WALLET_JOURNAL_FILTER, text: 'concord' })
     ).toBe(0);
+  });
+});
+
+describe('journalNetTotal', () => {
+  it('sums the amount across every entry', () => {
+    const rows = [entry({ id: 1, amount: 1000 }), entry({ id: 2, amount: -400 })];
+    expect(journalNetTotal(rows)).toBe(600);
+  });
+
+  it('treats a missing amount as zero', () => {
+    const rows = [entry({ id: 1, amount: undefined }), entry({ id: 2, amount: 250 })];
+    expect(journalNetTotal(rows)).toBe(250);
+  });
+
+  it('is zero for no entries', () => {
+    expect(journalNetTotal([])).toBe(0);
   });
 });

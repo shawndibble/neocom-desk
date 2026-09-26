@@ -8,7 +8,8 @@
  * panel owns the snapshot, the mode and the region names; this owns
  * everything that is only true of a haul.
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
@@ -49,6 +50,7 @@ import {
   paysFarAboveGoingRate,
 } from '@/engine/contracts/courierGoingRate';
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
+import { OVER_RATE_FILTERS, type OverRateFilter } from '@/features/contractSearch/overRateFilter';
 import { SecurityStatus } from '@/components/SecurityStatus';
 import {
   completableCourierRoutes,
@@ -67,12 +69,13 @@ import {
 import { reverseLaneMatches } from '@/engine/contracts/courierReverseLane';
 import { endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
 import { loadCharacterRegionId } from '@/features/contractSearch/characterRegion';
-import { formatIskAuto, formatIskCompact } from '@/lib/isk';
+import { formatIsk, formatIskAuto, formatIskCompact, parseIskAmount } from '@/lib/isk';
 import { formatMagnitude } from '@/lib/magnitude';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, enumParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
+import { useCourierFilterPref } from '@/features/contractSearch/courierFilterPref';
 
 /** Rows shown before "show all" — the same cap the item results use. */
 const ROW_CAP = 50;
@@ -121,15 +124,6 @@ function offeredSpaceKinds(rows: readonly CourierRouteRow[]): SpaceKind[] {
 function narrowsSpace(selected: readonly SpaceKind[], offered: readonly SpaceKind[]): boolean {
   return offered.some((kind) => !selected.includes(kind));
 }
-
-/**
- * Both directions, because the flag reads two ways: a hauler avoiding the
- * documented bait wants these gone, and one who has read the conditions and
- * judged them for themselves wants only these. Neither reading is the app's to
- * make, so it offers both and defaults to neither.
- */
-const OVER_RATE_FILTERS = ['all', 'only', 'hide'] as const;
-type OverRateFilter = (typeof OVER_RATE_FILTERS)[number];
 
 /** A blank or unparseable field is "no restriction", never `NaN` — which would silently exclude every row. */
 function parseNumeric(value: string): number | null {
@@ -348,6 +342,67 @@ function MyRegionButton({
   );
 }
 
+/**
+ * An ISK bound — reward floor, collateral ceiling. Typed as text so `1b` and
+ * `500m` work (`parseIskAmount`, the wallet threshold's parser), with the
+ * parsed figure echoed underneath so a run of zeros can be checked. What goes
+ * to `onChange`, and so into the URL, is the plain digit string — the same
+ * shape the bare number field wrote. Text that doesn't parse yet ("1.", "1x")
+ * leaves the committed value alone rather than clearing the filter mid-keystroke.
+ */
+function IskFilterField({
+  label,
+  value,
+  width,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  width: string;
+  onChange: (value: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [text, setText] = useState(value);
+  // The last value this field itself committed: a `value` that differs came
+  // from outside (Clear, a URL change) and replaces what was typed.
+  const committed = useRef(value);
+  useEffect(() => {
+    if (value !== committed.current) {
+      committed.current = value;
+      setText(value);
+    }
+  }, [value]);
+  const parsed = text.trim() === '' ? null : parseIskAmount(text);
+  return (
+    <FilterField label={label}>
+      <div className={`flex flex-col gap-1 ${width}`}>
+        <TextInput
+          type="text"
+          inputMode="decimal"
+          aria-label={label}
+          placeholder={label}
+          className="w-full"
+          value={text}
+          onChange={(event) => {
+            const next = event.target.value;
+            setText(next);
+            const amount = next.trim() === '' ? '' : parseIskAmount(next);
+            if (amount === null) return;
+            const nextValue = String(amount);
+            committed.current = nextValue;
+            onChange(nextValue);
+          }}
+        />
+        {parsed !== null && (
+          <span className="text-[0.6875rem] text-text-dim">
+            {t('contractSearch.iskFilterHint', { amount: formatIsk(parsed) })}
+          </span>
+        )}
+      </div>
+    </FilterField>
+  );
+}
+
 /** A bare numeric bound — reward floor, collateral ceiling, cargo ceiling, deadline floor. */
 function NumericFilterField({
   label,
@@ -527,13 +582,13 @@ function CourierFilterBar({
               ))}
             </div>
           )}
-          <NumericFilterField
+          <IskFilterField
             label={t('contractSearch.minRewardLabel')}
             value={draft.minReward}
             width="w-32"
             onChange={(minReward) => setDraft({ ...draft, minReward })}
           />
-          <NumericFilterField
+          <IskFilterField
             label={t('contractSearch.maxCollateralLabel')}
             value={draft.maxCollateral}
             width="w-32"
@@ -624,6 +679,89 @@ const COURIER_FILTER_PARAMS = {
   'courier.all': boolParam(),
 };
 const COURIER_SORT = { columnId: 'iskPerJump', direction: 'desc' } as const;
+
+/**
+ * The remembered-filter fields' own URL keys (`courierFilterPref.ts`), so
+ * "was this given in the URL on this load" can be asked per field — a parsed
+ * value equal to its codec default is ambiguous between "not given" and "the
+ * reader chose the default", and only the raw query string can tell the two
+ * apart (see `courierFilterPref.ts`'s header for why that distinction is the
+ * whole point).
+ */
+const REMEMBERED_FILTER_URL_KEYS = [
+  'courier.origin',
+  'courier.dest',
+  'courier.space',
+  'courier.hideRisky',
+  'courier.overRate',
+  'courier.minReward',
+  'courier.maxCollateral',
+  'courier.maxVolume',
+  'courier.minDays',
+] as const;
+
+/** Every field `uiFilter` carries — `routeQuery` is the one the stored shape doesn't (see `changedFields`). */
+const FILTER_KEYS: readonly (keyof CourierUiFilter)[] = [
+  'routeQuery',
+  'originRegionId',
+  'destinationRegionId',
+  'destinationSpace',
+  'hideUncompletable',
+  'overRate',
+  'minReward',
+  'maxCollateral',
+  'maxVolume',
+  'minDays',
+];
+
+/**
+ * `===` except for two arrays, compared by contents rather than reference —
+ * `destinationSpace` is rebuilt as a fresh array (`[...set]`, `.filter()`,
+ * `[...arr, kind]`) every time it is touched at all, including a render
+ * where its *contents* end up unchanged, so reference equality alone would
+ * read every one of those as "changed" and carry it across regardless of
+ * `changedFields`'s point.
+ */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((value) => b.includes(value));
+  }
+  return a === b;
+}
+
+/**
+ * `FilterBar`'s pointer-width surface commits the *whole* filter object on
+ * every single-field edit (`src/components/ui/FilterBar.tsx`: "every edit in
+ * the pointer-width box lands here immediately"), not a per-field patch. Read
+ * naively, that whole object would carry an untouched field's *displayed*
+ * value — which, since `uiFilter` blends the URL with the remembered default,
+ * is not the same as either source's own value — back into both the URL and
+ * storage on an edit to some other field entirely. That is exactly the
+ * decision `20260922-221531` forbids in both directions: a remembered default
+ * would get mirrored into the URL, and a URL-only value would get written
+ * back into storage.
+ *
+ * This is the one diff `changeFilter` needs: which field(s) `next` actually
+ * touched, against the previously *displayed* filter. Both write targets
+ * (the raw URL filter, the remembered filter) then spread this same patch
+ * onto their own baseline, so an untouched field's value always comes from
+ * wherever it already lived, never from the blend — one diff pass rather than
+ * one per target.
+ */
+function changedFields(
+  displayed: CourierUiFilter,
+  next: CourierUiFilter
+): Partial<CourierUiFilter> {
+  const patch: Partial<CourierUiFilter> = {};
+  for (const key of FILTER_KEYS) {
+    // A dynamic key across a keyed union — TS can't verify the write side
+    // matches the read side per-key, only that both come from `CourierUiFilter`.
+    if (!sameValue(displayed[key], next[key])) {
+      (patch as Record<string, unknown>)[key] = next[key];
+    }
+  }
+  return patch;
+}
 
 /**
  * Jumps for every filtered row, recomputed when the rows or the preference
@@ -811,7 +949,32 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   const { t } = useTranslation();
   const timeZone = useTimeZone();
   const [params, setParams] = useUrlParams(COURIER_FILTER_PARAMS);
-  const uiFilter = useMemo<CourierUiFilter>(
+
+  // The remembered filter (issue #1719): consulted only for a field the URL
+  // itself leaves unset on this load, never mirrored back into it (decision
+  // `20260922-221531` / ADR 0015) — see `courierFilterPref.ts`.
+  const rememberedFilter = useCourierFilterPref((state) => state.value);
+  const setRememberedFilter = useCourierFilterPref((state) => state.setValue);
+  const hydrateRememberedFilter = useCourierFilterPref((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateRememberedFilter();
+  }, [hydrateRememberedFilter]);
+
+  const location = useLocation();
+  const urlHasField = useMemo(() => {
+    const raw = new URLSearchParams(location.search);
+    const present = new Set(REMEMBERED_FILTER_URL_KEYS.filter((key) => raw.has(key)));
+    return (key: (typeof REMEMBERED_FILTER_URL_KEYS)[number]) => present.has(key);
+  }, [location.search]);
+
+  /**
+   * The filter exactly as the URL states it — no remembered fallback. This is
+   * `uiFilter` below's own write-back baseline: replaying only a real edit
+   * onto *this*, rather than onto the blended `uiFilter`, is what stops an
+   * untouched remembered field from being written into the URL the next time
+   * some other field changes (`carryOnlyChanges`'s own comment).
+   */
+  const rawUrlFilter = useMemo<CourierUiFilter>(
     () => ({
       routeQuery: params['courier.q'],
       originRegionId: params['courier.origin'],
@@ -825,6 +988,37 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
       minDays: params['courier.minDays'],
     }),
     [params]
+  );
+
+  const uiFilter = useMemo<CourierUiFilter>(
+    () => ({
+      // Free text is never remembered — see `courierFilterPref.ts`'s header.
+      routeQuery: rawUrlFilter.routeQuery,
+      originRegionId: urlHasField('courier.origin')
+        ? rawUrlFilter.originRegionId
+        : rememberedFilter.originRegionId,
+      destinationRegionId: urlHasField('courier.dest')
+        ? rawUrlFilter.destinationRegionId
+        : rememberedFilter.destinationRegionId,
+      destinationSpace: urlHasField('courier.space')
+        ? rawUrlFilter.destinationSpace
+        : rememberedFilter.destinationSpace,
+      hideUncompletable: urlHasField('courier.hideRisky')
+        ? rawUrlFilter.hideUncompletable
+        : rememberedFilter.hideUncompletable,
+      overRate: urlHasField('courier.overRate') ? rawUrlFilter.overRate : rememberedFilter.overRate,
+      minReward: urlHasField('courier.minReward')
+        ? rawUrlFilter.minReward
+        : rememberedFilter.minReward,
+      maxCollateral: urlHasField('courier.maxCollateral')
+        ? rawUrlFilter.maxCollateral
+        : rememberedFilter.maxCollateral,
+      maxVolume: urlHasField('courier.maxVolume')
+        ? rawUrlFilter.maxVolume
+        : rememberedFilter.maxVolume,
+      minDays: urlHasField('courier.minDays') ? rawUrlFilter.minDays : rememberedFilter.minDays,
+    }),
+    [rawUrlFilter, urlHasField, rememberedFilter]
   );
   const preference = params['courier.pref'];
   const showAll = params['courier.all'];
@@ -1056,19 +1250,30 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   }, [selectedRow, rows, filter, narrowToCompletable, narrowToOverRate]);
 
   function changeFilter(next: CourierUiFilter) {
+    // Diffed once, then replayed onto each target's own baseline — not onto
+    // `next`/`uiFilter` directly. See `changedFields`'s comment for why: only
+    // the field(s) this particular edit actually touched belong on either
+    // write.
+    const changed = changedFields(uiFilter, next);
+    const urlNext: CourierUiFilter = { ...rawUrlFilter, ...changed };
     setParams({
-      'courier.q': next.routeQuery,
-      'courier.origin': next.originRegionId,
-      'courier.dest': next.destinationRegionId,
-      'courier.space': new Set(next.destinationSpace),
-      'courier.hideRisky': next.hideUncompletable,
-      'courier.overRate': next.overRate,
-      'courier.minReward': next.minReward,
-      'courier.maxCollateral': next.maxCollateral,
-      'courier.maxVolume': next.maxVolume,
-      'courier.minDays': next.minDays,
+      'courier.q': urlNext.routeQuery,
+      'courier.origin': urlNext.originRegionId,
+      'courier.dest': urlNext.destinationRegionId,
+      'courier.space': new Set(urlNext.destinationSpace),
+      'courier.hideRisky': urlNext.hideUncompletable,
+      'courier.overRate': urlNext.overRate,
+      'courier.minReward': urlNext.minReward,
+      'courier.maxCollateral': urlNext.maxCollateral,
+      'courier.maxVolume': urlNext.maxVolume,
+      'courier.minDays': urlNext.minDays,
       'courier.all': false,
     });
+
+    // `routeQuery` has no field on the stored shape — see `courierFilterPref.ts`.
+    const storedChanged = { ...changed };
+    delete storedChanged.routeQuery;
+    void setRememberedFilter({ ...rememberedFilter, ...storedChanged });
   }
 
   /**
