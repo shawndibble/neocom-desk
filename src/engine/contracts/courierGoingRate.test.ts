@@ -4,6 +4,7 @@ import {
   goingRateMultiple,
   paysFarAboveGoingRate,
   communityFloorReward,
+  floorShare,
   MIN_GOING_RATE_SAMPLE,
   FAR_ABOVE_MULTIPLE,
 } from '@/engine/contracts/courierGoingRate';
@@ -124,6 +125,18 @@ describe('communityFloorReward', () => {
     expect(communityFloorReward(2_000_000_000, null)).toBeNull();
     // Nothing at risk, so the benchmark that prices risk says nothing.
     expect(communityFloorReward(0, 10)).toBeNull();
+  });
+});
+
+describe('floorShare', () => {
+  it('is the reward as a fraction of the community floor', () => {
+    // Issue #1720's own example: a 153M floor, and a haul paying 45M.
+    expect(floorShare(45_000_000, 153_000_000)).toBeCloseTo(0.294, 3);
+    expect(floorShare(20_000_000, 20_000_000)).toBe(1);
+  });
+
+  it('has no share where there is no floor', () => {
+    expect(floorShare(45_000_000, null)).toBeNull();
   });
 });
 

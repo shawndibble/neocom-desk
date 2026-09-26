@@ -33,18 +33,23 @@ import {
 } from '@/engine/contracts/courierSearch';
 import { collateralToRewardRatio, iskPerJump, iskPerVolume } from '@/engine/contracts/courierRates';
 import {
+  asksFarMoreCollateralThanReward,
   courierRisks,
   forcesFreighter,
   hoursToExpiry,
   FREIGHTER_VOLUME_M3,
   type CourierRiskKind,
 } from '@/engine/contracts/courierRisk';
-import { communityFloorReward, paysFarAboveGoingRate } from '@/engine/contracts/courierGoingRate';
+import {
+  communityFloorReward,
+  floorShare,
+  paysFarAboveGoingRate,
+} from '@/engine/contracts/courierGoingRate';
 import { routeExposure, type RouteExposure } from '@/features/contractSearch/routeExposure';
 import { formatMagnitude } from '@/lib/magnitude';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { endpointName, endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
-import { MARKED_RISKS, RISK_COPY } from '@/features/contractSearch/courierRiskLabels';
+import { RISK_COPY, WARNING_RISKS } from '@/features/contractSearch/courierRiskLabels';
 
 /**
  * This haul's distance, in the states the board itself has.
@@ -202,11 +207,13 @@ export function CourierContractDetailModal({
   // room for a marker. Every one names a condition and what it would cost;
   // none claims to know whether this player in particular has access.
   const endpointRisks = courierRisks(row);
-  // Contract-scoped rather than endpoint-scoped, so it is added here rather
-  // than derived from the two ends (issue #946).
-  const risks: CourierRiskKind[] = paysFarAboveGoingRate(goingRateMultiple)
-    ? [...endpointRisks, 'over-rate']
-    : endpointRisks;
+  // Contract-scoped rather than endpoint-scoped, so they are added here rather
+  // than derived from the two ends (issues #946, #1720).
+  const risks: CourierRiskKind[] = [
+    ...endpointRisks,
+    ...(paysFarAboveGoingRate(goingRateMultiple) ? (['over-rate'] as const) : []),
+    ...(asksFarMoreCollateralThanReward(collateralRatio) ? (['high-collateral'] as const) : []),
+  ];
   const exposure = useRouteExposure(row, preference);
   // Where the return hauls set out from, which is this haul's drop-off region.
   // Narrowed at the render site rather than defaulted to a blank here: a lane
@@ -215,6 +222,10 @@ export function CourierContractDetailModal({
   const returnRegionId = row.destination.regionId;
   const measuring = jumps.kind === 'pending';
   const floor = measuring ? null : communityFloorReward(collateral, jumpCount);
+  // Said as a share only when short of the floor — the case where two bare
+  // figures side by side read as unrelated to the multiple above (#1720).
+  const shareOfFloor = floorShare(row.reward, floor);
+  const belowFloor = shareOfFloor !== null && shareOfFloor < 1;
   // Pinned to when the detail opened rather than read each render: a figure
   // that ticks while the reader looks at it is a moving target, and "as of
   // when you opened this" is the honest reading of a countdown anyway.
@@ -223,7 +234,7 @@ export function CourierContractDetailModal({
   // A nullsec end is a note, not an alarm. Heading a section of nothing but
   // notes with a warning-coloured "Before you accept" would contradict the
   // sentence underneath it, which says outright that it is not a warning.
-  const warns = risks.some((kind) => MARKED_RISKS.includes(kind));
+  const warns = risks.some((kind) => WARNING_RISKS.includes(kind));
 
   const regionName = (regionId: number) => regionNames.get(regionId) ?? `#${regionId}`;
 
@@ -398,6 +409,7 @@ export function CourierContractDetailModal({
                   {' — '}
                   {t(RISK_COPY[kind].detail, {
                     multiple: goingRateMultiple === null ? '' : formatMagnitude(goingRateMultiple),
+                    ratio: collateralRatio === null ? '' : formatMagnitude(collateralRatio),
                   })}
                 </li>
               ))}
@@ -430,7 +442,20 @@ export function CourierContractDetailModal({
               <li>
                 {t('contractSearch.communityFloorValue', { reward: formatIskAuto(floor) })}
                 {' · '}
-                {t('contractSearch.communityFloorActual', { reward: formatIskAuto(row.reward) })}
+                {belowFloor
+                  ? t('contractSearch.communityFloorShare', {
+                      reward: formatIskAuto(row.reward),
+                      percent: formatMagnitude(shareOfFloor * 100),
+                    })
+                  : t('contractSearch.communityFloorActual', { reward: formatIskAuto(row.reward) })}
+                {/*
+                  A high multiple beside a short floor reads as a contradiction
+                  unless the two bases are named: one is cargo size, the other
+                  collateral.
+                */}
+                {belowFloor &&
+                  goingRateMultiple !== null &&
+                  ` ${t('contractSearch.communityFloorVsGoingRate')}`}
               </li>
             )}
             {forcesFreighter(row.volume) && (
