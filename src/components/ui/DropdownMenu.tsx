@@ -2,7 +2,12 @@ import { DropdownMenu as DropdownMenuPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
 import { usePortalContainer } from './portalContainer';
-import { menuContentClassName, menuItemClassName } from './menuStyles';
+import {
+  MENU_COLLISION_PADDING,
+  menuContentClassName,
+  menuItemClassName,
+  menuSubContentClassName,
+} from './menuStyles';
 
 /**
  * Click-triggered menu. Wraps `radix-ui`'s DropdownMenu — see docs/adr/0004
@@ -101,6 +106,7 @@ export function DropdownMenuSubTrigger({
 
 export function DropdownMenuSubContent({
   className,
+  collisionPadding = MENU_COLLISION_PADDING,
   ...props
 }: ComponentProps<typeof DropdownMenuPrimitive.SubContent>) {
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
@@ -109,7 +115,8 @@ export function DropdownMenuSubContent({
   return (
     <DropdownMenuPrimitive.Portal container={container}>
       <DropdownMenuPrimitive.SubContent
-        className={cx(menuContentClassName, className)}
+        collisionPadding={collisionPadding}
+        className={cx(menuSubContentClassName, className)}
         {...props}
       />
     </DropdownMenuPrimitive.Portal>

@@ -2,7 +2,12 @@ import { ContextMenu as ContextMenuPrimitive } from 'radix-ui';
 import type { ComponentProps } from 'react';
 import { cx } from '@/lib/cx';
 import { usePortalContainer } from './portalContainer';
-import { menuContentClassName, menuItemClassName } from './menuStyles';
+import {
+  MENU_COLLISION_PADDING,
+  menuContentClassName,
+  menuItemClassName,
+  menuSubContentClassName,
+} from './menuStyles';
 
 /**
  * Right-click menu. Wraps `radix-ui`'s ContextMenu — see docs/adr/0004 for
@@ -81,6 +86,7 @@ export function ContextMenuSubTrigger({
 
 export function ContextMenuSubContent({
   className,
+  collisionPadding = MENU_COLLISION_PADDING,
   ...props
 }: ComponentProps<typeof ContextMenuPrimitive.SubContent>) {
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
@@ -88,7 +94,11 @@ export function ContextMenuSubContent({
   const container = usePortalContainer();
   return (
     <ContextMenuPrimitive.Portal container={container}>
-      <ContextMenuPrimitive.SubContent className={cx(menuContentClassName, className)} {...props} />
+      <ContextMenuPrimitive.SubContent
+        collisionPadding={collisionPadding}
+        className={cx(menuSubContentClassName, className)}
+        {...props}
+      />
     </ContextMenuPrimitive.Portal>
   );
 }
