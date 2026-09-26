@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -366,6 +366,7 @@ function ExportPanel() {
 function ImportPanel() {
   const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [password, setPassword] = useState('');
   const [status, setStatus] = useState<'idle' | 'importing' | 'error'>('idle');
   const [summary, setSummary] = useState<ImportSummary | null>(null);
@@ -399,12 +400,21 @@ function ImportPanel() {
       <div className="max-w-md space-y-2">
         <p className="text-xs text-text-dim">{t('settings.backup.importHint')}</p>
         <input
+          ref={fileInputRef}
           type="file"
           accept="application/json"
           aria-label={t('settings.backup.fileLabel')}
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="block w-full text-xs text-text-dim file:mr-3 file:rounded-xs file:border-0 file:bg-panel-2 file:px-2 file:py-1 file:text-xs file:text-text"
+          className="hidden"
         />
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => fileInputRef.current?.click()}>
+            {t('settings.backup.chooseFile')}
+          </Button>
+          <span className="min-w-0 truncate text-xs text-text-dim">
+            {file ? file.name : t('settings.backup.noFileChosen')}
+          </span>
+        </div>
         <TextInput
           type="password"
           autoComplete="current-password"

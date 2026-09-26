@@ -5267,6 +5267,8 @@
       "importTitle": "Import backup",
       "importHint": "Pick a backup file exported from Neocom Desk and enter its password. A character already on this device is left untouched; only new characters are added.",
       "fileLabel": "Backup file",
+      "chooseFile": "Choose file",
+      "noFileChosen": "No file chosen",
       "importButton": "Import backup",
       "importError": "Unable to decrypt file. Check the password and try again.",
       "importSummary": "Added {{added}} character(s); skipped {{skipped}} already on this device.",
