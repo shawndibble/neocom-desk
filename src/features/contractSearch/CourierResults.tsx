@@ -1153,17 +1153,6 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   );
 
   /**
-   * Best rate first *before* the row cap: `DataTable` sorts only the rows it
-   * is handed, so capping an unranked set would leave the table claiming an
-   * ISK/jump sort over an arbitrary 50.
-   *
-   * Changing the preference changes every jump count and therefore this
-   * order, which is why the whole filtered set is ranked here rather than the
-   * visible page. Until the counts arrive the rate is unknown for every row,
-   * so the fallback order is by reward — the board stays useful mid-load
-   * instead of shuffling from an order that means nothing.
-   */
-  /**
    * How this haul's rate compares with the market's. `null` whenever either
    * half is unstatable — no distance, no cargo volume, or a corpus too small
    * for a median — so a row shows nothing rather than a figure computed
@@ -1204,6 +1193,12 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
 
   const ratedRows = useMemo(() => narrowToOverRate(matchingRows), [matchingRows, narrowToOverRate]);
 
+  /**
+   * Best rate first. Changing the preference changes every jump count and
+   * therefore this order. Until the counts arrive the rate is unknown for
+   * every row, so the fallback order is by reward — the board stays useful
+   * mid-load instead of shuffling from an order that means nothing.
+   */
   const displayRows = useMemo(() => {
     const ranked = [...ratedRows];
     if (jumps.kind !== 'known') return ranked.sort((a, b) => b.reward - a.reward);

@@ -803,7 +803,7 @@ describe('BpcSourcingPanel source multiselect', () => {
 
   /**
    * The synced contract snapshot can run to six figures (ADR 0013), while a
-   * character's owned blueprints realistically number in the dozens. If the
+   * character's owned blueprints realistically number in the dozens. The
    * owned row sorts after every priced contract row, so it has to stay
    * reachable by scrolling rather than fall past a cap (issue #1777).
    */
@@ -1228,10 +1228,10 @@ describe('BpcSourcingPanel Source/Space filter collapse (issue #807)', () => {
       expect(within(table).getAllByRole('button', { name: /BPO on contract/ })).toHaveLength(1);
     });
 
-    it('badges a copy that is on screen even when the cheapest one is past the row cap', async () => {
+    it('badges the cheapest copy across the whole set, even when the snapshot lists it last', async () => {
       loadPublicBpcContracts.mockResolvedValue(
         cachedSnapshot(
-          // Cheapest last, so it falls past the default 50-row cap.
+          // Cheapest last in snapshot order; the price sort brings it to the top.
           Array.from({ length: 60 }, (_, i) =>
             row({ contractId: i + 1, price: (60 - i) * 1_000_000 })
           ),

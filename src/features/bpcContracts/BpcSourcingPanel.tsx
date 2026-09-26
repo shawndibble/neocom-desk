@@ -552,7 +552,7 @@ export function BpcSourcingPanel() {
     void setVisibleColumns(next);
   }
 
-  // Search, filters, sources, Show all and the pinned blueprint all live in
+  // Search, filters, sources and the pinned blueprint all live in
   // the URL (`bpcSourcingUrl.ts`), one group so a handler that changes
   // several at once writes them in one navigation.
   const [params, setParams] = useUrlParams(BPC_SOURCING_PARAMS);

@@ -504,13 +504,20 @@ export function DataTable<T>({
       observer.disconnect();
     };
   }, [windowed, bodyElement]);
+  // Stable across scroll renders: TanStack Virtual rebuilds every row's
+  // position whenever this function's identity changes, which on a
+  // six-figure snapshot is the whole cost windowing exists to avoid.
+  const getItemKey = useCallback(
+    (index: number) => rowKey(sortedRows[index], index),
+    [rowKey, sortedRows]
+  );
   const rowVirtualizer = useWindowVirtualizer({
     count: windowed ? sortedRows.length : 0,
     enabled: windowed,
     estimateSize: () => estimatedRowHeight,
-    getItemKey: (index) => rowKey(sortedRows[index], index),
-    // A mounted row never really measures 0 — only jsdom, which does no
-    // layout, reports that — so 0 keeps the estimate instead of collapsing
+    getItemKey,
+    // A laid-out row never measures 0 — only jsdom (no layout) or a hidden
+    // container reports that — so 0 keeps the estimate instead of collapsing
     // every row and mounting the whole list.
     measureElement: (element, entry, instance) =>
       measureElement(element, entry, instance) || estimatedRowHeight,
@@ -520,9 +527,11 @@ export function DataTable<T>({
   // Crossing `sm` swaps table rows for cards of a different height; drop
   // the sizes measured under the old layout (TanStack Virtual's documented
   // reset, as `NotificationsPanel` does on its own breakpoint).
+  // Guarded: `measure()` re-renders, and every non-windowed table would pay
+  // for that on mount.
   useEffect(() => {
-    rowVirtualizer.measure();
-  }, [isPhone, rowVirtualizer]);
+    if (windowed) rowVirtualizer.measure();
+  }, [isPhone, windowed, rowVirtualizer]);
 
   function toggleSort(column: DataTableColumn<T>) {
     setSort(nextDataTableSort(sort, column.id));
@@ -549,6 +558,8 @@ export function DataTable<T>({
         // uses it to land on the fill a notification pointed at.
         data-row-key={key}
         data-index={windowIndex}
+        // Header row is 1; tells AT where this row sits in the whole set.
+        aria-rowindex={windowIndex === undefined ? undefined : windowIndex + 2}
         ref={windowIndex === undefined ? undefined : rowVirtualizer.measureElement}
         aria-expanded={expandableRow ? expanded : undefined}
         aria-current={selectedRowKey !== null && key === selectedRowKey ? 'true' : undefined}
@@ -740,6 +751,8 @@ export function DataTable<T>({
       ref={tableRef}
       role="table"
       aria-label={label}
+      // With most rows unmounted, AT would otherwise count only the window.
+      aria-rowcount={windowed ? sortedRows.length + 1 : undefined}
       className={cx(
         'w-full text-xs',
         responsive === 'stack' && 'dt-stack',
