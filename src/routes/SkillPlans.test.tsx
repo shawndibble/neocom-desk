@@ -427,7 +427,7 @@ describe('SkillPlans layout: side by side list + editor (#158)', () => {
       await db.skillPlans.add(seedPlan());
       render(<App />);
 
-      await user.click(await screen.findByText('Test plan'));
+      await user.click(await screen.findByRole('button', { name: 'Test plan' }));
       await screen.findByText('Your entries');
 
       // `find`, not `get`: 'Your entries' first renders on the very tick the
