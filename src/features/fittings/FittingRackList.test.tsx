@@ -245,6 +245,41 @@ describe('FittingRackList with the editor’s item actions', () => {
     );
   }
 
+  it('offers no charge entries on a module that takes no charge, and keeps them on one that does', async () => {
+    const actions = fakeItemActions({ names });
+    render(
+      <MemoryRouter>
+        <FittingItemActionsProvider value={actions}>
+          <FittingRackList
+            fitting={fitting}
+            stats={withSlots}
+            moduleResults={[
+              { state: 'active', maxState: 'overload', chargeGroupIds: [83] },
+              { state: 'online', maxState: 'online', chargeGroupIds: [] },
+            ]}
+          />
+        </FittingItemActionsProvider>
+      </MemoryRouter>
+    );
+    // The Damage Control takes no charge: no "No charge in cargo fits this".
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for #11' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    expect(await screen.findByRole('menuitem', { name: /Show info/ })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: 'No charge in cargo fits this' })).toBeNull();
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' });
+
+    // The autocannon does, with none in the hold: the entry is there, disabled.
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for #10' }), {
+      button: 0,
+      pointerType: 'mouse',
+    });
+    expect(
+      await screen.findByRole('menuitem', { name: 'No charge in cargo fits this' })
+    ).toHaveAttribute('aria-disabled', 'true');
+  });
+
   it('gives each module row a More actions button with the same menu, Move down included', async () => {
     const actions = fakeItemActions({ names });
     renderList(actions);

@@ -217,6 +217,7 @@ export function ModuleRow({
               shownState={shownState}
               maxState={maxState}
               withMove={inRack}
+              takesCharges={chargeGroupIds === undefined ? undefined : chargeGroupIds.length > 0}
             />
           ),
         }

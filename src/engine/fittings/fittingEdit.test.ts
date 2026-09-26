@@ -617,7 +617,7 @@ describe('loadChargeIntoCompatible', () => {
       24519,
       undefined,
     ]);
-    expect(result).toMatchObject({ loaded: 3, wanted: 3, ranOut: false });
+    expect(result).toMatchObject({ loaded: 3, newlyLoaded: 3, wanted: 3, ranOut: false });
     // Not from cargo: the hold is untouched.
     expect(result.fitting.cargo).toEqual(launchers.cargo);
     expect(launchers.modules[0].chargeTypeId).toBeUndefined();
@@ -762,7 +762,23 @@ describe('loadChargeIntoCompatible', () => {
       fromCargo: true,
     });
     expect(result.fitting).toBe(fit);
-    expect(result).toMatchObject({ loaded: 3, wanted: 3, ranOut: false });
+    expect(result).toMatchObject({ loaded: 3, newlyLoaded: 0, wanted: 3, ranOut: false });
+  });
+
+  it('tells the modules it loaded from those already holding the charge', () => {
+    const fit: Fitting = {
+      ...launchers,
+      modules: launchers.modules.map((m, index) =>
+        index === 0 ? { ...m, chargeTypeId: 24519 } : m
+      ),
+    };
+    const result = loadChargeIntoCompatible(fit, 24519, {
+      accepts,
+      chargesPerLoad: perLoad,
+      fromCargo: true,
+    });
+    // Three take it; one already held it, so this load put it in two.
+    expect(result).toMatchObject({ loaded: 3, newlyLoaded: 2, wanted: 3, ranOut: false });
   });
 
   it('returns the same Fitting when nothing takes the charge, or the cargo holds none', () => {

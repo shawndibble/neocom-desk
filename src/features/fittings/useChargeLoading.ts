@@ -173,7 +173,16 @@ export function useChargeLoading({
                 loaded: result.loaded,
                 count: result.wanted,
               })
-            : t('fittings.item.loaded', { name, count: result.loaded })
+            : result.newlyLoaded === 0
+              ? t('fittings.item.loadAllHeld', { name })
+              : [
+                  t('fittings.item.loaded', { name, count: result.newlyLoaded }),
+                  result.loaded > result.newlyLoaded
+                    ? t('fittings.item.alreadyHeld', { count: result.loaded - result.newlyLoaded })
+                    : null,
+                ]
+                  .filter((part) => part !== null)
+                  .join(' ')
       );
     },
     [edit, accepts, chargesPerLoad, catalogue, t]

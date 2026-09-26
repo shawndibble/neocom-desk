@@ -996,6 +996,9 @@
       "loadRanOut_one": "Loaded {{name}} into {{loaded}} of {{count}} module — cargo ran out.",
       "loadRanOut_other": "Loaded {{name}} into {{loaded}} of {{count}} modules — cargo ran out.",
       "loadNone": "Nothing fitted takes {{name}}.",
+      "loadAllHeld": "Every module that takes {{name}} already holds it.",
+      "alreadyHeld_one": "{{count}} already held it.",
+      "alreadyHeld_other": "{{count}} already held it.",
       "changeCharge": "Change charge",
       "noCharges": "No other charge fits this",
       "launch": "Launch"

@@ -83,6 +83,48 @@ describe('useChargeLoading', () => {
     expect(result.current.message).toBe('Loaded Scourge Heavy Missile into 2 modules.');
   });
 
+  it('says how many modules it loaded, and how many already held the charge', () => {
+    const holding: Fitting = {
+      ...fitting,
+      modules: fitting.modules.map((m, index) => (index === 0 ? { ...m, chargeTypeId: HEAVY } : m)),
+    };
+    const { result } = renderHook(() =>
+      useChargeLoading({
+        fitting: holding,
+        catalogue,
+        moduleResults: [launcher, launcher, passive],
+        engineReady: true,
+        profile,
+        edit: (change) => void change(holding),
+      })
+    );
+    act(() => result.current.load(HEAVY, { fromCargo: true }));
+    expect(result.current.message).toBe(
+      'Loaded Scourge Heavy Missile into 1 module. 1 already held it.'
+    );
+  });
+
+  it('says so when every module that takes the charge already holds it', () => {
+    const holding: Fitting = {
+      ...fitting,
+      modules: fitting.modules.map((m, index) => (index < 2 ? { ...m, chargeTypeId: HEAVY } : m)),
+    };
+    const { result } = renderHook(() =>
+      useChargeLoading({
+        fitting: holding,
+        catalogue,
+        moduleResults: [launcher, launcher, passive],
+        engineReady: true,
+        profile,
+        edit: (change) => void change(holding),
+      })
+    );
+    act(() => result.current.load(HEAVY, { fromCargo: true }));
+    expect(result.current.message).toBe(
+      'Every module that takes Scourge Heavy Missile already holds it.'
+    );
+  });
+
   it('says when nothing fitted takes the charge', () => {
     const { result } = setup();
     act(() =>

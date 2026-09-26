@@ -260,6 +260,8 @@ export interface ChargeLoadResult {
   fitting: Fitting;
   /** Modules holding the charge afterwards, of the `wanted` that take it — a part-load counts. */
   loaded: number;
+  /** Of `loaded`, the ones this load put it in — not those already holding it. */
+  newlyLoaded: number;
   wanted: number;
   /** The cargo emptied before every module that takes the charge had some. */
   ranOut: boolean;
@@ -291,6 +293,7 @@ export function loadChargeIntoCompatible(
   let left = fromCargo ? cargoQuantity(cargo, chargeTypeId) : Number.POSITIVE_INFINITY;
   let wanted = 0;
   let loaded = 0;
+  let newlyLoaded = 0;
   let changed = false;
   let ranOut = false;
   const modules = fitting.modules.map((module) => {
@@ -307,6 +310,7 @@ export function loadChargeIntoCompatible(
     // Rebuilt, not spread, so a quantity recorded for the charge it held never sticks to the new one.
     const next: FittingModule = { ...unloaded(module), chargeTypeId };
     loaded += 1;
+    newlyLoaded += 1;
     changed = true;
     if (!fromCargo) {
       cargo = withHeldChargesReturned({ ...fitting, cargo }, [module]);
@@ -321,6 +325,7 @@ export function loadChargeIntoCompatible(
   return {
     fitting: changed ? { ...fitting, modules, cargo } : fitting,
     loaded,
+    newlyLoaded,
     wanted,
     ranOut,
   };

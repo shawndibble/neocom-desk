@@ -106,6 +106,7 @@ export function ModuleMenuItems({
   shownState,
   maxState,
   withMove = false,
+  takesCharges,
 }: {
   module: FittingModule;
   /** The state it reached (what the radio ticks). */
@@ -114,6 +115,12 @@ export function ModuleMenuItems({
   maxState?: FittingItemState;
   /** Move up / down / to slot — the List's keyboard and touch way to reorder. */
   withMove?: boolean;
+  /**
+   * Whether the module takes a charge at all (its charge groups); false drops
+   * the "Load charge" entries a Damage Control would only show disabled.
+   * Unknown (undefined) until its calculation says, when they stay.
+   */
+  takesCharges?: boolean;
 }) {
   const { t } = useTranslation();
   const actions = useFittingItemActions();
@@ -146,7 +153,7 @@ export function ModuleMenuItems({
           </MenuSubContent>
         </MenuSub>
       )}
-      <ModuleChargeItems actions={actions} module={module} />
+      {takesCharges !== false && <ModuleChargeItems actions={actions} module={module} />}
       {module.chargeTypeId !== undefined && (
         <>
           <MenuItem
