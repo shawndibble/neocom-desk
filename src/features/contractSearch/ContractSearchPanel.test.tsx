@@ -384,10 +384,8 @@ describe('ContractSearchPanel', () => {
     ]);
   });
 
-  it('caps the table at the 50 cheapest offers, not the first 50 the snapshot lists', async () => {
-    // Snapshot order is contract-then-type, so the cheapest row can sit well
-    // past the cap. Slicing before sorting would show 50 arbitrary rows under
-    // a header that claims cheapest-first.
+  it('sorts every offer cheapest-first and windows them, with no cap to lift (issue #1777)', async () => {
+    // Snapshot order is contract-then-type, so the cheapest row can sit last.
     const dear = Array.from({ length: 60 }, (_, i) =>
       row({ contractId: 100 + i, price: 10_000_000 - i, quantity: 1 })
     );
@@ -396,10 +394,11 @@ describe('ContractSearchPanel', () => {
     renderWithRouter();
 
     const rows = await bodyRows();
-    expect(rows).toHaveLength(50);
+    // Only a window is mounted, but it is the head of the whole sorted set.
+    expect(rows.length).toBeLessThan(61);
     expect(within(rows[0]).getByText('7')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Show all (61 total)' })).toBeInTheDocument();
-    // The phone sort bar's count names every match, not the capped 50 on screen.
+    expect(screen.queryByRole('button', { name: /^Show all/ })).not.toBeInTheDocument();
+    // The phone sort bar's count names every match, not the rows mounted.
     expect(screen.getByText('61 offers')).toBeInTheDocument();
   });
 

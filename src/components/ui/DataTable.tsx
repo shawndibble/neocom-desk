@@ -1,5 +1,8 @@
+import { measureElement, useWindowVirtualizer } from '@tanstack/react-virtual';
 import {
   Fragment,
+  useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -310,6 +313,20 @@ interface DataTableProps<T> {
    * width to sit side by side and a reader compares them column-wise.
    */
   groupBy?: DataTableGroupBy<T>;
+  /**
+   * Mounts only the rows near the viewport (TanStack Virtual, windowed
+   * against the page the way `NotificationsPanel` is), so a list of tens of
+   * thousands — a region-wide public contract snapshot — costs what a
+   * screenful does. Every row stays reachable by scrolling; sorting still
+   * runs over the whole set first. Unmounted rows are stood in for by two
+   * `aria-hidden` spacer rows, so column widths stay the table's own.
+   *
+   * Phone `groupBy` renders unwindowed: collapsed groups mount nothing, and
+   * the toggle rows would need their own measuring. `highlightRowKey` and
+   * `expandableRow` are unsupported alongside it — both assume the row they
+   * target is in the DOM.
+   */
+  virtualize?: boolean;
 }
 
 const SORT_ARROW = { asc: '↑', desc: '↓' } as const;
@@ -361,6 +378,7 @@ export function DataTable<T>({
   mobileSort = false,
   stackSummary,
   groupBy,
+  virtualize = false,
 }: DataTableProps<T>) {
   const { t } = useTranslation();
   const [internalSort, setInternalSort] = useState<DataTableSort | null>(defaultSort ?? null);
@@ -454,6 +472,58 @@ export function DataTable<T>({
     );
   }, [grouping, groupBy, sortedRows]);
 
+  const windowed = virtualize && !grouping;
+  // Rough per-layout heights; each mounted row is then measured, so these
+  // only have to be close enough to size the rows not yet seen.
+  const estimatedRowHeight =
+    !isPhone || responsive === 'table'
+      ? density === 'compact'
+        ? 25
+        : 29
+      : dense
+        ? 52
+        : 16 + (stackColumns === 2 ? Math.ceil(columns.length / 2) * 36 : columns.length * 20);
+  // Where the body starts on the page: the virtualizer's positions are
+  // measured from the top of the document, not this table. A callback ref
+  // plus a body-resize observer, as `NotificationsPanel` does, since
+  // whatever sits above the table (filters, a banner) can change height
+  // after mount. `getBoundingClientRect` rather than `offsetTop`, which is
+  // relative to the nearest positioned ancestor, not the document.
+  const [bodyElement, setBodyElement] = useState<HTMLTableSectionElement | null>(null);
+  const bodyRef = useCallback((node: HTMLTableSectionElement | null) => setBodyElement(node), []);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  useEffect(() => {
+    if (!windowed || !bodyElement) return;
+    const measure = () => setScrollMargin(bodyElement.getBoundingClientRect().top + window.scrollY);
+    measure();
+    window.addEventListener('resize', measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.body);
+    return () => {
+      window.removeEventListener('resize', measure);
+      observer.disconnect();
+    };
+  }, [windowed, bodyElement]);
+  const rowVirtualizer = useWindowVirtualizer({
+    count: windowed ? sortedRows.length : 0,
+    enabled: windowed,
+    estimateSize: () => estimatedRowHeight,
+    getItemKey: (index) => rowKey(sortedRows[index], index),
+    // A mounted row never really measures 0 — only jsdom, which does no
+    // layout, reports that — so 0 keeps the estimate instead of collapsing
+    // every row and mounting the whole list.
+    measureElement: (element, entry, instance) =>
+      measureElement(element, entry, instance) || estimatedRowHeight,
+    scrollMargin,
+    overscan: 10,
+  });
+  // Crossing `sm` swaps table rows for cards of a different height; drop
+  // the sizes measured under the old layout (TanStack Virtual's documented
+  // reset, as `NotificationsPanel` does on its own breakpoint).
+  useEffect(() => {
+    rowVirtualizer.measure();
+  }, [isPhone, rowVirtualizer]);
+
   function toggleSort(column: DataTableColumn<T>) {
     setSort(nextDataTableSort(sort, column.id));
   }
@@ -462,7 +532,7 @@ export function DataTable<T>({
   // actions button. Full-width rows span them too.
   const trailingColumns = (expandableRow ? 1 : 0) + (rowMoreActions ? 1 : 0);
 
-  function renderRow(row: T, index: number, member = false) {
+  function renderRow(row: T, index: number, member = false, windowIndex?: number) {
     const key = rowKey(row, index);
     const expanded = expandableRow !== undefined && expandedRowKey === key;
     const focusable = Boolean(rowContextMenu) || Boolean(onRowClick) || expandableRow !== undefined;
@@ -478,6 +548,8 @@ export function DataTable<T>({
         // without this component growing a ref API — `TransactionsPanel`
         // uses it to land on the fill a notification pointed at.
         data-row-key={key}
+        data-index={windowIndex}
+        ref={windowIndex === undefined ? undefined : rowVirtualizer.measureElement}
         aria-expanded={expandableRow ? expanded : undefined}
         aria-current={selectedRowKey !== null && key === selectedRowKey ? 'true' : undefined}
         className={cx(
@@ -580,6 +652,30 @@ export function DataTable<T>({
           </tr>
         )}
       </Fragment>
+    );
+  }
+
+  function renderWindow() {
+    const items = rowVirtualizer.getVirtualItems();
+    const first = items[0];
+    const last = items[items.length - 1];
+    // `start`/`end` include `scrollMargin`; the total size does not.
+    const before = first ? first.start - rowVirtualizer.options.scrollMargin : 0;
+    const after = last
+      ? rowVirtualizer.getTotalSize() - (last.end - rowVirtualizer.options.scrollMargin)
+      : 0;
+    const spacer = (height: number, id: string) =>
+      height > 0 && (
+        <tr key={id} aria-hidden="true" className="dt-spacer" style={{ height }}>
+          <td colSpan={columns.length + trailingColumns} className="p-0" />
+        </tr>
+      );
+    return (
+      <>
+        {spacer(before, 'dt-spacer-before')}
+        {items.map((item) => renderRow(sortedRows[item.index], item.index, false, item.index))}
+        {spacer(after, 'dt-spacer-after')}
+      </>
     );
   }
 
@@ -733,7 +829,7 @@ export function DataTable<T>({
           )}
         </tr>
       </thead>
-      <tbody role="rowgroup" className="divide-y divide-line">
+      <tbody ref={bodyRef} role="rowgroup" className="divide-y divide-line">
         {groups
           ? groups.map((group) => {
               const first = group.rows[0];
@@ -773,7 +869,9 @@ export function DataTable<T>({
                 </Fragment>
               );
             })
-          : sortedRows.map((row, index) => renderRow(row, index))}
+          : windowed
+            ? renderWindow()
+            : sortedRows.map((row, index) => renderRow(row, index))}
       </tbody>
     </table>
   );

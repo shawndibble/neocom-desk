@@ -87,13 +87,7 @@ import { useTimeZone } from '@/lib/timeFormat';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { cx } from '@/lib/cx';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
-import {
-  boolParam,
-  enumParam,
-  optionalEnumParam,
-  optionalIdParam,
-  textParam,
-} from '@/lib/urlState';
+import { enumParam, optionalEnumParam, optionalIdParam, textParam } from '@/lib/urlState';
 import {
   DEFAULT_JUMP_RANGE,
   JUMP_RANGES,
@@ -112,9 +106,6 @@ import {
   JumpRangeSelect,
 } from '@/features/route/JumpRangeControls';
 import { renderJumpsCell } from '@/features/route/jumpsCell';
-
-/** Rows shown before "show all" — the same cap the character-contracts table and BPC Search use. */
-const ROW_CAP = 50;
 
 /** How many candidate types the suggestion list offers at once. */
 const SUGGESTION_LIMIT = 8;
@@ -171,7 +162,6 @@ const ITEMS_FILTER_PARAMS = {
   'items.kind': optionalEnumParam(SALE_KINDS),
   'items.jumps': enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE),
   'items.type': optionalIdParam(),
-  'items.all': boolParam(),
 };
 const ITEMS_SORT = { columnId: 'price', direction: 'asc' } as const;
 
@@ -511,11 +501,6 @@ export function ContractSearchPanel({
   }
   /** The type the user picked out of the suggestion list, pinning the search to exactly one item. */
   const selectedTypeId = itemsParams['items.type'];
-  const showAll = itemsParams['items.all'];
-  const setShowAll = useCallback(
-    (value: boolean) => setItemsParams({ 'items.all': value }),
-    [setItemsParams]
-  );
   const [selectedRow, setSelectedRow] = useState<PublicContractOfferRow | null>(null);
 
   // Freshness and the offline banner both name the snapshot actually on
@@ -620,12 +605,8 @@ export function ContractSearchPanel({
   }, [selectedTypeId, uiFilter.typeQuery, typeOptions]);
 
   /**
-   * Cheapest first *before* the row cap, not after it. `DataTable` sorts only
-   * the rows it is handed, so capping the snapshot's own contract-then-type
-   * order would leave the table claiming a price-ascending sort over an
-   * arbitrary 50 — and the Cheapest chip naming a price no visible row
-   * carries. Sorting first makes the capped view honestly "the 50 cheapest
-   * offers"; Show all lifts it.
+   * Cheapest first, so the rows arrive in the order the table's default
+   * sort shows them rather than the snapshot's own contract-then-type order.
    *
    * An unpriced (barter) row sorts last regardless of its raw price (issue
    * #1080): its 0 ISK is not a real price, and sorting on it as one would
@@ -676,7 +657,6 @@ export function ContractSearchPanel({
       'items.kind': next.saleKind,
       'items.jumps': next.jumps,
       'items.type': unpin ? null : selectedTypeId,
-      'items.all': false,
     });
   }
 
@@ -684,12 +664,11 @@ export function ContractSearchPanel({
     setItemsParams({
       'items.type': option.typeId,
       'items.q': option.name,
-      'items.all': false,
     });
   }
 
   function clearType() {
-    setItemsParams({ 'items.type': null, 'items.q': '', 'items.all': false });
+    setItemsParams({ 'items.type': null, 'items.q': '' });
   }
 
   /**
@@ -839,8 +818,6 @@ export function ContractSearchPanel({
     ITEMS_SORT,
     columns.map((column) => column.id)
   );
-
-  const visibleRows = showAll ? displayRows : displayRows.slice(0, ROW_CAP);
 
   /**
    * Same price rule the table's own column already renders (starting bid vs.
@@ -1139,7 +1116,7 @@ export function ContractSearchPanel({
                     <DataTable
                       label={t('contractSearch.title')}
                       columns={columns}
-                      rows={visibleRows}
+                      rows={displayRows}
                       // Index included deliberately: one contract lists the same
                       // item once per stack, so contractId+typeId is not unique —
                       // the duplicate React keys left stale rows in the table.
@@ -1149,9 +1126,6 @@ export function ContractSearchPanel({
                       // offers for a price and a place, not reads each one.
                       stackLayout="dense"
                       mobileSort
-                      // Counted over every matching offer, not the capped 50
-                      // on screen — the Show all button below says the same
-                      // total, and the two must not disagree.
                       stackSummary={t('contractSearch.mobile.offerCount', {
                         count: displayRows.length,
                       })}
@@ -1168,14 +1142,10 @@ export function ContractSearchPanel({
                           trigger={tr}
                         />
                       )}
+                      // A busy region's snapshot runs to thousands of offers;
+                      // every one stays reachable without mounting them all.
+                      virtualize
                     />
-                    {!showAll && displayRows.length > ROW_CAP && (
-                      <div className="px-3 py-2">
-                        <Button size="sm" onClick={() => setShowAll(true)}>
-                          {t('contractSearch.showAll', { count: displayRows.length })}
-                        </Button>
-                      </div>
-                    )}
                   </>
                 )}
               </>

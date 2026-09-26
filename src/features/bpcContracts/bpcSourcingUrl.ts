@@ -9,7 +9,7 @@
  * local settings already (`bpcSpaceFilterPref.ts`, `bpcSearchColumns.ts`).
  */
 import { tabPath } from '@/lib/pageTabs';
-import { boolParam, enumParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
+import { enumParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
 import { INDUSTRY_TABS } from '@/features/industry/industryTabs';
 import type { BpcSearchSource } from '@/engine/contracts/bpcSearch';
 import { DEFAULT_JUMP_RANGE, JUMP_RANGES } from '@/engine/route/jumpRange';
@@ -35,7 +35,6 @@ export const BPC_SOURCING_PARAMS = {
   'sourcing.minTe': textParam(),
   'sourcing.minRuns': textParam(),
   'sourcing.maxPrice': textParam(),
-  'sourcing.all': boolParam(),
   'sourcing.src': enumSetParam(SOURCE_TOGGLES, DEFAULT_SOURCE_TOGGLES),
   /** Jump Range from the Current System (`engine/route/jumpRange.ts`). */
   'sourcing.jumps': enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE),
