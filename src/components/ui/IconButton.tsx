@@ -48,7 +48,10 @@ interface IconButtonProps extends Omit<
    * override passed in from outside is not reliably an override.
    */
   tone?: IconButtonTone;
-  /** `md` (default) is the toolbar size; `sm` is for controls nested inside a dense row. */
+  /**
+   * `md` (default) is the toolbar size; `sm` is for controls nested inside a
+   * dense row; `row` is `sm` on a pointer but the 44px touch tier below `md`.
+   */
   size?: IconButtonSize;
   className?: string;
 }

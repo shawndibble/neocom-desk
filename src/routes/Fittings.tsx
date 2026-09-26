@@ -16,6 +16,7 @@ import {
   Tabs,
   TextInput,
 } from '@/components/ui';
+import { tappableRowClassName } from '@/components/ui/controlStyles';
 import { AddRow } from '@/components/ui/icons';
 import { AbyssalWeatherPicker } from '@/features/fittings/AbyssalWeatherPicker';
 import { useWeatherName } from '@/features/fittings/abyssalWeatherSelection';
@@ -387,7 +388,7 @@ function FittingsPage() {
   // The docked browser is always there; the others open on demand.
   const addButton =
     addMode === 'docked' ? undefined : (
-      <Button size="sm" onClick={() => selectTarget(null)}>
+      <Button size="sm" className={tappableRowClassName} onClick={() => selectTarget(null)}>
         <AddRow aria-hidden />
         {t('fittings.add.openButton')}
       </Button>

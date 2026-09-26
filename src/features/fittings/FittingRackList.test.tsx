@@ -112,6 +112,8 @@ describe('FittingRackList', () => {
     );
     const passive = screen.getByLabelText('State of #11') as HTMLSelectElement;
     expect(passive.value).toBe('online');
+    // A thumb gets 44px below md (DESIGN.md §3); a pointer keeps the sm height.
+    expect(passive.parentElement).toHaveClass('[&>select]:min-h-11', 'md:[&>select]:min-h-7');
     expect([...passive.options].map((option) => option.value)).toEqual(['offline', 'online']);
   });
 
@@ -246,6 +248,11 @@ describe('FittingRackList with the editor’s item actions', () => {
   it('gives each module row a More actions button with the same menu, Move down included', async () => {
     const actions = fakeItemActions({ names });
     renderList(actions);
+    // 44px for a thumb below md, the dense row size for a pointer.
+    expect(screen.getByRole('button', { name: 'More actions for #10' })).toHaveClass(
+      'size-11',
+      'md:size-7'
+    );
     fireEvent.pointerDown(screen.getByRole('button', { name: 'More actions for #10' }), {
       button: 0,
       pointerType: 'mouse',

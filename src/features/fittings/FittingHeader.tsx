@@ -128,7 +128,7 @@ export function FittingHeader({
         <div className="flex min-w-0 items-center gap-1">
           <h1 className="truncate text-lg font-semibold">{fitting.name}</h1>
           <IconButton
-            size="sm"
+            size="row"
             icon={<Rename />}
             label={t('fittings.header.rename')}
             tooltip={t('fittings.header.rename')}

@@ -57,6 +57,13 @@ describe('IconButton', () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
+  it('takes the touch tier on phones but stays row-sized from md up at size row', () => {
+    render(<IconButton icon={glyph} label="More" size="row" />);
+    const button = screen.getByRole('button');
+    expect(button).toHaveClass('size-11', 'md:size-7');
+    expect(button).not.toHaveClass('md:size-9');
+  });
+
   it('takes the touch-sized box on phones and the standard control size from md up', () => {
     render(<IconButton icon={glyph} label="Refresh" />);
     const button = screen.getByRole('button');

@@ -2,7 +2,7 @@ import { cx } from '@/lib/cx';
 
 export type IconButtonVariant = 'ghost' | 'plain';
 export type IconButtonTone = 'default' | 'danger' | 'positive';
-export type IconButtonSize = 'md' | 'sm';
+export type IconButtonSize = 'md' | 'sm' | 'row';
 
 export interface IconButtonClassNameOptions {
   /**
@@ -13,7 +13,11 @@ export interface IconButtonClassNameOptions {
   variant?: IconButtonVariant;
   /** `danger` is the destructive treatment; `positive` the "worth doing" one. */
   tone?: IconButtonTone;
-  /** `md` (default) is the toolbar size; `sm` is for controls nested in a dense row. */
+  /**
+   * `md` (default) is the toolbar size; `sm` is for controls nested in a
+   * dense row. `row` is `sm` on a pointer and the 44px touch tier below
+   * `md` — a row's own ⋮ or inline action, the thumb's only way in.
+   */
   size?: IconButtonSize;
   /** Toggle state — takes the accent treatment when on. */
   pressed?: boolean;
@@ -46,7 +50,7 @@ export function iconButtonClassName({
     'inline-flex shrink-0 items-center justify-center rounded-xs',
     'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
     'disabled:cursor-not-allowed disabled:opacity-40',
-    size === 'md' ? 'size-11 md:size-9' : 'size-9 md:size-7',
+    size === 'md' ? 'size-11 md:size-9' : size === 'row' ? 'size-11 md:size-7' : 'size-9 md:size-7',
     // `border` alone here: each state below names its own border colour, so no
     // two border-colour utilities ever land on the element at once. Tailwind
     // resolves same-property utilities by stylesheet order, not by their order
