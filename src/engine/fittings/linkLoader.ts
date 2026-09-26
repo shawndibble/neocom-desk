@@ -68,6 +68,8 @@ export function classifyLoadInput(input: string): LoadInput {
       const url = new URL(text);
       // This app's own Share Link (a Fitting's Export menu): the code rides in `?f=`.
       const code = url.searchParams.get('f');
+      // Matched on the path's end, so both `/ships/fittings` (since the
+      // section became Ships) and the older `/fittings` read back.
       if (code && /\/fittings(\/edit)?\/?$/.test(url.pathname)) return { kind: 'share', code };
       if (/(^|\.)eveworkbench\.com$/i.test(url.hostname) && /^\/fit\//i.test(url.pathname)) {
         return { kind: 'eveWorkbench' };

@@ -212,7 +212,7 @@ describe('FittingStartScreen', () => {
     renderScreen();
     await userEvent.click(await screen.findByRole('button', { name: /^Kite/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Compare' }));
-    expect(navigateMock).toHaveBeenCalledWith('/fittings/compare?f=1.abc');
+    expect(navigateMock).toHaveBeenCalledWith('/ships/fittings/compare?f=1.abc');
   });
 
   it('keeps edited notes on a saved fitting, and only there', async () => {

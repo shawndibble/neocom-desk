@@ -54,7 +54,7 @@ test.describe('Fitting Compare at 390px', () => {
   test('adds Fittings, pages through three on phone, and keeps the layout within 390px', async ({
     page,
   }) => {
-    await signInAndGoto(page, './fittings/compare');
+    await signInAndGoto(page, './ships/fittings/compare');
     await answerAnyType(page);
     await page.setViewportSize(PHONE);
 
@@ -102,7 +102,7 @@ test.describe('Fitting Compare control toolbar', () => {
 
   test('at 1440 the three selects share one row', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await signInAndGoto(page, './fittings/compare');
+    await signInAndGoto(page, './ships/fittings/compare');
     const ys: number[] = [];
     for (const name of LABELS) {
       const box = await page.getByRole('combobox', { name }).boundingBox();
@@ -113,7 +113,7 @@ test.describe('Fitting Compare control toolbar', () => {
 
   test('at 1024 the block is compact and each label sits beside its select', async ({ page }) => {
     await page.setViewportSize({ width: 1024, height: 768 });
-    await signInAndGoto(page, './fittings/compare');
+    await signInAndGoto(page, './ships/fittings/compare');
     const block = await page.getByTestId('compare-controls').boundingBox();
     expect(block!.height).toBeLessThan(70);
     for (const name of LABELS) {
@@ -137,7 +137,7 @@ test.describe('Fitting Compare column alignment', () => {
         page,
       }) => {
         await page.setViewportSize(size);
-        await signInAndGoto(page, './fittings/compare');
+        await signInAndGoto(page, './ships/fittings/compare');
         await answerAnyType(page);
         // Every later fit carries one more gun, so the "Modules that differ" table renders.
         for (const [i, eft] of fits.entries()) {

@@ -61,7 +61,7 @@ export const loadIndustryGroupPage = named(
   () => import('@/routes/IndustryGroupPage'),
   'IndustryGroupPage'
 );
-export const loadFittings = named(() => import('@/routes/Fittings'), 'Fittings');
+export const loadShips = named(() => import('@/routes/Ships'), 'Ships');
 export const loadFittingCompare = named(() => import('@/routes/FittingCompare'), 'FittingCompare');
 export const loadCorp = named(() => import('@/routes/Corp'), 'Corp');
 export const loadCorpMembers = named(() => import('@/routes/CorpMembers'), 'CorpMembers');
@@ -97,7 +97,8 @@ export const loadErrorProbe = named(() => import('@/routes/ErrorProbe'), 'ErrorP
  * Every feature route but the eager `/overview`, keyed the way `Layout`'s
  * links are. Exhaustive by type, so a route added to `routeScopes.ts` without
  * a chunk here is a compile error rather than a link that never preloads. The
- * redirect-only paths (`/skills`, `/bpc-contracts`) preload their target.
+ * redirect-only paths (`/skills`, `/bpc-contracts`, `/skills/ships`,
+ * `/fittings/*`) preload their target.
  */
 const PRELOADERS: Record<Exclude<AppRoutePath, '/overview'>, () => Promise<RouteModule>> = {
   '/characters': loadCharacters,
@@ -110,10 +111,10 @@ const PRELOADERS: Record<Exclude<AppRoutePath, '/overview'>, () => Promise<Route
   '/industry': loadIndustry,
   '/industry/plans/:planId': loadIndustryPlanPage,
   '/industry/groups/:groupId': loadIndustryGroupPage,
-  '/fittings': loadFittings,
-  '/skills/ships': loadFittings,
-  '/fittings/edit': loadFittings,
-  '/fittings/compare': loadFittingCompare,
+  '/ships': loadShips,
+  '/skills/ships': loadShips,
+  '/fittings/*': loadShips,
+  '/ships/fittings/compare': loadFittingCompare,
   '/market': loadMarket,
   '/wallet': loadWallet,
   '/wallet/loyalty/:corporationId': loadLoyaltyStore,

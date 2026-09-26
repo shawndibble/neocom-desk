@@ -94,7 +94,7 @@ function renderCallback(search: string) {
           <Route path="/characters" element={<div>characters page</div>} />
           <Route path="/overview" element={<div>overview page</div>} />
           <Route path="/login" element={<div>login page</div>} />
-          <Route path="/fittings" element={<div>fittings page</div>} />
+          <Route path="/ships/fittings" element={<div>fittings page</div>} />
         </Routes>
       </MemoryRouter>
     </StrictMode>
@@ -127,7 +127,7 @@ describe('Callback', () => {
 
   it('lets a stashed return-to path win over a first-ever login (#1544)', async () => {
     stashLogin('state-1');
-    setLoginReturnTo('/fittings?f=abc123');
+    setLoginReturnTo('/ships/fittings?f=abc123');
     renderCallback('?code=good-code&state=state-1');
 
     expect(await screen.findByText('fittings page')).toBeInTheDocument();

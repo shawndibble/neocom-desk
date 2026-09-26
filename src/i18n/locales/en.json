@@ -14,7 +14,7 @@
     "corp": "Corporation",
     "skills": "Skills",
     "industry": "Industry",
-    "fittings": "Fittings",
+    "ships": "Ships",
     "market": "Market",
     "groups": {
       "progression": "Progression",
@@ -56,6 +56,122 @@
     "implantsAssumedAction": "Grant Character details",
     "standingsAssumedTitle": "Assumes base standings",
     "standingsAssumedAction": "Grant Character details"
+  },
+  "ships": {
+    "tabs": {
+      "fittings": "Fittings",
+      "tree": "Tree"
+    },
+    "tree": {
+      "loading": "Loading the ship tree…",
+      "noCharacter": "No character selected — every hull shows as untrained. Log in to see which you can fly.",
+      "credit": "Ship tree icons and emblems are EVE Online artwork © CCP hf., copied from the EVE University wiki. EVE Online and the EVE logo are trademarks of CCP hf.",
+      "view": {
+        "label": "Ship tree view",
+        "map": "Map",
+        "ladder": "Ladder"
+      },
+      "factions": "Factions",
+      "mapLabel": "{{faction}} ship tree",
+      "searchPlaceholder": "Search every faction…",
+      "searchLabel": "Search hulls in every faction",
+      "searchShortcut": "Press / to search",
+      "searchResults": "Matching hulls",
+      "filterPlaceholder": "Search this faction…",
+      "filterLabel": "Search this faction's hulls",
+      "onlyFlyable": "Only ones I can fly",
+      "otherFactions": "Other factions:",
+      "noMatches": "No hulls match.",
+      "flyableCount": "{{flyable}} / {{total}} hulls flyable",
+      "flyableOfTotal": "{{flyable}}/{{total}} flyable",
+      "needs": "Needs:",
+      "switchFaction": "Switch to {{name}}",
+      "showNames": "Show hull names",
+      "zoomOut": "Zoom out",
+      "zoomIn": "Zoom in",
+      "zoomLevel": "Zoom level",
+      "fit": "Fit",
+      "fitLabel": "Fit the whole tree",
+      "hoverHint": "Click for fitting, skills and blueprint",
+      "tileLabel": "{{name}} — {{status}}",
+      "canFly": "Can fly",
+      "timeToFly": "{{time}} to fly",
+      "classSkill": "{{skill}} {{level}} — have {{have}}",
+      "omega": "Needs an Omega clone",
+      "legend": {
+        "masteryV": "Mastery V",
+        "canFly": "can fly",
+        "cantFly": "can't fly yet",
+        "omega": "needs Omega"
+      }
+    },
+    "info": {
+      "tabsLabel": "Ship info",
+      "tabs": {
+        "description": "Description",
+        "fitting": "Fitting",
+        "skills": "Skills & Mastery",
+        "blueprint": "Blueprint"
+      },
+      "subtitle": "{{faction}} · {{class}} · {{tech}}",
+      "tech": "Tech {{level}}",
+      "mastery": "Mastery {{level}}",
+      "masteryNone": "No Mastery yet",
+      "bonuses": {
+        "title": "Bonuses",
+        "skill": "{{skill}} bonuses (per skill level):",
+        "role": "Role bonus:"
+      },
+      "fitting": {
+        "highSlots": "High slots",
+        "medSlots": "Mid slots",
+        "lowSlots": "Low slots",
+        "rigSlots": "Rig slots",
+        "rigSlotsSized": "{{count}} ({{size}})",
+        "rigSize": {
+          "1": "small",
+          "2": "medium",
+          "3": "large",
+          "4": "capital"
+        },
+        "turrets": "Turret hardpoints",
+        "launchers": "Launcher hardpoints",
+        "cpu": "CPU",
+        "powergrid": "Powergrid",
+        "calibration": "Calibration",
+        "droneBay": "Drone bay",
+        "droneBandwidth": "Drone bandwidth",
+        "tf": "{{value}} tf",
+        "mw": "{{value}} MW",
+        "m3": "{{value}} m³",
+        "mbit": "{{value}} Mbit/s",
+        "unskilledNote": "Base values, before your skills.",
+        "subsystems": "A Tech III hull's slots and hardpoints come from the subsystems fitted to it.",
+        "simulate": "Simulate"
+      },
+      "skills": {
+        "masteryTitle": "Mastery",
+        "masteryLevel": "You have Mastery Level {{level}}",
+        "masteryLevelNone": "You have no Mastery Level yet",
+        "noMasteries": "No Mastery data for this hull.",
+        "tiersLabel": "Mastery tiers",
+        "tier": "Tier {{tier}}",
+        "tierComplete": "Tier {{tier}}, complete",
+        "tierEmpty": "This tier asks for nothing more.",
+        "addTier": "Add tier {{tier}} to plan",
+        "tierTrained": "All trained"
+      },
+      "blueprint": {
+        "none": "No blueprint — this hull isn't manufactured.",
+        "findCopy": "Find a copy",
+        "viewInMarket": "View in market",
+        "planBuild": "Plan to build it",
+        "planNeedsCharacter": "Log in with a character to plan a build.",
+        "ownOriginal": "You own an original",
+        "ownCopies_one": "You own {{count}} copy",
+        "ownCopies_other": "You own {{count}} copies"
+      }
+    }
   },
   "fittings": {
     "editTitle": "Editor",
@@ -5294,7 +5410,7 @@
     "dataTitle": "Data",
     "dataHint": "Clear locally cached EVE data if a view looks stale or you're troubleshooting — the app refetches from ESI as needed.",
     "dataAttributionTitle": "Data credit",
-    "dataAttributionText": "Ship, module and character data — including the ship-fitting stats in Fittings — is EVE Online data owned by CCP hf. and used here under its Developer License Agreement.",
+    "dataAttributionText": "Ship, module and character data — including the ship-fitting stats in Fittings — is EVE Online data owned by CCP hf. and used here under its Developer License Agreement. The Ship Tree's class icons and faction emblems are CCP's in-game artwork, copied from the EVE University wiki.",
     "dataAttributionLink": "Read the license",
     "clearCache": "Clear cached ESI data",
     "clearCacheConfirm": "Cache cleared.",

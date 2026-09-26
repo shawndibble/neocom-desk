@@ -40,7 +40,7 @@ export const MOBILE_TAB_CHOICES = [
   '/alerts',
   '/skills',
   '/industry',
-  '/fittings',
+  '/ships',
   '/mining',
   '/planetary-industry',
   '/market',
@@ -75,7 +75,7 @@ export const NAV_LABEL_KEYS: Record<MobileTabPath, string> = {
   '/alerts': 'nav.alerts',
   '/skills': 'nav.skills',
   '/industry': 'nav.industry',
-  '/fittings': 'nav.fittings',
+  '/ships': 'nav.ships',
   '/mining': 'nav.miningTax',
   '/planetary-industry': 'nav.pi',
   '/market': 'nav.market',
@@ -92,9 +92,12 @@ function isMobileTabPath(value: unknown): value is MobileTabPath {
   return (MOBILE_TAB_CHOICES as readonly string[]).includes(value as string);
 }
 
-/** A path this settings value may still hold from before #1304 renamed the route. */
+/** A path this settings value may still hold from before a route was renamed. */
 const LEGACY_PATH_REMAP: Record<string, MobileTabPath> = {
+  // #1304.
   '/moon-mining': '/mining',
+  // Fittings became the Ships section (scope decision `20260926-135538`).
+  '/fittings': '/ships',
 };
 
 function remapLegacyPath(value: unknown): unknown {

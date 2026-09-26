@@ -426,7 +426,7 @@ describe('Layout desktop rail domain grouping', () => {
       '[Progression]',
       'Skills',
       'Industry',
-      'Fittings',
+      'Ships',
       'Mining',
       'PI',
       '[Economy]',

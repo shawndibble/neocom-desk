@@ -46,7 +46,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
   test('loads a pasted fit into the List view, and the Load button meets the touch-target floor', async ({
     page,
   }) => {
-    await signInAndGoto(page, './fittings');
+    await signInAndGoto(page, './ships/fittings');
     await answerAnyType(page);
     await page.setViewportSize(PHONE);
 
@@ -75,7 +75,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
   test('switches to the Ring overview, edits a rack through a 44px rack button, and remembers the choice across a reload', async ({
     page,
   }) => {
-    await signInAndGoto(page, './fittings');
+    await signInAndGoto(page, './ships/fittings');
     await answerAnyType(page);
     await page.setViewportSize(PHONE);
 
@@ -114,7 +114,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
   });
 
   test('starts a new Fitting from a hull on the Start screen', async ({ page }) => {
-    await signInAndGoto(page, './fittings');
+    await signInAndGoto(page, './ships/fittings');
     await answerAnyType(page);
     await page.setViewportSize(PHONE);
 
@@ -136,7 +136,7 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
   test('a long fit name gets its own line: two lines at most, Save and the menu beside the chips', async ({
     page,
   }) => {
-    await signInAndGoto(page, './fittings');
+    await signInAndGoto(page, './ships/fittings');
     await answerAnyType(page);
     await page.setViewportSize(PHONE);
 

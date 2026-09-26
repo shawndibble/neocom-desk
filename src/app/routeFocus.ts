@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef, type RefObject } from 'react';
 import { pagePathFor } from './pagePathFor';
-import { tabbedPageFor } from './pageTabs';
+import { pageKeyFor, tabbedPageFor } from './pageTabs';
 import type { AppRoutePath } from './routeScopes';
 
 /**
@@ -30,14 +30,15 @@ const SUB_NAV_PAGES: Partial<Record<AppRoutePath, AppRoutePath>> = {
 export const HEADING_WAIT_MS = 2000;
 
 /**
- * Which page `pathname` is, for focus purposes: a tabbed page's base, a
- * sub-nav page's section, or the matched route pattern with any splat
- * dropped — so `/assets` and `/assets/60003760` are one page, and
- * `/skills/plans/1` and `/2` are one page apart from the plan list.
+ * Which page `pathname` is, for focus purposes: a tabbed page's base (or a
+ * standalone tab's own path, `pageKeyFor`), a sub-nav page's section, or the
+ * matched route pattern with any splat dropped — so `/assets` and
+ * `/assets/60003760` are one page, `/skills/plans/1` and `/2` are one page
+ * apart from the plan list, and opening a Fitting (`/ships/fittings/edit`)
+ * is a page change from the library it was opened from.
  */
 export function focusKeyFor(pathname: string): string {
-  const page = tabbedPageFor(pathname);
-  if (page !== null) return page.base;
+  if (tabbedPageFor(pathname) !== null) return pageKeyFor(pathname);
   const pattern = pagePathFor(pathname);
   if (pattern === '/*') return pathname;
   const route = pattern.replace(/\/\*$/, '') as AppRoutePath;

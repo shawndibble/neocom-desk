@@ -45,6 +45,17 @@ describe('documentTitleFor', () => {
     );
   });
 
+  it('titles the Ships section by its tab, the editor and Compare by their own names', () => {
+    expect(documentTitleFor('/ships/fittings', t)).toBe('Fittings — Ships — Neocom Desk');
+    expect(documentTitleFor('/ships/tree', t)).toBe('Tree — Ships — Neocom Desk');
+    expect(documentTitleFor('/ships/fittings/edit', t)).toBe(
+      `${i18n.t('fittings.editTitle')} — Ships — Neocom Desk`
+    );
+    expect(documentTitleFor('/ships/fittings/compare', t)).toBe(
+      `${i18n.t('fittings.compare.title')} — Ships — Neocom Desk`
+    );
+  });
+
   it('covers splat routes', () => {
     expect(documentTitleFor('/assets/60003760', t)).toBe('Assets — Neocom Desk');
   });

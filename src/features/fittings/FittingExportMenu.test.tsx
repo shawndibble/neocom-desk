@@ -47,9 +47,12 @@ function setup(price: Appraisal | null = PRICE) {
     copied.push(text);
   });
   render(
-    <MemoryRouter initialEntries={['/fittings']}>
+    <MemoryRouter initialEntries={['/ships/fittings']}>
       <Routes>
-        <Route path="/fittings" element={<FittingExportMenu fitting={FITTING} price={price} />} />
+        <Route
+          path="/ships/fittings"
+          element={<FittingExportMenu fitting={FITTING} price={price} />}
+        />
         <Route path="*" element={<LocationState />} />
       </Routes>
     </MemoryRouter>
@@ -71,7 +74,7 @@ describe('FittingExportMenu', () => {
     await choose('Copy Share Link');
     await waitFor(() => expect(copied).toHaveLength(1));
     const url = new URL(copied[0]);
-    expect(url.pathname.endsWith('/fittings')).toBe(true);
+    expect(url.pathname.endsWith('/ships/fittings')).toBe(true);
     const decoded = await decodeFittingShare(url.searchParams.get('f') ?? '');
     expect(decoded.ok && decoded.value.hullTypeId).toBe(587);
     expect(await screen.findByRole('status')).toHaveTextContent('Share Link copied');

@@ -169,7 +169,7 @@ export function useFittingWorkspace(): FittingWorkspace {
       if (now.pathname === FITTING_EDIT_PATH && new URLSearchParams(now.search).get('f') === code)
         return;
       // Only an entry already on the editor's path is ever overwritten: from
-      // anywhere else (the library, a too-large Fitting's `/fittings`) it is a
+      // anywhere else (the library, a too-large Fitting's `/ships/fittings`) it is a
       // new place, and replacing would erase the way Back.
       void navigate(fittingEditLocation(code), {
         replace: !push && now.pathname === FITTING_EDIT_PATH,

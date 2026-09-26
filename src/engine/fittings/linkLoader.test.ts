@@ -31,6 +31,18 @@ describe('classifyLoadInput', () => {
     });
   });
 
+  it('reads the Ships section paths back too, library and editor', () => {
+    expect(classifyLoadInput('https://x.example/neocom-desk/ships/fittings?f=1.abc_-')).toEqual({
+      kind: 'share',
+      code: '1.abc_-',
+    });
+    expect(classifyLoadInput('https://x.example/ships/fittings/edit?f=1.abc_-')).toEqual({
+      kind: 'share',
+      code: '1.abc_-',
+    });
+    expect(classifyLoadInput('https://x.example/ships/tree?f=1.abc').kind).toBe('unknown');
+  });
+
   it('recognises a bare DNA string', () => {
     expect(classifyLoadInput('587:100;2:200;1::')).toEqual({
       kind: 'dna',

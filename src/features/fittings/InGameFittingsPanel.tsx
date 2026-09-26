@@ -1,7 +1,7 @@
 /**
  * In-game Fittings (issue #1539): the active Character's ESI-saved fittings,
  * grouped by hull, Load into the editor on Open. Gated at this panel, not the
- * `/fittings` route (`routeScopes.ts`) — Load (EFT paste), stats and editing
+ * `/ships` route (`routeScopes.ts`) — Load (EFT paste), stats and editing
  * all work with no grant at all, same reasoning as Clones' `ReauthBanner`.
  */
 import { useMemo } from 'react';
