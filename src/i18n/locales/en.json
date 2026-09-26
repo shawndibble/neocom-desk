@@ -1661,6 +1661,8 @@
     "exportCsvJobs": "Export jobs",
     "copyShoppingList": "Copy shopping list for multibuy",
     "copyShoppingListDone": "Shopping list copied",
+    "copyShoppingListBlueprintsLeftOut_one": "{{count}} blueprint left out — buy it by contract",
+    "copyShoppingListBlueprintsLeftOut_other": "{{count}} blueprints left out — buy them by contract",
     "copyHubShoppingList": "Copy {{hub}} list",
     "copyHubShoppingListDone": "{{hub}} list copied",
     "copyShoppingListFailed": "Couldn't reach the clipboard. Check the browser's clipboard permission.",

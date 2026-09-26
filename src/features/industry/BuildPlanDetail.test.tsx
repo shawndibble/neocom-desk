@@ -342,10 +342,9 @@ describe('BuildPlanDetail shopping list', () => {
     await user.click(copyButton());
 
     // "Rifter Blueprint" is the blueprint's own Blueprint Acquisition row
-    // (issue #838): no owned copy, no BPC offer and no hub price for it in
-    // this fixture, so it lists unpriced at quantity 1 — still on the
-    // shopping list, since it is a real thing the pilot has to go acquire.
-    expect(writeText).toHaveBeenCalledWith('Rifter Blueprint\t1\nTritanium\t960');
+    // (issue #838): bought by contract, not market order, so multibuy can't
+    // buy it — excluded from the copied text (issue #1778).
+    expect(writeText).toHaveBeenCalledWith('Tritanium\t960');
   });
 
   it('confirms on the button itself — a clipboard write leaves nothing else to look at', async () => {
@@ -356,6 +355,20 @@ describe('BuildPlanDetail shopping list', () => {
     await user.click(copyButton());
 
     expect(await screen.findByRole('button', { name: 'Shopping list copied' })).toBeInTheDocument();
+  });
+
+  it('names the Blueprint Acquisition row left out of the copied text (issue #1778)', async () => {
+    const user = userEvent.setup();
+    configureClipboard(vi.fn<ClipboardWriter>().mockResolvedValue(undefined));
+    // Default fixture's "Rifter Blueprint" Blueprint Acquisition row (issue
+    // #838) is what gets left out here.
+    render(<Harness />);
+
+    await user.click(copyButton());
+
+    expect(
+      await screen.findByText('1 blueprint left out — buy it by contract')
+    ).toBeInTheDocument();
   });
 
   it('surfaces a denied clipboard instead of failing silently', async () => {
@@ -491,12 +504,10 @@ describe('BuildPlanDetail sub-builds', () => {
     await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
 
     // "Rifter Blueprint" (unbuilt) and "Tritanium Blueprint" (Tritanium is
-    // now built here — its own Blueprint Acquisition row, issue #838) both
-    // list unpriced at quantity 1 in this fixture; Pyerite is what the
-    // build actually needs.
-    expect(writeText).toHaveBeenCalledWith(
-      'Rifter Blueprint\t1\nTritanium Blueprint\t1\nPyerite\t1250'
-    );
+    // now built here — its own Blueprint Acquisition row, issue #838) are both
+    // excluded from the multibuy text (issue #1778): a blueprint is bought by
+    // contract, not market order. Pyerite is what the build actually needs.
+    expect(writeText).toHaveBeenCalledWith('Pyerite\t1250');
   });
 
   it('sizes the job against what is still needed, never rebuilding owned stock', async () => {
@@ -509,9 +520,9 @@ describe('BuildPlanDetail sub-builds', () => {
     await user.click(buildButton());
     await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
 
-    expect(writeText).toHaveBeenCalledWith(
-      'Rifter Blueprint\t1\nTritanium Blueprint\t1\nPyerite\t1000'
-    );
+    // Both Blueprint Acquisition rows are excluded from the multibuy text
+    // (issue #1778) — only Pyerite, the real material, remains.
+    expect(writeText).toHaveBeenCalledWith('Pyerite\t1000');
   });
 
   it('puts the material back on the list when the choice is undone', async () => {
@@ -525,9 +536,10 @@ describe('BuildPlanDetail sub-builds', () => {
     await user.click(screen.getByRole('button', { name: 'Copy shopping list for multibuy' }));
 
     // Undone: Tritanium is bought again, not built, so its own "Tritanium
-    // Blueprint" Blueprint Acquisition row is gone too — only "Rifter
-    // Blueprint" (the plan's own blueprint) remains.
-    expect(writeText).toHaveBeenCalledWith('Rifter Blueprint\t1\nTritanium\t1000');
+    // Blueprint" Blueprint Acquisition row is gone too. "Rifter Blueprint"
+    // (the plan's own blueprint) is still excluded from the multibuy text
+    // (issue #1778) — only Tritanium, the real material, remains.
+    expect(writeText).toHaveBeenCalledWith('Tritanium\t1000');
   });
 });
 

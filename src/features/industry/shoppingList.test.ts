@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { materialCostLines } from '@/engine/industry/sourcing';
 import type { HubPrices, MaterialCostLine, MaterialSourcingMap } from '@/engine/industry/types';
-import { hasShoppingList, shoppingListText } from './shoppingList';
+import { blueprintsLeftOutCount, hasShoppingList, shoppingListText } from './shoppingList';
 
 const nameFor = (typeID: number) => `Item ${typeID}`;
 
@@ -14,6 +14,17 @@ function line(
   sourcing?: MaterialSourcingMap
 ): MaterialCostLine {
   return materialCostLines([{ typeID, baseQuantity, quantity }], hubPrices, sourcing)[0];
+}
+
+/** A synthetic Blueprint Acquisition row (issue #838) — never buyable via multibuy. */
+function blueprintLine(
+  typeID: number,
+  remainingQuantity: number
+): MaterialCostLine & { acquisitionTier: { me: number; te: number } } {
+  return {
+    ...line(typeID, 1, remainingQuantity),
+    acquisitionTier: { me: 10, te: 20 },
+  };
 }
 
 describe('shoppingListText', () => {
@@ -50,6 +61,28 @@ describe('shoppingListText', () => {
     const owned = line(34, 1000, 1000, {}, { 34: { ownedQuantity: 1000 } });
     expect(shoppingListText([owned], nameFor)).toBe('');
   });
+
+  it('excludes a Blueprint Acquisition row — multibuy cannot buy a blueprint', () => {
+    const material = line(34, 1000, 1000);
+    const blueprint = blueprintLine(11568, 1);
+    expect(shoppingListText([blueprint, material], nameFor)).toBe('Item 34\t1000');
+  });
+});
+
+describe('blueprintsLeftOutCount', () => {
+  it('is 0 when no blueprint acquisition row is present', () => {
+    expect(blueprintsLeftOutCount([line(34, 1000, 1000)])).toBe(0);
+  });
+
+  it('counts a blueprint acquisition row that still has a remainder', () => {
+    const blueprint = blueprintLine(11568, 1);
+    expect(blueprintsLeftOutCount([blueprint, line(34, 1000, 1000)])).toBe(1);
+  });
+
+  it('does not count an already-owned blueprint — nothing was left out of the list', () => {
+    const owned = { ...blueprintLine(11568, 1), remainingQuantity: 0 };
+    expect(blueprintsLeftOutCount([owned])).toBe(0);
+  });
 });
 
 describe('hasShoppingList', () => {
@@ -66,5 +99,9 @@ describe('hasShoppingList', () => {
     const owned = line(34, 1000, 1000, {}, { 34: { ownedQuantity: 1000 } });
     const short = line(35, 200, 200, {}, { 35: { ownedQuantity: 199 } });
     expect(hasShoppingList([owned, short])).toBe(true);
+  });
+
+  it('is false when the only remainder is a Blueprint Acquisition row', () => {
+    expect(hasShoppingList([blueprintLine(11568, 1)])).toBe(false);
   });
 });

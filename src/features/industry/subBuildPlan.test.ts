@@ -390,6 +390,38 @@ describe('shoppingListMaterials', () => {
   });
 });
 
+describe('shoppingListMaterials — Blueprint Acquisition row merge (issue #1778)', () => {
+  /** A minimal synthetic Blueprint Acquisition row (issue #838), hand-built rather than
+   * through `resolve()`: reproducing it via the engine needs a priced sub-build tree,
+   * where this only needs the one marker `mergeInto` must carry across a merge. */
+  function acquisitionRow(typeID: number, remainingQuantity: number) {
+    return {
+      typeID,
+      baseQuantity: 1,
+      quantity: 1,
+      ownedQuantity: remainingQuantity > 0 ? 0 : 1,
+      remainingQuantity,
+      unitPrice: null,
+      lineCost: 0,
+      unpriced: remainingQuantity > 0,
+      acquisitionTier: { me: 10, te: 20 },
+    };
+  }
+
+  it('keeps the acquisitionTier marker when the same blueprint is acquired via two branches', () => {
+    // Same blueprint typeID reached through two different sub-builds — `mergeInto`
+    // merges them into one row, and must not lose the marker in the process.
+    const resolved = [acquisitionRow(11568, 1), acquisitionRow(11568, 1)];
+
+    const list = shoppingListMaterials(resolved);
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({
+      typeID: 11568,
+      acquisitionTier: { me: 10, te: 20 },
+    });
+  });
+});
+
 describe('subBuildSeconds', () => {
   it('is zero when nothing is built', () => {
     const resolved = resolve([{ typeID: SEAL, quantity: 150 }], []);
