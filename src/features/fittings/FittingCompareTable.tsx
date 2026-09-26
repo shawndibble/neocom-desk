@@ -38,6 +38,23 @@ export interface FittingCompareColumn {
   header: ReactNode;
 }
 
+/**
+ * Table classes + column group shared by the Stats and "Modules that differ" tables, so a Fitting's
+ * column sits at the same x in both (fixed layout from `sm` up; the phone keeps auto layout).
+ */
+export const COMPARE_TABLE_CLASS = 'w-full border-collapse text-xs sm:table-fixed';
+
+export function CompareColGroup({ count }: { count: number }) {
+  return (
+    <colgroup>
+      <col className="sm:w-2/5" />
+      {Array.from({ length: count }, (_, i) => (
+        <col key={i} />
+      ))}
+    </colgroup>
+  );
+}
+
 export interface FittingCompareTableProps {
   rows: readonly CompareRow[];
   /** Which columns to render, and what heads them — the phone pager's window, or every column on desktop. */
@@ -54,7 +71,8 @@ export function FittingCompareTable({ rows, columns, differencesOnly }: FittingC
   }
 
   return (
-    <table className="w-full border-collapse text-xs">
+    <table className={COMPARE_TABLE_CLASS}>
+      <CompareColGroup count={columns.length} />
       <thead>
         <tr>
           <th className="p-2 text-left text-text-dim">{t('fittings.compare.statColumn')}</th>

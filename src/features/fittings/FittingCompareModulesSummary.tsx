@@ -2,7 +2,11 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TypeIcon } from '@/components/ui';
-import type { FittingCompareColumn } from './FittingCompareTable';
+import {
+  COMPARE_TABLE_CLASS,
+  CompareColGroup,
+  type FittingCompareColumn,
+} from './FittingCompareTable';
 import type { ModuleDiffEntry } from '@/engine/fittings/fittingCompare';
 import { typeName } from '@/sde/loadSde';
 
@@ -40,7 +44,8 @@ export function FittingCompareModulesSummary({
   }
 
   return (
-    <table className="w-full border-collapse text-xs">
+    <table className={COMPARE_TABLE_CLASS}>
+      <CompareColGroup count={columns.length} />
       <thead>
         <tr>
           <th className="p-2 text-left text-text-dim">{t('fittings.compare.moduleColumn')}</th>
