@@ -286,9 +286,6 @@ function hubStationIn(regionId: number | null): number {
 
 const OFFERS_DEFAULT_SORT = { columnId: 'price', direction: 'asc' } as const;
 
-/** Rows shown before "show all" (same precedent as Contracts/the market order book). */
-const ROW_CAP = 50;
-
 function isDefaultSources(sources: ReadonlySet<SourceToggle>): boolean {
   return (
     sources.size === DEFAULT_SOURCE_TOGGLES.length &&
@@ -555,7 +552,7 @@ export function BpcSourcingPanel() {
     void setVisibleColumns(next);
   }
 
-  // Search, filters, sources, Show all and the pinned blueprint all live in
+  // Search, filters, sources and the pinned blueprint all live in
   // the URL (`bpcSourcingUrl.ts`), one group so a handler that changes
   // several at once writes them in one navigation.
   const [params, setParams] = useUrlParams(BPC_SOURCING_PARAMS);
@@ -570,7 +567,6 @@ export function BpcSourcingPanel() {
     }),
     [params]
   );
-  const showAll = params['sourcing.all'];
   const sources = params['sourcing.src'];
   const jumps = params['sourcing.jumps'];
   const currentSystem = useCurrentSystem();
@@ -788,12 +784,11 @@ export function BpcSourcingPanel() {
     setParams({
       'sourcing.type': suggestion.typeId,
       'sourcing.q': suggestion.name,
-      'sourcing.all': false,
     });
   }
 
   function clearBlueprint() {
-    setParams({ 'sourcing.type': null, 'sourcing.q': '', 'sourcing.all': false });
+    setParams({ 'sourcing.type': null, 'sourcing.q': '' });
   }
 
   /** Includes the Dexie-backed space filter — unlike the sourcing.* params here, nothing else resets it. */
@@ -827,10 +822,6 @@ export function BpcSourcingPanel() {
       'sourcing.minTe': next.minTe,
       'sourcing.minRuns': next.minRuns,
       'sourcing.maxPrice': next.maxPrice,
-      // Any filter edit gives a different row set, so an expansion asked for
-      // against the previous one no longer means anything — same reset the
-      // two blueprint handlers do.
-      'sourcing.all': false,
     });
   }
   const regionOptions = useMemo(
@@ -1014,9 +1005,8 @@ export function BpcSourcingPanel() {
 
   /**
    * Built from whichever source(s) are toggled on. Owned rows lead, then the
-   * BPO sources: the synced contract snapshot can run to six figures while
-   * the others number in the dozens, so copies-first would let them fill
-   * `ROW_CAP` and push every other row out of the default (not-`showAll`) view.
+   * BPO sources, ahead of the synced contract snapshot — which can run to six
+   * figures while the others number in the dozens.
    */
   const displayRows = useMemo<BpcSearchRow[]>(() => {
     const contractRows = sources.has('contract') ? contractSearchRows : [];
@@ -1025,15 +1015,11 @@ export function BpcSourcingPanel() {
     const contractBpoRows = sources.has('contractBpo') ? contractBpoSearchRows : [];
     return [...ownedRows, ...marketRows, ...contractBpoRows, ...contractRows];
   }, [sources, contractSearchRows, filteredOwnedRows, marketSearchRows, contractBpoSearchRows]);
-  const visibleRows = useMemo(
-    () => (showAll ? displayRows : displayRows.slice(0, ROW_CAP)),
-    [showAll, displayRows]
-  );
-  // With several blueprints listed, one on-screen copy row per type carries the BPO
+  // With several blueprints listed, one copy row per type carries the BPO
   // badge; with one picked, the callout cards say it instead (issue #1241).
   const badgedRows = useMemo(
-    () => (selectedTypeId === null ? bpoBadgeRows(visibleRows) : new Set<BpcSearchRow>()),
-    [selectedTypeId, visibleRows]
+    () => (selectedTypeId === null ? bpoBadgeRows(displayRows) : new Set<BpcSearchRow>()),
+    [selectedTypeId, displayRows]
   );
 
   // Both summarise `filteredRows`, not every row of the chosen blueprint, so
@@ -1439,7 +1425,7 @@ export function BpcSourcingPanel() {
             spaceKinds={spaceFilter}
             onSpaceKindsChange={(next) => void setSpaceFilter(next)}
             jumps={jumps}
-            onJumpsChange={(next) => setParams({ 'sourcing.jumps': next, 'sourcing.all': false })}
+            onJumpsChange={(next) => setParams({ 'sourcing.jumps': next })}
             currentSystem={currentSystem}
             searchComboboxProps={searchComboboxProps}
             actions={
@@ -1677,7 +1663,7 @@ export function BpcSourcingPanel() {
               <DataTable
                 label={t('bpcContracts.title')}
                 columns={columns}
-                rows={visibleRows}
+                rows={displayRows}
                 // Index included deliberately: a contract lists the same
                 // blueprint once per copy, so contractId+typeId is not
                 // unique — 70% of rows in a live pull shared one, and the
@@ -1706,14 +1692,9 @@ export function BpcSourcingPanel() {
                     trigger={tr}
                   />
                 )}
+                // Six-figure snapshots: windowed, never capped.
+                virtualize
               />
-              {!showAll && displayRows.length > ROW_CAP && (
-                <div className="px-3 py-2">
-                  <Button size="sm" onClick={() => setParams({ 'sourcing.all': true })}>
-                    {t('bpcContracts.showAll', { count: displayRows.length })}
-                  </Button>
-                </div>
-              )}
             </>
           )}
         </>

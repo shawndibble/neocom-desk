@@ -849,9 +849,6 @@ export function ActiveJobsPanel({
           return (
             <span key={category} className="flex items-center gap-1">
               {index > 0 && <span className="text-text-dim">/</span>}
-              <span className="hidden text-text-dim md:inline">
-                {t(`characters.jobSlotCategory.${category}`)}
-              </span>
               <span className={tone}>{entry ? entry.open : '—'}</span>
             </span>
           );

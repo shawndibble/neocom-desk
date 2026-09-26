@@ -17,6 +17,7 @@ export function neutralExtendedStats(): Pick<
   | 'jumpDrive'
   | 'lockedTargets'
   | 'allOverheated'
+  | 'unheated'
 > {
   return {
     fighters: {
@@ -40,6 +41,7 @@ export function neutralExtendedStats(): Pick<
     jumpDrive: null,
     lockedTargets: { ship: 0, pilot: 2, effective: 0 },
     allOverheated: false,
+    unheated: null,
     capacitorBudget: {
       peakRecharge: 0,
       drain: 0,

@@ -67,7 +67,11 @@ async function loadCacheOnly(characters: readonly CharacterRecord[]): Promise<Ro
  * settles on its own: a failing loader nulls one field rather than sinking the
  * character or the roster.
  */
-async function loadLive(characters: readonly CharacterRecord[]): Promise<RosterEntry[]> {
+async function loadLive(
+  characters: readonly CharacterRecord[],
+  nowMs: number,
+  onEntry?: (entry: RosterEntry) => void
+): Promise<RosterEntry[]> {
   const entries: RosterEntry[] = characters.map((c) => ({
     characterId: c.characterId,
     name: c.name,
@@ -77,24 +81,36 @@ async function loadLive(characters: readonly CharacterRecord[]): Promise<RosterE
     correctedTotalSp: null,
   }));
 
-  const requests = entries.flatMap((entry) => [
-    async () => {
-      entry.wallet = await loadWalletBalance(entry.characterId);
-    },
-    async () => {
-      entry.skills = await loadCharacterSkills(entry.characterId);
-    },
-    async () => {
-      entry.queue = await loadCharacterSkillQueue(entry.characterId);
-    },
-  ]);
+  // `onEntry` fires the moment a character's last request settles, so a caller
+  // can paint each character as it finishes instead of waiting on the roster.
+  const pending = new Map(entries.map((entry) => [entry.characterId, 3]));
+  const settle = (entry: RosterEntry) => {
+    const left = (pending.get(entry.characterId) ?? 1) - 1;
+    pending.set(entry.characterId, left);
+    if (left === 0) onEntry?.(withCorrectedTotalSp(entry, nowMs));
+  };
 
-  await mapWithConcurrencyLimit(requests, ESI_FANOUT_CONCURRENCY, async (run) => {
+  const requests = entries.flatMap((entry) =>
+    [
+      async () => {
+        entry.wallet = await loadWalletBalance(entry.characterId);
+      },
+      async () => {
+        entry.skills = await loadCharacterSkills(entry.characterId);
+      },
+      async () => {
+        entry.queue = await loadCharacterSkillQueue(entry.characterId);
+      },
+    ].map((run) => ({ entry, run }))
+  );
+
+  await mapWithConcurrencyLimit(requests, ESI_FANOUT_CONCURRENCY, async ({ entry, run }) => {
     try {
       await run();
     } catch {
       // Field stays null.
     }
+    settle(entry);
   });
 
   return entries;
@@ -107,28 +123,32 @@ async function loadLive(characters: readonly CharacterRecord[]): Promise<RosterE
  * paths below (the cache-only path never calls the corrected-skills loader
  * at all, and must not skip this).
  */
-function withCorrectedTotalSp(entries: RosterEntry[], nowMs: number): RosterEntry[] {
-  return entries.map((entry) => {
-    if (!entry.skills?.data) return entry;
-    const gain = completedSpGain(
-      entry.skills.data.skills,
-      completedQueueLevels(entry.queue?.data ?? [], nowMs)
-    );
-    return { ...entry, correctedTotalSp: entry.skills.data.total_sp + gain };
-  });
+function withCorrectedTotalSp(entry: RosterEntry, nowMs: number): RosterEntry {
+  if (!entry.skills?.data) return entry;
+  const gain = completedSpGain(
+    entry.skills.data.skills,
+    completedQueueLevels(entry.queue?.data ?? [], nowMs)
+  );
+  return { ...entry, correctedTotalSp: entry.skills.data.total_sp + gain };
 }
 
 /**
  * Cache-only by default (no live ESI call); `live: true` refreshes with
  * capped concurrency. `now` defaults to `Date.now()` — callers may inject it
  * (as the corrected-skills loader's callers do) to keep this testable.
+ * `onEntry` (live only) is called once per character as soon as that
+ * character's own requests have all settled.
  */
 export async function loadRosterSnapshot(opts?: {
   live?: boolean;
   now?: number;
+  onEntry?: (entry: RosterEntry) => void;
 }): Promise<RosterEntry[]> {
   const characters = await db.characters.toArray();
   if (characters.length === 0) return [];
-  const entries = opts?.live ? await loadLive(characters) : await loadCacheOnly(characters);
-  return withCorrectedTotalSp(entries, opts?.now ?? Date.now());
+  const nowMs = opts?.now ?? Date.now();
+  const entries = opts?.live
+    ? await loadLive(characters, nowMs, opts.onEntry)
+    : await loadCacheOnly(characters);
+  return entries.map((entry) => withCorrectedTotalSp(entry, nowMs));
 }

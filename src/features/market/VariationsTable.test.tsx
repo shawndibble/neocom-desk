@@ -20,8 +20,6 @@ function summary(bestSell: number | null, bestBuy: number | null): OrderBookSumm
 function defaultProps(overrides: Partial<VariationsTableProps> = {}): VariationsTableProps {
   return {
     rows: ROWS,
-    totalCount: ROWS.length,
-    truncated: false,
     prices: new Map(),
     onSelect: vi.fn(),
     onCompare: vi.fn(),
@@ -45,9 +43,7 @@ function renderTable(overrides: Partial<VariationsTableProps> = {}) {
 
 describe('VariationsTable', () => {
   it('renders nothing when there are no rows', () => {
-    const { container } = render(
-      <VariationsTable {...defaultProps({ rows: [], totalCount: 0 })} />
-    );
+    const { container } = render(<VariationsTable {...defaultProps({ rows: [] })} />);
     expect(container).toBeEmptyDOMElement();
   });
 
@@ -66,25 +62,20 @@ describe('VariationsTable', () => {
     expect(within(rowEls[2]).getByText("Vherokior's Slasher")).toBeInTheDocument();
   });
 
-  it('shows an em dash for a sibling-fallback row with no tier', () => {
-    renderTable({ rows: [{ typeId: 34, name: 'Tritanium', tier: null }], totalCount: 1 });
-    expect(screen.getByText('—')).toBeInTheDocument();
-  });
-
   it('shows a loading state until a row price arrives', () => {
-    renderTable({ rows: [ROWS[0]], totalCount: 1 });
+    renderTable({ rows: [ROWS[0]] });
     expect(screen.getAllByText('Loading').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows the sell-side empty state when only a buy order exists, and vice versa', () => {
-    renderTable({ rows: [ROWS[0]], totalCount: 1, prices: new Map([[588, summary(null, 90)]]) });
+    renderTable({ rows: [ROWS[0]], prices: new Map([[588, summary(null, 90)]]) });
     expect(screen.getByText('No sell orders')).toBeInTheDocument();
     // Shorthand on screen (#947); the exact figure is the accessible name.
     expect(screen.getByText('90.00 ISK', { selector: '.sr-only' })).toBeInTheDocument();
   });
 
   it('shows the shared "no orders" fallback when neither side has an order', () => {
-    renderTable({ rows: [ROWS[0]], totalCount: 1, prices: new Map([[588, summary(null, null)]]) });
+    renderTable({ rows: [ROWS[0]], prices: new Map([[588, summary(null, null)]]) });
     expect(screen.getAllByText('No orders')).toHaveLength(2);
   });
 
@@ -106,9 +97,20 @@ describe('VariationsTable', () => {
     expect(onCompare).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the truncated warning with the shown/total counts', () => {
-    renderTable({ totalCount: 40, truncated: true });
-    expect(screen.getByText('Showing 3 of 40')).toBeInTheDocument();
+  it('omits the Tier column when every row is a sibling fallback with no tier', () => {
+    renderTable({ rows: [{ typeId: 34, name: 'Tritanium', tier: null }] });
+    expect(screen.queryByRole('button', { name: /Tier/ })).not.toBeInTheDocument();
+    expect(screen.queryByText('—')).not.toBeInTheDocument();
+  });
+
+  it('keeps the Tier column when at least one row has a tier', () => {
+    renderTable({
+      rows: [
+        { typeId: 587, name: 'Rifter', tier: 'T1' },
+        { typeId: 34, name: 'Tritanium', tier: null },
+      ],
+    });
+    expect(screen.getByRole('button', { name: /Tier/ })).toBeInTheDocument();
   });
 
   it('re-sorts Sell descending on a second header click', async () => {

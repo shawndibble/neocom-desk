@@ -494,8 +494,8 @@ describe('CourierResults on a phone', () => {
     expect(document.querySelector('tr[data-row-key="999"]')).toHaveClass('dt-group-member');
   });
 
-  it('counts hauls and lanes over every row the filters kept, not the capped page', async () => {
-    // 60 hauls on one lane plus the two-haul return lane: past the 50-row cap.
+  it('counts hauls and lanes over every row the filters kept', async () => {
+    // 60 hauls on one lane plus the two-haul return lane.
     const many = Array.from({ length: 60 }, (_, index) =>
       laneRow(1_000 + index, 10_000_000, 10_000)
     );

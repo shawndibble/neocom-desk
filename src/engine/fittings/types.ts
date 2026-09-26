@@ -306,6 +306,12 @@ export interface FittingStats {
    */
   allOverheated: boolean;
   /**
+   * With `allOverheated`, the same figures unheated — what the page compares
+   * each figure against, so only those heat changes read as heated
+   * (`unheatedIfChanged`). Null otherwise, and always null on itself.
+   */
+  unheated: FittingStats | null;
+  /**
    * The same fit recalculated by the engine with every active module that
    * can overheat set to overload; null when no module can (nothing to show).
    */

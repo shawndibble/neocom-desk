@@ -257,6 +257,7 @@ export function extractFittingStats(
   | 'fighters'
   | 'lockedTargets'
   | 'allOverheated'
+  | 'unheated'
 > {
   const cpuTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.cpuOutput);
   const powergridTotal = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.powerOutput);
@@ -660,6 +661,23 @@ export function overheatedOrNull(
 ): number | null {
   if (overheated === null || overheated === undefined) return null;
   return overheated.toFixed(fractionDigits) === normal.toFixed(fractionDigits) ? null : overheated;
+}
+
+/**
+ * Under "Overheat all", the unheated figure as it would be shown — `format`
+ * applied to the unheated stats — when heat changed what is shown, else
+ * null: a figure heat leaves as it is (a hold, the mass, a fitting budget),
+ * or moves only below the shown precision, reads as unheated. Comparing the
+ * shown text, not the raw number, keeps units, scaling and rounding (km,
+ * tonnes, "used / total", a resist's percent) exactly as the page draws them.
+ */
+export function unheatedIfChanged<S extends { unheated: S | null }>(
+  stats: S,
+  format: (stats: S) => string
+): string | null {
+  if (stats.unheated === null) return null;
+  const unheated = format(stats.unheated);
+  return unheated === format(stats) ? null : unheated;
 }
 
 /**

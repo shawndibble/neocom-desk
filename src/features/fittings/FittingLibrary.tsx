@@ -32,6 +32,8 @@ interface FittingLibraryProps {
    */
   layout: 'page' | 'tabs';
   initialTab?: LibraryTab;
+  /** The route's title, for the `page` layout, which renders the page header itself. */
+  pageTitle?: string;
 }
 
 /**
@@ -49,6 +51,7 @@ export function FittingLibrary({
   onOpened,
   layout,
   initialTab = 'new',
+  pageTitle,
 }: FittingLibraryProps) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<LibraryTab>(initialTab);
@@ -115,6 +118,7 @@ export function FittingLibrary({
         inGameKey={inGameKey}
         onStartHull={onStartHull}
         onOpened={onOpened}
+        pageTitle={pageTitle}
       />
     );
   }

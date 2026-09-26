@@ -372,13 +372,15 @@ function FittingsPage() {
       onOpened={() => setLibrary(null)}
       layout={layout}
       initialTab={initialTab}
+      pageTitle={t('nav.fittings')}
     />
   );
 
   if (fitting === null) {
     return (
       <div className="space-y-3">
-        <PageHeader title={t('nav.fittings')} />
+        {/* Desktop's Start screen renders the header itself: it owns the In-game data age and refresh. */}
+        {isPhone && <PageHeader title={t('nav.fittings')} />}
         {/* A broken share link's message is on the Import tab; start there. */}
         {renderLibrary(isPhone ? 'tabs' : 'page', workspace.shareError ? 'import' : undefined)}
       </div>

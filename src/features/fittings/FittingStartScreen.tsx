@@ -7,6 +7,7 @@ import {
   EmptyState,
   IconButton,
   Modal,
+  PageHeader,
   RowActionsMenu,
   RowMoreActions,
   SearchInput,
@@ -43,6 +44,8 @@ interface FittingStartScreenProps {
   inGameKey: number;
   onStartHull: (hull: HullEntry) => void;
   onOpened?: () => void;
+  /** The route's title. This screen renders the page header itself, since the In-game data age and refresh in it come from a hook only this screen holds. */
+  pageTitle?: string;
 }
 
 /**
@@ -58,6 +61,7 @@ export function FittingStartScreen({
   inGameKey,
   onStartHull,
   onOpened,
+  pageTitle,
 }: FittingStartScreenProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -139,6 +143,27 @@ export function FittingStartScreen({
 
   return (
     <div className="space-y-3">
+      {pageTitle && (
+        <PageHeader
+          title={pageTitle}
+          meta={
+            hasCharacter && inGame.granted === true && inGame.result ? (
+              <DataAgeBadge date={inGame.result.fetchedAt} />
+            ) : undefined
+          }
+          actions={
+            hasCharacter && inGame.granted === true ? (
+              <IconButton
+                size="sm"
+                icon={<Icon.Refresh />}
+                label={t('fittings.inGame.refresh')}
+                onClick={() => void inGame.refresh()}
+                disabled={inGame.loading}
+              />
+            ) : undefined
+          }
+        />
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <div className="min-w-64 flex-1">
           <SearchInput
@@ -148,18 +173,6 @@ export function FittingStartScreen({
             onChange={(event) => setQuery(event.target.value)}
           />
         </div>
-        {hasCharacter && inGame.granted === true && (
-          <span className="flex items-center gap-2">
-            {inGame.result && <DataAgeBadge date={inGame.result.fetchedAt} />}
-            <IconButton
-              size="sm"
-              icon={<Icon.Refresh />}
-              label={t('fittings.inGame.refresh')}
-              onClick={() => void inGame.refresh()}
-              disabled={inGame.loading}
-            />
-          </span>
-        )}
         <Button variant="primary" onClick={() => setHullOpen(true)}>
           {t('fittings.start.newFromHull')}
         </Button>

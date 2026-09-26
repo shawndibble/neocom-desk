@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
 import { writeCached } from '@/esi/cache';
-import { loadRosterAttention } from './rosterAttention';
+import { loadRosterAttention, isPiExpired } from './rosterAttention';
 import { loadCharacterIndustryJobs } from '@/features/industry/jobs';
 import { loadCharacterPlanets, loadAllColonyDetails } from '@/features/pi/data';
 
@@ -83,6 +83,21 @@ beforeEach(async () => {
   vi.mocked(loadCharacterIndustryJobs).mockReset();
   vi.mocked(loadCharacterPlanets).mockReset();
   vi.mocked(loadAllColonyDetails).mockReset();
+});
+
+describe('isPiExpired', () => {
+  it('is true once a real expiry has passed', () => {
+    expect(isPiExpired(1_000, 2_000)).toBe(true);
+  });
+
+  it('is false while a real expiry is still in the future', () => {
+    expect(isPiExpired(2_000, 1_000)).toBe(false);
+  });
+
+  it('is false with no expiry at all', () => {
+    expect(isPiExpired(null, 2_000)).toBe(false);
+    expect(isPiExpired(undefined, 2_000)).toBe(false);
+  });
 });
 
 describe('loadRosterAttention (cache-only)', () => {

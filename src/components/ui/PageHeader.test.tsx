@@ -26,7 +26,9 @@ describe('PageHeader', () => {
 
   it('omits the actions cluster entirely when a route has no controls', () => {
     const { container } = render(<PageHeader title="Settings" />);
-    expect(container.querySelector('header')?.children).toHaveLength(1);
+    // Only the heading: no empty actions wrapper, no avatar slot.
+    expect(container.querySelector('header')?.querySelectorAll('div')).toHaveLength(1);
+    expect(container.querySelector('header')?.textContent).toBe('Settings');
   });
 
   describe('phone identity avatar', () => {
@@ -50,6 +52,18 @@ describe('PageHeader', () => {
       const link = await screen.findByRole('link', { name: 'Test Pilot, switch character' });
       expect(link).toHaveAttribute('href', '/characters');
       expect(link).toHaveClass('md:hidden');
+    });
+
+    it('comes after every action, so it is the top-right corner', async () => {
+      await seedPilot();
+      render(
+        <MemoryRouter initialEntries={['/mail']}>
+          <PageHeader title="Mail" actions={<button type="button">Refresh</button>} />
+        </MemoryRouter>
+      );
+      const link = await screen.findByRole('link', { name: 'Test Pilot, switch character' });
+      const action = screen.getByRole('button', { name: 'Refresh' });
+      expect(action.compareDocumentPosition(link) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it('renders nothing without an active Character', () => {

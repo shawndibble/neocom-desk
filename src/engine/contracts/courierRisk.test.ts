@@ -4,6 +4,8 @@ import {
   blocksCompletion,
   isWormholeRegion,
   completableCourierRoutes,
+  asksFarMoreCollateralThanReward,
+  HIGH_COLLATERAL_RATIO,
   type CourierRiskKind,
 } from '@/engine/contracts/courierRisk';
 import type { CourierEndpoint, CourierRouteRow } from '@/engine/contracts/courierSearch';
@@ -180,5 +182,25 @@ describe('completableCourierRoutes', () => {
     // most of its rows and never says why.
     const unreadable = { ...haul(station(), UNREADABLE), contractId: 5 };
     expect(completableCourierRoutes([unreadable]).map((r) => r.contractId)).toEqual([5]);
+  });
+});
+
+describe('asksFarMoreCollateralThanReward', () => {
+  it('fires from fifty times the reward in collateral, not below it', () => {
+    // Issue #1720: the threshold is set well clear of ordinary high-value
+    // freight — a 1B load paying 25M is 40x, and is honest work.
+    expect(HIGH_COLLATERAL_RATIO).toBe(50);
+    expect(asksFarMoreCollateralThanReward(49.9)).toBe(false);
+    expect(asksFarMoreCollateralThanReward(50)).toBe(true);
+    expect(asksFarMoreCollateralThanReward(100)).toBe(true);
+  });
+
+  it('says nothing about a haul whose ratio cannot be stated', () => {
+    // A haul paying nothing has no ratio — unknowable, not infinite.
+    expect(asksFarMoreCollateralThanReward(null)).toBe(false);
+  });
+
+  it('is a flag, never a reason to hide the haul', () => {
+    expect(blocksCompletion(['high-collateral'])).toBe(false);
   });
 });

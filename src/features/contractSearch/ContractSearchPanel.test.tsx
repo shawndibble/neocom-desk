@@ -384,10 +384,8 @@ describe('ContractSearchPanel', () => {
     ]);
   });
 
-  it('caps the table at the 50 cheapest offers, not the first 50 the snapshot lists', async () => {
-    // Snapshot order is contract-then-type, so the cheapest row can sit well
-    // past the cap. Slicing before sorting would show 50 arbitrary rows under
-    // a header that claims cheapest-first.
+  it('sorts every offer cheapest-first and windows them, with no cap to lift (issue #1777)', async () => {
+    // Snapshot order is contract-then-type, so the cheapest row can sit last.
     const dear = Array.from({ length: 60 }, (_, i) =>
       row({ contractId: 100 + i, price: 10_000_000 - i, quantity: 1 })
     );
@@ -396,10 +394,11 @@ describe('ContractSearchPanel', () => {
     renderWithRouter();
 
     const rows = await bodyRows();
-    expect(rows).toHaveLength(50);
+    // Only a window is mounted, but it is the head of the whole sorted set.
+    expect(rows.length).toBeLessThan(61);
     expect(within(rows[0]).getByText('7')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Show all (61 total)' })).toBeInTheDocument();
-    // The phone sort bar's count names every match, not the capped 50 on screen.
+    expect(screen.queryByRole('button', { name: /^Show all/ })).not.toBeInTheDocument();
+    // The phone sort bar's count names every match, not the rows mounted.
     expect(screen.getByText('61 offers')).toBeInTheDocument();
   });
 
@@ -1620,6 +1619,37 @@ describe('ContractSearchPanel — Courier going rate', () => {
     // The bound the whole design rests on.
     expect(within(dialog).queryByText(/scam/i)).not.toBeInTheDocument();
     expect(within(dialog).queryByText(/fraud|bad faith|dishonest/i)).not.toBeInTheDocument();
+  });
+
+  it('flags collateral far above the reward in the detail, and only there', async () => {
+    // 50B put up against 45M: the forfeit-bait shape (issue #1720). Stated as
+    // a ratio, and kept off the row per decision 20260912-172628.
+    const user = await showCourierWith([
+      courierRow({ contractId: 960, reward: 45_000_000, collateral: 50_000_000_000 }),
+    ]);
+    const [row] = await courierRows();
+    expect(within(row).queryByText('High collateral')).not.toBeInTheDocument();
+    await user.click(row);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('High collateral')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Collateral is 1,111\.1× the reward/)).toBeInTheDocument();
+    expect(within(dialog).getByText('Before you accept')).toBeInTheDocument();
+    // Short of the floor, it says by how much: 45M of a 200M floor.
+    expect(within(dialog).getByText(/22\.5% of that floor/)).toBeInTheDocument();
+    expect(within(dialog).queryByText(/scam/i)).not.toBeInTheDocument();
+  });
+
+  it('leaves ordinary high-value freight unflagged', async () => {
+    // 1B against 25M is 40x — expensive cargo, not an outlier.
+    const user = await showCourierWith([
+      courierRow({ contractId: 961, reward: 25_000_000, collateral: 1_000_000_000 }),
+    ]);
+    await user.click((await courierRows())[0]);
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByText('High collateral')).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/of that floor/)).not.toBeInTheDocument();
   });
 });
 

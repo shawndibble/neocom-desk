@@ -42,8 +42,13 @@ import { isSyncConfigured } from '@/app/syncStatus';
 import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
+import { useNow } from '@/lib/useNow';
 import { loadRosterSnapshot, type RosterEntry } from '@/features/character/roster';
-import { loadRosterAttention, type AttentionEntry } from '@/features/character/rosterAttention';
+import {
+  loadRosterAttention,
+  isPiExpired,
+  type AttentionEntry,
+} from '@/features/character/rosterAttention';
 import { useAlertCountsByCharacter } from '@/features/notifications/alertCountsByCharacter';
 import {
   useNotificationPreferences,
@@ -229,10 +234,30 @@ interface CharacterCardProps {
   groups: readonly CharacterGroup[];
   groupId: string | null;
   starred: boolean;
+  isActive: boolean;
+  alertCount: number;
+  attention: AttentionEntry | undefined;
+  /** One clock shared by every card (`useNow()` called once in `Characters`), not one interval per card — a large roster would otherwise re-render every card every tick regardless of whether it has anything counting down. */
+  now: number;
   onSelect: (characterId: number) => void;
   onToggleStar: (characterId: number) => void;
   onMoveToGroup: (characterId: number, groupId: string | null) => void;
   onRemove: (characterId: number, name: string) => void;
+}
+
+type PiCardAttention = { kind: 'stopped' } | { kind: 'expiring'; expiryMs: number };
+
+/** Card view's narrower PI signal (decision `20260925-230353`): only `idle`/`expiring-soon` reach a card, gated *before* `isPiExpired` — `decayed` also carries a real `piSoonestExpiryMs` and must stay table-only even once it's passed. */
+function piCardAttention(
+  attention: AttentionEntry | undefined,
+  nowMs: number
+): PiCardAttention | null {
+  const piAttention = attention?.piAttention;
+  if (piAttention !== 'idle' && piAttention !== 'expiring-soon') return null;
+  if (piAttention === 'idle') return { kind: 'stopped' };
+  const expiryMs = attention?.piSoonestExpiryMs;
+  if (isPiExpired(expiryMs, nowMs)) return { kind: 'stopped' };
+  return expiryMs != null ? { kind: 'expiring', expiryMs } : null;
 }
 
 /**
@@ -263,6 +288,10 @@ function CharacterCard({
   groups,
   groupId,
   starred,
+  isActive,
+  alertCount,
+  attention,
+  now,
   onSelect,
   onToggleStar,
   onMoveToGroup,
@@ -273,9 +302,15 @@ function CharacterCard({
   // complaint — three "Xm ago"s in a row): the oldest of whichever fields
   // this character has cached, so the card never overstates its freshness.
   const lastSynced = characterLastSynced(stats, queue);
+  const piChip = piCardAttention(attention, now);
 
   return (
-    <li className="flex flex-col gap-2 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm transition-colors hover:border-line-bright hover:bg-panel-2">
+    <li
+      aria-current={isActive ? 'true' : undefined}
+      className={`flex flex-col gap-2 rounded-xs border border-line bg-panel/85 p-3 backdrop-blur-sm transition-colors hover:border-line-bright hover:bg-panel-2 ${
+        isActive ? 'border-l-2 border-l-accent' : ''
+      }`}
+    >
       <div className="flex flex-wrap items-start gap-2">
         <button
           type="button"
@@ -298,6 +333,11 @@ function CharacterCard({
                 the corp/alliance lines below, which are separate rows. */}
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="truncate text-sm font-semibold">{character.name}</span>
+              {isActive && (
+                <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
+                  {t('characters.activeLabel')}
+                </span>
+              )}
               {lastSynced && (
                 <DataAgeBadge date={lastSynced} dotOnly alwaysVisible className="shrink-0" />
               )}
@@ -380,6 +420,20 @@ function CharacterCard({
             label={t('characters.queueState')}
             tone={queueChipTone(queue.state, notTrainingAlertEnabled)}
             value={t(`characters.queueStates.${queue.state}`)}
+          />
+        )}
+        {alertCount > 0 && (
+          <StatChip label={t('characters.column.alerts')} tone="warning" value={alertCount} />
+        )}
+        {piChip && (
+          <StatChip
+            label={t('characters.column.pi')}
+            tone="warning"
+            value={
+              piChip.kind === 'stopped'
+                ? t('pi.attention.idle')
+                : formatDuration((piChip.expiryMs - now) / 1000)
+            }
           />
         )}
       </div>
@@ -724,11 +778,7 @@ function buildColumns(
         const attention = row.attention?.piAttention;
         if (attention === undefined) return '—';
         const expiryMs = row.attention?.piSoonestExpiryMs;
-        // Once expiry has passed, this always reads "Stopped" — never the
-        // cached `attention` category, which only refreshes on a roster
-        // reload and can still say `expiring-soon` well after the real
-        // clock has passed the expiry it was computed from.
-        if (expiryMs != null && expiryMs <= Date.now()) {
+        if (expiryMs != null && isPiExpired(expiryMs, Date.now())) {
           const stoppedTone = STAT_CHIP_TONE_TEXT_CLASS[PI_ATTENTION_TONE.idle];
           return (
             <Tooltip openOnTap content={formatTimestamp(new Date(expiryMs), timeZone)}>
@@ -822,6 +872,8 @@ export function Characters() {
   const publicInfo = usePublicInfo((state) => state.byCharacterId);
   const loadPublicInfoMany = usePublicInfo((state) => state.loadMany);
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
+  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  const now = useNow();
 
   const groupsValue = useOverviewGroups((state) => state.value);
   const groupsHydrated = useOverviewGroups((state) => state.hydrated);
@@ -878,6 +930,17 @@ export function Characters() {
     setQueueById(queueInfoMap(roster, now));
     setJobSlotSkillsById(jobSlotSkillsMap(roster, now));
     setTotalSpById(totalSpMap(roster));
+  }
+
+  /** `applyRoster` for one character that just finished refreshing: merges into the maps rather than replacing them, so the rest of the roster keeps its rows. */
+  function mergeRosterEntry(entry: RosterEntry, now: number) {
+    const merge = <V,>(previous: Map<number, V>, fresh: Map<number, V>) =>
+      new Map([...previous, ...fresh]);
+    const one = [entry];
+    setStats((previous) => merge(previous, rosterSortStats(one)));
+    setQueueById((previous) => merge(previous, queueInfoMap(one, now)));
+    setJobSlotSkillsById((previous) => merge(previous, jobSlotSkillsMap(one, now)));
+    setTotalSpById((previous) => merge(previous, totalSpMap(one)));
   }
 
   const [addingGroup, setAddingGroup] = useState(false);
@@ -1069,7 +1132,7 @@ export function Characters() {
     try {
       const now = Date.now();
       const [roster, attention] = await Promise.all([
-        loadRosterSnapshot({ live: true }),
+        loadRosterSnapshot({ live: true, now, onEntry: (entry) => mergeRosterEntry(entry, now) }),
         loadRosterAttention({ live: true }),
       ]);
       applyRoster(roster, now);
@@ -1227,6 +1290,10 @@ export function Characters() {
               groups={groupsValue.groups}
               groupId={groupIdByCharacterId.get(characterId) ?? null}
               starred={isCharacterStarred(starred, characterId)}
+              isActive={activeCharacterId === characterId}
+              alertCount={alertCounts.get(characterId) ?? 0}
+              attention={attentionById.get(characterId)}
+              now={now}
               onSelect={(id) => void select(id)}
               onToggleStar={(id) => void handleToggleStar(id)}
               onMoveToGroup={(id, groupId) => void handleMoveToGroup(id, groupId)}

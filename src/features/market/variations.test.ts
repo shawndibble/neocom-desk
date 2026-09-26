@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildVariationIndex, type VariationTypeMap } from '@/engine/market/variations';
-import { getVariationRows, tierLabel, VARIATIONS_LIMIT } from './variations';
+import { getVariationRows, tierLabel } from './variations';
 import type { MarketTypeEntry } from '@/sde/marketTypes';
 
 const META_GROUP_NAMES = { 1: 'Tech I', 2: 'Tech II', 4: 'Faction' };
@@ -42,8 +42,6 @@ describe('getVariationRows', () => {
       { typeId: 588, name: 'Republic Fleet Rifter', tier: 'T2' },
       { typeId: 589, name: "Vherokior's Slasher", tier: 'Faction' },
     ]);
-    expect(result.totalCount).toBe(2);
-    expect(result.truncated).toBe(false);
   });
 
   it('skips a variation member absent from the published market types', () => {
@@ -70,8 +68,6 @@ describe('getVariationRows', () => {
       { typeId: 35, name: 'Pyerite', tier: null },
       { typeId: 36, name: 'Mexallon', tier: null },
     ]);
-    expect(result.totalCount).toBe(2);
-    expect(result.truncated).toBe(false);
   });
 
   it('falls back to siblings when the variation group has only the selected item itself', () => {
@@ -89,38 +85,30 @@ describe('getVariationRows', () => {
     const index = buildVariationIndex({}, META_GROUP_NAMES);
     const result = getVariationRows(index, new Map(), new Map(), type(587, 'Rifter', 2));
     expect(result.rows).toEqual([]);
-    expect(result.totalCount).toBe(0);
-    expect(result.truncated).toBe(false);
   });
 
-  it('bounds a large variation group at VARIATIONS_LIMIT and reports the true total', () => {
+  it('returns every member of a large variation group, uncapped', () => {
     const types: Record<number, VariationTypeMap[number]> = {
       1: { parentTypeId: null, metaGroupId: 1 },
     };
     const typesById = new Map<number, MarketTypeEntry>([[1, type(1, 'Selected', 5)]]);
-    for (let i = 0; i < VARIATIONS_LIMIT + 10; i++) {
+    for (let i = 0; i < 100; i++) {
       const childId = 1000 + i;
       types[childId] = { parentTypeId: 1, metaGroupId: 2 };
       typesById.set(childId, type(childId, `Item ${i}`, 5));
     }
     const index = buildVariationIndex(types, META_GROUP_NAMES);
     const result = getVariationRows(index, new Map(), typesById, type(1, 'Selected', 5));
-    expect(result.rows).toHaveLength(VARIATIONS_LIMIT);
-    expect(result.totalCount).toBe(VARIATIONS_LIMIT + 10);
-    expect(result.truncated).toBe(true);
+    expect(result.rows).toHaveLength(100);
   });
 
-  it('bounds a large sibling fallback at VARIATIONS_LIMIT and reports the true total', () => {
+  it('returns every sibling of a large fallback, uncapped', () => {
     const index = buildVariationIndex({}, META_GROUP_NAMES);
-    const many = Array.from({ length: VARIATIONS_LIMIT + 10 }, (_, i) =>
-      type(1000 + i, `Item ${i}`, 5)
-    );
+    const many = Array.from({ length: 100 }, (_, i) => type(1000 + i, `Item ${i}`, 5));
     const typesByGroup = new Map<number, MarketTypeEntry[]>([
       [5, [type(1, 'Selected', 5), ...many]],
     ]);
     const result = getVariationRows(index, typesByGroup, new Map(), type(1, 'Selected', 5));
-    expect(result.rows).toHaveLength(VARIATIONS_LIMIT);
-    expect(result.totalCount).toBe(VARIATIONS_LIMIT + 10);
-    expect(result.truncated).toBe(true);
+    expect(result.rows).toHaveLength(100);
   });
 });

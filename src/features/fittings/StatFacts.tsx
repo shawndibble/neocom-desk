@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { unheatedIfChanged } from '@/engine/fittings/stats';
 
 /**
  * An overheated value beside its normal one, in the warning tone — the
@@ -19,6 +20,31 @@ export function Overheated({
   return (
     <span className="ml-1 text-warning">
       {t('fittings.stats.overheated', { value: `${value.toFixed(digits)}${unit}` })}
+    </span>
+  );
+}
+
+/**
+ * One figure as `format` shows it. Under "Overheat all" it reads in the
+ * warning tone — the game's own mark for heat — only when heat changed it as
+ * shown, with the unheated figure on hover; a figure heat leaves as it is
+ * (a hold, the mass, a fitting budget) stays in the normal tone.
+ */
+export function HeatFigure<S extends { unheated: S | null }>({
+  stats,
+  format,
+}: {
+  stats: S;
+  format: (stats: S) => string;
+}) {
+  const { t } = useTranslation();
+  const unheated = unheatedIfChanged(stats, format);
+  if (unheated === null) return <>{format(stats)}</>;
+  const was = t('fittings.stats.unheated', { value: unheated });
+  return (
+    <span className="text-warning" title={was}>
+      {format(stats)}
+      <span className="sr-only"> ({was})</span>
     </span>
   );
 }
