@@ -86,7 +86,7 @@ describe('Login', () => {
     );
     expect(screen.queryByRole('heading', { name: /answers, not api dumps/i })).toBeNull();
     expect(screen.getByRole('heading', { name: 'Neocom Desk' })).toBeInTheDocument();
-    expect(screen.queryByText(/signing in lets it read/i)).toBeNull();
+    expect(screen.queryByText(/logging in lets it read/i)).toBeNull();
     expect(
       screen.getByRole('button', { name: /log in with custom permissions/i })
     ).toBeInTheDocument();
@@ -215,7 +215,7 @@ describe('Login', () => {
    */
   it("previews the Overview board using the board's own labels", async () => {
     renderLogin();
-    const preview = within(await screen.findByRole('group', { name: /signed-in view/i }));
+    const preview = within(await screen.findByRole('group', { name: /logged-in view/i }));
 
     // The summary strip: the three cells the real strip carries.
     for (const label of ['Next deadline', 'Training now', 'Wallet']) {
@@ -242,7 +242,7 @@ describe('Login', () => {
 
   it('renders no unresolved i18n keys anywhere on the page', async () => {
     const { container } = renderLogin();
-    await screen.findByRole('group', { name: /signed-in view/i });
+    await screen.findByRole('group', { name: /logged-in view/i });
 
     // An i18next miss renders the key verbatim. Real copy on this page never
     // contains a dotted path under one of the app's namespaces, so anything
@@ -270,7 +270,7 @@ describe('Login', () => {
       screen.getByRole('heading', { name: /your refresh token stays in this browser/i })
     ).toBeInTheDocument();
 
-    const permissions = screen.getByText(/signing in lets it read/i);
+    const permissions = screen.getByText(/logging in lets it read/i);
     for (const phrase of new Set(Object.values(READ_ONLY_PHRASES))) {
       expect(permissions).toHaveTextContent(phrase);
     }
@@ -278,7 +278,7 @@ describe('Login', () => {
 
   it('never calls the app read-only, since the Base Grant carries write scopes', async () => {
     const { container } = renderLogin();
-    await screen.findByRole('group', { name: /signed-in view/i });
+    await screen.findByRole('group', { name: /logged-in view/i });
     expect(container.textContent ?? '').not.toMatch(
       /read-only access|it never writes|read-only, and/i
     );
@@ -288,7 +288,7 @@ describe('Login', () => {
     renderLogin();
     await screen.findByRole('heading', { name: /it writes only when you act/i });
 
-    const permissions = screen.getByText(/signing in lets it read/i);
+    const permissions = screen.getByText(/logging in lets it read/i);
     for (const phrase of Object.values(WRITE_SCOPE_PHRASES)) {
       expect(permissions).not.toHaveTextContent(phrase);
       expect(screen.getByText(new RegExp(phrase, 'i'))).toBeInTheDocument();
