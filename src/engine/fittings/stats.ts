@@ -369,13 +369,17 @@ function isFiring(state: FittingItemState): boolean {
 }
 
 /**
- * Whether a module type has a charge slot at all, regardless of whether one
- * is loaded — true for turrets/launchers, but also e.g. an Ancillary Shield
- * Booster or a mining laser. Combine with `chargeTypeId === undefined` to
- * mean "this slot is empty", not "this slot is a weapon".
+ * Whether a module fires only with a charge loaded: a turret or launcher,
+ * which carries a rate of fire, and not a module whose charge is optional
+ * (a strip miner's crystal, a cap booster's, a disruptor's script) — those
+ * take a charge too, but run without one. Combine with
+ * `chargeTypeId === undefined` to mean "this weapon is empty".
  */
-function acceptsCharge(attributes: AttributeMap): boolean {
-  return chargeGroupIds(attributes).length > 0;
+function needsChargeToFire(attributes: AttributeMap): boolean {
+  return (
+    chargeGroupIds(attributes).length > 0 &&
+    readAttribute(attributes, ITEM_DOGMA_ATTRIBUTE.rateOfFire) > 0
+  );
 }
 
 function damageFigures(attributes: AttributeMap, quantity: number): DamageFigures {
@@ -424,7 +428,11 @@ export function extractOffense(
     if (!result || !isFiring(result.state)) return;
     const figures = damageFigures(result.attributes, item.quantity);
     if (figures.dps === 0 && figures.volley === 0) {
-      if (!item.isDrone && item.chargeTypeId === undefined && acceptsCharge(result.attributes)) {
+      if (
+        !item.isDrone &&
+        item.chargeTypeId === undefined &&
+        needsChargeToFire(result.attributes)
+      ) {
         chargelessWeaponCount += 1;
       }
       return;

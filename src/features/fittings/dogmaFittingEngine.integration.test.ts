@@ -666,6 +666,51 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
     ]);
   });
 
+  it('warns of an empty weapon, never of a strip miner running without a crystal', () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Hulk empty slots',
+      shipTypeId: HULK,
+      modules: [
+        { slot: 'high', slotIndex: 0, typeId: MODULATED_STRIP_MINER_II, state: 'active' },
+        {
+          slot: 'medium',
+          slotIndex: 0,
+          typeId: MEDIUM_CAPACITOR_BOOSTER_II,
+          state: 'active',
+        },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const empty = (typeId: number) => ({ typeId, quantity: 1, isDrone: false });
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(MINING_SKILL_IDS));
+    const hulk = extractOffense(
+      [empty(MODULATED_STRIP_MINER_II), empty(MEDIUM_CAPACITOR_BOOSTER_II)],
+      calculate(dogmaFit).items,
+      null
+    );
+    expect(hulk.chargelessWeaponCount).toBe(0);
+
+    const caracal = fittingToDogmaFit(
+      {
+        name: 'Integration Test Caracal empty launcher',
+        shipTypeId: CARACAL,
+        modules: [
+          { slot: 'high', slotIndex: 0, typeId: HEAVY_MISSILE_LAUNCHER_II, state: 'active' },
+        ],
+        drones: [],
+        cargo: [],
+      },
+      buildAllVProfile(SUPPORT_SKILL_IDS)
+    );
+    const launcher = extractOffense(
+      [empty(HEAVY_MISSILE_LAUNCHER_II)],
+      calculate(caracal).items,
+      null
+    );
+    expect(launcher.chargelessWeaponCount).toBe(1);
+  });
+
   it('mines more with a crystal loaded, and counts launched mining drones', () => {
     const hulk = (modules: Fitting['modules'], drones: Fitting['drones'] = []): Fitting => ({
       name: 'Hulk',

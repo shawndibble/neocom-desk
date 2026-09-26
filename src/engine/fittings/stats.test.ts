@@ -433,11 +433,41 @@ describe('extractOffense', () => {
         [ITEM_DOGMA_ATTRIBUTE.damagePerSecond, { value: 0 }],
         [ITEM_DOGMA_ATTRIBUTE.damageVolley, { value: 0 }],
         [ITEM_DOGMA_ATTRIBUTE.chargeGroup1, { value: 83 }],
+        [ITEM_DOGMA_ATTRIBUTE.rateOfFire, { value: 3375 }],
       ]),
       state,
       max_state: 'active' as const,
     };
   }
+
+  /** A strip miner, cap booster or disruptor: takes a charge, has no rate of fire. */
+  function optionalChargeResult(chargeGroup: number) {
+    return {
+      attributes: new Map([
+        [ITEM_DOGMA_ATTRIBUTE.damagePerSecond, { value: 0 }],
+        [ITEM_DOGMA_ATTRIBUTE.damageVolley, { value: 0 }],
+        [ITEM_DOGMA_ATTRIBUTE.chargeGroup1, { value: chargeGroup }],
+        [ITEM_DOGMA_ATTRIBUTE.rateOfFire, { value: 0 }],
+      ]),
+      state: 'active' as const,
+      max_state: 'active' as const,
+    };
+  }
+
+  it('counts only modules that need a charge to fire, never a strip miner, cap booster or disruptor without one', () => {
+    const empty = (typeId: number) => ({ typeId, quantity: 1, isDrone: false });
+    const offense = extractOffense(
+      [empty(17912), empty(2024), empty(2109), { ...BLASTER, chargeTypeId: undefined }],
+      [
+        optionalChargeResult(482), // Modulated Strip Miner II: mining crystals
+        optionalChargeResult(87), // Medium Capacitor Booster II: cap booster charges
+        optionalChargeResult(909), // Tracking Disruptor II: its scripts
+        chargeSlotResult('active'),
+      ],
+      null
+    );
+    expect(offense.chargelessWeaponCount).toBe(1);
+  });
 
   it('counts an active turret with no charge loaded as chargeless, not as an ordinary empty row', () => {
     const offense = extractOffense(
