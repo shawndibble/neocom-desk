@@ -1,12 +1,15 @@
 /**
  * Encodes a Fitting into the compact, versioned, URL-safe string that is
  * its Share Link (#1530) — hull, modules with slot/state/charge, drones with
- * active counts, fighters, cargo and an optional implant/booster set, and
- * nothing else (a Fitting's name lives outside this payload, in the My
- * Fittings record `{id, name, code, updatedAt}`).
+ * active counts, fighters, cargo, an optional implant/booster set and (from
+ * version 2, #1718) an optional fit name.
  *
  * Wire grammar, built as plain text before it's ever deflated:
- * `hull|modules|drones|fighters|cargo|implants`, hull/typeId/count/slot
+ * `hull|modules|drones|fighters|cargo|implants|name` (version 1 stops after
+ * `implants` — six parts, no name — and still decodes so every Share Link
+ * already handed out keeps working). `name` is `encodeURIComponent`'d so it
+ * can never contain the `|` separator, or empty when the fit has none.
+ * hull/typeId/count/slot
  * fields all base36. `modules` is 5 `;`-joined categories, fixed order
  * high/mid/low/rig/subsystem; each category is a `,`-joined list of
  * `slot:typeId:state[:chargeTypeId]` (state one of `0`-`3` — see
@@ -31,7 +34,12 @@
  * feature-layer concern.
  */
 
-export const FITTING_SHARE_VERSION = '1';
+export const FITTING_SHARE_VERSION = '2';
+/** The pre-name wire format; decode-only, never produced by `encodeFittingShare`. */
+export const LEGACY_FITTING_SHARE_VERSION = '1';
+
+/** A fit name past this is truncated on encode and rejected on decode. */
+export const MAX_FIT_NAME_LENGTH = 100;
 
 export type SlotCategory = 'high' | 'mid' | 'low' | 'rig' | 'subsystem';
 const SLOT_CATEGORIES: readonly SlotCategory[] = ['high', 'mid', 'low', 'rig', 'subsystem'];
@@ -85,6 +93,7 @@ export interface FittingShareInput {
   fighters: readonly FittingFighter[];
   cargo: readonly FittingCargoItem[];
   implantSet?: FittingImplantSet;
+  name?: string;
 }
 
 export interface DecodedFittingShare {
@@ -94,6 +103,8 @@ export interface DecodedFittingShare {
   fighters: FittingFighter[];
   cargo: FittingCargoItem[];
   implantSet?: FittingImplantSet;
+  /** Absent for version-1 payloads and for fits shared without a name. */
+  name?: string;
 }
 
 export type EncodeFittingShareResult =
@@ -280,6 +291,7 @@ export async function encodeFittingShare(
     fightersSection,
     cargoSection,
     implantsSection,
+    encodeURIComponent(input.name?.trim().slice(0, MAX_FIT_NAME_LENGTH) ?? ''),
   ].join('|');
 
   const bodyBytes = new TextEncoder().encode(body);
@@ -366,10 +378,23 @@ function parseImplantSet(raw: string): FittingImplantSet | undefined | null {
   return { implants, boosters };
 }
 
-function parseBody(body: string): DecodeFittingShareResult {
+function parseName(raw: string): string | undefined | null {
+  if (raw === '') return undefined;
+  let name: string;
+  try {
+    name = decodeURIComponent(raw).trim();
+  } catch {
+    return null;
+  }
+  if (name.length > MAX_FIT_NAME_LENGTH) return null;
+  return name === '' ? undefined : name;
+}
+
+function parseBody(body: string, version: string): DecodeFittingShareResult {
   const parts = body.split('|');
-  if (parts.length !== 6) return { ok: false, reason: 'invalid' };
-  const [hullStr, modulesStr, dronesStr, fightersStr, cargoStr, implantsStr] = parts;
+  if (parts.length !== (version === FITTING_SHARE_VERSION ? 7 : 6))
+    return { ok: false, reason: 'invalid' };
+  const [hullStr, modulesStr, dronesStr, fightersStr, cargoStr, implantsStr, nameStr = ''] = parts;
 
   const hullTypeId = parseBase36Positive(hullStr);
   if (hullTypeId === null) return { ok: false, reason: 'invalid' };
@@ -416,10 +441,12 @@ function parseBody(body: string): DecodeFittingShareResult {
   if (cargo === null) return { ok: false, reason: 'invalid' };
   const implantSet = parseImplantSet(implantsStr);
   if (implantSet === null) return { ok: false, reason: 'invalid' };
+  const name = parseName(nameStr);
+  if (name === null) return { ok: false, reason: 'invalid' };
 
   return {
     ok: true,
-    value: { hullTypeId, modules, drones, fighters, cargo, implantSet },
+    value: { hullTypeId, modules, drones, fighters, cargo, implantSet, name },
   };
 }
 
@@ -429,7 +456,8 @@ export async function decodeFittingShare(payload: string): Promise<DecodeFitting
 
   const version = payload.slice(0, dotIndex);
   const encoded = payload.slice(dotIndex + 1);
-  if (version !== FITTING_SHARE_VERSION) return { ok: false, reason: 'unsupported-version' };
+  if (version !== FITTING_SHARE_VERSION && version !== LEGACY_FITTING_SHARE_VERSION)
+    return { ok: false, reason: 'unsupported-version' };
   if (encoded === '') return { ok: false, reason: 'invalid' };
 
   const compressed = base64urlDecode(encoded);
@@ -450,5 +478,5 @@ export async function decodeFittingShare(payload: string): Promise<DecodeFitting
     return { ok: false, reason: 'invalid' };
   }
 
-  return parseBody(body);
+  return parseBody(body, version);
 }
