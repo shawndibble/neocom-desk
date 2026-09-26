@@ -13,6 +13,7 @@ const BASE_PROPS: SummaryStripProps = {
   walletUnavailable: false,
   failed: false,
   fetchedAt: null,
+  now: Date.now(),
   onRefresh: () => {},
   refreshing: false,
 };
@@ -39,5 +40,24 @@ describe('SummaryStrip idle training', () => {
 
     expect(screen.queryByRole('link', { name: 'Nothing in training' })).not.toBeInTheDocument();
     expect(screen.getByText('Nothing in training')).not.toHaveClass('text-warning');
+  });
+});
+
+describe('SummaryStrip cached-data line', () => {
+  const daysAgo = (days: number) => new Date(Date.now() - days * 86_400_000);
+
+  it('says the data is cached, with its age, when a read came from cache', () => {
+    renderStrip({ fetchedAt: daysAgo(2), fromCache: true });
+    expect(screen.getByText(/Showing cached data · 2d ago/)).toBeInTheDocument();
+  });
+
+  it('shows it for data older than an hour even when not from cache', () => {
+    renderStrip({ fetchedAt: daysAgo(1) });
+    expect(screen.getByText(/Showing cached data/)).toBeInTheDocument();
+  });
+
+  it('renders nothing when the data is fresh', () => {
+    renderStrip({ fetchedAt: new Date() });
+    expect(screen.queryByText(/Showing cached data/)).not.toBeInTheDocument();
   });
 });
