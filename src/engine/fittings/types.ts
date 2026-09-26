@@ -6,6 +6,9 @@
  * place that talks to the vendor package, and maps these shapes onto its own.
  */
 import type { AppliedDpsInputs } from './appliedDps';
+import type { CapacitorBudget } from './tank';
+import type { SupportStats } from './support';
+import type { MiningStats } from './mining';
 
 export type FittingSlotKind = 'high' | 'medium' | 'low' | 'rig' | 'subsystem';
 
@@ -50,6 +53,15 @@ export interface FittingDrone {
   state: 'online' | 'active';
 }
 
+/** One fighter squadron: its size, and whether it is launched from a tube or waits in the bay. */
+export interface FittingFighter {
+  typeId: number;
+  /** Fighters in the squadron. */
+  quantity: number;
+  /** 'active': in a launch tube, fighting; 'online': in the fighter bay. */
+  state: 'online' | 'active';
+}
+
 export interface FittingCargoItem {
   typeId: number;
   quantity: number;
@@ -59,6 +71,12 @@ export interface FittingCargoItem {
 export interface FittingImplantSet {
   implants: readonly number[];
   boosters: readonly number[];
+  /**
+   * The boosters' side effects switched on, by effect id
+   * (`boosterSideEffects.ts`); absent or empty: none, as a booster is
+   * assumed to roll none.
+   */
+  boosterSideEffects?: readonly number[];
 }
 
 /**
@@ -74,6 +92,13 @@ export interface Fitting {
   drones: FittingDrone[];
   cargo: FittingCargoItem[];
   implantSet?: FittingImplantSet;
+  /** Fighter squadrons, on a hull with fighter tubes; absent: none. */
+  fighters?: FittingFighter[];
+  /**
+   * A Tactical Destroyer's mode (`tacticalModes.ts`), by type id. Absent on a
+   * hull with modes means its default one; ignored on any other hull.
+   */
+  mode?: number;
 }
 
 /**
@@ -91,7 +116,24 @@ export interface PilotProfile {
   implantTypeIds: readonly number[];
   /** Type ids of the combat boosters in play, EVE's own booster-slot order. */
   boosterTypeIds: readonly number[];
+  /** The boosters' side effects switched on, by effect id; absent: none. */
+  boosterSideEffects?: readonly number[];
 }
+
+/**
+ * What one Fitting hands another: command-burst buffs and projected module
+ * effects (remote repair, webs, neutralizers…) — the engine's own
+ * "outgoing"/"incoming" projection, in our own shape (ADR 0016: nothing here
+ * imports the engine's types). A buff is a `dbuffCollections` id and its
+ * strength; an effect is the projecting type, its dogma effect and every
+ * attribute value the effect reads.
+ */
+export interface ProjectedEffects {
+  buffs: { id: number; value: number }[];
+  effects: { typeId: number; effectId: number; attributes: Record<number, number> }[];
+}
+
+export const NO_PROJECTED_EFFECTS: ProjectedEffects = { buffs: [], effects: [] };
 
 export type CapacitorStatus =
   { stable: true; stablePercentage: number } | { stable: false; depletesInSeconds: number };
@@ -141,6 +183,56 @@ export interface NavigationStats {
   warpSpeed: number;
 }
 
+export type SensorType = 'radar' | 'ladar' | 'magnetometric' | 'gravimetric';
+
+export interface SensorStats {
+  strength: number;
+  /** Which of the four the hull has; null for none. */
+  type: SensorType | null;
+}
+
+/** Hold capacities, m³; 0 where the hull has no such hold. */
+export interface HoldStats {
+  cargo: number;
+  fleetHangar: number;
+  miningHold: number;
+}
+
+export interface JumpDriveStats {
+  rangeLightYears: number;
+  /** The isotope the drive burns. */
+  fuelTypeId: number;
+  /** Isotopes a light year, under the pilot's skills. */
+  fuelPerLightYear: number;
+}
+
+/**
+ * How many targets can be locked: the hull's own limit, the pilot's (two
+ * untrained, one more a level of Target Management and of Advanced Target
+ * Management), and the lower of the two, which is what counts.
+ */
+/** What of something the hull has is used. */
+export interface UsedOfTotal {
+  used: number;
+  total: number;
+}
+
+/** Fighter tubes, each class's squadron limit, the fighter bay (m³), and the launched squadrons' DPS. */
+export interface FighterStats {
+  dps: number;
+  tubes: UsedOfTotal;
+  light: UsedOfTotal;
+  support: UsedOfTotal;
+  heavy: UsedOfTotal;
+  bay: UsedOfTotal;
+}
+
+export interface LockedTargets {
+  ship: number;
+  pilot: number;
+  effective: number;
+}
+
 export interface FittingStats {
   cpuUsed: number;
   cpuTotal: number;
@@ -177,6 +269,26 @@ export interface FittingStats {
   modules: FittingModuleResult[];
   offense: OffenseStats;
   repair: LocalRepair;
+  /** Peak recharge against what the running modules draw (`tank.ts`). */
+  capacitorBudget: CapacitorBudget;
+  tank: TankStats;
+  /** What the running modules do to another ship (`support.ts`). */
+  support: SupportStats;
+  /** Yield of the running miners and launched mining drones (`mining.ts`). */
+  mining: MiningStats;
+  fighters: FighterStats;
+  sensor: SensorStats;
+  holds: HoldStats;
+  /** Null on a hull without a jump drive. */
+  jumpDrive: JumpDriveStats | null;
+  /** `targeting.maxLockedTargets` is `lockedTargets.effective`. */
+  lockedTargets: LockedTargets;
+  /**
+   * Every figure was worked out with every module that can overheat
+   * overloaded (the "Overheat all" switch); `overheated` is then null, since
+   * the heated values are the values.
+   */
+  allOverheated: boolean;
   /**
    * The same fit recalculated by the engine with every active module that
    * can overheat set to overload; null when no module can (nothing to show).
@@ -190,7 +302,10 @@ export interface FittingStats {
 export interface WeaponRow {
   typeId: number;
   chargeTypeId?: number;
+  /** Drones and fighters: launched, never overheated. */
   isDrone: boolean;
+  /** Fighter squadrons of the type, rather than drones. */
+  isFighter?: boolean;
   /** Modules in the group, or drones in the stack. */
   count: number;
   /** Without reload. */
@@ -225,6 +340,41 @@ export interface LocalRepair {
   shield: number;
   armor: number;
   hull: number;
+}
+
+/** An ancillary armor repairer: its rate with paste and without, whichever it is running. */
+export interface AncillaryRepairer {
+  typeId: number;
+  layer: keyof LocalRepair;
+  /** HP/s with paste loaded. */
+  loaded: number;
+  /** HP/s running dry. */
+  empty: number;
+  /** Paste is loaded now. */
+  isLoaded: boolean;
+}
+
+/**
+ * Local tank, burst beside sustained (`tank.ts`): burst is every repairer at
+ * full speed as the engine reports it; sustained is what the capacitor and
+ * ancillary reloads let them average.
+ */
+export interface TankStats {
+  /** HP/s. */
+  burst: LocalRepair;
+  /** HP/s. */
+  sustained: LocalRepair;
+  /** Passive shield regeneration at its peak, HP/s. */
+  passiveShield: number;
+  /**
+   * EHP/s under the Damage Profile — each layer's HP/s scaled by its EHP ÷
+   * HP — with passive shield regeneration included.
+   */
+  burstEffective: number;
+  sustainedEffective: number;
+  /** The share (0–1) of the capacitor-using repairers' draw the capacitor can feed; below 1 the tank is cap-limited. */
+  capFraction: number;
+  ancillary: AncillaryRepairer[];
 }
 
 export interface OverheatedStats {
@@ -287,6 +437,24 @@ export const DOGMA_ATTRIBUTE = {
   armorRepairRate: -45,
   hullRepairRate: -46,
   shieldBoostRate: -47,
+  // Capacitor peaks, GJ/s (same `patches/ids.yaml`; read out of the pinned
+  // `sde.dat` 2026-09-25). Peak recharge is 2.5 × capacity ÷ recharge time
+  // (the default 2.5 times `capacitorCapacity` over `rechargeRate`, checked
+  // by hand against a live run); peak load is every running module's draw,
+  // with a cap booster's injection and a nosferatu's take netted off as
+  // negative draws.
+  capacitorPeakRecharge: -2,
+  capacitorPeakLoad: -4,
+  // Passive shield regeneration at its peak, 2.5 × shield HP ÷ recharge
+  // time — raw HP/s, and EHP/s under the Damage Profile.
+  passiveShieldRechargeRate: -51,
+  passiveShieldEffectiveRechargeRate: -52,
+  // The strongest of the four sensor strengths (a hull has one).
+  scanStrength: -53,
+  // What the ship can lock under its pilot's skills: the patched effect
+  // assigns the character's own limit, and the engine keeps the lower of
+  // it and the hull's. See `lockedTargetLimit` for the base it misses.
+  maxTargetsCharacter: -71,
   // Everything below is a plain SDE attribute (verified 2026-09-24 the same
   // way as the block above, plus a live run of the pinned engine against a
   // Rifter — see git history for the probe): calculate() returns the ship's
@@ -342,6 +510,34 @@ export const DOGMA_ATTRIBUTE = {
   lowSlots: 12,
   rigSlots: 1137,
   subsystemSlots: 1367,
+  // Sensor strengths by type (plain SDE, looked up by name in the pinned
+  // `sde.dat` 2026-09-25): a hull carries one of the four.
+  scanRadarStrength: 208,
+  scanLadarStrength: 209,
+  scanMagnetometricStrength: 210,
+  scanGravimetricStrength: 211,
+  // Holds, m³ (plain SDE, same lookup): the cargo hold is `capacity`.
+  cargoCapacity: 38,
+  fleetHangarCapacity: 912,
+  miningHoldCapacity: 1556,
+  jumpDriveRange: 867,
+  jumpDriveConsumptionAmount: 868,
+  jumpDriveConsumptionType: 866,
+  // Fighters: tubes and each class's squadron limit (plain SDE), the bay,
+  // and what's used of each and the fighters' DPS (patched ids; a live run
+  // of a Thanatos with two Templar I and a Cenobite I squadron launched,
+  // 2026-09-25: tubes 4, light 3, support 2; used 3 / 2 / 1).
+  fighterTubes: 2216,
+  fighterLightSlots: 2217,
+  fighterSupportSlots: 2218,
+  fighterHeavySlots: 2219,
+  fighterCapacity: 2055,
+  fighterCapacityUsed: -57,
+  fighterDamagePerSecond: -58,
+  fighterHeavySlotsUsed: -59,
+  fighterLightSlotsUsed: -60,
+  fighterSupportSlotsUsed: -61,
+  fighterTubesUsed: -62,
 } as const;
 
 /** Turret and launcher hardpoints — a hull's, or those its high slots take. */
@@ -360,7 +556,16 @@ export type StatsErrorReason = 'skills' | 'shipData';
  */
 export const CHARACTER_DOGMA_ATTRIBUTE = {
   maxActiveDrones: 352,
+  // The targets the pilot's skills add: Target Management and Advanced
+  // Target Management each +1 a level (their `maxTargetBonus`, 311, is 1).
+  // The engine leaves out the character's own base of two
+  // (`CHARACTER_BASE_LOCKED_TARGETS`): a live run reads 5 at Target
+  // Management V alone and nothing untrained (2026-09-25).
+  maxLockedTargets: 192,
 } as const;
+
+/** `maxLockedTargets` on the SDE's CharacterType (1373): what an untrained pilot can lock. */
+export const CHARACTER_BASE_LOCKED_TARGETS = 2;
 
 /**
  * Item-level (not ship-level) dogma attributes this seam reads off a fitted
@@ -393,6 +598,25 @@ export const ITEM_DOGMA_ATTRIBUTE = {
   // engine, 2026-09-24). Marks the module whose own armor resonances
   // (DOGMA_ATTRIBUTE.armor*Resonance ids, read off the item) are adapted.
   resistanceShiftAmount: 1849,
+  // Per-module capacitor and repair figures (patched ids, `patches/ids.yaml`
+  // as read out of the pinned `sde.dat` 2026-09-25, and a live run): GJ/s the
+  // module draws at full speed (negative for a cap booster or nosferatu), its
+  // cycle in ms, charges it holds, GJ a cap booster's charge injects, and its
+  // own repair rate in HP/s — a remote repairer's is what it hands out.
+  capacitorPeakLoad: -4,
+  cycleTime: -3,
+  chargeAmount: -8,
+  capacitorInjectionAmount: -67,
+  armorRepairRate: -45,
+  hullRepairRate: -46,
+  shieldBoostRate: -47,
+  // The ancillary armor repairer's paste multiplier (3 on a Medium AAR).
+  chargedArmorDamageMultiplier: 1886,
+  // Charges one cycle uses, and the reload, ms (plain SDE).
+  chargeRate: 56,
+  reloadTime: 1795,
+  // Optimal range, metres: only modules that reach another ship carry one.
+  maxRange: 54,
 } as const;
 
 export const CHARGE_GROUP_ATTRIBUTES: readonly number[] = [

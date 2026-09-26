@@ -4,19 +4,27 @@ import wasmInit, {
   load_sde,
   type Fit,
   type FitItem,
+  type Projection,
   type Violation,
 } from '@eveshipfit/dogma-engine';
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import {
+  extractCapacitorBudget,
+  extractTank,
   extractDroneLimits,
   extractFittingStats,
+  extractLockedTargets,
+  extractFighterStats,
   extractModuleResult,
   extractOffense,
   extractOverheatedStats,
   type OffenseItem,
 } from '@/engine/fittings/stats';
 import { extractAppliedDpsInputs } from '@/engine/fittings/appliedWeapons';
+import { extractSupport } from '@/engine/fittings/support';
+import { affectedAttributes, type AffectedAttribute } from '@/engine/fittings/affectedBy';
+import { extractMining, miningYield } from '@/engine/fittings/mining';
 import {
   ITEM_DOGMA_ATTRIBUTE,
   type Fitting,
@@ -24,6 +32,7 @@ import {
   type FittingStats,
   type PilotProfile,
   type DamageProfile,
+  type ProjectedEffects,
 } from '@/engine/fittings/types';
 
 /**
@@ -184,6 +193,76 @@ export function withWeather(fit: Fit, weatherTypeId?: number): Fit {
   };
 }
 
+/** What a Fitting's stats are worked out under, beyond the pilot and the Damage Profile. */
+export interface StatsOptions {
+  /** Also work out the overheated values (the default); callers that never show heat opt out of the cost. */
+  overheated?: boolean;
+  /** Every figure overheated — every module that can overheat, overloaded (the "Overheat all" switch). */
+  overheatAll?: boolean;
+  /** An Abyssal weather's beacon type id. */
+  weatherTypeId?: number;
+  /** What other Fittings project onto this one. */
+  incoming?: ProjectedEffects;
+}
+
+/**
+ * The fit taking in what other Fittings project onto it (`computeOutgoing`),
+ * beside whatever it already takes in (an Abyssal weather). Nothing projected
+ * leaves it as it is.
+ */
+export function withIncoming(fit: Fit, projected?: ProjectedEffects): Fit {
+  if (!projected || (projected.buffs.length === 0 && projected.effects.length === 0)) return fit;
+  const incoming = fit.incoming ?? {};
+  return {
+    ...fit,
+    incoming: {
+      ...incoming,
+      effects: [
+        ...(incoming.effects ?? []),
+        ...projected.effects.map((effect) => ({
+          type_id: effect.typeId,
+          effect_id: effect.effectId,
+          attributes: effect.attributes,
+        })),
+      ],
+      buffs: [...(incoming.buffs ?? []), ...projected.buffs],
+    },
+  };
+}
+
+/** A Map or a plain record of attribute values, as the engine may hand either back. */
+function attributeRecord(
+  values: Map<number, number> | Record<number, number> | undefined
+): Record<number, number> {
+  if (!values) return {};
+  return values instanceof Map ? Object.fromEntries(values) : { ...values };
+}
+
+/**
+ * What a Fitting projects onto another ship — its running command bursts'
+ * buffs and its running remote modules' effects — as the engine reports it,
+ * worked out under `profile`.
+ */
+export async function computeOutgoing(
+  fitting: Fitting,
+  profile: PilotProfile
+): Promise<ProjectedEffects> {
+  await loadDogmaEngine();
+  return toProjectedEffects(calculate(fittingToDogmaFit(fitting, profile)).outgoing);
+}
+
+/** The engine's outgoing projection in our own shape. */
+export function toProjectedEffects(outgoing: Projection | undefined): ProjectedEffects {
+  return {
+    buffs: (outgoing?.buffs ?? []).map((buff) => ({ id: buff.id, value: buff.value })),
+    effects: (outgoing?.effects ?? []).map((effect) => ({
+      typeId: effect.type_id,
+      effectId: effect.effect_id,
+      attributes: attributeRecord(effect.attributes),
+    })),
+  };
+}
+
 /**
  * Works out a Fitting's stats under a pilot's skills and implants, with EHP
  * measured against `damageProfile` (the engine's uniform default without
@@ -197,18 +276,47 @@ export async function computeFittingStats(
   damageProfile?: DamageProfile,
   {
     overheated: withOverheated = true,
+    overheatAll = false,
     weatherTypeId,
-  }: { overheated?: boolean; weatherTypeId?: number } = {}
+    incoming,
+  }: StatsOptions = {}
 ): Promise<FittingStats> {
   await loadDogmaEngine(onProgress);
   // The overheated recalculation below spreads this fit, so it keeps the weather too.
-  const dogmaFit = withWeather(fittingToDogmaFit(fitting, profile, damageProfile), weatherTypeId);
-  const calculation = calculate(dogmaFit);
-  const baseStats = extractFittingStats(
-    dogmaFit.items,
-    calculation.ship.attributes,
-    calculation.items
+  const dogmaFit = withIncoming(
+    withWeather(fittingToDogmaFit(fitting, profile, damageProfile), weatherTypeId),
+    incoming
   );
+  const calculation = calculate(dogmaFit);
+
+  // Overheated values come from the engine itself (its overload state), not
+  // a multiplier applied here: the same fit again with every active module
+  // that can overheat set to overload. Skipped when there is none, so a fit
+  // with nothing to overheat costs one calculation and shows no overheated line.
+  const heatable = dogmaFit.items.map(
+    (_, index) =>
+      index < fitting.modules.length &&
+      calculation.items[index]?.max_state === 'overload' &&
+      calculation.items[index]?.state === 'active'
+  );
+  const heatedCalculation =
+    (withOverheated || overheatAll) && heatable.includes(true)
+      ? calculate({
+          ...dogmaFit,
+          items: dogmaFit.items.map((item, index) =>
+            heatable[index] ? { ...item, state: 'overload' } : item
+          ),
+        })
+      : null;
+
+  // "Overheat all": every figure is the heated one, with no second number
+  // beside it. The editor's state controls still read the unheated result —
+  // they show what the pilot set, not the what-if.
+  const allOverheated = overheatAll && heatedCalculation !== null;
+  const shown = allOverheated ? heatedCalculation : calculation;
+  const beside = allOverheated || !withOverheated ? null : heatedCalculation;
+
+  const baseStats = extractFittingStats(dogmaFit.items, shown.ship.attributes, shown.items);
 
   // Calibration and drone bandwidth have no single ship-level "used" id the
   // way cpuFree/powerFree do (see types.ts's DOGMA_ATTRIBUTE doc comment) —
@@ -219,7 +327,7 @@ export async function computeFittingStats(
   let calibrationUsed = 0;
   let droneBandwidthUsed = 0;
   dogmaFit.items.forEach((item, index) => {
-    const itemAttributes = calculation.items[index]?.attributes;
+    const itemAttributes = shown.items[index]?.attributes;
     if (!itemAttributes) return;
     if (item.slot.type === 'rig') {
       calibrationUsed += itemAttributes.get(ITEM_DOGMA_ATTRIBUTE.calibrationCost)?.value ?? 0;
@@ -231,27 +339,6 @@ export async function computeFittingStats(
 
   // `fittingToDogmaFit` puts the modules first, so module i is items[i].
   const modules = fitting.modules.map((_, index) => extractModuleResult(calculation.items[index]));
-
-  // Overheated values come from the engine itself (its overload state), not
-  // a multiplier applied here: the same fit again with every active module
-  // that can overheat set to overload. Skipped when there is none, so a fit
-  // with nothing to overheat costs one calculation and shows no overheated line.
-  // Callers that never show heat (the variations diff) opt out of the cost.
-  const heatable = dogmaFit.items.map(
-    (_, index) =>
-      index < fitting.modules.length &&
-      calculation.items[index]?.max_state === 'overload' &&
-      calculation.items[index]?.state === 'active'
-  );
-  const overheatedCalculation =
-    withOverheated && heatable.includes(true)
-      ? calculate({
-          ...dogmaFit,
-          items: dogmaFit.items.map((item, index) =>
-            heatable[index] ? { ...item, state: 'overload' } : item
-          ),
-        })
-      : null;
 
   // Drones follow the modules in `dogmaFit.items`.
   const offenseItems: OffenseItem[] = [
@@ -266,32 +353,82 @@ export async function computeFittingStats(
       quantity: drone.quantity,
       isDrone: true,
     })),
+    // Fighters follow the drones.
+    ...(fitting.fighters ?? []).map((fighter) => ({
+      typeId: fighter.typeId,
+      quantity: fighter.quantity,
+      isDrone: true,
+      isFighter: true,
+    })),
   ];
-  const offense = extractOffense(
-    offenseItems,
-    calculation.items,
-    overheatedCalculation?.items ?? null
-  );
-  const overheated = overheatedCalculation
-    ? extractOverheatedStats(overheatedCalculation.ship.attributes)
-    : null;
+  const offense = extractOffense(offenseItems, shown.items, beside?.items ?? null);
+  const overheated = beside ? extractOverheatedStats(beside.ship.attributes) : null;
 
-  const applied = extractAppliedDpsInputs(
-    dogmaFit.items,
-    calculation.items,
-    calculation.character.attributes
-  );
+  const applied = extractAppliedDpsInputs(dogmaFit.items, shown.items, shown.character.attributes);
+  const lockedTargets = extractLockedTargets(shown.ship.attributes, shown.character.attributes);
 
   return {
     ...baseStats,
-    ...extractDroneLimits(dogmaFit.items, calculation.items, calculation.character.attributes),
+    targeting: { ...baseStats.targeting, maxLockedTargets: lockedTargets.effective },
+    ...extractDroneLimits(dogmaFit.items, shown.items, shown.character.attributes),
     calibrationUsed,
     droneBandwidthUsed,
     modules,
     offense,
     overheated,
     applied,
+    capacitorBudget: extractCapacitorBudget(dogmaFit.items, shown.items, shown.ship.attributes),
+    tank: extractTank(dogmaFit.items, shown.items, shown.ship.attributes, baseStats),
+    support: extractSupport(dogmaFit.items, shown.items),
+    mining: miningYield(extractMining(dogmaFit.items, shown.items)),
+    fighters: extractFighterStats(shown.ship.attributes),
+    lockedTargets,
+    allOverheated,
   };
+}
+
+/**
+ * "Affected by" for one fitted module (`engine/fittings/affectedBy.ts`):
+ * the same calculation the stats run, with the engine asked for its sources.
+ * Only ever on demand — the dialog asking — never on the stats themselves,
+ * where the extra bookkeeping would be paid on every edit for nothing.
+ */
+export async function explainModule(
+  fitting: Fitting,
+  profile: PilotProfile,
+  moduleIndex: number,
+  damageProfile?: DamageProfile,
+  { overheatAll = false, weatherTypeId, incoming }: StatsOptions = {}
+): Promise<AffectedAttribute[]> {
+  await loadDogmaEngine();
+  let dogmaFit = withIncoming(
+    withWeather(fittingToDogmaFit(fitting, profile, damageProfile), weatherTypeId),
+    incoming
+  );
+  if (overheatAll) {
+    // As the stats do: every running module that can overheat, overloaded.
+    const plain = calculate(dogmaFit);
+    dogmaFit = {
+      ...dogmaFit,
+      items: dogmaFit.items.map((item, index) =>
+        index < fitting.modules.length &&
+        plain.items[index]?.max_state === 'overload' &&
+        plain.items[index]?.state === 'active'
+          ? { ...item, state: 'overload' }
+          : item
+      ),
+    };
+  }
+  const calculation = calculate(dogmaFit, { sources: true });
+  const result = calculation.items[moduleIndex];
+  if (!result) return [];
+  return affectedAttributes(result.attributes, {
+    shipTypeId: dogmaFit.ship.type_id,
+    ...(dogmaFit.ship.mode === undefined ? {} : { modeTypeId: dogmaFit.ship.mode }),
+    itemTypeIds: dogmaFit.items.map((item) => item.type_id),
+    chargeTypeIds: dogmaFit.items.map((item) => item.charge?.type_id),
+    projectedTypeIds: (dogmaFit.incoming?.effects ?? []).map((effect) => effect.type_id),
+  });
 }
 
 export interface CandidateCheck {

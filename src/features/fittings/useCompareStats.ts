@@ -1,20 +1,20 @@
 /**
  * Stats for every compared Fitting under the pilot's selected Damage
- * Profile and Abyssal weather, cached per Fitting/profile/(Damage Profile,
- * weather) by `useCompareAsync` so
+ * Profile and conditions (Abyssal weather, Overheat all), cached per
+ * Fitting/profile/(Damage Profile, conditions) by `useCompareAsync` so
  * adding a slot doesn't recompute the ones already shown. Each Fitting is
  * worked out on the set it carries, as it would open (`evaluateFitting`).
  */
 import { useMemo } from 'react';
 import type { DamageProfile, Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
-import { useAbyssalWeather } from './abyssalWeatherSelection';
+import { useStatsConditions, type StatsConditions } from './statsConditions';
 import { useDamageProfiles } from './damageProfiles';
 import { useCompareAsync, type CompareAsyncResult } from './useCompareAsync';
 import { evaluateFitting } from './useFittingEvaluation';
 
 interface Conditions {
   damageProfile: DamageProfile;
-  weatherTypeId: number | null;
+  stats: StatsConditions;
 }
 
 function computeUnder(
@@ -22,8 +22,8 @@ function computeUnder(
   profile: PilotProfile,
   conditions?: unknown
 ): Promise<FittingStats | null> {
-  const { damageProfile, weatherTypeId } = conditions as Conditions;
-  return evaluateFitting(fitting, profile, damageProfile, weatherTypeId);
+  const { damageProfile, stats } = conditions as Conditions;
+  return evaluateFitting(fitting, profile, damageProfile, stats);
 }
 
 /**
@@ -35,11 +35,11 @@ export function useCompareStats(
   profile: PilotProfile | null
 ): CompareAsyncResult<FittingStats> {
   const damageProfiles = useDamageProfiles();
-  const weatherTypeId = useAbyssalWeather((state) => state.weatherTypeId);
+  const stats = useStatsConditions();
   // One cache key for both, stable while neither changes.
   const conditions = useMemo<Conditions>(
-    () => ({ damageProfile: damageProfiles.selected, weatherTypeId }),
-    [damageProfiles.selected, weatherTypeId]
+    () => ({ damageProfile: damageProfiles.selected, stats }),
+    [damageProfiles.selected, stats]
   );
   return useCompareAsync(
     fittings,

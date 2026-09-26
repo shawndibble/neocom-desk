@@ -16,13 +16,17 @@
  *   and the editor both only ever set a stack fully active or fully bayed),
  *   which is what the round-trip test below actually needs to hold.
  *
- * Fighters and implant sets are both real fields on the wire shape.
+ * A Tactical Destroyer's mode and the booster side effects switched on ride
+ * the wire's two optional trailing sections; on the domain side the side
+ * effects live on the implant set, beside the boosters they belong to.
+ *
+ * Fighter squadrons ride the wire's fighter section as type, size and — only
+ * for one in the bay — a bay flag.
+ *
+ * Implant sets are a real field on the wire shape.
  * `implantSet` is threaded straight through both directions, `undefined` and
  * `{implants: [], boosters: []}` staying distinct the way
- * `fittingShare.ts`'s own codec keeps them. Fighters have no home on the
- * domain `Fitting` at all — no capital ship fitting exists in the app —
- * and stay dropped in both directions; a fighter bay surviving a share round
- * trip is future tickets' scope, not a regression this mapper introduces.
+ * `fittingShare.ts`'s own codec keeps them.
  *
  * A `Fitting`'s name rides the version-2 payload (#1718). Version-1 links
  * carry none, so `shareToFitting` still takes a fallback name — callers pass
@@ -73,9 +77,24 @@ export function fittingToShareInput(fitting: Fitting): FittingShareInput {
       count: drone.quantity,
       active: drone.state === 'active' ? drone.quantity : 0,
     })),
-    fighters: [],
+    fighters: (fitting.fighters ?? []).map((fighter) => ({
+      typeId: fighter.typeId,
+      count: fighter.quantity,
+      ...(fighter.state === 'online' ? { inBay: true } : {}),
+    })),
     cargo: fitting.cargo.map((item) => ({ typeId: item.typeId, quantity: item.quantity })),
-    ...(fitting.implantSet === undefined ? {} : { implantSet: fitting.implantSet }),
+    ...(fitting.implantSet === undefined
+      ? {}
+      : {
+          implantSet: {
+            implants: fitting.implantSet.implants,
+            boosters: fitting.implantSet.boosters,
+          },
+        }),
+    ...(fitting.implantSet?.boosterSideEffects?.length
+      ? { boosterSideEffects: fitting.implantSet.boosterSideEffects }
+      : {}),
+    ...(fitting.mode === undefined ? {} : { mode: fitting.mode }),
     name: fitting.name,
   };
 }
@@ -101,6 +120,26 @@ export function shareToFitting(decoded: FittingShareInput, fallbackName: string)
       state: drone.active > 0 ? 'active' : 'online',
     })),
     cargo: decoded.cargo.map((item) => ({ typeId: item.typeId, quantity: item.quantity })),
-    ...(decoded.implantSet === undefined ? {} : { implantSet: decoded.implantSet }),
+    ...(decoded.fighters.length === 0
+      ? {}
+      : {
+          fighters: decoded.fighters.map((fighter) => ({
+            typeId: fighter.typeId,
+            quantity: fighter.count,
+            state: fighter.inBay ? ('online' as const) : ('active' as const),
+          })),
+        }),
+    // Side effects ride with the boosters that carry them; with no set, there are none.
+    ...(decoded.implantSet === undefined
+      ? {}
+      : {
+          implantSet: {
+            ...decoded.implantSet,
+            ...(decoded.boosterSideEffects?.length
+              ? { boosterSideEffects: decoded.boosterSideEffects }
+              : {}),
+          },
+        }),
+    ...(decoded.mode === undefined ? {} : { mode: decoded.mode }),
   };
 }

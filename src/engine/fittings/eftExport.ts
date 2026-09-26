@@ -31,6 +31,10 @@ export function fittingToEft(fitting: Fitting, typeName: (typeId: number) => str
   if (fitting.drones.length > 0) {
     sections.push(fitting.drones.map((drone) => `${typeName(drone.typeId)} x${drone.quantity}`));
   }
+  const fighters = fitting.fighters ?? [];
+  if (fighters.length > 0) {
+    sections.push(fighters.map((fighter) => `${typeName(fighter.typeId)} x${fighter.quantity}`));
+  }
   if (fitting.cargo.length > 0) {
     sections.push(fitting.cargo.map((item) => `${typeName(item.typeId)} x${item.quantity}`));
   }

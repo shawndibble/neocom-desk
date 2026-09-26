@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Caret, Tooltip } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
@@ -11,7 +11,6 @@ import {
 import type {
   DamageFigures as DamageFiguresValue,
   FittingStats,
-  LocalRepair,
   Resonances,
   StatsErrorReason,
 } from '@/engine/fittings/types';
@@ -20,6 +19,19 @@ import type { DogmaAssetProgress } from './dogmaFittingEngine';
 import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
 import { DamageProfilePicker } from './DamageProfilePicker';
 import { AppliedDpsPanel } from './AppliedDpsPanel';
+import { Facts, Overheated, type Fact } from './StatFacts';
+import { StatsToolbar } from './StatsToolbar';
+import { useIsPhone } from '@/lib/useIsPhone';
+import {
+  isSectionExpanded,
+  useStatsSectionsPreference,
+  withSectionExpanded,
+} from './statsSectionsPreference';
+import { CapacitorFacts, TankFacts } from './FittingTankStats';
+import { SupportFacts } from './FittingSupportStats';
+import { MiningFacts } from './FittingMiningStats';
+import { ProjectedEffectsPanel } from './ProjectedEffectsPanel';
+import { useProjectedSources } from './statsConditions';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
 
@@ -49,42 +61,6 @@ const RESONANCE_KEY = {
 } as const satisfies Record<DamageType, keyof Resonances>;
 
 const MICRO_LABEL = 'text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase';
-
-/**
- * An overheated value beside its normal one, in the warning tone — the
- * game marks heat the same way. Renders nothing when `value` is null.
- */
-function Overheated({
-  value,
-  digits,
-  unit = '',
-}: {
-  value: number | null;
-  digits: number;
-  unit?: string;
-}) {
-  const { t } = useTranslation();
-  if (value === null) return null;
-  return (
-    <span className="ml-1 text-warning">
-      {t('fittings.stats.overheated', { value: `${value.toFixed(digits)}${unit}` })}
-    </span>
-  );
-}
-
-/** Label-over-value pairs, two to a row — the compact body most sections use. */
-function Facts({ items }: { items: { label: string; value: ReactNode }[] }) {
-  return (
-    <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs tabular-nums">
-      {items.map((item) => (
-        <div key={item.label} className="min-w-0">
-          <dt className="text-[0.6875rem] text-text-dim">{item.label}</dt>
-          <dd>{item.value}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
 
 /** One resist, as the game draws it: the damage type's colour filling the share resisted. */
 function ResistCell({ resonance, tone }: { resonance: number; tone: DamageType }) {
@@ -180,20 +156,21 @@ function DamageFigures({
   );
 }
 
-const REPAIR_LAYERS: readonly (keyof LocalRepair)[] = ['shield', 'armor', 'hull'];
-
-const SECTIONS = [
-  'offense',
-  'appliedDps',
-  'defense',
-  'capacitor',
-  'targeting',
-  'navigation',
-  'drones',
-  'fitting',
-  'price',
-] as const;
-type Section = (typeof SECTIONS)[number];
+/** Stable ids — the remembered layout (`statsSectionsPreference.ts`) is keyed on them. */
+type Section =
+  | 'offense'
+  | 'appliedDps'
+  | 'defense'
+  | 'capacitor'
+  | 'support'
+  | 'mining'
+  | 'projected'
+  | 'targeting'
+  | 'navigation'
+  | 'drones'
+  | 'fighters'
+  | 'fitting'
+  | 'price';
 
 /** Open at first: what a pilot reads on every fit. The rest is a click away, as in the game window. */
 const OPEN_BY_DEFAULT: ReadonlySet<Section> = new Set([
@@ -201,20 +178,27 @@ const OPEN_BY_DEFAULT: ReadonlySet<Section> = new Set([
   'appliedDps',
   'defense',
   'capacitor',
+  // Only there at all when the fit has something to show in it.
+  'support',
+  'mining',
   'navigation',
   'drones',
+  'fighters',
 ]);
 
 function StatSection({
   title,
   meta,
   warning,
+  hot = false,
   expanded,
   onToggle,
   children,
 }: {
   title: string;
   meta: string | undefined;
+  /** Every figure is the overheated one ("Overheat all"): read in the warning tone, as the game marks heat. */
+  hot?: boolean;
   /** Shown on the row itself, so a warning inside a collapsed section isn't missed. */
   warning?: string;
   expanded: boolean;
@@ -236,9 +220,15 @@ function StatSection({
           </button>
         </h3>
         {warning && <span className="shrink-0 text-xs text-warning">{warning}</span>}
-        {meta && <span className="shrink-0 text-sm tabular-nums">{meta}</span>}
+        {meta && (
+          <span className={`shrink-0 text-sm tabular-nums ${hot ? 'text-warning' : ''}`}>
+            {meta}
+          </span>
+        )}
       </div>
-      {expanded && <div className="space-y-2 px-3 pb-3">{children}</div>}
+      {expanded && (
+        <div className={`space-y-2 px-3 pb-3 ${hot ? 'text-warning' : ''}`}>{children}</div>
+      )}
     </section>
   );
 }
@@ -326,14 +316,33 @@ export function FittingStatsSections({
   const adaptedHardeners = (stats?.modules ?? []).flatMap((module) =>
     module.adaptedResonances ? [module.adaptedResonances] : []
   );
-  const [expanded, setExpanded] = useState<Record<Section, boolean>>(
-    () =>
-      Object.fromEntries(
-        SECTIONS.map((section) => [section, OPEN_BY_DEFAULT.has(section)])
-      ) as Record<Section, boolean>
+  // Which sections are open is the pilot's own layout, kept on this device
+  // (`statsSectionsPreference.ts`); an untouched one opens as OPEN_BY_DEFAULT
+  // says on desktop and starts collapsed on a phone.
+  const isPhone = useIsPhone();
+  const storedSections = useStatsSectionsPreference((state) => state.value);
+  const hydrateSections = useStatsSectionsPreference((state) => state.hydrate);
+  const setSections = useStatsSectionsPreference((state) => state.setValue);
+  useEffect(() => {
+    void hydrateSections();
+  }, [hydrateSections]);
+  const isExpanded = (section: Section) =>
+    isSectionExpanded(storedSections, section, {
+      isPhone,
+      openByDefault: OPEN_BY_DEFAULT.has(section),
+    });
+  const projectedShips = useProjectedSources((state) =>
+    state.sources.reduce((sum, source) => sum + source.count, 0)
   );
   const toggle = (section: Section) =>
-    setExpanded((prev) => ({ ...prev, [section]: !prev[section] }));
+    // From the store's current value, never this render's possibly stale copy.
+    void setSections(
+      withSectionExpanded(
+        useStatsSectionsPreference.getState().value,
+        section,
+        !isExpanded(section)
+      )
+    );
 
   const downloadPct =
     statsProgress?.totalBytes && statsProgress.totalBytes > 0
@@ -361,7 +370,8 @@ export function FittingStatsSections({
         title={t(`fittings.stats.section.${id}`)}
         meta={meta}
         warning={warning}
-        expanded={expanded[id]}
+        hot={stats?.allOverheated ?? false}
+        expanded={isExpanded(id)}
         onToggle={() => toggle(id)}
       >
         {body}
@@ -420,6 +430,61 @@ export function FittingStatsSections({
     return rows;
   }
 
+  /** Support out's headline: remote repair handed out, else how many modules reach another ship. */
+  function supportMeta(s: FittingStats): string {
+    const { remoteRepair, rows } = s.support;
+    const repair = remoteRepair.shield + remoteRepair.armor + remoteRepair.hull;
+    if (repair > 0) return t('fittings.stats.unit.hpPerSecond', { value: repair.toFixed(1) });
+    return t('fittings.stats.support.modules', {
+      count: rows.reduce((sum, row) => sum + row.count, 0),
+    });
+  }
+
+  /** Holds, jump drive and sensors: what the hull carries, beside what the fit asks of it. */
+  function resourceFacts(s: FittingStats): Fact[] {
+    const facts: Fact[] = [
+      {
+        label: t('fittings.stats.fact.cargo'),
+        value: t('fittings.stats.unit.cubicMetres', { value: s.holds.cargo.toFixed(0) }),
+      },
+    ];
+    if (s.holds.fleetHangar > 0)
+      facts.push({
+        label: t('fittings.stats.fact.fleetHangar'),
+        value: t('fittings.stats.unit.cubicMetres', { value: s.holds.fleetHangar.toFixed(0) }),
+      });
+    if (s.holds.miningHold > 0)
+      facts.push({
+        label: t('fittings.stats.fact.miningHold'),
+        value: t('fittings.stats.unit.cubicMetres', { value: s.holds.miningHold.toFixed(0) }),
+      });
+    if (s.sensor.type !== null)
+      facts.push({
+        label: t('fittings.stats.fact.sensorStrength'),
+        value: t('fittings.stats.unit.sensor', {
+          value: s.sensor.strength.toFixed(1),
+          type: t(`fittings.stats.sensorType.${s.sensor.type}`),
+        }),
+      });
+    if (s.jumpDrive)
+      facts.push(
+        {
+          label: t('fittings.stats.fact.jumpRange'),
+          value: t('fittings.stats.unit.lightYears', {
+            value: s.jumpDrive.rangeLightYears.toFixed(2),
+          }),
+        },
+        {
+          label: t('fittings.stats.fact.jumpFuel'),
+          value: t('fittings.stats.unit.fuelPerLightYear', {
+            value: s.jumpDrive.fuelPerLightYear.toFixed(0),
+            fuel: typeName(s.jumpDrive.fuelTypeId),
+          }),
+        }
+      );
+    return facts;
+  }
+
   return (
     <div className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
       {heading && (
@@ -428,6 +493,7 @@ export function FittingStatsSections({
         </div>
       )}
       {conditions && <div className="border-b border-line px-3 py-2">{conditions}</div>}
+      {stats && <StatsToolbar stats={stats} />}
       {statsError && (
         <div
           role="alert"
@@ -468,7 +534,11 @@ export function FittingStatsSections({
                     )}
                     {row.isDrone && (
                       <span className="block text-text-dim">
-                        {t('fittings.stats.dronesNoOverheat')}
+                        {t(
+                          row.isFighter
+                            ? 'fittings.stats.fightersNoOverheat'
+                            : 'fittings.stats.dronesNoOverheat'
+                        )}
                       </span>
                     )}
                   </span>
@@ -520,29 +590,13 @@ export function FittingStatsSections({
                   {t('fittings.stats.armorIncludesRah', { profile: profileName })}
                 </p>
               )}
-              <ul className="space-y-1 text-xs text-text-dim">
-                {overheatedEhp !== null && (
-                  <li>
-                    {t('fittings.stats.ehpLine', { value: stats.ehp.toFixed(0) })}
-                    <Overheated value={overheatedEhp} digits={0} />
-                  </li>
-                )}
-                {REPAIR_LAYERS.filter((layer) => stats.repair[layer] > 0).map((layer) => (
-                  <li key={layer}>
-                    {t(`fittings.stats.repair.${layer}`, {
-                      value: stats.repair[layer].toFixed(1),
-                    })}
-                    <Overheated
-                      value={overheatedOrNull(
-                        stats.repair[layer],
-                        stats.overheated?.repair[layer],
-                        1
-                      )}
-                      digits={1}
-                    />
-                  </li>
-                ))}
-              </ul>
+              {overheatedEhp !== null && (
+                <p className="text-xs text-text-dim">
+                  {t('fittings.stats.ehpLine', { value: stats.ehp.toFixed(0) })}
+                  <Overheated value={overheatedEhp} digits={0} />
+                </p>
+              )}
+              <TankFacts stats={stats} typeName={typeName} />
             </>
           ) : (
             placeholder
@@ -561,24 +615,31 @@ export function FittingStatsSections({
                 seconds: stats.capacitor.depletesInSeconds.toFixed(0),
               })
           : undefined,
-        stats ? (
-          <Facts
-            items={[
-              {
-                label: t('fittings.stats.fact.capacity'),
-                value: t('fittings.stats.unit.gj', { value: stats.capacitorCapacity.toFixed(0) }),
-              },
-              {
-                label: t('fittings.stats.fact.recharge'),
-                value: t('fittings.stats.unit.seconds', {
-                  value: (stats.capacitorRechargeTime / 1000).toFixed(0),
-                }),
-              },
-            ]}
-          />
-        ) : (
-          placeholder
-        )
+        stats ? <CapacitorFacts stats={stats} /> : placeholder
+      )}
+
+      {stats &&
+        stats.support.rows.length > 0 &&
+        section(
+          'support',
+          supportMeta(stats),
+          <SupportFacts support={stats.support} typeName={typeName} />
+        )}
+
+      {stats &&
+        stats.mining.rows.length > 0 &&
+        section(
+          'mining',
+          t('fittings.stats.unit.cubicMetresPerSecond', {
+            value: stats.mining.perSecond.toFixed(1),
+          }),
+          <MiningFacts stats={stats} typeName={typeName} />
+        )}
+
+      {section(
+        'projected',
+        projectedShips > 0 ? t('fittings.projected.meta', { count: projectedShips }) : undefined,
+        <ProjectedEffectsPanel />
       )}
 
       {section(
@@ -599,7 +660,10 @@ export function FittingStatsSections({
               },
               {
                 label: t('fittings.stats.fact.lockedTargets'),
-                value: String(stats.targeting.maxLockedTargets),
+                value:
+                  stats.lockedTargets.ship === stats.lockedTargets.pilot
+                    ? String(stats.targeting.maxLockedTargets)
+                    : t('fittings.stats.lockedTargetsValue', { ...stats.lockedTargets }),
               },
               {
                 label: t('fittings.stats.fact.scanResolution'),
@@ -701,11 +765,44 @@ export function FittingStatsSections({
                     value: stats.droneCapacity.toFixed(0),
                   }),
                 },
+                {
+                  label: t('fittings.stats.fact.maxActiveDrones'),
+                  value: String(stats.maxActiveDrones),
+                },
               ]}
             />
           ) : (
             placeholder
           )
+        )}
+
+      {stats &&
+        stats.fighters.tubes.total > 0 &&
+        section(
+          'fighters',
+          t('fittings.stats.weaponDps', { value: stats.fighters.dps.toFixed(1) }),
+          <Facts
+            items={[
+              {
+                label: t('fittings.stats.fact.fighterDps'),
+                value: stats.fighters.dps.toFixed(1),
+              },
+              {
+                label: t('fittings.stats.fact.fighterTubes'),
+                value: t('fittings.stats.unit.usedOfTotal', {
+                  used: stats.fighters.tubes.used.toFixed(0),
+                  total: stats.fighters.tubes.total.toFixed(0),
+                }),
+              },
+              {
+                label: t('fittings.stats.fact.fighterBay'),
+                value: t('fittings.stats.unit.cubicMetresUsed', {
+                  used: stats.fighters.bay.used.toFixed(0),
+                  total: stats.fighters.bay.total.toFixed(0),
+                }),
+              },
+            ]}
+          />
         )}
 
       {section(
@@ -741,6 +838,7 @@ export function FittingStatsSections({
                     total: stats.calibrationTotal.toFixed(0),
                   }),
                 },
+                ...resourceFacts(stats),
               ]}
             />
             {stats.unknownItemTypeIds.length > 0 && (

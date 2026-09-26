@@ -141,6 +141,44 @@ describe('appliedDps', () => {
   });
 });
 
+describe('appliedDps against resists', () => {
+  const still = { signatureRadius: 400, velocity: 0 };
+  const resists = { em: 0, thermal: 0, kinetic: 0.5, explosive: 0.25 };
+
+  it('takes each damage type down by the target’s resist to it', () => {
+    const kinetic: AppliedWeapon = {
+      ...missile,
+      damage: { em: 0, thermal: 0, kinetic: 1, explosive: 0 },
+    };
+    const mixed: AppliedWeapon = {
+      ...missile,
+      damage: { em: 0, thermal: 0, kinetic: 0.5, explosive: 0.5 },
+    };
+    const inputs = (weapon: AppliedWeapon): AppliedDpsInputs => ({
+      weapons: [weapon],
+      droneControlRange: 0,
+    });
+    expect(appliedDps(inputs(kinetic), { ...still, resists }, 1000)).toBeCloseTo(50, 6);
+    expect(appliedDps(inputs(mixed), { ...still, resists }, 1000)).toBeCloseTo(
+      100 * (0.5 * 0.5 + 0.5 * 0.75),
+      6
+    );
+  });
+
+  it('spreads a weapon of unknown damage types evenly over the four', () => {
+    expect(
+      appliedDps({ weapons: [missile], droneControlRange: 0 }, { ...still, resists }, 1000)
+    ).toBeCloseTo(100 * (1 - 0.75 / 4), 6);
+  });
+
+  it('leaves a target with no resists at full damage', () => {
+    expect(appliedDps({ weapons: [missile], droneControlRange: 0 }, still, 1000)).toBeCloseTo(
+      100,
+      6
+    );
+  });
+});
+
 describe('graphs', () => {
   const fit = inputs([turret, missile]);
 

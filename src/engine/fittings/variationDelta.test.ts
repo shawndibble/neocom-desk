@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { diffFittingStats } from './variationDelta';
 import type { FittingStats } from './types';
+import { neutralExtendedStats } from './__fixtures__/fittingStats';
 
 function layer(hp: number) {
   return {
@@ -53,6 +54,7 @@ const base: FittingStats = {
   offense: { weapons: [], dps: 0, volley: 0, overheated: null, chargelessWeaponCount: 0 },
   repair: { shield: 0, armor: 0, hull: 0 },
   overheated: null,
+  ...neutralExtendedStats(),
 };
 
 describe('diffFittingStats', () => {

@@ -17,10 +17,12 @@
 import { MAX_SLOTS_PER_CATEGORY } from '@/engine/fitting/fittingShare';
 import { resolveTypeId, type EftTypeLookup } from '@/engine/fittings/eftLoader';
 import type { LoadParts, LoadWarning } from '@/engine/fittings/load';
+import { squadronsOf } from '@/engine/fittings/fighters';
 import {
   FITTING_SLOT_KINDS,
   type FittingCargoItem,
   type FittingDrone,
+  type FittingFighter,
   type FittingModule,
   type FittingSlotKind,
 } from '@/engine/fittings/types';
@@ -67,6 +69,7 @@ export function loadEveFitXmlEntry(entry: FittingXmlEntry, typeByName: EftTypeLo
   const modules: FittingModule[] = [];
   const drones: FittingDrone[] = [];
   const cargo: FittingCargoItem[] = [];
+  const fighters: FittingFighter[] = [];
   const moduleBySlotKey = new Map<string, FittingModule>();
 
   for (const item of entry.hardware) {
@@ -80,6 +83,17 @@ export function loadEveFitXmlEntry(entry: FittingXmlEntry, typeByName: EftTypeLo
       }
       // Carried, not deployed — matches eftLoader's drone-bay stacks.
       drones.push({ typeId, quantity: item.qty ?? 1, state: 'online' });
+      continue;
+    }
+
+    if (slotKey === 'fighter bay') {
+      const typeId = resolveTypeId(item.type, typeByName);
+      if (typeId === null) {
+        unresolved.push({ text: item.type, reason: 'unknown item' });
+        continue;
+      }
+      // Squadrons in the bay, as the EFT loader brings them in.
+      fighters.push(...squadronsOf(typeId, item.qty ?? 1));
       continue;
     }
 
@@ -133,5 +147,12 @@ export function loadEveFitXmlEntry(entry: FittingXmlEntry, typeByName: EftTypeLo
       a.slotIndex - b.slotIndex
   );
 
-  return { hullTypeId, modules, drones, cargo, unresolved };
+  return {
+    hullTypeId,
+    modules,
+    drones,
+    cargo,
+    ...(fighters.length > 0 ? { fighters } : {}),
+    unresolved,
+  };
 }
