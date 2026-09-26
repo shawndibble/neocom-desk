@@ -366,6 +366,109 @@ describe('IndustryPlanPage: results panel', () => {
   });
 });
 
+describe('IndustryPlanPage: Log production prefill from a job (#1787)', () => {
+  it('opens Log Production already filled with the job’s quantity and cost', async () => {
+    await db.buildPlans.add(seedPlan());
+    // Active Jobs' "Log production…" row action navigates here with the
+    // job's runs/cost in navigation state; the Rifter blueprint (typeID 638)
+    // makes 1 unit per run, so 4 runs -> quantity 4. `usr`: react-router's
+    // history wraps every pushed state under that key, and reads the initial
+    // entry's `location.state` from `window.history.state.usr` — a raw
+    // `pushState` without it leaves `location.state` `null`.
+    window.history.pushState(
+      { usr: { logProductionFromJob: { runs: 4, jobFee: 999 } } },
+      '',
+      '/industry/plans/bp-1'
+    );
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Rifter' });
+    expect(await screen.findByRole('heading', { name: 'Log Production' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Qty')).toHaveValue('4');
+    expect(screen.getByLabelText('Job fee')).toHaveValue('999');
+  });
+
+  it('multiplies runs by the blueprint’s own per-run product quantity, not just the run count', async () => {
+    // Mechanical Parts Blueprint (typeID 9841) makes 5 units per run — 2 runs
+    // must prefill quantity 10, not 2, proving the seed reads the blueprint's
+    // product quantity rather than assuming 1/run.
+    await db.buildPlans.add(seedPlan({ id: 'bp-2', blueprintTypeID: 9841 }));
+    window.history.pushState(
+      { usr: { logProductionFromJob: { runs: 2, jobFee: 500 } } },
+      '',
+      '/industry/plans/bp-2'
+    );
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Mechanical Parts' });
+    expect(await screen.findByRole('heading', { name: 'Log Production' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Qty')).toHaveValue('10');
+  });
+
+  it('does not reopen Log Production prefilled a second time from PlanVerdictHero’s own button', async () => {
+    await db.buildPlans.add(seedPlan());
+    window.history.pushState(
+      { usr: { logProductionFromJob: { runs: 4, jobFee: 999 } } },
+      '',
+      '/industry/plans/bp-1'
+    );
+    const user = userEvent.setup();
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Log Production' });
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('heading', { name: 'Log Production' })).not.toBeInTheDocument();
+
+    // Two buttons share this name (the hero's own CTA and the Production
+    // Runs panel's header action) — the hero's is the one wired to the same
+    // `logRequest` bump `pendingLogProduction` used, and renders first.
+    const [heroButton] = await screen.findAllByRole('button', { name: 'Log Production' });
+    await user.click(heroButton);
+    expect(await screen.findByRole('heading', { name: 'Log Production' })).toBeInTheDocument();
+    // The plan's own (still-loading-priced) estimate, not the job's seed replayed.
+    expect(screen.queryByDisplayValue('999')).not.toBeInTheDocument();
+  });
+
+  it('opens Log Production from Active Jobs’ own row menu when its match is the plan already open', async () => {
+    // Active Jobs (in the header, on every industry page including this
+    // one) can show a done job whose single matching plan is the very plan
+    // page it's rendered on — clicking "Log production…" there re-navigates
+    // to the same route, which doesn't remount `IndustryPlanPage`, so this
+    // exercises the same-route re-application path rather than a fresh mount.
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/industry/jobs`, () =>
+        HttpResponse.json([
+          {
+            job_id: 1,
+            activity_id: 1,
+            blueprint_type_id: 638,
+            product_type_id: 587,
+            facility_id: 60003760,
+            station_id: 60003760,
+            runs: 3,
+            cost: 4500,
+            start_date: '2020-01-01T00:00:00Z',
+            end_date: '2020-01-01T01:00:00Z',
+            status: 'active',
+          },
+        ])
+      )
+    );
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    await screen.findByRole('heading', { name: 'Rifter' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Show job list' }));
+    const row = screen.getAllByText('#638')[0].closest('tr')!;
+    fireEvent.contextMenu(row);
+    fireEvent.click(await screen.findByText('Log production…'));
+
+    expect(await screen.findByRole('heading', { name: 'Log Production' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Qty')).toHaveValue('3');
+    expect(screen.getByLabelText('Job fee')).toHaveValue('4,500');
+  });
+});
+
 describe('IndustryPlanPage: materials row context menu', () => {
   /** Right-clicks a materials-table row by its item name and returns the row. */
   async function openMaterialMenu(name: string) {

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
+import { captureException } from '@sentry/react';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import {
   Button,
   Caret,
@@ -13,6 +16,7 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   IconButton,
+  MenuItem,
   Panel,
   Spinner,
   Tooltip,
@@ -20,7 +24,7 @@ import {
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { GrantBanner } from '@/app/GrantNote';
-import { db } from '@/db';
+import { db, type BuildPlanRecord } from '@/db';
 import { loadTypes } from '@/sde/loadSde';
 import type { TypeMap } from '@/sde/types';
 import {
@@ -33,12 +37,19 @@ import {
   summarizeJobs,
   activityI18nKey,
   contextMenuTypeId,
+  canLogProductionFromJob,
   loadAllCharactersIndustryJobs,
   flattenJobsWithCharacter,
   type ActiveJob,
   type JobsLoadResult,
   type JobsFanOutSnapshot,
 } from './jobs';
+import {
+  findMatchingBuildPlans,
+  createBuildPlanForJob,
+  jobProductionSeed,
+} from './logProductionFromJob';
+import { LogProductionFromJobDialog } from './LogProductionFromJobDialog';
 import { formatDuration } from '@/lib/duration';
 import { formatEveDateTime } from '@/lib/eveTime';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -553,6 +564,52 @@ export function ActiveJobsPanel({
   );
 
   /**
+   * Issue #1787: a done manufacturing/reaction job's row menu offers "Log
+   * production…", resolving to whichever of the character's own Build Plans
+   * builds this blueprint (0: offer to create one; 1: go straight there;
+   * 2+: ask which) before landing on the plan page with the job's runs/cost
+   * ready to prefill Log Production.
+   */
+  const navigate = useNavigate();
+  const [logJobDialog, setLogJobDialog] = useState<{
+    job: JobRow;
+    matches: BuildPlanRecord[];
+  } | null>(null);
+  const canLog = useCallback((job: ActiveJob) => canLogProductionFromJob(job, now), [now]);
+  const navigateToPlanWithSeed = useCallback(
+    async (planId: string, job: Pick<ActiveJob, 'runs' | 'cost'> & { characterId: number }) => {
+      // Active Jobs' cross-character view (issue #607) can surface a done
+      // job for a character other than the active one — the plan page
+      // redirects away from any plan whose `characterId` isn't the active
+      // Character's, so this job's own owner must become active first, or
+      // landing there would silently bounce back to the plan index.
+      const { activeCharacterId, setActiveCharacter } = useActiveCharacter.getState();
+      if (activeCharacterId !== job.characterId) {
+        await setActiveCharacter(job.characterId);
+      }
+      navigate(`/industry/plans/${planId}`, {
+        state: { logProductionFromJob: jobProductionSeed(job) },
+      });
+    },
+    [navigate]
+  );
+  const handleLogProduction = useCallback(
+    async (job: JobRow) => {
+      try {
+        const matches = await findMatchingBuildPlans(job.characterId, job);
+        if (matches.length === 1) {
+          await navigateToPlanWithSeed(matches[0].id, job);
+          return;
+        }
+        setLogJobDialog({ job, matches });
+      } catch (error) {
+        captureException(error);
+      }
+    },
+    [navigateToPlanWithSeed]
+  );
+
+  /**
    * Rebuilt on every countdown tick — the remaining time, the progress
    * fraction and the warning tone are all relative to `now`, so memoising on
    * `t` alone would freeze the clock.
@@ -686,6 +743,13 @@ export function ActiveJobsPanel({
               onAddToQuickbar={onAddToQuickbar}
               quickbarAvailable={quickbarAvailable}
               onShowInfo={onShowInfo}
+              extraItems={
+                canLog(job) ? (
+                  <MenuItem onSelect={() => void handleLogProduction(job)}>
+                    {t('industry.jobsLogProduction')}
+                  </MenuItem>
+                ) : undefined
+              }
             />
           );
         },
@@ -702,6 +766,8 @@ export function ActiveJobsPanel({
       onAddToQuickbar,
       quickbarAvailable,
       onShowInfo,
+      canLog,
+      handleLogProduction,
     ]
   );
   const sortProps = useUrlSort(
@@ -721,6 +787,13 @@ export function ActiveJobsPanel({
         onAddToQuickbar={onAddToQuickbar}
         quickbarAvailable={quickbarAvailable}
         onShowInfo={onShowInfo}
+        extraItems={
+          canLog(job) ? (
+            <MenuItem onSelect={() => void handleLogProduction(job)}>
+              {t('industry.jobsLogProduction')}
+            </MenuItem>
+          ) : undefined
+        }
       >
         {tr}
       </ItemContextMenu>
@@ -1022,6 +1095,20 @@ export function ActiveJobsPanel({
             </div>
           )}
         </div>
+      )}
+      {logJobDialog && (
+        <LogProductionFromJobDialog
+          productName={nameForBlueprint(
+            logJobDialog.job.product_type_id ?? logJobDialog.job.blueprint_type_id
+          )}
+          matches={logJobDialog.matches}
+          onCreatePlan={() => createBuildPlanForJob(logJobDialog.job.characterId, logJobDialog.job)}
+          onResolved={(planId) => {
+            void navigateToPlanWithSeed(planId, logJobDialog.job);
+            setLogJobDialog(null);
+          }}
+          onClose={() => setLogJobDialog(null)}
+        />
       )}
     </Panel>
   );

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Navigate, useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -11,6 +11,7 @@ import { industryTabHref, type IndustryTab } from '@/features/industry/industryT
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { BuildPlanDetail } from '@/features/industry/BuildPlanDetail';
 import { applyBuildPlanChange } from '@/features/industry/buildPlanStore';
+import type { JobProductionSeed } from '@/features/industry/logProductionFromJob';
 import { useQuickbar } from '@/features/market/useQuickbar';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 
@@ -25,6 +26,7 @@ import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 export function IndustryPlanPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
   const { planId } = useParams<{ planId: string }>();
   const workspace = useIndustryWorkspace();
   const {
@@ -38,6 +40,30 @@ export function IndustryPlanPage() {
     corpOwnedBlueprints,
     blueprintsNeedsReauth,
   } = workspace;
+
+  // Active Jobs' "Log production…" row action (issue #1787) navigates here
+  // with the job's runs/cost in navigation state, for `BuildPlanDetail` to
+  // prefill Log Production with. Re-derived every render (not captured once)
+  // so a second "Log production…" click that lands on this same route still
+  // carries a fresh seed — `location.key` (passed alongside, below) is what
+  // tells `BuildPlanDetail` it's actually new.
+  const pendingLogProduction =
+    (location.state as { logProductionFromJob?: JobProductionSeed } | null)?.logProductionFromJob ??
+    null;
+  // Strips the state once `BuildPlanDetail` has had a chance to read it, so
+  // revisiting this history entry later (e.g. Back then Forward) doesn't
+  // replay it. Gated on `catalog` being ready, not just `location.key`:
+  // `BuildPlanDetail` doesn't mount at all until `catalog` loads (the
+  // `!catalog` branch below renders a Spinner instead), so clearing any
+  // earlier than that would strip the seed before it was ever read.
+  const clearedLogProductionKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pendingLogProduction || !catalog) return;
+    if (clearedLogProductionKeyRef.current === location.key) return;
+    clearedLogProductionKeyRef.current = location.key;
+    navigate(location.pathname, { replace: true, state: null });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reapplication is gated on `location.key` via the ref above, not a dependency list; `pendingLogProduction` is derived from `location.state` each render and would otherwise report false churn
+  }, [location.key, catalog]);
 
   const quickbar = useQuickbar(activeCharacterId);
   const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
@@ -114,6 +140,8 @@ export function IndustryPlanPage() {
           onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
           groupSnapshot={groupSnapshot}
           onSearchBpcSourcing={(typeId) => navigate(bpcSourcingHref(typeId))}
+          pendingLogProduction={pendingLogProduction}
+          pendingLogProductionKey={location.key}
         />
       )}
 

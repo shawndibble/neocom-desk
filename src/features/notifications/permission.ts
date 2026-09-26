@@ -100,8 +100,16 @@ export function shouldShowPermissionExplainer(state: {
    * appearing on the one platform AC1 exists for.
    */
   installRequired: boolean;
+  /**
+   * True once the player has moved past the very first screen of their very
+   * first session (issue #1788) — `hasCharacter` alone goes true the instant
+   * a first character exists, which for a first-time player can be the very
+   * first screen they ever land on. See `firstScreen.ts`.
+   */
+  hasLeftFirstScreen: boolean;
 }): boolean {
-  if (!state.hydrated || state.seen || !state.hasCharacter) return false;
+  if (!state.hydrated || state.seen || !state.hasCharacter || !state.hasLeftFirstScreen)
+    return false;
   // 'granted'/'denied' mean the browser has already been asked on this origin,
   // and a denied grant can never be re-requested from JS — an explainer whose
   // Enable button would do nothing is worse than no explainer. The

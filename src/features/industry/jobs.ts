@@ -195,6 +195,21 @@ export function secondsRemaining(job: Pick<IndustryJob, 'end_date'>, nowMs: numb
   return Math.max(0, (Date.parse(job.end_date) - nowMs) / 1000);
 }
 
+/** Activity ids issue #1787's "Log production…" row action applies to — the only two that produce an item at all. */
+const LOGGABLE_PRODUCTION_ACTIVITIES = new Set([1, 11]);
+
+/** Whether a job's row can offer "Log production…": done, manufacturing/reaction, and it actually produced something (research/copying/invention jobs have no product). */
+export function canLogProductionFromJob(
+  job: Pick<IndustryJob, 'activity_id' | 'product_type_id' | 'end_date'>,
+  nowMs: number
+): boolean {
+  return (
+    isJobDone(job, nowMs) &&
+    LOGGABLE_PRODUCTION_ACTIVITIES.has(job.activity_id) &&
+    job.product_type_id !== undefined
+  );
+}
+
 /** EVE industry activity IDs this app surfaces, per the task's scope decision (manufacturing v1 + these read views). */
 const ACTIVITY_NAMES: Record<number, string> = {
   1: 'manufacturing',

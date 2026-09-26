@@ -12,6 +12,7 @@
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
 import { CHARACTER_ID } from './support/fixtureData';
+import { expireCachedEsiRows, goExternallyOffline } from './support/login';
 
 const PHONE = { width: 390, height: 844 };
 
@@ -205,4 +206,23 @@ test('long-dated listings leave the Contracts row at "Nothing due" at 390px', as
   await signInAndGoto(page, './overview');
 
   await expect(page.getByRole('link', { name: 'Contracts: Nothing due' })).toBeVisible();
+});
+
+// Issue #1794: the strip's age badge is hidden below `md`, so a stale board
+// looked identical to a fresh one on a phone. It says so itself now.
+test('summary strip says the data is cached on a phone when offline with stale data', async ({
+  page,
+}) => {
+  await page.setViewportSize(PHONE);
+  await signInAndGoto(page, './overview');
+  // The wallet lands last of the reads the strip ages, so waiting on it means
+  // every one of them is in the ESI cache before it is expired below.
+  await expect(page.getByText(/1,234,567,890\.12 ISK/)).toBeVisible();
+  await expect(page.getByText(/Showing cached data/)).toHaveCount(0);
+
+  await goExternallyOffline(page);
+  await expireCachedEsiRows(page);
+  await page.reload();
+
+  await expect(page.getByText(/Showing cached data · \d+[mhd] ago/)).toBeVisible();
 });

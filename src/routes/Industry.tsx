@@ -315,6 +315,8 @@ export function Industry() {
         buildCost: row.result?.unpriceable ? null : (row.result?.totalCost ?? null),
         buyCost: row.result?.unpriceable ? null : (row.result?.buyCost ?? null),
         runs: runsByPlanId.get(row.planId) ?? 0,
+        iskPerHour: row.result?.iskPerHour ?? null,
+        marginPct: row.result?.marginPct ?? null,
       });
     }
     return map;
@@ -591,6 +593,7 @@ export function Industry() {
               onMovePlan={(planId, groupId) => void handleMovePlan(planId, groupId)}
               onOpenFitImport={() => setFitImportOpen(true)}
               statsByPlanId={statsByPlanId}
+              ownedBlueprints={ownedBlueprints}
               statsByGroupId={statsByGroupId}
             />
           )}

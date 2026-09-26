@@ -535,6 +535,10 @@ export function Overview() {
           miningSnapshot.data?.fetchedAt,
           contractsSnapshot.data?.fetchedAt,
         ])}
+        now={now}
+        fromCache={Boolean(
+          walletSnapshot.data?.result?.fromCache || skillsQueueSnapshot.data?.queueResult?.fromCache
+        )}
         onRefresh={() => {
           walletSnapshot.refresh();
           skillsQueueSnapshot.refresh();
