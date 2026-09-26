@@ -17,6 +17,7 @@
  * knowable by asking ESI per Character, so a section per stored Character
  * would mean a read per stored Character on every visit to Settings.
  */
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Trans, useTranslation } from 'react-i18next';
 import { Button, Panel } from '@/components/ui';
 import { beginEveLogin } from '@/app/loginFlow';
@@ -78,7 +79,7 @@ export function PermissionsPanel() {
                   href={AUTHORIZED_APPS_URL}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-accent hover:underline"
+                  className={inlineLinkClassName}
                 />
               ),
             }}

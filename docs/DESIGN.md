@@ -494,6 +494,14 @@ Rules:
   not shadows. Shadows only for popovers/menus (`shadow-lg shadow-black/50`).
 - One `primary` button per view; everything else `ghost`.
 - Accent = interactive/selected. Don't use accent for static decoration.
+- **In-sentence links underline at rest.** An accent link inside a sentence or
+  a definition list uses `inlineLinkClassName` (`controlStyles.ts`:
+  `text-accent font-medium underline`) — colour must not be the only cue
+  (WCAG 1.4.1). Add touch-size extras alongside it, don't fork the recipe. A
+  link that is a table-cell entity name (`MarketItemLink`, `IssuerLink`, the
+  Contracts type column) keeps its hover underline; `textActionClassName`
+  stays the recipe for uppercase text actions. `inlineLinkClassName.test.ts`
+  fails on a hand-rolled `text-accent underline`.
 - Status colors carry meaning; never use them decoratively. ISK amounts use
   `isk-pos`/`isk-neg`, not success/danger.
 - Density: tables are the norm; avoid card grids for data lists.

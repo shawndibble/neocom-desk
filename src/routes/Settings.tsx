@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -497,7 +498,7 @@ function DataAttributionPanel() {
           href="/vendor/dogma/LICENSE.EVE"
           target="_blank"
           rel="noreferrer"
-          className="text-accent underline"
+          className={inlineLinkClassName}
         >
           {t('settings.dataAttributionLink')}
         </a>
