@@ -5,6 +5,7 @@ import {
   countDaysBySource,
   mergeSnapshotDay,
   prunePriceSnapshotDates,
+  resolveTaxUnitPrice,
   resolveUnitPrice,
   weakestSource,
 } from './priceBasis';
@@ -111,6 +112,50 @@ describe('resolveUnitPrice — now bases', () => {
         TODAY,
         TODAY
       )
+    ).toEqual({ price: undefined, source: 'none' });
+  });
+});
+
+describe('resolveTaxUnitPrice', () => {
+  const historical = { buy: 80, sell: 120 };
+
+  it("uses the saved snapshot's buy side first", () => {
+    expect(resolveTaxUnitPrice({ saved, historical, live })).toEqual({
+      price: 90,
+      source: 'saved',
+    });
+  });
+
+  it('falls back to the historical split when nothing was saved', () => {
+    expect(resolveTaxUnitPrice({ historical, live })).toEqual({ price: 80, source: 'historical' });
+  });
+
+  it("falls back to today's live buy for ANY day, not just today/yesterday — Tax always bills at today's price when nothing day-specific exists", () => {
+    expect(resolveTaxUnitPrice({ live })).toEqual({ price: 95, source: 'live' });
+  });
+
+  it('skips a saved side with no buy orders and falls to historical', () => {
+    expect(resolveTaxUnitPrice({ saved: { buy: null, sell: 110 }, historical })).toEqual({
+      price: 80,
+      source: 'historical',
+    });
+  });
+
+  it('skips a historical side with no buy orders and falls to live', () => {
+    expect(resolveTaxUnitPrice({ historical: { buy: null, sell: 120 }, live })).toEqual({
+      price: 95,
+      source: 'live',
+    });
+  });
+
+  it('is unpriced when nothing has a buy side at all', () => {
+    expect(resolveTaxUnitPrice({})).toEqual({ price: undefined, source: 'none' });
+    expect(
+      resolveTaxUnitPrice({
+        saved: { buy: null, sell: 1 },
+        historical: { buy: null, sell: 1 },
+        live: { buy: null, sell: 1 },
+      })
     ).toEqual({ price: undefined, source: 'none' });
   });
 });

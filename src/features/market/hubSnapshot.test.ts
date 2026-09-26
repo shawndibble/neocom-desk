@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { db } from '@/db';
 import { resetRevalidationState } from '@/esi/cache';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { DEFAULT_TRADE_HUB, getTradeHub } from '@/market/hubs';
 import { loadHubSnapshotRange } from './hubSnapshot';
 
 const getDocs = vi.hoisted(() => vi.fn());
@@ -100,6 +100,25 @@ describe('loadHubSnapshotRange', () => {
 
     expect(result.saved.size).toBe(0);
     expect(result.historical.size).toBe(0);
+  });
+
+  it('reads a non-default hub when one is passed', async () => {
+    const amarr = getTradeHub('amarr')!;
+    getDocs.mockResolvedValue(
+      docsResult({
+        '2026-09-24': {
+          source: 'fuzzwork',
+          hubs: {
+            [STATION_KEY]: { '34': { buy: 3.6, sell: 3.8 } }, // Jita — not read
+            [String(amarr.stationId)]: { '34': { buy: 3.4, sell: 3.7 } },
+          },
+        },
+      })
+    );
+
+    const result = await loadHubSnapshotRange(CHARACTER_ID, '2026-09-24', '2026-09-24', amarr);
+
+    expect(result.saved.get('2026-09-24')?.get(34)).toEqual({ buy: 3.4, sell: 3.7 });
   });
 
   it('is empty without hitting Firestore when the range is backwards', async () => {

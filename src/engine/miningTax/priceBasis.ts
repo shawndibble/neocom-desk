@@ -90,6 +90,48 @@ export function resolveUnitPrice(
   return { price: undefined, source: 'none' };
 }
 
+export type TaxPriceSource = 'saved' | 'historical' | 'live' | 'none';
+
+export interface TaxUnitPriceInputs {
+  /** This app's saved snapshot for the day, if one was taken. */
+  saved?: SidePrices;
+  /** Adam4EVE's region-wide historical buy/sell split for the day, if the server ever had to backfill it. */
+  historical?: SidePrices;
+  /** Today's live book. */
+  live?: SidePrices;
+}
+
+export interface ResolvedTaxPrice {
+  price: number | undefined;
+  source: TaxPriceSource;
+}
+
+/**
+ * How the Moon Mining Tax ledger prices a mined day's ore (issue #523 follow-up):
+ * buy side only — Tax has never had a basis selector, it bills at what a
+ * Payee would actually get selling into buy orders — in this order:
+ *
+ *   saved snapshot for that day → Adam4EVE's historical buy split →
+ *   today's live buy.
+ *
+ * Deliberately its own resolver rather than `resolveUnitPrice` with a fixed
+ * `'buy'` basis: that function gates its `live` fallback to today/yesterday
+ * (an older day with no ESI history is a type that doesn't trade), which
+ * would leave every older, never-captured day unpriced. Tax has no ESI
+ * `average` tier to fall to first, so it keeps billing at today's live price
+ * for any such day — the same number it billed before this tiered pricing
+ * existed, not a new "unpriced" regression.
+ */
+export function resolveTaxUnitPrice(inputs: TaxUnitPriceInputs): ResolvedTaxPrice {
+  const saved = sidePrice(inputs.saved, 'buy');
+  if (saved !== undefined) return { price: saved, source: 'saved' };
+  const historical = sidePrice(inputs.historical, 'buy');
+  if (historical !== undefined) return { price: historical, source: 'historical' };
+  const live = sidePrice(inputs.live, 'buy');
+  if (live !== undefined) return { price: live, source: 'live' };
+  return { price: undefined, source: 'none' };
+}
+
 const SOURCE_RANK: Record<Exclude<PriceSource, 'none'>, number> = {
   saved: 0,
   live: 1,

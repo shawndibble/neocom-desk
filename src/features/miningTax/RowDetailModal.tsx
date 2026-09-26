@@ -22,13 +22,13 @@ interface RowDetailModalProps {
   typeNames: ReadonlyMap<number, string>;
   payees: readonly PayeeRecord[];
   /**
-   * Default-hub (Jita) prices, for this modal's own read-only valuation of an
-   * entry that has *no* Assignment and therefore no Payee to name a hub. The
-   * Assign form below values against a Payee instead — see `pricesFor`.
+   * Prices at a given Payee's hub on a given date, forwarded to
+   * `AssignDialog`, which resolves its own from whichever Payee is selected.
+   * This modal's own read-only valuation of an entry with *no* Assignment
+   * (and so no Payee to name a hub) calls it with `undefined`/`row.entry.date`
+   * — the default hub, at the day this ore was actually mined.
    */
-  unitPrices: ReadonlyMap<number, number>;
-  /** Prices at a given Payee's hub, forwarded to `AssignDialog`, which resolves its own from whichever Payee is selected. */
-  pricesFor: (hubId: string | undefined) => ReadonlyMap<number, number>;
+  pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   busy: boolean;
   /** A create or an edit through the Assign form both land here — refresh and close, same as every other action below. */
   onAssigned: () => void;
@@ -63,7 +63,6 @@ export function RowDetailModal({
   systemSecurity,
   typeNames,
   payees,
-  unitPrices,
   pricesFor,
   busy,
   onAssigned,
@@ -79,7 +78,7 @@ export function RowDetailModal({
   const oreLines = assignment ? assignment.oreLines : row.unassignedOreLines;
   const estimatedValue = assignment
     ? assignment.estimatedValue
-    : computeAssignmentValue(oreLines, unitPrices, 0).estimatedValue;
+    : computeAssignmentValue(oreLines, pricesFor(undefined, row.entry.date), 0).estimatedValue;
   // The Assign form already shows ore lines interactively (with split
   // checkboxes) whenever it's creating a new Assignment across more than one
   // line — showing the same lines again as a plain list just above it would

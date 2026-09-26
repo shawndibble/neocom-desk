@@ -40,12 +40,15 @@ interface JoinAssignDialogProps {
   payees: readonly PayeeRecord[];
   typeNames: ReadonlyMap<number, string>;
   /**
-   * Prices at a given Payee's trade hub. Resolved here rather than passed as
-   * one map, because the Payee a join settles on is decided *in* this dialog:
-   * either the terms an already-assigned member locks in, or the one the pilot
-   * picks below — and each Payee may bill at its own hub.
+   * Prices at a given Payee's trade hub, on a given date. Resolved here
+   * rather than passed as one map, because the Payee a join settles on is
+   * decided *in* this dialog: either the terms an already-assigned member
+   * locks in, or the one the pilot picks below — and each Payee may bill at
+   * its own hub. The date varies per member too (a join's whole purpose is
+   * combining entries from *different* mined dates), so each still-unassigned
+   * member is priced at its own `entry.date`, not one shared date.
    */
-  pricesFor: (hubId: string | undefined) => ReadonlyMap<number, number>;
+  pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   busy: boolean;
   onJoined: () => void;
 }
@@ -148,13 +151,16 @@ export function JoinAssignDialog({
     if (!canJoin || effectivePayeeId === null || effectivePayeeId === undefined) return;
     setSaving(true);
     try {
+      const hubId = payees.find((p) => p.id === effectivePayeeId)?.hubId;
       await joinAssignments(
         [primary, ...selected].map(memberInput),
         effectivePayeeId,
         effectiveTaxPct,
         // Every member of a join shares one Payee (that is the merge rule), so
-        // one hub prices the whole group — the Payee's, never the device's.
-        pricesFor(payees.find((p) => p.id === effectivePayeeId)?.hubId)
+        // one hub prices the whole group — the Payee's, never the device's —
+        // but each member keeps its own mined date, hence a resolver rather
+        // than one flat map.
+        (date) => pricesFor(hubId, date)
       );
       onJoined();
     } catch (error) {
