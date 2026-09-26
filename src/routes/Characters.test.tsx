@@ -132,6 +132,50 @@ function renderCharacters(
   );
 }
 
+function pilotRosterEntry(characterId: number, name: string): RosterEntry {
+  return {
+    characterId,
+    name,
+    wallet: null,
+    queue: null,
+    correctedTotalSp: 1_000_000,
+    skills: null,
+  };
+}
+
+function pilotAttentionEntry(
+  characterId: number,
+  overrides: Partial<Pick<AttentionEntry, 'piAttention' | 'piSoonestExpiryMs'>> = {}
+): AttentionEntry {
+  return {
+    characterId,
+    jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
+    jobCountsFetchedAt: new Date(),
+    piAttention: undefined,
+    piSoonestExpiryMs: undefined,
+    piFetchedAt: null,
+    ...overrides,
+  };
+}
+
+/** Mocks the roster snapshot + attention loaders for `run`, restoring both spies whether it passes or throws. */
+async function withMockedRoster(
+  roster: readonly RosterEntry[],
+  attention: readonly AttentionEntry[],
+  run: () => Promise<void>
+): Promise<void> {
+  const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue([...roster]);
+  const attentionSpy = vi
+    .spyOn(rosterAttentionModule, 'loadRosterAttention')
+    .mockResolvedValue([...attention]);
+  try {
+    await run();
+  } finally {
+    snapshotSpy.mockRestore();
+    attentionSpy.mockRestore();
+  }
+}
+
 describe('Characters', () => {
   it('renders character cards from Dexie with portraits', async () => {
     renderCharacters();
@@ -178,60 +222,23 @@ describe('Characters', () => {
   });
 
   it('shows a warning-tone "PI Stopped" chip for a Character whose colony has expired, none for a healthy card (#1793)', async () => {
-    const roster: RosterEntry[] = [
-      {
-        characterId: 91,
-        name: 'Pilot One',
-        wallet: null,
-        queue: null,
-        correctedTotalSp: 1_000_000,
-        skills: null,
-      },
-      {
-        characterId: 92,
-        name: 'Pilot Two',
-        wallet: null,
-        queue: null,
-        correctedTotalSp: 1_000_000,
-        skills: null,
-      },
-    ];
-    const attention: AttentionEntry[] = [
-      {
-        characterId: 91,
-        jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
-        jobCountsFetchedAt: new Date(),
-        piAttention: 'idle',
-        piSoonestExpiryMs: Date.now() - 3_600_000,
-        piFetchedAt: new Date(),
-      },
-      {
-        characterId: 92,
-        jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
-        jobCountsFetchedAt: new Date(),
-        piAttention: undefined,
-        piSoonestExpiryMs: undefined,
-        piFetchedAt: null,
-      },
-    ];
-    const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue(roster);
-    const attentionSpy = vi
-      .spyOn(rosterAttentionModule, 'loadRosterAttention')
-      .mockResolvedValue(attention);
+    await withMockedRoster(
+      [pilotRosterEntry(91, 'Pilot One'), pilotRosterEntry(92, 'Pilot Two')],
+      [
+        pilotAttentionEntry(91, { piAttention: 'idle', piSoonestExpiryMs: Date.now() - 3_600_000 }),
+        pilotAttentionEntry(92),
+      ],
+      async () => {
+        renderCharacters();
+        await screen.findByText('Pilot One');
 
-    try {
-      renderCharacters();
-      await screen.findByText('Pilot One');
-
-      const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
-      const pilotTwoCard = screen.getByText('Pilot Two').closest('li') as HTMLElement;
-      await within(pilotOneCard).findByText('Stopped');
-      expect(within(pilotOneCard).getByText('PI')).toBeInTheDocument();
-      expect(within(pilotTwoCard).queryByText('PI')).not.toBeInTheDocument();
-    } finally {
-      snapshotSpy.mockRestore();
-      attentionSpy.mockRestore();
-    }
+        const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
+        const pilotTwoCard = screen.getByText('Pilot Two').closest('li') as HTMLElement;
+        await within(pilotOneCard).findByText('Stopped');
+        expect(within(pilotOneCard).getByText('PI')).toBeInTheDocument();
+        expect(within(pilotTwoCard).queryByText('PI')).not.toBeInTheDocument();
+      }
+    );
   });
 
   it('shows both an Alerts chip and a PI chip on the same card when both apply (#1793)', async () => {
@@ -243,86 +250,42 @@ describe('Characters', () => {
       body: 'body',
       firedAt: Date.now(),
     });
-    const roster: RosterEntry[] = [
-      {
-        characterId: 91,
-        name: 'Pilot One',
-        wallet: null,
-        queue: null,
-        correctedTotalSp: 1_000_000,
-        skills: null,
-      },
-    ];
-    const attention: AttentionEntry[] = [
-      {
-        characterId: 91,
-        jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
-        jobCountsFetchedAt: new Date(),
-        piAttention: 'idle',
-        piSoonestExpiryMs: Date.now() - 3_600_000,
-        piFetchedAt: new Date(),
-      },
-    ];
-    const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue(roster);
-    const attentionSpy = vi
-      .spyOn(rosterAttentionModule, 'loadRosterAttention')
-      .mockResolvedValue(attention);
+    await withMockedRoster(
+      [pilotRosterEntry(91, 'Pilot One')],
+      [pilotAttentionEntry(91, { piAttention: 'idle', piSoonestExpiryMs: Date.now() - 3_600_000 })],
+      async () => {
+        renderCharacters();
+        await screen.findByText('Pilot One');
 
-    try {
-      renderCharacters();
-      await screen.findByText('Pilot One');
-
-      const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
-      await within(pilotOneCard).findByText('Stopped');
-      expect(within(pilotOneCard).getByText('Alerts')).toBeInTheDocument();
-      expect(within(pilotOneCard).getByText('1')).toBeInTheDocument();
-      expect(within(pilotOneCard).getByText('PI')).toBeInTheDocument();
-    } finally {
-      snapshotSpy.mockRestore();
-      attentionSpy.mockRestore();
-    }
+        const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
+        await within(pilotOneCard).findByText('Stopped');
+        expect(within(pilotOneCard).getByText('Alerts')).toBeInTheDocument();
+        expect(within(pilotOneCard).getByText('1')).toBeInTheDocument();
+        expect(within(pilotOneCard).getByText('PI')).toBeInTheDocument();
+      }
+    );
   });
 
   it('never shows a PI chip for a "decayed" colony, even once a stale cached expiry has passed (#1793)', async () => {
-    const roster: RosterEntry[] = [
-      {
-        characterId: 91,
-        name: 'Pilot One',
-        wallet: null,
-        queue: null,
-        correctedTotalSp: 1_000_000,
-        skills: null,
-      },
-    ];
-    const attention: AttentionEntry[] = [
-      {
-        characterId: 91,
-        jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
-        jobCountsFetchedAt: new Date(),
-        // `decayed` still carries a real `piSoonestExpiryMs` (a program that
-        // hasn't stopped, just fallen past its efficient window) — this must
-        // stay table-only even once the clock has passed that expiry,
-        // unlike `idle`/`expiring-soon`.
-        piAttention: 'decayed',
-        piSoonestExpiryMs: Date.now() - 3_600_000,
-        piFetchedAt: new Date(),
-      },
-    ];
-    const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue(roster);
-    const attentionSpy = vi
-      .spyOn(rosterAttentionModule, 'loadRosterAttention')
-      .mockResolvedValue(attention);
-
-    try {
-      renderCharacters();
-      const pilotOneCard = (await screen.findByText('Pilot One')).closest('li') as HTMLElement;
-      await within(pilotOneCard).findByText('SP');
-      expect(within(pilotOneCard).queryByText('PI')).not.toBeInTheDocument();
-      expect(within(pilotOneCard).queryByText('Stopped')).not.toBeInTheDocument();
-    } finally {
-      snapshotSpy.mockRestore();
-      attentionSpy.mockRestore();
-    }
+    // `decayed` still carries a real `piSoonestExpiryMs` (a program that
+    // hasn't stopped, just fallen past its efficient window) — must stay
+    // table-only even once the clock has passed that expiry.
+    await withMockedRoster(
+      [pilotRosterEntry(91, 'Pilot One')],
+      [
+        pilotAttentionEntry(91, {
+          piAttention: 'decayed',
+          piSoonestExpiryMs: Date.now() - 3_600_000,
+        }),
+      ],
+      async () => {
+        renderCharacters();
+        const pilotOneCard = (await screen.findByText('Pilot One')).closest('li') as HTMLElement;
+        await within(pilotOneCard).findByText('SP');
+        expect(within(pilotOneCard).queryByText('PI')).not.toBeInTheDocument();
+        expect(within(pilotOneCard).queryByText('Stopped')).not.toBeInTheDocument();
+      }
+    );
   });
 
   it('shows one combined data-age badge per card — the oldest of the fetched fields, not one each', async () => {

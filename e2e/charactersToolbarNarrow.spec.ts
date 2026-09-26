@@ -103,17 +103,11 @@ test('the table view shows Last synced age text at 390px (#1783)', async ({ page
 });
 
 /**
- * The Characters card view's active marker and non-zero attention chip
- * (#1793). The ticket named `e2e/charactersNarrow.spec.ts`, which doesn't
- * exist — this file is the actual narrow-width Characters spec, so the
- * coverage lands here instead.
- *
- * The sole logged-in Character becomes the active one on first login
- * (`Callback.tsx`), so no second character is needed to prove the marker is
- * selective — jsdom-based unit tests already cover that in
- * `Characters.test.tsx`. The PI colony's extractor expired a day ago, so the
- * attention chip reads a fixed "Stopped" rather than a countdown a slow CI
- * run could shift across a minute boundary.
+ * The sole logged-in Character is active on first login (`Callback.tsx`), so
+ * one Character proves the marker is selective; a second, non-active card is
+ * already covered in `Characters.test.tsx`. The colony's extractor expired a
+ * day ago, so the chip reads a fixed "Stopped" rather than a countdown a slow
+ * CI run could shift across a minute boundary.
  */
 test('the active card shows aria-current and an Active label, and a stopped PI colony shows a warning chip, at 390px (#1793)', async ({
   page,
@@ -121,13 +115,9 @@ test('the active card shows aria-current and an Active label, and a stopped PI c
   const installedAt = new Date(Date.now() - 15 * DAY_MS).toISOString();
   const expiresAt = new Date(Date.now() - DAY_MS).toISOString();
 
-  // Registered before any navigation — unlike the other tests in this file,
-  // this one needs the colony fixture in place for the very first `/planets`
-  // fetch (the Overview board's own prefetch on login), not only for the
-  // later "Refresh all" click. Otherwise that first fetch caches the default
-  // mock's empty list, and "Refresh all" reusing the cached response's own
-  // `[]` (rather than a fresh network round trip) leaves the card with
-  // nothing to flag.
+  // Must register before the first navigation: Overview's own login-time
+  // prefetch hits `/planets` first, and "Refresh all" later reuses whatever
+  // that first call cached rather than a fresh round trip.
   await page.route('https://esi.evetech.net/**', async (route) => {
     const { pathname } = new URL(route.request().url());
     const json = (body: unknown) =>

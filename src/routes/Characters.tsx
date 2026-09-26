@@ -44,7 +44,11 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
 import { useNow } from '@/lib/useNow';
 import { loadRosterSnapshot, type RosterEntry } from '@/features/character/roster';
-import { loadRosterAttention, type AttentionEntry } from '@/features/character/rosterAttention';
+import {
+  loadRosterAttention,
+  isPiExpired,
+  type AttentionEntry,
+} from '@/features/character/rosterAttention';
 import { useAlertCountsByCharacter } from '@/features/notifications/alertCountsByCharacter';
 import {
   useNotificationPreferences,
@@ -243,28 +247,16 @@ interface CharacterCardProps {
 
 type PiCardAttention = { kind: 'stopped' } | { kind: 'expiring'; expiryMs: number };
 
-/**
- * Card view's narrower PI signal (decision `20260925-230353`): only the two
- * "you must act now" attention states reach a card — `decayed`/`healthy`/
- * `unknown` stay table-only, so a healthy pilot's card never grows a chip.
- * The category gate runs *before* the expiry check, unlike the table's `pi`
- * column: a `decayed` colony also carries a real `piSoonestExpiryMs`, and
- * without the gate a long-stale cached entry whose expiry the clock has
- * since passed would surface here as "Stopped" — exactly the state this
- * decision says must stay table-only.
- */
+/** Card view's narrower PI signal (decision `20260925-230353`): only `idle`/`expiring-soon` reach a card, gated *before* `isPiExpired` — `decayed` also carries a real `piSoonestExpiryMs` and must stay table-only even once it's passed. */
 function piCardAttention(
   attention: AttentionEntry | undefined,
   nowMs: number
 ): PiCardAttention | null {
   const piAttention = attention?.piAttention;
   if (piAttention !== 'idle' && piAttention !== 'expiring-soon') return null;
-  const expiryMs = attention?.piSoonestExpiryMs;
-  // Same "expired always wins" rule as the table's `pi` column: a stale
-  // cached category can still say `expiring-soon` after the real clock has
-  // already passed the expiry it was computed from.
-  if (expiryMs != null && expiryMs <= nowMs) return { kind: 'stopped' };
   if (piAttention === 'idle') return { kind: 'stopped' };
+  const expiryMs = attention?.piSoonestExpiryMs;
+  if (isPiExpired(expiryMs, nowMs)) return { kind: 'stopped' };
   return expiryMs != null ? { kind: 'expiring', expiryMs } : null;
 }
 
@@ -785,11 +777,7 @@ function buildColumns(
         const attention = row.attention?.piAttention;
         if (attention === undefined) return '—';
         const expiryMs = row.attention?.piSoonestExpiryMs;
-        // Once expiry has passed, this always reads "Stopped" — never the
-        // cached `attention` category, which only refreshes on a roster
-        // reload and can still say `expiring-soon` well after the real
-        // clock has passed the expiry it was computed from.
-        if (expiryMs != null && expiryMs <= Date.now()) {
+        if (expiryMs != null && isPiExpired(expiryMs, Date.now())) {
           const stoppedTone = STAT_CHIP_TONE_TEXT_CLASS[PI_ATTENTION_TONE.idle];
           return (
             <Tooltip openOnTap content={formatTimestamp(new Date(expiryMs), timeZone)}>
@@ -884,9 +872,6 @@ export function Characters() {
   const loadPublicInfoMany = usePublicInfo((state) => state.loadMany);
   const setActiveCharacter = useActiveCharacter((state) => state.setActiveCharacter);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  // One shared clock for every card's PI countdown, not one `setInterval` per
-  // card — a large roster would otherwise re-render every card on every tick
-  // regardless of whether it has anything counting down.
   const now = useNow();
 
   const groupsValue = useOverviewGroups((state) => state.value);
