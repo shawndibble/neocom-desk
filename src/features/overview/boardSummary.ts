@@ -25,7 +25,13 @@ import { isJobDone } from '@/features/industry/jobs';
 import { needsAttentionCount, openOrderProblemCounts } from '@/features/market/openOrdersModel';
 import type { OpenOrderRow } from '@/features/market/openOrdersModel';
 import { compareSeverity } from '@/engine/severity';
-import type { IndustryBoardData, MiningTaxBoardData, PlanetaryBoardData } from './boardData';
+import { formatCountdown } from '@/lib/duration';
+import type {
+  ContractsBoardData,
+  IndustryBoardData,
+  MiningTaxBoardData,
+  PlanetaryBoardData,
+} from './boardData';
 
 /**
  * The narrow slice of i18next's `t` these need: a key, and interpolations that
@@ -117,4 +123,44 @@ export function alertsSummary(t: Translate, unread: number, typeCount: number): 
     'overview.board.alertTypes',
     { count: typeCount }
   )}`;
+}
+
+/** The soonest contract on a clock, named for the strip and the card's footer. Null when nothing qualifies. */
+export function contractsDeadlineNote(t: Translate, data: ContractsBoardData): string | null {
+  const { soonest } = data.summary;
+  if (soonest === null) return null;
+  if (soonest.kind === 'listing') return t('overview.board.contractsListingExpires');
+  const note = t(
+    soonest.overdue
+      ? 'overview.board.contractsCourierOverdue'
+      : 'overview.board.contractsCourierDue'
+  );
+  return data.route === null ? note : `${note} · ${data.route}`;
+}
+
+/** Contracts: hauls in flight and the clock on them, else a listing about to lapse, else nothing. */
+export function contractsSummary(
+  t: Translate,
+  data: ContractsBoardData | null,
+  nowMs: number
+): string {
+  if (data === null) return t(CHECKING);
+  if (data.needsReauth) return t(REAUTH);
+  const { inProgress, overdue, soonest } = data.summary;
+  const parts: string[] = [];
+  if (inProgress > 0) parts.push(t('overview.board.contractsInProgress', { count: inProgress }));
+  if (overdue > 0) {
+    parts.push(t('overview.board.contractsOverdue', { count: overdue }));
+  } else if (soonest !== null) {
+    const duration = formatCountdown(Math.max(0, soonest.atMs - nowMs) / 1000);
+    parts.push(
+      t(
+        soonest.kind === 'listing'
+          ? 'overview.board.contractsListingIn'
+          : 'overview.board.contractsNextDue',
+        { duration }
+      )
+    );
+  }
+  return parts.length > 0 ? parts.join(' · ') : t('overview.board.contractsNothingDue');
 }

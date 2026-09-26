@@ -211,6 +211,43 @@ function hoursFromNow(hours: number): string {
 const ORDERS_SCOPE = 'esi-markets.read_character_orders.v1';
 const PLANETS_SCOPE = 'esi-planets.manage_planets.v1';
 const INDUSTRY_SCOPE = 'esi-industry.read_character_jobs.v1';
+const CONTRACTS_SCOPE = 'esi-contracts.read_character_contracts.v1';
+
+/** An accepted courier with `dueInHours` left to deliver, owed by this Character. */
+function courierContract({ id, dueInHours }: { id: number; dueInHours: number }) {
+  return {
+    contract_id: id,
+    issuer_id: 1,
+    issuer_corporation_id: 1,
+    assignee_id: CHAR_ID,
+    acceptor_id: CHAR_ID,
+    type: 'courier',
+    status: 'in_progress',
+    for_corporation: false,
+    availability: 'personal',
+    date_issued: hoursFromNow(-48),
+    date_expired: hoursFromNow(24 * 20),
+    date_accepted: hoursFromNow(dueInHours - 72),
+    days_to_complete: 3,
+  };
+}
+
+/** One of this Character's own listings, lapsing `expiresInHours` from now. */
+function listingContract({ id, expiresInHours }: { id: number; expiresInHours: number }) {
+  return {
+    contract_id: id,
+    issuer_id: CHAR_ID,
+    issuer_corporation_id: 1,
+    assignee_id: 0,
+    acceptor_id: 0,
+    type: 'item_exchange',
+    status: 'outstanding',
+    for_corporation: false,
+    availability: 'public',
+    date_issued: hoursFromNow(-24),
+    date_expired: hoursFromNow(expiresInHours),
+  };
+}
 
 /**
  * Adds scopes to the seeded token.
@@ -536,6 +573,32 @@ describe('Overview board', () => {
     expect(within(link).getByText(/^(2d 0h|1d 23h)$/)).toBeInTheDocument();
   });
 
+  it('draws the next deadline from a courier when it is the soonest clock', async () => {
+    await grantScopes([CONTRACTS_SCOPE]);
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () =>
+        HttpResponse.json([courierContract({ id: 1, dueInHours: 5 })])
+      )
+    );
+    render(<App />);
+
+    const hero = await screen.findByText('Next deadline');
+    const cell = hero.parentElement as HTMLElement;
+    await waitFor(() => {
+      expect(within(cell).getByRole('link')).toHaveAttribute(
+        'href',
+        '/contracts/history?history.status=in_progress'
+      );
+    });
+    const link = within(cell).getByRole('link');
+    expect(within(link).getByText('Courier due')).toBeInTheDocument();
+    expect(within(link).getByText(/^(5h 0m|4h 5[0-9]m)$/)).toBeInTheDocument();
+
+    const card = await findCard(/^contracts$/i);
+    expect(within(card).getByText('In progress')).toBeInTheDocument();
+    expect(within(card).getByText('Due < 24h')).toBeInTheDocument();
+  });
+
   /*
    * "A card that disappears when there is nothing wrong is a card you cannot
    * tell from a card that failed to load." Every domain has to be present on a
@@ -710,7 +773,56 @@ describe('the board on a phone', () => {
     expect(full).toHaveLength(2);
     // Every domain still has a place, and none has two. A fold that quietly
     // dropped the fourth card would look exactly like a fold that worked.
-    expect([...full, ...foldedDomains()].sort()).toEqual([...DOMAINS, 'Alerts'].sort());
+    expect([...full, ...foldedDomains()].sort()).toEqual(
+      [...DOMAINS, 'Alerts', 'Contracts'].sort()
+    );
+  });
+
+  it('folds contracts into a row that names the haul and its clock', async () => {
+    await grantScopes([CONTRACTS_SCOPE]);
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () =>
+        HttpResponse.json([courierContract({ id: 1, dueInHours: 5 })])
+      )
+    );
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Everything else' });
+    await waitFor(() => expect(foldedRowLabel('Contracts')).toMatch(/1 haul in progress/));
+    expect(foldedRowLabel('Contracts')).toMatch(/next due (5h 0m|4h 5[0-9]m)/);
+    const panel = screen.getByRole('heading', { name: 'Everything else' }).closest('section')!;
+    expect(within(panel).getByRole('link', { name: /^Contracts:/ })).toHaveAttribute(
+      'href',
+      '/contracts/history?history.status=in_progress'
+    );
+  });
+
+  it('reads Nothing due for a trader whose listings are all long-dated', async () => {
+    await grantScopes([CONTRACTS_SCOPE]);
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () =>
+        HttpResponse.json(
+          Array.from({ length: 12 }, (_, i) =>
+            listingContract({ id: 100 + i, expiresInHours: 24 * (5 + i) })
+          )
+        )
+      )
+    );
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Everything else' });
+    await waitFor(() => expect(foldedRowLabel('Contracts')).toBe('Contracts: Nothing due'));
+  });
+
+  it('tones an overdue courier in the folded row', async () => {
+    await grantScopes([CONTRACTS_SCOPE]);
+    server.use(
+      http.get(`https://esi.evetech.net/characters/${CHAR_ID}/contracts`, () =>
+        HttpResponse.json([courierContract({ id: 1, dueInHours: -2 })])
+      )
+    );
+    render(<App />);
+    await screen.findByRole('heading', { name: 'Everything else' });
+    await waitFor(() => expect(foldedRowLabel('Contracts')).toMatch(/1 overdue/));
+    expect(screen.getByText('1 haul in progress · 1 overdue').className).toContain('text-danger');
   });
 
   it('gives the full cards to the worst domains', async () => {

@@ -20,6 +20,9 @@ import { loadAllColonyDetails, loadCharacterPlanets } from '@/features/pi/data';
 import { loadPlanetName } from '@/features/pi/names';
 import { extractorProgramsFromPins } from '@/features/pi/adapters';
 import { loadTypeNames } from '@/features/character/typeNames';
+import { loadContracts } from '@/features/character/contracts';
+import { loadContractLocationName } from '@/features/character/contractLocationName';
+import { summarizeContractsBoard, type ContractsBoardSummary } from '@/engine/contractsBoard';
 
 /*
  * `Overview` is the landing route and stays in the entry chunk (every other
@@ -202,4 +205,40 @@ export async function loadIndustryBoard(characterId: number): Promise<IndustryBo
     needsReauth,
     fetchedAt: cached ? cached.fetchedAt : null,
   };
+}
+
+// --- Contracts ------------------------------------------------------------
+
+export interface ContractsBoardData {
+  summary: ContractsBoardSummary;
+  /** "Jita → Amarr" for the soonest courier, or null when it is not a courier or the names did not resolve. */
+  route: string | null;
+  needsReauth: boolean;
+  fetchedAt: Date | null;
+  /** The instant the summary was computed against. */
+  loadedAt: number;
+}
+
+/**
+ * Only the deadline-relevant subset of the pilot's contracts (`engine/contractsBoard`).
+ * The route name is a courtesy: a lookup that fails leaves the note without one.
+ */
+export async function loadContractsBoard(characterId: number): Promise<ContractsBoardData> {
+  const { cached, needsReauth } = await loadContracts(characterId);
+  const loadedAt = Date.now();
+  const summary = summarizeContractsBoard(cached?.data ?? [], characterId, loadedAt);
+  const { soonest } = summary;
+  let route: string | null = null;
+  if (soonest?.kind === 'courier' && soonest.startLocationId && soonest.endLocationId) {
+    try {
+      const [from, to] = await Promise.all([
+        loadContractLocationName(characterId, soonest.startLocationId),
+        loadContractLocationName(characterId, soonest.endLocationId),
+      ]);
+      if (from && to) route = `${from} → ${to}`;
+    } catch {
+      route = null;
+    }
+  }
+  return { summary, route, needsReauth, fetchedAt: cached ? cached.fetchedAt : null, loadedAt };
 }
