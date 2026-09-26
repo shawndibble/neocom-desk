@@ -79,6 +79,7 @@ describe('shouldShowPermissionExplainer', () => {
     hasCharacter: true,
     permission: 'default',
     installRequired: false,
+    pastFirstScreen: true,
   } as const;
 
   it('shows once a character exists and the device has never been asked', () => {
@@ -95,6 +96,12 @@ describe('shouldShowPermissionExplainer', () => {
 
   it('waits for the first character login', () => {
     expect(shouldShowPermissionExplainer({ ...base, hasCharacter: false })).toBe(false);
+  });
+
+  // issue #1788: `hasCharacter` alone goes true the instant a new player
+  // lands on /characters, which put this on their very first screen.
+  it('waits until the player has moved past the very first screen', () => {
+    expect(shouldShowPermissionExplainer({ ...base, pastFirstScreen: false })).toBe(false);
   });
 
   it('stays hidden when the browser has already answered', () => {
