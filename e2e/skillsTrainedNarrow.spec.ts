@@ -172,9 +172,12 @@ test('the in-progress skill shows a Training chip at 390px, and no other row doe
   await page.setViewportSize(PHONE);
 
   await page.getByRole('button', { name: /^Gunnery/ }).click();
-  const chip = page.getByText(/^Training → IV · 4d 4h$/);
+  const chip = page
+    .getByRole('button', { name: /^Small Hybrid Turret/ })
+    .getByText(/^Training → IV · 4d 4h$/);
   await expect(chip).toBeVisible();
-  await expect(page.getByText(/^Training →/)).toHaveCount(1);
+  // One on the row, one on its group's header (#2002); no other row has one.
+  await expect(page.getByText(/^Training →/)).toHaveCount(2);
 
   const box = await chip.boundingBox();
   expect(box).not.toBeNull();

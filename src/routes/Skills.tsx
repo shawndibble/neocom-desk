@@ -173,6 +173,14 @@ export function Skills() {
   const completedLevels = data?.completedLevels ?? null;
   const training = data?.training ?? null;
   const completedSp = data?.completedSp ?? 0;
+  const trainingChip = training && (
+    <span className="shrink-0 rounded-xs border border-line bg-panel-2 px-1.5 text-[0.6875rem] whitespace-nowrap text-accent tabular-nums">
+      {t('skills.trainingChip', {
+        level: ROMAN[training.targetLevel - 1] ?? training.targetLevel,
+        time: formatCountdown(training.secondsRemaining),
+      })}
+    </span>
+  );
   const fetchedAt = data?.fetchedAt ?? null;
   const implantDetails = data?.implantDetails ?? [];
   const attributeSlotsFilled = implantDetails.filter((i) => i.attributeSlot).length;
@@ -430,6 +438,9 @@ export function Skills() {
             groups.map((group) => {
               if (searching && !filterResult.visibleGroupNames.has(group.groupName)) return null;
               const expanded = searching || expandedGroups.has(group.groupName);
+              const groupHasTraining =
+                training !== null &&
+                group.skills.some((skill) => skill.skillTypeID === training.skillTypeID);
               const skillsToShow = searching
                 ? (filterResult.matchedSkillsByGroup.get(group.groupName) ?? [])
                 : group.skills;
@@ -448,12 +459,15 @@ export function Skills() {
                         expanded ? 'border-b' : ''
                       }`}
                     >
-                      <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      <span className="flex min-w-0 items-center gap-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                         <Caret expanded={expanded} />
-                        {group.groupName}
+                        <span className="truncate">{group.groupName}</span>
                       </span>
-                      <span className="shrink-0 text-[0.6875rem] tabular-nums text-text-dim">
-                        {skillsToShow.length}
+                      <span className="flex shrink-0 items-center gap-2">
+                        {groupHasTraining && trainingChip}
+                        <span className="text-[0.6875rem] tabular-nums text-text-dim">
+                          {skillsToShow.length}
+                        </span>
                       </span>
                     </button>
                   </h2>
@@ -480,14 +494,7 @@ export function Skills() {
                               }`}
                             >
                               <span className="flex-1 truncate">{skill.name}</span>
-                              {training?.skillTypeID === skill.skillTypeID && (
-                                <span className="shrink-0 rounded-xs border border-line bg-panel-2 px-1.5 text-[0.6875rem] whitespace-nowrap text-accent tabular-nums">
-                                  {t('skills.trainingChip', {
-                                    level: ROMAN[training.targetLevel - 1] ?? training.targetLevel,
-                                    time: formatCountdown(training.secondsRemaining),
-                                  })}
-                                </span>
-                              )}
+                              {training?.skillTypeID === skill.skillTypeID && trainingChip}
                               <SkillBar level={skill.level} progress={progress} />
                               <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
                                 {skill.sp === null
