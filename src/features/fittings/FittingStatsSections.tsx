@@ -26,6 +26,7 @@ import { DamageProfilePicker } from './DamageProfilePicker';
 import { AppliedDpsPanel } from './AppliedDpsPanel';
 import { Facts, HeatFigure, type Fact } from './StatFacts';
 import { SkillOverridesControl } from './SkillOverridesControl';
+import { PriceHubSelect } from './PriceHubSelect';
 import { StatsToolbar } from './StatsToolbar';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
@@ -1066,6 +1067,7 @@ export function FittingStatsSections({
         price ? (nothingPriced ? '—' : iskLabel(price.totals.sell)) : undefined,
         price ? (
           <>
+            <PriceHubSelect />
             <Facts
               items={[
                 {

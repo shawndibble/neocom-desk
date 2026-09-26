@@ -623,7 +623,6 @@
       "unheated": "Unheated: {{value}}",
       "dronesNoOverheat": "Drones don't overheat",
       "defenseEhp": "{{value}} EHP",
-      "ehpLine": "Effective HP: {{value}}",
       "repair": {
         "shield": "Shield boost: {{value}} HP/s",
         "armor": "Armor repair: {{value}} HP/s",
@@ -641,6 +640,7 @@
       "unknownItemsMore_other": "…and {{count}} more",
       "priceBuy": "Jita buy: {{value}} ISK",
       "priceSell": "Jita sell: {{value}} ISK",
+      "priceHub": "Priced at",
       "priceUnpriced_one": "{{count}} item has no price at this hub",
       "priceUnpriced_other": "{{count}} items have no price at this hub",
       "priceLoading": "Pricing…",

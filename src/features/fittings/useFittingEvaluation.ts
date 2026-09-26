@@ -24,7 +24,8 @@ import {
 } from '@/engine/fittings/implantBasis';
 import type { DamageProfile, Fitting, FittingStats, PilotProfile } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
+import { useMarketHub } from '@/features/market/hub';
+import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
 import {
   pilotUnder,
   statsOptions,
@@ -251,17 +252,25 @@ export function useFittingEvaluation({
     };
   }, [fitting, pilot, damageProfile, conditions, attempt]);
 
+  // Priced at the pilot's Trade Hub (Settings, or the Price section's select).
+  const hubId = useMarketHub((state) => state.value);
+  const hubHydrated = useMarketHub((state) => state.hydrated);
+  const hydrateHub = useMarketHub((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateHub();
+  }, [hydrateHub]);
+
   useEffect(() => {
     let cancelled = false;
-    if (fitting === null) return;
+    if (fitting === null || !hubHydrated) return;
     void (async () => {
-      const result = await loadFittingPrice(fitting, DEFAULT_TRADE_HUB);
+      const result = await loadFittingPrice(fitting, getTradeHub(hubId) ?? DEFAULT_TRADE_HUB);
       if (!cancelled) setPrice(result);
     })();
     return () => {
       cancelled = true;
     };
-  }, [fitting]);
+  }, [fitting, hubId, hubHydrated]);
 
   const variants = useMemo(
     () =>

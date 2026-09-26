@@ -681,20 +681,6 @@ export function extractOverheatedStats(shipAttributes: AttributeMap): Overheated
 }
 
 /**
- * The overheated value to show beside a normal one, or null when there is
- * none or it would read the same at the displayed precision — so a section
- * no overheatable module touches shows no overheated line.
- */
-export function overheatedOrNull(
-  normal: number,
-  overheated: number | null | undefined,
-  fractionDigits: number
-): number | null {
-  if (overheated === null || overheated === undefined) return null;
-  return overheated.toFixed(fractionDigits) === normal.toFixed(fractionDigits) ? null : overheated;
-}
-
-/**
  * Under "Overheat all", the unheated figure as it would be shown — `format`
  * applied to the unheated stats — when heat changed what is shown, else
  * null: a figure heat leaves as it is (a hold, the mass, a fitting budget),

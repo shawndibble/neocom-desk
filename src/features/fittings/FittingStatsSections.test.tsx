@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { Appraisal } from '@/engine/market/appraisal';
 import '@/i18n';
 import { BUILT_IN_DAMAGE_PROFILES } from '@/engine/fittings/damageProfile';
 import type { FittingStats } from '@/engine/fittings/types';
@@ -1071,5 +1072,41 @@ describe('FittingStatsSections — Fighters', () => {
   it('has no Fighters section on a hull without tubes', () => {
     renderSections(stats());
     expect(screen.queryByRole('heading', { name: 'Fighters' })).toBeNull();
+  });
+});
+
+describe('FittingStatsSections price', () => {
+  const row = (typeId: number, name: string, quantity: number, sell: number | null) => ({
+    typeId,
+    name,
+    quantity,
+    buyEach: sell,
+    sellEach: sell,
+    buyTotal: sell === null ? null : sell * quantity,
+    sellTotal: sell === null ? null : sell * quantity,
+  });
+
+  it('names the unpriced items and offers a Trade Hub select', async () => {
+    const price = {
+      rows: [row(1, 'Priced Thing', 1, 10), row(2, 'Rare Thing', 3, null)],
+      totals: { buy: 10, sell: 10, spread: 0, unpricedRows: 1 },
+    } as unknown as Appraisal;
+    render(
+      <FittingStatsSections
+        stats={stats()}
+        statsProgress={null}
+        statsError={false}
+        price={price}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={typeName}
+      />
+    );
+    await userEvent.click(screen.getByRole('button', { name: /^Price/ }));
+    const body = within(sectionBody('Price'));
+
+    expect(body.getByText('Rare Thing ×3')).toBeInTheDocument();
+    expect(body.queryByText('Priced Thing')).toBeNull();
+    expect(body.getByRole('combobox', { name: 'Priced at' })).toBeInTheDocument();
   });
 });
