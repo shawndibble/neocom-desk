@@ -886,7 +886,7 @@ export function Mail() {
                       readerHeadingRef.current = el;
                     }}
                     tabIndex={-1}
-                    className="text-base font-semibold text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    className="text-base font-semibold break-words text-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   >
                     {body.data.subject || t('mail.noSubject')}
                   </h3>
