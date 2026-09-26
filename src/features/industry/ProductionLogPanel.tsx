@@ -20,6 +20,7 @@ import {
 } from '@/components/ui';
 import type { DataTableColumn } from '@/components/ui';
 import { cx } from '@/lib/cx';
+import { soldUnitsMargin } from '@/engine/industry/realizedProfit';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
@@ -83,6 +84,9 @@ interface ItemRow {
   revenue: number;
   /** Null when nothing has sold for this item yet — a percentage of zero revenue is not a number. */
   avgMarginPct: number | null;
+  /** Net revenue less the sold units' share of cost (issue #1785). */
+  soldUnitsMargin: number;
+  unsoldCost: number;
 }
 
 // Stable empty fallbacks for `useLiveQuery(...) ?? []`: a fresh `[]` literal
@@ -221,12 +225,20 @@ function buildRollup(
   for (const s of summaries) {
     const typeID = s.run.productTypeID;
     const existing = byItem.get(typeID);
+    const sold = soldUnitsMargin({
+      totalCost: s.run.totalCost,
+      quantity: s.run.quantity,
+      quantitySold: s.quantitySold,
+      netRevenue: s.profit.netRevenue,
+    });
     if (existing) {
       existing.runsLogged += 1;
       existing.unitsProduced += s.run.quantity;
       existing.unitsSold += s.quantitySold;
       existing.realizedProfit += s.profit.profit;
       existing.revenue += s.profit.grossRevenue;
+      existing.soldUnitsMargin += sold.margin;
+      existing.unsoldCost += sold.unsoldCost;
     } else {
       byItem.set(typeID, {
         productTypeID: typeID,
@@ -237,6 +249,8 @@ function buildRollup(
         realizedProfit: s.profit.profit,
         revenue: s.profit.grossRevenue,
         avgMarginPct: null,
+        soldUnitsMargin: sold.margin,
+        unsoldCost: sold.unsoldCost,
       });
     }
   }
@@ -482,6 +496,23 @@ export function ProductionLogPanel({
       className: 'tabular-nums text-text-dim',
       sortValue: (r) => r.avgMarginPct ?? undefined,
       render: (r) => (r.avgMarginPct === null ? '—' : formatPercent(r.avgMarginPct)),
+    },
+    {
+      id: 'soldUnitsMargin',
+      header: t('industry.soldUnitsMargin'),
+      align: 'right',
+      className: 'tabular-nums',
+      cellClassName: (r) => (r.unitsSold > 0 ? iskToneClass(r.soldUnitsMargin) : 'text-text-dim'),
+      sortValue: (r) => (r.unitsSold > 0 ? r.soldUnitsMargin : undefined),
+      render: (r) => (r.unitsSold > 0 ? formatIsk(r.soldUnitsMargin) : '—'),
+    },
+    {
+      id: 'unsoldCost',
+      header: t('industry.unsoldCost'),
+      align: 'right',
+      className: 'tabular-nums text-text-dim',
+      sortValue: (r) => r.unsoldCost,
+      render: (r) => formatIsk(r.unsoldCost),
     },
     {
       id: 'moreActions',
