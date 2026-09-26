@@ -686,6 +686,16 @@ export interface MaterialCostLine extends EffectiveMaterial {
   lineCost: number;
   /** True when a non-zero remainder has neither an override nor a hub price. */
   unpriced: boolean;
+  /**
+   * Present only on a synthetic Blueprint Acquisition row (issue #838) — the
+   * ME/TE tier it resolved to. Optional and rarely carried through a merge
+   * (`mergeCostLines` doesn't spread it, so two occurrences merging into one
+   * line drops it), but declared here rather than read off an untyped cast
+   * so a caller that does have it (e.g. `groupRollup.ts`'s
+   * `acquisitionTypeIds`) can check it without reaching past this module's
+   * own type.
+   */
+  acquisitionTier?: { me: number; te: number };
 }
 
 export type BuildRecommendation = 'build' | 'buy' | 'unknown';

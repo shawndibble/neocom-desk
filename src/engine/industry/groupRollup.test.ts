@@ -354,6 +354,83 @@ describe('rollUpBuildGroup — group-owned ledger', () => {
   });
 });
 
+describe('rollUpBuildGroup — blueprint acquisition rows (issue #1776)', () => {
+  // The synthetic Blueprint Acquisition row `acquisitionMaterialFor` produces
+  // for an owned BPC/BPO: fully owned, one unit, nothing left to buy. Only
+  // `tableMaterials` carries the `acquisitionTier` marker in real data
+  // (`shoppingListMaterials`'s `costLine` strips it before it reaches this
+  // module) — this fixture mirrors that split.
+  function acquisitionLine(
+    typeID: number,
+    extra: Partial<MaterialCostLine> = {}
+  ): MaterialCostLine {
+    return {
+      ...line(typeID, 1, { ownedQuantity: 1, remainingQuantity: 0, lineCost: 0, ...extra }),
+      acquisitionTier: { me: 0, te: 0 },
+    };
+  }
+
+  it('does not net an owned blueprint against the group ledger — the ledger has no opinion about a blueprint', () => {
+    const rollup = rollUpBuildGroup(
+      [
+        member({
+          planId: 'a',
+          // shoppingMaterials mirrors real data: same owned/remaining split,
+          // but no acquisitionTier field at all (costLine already stripped it).
+          shoppingMaterials: [
+            line(11185, 1, { ownedQuantity: 1, remainingQuantity: 0, lineCost: 0 }),
+          ],
+          tableMaterials: [acquisitionLine(11185)],
+        }),
+      ],
+      { ownedStock: new Map() }
+    );
+    const tableRow = rollup.tableMaterials.find((m) => m.typeID === 11185);
+    expect(tableRow?.remainingQuantity).toBe(0);
+    expect(tableRow?.ownedQuantity).toBe(1);
+    const shoppingRow = rollup.shoppingMaterials.find((m) => m.typeID === 11185);
+    expect(shoppingRow?.remainingQuantity).toBe(0);
+  });
+
+  it('still shows a real shortfall — an unowned blueprint is unaffected by this fix', () => {
+    const rollup = rollUpBuildGroup(
+      [
+        member({
+          planId: 'a',
+          tableMaterials: [
+            acquisitionLine(11185, {
+              ownedQuantity: 0,
+              remainingQuantity: 1,
+              unitPrice: 5_000_000,
+              lineCost: 5_000_000,
+            }),
+          ],
+        }),
+      ],
+      { ownedStock: new Map() }
+    );
+    const bpcRow = rollup.tableMaterials.find((m) => m.typeID === 11185);
+    expect(bpcRow?.remainingQuantity).toBe(1);
+  });
+
+  it('still skips netting when two members need the same blueprint typeID, even though the merge itself drops the marker', () => {
+    // mergeCostLines merges these two acquisition rows into one plain
+    // MaterialCostLine with no acquisitionTier (it doesn't spread the field) —
+    // the skip-set must come from each member's own tableMaterials, read
+    // before that merge, or this collision silently reopens issue #1776.
+    const rollup = rollUpBuildGroup(
+      [
+        member({ planId: 'a', tableMaterials: [acquisitionLine(11185)] }),
+        member({ planId: 'b', tableMaterials: [acquisitionLine(11185)] }),
+      ],
+      { ownedStock: new Map() }
+    );
+    const bpcRow = rollup.tableMaterials.find((m) => m.typeID === 11185);
+    expect(bpcRow?.remainingQuantity).toBe(0);
+    expect(bpcRow?.ownedQuantity).toBe(2);
+  });
+});
+
 describe('rollUpBuildGroup — mixed hubs', () => {
   it('reports a single hub as pasteable', () => {
     const rollup = rollUpBuildGroup([
