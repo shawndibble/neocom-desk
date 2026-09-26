@@ -91,6 +91,15 @@ test('New Group, density, and view-mode controls share one row at 390px', async 
   expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
 });
 
+test('the table view shows Last synced age text at 390px (#1783)', async ({ page }) => {
+  await landOnCharactersAtPhoneWidth(page);
+  await page.getByRole('button', { name: 'Table' }).click();
+
+  const age = page.locator('table td time').first();
+  await expect(age).toBeVisible();
+  await expect(age).not.toHaveText('');
+});
+
 /**
  * `hasTouch` is scoped to this block, not the file: it flips
  * `(pointer: coarse)`/`(hover: none)`, and the row-layout test above must keep
