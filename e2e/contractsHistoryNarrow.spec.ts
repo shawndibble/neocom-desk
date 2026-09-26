@@ -94,3 +94,31 @@ test.describe('contracts history — detail opener', () => {
     });
   });
 });
+
+test.describe('contracts history — untitled courier route (issue #1706)', () => {
+  test.use({ viewport: PHONE });
+
+  test('shows start → end with collateral instead of a bare "Courier"', async ({ page }) => {
+    await signInAndGoto(page);
+    await page.route(`https://esi.evetech.net/characters/${CHARACTER_ID}/contracts*`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            ...contract(9101, 'courier', ''),
+            start_location_id: 60003760,
+            end_location_id: 60008494,
+            collateral: 250_000_000,
+          },
+        ]),
+      })
+    );
+    await page.goto('./contracts/history');
+    const opener = page.getByRole('table').first().locator('tbody tr td:first-child button');
+    await expect(opener).toContainText(/Jita.+ → Amarr/);
+    await expect(opener).toContainText('Collateral');
+    const box = await opener.boundingBox();
+    expect(box?.width ?? 0).toBeLessThanOrEqual(PHONE.width);
+  });
+});
