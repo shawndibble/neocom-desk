@@ -2,7 +2,7 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import type { EngineSkill } from '@/engine/types';
+import type { EngineSkill, PlanEntry } from '@/engine/types';
 import type { TargetPlan } from '../useTargetPlan';
 import { loadUniverseType } from '../data';
 import { loadKnownRequirements } from '@/features/fittings/skillRequirements';
@@ -61,7 +61,12 @@ function fakeTarget(overrides: Partial<TargetPlan> = {}): TargetPlan {
     plans: [],
     targetPlanId: null,
     setTargetPlanId: vi.fn(),
-    addEntries: vi.fn(async () => {}),
+    addEntries: vi.fn(async (entries: readonly PlanEntry[]) => ({
+      planId: 'plan-1',
+      planName: 'Vexor',
+      added: [...entries],
+    })),
+    removeEntries: vi.fn(async () => {}),
     ...overrides,
   };
 }
@@ -236,6 +241,60 @@ describe('ShipsPanel', () => {
     await waitFor(() =>
       expect(screen.getByText(/doesn't look like an eft fit/i)).toBeInTheDocument()
     );
+  });
+
+  it('Add shows an Added confirmation toast naming the plan, Undo removes what it added (#1704)', async () => {
+    const user = userEvent.setup();
+    const target = fakeTarget();
+    renderPanel(target);
+    await pickVexor(user);
+    await waitFor(() => expect(screen.getByText('Gunnery')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Added 1 skill to Vexor');
+    await user.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(target.removeEntries).toHaveBeenCalledWith('plan-1', [
+      { skillTypeID: 3300, targetLevel: 1 },
+    ]);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('shows no toast when nothing new was actually added', async () => {
+    const user = userEvent.setup();
+    const target = fakeTarget({
+      addEntries: vi.fn(async () => ({ planId: 'plan-1', planName: 'Vexor', added: [] })),
+    });
+    renderPanel(target);
+    await pickVexor(user);
+    await waitFor(() => expect(screen.getByText('Gunnery')).toBeInTheDocument());
+
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    await waitFor(() => expect(target.addEntries).toHaveBeenCalled());
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('a row already covered by the target plan shows "In plan" instead of an active Add button', async () => {
+    const user = userEvent.setup();
+    const target = fakeTarget({
+      plans: [
+        {
+          id: 'plan-1',
+          characterId: 1,
+          name: 'Vexor',
+          entries: [{ skillTypeID: 3300, targetLevel: 1 }],
+          remapCount: 0,
+          updatedAt: 0,
+        },
+      ],
+      targetPlanId: 'plan-1',
+    });
+    renderPanel(target);
+    await pickVexor(user);
+
+    expect(await screen.findByText('In plan')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument();
   });
 
   it('a manual reselect while a fit check is in flight is not clobbered by the auto-switch', async () => {

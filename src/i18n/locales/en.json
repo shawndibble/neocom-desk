@@ -801,7 +801,11 @@
       "addAllToPlan": "Add all to Skill Plan",
       "createPlanAndAdd": "Create Skill Plan and add",
       "add": "Add",
-      "trained": "Trained"
+      "trained": "Trained",
+      "inPlan": "In plan",
+      "addedToast_one": "Added {{count}} skill to {{plan}}",
+      "addedToast_other": "Added {{count}} skills to {{plan}}",
+      "addedToastUndo": "Undo"
     },
     "requiredSkills": {
       "title": "Required Skills",
@@ -1172,7 +1176,8 @@
       "namePlaceholder": "Goal name (e.g. \"Fly Loki\")",
       "save": "Save",
       "cancel": "Cancel"
-    }
+    },
+    "jumpToAdded": "Jump to it"
   },
   "skillCompare": {
     "pickCharacters": "Characters to compare",
