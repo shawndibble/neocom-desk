@@ -317,7 +317,9 @@ test('the header progress chips wrap at 390px without horizontal scroll', async 
   await page.setViewportSize(PHONE);
   await page.goto(`./skills/plans/${PLAN_ID}`);
 
-  await expect(page.getByText('Trained', { exact: true })).toBeVisible();
+  // The Skills sub-nav also has a "Trained" tab (a link), so match the chip's
+  // own label span.
+  await expect(page.locator('span', { hasText: /^Trained$/ })).toBeVisible();
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth
   );
@@ -329,7 +331,7 @@ test('the header progress chips wrap at 390px without horizontal scroll', async 
  * headline number, so the summary says so beside them — visible on a phone,
  * where the lens control itself sits inside the collapsed tools disclosure.
  */
-test('a non-Current what-if lens shows a chip beside the headline at 390px', async ({ page }) => {
+test('a non-Current what-if lens shows a chip in the header strip at 390px', async ({ page }) => {
   await signInAndGoto(page);
   await putRecord(page, 'skillPlans', {
     id: PLAN_ID,
@@ -346,4 +348,9 @@ test('a non-Current what-if lens shows a chip beside the headline at 390px', asy
   await expect(page.getByTestId('what-if-chip')).toContainText(
     /^What-if \+5(Saves .+ vs current|Costs .+ vs current|Same as current)$/
   );
+  // A StatChip never wraps inside itself, so the page must not scroll sideways.
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
 });
