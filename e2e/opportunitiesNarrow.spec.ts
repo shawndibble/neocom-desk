@@ -236,4 +236,22 @@ test.describe('Opportunities — ranked phone list', () => {
       expect(await checkbox.isChecked()).toBe(true);
     });
   });
+
+  /**
+   * Issue #1781: the card's own face stays uncrowded — "Start a plan" lives
+   * in the row's card menu, the same per-row action the market-wide table
+   * gives its own row directly.
+   */
+  test('the card menu\'s "Start a plan" action creates a plan and opens it (issue #1781)', async ({
+    page,
+  }) => {
+    await page.setViewportSize(PHONE);
+    await page.goto('./industry/opportunities');
+
+    await expect(page.getByText('Rifter', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /More actions for Rifter/ }).click();
+    await page.getByRole('menuitem', { name: 'Start a plan' }).click();
+
+    await expect(page).toHaveURL(/\/industry\/plans\/[^/]+$/);
+  });
 });

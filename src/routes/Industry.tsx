@@ -452,6 +452,16 @@ export function Industry() {
     setTab('plans');
   }
 
+  function handleStartPlan(entry: BlueprintCatalogEntry) {
+    // Distinct from the plain search-box create: picking a scan result or an
+    // owned Opportunities row is an explicit "go build this" choice, same as
+    // opening a `?product=` deep link, so it opens the new plan's own page
+    // rather than leaving the pilot on the Opportunities tab.
+    void createPlan(entry).then((id) => {
+      if (id) navigate(`/industry/plans/${id}`);
+    });
+  }
+
   function exitCompare() {
     setCompareMode(false);
     setCompareSelectedIds(new Set());
@@ -497,6 +507,7 @@ export function Industry() {
                 onAddToQuickbar={quickbar.add}
                 quickbarAvailable={quickbar.available}
                 onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
+                onStartPlan={handleStartPlan}
               />
               <MarketWideOpportunitiesPanel
                 hub={DEFAULT_TRADE_HUB}
@@ -507,16 +518,7 @@ export function Industry() {
                 onAddToQuickbar={quickbar.add}
                 quickbarAvailable={quickbar.available}
                 onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
-                onStartPlan={(entry) => {
-                  // Distinct from the plain search-box create: picking a
-                  // scan result is an explicit "go build this" choice, same
-                  // as opening a `?product=` deep link, so it opens the new
-                  // plan's own page rather than leaving the pilot on the
-                  // Opportunities tab.
-                  void createPlan(entry).then((id) => {
-                    if (id) navigate(`/industry/plans/${id}`);
-                  });
-                }}
+                onStartPlan={handleStartPlan}
               />
             </div>
           ) : tab === 'records' ? (
