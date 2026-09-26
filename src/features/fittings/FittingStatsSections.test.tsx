@@ -905,7 +905,10 @@ describe('FittingStatsSections — Mining', () => {
     expect(mining.getByText('1122 m³ / 32.5 s')).toBeInTheDocument();
     expect(mining.getAllByText('34.5 m³/s').length).toBeGreaterThan(0);
     expect(mining.getByText('124.2K m³/h')).toBeInTheDocument();
-    expect(mining.getByText('−36.8% expected (12.7 m³/s)')).toBeInTheDocument();
+    // Residue is lost on top of the yield, never read as a cut from it.
+    expect(mining.getByText('Residue (ore destroyed)')).toBeInTheDocument();
+    expect(mining.getByText('12.7 m³/s, 36.8% of yield on top')).toBeInTheDocument();
+    expect(mining.queryByText(/−36.8%/)).toBeNull();
     expect(mining.getByText('Mining hold full in')).toBeInTheDocument();
     expect(mining.getByText('5m (11500 m³)')).toBeInTheDocument();
   });

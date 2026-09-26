@@ -653,10 +653,10 @@
         "crystal": "Crystal: {{name}}",
         "total": "Total",
         "perHour": "Per hour",
-        "residue": "Residue",
-        "residueValue": "−{{pct}}% expected ({{value}} m³/s)",
+        "residue": "Residue (ore destroyed)",
+        "residueValue": "{{value}} m³/s, {{pct}}% of yield on top",
         "fillsIn": "{{hold}} full in",
-        "note": "Yield includes expected critical successes; a crystal's bonus counts only on its own ore.",
+        "note": "Yield includes expected critical successes; a crystal's bonus counts only on its own ore. Residue is extra ore the asteroid loses on top of what you mine: it doesn't reduce your yield.",
         "fillTime": "{{time}} ({{capacity}} m³)"
       },
       "fightersNoOverheat": "Fighters don't overheat"
