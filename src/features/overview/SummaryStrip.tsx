@@ -17,6 +17,7 @@ import { Link } from 'react-router-dom';
 import { DataAgeBadge, IconButton, SEVERITY_TEXT, SeverityIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { DeadlineSeverity } from '@/engine/severity';
+import { formatAge, HOUR_MS } from '@/lib/age';
 import { cx } from '@/lib/cx';
 
 export interface SummaryStripProps {
@@ -44,6 +45,14 @@ export interface SummaryStripProps {
   failed: boolean;
   /** Stalest of the board's own reads: every countdown above is only as fresh as this. */
   fetchedAt: Date | null;
+  /**
+   * Any of the board's own reads came from cache rather than a live fetch.
+   * The badge that says so is hidden below `md`, so on a phone this strip
+   * carries the cue itself (issue #1794).
+   */
+  fromCache?: boolean;
+  /** The board's clock, so the age line ticks with the countdowns instead of reading its own. */
+  now: number;
   onRefresh: () => void;
   refreshing: boolean;
 }
@@ -57,10 +66,14 @@ export function SummaryStrip({
   walletUnavailable,
   failed,
   fetchedAt,
+  fromCache = false,
+  now,
   onRefresh,
   refreshing,
 }: SummaryStripProps) {
   const { t } = useTranslation();
+  const ageMs = fetchedAt ? Math.max(0, now - fetchedAt.getTime()) : 0;
+  const stale = fetchedAt !== null && (fromCache || ageMs > HOUR_MS);
   return (
     <section className="rounded-xs border border-line bg-panel/85 backdrop-blur-sm">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3 p-3 sm:gap-x-8">
@@ -118,6 +131,14 @@ export function SummaryStrip({
             disabled={refreshing}
           />
         </span>
+
+        {stale && (
+          <div className="w-full md:hidden">
+            <WarningLine>
+              {t('common.offlineTitle')} · {formatAge(ageMs, t)}
+            </WarningLine>
+          </div>
+        )}
       </div>
     </section>
   );
