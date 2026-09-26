@@ -123,3 +123,49 @@ test.describe('Fitting Compare control toolbar', () => {
     }
   });
 });
+
+test.describe('Fitting Compare column alignment', () => {
+  for (const size of [
+    { width: 1024, height: 768 },
+    { width: 1440, height: 900 },
+  ]) {
+    for (const fits of [
+      [FIT_A, FIT_B],
+      [FIT_A, FIT_B, FIT_C],
+    ]) {
+      test(`${fits.length} fits line up between Stats and Modules at ${size.width}`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(size);
+        await signInAndGoto(page, './fittings/compare');
+        await answerAnyType(page);
+        // Every later fit carries one more gun, so the "Modules that differ" table renders.
+        for (const [i, eft] of fits.entries()) {
+          await addFitting(
+            page,
+            i === 0
+              ? eft
+              : `${eft}
+125mm Gatling AutoCannon I`
+          );
+        }
+        const tables = page.locator('table');
+        await expect(tables).toHaveCount(2, { timeout: 20_000 });
+        for (const index of [0, 1]) {
+          await expect(tables.nth(index).locator('thead th')).toHaveCount(fits.length + 1, {
+            timeout: 20_000,
+          });
+        }
+        const rights = async (index: number) =>
+          tables
+            .nth(index)
+            .locator('thead th')
+            .evaluateAll((ths) => ths.map((th) => th.getBoundingClientRect().right));
+        const stats = await rights(0);
+        const modules = await rights(1);
+        expect(stats).toHaveLength(fits.length + 1);
+        stats.forEach((right, i) => expect(Math.abs(right - modules[i]!)).toBeLessThanOrEqual(1));
+      });
+    }
+  }
+});

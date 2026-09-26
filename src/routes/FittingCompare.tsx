@@ -184,7 +184,9 @@ export function FittingCompare() {
     return (
       <RowActionsMenu name={name} items={items}>
         <div className="flex flex-col items-end gap-1">
-          <span className="max-w-40 truncate font-medium text-text">{slot.fitting?.name}</span>
+          <span className="max-w-40 truncate font-medium sm:max-w-full text-text">
+            {slot.fitting?.name}
+          </span>
           {stats.failed[index] && (
             <span className="text-danger">{t('fittings.compare.statsFailed')}</span>
           )}
