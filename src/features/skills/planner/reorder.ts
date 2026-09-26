@@ -39,6 +39,15 @@ export function dedupeEntries(entries: readonly PlanEntry[]): PlanEntry[] {
   });
 }
 
+/** Does an existing row already train this skill to at least this level? */
+export function isEntryCovered(
+  entries: readonly PlanEntry[],
+  skillTypeID: number,
+  targetLevel: number
+): boolean {
+  return entries.some((e) => e.skillTypeID === skillTypeID && e.targetLevel >= targetLevel);
+}
+
 /**
  * Add a skill at a target level as its own row, unless the plan already
  * trains that skill to at least that level — an entry for a level an earlier
@@ -50,10 +59,9 @@ export function dedupeEntries(entries: readonly PlanEntry[]): PlanEntry[] {
  * ride along, so this survives future fields.
  */
 export function upsertEntry(entries: readonly PlanEntry[], entry: PlanEntry): PlanEntry[] {
-  const covered = entries.some(
-    (e) => e.skillTypeID === entry.skillTypeID && e.targetLevel >= entry.targetLevel
-  );
-  return covered ? [...entries] : [...entries, entry];
+  return isEntryCovered(entries, entry.skillTypeID, entry.targetLevel)
+    ? [...entries]
+    : [...entries, entry];
 }
 
 /**
