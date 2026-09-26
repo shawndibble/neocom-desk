@@ -544,7 +544,7 @@ describe('CourierResults remembered filter (issue #1719)', () => {
     renderBoard(CHARACTER_ID, ['/']);
 
     await openFilters(user);
-    expect(screen.getByLabelText('Max collateral')).toHaveValue(50000000);
+    expect(screen.getByLabelText('Max collateral')).toHaveValue('50000000');
   });
 
   it("lets a shared link's URL param win over a remembered filter value", async () => {
@@ -556,7 +556,7 @@ describe('CourierResults remembered filter (issue #1719)', () => {
     renderBoard(CHARACTER_ID, ['/?courier.maxCollateral=1000']);
 
     await openFilters(user);
-    expect(screen.getByLabelText('Max collateral')).toHaveValue(1000);
+    expect(screen.getByLabelText('Max collateral')).toHaveValue('1000');
   });
 
   it('remembers a filter change for the next visit', async () => {
@@ -615,5 +615,39 @@ describe('CourierResults remembered filter (issue #1719)', () => {
 
     await waitFor(() => expect(useCourierFilterPref.getState().value.maxCollateral).toBe('1'));
     expect(useCourierFilterPref.getState().value.originRegionId).toBeNull();
+  });
+});
+
+describe('CourierResults ISK filters', () => {
+  it('accepts shorthand in Min reward and echoes the parsed figure', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await openFilters(user);
+    const field = screen.getByRole('textbox', { name: 'Min reward' });
+    await user.type(field, '1b');
+    expect(field).toHaveValue('1b');
+    expect(screen.getByText('= 1,000,000,000 ISK')).toBeInTheDocument();
+  });
+
+  it('filters on the shorthand value, and plain digits still work', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await openFilters(user);
+    const field = screen.getByRole('textbox', { name: 'Min reward' });
+    // The one haul pays 5,000,000: 10m excludes it, 5m keeps it.
+    await user.type(field, '10m');
+    expect(screen.queryAllByText(/Jita/)).toHaveLength(0);
+    await user.clear(field);
+    await user.type(field, '5000000');
+    expect(screen.getByText('= 5,000,000 ISK')).toBeInTheDocument();
+    expect(screen.getAllByText(/Jita/).length).toBeGreaterThan(0);
+  });
+
+  it('shows no hint for an empty or unparseable field', async () => {
+    const user = userEvent.setup();
+    renderBoard();
+    await openFilters(user);
+    await user.type(screen.getByRole('textbox', { name: 'Max collateral' }), '1x');
+    expect(screen.queryByText(/^= .* ISK$/)).not.toBeInTheDocument();
   });
 });

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
 import { BootScreen } from '@/app/BootScreen';
-import { buttonClassName, EmptyState, LogoMark, Panel, Spinner } from '@/components/ui';
+import { buttonClassName, EmptyState, LogoMark, Panel, Spinner, TypeIcon } from '@/components/ui';
 import { setLoginReturnTo } from '@/auth/loginReturnTo';
 import { writeToClipboard } from '@/lib/clipboard';
 import { fittingEditLocation } from '@/features/fittings/fittingRoutes';
@@ -181,6 +181,19 @@ export function FittingShared() {
 
       {state.status === 'ready' && (
         <>
+          <div className="flex items-center gap-3">
+            <TypeIcon typeId={state.fitting.shipTypeId} size={64} className="size-12 shrink-0" />
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-semibold">
+                {typeName?.(state.fitting.shipTypeId) ?? ''}
+              </h2>
+              {typeName !== null &&
+                state.fitting.name !== '' &&
+                state.fitting.name !== typeName(state.fitting.shipTypeId) && (
+                  <p className="truncate text-sm text-text-dim">{state.fitting.name}</p>
+                )}
+            </div>
+          </div>
           <FittingRing
             fitting={state.fitting}
             stats={stats}
@@ -239,7 +252,9 @@ function ModuleList({ fitting, typeName }: { fitting: Fitting; typeName: TypeNam
     modules: fitting.modules.filter((module) => module.slot === rack),
   })).filter((group) => group.modules.length > 0);
 
-  if (groups.length === 0 && fitting.drones.length === 0) return null;
+  if (groups.length === 0 && fitting.drones.length === 0 && fitting.cargo.length === 0) {
+    return null;
+  }
 
   return (
     <Panel title={t('fittingShare.moduleListTitle')}>
@@ -268,6 +283,20 @@ function ModuleList({ fitting, typeName }: { fitting: Fitting; typeName: TypeNam
               {fitting.drones.map((drone, index) => (
                 <li key={index}>
                   {typeName(drone.typeId)} x{drone.quantity}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {fitting.cargo.length > 0 && (
+          <div>
+            <p className="font-semibold tracking-widest text-text-dim uppercase">
+              {t('fittings.list.cargo')}
+            </p>
+            <ul>
+              {fitting.cargo.map((item, index) => (
+                <li key={index}>
+                  {typeName(item.typeId)} x{item.quantity}
                 </li>
               ))}
             </ul>

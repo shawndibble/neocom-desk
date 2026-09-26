@@ -72,7 +72,7 @@ export function Callback() {
         if (!code || !state) throw new Error('missing code or state param');
         return addCharacter({ code, state });
       })
-      .then(async (character) => {
+      .then(async ({ character, firstEver }) => {
         clearLoginRecovery();
         // Past this point the Character and its token are in Dexie, so the
         // login has happened; a throw from anything below must not put an
@@ -89,8 +89,12 @@ export function Callback() {
         // A Fitting Share Link's "Open in Neocom Desk" (#1544) stashed where
         // to land before sending this login to SSO; every other entry point
         // leaves nothing there, so this is the ordinary `/characters` most of
-        // the time.
-        navigate(takeLoginReturnTo() ?? '/characters', { replace: true });
+        // the time. A first-ever login has exactly one Character, so the list
+        // has nothing to choose between and Overview is the useful landing
+        // (#1771); adding an alt still gets the list.
+        navigate(takeLoginReturnTo() ?? (firstEver ? '/overview' : '/characters'), {
+          replace: true,
+        });
       })
       .catch(async (err: unknown) => {
         if (err instanceof SsoRejection) {

@@ -3,6 +3,8 @@ import type { WhatIfImplantSelection } from '@/db';
 import type { Implants } from '@/engine/types';
 import {
   DEFAULT_WHAT_IF_SELECTION,
+  isHypotheticalLens,
+  whatIfVerdict,
   cloneSelection,
   matchingCloneId,
   normalizeWhatIfSelection,
@@ -291,5 +293,26 @@ describe('jump-clone what-if presets', () => {
     expect(matchingCloneId(selected, {}, clones)).toBe(12);
     expect(matchingCloneId(setWhatIfBonus(selected, {}, 'memory', 1), {}, clones)).toBeNull();
     expect(matchingCloneId(preset('current'), {}, clones)).toBeNull();
+  });
+});
+
+describe('what-if lens comparison', () => {
+  it('only "Current" is not hypothetical', () => {
+    expect(isHypotheticalLens(preset('current'))).toBe(false);
+    expect(isHypotheticalLens(preset('+5'))).toBe(true);
+    expect(isHypotheticalLens(preset('none'))).toBe(true);
+    expect(isHypotheticalLens(custom({ memory: 5 }))).toBe(true);
+  });
+
+  it('a faster what-if schedule saves the difference', () => {
+    expect(whatIfVerdict(100_000, 90_000)).toEqual({ kind: 'saves', seconds: 10_000 });
+  });
+
+  it('a slower what-if schedule costs the difference', () => {
+    expect(whatIfVerdict(90_000, 100_000)).toEqual({ kind: 'costs', seconds: 10_000 });
+  });
+
+  it('an identical schedule is the same', () => {
+    expect(whatIfVerdict(90_000, 90_000)).toEqual({ kind: 'same', seconds: 0 });
   });
 });

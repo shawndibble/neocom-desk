@@ -137,5 +137,13 @@ export function loadEftFitting(
 
   // Deterministic order regardless of the order sections happened to appear
   // in the pasted text — the same order the List view's racks render in.
-  return { hullTypeId, modules: sortFittingModules(modules), drones, cargo, unresolved };
+  const fitName = fit.fitName.trim();
+  return {
+    hullTypeId,
+    modules: sortFittingModules(modules),
+    drones,
+    cargo,
+    ...(fitName === '' ? {} : { fitName }),
+    unresolved,
+  };
 }

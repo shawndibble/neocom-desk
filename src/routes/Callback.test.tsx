@@ -92,6 +92,7 @@ function renderCallback(search: string) {
         <Routes>
           <Route path="/callback" element={<Callback />} />
           <Route path="/characters" element={<div>characters page</div>} />
+          <Route path="/overview" element={<div>overview page</div>} />
           <Route path="/login" element={<div>login page</div>} />
           <Route path="/fittings" element={<div>fittings page</div>} />
         </Routes>
@@ -101,17 +102,30 @@ function renderCallback(search: string) {
 }
 
 describe('Callback', () => {
-  it('completes login once (StrictMode-safe) and navigates to /characters', async () => {
+  it('completes login once (StrictMode-safe) and lands a first-ever login on /overview (#1771)', async () => {
     stashLogin('state-1');
     renderCallback('?code=good-code&state=state-1');
 
-    expect(await screen.findByText('characters page')).toBeInTheDocument();
+    expect(await screen.findByText('overview page')).toBeInTheDocument();
     expect(tokenRequests).toBe(1);
     expect(await db.characters.get(CHAR_ID)).toMatchObject({ name: 'CCP Alpha' });
     expect(useActiveCharacter.getState().activeCharacterId).toBe(CHAR_ID);
   });
 
-  it('lands on a stashed return-to path instead of /characters (#1544)', async () => {
+  it('still lands on /characters when adding to an existing roster (#1771)', async () => {
+    await db.characters.put({
+      characterId: 90_000_001,
+      name: 'Existing Pilot',
+      ownerHash: 'owner-hash-0',
+      addedAt: 1,
+    });
+    stashLogin('state-1');
+    renderCallback('?code=good-code&state=state-1');
+
+    expect(await screen.findByText('characters page')).toBeInTheDocument();
+  });
+
+  it('lets a stashed return-to path win over a first-ever login (#1544)', async () => {
     stashLogin('state-1');
     setLoginReturnTo('/fittings?f=abc123');
     renderCallback('?code=good-code&state=state-1');
@@ -227,7 +241,7 @@ describe('Callback', () => {
     );
     renderCallback('?code=good-code&state=state-1');
 
-    expect(await screen.findByText('characters page')).toBeInTheDocument();
+    expect(await screen.findByText('overview page')).toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -244,7 +258,7 @@ describe('Callback', () => {
     stashLogin('state-1');
     renderCallback('?code=good-code&state=state-1');
 
-    expect(await screen.findByText('characters page')).toBeInTheDocument();
+    expect(await screen.findByText('overview page')).toBeInTheDocument();
     expect(sessionStorage.getItem('neocom.sso.autoRetries')).toBeNull();
     expect(sessionStorage.getItem('neocom.sso.intent')).toBeNull();
   });

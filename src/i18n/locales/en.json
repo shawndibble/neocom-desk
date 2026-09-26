@@ -359,6 +359,7 @@
     },
     "header": {
       "menu": "Fittings",
+      "rename": "Rename fitting",
       "newFromHull": "New from a hull…",
       "import": "Import…",
       "libraryTitle": "Open a fitting",
@@ -964,6 +965,11 @@
     "optimizeForMeTitle": "Optimize for me",
     "optimizeForMeTotal": "Total {{before}} → {{after}}",
     "remapSaves": "Remapping saves {{duration}}",
+    "whatIfChip": {
+      "saves": "What-if {{lens}} · saves {{duration}} vs current",
+      "costs": "What-if {{lens}} · costs {{duration}} vs current",
+      "same": "What-if {{lens}} · same as current"
+    },
     "remapNoGain": "No remap improves this plan in its current order — keeping current attributes. Try \"Reorder only\" to group similar skills first, then optimize again.",
     "remapNoneAvailable": "This plan has 0 remaps to spend, so nothing was placed.",
     "optimizeConfirmSaves": "Saves {{duration}}",
@@ -5284,6 +5290,7 @@
     "destinationRegionLabel": "To region",
     "minRewardLabel": "Min reward",
     "maxCollateralLabel": "Max collateral",
+    "iskFilterHint": "= {{amount}} ISK",
     "maxVolumeLabel": "Max volume (m³)",
     "minDaysLabel": "Min days",
     "routeColumn": "Route",

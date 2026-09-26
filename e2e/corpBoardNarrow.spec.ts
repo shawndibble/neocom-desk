@@ -117,7 +117,6 @@ test.describe('corp ops board — 320px width', () => {
 
     await page.goto('./');
     await page.getByRole('button', { name: 'Log in with EVE Online' }).first().click();
-    await page.getByRole('button', { name: `Select ${CHARACTER_NAME}` }).click();
     await expect(page).toHaveURL(/\/overview$/);
 
     await page.goto('./corp');

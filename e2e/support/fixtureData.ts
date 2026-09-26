@@ -46,6 +46,8 @@ export const SKILL = {
   caldariDestroyer: 33092,
   /** name "Caldari Cruiser", group "Spaceship Command". Added via picker. */
   caldariCruiser: 3334,
+  /** name "Gallente Drone Specialization" (29 chars) — long enough to truncate at 390px (issue #1716). Prereq "Drones" is untrained, so seeding it also inserts one short prereq row. */
+  gallenteDroneSpecialization: 12486,
 } as const;
 
 /** Character skills fixture: total_sp + unallocated_sp asserted verbatim in skills.spec.ts. */

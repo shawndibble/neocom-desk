@@ -21,7 +21,9 @@ async function landOnCharactersAtPhoneWidth(page: Page) {
   await page.goto('./');
   await page.getByRole('button', { name: 'Log in with EVE Online' }).first().click();
   await page.waitForLoadState('load');
-  await expect(page).toHaveURL(/\/characters$/);
+  // A first-ever login lands on /overview (#1771); this file is about the list.
+  await expect(page).toHaveURL(/\/overview$/);
+  await page.goto('./characters');
   await expect(page.getByRole('button', { name: `Select ${CHARACTER_NAME}` })).toBeVisible();
 }
 

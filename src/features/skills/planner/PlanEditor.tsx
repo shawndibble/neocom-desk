@@ -132,6 +132,9 @@ import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueR
 import { remapBudget, type RemapAvailability } from './remapAvailability';
 import {
   whatIfImplants,
+  DEFAULT_WHAT_IF_SELECTION,
+  isHypotheticalLens,
+  whatIfVerdict,
   normalizeWhatIfSelection,
   readsLoadedImplants,
   setWhatIfBonus,
@@ -533,6 +536,50 @@ export function PlanEditor({
       plan.markers,
       plan.markerAttributes,
       plan.whatIfImplants,
+      plan.booster,
+      plan.boosters,
+      catalog,
+      trainedSkills,
+      queueEntries,
+      attributes,
+      attributeBaseline,
+      implants,
+      cloneState,
+      loadedAtMs,
+    ]
+  );
+  // The what-if chip's "vs current" figure: one more pass of the same costing
+  // against the clone's real implants, run only while the lens is hypothetical.
+  const hypotheticalLens = isHypotheticalLens(whatIf);
+  const currentLensTotalSeconds = useMemo(
+    () =>
+      hypotheticalLens
+        ? schedulePlan(
+            {
+              entries: plan.entries,
+              markers: plan.markers,
+              markerAttributes: plan.markerAttributes,
+              whatIfImplants: DEFAULT_WHAT_IF_SELECTION,
+              booster: plan.booster,
+              boosters: plan.boosters,
+            },
+            {
+              catalog,
+              trained: trainedSkills,
+              queueEntries,
+              attributes,
+              attributeBaseline,
+              implants,
+              cloneState,
+            },
+            loadedAtMs
+          ).totalSeconds
+        : null,
+    [
+      hypotheticalLens,
+      plan.entries,
+      plan.markers,
+      plan.markerAttributes,
       plan.booster,
       plan.boosters,
       catalog,
@@ -1883,6 +1930,26 @@ export function PlanEditor({
         />
 
         {implantsAssumed && <ImplantsAssumedNote hint={t('plans.assumesNoImplantsHint')} />}
+
+        {currentLensTotalSeconds !== null && !error && (
+          <p
+            data-testid="what-if-chip"
+            className="inline-flex w-fit items-center rounded-xs border border-accent/60 px-1.5 py-0.5 text-xs text-accent"
+          >
+            {(() => {
+              const verdict = whatIfVerdict(currentLensTotalSeconds, totalSeconds);
+              return t(`plans.whatIfChip.${verdict.kind}`, {
+                lens:
+                  whatIf.kind === 'custom'
+                    ? t('plans.whatIfCustom')
+                    : whatIf.preset === 'none'
+                      ? t('plans.whatIfNone')
+                      : whatIf.preset,
+                duration: formatDuration(verdict.seconds),
+              });
+            })()}
+          </p>
+        )}
 
         {/* Plan Milestones (CONTEXT.md) whose entry was removed from the plan
             entirely — no row exists to flag any more, so they surface here

@@ -276,6 +276,41 @@ test("naming a milestone from an entry row shows it as the header's next milesto
   await expect(page.getByText('Fly Loki').first()).toBeVisible();
 });
 
+/**
+ * Plan row level numeral (issue #1716): the row's level numeral used to sit
+ * inside the same truncating span as the skill name, so a long name clipped
+ * it away — exactly the piece of information that disambiguates "level III"
+ * from "level IV". Gallente Drone Specialization (29 chars) truncates at
+ * 390px; the numeral now lives in its own `shrink-0` sibling span.
+ */
+test('a long skill name still shows its full level numeral at 390px', async ({ page }) => {
+  await signInAndGoto(page);
+  await seedPlan(page, [{ skillTypeID: SKILL.gallenteDroneSpecialization, targetLevel: 4 }]);
+  await page.goto(`./skills/plans/${PLAN_ID}`);
+  await page.setViewportSize(PHONE);
+
+  const removeButton = page.getByRole('button', {
+    name: 'Remove Gallente Drone Specialization IV',
+  });
+  await expect(removeButton).toBeVisible();
+
+  const row = page.locator('li', { has: removeButton });
+  const numeral = row.getByText('IV', { exact: true });
+  await expect(numeral).toBeVisible();
+
+  const right = await numeral.evaluate((el) => el.getBoundingClientRect().right);
+  expect(right).toBeLessThanOrEqual(PHONE.width);
+
+  // Drones V is an untrained prereq the plan engine inserts ahead of the
+  // entry above — same truncate+numeral shape as an entry row (PrereqRow),
+  // and its numeral is short enough to be a free check that fix applies
+  // there too.
+  const prereqPromote = page.getByRole('button', { name: 'Add Drones V to the plan' });
+  await expect(prereqPromote).toBeVisible();
+  const prereqRow = page.locator('li', { has: prereqPromote });
+  await expect(prereqRow.getByText('V', { exact: true })).toBeVisible();
+});
+
 test('the header progress chips wrap at 390px without horizontal scroll', async ({ page }) => {
   await signInAndGoto(page);
   await seedPlan(page, [PLAN_ENTRY]);
@@ -287,4 +322,28 @@ test('the header progress chips wrap at 390px without horizontal scroll', async 
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth
   );
   expect(overflow).toBeLessThanOrEqual(0);
+});
+
+/**
+ * What-if chip (issue #1711): a hypothetical implant lens re-costs every
+ * headline number, so the summary says so beside them — visible on a phone,
+ * where the lens control itself sits inside the collapsed tools disclosure.
+ */
+test('a non-Current what-if lens shows a chip beside the headline at 390px', async ({ page }) => {
+  await signInAndGoto(page);
+  await putRecord(page, 'skillPlans', {
+    id: PLAN_ID,
+    characterId: CHARACTER_ID,
+    name: PLAN_NAME,
+    entries: [PLAN_ENTRY],
+    remapCount: 0,
+    whatIfImplants: { kind: 'preset', preset: '+5' },
+    updatedAt: Date.now(),
+  });
+  await page.setViewportSize(PHONE);
+  await page.goto(`./skills/plans/${PLAN_ID}`);
+
+  await expect(page.getByTestId('what-if-chip')).toContainText(
+    /^What-if \+5 · (saves .+ vs current|costs .+ vs current|same as current)$/
+  );
 });
