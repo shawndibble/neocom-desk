@@ -1,10 +1,11 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { EngineSkill } from '@/engine/types';
 import type { TargetPlan } from '../useTargetPlan';
 import { loadUniverseType } from '../data';
+import { loadKnownRequirements } from '@/features/fittings/skillRequirements';
 import { ShipsPanel } from './ShipsPanel';
 
 vi.mock('@/sde/loadSde', () => ({
@@ -27,6 +28,9 @@ vi.mock('@/sde/loadSde', () => ({
 vi.mock('../typeCatalog', () => ({
   loadSkillNameMap: vi.fn(async () => new Map()),
   loadItemNameMap: vi.fn(async () => new Map([['vexor', { typeID: 626 }]])),
+}));
+vi.mock('@/features/fittings/skillRequirements', () => ({
+  loadKnownRequirements: vi.fn(async () => []),
 }));
 vi.mock('../data', () => ({
   loadUniverseType: vi.fn(async (typeId: number) =>
@@ -90,6 +94,10 @@ async function attachFit(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe('ShipsPanel', () => {
+  afterEach(() => {
+    vi.mocked(loadKnownRequirements).mockResolvedValue([]);
+  });
+
   it('picking a ship shows its Mastery skills, tagged by tier', async () => {
     const user = userEvent.setup();
     renderPanel(fakeTarget());
@@ -154,18 +162,63 @@ describe('ShipsPanel', () => {
     expect(screen.queryByText('Gunnery')).not.toBeInTheDocument();
   });
 
-  it('Add all to Skill Plan adds only the currently visible untrained rows', async () => {
+  it('the Mastery split Add defaults to the next unmet tier and its menu adds any tier', async () => {
     const user = userEvent.setup();
     const target = fakeTarget();
     renderPanel(target);
     await pickVexor(user);
     await waitFor(() => expect(screen.getByText('Gunnery')).toBeInTheDocument());
 
-    await user.click(screen.getByRole('button', { name: 'Create Skill Plan and add' }));
+    await user.click(screen.getByRole('button', { name: 'Create plan and add Mastery I' }));
     expect(target.addEntries).toHaveBeenCalledWith(
       [{ skillTypeID: 3300, targetLevel: 1 }],
       'Vexor'
     );
+
+    await user.click(screen.getByRole('button', { name: 'Choose a Mastery tier to add' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Mastery I' }));
+    expect(target.addEntries).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows a Required to fly group with a verdict and a scoped Add', async () => {
+    vi.mocked(loadKnownRequirements).mockResolvedValue([{ skillTypeID: 3301, level: 3 }]);
+    const user = userEvent.setup();
+    const target = fakeTarget();
+    render(
+      <ShipsPanel
+        target={target}
+        skills={
+          new Map([
+            [3300, GUNNERY],
+            [3301, { ...GUNNERY, typeID: 3301, name: 'Heavy Assault Cruisers' }],
+          ])
+        }
+        trainedSkills={new Map()}
+        attributes={{ intelligence: 20, memory: 20, perception: 20, willpower: 20, charisma: 19 }}
+        implants={{}}
+        cloneState="omega"
+      />
+    );
+    await pickVexor(user);
+
+    expect(await screen.findByText('Heavy Assault Cruisers')).toBeInTheDocument();
+    expect(screen.getByText('Required to fly')).toBeInTheDocument();
+    expect(screen.getByText(/can fly in .* · 1 skill missing/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Add required (1)' }));
+    expect(target.addEntries).toHaveBeenCalledWith(
+      [{ skillTypeID: 3301, targetLevel: 3 }],
+      'Vexor'
+    );
+  });
+
+  it('says "You can fly this" once every required skill is trained', async () => {
+    vi.mocked(loadKnownRequirements).mockResolvedValue([{ skillTypeID: 3300, level: 3 }]);
+    const user = userEvent.setup();
+    renderPanel(fakeTarget(), new Map([[3300, { level: 4, sp: 1_000_000 }]]));
+    await pickVexor(user);
+
+    expect(await screen.findByText('You can fly this')).toBeInTheDocument();
   });
 
   it('pasting text that is not an EFT fit shows the inline error', async () => {
