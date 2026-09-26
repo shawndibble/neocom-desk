@@ -200,7 +200,7 @@ describe('Assets', () => {
     expect(await screen.findByText(JITA)).toBeInTheDocument();
     const chipLabel = screen.getByText('Total value');
     expect(chipLabel.closest('header')).toBe(
-      screen.getByRole('heading', { level: 1 }).parentElement
+      screen.getByRole('heading', { level: 1 }).closest('header')
     );
     expect(chipLabel.parentElement).toHaveTextContent('Total value0');
     expect(screen.queryByText(/Total Assets Value/)).not.toBeInTheDocument();
