@@ -239,7 +239,7 @@ export const ROUTE_REQUIREMENTS = {
     strings: 'loyalty',
   },
   '/contacts': {
-    endpoints: ['getCharacterContacts', 'postUniverseNames'],
+    endpoints: ['getCharacterContacts', 'getCharacterContactLabels', 'postUniverseNames'],
     strings: 'contacts',
   },
   // The Moon Mining Tax ledger (issue #523) is built entirely on the personal

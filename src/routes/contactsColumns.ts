@@ -6,7 +6,13 @@
  */
 import { createColumnVisibilitySetting } from '@/lib/columnVisibility';
 
-export const CONTACTS_CHARACTER_COLUMN_IDS = ['type', 'affiliation', 'standing', 'flags'] as const;
+export const CONTACTS_CHARACTER_COLUMN_IDS = [
+  'type',
+  'affiliation',
+  'labels',
+  'standing',
+  'flags',
+] as const;
 export type ContactsCharacterColumnId = (typeof CONTACTS_CHARACTER_COLUMN_IDS)[number];
 
 export const contactsCharacterColumnsStore = createColumnVisibilitySetting({

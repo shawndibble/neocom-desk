@@ -1660,6 +1660,24 @@ export function getCharacterContacts(
   });
 }
 
+// --- GET /characters/{character_id}/contacts/labels (esi-characters.read_contacts.v1) ---
+
+export interface CharacterContactLabel {
+  label_id: number;
+  label_name: string;
+}
+
+export function getCharacterContactLabels(
+  characterId: number,
+  options: EndpointOptions = {}
+): Promise<EsiResult<CharacterContactLabel[]>> {
+  return esiFetch<CharacterContactLabel[]>(`/characters/${characterId}/contacts/labels`, {
+    ...options,
+    characterId,
+    endpointId: 'getCharacterContactLabels',
+  });
+}
+
 // --- GET /characters/{character_id}/loyalty/points (esi-characters.read_loyalty.v1) ---
 
 export interface CharacterLoyaltyPoints {
