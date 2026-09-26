@@ -48,6 +48,40 @@ export function VerdictPill({
   );
 }
 
+/** Names the real limit of an owned BPC the plan's runs exceed, with a one-click fix (issue #1775). */
+export function BpcCoverageWarning({
+  coverage,
+  blueprintName,
+  onSetRuns,
+}: {
+  coverage: { coveredRuns: number; neededRuns: number };
+  blueprintName?: string;
+  onSetRuns?: (runs: number) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <p className="text-xs text-warning" role="status">
+      {blueprintName ? `${blueprintName}: ` : ''}
+      {t('industry.bpcCoverageWarning', {
+        covered: coverage.coveredRuns,
+        needed: coverage.neededRuns,
+      })}
+      {onSetRuns && (
+        <>
+          {' '}
+          <button
+            type="button"
+            className="underline"
+            onClick={() => onSetRuns(coverage.coveredRuns)}
+          >
+            {t('industry.bpcCoverageSetRuns', { count: coverage.coveredRuns })}
+          </button>
+        </>
+      )}
+    </p>
+  );
+}
+
 interface PlanVerdictHeroProps {
   result: BuildResult;
   pricesReady: boolean;
@@ -65,6 +99,10 @@ interface PlanVerdictHeroProps {
    */
   itemActionsFor?: (typeId: number) => ReactElement;
   runs: number;
+  /** The owned BPC's real run limit when the plan's runs exceed it and nothing extends it (issue #1775); the hero names the blueprint instead of a generic empty state. */
+  bpcCoverage?: { coveredRuns: number; neededRuns: number } | null;
+  blueprintName?: string;
+  onSetRuns?: (runs: number) => void;
   /** Both liquidation bases; the hero states the sell-now one. Null with no owned stock priced. */
   ownedSale: { instant: OwnedStockSale; order: OwnedStockSale } | null;
   breakdown: BreakdownContext;
@@ -94,6 +132,9 @@ export function PlanVerdictHero({
   itemMenuFor,
   itemActionsFor,
   runs,
+  bpcCoverage,
+  blueprintName,
+  onSetRuns,
   ownedSale,
   breakdown,
   breakdownOpen,
@@ -180,13 +221,21 @@ export function PlanVerdictHero({
                 )}
               </p>
             )}
-            <p className="text-xs tabular-nums text-text-dim">
-              {pricesLoading
-                ? ''
-                : !pricesReady || profit === null
-                  ? t('industry.heroNoPrices')
-                  : qualifiers.join(' · ')}
-            </p>
+            {!pricesLoading && pricesReady && profit === null && bpcCoverage ? (
+              <BpcCoverageWarning
+                coverage={bpcCoverage}
+                blueprintName={blueprintName}
+                onSetRuns={onSetRuns}
+              />
+            ) : (
+              <p className="text-xs tabular-nums text-text-dim">
+                {pricesLoading
+                  ? ''
+                  : !pricesReady || profit === null
+                    ? t('industry.heroNoPrices')
+                    : qualifiers.join(' · ')}
+              </p>
+            )}
           </div>
 
           {!pricesLoading && pricesReady && (

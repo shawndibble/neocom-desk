@@ -666,6 +666,12 @@ export interface AcquisitionResolution {
   blueprintTypeID: number;
   /** `null` only when the resolved tier is an owned BPO â€” nothing to acquire. */
   line: AcquisitionLine | null;
+  /**
+   * Set when the resolved tier is an owned finite BPC that covers fewer runs
+   * than the node needs and no offer or purchase tops it up — the job cannot
+   * be started past `coveredRuns` (issue #1775).
+   */
+  coverage?: { coveredRuns: number; neededRuns: number };
 }
 
 /** An effective material priced against its sourcing overrides + hub prices. */

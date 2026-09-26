@@ -117,7 +117,7 @@ import { useIncludeBlueprintCost } from './includeBlueprintCost';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { BuildPlanAutoBuildControl } from './BuildPlanAutoBuildControl';
 import { ResultsSummary } from './ResultsSummary';
-import { PlanVerdictHero } from './PlanVerdictHero';
+import { BpcCoverageWarning, PlanVerdictHero } from './PlanVerdictHero';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ProductionRunsPanel } from './ProductionRunsPanel';
 import { BuildSystemInput } from './BuildSystemInput';
@@ -550,7 +550,8 @@ export function BuildPlanDetail({
       reactionSnapshot?.systemCostIndex,
     ]
   );
-  const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices } = resolved;
+  const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices, bpcCoverage } =
+    resolved;
 
   /**
    * Both liquidation bases at once, so the Use-or-sell toggle switches between
@@ -1140,6 +1141,9 @@ export function BuildPlanDetail({
           itemMenuFor={itemMenuFor}
           itemActionsFor={itemActionsFor}
           runs={plan.runs}
+          bpcCoverage={bpcCoverage}
+          blueprintName={nameForType(catalog, plan.blueprintTypeID)}
+          onSetRuns={(runs) => update({ runs })}
           ownedSale={ownedSale}
           breakdown={breakdownContext}
           breakdownOpen={breakdownOpen}
@@ -1191,6 +1195,12 @@ export function BuildPlanDetail({
                     parse={(raw) => parseOrKeep(plan.runs, raw, (n) => Math.max(1, Math.round(n)))}
                     onCommit={(runs) => update({ runs })}
                   />
+                  {bpcCoverage && (
+                    <BpcCoverageWarning
+                      coverage={bpcCoverage}
+                      onSetRuns={(runs) => update({ runs })}
+                    />
+                  )}
                 </label>
 
                 {/*
