@@ -323,3 +323,27 @@ test('the header progress chips wrap at 390px without horizontal scroll', async 
   );
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+/**
+ * What-if chip (issue #1711): a hypothetical implant lens re-costs every
+ * headline number, so the summary says so beside them — visible on a phone,
+ * where the lens control itself sits inside the collapsed tools disclosure.
+ */
+test('a non-Current what-if lens shows a chip beside the headline at 390px', async ({ page }) => {
+  await signInAndGoto(page);
+  await putRecord(page, 'skillPlans', {
+    id: PLAN_ID,
+    characterId: CHARACTER_ID,
+    name: PLAN_NAME,
+    entries: [PLAN_ENTRY],
+    remapCount: 0,
+    whatIfImplants: { kind: 'preset', preset: '+5' },
+    updatedAt: Date.now(),
+  });
+  await page.setViewportSize(PHONE);
+  await page.goto(`./skills/plans/${PLAN_ID}`);
+
+  await expect(page.getByTestId('what-if-chip')).toContainText(
+    /^What-if \+5 · (saves .+ vs current|costs .+ vs current|same as current)$/
+  );
+});
