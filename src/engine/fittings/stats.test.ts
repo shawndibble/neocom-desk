@@ -12,6 +12,7 @@ import {
   extractOffense,
   extractOverheatedStats,
   overheatedOrNull,
+  unheatedIfChanged,
   weaponRowKey,
   type OffenseItem,
 } from './stats';
@@ -544,6 +545,36 @@ describe('overheatedOrNull', () => {
     expect(overheatedOrNull(63.2, 81.8, 1)).toBe(81.8);
     expect(overheatedOrNull(63.21, 63.24, 1)).toBeNull();
     expect(overheatedOrNull(63.2, null, 1)).toBeNull();
+  });
+});
+
+describe('unheatedIfChanged', () => {
+  interface Figures {
+    dps: number;
+    mass: number;
+    unheated: Figures | null;
+  }
+  const heated: Figures = {
+    dps: 61.7,
+    mass: 1_000_000,
+    unheated: { dps: 53.7, mass: 1_000_000, unheated: null },
+  };
+
+  it('returns the unheated figure, as shown, when heat changed what is shown', () => {
+    expect(unheatedIfChanged(heated, (s) => `${s.dps.toFixed(1)} DPS`)).toBe('53.7 DPS');
+  });
+
+  it('is null for a figure heat leaves as it is', () => {
+    expect(unheatedIfChanged(heated, (s) => `${(s.mass / 1000).toFixed(0)} t`)).toBeNull();
+  });
+
+  it('is null when heat only moves a figure below the shown precision', () => {
+    const nearly: Figures = { ...heated, unheated: { ...heated.unheated!, dps: 61.71 } };
+    expect(unheatedIfChanged(nearly, (s) => s.dps.toFixed(1))).toBeNull();
+  });
+
+  it('is null when there is no unheated calculation to compare with', () => {
+    expect(unheatedIfChanged({ ...heated, unheated: null }, (s) => s.dps.toFixed(1))).toBeNull();
   });
 });
 
