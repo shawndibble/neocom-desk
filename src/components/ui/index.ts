@@ -39,6 +39,7 @@ export { TypeIcon } from './TypeIcon';
 export { characterAvatarBoxClassName } from './characterAvatarBox';
 export type { CharacterAvatarSize } from './characterAvatarBox';
 export { FilterChip } from './FilterChip';
+export { SegmentedControl } from './SegmentedControl';
 export { FilterBar, FilterField } from './FilterBar';
 export { DateRangeFields } from './DateRangeFields';
 export { useFilterSurface } from './filterSurface';

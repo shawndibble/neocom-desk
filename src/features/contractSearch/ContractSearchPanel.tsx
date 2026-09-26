@@ -34,6 +34,7 @@ import {
   Panel,
   RegionSelect,
   SearchInput,
+  SegmentedControl,
   Spinner,
   StatChip,
   TextInput,
@@ -85,7 +86,6 @@ import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { cx } from '@/lib/cx';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { enumParam, optionalEnumParam, optionalIdParam, textParam } from '@/lib/urlState';
 import {
@@ -370,35 +370,21 @@ interface ContractModeSegmentsProps {
  * the desktop chips (`aria-pressed`, exactly one on, same accessible names),
  * drawn as one joined control. Beside a tab bar, two free-standing chips read
  * as two more filters; a shared border reads as one either/or choice. Each
- * segment is `min-h-11` — the touch tier — since it sits where a thumb lands.
+ * segment takes the control scale's `md` height (44px on a phone), since it
+ * sits where a thumb lands.
  */
 function ContractModeSegments({ mode, onChange }: ContractModeSegmentsProps) {
   const { t } = useTranslation();
   return (
-    <div
-      role="group"
-      aria-label={t('contractSearch.modeLabel')}
-      className="inline-flex overflow-hidden rounded-xs border border-line"
-    >
-      {CONTRACT_MODES.map((candidate, index) => {
-        const selected = mode === candidate;
-        return (
-          <button
-            key={candidate}
-            type="button"
-            aria-pressed={selected}
-            onClick={() => onChange(candidate)}
-            className={cx(
-              'inline-flex min-h-11 items-center px-3 text-[0.6875rem] font-semibold tracking-widest whitespace-nowrap uppercase transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent',
-              index > 0 && 'border-l border-line',
-              selected ? 'bg-accent/15 text-accent' : 'text-text-dim hover:text-text'
-            )}
-          >
-            {t(`contractSearch.mode.${candidate}`)}
-          </button>
-        );
-      })}
-    </div>
+    <SegmentedControl
+      label={t('contractSearch.modeLabel')}
+      options={CONTRACT_MODES.map((candidate) => ({
+        value: candidate,
+        label: t(`contractSearch.mode.${candidate}`),
+      }))}
+      value={mode}
+      onChange={onChange}
+    />
   );
 }
 
