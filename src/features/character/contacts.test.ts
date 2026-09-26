@@ -3,7 +3,7 @@ import { http, HttpResponse } from 'msw';
 import { setupServer } from 'msw/node';
 import { configureEsi, ESI_BASE_URL } from '@/esi/client';
 import { db } from '@/db';
-import { loadContacts } from './contacts';
+import { contactLabelNames, loadContactLabels, loadContacts } from './contacts';
 
 const CHAR_ID = 91;
 const server = setupServer();
@@ -75,5 +75,54 @@ describe('loadContacts', () => {
 
     expect(result.needsReauth).toBe(true);
     expect(result.cached).toBeNull();
+  });
+});
+
+describe('loadContactLabels', () => {
+  const URL = `${ESI_BASE_URL}/characters/${CHAR_ID}/contacts/labels`;
+
+  it('maps label ids to names', async () => {
+    server.use(
+      http.get(URL, () =>
+        HttpResponse.json([
+          { label_id: 1, label_name: 'Trade' },
+          { label_id: 2, label_name: 'Blues' },
+        ])
+      )
+    );
+
+    const labels = await loadContactLabels(CHAR_ID);
+
+    expect([...labels]).toEqual([
+      [1, 'Trade'],
+      [2, 'Blues'],
+    ]);
+  });
+
+  it.each([403, 404, 500])('is empty, not an error, on a %i', async (status) => {
+    server.use(http.get(URL, () => new HttpResponse(null, { status })));
+
+    expect((await loadContactLabels(CHAR_ID)).size).toBe(0);
+  });
+
+  it('is empty on a network failure', async () => {
+    server.use(http.get(URL, () => HttpResponse.error()));
+
+    expect((await loadContactLabels(CHAR_ID)).size).toBe(0);
+  });
+});
+
+describe('contactLabelNames', () => {
+  const labels = new Map([
+    [1, 'Trade'],
+    [2, 'Blues'],
+  ]);
+
+  it('names each label in the contact order and drops unknown ids', () => {
+    expect(contactLabelNames({ label_ids: [2, 9, 1] }, labels)).toEqual(['Blues', 'Trade']);
+  });
+
+  it('is empty for an unlabelled contact', () => {
+    expect(contactLabelNames({}, labels)).toEqual([]);
   });
 });

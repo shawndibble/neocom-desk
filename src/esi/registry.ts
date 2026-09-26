@@ -428,6 +428,11 @@ export const ESI_REGISTRY = {
     scope: 'esi-characters.read_contacts.v1',
     group: 'characterDetails',
   },
+  getCharacterContactLabels: {
+    route: '/characters/{character_id}/contacts/labels',
+    scope: 'esi-characters.read_contacts.v1',
+    group: 'characterDetails',
+  },
   getCharacterLoyaltyPoints: {
     route: '/characters/{character_id}/loyalty/points',
     scope: 'esi-characters.read_loyalty.v1',

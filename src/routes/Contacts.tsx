@@ -33,7 +33,7 @@ import {
   type ContactsCharacterColumnId,
 } from './contactsColumns';
 import { GrantBanner } from '@/app/GrantNote';
-import { loadContacts } from '@/features/character/contacts';
+import { contactLabelNames, loadContactLabels, loadContacts } from '@/features/character/contacts';
 import {
   ALL_CONTACT_TYPES,
   STANDING_CATEGORIES,
@@ -79,6 +79,8 @@ interface Snapshot {
   /** Fewer pages came back than ESI advertised — the list below is partial. */
   contactsTruncated: boolean;
   contactNames: Map<number, string>;
+  /** The character's in-game contact labels (id to name); empty when none or unreadable. */
+  contactLabels: Map<number, string>;
   /** Player contacts only, plus the signed-in character — see `loadContactsSnapshot`. */
   affiliations: Map<number, CharacterAffiliation>;
   /** The signed-in character's own corp and alliance, for the "yours" badges. */
@@ -111,6 +113,7 @@ function entityName(names: ReadonlyMap<number, string>, id: number): string {
 
 /** Stable identities, so a fallback doesn't invalidate the column memo every render. */
 const NO_NAMES: ReadonlyMap<number, string> = new Map();
+const NO_LABELS: ReadonlyMap<number, string> = new Map();
 const NO_AFFILIATIONS: ReadonlyMap<number, CharacterAffiliation> = new Map();
 const NO_OWN_AFFILIATION: OwnAffiliation = {};
 const NO_LISTS: readonly CharacterContactList[] = [];
@@ -146,6 +149,7 @@ async function loadContactsSnapshot(
   // ids go into the same batch — otherwise every row belonging only to an alt
   // would print as `#id`.
   const acrossLists = await loadContactsAcrossCharacters();
+  const contactLabels = await loadContactLabels(characterId);
   const contactNames = await resolveNames([
     ...contacts.map((c) => c.contact_id),
     ...affiliationIds,
@@ -156,6 +160,7 @@ async function loadContactsSnapshot(
     contactsNeedsReauth,
     contactsTruncated,
     contactNames,
+    contactLabels,
     affiliations,
     ownAffiliation,
     acrossLists,
@@ -589,6 +594,10 @@ export function Contacts() {
   const contactsNeedsReauth = data?.contactsNeedsReauth ?? false;
   const contactsTruncated = data?.contactsTruncated ?? false;
   const contactNames = data?.contactNames ?? NO_NAMES;
+  const contactLabels = data?.contactLabels ?? NO_LABELS;
+  // A character with no labels sees no Labels column at all — neither in the
+  // table nor in the picker — so the table is exactly what it was.
+  const hasLabels = contactLabels.size > 0;
   const affiliations = data?.affiliations ?? NO_AFFILIATIONS;
   const acrossLists = data?.acrossLists ?? NO_LISTS;
   const ownAffiliation = data?.ownAffiliation ?? NO_OWN_AFFILIATION;
@@ -700,6 +709,23 @@ export function Contacts() {
             : entityName(contactNames, row.corporationId);
         },
       },
+      labels: {
+        id: 'labels',
+        header: t('contacts.labels'),
+        // One line however many labels or however long: the full list is the
+        // cell's title, so truncation hides nothing.
+        render: (contact) => {
+          const names = contactLabelNames(contact, contactLabels);
+          if (names.length === 0) return '—';
+          const text = names.join(', ');
+          return (
+            <span className="block max-w-56 truncate" title={text}>
+              {text}
+            </span>
+          );
+        },
+        sortValue: (contact) => contactLabelNames(contact, contactLabels)[0],
+      },
       standing: {
         id: 'standing',
         header: t('contacts.standing'),
@@ -748,7 +774,12 @@ export function Contacts() {
         },
       },
     }),
-    [t, contactNames, affiliationRows]
+    [t, contactNames, contactLabels, affiliationRows]
+  );
+  // The ids the table and picker offer: `labels` only when there is something to show.
+  const availableCharacterColumnIds = useMemo(
+    () => CONTACTS_CHARACTER_COLUMN_IDS.filter((id) => id !== 'labels' || hasLabels),
+    [hasLabels]
   );
   const columns = useMemo<DataTableColumn<CharacterContact>[]>(
     () => [
@@ -758,11 +789,17 @@ export function Contacts() {
         render: (contact) => contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`,
         sortValue: (contact) => contactNames.get(contact.contact_id) ?? `#${contact.contact_id}`,
       },
-      ...CONTACTS_CHARACTER_COLUMN_IDS.filter(characterColumnVisibility.isVisible).map(
-        (id) => optionalCharacterColumns[id]
-      ),
+      ...availableCharacterColumnIds
+        .filter(characterColumnVisibility.isVisible)
+        .map((id) => optionalCharacterColumns[id]),
     ],
-    [t, contactNames, optionalCharacterColumns, characterColumnVisibility.isVisible]
+    [
+      t,
+      contactNames,
+      optionalCharacterColumns,
+      availableCharacterColumnIds,
+      characterColumnVisibility.isVisible,
+    ]
   );
   // The full catalog, not just `columns`' currently-visible ids — see the
   // Across table's own `sortProps` for why.
@@ -804,7 +841,7 @@ export function Contacts() {
       />
     ) : (
       <ColumnPickerMenu
-        available={CONTACTS_CHARACTER_COLUMN_IDS}
+        available={availableCharacterColumnIds}
         visible={characterColumnVisibility.visible}
         columnsById={optionalCharacterColumns}
         onToggle={characterColumnVisibility.toggle}

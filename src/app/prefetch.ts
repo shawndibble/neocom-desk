@@ -137,7 +137,7 @@ export const PREFETCH_TASKS: readonly PrefetchTask[] = [
   },
   {
     id: 'contacts',
-    endpoints: ['getCharacterContacts'],
+    endpoints: ['getCharacterContacts', 'getCharacterContactLabels'],
     run: loadContacts,
   },
   {
