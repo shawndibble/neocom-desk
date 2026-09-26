@@ -64,6 +64,8 @@ import {
   typeIdsFromKey,
 } from './planMaterialsView';
 import { flattenBuildResult } from './resultFlattenCache';
+import { GroupSlotLine } from './PlanSlotLine';
+import { countJobsByCategory } from './planJobSlots';
 import { hasShoppingList, shoppingListText } from './shoppingList';
 import { useComparedBuildResults } from './useComparedBuildResults';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
@@ -339,6 +341,25 @@ export function BuildGroupPanel({
     () => totalVolume(buyRows, (typeID) => volumeForType(catalog, typeID)),
     [buyRows, catalog]
   );
+
+  // Slot demand of the whole group: every member's own job plus each sub-job
+  // beneath it, by pool — what `GroupSlotLine` sets against free slots.
+  const groupJobCounts = useMemo(() => {
+    const counts = { manufacturing: 0, science: 0, reaction: 0 };
+    const byId = new Map(plans.map((p) => [p.id, p]));
+    for (const member of members) {
+      const plan = byId.get(member.planId);
+      const activity = plan
+        ? (catalog.byBlueprintTypeID.get(plan.blueprintTypeID)?.blueprint.activity ??
+          'manufacturing')
+        : 'manufacturing';
+      const memberCounts = countJobsByCategory(activity, member.result.materials, catalog);
+      counts.manufacturing += memberCounts.manufacturing;
+      counts.science += memberCounts.science;
+      counts.reaction += memberCounts.reaction;
+    }
+    return counts;
+  }, [members, plans, catalog]);
 
   // The verdict band's sub-line: percent + hub only when there's a real
   // comparison to state (buyCost known and non-zero on the relevant side);
@@ -687,6 +708,11 @@ export function BuildGroupPanel({
                   : t('industry.verdictBuy', { amount: formatIsk(-groupProfit) })}
           </p>
           <p className="text-xs tabular-nums text-text-dim">{verdictQualifiers}</p>
+          {plans.length > 0 && (
+            <div className="basis-full">
+              <GroupSlotLine characterId={plans[0].characterId} counts={groupJobCounts} />
+            </div>
+          )}
         </div>
       )}
 

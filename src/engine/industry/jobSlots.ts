@@ -130,3 +130,34 @@ export function aggregateJobSlotSummary(
   }
   return totals;
 }
+
+/** When one more job in a category could start, and so finish, for one character. */
+export interface JobFinishProjection {
+  /** Free slots in the category right now (never negative). */
+  open: number;
+  /** Epoch ms the job would start: `nowMs` with a slot free, else the moment the earliest-ending running job frees one. */
+  startMs: number;
+  finishMs: number;
+}
+
+/**
+ * When a job of `seconds` in `category` would finish if the character
+ * installed it as soon as a slot allows. With a slot open that is now; with
+ * every slot full it waits for the running job that ends soonest (the
+ * `running - max`-th earliest end, when several are over capacity).
+ */
+export function projectJobFinish(
+  character: { skills: JobSlotSkills; jobs: readonly JobSlotJob[] },
+  category: JobSlotCategory,
+  seconds: number,
+  nowMs: number
+): JobFinishProjection {
+  const max = maxJobSlots(character.skills)[category];
+  const runningEnds = character.jobs
+    .filter((job) => job.endMs > nowMs && jobSlotCategory(job.activityId) === category)
+    .map((job) => job.endMs)
+    .sort((a, b) => a - b);
+  const open = Math.max(0, max - runningEnds.length);
+  const startMs = open > 0 ? nowMs : (runningEnds[runningEnds.length - max] ?? nowMs);
+  return { open, startMs, finishMs: startMs + seconds * 1000 };
+}
