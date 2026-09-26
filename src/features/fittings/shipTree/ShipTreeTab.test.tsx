@@ -99,8 +99,13 @@ beforeEach(async () => {
 describe('ShipTreeTab — map', () => {
   it('opens on the Caldari map by default, with every faction in the bar', async () => {
     renderTab();
-    expect(await screen.findByRole('region', { name: 'Caldari State ship tree' })).toBeVisible();
-    const bar = screen.getByRole('group', { name: 'Factions' });
+    const map = await screen.findByRole('region', { name: 'Caldari State ship tree' });
+    expect(map).toBeVisible();
+    // The faction panel and the legend sit inside the canvas, as in game.
+    const bar = within(map).getByRole('group', { name: 'Factions' });
+    expect(
+      within(within(map).getByTestId('ship-tree-legend')).getByText('Mastery V')
+    ).toBeVisible();
     expect(within(bar).getByRole('button', { name: /Caldari State/ })).toHaveAttribute(
       'aria-pressed',
       'true'

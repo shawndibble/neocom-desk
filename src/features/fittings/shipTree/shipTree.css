@@ -470,3 +470,59 @@
 .isis-trait-skill {
   color: #6fb7d8;
 }
+
+/* Map overlays: the faction panel (top right, as the in-game one) and the legend. */
+.isis-overlay {
+  background: #05090ce6;
+  border: 1px solid #2d3f49;
+}
+.isis-overlay-divider {
+  border-top: 1px solid #2d3f49;
+}
+.isis-faction {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  color: #b8ccd5;
+}
+.isis-faction img {
+  opacity: 0.8;
+}
+.isis-faction:hover {
+  border-color: #4d636f;
+}
+.isis-faction:hover img,
+.isis-faction[aria-pressed='true'] img {
+  opacity: 1;
+}
+.isis-faction[aria-pressed='true'] {
+  background: #1a2a34;
+  border-color: #8fb5c6;
+}
+.isis-faction[aria-pressed='true']::before,
+.isis-faction[aria-pressed='true']::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-color: #dcecf3;
+  border-style: solid;
+}
+.isis-faction[aria-pressed='true']::before {
+  top: -1px;
+  left: -1px;
+  border-width: 1px 0 0 1px;
+}
+.isis-faction[aria-pressed='true']::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 1px 1px 0;
+}
+.isis-faction:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}

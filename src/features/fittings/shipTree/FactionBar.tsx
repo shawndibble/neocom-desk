@@ -1,6 +1,7 @@
 /**
  * Every faction the tree has, one button each: emblem, name, and how many of
- * its hulls the pilot can fly. Scrolls sideways rather than wrapping.
+ * its hulls the pilot can fly. Scrolls sideways rather than wrapping. The
+ * ladder's and a phone's picker; a wider map has `FactionGrid` inside it.
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -8,7 +9,7 @@ import type { ShipTreeHullStatus } from '@/engine/shipTree/types';
 import { cx } from '@/lib/cx';
 import type { ShipTreeData } from '@/sde/types';
 import { factionEmblemUrl } from './shipTreeAssets';
-import { flyableCount } from './shipTreeModel';
+import { flyableCount, inGameFactionOrder } from './shipTreeModel';
 
 export function FactionBar({
   data,
@@ -41,7 +42,7 @@ export function FactionBar({
       aria-label={t('ships.tree.factions')}
       className="flex gap-1 overflow-x-auto pb-1"
     >
-      {data.factions.map((f) => {
+      {inGameFactionOrder(data.factions).map((f) => {
         const c = counts.get(f.id) ?? { total: 0, flyable: 0 };
         const emblem = factionEmblemUrl(f.id);
         const current = f.id === factionID;

@@ -78,3 +78,11 @@ describe('wheelZoomFactor', () => {
     expect(wheelZoomFactor(5, PAGE)).toBe(wheelZoomFactor(100_000, PIXEL));
   });
 });
+
+describe('fitCamera with a right inset', () => {
+  it('fits the tree into the area left of an overlay panel', () => {
+    const cam = fitCamera({ width: 1000, height: 500 }, { width: 1256, height: 800 }, 256);
+    // Same zoom as a 1000px-wide viewport, centred in the left 1000px.
+    expect(cam).toEqual(fitCamera({ width: 1000, height: 500 }, { width: 1000, height: 800 }));
+  });
+});
