@@ -52,20 +52,24 @@ function PhoneIdentityAvatar() {
     [activeCharacterId]
   );
   if (!character || pathname === '/characters') return null;
+  // `h-11 self-start` centres it on the title's first line even when the
+  // actions beside it wrap to a second.
   return (
-    <Link
-      to="/characters"
-      state={{ from: pathname }}
-      aria-label={t('nav.switchCharacterNamed', { name: character.name })}
-      className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:hidden"
-    >
-      <CharacterAvatar
-        characterId={character.characterId}
-        size="sm"
-        loading="lazy"
-        className="rounded-full"
-      />
-    </Link>
+    <div className="flex h-11 shrink-0 items-center self-start md:hidden">
+      <Link
+        to="/characters"
+        state={{ from: pathname }}
+        aria-label={t('nav.switchCharacterNamed', { name: character.name })}
+        className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:hidden"
+      >
+        <CharacterAvatar
+          characterId={character.characterId}
+          size="sm"
+          loading="lazy"
+          className="rounded-full"
+        />
+      </Link>
+    </div>
   );
 }
 
@@ -85,6 +89,12 @@ function PhoneIdentityAvatar() {
  * one with icon actions, and everything below it (a `Tabs` sub-nav, most
  * visibly) would sit at a different height route to route, jumping as you
  * switch between them on the bottom tab bar.
+ *
+ * Below `md` the phone identity avatar is always the top-right corner, beside
+ * the title. Title, meta and actions share one wrapping row to its left, so
+ * actions stay inline when they fit and drop to a second line when they
+ * don't — without taking the avatar (or the title) with them. At `md` that
+ * row is `contents`, so every child is back in the header's own flex row.
  */
 export function PageHeader({ title, meta, actions, subNav, className = '' }: PageHeaderProps) {
   // Some unit tests render a route's header without a router.
@@ -96,26 +106,34 @@ export function PageHeader({ title, meta, actions, subNav, className = '' }: Pag
         // With a sub-nav the header *is* the tab bar's baseline, so everything
         // in it aligns to that rule rather than to the row's centre. Without
         // one, nothing changes for the thirteen routes already using this.
-        subNav ? 'items-end gap-x-5 border-b border-line' : 'items-center',
+        subNav ? 'items-end md:gap-x-5 border-b border-line' : 'items-center',
         className
       )}
     >
-      {/* `tabIndex={-1}`: route focus (`app/routeFocus.ts`) lands here after navigation. */}
-      <h1
-        tabIndex={-1}
-        className="text-xl font-semibold tracking-widest uppercase focus:outline-none"
-      >
-        {title}
-      </h1>
-      {meta}
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 self-stretch md:contents">
+        {/* `tabIndex={-1}`: route focus (`app/routeFocus.ts`) lands here after navigation. */}
+        <h1
+          tabIndex={-1}
+          className="min-w-0 text-xl font-semibold tracking-widest break-words uppercase focus:outline-none"
+        >
+          {title}
+        </h1>
+        {meta}
+        {actions && (
+          // `md:order-1`: after the sub-nav, which sits between meta and actions at `md`.
+          <div
+            className={cx(
+              'ml-auto flex flex-wrap items-center justify-end gap-1.5 md:order-1',
+              subNav ? 'md:pb-1' : undefined
+            )}
+          >
+            {actions}
+          </div>
+        )}
+      </div>
+      {inRouter && <PhoneIdentityAvatar />}
       {subNav && (
         <div className="order-last w-full min-w-0 md:order-none md:w-auto md:flex-1">{subNav}</div>
-      )}
-      {(actions || inRouter) && (
-        <div className={cx('ml-auto flex items-center gap-1.5', subNav ? 'pb-1' : undefined)}>
-          {inRouter && <PhoneIdentityAvatar />}
-          {actions}
-        </div>
       )}
     </header>
   );
