@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -63,6 +63,7 @@ function PlanRow({
   const { t } = useTranslation();
   const [renaming, setRenaming] = useState(autoRename);
   const [draftName, setDraftName] = useState(plan.name);
+  const renameChosen = useRef(false);
   // The new plan's row can mount before or after the flag arrives, so both
   // orders must land in rename mode — adjusting state during render, not in an effect.
   const [seenAutoRename, setSeenAutoRename] = useState(autoRename);
@@ -125,18 +126,33 @@ function PlanRow({
       {/* Rename, Duplicate and Copy live in one menu so the name keeps the row's
           width (and the finish date under it stays on one line). Delete stays a
           visible button: it is the destructive one. */}
-      {!renaming && (
+      {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <IconButton
               size="sm"
               variant="plain"
               icon={<Icon.More size={Icon.ICON_SIZE.sm} />}
-              label={`${t('plans.moreActions')} ${plan.name}`}
+              label={t('plans.moreActions', { name: plan.name })}
             />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => setRenaming(true)}>
+          {/* Rename opens its input only once the menu has closed: opened earlier,
+              the menu's focus handling blurs it and cancels the rename. */}
+          <DropdownMenuContent
+            align="end"
+            onCloseAutoFocus={(e) => {
+              if (renameChosen.current) {
+                e.preventDefault();
+                renameChosen.current = false;
+                setRenaming(true);
+              }
+            }}
+          >
+            <DropdownMenuItem
+              onSelect={() => {
+                renameChosen.current = true;
+              }}
+            >
               {t('plans.rename')}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onDuplicate(plan.id)}>
@@ -149,7 +165,7 @@ function PlanRow({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-      )}
+      }
       <IconButton
         size="sm"
         icon={<Icon.Close />}

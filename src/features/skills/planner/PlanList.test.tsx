@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { PlanList } from './PlanList';
@@ -143,6 +143,7 @@ describe('PlanList row menu', () => {
     await user.click(screen.getByRole('button', { name: 'More actions for Alpha' }));
     await user.click(screen.getByRole('menuitem', { name: 'Rename' }));
     const input = screen.getByRole('textbox', { name: 'Rename' });
+    await waitFor(() => expect(input).toHaveFocus());
     await user.clear(input);
     await user.type(input, 'Beta{Enter}');
     expect(onRename).toHaveBeenCalledWith('1', 'Beta');
