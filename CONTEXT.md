@@ -42,8 +42,10 @@ here — they go one per file in `docs/context/decisions/`.
   not just prefilled, and invoice semantics thereafter: neither a later Jita
   price move nor an edited Payee default retroactively changes what it shows
   as owed. Re-diffed on every ledger refresh: if ESI reports _more_ ore for
-  the same entry afterward, it flips to `needs-review` with an explicit
-  before/after diff rather than silently absorbing the growth. A `dismissed`
+  the same entry afterward, an Outstanding, ungrouped one absorbs the growth
+  at once (re-snapshotted, re-priced), while a Paid, dismissed or joined one
+  flips to `needs-review` with an explicit before/after diff � and can be
+  split from there. A `dismissed`
   Assignment ("I don't pay tax on this entry") carries no Payee at all, but
   still re-diffs the same way — growth on it still surfaces rather than
   staying tax-free forever (issue #523).

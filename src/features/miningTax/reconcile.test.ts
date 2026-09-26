@@ -6,6 +6,9 @@ import { reconcileAssignments } from './reconcile';
 const syncMock = vi.hoisted(() => ({ scheduleSync: vi.fn() }));
 vi.mock('@/sync', () => syncMock);
 
+const assignmentsMock = vi.hoisted(() => ({ resolveNeedsReview: vi.fn() }));
+vi.mock('./assignments', () => assignmentsMock);
+
 const CHAR_A = 1;
 const TYPE_A = 45490;
 const TYPE_B = 45491;
@@ -29,6 +32,7 @@ function assignment(overrides: Partial<MiningTaxAssignmentRecord> = {}): MiningT
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  assignmentsMock.resolveNeedsReview.mockResolvedValue(undefined);
   await db.miningTaxAssignments.clear();
 });
 
@@ -55,8 +59,10 @@ describe('reconcileAssignments', () => {
     expect(syncMock.scheduleSync).not.toHaveBeenCalled();
   });
 
-  it('flips to needs-review with an explicit diff when ESI reports more ore', async () => {
-    await db.miningTaxAssignments.put(assignment());
+  it('flips to needs-review with an explicit diff when ESI reports more ore on a dismissed entry', async () => {
+    await db.miningTaxAssignments.put(
+      assignment({ status: 'dismissed', payeeId: undefined, taxPct: 0, taxOwed: 0 })
+    );
     const fresh: MiningLedgerEntry[] = [
       {
         characterId: CHAR_A,
@@ -74,6 +80,59 @@ describe('reconcileAssignments', () => {
     // The stored snapshot itself is untouched â€” only status/reviewDiff moved.
     expect(updated?.oreLines).toEqual([{ typeId: TYPE_A, quantity: 100 }]);
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+    expect(assignmentsMock.resolveNeedsReview).not.toHaveBeenCalled();
+  });
+
+  it('auto-absorbs growth on an unpaid (outstanding) assignment instead of flagging it', async () => {
+    const outstanding = assignment();
+    await db.miningTaxAssignments.put(outstanding);
+    const entry: MiningLedgerEntry = {
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      oreLines: [{ typeId: TYPE_A, quantity: 150 }],
+    };
+
+    await reconcileAssignments(CHAR_A, [entry]);
+
+    expect(assignmentsMock.resolveNeedsReview).toHaveBeenCalledTimes(1);
+    expect(assignmentsMock.resolveNeedsReview).toHaveBeenCalledWith(outstanding, entry, [
+      outstanding,
+    ]);
+    // Absorbing is resolveNeedsReview's job — reconcile itself never flags it.
+    expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('outstanding');
+  });
+
+  it('flags instead when the absorb itself fails (e.g. prices unavailable)', async () => {
+    assignmentsMock.resolveNeedsReview.mockRejectedValue(new Error('offline'));
+    await db.miningTaxAssignments.put(assignment());
+
+    await reconcileAssignments(CHAR_A, [
+      {
+        characterId: CHAR_A,
+        date: '2026-09-04',
+        solarSystemId: 1,
+        oreLines: [{ typeId: TYPE_A, quantity: 150 }],
+      },
+    ]);
+
+    expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('needs-review');
+  });
+
+  it('never auto-absorbs a member of a joined group', async () => {
+    await db.miningTaxAssignments.put(assignment({ groupId: 'g1' }));
+
+    await reconcileAssignments(CHAR_A, [
+      {
+        characterId: CHAR_A,
+        date: '2026-09-04',
+        solarSystemId: 1,
+        oreLines: [{ typeId: TYPE_A, quantity: 150 }],
+      },
+    ]);
+
+    expect(assignmentsMock.resolveNeedsReview).not.toHaveBeenCalled();
+    expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('needs-review');
   });
 
   it('flips a paid assignment too, since the debt grew after payment', async () => {
@@ -145,7 +204,7 @@ describe('reconcileAssignments', () => {
   });
 
   it('folds a brand-new ore type into the sole Assignment for that entry (a continuous mining session)', async () => {
-    await db.miningTaxAssignments.put(assignment()); // covers only TYPE_A
+    await db.miningTaxAssignments.put(assignment({ status: 'paid', paidAt: 5 })); // covers only TYPE_A
     const fresh: MiningLedgerEntry[] = [
       {
         characterId: CHAR_A,

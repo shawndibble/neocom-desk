@@ -90,6 +90,7 @@ import { JoinAssignDialog } from '@/features/miningTax/JoinAssignDialog';
 import { PayeeManagerDialog } from '@/features/miningTax/PayeeManagerDialog';
 import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
 import { SplitDialog } from '@/features/miningTax/SplitDialog';
+import { linesOwnedBy } from '@/engine/miningTax/ownership';
 
 const ALL_STATUSES: readonly MiningTaxRowStatus[] = [
   'unassigned',
@@ -1355,7 +1356,20 @@ export function TaxTab({ tabBar }: TaxTabProps) {
         <SplitDialog
           open
           onClose={() => setSplitTarget(null)}
-          assignment={splitTarget.assignment}
+          assignment={
+            // A needs-review row splits against what ESI reports now, so the
+            // growth (the ore the pilot usually wants to move) is on offer.
+            splitTarget.assignment.status === 'needs-review'
+              ? {
+                  ...splitTarget.assignment,
+                  oreLines: linesOwnedBy(
+                    splitTarget.row.entry.oreLines,
+                    splitTarget.row.assignments,
+                    splitTarget.assignment.id
+                  ),
+                }
+              : splitTarget.assignment
+          }
           row={splitTarget.row}
           systemName={systemName(splitTarget)}
           payees={allPayees}

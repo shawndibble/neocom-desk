@@ -39,7 +39,7 @@ interface RowDetailModalProps {
   onUndo: () => void;
   /** Opens `JoinAssignDialog` to fold another same-system entry into this one (issue #523) — offered only for Unassigned/Outstanding rows that aren't already part of a joined group. */
   onJoin?: () => void;
-  /** Opens `SplitDialog` to move part of this day's ore to a second Payee — offered for Outstanding/Paid rows that aren't part of a joined group. */
+  /** Opens `SplitDialog` to move part of this day's ore to a second Payee — offered for Outstanding/Paid/Needs-review rows that aren't part of a joined group. */
   onSplit?: () => void;
   /** Opens the Payee manager over this modal when the pilot has no Payees yet. */
   onAddPayee?: () => void;
@@ -218,11 +218,12 @@ export function RowDetailModal({
                     {t('miningTax.joinAction')}
                   </Button>
                 )}
-                {onSplit && (status === 'outstanding' || status === 'paid') && (
-                  <Button size="sm" disabled={busy} onClick={onSplit}>
-                    {t('miningTax.splitAction')}
-                  </Button>
-                )}
+                {onSplit &&
+                  (status === 'outstanding' || status === 'paid' || status === 'needs-review') && (
+                    <Button size="sm" disabled={busy} onClick={onSplit}>
+                      {t('miningTax.splitAction')}
+                    </Button>
+                  )}
                 {assignment && (
                   <Button size="sm" variant="danger" disabled={busy} onClick={onUndo}>
                     {t('miningTax.unassignAction')}
