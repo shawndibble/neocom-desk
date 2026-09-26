@@ -1,11 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Panel, StatChip, TextInput } from '@/components/ui';
+import { Panel, StatChip, TextInput, type StatChipTone } from '@/components/ui';
 import { formatDuration } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { formatCompactNumber } from '@/lib/compactNumber';
 import type { PlanProgress } from '@/engine/planProgress';
 import { MIN_MEANINGFUL_SAVINGS_SECONDS, type OptimizationBadge } from './planHeaderStats';
+import type { WhatIfVerdict } from './whatIfImplants';
+
+const WHAT_IF_TONE: Record<WhatIfVerdict['kind'], StatChipTone> = {
+  saves: 'success',
+  costs: 'warning',
+  same: 'default',
+};
 
 interface PlanHeaderProps {
   totalSeconds: number;
@@ -25,7 +32,7 @@ interface PlanHeaderProps {
    * The What-If Implants lens against the clone's real implants; omitted or
    * null while the plan is costed on the real implants.
    */
-  whatIf?: { lens: string; verdict: { kind: 'saves' | 'costs' | 'same'; seconds: number } } | null;
+  whatIf?: { lens: string; verdict: WhatIfVerdict } | null;
   /** False until the character's trained skills have loaded: progress reads `—`, not 0%. */
   trainedKnown?: boolean;
   /**
@@ -166,23 +173,14 @@ export function PlanHeader({
           />
         )}
         {whatIf && (
-          // The wrapper only carries the test id; `contents` keeps the chip a
-          // direct flex item of the strip.
-          <span data-testid="what-if-chip" className="contents">
-            <StatChip
-              label={t('plans.whatIfChip.label', { lens: whatIf.lens })}
-              tone={
-                whatIf.verdict.kind === 'saves'
-                  ? 'success'
-                  : whatIf.verdict.kind === 'costs'
-                    ? 'warning'
-                    : 'default'
-              }
-              value={t(`plans.whatIfChip.${whatIf.verdict.kind}`, {
-                duration: formatDuration(whatIf.verdict.seconds),
-              })}
-            />
-          </span>
+          <StatChip
+            testId="what-if-chip"
+            label={t('plans.whatIfChip.label', { lens: whatIf.lens })}
+            tone={WHAT_IF_TONE[whatIf.verdict.kind]}
+            value={t(`plans.whatIfChip.${whatIf.verdict.kind}`, {
+              duration: formatDuration(whatIf.verdict.seconds),
+            })}
+          />
         )}
       </div>
     </Panel>

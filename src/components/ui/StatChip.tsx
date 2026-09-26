@@ -12,6 +12,7 @@ interface StatChipProps {
   className?: string;
   /** One-line plain-language explanation, rendered as a small "?" tooltip next to the label. */
   tooltip?: string;
+  testId?: string;
 }
 
 export function StatChip({
@@ -20,10 +21,12 @@ export function StatChip({
   tone = 'default',
   className = '',
   tooltip,
+  testId,
 }: StatChipProps) {
   const { t } = useTranslation();
   return (
     <span
+      data-testid={testId}
       // `h-7` is a fixed height, so the chip cannot absorb a second line of
       // text: left to shrink, a flex row squeezes it until the label wraps and
       // spills past the border. `shrink-0` + `whitespace-nowrap` make the chip

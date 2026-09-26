@@ -210,7 +210,6 @@ describe('PlanHeader what-if chip', () => {
       <PlanHeader {...base} whatIf={{ lens: '+5', verdict: { kind: 'saves', seconds: 7200 } }} />
     );
     const chip = screen.getByTestId('what-if-chip');
-    expect(chip).toHaveTextContent('What-if +5');
     expect(chip).toHaveTextContent(/^What-if \+5Saves .+ vs current$/);
   });
 
