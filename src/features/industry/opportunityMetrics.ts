@@ -7,7 +7,7 @@
  */
 import type { StatChipTone } from '@/components/ui';
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
-import type { OpportunityRow } from './opportunities';
+import { pricedRuns, type OpportunityRow } from './opportunities';
 
 export const ORDER_DEPTH_TONE: Record<OrderDepthLevel, StatChipTone> = {
   deep: 'success',
@@ -26,7 +26,7 @@ export const ORDER_DEPTH_RANK: Record<OrderDepthLevel, number> = {
 
 export function unitCount(row: OpportunityRow): number {
   const quantity = row.candidate.catalogEntry.blueprint.products[0]?.quantity ?? 1;
-  return quantity * row.candidate.blueprint.runs;
+  return quantity * pricedRuns(row.candidate.blueprint);
 }
 
 export function unitMargin(row: OpportunityRow): number | null {

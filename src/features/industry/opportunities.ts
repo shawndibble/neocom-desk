@@ -107,6 +107,15 @@ function ownedMaterialSourcing(
 }
 
 /**
+ * The runs an opportunity row is priced at: a BPC's own remaining runs, or 1
+ * for a BPO (`runs === -1`, unlimited). Shared by the plan seeding below and
+ * the per-unit metrics, so a BPO's -1 sentinel never leaks into arithmetic.
+ */
+export function pricedRuns(blueprint: { runs: number }): number {
+  return blueprint.runs > 0 ? blueprint.runs : 1;
+}
+
+/**
  * A Build Plan for one candidate, at the given owned-materials sourcing —
  * unsaved when used to price a row (never written to Dexie), and exactly
  * what "Add to Compare" persists for a row the pilot picks: the plan's own
@@ -136,7 +145,7 @@ export function planForOpportunityCandidate(
   // rate rather than a claim about how many runs the pilot will actually
   // queue (issue #642's brief: literal per-row ISK/hour, no finite/infinite
   // run-count normalization beyond that).
-  const runs = blueprint.runs > 0 ? blueprint.runs : 1;
+  const runs = pricedRuns(blueprint);
   return {
     ...newBuildPlan(ownerCharacterId, candidate.catalogEntry, blueprint, null, facilityDefaults, {
       runs,

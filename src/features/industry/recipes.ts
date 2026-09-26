@@ -295,7 +295,13 @@ export function acquisitionForLookup(
     }
     claimBlueprintTier(pool, resolved, needed);
 
-    return { me: resolved.me, te: resolved.te, blueprintTypeID, line: resolved.line };
+    return {
+      me: resolved.me,
+      te: resolved.te,
+      blueprintTypeID,
+      line: resolved.line,
+      coverage: resolved.coverage,
+    };
   };
 }
 

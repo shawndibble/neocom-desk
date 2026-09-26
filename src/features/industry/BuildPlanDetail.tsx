@@ -117,7 +117,7 @@ import { useIncludeBlueprintCost } from './includeBlueprintCost';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { BuildPlanAutoBuildControl } from './BuildPlanAutoBuildControl';
 import { ResultsSummary } from './ResultsSummary';
-import { PlanVerdictHero } from './PlanVerdictHero';
+import { BpcCoverageWarning, PlanVerdictHero } from './PlanVerdictHero';
 import { useIsDesktop } from '@/lib/useIsDesktop';
 import { ProductionRunsPanel } from './ProductionRunsPanel';
 import { BuildSystemInput } from './BuildSystemInput';
@@ -550,7 +550,8 @@ export function BuildPlanDetail({
       reactionSnapshot?.systemCostIndex,
     ]
   );
-  const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices } = resolved;
+  const { result, error, makeOrBuyContext, resolvedMe, resolvedTe, materialPrices, bpcCoverage } =
+    resolved;
 
   /**
    * Both liquidation bases at once, so the Use-or-sell toggle switches between
@@ -1140,6 +1141,9 @@ export function BuildPlanDetail({
           itemMenuFor={itemMenuFor}
           itemActionsFor={itemActionsFor}
           runs={plan.runs}
+          bpcCoverage={bpcCoverage}
+          blueprintName={nameForType(catalog, plan.blueprintTypeID)}
+          onSetRuns={(runs) => update({ runs })}
           ownedSale={ownedSale}
           breakdown={breakdownContext}
           breakdownOpen={breakdownOpen}
@@ -1177,6 +1181,15 @@ export function BuildPlanDetail({
               <h3 className="border-b border-line pb-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
                 {t('industry.groupBlueprint')}
               </h3>
+              {bpcCoverage && (
+                <div className="mt-2">
+                  <BpcCoverageWarning
+                    coverage={bpcCoverage}
+                    blueprintName={nameForType(catalog, plan.blueprintTypeID)}
+                    onSetRuns={(runs) => update({ runs })}
+                  />
+                </div>
+              )}
               <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <label className="flex flex-col gap-1 text-xs">
                   {t('industry.runs')}
