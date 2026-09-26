@@ -543,6 +543,7 @@ function AcrossCharactersPanel({
           rows={visibleRows}
           rowKey={(row) => `${row.contactType}:${row.contactId}`}
           {...sortProps}
+          mobileSort
           rowContextMenu={(row, tr) => (
             <ContactContextMenu
               contact={{ contact_id: row.contactId, contact_type: row.contactType }}
@@ -966,6 +967,7 @@ export function Contacts() {
               rows={filteredContacts}
               rowKey={(contact) => contact.contact_id}
               {...characterSortProps}
+              mobileSort
               rowContextMenu={contactRowContextMenu}
             />
           )}
