@@ -13,7 +13,10 @@ One row per surface, with what the audit concluded.
 | Overview (`/overview`, board + Alerts column)              | Clean at 1280+. At 1024-1179 the cards                                                                                                                                                                                                                                                           | alerts split starts at `lg` (viewport) not at the content width, so cards are ~250px and titles, "Not urgent" badges and the "Undercut" tile label truncate (#1615 made them truncate rather than wrap) — filed #1680. |
 | Industry (`/industry`, Build Plans tab, Active Jobs strip) | Empty-state layout is clean. `ActiveJobsPanel`'s free-slot readout prints bare "1 / 1 / 1" with colour-only tone — filed #1681. Populated Records/Opportunities/BPC Search tabs were not rendered (mocks give no data; `?tab=` query is not the tab switch) — audit those with seeded data next. |
 | Skills › Trained (`/skills/trained`)                       | Empty/loading render is clean (chips show "—" then fill; Attributes panel, search + expand/collapse row, collapsed groups). Expanded skill rows not rendered.                                                                                                                                    |
-| Wallet (`/wallet`, Balance tab, empty state)               | Clean at 1024 and 1440 in the empty state: `EmptyState`s explain the fix, Balance leads with the ISK figure. Journal tab not rendered.                                                                                                                                                           |
+| Wallet (`/wallet`, Balance tab, empty state)               | Clean at 1024 and 1440 in the empty state: `EmptyState`s explain the fix, Balance leads with the ISK figure. Journal tab: see the seeded row below.                                                                                                                                              |
+| Wallet � Balance chart + Journal (seeded 25 rows)          | Journal table clean (amount header/cells right-aligned; net total shipped in #1721). Balance chart X axis is categorical, so date labels repeat and entries are spaced by index, not time: filed #1916.                                                                                          |
+| Assets (`/assets`, seeded one location)                    | Clean at both widths; the tall single-location panel is a scroll container, not a dead zone.                                                                                                                                                                                                     |
+| Market � Open Orders (seeded 2 healthy orders)             | Untitled `Panel` header bar carries only actions because the tab already names it. Not a finding.                                                                                                                                                                                                |
 
 ## Contract already enforced
 
@@ -27,16 +30,18 @@ UI rules proved by a spec or a shared primitive, so no run re-discovers them.
 Reusable heuristics learned from runs, beyond RUBRIC.md's own. A new one earns
 its place by killing a whole class of finding.
 
+- **Search closed issues first.** Wallet, Market, Assets and Overview have been swept repeatedly (#1615, #1616, #1699, #1700, #1721, #1738); most feature gaps already shipped. The e2e mock returns near-empty data, so seed routes (journal, orders, assets) to judge populated states.
 - **Measure at 1024 _and_ 1180.** Sidebar (191px) plus padding takes ~240px, so `lg:`/`md:` breakpoints keyed to the viewport give columns far narrower than the viewport suggests. Test `scrollWidth > clientWidth` on leaf elements in `main` at 1024, 1180, 1280.
 
 ## Filed findings
 
 Issue number, size (tweak/rework), verdict, one line.
 
-| Issue | Size  | Verdict | Finding                                                                     |
-| ----- | ----- | ------- | --------------------------------------------------------------------------- |
-| #1680 | tweak | NARROW  | Overview: move the cards                                                    | alerts split from `lg` to `xl` so cards stop truncating at 1024-1279. |
-| #1681 | tweak | SHIP    | Industry Active Jobs: label each free-slot figure Mfg/Sci/Rxn from `md` up. |
+| Issue | Size  | Verdict | Finding                                                                           |
+| ----- | ----- | ------- | --------------------------------------------------------------------------------- |
+| #1680 | tweak | NARROW  | Overview: move the cards                                                          | alerts split from `lg` to `xl` so cards stop truncating at 1024-1279. |
+| #1681 | tweak | SHIP    | Industry Active Jobs: label each free-slot figure Mfg/Sci/Rxn from `md` up.       |
+| #1916 | tweak | NARROW  | Wallet Balance chart: time-scaled X axis, unique day-aligned ticks (pure helper). |
 
 ## Killed findings
 
@@ -44,3 +49,5 @@ What was killed, and why. This is what stops a re-pitch.
 
 - Industry vs other routes' content width differing at 1440 — documented tiering (see Contract).
 - Overview Alerts card showing a tall empty area beside two short card rows when there are no alerts — empty-state artefact of grid `stretch`, which the code comment defends on purpose.
+- Wallet journal lacks a net total � shipped in #1721.
+- Open Orders panel has an untitled header bar � the tab already names it.
