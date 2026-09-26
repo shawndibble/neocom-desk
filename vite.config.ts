@@ -197,6 +197,9 @@ export default defineConfig({
   // Read once at build/dev/test start, not hand-maintained in source — it is
   // the release tag Sentry reports, so it must match the shipped build.
   define: { __APP_VERSION__: JSON.stringify(version) },
+  // The hull-check worker imports the dogma engine (wasm-bindgen glue): ES
+  // modules, not the IIFE default, which cannot code-split its imports.
+  worker: { format: 'es' },
   plugins: [
     react(),
     tailwindcss(),

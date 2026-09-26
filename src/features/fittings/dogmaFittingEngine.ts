@@ -8,6 +8,7 @@ import wasmInit, {
   type Violation,
 } from '@eveshipfit/dogma-engine';
 import { classifyRuleBreaks, type CandidateRack } from '@/engine/fittings/candidates';
+import { racksWithSlots } from '@/engine/fittings/hullFitKey';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
 import {
   extractCapacitorBudget,
@@ -56,6 +57,8 @@ const SDE_URL = '/vendor/dogma/sde.dat';
  * fetch, on the next bump.
  */
 const CACHE_VERSION = 1;
+/** The engine assets' version — part of what a saved hull check is valid for. */
+export const DOGMA_ASSET_VERSION = CACHE_VERSION;
 const CACHE_NAME = `dogma-engine-assets-v${CACHE_VERSION}`;
 
 export interface DogmaAssetProgress {
@@ -522,29 +525,113 @@ export function checkCandidates(
     const key = `${shipTypeId}:${rack}:${typeId}`;
     let check = cache.get(key);
     if (!check) {
-      const item: FitItem =
-        rack === 'drone'
-          ? { type_id: typeId, slot: { type: 'drone_bay' }, quantity: 1, state: 'online' }
-          : { type_id: typeId, slot: { type: rack, index: 0 }, state: 'online' };
-      const fit: Fit = {
-        ship: { type_id: shipTypeId },
-        items: [item],
-        character: { skills: profile.skillLevels },
-      };
-      const { violations } = calculate(fit, { validate: true });
-      const shipRules = (violations ?? []).filter(
-        (v) => v.target.type === 'ship' && v.rule.type !== 'skill'
-      );
-      check = classifyRuleBreaks(
-        [...rulesNaming(violations, 'item'), ...shipRules].map((v) =>
-          v.rule.type === 'resource' ? `resource:${v.rule.resource}` : v.rule.type
-        )
-      );
+      check = checkOneCandidate(shipTypeId, rack, typeId, profile.skillLevels);
       cache.set(key, check);
     }
     results.set(typeId, check);
   }
   return results;
+}
+
+/** The candidate alone on the bare hull, validated: what the engine says is wrong with it. */
+function validateCandidate(
+  shipTypeId: number,
+  rack: CandidateRack,
+  typeId: number,
+  skillLevels: Map<number, number>
+): Violation[] {
+  const item: FitItem =
+    rack === 'drone'
+      ? { type_id: typeId, slot: { type: 'drone_bay' }, quantity: 1, state: 'online' }
+      : { type_id: typeId, slot: { type: rack, index: 0 }, state: 'online' };
+  const fit: Fit = {
+    ship: { type_id: shipTypeId },
+    items: [item],
+    character: { skills: skillLevels },
+  };
+  return calculate(fit, { validate: true }).violations ?? [];
+}
+
+/** The rules that count against a candidate: its own, and the ship-level ones but skills. */
+function candidateRuleTypes(violations: readonly Violation[]): string[] {
+  const shipRules = violations.filter((v) => v.target.type === 'ship' && v.rule.type !== 'skill');
+  return [...rulesNaming(violations, 'item'), ...shipRules].map((v) =>
+    v.rule.type === 'resource' ? `resource:${v.rule.resource}` : v.rule.type
+  );
+}
+
+/** One candidate alone on the bare hull, uncached — the work `checkCandidates` memoizes. */
+export function checkOneCandidate(
+  shipTypeId: number,
+  rack: CandidateRack,
+  typeId: number,
+  skillLevels: Map<number, number>
+): CandidateCheck {
+  return classifyRuleBreaks(
+    candidateRuleTypes(validateCandidate(shipTypeId, rack, typeId, skillLevels))
+  );
+}
+
+const NO_SKILLS: Map<number, number> = new Map();
+
+/**
+ * The same answer as `checkOneCandidate`, cheaper: the engine's cost per call
+ * grows with the number of skills it is handed (about 14x from none to a full
+ * skill set), and most of what the check needs doesn't depend on them. Run
+ * with no skills, the hull rules already answer "goes on this hull" (null when
+ * it doesn't — the browser lists only what does), and the skill rules list
+ * every skill the item asks for, so "can fly" is read off them against the
+ * pilot's own. Only an item too big for the bare hull without skills needs
+ * the real run, since skills are what make room (Power Grid Management, the
+ * weapon upgrades); an item that fits without them fits with them.
+ */
+export function checkHullCandidate(
+  shipTypeId: number,
+  rack: CandidateRack,
+  typeId: number,
+  skillLevels: Map<number, number>
+): CandidateCheck | null {
+  const bare = validateCandidate(shipTypeId, rack, typeId, NO_SKILLS);
+  const base = classifyRuleBreaks(candidateRuleTypes(bare));
+  if (!base.fitsHull) return null;
+  if (!base.fitsResources) return checkOneCandidate(shipTypeId, rack, typeId, skillLevels);
+  const canFly = rulesNaming(bare, 'item').every(
+    (v) => v.rule.type !== 'skill' || (skillLevels.get(v.rule.type_id) ?? 0) >= v.rule.required
+  );
+  return { fitsHull: true, canFly, fitsResources: true };
+}
+
+/** How many slots the bare hull has in each rack — a Tech 3's are 0 until subsystems are fitted. */
+export function hullSlotCounts(
+  shipTypeId: number,
+  skillLevels: Map<number, number>
+): Record<FittingSlotKind, number> {
+  const { ship } = calculate({
+    ship: { type_id: shipTypeId },
+    items: [],
+    character: { skills: skillLevels },
+  });
+  const read = (attributeId: number) => ship.attributes.get(attributeId)?.value ?? 0;
+  return {
+    high: read(DOGMA_ATTRIBUTE.hiSlots),
+    medium: read(DOGMA_ATTRIBUTE.medSlots),
+    low: read(DOGMA_ATTRIBUTE.lowSlots),
+    rig: read(DOGMA_ATTRIBUTE.rigSlots),
+    subsystem: read(DOGMA_ATTRIBUTE.subsystemSlots),
+  };
+}
+
+/**
+ * The racks worth asking the engine about on this hull (`racksWithSlots` of
+ * its slot counts). An item in any other rack can only fail the hull's rules,
+ * so the whole-catalogue check (`useHullFit`) answers it without the engine
+ * and leaves it out — the browser shows nothing the check doesn't list.
+ */
+export function hullRacks(
+  shipTypeId: number,
+  skillLevels: Map<number, number>
+): Set<CandidateRack> {
+  return racksWithSlots(hullSlotCounts(shipTypeId, skillLevels));
 }
 
 /**

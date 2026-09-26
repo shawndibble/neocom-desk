@@ -3,7 +3,15 @@ import { readFile } from 'node:fs/promises';
 import { beforeAll, describe, expect, it } from 'vitest';
 import wasmInit, { calculate } from '@eveshipfit/dogma-engine';
 import { fittingToDogmaFit } from '@/engine/fittings/fitMapper';
-import { toProjectedEffects, withIncoming, withWeather } from './dogmaFittingEngine';
+import {
+  checkHullCandidate,
+  hullRacks,
+  checkOneCandidate,
+  hullSlotCounts,
+  toProjectedEffects,
+  withIncoming,
+  withWeather,
+} from './dogmaFittingEngine';
 import {
   extractCapacitorBudget,
   extractLockedTargets,
@@ -21,6 +29,7 @@ import { extractMining, miningYield } from '@/engine/fittings/mining';
 import { capacitorStatusAtDrain } from '@/engine/fittings/tank';
 import { buildAllVProfile, buildPilotProfile } from '@/engine/fittings/pilotProfile';
 import type { Fitting } from '@/engine/fittings/types';
+import type { CandidateRack } from '@/engine/fittings/candidates';
 
 /**
  * Runs the real, pinned `@eveshipfit/dogma-engine` + `@eveshipfit/sde`
@@ -1242,3 +1251,64 @@ const SUPPORT_SKILL_IDS = Array.from({ length: 200 }, (_, i) => 3300 + i);
 
 /** The core skills plus the mining ones outside 3300-3499 (Mining Barge, Exhumers). */
 const MINING_SKILL_IDS = [...SUPPORT_SKILL_IDS, 17940, 22551];
+
+// Runs on the engine and SDE the describe above loaded (the SDE loads once per process).
+describe('hull fit pre-filter (real WASM + real pinned SDE)', () => {
+  // A Rifter (frigate), a Loki (Tech 3: no hi/med/low slots until subsystems
+  // are fitted) and a Bestower (an industrial).
+  const HULLS = [587, 29990, 1944];
+  // Modules and drones of every rack, from the same ids the tests above use.
+  const ITEMS: [CandidateRack, number][] = [
+    ['high', NEUTRON_BLASTER_CANNON_II],
+    ['medium', MULTISPECTRUM_SHIELD_HARDENER_II],
+    ['low', DAMAGE_CONTROL_II],
+    ['low', MEDIUM_ARMOR_REPAIRER_II],
+    ['drone', DRONE_DAMAGE_AMPLIFIER_II],
+    ['drone', WARRIOR_II],
+  ];
+
+  it.each(HULLS)('leaves out only items the full check refuses, on hull %i', (hull) => {
+    const skills = new Map<number, number>();
+    const racks = hullRacks(hull, skills);
+    for (const [rack, id] of ITEMS) {
+      if (!racks.has(rack)) expect(checkOneCandidate(hull, rack, id, skills).fitsHull).toBe(false);
+    }
+  });
+
+  // The skill-free shortcut against the full check, over a spread of the real
+  // catalogue (every 9th fittable item), for a pilot with every skill, one
+  // with a few, and one with none: same answer for everything that goes on
+  // the hull, and nothing left out that does.
+  describe('checkHullCandidate against the full check', async () => {
+    const slots = JSON.parse(
+      await readFile(new URL('../../../public/data/fittingSlots.json', import.meta.url), 'utf8')
+    ) as Record<string, CandidateRack>;
+    const skillList = JSON.parse(
+      await readFile(new URL('../../../public/data/skills.json', import.meta.url), 'utf8')
+    ) as { typeID: number }[];
+    const sample = Object.entries(slots).filter((_, index) => index % 9 === 0);
+    const profiles: [string, Map<number, number>][] = [
+      ['every skill at V', new Map(skillList.map((skill) => [skill.typeID, 5]))],
+      ['a few skills at III', new Map(skillList.slice(0, 40).map((skill) => [skill.typeID, 3]))],
+      ['no skills', new Map()],
+    ];
+
+    it.each(
+      HULLS.flatMap((hull) => profiles.map(([name, skills]) => [hull, name, skills] as const))
+    )('hull %i, %s', { timeout: 120_000 }, (hull, _name, skills) => {
+      for (const [id, rack] of sample) {
+        const typeId = Number(id);
+        const full = checkOneCandidate(hull, rack, typeId, skills);
+        const fast = checkHullCandidate(hull, rack, typeId, skills);
+        if (full.fitsHull) expect({ typeId, fast }).toEqual({ typeId, fast: full });
+        else expect({ typeId, fast }).toEqual({ typeId, fast: null });
+      }
+    });
+  });
+
+  it('reports a Tech 3 hull as having no hi, med or low slots until subsystems are fitted', () => {
+    const counts = hullSlotCounts(29990, new Map());
+    expect(counts.high + counts.medium + counts.low).toBe(0);
+    expect(counts.subsystem).toBeGreaterThan(0);
+  });
+});
