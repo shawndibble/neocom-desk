@@ -24,12 +24,21 @@ import { NOTIFICATION_CHANNELS } from './eventSelection';
  */
 export const CHANNEL_COLUMNS = 'grid shrink-0 grid-cols-[4.25rem_4.25rem] justify-items-center';
 
-/** The caption row that sits directly above a block of channel checkboxes. */
-export function ChannelColumnHeadings() {
+/**
+ * The caption row that sits directly above a block of channel checkboxes.
+ * `pinned` glues it to the top of the viewport from `md` up while its
+ * section's rows scroll beneath it (opaque, so rows don't show through); it
+ * leaves with its own section. Phone is unchanged.
+ */
+export function ChannelColumnHeadings({ pinned = false }: { pinned?: boolean }) {
   const { t } = useTranslation();
 
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-line px-3 py-1.5">
+    <div
+      className={`flex items-center justify-between gap-3 border-b border-line px-3 py-1.5${
+        pinned ? ' md:sticky md:top-0 md:z-10 md:bg-panel-2' : ''
+      }`}
+    >
       <span className="sr-only">{t('settings.notifications.columnEvent')}</span>
       <span aria-hidden="true" className="flex-1" />
       <div className={CHANNEL_COLUMNS}>
