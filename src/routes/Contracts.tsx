@@ -34,6 +34,7 @@ import { loadContracts } from '@/features/character/contracts';
 import { contractAmount } from '@/features/character/contractAmount';
 import { ContractContextMenu } from '@/features/character/ContractContextMenu';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
+import { ContractIdentity } from '@/features/character/ContractIdentity';
 import { IssuerLink } from '@/features/character/IssuerLink';
 import { StandingTag } from '@/features/character/StandingTag';
 import { loadContacts } from '@/features/character/contacts';
@@ -471,7 +472,7 @@ export function Contracts() {
             onClick={() => setSelectedContract(contract)}
             className="flex min-h-11 w-full items-center text-left font-medium text-accent hover:underline md:block md:min-h-0 md:w-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            {contract.title || t(CONTRACT_TYPE_KEY[contract.type])}
+            <ContractIdentity contract={contract} characterId={activeCharacterId} />
           </button>
         ),
       },
@@ -479,7 +480,7 @@ export function Contracts() {
         (id) => optionalHistoryColumns[id]
       ),
     ],
-    [t, optionalHistoryColumns, historyColumnVisibility.isVisible]
+    [t, optionalHistoryColumns, historyColumnVisibility.isVisible, activeCharacterId]
   );
   // The full catalog, not just `columns`' currently-visible ids: a sort
   // picked while a column was shown should still resolve once the picker
