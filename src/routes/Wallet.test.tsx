@@ -253,6 +253,8 @@ describe('Wallet', () => {
     render(<App />);
     const link = await screen.findByRole('link', { name: 'Transactions →' });
     expect(link).toHaveAttribute('href', '/market/history/transactions');
+    // Rests in the accent colour so it reads as a link (issue #2019).
+    expect(link).toHaveClass('text-accent');
   });
 
   it('scrolls to and pulses the journal line a wallet alert pointed at', async () => {
