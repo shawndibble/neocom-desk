@@ -689,7 +689,16 @@ function FittingsPage() {
                 </Panel>
               )}
               {/* Ring | List as the app's own tabs over the column they switch. */}
-              <div className="min-w-0 space-y-3">
+              {/* The Ring stays in view while the tall stats column is read (lg+). The List
+                  needs the width and the stacked layout has nothing beside it. */}
+              <div
+                data-testid="fitting-editor-column"
+                className={`min-w-0 space-y-3 ${
+                  view === 'ring' && (addMode === 'docked' || !addOpen)
+                    ? 'lg:sticky lg:top-3 lg:max-h-[calc(100vh-1.5rem)] lg:overflow-y-auto'
+                    : ''
+                }`}
+              >
                 <Tabs
                   tabs={[
                     { id: 'ring', label: t('fittings.view.ring') },

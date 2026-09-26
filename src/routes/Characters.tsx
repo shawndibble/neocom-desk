@@ -316,7 +316,7 @@ function CharacterCard({
           type="button"
           aria-label={t('characters.select', { name: character.name })}
           onClick={() => onSelect(character.characterId)}
-          className="flex min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="flex min-w-40 flex-1 items-center gap-3 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <CharacterAvatar
             characterId={character.characterId}
@@ -331,8 +331,8 @@ function CharacterCard({
                 the outer `span`) is what lets the name still truncate instead
                 of pushing the dot off — and shrinking the name never touches
                 the corp/alliance lines below, which are separate rows. */}
-            <span className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate text-sm font-semibold">{character.name}</span>
+            <span className="flex min-w-0 flex-wrap items-center gap-x-1.5">
+              <span className="max-w-full truncate text-sm font-semibold">{character.name}</span>
               {isActive && (
                 <span className="shrink-0 text-[0.6875rem] font-semibold tracking-widest text-accent uppercase">
                   {t('characters.activeLabel')}

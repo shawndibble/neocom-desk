@@ -5,6 +5,7 @@
  * and cached per Fitting + Character, so reopening — or adding a third slot —
  * never redoes a check.
  */
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Popover, PopoverContent, PopoverTrigger, Spinner } from '@/components/ui';
@@ -75,7 +76,7 @@ export function CompareCanFlyByCharacter({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button type="button" className="text-accent underline">
+        <button type="button" className={inlineLinkClassName}>
           {t('fittings.compare.canFlyAllCharacters')}
         </button>
       </PopoverTrigger>

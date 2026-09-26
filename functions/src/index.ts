@@ -533,6 +533,14 @@ async function fetchAdam4eveChunk(
  * whole missing date range in one call (Adam4EVE's `start`/`end` already
  * spans many days), spaced `ADAM4EVE_MIN_REQUEST_GAP_MS` apart — the
  * catalog is ~500 types, so ~25-30 requests, once.
+ *
+ * A chunk's request failing is logged and skipped rather than thrown
+ * (issue #1279 follow-up: live, this 400'd with "Parameter 'typeID'
+ * invalid!" for two of ~500 type_ids — 92371, 92374 — that Adam4EVE's own
+ * catalog doesn't recognize, likely too new or too obscure for it to have
+ * indexed). Those ~20 types simply keep falling to the `average` tier for
+ * their missing days, same as before this job existed; the other ~480
+ * types' backfill isn't held hostage by the ones Adam4EVE can't answer for.
  */
 async function backfillFromAdam4eve(db: Firestore, missingDates: readonly string[]): Promise<void> {
   if (missingDates.length === 0) return;
@@ -543,9 +551,20 @@ async function backfillFromAdam4eve(db: Firestore, missingDates: readonly string
   const byDate = new Map<string, StoredHubDay>();
   const typeChunks = chunk(PRICED_TYPE_IDS, ADAM4EVE_TYPE_CHUNK_SIZE);
   const stationKey = String(BACKFILL_HUB.stationId);
+  let skippedChunks = 0;
   for (let i = 0; i < typeChunks.length; i += 1) {
     if (i > 0) await sleep(ADAM4EVE_MIN_REQUEST_GAP_MS);
-    const byTypeThenDate = await fetchAdam4eveChunk(typeChunks[i], start, end);
+    let byTypeThenDate: Map<number, Map<string, SidePrices>>;
+    try {
+      byTypeThenDate = await fetchAdam4eveChunk(typeChunks[i], start, end);
+    } catch (err) {
+      skippedChunks += 1;
+      logWarn('Adam4EVE backfill chunk failed, skipping', {
+        typeIds: typeChunks[i],
+        error: err instanceof Error ? err.message : String(err),
+      });
+      continue;
+    }
     for (const [typeId, byDateForType] of byTypeThenDate) {
       for (const [date, prices] of byDateForType) {
         // Adam4EVE's own range can include a day this run already captured
@@ -576,6 +595,7 @@ async function backfillFromAdam4eve(db: Firestore, missingDates: readonly string
   logInfo('market history backfill', {
     requestedDays: missingDates.length,
     daysWritten: byDate.size,
+    skippedChunks,
   });
 }
 
@@ -637,6 +657,16 @@ async function captureLiveHubPrices(db: Firestore, today: string): Promise<void>
  * One collection read up front serves both the backfill-gap check and the
  * prune list, rather than two passes over the same ~90-100 docs.
  *
+ * Backfill runs first but is wrapped so it can never block the other two
+ * steps: it is a one-time fill of history the app already had a fallback
+ * for (ESI's `average`), while live capture is the thing that has to run
+ * every single tick to keep today's price building up. A prior deploy hit
+ * exactly this — one bad Adam4EVE chunk threw, which killed the whole
+ * invocation before live capture or the prune ever ran (see
+ * `backfillFromAdam4eve`'s own per-chunk tolerance for the underlying fix;
+ * this is the second, outer layer, in case something *else* in that
+ * function throws next time).
+ *
  * It is the deployment's 4th scheduled job, alongside `dispatchProjections`,
  * `purgeNotificationFeed` and `syncPublicContractOffers` — past the 3 free
  * Cloud Scheduler jobs per billing account `syncPublicContractOffers`'s own
@@ -652,7 +682,13 @@ export const captureMiningPriceSnapshot = onSchedule(
     const existingDates = new Set(snapshot.docs.map((doc) => doc.id));
     const staleDocs = snapshot.docs.filter((doc) => isOutsideRetention(doc.id, today));
 
-    await backfillFromAdam4eve(db, missingBackfillDates(existingDates, today));
+    try {
+      await backfillFromAdam4eve(db, missingBackfillDates(existingDates, today));
+    } catch (err) {
+      logError('market history backfill failed, continuing to live capture', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
     await captureLiveHubPrices(db, today);
 
     if (staleDocs.length > 0) {

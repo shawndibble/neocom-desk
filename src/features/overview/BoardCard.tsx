@@ -11,7 +11,13 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { IconButton, Panel, SEVERITY_TEXT, SeverityIcon } from '@/components/ui';
+import {
+  IconButton,
+  Panel,
+  SEVERITY_TEXT,
+  SeverityIcon,
+  textActionClassName,
+} from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { DeadlineSeverity } from '@/engine/severity';
 import type { AppRoutePath } from '@/app/routeScopes';
@@ -63,10 +69,7 @@ export function BoardCard({ title, meta, to, openLabel, children, footer, help }
         // never meant to grow (issue #1070).
         <div className="flex items-center gap-1">
           {help && <IconButton size="sm" variant="plain" icon={<Icon.Info />} label={help} />}
-          <Link
-            to={to}
-            className="flex min-h-11 items-center gap-1 rounded-xs whitespace-nowrap text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
-          >
+          <Link to={to} className={textActionClassName('gap-1 whitespace-nowrap')}>
             {openLabel}
             <Icon.Descend size={Icon.ICON_SIZE.sm} aria-hidden="true" />
           </Link>

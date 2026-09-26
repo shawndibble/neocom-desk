@@ -96,3 +96,76 @@ test.describe('Fitting Compare at 390px', () => {
     expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
   });
 });
+
+test.describe('Fitting Compare control toolbar', () => {
+  const LABELS = ['Damage profile', 'Abyssal weather', 'Target profile'];
+
+  test('at 1440 the three selects share one row', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await signInAndGoto(page, './fittings/compare');
+    const ys: number[] = [];
+    for (const name of LABELS) {
+      const box = await page.getByRole('combobox', { name }).boundingBox();
+      ys.push(box!.y);
+    }
+    expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(1);
+  });
+
+  test('at 1024 the block is compact and each label sits beside its select', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await signInAndGoto(page, './fittings/compare');
+    const block = await page.getByTestId('compare-controls').boundingBox();
+    expect(block!.height).toBeLessThan(70);
+    for (const name of LABELS) {
+      const select = await page.getByRole('combobox', { name }).boundingBox();
+      const label = await page.getByText(name, { exact: true }).first().boundingBox();
+      expect(select!.x - (label!.x + label!.width)).toBeLessThan(12);
+    }
+  });
+});
+
+test.describe('Fitting Compare column alignment', () => {
+  for (const size of [
+    { width: 1024, height: 768 },
+    { width: 1440, height: 900 },
+  ]) {
+    for (const fits of [
+      [FIT_A, FIT_B],
+      [FIT_A, FIT_B, FIT_C],
+    ]) {
+      test(`${fits.length} fits line up between Stats and Modules at ${size.width}`, async ({
+        page,
+      }) => {
+        await page.setViewportSize(size);
+        await signInAndGoto(page, './fittings/compare');
+        await answerAnyType(page);
+        // Every later fit carries one more gun, so the "Modules that differ" table renders.
+        for (const [i, eft] of fits.entries()) {
+          await addFitting(
+            page,
+            i === 0
+              ? eft
+              : `${eft}
+125mm Gatling AutoCannon I`
+          );
+        }
+        const tables = page.locator('table');
+        await expect(tables).toHaveCount(2, { timeout: 20_000 });
+        for (const index of [0, 1]) {
+          await expect(tables.nth(index).locator('thead th')).toHaveCount(fits.length + 1, {
+            timeout: 20_000,
+          });
+        }
+        const rights = async (index: number) =>
+          tables
+            .nth(index)
+            .locator('thead th')
+            .evaluateAll((ths) => ths.map((th) => th.getBoundingClientRect().right));
+        const stats = await rights(0);
+        const modules = await rights(1);
+        expect(stats).toHaveLength(fits.length + 1);
+        stats.forEach((right, i) => expect(Math.abs(right - modules[i]!)).toBeLessThanOrEqual(1));
+      });
+    }
+  }
+});

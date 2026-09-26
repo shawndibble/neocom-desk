@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 import { usePageTab } from '@/lib/usePageTab';
@@ -1080,7 +1081,7 @@ export function Market() {
             meta={
               selectedItem &&
               selectedTypeId !== null && (
-                <span className="flex flex-wrap items-center gap-1">
+                <span className="flex flex-wrap items-center gap-1 max-md:shrink-0 max-md:flex-nowrap">
                   <ItemPriceAlertBell
                     typeId={selectedTypeId}
                     name={selectedItem.name}
@@ -1453,7 +1454,7 @@ export function Market() {
           </span>
           <button
             type="button"
-            className="text-accent font-medium underline"
+            className={inlineLinkClassName}
             onClick={handleUndoCompareVariations}
           >
             {t('market.compareUndo.undo')}

@@ -72,7 +72,7 @@
       "needCharacter": "Log in with a Character to save Fittings.",
       "tooLarge": "This Fitting is too large to save.",
       "searchLabel": "Search My Fittings",
-      "searchPlaceholder": "Search by name or hull",
+      "searchPlaceholder": "Search by name or hull…",
       "empty": "Nothing saved yet. Open a Fitting and choose Save to My Fittings.",
       "noMatches": "No saved Fitting matches that search.",
       "unknownHull": "Unknown hull",
@@ -369,6 +369,7 @@
         "capacitor": "Capacitor",
         "capStable": "Stable at {{pct}}%",
         "capDepletes": "Empty in {{time}}",
+        "capDepletesSeconds": "Empty in {{seconds}}s",
         "signature": "Signature",
         "skillsNeedCharacter": "Pick a Character to see which skills this needs.",
         "skillsHint": "You can't fly this yet. Add the missing skills to a Skill Plan:",
@@ -1016,8 +1017,8 @@
       "copyEft": "Copy EFT",
       "copyShareLink": "Copy Share Link",
       "saveToEve": "Save to EVE…",
-      "rename": "Rename…",
-      "delete": "Delete…",
+      "rename": "Rename",
+      "delete": "Delete",
       "unreadable": "This saved fitting can no longer be read.",
       "duplicated": "Saved a copy of {{name}} to My Fittings.",
       "savedToEve": "Saved to EVE."
@@ -2356,7 +2357,7 @@
       "allCharacters": "All characters",
       "selectedCount_one": "{{count}} character",
       "selectedCount_other": "{{count}} characters",
-      "searchPlaceholder": "Search characters",
+      "searchPlaceholder": "Search characters…",
       "noResults": "No characters match your search."
     }
   },
@@ -2413,7 +2414,7 @@
     "removeDeferredNotice": "{{name}}'s synced data couldn't be cleared right now — their session couldn't be re-established. It will be cleared automatically the next time you sign in as {{name}}.",
     "cancel": "Cancel",
     "ok": "OK",
-    "searchPlaceholder": "Search by name or corporation",
+    "searchPlaceholder": "Search by name or corporation…",
     "noSearchMatches": "No characters match this search or filter.",
     "noSearchMatchesHint": "Clear the search and filters to see every character.",
     "filterQueueLabel": "Queue state",
@@ -2574,7 +2575,7 @@
     "mutedTypes": "Muted types",
     "filterTitle": "Filter alerts",
     "searchLabel": "Search alerts",
-    "searchPlaceholder": "Search alerts",
+    "searchPlaceholder": "Search alerts…",
     "characterLabel": "Character",
     "allCharacters": "All characters",
     "empty": "No alerts yet",
@@ -2709,8 +2710,8 @@
     "journalItemBought": "Bought {{quantity}} × {{unitPrice}} = {{total}}",
     "journalItemSold": "Sold {{quantity}} × {{unitPrice}} = {{total}}",
     "journalContractLink": "Contract →",
-    "journalFilteredSummary_one": "{{count}} entry · net {{net}}",
-    "journalFilteredSummary_other": "{{count}} entries · net {{net}}"
+    "journalFilteredSummary_one": "{{count}} entry · net <net>{{net}}</net>",
+    "journalFilteredSummary_other": "{{count}} entries · net <net>{{net}}</net>"
   },
   "miningTax": {
     "title": "Mining",
@@ -3058,7 +3059,7 @@
     "reauthHint": "Log in again to fetch this character's assets.",
     "reauthAction": "Log in again with EVE Online",
     "fetchTruncatedNotice": "Only the first {{shown}} assets were fetched — this character has more.",
-    "fetchTruncatedRetry": "Retry",
+    "fetchTruncatedRetry": "Try again",
     "unknownValue": "-",
     "security": {
       "ariaLabel": "Security status: {{value}}"
@@ -3838,6 +3839,7 @@
     "status": "Status",
     "type": "Type",
     "price": "Price / reward",
+    "issued": "Issued",
     "expires": "Expires",
     "issuer": "Issuer",
     "exportCsv": "Export CSV",
@@ -3846,7 +3848,7 @@
     "noFilterMatchesHint": "Clear the search or reset the status/type filters to see every contract.",
     "noFilterMatchesResetHint": "No contract matches the current search and filters.",
     "staleTooltip": "Outstanding and past its deadline — lapsed and unclaimed.",
-    "fetchTruncatedRetry": "Retry",
+    "fetchTruncatedRetry": "Try again",
     "reauthTitle": "Log in again to see your contracts",
     "reauthHint": "Log in again to fetch this character's contracts.",
     "reauthAction": "Log in again with EVE Online",
@@ -4096,7 +4098,7 @@
   "loyaltyStore": {
     "back": "Loyalty Points",
     "title": "LP Store",
-    "searchPlaceholder": "Search offers",
+    "searchPlaceholder": "Search offers…",
     "hubLabel": "Market hub",
     "priceBasisLabel": "Revenue basis",
     "priceBasisSell": "Sell (list order)",
@@ -4924,7 +4926,7 @@
         "matchCount": "{{count}} of {{total}} orders match"
       },
       "checkDeeper": "Refresh system & region prices",
-      "checkingDeeper": "Checking...",
+      "checkingDeeper": "Checking…",
       "refreshOrders": "Refresh orders & market prices",
       "scopeNotChecked": "Not checked yet",
       "scopeClear": "Nobody cheaper here",
@@ -5300,6 +5302,8 @@
       "importTitle": "Import backup",
       "importHint": "Pick a backup file exported from Neocom Desk and enter its password. A character already on this device is left untouched; only new characters are added.",
       "fileLabel": "Backup file",
+      "chooseFile": "Choose file",
+      "noFileChosen": "No file chosen",
       "importButton": "Import backup",
       "importError": "Unable to decrypt file. Check the password and try again.",
       "importSummary": "Added {{added}} character(s); skipped {{skipped}} already on this device.",

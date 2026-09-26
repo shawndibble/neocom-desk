@@ -6,6 +6,7 @@ import {
   IskAmount,
   TextInput,
   Tooltip,
+  textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -661,7 +662,7 @@ export function MaterialsTable({
                     // material they are on. The visible word leads the
                     // accessible name rather than being replaced by it.
                     aria-label={t('industry.buildRecipe.actionFor', { material: name })}
-                    className="text-[0.6875rem] whitespace-nowrap text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    className={textActionClassName('whitespace-nowrap')}
                     onClick={() => onShowRecipe(material.typeID)}
                   >
                     {t('industry.priceSourceBuilt')}

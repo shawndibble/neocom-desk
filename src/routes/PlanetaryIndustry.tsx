@@ -647,7 +647,7 @@ function ColonyRow({
           aria-expanded={expanded}
           aria-controls={regionId}
           onClick={onToggle}
-          className="flex w-full flex-col gap-2 px-3 py-2.5 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1.5"
+          className="flex w-full flex-col gap-2 px-3 py-2.5 text-left hover:bg-panel-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1.5 md:grid md:grid-cols-[8rem_11rem_minmax(4rem,1fr)_minmax(0,9rem)_minmax(0,9rem)_minmax(0,10rem)_auto_auto] md:flex-nowrap md:gap-x-3"
         >
           {/* Below `sm` this collapses to 4 lines (name+status, the track,
               expiry alone, product+pins+caret) instead of one field per
@@ -657,17 +657,22 @@ function ColonyRow({
               desktop breakpoint so their children rejoin the outer
               `sm:flex-row` as flat siblings, unchanged from before. */}
           <div className="flex items-center justify-between gap-2 sm:contents">
-            <span className="truncate font-medium sm:w-32 sm:shrink-0">{planetName}</span>
+            <span
+              className="truncate font-medium sm:w-32 sm:shrink-0 md:w-auto md:min-w-0"
+              title={planetName}
+            >
+              {planetName}
+            </span>
             <StatChip
               label={t('pi.attentionLabel')}
               value={t(`pi.attention.${attention}`)}
               tone={ATTENTION_TONE[attention]}
-              className="shrink-0"
+              className="shrink-0 md:w-full md:min-w-0"
             />
           </div>
           <span
             aria-hidden="true"
-            className="h-1.5 w-full min-w-16 flex-1 overflow-hidden rounded-full bg-panel-2"
+            className="h-1.5 w-full min-w-16 flex-1 overflow-hidden rounded-full bg-panel-2 md:min-w-0"
           >
             {/* No fill at all when the banked share is unknown (no yield
                 baseline) — a 0%-wide fill would read as "this program has
@@ -679,14 +684,14 @@ function ColonyRow({
             )}
           </span>
           <div className="flex w-full items-center sm:contents">
-            <span className="min-w-0 flex-1 truncate text-xs text-text-dim tabular-nums sm:w-44 sm:shrink-0 sm:flex-none">
+            <span className="min-w-0 flex-1 truncate text-xs text-text-dim tabular-nums sm:w-44 sm:shrink-0 sm:flex-none md:w-auto md:min-w-0">
               {expiryLabel}
             </span>
           </div>
           {fillTimeDisplay.kind !== 'none' && (
             <div className="flex w-full items-center sm:contents">
               <span
-                className={`min-w-0 flex-1 truncate text-xs tabular-nums sm:w-44 sm:shrink-0 sm:flex-none ${
+                className={`min-w-0 flex-1 truncate text-xs tabular-nums sm:w-44 sm:shrink-0 sm:flex-none md:w-auto md:min-w-0 ${
                   fillTimeDisplay.kind === 'soon' ? 'text-warning' : 'text-text-dim'
                 }`}
               >
@@ -698,8 +703,11 @@ function ColonyRow({
               </span>
             </div>
           )}
+          {fillTimeDisplay.kind === 'none' && (
+            <span aria-hidden="true" className="hidden md:block" />
+          )}
           <div className="flex w-full items-center gap-3 sm:contents">
-            <span className="min-w-0 flex-1 truncate text-xs text-text-dim sm:w-40 sm:shrink-0 sm:flex-none">
+            <span className="min-w-0 flex-1 truncate text-xs text-text-dim sm:w-40 sm:shrink-0 sm:flex-none md:w-auto md:min-w-0">
               {productLabel}
             </span>
             <span className="shrink-0 text-xs text-text-dim tabular-nums">

@@ -491,7 +491,7 @@ describe('Assets', () => {
     await screen.findByText(/only the first 25 assets were fetched/i);
     const requestsBeforeRetry = requestCount;
 
-    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
 
     await waitFor(() => expect(requestCount).toBeGreaterThan(requestsBeforeRetry));
   });

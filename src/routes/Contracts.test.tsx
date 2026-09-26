@@ -429,7 +429,7 @@ describe('Contracts market/issuer links and filters (issue #417)', () => {
     expect(screen.getByText(/incomplete data/i)).toBeInTheDocument();
     const requestsBeforeRetry = page2Requests;
 
-    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
 
     await waitFor(() => expect(page2Requests).toBeGreaterThan(requestsBeforeRetry));
   });
@@ -496,6 +496,17 @@ describe('Contact standing cross-reference', () => {
         name: 'Terrible standing (-10) — your entry on their corp, not on them',
       })
     ).toHaveLength(2);
+  });
+
+  it('shows an Issued column and sorts newest-issued first by default', async () => {
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    const table = screen.getByRole('table', { name: 'Contracts' });
+    const issued = within(table).getByRole('columnheader', { name: /Issued/ });
+    expect(issued).toHaveAttribute('aria-sort', 'descending');
+    expect(
+      within(table).getByText(formatTimestamp(new Date(contractPage1[0].date_issued)))
+    ).toBeInTheDocument();
   });
 
   it('carries the same standing tag into the contract detail modal', async () => {

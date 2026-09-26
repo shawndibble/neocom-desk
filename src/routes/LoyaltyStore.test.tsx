@@ -265,7 +265,7 @@ describe('LoyaltyStore filters', () => {
     const user = userEvent.setup();
     renderStore();
 
-    await user.type(screen.getByPlaceholderText('Search offers'), 'plex');
+    await user.type(screen.getByPlaceholderText('Search offers…'), 'plex');
     await waitFor(() => expect(probe.search).toContain('search=plex'));
   });
 
@@ -286,7 +286,7 @@ describe('LoyaltyStore filters', () => {
     const user = userEvent.setup();
     renderStore();
 
-    await user.type(screen.getByPlaceholderText('Search offers'), 'zzz-no-such-offer');
+    await user.type(screen.getByPlaceholderText('Search offers…'), 'zzz-no-such-offer');
     expect(await screen.findByText('No offers match these filters')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Reset filters' }));

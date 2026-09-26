@@ -35,16 +35,17 @@ interface FittingHeaderProps {
   context?: ReactNode;
   save: ReactNode;
   /**
-   * Below desktop, or while the Add slide-out narrows the page: identity and
-   * Save on the first line, the Fittings menu and Export folded into one ⋮
-   * menu beside them, what the numbers assume below.
+   * Below desktop, or while the Add slide-out narrows the page: the identity
+   * on its own line, then what the numbers assume with Save and one ⋮ menu
+   * (the Fittings menu and Export folded together) at the end.
    */
   compact?: boolean;
 }
 
 /**
- * Below desktop: identity, Save and one ⋮ menu — the Fittings menu's items,
- * then Export's — on the first line; what the numbers assume below.
+ * Below desktop: the identity on its own line, then what the numbers assume
+ * with Save and one ⋮ menu — the Fittings menu's items, then Export's — at
+ * the end of the second.
  */
 function CompactFittingHeader({
   fitting,
@@ -65,29 +66,27 @@ function CompactFittingHeader({
   const exportActions = useFittingExport(fitting);
   return (
     <div className="space-y-2 rounded-xs border border-line bg-panel/85 p-2 backdrop-blur-sm">
-      <div className="flex items-center gap-2">
-        {identity}
-        {save}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <IconButton icon={<More />} label={t('fittings.header.moreActions')} />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-56">
-            {libraryItems}
-            <DropdownMenuSeparator />
-            <p className="px-2 pt-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-              {t('fittings.export.button')}
-            </p>
-            <FittingExportItems actions={exportActions} price={price} />
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-      {/* The copy notice ends the second line, so the header doesn't grow and shrink with it. */}
+      {identity}
+      {/* Save and ⋮ end the second line, so the name keeps the whole first one. The copy notice sits before them, so the header doesn't grow and shrink with it. */}
       <div className="flex flex-wrap items-center gap-2">
         {context}
-        <span className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
           <FittingExportNotice notice={exportActions.notice} />
-        </span>
+          {save}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton icon={<More />} label={t('fittings.header.moreActions')} />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-56">
+              {libraryItems}
+              <DropdownMenuSeparator />
+              <p className="px-2 pt-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('fittings.export.button')}
+              </p>
+              <FittingExportItems actions={exportActions} price={price} />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </div>
   );
@@ -126,7 +125,11 @@ export function FittingHeader({
       />
       <div className="min-w-0">
         <div className="flex min-w-0 items-center gap-1">
-          <h1 className="truncate text-lg font-semibold">{fitting.name}</h1>
+          <h1
+            className={`text-lg font-semibold ${compact ? 'line-clamp-2 break-words' : 'truncate'}`}
+          >
+            {fitting.name}
+          </h1>
           <IconButton
             size="row"
             icon={<Rename />}
@@ -200,7 +203,7 @@ export function FittingHeader({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xs border border-line bg-panel/85 px-3 py-2 backdrop-blur-sm">
         {identity}
         {context && <div className="flex flex-wrap items-center gap-3">{context}</div>}
-        <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button>

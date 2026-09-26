@@ -1,4 +1,5 @@
 import { Trans, useTranslation } from 'react-i18next';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Panel } from '@/components/ui';
 import { ISSUES_URL } from '@/lib/links';
 import { WHAT_WE_STORE_GROUPS, WHAT_WE_STORE_NOTES } from './whatWeStore';
@@ -11,7 +12,7 @@ import { WHAT_WE_STORE_GROUPS, WHAT_WE_STORE_NOTES } from './whatWeStore';
  */
 const PROSE = 'max-w-2xl space-y-3 text-sm';
 
-const LINK = 'text-accent hover:underline';
+const LINK = inlineLinkClassName;
 
 /**
  * Settings' FAQ tab.

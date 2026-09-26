@@ -449,6 +449,21 @@ describe('Wallet', () => {
     expect(screen.queryByText('Donation')).toBeNull();
   });
 
+  it('tones the filtered net total by sign (issue #1961)', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(await screen.findByRole('tab', { name: 'Journal' }));
+    await screen.findByText('Bounty');
+
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    await user.click(screen.getByRole('combobox', { name: 'Ref type' }));
+    await user.click(await screen.findByRole('option', { name: 'Bounty prize' }));
+
+    const net = await screen.findByText('+1,000.00');
+    expect(net).toHaveClass('text-isk-pos');
+    expect(net.parentElement).toHaveTextContent('1 entry · net +1,000.00');
+  });
+
   it('narrows the journal by free text against the description (issue #413)', async () => {
     const user = userEvent.setup();
     render(<App />);
@@ -479,7 +494,9 @@ describe('Wallet', () => {
 
     await user.type(screen.getByPlaceholderText('Search description…'), 'Donation');
 
-    expect(await screen.findByText('1 entry · net -500.00')).toBeInTheDocument();
+    const summary = await screen.findByText(/1 entry/);
+    expect(summary).toHaveTextContent('1 entry · net -500.00');
+    expect(within(summary).getByText('-500.00')).toHaveClass('text-isk-neg');
   });
 
   it('shows a filtered-empty message, not the no-data empty state, when the filter matches nothing (issue #413)', async () => {

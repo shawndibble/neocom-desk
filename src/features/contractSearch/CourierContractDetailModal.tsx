@@ -19,6 +19,7 @@
  * is a constraint to check rather than a figure to weigh, and sits in one
  * quiet grid below.
  */
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/ui';
@@ -361,7 +362,7 @@ export function CourierContractDetailModal({
               <button
                 type="button"
                 onClick={onSearchReverseLane}
-                className="-my-2.5 flex min-h-11 items-center self-start py-1 text-accent underline md:my-0 md:min-h-0"
+                className={`-my-2.5 flex min-h-11 items-center self-start py-1 md:my-0 md:min-h-0 ${inlineLinkClassName}`}
               >
                 {t('contractSearch.reverseLaneCount', { count: reverseLane.count })}
               </button>

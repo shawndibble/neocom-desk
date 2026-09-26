@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Button,
@@ -79,7 +79,7 @@ import {
   TRANSACTION_FILTER_PARAMS,
   type WalletTransactionFilter,
 } from '@/features/character/walletTransactionFilter';
-import { formatIsk } from '@/lib/isk';
+import { clampIskZero, formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -227,6 +227,7 @@ function JournalTable({
   onSortChange,
 }: JournalTableProps) {
   const { t } = useTranslation();
+  const filteredNet = useMemo(() => journalNetTotal(filteredJournal), [filteredJournal]);
   // One store for both journals, so hiding a column on one hides it on the other.
   const { visible, isVisible, toggle, reset } = useColumnVisibility(
     useVisibleWalletJournalColumns,
@@ -274,10 +275,20 @@ function JournalTable({
       />
       {filterIsActive && filteredJournal.length > 0 && (
         <p className="border-b border-line px-3 py-2 text-xs text-text-dim">
-          {t('wallet.journalFilteredSummary', {
-            count: filteredJournal.length,
-            net: signedIsk(journalNetTotal(filteredJournal), 2),
-          })}
+          <Trans
+            i18nKey="wallet.journalFilteredSummary"
+            count={filteredJournal.length}
+            values={{ net: signedIsk(filteredNet, 2) }}
+            components={{
+              net: (
+                <span
+                  className={`tabular-nums ${
+                    clampIskZero(filteredNet, 2) === 0 ? '' : iskToneClass(filteredNet)
+                  }`}
+                />
+              ),
+            }}
+          />
         </p>
       )}
       {filteredJournal.length === 0 ? (
@@ -1509,7 +1520,10 @@ export function Wallet() {
           actions={
             <span className="flex items-center gap-2">
               {!showingCorp && (
-                <Link to="/market/history/transactions" className="text-xs hover:text-accent">
+                <Link
+                  to="/market/history/transactions"
+                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs hover:text-accent md:min-h-0 md:min-w-0"
+                >
                   {t('wallet.transactionsLink')}
                 </Link>
               )}

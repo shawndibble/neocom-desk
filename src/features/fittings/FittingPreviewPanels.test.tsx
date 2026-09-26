@@ -105,6 +105,21 @@ describe('DefensePanel', () => {
     );
     expect(screen.getByText(/Empty in/)).toBeInTheDocument();
   });
+
+  it('reads a sub-minute capacitor depletion in seconds, never 0m', () => {
+    render(
+      <DefensePanel stats={statsWith({ capacitor: { stable: false, depletesInSeconds: 36 } })} />
+    );
+    expect(screen.getByText('Empty in 36s')).toBeInTheDocument();
+    expect(screen.queryByText(/0m/)).not.toBeInTheDocument();
+  });
+
+  it('keeps minutes for a depletion of a minute or more', () => {
+    render(
+      <DefensePanel stats={statsWith({ capacitor: { stable: false, depletesInSeconds: 125 } })} />
+    );
+    expect(screen.getByText('Empty in 2m')).toBeInTheDocument();
+  });
 });
 
 describe('FitMeters', () => {
