@@ -51,6 +51,11 @@ export interface AttentionEntry {
   piFetchedAt: Date | null;
 }
 
+/** A cached `piSoonestExpiryMs` the clock has since passed — the one "expired always wins" check both the Characters table's `pi` column and its card view's attention chip apply to a category that can otherwise lag a stale roster load. */
+export function isPiExpired(expiryMs: number | null | undefined, nowMs: number): boolean {
+  return expiryMs != null && expiryMs <= nowMs;
+}
+
 function emptyEntry(characterId: number): AttentionEntry {
   return {
     characterId,

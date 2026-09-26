@@ -80,6 +80,7 @@ afterEach(() => server.resetHandlers());
 beforeEach(async () => {
   await db.characters.clear();
   await db.settings.clear();
+  await db.notificationFeed.clear();
   useActiveCharacter.setState({ activeCharacterId: null, hydrated: true });
   usePublicInfo.setState({ byCharacterId: {} });
   useOverviewGroups.setState({ value: { groups: [], updatedAt: 0 }, hydrated: false });
@@ -131,6 +132,50 @@ function renderCharacters(
   );
 }
 
+function pilotRosterEntry(characterId: number, name: string): RosterEntry {
+  return {
+    characterId,
+    name,
+    wallet: null,
+    queue: null,
+    correctedTotalSp: 1_000_000,
+    skills: null,
+  };
+}
+
+function pilotAttentionEntry(
+  characterId: number,
+  overrides: Partial<Pick<AttentionEntry, 'piAttention' | 'piSoonestExpiryMs'>> = {}
+): AttentionEntry {
+  return {
+    characterId,
+    jobCounts: { manufacturing: 0, science: 0, reaction: 0 },
+    jobCountsFetchedAt: new Date(),
+    piAttention: undefined,
+    piSoonestExpiryMs: undefined,
+    piFetchedAt: null,
+    ...overrides,
+  };
+}
+
+/** Mocks the roster snapshot + attention loaders for `run`, restoring both spies whether it passes or throws. */
+async function withMockedRoster(
+  roster: readonly RosterEntry[],
+  attention: readonly AttentionEntry[],
+  run: () => Promise<void>
+): Promise<void> {
+  const snapshotSpy = vi.spyOn(rosterModule, 'loadRosterSnapshot').mockResolvedValue([...roster]);
+  const attentionSpy = vi
+    .spyOn(rosterAttentionModule, 'loadRosterAttention')
+    .mockResolvedValue([...attention]);
+  try {
+    await run();
+  } finally {
+    snapshotSpy.mockRestore();
+    attentionSpy.mockRestore();
+  }
+}
+
 describe('Characters', () => {
   it('renders character cards from Dexie with portraits', async () => {
     renderCharacters();
@@ -140,6 +185,106 @@ describe('Characters', () => {
     expect(portrait).toHaveAttribute(
       'src',
       'https://images.evetech.net/characters/91/portrait?size=128'
+    );
+  });
+
+  it("marks the active Character's card with aria-current and an Active label, and only that card (#1793)", async () => {
+    useActiveCharacter.setState({ activeCharacterId: 91, hydrated: true });
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
+    const pilotTwoCard = screen.getByText('Pilot Two').closest('li') as HTMLElement;
+    expect(pilotOneCard).toHaveAttribute('aria-current', 'true');
+    expect(within(pilotOneCard).getByText('Active')).toBeInTheDocument();
+    expect(pilotTwoCard).not.toHaveAttribute('aria-current');
+    expect(within(pilotTwoCard).queryByText('Active')).not.toBeInTheDocument();
+  });
+
+  it('shows an Alerts chip only for a Character with alerts, none for a healthy card (#1793)', async () => {
+    await db.notificationFeed.put({
+      id: 'feed-1',
+      characterId: 91,
+      eventId: 'newMail',
+      title: 'New mail',
+      body: 'body',
+      firedAt: Date.now(),
+    });
+
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
+    const pilotTwoCard = screen.getByText('Pilot Two').closest('li') as HTMLElement;
+    await within(pilotOneCard).findByText('1');
+    expect(within(pilotOneCard).getByText('Alerts')).toBeInTheDocument();
+    expect(within(pilotTwoCard).queryByText('Alerts')).not.toBeInTheDocument();
+  });
+
+  it('shows a warning-tone "PI Stopped" chip for a Character whose colony has expired, none for a healthy card (#1793)', async () => {
+    await withMockedRoster(
+      [pilotRosterEntry(91, 'Pilot One'), pilotRosterEntry(92, 'Pilot Two')],
+      [
+        pilotAttentionEntry(91, { piAttention: 'idle', piSoonestExpiryMs: Date.now() - 3_600_000 }),
+        pilotAttentionEntry(92),
+      ],
+      async () => {
+        renderCharacters();
+        await screen.findByText('Pilot One');
+
+        const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
+        const pilotTwoCard = screen.getByText('Pilot Two').closest('li') as HTMLElement;
+        await within(pilotOneCard).findByText('Stopped');
+        expect(within(pilotOneCard).getByText('PI')).toBeInTheDocument();
+        expect(within(pilotTwoCard).queryByText('PI')).not.toBeInTheDocument();
+      }
+    );
+  });
+
+  it('shows both an Alerts chip and a PI chip on the same card when both apply (#1793)', async () => {
+    await db.notificationFeed.put({
+      id: 'feed-both',
+      characterId: 91,
+      eventId: 'newMail',
+      title: 'New mail',
+      body: 'body',
+      firedAt: Date.now(),
+    });
+    await withMockedRoster(
+      [pilotRosterEntry(91, 'Pilot One')],
+      [pilotAttentionEntry(91, { piAttention: 'idle', piSoonestExpiryMs: Date.now() - 3_600_000 })],
+      async () => {
+        renderCharacters();
+        await screen.findByText('Pilot One');
+
+        const pilotOneCard = screen.getByText('Pilot One').closest('li') as HTMLElement;
+        await within(pilotOneCard).findByText('Stopped');
+        expect(within(pilotOneCard).getByText('Alerts')).toBeInTheDocument();
+        expect(within(pilotOneCard).getByText('1')).toBeInTheDocument();
+        expect(within(pilotOneCard).getByText('PI')).toBeInTheDocument();
+      }
+    );
+  });
+
+  it('never shows a PI chip for a "decayed" colony, even once a stale cached expiry has passed (#1793)', async () => {
+    // `decayed` still carries a real `piSoonestExpiryMs` (a program that
+    // hasn't stopped, just fallen past its efficient window) — must stay
+    // table-only even once the clock has passed that expiry.
+    await withMockedRoster(
+      [pilotRosterEntry(91, 'Pilot One')],
+      [
+        pilotAttentionEntry(91, {
+          piAttention: 'decayed',
+          piSoonestExpiryMs: Date.now() - 3_600_000,
+        }),
+      ],
+      async () => {
+        renderCharacters();
+        const pilotOneCard = (await screen.findByText('Pilot One')).closest('li') as HTMLElement;
+        await within(pilotOneCard).findByText('SP');
+        expect(within(pilotOneCard).queryByText('PI')).not.toBeInTheDocument();
+        expect(within(pilotOneCard).queryByText('Stopped')).not.toBeInTheDocument();
+      }
     );
   });
 

@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   JOB_SLOT_CATEGORIES,
@@ -6,18 +5,8 @@ import {
   type JobSlotCategory,
 } from '@/engine/industry/jobSlots';
 import { formatEveDateTime } from '@/lib/eveTime';
+import { useNow } from '@/lib/useNow';
 import { openSlots, usePlanJobSlots } from './planJobSlots';
-
-const TICK_MS = 60_000;
-
-function useNow(): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), TICK_MS);
-    return () => clearInterval(id);
-  }, []);
-  return now;
-}
 
 /** "Uses 1 Mfg slot · 6 free · done by <EVE time> if started now" for one plan's own job; renders nothing without slot data. */
 export function PlanSlotLine({

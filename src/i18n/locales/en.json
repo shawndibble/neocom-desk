@@ -2371,6 +2371,7 @@
       "skillPoints": "Skill points",
       "wallet": "Wallet"
     },
+    "activeLabel": "Active",
     "spLabel": "SP",
     "walletLabel": "Wallet",
     "queueState": "Queue",
