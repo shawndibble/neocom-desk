@@ -1505,8 +1505,12 @@ describe('BpcSourcingPanel Jump Range', () => {
     const jitaRow = rows.find((r) => within(r).queryByText('Jita IV - Moon 4'));
     expect(jitaRow).toBeDefined();
     const jumpsCell = (jitaRow as HTMLElement).querySelector('[data-label="Jumps"]');
+    // findByTitle, not getByTitle: the cell can still show the "…" pending
+    // placeholder for a tick after loadCharacterSolarSystemId's mock resolves.
     expect(
-      within(jumpsCell as HTMLElement).getByTitle('Set your current system to filter by distance.')
+      await within(jumpsCell as HTMLElement).findByTitle(
+        'Set your current system to filter by distance.'
+      )
     ).toBeInTheDocument();
   });
 

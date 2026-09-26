@@ -16,6 +16,7 @@
  */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { CHARACTER_NAME } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
 
@@ -60,6 +61,12 @@ test('shows one onboarding banner at a time at 390px, then the next one', async 
   await pinNotificationPermissionToDefault(page);
   await page.setViewportSize(PHONE);
   await signInAndGoto(page, './overview');
+  // issue #1788: the explainer now waits for a second route. Wait for the
+  // overview heading before navigating away — `page.goto`'s `load` event
+  // fires before the dev server's lazy-loaded Layout/Prompt tree commits, so
+  // navigating too early records `/characters` as the "first screen" instead.
+  await expect(page.getByRole('heading', { name: CHARACTER_NAME })).toBeVisible();
+  await page.goto('./characters');
 
   // Counted as the AC words it: every `role="alert"` on the page, so a future
   // fixed banner that regresses the rule without opting into the shared
