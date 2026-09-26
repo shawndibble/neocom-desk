@@ -23,6 +23,11 @@ export interface DataTableSort {
   direction: 'asc' | 'desc';
 }
 
+const STICKY_START = 'sticky left-0 z-10 bg-panel max-md:border-r max-md:border-line';
+// `hover:bg-panel-2` lives on the `<tr>`, whose own background a sticky
+// cell's opaque one would otherwise cover.
+const STICKY_START_CELL = 'max-sm:max-w-30 [tr:hover>&]:bg-panel-2';
+
 export interface DataTableColumn<T> {
   id: string;
   /** Already-translated header text. */
@@ -39,6 +44,14 @@ export interface DataTableColumn<T> {
    * `text-text-dim` has no business on the header.
    */
   headerClassName?: string;
+  /**
+   * Pins the column at the left edge while the rest scroll sideways under it
+   * (a table that overflows its wrapper, e.g. `responsive="table"` on a
+   * phone), so row labels stay on screen. Below `md` it also gets a right
+   * border marking the scroll edge and shrinks to ~120px; where the table
+   * fits, it's a visual no-op. Only for the first column.
+   */
+  stickyStart?: boolean;
   /**
    * One-line plain-language note on what the column's values *are*, shown as
    * a small info control beside the header text — e.g. that a ledger date is
@@ -418,6 +431,7 @@ export function DataTable<T>({
       column.align === 'right' && 'text-right',
       column.align === 'right' && column.sortValue && sortIconGutter,
       column.align === 'center' && 'text-center',
+      column.stickyStart && `${STICKY_START} ${STICKY_START_CELL}`,
       column.className
     )
   );
@@ -665,7 +679,10 @@ export function DataTable<T>({
                 key={column.id}
                 role="columnheader"
                 scope="col"
-                className={sortable ? 'p-0' : headerTextClass[i]}
+                className={cx(
+                  sortable ? 'p-0' : headerTextClass[i],
+                  column.stickyStart && STICKY_START
+                )}
                 aria-sort={
                   sortable
                     ? active

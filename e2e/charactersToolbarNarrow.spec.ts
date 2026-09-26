@@ -100,6 +100,29 @@ test('the table view shows Last synced age text at 390px (#1783)', async ({ page
   await expect(age).not.toHaveText('');
 });
 
+test('the table view keeps the Name column pinned while scrolling right at 390px (#1792)', async ({
+  page,
+}) => {
+  await landOnCharactersAtPhoneWidth(page);
+  await page.getByRole('button', { name: 'Table' }).click();
+
+  const nameCell = page.locator('table tbody td').first();
+  await expect(nameCell).toBeVisible();
+  const scroller = page.locator('div.overflow-x-auto', { has: page.locator('table') }).last();
+  const scrolled = await scroller.evaluate((el) => {
+    el.scrollLeft = el.scrollWidth;
+    return el.scrollLeft;
+  });
+  // Nothing to prove if the table happens to fit this fixture.
+  expect(scrolled).toBeGreaterThan(0);
+
+  const box = await nameCell.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(PHONE.width);
+  expect(box!.width).toBeLessThanOrEqual(130);
+});
+
 /**
  * `hasTouch` is scoped to this block, not the file: it flips
  * `(pointer: coarse)`/`(hover: none)`, and the row-layout test above must keep
