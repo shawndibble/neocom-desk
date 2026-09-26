@@ -44,3 +44,20 @@ test('Journal "Transactions →" link keeps its text-link height at 1280px', asy
   const height = await link.evaluate((el) => el.getBoundingClientRect().height);
   expect(height).toBeLessThanOrEqual(20);
 });
+
+test('Journal "Transactions →" link rests in the accent colour at 1440px', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await signInAndGoto(page, './wallet/journal');
+
+  const link = page.getByRole('link', { name: 'Transactions →' });
+  await expect(link).toBeVisible();
+  const { linkColor, accentColor } = await link.evaluate((el) => {
+    const probe = document.createElement('span');
+    probe.className = 'text-accent';
+    document.body.appendChild(probe);
+    const accentColor = getComputedStyle(probe).color;
+    probe.remove();
+    return { linkColor: getComputedStyle(el).color, accentColor };
+  });
+  expect(linkColor).toBe(accentColor);
+});
