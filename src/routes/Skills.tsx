@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -180,6 +180,15 @@ export function Skills() {
   const attributeBaseline = data?.attributeBaseline ?? null;
 
   const [selectedSkillTypeID, setSelectedSkillTypeID] = useState<number | null>(null);
+  const inspectorRef = useRef<HTMLDivElement>(null);
+
+  // The inspector renders above the sticky search bar and the row that
+  // opened it, so a plain selection change can leave it off-screen.
+  useEffect(() => {
+    if (selectedSkillTypeID !== null) {
+      inspectorRef.current?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedSkillTypeID]);
 
   // Drop the inspector selection when switching characters, without an effect
   // (https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes).
@@ -375,13 +384,15 @@ export function Skills() {
           </Panel>
 
           {inspector && (
-            <SkillInspector
-              skillName={inspector.name}
-              description={inspector.description}
-              prereqs={inspector.prereqs}
-              unlocks={inspector.unlocks}
-              onClose={() => setSelectedSkillTypeID(null)}
-            />
+            <div ref={inspectorRef}>
+              <SkillInspector
+                skillName={inspector.name}
+                description={inspector.description}
+                prereqs={inspector.prereqs}
+                unlocks={inspector.unlocks}
+                onClose={() => setSelectedSkillTypeID(null)}
+              />
+            </div>
           )}
 
           {groups.length > 0 && (

@@ -604,4 +604,24 @@ describe('Skills', () => {
     });
     expect(await screen.findByText('No skills match your search.')).toBeInTheDocument();
   });
+
+  it('scrolls the inspector into view on selection, since it renders above the sticky search bar (#1712)', async () => {
+    const scrollIntoView = vi
+      .spyOn(Element.prototype, 'scrollIntoView')
+      .mockImplementation(() => {});
+
+    try {
+      render(<App />);
+
+      fireEvent.click(await screen.findByRole('button', { name: /Spaceship Command/ }));
+      fireEvent.click(screen.getByRole('button', { name: /^Frigate/ }));
+
+      const closeButton = await screen.findByRole('button', { name: 'Close' });
+      const inspectorContainer = closeButton.closest('section')!.parentElement!;
+      expect(scrollIntoView.mock.instances).toContain(inspectorContainer);
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+    } finally {
+      scrollIntoView.mockRestore();
+    }
+  });
 });
