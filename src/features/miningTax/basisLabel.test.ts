@@ -36,7 +36,7 @@ describe('basisSummary', () => {
 });
 
 describe('basisUsage', () => {
-  const counts = { total: 6, saved: 6, average: 0, live: 0, none: 0 };
+  const counts = { total: 6, saved: 6, historical: 0, average: 0, live: 0, none: 0 };
 
   it('counts saved days when nothing fell back', () => {
     expect(basisUsage(i18n.t, 'buy', counts)).toBe('6 of 6 days use saved prices');
@@ -49,9 +49,16 @@ describe('basisUsage', () => {
   });
 
   it('names each fallback source', () => {
-    expect(basisUsage(i18n.t, 'sell', { total: 8, saved: 4, average: 2, live: 1, none: 1 })).toBe(
-      '4 of 8 days use saved prices, 2 daily avg, 1 live, 1 unpriced'
-    );
+    expect(
+      basisUsage(i18n.t, 'sell', {
+        total: 9,
+        saved: 4,
+        historical: 1,
+        average: 2,
+        live: 1,
+        none: 1,
+      })
+    ).toBe('4 of 9 days use saved prices, 1 historical, 2 daily avg, 1 live, 1 unpriced');
   });
 
   it('is empty under a now basis or with no days', () => {

@@ -36,6 +36,28 @@ import {
 } from './purgeFeed.js';
 import { streamPublicContractsCsvs } from './publicContractsArchive.js';
 import {
+  ADAM4EVE_MIN_REQUEST_GAP_MS,
+  ADAM4EVE_TYPE_CHUNK_SIZE,
+  BACKFILL_HUB,
+  FUZZWORK_TYPE_CHUNK_SIZE,
+  MARKET_HISTORY_COLLECTION,
+  PRICED_TYPE_IDS,
+  SNAPSHOT_HUBS,
+  buildAdam4eveHistoryUrl,
+  buildFuzzworkUrl,
+  chunk,
+  foldHubPriceCapture,
+  isOutsideRetention,
+  missingBackfillDates,
+  parseAdam4eveHistoryResponse,
+  parseFuzzworkAggregates,
+  utcDateString,
+  type MarketHistoryDoc,
+  type SidePrices,
+  type StoredHubDay,
+  type StoredHubPrice,
+} from './marketSnapshot.js';
+import {
   chunkDocId,
   chunkRows,
   compactContractOfferRow,
@@ -478,6 +500,170 @@ async function writePublicCourierContractsSnapshot(
  * per billing account ADR 0013 budgeted against, now that the blueprint-only
  * sync it briefly ran beside is gone.
  */
+// Same contact string ESI calls send (src/esi/client.ts's USER_AGENT) —
+// functions/ has no `@/` alias to import it, and Adam4EVE's own docs ask for
+// a User-Agent naming this app rather than a personal contact.
+const MARKET_HISTORY_USER_AGENT = 'Neocom Desk (github.com/shawndibble/neocom-desk)';
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchAdam4eveChunk(
+  typeIds: readonly number[],
+  start: string,
+  end: string
+): Promise<Map<number, Map<string, SidePrices>>> {
+  const url = buildAdam4eveHistoryUrl(typeIds, BACKFILL_HUB.regionId, start, end);
+  const response = await fetch(url, { headers: { 'User-Agent': MARKET_HISTORY_USER_AGENT } });
+  if (!response.ok) {
+    throw new Error(`Adam4EVE market_price_history request failed with status ${response.status}`);
+  }
+  return parseAdam4eveHistoryResponse(await response.json());
+}
+
+/**
+ * Fills whatever days in the retention window have no doc at all yet, from
+ * Adam4EVE's region-wide history (marketSnapshot.ts's header comment). A
+ * no-op once the live capture below has covered every day in the window —
+ * this is meant to run itself out of work within
+ * `MARKET_HISTORY_RETENTION_DAYS` of first deploying.
+ *
+ * One request per 20-type chunk of the mining catalog, each covering the
+ * whole missing date range in one call (Adam4EVE's `start`/`end` already
+ * spans many days), spaced `ADAM4EVE_MIN_REQUEST_GAP_MS` apart — the
+ * catalog is ~500 types, so ~25-30 requests, once.
+ */
+async function backfillFromAdam4eve(db: Firestore, missingDates: readonly string[]): Promise<void> {
+  if (missingDates.length === 0) return;
+  const missingDateSet = new Set(missingDates);
+  const start = missingDates[0];
+  const end = missingDates[missingDates.length - 1];
+
+  const byDate = new Map<string, StoredHubDay>();
+  const typeChunks = chunk(PRICED_TYPE_IDS, ADAM4EVE_TYPE_CHUNK_SIZE);
+  const stationKey = String(BACKFILL_HUB.stationId);
+  for (let i = 0; i < typeChunks.length; i += 1) {
+    if (i > 0) await sleep(ADAM4EVE_MIN_REQUEST_GAP_MS);
+    const byTypeThenDate = await fetchAdam4eveChunk(typeChunks[i], start, end);
+    for (const [typeId, byDateForType] of byTypeThenDate) {
+      for (const [date, prices] of byDateForType) {
+        // Adam4EVE's own range can include a day this run already captured
+        // live (e.g. a retry landing after midnight UTC) — only the actual
+        // gaps get written from this source.
+        if (!missingDateSet.has(date)) continue;
+        const day = byDate.get(date) ?? {};
+        const stationBucket = day[stationKey] ?? {};
+        stationBucket[String(typeId)] = {
+          buy: prices.buy,
+          sell: prices.sell,
+          buyCount: prices.buy === null ? 0 : 1,
+          sellCount: prices.sell === null ? 0 : 1,
+        };
+        day[stationKey] = stationBucket;
+        byDate.set(date, day);
+      }
+    }
+  }
+
+  const updatedAt = Date.now();
+  await Promise.all(
+    [...byDate].map(([date, hubs]) => {
+      const doc: MarketHistoryDoc = { hubs, source: 'adam4eve', updatedAt };
+      return db.collection(MARKET_HISTORY_COLLECTION).doc(date).set(doc);
+    })
+  );
+  logInfo('market history backfill', {
+    requestedDays: missingDates.length,
+    daysWritten: byDate.size,
+  });
+}
+
+/**
+ * Captures every hub's current live book and folds it into today's running
+ * average (marketSnapshot.ts's `foldHubPriceCapture`). Runs every 6 hours;
+ * a fetch failure for one hub is logged and skipped rather than failing the
+ * whole run — the day's average is simply built from however many captures
+ * actually landed.
+ */
+async function captureLiveHubPrices(db: Firestore, today: string): Promise<void> {
+  const docRef = db.collection(MARKET_HISTORY_COLLECTION).doc(today);
+  const existing = (await docRef.get()).data() as MarketHistoryDoc | undefined;
+  const hubs: StoredHubDay = existing?.source === 'fuzzwork' ? { ...existing.hubs } : {};
+
+  for (const hub of SNAPSHOT_HUBS) {
+    const captured = new Map<number, SidePrices>();
+    for (const typeIdChunk of chunk(PRICED_TYPE_IDS, FUZZWORK_TYPE_CHUNK_SIZE)) {
+      const url = buildFuzzworkUrl(hub.stationId, typeIdChunk);
+      let response: Response;
+      try {
+        response = await fetch(url);
+      } catch (err) {
+        logWarn('Fuzzwork aggregates request failed', {
+          hub: hub.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        continue;
+      }
+      if (!response.ok) {
+        logWarn('Fuzzwork aggregates request failed', { hub: hub.id, status: response.status });
+        continue;
+      }
+      for (const [typeId, prices] of parseFuzzworkAggregates(await response.json(), typeIdChunk)) {
+        captured.set(typeId, prices);
+      }
+    }
+
+    const stationKey = String(hub.stationId);
+    const stationBucket: Record<string, StoredHubPrice> = { ...hubs[stationKey] };
+    for (const [typeId, prices] of captured) {
+      stationBucket[String(typeId)] = foldHubPriceCapture(stationBucket[String(typeId)], prices);
+    }
+    hubs[stationKey] = stationBucket;
+  }
+
+  const doc: MarketHistoryDoc = { hubs, source: 'fuzzwork', updatedAt: Date.now() };
+  await docRef.set(doc);
+  logInfo('market history live capture', { date: today, hubCount: SNAPSHOT_HUBS.length });
+}
+
+/**
+ * captureMiningPriceSnapshot: the Mining Yield Overview's server-side price
+ * source (issue #1279) — see marketSnapshot.ts's header comment for the full
+ * design. Every 6 hours: backfill whatever's missing from Adam4EVE (idle
+ * once the window is full), fold a live capture into today's running
+ * average, then prune anything that's aged out of the retention window.
+ *
+ * One collection read up front serves both the backfill-gap check and the
+ * prune list, rather than two passes over the same ~90-100 docs.
+ *
+ * It is the deployment's 4th scheduled job, alongside `dispatchProjections`,
+ * `purgeNotificationFeed` and `syncPublicContractOffers` — past the 3 free
+ * Cloud Scheduler jobs per billing account `syncPublicContractOffers`'s own
+ * comment budgeted against (see the decision doc this ships with).
+ */
+export const captureMiningPriceSnapshot = onSchedule(
+  { schedule: 'every 6 hours', timeoutSeconds: 540 },
+  async () => {
+    const db = getFirestore();
+    const today = utcDateString(new Date());
+
+    const snapshot = await db.collection(MARKET_HISTORY_COLLECTION).get();
+    const existingDates = new Set(snapshot.docs.map((doc) => doc.id));
+    const staleDocs = snapshot.docs.filter((doc) => isOutsideRetention(doc.id, today));
+
+    await backfillFromAdam4eve(db, missingBackfillDates(existingDates, today));
+    await captureLiveHubPrices(db, today);
+
+    if (staleDocs.length > 0) {
+      const batch = db.batch();
+      for (const doc of staleDocs) batch.delete(doc.ref);
+      await batch.commit();
+      logInfo('market history prune', { deleted: staleDocs.length });
+    }
+  }
+);
+
 export const syncPublicContractOffers = onSchedule(
   { schedule: 'every 30 minutes', memory: '2GiB', timeoutSeconds: 540 },
   async () => {

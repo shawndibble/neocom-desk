@@ -40,6 +40,7 @@ import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurren
 import { getHubPrices } from '@/market/prices';
 import {
   PRICE_BASES,
+  mergeSnapshotDay,
   resolveUnitPrice,
   weakestSource,
   type PriceBasis,
@@ -49,6 +50,7 @@ import {
 } from '@/engine/miningTax/priceBasis';
 import { eveToday } from '@/engine/miningTax/yieldRange';
 import { loadPriceSnapshots, saveTodayPriceSnapshot } from './priceSnapshots';
+import { loadHubSnapshotRange } from '@/features/market/hubSnapshot';
 
 export interface TrackedCharacter {
   characterId: number;
@@ -298,6 +300,27 @@ export async function loadMiningYieldSnapshot(showRefining = true): Promise<Mini
   }
   const savedByDate = await loadPriceSnapshots().catch(() => new Map<string, SnapshotDay>());
 
+  // The server's own hub-price job (`functions/src/marketSnapshot.ts`, issue
+  // #1279) covers every day going forward regardless of whether this browser
+  // ever saved one, and backfills whatever's older — see priceBasis.ts's
+  // header comment for the tier ordering. Its Jita capture (source:
+  // 'fuzzwork') is folded into the same `saved` tier as this browser's own
+  // Dexie snapshot, server winning where both have a value for a day; its
+  // Adam4EVE backfill (source: 'adam4eve') feeds the weaker `historical` tier
+  // instead. `allEntries` is non-empty here (checked above), so there is
+  // always a characterId to sign in as — the read is public, not
+  // character-scoped, so which one doesn't matter.
+  const entryDates = allEntries.map(({ entry }) => entry.date);
+  const hubSnapshot = await loadHubSnapshotRange(
+    allEntries[0].characterId,
+    entryDates.reduce((min, date) => (date < min ? date : min)),
+    entryDates.reduce((max, date) => (date > max ? date : max))
+  );
+  for (const [date, byType] of hubSnapshot.saved) {
+    const fresh: SnapshotDay = Object.fromEntries(byType);
+    savedByDate.set(date, mergeSnapshotDay(savedByDate.get(date) ?? {}, fresh));
+  }
+
   const priceByTypeAndDate = new Map<number, Map<string, number>>();
   for (const [typeId, result] of histories) {
     const byDate = new Map<string, number>();
@@ -322,6 +345,7 @@ export async function loadMiningYieldSnapshot(showRefining = true): Promise<Mini
     resolveUnitPrice(
       {
         saved: savedByDate.get(date)?.[typeId],
+        historical: hubSnapshot.historical.get(date)?.get(typeId),
         average: priceByTypeAndDate.get(typeId)?.get(date),
         live: livePrices.get(typeId),
       },
