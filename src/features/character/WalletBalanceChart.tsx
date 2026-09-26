@@ -20,19 +20,19 @@ import { useTranslation } from 'react-i18next';
 import { DataTable, type DataTableColumn } from '@/components/ui';
 import { COMPACT_ISK_Y_AXIS_MARGIN_LEFT, COMPACT_ISK_Y_AXIS_WIDTH } from '@/lib/chartAxis';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
-import { formatDateOnly, formatTimestamp } from '@/lib/timestamp';
+import { formatCalendarTimestamp, formatDateOnly } from '@/lib/timestamp';
+import { toChartPoints, type ChartPoint } from './walletBalanceChartPoints';
+import { timeAxisTicks } from '@/engine/wallet/timeTicks';
 import type { WalletBalancePoint, WalletBalanceTrend } from '@/engine/wallet/balanceHistory';
-
-interface ChartPoint extends WalletBalancePoint {
-  dateLabel: string;
-  tooltipLabel: string;
-}
 
 interface WalletBalanceChartProps {
   points: WalletBalancePoint[];
   trend: WalletBalanceTrend;
   timeZone?: string;
 }
+
+/** Few enough that "9/21/2026"-wide labels don't collide at 390px. */
+const MAX_X_TICKS = 5;
 
 const TREND_STROKE: Record<WalletBalanceTrend, string> = {
   up: 'var(--color-isk-pos)',
@@ -59,14 +59,16 @@ function BalanceTooltip({ active, payload }: TooltipContentProps): React.ReactEl
 export default function WalletBalanceChart({ points, trend, timeZone }: WalletBalanceChartProps) {
   const { t } = useTranslation();
   const chartData = useMemo<ChartPoint[]>(
-    () =>
-      points.map((p) => ({
-        ...p,
-        dateLabel: formatDateOnly(new Date(p.date), timeZone),
-        tooltipLabel: formatTimestamp(new Date(p.date), timeZone),
-      })),
+    () => toChartPoints(points, timeZone),
     [points, timeZone]
   );
+
+  const axis = useMemo(() => {
+    const xs = chartData.map((p) => p.x).filter(Number.isFinite);
+    const min = xs.length ? Math.min(...xs) : 0;
+    const max = xs.length ? Math.max(...xs) : 0;
+    return { min, max, ...timeAxisTicks(min, max, timeZone, MAX_X_TICKS) };
+  }, [chartData, timeZone]);
 
   const columns = useMemo<DataTableColumn<ChartPoint>[]>(
     () => [
@@ -89,7 +91,16 @@ export default function WalletBalanceChart({ points, trend, timeZone }: WalletBa
           >
             <CartesianGrid stroke="var(--color-line)" strokeDasharray="3 3" />
             <XAxis
-              dataKey="dateLabel"
+              dataKey="x"
+              type="number"
+              scale="time"
+              domain={[axis.min, axis.max]}
+              ticks={axis.ticks}
+              tickFormatter={(value: number) =>
+                axis.showTime
+                  ? formatCalendarTimestamp(new Date(value), timeZone)
+                  : formatDateOnly(new Date(value), timeZone)
+              }
               stroke="var(--color-text-dim)"
               tick={{ fontSize: 11, fill: 'var(--color-text-dim)' }}
             />
