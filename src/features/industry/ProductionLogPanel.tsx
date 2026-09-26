@@ -48,6 +48,7 @@ import { useSaleLinking } from './useSaleLinking';
 import { iskToneClass } from '@/features/character/format';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { formatIsk } from '@/lib/isk';
+import { useTimeZone } from '@/lib/timeFormat';
 import { formatPercent } from './format';
 import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
 import { isoDateParam, optionalSortParam, type UrlSort } from '@/lib/urlState';
@@ -309,6 +310,7 @@ export function ProductionLogPanel({
   onShowInfo,
 }: ProductionLogPanelProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const [dateRange, setDateRange] = useUrlParams(DATE_RANGE_PARAMS);
   const filter: ProductionLogFilter = useMemo(
     () => ({ startDate: dateRange['records.from'], endDate: dateRange['records.to'] }),
@@ -523,7 +525,7 @@ export function ProductionLogPanel({
   ];
 
   const runColumns: DataTableColumn<RunRow>[] = [
-    loggedAtColumn(t),
+    loggedAtColumn(t, timeZone),
     {
       id: 'item',
       header: t('industry.productionRunColumnItem'),

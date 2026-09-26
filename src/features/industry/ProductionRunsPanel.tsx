@@ -39,6 +39,7 @@ import { SaleLinkingModals } from './SaleLinkingControls';
 import { useSaleLinking } from './useSaleLinking';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
+import { useTimeZone } from '@/lib/timeFormat';
 
 interface ProductionRunsPanelProps {
   characterId: number;
@@ -94,6 +95,7 @@ export function ProductionRunsPanel({
   logRequest = 0,
 }: ProductionRunsPanelProps) {
   const { t } = useTranslation();
+  const timeZone = useTimeZone();
   const [loggingOpen, setLoggingOpen] = useState(false);
   // Closed until asked: the table is the record, and on a plan being priced
   // the header's one-line rollup is the read that matters. Its rows are
@@ -207,7 +209,7 @@ export function ProductionRunsPanel({
   }
 
   const columns: DataTableColumn<ProductionRunSummary>[] = [
-    loggedAtColumn(t),
+    loggedAtColumn(t, timeZone),
     quantityColumn(t),
     totalCostColumn(t),
     {

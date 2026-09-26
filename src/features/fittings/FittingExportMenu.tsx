@@ -9,6 +9,7 @@ import {
 } from '@/components/ui';
 import type { Fitting } from '@/engine/fittings/types';
 import type { Appraisal } from '@/engine/market/appraisal';
+import { formatIsk } from '@/lib/isk';
 import { useFittingExport, type FittingExport } from './useFittingExport';
 
 interface Props {
@@ -57,8 +58,8 @@ export function FittingExportItems({
       <div className="px-2 py-1.5 text-xs text-text-dim">
         {price ? (
           <>
-            <p>{t('fittings.stats.priceSell', { value: price.totals.sell.toFixed(0) })}</p>
-            <p>{t('fittings.stats.priceBuy', { value: price.totals.buy.toFixed(0) })}</p>
+            <p>{t('fittings.stats.priceSell', { value: formatIsk(price.totals.sell) })}</p>
+            <p>{t('fittings.stats.priceBuy', { value: formatIsk(price.totals.buy) })}</p>
           </>
         ) : (
           <p>{t('fittings.stats.priceLoading')}</p>
