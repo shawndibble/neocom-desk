@@ -8,20 +8,21 @@ findings live in `.claude/skills/improve-mobile-ux/LEDGER.md`, not here.
 
 One row per surface, with what the audit concluded.
 
-| Surface                                                 | Conclusion                                                                                                                                                                                                                                               |
-| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Overview (board + Alerts column)                        | Clean at 1280+. At 1024-1179 the cards/alerts split starts at `lg` (viewport) not at content width, so card titles and badges truncate (#1615 made them truncate, not wrap). Filed #1680.                                                                |
-| Industry (Build Plans tab, Active Jobs strip)           | Empty-state layout clean. Active Jobs free-slot readout printed bare "1 / 1 / 1" with colour-only tone: #1681. Populated Records/Opportunities/BPC Search tabs not rendered (mocks give no data; `?tab=` is not the tab switch): audit with seeded data. |
-| Skills > Trained                                        | Clean at both widths, empty and loading. "N of 5 slots empty" counts attribute enhancers only. Expanded skill rows not rendered.                                                                                                                         |
-| Wallet (Balance, Journal)                               | Clean at 1024 and 1440: `EmptyState`s explain the fix, Balance leads with ISK, Journal amounts right-aligned. Balance chart X axis was categorical: #1916.                                                                                               |
-| Assets (seeded one location)                            | Clean. The tall single-location panel is a scroll container, not a dead zone.                                                                                                                                                                            |
-| Market > Open Orders (seeded 2 orders)                  | Untitled `Panel` header bar carries only actions because the tab names it. Not a finding.                                                                                                                                                                |
-| Characters (card view)                                  | Card header never wraps (`flex-1 min-w-0`), so at 1024's three columns the active card's name collapses: #1943. Toolbar and 1440 clean.                                                                                                                  |
-| Market Browser (empty pre-selection)                    | Clean. Tree plus empty detail pane leaves a void at 1440; that is the empty state. A selected item's order book not rendered.                                                                                                                            |
-| Fittings (open Fitting, Compare)                        | Header buttons stack, Compare controls and columns, Ring column: #1925-#1929.                                                                                                                                                                            |
-| Contracts > History (seeded 7 contracts, both widths)   | No date for when a contract was issued; only Expires, and default sort is a proxy: #1954. Issuer cell and PRICE / REWARD header wrap at 1024 (not filed; revisit if #1954 makes it worse). Search tab needs the sync backend; empty state explains.      |
-| Planetary Industry > Colonies (4 seeded colonies), Plan | Colony rows misalign bars and wrap at 1024-1180: #1952. Plan tab renders clean (inputs column tall but dense). Empty states are bare titles after a successful fetch, by design (`CachedEmptyState`).                                                    |
-| Contacts (12 seeded), Loyalty Store (14 offers), Clones | Contacts: header info icon drifts from its label (shared `DataTable`): #1953. Loyalty Store: narrow list plus empty detail pane is the unselected state; clean. Clones empty state clean.                                                                |
+| Surface                                                               | Conclusion                                                                                                                                                                                                                                                                                                                                                                                    |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Overview (board + Alerts column)                                      | Clean at 1280+. At 1024-1179 the cards/alerts split starts at `lg` (viewport) not at content width, so card titles and badges truncate (#1615 made them truncate, not wrap). Filed #1680.                                                                                                                                                                                                     |
+| Industry (Build Plans tab, Active Jobs strip)                         | Empty-state layout clean. Active Jobs free-slot readout printed bare "1 / 1 / 1" with colour-only tone: #1681. Populated Records/Opportunities/BPC Search tabs not rendered (mocks give no data; `?tab=` is not the tab switch): audit with seeded data.                                                                                                                                      |
+| Skills > Trained                                                      | Clean at both widths, empty and loading. "N of 5 slots empty" counts attribute enhancers only. Expanded skill rows not rendered.                                                                                                                                                                                                                                                              |
+| Wallet (Balance, Journal)                                             | Clean at 1024 and 1440: `EmptyState`s explain the fix, Balance leads with ISK, Journal amounts right-aligned. Balance chart X axis was categorical: #1916.                                                                                                                                                                                                                                    |
+| Assets (seeded one location)                                          | Clean. The tall single-location panel is a scroll container, not a dead zone.                                                                                                                                                                                                                                                                                                                 |
+| Market > Open Orders (seeded 2 orders)                                | Untitled `Panel` header bar carries only actions because the tab names it. Not a finding.                                                                                                                                                                                                                                                                                                     |
+| Characters (card view)                                                | Card header never wraps (`flex-1 min-w-0`), so at 1024's three columns the active card's name collapses: #1943. Toolbar and 1440 clean.                                                                                                                                                                                                                                                       |
+| Market Browser (empty pre-selection)                                  | Clean. Tree plus empty detail pane leaves a void at 1440; that is the empty state. A selected item's order book not rendered.                                                                                                                                                                                                                                                                 |
+| Fittings (open Fitting, Compare)                                      | Header buttons stack, Compare controls and columns, Ring column: #1925-#1929.                                                                                                                                                                                                                                                                                                                 |
+| Contracts > History (seeded 7 contracts, both widths)                 | No date for when a contract was issued; only Expires, and default sort is a proxy: #1954. Issuer cell and PRICE / REWARD header wrap at 1024 (not filed; revisit if #1954 makes it worse). Search tab needs the sync backend; empty state explains.                                                                                                                                           |
+| Planetary Industry > Colonies (4 seeded colonies), Plan               | Colony rows misalign bars and wrap at 1024-1180: #1952. Plan tab renders clean (inputs column tall but dense). Empty states are bare titles after a successful fetch, by design (`CachedEmptyState`).                                                                                                                                                                                         |
+| Contacts (12 seeded), Loyalty Store (14 offers), Clones               | Contacts: header info icon drifts from its label (shared `DataTable`): #1953. Loyalty Store: narrow list plus empty detail pane is the unselected state; clean. Clones empty state clean.                                                                                                                                                                                                     |
+| Mail (14 seeded, open mail), Alerts (empty), Settings (every section) | Mail clean at both widths (multi-select folder chips are deliberate, all four read as on by default). Alerts populated state not rendered (feed is local-generated; needs Dexie seeding). Settings: Notifications captions scroll away: #1966. Display's Phone tab bar shows on desktop: #1967 (escalated). Form sections cap at a narrow measure while prose runs full width; not a finding. |
 
 ## Contract already enforced
 
@@ -46,21 +47,23 @@ its place by killing a whole class of finding.
 
 Issue number, size (tweak/rework), verdict, one line.
 
-| Issue | Size  | Verdict | Finding                                                                           |
-| ----- | ----- | ------- | --------------------------------------------------------------------------------- |
-| #1680 | tweak | NARROW  | Overview: move the cards/alerts split from `lg` to `xl` so cards stop clipping.   |
-| #1681 | tweak | SHIP    | Industry Active Jobs: label each free-slot figure Mfg/Sci/Rxn from `md` up.       |
-| #1916 | tweak | NARROW  | Wallet Balance chart: time-scaled X axis, unique day-aligned ticks.               |
-| #1925 | tweak | SHIP    | 1024 open-Fitting header buttons stack one per line.                              |
-| #1926 | tweak | NARROW  | Start preview "Empty in 0m" (preview-only; do not touch shared `formatDuration`). |
-| #1927 | tweak | NARROW  | Compare controls into one wrapping row.                                           |
-| #1928 | tweak | SHIP    | Compare Stats/Modules fit columns share widths.                                   |
-| #1929 | tweak | NARROW  | Ring column sticky at lg+.                                                        |
-| #1943 | tweak | NARROW  | Characters card name collapses at 1024; identity block gets a width floor.        |
-| #1952 | tweak | NARROW  | PI Colonies rows: shared column tracks so bars align and rows never wrap at md+.  |
-| #1953 | tweak | SHIP    | DataTable header info icon hugs its label on left/center-aligned columns.         |
-| #1954 | tweak | NARROW  | Contracts History: Issued column, default sort issued desc.                       |
-| #1961 | tweak | NARROW  | Wallet Journal: tone the filtered net with isk-pos/isk-neg (tone only, one line). |
+| Issue | Size  | Verdict  | Finding                                                                                      |
+| ----- | ----- | -------- | -------------------------------------------------------------------------------------------- |
+| #1680 | tweak | NARROW   | Overview: move the cards/alerts split from `lg` to `xl` so cards stop clipping.              |
+| #1681 | tweak | SHIP     | Industry Active Jobs: label each free-slot figure Mfg/Sci/Rxn from `md` up.                  |
+| #1916 | tweak | NARROW   | Wallet Balance chart: time-scaled X axis, unique day-aligned ticks.                          |
+| #1925 | tweak | SHIP     | 1024 open-Fitting header buttons stack one per line.                                         |
+| #1926 | tweak | NARROW   | Start preview "Empty in 0m" (preview-only; do not touch shared `formatDuration`).            |
+| #1927 | tweak | NARROW   | Compare controls into one wrapping row.                                                      |
+| #1928 | tweak | SHIP     | Compare Stats/Modules fit columns share widths.                                              |
+| #1929 | tweak | NARROW   | Ring column sticky at lg+.                                                                   |
+| #1943 | tweak | NARROW   | Characters card name collapses at 1024; identity block gets a width floor.                   |
+| #1952 | tweak | NARROW   | PI Colonies rows: shared column tracks so bars align and rows never wrap at md+.             |
+| #1953 | tweak | SHIP     | DataTable header info icon hugs its label on left/center-aligned columns.                    |
+| #1954 | tweak | NARROW   | Contracts History: Issued column, default sort issued desc.                                  |
+| #1961 | tweak | NARROW   | Wallet Journal: tone the filtered net with isk-pos/isk-neg (tone only, one line).            |
+| #1966 | tweak | NARROW   | Settings Notifications: pin DEVICE / ALERTS captions at md+.                                 |
+| #1967 | tweak | ESCALATE | Settings Display: Phone tab bar panel shown at md+ though device-local (reviewer said KILL). |
 
 ## Killed findings
 
@@ -77,3 +80,6 @@ What was killed, and why. This is what stops a re-pitch.
 - PI Colonies repeated per-row "STATUS" label: a scan aid; removing it is a design call, not a defect.
 - Contracts History "expired" status renders blank: `expired` is not an ESI contract status, a seed artefact.
 - Loyalty Store "Type #43" names and Contacts "Unknown N" names: unmocked name lookups.
+- Settings > Permissions lists 'Not granted' rows last among 13: all rows fit one viewport, cost too small.
+- Settings form sections (Industry defaults, Permissions) cap at a narrow column while Data prose runs full width: a measure preference, no user cost.
+- Mail reading pane shows 'Subject 1' under a selected 'Subject 2', and 'Unknown 9000000N' senders: unmocked lookups in the seed.
