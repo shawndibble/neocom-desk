@@ -215,6 +215,25 @@ export function loadChargeIntoAll(
   }).fitting;
 }
 
+/**
+ * Relative slack on capacity ÷ volume. The engine reports a module's
+ * capacity as the SDE's float32 (a Medium Ancillary Armor Repairer's 0.32 m3
+ * is 0.3199999928…, 31.99999928 pastes of 0.01 m3), which is off by about
+ * 1e-7 relative; no real load is anywhere near that close under a whole
+ * charge, so a far wider margin is still safe.
+ */
+const CHARGE_FIT_TOLERANCE = 1e-5;
+
+/**
+ * Charges one full load puts in a module: its charge capacity over the
+ * charge's volume, whole charges only, float32 noise forgiven. At least one,
+ * and one when either figure is unknown.
+ */
+export function chargesPerLoad(capacity: number, volume: number): number {
+  if (!(capacity > 0) || !(volume > 0)) return 1;
+  return Math.max(1, Math.floor((capacity / volume) * (1 + CHARGE_FIT_TOLERANCE)));
+}
+
 /** How a charge goes in — which modules take it, and what one load of it costs the cargo. */
 export interface ChargeLoad {
   /**

@@ -6,6 +6,7 @@ import {
   addModule,
   cargoGroups,
   cargoVolumeUsed,
+  chargesPerLoad,
   copyToAllOfType,
   launchDrones,
   droneBayUsed,
@@ -869,5 +870,35 @@ describe('launching and recalling one drone type', () => {
       inBay: 5,
     });
     expect(recallDrones(fit, 2454)).toBe(fit);
+  });
+});
+
+describe('chargesPerLoad', () => {
+  // The engine reports a module's capacity as the SDE's float32, so 0.32 m3
+  // arrives as 0.3199999928…; the catalogue's charge volume is decimal.
+  const f32 = Math.fround;
+
+  it('fills an ancillary armor repairer to its full paste load, float32 capacity and all', () => {
+    expect(chargesPerLoad(f32(0.08), 0.01)).toBe(8);
+    expect(chargesPerLoad(f32(0.32), 0.01)).toBe(32);
+    expect(chargesPerLoad(f32(0.64), 0.01)).toBe(64);
+  });
+
+  it('counts every other charge the same as the game does', () => {
+    expect(chargesPerLoad(f32(1.2), 0.03)).toBe(40); // Heavy Missile Launcher II
+    expect(chargesPerLoad(f32(0.99), 0.015)).toBe(66); // Heavy Assault Missile Launcher II
+    expect(chargesPerLoad(f32(1.35), 0.05)).toBe(27); // Cruise Missile Launcher II
+    expect(chargesPerLoad(f32(2), 0.05)).toBe(40); // Torpedo Launcher II
+    expect(chargesPerLoad(f32(0.3), 0.0025)).toBe(120); // 200mm AutoCannon II, Hail S
+    expect(chargesPerLoad(f32(1), 0.0125)).toBe(80); // Heavy Neutron Blaster II, Antimatter M
+    expect(chargesPerLoad(f32(2), 0.025)).toBe(80); // Neutron Blaster Cannon II, Antimatter L
+    expect(chargesPerLoad(f32(40), 12)).toBe(3); // Medium Capacitor Booster II, Navy Cap Booster 400
+    expect(chargesPerLoad(f32(40), 16)).toBe(2); // …and a plain Cap Booster 400
+  });
+
+  it('is at least one, and one when either figure is unknown', () => {
+    expect(chargesPerLoad(f32(0.5), 1)).toBe(1);
+    expect(chargesPerLoad(0, 0.01)).toBe(1);
+    expect(chargesPerLoad(1, 0)).toBe(1);
   });
 });
