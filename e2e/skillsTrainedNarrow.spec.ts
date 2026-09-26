@@ -183,3 +183,120 @@ test('the in-progress skill shows a Training chip at 390px, and no other row doe
   expect(box).not.toBeNull();
   expect(box!.x + box!.width).toBeLessThanOrEqual(PHONE.width);
 });
+
+/**
+ * Below `sm` the training row's name and chip share a column: the chip drops
+ * under the name instead of squeezing it to "Adva…" (#2004).
+ */
+async function seedTrainingAdvancedIndustrial(page: Page) {
+  const day = 86_400_000;
+  await page.route(`**/characters/${CHARACTER_ID}/skills`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        skills: [
+          {
+            skill_id: 3396,
+            trained_skill_level: 4,
+            active_skill_level: 4,
+            skillpoints_in_skill: 45_255_000,
+          },
+          {
+            skill_id: 62451,
+            trained_skill_level: 1,
+            active_skill_level: 1,
+            skillpoints_in_skill: 1_280_000,
+          },
+          {
+            skill_id: 25718,
+            trained_skill_level: 1,
+            active_skill_level: 1,
+            skillpoints_in_skill: 1_000,
+          },
+        ],
+        total_sp: 46_536_000,
+        unallocated_sp: 0,
+      }),
+    })
+  );
+  await page.route(`**/characters/${CHARACTER_ID}/skillqueue`, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          skill_id: 3396,
+          finished_level: 5,
+          queue_position: 0,
+          start_date: new Date(Date.now() - day).toISOString(),
+          finish_date: new Date(Date.now() + day + 3_600_000 + 60_000).toISOString(),
+        },
+      ]),
+    })
+  );
+}
+
+async function openTrainingRow(page: Page, size: { width: number; height: number }) {
+  await seedTrainingAdvancedIndustrial(page);
+  await gotoTrainedSkills(page);
+  await page.setViewportSize(size);
+  await page.getByRole('button', { name: /^Production/ }).click();
+  const row = page.getByRole('button', { name: /^Advanced Industrial Ship Construction/ });
+  await expect(row).toBeVisible();
+  const name = row.getByText('Advanced Industrial Ship Construction', { exact: true });
+  const chip = row.getByText(/^Training →/);
+  await expect(chip).toBeVisible();
+  return { row, name, chip };
+}
+
+test('the training row shows its full name with the chip under it at 390px', async ({ page }) => {
+  const { row, name, chip } = await openTrainingRow(page, PHONE);
+
+  const fits = await name.evaluate((el) => el.scrollHeight <= el.clientHeight);
+  expect(fits).toBe(true);
+
+  const rowBox = (await row.boundingBox())!;
+  const nameBox = (await name.boundingBox())!;
+  const chipBox = (await chip.boundingBox())!;
+  expect(chipBox.y).toBeGreaterThanOrEqual(nameBox.y + nameBox.height - 1);
+  expect(chipBox.x + chipBox.width).toBeLessThanOrEqual(rowBox.x + rowBox.width);
+  expect(rowBox.height).toBeGreaterThanOrEqual(44);
+
+  await row.click();
+  await expect(row).toHaveAttribute('aria-pressed', 'true');
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth <= document.documentElement.clientWidth
+  );
+  expect(overflow).toBe(true);
+});
+
+test('a 40-character skill name wraps to at most two lines at 390px', async ({ page }) => {
+  await seedTrainingAdvancedIndustrial(page);
+  await gotoTrainedSkills(page);
+  await page.setViewportSize(PHONE);
+  await page.getByRole('button', { name: /^Resource Processing/ }).click();
+  const row = page.getByRole('button', { name: /^Capital Shipboard Compression Technology/ });
+  const name = row.getByText('Capital Shipboard Compression Technology', { exact: true });
+  await expect(name).toBeVisible();
+
+  const fits = await name.evaluate((el) => el.scrollHeight <= el.clientHeight);
+  expect(fits).toBe(true);
+  const box = (await row.boundingBox())!;
+  expect(box.height).toBeGreaterThanOrEqual(44);
+});
+
+for (const size of [
+  { width: 1280, height: 800 },
+  { width: 768, height: 800 },
+]) {
+  test(`the training row keeps a one-line name with the chip beside it at ${size.width}px`, async ({
+    page,
+  }) => {
+    const { name, chip } = await openTrainingRow(page, size);
+    const nameBox = (await name.boundingBox())!;
+    const chipBox = (await chip.boundingBox())!;
+    expect(chipBox.y).toBeLessThan(nameBox.y + nameBox.height);
+    expect(nameBox.height).toBeLessThan(20);
+  });
+}

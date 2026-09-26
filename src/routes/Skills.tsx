@@ -493,8 +493,12 @@ export function Skills() {
                                 selected ? 'bg-panel-2' : ''
                               }`}
                             >
-                              <span className="flex-1 truncate">{skill.name}</span>
-                              {training?.skillTypeID === skill.skillTypeID && trainingChip}
+                              <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5 sm:flex-row sm:items-center sm:gap-2">
+                                <span className="line-clamp-2 min-w-0 sm:line-clamp-none sm:flex-1 sm:truncate">
+                                  {skill.name}
+                                </span>
+                                {training?.skillTypeID === skill.skillTypeID && trainingChip}
+                              </span>
                               <SkillBar level={skill.level} progress={progress} />
                               <span className="w-20 shrink-0 text-right tabular-nums text-text-dim">
                                 {skill.sp === null
