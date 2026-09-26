@@ -62,6 +62,28 @@ export async function loadBlueprintCatalog(): Promise<BlueprintCatalog> {
   return { entries, byBlueprintTypeID, byProductTypeID, typesById: types };
 }
 
+/**
+ * What a Build Plan opened from `typeId` would build, and the blueprint that
+ * builds it � null when nothing does. Two readings, blueprint first: a
+ * blueprint asset means "build what this makes", a plain item means "build
+ * this" (same rule as `plannableProductTypeID`). `/industry?product=` takes
+ * the *product*, so a blueprint must never resolve to itself.
+ */
+export function planTargetForItem(
+  catalog: BlueprintCatalog,
+  typeId: number
+): { blueprintTypeID: number; productTypeID: number } | null {
+  const asBlueprint = catalog.byBlueprintTypeID.get(typeId);
+  if (asBlueprint?.productTypeID != null) {
+    return {
+      blueprintTypeID: asBlueprint.blueprintTypeID,
+      productTypeID: asBlueprint.productTypeID,
+    };
+  }
+  const asProduct = catalog.byProductTypeID.get(typeId);
+  return asProduct ? { blueprintTypeID: asProduct.blueprintTypeID, productTypeID: typeId } : null;
+}
+
 /** Item name for a typeID (materials, products), falling back to `#typeID` when unknown. */
 export function nameForType(catalog: BlueprintCatalog, typeID: number): string {
   return catalog.typesById[String(typeID)]?.name ?? `#${typeID}`;
