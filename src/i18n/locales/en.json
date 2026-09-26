@@ -2742,7 +2742,7 @@
     "splitKeepsLabel": "{{payee}} keeps",
     "splitNewLabel": "{{payee}} gets",
     "splitAtPct": "at {{pct}}%",
-    "splitRepriceHint": "Each side is re-priced at today's buy orders at its own Payee's trade hub. The original keeps its paid or outstanding status; the new one starts Outstanding.",
+    "splitRepriceHint": "Each side is re-priced at the day this ore was mined, at its own Payee's trade hub. The original keeps its paid or outstanding status; the new one starts Outstanding.",
     "splitConfirmAction": "Split · move {{count}} units",
     "dismissedLabel": "No tax owed",
     "resolveTitle": "More ore reported since this was assigned",

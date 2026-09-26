@@ -44,7 +44,6 @@ function renderModal(
         systemSecurity={0.9}
         typeNames={typeNames}
         payees={[]}
-        unitPrices={new Map()}
         pricesFor={() => new Map()}
         busy={false}
         onAssigned={noop}

@@ -32,12 +32,14 @@ interface SplitDialogProps {
   payees: readonly PayeeRecord[];
   typeNames: ReadonlyMap<number, string>;
   /**
-   * Prices at a given Payee's trade hub. A split is the one flow that needs
-   * two of them at once: the units staying put are worth what the original
-   * Payee's hub bids, the moved units what the *second* Payee's hub bids, and
-   * the second Payee is picked here.
+   * Prices at a given Payee's trade hub, on a given date. A split is the one
+   * flow that needs two of them at once: the units staying put are worth
+   * what the original Payee's hub bids, the moved units what the *second*
+   * Payee's hub bids, and the second Payee is picked here. Both sides use
+   * `assignment.date` — the entry's mined date, not "now" — since a split
+   * only changes who is billed, never when the ore was mined.
    */
-  pricesFor: (hubId: string | undefined) => ReadonlyMap<number, number>;
+  pricesFor: (hubId: string | undefined, date: string) => ReadonlyMap<number, number>;
   busy: boolean;
   onSplit: () => void;
 }
@@ -48,9 +50,9 @@ interface SplitDialogProps {
  * in the same system, and ESI reports them as one entry. Per ore type a
  * slider (or typed figure) moves units to a second Payee, and a radio picks
  * which side collects any ore ESI reports for this day later
- * (`engine/miningTax/ownership.ts`). Each side is re-priced at the current buy
- * orders of *its own* Payee's trade hub — the two Payees need not share one —
- * see `splitAssignment`.
+ * (`engine/miningTax/ownership.ts`). Each side is re-priced at *its own*
+ * Payee's trade hub, at the entry's mined date — the two Payees need not
+ * share a hub — see `splitAssignment`.
  */
 export function SplitDialog({
   open,
@@ -91,8 +93,8 @@ export function SplitDialog({
   // pilot picks a second Payee that bills somewhere else, not only when they
   // move units.
   const prices = {
-    kept: pricesFor(payees.find((p) => p.id === assignment.payeeId)?.hubId),
-    moved: pricesFor(otherPayees.find((p) => p.id === payeeId)?.hubId),
+    kept: pricesFor(payees.find((p) => p.id === assignment.payeeId)?.hubId, assignment.date),
+    moved: pricesFor(otherPayees.find((p) => p.id === payeeId)?.hubId, assignment.date),
   };
   const keptValue = computeAssignmentValue(keptLines, prices.kept, assignment.taxPct);
   const newValue = computeAssignmentValue(movedLines, prices.moved, safePct);
