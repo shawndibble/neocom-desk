@@ -34,10 +34,11 @@ interface PlanListPaneProps {
    */
   height?: 'viewport' | 'sidebar';
   className?: string;
+  /** The plan open in the editor, highlighted in the list. */
+  activePlanId?: string;
   /**
    * When given, each row shows its plan's total time and finish, costed by
    * `schedulePlan` — the call the editor and Calendar make, so the three agree.
-   * Left out on the editor route, whose sidebar stays name-only.
    */
   scheduleInputs?: Omit<PlanScheduleInputs, 'cloneState'> & { trainedSkillsKnown: boolean };
 }
@@ -56,6 +57,7 @@ export function PlanListPane({
   remapInfo,
   height = 'viewport',
   className,
+  activePlanId,
   scheduleInputs,
 }: PlanListPaneProps) {
   const { t } = useTranslation();
@@ -115,7 +117,8 @@ export function PlanListPane({
     const plan = newPlan(activeCharacterId, t('plans.newPlanName'), remapInfo?.available ?? 0);
     await db.skillPlans.add(plan);
     syncAfterEdit();
-    navigate(`/skills/plans/${plan.id}`);
+    // The flag lands the pilot on the editor's name field, ready to rename.
+    navigate(`/skills/plans/${plan.id}`, { state: { focusName: true } });
   }
 
   const characters = useLiveQuery(async () => db.characters.toArray(), []);
@@ -210,6 +213,7 @@ export function PlanListPane({
           <PlanList
             plans={plans}
             stats={stats}
+            activePlanId={activePlanId}
             onOpen={(id) => navigate(`/skills/plans/${id}`)}
             onDuplicate={(id) => void handleDuplicate(id)}
             otherCharacters={otherCharacters}

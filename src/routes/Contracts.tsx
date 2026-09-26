@@ -34,6 +34,7 @@ import { loadContracts } from '@/features/character/contracts';
 import { contractAmount } from '@/features/character/contractAmount';
 import { ContractContextMenu } from '@/features/character/ContractContextMenu';
 import { ContractDetailModal } from '@/features/character/ContractDetailModal';
+import { ContractIdentity } from '@/features/character/ContractIdentity';
 import { IssuerLink } from '@/features/character/IssuerLink';
 import { StandingTag } from '@/features/character/StandingTag';
 import { loadContacts } from '@/features/character/contacts';
@@ -62,6 +63,8 @@ import type { CachedResult } from '@/esi/cache';
 import { resolveNames } from '@/features/character/names';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatTimestamp } from '@/lib/timestamp';
+import { formatCountdown } from '@/lib/duration';
+import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -453,8 +456,21 @@ export function Contracts() {
         id: 'expires',
         header: t('contracts.expires'),
         className: 'whitespace-nowrap text-text-dim',
-        sortValue: (contract) => new Date(contract.date_expired).getTime(),
-        render: (contract) => formatTimestamp(new Date(contract.date_expired), timeZone),
+        // An accepted courier's clock is delivery, not the accept-by expiry.
+        sortValue: (contract) =>
+          courierDeliveryDeadlineMs(contract) ?? new Date(contract.date_expired).getTime(),
+        render: (contract) => {
+          const deadlineMs = courierDeliveryDeadlineMs(contract);
+          if (deadlineMs === null)
+            return formatTimestamp(new Date(contract.date_expired), timeZone);
+          const time = formatTimestamp(new Date(deadlineMs), timeZone);
+          const remainingMs = deadlineMs - Date.now();
+          return remainingMs <= 0 ? (
+            <span className="text-danger">{t('contracts.deliverOverdue', { time })}</span>
+          ) : (
+            t('contracts.deliverDue', { time, duration: formatCountdown(remainingMs / 1000) })
+          );
+        },
       },
     }),
     [t, issuerNames, timeZone, standingIndex, issuerAffiliations]
@@ -471,7 +487,7 @@ export function Contracts() {
             onClick={() => setSelectedContract(contract)}
             className="flex min-h-11 w-full items-center text-left font-medium text-accent hover:underline md:block md:min-h-0 md:w-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
-            {contract.title || t(CONTRACT_TYPE_KEY[contract.type])}
+            <ContractIdentity contract={contract} characterId={activeCharacterId} />
           </button>
         ),
       },
@@ -479,7 +495,7 @@ export function Contracts() {
         (id) => optionalHistoryColumns[id]
       ),
     ],
-    [t, optionalHistoryColumns, historyColumnVisibility.isVisible]
+    [t, optionalHistoryColumns, historyColumnVisibility.isVisible, activeCharacterId]
   );
   // The full catalog, not just `columns`' currently-visible ids: a sort
   // picked while a column was shown should still resolve once the picker

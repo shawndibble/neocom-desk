@@ -304,17 +304,52 @@
     }
 
     /* The More actions button (`rowMoreActions`): a control, not a field —
-       no label gutter, sat at the card's bottom right. */
+       no label gutter. `width: auto` overrides the cell's own `w-0` (kept
+       for desktop's tight actions column, see the JSX): a zero-width flowed
+       cell left the button clipped past the card's right edge and scrolled
+       the whole page sideways (#1708). Where the cell actually sits is
+       layout-specific — the dense card (below) places it inline; every
+       other layout pins it to the card's own corner next. */
     .dt-stack td.dt-actions {
-      align-self: flex-end;
-      justify-self: end;
-      grid-column: 1 / -1;
       padding: 0;
       min-height: 0;
+      width: auto;
     }
 
     .dt-stack td.dt-actions::before {
       content: none;
+    }
+
+    /* Labelled cards (`stackColumns={1}`/`{2}`): pinned to the card's own
+       top-right corner instead of flowing as a bottom row, which used to
+       leave a dead ~40px strip under a title-height's worth of nothing. The
+       button is sized to a 44px touch target here regardless of its own
+       (desktop-oriented) size prop. */
+    .dt-stack:not(.dt-stack-dense) td.dt-actions {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.75rem;
+    }
+
+    .dt-stack:not(.dt-stack-dense) td.dt-actions button {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
+
+    /* A row with both a corner value and the actions button: one corner
+       control per position, not two overlapping. The button keeps the
+       card's actual top-right corner; the value shifts left to clear it. */
+    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-corner {
+      right: 3.75rem;
+    }
+
+    /* The card title truncates before the pinned button rather than
+       running under it. Only when the row actually has one. */
+    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-primary {
+      padding-right: 3rem;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
 
     /*

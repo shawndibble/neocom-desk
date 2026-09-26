@@ -91,3 +91,30 @@ export function masteryRowSortValue(
   const tier = row.highestMasteryTier ?? 5;
   return tier * 1e10 + row.seconds;
 }
+
+/**
+ * The lowest Mastery tier (0-4) with any skill not yet trained to its level —
+ * the default of the split Add button. `null` once every tier is met.
+ */
+export function nextUnmetMasteryTier(
+  masteryTiers: readonly (readonly SkillPrereq[])[],
+  trainedLevel: (skillTypeID: number) => number
+): number | null {
+  const tier = masteryTiers.findIndex((bundle) =>
+    bundle.some(({ skillTypeID, level }) => trainedLevel(skillTypeID) < level)
+  );
+  return tier === -1 ? null : tier;
+}
+
+/**
+ * Required-to-fly entries not already covered by a Mastery/fit row: a Mastery
+ * or fit row for a required skill is dropped only when its target is no higher
+ * than the required level (the Required group's own row already asks for it).
+ */
+export function dropCoveredRows<T extends { skillTypeID: number; targetLevel: number }>(
+  rows: readonly T[],
+  required: readonly PlanEntry[]
+): T[] {
+  const requiredLevel = new Map(required.map((e) => [e.skillTypeID, e.targetLevel]));
+  return rows.filter((row) => (requiredLevel.get(row.skillTypeID) ?? 0) < row.targetLevel);
+}

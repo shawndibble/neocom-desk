@@ -26,6 +26,7 @@ import type {
   SkillQueueEntry,
 } from '@/esi/endpoints';
 import { isActiveContractStatus } from '@/engine/contractStatus';
+import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
 import { parseInstant } from '@/engine/esiInstant';
 import type { BoardCalendarEventSource, BoardClockSource } from '@/engine/character/board';
 import type { BoardExtractionSource } from '@/engine/corp/board';
@@ -196,33 +197,11 @@ export function toMoonChunkSources(
   });
 }
 
-/**
- * An accepted courier's real deadline: delivery, not the offer's expiry.
- *
- * `date_expired` is the deadline to *accept*, which for every other contract is
- * also the deadline that matters. Accepting a courier replaces it — delivery is
- * owed within `days_to_complete` of `date_accepted`, usually sooner than the
- * offer window closes, so the expiry over-read the one clock whose miss forfeits
- * the collateral.
- *
- * `null` where that cannot be derived, and the caller keeps the expiry rather
- * than guess. `days_to_complete: 0` is no completion window at all, not a
- * zero-length one — read as a duration it would leave the row permanently overdue.
- */
-function toCourierDeliveryDeadlineMs(contract: Contract): number | null {
-  if (contract.type !== 'courier' || contract.status !== 'in_progress') return null;
-  const days = contract.days_to_complete;
-  if (days === undefined || !Number.isFinite(days) || days <= 0) return null;
-  const acceptedMs = parseInstant(contract.date_accepted);
-  if (acceptedMs === null) return null;
-  return acceptedMs + days * DAY_MS;
-}
-
 export function toContractExpirySources(contracts: readonly Contract[]): BoardClockSource[] {
   const sources: BoardClockSource[] = [];
   for (const contract of contracts) {
     if (!isActiveContractStatus(contract.status)) continue;
-    const deadlineMs = toCourierDeliveryDeadlineMs(contract) ?? parseInstant(contract.date_expired);
+    const deadlineMs = courierDeliveryDeadlineMs(contract) ?? parseInstant(contract.date_expired);
     if (deadlineMs === null) continue;
     sources.push({
       id: String(contract.contract_id),
