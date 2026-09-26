@@ -6,6 +6,7 @@ import {
   extractDroneLimits,
   extractTank,
   extractLockedTargets,
+  extractFighterStats,
   extractFittingStats,
   extractModuleResult,
   extractOffense,
@@ -783,5 +784,55 @@ describe('extractLockedTargets', () => {
 
   it('gives an untrained pilot the base two', () => {
     expect(extractLockedTargets(attrs({ maxLockedTargets: 7 }), character()).effective).toBe(2);
+  });
+});
+
+describe('extractFighterStats', () => {
+  it('reads fighter DPS, tubes and each class’s limit and use, and the fighter bay', () => {
+    const ship = new Map(
+      Object.entries({
+        [DOGMA_ATTRIBUTE.fighterDamagePerSecond]: 822.7,
+        [DOGMA_ATTRIBUTE.fighterTubes]: 4,
+        [DOGMA_ATTRIBUTE.fighterTubesUsed]: 3,
+        [DOGMA_ATTRIBUTE.fighterLightSlots]: 3,
+        [DOGMA_ATTRIBUTE.fighterLightSlotsUsed]: 2,
+        [DOGMA_ATTRIBUTE.fighterSupportSlots]: 2,
+        [DOGMA_ATTRIBUTE.fighterSupportSlotsUsed]: 1,
+        [DOGMA_ATTRIBUTE.fighterCapacity]: 93750,
+        [DOGMA_ATTRIBUTE.fighterCapacityUsed]: 36000,
+      }).map(([id, value]) => [Number(id), { value }])
+    );
+    expect(extractFighterStats(ship)).toEqual({
+      dps: 822.7,
+      tubes: { used: 3, total: 4 },
+      light: { used: 2, total: 3 },
+      support: { used: 1, total: 2 },
+      heavy: { used: 0, total: 0 },
+      bay: { used: 36000, total: 93750 },
+    });
+  });
+});
+
+describe('extractOffense — fighters', () => {
+  it('gives each launched fighter type its own row, per fighter times the squadron', () => {
+    const offense = extractOffense(
+      [{ typeId: 23055, quantity: 6, isDrone: true, isFighter: true }],
+      [
+        {
+          attributes: new Map([
+            [ITEM_DOGMA_ATTRIBUTE.damagePerSecond, { value: 45.7 }],
+            [ITEM_DOGMA_ATTRIBUTE.damageVolley, { value: 100 }],
+          ]),
+          state: 'active',
+          max_state: 'active',
+        },
+      ],
+      null
+    );
+    expect(offense.weapons).toEqual([
+      expect.objectContaining({ typeId: 23055, isFighter: true, count: 6 }),
+    ]);
+    expect(offense.dps).toBeCloseTo(45.7 * 6, 6);
+    expect(weaponRowKey(offense.weapons[0])).toBe('fighter:23055:');
   });
 });

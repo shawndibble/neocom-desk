@@ -53,6 +53,15 @@ export interface FittingDrone {
   state: 'online' | 'active';
 }
 
+/** One fighter squadron: its size, and whether it is launched from a tube or waits in the bay. */
+export interface FittingFighter {
+  typeId: number;
+  /** Fighters in the squadron. */
+  quantity: number;
+  /** 'active': in a launch tube, fighting; 'online': in the fighter bay. */
+  state: 'online' | 'active';
+}
+
 export interface FittingCargoItem {
   typeId: number;
   quantity: number;
@@ -83,6 +92,8 @@ export interface Fitting {
   drones: FittingDrone[];
   cargo: FittingCargoItem[];
   implantSet?: FittingImplantSet;
+  /** Fighter squadrons, on a hull with fighter tubes; absent: none. */
+  fighters?: FittingFighter[];
   /**
    * A Tactical Destroyer's mode (`tacticalModes.ts`), by type id. Absent on a
    * hull with modes means its default one; ignored on any other hull.
@@ -200,6 +211,22 @@ export interface JumpDriveStats {
  * untrained, one more a level of Target Management and of Advanced Target
  * Management), and the lower of the two, which is what counts.
  */
+/** What of something the hull has is used. */
+export interface UsedOfTotal {
+  used: number;
+  total: number;
+}
+
+/** Fighter tubes, each class's squadron limit, the fighter bay (m³), and the launched squadrons' DPS. */
+export interface FighterStats {
+  dps: number;
+  tubes: UsedOfTotal;
+  light: UsedOfTotal;
+  support: UsedOfTotal;
+  heavy: UsedOfTotal;
+  bay: UsedOfTotal;
+}
+
 export interface LockedTargets {
   ship: number;
   pilot: number;
@@ -249,6 +276,7 @@ export interface FittingStats {
   support: SupportStats;
   /** Yield of the running miners and launched mining drones (`mining.ts`). */
   mining: MiningStats;
+  fighters: FighterStats;
   sensor: SensorStats;
   holds: HoldStats;
   /** Null on a hull without a jump drive. */
@@ -274,7 +302,10 @@ export interface FittingStats {
 export interface WeaponRow {
   typeId: number;
   chargeTypeId?: number;
+  /** Drones and fighters: launched, never overheated. */
   isDrone: boolean;
+  /** Fighter squadrons of the type, rather than drones. */
+  isFighter?: boolean;
   /** Modules in the group, or drones in the stack. */
   count: number;
   /** Without reload. */
@@ -486,6 +517,21 @@ export const DOGMA_ATTRIBUTE = {
   jumpDriveRange: 867,
   jumpDriveConsumptionAmount: 868,
   jumpDriveConsumptionType: 866,
+  // Fighters: tubes and each class's squadron limit (plain SDE), the bay,
+  // and what's used of each and the fighters' DPS (patched ids; a live run
+  // of a Thanatos with two Templar I and a Cenobite I squadron launched,
+  // 2026-09-25: tubes 4, light 3, support 2; used 3 / 2 / 1).
+  fighterTubes: 2216,
+  fighterLightSlots: 2217,
+  fighterSupportSlots: 2218,
+  fighterHeavySlots: 2219,
+  fighterCapacity: 2055,
+  fighterCapacityUsed: -57,
+  fighterDamagePerSecond: -58,
+  fighterHeavySlotsUsed: -59,
+  fighterLightSlotsUsed: -60,
+  fighterSupportSlotsUsed: -61,
+  fighterTubesUsed: -62,
 } as const;
 
 /** Turret and launcher hardpoints — a hull's, or those its high slots take. */

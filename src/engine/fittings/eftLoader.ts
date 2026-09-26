@@ -30,9 +30,11 @@ import {
   sortFittingModules,
   type FittingCargoItem,
   type FittingDrone,
+  type FittingFighter,
   type FittingModule,
   type FittingSlotKind,
 } from './types';
+import { isFighter, squadronsOf } from './fighters';
 
 /** A `TypeCatalog` value, matching `features/skills/typeCatalog.ts`'s shape. */
 export interface EftTypeLookup {
@@ -77,6 +79,7 @@ export function loadEftFitting(
   const modules: FittingModule[] = [];
   const drones: FittingDrone[] = [];
   const cargo: FittingCargoItem[] = [];
+  const fighters: FittingFighter[] = [];
   const slotIndexByRack: Record<FittingSlotKind, number> = {
     high: 0,
     medium: 0,
@@ -116,6 +119,9 @@ export function loadEftFitting(
 
     if (rack === 'drone') {
       drones.push({ typeId, quantity: item.quantity, state: 'online' });
+    } else if (isFighter(typeId)) {
+      // A fighter line is a squadron (or a stack of them), always to the bay.
+      fighters.push(...squadronsOf(typeId, item.quantity));
     } else if (rack !== undefined && !hasExplicitQuantity) {
       const slotIndex = slotIndexByRack[rack];
       if (slotIndex >= MAX_SLOTS_PER_CATEGORY) {
@@ -137,5 +143,12 @@ export function loadEftFitting(
 
   // Deterministic order regardless of the order sections happened to appear
   // in the pasted text — the same order the List view's racks render in.
-  return { hullTypeId, modules: sortFittingModules(modules), drones, cargo, unresolved };
+  return {
+    hullTypeId,
+    modules: sortFittingModules(modules),
+    drones,
+    cargo,
+    ...(fighters.length > 0 ? { fighters } : {}),
+    unresolved,
+  };
 }

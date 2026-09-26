@@ -11,6 +11,7 @@ export function neutralExtendedStats(): Pick<
   | 'tank'
   | 'support'
   | 'mining'
+  | 'fighters'
   | 'sensor'
   | 'holds'
   | 'jumpDrive'
@@ -18,6 +19,14 @@ export function neutralExtendedStats(): Pick<
   | 'allOverheated'
 > {
   return {
+    fighters: {
+      dps: 0,
+      tubes: { used: 0, total: 0 },
+      light: { used: 0, total: 0 },
+      support: { used: 0, total: 0 },
+      heavy: { used: 0, total: 0 },
+      bay: { used: 0, total: 0 },
+    },
     mining: { rows: [], perSecond: 0, perHour: 0, wastePerSecond: 0, wastePct: 0 },
     support: {
       rows: [],

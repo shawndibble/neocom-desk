@@ -20,6 +20,7 @@ import {
   type SensorStats,
   type SensorType,
   type TankStats,
+  type FighterStats,
   CHARACTER_BASE_LOCKED_TARGETS,
 } from './types';
 import {
@@ -251,6 +252,7 @@ export function extractFittingStats(
   | 'tank'
   | 'support'
   | 'mining'
+  | 'fighters'
   | 'lockedTargets'
   | 'allOverheated'
 > {
@@ -353,6 +355,7 @@ export interface OffenseItem {
   chargeTypeId?: number;
   quantity: number;
   isDrone: boolean;
+  isFighter?: boolean;
 }
 
 function isFiring(state: FittingItemState): boolean {
@@ -366,9 +369,26 @@ function damageFigures(attributes: AttributeMap, quantity: number): DamageFigure
   };
 }
 
-/** One Offense row per key: drone-ness, type and charge. */
-export function weaponRowKey(row: Pick<WeaponRow, 'isDrone' | 'typeId' | 'chargeTypeId'>): string {
-  return `${row.isDrone ? 'drone' : 'module'}:${row.typeId}:${row.chargeTypeId ?? ''}`;
+/** One Offense row per key: module, drone or fighter, type and charge. */
+export function weaponRowKey(
+  row: Pick<WeaponRow, 'isDrone' | 'isFighter' | 'typeId' | 'chargeTypeId'>
+): string {
+  const kind = row.isFighter ? 'fighter' : row.isDrone ? 'drone' : 'module';
+  return `${kind}:${row.typeId}:${row.chargeTypeId ?? ''}`;
+}
+
+/** Fighter tubes, class limits and bay off the ship; all 0 on a hull with no tubes. */
+export function extractFighterStats(shipAttributes: AttributeMap): FighterStats {
+  const read = (id: number) => readAttribute(shipAttributes, id);
+  const of = (used: number, total: number) => ({ used: read(used), total: read(total) });
+  return {
+    dps: read(DOGMA_ATTRIBUTE.fighterDamagePerSecond),
+    tubes: of(DOGMA_ATTRIBUTE.fighterTubesUsed, DOGMA_ATTRIBUTE.fighterTubes),
+    light: of(DOGMA_ATTRIBUTE.fighterLightSlotsUsed, DOGMA_ATTRIBUTE.fighterLightSlots),
+    support: of(DOGMA_ATTRIBUTE.fighterSupportSlotsUsed, DOGMA_ATTRIBUTE.fighterSupportSlots),
+    heavy: of(DOGMA_ATTRIBUTE.fighterHeavySlotsUsed, DOGMA_ATTRIBUTE.fighterHeavySlots),
+    bay: of(DOGMA_ATTRIBUTE.fighterCapacityUsed, DOGMA_ATTRIBUTE.fighterCapacity),
+  };
 }
 
 /**
@@ -397,6 +417,7 @@ export function extractOffense(
         typeId: item.typeId,
         chargeTypeId: item.chargeTypeId,
         isDrone: item.isDrone,
+        ...(item.isFighter ? { isFighter: true } : {}),
         count: 0,
         dps: 0,
         volley: 0,

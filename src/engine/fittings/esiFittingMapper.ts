@@ -15,6 +15,7 @@ import {
   type Fitting,
   type FittingCargoItem,
   type FittingDrone,
+  type FittingFighter,
   type FittingModule,
   type FittingSlotKind,
 } from './types';
@@ -62,11 +63,13 @@ const FLAG_PREFIX: Record<FittingSlotKind, string> = {
 };
 
 const SLOT_FLAG = /^(Hi|Med|Lo|Rig|SubSystem)Slot(\d+)$/;
+const FIGHTER_TUBE_FLAG = /^FighterTube\d$/;
 
 export function esiFittingToFitting(esiFitting: EsiCharacterFitting): LoadedFitting {
   const modules: FittingModule[] = [];
   const drones: FittingDrone[] = [];
   const cargo: FittingCargoItem[] = [];
+  const fighters: FittingFighter[] = [];
   const unresolved: LoadWarning[] = [];
 
   for (const item of esiFitting.items) {
@@ -82,6 +85,14 @@ export function esiFittingToFitting(esiFitting: EsiCharacterFitting): LoadedFitt
     }
     if (item.flag === 'DroneBay') {
       drones.push({ typeId: item.type_id, quantity: item.quantity, state: 'online' });
+      continue;
+    }
+    if (FIGHTER_TUBE_FLAG.test(item.flag) || item.flag === 'FighterBay') {
+      fighters.push({
+        typeId: item.type_id,
+        quantity: item.quantity,
+        state: item.flag === 'FighterBay' ? 'online' : 'active',
+      });
       continue;
     }
     if (item.flag === 'Cargo') {
@@ -100,6 +111,7 @@ export function esiFittingToFitting(esiFitting: EsiCharacterFitting): LoadedFitt
       modules: sortFittingModules(modules),
       drones,
       cargo,
+      ...(fighters.length > 0 ? { fighters } : {}),
     },
     unresolved,
   };
@@ -129,6 +141,12 @@ export function fittingToEsiFitting(
   }
   for (const drone of fitting.drones) {
     items.push({ flag: 'DroneBay', quantity: drone.quantity, type_id: drone.typeId });
+  }
+  // Launched squadrons take the tubes in order, as the engine sees them.
+  let tube = 0;
+  for (const fighter of fitting.fighters ?? []) {
+    const flag = fighter.state === 'active' ? `FighterTube${tube++}` : 'FighterBay';
+    items.push({ flag, quantity: fighter.quantity, type_id: fighter.typeId });
   }
   for (const item of fitting.cargo) {
     items.push({ flag: 'Cargo', quantity: item.quantity, type_id: item.typeId });

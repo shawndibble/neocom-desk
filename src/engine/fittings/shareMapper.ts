@@ -20,13 +20,13 @@
  * the wire's two optional trailing sections; on the domain side the side
  * effects live on the implant set, beside the boosters they belong to.
  *
- * Fighters and implant sets are both real fields on the wire shape.
+ * Fighter squadrons ride the wire's fighter section as type and size; the
+ * wire has no launched/bay split, so they come back launched.
+ *
+ * Implant sets are a real field on the wire shape.
  * `implantSet` is threaded straight through both directions, `undefined` and
  * `{implants: [], boosters: []}` staying distinct the way
- * `fittingShare.ts`'s own codec keeps them. Fighters have no home on the
- * domain `Fitting` at all — no capital ship fitting exists in the app —
- * and stay dropped in both directions; a fighter bay surviving a share round
- * trip is future tickets' scope, not a regression this mapper introduces.
+ * `fittingShare.ts`'s own codec keeps them.
  *
  * A `Fitting`'s name is deliberately not part of this mapping at all: the
  * share payload never carries it (`fittingShare.ts`'s own header comment), so
@@ -77,7 +77,11 @@ export function fittingToShareInput(fitting: Fitting): FittingShareInput {
       count: drone.quantity,
       active: drone.state === 'active' ? drone.quantity : 0,
     })),
-    fighters: [],
+    // The link carries a squadron's type and size, not whether it's launched.
+    fighters: (fitting.fighters ?? []).map((fighter) => ({
+      typeId: fighter.typeId,
+      count: fighter.quantity,
+    })),
     cargo: fitting.cargo.map((item) => ({ typeId: item.typeId, quantity: item.quantity })),
     ...(fitting.implantSet === undefined
       ? {}
@@ -115,6 +119,17 @@ export function shareToFitting(decoded: FittingShareInput, name: string): Fittin
       state: drone.active > 0 ? 'active' : 'online',
     })),
     cargo: decoded.cargo.map((item) => ({ typeId: item.typeId, quantity: item.quantity })),
+    // Launched: a carrier's squadrons are its weapons, so that's what a link
+    // shows; the tubes a hull lacks, the engine simply doesn't count.
+    ...(decoded.fighters.length === 0
+      ? {}
+      : {
+          fighters: decoded.fighters.map((fighter) => ({
+            typeId: fighter.typeId,
+            quantity: fighter.count,
+            state: 'active' as const,
+          })),
+        }),
     // Side effects ride with the boosters that carry them; with no set, there are none.
     ...(decoded.implantSet === undefined
       ? {}

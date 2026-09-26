@@ -201,3 +201,35 @@ describe('fittingToDogmaFit — Tactical Destroyer modes and booster side effect
     expect(booster(15466)?.booster_side_effects).toEqual([2737, 2741]);
   });
 });
+
+describe('fittingToDogmaFit — fighters', () => {
+  it('launches each squadron into the next tube, keeps the rest in the bay, after the drones and before cargo', () => {
+    const dogmaFit = fittingToDogmaFit(
+      fitting({
+        shipTypeId: 23911,
+        drones: [{ typeId: 2488, quantity: 5, state: 'online' }],
+        fighters: [
+          { typeId: 23055, quantity: 6, state: 'active' },
+          { typeId: 23055, quantity: 6, state: 'online' },
+          { typeId: 37599, quantity: 3, state: 'active' },
+        ],
+        cargo: [{ typeId: 34, quantity: 1 }],
+      }),
+      emptyProfile
+    );
+    expect(dogmaFit.items.map((item) => item.slot)).toEqual([
+      { type: 'drone_bay' },
+      { type: 'fighter_tube', index: 0 },
+      { type: 'fighter_bay' },
+      { type: 'fighter_tube', index: 1 },
+      { type: 'cargo' },
+    ]);
+    expect(dogmaFit.items[1]).toEqual({
+      type_id: 23055,
+      slot: { type: 'fighter_tube', index: 0 },
+      quantity: 6,
+      state: 'active',
+    });
+    expect(dogmaFit.items[2].state).toBe('offline');
+  });
+});

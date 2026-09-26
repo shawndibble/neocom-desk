@@ -16,6 +16,25 @@ function moduleToFitItem(module: FittingModule): FitItem {
   };
 }
 
+function launchFighters(fitting: Fitting): FitItem[] {
+  let tube = 0;
+  return (fitting.fighters ?? []).map((fighter): FitItem =>
+    fighter.state === 'active'
+      ? {
+          type_id: fighter.typeId,
+          slot: { type: 'fighter_tube', index: tube++ },
+          quantity: fighter.quantity,
+          state: 'active',
+        }
+      : {
+          type_id: fighter.typeId,
+          slot: { type: 'fighter_bay' },
+          quantity: fighter.quantity,
+          state: 'offline',
+        }
+  );
+}
+
 /** An implant or booster, numbered from `SLOT_INDEX_START` — same shape either way, just the slot type and (for a booster) side effects. */
 function slottedItem(
   typeId: number,
@@ -58,6 +77,8 @@ export function fittingToDogmaFit(
       // 'offline', so a bay stack ('online' here) goes in as that.
       state: drone.state === 'active' ? 'active' : 'offline',
     })),
+    // Launched squadrons take the tubes in order; the rest wait in the bay.
+    ...launchFighters(fitting),
     ...fitting.cargo.map((item): FitItem => ({
       type_id: item.typeId,
       slot: { type: 'cargo' },

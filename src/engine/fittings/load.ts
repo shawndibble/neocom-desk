@@ -18,7 +18,13 @@ import {
   loadDnaFitting,
   type KillmailVictim,
 } from './linkLoader';
-import type { Fitting, FittingCargoItem, FittingDrone, FittingModule } from './types';
+import type {
+  Fitting,
+  FittingCargoItem,
+  FittingDrone,
+  FittingModule,
+  FittingFighter,
+} from './types';
 
 /** One thing a Load couldn't place. `line` is the pasted text's line, for a text Load. */
 export interface LoadWarning {
@@ -40,6 +46,8 @@ export type LoadParts =
       modules: FittingModule[];
       drones: FittingDrone[];
       cargo: FittingCargoItem[];
+      /** Absent or empty: none (most formats, and every hull without tubes). */
+      fighters?: FittingFighter[];
       unresolved: LoadWarning[];
     }
   | { hullTypeId: null; unresolved: LoadWarning[] };
@@ -84,6 +92,7 @@ export function toLoadOutcome(parts: LoadParts, name: string, source: LoadSource
       modules: parts.modules,
       drones: parts.drones,
       cargo: parts.cargo,
+      ...(parts.fighters?.length ? { fighters: parts.fighters } : {}),
     },
     unresolved: parts.unresolved,
   };

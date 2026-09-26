@@ -140,3 +140,34 @@ describe('fittingToShareInput / shareToFitting — mode and booster side effects
     expect(shareToFitting(input, 'Rifter')).toEqual(fitting());
   });
 });
+
+describe('fittingToShareInput / shareToFitting — fighters', () => {
+  it('round-trips launched fighter squadrons through the real codec', async () => {
+    const original = fitting({
+      shipTypeId: 23911,
+      fighters: [
+        { typeId: 23055, quantity: 6, state: 'active' },
+        { typeId: 37599, quantity: 3, state: 'active' },
+      ],
+    });
+    const encoded = await encodeFittingShare(fittingToShareInput(original));
+    if (!encoded.ok) throw new Error('encode failed');
+    const decoded = await decodeFittingShare(encoded.payload);
+    if (!decoded.ok) throw new Error('decode failed');
+    expect(shareToFitting(decoded.value, original.name)).toEqual(original);
+  });
+
+  it('brings a squadron back launched: the link has no bay/tube split to keep', () => {
+    const input = fittingToShareInput(
+      fitting({ fighters: [{ typeId: 23055, quantity: 6, state: 'online' }] })
+    );
+    expect(input.fighters).toEqual([{ typeId: 23055, count: 6 }]);
+    expect(shareToFitting(input, 'Thanatos').fighters).toEqual([
+      { typeId: 23055, quantity: 6, state: 'active' },
+    ]);
+  });
+
+  it('carries no fighters key at all for a Fitting without fighters, as before', () => {
+    expect(shareToFitting(fittingToShareInput(fitting()), 'Rifter')).not.toHaveProperty('fighters');
+  });
+});

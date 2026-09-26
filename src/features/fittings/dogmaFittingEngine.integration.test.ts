@@ -7,6 +7,7 @@ import { toProjectedEffects, withIncoming, withWeather } from './dogmaFittingEng
 import {
   extractCapacitorBudget,
   extractLockedTargets,
+  extractFighterStats,
   extractTank,
   extractDroneLimits,
   extractFittingStats,
@@ -90,6 +91,10 @@ const RAPID_DEPLOYMENT_CHARGE = 42840;
 const SVIPUL = 34562;
 const SVIPUL_PROPULSION_MODE = 34566;
 const STANDARD_BLUE_PILL_BOOSTER = 9950;
+const TEMPLAR_I = 23055;
+const CENOBITE_I = 37599;
+/** Fighters, Light Fighters, Support Fighters, Fighter Hangar Management. */
+const FIGHTER_SKILL_IDS = [23069, 40572, 40573, 24613];
 const COMMAND_SKILL_IDS = [3348, 3349, 3354, 11574, 24764, 23950];
 
 const PARTIAL_SKILLS = new Map([
@@ -859,6 +864,47 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       read(rifter, bluePill()).shield.hp * 0.8,
       6
     );
+  });
+
+  it('launches fighter squadrons from the tubes, and reads their DPS and the tubes they take', () => {
+    const fitting: Fitting = {
+      name: 'Thanatos',
+      shipTypeId: THANATOS,
+      modules: [],
+      drones: [],
+      cargo: [],
+      fighters: [
+        { typeId: TEMPLAR_I, quantity: 6, state: 'active' },
+        { typeId: TEMPLAR_I, quantity: 6, state: 'online' },
+        { typeId: CENOBITE_I, quantity: 3, state: 'active' },
+      ],
+    };
+    const dogmaFit = fittingToDogmaFit(
+      fitting,
+      buildAllVProfile([...SUPPORT_SKILL_IDS, ...FIGHTER_SKILL_IDS])
+    );
+    const calculation = calculate(dogmaFit);
+    const fighters = extractFighterStats(calculation.ship.attributes);
+
+    expect(fighters.tubes).toEqual({ used: 2, total: 4 });
+    expect(fighters.light).toEqual({ used: 1, total: 3 });
+    expect(fighters.support).toEqual({ used: 1, total: 2 });
+    expect(fighters.dps).toBeGreaterThan(0);
+    // Offense rows add up to the engine's own fighter DPS; the bay squadron doesn't fight.
+    const offense = extractOffense(
+      fitting.fighters!.map((f) => ({
+        typeId: f.typeId,
+        quantity: f.quantity,
+        isDrone: true,
+        isFighter: true,
+      })),
+      calculation.items,
+      null
+    );
+    expect(offense.dps).toBeCloseTo(fighters.dps, 6);
+    expect(offense.weapons).toEqual([
+      expect.objectContaining({ typeId: TEMPLAR_I, count: 6, isFighter: true }),
+    ]);
   });
 
   it('reads applied-DPS inputs: running turrets, loaded launchers, launched drones only', () => {

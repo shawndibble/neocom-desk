@@ -15,6 +15,7 @@ import {
   extractDroneLimits,
   extractFittingStats,
   extractLockedTargets,
+  extractFighterStats,
   extractModuleResult,
   extractOffense,
   extractOverheatedStats,
@@ -352,6 +353,13 @@ export async function computeFittingStats(
       quantity: drone.quantity,
       isDrone: true,
     })),
+    // Fighters follow the drones.
+    ...(fitting.fighters ?? []).map((fighter) => ({
+      typeId: fighter.typeId,
+      quantity: fighter.quantity,
+      isDrone: true,
+      isFighter: true,
+    })),
   ];
   const offense = extractOffense(offenseItems, shown.items, beside?.items ?? null);
   const overheated = beside ? extractOverheatedStats(beside.ship.attributes) : null;
@@ -373,6 +381,7 @@ export async function computeFittingStats(
     tank: extractTank(dogmaFit.items, shown.items, shown.ship.attributes, baseStats),
     support: extractSupport(dogmaFit.items, shown.items),
     mining: miningYield(extractMining(dogmaFit.items, shown.items)),
+    fighters: extractFighterStats(shown.ship.attributes),
     lockedTargets,
     allOverheated,
   };

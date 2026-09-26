@@ -9,6 +9,7 @@ const TYPES: Record<string, number> = {
   'damage control i': 2046,
   'hobgoblin i': 2454,
   'nanite repair paste': 28668,
+  'templar i': 23055,
 };
 
 const typeByName: EftTypeLookup = {
@@ -137,5 +138,20 @@ describe('loadEveFitXmlEntry', () => {
     expect(result.unresolved).toEqual([
       { text: 'Damage Control I', reason: 'unknown slot: implant' },
     ]);
+  });
+});
+
+describe('loadEveFitXmlEntry — fighters', () => {
+  it('loads the fighter bay as squadrons, in the bay', () => {
+    const result = loadEveFitXmlEntry(
+      entry({ hardware: [{ slot: 'fighter bay', type: 'Templar I', qty: 12 }] }),
+      typeByName
+    );
+    if (result.hullTypeId === null) throw new Error('no hull');
+    expect(result.fighters).toEqual([
+      { typeId: 23055, quantity: 6, state: 'online' },
+      { typeId: 23055, quantity: 6, state: 'online' },
+    ]);
+    expect(result.unresolved).toEqual([]);
   });
 });

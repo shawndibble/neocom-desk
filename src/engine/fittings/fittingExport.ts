@@ -25,6 +25,7 @@ export function fittingItemCounts(fitting: Fitting): Map<number, number> {
     if (module.chargeTypeId !== undefined) add(module.chargeTypeId, 1);
   }
   for (const drone of fitting.drones) add(drone.typeId, drone.quantity);
+  for (const fighter of fitting.fighters ?? []) add(fighter.typeId, fighter.quantity);
   for (const item of fitting.cargo) add(item.typeId, item.quantity);
 
   return counts;
@@ -53,6 +54,11 @@ export function fittingToEft(fitting: Fitting, nameFor: ItemNameFor): string {
   }
   if (fitting.drones.length > 0) {
     sections.push(fitting.drones.map((d) => `${nameFor(d.typeId)} x${d.quantity}`).join('\n'));
+  }
+  // A squadron a line, after the drones, as Pyfa writes them.
+  const fighters = fitting.fighters ?? [];
+  if (fighters.length > 0) {
+    sections.push(fighters.map((f) => `${nameFor(f.typeId)} x${f.quantity}`).join('\n'));
   }
   if (fitting.cargo.length > 0) {
     sections.push(fitting.cargo.map((c) => `${nameFor(c.typeId)} x${c.quantity}`).join('\n'));
@@ -84,6 +90,7 @@ export function fittingToDna(fitting: Fitting): string {
     if (module.chargeTypeId !== undefined) add(rest, module.chargeTypeId, 1);
   }
   for (const drone of fitting.drones) add(rest, drone.typeId, drone.quantity);
+  for (const fighter of fitting.fighters ?? []) add(rest, fighter.typeId, fighter.quantity);
   for (const item of fitting.cargo) add(rest, item.typeId, item.quantity);
 
   const entries = [...modules, ...rest].map(([typeId, quantity]) => `${typeId};${quantity}`);
@@ -145,6 +152,14 @@ export function fittingToEveXml(fitting: Fitting, nameFor: ItemNameFor): string 
   for (const [typeId, quantity] of drones) {
     const type = xmlAttr(nameFor(typeId));
     lines.push(hardware(`qty="${quantity}" slot="drone bay" type="${type}"`));
+  }
+  const fighters = new Map<number, number>();
+  for (const fighter of fitting.fighters ?? []) {
+    fighters.set(fighter.typeId, (fighters.get(fighter.typeId) ?? 0) + fighter.quantity);
+  }
+  for (const [typeId, quantity] of fighters) {
+    const type = xmlAttr(nameFor(typeId));
+    lines.push(hardware(`qty="${quantity}" slot="fighter bay" type="${type}"`));
   }
   const cargo = new Map<number, number>();
   const carry = (typeId: number, quantity: number) =>
