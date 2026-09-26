@@ -30,6 +30,15 @@ export interface FittingModule {
   typeId: number;
   state: FittingItemState;
   chargeTypeId?: number;
+  /**
+   * How many of the charge the app took out of this Fitting's own cargo to
+   * load it — the only count it can prove, so the only one a swap from cargo
+   * gives back. Absent for a charge from anywhere else (the Add panel, a
+   * Load, a Share Link): that one never left the hold, so nothing returns to
+   * it. Session-only: no share or export format carries it, so a decoded or
+   * reopened Fitting has none.
+   */
+  chargeQuantity?: number;
 }
 
 /**

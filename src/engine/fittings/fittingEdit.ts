@@ -172,7 +172,9 @@ export interface ChargeLoad {
   chargesPerLoad?: (module: FittingModule, chargeTypeId: number) => number;
   /**
    * The charge comes out of the Fitting's own cargo: each load is debited
-   * from it, and whatever charge a module held goes back into it.
+   * from it and recorded on the module (`chargeQuantity`), and a charge the
+   * module held goes back into it — as many as were recorded, none when
+   * the charge didn't come out of the hold.
    */
   fromCargo?: boolean;
   /** Just this module (an Alt-drop, "Load into…"), rather than every one that takes it. */
@@ -226,18 +228,26 @@ export function loadChargeIntoCompatible(
       ranOut = true;
       return module;
     }
-    if (fromCargo) {
-      const taken = Math.min(left, perLoad(module, chargeTypeId));
-      left -= taken;
-      cargo = setCargoQuantity({ ...fitting, cargo }, chargeTypeId, left).cargo;
-      if (module.chargeTypeId !== undefined) {
-        const returned = module.chargeTypeId;
-        cargo = addCargo({ ...fitting, cargo }, returned, perLoad(module, returned)).cargo;
-      }
-    }
+    // Rebuilt, not spread, so a quantity recorded for the charge it held never sticks to the new one.
+    const next: FittingModule = {
+      slot: module.slot,
+      slotIndex: module.slotIndex,
+      typeId: module.typeId,
+      state: module.state,
+      chargeTypeId,
+    };
     loaded += 1;
     changed = true;
-    return { ...module, chargeTypeId };
+    if (!fromCargo) return next;
+    const taken = Math.min(left, perLoad(module, chargeTypeId));
+    left -= taken;
+    cargo = setCargoQuantity({ ...fitting, cargo }, chargeTypeId, left).cargo;
+    // Only what this app provably took out of the hold goes back into it —
+    // the Fitting doesn't know how many a charge from anywhere else was.
+    if (module.chargeTypeId !== undefined && module.chargeQuantity !== undefined) {
+      cargo = addCargo({ ...fitting, cargo }, module.chargeTypeId, module.chargeQuantity).cargo;
+    }
+    return { ...next, chargeQuantity: taken };
   });
   return {
     fitting: changed ? { ...fitting, modules, cargo } : fitting,
