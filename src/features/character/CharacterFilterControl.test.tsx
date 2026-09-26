@@ -123,7 +123,7 @@ describe('CharacterFilterControl', () => {
     const user = await openMenu();
     await user.click(screen.getByRole('button', { name: 'This character' }));
     expect(onChange).toHaveBeenCalledWith('current');
-    expect(screen.queryByPlaceholderText('Search characters')).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Search characters…')).not.toBeInTheDocument();
   });
 
   it('"All Characters" sets the value to \'all\'', async () => {
@@ -164,7 +164,7 @@ describe('CharacterFilterControl', () => {
       />
     );
     const user = await openMenu();
-    await user.type(screen.getByPlaceholderText('Search characters'), 'ali');
+    await user.type(screen.getByPlaceholderText('Search characters…'), 'ali');
     expect(screen.getByRole('option', { name: 'Alice' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Bob' })).not.toBeInTheDocument();
     expect(screen.queryByRole('option', { name: 'Carol' })).not.toBeInTheDocument();
@@ -180,7 +180,7 @@ describe('CharacterFilterControl', () => {
       />
     );
     const user = await openMenu();
-    const search = screen.getByPlaceholderText('Search characters');
+    const search = screen.getByPlaceholderText('Search characters…');
     await user.type(search, 'ali');
     await user.clear(search);
     expect(screen.getByRole('option', { name: 'Alice' })).toBeInTheDocument();
