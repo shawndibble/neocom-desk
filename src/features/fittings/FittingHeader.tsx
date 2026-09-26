@@ -93,8 +93,8 @@ function CompactFittingHeader({
 }
 
 /**
- * The open Fitting's header, one row as in mockup A (scope decision
- * `20260924-215855`): what the Fitting is, what its numbers assume, then
+ * The open Fitting's header, one row (scope decisions `20260924-215855`,
+ * then `20260926-155124`): what the Fitting is with its icon badges, then
  * its controls — a Fittings menu for opening a different one (new from a
  * hull, Import, My Fittings, In-game), the view, Export and Save.
  */

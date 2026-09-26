@@ -11,7 +11,7 @@ export interface IconButtonClassNameOptions {
    * around every line of a list.
    */
   variant?: IconButtonVariant;
-  /** `danger` is the destructive treatment; `positive` the "worth doing" one, `warning` the caution one. */
+  /** `danger` is the destructive treatment; `positive` the "worth doing" one; `warning` the amber caution one (`text-warning`). */
   tone?: IconButtonTone;
   /**
    * `md` (default) is the toolbar size; `sm` is for controls nested in a
