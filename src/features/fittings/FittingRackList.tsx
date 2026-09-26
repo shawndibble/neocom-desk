@@ -42,6 +42,7 @@ import { endFittingDrag, startFittingDrag, type FittingDragPayload } from './fit
 import {
   CargoMenuItems,
   DroneMenuItems,
+  EmptySlotMenuItems,
   FittingItemMenu,
   ModuleMenuItems,
 } from './FittingItemMenu';
@@ -461,7 +462,11 @@ function AddSlotButton({
   );
 }
 
-/** An empty List slot: tap to add there, drop a module on it. */
+/**
+ * An empty List slot: tap to add there, drop a module on it. With the
+ * editor's actions it has the Ring's empty-slot menu too (Add module ▸,
+ * Paste, Fill rack), on right-click, touch-and-hold or its ⋮.
+ */
 function EmptySlot({
   rack,
   slotIndex,
@@ -473,8 +478,22 @@ function EmptySlot({
   selected: boolean;
   onClick: () => void;
 }) {
+  const actions = useFittingItemActions();
   const drop = useFittingDropTarget({ kind: 'slot', rack, index: slotIndex, filled: false });
-  return <AddSlotButton {...button} drop={drop} />;
+  const slot = <AddSlotButton {...button} drop={drop} />;
+  if (actions === null) return slot;
+  return (
+    <FittingItemMenu
+      name={button.label}
+      items={<EmptySlotMenuItems rack={rack} index={slotIndex} />}
+    >
+      {/* The ⋮ sits beside the slot's button, never inside it. */}
+      <div className="flex items-center gap-1">
+        {slot}
+        <RowMoreActions />
+      </div>
+    </FittingItemMenu>
+  );
 }
 
 /**

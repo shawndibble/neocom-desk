@@ -258,6 +258,32 @@ describe('FittingRackList with the editor’s item actions', () => {
     expect(actions.move).toHaveBeenCalledWith('high', 0, 1);
   });
 
+  it('gives an empty slot the Ring’s empty-slot menu — Paste and Fill rack from its More actions', async () => {
+    const actions = fakeItemActions(
+      { names },
+      { recentFor: () => [10], clipboardFor: (rack) => (rack === 'high' ? 10 : null) }
+    );
+    renderList(actions);
+    const empties = screen.getAllByRole('button', { name: /More actions for Empty/ });
+    // High slots 1 and 2 are empty; low has none.
+    expect(empties).toHaveLength(2);
+    fireEvent.pointerDown(empties[0], { button: 0, pointerType: 'mouse' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Paste Autocannon' }));
+    expect(actions.addModule).toHaveBeenCalledWith('high', 1, 10);
+    fireEvent.pointerDown(empties[1], { button: 0, pointerType: 'mouse' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Fill rack with Autocannon' }));
+    expect(actions.fillRack).toHaveBeenCalledWith('high', 10);
+  });
+
+  it('opens the empty-slot menu on a right-click of the slot itself', async () => {
+    const actions = fakeItemActions({ names });
+    renderList(actions);
+    fireEvent.contextMenu(screen.getAllByRole('button', { name: /^Empty/ })[0]);
+    expect(
+      await screen.findByRole('menuitem', { name: 'Paste module (copy one first)' })
+    ).toBeTruthy();
+  });
+
   it('takes a charge dropped on a rack heading, loading every module that takes it', () => {
     const actions = fakeItemActions({ names, takes: { 21: ['high-0'] } });
     renderList(actions);
