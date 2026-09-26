@@ -37,6 +37,7 @@ import {
   explainModule,
   isDogmaEngineReady,
   type DogmaAssetProgress,
+  type StatsOptions,
 } from './dogmaFittingEngine';
 import type { AffectedAttribute } from '@/engine/fittings/affectedBy';
 import { loadFittingPrice } from './fittingPrice';
@@ -96,45 +97,55 @@ export interface FittingEvaluation {
 }
 
 /**
- * The pilot under the conditions' skill overrides. Awaited only when that
- * needs a load, so with no overrides the engine is called in the same tick.
+ * What a Fitting is worked out under, beside the Fitting itself: the pilot
+ * (skills, and the implants the basis picked), the Damage Profile and the
+ * session's conditions. One object, so every calculation below takes the
+ * same three together and none can forget one.
  */
-async function overridden(pilot: PilotProfile, conditions: StatsConditions) {
-  return pilotUnder(pilot, conditions);
+interface EvaluationBasis {
+  pilot: PilotProfile;
+  /** Absent: the engine's uniform default. */
+  damageProfile?: DamageProfile;
+  conditions: StatsConditions;
 }
 
-async function withoutOverheat(
+/**
+ * Runs `calculate` with the basis's pilot under its skill overrides and the
+ * engine options its conditions ask for. `pilotUnder` is awaited only when
+ * it hands back a Promise (All V loads the skill list): otherwise `calculate`
+ * starts in the same tick, as it did before overrides existed.
+ */
+async function underBasis<T>(
+  { pilot, conditions }: EvaluationBasis,
+  calculate: (pilot: PilotProfile, options: StatsOptions) => Promise<T>
+): Promise<T> {
+  const under = pilotUnder(pilot, conditions);
+  return calculate(under instanceof Promise ? await under : under, statsOptions(conditions));
+}
+
+/** `fitting`'s stats under `basis`; `extra` adds engine options (no overheat) or a progress callback. */
+function statsUnder(
   fitting: Fitting,
-  pilot: PilotProfile,
-  damageProfile: DamageProfile,
-  conditions: StatsConditions
+  basis: EvaluationBasis,
+  extra: { overheated?: boolean; onProgress?: (progress: DogmaAssetProgress) => void } = {}
 ): Promise<FittingStats> {
-  return computeFittingStats(
-    fitting,
-    await overridden(pilot, conditions),
-    undefined,
-    damageProfile,
-    {
-      overheated: false,
-      ...statsOptions(conditions),
-    }
+  return underBasis(basis, (pilot, options) =>
+    computeFittingStats(fitting, pilot, extra.onProgress, basis.damageProfile, {
+      ...(extra.overheated === undefined ? {} : { overheated: extra.overheated }),
+      ...options,
+    })
   );
 }
 
-function variantEvaluator(
-  fitting: Fitting,
-  pilot: PilotProfile,
-  damageProfile: DamageProfile,
-  conditions: StatsConditions
-): VariantEvaluator {
+function variantEvaluator(fitting: Fitting, basis: EvaluationBasis): VariantEvaluator {
   // Dropped on failure so a transient error doesn't wedge every later compare.
   let baseline: Promise<FittingStats> | null = null;
   return {
     fitting,
-    profile: pilot,
+    profile: basis.pilot,
     async compare(variant) {
       if (baseline === null) {
-        const pending = withoutOverheat(fitting, pilot, damageProfile, conditions);
+        const pending = statsUnder(fitting, basis, { overheated: false });
         baseline = pending;
         pending.catch(() => {
           if (baseline === pending) baseline = null;
@@ -142,7 +153,7 @@ function variantEvaluator(
       }
       const [before, after] = await Promise.all([
         baseline,
-        withoutOverheat(variant, pilot, damageProfile, conditions),
+        statsUnder(variant, basis, { overheated: false }),
       ]);
       return { before, after };
     },
@@ -155,20 +166,18 @@ function variantEvaluator(
  * carries one, else the pilot's clone — under the same conditions as the
  * open one (`useStatsConditions`, passed in so a caller re-runs when they change).
  */
-export async function evaluateFitting(
+export function evaluateFitting(
   fitting: Fitting,
   profile: PilotProfile,
   damageProfile: DamageProfile | undefined,
   conditions: StatsConditions
 ): Promise<FittingStats> {
   const pilot = applyImplantBasis(profile, fitting.implantSet, defaultImplantBasis(fitting));
-  return computeFittingStats(
-    fitting,
-    await overridden(pilot, conditions),
-    undefined,
-    damageProfile,
-    statsOptions(conditions)
-  );
+  return statsUnder(fitting, {
+    pilot,
+    conditions,
+    ...(damageProfile === undefined ? {} : { damageProfile }),
+  });
 }
 
 /** The open Fitting's stats, price and Variations evaluator. */
@@ -221,15 +230,14 @@ export function useFittingEvaluation({
     if (fitting === null || pilot === null || damageProfile === null) return;
     void (async () => {
       try {
-        const under = pilotUnder(pilot, conditions);
-        const result = await computeFittingStats(
+        const result = await statsUnder(
           fitting,
-          under instanceof Promise ? await under : under,
-          (progress) => {
-            if (!cancelled) setStatsProgress(progress);
-          },
-          damageProfile,
-          statsOptions(conditions)
+          { pilot, damageProfile, conditions },
+          {
+            onProgress: (progress) => {
+              if (!cancelled) setStatsProgress(progress);
+            },
+          }
         );
         if (cancelled) return;
         setEngineReady(true);
@@ -259,7 +267,7 @@ export function useFittingEvaluation({
     () =>
       fitting === null || pilot === null || damageProfile === null || !engineReady
         ? null
-        : variantEvaluator(fitting, pilot, damageProfile, conditions),
+        : variantEvaluator(fitting, { pilot, damageProfile, conditions }),
     [fitting, pilot, damageProfile, conditions, engineReady]
   );
 
@@ -267,13 +275,9 @@ export function useFittingEvaluation({
     () =>
       fitting === null || pilot === null || damageProfile === null || !engineReady
         ? null
-        : async (moduleIndex: number) =>
-            explainModule(
-              fitting,
-              await overridden(pilot, conditions),
-              moduleIndex,
-              damageProfile,
-              statsOptions(conditions)
+        : (moduleIndex: number) =>
+            underBasis({ pilot, damageProfile, conditions }, (under, options) =>
+              explainModule(fitting, under, moduleIndex, damageProfile, options)
             ),
     [fitting, pilot, damageProfile, conditions, engineReady]
   );
