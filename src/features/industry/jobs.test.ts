@@ -11,6 +11,7 @@ import {
   isJobDone,
   isCompletingSoon,
   secondsRemaining,
+  canLogProductionFromJob,
   activityI18nKey,
   contextMenuTypeId,
   summarizeJobs,
@@ -215,6 +216,39 @@ describe('isJobDone / isCompletingSoon / secondsRemaining', () => {
   it('secondsRemaining counts down and clamps at 0', () => {
     expect(secondsRemaining(j, Date.parse('2026-08-29T11:00:00Z'))).toBe(3600);
     expect(secondsRemaining(j, Date.parse('2026-08-29T13:00:00Z'))).toBe(0);
+  });
+});
+
+describe('canLogProductionFromJob', () => {
+  const doneAt = Date.parse('2026-08-29T13:00:00Z');
+
+  it('is true for a done manufacturing job with a product', () => {
+    const j = job({ activity_id: 1, product_type_id: 587, end_date: '2026-08-29T12:00:00Z' });
+    expect(canLogProductionFromJob(j, doneAt)).toBe(true);
+  });
+
+  it('is true for a done reaction job with a product', () => {
+    const j = job({ activity_id: 11, product_type_id: 587, end_date: '2026-08-29T12:00:00Z' });
+    expect(canLogProductionFromJob(j, doneAt)).toBe(true);
+  });
+
+  it('is false while the job is still running', () => {
+    const j = job({
+      activity_id: 1,
+      product_type_id: 587,
+      end_date: '2026-08-29T14:00:00Z',
+    });
+    expect(canLogProductionFromJob(j, doneAt)).toBe(false);
+  });
+
+  it('is false for a done job with no product (research/copying/invention)', () => {
+    const j = job({ activity_id: 8, product_type_id: undefined, end_date: '2026-08-29T12:00:00Z' });
+    expect(canLogProductionFromJob(j, doneAt)).toBe(false);
+  });
+
+  it('is false for a done, product-bearing job outside manufacturing/reaction', () => {
+    const j = job({ activity_id: 5, product_type_id: 587, end_date: '2026-08-29T12:00:00Z' });
+    expect(canLogProductionFromJob(j, doneAt)).toBe(false);
   });
 });
 
