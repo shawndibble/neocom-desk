@@ -59,6 +59,9 @@ export const NOTIFICATION_ROUTES: Record<NotificationEventId, string> = {
   // History, just a later transition of the same contract.
   contractCompleted: '/contracts/history',
   contractFailed: '/contracts/history',
+  // The still-open contract's row in History (issue #1713), the same page the
+  // three transitions above land on.
+  courierDeliveryDue: '/contracts/history',
   // The tab is a path segment (ADR 0015) — this lands straight on the tab
   // that actually shows the event, not just the page.
   walletBalanceChanged: '/wallet/journal',
@@ -170,6 +173,7 @@ const SUBJECT_URLS: Partial<Record<NotificationEventId, SubjectUrl>> = {
   contractAccepted: highlightRow,
   contractCompleted: highlightRow,
   contractFailed: highlightRow,
+  courierDeliveryDue: highlightRow,
   industryJobComplete: highlightRow,
   corpMemberJoined: highlightRow,
   // The item itself, selected via Market Browser's own `?type=` param rather

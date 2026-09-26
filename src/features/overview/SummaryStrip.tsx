@@ -5,7 +5,7 @@
  * "Next deadline" leads, at the largest type on the page, because it is the
  * one question this board is asked every single time it opens. It is a real
  * deadline drawn from the cards below it — the soonest colony batch, industry
- * job or skill completion — not a fourth number with its own idea of urgency.
+ * job, contract or skill completion — not a fourth number with its own idea of urgency.
  *
  * There is deliberately no ISK-owed cell. An earlier draft had one and it
  * printed the same figure as the Mining Tax card's own tile two panels away;

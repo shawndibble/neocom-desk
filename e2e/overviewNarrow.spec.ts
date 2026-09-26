@@ -11,6 +11,7 @@
  */
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { CHARACTER_ID } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
 
@@ -138,4 +139,70 @@ test('summary strip empty answers are not clipped at 390px', async ({ page }) =>
     const clipped = await value.evaluate((el) => el.scrollWidth > el.clientWidth);
     expect(clipped).toBe(false);
   }
+});
+
+// Issue #1714: contracts on a clock feed the Next deadline strip and get a folded row.
+const HOUR_MS = 60 * 60 * 1000;
+
+function contractFixture(over: Record<string, unknown>) {
+  return {
+    contract_id: 1,
+    issuer_id: CHARACTER_ID,
+    issuer_corporation_id: 2,
+    assignee_id: 0,
+    acceptor_id: 0,
+    type: 'item_exchange',
+    status: 'outstanding',
+    for_corporation: false,
+    availability: 'public',
+    date_issued: new Date(Date.now() - 24 * HOUR_MS).toISOString(),
+    date_expired: new Date(Date.now() + 10 * 24 * HOUR_MS).toISOString(),
+    ...over,
+  };
+}
+
+async function mockContracts(page: import('@playwright/test').Page, body: unknown[]) {
+  await page.route(`https://esi.evetech.net/characters/${CHARACTER_ID}/contracts*`, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
+  );
+}
+
+test('a courier due soon shows in the Contracts row and the next deadline at 390px', async ({
+  page,
+}) => {
+  await page.setViewportSize(PHONE);
+  await mockContracts(page, [
+    contractFixture({
+      contract_id: 7,
+      issuer_id: 1,
+      acceptor_id: CHARACTER_ID,
+      type: 'courier',
+      status: 'in_progress',
+      date_accepted: new Date(Date.now() - 67 * HOUR_MS).toISOString(),
+      days_to_complete: 3,
+    }),
+  ]);
+  await signInAndGoto(page, './overview');
+
+  const row = page.getByRole('link', { name: /^Contracts: 1 haul in progress/ });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText(/next due (4h 5\d|5h 0)m/);
+  await expect(row).toHaveAttribute('href', /\/contracts\/history\?history\.status=in_progress$/);
+  await expect(page.getByText(/^Courier due/).first()).toBeVisible();
+});
+
+test('long-dated listings leave the Contracts row at "Nothing due" at 390px', async ({ page }) => {
+  await page.setViewportSize(PHONE);
+  await mockContracts(
+    page,
+    Array.from({ length: 12 }, (_, i) =>
+      contractFixture({
+        contract_id: 100 + i,
+        date_expired: new Date(Date.now() + (5 + i) * 24 * HOUR_MS).toISOString(),
+      })
+    )
+  );
+  await signInAndGoto(page, './overview');
+
+  await expect(page.getByRole('link', { name: 'Contracts: Nothing due' })).toBeVisible();
 });

@@ -174,6 +174,14 @@ const CATALOG = [
     scope: requiredScope('getCharacterContracts'),
   },
   {
+    // A lead-time warning (issue #1713) for an accepted courier's deliver-by
+    // deadline — `contractFailed` only arrives once the collateral is gone.
+    id: 'courierDeliveryDue',
+    labelKey: 'settings.notifications.event.courierDeliveryDue',
+    defaultChannels: 'both',
+    scope: requiredScope('getCharacterContracts'),
+  },
+  {
     id: 'walletBalanceChanged',
     labelKey: 'settings.notifications.event.walletBalanceChanged',
     defaultChannels: 'feedOnly',
