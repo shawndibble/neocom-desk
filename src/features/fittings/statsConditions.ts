@@ -7,7 +7,8 @@
  * the session, read by the editor, its Variations, the applied-DPS overlay
  * and Fitting Compare alike, so no two numbers on screen are in different
  * conditions. Neither is saved or put in a Share Link: each is a question
- * asked of a fit, not part of it.
+ * asked of a fit, not part of it. The projected sources alone belong to a
+ * Character (its saved Fittings), so they go when the active Character does.
  */
 import { useMemo } from 'react';
 import { create } from 'zustand';
@@ -20,6 +21,7 @@ import {
 import { combineProjections, projectsNothing } from '@/engine/fittings/projection';
 import type { PilotProfile, ProjectedEffects } from '@/engine/fittings/types';
 import { loadSkills } from '@/sde/loadSde';
+import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useAbyssalWeather } from './abyssalWeatherSelection';
 import type { StatsOptions } from './dogmaFittingEngine';
 
@@ -67,6 +69,16 @@ export const useProjectedSources = create<ProjectedSourcesSelection>((set) => ({
   sources: [],
   setSources: (sources) => set({ sources }),
 }));
+
+// The sources are the active Character's own saved Fittings: another
+// Character's list doesn't have them, so switching lets go of them all.
+// Opening a different Fitting keeps them, as it keeps the weather.
+useActiveCharacter.subscribe((state, previous) => {
+  if (state.activeCharacterId === previous.activeCharacterId) return;
+  if (useProjectedSources.getState().sources.length > 0) {
+    useProjectedSources.setState({ sources: [] });
+  }
+});
 
 export interface StatsConditions {
   /** An Abyssal weather beacon's type id, or null for normal space. */
