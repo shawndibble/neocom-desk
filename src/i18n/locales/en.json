@@ -3514,6 +3514,8 @@
     "detailPrice": "Acceptor Pays",
     "detailReward": "Acceptor Receives",
     "detailCollateral": "Collateral",
+    "courierRoute": "{{start}} → {{end}}",
+    "collateralMeta": "Collateral {{value}}",
     "detailBuyout": "Buyout",
     "detailVolume": "Volume",
     "detailItemsIncluded": "Included",
