@@ -125,7 +125,8 @@ const LIVE_JOB_STATUSES = new Set<IndustryJob['status']>(['active', 'ready']);
 
 export function toIndustryJobSources(
   jobs: readonly IndustryJob[],
-  typeName: TypeNamer
+  typeName: TypeNamer,
+  nowMs: number
 ): BoardClockSource[] {
   const sources: BoardClockSource[] = [];
   for (const job of jobs) {
@@ -137,7 +138,12 @@ export function toIndustryJobSources(
       // The product is what the pilot is waiting for; a job with none (a copy,
       // an invention) is only nameable by its blueprint.
       subject: typeName(job.product_type_id ?? job.blueprint_type_id),
-      detail: job.status,
+      // A finished job's headline already reads "ready to deliver"
+      // (`pastDeadlineLabelKey`); repeating it here would only double the same
+      // words on one row. Keyed on the deadline itself, not `job.status` — ESI
+      // can still report `active` for a moment after `end_date` passes, and
+      // that must not leave the headline and this line disagreeing.
+      detail: deadlineMs <= nowMs ? '' : job.status,
       deadlineMs,
     });
   }
@@ -197,7 +203,18 @@ export function toMoonChunkSources(
   });
 }
 
-export function toContractExpirySources(contracts: readonly Contract[]): BoardClockSource[] {
+/**
+ * `typeLabel` and `routeName` are supplied by the caller, which alone has
+ * i18next and the location-name cache this needs — this module stays pure.
+ * `typeLabel` names a contract's type (e.g. "Courier"); `routeName` names an
+ * untitled courier's start → end when both ends have resolved (same resolver
+ * `ContractIdentity` uses per-row, issue #1706), and `undefined` otherwise.
+ */
+export function toContractExpirySources(
+  contracts: readonly Contract[],
+  typeLabel: (type: Contract['type']) => string,
+  routeName: (contract: Contract) => string | undefined
+): BoardClockSource[] {
   const sources: BoardClockSource[] = [];
   for (const contract of contracts) {
     if (!isActiveContractStatus(contract.status)) continue;
@@ -205,10 +222,10 @@ export function toContractExpirySources(contracts: readonly Contract[]): BoardCl
     if (deadlineMs === null) continue;
     sources.push({
       id: String(contract.contract_id),
-      // Most contracts are untitled, and then the type is the only name there
-      // is. Not translated here: `detail` and `subject` are data, and the view
-      // owns the wording.
-      subject: contract.title || contract.type,
+      // Most contracts are untitled. An untitled courier gets its route; every
+      // other untitled contract gets its translated type label rather than the
+      // raw ESI enum (issue #1715).
+      subject: contract.title || routeName(contract) || typeLabel(contract.type),
       detail: contract.type,
       deadlineMs,
     });
