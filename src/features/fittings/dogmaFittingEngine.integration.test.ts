@@ -68,6 +68,7 @@ const MEDIUM_SHIELD_BOOSTER_II = 10850;
 const MEDIUM_CAPACITOR_BOOSTER_II = 2024;
 const CAP_BOOSTER_400 = 11287;
 const CAP_BOOSTER_150 = 11283;
+const NAVY_CAP_BOOSTER_400 = 32006;
 const MEDIUM_ENERGY_NEUTRALIZER_II = 12267;
 const MEDIUM_ENERGY_NOSFERATU_II = 12259;
 const MEDIUM_REMOTE_ARMOR_REPAIRER_II = 26913;
@@ -501,18 +502,51 @@ describe('dogma engine integration (real WASM + real pinned SDE)', () => {
       (2.5 * stats.capacitorCapacity) / (stats.capacitorRechargeTime / 1000),
       6
     );
-    // The split adds back up to the engine's own net peak load (-4).
-    expect(budget.drain - budget.boosterInjection - budget.nosferatuGain).toBeCloseTo(read(-4), 6);
-    // A Cap Booster 400 every 12 s; the Medium Energy Nosferatu II's 36 GJ every 5 s.
-    expect(budget.boosterInjection).toBeCloseTo(400 / 12, 6);
+    // Two Cap Booster 400s a load (40 m3 of 16 m3 charges), one every 12 s,
+    // then a 10 s reload: 800 GJ every 34 s. The engine's own net peak load
+    // (-4) and delta (-5) count the booster at 400 every 12 s, no reload.
+    const reloadShortfall = 400 / 12 - 800 / 34;
+    expect(budget.boosterInjection).toBeCloseTo(800 / 34, 6);
+    expect(budget.drain - budget.boosterInjection - budget.nosferatuGain).toBeCloseTo(
+      read(-4) + reloadShortfall,
+      6
+    );
+    // The Medium Energy Nosferatu II's 36 GJ every 5 s.
     expect(budget.nosferatuGain).toBeCloseTo(36 / 5, 6);
-    expect(budget.delta).toBeCloseTo(read(-5), 6);
+    expect(budget.delta).toBeCloseTo(read(-5) - reloadShortfall, 6);
 
     // The remote armor repairer repairs someone else: the local tank has no armor.
     expect(tank.burst.armor).toBe(0);
     expect(tank.burst.shield).toBeGreaterThan(0);
     // Passive regeneration peaks at 2.5 × shield HP over the shield recharge time.
     expect(tank.passiveShield).toBeCloseTo((2.5 * stats.shield.hp) / (read(479) / 1000), 6);
+  });
+
+  it('averages a Navy Cap Booster 400 over its reload: 26.1 GJ/s, not 33.3', () => {
+    const fitting: Fitting = {
+      name: 'Integration Test Caracal cap booster',
+      shipTypeId: CARACAL,
+      modules: [
+        {
+          slot: 'medium',
+          slotIndex: 0,
+          typeId: MEDIUM_CAPACITOR_BOOSTER_II,
+          state: 'active',
+          chargeTypeId: NAVY_CAP_BOOSTER_400,
+        },
+      ],
+      drones: [],
+      cargo: [],
+    };
+    const dogmaFit = fittingToDogmaFit(fitting, buildAllVProfile(SUPPORT_SKILL_IDS));
+    const calculation = calculate(dogmaFit);
+    const budget = extractCapacitorBudget(
+      dogmaFit.items,
+      calculation.items,
+      calculation.ship.attributes
+    );
+    // Three 12 m3 charges in 40 m3, 12 s apart, then 10 s reloading.
+    expect(budget.boosterInjection).toBeCloseTo(1200 / 46, 6);
   });
 
   it('reads what the support modules hand out, each by its own kind', () => {

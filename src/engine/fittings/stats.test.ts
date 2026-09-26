@@ -672,6 +672,28 @@ describe('extractCapacitorBudget', () => {
     expect(budget.nosferatuGain).toBeCloseTo(7.2, 6);
   });
 
+  it('averages a loaded cap booster over its reload', () => {
+    const booster = running(
+      2024,
+      {
+        capacitorPeakLoad: -400 / 12,
+        capacitorInjectionAmount: 400,
+        chargeAmount: 3,
+        chargeRate: 1,
+        cycleTime: 12000,
+        reloadTime: 10000,
+      },
+      { chargeTypeId: 32006 }
+    );
+    const budget = extractCapacitorBudget(
+      [booster.item],
+      [booster.result],
+      attrs({ capacitorPeakRecharge: 30 })
+    );
+    // 1200 GJ over three 12 s cycles and a 10 s reload: 26.1 GJ/s, not 33.3.
+    expect(budget.boosterInjection).toBeCloseTo(1200 / 46, 6);
+  });
+
   it('leaves drones, cargo and implants out', () => {
     const drone = {
       item: { type_id: 9, slot: { type: 'drone_bay' } },
@@ -778,6 +800,32 @@ describe('extractTank', () => {
     expect(tank.ancillary).toEqual([
       { typeId: 33101, layer: 'armor', loaded: 78, empty: 26, isLoaded: true },
     ]);
+  });
+
+  it('feeds the repairers only what a reloading cap booster really injects', () => {
+    const booster = running(
+      2024,
+      {
+        capacitorPeakLoad: -400 / 12,
+        capacitorInjectionAmount: 400,
+        chargeAmount: 3,
+        chargeRate: 1,
+        cycleTime: 12000,
+        reloadTime: 10000,
+      },
+      { chargeTypeId: 32006 }
+    );
+    const rep = running(3530, { armorRepairRate: 60, capacitorPeakLoad: 40 });
+    const tank = extractTank(
+      [booster.item, rep.item],
+      [booster.result, rep.result],
+      // The engine nets the booster at its full rate: 40 − 33.3.
+      attrs({ armorRepairRate: 60, capacitorPeakRecharge: 10, capacitorPeakLoad: 40 - 400 / 12 }),
+      layers
+    );
+    // Recharge 10 + 1200/46 injected feeds 36.1 of the rep's 40 GJ/s.
+    expect(tank.capFraction).toBeCloseTo((10 + 1200 / 46) / 40, 6);
+    expect(tank.sustained.armor).toBeCloseTo((60 * (10 + 1200 / 46)) / 40, 6);
   });
 
   it('gives an empty ancillary armor repairer its loaded rate from its own multiplier', () => {

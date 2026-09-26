@@ -45,6 +45,9 @@ describe('TankFacts', () => {
     expect(
       screen.getByText('Cap-limited: repairers get 50% of the capacitor they need')
     ).toBeInTheDocument();
+    expect(
+      screen.getByText(/cap boosters and ancillary repairers averaged over their reloads/)
+    ).toBeInTheDocument();
   });
 
   it('gives an ancillary armor repairer its rate with paste and dry', () => {

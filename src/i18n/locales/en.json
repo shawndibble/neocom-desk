@@ -575,7 +575,7 @@
         "burst": "Burst tank",
         "sustained": "Sustained",
         "capLimited": "Cap-limited: repairers get {{pct}}% of the capacitor they need",
-        "estimateNote": "Sustained is our estimate: what the capacitor can feed at peak recharge, cap boosters counted without reloads, ancillary repairers with theirs."
+        "estimateNote": "Sustained is our estimate: what the capacitor can feed at peak recharge, with cap boosters and ancillary repairers averaged over their reloads."
       },
       "cap": {
         "peakRecharge": "Peak recharge",

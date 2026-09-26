@@ -1,5 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { capacitorBudget, sustainedRepair, type CapacitorUser, type Repairer } from './tank';
+import {
+  boosterReloadShortfall,
+  capacitorBudget,
+  reloadDuty,
+  sustainedRepair,
+  type CapacitorUser,
+  type Repairer,
+} from './tank';
+
+describe('reloadDuty', () => {
+  it('is the share of the time a magazine keeps the module running, reloads counted', () => {
+    // Three 12 s cycles, then a 10 s reload: 36 of every 46 s.
+    expect(reloadDuty({ cycles: 3, cycleSeconds: 12, reloadSeconds: 10 })).toBeCloseTo(36 / 46, 9);
+  });
+
+  it('is 1 with no magazine, or one too small for a whole cycle', () => {
+    expect(reloadDuty(undefined)).toBe(1);
+    expect(reloadDuty({ cycles: 0, cycleSeconds: 12, reloadSeconds: 10 })).toBe(1);
+  });
+});
 
 describe('capacitorBudget', () => {
   const users: CapacitorUser[] = [
@@ -21,6 +40,28 @@ describe('capacitorBudget', () => {
     expect(budget.nosferatuGain).toBeCloseTo(7.2, 6);
     // Recharge + booster + nos − drain.
     expect(budget.delta).toBeCloseTo(35.84 + 33.333 + 7.2 - 29.375, 3);
+  });
+
+  it('averages a cap booster over its reload, as an ancillary repairer is', () => {
+    // Medium Capacitor Booster II, Navy Cap Booster 400: three 400 GJ charges
+    // 12 s apart, then 10 s reloading — 1200 GJ every 46 s, not 400 every 12.
+    const magazine = { cycles: 3, cycleSeconds: 12, reloadSeconds: 10 };
+    const budget = capacitorBudget(
+      [{ capPerSecond: 20 }, { capPerSecond: -400 / 12, injectionPerCharge: 400, magazine }],
+      30
+    );
+    expect(budget.boosterInjection).toBeCloseTo(1200 / 46, 6);
+    expect(budget.delta).toBeCloseTo(30 + 1200 / 46 - 20, 6);
+  });
+
+  it('keeps the charge interval to hold peak an average that counts reloads in', () => {
+    const magazine = { cycles: 3, cycleSeconds: 12, reloadSeconds: 10 };
+    const budget = capacitorBudget(
+      [{ capPerSecond: 60 }, { capPerSecond: -400 / 12, injectionPerCharge: 400, magazine }],
+      40
+    );
+    // Still 20 GJ/s short without it: one 400 GJ charge per 20 s on average.
+    expect(budget.secondsPerBoosterCharge).toBeCloseTo(20, 6);
   });
 
   it('says how often a cap booster must inject to hold peak when the rest runs the cap dry', () => {
@@ -66,6 +107,24 @@ describe('capacitorBudget', () => {
 
   it('gives the delta as a share of peak recharge', () => {
     expect(capacitorBudget([{ capPerSecond: 30 }], 40).deltaPct).toBeCloseTo(25, 6);
+  });
+});
+
+describe('boosterReloadShortfall', () => {
+  it('is the injection a reloading cap booster loses against the engine’s no-reload rate', () => {
+    const magazine = { cycles: 3, cycleSeconds: 12, reloadSeconds: 10 };
+    expect(
+      boosterReloadShortfall([
+        { capPerSecond: 20 },
+        { capPerSecond: -400 / 12, injectionPerCharge: 400, magazine },
+        { capPerSecond: -7.2 },
+      ])
+    ).toBeCloseTo(400 / 12 - 1200 / 46, 6);
+  });
+
+  it('is 0 with no cap booster, or one without a magazine', () => {
+    expect(boosterReloadShortfall([{ capPerSecond: -7.2 }])).toBe(0);
+    expect(boosterReloadShortfall([{ capPerSecond: -400 / 12, injectionPerCharge: 400 }])).toBe(0);
   });
 });
 

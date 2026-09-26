@@ -18,10 +18,31 @@
  * - A loaded **ancillary** repairer (charges instead of, or on top of,
  *   capacitor) runs its whole magazine and then stops for the reload, so it
  *   averages its burst over `cycles × cycle + reload`.
- * - Cap boosters count at their charge-per-cycle rate with no reload, as the
- *   engine's own peak load does: optimistic for a long fight.
+ * - A **cap booster** does the same: its injection is averaged over its
+ *   magazine and reload (`reloadDuty`, the one rule for both). The engine's
+ *   own peak load counts it at its charge-per-cycle rate with no reload, so
+ *   `boosterReloadShortfall` is what the sustained tank adds back to it.
  */
 import type { LocalRepair } from './types';
+
+/** A module's charges: how many whole cycles one load runs, and the reload after. */
+export interface Magazine {
+  cycles: number;
+  cycleSeconds: number;
+  reloadSeconds: number;
+}
+
+/**
+ * The share (0–1] of a long fight a module with this magazine spends
+ * running rather than reloading; 1 with none, or one too small for a whole
+ * cycle (which never reloads into anything).
+ */
+export function reloadDuty(magazine: Magazine | undefined): number {
+  if (!magazine || magazine.cycles <= 0) return 1;
+  const running = magazine.cycles * magazine.cycleSeconds;
+  const total = running + magazine.reloadSeconds;
+  return total > 0 ? running / total : 1;
+}
 
 /** One running module's capacitor use, as the engine reports it. */
 export interface CapacitorUser {
@@ -32,6 +53,23 @@ export interface CapacitorUser {
    * ancillary shield booster loads the same charges and just runs free on them.
    */
   injectionPerCharge?: number;
+  /** A cap booster's charges and reload, which its injection is averaged over. */
+  magazine?: Magazine;
+}
+
+/** A cap booster: it injects (a negative draw) from a loaded charge. */
+function isBooster(user: CapacitorUser): boolean {
+  return user.capPerSecond < 0 && (user.injectionPerCharge ?? 0) > 0;
+}
+
+/**
+ * GJ/s the cap boosters lose to their reloads against the no-reload rate
+ * the engine nets into its own peak load — what to add back to that load.
+ */
+export function boosterReloadShortfall(users: readonly CapacitorUser[]): number {
+  return users
+    .filter(isBooster)
+    .reduce((sum, user) => sum - user.capPerSecond * (1 - reloadDuty(user.magazine)), 0);
 }
 
 export interface CapacitorBudget {
@@ -39,7 +77,7 @@ export interface CapacitorBudget {
   peakRecharge: number;
   /** GJ/s every running module draws. */
   drain: number;
-  /** GJ/s cap boosters inject, one charge a cycle, no reload. */
+  /** GJ/s cap boosters inject, one charge a cycle, averaged over their reloads. */
   boosterInjection: number;
   /** GJ/s nosferatu take from their targets. */
   nosferatuGain: number;
@@ -48,9 +86,10 @@ export interface CapacitorBudget {
   /** `delta` as a share of peak recharge, percent. */
   deltaPct: number;
   /**
-   * How often a cap booster must inject its biggest loaded charge to hold
-   * the capacitor at peak — null when recharge alone keeps up, or no booster
-   * is fitted to do it.
+   * How often, on average, a cap booster must inject its biggest loaded
+   * charge to hold the capacitor at peak — an average over a long fight, so
+   * reloads don't change it — null when recharge alone keeps up, or no
+   * booster is fitted to do it.
    */
   secondsPerBoosterCharge: number | null;
 }
@@ -64,11 +103,11 @@ export function capacitorBudget(
   let nosferatuGain = 0;
   let biggestCharge = 0;
   for (const user of users) {
-    const charge = user.injectionPerCharge ?? 0;
-    if (user.capPerSecond < 0 && charge > 0) {
-      // The engine nets a cap booster's injection into its own draw.
-      boosterInjection -= user.capPerSecond;
-      biggestCharge = Math.max(biggestCharge, charge);
+    if (isBooster(user)) {
+      // The engine nets a cap booster's injection into its own draw, at its
+      // full rate; a long fight also waits out its reloads.
+      boosterInjection -= user.capPerSecond * reloadDuty(user.magazine);
+      biggestCharge = Math.max(biggestCharge, user.injectionPerCharge ?? 0);
     } else if (user.capPerSecond < 0) {
       nosferatuGain -= user.capPerSecond;
     } else {
@@ -99,7 +138,7 @@ export interface Repairer {
   /** GJ/s it draws; 0 for an ancillary shield booster running on its charges. */
   capPerSecond: number;
   /** Loaded with charges it runs out of: how many whole cycles, and the reload after. */
-  ancillary?: { cycles: number; cycleSeconds: number; reloadSeconds: number };
+  ancillary?: Magazine;
 }
 
 export interface SustainedRepair {
@@ -123,12 +162,7 @@ export function sustainedRepair(
 
   const sustained: LocalRepair = { shield: 0, armor: 0, hull: 0 };
   for (const repairer of repairers) {
-    let rate = repairer.rate;
-    const magazine = repairer.ancillary;
-    if (magazine && magazine.cycles > 0) {
-      const running = magazine.cycles * magazine.cycleSeconds;
-      rate *= running / (running + magazine.reloadSeconds);
-    }
+    let rate = repairer.rate * reloadDuty(repairer.ancillary);
     if (repairer.capPerSecond > 0) rate *= capFraction;
     sustained[repairer.layer] += rate;
   }

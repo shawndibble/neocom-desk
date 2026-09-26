@@ -24,10 +24,12 @@ import {
   CHARACTER_BASE_LOCKED_TARGETS,
 } from './types';
 import {
+  boosterReloadShortfall,
   capacitorBudget,
   sustainedRepair,
   type CapacitorBudget,
   type CapacitorUser,
+  type Magazine,
   type RepairLayer,
   type Repairer,
 } from './tank';
@@ -498,22 +500,43 @@ function runningModules<I extends CalculatedItem, R extends RunningResult>(
   });
 }
 
+/**
+ * A loaded module's magazine: the charges the engine says it holds, over
+ * what one cycle uses, and its reload. The same for an ancillary repairer
+ * and a cap booster.
+ */
+function magazineOf(read: (id: number) => number): Magazine {
+  const chargeRate = read(ITEM_DOGMA_ATTRIBUTE.chargeRate) || 1;
+  return {
+    cycles: Math.floor(read(ITEM_DOGMA_ATTRIBUTE.chargeAmount) / chargeRate + 1e-9),
+    cycleSeconds: read(ITEM_DOGMA_ATTRIBUTE.cycleTime) / 1000,
+    reloadSeconds: read(ITEM_DOGMA_ATTRIBUTE.reloadTime) / 1000,
+  };
+}
+
+/** Every running module's capacitor use, a cap booster's with its magazine. */
+function capacitorUsers(
+  items: readonly CalculatedItem[],
+  results: readonly RunningResult[]
+): CapacitorUser[] {
+  return runningModules(items, results).map(({ result }) => {
+    const read = (id: number) => readAttribute(result.attributes, id);
+    const injectionPerCharge = read(ITEM_DOGMA_ATTRIBUTE.capacitorInjectionAmount);
+    return {
+      capPerSecond: read(ITEM_DOGMA_ATTRIBUTE.capacitorPeakLoad),
+      ...(injectionPerCharge > 0 ? { injectionPerCharge, magazine: magazineOf(read) } : {}),
+    };
+  });
+}
+
 /** Peak recharge against every running module's draw (`tank.ts`'s `capacitorBudget`). */
 export function extractCapacitorBudget(
   items: readonly CalculatedItem[],
   results: readonly RunningResult[],
   shipAttributes: AttributeMap
 ): CapacitorBudget {
-  const users: CapacitorUser[] = runningModules(items, results).map(({ result }) => {
-    const read = (id: number) => readAttribute(result.attributes, id);
-    const injectionPerCharge = read(ITEM_DOGMA_ATTRIBUTE.capacitorInjectionAmount);
-    return {
-      capPerSecond: read(ITEM_DOGMA_ATTRIBUTE.capacitorPeakLoad),
-      ...(injectionPerCharge > 0 ? { injectionPerCharge } : {}),
-    };
-  });
   return capacitorBudget(
-    users,
+    capacitorUsers(items, results),
     readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakRecharge)
   );
 }
@@ -548,20 +571,11 @@ export function extractTank(
     for (const layer of REPAIR_LAYERS) {
       const rate = read(REPAIR_RATE_ATTRIBUTE[layer]);
       if (rate <= 0) continue;
-      const chargeRate = read(ITEM_DOGMA_ATTRIBUTE.chargeRate) || 1;
       repairers.push({
         layer,
         rate,
         capPerSecond: read(ITEM_DOGMA_ATTRIBUTE.capacitorPeakLoad),
-        ...(item.charge
-          ? {
-              ancillary: {
-                cycles: Math.floor(read(ITEM_DOGMA_ATTRIBUTE.chargeAmount) / chargeRate + 1e-9),
-                cycleSeconds: read(ITEM_DOGMA_ATTRIBUTE.cycleTime) / 1000,
-                reloadSeconds: read(ITEM_DOGMA_ATTRIBUTE.reloadTime) / 1000,
-              },
-            }
-          : {}),
+        ...(item.charge ? { ancillary: magazineOf(read) } : {}),
       });
       // The paste multiplier lands on the paste, not the module (a live run:
       // the module's own `chargedRepairMultiplier` stays unset), so a loaded
@@ -592,7 +606,10 @@ export function extractTank(
 
   const { sustained, capFraction } = sustainedRepair(repairers, {
     peakRecharge: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakRecharge),
-    peakLoad: readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakLoad),
+    // The engine's load nets cap boosters in at their no-reload rate.
+    peakLoad:
+      readAttribute(shipAttributes, DOGMA_ATTRIBUTE.capacitorPeakLoad) +
+      boosterReloadShortfall(capacitorUsers(items, results)),
   });
   const passiveShield = readAttribute(shipAttributes, DOGMA_ATTRIBUTE.passiveShieldRechargeRate);
   const passiveEffective = readAttribute(
