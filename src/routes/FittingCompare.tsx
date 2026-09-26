@@ -217,6 +217,7 @@ export function FittingCompare() {
               icon={<Icon.Close />}
               label={t('fittings.compare.remove')}
               onClick={() => removeSlot(index)}
+              tone="danger"
             />
           </div>
         </div>

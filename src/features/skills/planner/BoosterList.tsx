@@ -145,6 +145,7 @@ function BoosterRow({
           onClick={onRemove}
           size="sm"
           variant="plain"
+          tone="danger"
         />
       </div>
       {row.enabled && (
