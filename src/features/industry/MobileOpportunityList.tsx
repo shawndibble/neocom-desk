@@ -35,6 +35,7 @@ import type { SkillGateVerdict } from '@/engine/industry/skillGate';
 import { iskToneClass } from '@/features/character/format';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
+import type { BlueprintCatalogEntry } from './blueprintCatalog';
 import { ORDER_DEPTH_TONE, unitMargin } from './opportunityMetrics';
 import { formatPercent } from './format';
 import type { OpportunityRow } from './opportunities';
@@ -47,6 +48,7 @@ interface MobileOpportunityListProps {
   showCharacterColumn: boolean;
   selectedIds: ReadonlySet<string>;
   onToggleSelected: (id: string) => void;
+  onStartPlan: (entry: BlueprintCatalogEntry) => void;
   onViewHistory: (typeId: number, itemName: string) => void;
   /** Account-wide skill gate for a row's product (issue #1231). */
   skillGateFor: (productTypeID: number) => SkillGateVerdict | undefined;
@@ -138,6 +140,7 @@ export function MobileOpportunityList({
   showCharacterColumn,
   selectedIds,
   onToggleSelected,
+  onStartPlan,
   onViewHistory,
   skillGateFor,
   nameForSkill,
@@ -230,19 +233,39 @@ export function MobileOpportunityList({
                     {row.candidate.characterName}
                   </span>
                 )}
-                {productTypeID !== null && (
-                  <IconButton
-                    size="sm"
-                    icon={<Icon.Market />}
-                    label={t('industry.opportunitiesViewHistory', {
-                      name: row.candidate.catalogEntry.productName,
-                    })}
-                    onClick={() =>
-                      onViewHistory(productTypeID, row.candidate.catalogEntry.productName)
-                    }
-                    className="ml-auto shrink-0"
-                  />
-                )}
+                <span className="ml-auto flex shrink-0 items-center gap-1">
+                  {productTypeID !== null && (
+                    <IconButton
+                      size="sm"
+                      icon={<Icon.Market />}
+                      label={t('industry.opportunitiesViewHistory', {
+                        name: row.candidate.catalogEntry.productName,
+                      })}
+                      onClick={() =>
+                        onViewHistory(productTypeID, row.candidate.catalogEntry.productName)
+                      }
+                    />
+                  )}
+                  {/* Card menu, not the card face: a per-row "Start a plan"
+                      button here would crowd this already dense header
+                      line. */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <IconButton
+                        size="sm"
+                        icon={<Icon.More />}
+                        label={t('industry.moreActionsLabel', {
+                          name: row.candidate.catalogEntry.productName,
+                        })}
+                      />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => onStartPlan(row.candidate.catalogEntry)}>
+                        {t('industry.marketOpportunitiesStartPlan')}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </span>
               </div>
 
               <div

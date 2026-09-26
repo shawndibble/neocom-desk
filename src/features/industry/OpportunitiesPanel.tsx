@@ -44,7 +44,7 @@ import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { useResolvedCharacterFilter } from '@/features/character/characterFilterValue';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
-import { nameForType, type BlueprintCatalog } from './blueprintCatalog';
+import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
 import { loadCharacterBlueprints } from './data';
 import type { ActivityFacilityDefaults } from './facilityDefaults';
 import { formatPercent } from './format';
@@ -67,6 +67,7 @@ interface OpportunitiesPanelProps {
   activeCharacterId: number;
   ownedStockSnapshot: OwnedStockSnapshot;
   onAddToCompare: (rows: readonly OpportunityRow[]) => void;
+  onStartPlan: (entry: BlueprintCatalogEntry) => void;
   onAddToQuickbar: (typeId: number, itemName: string) => void;
   /** False with no active character — the Quickbar has nobody to save the item under. */
   quickbarAvailable: boolean;
@@ -93,6 +94,7 @@ export function OpportunitiesPanel({
   activeCharacterId,
   ownedStockSnapshot,
   onAddToCompare,
+  onStartPlan,
   onAddToQuickbar,
   quickbarAvailable,
   onShowInfo,
@@ -395,6 +397,18 @@ export function OpportunitiesPanel({
       ),
     },
     {
+      // Same pattern `MarketWideOpportunitiesPanel` sets (issue #1781): a
+      // direct per-row action rather than routing every plan through the
+      // Compare button, which needs 2+ selected rows to do anything.
+      id: 'action',
+      header: '',
+      render: (row) => (
+        <Button size="sm" onClick={() => onStartPlan(row.candidate.catalogEntry)}>
+          {t('industry.marketOpportunitiesStartPlan')}
+        </Button>
+      ),
+    },
+    {
       // Visible keyboard-reachable equivalent of `rowContextMenu` below (WCAG
       // 2.1.1, issue #1498) — same conditional: a row whose product type is
       // unknown has no item to open a menu for, so it renders bare.
@@ -473,7 +487,7 @@ export function OpportunitiesPanel({
               {t('industry.opportunitiesRefresh')}
             </Button>
           )}
-          {selectedRows.length > 0 && (
+          {selectedRows.length > 1 && (
             <Button size="sm" variant="primary" onClick={() => onAddToCompare(selectedRows)}>
               {t('industry.opportunitiesAddToCompare', { count: selectedRows.length })}
             </Button>
@@ -508,6 +522,7 @@ export function OpportunitiesPanel({
           showCharacterColumn={showCharacterColumn}
           selectedIds={selectedIds}
           onToggleSelected={toggleSelected}
+          onStartPlan={onStartPlan}
           onViewHistory={(typeId, itemName) => setHistoryItem({ typeId, itemName })}
           skillGateFor={(productTypeID) => skillGateByProductTypeID.get(productTypeID)}
           nameForSkill={(typeID) => nameForType(catalog, typeID)}

@@ -599,10 +599,10 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
     expect(new URLSearchParams(window.location.search).get('opps.chars')).toBe('all');
 
     await user.click(
-      await screen.findByRole('checkbox', { name: 'Select Rifter to add to Compare' })
+      await screen.findByRole('checkbox', { name: 'Select Rifter to compare plans' })
     );
     await user.click(
-      screen.getByRole('checkbox', { name: 'Select Mechanical Parts to add to Compare' })
+      screen.getByRole('checkbox', { name: 'Select Mechanical Parts to compare plans' })
     );
     await user.click(screen.getByRole('button', { name: 'Add 2 to Compare' }));
 

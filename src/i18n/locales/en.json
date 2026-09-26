@@ -1804,7 +1804,7 @@
     "opportunitiesProgress": "{{done}} of {{total}} calculated",
     "opportunitiesRefresh": "Refresh",
     "opportunitiesAddToCompare": "Add {{count}} to Compare",
-    "opportunitiesSelectFor": "Select {{name}} to add to Compare",
+    "opportunitiesSelectFor": "Select {{name}} to compare plans",
     "opportunitiesLossBreakdownFor": "Why {{name}} is a loss",
     "opportunitiesLossBreakdown": "Build cost {{cost}} vs. sell price {{revenue}}",
     "opportunitiesViewHistory": "View {{name}} price history",

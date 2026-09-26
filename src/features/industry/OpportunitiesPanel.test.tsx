@@ -97,6 +97,7 @@ describe('OpportunitiesPanel', () => {
         activeCharacterId={CHARACTER_ID}
         ownedStockSnapshot={SNAPSHOT}
         onAddToCompare={() => {}}
+        onStartPlan={() => {}}
         onAddToQuickbar={() => {}}
         quickbarAvailable
         onShowInfo={() => {}}
@@ -169,6 +170,7 @@ describe('OpportunitiesPanel', () => {
           activeCharacterId={CHARACTER_ID}
           ownedStockSnapshot={SNAPSHOT}
           onAddToCompare={() => {}}
+          onStartPlan={() => {}}
           onAddToQuickbar={onAddToQuickbar}
           quickbarAvailable
           onShowInfo={onShowInfo}
@@ -216,6 +218,88 @@ describe('OpportunitiesPanel', () => {
     it('renders no More-actions button for a row with an unknown product type', async () => {
       const { row } = await renderWithRow(null);
       expect(within(row).queryByRole('button', { name: /More actions/ })).not.toBeInTheDocument();
+    });
+
+    it('gives the row a "Start a plan" button that fires onStartPlan with its catalog entry (issue #1781)', async () => {
+      const onStartPlan = vi.fn();
+      const { row } = await renderWithRow(1000, { onStartPlan });
+      fireEvent.click(within(row).getByRole('button', { name: 'Start a plan' }));
+      expect(onStartPlan).toHaveBeenCalledWith(entry(1000, 'Widget Alpha'));
+    });
+  });
+
+  describe('Compare button (issue #1781)', () => {
+    function candidateRow(id: string, name: string) {
+      const e = {
+        blueprintTypeID: 900,
+        blueprint: { activity: 'manufacturing', skills: [] },
+        productTypeID: 1000,
+        productName: name,
+        productNameLower: name.toLowerCase(),
+      };
+      return {
+        candidate: {
+          id,
+          characterId: CHARACTER_ID,
+          characterName: 'Pilot One',
+          blueprint: { item_id: 1, type_id: 900, runs: -1 },
+          catalogEntry: e,
+        },
+        result: {
+          seconds: 60,
+          iskPerHour: null,
+          marginPct: null,
+          profit: null,
+          totalCost: 0,
+          revenue: null,
+        },
+        orderDepth: 'deep',
+      };
+    }
+
+    it('stays hidden with a single row selected, and appears once a second joins it', async () => {
+      const rowA = candidateRow(`${CHARACTER_ID}:1`, 'Widget Alpha');
+      const rowB = candidateRow(`${CHARACTER_ID}:2`, 'Widget Beta');
+      stub.rows = [rowA, rowB];
+      const catalog = {
+        ...CATALOG,
+        byBlueprintTypeID: new Map([[900, rowA.candidate.catalogEntry]]),
+      } as unknown as BlueprintCatalog;
+      loadCharacterBlueprints.mockResolvedValue({
+        cached: {
+          data: [
+            { item_id: 1, type_id: 900, runs: -1, material_efficiency: 0, time_efficiency: 0 },
+          ],
+          fetchedAt: new Date(),
+        },
+      });
+      render(
+        <OpportunitiesPanel
+          catalog={catalog}
+          pi={null}
+          modifiers={NO_CHARACTER_MODIFIERS}
+          facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
+          activeCharacterId={CHARACTER_ID}
+          ownedStockSnapshot={SNAPSHOT}
+          onAddToCompare={() => {}}
+          onStartPlan={() => {}}
+          onAddToQuickbar={() => {}}
+          quickbarAvailable
+          onShowInfo={() => {}}
+        />,
+        { wrapper: MemoryRouter }
+      );
+
+      const first = await screen.findByRole('checkbox', {
+        name: 'Select Widget Alpha to compare plans',
+      });
+      const second = screen.getByRole('checkbox', { name: 'Select Widget Beta to compare plans' });
+
+      fireEvent.click(first);
+      expect(screen.queryByRole('button', { name: /Add \d+ to Compare/ })).not.toBeInTheDocument();
+
+      fireEvent.click(second);
+      expect(screen.getByRole('button', { name: 'Add 2 to Compare' })).toBeInTheDocument();
     });
   });
 });
