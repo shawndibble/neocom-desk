@@ -166,6 +166,7 @@
     },
     "mastery": {
       "chip": "Mastery",
+      "tooltip": "{{name}} Mastery — the skills its tiers ask for and how long they take",
       "title": "{{name}} Mastery",
       "hideCompleted": "Hide completed",
       "empty": "Nothing to show — every skill here is trained.",

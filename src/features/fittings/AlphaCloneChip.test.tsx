@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
-import { buttonClassName } from '@/components/ui/buttonClassName';
+import { iconButtonClassName } from '@/components/ui/iconButtonClassName';
 import { AlphaCloneChip } from './AlphaCloneChip';
 
 const skillName = (typeId: number) =>
@@ -34,20 +34,29 @@ describe('AlphaCloneChip', () => {
     expect(tooltip).toHaveTextContent('Gallente Cruiser V (Alpha max IV)');
   });
 
-  it('renders through Button, success when Alpha can fly it and ghost otherwise', () => {
+  it('is an α icon in the positive tone when Alpha can fly it, an Ω in the warning tone otherwise', () => {
     const { rerender } = render(<AlphaCloneChip blockers={[]} skillName={skillName} />);
-    expect(screen.getByRole('button', { name: 'Alpha OK' })).toHaveClass(
-      ...buttonClassName({ variant: 'success', size: 'md' }).split(' ')
-    );
+    const ok = screen.getByRole('button', { name: 'Alpha OK' });
+    expect(ok).toHaveTextContent('α');
+    expect(ok).toHaveClass(...iconButtonClassName({ tone: 'positive' }).split(' '));
     rerender(
       <AlphaCloneChip
         blockers={[{ skillTypeID: 3332, level: 5, alphaMaxLevel: 4 }]}
         skillName={skillName}
       />
     );
-    expect(screen.getByRole('button', { name: 'Omega only' })).toHaveClass(
-      ...buttonClassName({ variant: 'ghost', size: 'md' }).split(' ')
-    );
+    const omega = screen.getByRole('button', { name: 'Omega only' });
+    expect(omega).toHaveTextContent('Ω');
+    expect(omega).toHaveClass(...iconButtonClassName({ tone: 'warning' }).split(' '));
+  });
+
+  it('opens its tooltip on a plain tap, for touch', async () => {
+    render(<AlphaCloneChip blockers={[]} skillName={skillName} />);
+    fireEvent.touchStart(screen.getByRole('button', { name: 'Alpha OK' }), {
+      touches: [{ clientX: 0, clientY: 0 }],
+    });
+    fireEvent.touchEnd(screen.getByRole('button', { name: 'Alpha OK' }), { touches: [] });
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('By skill caps');
   });
 
   it('shows nothing while the requirements load', () => {

@@ -336,7 +336,7 @@ interface FittingStatsSectionsProps {
   overlay?: OverlayFitting;
   /** A line above the sections — whose skills the numbers are worked out under. */
   heading?: ReactNode;
-  /** Controls for the conditions every section is worked out in (the Abyssal weather), under the heading. */
+  /** Controls for the conditions every section is worked out in — implants, Tactical mode, Abyssal weather, missing skills — under the heading. */
   conditions?: ReactNode;
   /** The hull takes drones (`showsDrones`) — else there is no Drones section. */
   showDrones?: boolean;

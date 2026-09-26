@@ -31,20 +31,20 @@ interface FittingHeaderProps {
   onRename: (name: string) => void;
   /** The Fitting's Jita price, for Export; null while it loads. */
   price: Appraisal | null;
-  /** What its numbers are worked out under — implants, missing skills. */
+  /** Icon badges about the fit itself — Alpha/Omega, Mastery. What its numbers assume (implants, missing skills) lives in the stats panel. */
   context?: ReactNode;
   save: ReactNode;
   /**
    * Below desktop, or while the Add slide-out narrows the page: the identity
-   * on its own line, then what the numbers assume with Save and one ⋮ menu
-   * (the Fittings menu and Export folded together) at the end.
+   * on its own line, then the badges with Save and one ⋮ menu (the Fittings
+   * menu and Export folded together) at the end.
    */
   compact?: boolean;
 }
 
 /**
- * Below desktop: the identity on its own line, then what the numbers assume
- * with Save and one ⋮ menu — the Fittings menu's items, then Export's — at
+ * Below desktop: the identity on its own line, then the badges with Save and
+ * one ⋮ menu — the Fittings menu's items, then Export's — at
  * the end of the second.
  */
 function CompactFittingHeader({
@@ -93,8 +93,8 @@ function CompactFittingHeader({
 }
 
 /**
- * The open Fitting's header, one row as in mockup A (scope decision
- * `20260924-215855`): what the Fitting is, what its numbers assume, then
+ * The open Fitting's header, one row (scope decisions `20260924-215855`,
+ * then `20260926-155124`): what the Fitting is with its icon badges, then
  * its controls — a Fittings menu for opening a different one (new from a
  * hull, Import, My Fittings, In-game), the view, Export and Save.
  */
