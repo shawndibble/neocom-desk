@@ -59,8 +59,7 @@ export const ROUTE_REQUIREMENTS = {
   // Reads each compared character's already-cached skills endpoint (same one
   // the trained view itself uses); no scope of its own to gate on.
   '/skills/compare': UNGATED,
-  // Fit Check reuses the same cached ESI reads the plan editor's clipboard
-  // import already relies on; Ship Mastery reads no ESI endpoint at all.
+  // A redirect into Fittings, where Mastery now lives (App.tsx); no scope of its own.
   '/skills/ships': UNGATED,
   // Section index: renders nothing of its own, it redirects to the plan list
   // (App.tsx) — planning is what the Skills section opens on.

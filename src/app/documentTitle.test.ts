@@ -56,7 +56,7 @@ describe('documentTitleFor', () => {
   it('gives every feature route a distinct title', () => {
     const concrete = (Object.keys(ROUTE_REQUIREMENTS) as AppRoutePath[])
       // Redirect-only routes never render a page of their own.
-      .filter((path) => path !== '/skills' && path !== '/bpc-contracts')
+      .filter((path) => path !== '/skills' && path !== '/bpc-contracts' && path !== '/skills/ships')
       .map((path) => path.replace(/:\w+/g, '1').replace('/*', '/x'))
       // `/assets/x` is the same page as `/assets`, one drill-down deeper.
       .filter((path) => !path.endsWith('/x'));

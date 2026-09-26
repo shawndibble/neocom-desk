@@ -54,7 +54,6 @@ const Skills = lazy(routeChunks.loadSkills);
 const SkillPlans = lazy(routeChunks.loadSkillPlans);
 const SkillPlanEditor = lazy(routeChunks.loadSkillPlanEditor);
 const SkillCompare = lazy(routeChunks.loadSkillCompare);
-const SkillShips = lazy(routeChunks.loadSkillShips);
 const Industry = lazy(routeChunks.loadIndustry);
 const IndustryPlanPage = lazy(routeChunks.loadIndustryPlanPage);
 const IndustryGroupPage = lazy(routeChunks.loadIndustryGroupPage);
@@ -126,7 +125,8 @@ const ROUTE_ELEMENTS = {
   '/skills/plans': <SkillPlans />,
   '/skills/plans/:planId': <SkillPlanEditor />,
   '/skills/compare': <SkillCompare />,
-  '/skills/ships': <SkillShips />,
+  // Mastery moved into Fittings; keep old bookmarks landing there.
+  '/skills/ships': <Navigate to="/fittings" replace />,
   '/industry': <Industry />,
   '/industry/plans/:planId': <IndustryPlanPage />,
   '/industry/groups/:groupId': <IndustryGroupPage />,
