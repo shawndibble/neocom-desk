@@ -799,7 +799,7 @@ describe('Characters', () => {
     // so only Pilot One ever gets a resolved corp name to search on.
     await screen.findByText('Test Corp');
 
-    const search = screen.getByPlaceholderText('Search by name or corporation');
+    const search = screen.getByPlaceholderText('Search by name or corporation…');
     await user.type(search, 'Pilot One');
     expect(screen.getByText('Pilot One')).toBeInTheDocument();
     expect(screen.queryByText('Pilot Two')).not.toBeInTheDocument();
@@ -887,7 +887,7 @@ describe('Characters URL state', () => {
   it('applies search text and sort from the URL on first render', async () => {
     renderCharacters('/characters?q=pilot&dir=desc');
     await screen.findByText('Pilot One');
-    expect(screen.getByPlaceholderText('Search by name or corporation')).toHaveValue('pilot');
+    expect(screen.getByPlaceholderText('Search by name or corporation…')).toHaveValue('pilot');
     await waitFor(() => expect(firstCardName()).toContain('Pilot Two'));
   });
 
@@ -903,7 +903,7 @@ describe('Characters URL state', () => {
     await screen.findByText('Pilot One');
     expect(locationSearch()).toBe('');
 
-    const search = screen.getByPlaceholderText('Search by name or corporation');
+    const search = screen.getByPlaceholderText('Search by name or corporation…');
     await user.type(search, 'One');
     await waitFor(() => expect(locationSearch()).toBe('?q=One'));
 

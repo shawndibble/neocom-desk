@@ -776,7 +776,7 @@ describe('OpenOrdersPanel', () => {
     await user.click(within(row).getByRole('button', { name: 'Details' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
-    await waitFor(() => expect(within(dialog).queryByText('Checking...')).not.toBeInTheDocument());
+    await waitFor(() => expect(within(dialog).queryByText('Checking…')).not.toBeInTheDocument());
     // "Who is cheaper" starts folded (issue #1428).
     fireEvent.click(within(dialog).getByRole('button', { name: /Who is cheaper/ }));
 

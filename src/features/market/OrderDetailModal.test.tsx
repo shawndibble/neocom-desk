@@ -181,7 +181,7 @@ describe('OrderDetailModal', () => {
     expect(
       screen.queryByRole('button', { name: 'Refresh system & region prices' })
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Checking...')).toBeInTheDocument();
+    expect(screen.getByText('Checking…')).toBeInTheDocument();
   });
 
   it('calls onCheckDeeper when the group-level deep-check button is pressed', async () => {
