@@ -6,6 +6,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
+import { expectNoPageOverflow } from './support/overflow';
 
 const PHONE = { width: 390, height: 844 };
 const DESKTOP = { width: 1280, height: 800 };
@@ -92,5 +93,11 @@ test('Required to fly group and verdict fit at 390px without horizontal overflow
   await expect(
     page.getByRole('button', { name: /^(Create plan and )?[Aa]dd Mastery/ })
   ).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await expectNoPageOverflow(page);
+
+  // Toolbar chips wrap in the panel body (#1710), so they stay inside the viewport.
+  const chip = page.getByRole('button', { name: 'Hide completed' });
+  await expect(chip).toBeVisible();
+  const box = await chip.boundingBox();
+  expect(box!.x + box!.width).toBeLessThanOrEqual(PHONE.width);
 });
