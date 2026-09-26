@@ -200,7 +200,7 @@ export function FittingHeader({
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xs border border-line bg-panel/85 px-3 py-2 backdrop-blur-sm">
         {identity}
         {context && <div className="flex flex-wrap items-center gap-3">{context}</div>}
-        <div className="flex flex-1 flex-wrap items-center justify-end gap-2">
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button>
