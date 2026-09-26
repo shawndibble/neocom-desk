@@ -132,4 +132,43 @@ test.describe('Fittings — Load (EFT paste) at 390px', () => {
     }));
     expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
   });
+
+  test('a long fit name gets its own line: two lines at most, Save and the menu beside the chips', async ({
+    page,
+  }) => {
+    await signInAndGoto(page, './fittings');
+    await answerAnyType(page);
+    await page.setViewportSize(PHONE);
+
+    const longName = 'Rifter - long PvE mission tackle fit name here for the header';
+    await page.getByRole('tab', { name: 'Import' }).click();
+    await page.getByLabel('Link or text').fill(`[Rifter, ${longName}]
+1MN Afterburner I`);
+    await page.getByRole('button', { name: 'Load', exact: true }).click();
+
+    const h1 = page.getByRole('heading', { level: 1 });
+    await expect(h1).toContainText('Rifter - long PvE');
+    const h1Box = (await h1.boundingBox())!;
+    // Wider than the ~65px it had beside Save, and no more than two 28px lines.
+    expect(h1Box.width).toBeGreaterThan(200);
+    expect(h1Box.height).toBeLessThanOrEqual(60);
+    const h1Size = await h1.evaluate((el) => el.scrollWidth <= el.clientWidth);
+    expect(h1Size).toBe(true);
+
+    for (const control of [
+      page.getByRole('button', { name: 'Fitting actions' }),
+      page.getByRole('button', { name: /^Save/ }).first(),
+    ]) {
+      const box = (await control.boundingBox())!;
+      expect(box.y).toBeGreaterThan(h1Box.y + 20);
+      expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width);
+      expect(box.height).toBeGreaterThanOrEqual(44);
+    }
+
+    const doc = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
+  });
 });
