@@ -64,6 +64,13 @@ describe('bpcRowsFromContractOffers', () => {
     expect(bpcRowsFromContractOffers([])).toEqual([]);
   });
 
+  it('carries requestedPlex through only when the offer has one', () => {
+    expect(bpcRowsFromContractOffers([copy])[0].requestedPlex).toBeUndefined();
+    expect(bpcRowsFromContractOffers([{ ...copy, requestedPlex: 1000 }])[0].requestedPlex).toBe(
+      1000
+    );
+  });
+
   describe('isMultiType (issue #1076)', () => {
     it('is false for a contract selling a single distinct type, however many lines/quantity it has', () => {
       // Two lines of the same typeId (different ME) is still one type.

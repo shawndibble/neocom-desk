@@ -958,6 +958,82 @@ describe('BpcSourcingPanel source multiselect', () => {
   });
 });
 
+describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
+  it('hides an auction row once the Auctions exclude chip is on', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, typeId: 638 }),
+        row({ contractId: 2, typeId: 870, isAuction: true }),
+      ])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+    expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+
+    await openFilters(user);
+    await user.click(screen.getByRole('button', { name: 'Auctions' }));
+
+    expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+    expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
+  });
+
+  it('hides a contract asking for PLEX once the PLEX exclude chip is on', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, typeId: 638 }),
+        row({ contractId: 2, typeId: 870, price: 0, requestedPlex: 1000 }),
+      ])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+    expect(within(table).getByText('Caracal Blueprint')).toBeInTheDocument();
+
+    await openFilters(user);
+    await user.click(screen.getByRole('button', { name: 'PLEX contracts' }));
+
+    expect(within(table).getByText('Rifter Blueprint')).toBeInTheDocument();
+    expect(within(table).queryByText('Caracal Blueprint')).not.toBeInTheDocument();
+  });
+
+  it('shows the requested PLEX quantity as the price, instead of the 0 ISK ask', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 1, typeId: 638, price: 0, requestedPlex: 1000 })])
+    );
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+    expect(within(table).getByText('1,000 PLEX')).toBeInTheDocument();
+  });
+
+  it('Reset filters clears both exclude chips', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([
+        row({ contractId: 1, typeId: 638, isAuction: true }),
+        row({ contractId: 2, typeId: 870, price: 0, requestedPlex: 1000 }),
+      ])
+    );
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+    await openFilters(user);
+    await user.click(screen.getByRole('button', { name: 'Auctions' }));
+    await user.click(screen.getByRole('button', { name: 'PLEX contracts' }));
+    await user.click(screen.getByRole('button', { name: 'Reset filters' }));
+
+    expect(screen.getByRole('button', { name: 'Auctions' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(screen.getByRole('button', { name: 'PLEX contracts' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+  });
+});
+
 describe('BpcSourcingPanel Location/Space', () => {
   it('shows an owned row resolved location in the Location column instead of "—"', async () => {
     loadCharacterBlueprints.mockResolvedValue(

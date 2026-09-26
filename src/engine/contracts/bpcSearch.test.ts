@@ -128,6 +128,24 @@ describe('filterBpcContracts', () => {
     });
     expect(filtered.map((r) => r.contractId)).toEqual([1]);
   });
+
+  it('drops an auction row when hideAuctions is set', () => {
+    const rows = [
+      row({ contractId: 1, isAuction: false }),
+      row({ contractId: 2, isAuction: true }),
+    ];
+    const filtered = filterBpcContracts(rows, { ...EMPTY_BPC_SEARCH_FILTER, hideAuctions: true });
+    expect(filtered.map((r) => r.contractId)).toEqual([1]);
+  });
+
+  it('drops a contract asking for PLEX when hidePlexRequests is set', () => {
+    const rows = [row({ contractId: 1 }), row({ contractId: 2, price: 0, requestedPlex: 1000 })];
+    const filtered = filterBpcContracts(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      hidePlexRequests: true,
+    });
+    expect(filtered.map((r) => r.contractId)).toEqual([1]);
+  });
 });
 
 function ownedInput(overrides: Partial<OwnedBlueprintInput> = {}): OwnedBlueprintInput {
@@ -423,6 +441,27 @@ describe('filterBpcSearchRows', () => {
       ownedBlueprintToSearchRow(ownedInput({ itemId: 1 })),
     ];
     expect(filterBpcSearchRows(rows, EMPTY_BPC_SEARCH_FILTER)).toEqual(rows);
+  });
+
+  it('drops an auction contract row when hideAuctions is set, never an owned row', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, isAuction: true })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, { ...EMPTY_BPC_SEARCH_FILTER, hideAuctions: true });
+    expect(filtered.map((r) => r.source)).toEqual(['owned']);
+  });
+
+  it('drops a contract row asking for PLEX when hidePlexRequests is set, never an owned row', () => {
+    const rows = [
+      contractRowToSearchRow(row({ contractId: 1, price: 0, requestedPlex: 1000 })),
+      ownedBlueprintToSearchRow(ownedInput({ itemId: 1 })),
+    ];
+    const filtered = filterBpcSearchRows(rows, {
+      ...EMPTY_BPC_SEARCH_FILTER,
+      hidePlexRequests: true,
+    });
+    expect(filtered.map((r) => r.source)).toEqual(['owned']);
   });
 });
 
