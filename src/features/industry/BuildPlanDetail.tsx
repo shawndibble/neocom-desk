@@ -18,6 +18,7 @@ import {
   SelectValue,
   TextInput,
   Checkbox,
+  Toast,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import {
@@ -90,7 +91,7 @@ import { BuildRecipeModal } from './BuildRecipeModal';
 import { BlueprintAcquisitionModal } from './BlueprintAcquisitionModal';
 import { buyPricedLine } from './materialRow';
 import { materialsCsvColumns } from './materialsCsv';
-import { hasShoppingList, shoppingListText } from './shoppingList';
+import { blueprintsLeftOutCount, hasShoppingList, shoppingListText } from './shoppingList';
 import {
   buildRecipe,
   hasSubBuilds,
@@ -328,6 +329,8 @@ export function BuildPlanDetail({
    * uses, in the one form a toolbar IconButton has: its own icon and label.
    */
   const [copyState, setCopyState] = useState<'copied' | 'failed' | null>(null);
+  /** Blueprint Acquisition rows (issue #838) `shoppingListText` just left out of a successful copy. */
+  const [blueprintsLeftOut, setBlueprintsLeftOut] = useState(0);
   // Verdict-first layout: the inputs fold behind a chip summary, the ledger
   // follows the viewport (open where there is room beside the materials,
   // folded on a phone until asked), and the one Calculation Breakdown is
@@ -864,7 +867,10 @@ export function BuildPlanDetail({
   // of setting state on a gone component.
   useEffect(() => {
     if (copyState === null) return;
-    const timer = setTimeout(() => setCopyState(null), 2000);
+    const timer = setTimeout(() => {
+      setCopyState(null);
+      setBlueprintsLeftOut(0);
+    }, 2000);
     return () => clearTimeout(timer);
   }, [copyState]);
 
@@ -1057,6 +1063,9 @@ export function BuildPlanDetail({
       // replaced it are — however many levels down they sit.
       await writeToClipboard(shoppingListText(shoppingMaterials, (id) => nameForType(catalog, id)));
       setCopyState('copied');
+      // Multibuy can't buy a blueprint (issue #1778) — shoppingListText already
+      // dropped it; name the count so the pilot knows to buy it by contract.
+      setBlueprintsLeftOut(blueprintsLeftOutCount(shoppingMaterials));
     } catch {
       setCopyState('failed');
     }
@@ -1875,6 +1884,11 @@ export function BuildPlanDetail({
         standing={standing}
         logRequest={logRequest}
       />
+      {copyState === 'copied' && blueprintsLeftOut > 0 && (
+        <Toast
+          message={t('industry.copyShoppingListBlueprintsLeftOut', { count: blueprintsLeftOut })}
+        />
+      )}
     </div>
   );
 }

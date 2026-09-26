@@ -26,16 +26,29 @@
  * a player who takes it buys that item's inputs from a build plan of its own.
  * Nothing is lost by including it either: `makeOrBuy` is one level deep, so
  * the sub-inputs that would replace the row do not exist on this plan.
+ *
+ * A synthetic Blueprint Acquisition row (issue #838) is excluded, though: it
+ * is bought by contract, not market order, and multibuy rejects it outright.
+ * Same `acquisitionTier` marker `sellableMaterials` (`ownedStockSale.ts`)
+ * already uses to pull this row out of a different list.
  */
 
 import type { MaterialCostLine } from '@/engine/industry/types';
 
+/** A material line, optionally carrying the Blueprint Acquisition marker. */
+type ShoppingMaterial = MaterialCostLine & { acquisitionTier?: unknown };
+
+/** A remainder multibuy can actually buy: real stock, not a Blueprint Acquisition row. */
+function isMultibuyable(material: ShoppingMaterial): boolean {
+  return material.remainingQuantity > 0 && material.acquisitionTier === undefined;
+}
+
 export function shoppingListText(
-  materials: readonly MaterialCostLine[],
+  materials: readonly ShoppingMaterial[],
   nameFor: (typeID: number) => string
 ): string {
   return materials
-    .filter((material) => material.remainingQuantity > 0)
+    .filter(isMultibuyable)
     .map((material) => `${nameFor(material.typeID)}\t${material.remainingQuantity}`)
     .join('\n');
 }
@@ -44,8 +57,17 @@ export function shoppingListText(
  * Whether there is anything to copy. The copy control gates on this rather than
  * on the materials list being non-empty: a plan whose every material is already
  * owned has rows to show but nothing to order, and a button that copies an
- * empty string is worse than one that is plainly unavailable.
+ * empty string is worse than one that is plainly unavailable. A remainder that
+ * is only a Blueprint Acquisition row doesn't count either — `shoppingListText`
+ * would drop it, leaving nothing to paste.
  */
-export function hasShoppingList(materials: readonly MaterialCostLine[]): boolean {
-  return materials.some((material) => material.remainingQuantity > 0);
+export function hasShoppingList(materials: readonly ShoppingMaterial[]): boolean {
+  return materials.some(isMultibuyable);
+}
+
+/** Count of Blueprint Acquisition rows `shoppingListText` left out — for the "left out" toast. */
+export function blueprintsLeftOutCount(materials: readonly ShoppingMaterial[]): number {
+  return materials.filter(
+    (material) => material.remainingQuantity > 0 && material.acquisitionTier !== undefined
+  ).length;
 }

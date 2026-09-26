@@ -42,11 +42,11 @@ export interface MaterialTableRow extends MaterialCostLine {
   subBuilds: readonly ResolvedSubBuild[];
   /**
    * Present only on a synthetic Blueprint Acquisition row (issue #838) — the
-   * ME/TE tier it resolved to, for the row's caption. Dropped on a merge
-   * (`mergeCostLines` returns a plain `MaterialCostLine`): the same
-   * blueprint acquired at two branches of one tree is rare enough that
-   * losing the caption on that specific collision is an acceptable gap,
-   * rather than widening `mergeCostLines`'s shared contract for it.
+   * ME/TE tier it resolved to, for the row's caption, and (issue #1778) what
+   * `shoppingListText` keys off to exclude the row from the multibuy text.
+   * `mergeInto` below carries it across a merge itself, since `mergeCostLines`
+   * returns a plain `MaterialCostLine` and dropping it there would silently
+   * let a merged Blueprint Acquisition row back into the shopping list.
    */
   acquisitionTier?: { me: number; te: number };
 }
@@ -78,6 +78,7 @@ function mergeInto(rows: Map<number, MaterialTableRow>, material: ResolvedMateri
   rows.set(material.typeID, {
     ...mergeCostLines(existing, line),
     subBuilds: subBuild ? [...existing.subBuilds, subBuild] : existing.subBuilds,
+    acquisitionTier: existing.acquisitionTier ?? line.acquisitionTier,
   });
 }
 
@@ -85,9 +86,13 @@ function mergeInto(rows: Map<number, MaterialTableRow>, material: ResolvedMateri
  * A merged row as a plain cost line, for a caller that has no use for the jobs
  * behind it. Written out field by field rather than spread-minus-`subBuilds`
  * so a new member of `MaterialCostLine` is a type error here rather than a
- * field that silently stops being carried.
+ * field that silently stops being carried. `acquisitionTier` rides along too,
+ * when present (issue #1778) — `shoppingListText` needs it to pull the
+ * Blueprint Acquisition row out of the multibuy text.
  */
-function costLine(row: MaterialTableRow): MaterialCostLine {
+function costLine(
+  row: MaterialTableRow
+): MaterialCostLine & { acquisitionTier?: MaterialTableRow['acquisitionTier'] } {
   return {
     typeID: row.typeID,
     baseQuantity: row.baseQuantity,
@@ -97,6 +102,7 @@ function costLine(row: MaterialTableRow): MaterialCostLine {
     unitPrice: row.unitPrice,
     lineCost: row.lineCost,
     unpriced: row.unpriced,
+    ...(row.acquisitionTier !== undefined ? { acquisitionTier: row.acquisitionTier } : {}),
   };
 }
 
