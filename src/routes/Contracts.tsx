@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import {
@@ -68,9 +68,12 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import { contractsCsvColumns } from '@/features/character/contractsCsv';
 import type { CharacterAffiliation, Contract } from '@/esi/endpoints';
 import { usePageTab } from '@/lib/usePageTab';
+import { useContractSearchMode } from '@/features/contractSearch/contractSearchModePref';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, optionalEnumParam, textParam } from '@/lib/urlState';
 import { CONTRACTS_TABS } from '@/app/pageTabs';
+import { tabPath } from '@/lib/pageTabs';
+import type { TabRouteDefaultState } from '@/app/TabRoute';
 
 interface Snapshot {
   contractsResult: CachedResult<Contract[]> | null;
@@ -316,7 +319,69 @@ export function Contracts() {
     (next: 'search' | 'history') => setTabId(next === 'history' ? 'history' : `search/${mode}`),
     [setTabId, mode]
   );
-  const setMode = useCallback((next: ContractMode) => setTabId(`search/${next}`), [setTabId]);
+  const rememberedMode = useContractSearchMode((state) => state.value);
+  const rememberedModeHydrated = useContractSearchMode((state) => state.hydrated);
+  const hydrateRememberedMode = useContractSearchMode((state) => state.hydrate);
+  const setRememberedMode = useContractSearchMode((state) => state.setValue);
+  useEffect(() => {
+    void hydrateRememberedMode();
+  }, [hydrateRememberedMode]);
+  const setMode = useCallback(
+    (next: ContractMode) => {
+      setTabId(`search/${next}`);
+      void setRememberedMode(next);
+    },
+    [setTabId, setRememberedMode]
+  );
+  /**
+   * A bare `/contracts` visit always redirects to `CONTRACTS_TABS`' hardcoded
+   * `search/items` (issue #1719) — the route/tab itself stays unpersisted
+   * (decision `20260912-141100`), so this only steps in once, right after
+   * that redirect, to swap for the last-used mode.
+   *
+   * `tabId` alone can't tell that redirect apart from an explicit, bookmarked
+   * or shared deep link to the literal `/contracts/search/items` path — both
+   * resolve to the exact same `tabId`. `TabRoute`'s own `state` marker
+   * (`tabRouteDefaulted`) is the one signal that distinguishes them, since
+   * only `TabRoute` knows which case produced this landing; a deep link never
+   * carries it, so `landedOnDefault` is false and this never touches it.
+   *
+   * `navigate` directly, not `setTabId`/`setMode`: those always push a new
+   * history entry (`usePageTab`'s own contract, so an explicit tab switch is
+   * a place Back returns to) — a *silent* restore on first paint is not such
+   * a place, and pushing one here would leave a phantom Items entry behind
+   * Courier for Back to bounce off of. Skipped entirely when the remembered
+   * mode already matches (`rememberedMode` is `'items'`, the hardcoded
+   * default) — nothing to change, and the only cost of leaving the marker in
+   * place is that it can ride along on a later URL-param write within this
+   * mount, which nothing here or elsewhere ever reads again.
+   */
+  const location = useLocation();
+  const navigate = useNavigate();
+  const landedOnDefault = Boolean(
+    (location.state as TabRouteDefaultState | null)?.tabRouteDefaulted
+  );
+  const appliedRememberedMode = useRef(false);
+  useEffect(() => {
+    if (appliedRememberedMode.current || !rememberedModeHydrated) return;
+    appliedRememberedMode.current = true;
+    if (!landedOnDefault || rememberedMode !== 'courier') return;
+    navigate(
+      {
+        pathname: tabPath(CONTRACTS_TABS, 'search/courier'),
+        search: location.search,
+        hash: location.hash,
+      },
+      { replace: true, state: null }
+    );
+  }, [
+    rememberedModeHydrated,
+    landedOnDefault,
+    rememberedMode,
+    location.search,
+    location.hash,
+    navigate,
+  ]);
   const pageTabs = useMemo(
     () => [
       { id: 'search' as const, label: t('contracts.searchTab') },

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifySpace, isWormholeSystemName, SPACE_KINDS } from './space';
+import { classifySpace, isSpaceKind, isWormholeSystemName, SPACE_KINDS } from './space';
 
 describe('isWormholeSystemName', () => {
   it('matches the J###### wormhole naming pattern', () => {
@@ -37,5 +37,17 @@ describe('classifySpace', () => {
 describe('SPACE_KINDS', () => {
   it('lists all four kinds, highsec to wormhole', () => {
     expect(SPACE_KINDS).toEqual(['highsec', 'lowsec', 'nullsec', 'wormhole']);
+  });
+});
+
+describe('isSpaceKind', () => {
+  it('accepts every declared kind', () => {
+    for (const kind of SPACE_KINDS) expect(isSpaceKind(kind)).toBe(true);
+  });
+
+  it('rejects a string that names no kind, and any non-string', () => {
+    expect(isSpaceKind('deep-space')).toBe(false);
+    expect(isSpaceKind(null)).toBe(false);
+    expect(isSpaceKind(42)).toBe(false);
   });
 });
