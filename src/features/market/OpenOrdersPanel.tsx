@@ -23,6 +23,7 @@ import {
   SelectValue,
   Spinner,
   Tooltip,
+  textActionClassName,
   type DataTableColumn,
 } from '@/components/ui';
 import { useColumnVisibility } from '@/lib/columnVisibility';
@@ -1104,7 +1105,7 @@ export function OpenOrdersPanel({
               ))}
               <button
                 type="button"
-                className="flex min-h-11 items-center rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
+                className={textActionClassName()}
                 onClick={() => setFilter(DEFAULT_FILTER)}
               >
                 {t('market.orders.filter.clearAll')}
@@ -1184,11 +1185,7 @@ export function OpenOrdersPanel({
                       </button>
                       <span className="flex items-center gap-3">
                         {group.problem === 'healthy' && (
-                          <button
-                            type="button"
-                            className="flex min-h-11 items-center rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
-                            onClick={toggle}
-                          >
+                          <button type="button" className={textActionClassName()} onClick={toggle}>
                             {t(
                               filter.hideHealthy
                                 ? 'market.orders.showHealthy'
@@ -1256,7 +1253,7 @@ export function OpenOrdersPanel({
           <div className="flex flex-wrap items-center gap-3 px-3 py-2">
             <button
               type="button"
-              className="flex min-h-11 items-center rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
+              className={textActionClassName()}
               onClick={() => setLegendOpen(true)}
             >
               {t('market.orders.legendOpen')}

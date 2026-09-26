@@ -8,7 +8,13 @@
  */
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { IskAmount, Panel, SEVERITY_LABEL, SeverityIcon } from '@/components/ui';
+import {
+  IskAmount,
+  Panel,
+  SEVERITY_LABEL,
+  SeverityIcon,
+  textActionClassName,
+} from '@/components/ui';
 import type { DeadlineSeverity } from '@/engine/severity';
 import { formatDuration } from '@/lib/duration';
 import { formatAge } from '@/lib/age';
@@ -460,11 +466,7 @@ export function AlertsColumn({
       }
       actions={
         unread > 0 ? (
-          <button
-            type="button"
-            onClick={onDismissAll}
-            className="flex min-h-11 items-center rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
-          >
+          <button type="button" onClick={onDismissAll} className={textActionClassName()}>
             {t('overview.board.dismissAll')}
           </button>
         ) : undefined

@@ -12,7 +12,7 @@
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EmptyState, Panel } from '@/components/ui';
+import { EmptyState, Panel, textActionClassName } from '@/components/ui';
 import type { CharacterBoardItem } from '@/engine/character/board';
 import { groupByDay, relativeDayFor } from '@/engine/character/deadlines';
 import { CharacterBoardRow } from './CharacterBoardRow';
@@ -98,11 +98,7 @@ export function ComingUpRail({
       }
       actions={
         selectedDayMs !== null && (
-          <button
-            type="button"
-            onClick={onClearDay}
-            className="flex min-h-11 items-center rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
-          >
+          <button type="button" onClick={onClearDay} className={textActionClassName()}>
             {t('calendar.map.clearDay')}
           </button>
         )

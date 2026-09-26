@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Tooltip } from '@/components/ui';
+import { Tooltip, textActionClassName } from '@/components/ui';
 import type { OwnedStockDetection } from './ownedStockDetection';
 
 interface OwnedStockHintProps {
@@ -78,7 +78,7 @@ export function OwnedStockHint({
           material: materialName,
           detected,
         })}
-        className="flex min-h-11 items-center justify-end rounded-xs text-[0.6875rem] font-semibold tracking-widest text-accent uppercase hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:min-h-0"
+        className={textActionClassName('justify-end')}
       >
         {t('industry.useDetected', { quantity: suggestion.toLocaleString() })}
       </button>
