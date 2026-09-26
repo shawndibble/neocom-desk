@@ -335,16 +335,15 @@ export const marketOrderCopy: DomainCopy<MarketOrderNotificationFire, ItemNames>
   poll: (fire, character, names) => {
     const item = names.item ?? `#${fire.typeId}`;
     return {
-      title: fired('marketOrderFilled', 'title'),
+      title: fired('marketOrderFilled', 'title', { character }),
       // "1 x Tritanium" is noise; a bare item name is not.
       body:
         fire.quantity > 1
           ? fired('marketOrderFilled', 'bodyWithQuantity', {
-              character,
               item,
               quantity: fire.quantity.toLocaleString(),
             })
-          : fired('marketOrderFilled', 'body', { character, item }),
+          : fired('marketOrderFilled', 'body', { item }),
     };
   },
   // The fill itself — what sold, how many, to whom. ESI's transactions carry

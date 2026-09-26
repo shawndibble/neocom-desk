@@ -293,7 +293,7 @@ describe('poll copy', () => {
           PILOT,
           { item: 'Tritanium' }
         ),
-      expected: { title: 'Sell order filled', body: 'Someone bought Tritanium from Kestrel.' },
+      expected: { title: 'Kestrel — Sell order filled', body: 'Someone bought Tritanium.' },
     },
     {
       name: 'marketOrderFilled, quantity',
@@ -304,8 +304,8 @@ describe('poll copy', () => {
           { item: 'Tritanium' }
         ),
       expected: {
-        title: 'Sell order filled',
-        body: 'Someone bought 25,000 x Tritanium from Kestrel.',
+        title: 'Kestrel — Sell order filled',
+        body: 'Someone bought 25,000 x Tritanium.',
       },
     },
     {
@@ -316,7 +316,7 @@ describe('poll copy', () => {
           PILOT,
           {}
         ),
-      expected: { title: 'Sell order filled', body: 'Someone bought 2 x #35 from Kestrel.' },
+      expected: { title: 'Kestrel — Sell order filled', body: 'Someone bought 2 x #35.' },
     },
     {
       name: 'marketOrderUndercut, sell order',
