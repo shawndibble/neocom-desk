@@ -222,6 +222,8 @@ interface UiFilter {
   minTe: string;
   minRuns: string;
   maxPrice: string;
+  hideAuctions: boolean;
+  hidePlex: boolean;
 }
 
 const TYPE_SEARCH_LIMIT = 50;
@@ -344,6 +346,8 @@ function BpcFilterBar({
     filter.minTe,
     filter.minRuns,
     filter.maxPrice,
+    filter.hideAuctions,
+    filter.hidePlex,
     !isDefaultSources(sources),
     spaceKinds.length !== SPACE_KINDS.length,
     jumps !== DEFAULT_JUMP_RANGE,
@@ -457,6 +461,24 @@ function BpcFilterBar({
           </FilterField>
           <div
             role="group"
+            aria-label={t('bpcContracts.excludeLabel')}
+            className="flex flex-wrap items-center gap-2"
+          >
+            <span className="text-text-dim">{t('bpcContracts.excludeLabel')}</span>
+            <FilterChip
+              label={t('bpcContracts.hideAuctions')}
+              selected={draft.hideAuctions}
+              onToggle={() => setDraft({ ...draft, hideAuctions: !draft.hideAuctions })}
+            />
+            <FilterChip
+              label={t('bpcContracts.hidePlex')}
+              tooltip={t('bpcContracts.hidePlexTooltip')}
+              selected={draft.hidePlex}
+              onToggle={() => setDraft({ ...draft, hidePlex: !draft.hidePlex })}
+            />
+          </div>
+          <div
+            role="group"
             aria-label={t('bpcContracts.sourceLabel')}
             className="flex flex-wrap items-center gap-2"
           >
@@ -564,6 +586,8 @@ export function BpcSourcingPanel() {
       minTe: params['sourcing.minTe'],
       minRuns: params['sourcing.minRuns'],
       maxPrice: params['sourcing.maxPrice'],
+      hideAuctions: params['sourcing.hideAuctions'],
+      hidePlex: params['sourcing.hidePlex'],
     }),
     [params]
   );
@@ -680,6 +704,8 @@ export function BpcSourcingPanel() {
       maxPrice: parsePositiveNumber(uiFilter.maxPrice),
       spaceKinds: activeSpaceKinds,
       allowedSystems: jumpFilter.allowed,
+      hideAuctions: uiFilter.hideAuctions,
+      hidePlexRequests: uiFilter.hidePlex,
     }),
     [
       uiFilter.regionId,
@@ -687,6 +713,8 @@ export function BpcSourcingPanel() {
       uiFilter.minTe,
       uiFilter.minRuns,
       uiFilter.maxPrice,
+      uiFilter.hideAuctions,
+      uiFilter.hidePlex,
       activeSpaceKinds,
       jumpFilter.allowed,
     ]
@@ -800,6 +828,8 @@ export function BpcSourcingPanel() {
       minTe: '',
       minRuns: '',
       maxPrice: '',
+      hideAuctions: false,
+      hidePlex: false,
     });
     setParams({
       'sourcing.src': new Set(DEFAULT_SOURCE_TOGGLES),
@@ -822,6 +852,8 @@ export function BpcSourcingPanel() {
       'sourcing.minTe': next.minTe,
       'sourcing.minRuns': next.minRuns,
       'sourcing.maxPrice': next.maxPrice,
+      'sourcing.hideAuctions': next.hideAuctions,
+      'sourcing.hidePlex': next.hidePlex,
     });
   }
   const regionOptions = useMemo(
@@ -1163,7 +1195,13 @@ export function BpcSourcingPanel() {
         sortValue: (row) => {
           if (row.source === 'market') return row.price;
           const contract = asContract(row);
-          return contract ? effectivePrice(contract) : Infinity;
+          if (!contract) return Infinity;
+          // A PLEX-for-item barter's real ask isn't ISK at all (issue #1105)
+          // — sorting it at its `0` ISK price would put it above every real
+          // priced offer as "cheapest", which it isn't. Sorts last, the same
+          // stance an owned row (no price to judge) already takes.
+          if (contract.requestedPlex) return Infinity;
+          return effectivePrice(contract);
         },
         render: (row) => {
           if (row.source === 'market') return <IskAmount value={row.price} revealOn="longPress" />;
@@ -1179,7 +1217,14 @@ export function BpcSourcingPanel() {
           // `bpcContracts` does not). Sorting is unaffected: `sortValue`
           // reads `effectivePrice`. Long press, not tap: a row tap opens the
           // contract.
-          const amount = contract.isAuction ? (
+          //
+          // A contract asking for PLEX (issue #1105) has an ISK `price` of
+          // `0` — the ask is the PLEX, not a real zero — so its requested
+          // quantity is shown here instead of the ISK figure `sortValue`
+          // would otherwise reflect as "free".
+          const amount = contract.requestedPlex ? (
+            t('bpcContracts.plexPrice', { plex: contract.requestedPlex.toLocaleString() })
+          ) : contract.isAuction ? (
             contract.buyout !== undefined ? (
               t('bpcContracts.buyout', {
                 price: formatIskAuto(contract.buyout, CONTRACT_ISK_CENTS_BELOW),
