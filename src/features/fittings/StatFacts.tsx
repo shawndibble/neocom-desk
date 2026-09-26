@@ -40,9 +40,11 @@ export function HeatFigure<S extends { unheated: S | null }>({
   const { t } = useTranslation();
   const unheated = unheatedIfChanged(stats, format);
   if (unheated === null) return <>{format(stats)}</>;
+  const was = t('fittings.stats.unheated', { value: unheated });
   return (
-    <span className="text-warning" title={t('fittings.stats.unheated', { value: unheated })}>
+    <span className="text-warning" title={was}>
       {format(stats)}
+      <span className="sr-only"> ({was})</span>
     </span>
   );
 }

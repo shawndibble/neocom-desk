@@ -119,15 +119,22 @@ export function AppliedDpsPanel({
     unheated: unheatedApplied ? { applied: unheatedApplied, unheated: null } : null,
   };
   const maxRange = graphMaxRange(overlayResult ? [applied, overlayResult.applied] : [applied]);
-  // Each side at its own best range, as the summary would read it.
-  const summary = ({ applied: inputs }: AppliedFigures) => {
-    const atRange = bestRange(appliedDpsVsRange(inputs, target, maxRange));
-    return t('fittings.appliedDps.summary', {
-      raw: rawDps(inputs).toFixed(1),
-      applied: appliedDps(inputs, target, atRange).toFixed(1),
-      km: (atRange / 1000).toFixed(1),
-    });
-  };
+  // Each side at its own best range, as the summary would read it; worked out
+  // once per input set rather than on every render (and every HeatFigure pass).
+  const summaries = useMemo(() => {
+    const read = (inputs: AppliedDpsInputs) => {
+      const atRange = bestRange(appliedDpsVsRange(inputs, target, maxRange));
+      return t('fittings.appliedDps.summary', {
+        raw: rawDps(inputs).toFixed(1),
+        applied: appliedDps(inputs, target, atRange).toFixed(1),
+        km: (atRange / 1000).toFixed(1),
+      });
+    };
+    const byInputs = new Map<AppliedDpsInputs, string>([[applied, read(applied)]]);
+    if (unheatedApplied) byInputs.set(unheatedApplied, read(unheatedApplied));
+    return byInputs;
+  }, [applied, unheatedApplied, target, maxRange, t]);
+  const summary = ({ applied: inputs }: AppliedFigures) => summaries.get(inputs) ?? '';
 
   return (
     <div className="space-y-2">

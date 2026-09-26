@@ -726,6 +726,8 @@ describe('FittingStatsSections — Overheat all and Copy stats', () => {
     const ehp = screen.getByText('17400 EHP');
     expect(inWarningTone(ehp)).toBe(true);
     expect(ehp).toHaveAttribute('title', 'Unheated: 4619 EHP');
+    // Colour and hover alone reach neither touch nor screen readers: the value is also in the text.
+    expect(ehp).toHaveTextContent('(Unheated: 4619 EHP)');
     expect(inWarningTone(screen.getByText('Armor repair: 81.8 HP/s'))).toBe(true);
 
     // Offense: the blasters' DPS moved, their volley and the drones didn't.

@@ -97,6 +97,9 @@ function ResistCell({
           }
         >
           {pct.toFixed(0)}%
+          {unheated !== undefined && (
+            <span className="sr-only"> ({t('fittings.stats.unheated', { value: unheated })})</span>
+          )}
         </span>
       </div>
     </td>
@@ -170,6 +173,12 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
               }
             >
               {row.ehp === undefined ? '' : row.ehp.toFixed(0)}
+              {row.unheated?.ehp !== undefined && (
+                <span className="sr-only">
+                  {' '}
+                  ({t('fittings.stats.unheated', { value: row.unheated.ehp })})
+                </span>
+              )}
             </td>
           </tr>
         ))}
