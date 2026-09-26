@@ -55,15 +55,12 @@ export function MissingSkillsChip({ entries, characterId, fittingName }: Missing
     // one-row header, which an inline list would push apart.
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          className="min-h-11 rounded-xs border border-line bg-panel-2 px-3 text-xs font-semibold text-warning md:min-h-9"
-        >
+        <Button variant="warning">
           {t('fittings.missingSkills.chip', {
             count: rows.length,
             time: formatDuration(totalSeconds),
           })}
-        </button>
+        </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-3">
         <div className="space-y-2">

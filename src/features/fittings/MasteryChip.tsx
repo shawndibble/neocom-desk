@@ -113,12 +113,7 @@ export function MasteryChip({ hullTypeId, hullName, characterId }: MasteryChipPr
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button
-            type="button"
-            className="min-h-11 rounded-xs border border-line bg-panel-2 px-3 text-xs font-semibold text-text md:min-h-9"
-          >
-            {t('fittings.mastery.chip')}
-          </button>
+          <Button>{t('fittings.mastery.chip')}</Button>
         </PopoverTrigger>
         <PopoverContent align="start" className="w-96 max-w-[calc(100vw-2rem)] p-3">
           <div className="space-y-2">

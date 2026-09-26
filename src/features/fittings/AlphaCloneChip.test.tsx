@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
+import { buttonClassName } from '@/components/ui/buttonClassName';
 import { AlphaCloneChip } from './AlphaCloneChip';
 
 const skillName = (typeId: number) =>
@@ -31,6 +32,22 @@ describe('AlphaCloneChip', () => {
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Heavy Assault Cruisers I (Alphas can’t train it)');
     expect(tooltip).toHaveTextContent('Gallente Cruiser V (Alpha max IV)');
+  });
+
+  it('renders through Button, success when Alpha can fly it and ghost otherwise', () => {
+    const { rerender } = render(<AlphaCloneChip blockers={[]} skillName={skillName} />);
+    expect(screen.getByRole('button', { name: 'Alpha OK' })).toHaveClass(
+      ...buttonClassName({ variant: 'success', size: 'md' }).split(' ')
+    );
+    rerender(
+      <AlphaCloneChip
+        blockers={[{ skillTypeID: 3332, level: 5, alphaMaxLevel: 4 }]}
+        skillName={skillName}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Omega only' })).toHaveClass(
+      ...buttonClassName({ variant: 'ghost', size: 'md' }).split(' ')
+    );
   });
 
   it('shows nothing while the requirements load', () => {
