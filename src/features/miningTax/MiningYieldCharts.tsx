@@ -68,21 +68,13 @@ function formatDateTick(date: string): string {
   });
 }
 
-function tooltipContentStyle(): React.CSSProperties {
-  return {
-    background: 'var(--color-panel-2)',
-    border: '1px solid var(--color-line)',
-    fontSize: '0.75rem',
-  };
-}
-
 function RateTooltip({ active, payload, label }: TooltipContentProps): React.ReactElement | null {
   const { t } = useTranslation();
   if (!active || !payload || payload.length === 0) return null;
   const point = payload[0]?.payload as DailyRatePoint | undefined;
   if (!point) return null;
   return (
-    <div style={tooltipContentStyle()} className="rounded-xs px-2 py-1.5">
+    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs tabular-nums text-text shadow-lg shadow-black/50">
       <p className="font-semibold">{typeof label === 'string' ? formatDateTick(label) : ''}</p>
       <p>
         {t('miningTax.overview.iskPerHour')}: {formatIsk(point.iskPerHour, 0)} ISK
@@ -102,7 +94,7 @@ function CompareTooltip({
   const point = payload[0]?.payload as ComparisonBar | undefined;
   if (!point) return null;
   return (
-    <div style={tooltipContentStyle()} className="rounded-xs px-2 py-1.5">
+    <div className="rounded-xs border border-line bg-panel-2 px-2 py-1.5 text-xs tabular-nums text-text shadow-lg shadow-black/50">
       <p className="font-semibold">{point.typeName}</p>
       <p>
         {t('miningTax.overview.rawSellValue')}: {formatIsk(point.rawValue, 0)} ISK
