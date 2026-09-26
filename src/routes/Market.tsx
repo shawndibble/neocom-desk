@@ -1080,7 +1080,7 @@ export function Market() {
             meta={
               selectedItem &&
               selectedTypeId !== null && (
-                <span className="flex flex-wrap items-center gap-1">
+                <span className="flex flex-wrap items-center gap-1 max-md:shrink-0 max-md:flex-nowrap">
                   <ItemPriceAlertBell
                     typeId={selectedTypeId}
                     name={selectedItem.name}
