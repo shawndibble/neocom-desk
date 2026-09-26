@@ -21,3 +21,8 @@ _Recorded 2026-09-26._
   re-price per member. Rows already `needs-review` before this change stay so
   until the pilot resolves them. Supersedes the "flips to needs-review" rule
   in `20260905-170644-moon-mining-tax-ledger.md` for the Outstanding case only.
+- **Known trade-off: absorbing re-prices the whole Assignment, so a hand-edited
+  estimated value or tax owed on an Outstanding row is replaced by the computed
+  one when its ore grows.** This is exactly what pressing Accept New Total did
+  before; the only change is that it now happens on refresh. Pilots who hand-edit
+  a figure should expect it to reset when more ore arrives.

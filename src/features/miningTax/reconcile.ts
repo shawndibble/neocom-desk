@@ -79,7 +79,7 @@ export async function reconcileAssignments(
     if (diffs.length === 0) continue;
     if (assignment.status === 'needs-review' && sameDiffs(assignment.reviewDiff, diffs)) continue;
     // Unpaid, ungrouped growth has no settled history to protect, so it folds
-    // straight in — the pilot then splits it from the ordinary row if the
+    // straight in â€” the pilot then splits it from the ordinary row if the
     // new ore belongs to another Payee.
     if (assignment.status === 'outstanding' && !assignment.groupId) {
       absorbs.push({ assignment, key });

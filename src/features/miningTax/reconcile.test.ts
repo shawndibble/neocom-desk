@@ -99,7 +99,7 @@ describe('reconcileAssignments', () => {
     expect(assignmentsMock.resolveNeedsReview).toHaveBeenCalledWith(outstanding, entry, [
       outstanding,
     ]);
-    // Absorbing is resolveNeedsReview's job — reconcile itself never flags it.
+    // Absorbing is resolveNeedsReview's job â€” reconcile itself never flags it.
     expect((await db.miningTaxAssignments.get('a1'))?.status).toBe('outstanding');
   });
 
