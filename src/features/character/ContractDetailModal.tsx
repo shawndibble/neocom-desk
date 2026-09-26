@@ -41,6 +41,7 @@ import { StandingTag } from './StandingTag';
 import type { EffectiveStanding } from './contactStandings';
 import { CONTRACT_ISK_CENTS_BELOW, formatIskAuto } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
+import { courierDeliveryDeadlineMs } from '@/engine/courierDeadline';
 import { useTimeZone } from '@/lib/timeFormat';
 import type { Contract, ContractItem } from '@/esi/endpoints';
 
@@ -79,6 +80,7 @@ export function ContractDetailModal({
 }: ContractDetailModalProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
+  const deliverByMs = courierDeliveryDeadlineMs(contract);
   const hubId = useMarketHub((s) => s.value);
   const hub = getTradeHub(hubId) ?? DEFAULT_TRADE_HUB;
   const [location, setLocation] = useState<LocationState | undefined>(undefined);
@@ -237,6 +239,13 @@ export function ContractDetailModal({
 
             <dt className="text-text-dim uppercase">{t('contracts.detailDateExpired')}</dt>
             <dd>{formatTimestamp(new Date(contract.date_expired), timeZone)}</dd>
+
+            {deliverByMs !== null && (
+              <>
+                <dt className="text-text-dim uppercase">{t('contracts.detailDeliverBy')}</dt>
+                <dd>{formatTimestamp(new Date(deliverByMs), timeZone)}</dd>
+              </>
+            )}
 
             {contract.date_accepted && (
               <>
