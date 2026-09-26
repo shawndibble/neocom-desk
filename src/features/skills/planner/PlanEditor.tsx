@@ -652,18 +652,6 @@ export function PlanEditor({
     () => planProgress(plan.entries, catalog.engineSkills, trainedSkills),
     [plan.entries, catalog.engineSkills, trainedSkills]
   );
-  const headerNextStep = useMemo(() => {
-    const first = schedule.scheduled[0];
-    const name = first && catalog.engineSkills.get(first.skillTypeID)?.name;
-    return first && name
-      ? {
-          name,
-          level: first.level,
-          cumulativeSeconds: first.cumulativeSeconds,
-          startDate: schedule.startDate,
-        }
-      : null;
-  }, [schedule, catalog.engineSkills]);
   const headerNextMilestone = useMemo(() => {
     const next = nextMilestone(milestoneStatuses);
     return next && next.finish ? { name: next.milestone.name, finish: next.finish } : null;
@@ -1940,7 +1928,19 @@ export function PlanEditor({
           badge={headerBadge}
           nextMilestone={headerNextMilestone}
           progress={headerProgress}
-          nextStep={headerNextStep}
+          whatIf={
+            currentLensTotalSeconds !== null && !error
+              ? {
+                  lens:
+                    whatIf.kind === 'custom'
+                      ? t('plans.whatIfCustom')
+                      : whatIf.preset === 'none'
+                        ? t('plans.whatIfNone')
+                        : whatIf.preset,
+                  verdict: whatIfVerdict(currentLensTotalSeconds, totalSeconds),
+                }
+              : null
+          }
           trainedKnown={trainedSkillsKnown}
           name={plan.name}
           onRename={isDesktop ? undefined : (name) => onUpdate({ name })}
@@ -1948,26 +1948,6 @@ export function PlanEditor({
         />
 
         {implantsAssumed && <ImplantsAssumedNote hint={t('plans.assumesNoImplantsHint')} />}
-
-        {currentLensTotalSeconds !== null && !error && (
-          <p
-            data-testid="what-if-chip"
-            className="inline-flex w-fit items-center rounded-xs border border-accent/60 px-1.5 py-0.5 text-xs text-accent"
-          >
-            {(() => {
-              const verdict = whatIfVerdict(currentLensTotalSeconds, totalSeconds);
-              return t(`plans.whatIfChip.${verdict.kind}`, {
-                lens:
-                  whatIf.kind === 'custom'
-                    ? t('plans.whatIfCustom')
-                    : whatIf.preset === 'none'
-                      ? t('plans.whatIfNone')
-                      : whatIf.preset,
-                duration: formatDuration(verdict.seconds),
-              });
-            })()}
-          </p>
-        )}
 
         {/* Plan Milestones (CONTEXT.md) whose entry was removed from the plan
             entirely — no row exists to flag any more, so they surface here

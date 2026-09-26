@@ -4,9 +4,7 @@ import { Panel, StatChip, TextInput } from '@/components/ui';
 import { formatDuration } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
 import { formatCompactNumber } from '@/lib/compactNumber';
-import { romanLevel } from '@/engine/projection';
 import type { PlanProgress } from '@/engine/planProgress';
-import { doneByText } from './doneBy';
 import { MIN_MEANINGFUL_SAVINGS_SECONDS, type OptimizationBadge } from './planHeaderStats';
 
 interface PlanHeaderProps {
@@ -23,8 +21,11 @@ interface PlanHeaderProps {
   nextMilestone: { name: string; finish: Date } | null;
   /** Share of the plan already trained; omitted by callers with no plan basis. */
   progress?: PlanProgress;
-  /** The first step of the Skill Plan schedule, with what its "Done by" date needs. */
-  nextStep?: { name: string; level: number; cumulativeSeconds: number; startDate: Date } | null;
+  /**
+   * The What-If Implants lens against the clone's real implants; omitted or
+   * null while the plan is costed on the real implants.
+   */
+  whatIf?: { lens: string; verdict: { kind: 'saves' | 'costs' | 'same'; seconds: number } } | null;
   /** False until the character's trained skills have loaded: progress reads `—`, not 0%. */
   trainedKnown?: boolean;
   /**
@@ -40,7 +41,8 @@ interface PlanHeaderProps {
 
 /**
  * Plan-at-a-glance header: total time, skill count, projected finish, a live
- * remap-savings badge, and the next Plan Milestone still ahead.
+ * remap-savings badge, the next Plan Milestone still ahead, and the what-if
+ * lens's gain or loss.
  */
 export function PlanHeader({
   totalSeconds,
@@ -49,7 +51,7 @@ export function PlanHeader({
   badge,
   nextMilestone,
   progress,
-  nextStep = null,
+  whatIf = null,
   trainedKnown = true,
   name,
   onRename,
@@ -136,28 +138,6 @@ export function PlanHeader({
             }
           />
         )}
-        {progressFraction !== null && (
-          <StatChip
-            label={t('plans.headerNextStep')}
-            value={
-              !trainedKnown ? (
-                '—'
-              ) : nextStep ? (
-                <>
-                  {t('plans.headerNextStepValue', {
-                    name: nextStep.name,
-                    level: romanLevel(nextStep.level),
-                  })}{' '}
-                  <span className="text-text-dim">
-                    {doneByText(nextStep.cumulativeSeconds, nextStep.startDate)}
-                  </span>
-                </>
-              ) : (
-                t('plans.headerNothingLeft')
-              )
-            }
-          />
-        )}
         {nextMilestone && (
           <StatChip
             label={t('plans.milestone.next')}
@@ -184,6 +164,25 @@ export function PlanHeader({
               </>
             }
           />
+        )}
+        {whatIf && (
+          // The wrapper only carries the test id; `contents` keeps the chip a
+          // direct flex item of the strip.
+          <span data-testid="what-if-chip" className="contents">
+            <StatChip
+              label={t('plans.whatIfChip.label', { lens: whatIf.lens })}
+              tone={
+                whatIf.verdict.kind === 'saves'
+                  ? 'success'
+                  : whatIf.verdict.kind === 'costs'
+                    ? 'warning'
+                    : 'default'
+              }
+              value={t(`plans.whatIfChip.${whatIf.verdict.kind}`, {
+                duration: formatDuration(whatIf.verdict.seconds),
+              })}
+            />
+          </span>
         )}
       </div>
     </Panel>

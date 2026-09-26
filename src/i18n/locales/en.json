@@ -1416,9 +1416,10 @@
     "optimizeForMeTotal": "Total {{before}} → {{after}}",
     "remapSaves": "Remapping saves {{duration}}",
     "whatIfChip": {
-      "saves": "What-if {{lens}} · saves {{duration}} vs current",
-      "costs": "What-if {{lens}} · costs {{duration}} vs current",
-      "same": "What-if {{lens}} · same as current"
+      "label": "What-if {{lens}}",
+      "saves": "Saves {{duration}} vs current",
+      "costs": "Costs {{duration}} vs current",
+      "same": "Same as current"
     },
     "remapNoGain": "No remap improves this plan in its current order — keeping current attributes. Try \"Reorder only\" to group similar skills first, then optimize again.",
     "remapNoneAvailable": "This plan has 0 remaps to spend, so nothing was placed.",
@@ -1454,7 +1455,7 @@
     "booster": "Booster",
     "boosterAdd": "Add accelerator",
     "boosterRemove": "Remove accelerator",
-    "boosterMarketLink": "View boosters in Market",
+    "boosterMarketLink": "View cerebral accelerators in Market",
     "boosterBonus": "Bonus",
     "boosterStartsAt": "Starts",
     "boosterStartsNow": "Already running",
@@ -1576,9 +1577,6 @@
     "headerSavingsNone": "None",
     "headerTrained": "Trained",
     "headerTrainedSp": "{{trained}} / {{total}} SP",
-    "headerNextStep": "Next step",
-    "headerNextStepValue": "{{name}} {{level}}",
-    "headerNothingLeft": "Nothing left to train",
     "injectors": {
       "title": "Skill injectors",
       "ifInjectedNow": "If injected now:",

@@ -368,8 +368,7 @@ describe('PlanEditor tools pane', () => {
       'false'
     );
     expect(screen.getByRole('heading', { name: 'Your entries' })).toBeInTheDocument();
-    // The header's Next step chip repeats the first row's name, so match at least one.
-    expect(screen.getAllByText('Skill A I').length).toBeGreaterThan(0);
+    expect(screen.getByText('Skill A')).toBeInTheDocument();
   });
 
   it('collapses Export into one control that reveals "to clipboard" / "to CSV" only after being opened', async () => {
@@ -1307,14 +1306,14 @@ describe('PlanEditor Character details assumption note (issue #1526)', () => {
 });
 
 describe('PlanEditor booster market link (issue #407)', () => {
-  it('links to Market, scoped to the booster category', async () => {
+  it('links to Market, scoped to the cerebral accelerators group', async () => {
     const user = userEvent.setup();
     renderEditor();
     await openTools(user);
 
-    await user.click(screen.getByRole('button', { name: 'View boosters in Market' }));
+    await user.click(screen.getByRole('button', { name: 'View cerebral accelerators in Market' }));
 
-    expect(screen.getByTestId('location-probe')).toHaveTextContent('/market/browser?group=977');
+    expect(screen.getByTestId('location-probe')).toHaveTextContent('/market/browser?group=2487');
   });
 });
 

@@ -196,6 +196,37 @@ describe('PlanHeader', () => {
   });
 });
 
+describe('PlanHeader what-if chip', () => {
+  const base = {
+    totalSeconds: 3600,
+    skillCount: 2,
+    projectedFinish: null,
+    badge: null,
+    nextMilestone: null,
+  };
+
+  it('sits in the stat strip, naming the lens and its gain', () => {
+    render(
+      <PlanHeader {...base} whatIf={{ lens: '+5', verdict: { kind: 'saves', seconds: 7200 } }} />
+    );
+    const chip = screen.getByTestId('what-if-chip');
+    expect(chip).toHaveTextContent('What-if +5');
+    expect(chip).toHaveTextContent(/^What-if \+5Saves .+ vs current$/);
+  });
+
+  it('reads same as current with no difference', () => {
+    render(
+      <PlanHeader {...base} whatIf={{ lens: 'None', verdict: { kind: 'same', seconds: 0 } }} />
+    );
+    expect(screen.getByTestId('what-if-chip')).toHaveTextContent('What-if NoneSame as current');
+  });
+
+  it('is absent on the real implants', () => {
+    render(<PlanHeader {...base} whatIf={null} />);
+    expect(screen.queryByTestId('what-if-chip')).not.toBeInTheDocument();
+  });
+});
+
 describe('PlanHeader progress chips (#1409)', () => {
   const base = {
     totalSeconds: 3600,
@@ -205,19 +236,10 @@ describe('PlanHeader progress chips (#1409)', () => {
     nextMilestone: null,
   };
   const progress = { trainedSp: 500_000, totalSp: 2_000_000, fraction: 0.25 };
-  const nextStep = {
-    name: 'Gunnery',
-    level: 3,
-    cumulativeSeconds: 0,
-    startDate: new Date('2026-09-01T12:00:00Z'),
-  };
-
-  it('shows the trained percentage and the next step', () => {
-    render(<PlanHeader {...base} progress={progress} nextStep={nextStep} />);
+  it('shows the trained percentage', () => {
+    render(<PlanHeader {...base} progress={progress} />);
     expect(screen.getByText('Trained')).toBeInTheDocument();
     expect(screen.getByText(/25%/)).toBeInTheDocument();
-    expect(screen.getByText('Next step')).toBeInTheDocument();
-    expect(screen.getByText(/Gunnery III/)).toBeInTheDocument();
   });
 
   it('reads — while trained data is unknown', () => {
@@ -226,36 +248,21 @@ describe('PlanHeader progress chips (#1409)', () => {
         {...base}
         projectedFinish={new Date('2026-09-02T12:00:00Z')}
         progress={progress}
-        nextStep={nextStep}
         trainedKnown={false}
       />
     );
-    expect(screen.getAllByText('—')).toHaveLength(2);
+    expect(screen.getByText('—')).toBeInTheDocument();
     expect(screen.queryByText(/25%/)).not.toBeInTheDocument();
   });
 
   it('shows no progress chips for an empty plan', () => {
-    render(
-      <PlanHeader
-        {...base}
-        progress={{ trainedSp: 0, totalSp: 0, fraction: null }}
-        nextStep={null}
-      />
-    );
+    render(<PlanHeader {...base} progress={{ trainedSp: 0, totalSp: 0, fraction: null }} />);
     expect(screen.queryByText('Trained')).not.toBeInTheDocument();
-    expect(screen.queryByText('Next step')).not.toBeInTheDocument();
   });
 
-  it('reads 100% and nothing left when fully trained', () => {
-    render(
-      <PlanHeader
-        {...base}
-        progress={{ trainedSp: 10, totalSp: 10, fraction: 1 }}
-        nextStep={null}
-      />
-    );
+  it('reads 100% when fully trained', () => {
+    render(<PlanHeader {...base} progress={{ trainedSp: 10, totalSp: 10, fraction: 1 }} />);
     expect(screen.getByText(/100%/)).toBeInTheDocument();
-    expect(screen.getByText('Nothing left to train')).toBeInTheDocument();
   });
 
   describe('plan name (#1709)', () => {

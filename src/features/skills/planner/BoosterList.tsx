@@ -22,7 +22,7 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { PlanBooster } from '@/db';
 import { buildMarketGroupParams } from '@/engine/market/urlState';
-import { BOOSTER_MARKET_GROUP_ID } from './plannerMarketGroups';
+import { CEREBRAL_ACCELERATORS_MARKET_GROUP_ID } from './plannerMarketGroups';
 import {
   BOOSTER_QUICK_PICKS,
   DEFAULT_PLAN_BOOSTER,
@@ -249,7 +249,7 @@ export function BoosterList({ boosters, detectedAccelerator, onChange }: Booster
           label={t('plans.boosterMarketLink')}
           onClick={() =>
             navigate(
-              `/market/browser?${new URLSearchParams(buildMarketGroupParams(BOOSTER_MARKET_GROUP_ID)).toString()}`
+              `/market/browser?${new URLSearchParams(buildMarketGroupParams(CEREBRAL_ACCELERATORS_MARKET_GROUP_ID)).toString()}`
             )
           }
           size="sm"

@@ -317,7 +317,7 @@ test('the header progress chips wrap at 390px without horizontal scroll', async 
   await page.setViewportSize(PHONE);
   await page.goto(`./skills/plans/${PLAN_ID}`);
 
-  await expect(page.getByText('Next step', { exact: true })).toBeVisible();
+  await expect(page.getByText('Trained', { exact: true })).toBeVisible();
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth
   );
@@ -344,6 +344,6 @@ test('a non-Current what-if lens shows a chip beside the headline at 390px', asy
   await page.goto(`./skills/plans/${PLAN_ID}`);
 
   await expect(page.getByTestId('what-if-chip')).toContainText(
-    /^What-if \+5 · (saves .+ vs current|costs .+ vs current|same as current)$/
+    /^What-if \+5(Saves .+ vs current|Costs .+ vs current|Same as current)$/
   );
 });
