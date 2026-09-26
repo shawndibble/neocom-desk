@@ -96,3 +96,30 @@ test.describe('Fitting Compare at 390px', () => {
     expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
   });
 });
+
+test.describe('Fitting Compare control toolbar', () => {
+  const LABELS = ['Damage profile', 'Abyssal weather', 'Target profile'];
+
+  test('at 1440 the three selects share one row', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await signInAndGoto(page, './fittings/compare');
+    const ys: number[] = [];
+    for (const name of LABELS) {
+      const box = await page.getByRole('combobox', { name }).boundingBox();
+      ys.push(box!.y);
+    }
+    expect(Math.max(...ys) - Math.min(...ys)).toBeLessThan(1);
+  });
+
+  test('at 1024 the block is compact and each label sits beside its select', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await signInAndGoto(page, './fittings/compare');
+    const block = await page.getByTestId('compare-controls').boundingBox();
+    expect(block!.height).toBeLessThan(70);
+    for (const name of LABELS) {
+      const select = await page.getByRole('combobox', { name }).boundingBox();
+      const label = await page.getByText(name, { exact: true }).first().boundingBox();
+      expect(select!.x - (label!.x + label!.width)).toBeLessThan(12);
+    }
+  });
+});
