@@ -60,6 +60,9 @@ test('shows one onboarding banner at a time at 390px, then the next one', async 
   await pinNotificationPermissionToDefault(page);
   await page.setViewportSize(PHONE);
   await signInAndGoto(page, './overview');
+  // issue #1788: the explainer now waits for a second route so it never
+  // competes with the very first screen a new player sees.
+  await page.goto('./characters');
 
   // Counted as the AC words it: every `role="alert"` on the page, so a future
   // fixed banner that regresses the rule without opting into the shared

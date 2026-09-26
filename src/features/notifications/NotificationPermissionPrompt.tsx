@@ -45,7 +45,7 @@ export function NotificationPermissionPrompt() {
   // non-installed iOS Safari tab, so `permission` alone would read
   // 'unsupported' and hide the explainer entirely without this.
   const installRequired = webPushSupport() === 'requires-install';
-  const pastFirstScreen = useHasLeftFirstScreen();
+  const hasLeftFirstScreen = useHasLeftFirstScreen();
 
   const visible = shouldShowPermissionExplainer({
     hydrated,
@@ -53,7 +53,7 @@ export function NotificationPermissionPrompt() {
     hasCharacter: (characterCount ?? 0) > 0,
     permission,
     installRequired,
-    pastFirstScreen,
+    hasLeftFirstScreen,
   });
   // Eligibility above is unchanged; this only decides whether the shared
   // bottom slot is this banner's to use right now (issue #1124).

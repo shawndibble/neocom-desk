@@ -1,15 +1,18 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route, useNavigate, type NavigateFunction } from 'react-router-dom';
+import { db } from '@/db';
 import {
   FIRST_SCREEN_PATHNAME_KEY,
+  HAS_COMPLETED_A_SESSION_KEY,
   hasLeftFirstScreen,
   recordFirstScreenPathname,
   useHasLeftFirstScreen,
 } from './firstScreen';
 
-beforeEach(() => {
+beforeEach(async () => {
   sessionStorage.clear();
+  await db.settings.clear();
 });
 
 describe('hasLeftFirstScreen', () => {
@@ -65,8 +68,14 @@ function renderAt(initialPath: string) {
 }
 
 describe('useHasLeftFirstScreen', () => {
-  it('is false on the very first screen', () => {
+  it('is false on the very first screen of a device first-ever session', async () => {
     const { result } = renderAt('/characters');
+    expect(result.current).toBe(false);
+    // Give the "has this device ever completed a session" read a chance to
+    // resolve, so this isn't just testing a still-pending Promise.
+    await waitFor(async () =>
+      expect(await db.settings.get(HAS_COMPLETED_A_SESSION_KEY)).toBeDefined()
+    );
     expect(result.current).toBe(false);
   });
 
@@ -85,5 +94,24 @@ describe('useHasLeftFirstScreen', () => {
     navigate()?.('/characters');
     rerender();
     expect(result.current).toBe(false);
+  });
+
+  // issue #1788 guardrail: "second route or session" must be a floor, not an
+  // indefinite defer — a player who never navigates within a session must
+  // still see it once a later session starts.
+  it('is true immediately in a later session, with no route change needed', async () => {
+    await db.settings.put({ key: HAS_COMPLETED_A_SESSION_KEY, value: true });
+    const { result } = renderAt('/characters');
+    await waitFor(() => expect(result.current).toBe(true));
+  });
+
+  it('marks the device as having completed a session, for next time', async () => {
+    renderAt('/characters');
+    await waitFor(async () =>
+      expect(await db.settings.get(HAS_COMPLETED_A_SESSION_KEY)).toEqual({
+        key: HAS_COMPLETED_A_SESSION_KEY,
+        value: true,
+      })
+    );
   });
 });
