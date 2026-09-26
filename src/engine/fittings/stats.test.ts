@@ -11,7 +11,6 @@ import {
   extractModuleResult,
   extractOffense,
   extractOverheatedStats,
-  overheatedOrNull,
   unheatedIfChanged,
   weaponRowKey,
   type OffenseItem,
@@ -567,14 +566,6 @@ describe('local repair and overheated stats', () => {
     });
     expect(overheated.shield.emResonance).toBe(0.3);
     expect(overheated.armor.kineticResonance).toBe(0.4);
-  });
-});
-
-describe('overheatedOrNull', () => {
-  it('returns the overheated value only when it differs at display rounding', () => {
-    expect(overheatedOrNull(63.2, 81.8, 1)).toBe(81.8);
-    expect(overheatedOrNull(63.21, 63.24, 1)).toBeNull();
-    expect(overheatedOrNull(63.2, null, 1)).toBeNull();
   });
 });
 

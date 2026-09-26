@@ -4,7 +4,6 @@ import { Button, Caret, RowMoreActions, Tooltip } from '@/components/ui';
 import { formatIskCompact } from '@/lib/isk';
 import {
   alignTimeSeconds,
-  overheatedOrNull,
   resistPct,
   unheatedIfChanged,
   weaponRowKey,
@@ -25,7 +24,9 @@ import type { DogmaAssetProgress } from './dogmaFittingEngine';
 import { useDamageProfileName, type DamageProfiles } from './damageProfiles';
 import { DamageProfilePicker } from './DamageProfilePicker';
 import { AppliedDpsPanel } from './AppliedDpsPanel';
-import { Facts, HeatFigure, Overheated, type Fact } from './StatFacts';
+import { Facts, HeatFigure, type Fact } from './StatFacts';
+import { SkillOverridesControl } from './SkillOverridesControl';
+import { PriceHubSelect } from './PriceHubSelect';
 import { StatsToolbar } from './StatsToolbar';
 import { useIsPhone } from '@/lib/useIsPhone';
 import {
@@ -112,16 +113,16 @@ export interface ResistRow {
   sub?: string;
   resonances: Resonances;
   ehp?: number;
-  /** Overheated / adapted rows read as a note on the row above. */
-  tone?: 'overheated' | 'note';
+  /** Adapted rows read as a note on the row above. */
+  tone?: 'note';
   /** Under "Overheat all", each cell heat changed: its unheated value as shown. */
   unheated?: Partial<Record<DamageType | 'ehp', string>>;
 }
 
 /**
  * The Defense table (mockup A): a row per layer — its raw HP beneath the
- * name, a cell per damage type, EHP last — with an overheated row under any
- * layer heat changes, and the Reactive Armor Hardener's adapted resists.
+ * name, a cell per damage type, EHP last — and the Reactive Armor
+ * Hardener's adapted resists.
  */
 export function ResistTable({ rows }: { rows: ResistRow[] }) {
   const { t } = useTranslation();
@@ -187,31 +188,26 @@ export function ResistTable({ rows }: { rows: ResistRow[] }) {
   );
 }
 
-type HeatedDamage = DamageFiguresValue & { overheated: DamageFiguresValue | null };
-
 /**
- * A row's DPS and volley, each with its overheated value beside it — or,
- * under "Overheat all", in the warning tone where heat changed it. `figures`
- * picks the same row out of either calculation.
+ * A row's DPS and volley — under "Overheat all", in the warning tone where
+ * heat changed them. `figures` picks the same row out of either calculation.
  */
 function DamageFigures({
   stats,
   figures,
 }: {
   stats: FittingStats;
-  figures: (stats: FittingStats) => HeatedDamage;
+  figures: (stats: FittingStats) => DamageFiguresValue;
 }) {
   const { t } = useTranslation();
-  const { dps, volley, overheated } = figures(stats);
   return (
-    <span className="shrink-0 text-right tabular-nums">
+    <span className="ml-auto shrink-0 text-right tabular-nums">
       <span>
         <HeatFigure
           stats={stats}
           format={(s) => t('fittings.stats.weaponDps', { value: figures(s).dps.toFixed(1) })}
         />
       </span>
-      <Overheated value={overheatedOrNull(dps, overheated?.dps, 1)} digits={1} />
       <span className="text-text-dim"> · </span>
       <span>
         <HeatFigure
@@ -219,13 +215,13 @@ function DamageFigures({
           format={(s) => t('fittings.stats.weaponVolley', { value: figures(s).volley.toFixed(0) })}
         />
       </span>
-      <Overheated value={overheatedOrNull(volley, overheated?.volley, 0)} digits={0} />
     </span>
   );
 }
 
 /** Stable ids — the remembered layout (`statsSectionsPreference.ts`) is keyed on them. */
 type Section =
+  | 'assumptions'
   | 'offense'
   | 'appliedDps'
   | 'defense'
@@ -338,6 +334,8 @@ interface FittingStatsSectionsProps {
   heading?: ReactNode;
   /** Controls for the conditions every section is worked out in — implants, Tactical mode, Abyssal weather, missing skills — under the heading. */
   conditions?: ReactNode;
+  /** The implant controls, grouped with the skills override under "Implants & skills" — absent where a Fitting has no implants to choose. */
+  implants?: ReactNode;
   /** The hull takes drones (`showsDrones`) — else there is no Drones section. */
   showDrones?: boolean;
   /**
@@ -416,7 +414,7 @@ function OffenseRows({
         const hasMenu = group !== null && group.modules.length > 0;
         const content = (
           <>
-            <span className="min-w-0 flex-1">
+            <span className="min-w-0 basis-full">
               <span>{name}</span>
               {row.chargeTypeId !== undefined && (
                 <span className="block text-text-dim">{typeName(row.chargeTypeId)}</span>
@@ -440,7 +438,7 @@ function OffenseRows({
             {hasMenu && <RowMoreActions />}
           </>
         );
-        const rowClass = 'flex flex-wrap items-center justify-between gap-x-2';
+        const rowClass = 'flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5';
         return hasMenu ? (
           <FittingItemMenu
             key={weaponRowKey(row)}
@@ -489,6 +487,7 @@ export function FittingStatsSections({
   overlay,
   heading,
   conditions,
+  implants,
   showDrones = true,
   fitting = null,
   moduleResults = null,
@@ -549,7 +548,6 @@ export function FittingStatsSections({
     </p>
   );
 
-  const overheatedEhp = stats ? overheatedOrNull(stats.ehp, stats.overheated?.ehp, 0) : null;
   const pctOf = (used: number, total: number) => (total > 0 ? (used / total) * 100 : 0);
 
   /**
@@ -580,23 +578,20 @@ export function FittingStatsSections({
         key: 'shield' as const,
         label: t('fittings.stats.shield'),
         layer: s.shield,
-        hot: s.overheated?.shield,
       },
       {
         key: 'armor' as const,
         label: t('fittings.stats.armor'),
         layer: s.armor,
-        hot: s.overheated?.armor,
       },
       {
         key: 'hull' as const,
         label: t('fittings.stats.hull'),
         layer: s.hull,
-        hot: s.overheated?.hull,
       },
     ];
     const rows: ResistRow[] = [];
-    for (const { key, label, layer, hot } of layers) {
+    for (const { key, label, layer } of layers) {
       // "Overheat all": the cells heat changed, with what they read unheated.
       const unheated: NonNullable<ResistRow['unheated']> = {};
       for (const type of RESIST_TYPES) {
@@ -613,24 +608,6 @@ export function FittingStatsSections({
         ehp: layer.ehp,
         unheated,
       });
-      const changed =
-        hot !== undefined &&
-        RESIST_TYPES.some(
-          (type) =>
-            overheatedOrNull(
-              resistPct(layer[RESONANCE_KEY[type]]),
-              resistPct(hot[RESONANCE_KEY[type]]),
-              0
-            ) !== null
-        );
-      if (changed && hot) {
-        rows.push({
-          key: `${key}-hot`,
-          label: t('fittings.stats.overheatedRow'),
-          resonances: hot,
-          tone: 'overheated',
-        });
-      }
     }
     adaptedHardeners.forEach((resonances, index) =>
       rows.push({
@@ -740,6 +717,16 @@ export function FittingStatsSections({
         </div>
       )}
 
+      {stats &&
+        section(
+          'assumptions',
+          undefined,
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            {implants}
+            <SkillOverridesControl />
+          </div>
+        )}
+
       {section(
         'offense',
         stats && stats.offense.weapons.length > 0
@@ -792,12 +779,6 @@ export function FittingStatsSections({
               {adaptedHardeners.length > 0 && (
                 <p className="text-xs text-text-dim">
                   {t('fittings.stats.armorIncludesRah', { profile: profileName })}
-                </p>
-              )}
-              {overheatedEhp !== null && (
-                <p className="text-xs text-text-dim">
-                  {t('fittings.stats.ehpLine', { value: stats.ehp.toFixed(0) })}
-                  <Overheated value={overheatedEhp} digits={0} />
                 </p>
               )}
               <TankFacts stats={stats} typeName={typeName} />
@@ -903,22 +884,10 @@ export function FittingStatsSections({
             items={[
               {
                 label: t('fittings.stats.fact.maxVelocity'),
-                value: (
-                  <>
-                    {figure((s) =>
-                      t('fittings.stats.maxVelocityMeta', {
-                        value: s.navigation.maxVelocity.toFixed(0),
-                      })
-                    )}
-                    <Overheated
-                      value={overheatedOrNull(
-                        stats.navigation.maxVelocity,
-                        stats.overheated?.maxVelocity,
-                        0
-                      )}
-                      digits={0}
-                    />
-                  </>
+                value: figure((s) =>
+                  t('fittings.stats.maxVelocityMeta', {
+                    value: s.navigation.maxVelocity.toFixed(0),
+                  })
                 ),
               },
               {
@@ -1098,6 +1067,7 @@ export function FittingStatsSections({
         price ? (nothingPriced ? '—' : iskLabel(price.totals.sell)) : undefined,
         price ? (
           <>
+            <PriceHubSelect />
             <Facts
               items={[
                 {
@@ -1111,9 +1081,19 @@ export function FittingStatsSections({
               ]}
             />
             {price.totals.unpricedRows > 0 && (
-              <p className="text-xs text-warning">
-                {t('fittings.stats.priceUnpriced', { count: price.totals.unpricedRows })}
-              </p>
+              <div className="text-xs text-warning">
+                <p>{t('fittings.stats.priceUnpriced', { count: price.totals.unpricedRows })}</p>
+                <ul className="mt-0.5 list-disc pl-4">
+                  {price.rows
+                    .filter((row) => row.buyTotal === null || row.sellTotal === null)
+                    .map((row) => (
+                      <li key={row.typeId}>
+                        {row.name}
+                        {row.quantity > 1 && ` ×${row.quantity}`}
+                      </li>
+                    ))}
+                </ul>
+              </div>
             )}
           </>
         ) : (
