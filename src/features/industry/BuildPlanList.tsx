@@ -39,6 +39,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { formatIsk } from '@/lib/isk';
 import type { BuildPlanRecord } from '@/db';
+import type { CharacterBlueprint } from '@/esi/endpoints';
 import { iskToneClass } from '@/features/character/format';
 import { BlueprintPicker } from './BlueprintPicker';
 import { BuildPlanRowContextMenu } from './BuildPlanRowContextMenu';
@@ -74,6 +75,70 @@ export interface PlanRollupStats {
 /** One plan row's Est. total / Verdict / Runs — everything the pricing/records data supplies per plan. */
 export interface PlanIndexStats extends PlanRollupStats {
   runs: number;
+  /** Profit per hour of job time; null when unpriceable. Read only by the `lg:` ISK/h column and its sort. */
+  iskPerHour?: number | null;
+  /** Profit as a percentage of revenue; null when unpriceable. Read only by the `lg:` Margin column and its sort. */
+  marginPct?: number | null;
+}
+
+/** The columns the list can be sorted by. No active sort means the pilot's own drag order. */
+type SortKey = 'profit' | 'iskPerHour' | 'margin';
+interface ListSort {
+  key: SortKey;
+  dir: 'asc' | 'desc';
+}
+
+function sortValue(stats: PlanIndexStats | undefined, key: SortKey): number | null {
+  if (!stats) return null;
+  if (key === 'profit') return stats.profit;
+  return (key === 'iskPerHour' ? stats.iskPerHour : stats.marginPct) ?? null;
+}
+
+/** Stable sort by one column; plans with no figure sink to the bottom in either direction. */
+function sortPlans(
+  plans: readonly BuildPlanRecord[],
+  sort: ListSort | null,
+  statsByPlanId: ReadonlyMap<string, PlanIndexStats>
+): readonly BuildPlanRecord[] {
+  if (!sort) return plans;
+  const sign = sort.dir === 'asc' ? 1 : -1;
+  return [...plans].sort((a, b) => {
+    const av = sortValue(statsByPlanId.get(a.id), sort.key);
+    const bv = sortValue(statsByPlanId.get(b.id), sort.key);
+    if (av === null || bv === null) return av === bv ? 0 : av === null ? 1 : -1;
+    return (av - bv) * sign;
+  });
+}
+
+function SortHeader({
+  sortKey,
+  label,
+  sort,
+  onSort,
+  className,
+}: {
+  sortKey: SortKey;
+  label: string;
+  sort: ListSort | null;
+  onSort: (key: SortKey) => void;
+  className: string;
+}) {
+  const { t } = useTranslation();
+  const active = sort?.key === sortKey;
+  return (
+    <span className={className}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        aria-label={t('industry.sortBy', { column: label })}
+        aria-pressed={active}
+        className="inline-flex items-center gap-0.5 uppercase tracking-widest hover:text-text focus-visible:outline-2 focus-visible:outline-accent"
+      >
+        {label}
+        {active && <span aria-hidden="true">{sort.dir === 'asc' ? '↑' : '↓'}</span>}
+      </button>
+    </span>
+  );
 }
 
 // Same tone convention `PlanVerdictHero.tsx`'s `VerdictPill` already
@@ -230,6 +295,8 @@ interface BuildPlanListProps {
   note?: ReactNode;
   /** Profit / Verdict / Runs per plan row — `undefined` renders every column as "—". */
   statsByPlanId: ReadonlyMap<string, PlanIndexStats>;
+  /** Owned blueprints, so the picker can tag results the pilot already has a copy of. */
+  ownedBlueprints?: readonly CharacterBlueprint[];
   /** Profit / Verdict per group row (rolled up from its members) — Runs has no group-level meaning. */
   statsByGroupId: ReadonlyMap<string, PlanRollupStats>;
 }
@@ -418,6 +485,16 @@ function PlanRow({
       <span className="w-24 shrink-0 text-right">
         <ProfitCell profit={stats?.profit ?? null} />
       </span>
+      <span className="hidden w-24 shrink-0 text-right tabular-nums text-text-dim lg:block">
+        {stats?.iskPerHour == null ? (
+          '—'
+        ) : (
+          <IskAmount value={stats.iskPerHour} revealOn="tap" decimals={0} />
+        )}
+      </span>
+      <span className="hidden w-16 shrink-0 text-right tabular-nums text-text-dim lg:block">
+        {stats?.marginPct == null ? '—' : `${stats.marginPct.toFixed(1)}%`}
+      </span>
       <span className="hidden w-14 shrink-0 justify-end sm:flex">
         <VerdictTag
           verdict={stats?.verdict ?? 'unknown'}
@@ -554,6 +631,8 @@ function GroupHeader({
       <span className="w-24 shrink-0 text-right">
         <ProfitCell profit={stats?.profit ?? null} />
       </span>
+      <span className="hidden w-24 shrink-0 lg:block" aria-hidden="true" />
+      <span className="hidden w-16 shrink-0 lg:block" aria-hidden="true" />
       <span className="hidden w-14 shrink-0 justify-end sm:flex">
         <VerdictTag
           verdict={stats?.verdict ?? 'unknown'}
@@ -615,6 +694,7 @@ export function BuildPlanList({
   note,
   statsByPlanId,
   statsByGroupId,
+  ownedBlueprints,
 }: BuildPlanListProps) {
   const { t } = useTranslation();
   const sensors = useSensors(
@@ -625,6 +705,15 @@ export function BuildPlanList({
     // reason (#408).
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } })
   );
+  // Click-to-sort orders plans within each section (a group's members, the
+  // ungrouped ones) and leaves group rows where they are. Null is the manual
+  // drag order, which is the default: desc, then asc, then back to manual.
+  const [sort, setSort] = useState<ListSort | null>(null);
+  function cycleSort(key: SortKey) {
+    setSort((prev) =>
+      prev?.key !== key ? { key, dir: 'desc' } : prev.dir === 'desc' ? { key, dir: 'asc' } : null
+    );
+  }
   /** The plan being dragged, for the overlay. */
   const [draggingPlanId, setDraggingPlanId] = useState<string | null>(null);
   /**
@@ -667,8 +756,15 @@ export function BuildPlanList({
       if (members) members.push(plan);
       else byGroup.set(groupId, [plan]);
     }
-    return { membersByGroup: byGroup, ungrouped: loose, groupOfPlan: ofPlan };
-  }, [plans, groups]);
+    for (const [groupId, members] of byGroup) {
+      byGroup.set(groupId, [...sortPlans(members, sort, statsByPlanId)]);
+    }
+    return {
+      membersByGroup: byGroup,
+      ungrouped: [...sortPlans(loose, sort, statsByPlanId)],
+      groupOfPlan: ofPlan,
+    };
+  }, [plans, groups, sort, statsByPlanId]);
 
   const draggingPlan =
     draggingPlanId === null ? undefined : plans.find((p) => p.id === draggingPlanId);
@@ -775,7 +871,7 @@ export function BuildPlanList({
     >
       {note}
       <div className="space-y-2">
-        <BlueprintPicker catalog={catalog} onPick={onCreate} />
+        <BlueprintPicker catalog={catalog} onPick={onCreate} ownedBlueprints={ownedBlueprints} />
 
         {plans.length === 0 && groups.length === 0 ? (
           <EmptyState
@@ -812,7 +908,27 @@ export function BuildPlanList({
               row cells by the same fixed widths, not real table cells. */}
             <div className="flex items-center gap-2 border-b border-line bg-panel-2 px-2 py-1.5 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
               <span className="flex-1">{t('industry.title')}</span>
-              <span className="w-24 shrink-0 text-right">{t('industry.profitColumn')}</span>
+              <SortHeader
+                sortKey="profit"
+                label={t('industry.profitColumn')}
+                sort={sort}
+                onSort={cycleSort}
+                className="w-24 shrink-0 text-right"
+              />
+              <SortHeader
+                sortKey="iskPerHour"
+                label={t('industry.iskPerHourColumn')}
+                sort={sort}
+                onSort={cycleSort}
+                className="hidden w-24 shrink-0 text-right lg:block"
+              />
+              <SortHeader
+                sortKey="margin"
+                label={t('industry.marginColumn')}
+                sort={sort}
+                onSort={cycleSort}
+                className="hidden w-16 shrink-0 text-right lg:block"
+              />
               <span className="hidden w-14 shrink-0 justify-end sm:flex">
                 {t('industry.verdictColumn')}
               </span>
