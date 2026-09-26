@@ -29,13 +29,25 @@ const TOUCH_CLICK_ECHO_MS = 700;
  * controlled `open`, so track it: a focus that follows a tap or click is not
  * keyboard navigation.
  */
-let lastInputWasPointer = false;
+const inputModality = { pointer: false };
 let modalityTracked = false;
 function trackInputModality() {
   if (modalityTracked || typeof document === 'undefined') return;
   modalityTracked = true;
-  document.addEventListener('pointerdown', () => (lastInputWasPointer = true), true);
-  document.addEventListener('keydown', () => (lastInputWasPointer = false), true);
+  document.addEventListener(
+    'pointerdown',
+    () => {
+      inputModality.pointer = true;
+    },
+    true
+  );
+  document.addEventListener(
+    'keydown',
+    () => {
+      inputModality.pointer = false;
+    },
+    true
+  );
 }
 
 interface TooltipProps {
@@ -233,13 +245,13 @@ export function Tooltip({
 
   /**
    * Radix opens on any focus, including a dialog handing focus back to its
-   * trigger on close — which pops the bubble over whatever sits beside it.
+   * trigger on close â€” which pops the bubble over whatever sits beside it.
    * Only keyboard-driven focus should open it (`:focus-visible` semantics); a
    * hovering mouse still does, since its focus is not what opened it.
    */
   function isNonKeyboardFocusOpen() {
     const el = triggerRef.current;
-    return !!el && !mouseHovering.current && document.activeElement === el && lastInputWasPointer;
+    return !!el && !mouseHovering.current && document.activeElement === el && inputModality.pointer;
   }
 
   function handlePointerEnter(event: PointerEvent) {
