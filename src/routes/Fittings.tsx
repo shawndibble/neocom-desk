@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { fittingsRedirect } from '@/features/fittings/fittingRoutes';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db';
@@ -31,36 +31,18 @@ import {
   addDronesWithinBay,
   addModule,
   cargoGroups,
-  cargoVolumeUsed,
-  copyToAllOfType,
-  droneGroups,
-  droneRoom,
   droneTotals,
-  fillRack,
   firstFreeSlotIndex,
-  launchDrones,
   moveModule,
   newFitting,
-  recallDrones,
-  removeAllOfType,
-  removeModule,
   setCargoQuantity,
-  setDroneCounts,
-  setModuleCharge,
-  setModuleState,
   swapModuleType,
-  type DroneBay,
-  type DroneLaunchLimits,
 } from '@/engine/fittings/fittingEdit';
-import { buildVariationIndex, getVariations } from '@/engine/market/variations';
 import { FittingAddPanel } from '@/features/fittings/FittingAddPanel';
-import { chargeGroupIdsFor, checkCharges } from '@/features/fittings/dogmaFittingEngine';
-import {
-  FittingItemActionsProvider,
-  type FittingItemActions,
-} from '@/features/fittings/fittingItemActions';
-import type { FittingDragPayload, FittingDropTarget } from '@/features/fittings/fittingDrag';
+import { CargoQuantityDialog } from '@/features/fittings/CargoQuantityDialog';
+import { FittingItemActionsProvider } from '@/features/fittings/fittingItemActions';
 import { useChargeLoading } from '@/features/fittings/useChargeLoading';
+import { useEditorItemActions } from '@/features/fittings/useEditorItemActions';
 import { targetRack, type AddTarget } from '@/features/fittings/addTarget';
 import { writeCompareCodes } from '@/features/fittings/compareUrl';
 import { FittingHeader } from '@/features/fittings/FittingHeader';
@@ -93,11 +75,7 @@ import { MissingSkillsChip } from '@/features/fittings/MissingSkillsChip';
 import { useFittingAlpha } from '@/features/fittings/useFittingAlpha';
 import { useFittingHardpoints } from '@/features/fittings/useFittingHardpoints';
 import { useFittingSkillGaps } from '@/features/fittings/useFittingSkillGaps';
-import {
-  catalogueTypeName,
-  catalogueVolume,
-  useFittingCatalogue,
-} from '@/features/fittings/useFittingCatalogue';
+import { catalogueTypeName, useFittingCatalogue } from '@/features/fittings/useFittingCatalogue';
 import { useFittingWorkspace } from '@/features/fittings/useFittingWorkspace';
 import { useModuleVariations } from '@/features/fittings/useModuleVariations';
 import { useOverlayFitting } from '@/features/fittings/useOverlayFitting';
@@ -204,7 +182,7 @@ function FittingsPage() {
     savedRecord.code !== currentShareCode;
   // The item whose info (the Market's item detail) is open — a List name click.
   const [infoItem, setInfoItem] = useState<{ typeId: number; name: string } | null>(null);
-  const showInfo = (typeId: number, name: string) => setInfoItem({ typeId, name });
+  const showInfo = useCallback((typeId: number, name: string) => setInfoItem({ typeId, name }), []);
   // Bumped on a successful Save to EVE so In-game Fittings remounts and
   // refetches, picking up the fitting that just landed (or the overwrite).
   const [inGameFittingsKey, setInGameFittingsKey] = useState(0);
@@ -241,86 +219,32 @@ function FittingsPage() {
     profile: workspace.profile,
     edit,
   });
-  // The types last fitted to each rack, newest first — an empty slot's
-  // "Add module ▸" and "Fill rack with last used".
-  const [recent, setRecent] = useState<Partial<Record<FittingSlotKind, number[]>>>({});
-  function noteRecent(rack: FittingSlotKind, typeId: number) {
-    setRecent((prev) => ({
-      ...prev,
-      [rack]: [typeId, ...(prev[rack] ?? []).filter((id) => id !== typeId)].slice(0, 5),
-    }));
-  }
-  // "Copy module", for "Paste module" into an empty slot of the same rack.
-  const [copiedModule, setCopiedModule] = useState<{
-    rack: FittingSlotKind;
-    typeId: number;
-  } | null>(null);
-  // The cargo item whose quantity dialog is open, and what's being typed there.
+  // The cargo item whose quantity dialog is open.
   const [cargoQuantityFor, setCargoQuantityFor] = useState<number | null>(null);
-  const [cargoQuantityDraft, setCargoQuantityDraft] = useState('');
-  // The hold as fitted (a cargo expander counts), read off the stats already
-  // worked out under the conditions (All V, skill overrides…); null before them.
-  const cargoCapacity = stats?.holds.cargo ?? null;
-  const variationIndex = useMemo(
-    () =>
-      catalogue === null
-        ? null
-        : buildVariationIndex(catalogue.variations.types, catalogue.variations.metaGroups),
-    [catalogue]
-  );
+  const selectTarget = useCallback((next: AddTarget | null) => {
+    setTarget(next);
+    setAddOpen(true);
+  }, []);
+  const { itemActions, fitAt, canPlace, droneBay, noteRecent, defaultCharges } =
+    useEditorItemActions({
+      fitting,
+      stats,
+      edit,
+      engineReady: workspace.engineReady,
+      profile: workspace.profile,
+      catalogue,
+      charges,
+      target,
+      dronesShown,
+      dragEnabled: isDesktop,
+      showInfo,
+      selectTarget,
+      openCargoQuantity: setCargoQuantityFor,
+    });
 
   function openLibrary(tab: LibraryTab) {
     setLibraryOver(fitting);
     setLibrary(tab);
-  }
-
-  // Before the ship data the bay's size is unknown (null), so nothing is capped yet.
-  const droneBay: DroneBay | null =
-    stats === null
-      ? null
-      : { capacity: stats.droneCapacity, volumeOf: (typeId) => catalogueVolume(catalogue, typeId) };
-
-  function canPlace(rack: CandidateRack, typeId: number): boolean {
-    if (rack === 'drone') {
-      // Room for one more of this drone beside what the bay already holds.
-      return dronesShown && fitting !== null && droneRoom(fitting, typeId, droneBay) >= 1;
-    }
-    if (fitting === null || slotCounts === null) return false;
-    if (target?.kind === 'slot' && target.slot === rack) return true;
-    return firstFreeSlotIndex(fitting, rack, slotCounts[rack]) !== null;
-  }
-
-  /**
-   * The charges a not-yet-fitted `typeId` could default to at `rack` — its
-   * own charge groups (calculated alone, since it has no fitted result yet),
-   * narrowed to what the hull and skills accept, alphabetical to match the
-   * Charges tab's own ordering (issue #1728's "first charge listed").
-   */
-  function resolveDefaultChargeCandidates(rack: FittingSlotKind, typeId: number): number[] {
-    if (
-      fitting === null ||
-      !workspace.engineReady ||
-      workspace.profile === null ||
-      catalogue === null
-    ) {
-      return [];
-    }
-    const groupIds = chargeGroupIdsFor(fitting.shipTypeId, rack, typeId);
-    if (groupIds.length === 0) return [];
-    const candidates = [
-      ...new Set(groupIds.flatMap((id) => catalogue.typeIdsByGroup.get(id) ?? [])),
-    ];
-    const accepted = checkCharges(
-      fitting.shipTypeId,
-      { slot: rack, typeId },
-      candidates,
-      workspace.profile
-    );
-    return candidates
-      .filter((id) => accepted.has(id))
-      .sort((a, b) =>
-        catalogueTypeName(catalogue, a).localeCompare(catalogueTypeName(catalogue, b))
-      );
   }
 
   function handleAdd(typeId: number, rack: CandidateRack) {
@@ -341,7 +265,7 @@ function FittingsPage() {
         onTarget && target.kind === 'slot' ? target.slotIndex : firstFreeSlotIndex(f, rack, count);
       if (slotIndex === null) return f;
       const next = addModule(f, rack, slotIndex, typeId, () =>
-        resolveDefaultChargeCandidates(rack, typeId)
+        defaultCharges(f.shipTypeId, rack, typeId)
       );
       noteRecent(rack, typeId);
       if (onTarget) {
@@ -352,65 +276,6 @@ function FittingsPage() {
     });
     if (addMode === 'sheet') closeAdd();
     else setTarget(after.target);
-  }
-
-  /** A module into `slotIndex` (or the rack's first free slot), charged as the Add panel's are. */
-  function fitAt(rack: FittingSlotKind, slotIndex: number | null, typeId: number) {
-    if (slotIndex === null) return;
-    noteRecent(rack, typeId);
-    edit((f) =>
-      addModule(f, rack, slotIndex, typeId, () => resolveDefaultChargeCandidates(rack, typeId))
-    );
-  }
-
-  function droneLaunchLimits(): DroneLaunchLimits | null {
-    if (stats === null) return null;
-    return {
-      bandwidthTotal: stats.droneBandwidthTotal,
-      maxActive: stats.maxActiveDrones,
-      // A drone the engine gave no bandwidth for stays in the bay rather than launching unlimited.
-      bandwidthOf: (typeId) => stats.droneBandwidthByType[typeId] ?? Number.POSITIVE_INFINITY,
-    };
-  }
-
-  /**
-   * A drop on the List (the Ring's module drops come through its own props):
-   * a charge loads — into every module that takes it, or with Alt only the
-   * one it landed on — a module goes in, or moves, and a drone launches.
-   */
-  function handleDrop(payload: FittingDragPayload, target: FittingDropTarget, alt: boolean) {
-    if (payload.kind === 'charge') {
-      charges.load(payload.typeId, {
-        fromCargo: payload.fromCargo,
-        only:
-          alt && target.kind === 'slot'
-            ? { slot: target.rack, slotIndex: target.index }
-            : undefined,
-      });
-      return;
-    }
-    if (payload.kind === 'slot') {
-      if (target.kind === 'slot')
-        edit((f) => moveModule(f, target.rack, payload.index, target.index));
-      return;
-    }
-    if (payload.kind === 'drone' || payload.rack === 'drone') {
-      const limits = droneLaunchLimits();
-      const { typeId } = payload;
-      edit((f) => {
-        // From the Add panel, one more goes in the bay first.
-        const stocked = payload.kind === 'type' ? addDronesWithinBay(f, typeId, 1, droneBay) : f;
-        return limits === null ? stocked : launchDrones(stocked, limits, typeId);
-      });
-      return;
-    }
-    const { rack, typeId } = payload;
-    if (target.kind === 'drones' || rack !== target.rack || fitting === null || slotCounts === null)
-      return;
-    // A rack heading takes it into the rack's first free slot.
-    const slotIndex =
-      target.kind === 'slot' ? target.index : firstFreeSlotIndex(fitting, rack, slotCounts[rack]);
-    fitAt(rack, slotIndex, typeId);
   }
 
   function selectSlot(slot: FittingSlotKind, slotIndex: number) {
@@ -434,92 +299,10 @@ function FittingsPage() {
     selectTarget(next);
   }
 
-  function selectTarget(next: AddTarget | null) {
-    setTarget(next);
-    setAddOpen(true);
-  }
-
   function closeAdd() {
     setAddOpen(false);
     setTarget(null);
   }
-
-  const itemActions: FittingItemActions | null =
-    fitting === null
-      ? null
-      : {
-          typeName: (typeId) => catalogueTypeName(catalogue, typeId),
-          showInfo,
-          charges,
-          setState: (rack, index, state) => edit((f) => setModuleState(f, rack, index, state)),
-          unloadCharge: (rack, index) => edit((f) => setModuleCharge(f, rack, index, null)),
-          copyToAllOfType: (rack, index) => edit((f) => copyToAllOfType(f, rack, index)),
-          variantsOf: (typeId) =>
-            variationIndex === null
-              ? []
-              : getVariations(variationIndex, typeId)
-                  .members.filter((member) => member.typeId !== typeId)
-                  .map((member) => ({
-                    typeId: member.typeId,
-                    name: catalogueTypeName(catalogue, member.typeId),
-                  })),
-          swapType: (rack, index, typeId) => edit((f) => swapModuleType(f, rack, index, typeId)),
-          removeAllOfType: (typeId) => edit((f) => removeAllOfType(f, typeId)),
-          remove: (rack, index) => edit((f) => removeModule(f, rack, index)),
-          move: (rack, from, to) => edit((f) => moveModule(f, rack, from, to)),
-          slotCount: (rack) => slotCounts?.[rack] ?? null,
-          copyModule: (module) => setCopiedModule({ rack: module.slot, typeId: module.typeId }),
-          recentFor: (rack) => recent[rack] ?? [],
-          clipboardFor: (rack) => (copiedModule?.rack === rack ? copiedModule.typeId : null),
-          addModule: (rack, index, typeId) => fitAt(rack, index, typeId),
-          browseFor: (rack, index) => selectTarget({ kind: 'slot', slot: rack, slotIndex: index }),
-          fillRack: (rack, typeId) => {
-            if (slotCounts === null) return;
-            edit((f) =>
-              fillRack(f, rack, slotCounts[rack], typeId, () =>
-                resolveDefaultChargeCandidates(rack, typeId)
-              )
-            );
-          },
-          launchDrones: (typeId) => {
-            const limits = droneLaunchLimits();
-            if (limits !== null) edit((f) => launchDrones(f, limits, typeId));
-          },
-          recallDrones: (typeId) => edit((f) => recallDrones(f, typeId)),
-          recallAllDrones: () =>
-            edit((f) =>
-              droneGroups(f).reduce((next, group) => recallDrones(next, group.typeId), f)
-            ),
-          removeDrones: (typeId) =>
-            edit((f) => setDroneCounts(f, typeId, { inSpace: 0, inBay: 0 })),
-          cargoCapacity,
-          cargoUsed:
-            catalogue === null
-              ? null
-              : cargoVolumeUsed(fitting, (typeId) => catalogueVolume(catalogue, typeId)),
-          openAddCargo: () => selectTarget({ kind: 'cargo' }),
-          changeCargoQuantity: (typeId) => {
-            setCargoQuantityDraft(
-              String(cargoGroups(fitting).find((item) => item.typeId === typeId)?.quantity ?? 1)
-            );
-            setCargoQuantityFor(typeId);
-          },
-          removeCargo: (typeId) => edit((f) => setCargoQuantity(f, typeId, 0)),
-          canFitFirstFree: (typeId, rack) => canPlace(rack, typeId),
-          fitFirstFree: (typeId, rack) => {
-            if (rack === 'drone') {
-              edit((f) => addDronesWithinBay(f, typeId, 1, droneBay), `drone-add-${typeId}`);
-              return;
-            }
-            if (slotCounts !== null && fitting !== null)
-              fitAt(rack, firstFreeSlotIndex(fitting, rack, slotCounts[rack]), typeId);
-          },
-          // Drag is pointer-only: a touch screen has the menus instead.
-          dropHandlers: isDesktop
-            ? { addType: true, moveModule: true, loadCharge: true, launchDrone: true }
-            : {},
-          drop: handleDrop,
-        };
 
   const addTitle =
     target === null
@@ -617,7 +400,7 @@ function FittingsPage() {
           typeName={typeName}
           onSlotSelect={selectSlot}
           // Drag is pointer-only: a touch tablet taps a slot and picks instead.
-          onDropType={isDesktop ? (rack, index, typeId) => fitAt(rack, index, typeId) : undefined}
+          onDropType={isDesktop ? fitAt : undefined}
           onMoveModule={
             isDesktop ? (rack, from, to) => edit((f) => moveModule(f, rack, from, to)) : undefined
           }
@@ -1077,45 +860,20 @@ function FittingsPage() {
             {addPanel}
           </SlideOver>
         )}
-        <Modal
-          open={cargoQuantityFor !== null}
-          onClose={() => setCargoQuantityFor(null)}
-          title={t('fittings.item.quantityTitle', {
-            name: cargoQuantityFor === null ? '' : catalogueTypeName(catalogue, cargoQuantityFor),
-          })}
-        >
-          <form
-            className="space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const quantity = Math.floor(Number(cargoQuantityDraft));
+        {cargoQuantityFor !== null && (
+          <CargoQuantityDialog
+            name={catalogueTypeName(catalogue, cargoQuantityFor)}
+            quantity={
+              cargoGroups(fitting).find((item) => item.typeId === cargoQuantityFor)?.quantity ?? 1
+            }
+            onClose={() => setCargoQuantityFor(null)}
+            onConfirm={(quantity) => {
               const typeId = cargoQuantityFor;
-              if (typeId === null || !Number.isFinite(quantity) || quantity < 0) return;
               edit((f) => setCargoQuantity(f, typeId, quantity));
               setCargoQuantityFor(null);
             }}
-          >
-            <label className="block text-xs text-text-dim" htmlFor="fitting-cargo-quantity">
-              {t('fittings.edit.quantity')}
-            </label>
-            <TextInput
-              id="fitting-cargo-quantity"
-              type="number"
-              min={0}
-              className="w-full"
-              value={cargoQuantityDraft}
-              onChange={(e) => setCargoQuantityDraft(e.target.value)}
-            />
-            <div className="flex justify-end gap-2">
-              <Button onClick={() => setCargoQuantityFor(null)}>
-                {t('fittings.myFittings.cancel')}
-              </Button>
-              <Button type="submit" variant="primary">
-                {t('fittings.item.quantityConfirm')}
-              </Button>
-            </div>
-          </form>
-        </Modal>
+          />
+        )}
       </div>
     </FittingItemActionsProvider>
   );

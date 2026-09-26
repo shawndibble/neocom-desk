@@ -177,5 +177,9 @@ export function useChargeLoading({
     [edit, accepts, chargesPerLoad, catalogue, t]
   );
 
-  return { accepts, targetsFor, cargoChargesFor, load, message };
+  // One object while none of its parts changes, so the item menus it feeds keep their memoization.
+  return useMemo(
+    () => ({ accepts, targetsFor, cargoChargesFor, load, message }),
+    [accepts, targetsFor, cargoChargesFor, load, message]
+  );
 }

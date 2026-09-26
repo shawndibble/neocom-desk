@@ -485,7 +485,10 @@ export function addCargo(fitting: Fitting, typeId: number, quantity: number): Fi
 }
 
 /** m3 the cargo takes, every stack of it. */
-export function cargoVolumeUsed(fitting: Fitting, volumeOf: (typeId: number) => number): number {
+export function cargoVolumeUsed(
+  fitting: Pick<Fitting, 'cargo'>,
+  volumeOf: (typeId: number) => number
+): number {
   return fitting.cargo.reduce((sum, item) => sum + volumeOf(item.typeId) * item.quantity, 0);
 }
 
