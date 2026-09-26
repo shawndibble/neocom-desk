@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import {
   alignTimeSeconds,
   showsDrones,
+  extractCapacitorBudget,
   extractDroneLimits,
+  extractTank,
+  extractLockedTargets,
+  extractFighterStats,
   extractFittingStats,
   extractModuleResult,
   extractOffense,
@@ -11,7 +15,7 @@ import {
   weaponRowKey,
   type OffenseItem,
 } from './stats';
-import { DOGMA_ATTRIBUTE, ITEM_DOGMA_ATTRIBUTE } from './types';
+import { DOGMA_ATTRIBUTE, ITEM_DOGMA_ATTRIBUTE, type FittingItemState } from './types';
 
 function attrs(
   values: Partial<Record<keyof typeof DOGMA_ATTRIBUTE, number>>
@@ -619,5 +623,295 @@ describe('extractFittingStats — hardpoints', () => {
       [101, { value: 2 }],
     ]);
     expect(extractFittingStats([], ship, []).hardpoints).toEqual({ turrets: 3, launchers: 2 });
+  });
+});
+
+function itemAttrs(
+  values: Partial<Record<keyof typeof ITEM_DOGMA_ATTRIBUTE, number>>
+): Map<number, { value: number }> {
+  const map = new Map<number, { value: number }>();
+  for (const [key, value] of Object.entries(values)) {
+    map.set(ITEM_DOGMA_ATTRIBUTE[key as keyof typeof ITEM_DOGMA_ATTRIBUTE], { value });
+  }
+  return map;
+}
+
+function running(
+  typeId: number,
+  values: Partial<Record<keyof typeof ITEM_DOGMA_ATTRIBUTE, number>>,
+  { chargeTypeId, state = 'active' }: { chargeTypeId?: number; state?: FittingItemState } = {}
+) {
+  return {
+    item: {
+      type_id: typeId,
+      slot: { type: 'medium' },
+      ...(chargeTypeId === undefined ? {} : { charge: { type_id: chargeTypeId } }),
+    },
+    result: { attributes: itemAttrs(values), state },
+  };
+}
+
+describe('extractCapacitorBudget', () => {
+  it("splits the running modules' draw from a cap booster's injection and a nosferatu's take", () => {
+    const modules = [
+      running(1, { capacitorPeakLoad: 20 }),
+      running(2, { capacitorPeakLoad: -400 / 12, capacitorInjectionAmount: 400, cycleTime: 12000 }),
+      running(3, { capacitorPeakLoad: -7.2 }),
+      // Online, not running: draws nothing whatever its figure says.
+      running(4, { capacitorPeakLoad: 50 }, { state: 'online' }),
+    ];
+    const budget = extractCapacitorBudget(
+      modules.map((m) => m.item),
+      modules.map((m) => m.result),
+      attrs({ capacitorPeakRecharge: 35.84 })
+    );
+
+    expect(budget.peakRecharge).toBeCloseTo(35.84, 6);
+    expect(budget.drain).toBeCloseTo(20, 6);
+    expect(budget.boosterInjection).toBeCloseTo(33.333, 3);
+    expect(budget.nosferatuGain).toBeCloseTo(7.2, 6);
+  });
+
+  it('leaves drones, cargo and implants out', () => {
+    const drone = {
+      item: { type_id: 9, slot: { type: 'drone_bay' } },
+      result: { attributes: itemAttrs({ capacitorPeakLoad: 5 }), state: 'active' as const },
+    };
+    const budget = extractCapacitorBudget([drone.item], [drone.result], attrs({}));
+    expect(budget.drain).toBe(0);
+  });
+});
+
+describe('extractTank', () => {
+  const layers = {
+    shield: {
+      hp: 1000,
+      ehp: 2000,
+      emResonance: 1,
+      thermalResonance: 1,
+      kineticResonance: 1,
+      explosiveResonance: 1,
+    },
+    armor: {
+      hp: 1000,
+      ehp: 4000,
+      emResonance: 1,
+      thermalResonance: 1,
+      kineticResonance: 1,
+      explosiveResonance: 1,
+    },
+    hull: {
+      hp: 1000,
+      ehp: 1000,
+      emResonance: 1,
+      thermalResonance: 1,
+      kineticResonance: 1,
+      explosiveResonance: 1,
+    },
+  };
+
+  it('reads burst per layer off the ship and sustained from the local repairers, scaled to EHP/s', () => {
+    const modules = [
+      running(1, { shieldBoostRate: 40, capacitorPeakLoad: 20 }),
+      // A remote armor repairer: it has a range, and what it repairs is someone else's.
+      running(2, { armorRepairRate: 50, capacitorPeakLoad: 10, maxRange: 6000 }),
+    ];
+    const tank = extractTank(
+      modules.map((m) => m.item),
+      modules.map((m) => m.result),
+      attrs({
+        shieldBoostRate: 40,
+        capacitorPeakRecharge: 20,
+        capacitorPeakLoad: 30,
+        passiveShieldRechargeRate: 5,
+        passiveShieldEffectiveRechargeRate: 10,
+      }),
+      layers
+    );
+
+    expect(tank.burst).toEqual({ shield: 40, armor: 0, hull: 0 });
+    // 10 GJ/s go to the remote rep, 10 are left for the booster's 20.
+    expect(tank.capFraction).toBeCloseTo(0.5, 6);
+    expect(tank.sustained.shield).toBeCloseTo(20, 6);
+    expect(tank.passiveShield).toBe(5);
+    // Shield EHP/HP is 2: burst 80 + passive 10; sustained 40 + 10.
+    expect(tank.burstEffective).toBeCloseTo(90, 6);
+    expect(tank.sustainedEffective).toBeCloseTo(50, 6);
+  });
+
+  it('counts remote repair received (projected onto the ship) as sustained, drawing none of its capacitor', () => {
+    const rep = running(3530, { armorRepairRate: 30, capacitorPeakLoad: 10 });
+    const tank = extractTank(
+      [rep.item],
+      [rep.result],
+      // 30 HP/s of its own, 200 HP/s landing from a logistics ship.
+      attrs({ armorRepairRate: 230, capacitorPeakRecharge: 5, capacitorPeakLoad: 10 }),
+      layers
+    );
+    expect(tank.burst.armor).toBe(230);
+    // Its own rep gets half the capacitor it needs; the incoming reps all land.
+    expect(tank.sustained.armor).toBeCloseTo(15 + 200, 6);
+  });
+
+  it('spreads a loaded ancillary armor repairer over its reload and gives its empty rate', () => {
+    const aar = running(
+      33101,
+      {
+        armorRepairRate: 78,
+        capacitorPeakLoad: 0,
+        chargeAmount: 32,
+        chargeRate: 4,
+        cycleTime: 12000,
+        reloadTime: 60000,
+        chargedArmorDamageMultiplier: 3,
+      },
+      { chargeTypeId: 28668 }
+    );
+    const tank = extractTank(
+      [aar.item],
+      [aar.result],
+      attrs({ armorRepairRate: 78, capacitorPeakRecharge: 30 }),
+      layers
+    );
+
+    expect(tank.sustained.armor).toBeCloseTo((78 * 96) / 156, 6);
+    expect(tank.ancillary).toEqual([
+      { typeId: 33101, layer: 'armor', loaded: 78, empty: 26, isLoaded: true },
+    ]);
+  });
+
+  it('gives an empty ancillary armor repairer its loaded rate from its own multiplier', () => {
+    const aar = running(33101, {
+      armorRepairRate: 26,
+      capacitorPeakLoad: 17.8,
+      chargedArmorDamageMultiplier: 3,
+    });
+    const tank = extractTank(
+      [aar.item],
+      [aar.result],
+      attrs({ armorRepairRate: 26, capacitorPeakRecharge: 30, capacitorPeakLoad: 17.8 }),
+      layers
+    );
+    expect(tank.ancillary).toEqual([
+      { typeId: 33101, layer: 'armor', loaded: 78, empty: 26, isLoaded: false },
+    ]);
+    expect(tank.sustained.armor).toBeCloseTo(26, 6);
+  });
+});
+
+describe('extractFittingStats resources', () => {
+  it('reads the sensor strength and names which of the four the hull has', () => {
+    const stats = extractFittingStats(
+      [],
+      attrs({ scanStrength: 21.6, scanRadarStrength: 21.6 }),
+      []
+    );
+    expect(stats.sensor).toEqual({ strength: 21.6, type: 'radar' });
+  });
+
+  it('has no sensor type on a hull with none', () => {
+    expect(extractFittingStats([], attrs({}), []).sensor).toEqual({ strength: 0, type: null });
+  });
+
+  it('reads the cargo hold, fleet hangar and mining hold', () => {
+    const stats = extractFittingStats(
+      [],
+      attrs({ cargoCapacity: 4600, fleetHangarCapacity: 5000, miningHoldCapacity: 28000 }),
+      []
+    );
+    expect(stats.holds).toEqual({ cargo: 4600, fleetHangar: 5000, miningHold: 28000 });
+  });
+
+  it('reads a jump drive only on a hull that has one', () => {
+    const jumper = extractFittingStats(
+      [],
+      attrs({
+        jumpDriveRange: 7,
+        jumpDriveConsumptionAmount: 3000,
+        jumpDriveConsumptionType: 16274,
+      }),
+      []
+    );
+    expect(jumper.jumpDrive).toEqual({
+      rangeLightYears: 7,
+      fuelTypeId: 16274,
+      fuelPerLightYear: 3000,
+    });
+    // Every hull reads the consumption default; only the range says there's a drive.
+    expect(
+      extractFittingStats([], attrs({ jumpDriveConsumptionAmount: 1000 }), []).jumpDrive
+    ).toBeNull();
+  });
+});
+
+describe('extractLockedTargets', () => {
+  const character = (bonus?: number) =>
+    new Map(bonus === undefined ? [] : [[192, { value: bonus }]]);
+
+  it('is the lower of the hull’s limit and the pilot’s: two, plus a target a level of Target Management and Advanced Target Management', () => {
+    expect(extractLockedTargets(attrs({ maxLockedTargets: 7 }), character(10))).toEqual({
+      ship: 7,
+      pilot: 12,
+      effective: 7,
+    });
+    expect(extractLockedTargets(attrs({ maxLockedTargets: 7 }), character(1))).toEqual({
+      ship: 7,
+      pilot: 3,
+      effective: 3,
+    });
+  });
+
+  it('gives an untrained pilot the base two', () => {
+    expect(extractLockedTargets(attrs({ maxLockedTargets: 7 }), character()).effective).toBe(2);
+  });
+});
+
+describe('extractFighterStats', () => {
+  it('reads fighter DPS, tubes and each class’s limit and use, and the fighter bay', () => {
+    const ship = new Map(
+      Object.entries({
+        [DOGMA_ATTRIBUTE.fighterDamagePerSecond]: 822.7,
+        [DOGMA_ATTRIBUTE.fighterTubes]: 4,
+        [DOGMA_ATTRIBUTE.fighterTubesUsed]: 3,
+        [DOGMA_ATTRIBUTE.fighterLightSlots]: 3,
+        [DOGMA_ATTRIBUTE.fighterLightSlotsUsed]: 2,
+        [DOGMA_ATTRIBUTE.fighterSupportSlots]: 2,
+        [DOGMA_ATTRIBUTE.fighterSupportSlotsUsed]: 1,
+        [DOGMA_ATTRIBUTE.fighterCapacity]: 93750,
+        [DOGMA_ATTRIBUTE.fighterCapacityUsed]: 36000,
+      }).map(([id, value]) => [Number(id), { value }])
+    );
+    expect(extractFighterStats(ship)).toEqual({
+      dps: 822.7,
+      tubes: { used: 3, total: 4 },
+      light: { used: 2, total: 3 },
+      support: { used: 1, total: 2 },
+      heavy: { used: 0, total: 0 },
+      bay: { used: 36000, total: 93750 },
+    });
+  });
+});
+
+describe('extractOffense — fighters', () => {
+  it('gives each launched fighter type its own row, per fighter times the squadron', () => {
+    const offense = extractOffense(
+      [{ typeId: 23055, quantity: 6, isDrone: true, isFighter: true }],
+      [
+        {
+          attributes: new Map([
+            [ITEM_DOGMA_ATTRIBUTE.damagePerSecond, { value: 45.7 }],
+            [ITEM_DOGMA_ATTRIBUTE.damageVolley, { value: 100 }],
+          ]),
+          state: 'active',
+          max_state: 'active',
+        },
+      ],
+      null
+    );
+    expect(offense.weapons).toEqual([
+      expect.objectContaining({ typeId: 23055, isFighter: true, count: 6 }),
+    ]);
+    expect(offense.dps).toBeCloseTo(45.7 * 6, 6);
+    expect(weaponRowKey(offense.weapons[0])).toBe('fighter:23055:');
   });
 });

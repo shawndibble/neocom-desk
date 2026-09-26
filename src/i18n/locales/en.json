@@ -188,7 +188,8 @@
         "online": "online",
         "active": "active",
         "overload": "overloaded"
-      }
+      },
+      "cargoHold": "Cargo hold (m³)"
     },
     "view": {
       "label": "Fitting view",
@@ -261,7 +262,8 @@
         "low": "low slot",
         "rig": "rig slot",
         "subsystem": "subsystem slot",
-        "drone": "drone bay"
+        "drone": "drone bay",
+        "cargo": "cargo hold"
       },
       "searchLabel": "Search items to add",
       "searchPlaceholder": "Search modules, rigs, drones…",
@@ -281,7 +283,8 @@
       "tab": {
         "modules": "Modules",
         "charges": "Charges",
-        "drones": "Drones"
+        "drones": "Drones",
+        "cargo": "Cargo"
       },
       "tabsLabel": "What to add",
       "addingTo": "Adding to {{slot}} {{index}}",
@@ -289,8 +292,13 @@
       "checkingHull": "Checking what fits this ship…",
       "noChargeTakers": "Nothing fitted takes charges.",
       "loaded": "loaded",
-      "dragHint": "Click an item to fit it, or drag it onto a slot on the Ring.",
-      "chargeTaker": "{{count}}× {{name}}"
+      "dragHint": "Click an item to fit it, or drag it onto a slot on the Ring or a rack in the List.",
+      "chargeTaker": "{{count}}× {{name}}",
+      "cargoSearchLabel": "Search items to put in the cargo hold",
+      "cargoSearchPlaceholder": "Search any item — ammo, paste, filaments…",
+      "cargoHint": "Search for anything to carry: ammo, nanite paste, cap boosters, filaments, a depot.",
+      "cargoAddCount_one": "+{{count}}",
+      "cargoAddCount_other": "+{{count}}"
     },
     "start": {
       "newTitle": "New fitting from a hull",
@@ -354,7 +362,16 @@
         "signature": "Signature",
         "skillsNeedCharacter": "Pick a Character to see which skills this needs.",
         "skillsHint": "You can't fly this yet. Add the missing skills to a Skill Plan:",
-        "tooLargeToCompare": "Too large to compare through a link"
+        "tooLargeToCompare": "Too large to compare through a link",
+        "meter": "{{used}} / {{total}} {{unit}}",
+        "meterOver": "{{used}} / {{total}} {{unit}} (over)",
+        "unit": {
+          "teraflops": "tf",
+          "megawatts": "MW",
+          "megabits": "Mbit/s",
+          "speed": "{{value}} m/s",
+          "metres": "{{value}} m"
+        }
       }
     },
     "header": {
@@ -446,7 +463,11 @@
         "navigation": "Navigation",
         "drones": "Drones",
         "fitting": "Fitting",
-        "price": "Price"
+        "price": "Price",
+        "support": "Support out",
+        "mining": "Mining",
+        "projected": "Projected effects",
+        "fighters": "Fighters"
       },
       "capacitorStable": "Stable at {{pct}}%",
       "capacitorDepletes": "Depletes in {{seconds}}s",
@@ -514,7 +535,17 @@
         "powergrid": "Powergrid",
         "calibration": "Calibration",
         "sell": "Sell",
-        "buy": "Buy"
+        "buy": "Buy",
+        "maxActiveDrones": "Max active drones",
+        "cargo": "Cargo hold",
+        "fleetHangar": "Fleet hangar",
+        "miningHold": "Mining hold",
+        "jumpRange": "Jump range",
+        "jumpFuel": "Jump fuel",
+        "sensorStrength": "Sensor strength",
+        "fighterDps": "Fighter DPS",
+        "fighterTubes": "Tubes",
+        "fighterBay": "Fighter bay"
       },
       "unit": {
         "gj": "{{value}} GJ",
@@ -527,8 +558,93 @@
         "bandwidth": "{{used}} / {{total}} Mbit/s",
         "cubicMetres": "{{value}} m³",
         "usedOfTotal": "{{used}} / {{total}}",
-        "isk": "{{value}} ISK"
-      }
+        "isk": "{{value}} ISK",
+        "ehpPerSecond": "{{value}} EHP/s",
+        "gjPerSecond": "{{value}} GJ/s",
+        "hpPerSecond": "{{value}} HP/s",
+        "lightYears": "{{value}} ly",
+        "sensor": "{{value}} {{type}}",
+        "fuelPerLightYear": "{{value}} {{fuel}}/ly",
+        "cubicMetresPerSecond": "{{value}} m³/s",
+        "cubicMetresPerHour": "{{value}} m³/h",
+        "cubicMetresUsed": "{{used}} / {{total}} m³"
+      },
+      "tank": {
+        "passiveShield": "Passive shield regen: {{value}} HP/s",
+        "ancillary": "{{name}}: {{loaded}} HP/s with paste, {{empty}} dry",
+        "burst": "Burst tank",
+        "sustained": "Sustained",
+        "capLimited": "Cap-limited: repairers get {{pct}}% of the capacitor they need",
+        "estimateNote": "Sustained is our estimate: what the capacitor can feed at peak recharge, cap boosters counted without reloads, ancillary repairers with theirs."
+      },
+      "cap": {
+        "peakRecharge": "Peak recharge",
+        "drain": "Drain",
+        "boosters": "Cap boosters",
+        "nosferatu": "Nosferatu",
+        "delta": "Delta",
+        "boosterCharge": "Booster charge to hold peak",
+        "chargeEvery": "1 every {{seconds}} s"
+      },
+      "copyText": {
+        "allOverheated": "All figures overheated",
+        "dps": "DPS {{dps}}{{overheated}} · volley {{volley}}",
+        "dpsOverheated": " ({{value}} overheated)",
+        "ehp": "EHP {{ehp}} · shield {{shield}} HP · armor {{armor}} HP · hull {{hull}} HP",
+        "resists": "Resists EM/Th/Kin/Exp: shield {{shield}} · armor {{armor}} · hull {{hull}}",
+        "tank": "Tank {{burst}} EHP/s burst · {{sustained}} EHP/s sustained",
+        "capacitor": "Capacitor {{state}} · delta {{delta}} GJ/s",
+        "navigation": "Speed {{speed}} m/s · align {{align}} s · warp {{warp}} AU/s",
+        "targeting": "Targeting {{range}} km · {{targets}} targets · {{scanResolution}} mm · signature {{signature}} m",
+        "drones": "Drones {{dps}} DPS · {{used}} / {{total}} Mbit/s",
+        "fitting": "CPU {{cpuUsed}} / {{cpuTotal}} · PG {{pgUsed}} / {{pgTotal}} · calibration {{calibrationUsed}} / {{calibrationTotal}}"
+      },
+      "copy": "Copy stats",
+      "copied": "Stats copied",
+      "copyFailed": "Couldn't copy",
+      "overheatAll": "Overheat all",
+      "overheatAllOn": "Every figure is overheated",
+      "lockedTargetsValue": "{{effective}} (hull {{ship}}, pilot {{pilot}})",
+      "sensorType": {
+        "radar": "Radar",
+        "ladar": "Ladar",
+        "magnetometric": "Magnetometric",
+        "gravimetric": "Gravimetric"
+      },
+      "support": {
+        "range": "{{optimal}} km",
+        "rangeFalloff": "{{optimal}} + {{falloff}} km",
+        "modules_one": "{{count}} module",
+        "modules_other": "{{count}} modules",
+        "kind": {
+          "remoteShield": "{{value}} HP/s shield",
+          "remoteArmor": "{{value}} HP/s armor",
+          "remoteHull": "{{value}} HP/s hull",
+          "neutralizer": "{{value}} GJ/s neutralized",
+          "nosferatu": "{{value}} GJ/s drained",
+          "capTransfer": "{{value}} GJ/s transferred",
+          "web": "−{{value}}% speed",
+          "warpDisruption_one": "{{value}} point",
+          "warpDisruption_other": "{{value}} points",
+          "ecm": "{{value}} jam strength",
+          "targetPainter": "+{{value}}% signature",
+          "trackingDisruptor": "−{{value}}% tracking",
+          "sensorDampener": "−{{value}}% lock range",
+          "guidanceDisruptor": "−{{value}}% explosion velocity"
+        }
+      },
+      "mining": {
+        "perCycle": "{{value}} m³ / {{seconds}} s",
+        "crystal": "Crystal: {{name}}",
+        "total": "Total",
+        "perHour": "Per hour",
+        "residue": "Residue",
+        "residueValue": "−{{pct}}% expected ({{value}} m³/s)",
+        "fillsIn": "{{hold}} full in",
+        "note": "Yield includes expected critical successes; a crystal's bonus counts only on its own ore.",
+        "fillTime": "{{time}} ({{capacity}} m³)"
+      },
+      "fightersNoOverheat": "Fighters don't overheat"
     },
     "variations": {
       "title": "Variations",
@@ -591,7 +707,13 @@
         "maxVelocity": "Max velocity {{value}} m/s",
         "agility": "Inertia modifier {{value}}",
         "mass": "Mass {{value}} t",
-        "warpSpeed": "Warp speed {{value}} AU/s"
+        "warpSpeed": "Warp speed {{value}} AU/s",
+        "overheatedDps": "Overheated DPS {{value}}",
+        "burstTank": "Burst tank {{value}} EHP/s",
+        "sustainedTank": "Sustained tank {{value}} EHP/s",
+        "capacitorDelta": "Capacitor delta {{value}} GJ/s",
+        "sensorStrength": "Sensor strength {{value}}",
+        "cargoCapacity": "Cargo hold {{value}} m³"
       }
     },
     "damageProfile": {
@@ -644,17 +766,20 @@
       "save": "Save",
       "cancel": "Cancel",
       "errorName": "Give the profile a name.",
-      "errorValues": "Enter a signature radius above zero and a speed of zero or more.",
+      "errorValues": "Enter a signature radius above zero, a speed of zero or more, and resists from 0 to 100%.",
       "builtin": {
         "frigate": "NPC frigate",
         "cruiser": "NPC cruiser",
         "battleship": "NPC battleship"
-      }
+      },
+      "resistsLabel": "Resists (%)",
+      "resistLabel": "{{type}} resist (%)",
+      "resistSummary": " · resists {{resists}}%"
     },
     "appliedDps": {
       "summary": "Raw DPS {{raw}} · applied {{applied}} at {{km}} km",
-      "assumptions": "Our own calculation, not the engine's: your ship stationary, the target moving fully transversal at the profile's speed. Drones only apply inside drone control range.",
-      "noWeapons": "No weapons are running — set a turret or launcher active, or launch drones.",
+      "assumptions": "Our own calculation, not the engine's: your ship stationary, the target moving fully transversal at the profile's speed. Drones only apply inside drone control range. Fighters fly to the target and are counted at full damage at any range — their hit chance isn't modelled.",
+      "noWeapons": "No weapons are running — set a turret or launcher active, or launch drones or fighters.",
       "loading": "Loading graphs…",
       "overlayLabel": "Compare with",
       "overlayNone": "No overlay",
@@ -688,7 +813,23 @@
       "remove": "Remove {{name}}",
       "notFound": "No item found with that exact name.",
       "full": "This set is already full.",
-      "assumesNoImplantsHint": "My clone stats are calculated without this character's fitted implants. Grant Character details for accurate stats."
+      "assumesNoImplantsHint": "My clone stats are calculated without this character's fitted implants. Grant Character details for accurate stats.",
+      "sideEffects": "Side effects",
+      "sideEffect": "{{what}} {{pct}}%",
+      "sideEffectName": {
+        "2735": "Armor HP",
+        "2736": "Armor repair amount",
+        "2737": "Shield capacity",
+        "2739": "Turret optimal range",
+        "2741": "Turret falloff",
+        "2745": "Capacitor capacity",
+        "2746": "Max velocity",
+        "2747": "Turret tracking",
+        "2748": "Missile velocity",
+        "2749": "Missile explosion velocity",
+        "2791": "Missile explosion radius",
+        "4970": "Shield boost amount"
+      }
     },
     "compare": {
       "entryButton": "Compare",
@@ -776,8 +917,161 @@
         "mass": "Mass (t)",
         "warpSpeed": "Warp speed (AU/s)",
         "priceSell": "Price (sell)",
-        "priceBuy": "Price (buy)"
+        "priceBuy": "Price (buy)",
+        "overheatedDps": "Overheated DPS",
+        "burstTank": "Burst tank (EHP/s)",
+        "sustainedTank": "Sustained tank (EHP/s)",
+        "capacitorDelta": "Capacitor delta (GJ/s)",
+        "sensorStrength": "Sensor strength",
+        "cargoCapacity": "Cargo hold (m³)"
+      },
+      "openInEditor": "Open in the editor"
+    },
+    "item": {
+      "slot": "{{rack}} {{index}}",
+      "state": "State",
+      "loadCharge": "Load charge from cargo",
+      "noCargoCharge": "No charge in cargo fits this",
+      "loadThisOne": "Into this module",
+      "loadAllCompatible": "Into every module that takes it",
+      "sameChargeEverywhere": "Load {{name}} into all compatible",
+      "copyToAllOfType": "Copy to all of this type",
+      "swapVariant": "Swap for meta variant",
+      "copyModule": "Copy module",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "moveTo": "Move to slot",
+      "removeAllOfType": "Remove all of this type",
+      "addModule": "Add module",
+      "browse": "Browse…",
+      "paste": "Paste {{name}}",
+      "pasteNone": "Paste module (copy one first)",
+      "fillRack": "Fill rack with {{name}}",
+      "fillRackNone": "Fill rack with last used (none yet)",
+      "launchAll": "Launch all",
+      "moveToBay": "Move to bay",
+      "recallAll": "Recall all drones",
+      "noneTakes": "Nothing fitted takes this",
+      "loadAllCompatibleCount_one": "Load into all compatible ({{count}} module)",
+      "loadAllCompatibleCount_other": "Load into all compatible ({{count}} modules)",
+      "loadInto": "Load into…",
+      "changeQuantity": "Change quantity…",
+      "quantityTitle": "Quantity of {{name}}",
+      "quantityConfirm": "Set quantity",
+      "fitFirstFree": "Fit to first free slot",
+      "addToBay": "Add to drone bay",
+      "addCargo": "Add cargo",
+      "cargoHold": "{{used}} / {{total}} m³",
+      "dragToMove": "Drag {{name}} to another slot",
+      "dragToLaunch": "Drag {{name}} onto Drones to launch it",
+      "dragToLoad": "Drag {{name}} onto a module that takes it",
+      "loaded_one": "Loaded {{name}} into {{count}} module.",
+      "loaded_other": "Loaded {{name}} into {{count}} modules.",
+      "loadRanOut_one": "Loaded {{name}} into {{loaded}} of {{count}} module — cargo ran out.",
+      "loadRanOut_other": "Loaded {{name}} into {{loaded}} of {{count}} modules — cargo ran out.",
+      "loadNone": "Nothing fitted takes {{name}}.",
+      "changeCharge": "Change charge",
+      "noCharges": "No other charge fits this",
+      "launch": "Launch"
+    },
+    "libraryMenu": {
+      "open": "Open",
+      "compare": "Compare with…",
+      "duplicate": "Duplicate",
+      "copyEft": "Copy EFT",
+      "copyShareLink": "Copy Share Link",
+      "saveToEve": "Save to EVE…",
+      "rename": "Rename…",
+      "delete": "Delete…",
+      "unreadable": "This saved fitting can no longer be read.",
+      "duplicated": "Saved a copy of {{name}} to My Fittings.",
+      "savedToEve": "Saved to EVE."
+    },
+    "skillOverrides": {
+      "label": "Skills",
+      "base": {
+        "character": "Own skills",
+        "all0": "All 0",
+        "allV": "All V"
+      },
+      "custom": "Set levels…",
+      "customCount_one": "{{count}} level set",
+      "customCount_other": "{{count}} levels set",
+      "customTitle": "Skill levels for these stats",
+      "customHint": "Set single skills on top of the choice above. Only these stats change: what you can fly still follows your Character's real skills.",
+      "search": "Find a skill",
+      "loading": "Loading skills…",
+      "add": "Set {{name}}",
+      "levelOf": "{{name}} level",
+      "remove": "Clear {{name}}",
+      "done": "Done"
+    },
+    "affectedBy": {
+      "title": "Affected by",
+      "loading": "Working out what affects it…",
+      "none": "Nothing changes this module's attributes.",
+      "failed": "Couldn't work out what affects this module.",
+      "change": "{{base}} → {{value}}",
+      "notApplied": "not running",
+      "penalty": "stacking penalty {{pct}}%",
+      "kind": {
+        "ship": "Hull",
+        "mode": "Mode",
+        "character": "Character",
+        "item": "Module",
+        "charge": "Charge",
+        "skill": "Skill",
+        "projected": "Projected",
+        "buff": "Fleet boost #{{id}}"
+      },
+      "operator": {
+        "pre_assign": "= {{value}}",
+        "post_assign": "= {{value}}",
+        "pre_mul": "×{{value}}",
+        "post_mul": "×{{value}}",
+        "pre_div": "÷{{value}}",
+        "post_div": "÷{{value}}",
+        "mod_add": "+{{value}}",
+        "mod_sub": "−{{value}}",
+        "post_percent": "{{value}}%"
       }
+    },
+    "projected": {
+      "hint": "Another saved Fitting's command bursts, remote repair, webs, neutralizers and the like, landing on this one. Each is worked out at all skills V.",
+      "add": "Project a saved fitting",
+      "addPlaceholder": "Pick a fitting…",
+      "needsCharacter": "Save fittings to My Fittings to project them onto this one.",
+      "none": "Nothing projected.",
+      "nothing": "Projects nothing (no running burst or remote module)",
+      "count_one": "{{count}} ship",
+      "count_other": "{{count}} ships",
+      "fewer": "One fewer {{name}}",
+      "more": "One more {{name}}",
+      "remove": "Stop projecting {{name}}",
+      "failed": "Couldn't work out what {{name}} projects.",
+      "meta_one": "{{count}} ship",
+      "meta_other": "{{count}} ships"
+    },
+    "mode": {
+      "label": "Tactical mode"
+    },
+    "fighters": {
+      "title": "Fighters",
+      "tubes": "{{used}} of {{total}} tubes",
+      "classes": "light {{light}} · support {{support}} · heavy {{heavy}}",
+      "none": "No fighters.",
+      "class": {
+        "light": "Light fighter",
+        "support": "Support fighter",
+        "heavy": "Heavy fighter"
+      },
+      "size": "{{count}}/{{full}}",
+      "fewer": "One fewer {{name}}",
+      "more": "One more {{name}}",
+      "launched": "Launched",
+      "remove": "Remove {{name}}",
+      "search": "Find a fighter",
+      "add": "Add {{name}}"
     }
   },
   "skills": {
@@ -2831,7 +3125,8 @@
       "action": "Back to all locations"
     },
     "nodeBadge_one": "{{count}} item · {{value}} ISK",
-    "nodeBadge_other": "{{count}} items · {{value}} ISK"
+    "nodeBadge_other": "{{count}} items · {{value}} ISK",
+    "openInFittings": "Open in Fittings"
   },
   "mail": {
     "title": "Mail",

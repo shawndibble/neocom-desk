@@ -1,7 +1,8 @@
 /**
  * Picks the Target Profile applied DPS is worked out against, and manages the
  * pilot's custom ones (issue #1546) — create, edit, delete, all synced via
- * `targetProfiles.ts`. The two-field twin of `DamageProfilePicker`.
+ * `targetProfiles.ts`. A target has a signature, a speed and, optionally,
+ * a resist to each damage type — the twin of `DamageProfilePicker`.
  */
 import { useId, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +26,20 @@ import {
   BUILT_IN_TARGET_PROFILES,
   isValidTargetProfile,
   type CustomTargetProfile,
+  type TargetProfile,
+  type TargetResists,
 } from '@/engine/fittings/targetProfile';
+
+const RESIST_TYPES = ['em', 'thermal', 'kinetic', 'explosive'] as const;
+
+type ResistDraft = Record<keyof TargetResists, string>;
+
+const NO_RESIST_DRAFT: ResistDraft = { em: '', thermal: '', kinetic: '', explosive: '' };
+
+/** "50/40/30/20" — whole percentages, EM first as the game orders them. */
+function resistSummary(resists: TargetResists): string {
+  return RESIST_TYPES.map((type) => Math.round(resists[type] * 100)).join('/');
+}
 import {
   newCustomTargetProfileId,
   useTargetProfileName,
@@ -37,17 +51,45 @@ interface Draft {
   name: string;
   signatureRadius: string;
   velocity: string;
+  /** Percent, as typed; empty is none. */
+  resists: ResistDraft;
 }
 
-const EMPTY_DRAFT: Draft = { id: null, name: '', signatureRadius: '125', velocity: '200' };
+const EMPTY_DRAFT: Draft = {
+  id: null,
+  name: '',
+  signatureRadius: '125',
+  velocity: '200',
+  resists: NO_RESIST_DRAFT,
+};
 
 function draftOf(profile: CustomTargetProfile): Draft {
+  const resists = profile.resists;
   return {
     id: profile.id,
     name: profile.name,
     signatureRadius: String(profile.signatureRadius),
     velocity: String(profile.velocity),
+    resists: resists
+      ? {
+          em: String(resists.em * 100),
+          thermal: String(resists.thermal * 100),
+          kinetic: String(resists.kinetic * 100),
+          explosive: String(resists.explosive * 100),
+        }
+      : NO_RESIST_DRAFT,
   };
+}
+
+/**
+ * Typed percentages as shares; `undefined` when every one is empty or 0, so
+ * a profile without resists keeps the shape it had before resists existed.
+ */
+function resistsOf(draft: ResistDraft): TargetResists | undefined {
+  const resists = Object.fromEntries(
+    RESIST_TYPES.map((type) => [type, draft[type] === '' ? 0 : Number(draft[type]) / 100])
+  ) as unknown as TargetResists;
+  return RESIST_TYPES.every((type) => resists[type] === 0) ? undefined : resists;
 }
 
 function ProfileForm({
@@ -63,6 +105,7 @@ function ProfileForm({
   const [name, setName] = useState(draft.name);
   const [signatureRadius, setSignatureRadius] = useState(draft.signatureRadius);
   const [velocity, setVelocity] = useState(draft.velocity);
+  const [resists, setResists] = useState(draft.resists);
   const [error, setError] = useState<string | null>(null);
   const errorId = useId();
 
@@ -74,9 +117,11 @@ function ProfileForm({
       return;
     }
     // An empty speed is a stationary target; an empty signature is invalid.
-    const values = {
+    const typedResists = resistsOf(resists);
+    const values: TargetProfile = {
       signatureRadius: signatureRadius === '' ? Number.NaN : Number(signatureRadius),
       velocity: Number(velocity || 0),
+      ...(typedResists ? { resists: typedResists } : {}),
     };
     if (!isValidTargetProfile(values)) {
       setError(t('fittings.targetProfile.errorValues'));
@@ -124,6 +169,34 @@ function ProfileForm({
           />
         </label>
       </div>
+      <fieldset className="space-y-1">
+        <legend className="text-xs text-text-dim">
+          {t('fittings.targetProfile.resistsLabel')}
+        </legend>
+        <div className="grid grid-cols-4 gap-2">
+          {RESIST_TYPES.map((type) => (
+            <label key={type} className="block space-y-1 text-xs text-text-dim">
+              <span>{t(`fittings.stats.damageTypeShort.${type}`)}</span>
+              <TextInput
+                size="sm"
+                type="number"
+                min={0}
+                max={100}
+                inputMode="decimal"
+                aria-label={t('fittings.targetProfile.resistLabel', {
+                  type: t(`fittings.stats.damageType.${type}`),
+                })}
+                className="w-full"
+                value={resists[type]}
+                placeholder="0"
+                onChange={(event) =>
+                  setResists((current) => ({ ...current, [type]: event.target.value }))
+                }
+              />
+            </label>
+          ))}
+        </div>
+      </fieldset>
       {error && <FieldError id={errorId}>{error}</FieldError>}
       <div className="flex justify-end gap-2">
         <Button size="sm" onClick={onCancel}>
@@ -170,6 +243,10 @@ function ManageProfilesModal({
                     signature: profile.signatureRadius,
                     velocity: profile.velocity,
                   })}
+                  {profile.resists &&
+                    t('fittings.targetProfile.resistSummary', {
+                      resists: resistSummary(profile.resists),
+                    })}
                 </span>
                 <IconButton
                   variant="plain"
@@ -256,6 +333,10 @@ export function TargetProfilePicker({ targetProfiles }: { targetProfiles: Target
           signature: selected.signatureRadius,
           velocity: selected.velocity,
         })}
+        {selected.resists &&
+          t('fittings.targetProfile.resistSummary', {
+            resists: resistSummary(selected.resists),
+          })}
       </span>
       <Button size="sm" onClick={() => setManaging(true)}>
         {t('fittings.targetProfile.manage')}

@@ -1,5 +1,6 @@
 import {
   cloneElement,
+  useContext,
   isValidElement,
   useEffect,
   useRef,
@@ -13,6 +14,7 @@ import {
 import { Tooltip as TooltipPrimitive } from 'radix-ui';
 import { cx } from '@/lib/cx';
 import { usePortalContainer } from './portalContainer';
+import { TooltipHoldContext } from './tooltipHold';
 
 /** Matches Material UI's `enterTouchDelay` — long enough to not fire on an incidental brush, short enough to feel responsive. */
 const TOUCH_LONG_PRESS_MS = 500;
@@ -44,6 +46,19 @@ interface TooltipProps {
    * action, and touch-and-hold stays the way to read the tooltip.
    */
   openOnTap?: boolean;
+  /**
+   * Off for a trigger whose touch-and-hold belongs to something else — a
+   * context menu, which Radix opens on a long-press: both would open at once.
+   * Touch then has no way to the bubble, so what it says must be reachable
+   * another way (the menu itself, a label). Hover and focus still show it.
+   *
+   * Unset, it follows `TooltipHoldContext`: off inside a row menu
+   * (`RowActionsMenu`), on everywhere else. Set true inside a row menu for a
+   * trigger whose bubble touch has no other way to (`IskAmount`'s exact
+   * figure): the trigger then keeps its touch-and-hold, and the row's menu
+   * never starts from it — a right-click still opens the menu.
+   */
+  holdToReveal?: boolean;
   /** Extra classes merged onto the trigger element, e.g. `w-full` so a full-width trigger stays full-width. */
   className?: string;
 }
@@ -70,7 +85,20 @@ interface TooltipProps {
  * something dismisses it: a tap outside, a scroll, Escape, or another tap on
  * an `openOnTap` trigger.
  */
-export function Tooltip({ content, children, openOnTap = false, className = '' }: TooltipProps) {
+export function Tooltip({
+  content,
+  children,
+  openOnTap = false,
+  holdToReveal: holdProp,
+  className = '',
+}: TooltipProps) {
+  // Off by default inside a row menu, whose touch-and-hold is the menu's (see `tooltipHold.ts`).
+  const holdDefault = useContext(TooltipHoldContext);
+  const holdToReveal = holdProp ?? holdDefault;
+  // Asked for inside a row menu: this trigger's touch-and-hold is its own, not the menu's.
+  const claimsHold = holdProp === true && !holdDefault;
+  /** The last press was a finger (or pen), so a `contextmenu` now is its long-press, not a right-click. */
+  const pressedByTouch = useRef(false);
   // Inside a `Modal` this is the dialog's own body; everywhere else it is null,
   // which Radix reads as "portal to document.body" — see `portalContainer.ts`.
   // A `<dialog>` opened with `showModal()` sits in the browser's top layer,
@@ -107,7 +135,18 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
   }
 
   function handlePointerDown(event: PointerEvent) {
-    if (event.pointerType !== 'mouse') captureOpenState();
+    pressedByTouch.current = event.pointerType !== 'mouse';
+    if (!pressedByTouch.current) return;
+    captureOpenState();
+    // The row menu's own long-press timer starts on this pointerdown, on the row.
+    if (claimsHold) event.stopPropagation();
+  }
+
+  /** A touch long-press's own `contextmenu` (Android fires one) stays here; a right-click reaches the row menu. */
+  function handleContextMenu(event: MouseEvent) {
+    if (!claimsHold || !pressedByTouch.current) return;
+    event.stopPropagation();
+    event.preventDefault();
   }
 
   function handleTouchStart(event: TouchEvent) {
@@ -116,7 +155,7 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
     touchDragged.current = event.touches.length > 1;
     const touch = event.touches.length === 1 ? event.touches[0] : undefined;
     touchOrigin.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
-    if (!openOnTap && !touchDragged.current) {
+    if (!openOnTap && holdToReveal && !touchDragged.current) {
       longPressTimer.current = setTimeout(() => setTouchOpen(true), TOUCH_LONG_PRESS_MS);
     }
   }
@@ -194,6 +233,7 @@ export function Tooltip({ content, children, openOnTap = false, className = '' }
           onTouchEnd={handleTouchEnd}
           onTouchCancel={handleTouchCancel}
           onClick={suppressEchoedClose}
+          onContextMenu={handleContextMenu}
           // A tap opens this bubble, so a clickable table row must leave the
           // tap to it rather than open the row too (see DataTable).
           data-row-control={openOnTap ? '' : undefined}

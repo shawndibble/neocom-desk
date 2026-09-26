@@ -126,3 +126,59 @@ describe('fittingToShareInput / shareToFitting', () => {
     expect(restored).toEqual(original);
   });
 });
+
+describe('fittingToShareInput / shareToFitting — mode and booster side effects', () => {
+  it('round-trips a Tactical Destroyer mode and the side effects on its boosters', async () => {
+    const original = fitting({
+      shipTypeId: 34562,
+      mode: 34566,
+      implantSet: { implants: [], boosters: [9950], boosterSideEffects: [2737] },
+    });
+    const encoded = await encodeFittingShare(fittingToShareInput(original));
+    if (!encoded.ok) throw new Error('encode failed');
+    const decoded = await decodeFittingShare(encoded.payload);
+    if (!decoded.ok) throw new Error('decode failed');
+    expect(shareToFitting(decoded.value, original.name)).toEqual(original);
+  });
+
+  it('drops side effects that arrive with no boosters to carry them', () => {
+    const input = { ...fittingToShareInput(fitting()), boosterSideEffects: [2737] };
+    expect(shareToFitting(input, 'Rifter')).toEqual(fitting());
+  });
+});
+
+describe('fittingToShareInput / shareToFitting — fighters', () => {
+  it('round-trips launched fighter squadrons through the real codec', async () => {
+    const original = fitting({
+      shipTypeId: 23911,
+      fighters: [
+        { typeId: 23055, quantity: 6, state: 'active' },
+        { typeId: 37599, quantity: 3, state: 'active' },
+      ],
+    });
+    const encoded = await encodeFittingShare(fittingToShareInput(original));
+    if (!encoded.ok) throw new Error('encode failed');
+    const decoded = await decodeFittingShare(encoded.payload);
+    if (!decoded.ok) throw new Error('decode failed');
+    expect(shareToFitting(decoded.value, original.name)).toEqual(original);
+  });
+
+  it('keeps a squadron in the bay in the bay', () => {
+    const original = fitting({
+      fighters: [
+        { typeId: 23055, quantity: 6, state: 'active' },
+        { typeId: 23055, quantity: 6, state: 'online' },
+      ],
+    });
+    const input = fittingToShareInput(original);
+    expect(input.fighters).toEqual([
+      { typeId: 23055, count: 6 },
+      { typeId: 23055, count: 6, inBay: true },
+    ]);
+    expect(shareToFitting(input, original.name)).toEqual(original);
+  });
+
+  it('carries no fighters key at all for a Fitting without fighters, as before', () => {
+    expect(shareToFitting(fittingToShareInput(fitting()), 'Rifter')).not.toHaveProperty('fighters');
+  });
+});

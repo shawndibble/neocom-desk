@@ -14,9 +14,15 @@
  * high/mid/low/rig/subsystem; each category is a `,`-joined list of
  * `slot:typeId:state[:chargeTypeId]` (state one of `0`-`3` — see
  * `STATE_TOKENS`). `drones` is `,`-joined `typeId:count:active`; `fighters`
- * and `cargo` are `,`-joined `typeId:count`/`typeId:quantity`; `implants` is
+ * and `cargo` are `,`-joined `typeId:count`/`typeId:quantity` (a fighter
+ * squadron in the bay adds `:0`); `implants` is
  * `implantIds:boosterIds` (each `,`-joined), or empty when no implant set is
- * carried at all. That text is then deflated with the platform's native
+ * carried at all. Two optional trailing sections follow, written only when
+ * the Fitting has something to put in them, so a Fitting without either
+ * encodes exactly as it did before they existed (and older builds still read
+ * its link): `mode` — a Tactical Destroyer's mode type id, or empty — and
+ * `boosterSideEffects` — the effect ids of the booster side effects switched
+ * on, `,`-joined. That text is then deflated with the platform's native
  * `CompressionStream('deflate-raw')` and base64url-encoded — no compression
  * library, per the Appraisal share decision this repo already follows
  * (`20260911-110045`).
@@ -74,6 +80,12 @@ export interface FittingDrone {
 export interface FittingFighter {
   typeId: number;
   count: number;
+  /**
+   * In the fighter bay rather than launched — written as a third `:0` field
+   * only when true, so a launched squadron (and every link from before the
+   * flag) reads `typeId:count` as it always did.
+   */
+  inBay?: boolean;
 }
 
 export interface FittingCargoItem {
@@ -94,6 +106,10 @@ export interface FittingShareInput {
   cargo: readonly FittingCargoItem[];
   implantSet?: FittingImplantSet;
   name?: string;
+  /** A Tactical Destroyer's mode type id. */
+  mode?: number;
+  /** Effect ids of the booster side effects switched on. */
+  boosterSideEffects?: readonly number[];
 }
 
 export interface DecodedFittingShare {
@@ -105,6 +121,8 @@ export interface DecodedFittingShare {
   implantSet?: FittingImplantSet;
   /** Absent for version-1 payloads and for fits shared without a name. */
   name?: string;
+  mode?: number;
+  boosterSideEffects?: number[];
 }
 
 export type EncodeFittingShareResult =
@@ -121,6 +139,8 @@ export const MAX_FIGHTERS = 50;
 export const MAX_CARGO_ITEMS = 500;
 export const MAX_IMPLANTS = 10;
 export const MAX_BOOSTERS = 10;
+/** Four side effects a booster, a booster a slot. */
+export const MAX_BOOSTER_SIDE_EFFECTS = 40;
 
 /** A legitimate fit's body is well under 1KB even uncompressed; this only bounds a decompression bomb. */
 const MAX_DECOMPRESSED_BYTES = 65536;
@@ -254,6 +274,8 @@ export async function encodeFittingShare(
     if (input.implantSet.implants.length > MAX_IMPLANTS) return { ok: false, reason: 'too-large' };
     if (input.implantSet.boosters.length > MAX_BOOSTERS) return { ok: false, reason: 'too-large' };
   }
+  if ((input.boosterSideEffects?.length ?? 0) > MAX_BOOSTER_SIDE_EFFECTS)
+    return { ok: false, reason: 'too-large' };
 
   const modulesSection = SLOT_CATEGORIES.map((category) =>
     input.modules[category]
@@ -271,7 +293,7 @@ export async function encodeFittingShare(
     .join(',');
 
   const fightersSection = input.fighters
-    .map((f) => `${f.typeId.toString(36)}:${f.count.toString(36)}`)
+    .map((f) => `${f.typeId.toString(36)}:${f.count.toString(36)}${f.inBay ? ':0' : ''}`)
     .join(',');
 
   const cargoSection = input.cargo
@@ -284,7 +306,7 @@ export async function encodeFittingShare(
         .join(',')}`
     : '';
 
-  const body = [
+  const sections = [
     input.hullTypeId.toString(36),
     modulesSection,
     dronesSection,
@@ -292,7 +314,16 @@ export async function encodeFittingShare(
     cargoSection,
     implantsSection,
     encodeURIComponent(input.name?.trim().slice(0, MAX_FIT_NAME_LENGTH) ?? ''),
-  ].join('|');
+  ];
+  const sideEffects = input.boosterSideEffects ?? [];
+  // Trailing sections only when there's something in them — see the header.
+  if (input.mode !== undefined || sideEffects.length > 0) {
+    sections.push(input.mode === undefined ? '' : input.mode.toString(36));
+  }
+  if (sideEffects.length > 0) {
+    sections.push(sideEffects.map((id) => id.toString(36)).join(','));
+  }
+  const body = sections.join('|');
 
   const bodyBytes = new TextEncoder().encode(body);
   const compressed = await drain(
@@ -343,7 +374,19 @@ function parseTypeIdCountPairs(
 }
 
 function parseFighters(raw: string): FittingFighter[] | null {
-  return parseTypeIdCountPairs(raw, MAX_FIGHTERS);
+  if (raw === '') return [];
+  const entries = raw.split(',');
+  if (entries.length > MAX_FIGHTERS) return null;
+  const fighters: FittingFighter[] = [];
+  for (const entryStr of entries) {
+    const fields = entryStr.split(':');
+    if (fields.length !== 2 && !(fields.length === 3 && fields[2] === '0')) return null;
+    const typeId = parseBase36Positive(fields[0]);
+    const count = parseBase36Positive(fields[1]);
+    if (typeId === null || count === null) return null;
+    fighters.push(fields.length === 3 ? { typeId, count, inBay: true } : { typeId, count });
+  }
+  return fighters;
 }
 
 function parseCargo(raw: string): FittingCargoItem[] | null {
@@ -390,11 +433,25 @@ function parseName(raw: string): string | undefined | null {
   return name === '' ? undefined : name;
 }
 
+/** `undefined` for an absent/empty mode section; `null` when it's malformed. */
+function parseMode(raw: string | undefined): number | undefined | null {
+  if (raw === undefined || raw === '') return undefined;
+  return parseBase36Positive(raw);
+}
+
 function parseBody(body: string, version: string): DecodeFittingShareResult {
   const parts = body.split('|');
-  if (parts.length !== (version === FITTING_SHARE_VERSION ? 7 : 6))
-    return { ok: false, reason: 'invalid' };
-  const [hullStr, modulesStr, dronesStr, fightersStr, cargoStr, implantsStr, nameStr = ''] = parts;
+  // Version 1: six sections. Version 2 adds the name, then the optional mode
+  // and booster side effects.
+  const named = version === FITTING_SHARE_VERSION;
+  const base = named ? 7 : 6;
+  // Only version 2 carries the trailing sections; version 1 is exactly six.
+  const max = named ? base + 2 : base;
+  if (parts.length < base || parts.length > max) return { ok: false, reason: 'invalid' };
+  const [hullStr, modulesStr, dronesStr, fightersStr, cargoStr, implantsStr] = parts;
+  const nameStr = named ? parts[6] : '';
+  const modeStr = parts[base];
+  const sideStr = parts[base + 1];
 
   const hullTypeId = parseBase36Positive(hullStr);
   if (hullTypeId === null) return { ok: false, reason: 'invalid' };
@@ -443,10 +500,24 @@ function parseBody(body: string, version: string): DecodeFittingShareResult {
   if (implantSet === null) return { ok: false, reason: 'invalid' };
   const name = parseName(nameStr);
   if (name === null) return { ok: false, reason: 'invalid' };
+  const mode = parseMode(modeStr);
+  if (mode === null) return { ok: false, reason: 'invalid' };
+  const boosterSideEffects = parseTypeIdList(sideStr ?? '', MAX_BOOSTER_SIDE_EFFECTS);
+  if (boosterSideEffects === null) return { ok: false, reason: 'invalid' };
 
   return {
     ok: true,
-    value: { hullTypeId, modules, drones, fighters, cargo, implantSet, name },
+    value: {
+      hullTypeId,
+      modules,
+      drones,
+      fighters,
+      cargo,
+      implantSet,
+      name,
+      ...(mode === undefined ? {} : { mode }),
+      ...(boosterSideEffects.length === 0 ? {} : { boosterSideEffects }),
+    },
   };
 }
 

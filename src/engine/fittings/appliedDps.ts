@@ -13,8 +13,21 @@
  * - Drones: nothing past drone control range; a mobile drone at least as
  *   fast as its target is assumed to keep up and always hit (Pyfa's "auto"
  *   mode), one slower than it — or a sentry — tracks like a turret on the ship.
+ * - Fighters: at full, wherever the target is. A squadron flies to its
+ *   target, so neither the shooter's range nor drone control range limits
+ *   it, and no application model for its attack is verified against the
+ *   engine here, so none is guessed at, and the UI says so.
+ * - Then the target's resists: each damage type the weapon deals is taken
+ *   down by the target's resist to it.
  */
-import type { TargetProfile } from './targetProfile';
+import { targetResists, type TargetProfile, type TargetResists } from './targetProfile';
+import type { PerDamageType } from './types';
+
+/** A weapon's damage split by type, as shares summing to 1. */
+export type DamageSplit = PerDamageType;
+
+/** A weapon whose damage types aren't known counts as an even split. */
+const EVEN_SPLIT: DamageSplit = { em: 0.25, thermal: 0.25, kinetic: 0.25, explosive: 0.25 };
 
 interface TrackingWeapon {
   /** Raw DPS, no reload. */
@@ -29,26 +42,38 @@ interface TrackingWeapon {
   optimalSigRadius: number;
 }
 
-export type AppliedWeapon =
-  | ({ kind: 'turret' } & TrackingWeapon)
-  | {
-      kind: 'missile';
-      dps: number;
-      /** Metres — flight speed × flight time. */
-      range: number;
-      explosionRadius: number;
-      explosionVelocity: number;
-      damageReductionFactor: number;
-    }
-  | ({
-      kind: 'drone';
-      /** m/s; 0 for a sentry. */
-      speed: number;
-    } & TrackingWeapon);
+interface DamageTyped {
+  /** How its damage splits by type — what the target's resists bite on. Absent: an even split. */
+  damage?: DamageSplit;
+}
+
+export type AppliedWeapon = DamageTyped &
+  (
+    | ({ kind: 'turret' } & TrackingWeapon)
+    | {
+        kind: 'missile';
+        dps: number;
+        /** Metres — flight speed × flight time. */
+        range: number;
+        explosionRadius: number;
+        explosionVelocity: number;
+        damageReductionFactor: number;
+      }
+    | ({
+        kind: 'drone';
+        /** m/s; 0 for a sentry. */
+        speed: number;
+      } & TrackingWeapon)
+    | {
+        kind: 'fighter';
+        /** A launched squadron's raw DPS: per fighter, times the fighters in it. */
+        dps: number;
+      }
+  );
 
 /** Everything applied DPS needs from one calculated Fitting. */
 export interface AppliedDpsInputs {
-  /** Only weapons actually firing: active/overloaded modules, launched drones (their stack's DPS). */
+  /** Only weapons actually firing: active/overloaded modules, launched drones (their stack's DPS), launched fighter squadrons. */
   weapons: AppliedWeapon[];
   /** Metres. */
   droneControlRange: number;
@@ -117,17 +142,33 @@ function weaponAppliedDps(
       const hitChance = keepsUp ? 1 : turretHitChance(weapon, target, distance);
       return weapon.dps * turretDamageMultiplier(hitChance);
     }
+    case 'fighter':
+      return weapon.dps;
   }
 }
 
-/** Applied DPS against `target` at `distance` metres. */
+/** The share of a weapon's damage that gets through the target's resists. */
+function throughResists(split: DamageSplit, resists: TargetResists): number {
+  return (
+    split.em * (1 - resists.em) +
+    split.thermal * (1 - resists.thermal) +
+    split.kinetic * (1 - resists.kinetic) +
+    split.explosive * (1 - resists.explosive)
+  );
+}
+
+/** Applied DPS against `target` at `distance` metres, after its resists. */
 export function appliedDps(
   inputs: AppliedDpsInputs,
   target: TargetProfile,
   distance: number
 ): number {
+  const resists = targetResists(target);
   return inputs.weapons.reduce(
-    (sum, weapon) => sum + weaponAppliedDps(weapon, target, distance, inputs.droneControlRange),
+    (sum, weapon) =>
+      sum +
+      weaponAppliedDps(weapon, target, distance, inputs.droneControlRange) *
+        throughResists(weapon.damage ?? EVEN_SPLIT, resists),
     0
   );
 }
@@ -172,6 +213,9 @@ function weaponReach(weapon: AppliedWeapon, droneControlRange: number): number {
       return weapon.range;
     case 'drone':
       return droneControlRange;
+    case 'fighter':
+      // Reaches wherever its target is: it stretches no axis.
+      return 0;
   }
 }
 
@@ -180,14 +224,23 @@ const RANGE_ROUNDING = 5000;
 /**
  * A range axis every fit in `fits` reaches across: 10% past the longest
  * weapon's reach (a turret's optimal + 3 falloffs, where it's down to ~0.2%),
- * rounded up to a whole 5 km. 0 when nothing fires.
+ * rounded up to a whole 5 km. Fighters have no reach of their own, so a fit
+ * firing only fighters runs to its drone control range, the usual axis for
+ * launched craft. 0 when nothing fires.
  */
 export function graphMaxRange(fits: readonly AppliedDpsInputs[]): number {
   const reach = Math.max(
     0,
     ...fits.flatMap((fit) => fit.weapons.map((w) => weaponReach(w, fit.droneControlRange)))
   );
-  return Math.ceil((reach * 1.1) / RANGE_ROUNDING) * RANGE_ROUNDING;
+  const axis =
+    reach > 0
+      ? reach
+      : Math.max(
+          0,
+          ...fits.filter((fit) => fit.weapons.length > 0).map((f) => f.droneControlRange)
+        );
+  return Math.ceil((axis * 1.1) / RANGE_ROUNDING) * RANGE_ROUNDING;
 }
 
 /**

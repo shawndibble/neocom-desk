@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { IconButton, Panel, SearchInput } from '@/components/ui';
+import { IconButton, Panel, RowActionsMenu, RowMoreActions, SearchInput } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import type { FittingRecord } from '@/db';
 import { filterMyFittings, groupByHull } from '@/engine/fittings/myFittings';
+import { FittingExportNotice } from './FittingExportMenu';
 import { DeleteFittingModal, RenameFittingModal } from './SavedFittingModals';
 import { savedRows, useSavedFittings } from './useLibraryFittings';
+import { useLibraryRowActions } from './useLibraryRowActions';
 
 interface MyFittingsPanelProps {
   characterId: number | null;
@@ -20,6 +22,15 @@ export function MyFittingsPanel({ characterId, onOpen }: MyFittingsPanelProps) {
   const [query, setQuery] = useState('');
   const [renaming, setRenaming] = useState<FittingRecord | null>(null);
   const [deleting, setDeleting] = useState<FittingRecord | null>(null);
+
+  const rowActions = useLibraryRowActions({
+    characterId,
+    onOpen: (row) => {
+      if (row.source === 'saved') onOpen(row.record);
+    },
+    onRename: (row) => setRenaming(row.record),
+    onDelete: (row) => setDeleting(row.record),
+  });
 
   const groups = useMemo(
     () => groupByHull(filterMyFittings(savedRows(records, hulls), query)),
@@ -52,33 +63,36 @@ export function MyFittingsPanel({ characterId, onOpen }: MyFittingsPanelProps) {
                 </h3>
                 <ul className="divide-y divide-line">
                   {group.rows.map((row) => (
-                    <li key={row.id} className="flex items-center gap-2 py-1">
-                      <button
-                        type="button"
-                        className="min-h-11 min-w-0 flex-1 truncate text-left text-sm text-text hover:text-accent"
-                        aria-label={t('fittings.myFittings.open', { name: row.name })}
-                        onClick={() => onOpen(row.record)}
-                      >
-                        {row.name}
-                      </button>
-                      <IconButton
-                        size="sm"
-                        icon={<Icon.Rename />}
-                        label={t('fittings.myFittings.rename', { name: row.name })}
-                        tooltip={t('fittings.myFittings.confirmRename')}
-                        onClick={() => {
-                          setRenaming(row.record);
-                        }}
-                      />
-                      <IconButton
-                        size="sm"
-                        tone="danger"
-                        icon={<Icon.Close />}
-                        label={t('fittings.myFittings.delete', { name: row.name })}
-                        tooltip={t('fittings.myFittings.confirmDelete')}
-                        onClick={() => setDeleting(row.record)}
-                      />
-                    </li>
+                    <RowActionsMenu key={row.id} name={row.name} items={rowActions.itemsFor(row)}>
+                      <li className="flex items-center gap-2 py-1">
+                        <button
+                          type="button"
+                          className="min-h-11 min-w-0 flex-1 truncate text-left text-sm text-text hover:text-accent"
+                          aria-label={t('fittings.myFittings.open', { name: row.name })}
+                          onClick={() => onOpen(row.record)}
+                        >
+                          {row.name}
+                        </button>
+                        <IconButton
+                          size="sm"
+                          icon={<Icon.Rename />}
+                          label={t('fittings.myFittings.rename', { name: row.name })}
+                          tooltip={t('fittings.myFittings.confirmRename')}
+                          onClick={() => {
+                            setRenaming(row.record);
+                          }}
+                        />
+                        <IconButton
+                          size="sm"
+                          tone="danger"
+                          icon={<Icon.Close />}
+                          label={t('fittings.myFittings.delete', { name: row.name })}
+                          tooltip={t('fittings.myFittings.confirmDelete')}
+                          onClick={() => setDeleting(row.record)}
+                        />
+                        <RowMoreActions />
+                      </li>
+                    </RowActionsMenu>
                   ))}
                 </ul>
               </section>
@@ -87,6 +101,8 @@ export function MyFittingsPanel({ characterId, onOpen }: MyFittingsPanelProps) {
         )}
       </div>
 
+      <FittingExportNotice notice={rowActions.notice} />
+      {rowActions.dialog}
       <RenameFittingModal record={renaming} onClose={() => setRenaming(null)} />
       <DeleteFittingModal record={deleting} onClose={() => setDeleting(null)} />
     </Panel>

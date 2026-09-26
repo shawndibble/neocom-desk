@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { diffFittingStats } from './variationDelta';
 import type { FittingStats } from './types';
+import { neutralExtendedStats } from './__fixtures__/fittingStats';
 
 function layer(hp: number) {
   return {
@@ -53,6 +54,7 @@ const base: FittingStats = {
   offense: { weapons: [], dps: 0, volley: 0, overheated: null, chargelessWeaponCount: 0 },
   repair: { shield: 0, armor: 0, hull: 0 },
   overheated: null,
+  ...neutralExtendedStats(),
 };
 
 describe('diffFittingStats', () => {
@@ -65,6 +67,21 @@ describe('diffFittingStats', () => {
     const delta = diffFittingStats(base, after);
     expect(delta.count).toBe(1);
     expect(delta.changes).toEqual([{ key: 'ehp', before: 20000, after: 24000 }]);
+  });
+
+  it('leaves out the stats only Fitting Compare shows — Variations lists what it always has', () => {
+    const after: FittingStats = {
+      ...base,
+      offense: {
+        ...base.offense,
+        overheated: { dps: 999, volley: 999 },
+      } as FittingStats['offense'],
+      tank: { ...base.tank, burstEffective: 999, sustainedEffective: 999 },
+      capacitorBudget: { ...base.capacitorBudget, delta: 999 },
+      sensor: { ...base.sensor, strength: 999 },
+      holds: { ...base.holds, cargo: 999 },
+    };
+    expect(diffFittingStats(base, after).changes).toEqual([]);
   });
 
   it('reports a total DPS change (e.g. a turret variation)', () => {

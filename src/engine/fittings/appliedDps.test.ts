@@ -43,6 +43,12 @@ const drone: Extract<AppliedWeapon, { kind: 'drone' }> = {
   optimalSigRadius: 25,
 };
 
+const fighter: Extract<AppliedWeapon, { kind: 'fighter' }> = {
+  kind: 'fighter',
+  dps: 230,
+  damage: { em: 1, thermal: 0, kinetic: 0, explosive: 0 },
+};
+
 const stationaryBig = { signatureRadius: 400, velocity: 0 };
 
 function inputs(weapons: AppliedWeapon[], droneControlRange = 60000): AppliedDpsInputs {
@@ -138,6 +144,63 @@ describe('appliedDps', () => {
       optimalSigRadius: 400,
     };
     expect(appliedDps(inputs([sentry]), stationaryBig, 10000)).toBeCloseTo(60 * 1.01505, 3);
+  });
+});
+
+describe('appliedDps against resists', () => {
+  const still = { signatureRadius: 400, velocity: 0 };
+  const resists = { em: 0, thermal: 0, kinetic: 0.5, explosive: 0.25 };
+
+  it('takes each damage type down by the target’s resist to it', () => {
+    const kinetic: AppliedWeapon = {
+      ...missile,
+      damage: { em: 0, thermal: 0, kinetic: 1, explosive: 0 },
+    };
+    const mixed: AppliedWeapon = {
+      ...missile,
+      damage: { em: 0, thermal: 0, kinetic: 0.5, explosive: 0.5 },
+    };
+    const inputs = (weapon: AppliedWeapon): AppliedDpsInputs => ({
+      weapons: [weapon],
+      droneControlRange: 0,
+    });
+    expect(appliedDps(inputs(kinetic), { ...still, resists }, 1000)).toBeCloseTo(50, 6);
+    expect(appliedDps(inputs(mixed), { ...still, resists }, 1000)).toBeCloseTo(
+      100 * (0.5 * 0.5 + 0.5 * 0.75),
+      6
+    );
+  });
+
+  it('spreads a weapon of unknown damage types evenly over the four', () => {
+    expect(
+      appliedDps({ weapons: [missile], droneControlRange: 0 }, { ...still, resists }, 1000)
+    ).toBeCloseTo(100 * (1 - 0.75 / 4), 6);
+  });
+
+  it('leaves a target with no resists at full damage', () => {
+    expect(appliedDps({ weapons: [missile], droneControlRange: 0 }, still, 1000)).toBeCloseTo(
+      100,
+      6
+    );
+  });
+});
+
+describe('appliedDps fighters', () => {
+  it('applies a squadron at full wherever the target is, then takes its resists', () => {
+    const fast = { signatureRadius: 35, velocity: 3000 };
+    expect(appliedDps(inputs([fighter], 20000), fast, 0)).toBeCloseTo(230, 6);
+    // Far past drone control range: fighters fly to the target.
+    expect(appliedDps(inputs([fighter], 20000), fast, 150000)).toBeCloseTo(230, 6);
+    const resists = { em: 0.5, thermal: 0, kinetic: 0, explosive: 0 };
+    expect(appliedDps(inputs([fighter]), { ...fast, resists }, 1000)).toBeCloseTo(115, 6);
+  });
+
+  it('counts in raw DPS, and a fighter-only fit’s range axis runs to drone control range', () => {
+    expect(rawDps(inputs([fighter, missile]))).toBe(330);
+    // 57 km x1.1 = 62.7 -> 65 km
+    expect(graphMaxRange([inputs([fighter], 57000)])).toBe(65000);
+    // Beside weapons with a reach, fighters don't stretch the axis.
+    expect(graphMaxRange([inputs([fighter, missile], 57000)])).toBe(45000);
   });
 });
 

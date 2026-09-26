@@ -18,9 +18,11 @@ import {
   FITTING_SLOT_KINDS,
   type FittingCargoItem,
   type FittingDrone,
+  type FittingFighter,
   type FittingModule,
   type FittingSlotKind,
 } from './types';
+import { isFighter, squadronsOf } from './fighters';
 
 export type LoadInput =
   | { kind: 'eft'; text: string }
@@ -106,6 +108,7 @@ export function loadDnaFitting(dna: string, slotByTypeId: EftSlotLookup): LoadPa
   const modules: FittingModule[] = [];
   const drones: FittingDrone[] = [];
   const cargo: FittingCargoItem[] = [];
+  const fighters: FittingFighter[] = [];
   const next: Record<FittingSlotKind, number> = {
     high: 0,
     medium: 0,
@@ -125,6 +128,8 @@ export function loadDnaFitting(dna: string, slotByTypeId: EftSlotLookup): LoadPa
     const rack = slotByTypeId[typeId];
     if (rack === 'drone') {
       drones.push({ typeId, quantity, state: 'online' });
+    } else if (isFighter(typeId)) {
+      fighters.push(...squadronsOf(typeId, quantity));
     } else if (rack === undefined) {
       cargo.push({ typeId, quantity });
     } else {
@@ -141,7 +146,14 @@ export function loadDnaFitting(dna: string, slotByTypeId: EftSlotLookup): LoadPa
     }
   }
   sortModules(modules);
-  return { hullTypeId, modules, drones, cargo, unresolved: problems };
+  return {
+    hullTypeId,
+    modules,
+    drones,
+    cargo,
+    ...(fighters.length > 0 ? { fighters } : {}),
+    unresolved: problems,
+  };
 }
 
 /** The parts of ESI's killmail `victim` this reads. */

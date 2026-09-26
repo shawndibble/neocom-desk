@@ -36,6 +36,41 @@ const shieldHardener = attrs({ [A.dps]: 0 });
 
 const high = { slot: { type: 'high' }, state: 'active' };
 
+describe('extractAppliedDpsInputs damage types', () => {
+  it('splits a weapon’s damage by type, off its charge — or, for a drone, itself', () => {
+    const antimatter = attrs({
+      [A.emDamage]: 0,
+      [A.thermalDamage]: 5,
+      [A.kineticDamage]: 7,
+      [A.explosiveDamage]: 0,
+    });
+    const inputs = extractAppliedDpsInputs(
+      [high, { slot: { type: 'drone_bay' }, state: 'active', quantity: 1 }],
+      [
+        { attributes: blaster, state: 'active', charge: { attributes: antimatter } },
+        {
+          attributes: attrs({
+            [A.dps]: 8,
+            [A.optimal]: 2100,
+            [A.tracking]: 5,
+            [A.optimalSigRadius]: 25,
+            [A.thermalDamage]: 8,
+          }),
+          state: 'active',
+        },
+      ],
+      new Map()
+    );
+    expect(inputs.weapons[0].damage).toEqual({
+      em: 0,
+      thermal: 5 / 12,
+      kinetic: 7 / 12,
+      explosive: 0,
+    });
+    expect(inputs.weapons[1].damage).toEqual({ em: 0, thermal: 1, kinetic: 0, explosive: 0 });
+  });
+});
+
 describe('extractAppliedDpsInputs', () => {
   it('reads turrets, launchers with their missile, and launched drone stacks', () => {
     const inputs = extractAppliedDpsInputs(
@@ -113,5 +148,62 @@ describe('extractAppliedDpsInputs', () => {
       attrs({})
     );
     expect(inputs.weapons).toEqual([]);
+  });
+});
+
+describe('extractAppliedDpsInputs fighters', () => {
+  // A Templar I as the pinned engine reports it: its standard attack's DPS
+  // per fighter, and that attack's damage — all EM.
+  const templar = attrs({
+    [A.dps]: 38.39,
+    [A.fighterAttackEmDamage]: 97.5,
+    [A.fighterAttackThermalDamage]: 0,
+    [A.fighterAttackKineticDamage]: 0,
+    [A.fighterAttackExplosiveDamage]: 0,
+  });
+
+  it('reads a launched squadron at its fighters’ DPS, split by its attack’s damage types', () => {
+    const inputs = extractAppliedDpsInputs(
+      [{ slot: { type: 'fighter_tube' }, state: 'active', quantity: 6 }],
+      [{ attributes: templar, state: 'active' }],
+      attrs({})
+    );
+    expect(inputs.weapons).toEqual([
+      {
+        kind: 'fighter',
+        dps: 38.39 * 6,
+        damage: { em: 1, thermal: 0, kinetic: 0, explosive: 0 },
+      },
+    ]);
+  });
+
+  it('leaves a squadron in the bay out', () => {
+    const inputs = extractAppliedDpsInputs(
+      [{ slot: { type: 'fighter_bay' }, state: 'offline', quantity: 6 }],
+      [{ attributes: templar, state: 'active' }],
+      attrs({})
+    );
+    expect(inputs.weapons).toEqual([]);
+  });
+
+  it('falls back to the attack’s turret-style damage when it has no missile-style damage', () => {
+    const inputs = extractAppliedDpsInputs(
+      [{ slot: { type: 'fighter_tube' }, state: 'active', quantity: 1 }],
+      [
+        {
+          attributes: attrs({
+            [A.dps]: 10,
+            [A.fighterTurretThermalDamage]: 3,
+            [A.fighterTurretKineticDamage]: 1,
+          }),
+          state: 'active',
+        },
+      ],
+      attrs({})
+    );
+    expect(inputs.weapons[0]).toMatchObject({
+      kind: 'fighter',
+      damage: { em: 0, thermal: 0.75, kinetic: 0.25, explosive: 0 },
+    });
   });
 });

@@ -1,5 +1,5 @@
-import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { BUILT_IN_DAMAGE_PROFILES } from '@/engine/fittings/damageProfile';
@@ -10,6 +10,22 @@ import type { DamageProfiles } from './damageProfiles';
 import type { TargetProfiles } from './targetProfiles';
 import type { OverlayFitting } from './useOverlayFitting';
 import { FittingStatsSections } from './FittingStatsSections';
+import { db } from '@/db';
+import { useStatsSectionsPreference } from './statsSectionsPreference';
+import { useOverheatAll } from './statsConditions';
+import { configureClipboard } from '@/lib/clipboard';
+import { fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import type { Fitting } from '@/engine/fittings/types';
+import { FittingItemActionsProvider } from './fittingItemActions';
+import { fakeItemActions } from './__fixtures__/itemActions';
+
+beforeEach(async () => {
+  await db.settings.clear();
+  useStatsSectionsPreference.setState({ value: {}, hydrated: false });
+  useOverheatAll.setState({ overheatAll: false });
+});
+import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
 
 function layer(hp: number, ehp: number) {
   return {
@@ -58,6 +74,7 @@ function stats(overrides: Partial<FittingStats> = {}): FittingStats {
     offense: { weapons: [], dps: 0, volley: 0, overheated: null, chargelessWeaponCount: 0 },
     repair: { shield: 0, armor: 0, hull: 0 },
     overheated: null,
+    ...neutralExtendedStats(),
     ...overrides,
   };
 }
@@ -154,6 +171,92 @@ function renderSections(
 function sectionBody(title: string): HTMLElement {
   return screen.getByRole('heading', { name: title }).closest('section')!;
 }
+
+describe('FittingStatsSections offense weapon menu', () => {
+  const blasters: Fitting = {
+    name: 'Brutix',
+    shipTypeId: 16229,
+    modules: [
+      { slot: 'high', slotIndex: 0, typeId: 3186, state: 'active', chargeTypeId: 230 },
+      { slot: 'high', slotIndex: 1, typeId: 3186, state: 'active', chargeTypeId: 230 },
+      // Same blaster, other charge: another row, not this one.
+      { slot: 'high', slotIndex: 2, typeId: 3186, state: 'active', chargeTypeId: 231 },
+    ],
+    drones: [],
+    cargo: [{ typeId: 229, quantity: 1000 }],
+  };
+
+  function renderWithActions() {
+    const actions = fakeItemActions(
+      { names: { ...NAMES, 229: 'Null M', 232: 'Void M' }, cargoCharges: [229, 230] },
+      { chargesFor: () => [229, 230, 232] }
+    );
+    render(
+      <MemoryRouter>
+        <FittingItemActionsProvider value={actions}>
+          <FittingStatsSections
+            stats={heatedStats()}
+            statsProgress={null}
+            statsError={false}
+            price={null}
+            damageProfiles={damageProfiles()}
+            targetProfiles={targetProfiles()}
+            typeName={typeName}
+            fitting={blasters}
+          />
+        </FittingItemActionsProvider>
+      </MemoryRouter>
+    );
+    return actions;
+  }
+
+  const group = [
+    { slot: 'high', slotIndex: 0 },
+    { slot: 'high', slotIndex: 1 },
+  ];
+
+  it('changes the charge of just that weapon group, from cargo', async () => {
+    const actions = renderWithActions();
+    const offense = within(sectionBody('Offense'));
+    fireEvent.pointerDown(
+      offense.getByRole('button', { name: 'More actions for 2× Neutron Blaster Cannon II' }),
+      { button: 0, pointerType: 'mouse' }
+    );
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Change charge' }));
+    // The charge it already holds isn't offered again.
+    expect(screen.queryByRole('menuitem', { name: 'Antimatter Charge M' })).toBeNull();
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Null M' }));
+    expect(actions.charges.load).toHaveBeenCalledWith(229, { fromCargo: true, only: group });
+  });
+
+  it('offers every other charge the group takes too, loaded without touching the hold', async () => {
+    const actions = renderWithActions();
+    fireEvent.pointerDown(
+      within(sectionBody('Offense')).getByRole('button', {
+        name: 'More actions for 2× Neutron Blaster Cannon II',
+      }),
+      { button: 0, pointerType: 'mouse' }
+    );
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Change charge' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Void M' }));
+    expect(actions.charges.load).toHaveBeenCalledWith(232, { fromCargo: false, only: group });
+  });
+
+  it('sets the group’s state, and opens on a right-click of the row too', async () => {
+    const actions = renderWithActions();
+    fireEvent.contextMenu(within(sectionBody('Offense')).getByText('2× Neutron Blaster Cannon II'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'State' }));
+    fireEvent.click(await screen.findByRole('menuitemradio', { name: 'Online' }));
+    expect(actions.setGroupState).toHaveBeenCalledWith(group, 'online');
+  });
+
+  it('gives drone rows no weapon menu', () => {
+    renderWithActions();
+    expect(
+      screen.queryByRole('button', { name: 'More actions for 5× Warrior II' })
+    ).not.toBeInTheDocument();
+  });
+});
 
 describe('FittingStatsSections offense', () => {
   it('lists each weapon group and drone type with its DPS and volley, and the total', () => {
@@ -461,6 +564,41 @@ describe('FittingStatsSections — Applied DPS', () => {
     });
   });
 
+  it('gives a custom target profile resists', async () => {
+    const user = userEvent.setup();
+    const saveCustom = vi.fn();
+    renderSections(armed(), damageProfiles(), targetProfiles({ saveCustom }));
+
+    await user.click(screen.getByRole('button', { name: 'Manage targets' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'New profile' }));
+    await user.type(within(dialog).getByLabelText('Name'), 'Guristas cruiser');
+    await user.type(within(dialog).getByLabelText('Kinetic resist (%)'), '50');
+    await user.type(within(dialog).getByLabelText('Thermal resist (%)'), '40');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+    expect(saveCustom).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Guristas cruiser',
+        resists: { em: 0, thermal: 0.4, kinetic: 0.5, explosive: 0 },
+      })
+    );
+  });
+
+  it('refuses a resist over 100%', async () => {
+    const user = userEvent.setup();
+    const saveCustom = vi.fn();
+    renderSections(armed(), damageProfiles(), targetProfiles({ saveCustom }));
+
+    await user.click(screen.getByRole('button', { name: 'Manage targets' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'New profile' }));
+    await user.type(within(dialog).getByLabelText('Name'), 'Wall');
+    await user.type(within(dialog).getByLabelText('EM resist (%)'), '120');
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }));
+    expect(saveCustom).not.toHaveBeenCalled();
+  });
+
   it('refuses a zero signature radius', async () => {
     const user = userEvent.setup();
     const saveCustom = vi.fn();
@@ -510,5 +648,207 @@ describe('FittingStatsSections — a failed calculation', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       "Couldn't load this Character's skills, so the stats can't be worked out."
     );
+  });
+});
+
+describe('FittingStatsSections — remembered layout', () => {
+  it('keeps a section the pilot collapsed collapsed after the stats are shown again', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderSections(stats());
+    const toggle = () => screen.getByRole('button', { name: 'Defense' });
+    expect(toggle()).toHaveAttribute('aria-expanded', 'true');
+
+    await user.click(toggle());
+    expect(toggle()).toHaveAttribute('aria-expanded', 'false');
+    unmount();
+
+    // A fresh load reads the choice back from storage, not from memory.
+    useStatsSectionsPreference.setState({ value: {}, hydrated: false });
+    renderSections(stats());
+    await waitFor(() => expect(toggle()).toHaveAttribute('aria-expanded', 'false'));
+    // Sections the pilot never touched keep their defaults.
+    expect(screen.getByRole('button', { name: 'Offense' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    expect(screen.getByRole('button', { name: 'Price' })).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
+describe('FittingStatsSections — Overheat all and Copy stats', () => {
+  it('turns Overheat all on for every calculation, and reads every figure in the warning tone once it is', async () => {
+    const user = userEvent.setup();
+    const { rerender } = renderSections(heatedStats());
+    await user.click(screen.getByRole('checkbox', { name: 'Overheat all' }));
+    expect(useOverheatAll.getState().overheatAll).toBe(true);
+
+    rerender(
+      <FittingStatsSections
+        stats={{
+          ...heatedStats(),
+          allOverheated: true,
+          overheated: null,
+          offense: {
+            ...heatedStats().offense,
+            weapons: heatedStats().offense.weapons.map((row) => ({ ...row, overheated: null })),
+            overheated: null,
+          },
+        }}
+        statsProgress={null}
+        statsError={false}
+        price={null}
+        damageProfiles={damageProfiles()}
+        targetProfiles={targetProfiles()}
+        typeName={typeName}
+      />
+    );
+    expect(screen.getByText('4619 EHP')).toHaveClass('text-warning');
+    // No second, "overheated" number beside the heated one.
+    expect(screen.queryByText(/overheated$/)).toBeNull();
+  });
+
+  it('has nothing to overheat on a fit with no module that can', () => {
+    renderSections(stats());
+    expect(screen.getByRole('checkbox', { name: 'Overheat all' })).toBeDisabled();
+  });
+
+  it('copies the headline stats as text', async () => {
+    const written: string[] = [];
+    configureClipboard(async (text) => {
+      written.push(text);
+    });
+    const user = userEvent.setup();
+    renderSections(heatedStats());
+    await user.click(screen.getByRole('button', { name: 'Copy stats' }));
+    expect(written[0]).toMatch(/^DPS 173\.7 \(181\.7 overheated\)/);
+    expect(await screen.findByText('Stats copied')).toBeInTheDocument();
+    configureClipboard(null);
+  });
+});
+
+describe('FittingStatsSections — resources', () => {
+  it('names both lock limits when the pilot and the hull differ', async () => {
+    const user = userEvent.setup();
+    renderSections(stats({ lockedTargets: { ship: 7, pilot: 3, effective: 3 } }));
+    await user.click(screen.getByRole('button', { name: 'Targeting' }));
+    expect(screen.getByText('3 (hull 7, pilot 3)')).toBeInTheDocument();
+  });
+
+  it('reads out the holds, the sensor and the jump drive in Fitting', async () => {
+    const user = userEvent.setup();
+    renderSections(
+      stats({
+        holds: { cargo: 450, fleetHangar: 5000, miningHold: 0 },
+        sensor: { strength: 21.6, type: 'gravimetric' },
+        jumpDrive: { rangeLightYears: 7, fuelTypeId: 16274, fuelPerLightYear: 3000 },
+      })
+    );
+    await user.click(screen.getByRole('button', { name: 'Fitting' }));
+    const fitting = within(sectionBody('Fitting'));
+    expect(fitting.getByText('450 m³')).toBeInTheDocument();
+    expect(fitting.getByText('5000 m³')).toBeInTheDocument();
+    expect(fitting.queryByText('Mining hold')).toBeNull();
+    expect(fitting.getByText('21.6 Gravimetric')).toBeInTheDocument();
+    expect(fitting.getByText('7.00 ly')).toBeInTheDocument();
+    expect(fitting.getByText('3000 #16274/ly')).toBeInTheDocument();
+  });
+});
+
+describe('FittingStatsSections — Support out', () => {
+  it('lists what each support module hands out, at its range', () => {
+    const neutral = stats().support;
+    renderSections(
+      stats({
+        support: {
+          ...neutral,
+          rows: [
+            {
+              kind: 'remoteArmor',
+              typeId: 26913,
+              count: 2,
+              amount: 85.3,
+              optimal: 10500,
+              falloff: 3000,
+            },
+            { kind: 'web', typeId: 527, count: 1, amount: 60, optimal: 10000, falloff: 0 },
+            { kind: 'warpDisruption', typeId: 448, count: 1, amount: 2, optimal: 9000, falloff: 0 },
+          ],
+          remoteRepair: { shield: 0, armor: 85.3, hull: 0 },
+        },
+      })
+    );
+    const support = within(sectionBody('Support out'));
+    expect(support.getAllByText('85.3 HP/s')).toHaveLength(1);
+    expect(support.getByText('85.3 HP/s armor')).toBeInTheDocument();
+    expect(support.getByText('10.5 + 3.0 km')).toBeInTheDocument();
+    expect(support.getByText('−60% speed')).toBeInTheDocument();
+    expect(support.getByText('2 points')).toBeInTheDocument();
+  });
+
+  it('has no Support out section when nothing reaches another ship', () => {
+    renderSections(stats());
+    expect(screen.queryByRole('heading', { name: 'Support out' })).toBeNull();
+  });
+});
+
+describe('FittingStatsSections — Mining', () => {
+  it('shows each miner with its crystal, the total, the residue and when the ore hold fills', () => {
+    renderSections(
+      stats({
+        holds: { cargo: 350, fleetHangar: 0, miningHold: 11500 },
+        mining: {
+          rows: [
+            {
+              typeId: 17912,
+              chargeTypeId: 60281,
+              isDrone: false,
+              count: 2,
+              perCycle: 1122,
+              cycleSeconds: 32.5,
+              perSecond: 34.5,
+              wastePerSecond: 12.7,
+            },
+          ],
+          perSecond: 34.5,
+          perHour: 124200,
+          wastePerSecond: 12.7,
+          wastePct: 36.8,
+        },
+      })
+    );
+    const mining = within(sectionBody('Mining'));
+    expect(mining.getByText('2× #17912')).toBeInTheDocument();
+    expect(mining.getByText('Crystal: #60281')).toBeInTheDocument();
+    expect(mining.getByText('1122 m³ / 32.5 s')).toBeInTheDocument();
+    expect(mining.getAllByText('34.5 m³/s').length).toBeGreaterThan(0);
+    expect(mining.getByText('124.2K m³/h')).toBeInTheDocument();
+    expect(mining.getByText('−36.8% expected (12.7 m³/s)')).toBeInTheDocument();
+    expect(mining.getByText('Mining hold full in')).toBeInTheDocument();
+    expect(mining.getByText('5m (11500 m³)')).toBeInTheDocument();
+  });
+});
+
+describe('FittingStatsSections — Fighters', () => {
+  it('shows fighter DPS, tubes and the bay on a hull with tubes', () => {
+    const neutral = stats().fighters;
+    renderSections(
+      stats({
+        fighters: {
+          ...neutral,
+          dps: 822.7,
+          tubes: { used: 2, total: 4 },
+          bay: { used: 36000, total: 93750 },
+        },
+      })
+    );
+    const fighters = within(sectionBody('Fighters'));
+    expect(fighters.getAllByText('822.7 DPS').length).toBeGreaterThan(0);
+    expect(fighters.getByText('2 / 4')).toBeInTheDocument();
+    expect(fighters.getByText('36000 / 93750 m³')).toBeInTheDocument();
+  });
+
+  it('has no Fighters section on a hull without tubes', () => {
+    renderSections(stats());
+    expect(screen.queryByRole('heading', { name: 'Fighters' })).toBeNull();
   });
 });
