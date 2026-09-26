@@ -37,6 +37,7 @@ export function fakeItemActions(
     unloadCharge: vi.fn(),
     setGroupState: vi.fn(),
     unloadGroup: vi.fn(),
+    chargesFor: () => [],
     copyToAllOfType: vi.fn(),
     variantsOf: () => [],
     swapType: vi.fn(),

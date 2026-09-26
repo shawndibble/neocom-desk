@@ -8,4 +8,4 @@ _Recorded 2026-09-25._
 
 ## Not carried
 
-- **EFT, DNA and XML exports and loads carry neither a Tactical Destroyer mode nor booster side effects.** None of those formats has a place for them. Pyfa's own EFT export (`service/port/eft.py`) writes no mode line and no side effects, and its import reads none. The game's fittings (In-game Fittings, DNA, XML) don't store either one. So the app doesn't invent a line for them: a Fitting loaded from any of these formats opens on the hull's default mode with no side effects switched on. Only the Share Link carries both.
+- **EFT, DNA, XML and In-game Fittings carry neither a Tactical Destroyer mode nor booster side effects; only the Share Link does.** Pyfa's EFT port (`service/port/eft.py`) was checked: its export writes no mode or side-effect line, and its import reads none. No verified form for either is known for DNA, XML or ESI, so those were left as they are rather than given an invented line. A Fitting loaded from any of them opens on the hull's default mode with no side effects switched on.

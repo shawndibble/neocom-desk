@@ -971,6 +971,7 @@
       "loadRanOut_other": "Loaded {{name}} into {{loaded}} of {{count}} modules — cargo ran out.",
       "loadNone": "Nothing fitted takes {{name}}.",
       "changeCharge": "Change charge",
+      "noCharges": "No other charge fits this",
       "launch": "Launch"
     },
     "libraryMenu": {

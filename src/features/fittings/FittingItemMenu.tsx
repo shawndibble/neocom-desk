@@ -223,6 +223,44 @@ export function ModuleMenuItems({
 }
 
 /**
+ * A weapon group's charge choices: what the cargo holds that it takes
+ * (loaded out of the hold), then every other charge it takes (the hold left
+ * alone, as the Add panel's Charges tab does). Not the one it holds now.
+ */
+function ChangeChargeItems({
+  actions,
+  module,
+  at,
+}: {
+  actions: FittingItemActions;
+  module: FittingModule;
+  at: readonly { slot: FittingSlotKind; slotIndex: number }[];
+}) {
+  const { t } = useTranslation();
+  const current = module.chargeTypeId;
+  const inCargo = actions.charges.cargoChargesFor(module).filter((id) => id !== current);
+  const others = actions.chargesFor(module).filter((id) => id !== current && !inCargo.includes(id));
+  if (inCargo.length === 0 && others.length === 0) {
+    return <MenuItem disabled>{t('fittings.item.noCharges')}</MenuItem>;
+  }
+  const item = (chargeTypeId: number, fromCargo: boolean) => (
+    <MenuItem
+      key={chargeTypeId}
+      onSelect={() => actions.charges.load(chargeTypeId, { fromCargo, only: at })}
+    >
+      {actions.typeName(chargeTypeId)}
+    </MenuItem>
+  );
+  return (
+    <>
+      {inCargo.map((id) => item(id, true))}
+      {inCargo.length > 0 && others.length > 0 && <MenuSeparator />}
+      {others.map((id) => item(id, false))}
+    </>
+  );
+}
+
+/**
  * A weapon group's actions — a stats Offense row, every module of one type
  * holding one charge: change the charge they hold (from cargo), their state,
  * and what the weapon is. Each is one edit for the whole group.
@@ -245,24 +283,13 @@ export function WeaponMenuItems({
   if (actions === null || first === undefined) return null;
   const at = modules.map(({ slot, slotIndex }) => ({ slot, slotIndex }));
   const name = actions.typeName(first.typeId);
-  const inCargo = actions.charges.cargoChargesFor(first).filter((id) => id !== first.chargeTypeId);
   return (
     <>
       <MenuSub>
-        <MenuSubTrigger disabled={inCargo.length === 0}>
-          {inCargo.length === 0
-            ? t('fittings.item.noCargoCharge')
-            : t('fittings.item.changeCharge')}
-        </MenuSubTrigger>
-        <MenuSubContent>
-          {inCargo.map((chargeTypeId) => (
-            <MenuItem
-              key={chargeTypeId}
-              onSelect={() => actions.charges.load(chargeTypeId, { fromCargo: true, only: at })}
-            >
-              {actions.typeName(chargeTypeId)}
-            </MenuItem>
-          ))}
+        <MenuSubTrigger>{t('fittings.item.changeCharge')}</MenuSubTrigger>
+        <MenuSubContent className="max-h-80 overflow-y-auto">
+          {/* Its own component, so the engine is only asked once the submenu opens. */}
+          <ChangeChargeItems actions={actions} module={first} at={at} />
         </MenuSubContent>
       </MenuSub>
       {first.chargeTypeId !== undefined && (

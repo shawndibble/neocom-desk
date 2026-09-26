@@ -187,10 +187,10 @@ describe('FittingStatsSections offense weapon menu', () => {
   };
 
   function renderWithActions() {
-    const actions = fakeItemActions({
-      names: { ...NAMES, 229: 'Null M' },
-      cargoCharges: [229, 230],
-    });
+    const actions = fakeItemActions(
+      { names: { ...NAMES, 229: 'Null M', 232: 'Void M' }, cargoCharges: [229, 230] },
+      { chargesFor: () => [229, 230, 232] }
+    );
     render(
       <MemoryRouter>
         <FittingItemActionsProvider value={actions}>
@@ -227,6 +227,19 @@ describe('FittingStatsSections offense weapon menu', () => {
     expect(screen.queryByRole('menuitem', { name: 'Antimatter Charge M' })).toBeNull();
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Null M' }));
     expect(actions.charges.load).toHaveBeenCalledWith(229, { fromCargo: true, only: group });
+  });
+
+  it('offers every other charge the group takes too, loaded without touching the hold', async () => {
+    const actions = renderWithActions();
+    fireEvent.pointerDown(
+      within(sectionBody('Offense')).getByRole('button', {
+        name: 'More actions for 2× Neutron Blaster Cannon II',
+      }),
+      { button: 0, pointerType: 'mouse' }
+    );
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Change charge' }));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Void M' }));
+    expect(actions.charges.load).toHaveBeenCalledWith(232, { fromCargo: false, only: group });
   });
 
   it('sets the group’s state, and opens on a right-click of the row too', async () => {

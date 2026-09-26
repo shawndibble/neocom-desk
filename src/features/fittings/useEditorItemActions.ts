@@ -252,6 +252,7 @@ export function useEditorItemActions({
   // worked out under the conditions (All V, skill overrides…); null before them.
   const cargoCapacity = stats?.holds.cargo ?? null;
   const open = fitting !== null;
+  const shipTypeId = fitting?.shipTypeId ?? null;
 
   const itemActions = useMemo<FittingItemActions | null>(
     () =>
@@ -265,6 +266,8 @@ export function useEditorItemActions({
             unloadCharge: (rack, index) => edit((f) => setModuleCharge(f, rack, index, null)),
             setGroupState: (at, state) => edit((f) => setModulesState(f, at, state)),
             unloadGroup: (at) => edit((f) => unloadCharges(f, at)),
+            chargesFor: (module) =>
+              shipTypeId === null ? [] : defaultCharges(shipTypeId, module.slot, module.typeId),
             copyToAllOfType: (rack, index) => edit((f) => copyToAllOfType(f, rack, index)),
             variantsOf: (typeId) =>
               variationIndex === null
@@ -325,6 +328,7 @@ export function useEditorItemActions({
           },
     [
       open,
+      shipTypeId,
       catalogue,
       showInfo,
       charges,

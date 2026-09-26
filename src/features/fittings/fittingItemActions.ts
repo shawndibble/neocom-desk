@@ -30,6 +30,8 @@ export interface FittingItemActions {
   unloadCharge: (rack: FittingSlotKind, index: number) => void;
   /** A weapon group's state (the stats' Offense rows), in one edit. */
   setGroupState: (at: readonly ModuleAt[], state: FittingItemState) => void;
+  /** Every charge `module` takes, whether carried or not (alphabetical) — worked out on the engine, so ask only when a menu opens. */
+  chargesFor: (module: FittingModule) => number[];
   /** A weapon group's charges out, in one edit. */
   unloadGroup: (at: readonly ModuleAt[]) => void;
   copyToAllOfType: (rack: FittingSlotKind, index: number) => void;
