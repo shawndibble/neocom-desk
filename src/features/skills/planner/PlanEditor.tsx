@@ -258,7 +258,12 @@ export function PlanEditor({
   const { t } = useTranslation();
   const navigate = useNavigate();
   // "New plan" navigates here with this flag so the name field takes focus for a rename.
-  const focusName = (useLocation().state as { focusName?: boolean } | null)?.focusName === true;
+  const location = useLocation();
+  const focusName = (location.state as { focusName?: boolean } | null)?.focusName === true;
+  // Spent once the field has focus, so a reload or Back doesn't re-steal it.
+  useEffect(() => {
+    if (focusName) navigate(location.pathname, { replace: true, state: null });
+  }, [focusName, location.pathname, navigate]);
   // Which side the tools pane lands on — the same hook the rest of the app's two-column
   // layouts switch on, so this pane can never disagree with them.
   const isDesktop = useIsDesktop();
