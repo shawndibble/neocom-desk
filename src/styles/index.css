@@ -114,6 +114,15 @@
   --color-dmg-kinetic: #a3adb8;
   --color-dmg-explosive: #e8a13d;
 
+  /*
+   * Ship Tree golds — the game's own, part of the Ship Tree's documented
+   * exception (DESIGN.md §1 "Ship Tree (ISIS)"). `mastery-elite` marks
+   * Mastery V and nothing else; `omega` marks "needs an Omega clone" and
+   * nothing else. Never for status or decoration.
+   */
+  --color-mastery-elite: #e8b84a;
+  --color-omega: #d9a72c;
+
   /* Type — system stack approximating EVE's condensed sans */
   --font-sans: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, system-ui, sans-serif;

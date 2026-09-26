@@ -12,7 +12,7 @@ export function FlyDot({ status }: { status: ShipTreeHullStatus | undefined }) {
         'inline-block h-2 w-2 shrink-0 rounded-full',
         tone === 'locked' && 'bg-text-faint',
         tone === 'canFly' && 'bg-text',
-        tone === 'elite' && 'bg-[#e8b84a]'
+        tone === 'elite' && 'bg-mastery-elite'
       )}
     />
   );

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildShipTree } from './shipTree.mjs';
+import { buildShipTree, tidyDescription } from './shipTree.mjs';
 
 /** Turns a header + data-row lists into the array-of-arrays shape `parseCsv` returns. */
 function rows(header, ...data) {
@@ -237,11 +237,11 @@ describe('buildShipTree', () => {
     });
   });
 
-  it('strips markup and tidies whitespace in a hull description', () => {
+  it('strips markup in a hull description, keeping its paragraph breaks', () => {
     const { ships } = buildShipTree(csv());
     const rifter = ships.find((s) => s.typeID === 587);
     expect(rifter.description).toBe(
-      'A very powerful combat frigate. Can tackle the best frigates out there.'
+      'A very powerful combat frigate.\n\nCan tackle the best frigates out there.'
     );
   });
 
@@ -268,5 +268,27 @@ describe('buildShipTree', () => {
     const tengu = ships.find((s) => s.typeID === 2001);
     expect(tengu.techLevel).toBe(1);
     expect(tengu.metaLevel).toBe(0);
+  });
+});
+
+describe('tidyDescription', () => {
+  it('turns <br> in any spelling into a line break, so sentences never glue together', () => {
+    expect(tidyDescription('from the wreckage.<br>The Noctis')).toBe(
+      'from the wreckage.\nThe Noctis'
+    );
+    expect(tidyDescription('a<br/>b<BR />c<Br >d')).toBe('a\nb\nc\nd');
+  });
+  it('turns paragraph tags into line breaks and strips every other tag', () => {
+    expect(tidyDescription('<p>One <b>bold</b> line.</p><p>Two.</p>')).toBe(
+      'One bold line.\n\nTwo.'
+    );
+    expect(tidyDescription('See <a href=showinfo:587>Rifter</a>.')).toBe('See Rifter.');
+  });
+  it('collapses runs of spaces and tabs, keeps at most two newlines in a row, and trims', () => {
+    expect(tidyDescription('  a \t  b\r\n\r\n\r\n\r\nc  \n  d  ')).toBe('a b\n\nc\nd');
+    expect(tidyDescription('a<br><br><br><br>b')).toBe('a\n\nb');
+  });
+  it('reads a missing description as empty', () => {
+    expect(tidyDescription(undefined)).toBe('');
   });
 });

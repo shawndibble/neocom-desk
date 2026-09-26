@@ -31,7 +31,7 @@ export function HoverCard({
     <div
       role="tooltip"
       data-testid="ship-tree-hover-card"
-      className="pointer-events-none fixed z-50 border border-[#3d525e] bg-[#05090c]/95 p-3 text-xs text-[#c9d6dc] shadow-xl shadow-black/60"
+      className="isis-hover-card pointer-events-none fixed z-50 border p-3 text-xs shadow-xl shadow-black/60"
       style={{
         width: WIDTH,
         left,
@@ -42,17 +42,17 @@ export function HoverCard({
         <img
           src={typeRenderUrl(ship.typeID, 128)}
           alt=""
-          className="h-20 w-20 shrink-0 border border-[#2a3a44] object-cover"
+          className="isis-hover-render h-20 w-20 shrink-0 border object-cover"
         />
         <div className="min-w-0">
-          <div className="text-base text-white">{ship.name}</div>
-          <div className="text-[#8aa0ab]">{className}</div>
+          <div className="isis-hover-name text-base">{ship.name}</div>
+          <div className="isis-hover-class">{className}</div>
         </div>
       </div>
       <div className="mt-2">
         <TraitList traits={ship.traits} skillName={skillName} tone="isis" />
       </div>
-      <div className="mt-2 text-[#6f808b]">{t('ships.tree.hoverHint')}</div>
+      <div className="isis-hover-hint mt-2">{t('ships.tree.hoverHint')}</div>
     </div>
   );
 }

@@ -10,14 +10,14 @@ import { CAPSULE_ICON_URL } from './shipTreeAssets';
 function Pipe({ d, lit }: { d: string; lit: boolean }) {
   return lit ? (
     <g data-lit="true">
-      <path d={d} fill="none" stroke="#9fc3d3" strokeOpacity={0.25} strokeWidth={10} />
-      <path d={d} fill="none" stroke="#c6dde6" strokeWidth={6} />
-      <path d={d} fill="none" stroke="#56707c" strokeWidth={2.4} />
+      <path d={d} className="isis-pipe-glow" />
+      <path d={d} className="isis-pipe-lit" />
+      <path d={d} className="isis-pipe-core" />
     </g>
   ) : (
     <g data-lit="false">
-      <path d={d} fill="none" stroke="#3b4b55" strokeWidth={4} />
-      <path d={d} fill="none" stroke="#070d12" strokeWidth={2} />
+      <path d={d} className="isis-pipe-dim" />
+      <path d={d} className="isis-pipe-dim-core" />
     </g>
   );
 }
@@ -41,8 +41,8 @@ export function MapLines({
         const d = `M ${e.from.x} ${e.from.y} V ${e.y}`;
         return (
           <g key={`em${i}`}>
-            <path d={d} fill="none" stroke="#3b4b55" strokeWidth={4} />
-            <path d={d} fill="none" stroke="#070d12" strokeWidth={2} />
+            <path d={d} className="isis-pipe-dim" />
+            <path d={d} className="isis-pipe-dim-core" />
           </g>
         );
       })}
@@ -56,20 +56,8 @@ export function MapLines({
       ))}
       {omegas.map((o, i) => (
         <g key={`o${i}`} transform={`translate(${o.x} ${o.y})`} data-omega="true">
-          <polygon
-            points="-8,-14 8,-14 16,0 8,14 -8,14 -16,0"
-            fill="#15130b"
-            stroke="#7a6120"
-            strokeWidth={1.5}
-          />
-          <text
-            y={5}
-            textAnchor="middle"
-            fontSize={15}
-            fontWeight={700}
-            fill="#d9a72c"
-            fontFamily="serif"
-          >
+          <polygon points="-8,-14 8,-14 16,0 8,14 -8,14 -16,0" className="isis-omega-hex" />
+          <text y={5} textAnchor="middle" className="isis-omega-glyph">
             Ω
           </text>
         </g>

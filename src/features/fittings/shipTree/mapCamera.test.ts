@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { FIT_FLOOR, MAX_ZOOM, fitCamera, focusCamera, zoomAround } from './mapCamera';
+import {
+  FIT_FLOOR,
+  MAX_ZOOM,
+  fitCamera,
+  focusCamera,
+  wheelZoomFactor,
+  zoomAround,
+} from './mapCamera';
 
 describe('fitCamera', () => {
   it('centres the tree at 100% when it fits', () => {
@@ -40,5 +47,34 @@ describe('zoomAround', () => {
     const cam = zoomAround({ x: 0, y: 0, z: 1 }, 2, 100, 50);
     expect(cam).toEqual({ z: 2, x: -100, y: -50 });
     expect(zoomAround({ x: 0, y: 0, z: 2 }, 10, 0, 0).z).toBe(MAX_ZOOM);
+  });
+});
+
+describe('wheelZoomFactor', () => {
+  const PIXEL = 0;
+  const LINE = 1;
+  const PAGE = 2;
+  it('ignores a wheel event with no vertical delta (a sideways swipe, shift+wheel)', () => {
+    expect(wheelZoomFactor(0, PIXEL)).toBe(1);
+    expect(wheelZoomFactor(0, LINE)).toBe(1);
+  });
+  it('zooms a classic 100px mouse notch by about 12%, in when scrolling up', () => {
+    expect(wheelZoomFactor(-100, PIXEL)).toBeCloseTo(1.12, 5);
+    expect(wheelZoomFactor(100, PIXEL)).toBeCloseTo(1 / 1.12, 5);
+  });
+  it('scales with the delta, so a trackpad or pinch nudge zooms only a little', () => {
+    const nudge = wheelZoomFactor(-4, PIXEL);
+    expect(nudge).toBeGreaterThan(1);
+    expect(nudge).toBeLessThan(1.01);
+    expect(wheelZoomFactor(-50, PIXEL) ** 2).toBeCloseTo(wheelZoomFactor(-100, PIXEL), 10);
+  });
+  it('reads line and page deltas as pixels: a 3-line notch is about one mouse notch', () => {
+    expect(wheelZoomFactor(-3, LINE)).toBeCloseTo(1.12, 2);
+    expect(wheelZoomFactor(1, PAGE)).toBeLessThan(1);
+  });
+  it('caps one event, so a huge delta is still one controlled step', () => {
+    expect(wheelZoomFactor(-100_000, PIXEL)).toBe(wheelZoomFactor(-2_000, PIXEL));
+    expect(wheelZoomFactor(-100_000, PIXEL)).toBeLessThan(1.5);
+    expect(wheelZoomFactor(5, PAGE)).toBe(wheelZoomFactor(100_000, PIXEL));
   });
 });

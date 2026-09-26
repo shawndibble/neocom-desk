@@ -81,7 +81,11 @@ export function IsisTile({
       onMouseLeave={() => onHover(null)}
       onFocus={show}
       onBlur={() => onHover(null)}
-      aria-label={t('ships.tree.tileLabel', { name: ship.name, status: flyLabel(t, status) })}
+      aria-label={
+        status
+          ? t('ships.tree.tileLabel', { name: ship.name, status: flyLabel(t, status) })
+          : ship.name
+      }
       className={cx('isis-tile', tone, selected && 'selected')}
     >
       <TileMarks ship={ship} mastery={status?.mastery ?? 0} />

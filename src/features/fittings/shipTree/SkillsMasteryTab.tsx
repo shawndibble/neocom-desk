@@ -108,7 +108,7 @@ export function SkillsMasteryTab({
                       tier === n
                         ? 'border-accent bg-accent/10'
                         : 'border-line hover:border-line-bright',
-                      n === 5 ? 'text-[#e8b84a]' : tier === n ? 'text-accent' : 'text-text-dim'
+                      n === 5 ? 'text-mastery-elite' : tier === n ? 'text-accent' : 'text-text-dim'
                     )}
                   >
                     {complete && <Done size={12} aria-hidden="true" />}

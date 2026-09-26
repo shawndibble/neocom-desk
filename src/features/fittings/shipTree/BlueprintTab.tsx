@@ -29,7 +29,7 @@ export function BlueprintTab({
   characterId: number | null;
 }) {
   const { t } = useTranslation();
-  const [catalog, setCatalog] = useState<BlueprintCatalog | null>(null);
+  const [catalog, setCatalog] = useState<BlueprintCatalog | 'failed' | null>(null);
   const [owned, setOwned] = useState<{
     characterId: number;
     blueprints: readonly CharacterBlueprint[];
@@ -37,9 +37,13 @@ export function BlueprintTab({
 
   useEffect(() => {
     let cancelled = false;
-    void loadBlueprintCatalog().then((c) => {
-      if (!cancelled) setCatalog(c);
-    });
+    loadBlueprintCatalog()
+      .then((c) => {
+        if (!cancelled) setCatalog(c);
+      })
+      .catch(() => {
+        if (!cancelled) setCatalog('failed');
+      });
     return () => {
       cancelled = true;
     };
@@ -60,6 +64,8 @@ export function BlueprintTab({
   }, [characterId]);
 
   if (!catalog) return <Spinner size="sm" />;
+  if (catalog === 'failed')
+    return <p className="text-sm text-text-dim">{t('ships.info.blueprint.loadFailed')}</p>;
   const planTarget = planTargetForItem(catalog, ship.typeID);
   if (!planTarget) return <p className="text-sm text-text-dim">{t('ships.info.blueprint.none')}</p>;
 

@@ -25,6 +25,7 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
   const s = ship.stats;
 
   const rows: [string, string][] = [];
@@ -63,11 +64,18 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
 
   async function simulate() {
     setBusy(true);
-    const encoded = await encodeFittingShare(
-      fittingToShareInput(newFitting(ship.typeID, ship.name))
-    );
-    setBusy(false);
-    if (encoded.ok) navigate(fittingEditLocation(encoded.payload));
+    setFailed(false);
+    try {
+      const encoded = await encodeFittingShare(
+        fittingToShareInput(newFitting(ship.typeID, ship.name))
+      );
+      if (encoded.ok) navigate(fittingEditLocation(encoded.payload));
+      else setFailed(true);
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -87,6 +95,11 @@ export function FittingTab({ ship }: { ship: ShipTreeShip }) {
       <Button variant="primary" onClick={() => void simulate()} disabled={busy}>
         {t('ships.info.fitting.simulate')}
       </Button>
+      {failed && (
+        <p role="alert" className="text-danger">
+          {t('ships.info.fitting.simulateFailed')}
+        </p>
+      )}
     </div>
   );
 }

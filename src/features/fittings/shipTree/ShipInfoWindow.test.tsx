@@ -5,7 +5,8 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
-import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import { encodeFittingShare } from '@/engine/fitting/fittingShare';
+import { loadBlueprintCatalog, type BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { industryTabHref } from '@/features/industry/industryTabs';
 import type { TargetPlan } from '@/features/skills/useTargetPlan';
 import { useActiveCharacter } from '@/stores/activeCharacter';
@@ -14,6 +15,10 @@ import { INTERCEPTORS, MERLIN } from './__fixtures__/shipTreeFixture';
 import { ShipTreeTab } from './ShipTreeTab';
 import { useShipTreeViewPreference } from './shipTreeViewPreference';
 
+vi.mock('@/engine/fitting/fittingShare', async (importOriginal) => {
+  const real = await importOriginal<typeof import('@/engine/fitting/fittingShare')>();
+  return { ...real, encodeFittingShare: vi.fn(real.encodeFittingShare) };
+});
 vi.mock('@/sde/loadSde', async (importOriginal) => {
   const f = await import('./__fixtures__/shipTreeFixture');
   return {
@@ -37,6 +42,7 @@ vi.mock('@/features/skills/planner/usePlanEditorData', async () => {
     usePlanEditorData: (characterId: number | null) => ({
       catalog: characterId === null ? null : f.CATALOG,
       trainedSkills: characterId === null ? NO_TRAINED : f.TRAINED,
+      trainedSkillsKnown: characterId !== null,
       attributes: ATTRIBUTES,
       implants: {},
     }),
@@ -188,6 +194,18 @@ describe('Ship Info window', () => {
     });
   });
 
+  it("Fitting: Simulate says so when the new Fitting can't be encoded", async () => {
+    vi.mocked(encodeFittingShare).mockResolvedValueOnce({ ok: false, reason: 'too-large' });
+    const { user, dialog } = await openShip(/^Merlin/);
+    await user.click(within(dialog).getByRole('tab', { name: 'Fitting' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Simulate' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      "Couldn't open this hull in the editor."
+    );
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/ships\/tree$/);
+    expect(within(dialog).getByRole('button', { name: 'Simulate' })).toBeEnabled();
+  });
+
   it('Fitting: a Tech III hull says its slots come from subsystems', async () => {
     const { user, dialog } = await openShip(/^Tengu/);
     await user.click(within(dialog).getByRole('tab', { name: 'Fitting' }));
@@ -237,6 +255,13 @@ describe('Ship Info window', () => {
       'href',
       `${industryTabHref('plans')}?product=${MERLIN}`
     );
+  });
+
+  it("Blueprint: says so when the blueprint catalog can't be loaded", async () => {
+    vi.mocked(loadBlueprintCatalog).mockRejectedValueOnce(new Error('offline'));
+    const { user, dialog } = await openShip(/^Merlin/);
+    await user.click(within(dialog).getByRole('tab', { name: 'Blueprint' }));
+    expect(await within(dialog).findByText("Couldn't load blueprint data.")).toBeVisible();
   });
 
   it('Blueprint: a hull nothing manufactures says so', async () => {

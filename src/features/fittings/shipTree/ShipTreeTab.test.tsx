@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import '@/i18n';
+import { loadShipTree } from '@/sde/loadSde';
 import type { TargetPlan } from '@/features/skills/useTargetPlan';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { CROW, HOOKBILL, IBIS, MERLIN, TENGU, WORM } from './__fixtures__/shipTreeFixture';
@@ -26,12 +27,15 @@ vi.mock('@/features/skills/skillMap', async (importOriginal) => {
 });
 const ATTRIBUTES = { intelligence: 20, memory: 20, perception: 20, willpower: 20, charisma: 19 };
 const NO_TRAINED = new Map();
+/** Whether the mocked /skills read has answered yet (usePlanEditorData's `trainedSkillsKnown`). */
+const skills = vi.hoisted(() => ({ known: true }));
 vi.mock('@/features/skills/planner/usePlanEditorData', async () => {
   const f = await import('./__fixtures__/shipTreeFixture');
   return {
     usePlanEditorData: (characterId: number | null) => ({
-      catalog: characterId === null ? null : f.CATALOG,
-      trainedSkills: characterId === null ? NO_TRAINED : f.TRAINED,
+      catalog: characterId === null || !skills.known ? null : f.CATALOG,
+      trainedSkills: characterId === null || !skills.known ? NO_TRAINED : f.TRAINED,
+      trainedSkillsKnown: characterId !== null && skills.known,
       attributes: ATTRIBUTES,
       implants: {},
     }),
@@ -73,6 +77,7 @@ const tile = (container: HTMLElement, typeID: number) =>
   container.querySelector<HTMLElement>(`[data-ship="${typeID}"]`)!;
 
 beforeEach(async () => {
+  skills.known = true;
   useActiveCharacter.setState({ activeCharacterId: 1, hydrated: true });
   await useShipTreeViewPreference.getState().setValue(null);
 });
@@ -151,6 +156,26 @@ describe('ShipTreeTab — map', () => {
   });
 });
 
+describe('ShipTreeTab — loading', () => {
+  it("says so when the tree can't be loaded, rather than spinning forever", async () => {
+    vi.mocked(loadShipTree).mockRejectedValueOnce(new Error('offline'));
+    renderTab();
+    expect(await screen.findByText("Couldn't load the ship tree")).toBeVisible();
+    expect(screen.queryByText('Loading the ship tree…')).not.toBeInTheDocument();
+  });
+
+  it("marks nothing flyable until the Character's skills have been read", async () => {
+    skills.known = false;
+    const { container } = renderTab();
+    await screen.findByRole('region', { name: 'Caldari State ship tree' });
+    // Not even the Corvette, which needs no skills: no status yet, not "can fly".
+    for (const id of [MERLIN, IBIS, CROW]) expect(tile(container, id).dataset.tone).toBe('locked');
+    expect(screen.queryByRole('button', { name: /Can fly|to fly/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Merlin' })).toBeInTheDocument();
+    expect(screen.getByText('0 / 5 hulls flyable')).toBeVisible();
+  });
+});
+
 describe('ShipTreeTab — view switch', () => {
   it('switches to the ladder and back, remembering the choice', async () => {
     const user = userEvent.setup();
@@ -194,6 +219,29 @@ describe('ShipTreeTab — ladder', () => {
     expect(merlin.querySelector('[data-tone]')).toHaveAttribute('data-tone', 'elite');
     expect(merlin.querySelector('.ring')?.textContent).toBe('V');
     expect(merlin).toHaveTextContent('Can fly');
+  });
+
+  it('opens every section while searching, even one the reader collapsed', async () => {
+    const user = userEvent.setup();
+    const { container } = renderTab();
+    await screen.findByRole('button', { name: /Merlin/ });
+    const frigate = container.querySelector<HTMLDetailsElement>('details[data-class="8"]')!;
+    expect(frigate.open).toBe(true);
+    frigate.open = false;
+    fireEvent(frigate, new Event('toggle'));
+    await waitFor(() => expect(frigate.open).toBe(false));
+    expect(screen.getByRole('button', { name: /Merlin/ })).not.toBeVisible();
+
+    await user.type(
+      screen.getByRole('searchbox', { name: "Search this faction's hulls" }),
+      'Merlin'
+    );
+    await waitFor(() => expect(frigate.open).toBe(true));
+    expect(screen.getByRole('button', { name: /Merlin/ })).toBeVisible();
+
+    // Clearing the search restores what the reader chose.
+    await user.clear(screen.getByRole('searchbox', { name: "Search this faction's hulls" }));
+    await waitFor(() => expect(frigate.open).toBe(false));
   });
 
   it('nests specialised classes under their parent', async () => {

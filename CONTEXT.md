@@ -827,6 +827,21 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   compressed into the URL. It opens without a session, stated at every skill
   level V. Inside the app, that same URL is where an open Fitting lives while it
   is edited, so the address bar is always a Share Link.
+- **Ship Info window**: The window a hull opens from the **Ship Tree**, after
+  the game's own: four tabs — Description (class, faction, bonuses, CCP's
+  text), Fitting (base slots and resources; Simulate opens a new **Fitting**
+  of the hull), Skills & Mastery (required skills, Mastery I–V, add a tier to
+  a **Skill Plan**) and Blueprint (where to get one; start a **Build Plan**).
+- **Ship Tree**: The Ships section's Tree tab — the in-game tree of hull
+  classes, one faction at a time, marked with the active Character's
+  progress: lit classes, skill bars, dim hulls they can't fly yet, gold at
+  Mastery V only. A gold Ω on a line marks where the next class needs an
+  Omega **Clone State**. The game calls it ISIS (Interbus Ship Identification
+  System), hence `isis-*` and `IsisTile` in code. A map on a desktop, a
+  ladder (the same tree as a nested list) on a phone.
+- **Ships**: The section holding the **Fitting** tools and the **Ship Tree**,
+  as two tabs — Fittings (`/ships/fittings`) and Tree (`/ships/tree`). It
+  was Fittings until the tree joined it; every old `/fittings` path redirects.
 - **Shorthand ISK**: An ISK figure rendered abbreviated (`1.3B`) by the
   `IskAmount` component, with the exact value one gesture away — hover,
   keyboard focus, or touch — and in the element's accessible name so a screen

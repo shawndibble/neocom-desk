@@ -41,11 +41,30 @@ function indexHeader(rows) {
   return idx;
 }
 
-/** Strips HTML tags (invTraits' `<a href=showinfo:…>…</a>`, invTypes' description markup) and tidies whitespace. */
+/** Strips HTML tags (invTraits' `<a href=showinfo:…>…</a>`) and tidies whitespace onto one line. */
 function tidyText(s) {
   return (s ?? '')
     .replace(/<[^>]+>/g, '')
     .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * A hull description (invTypes' markup) as plain text that keeps its line
+ * breaks: `<br>` and paragraph tags become newlines — stripping them outright
+ * glued sentences together ("wreckage.The Noctis") — every other tag goes,
+ * runs of spaces and tabs collapse, and never more than one blank line.
+ */
+export function tidyDescription(s) {
+  return (s ?? '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p\s*>\s*<p\b[^>]*>/gi, '\n\n')
+    .replace(/<\/?p\b[^>]*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
@@ -139,7 +158,7 @@ export function buildShipTree(csv) {
         // its slots come from fitted subsystems, not the hull — so every
         // field defaults to 0 rather than some fields being absent.
         stats: { ...ZERO_STATS },
-        description: tidyText(r[h.description]),
+        description: tidyDescription(r[h.description]),
       });
     }
   }

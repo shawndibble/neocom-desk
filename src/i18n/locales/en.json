@@ -64,6 +64,8 @@
     },
     "tree": {
       "loading": "Loading the ship tree…",
+      "loadFailed": "Couldn't load the ship tree",
+      "loadFailedHint": "Check your connection, then reload the page.",
       "noCharacter": "No character selected — every hull shows as untrained. Log in to see which you can fly.",
       "credit": "Ship tree icons and emblems are EVE Online artwork © CCP hf., copied from the EVE University wiki. EVE Online and the EVE logo are trademarks of CCP hf.",
       "view": {
@@ -153,7 +155,8 @@
         "mbit": "{{value}} Mbit/s",
         "unskilledNote": "Base values, before your skills.",
         "subsystems": "A Tech III hull's slots and hardpoints come from the subsystems fitted to it.",
-        "simulate": "Simulate"
+        "simulate": "Simulate",
+        "simulateFailed": "Couldn't open this hull in the editor."
       },
       "skills": {
         "masteryTitle": "Mastery",
@@ -169,6 +172,7 @@
       },
       "blueprint": {
         "none": "No blueprint — this hull isn't manufactured.",
+        "loadFailed": "Couldn't load blueprint data.",
         "findCopy": "Find a copy",
         "viewInMarket": "View in market",
         "planBuild": "Plan to build it",

@@ -162,10 +162,18 @@ function LadderClass({
   const empires = [...tree.parentEmpires(id)].reverse();
   const name = group?.name ?? '';
   const factionName = (fid: number) => data.factions.find((f) => f.id === fid)?.name ?? '';
+  // Top level starts open; the reader's own toggles stick. A search opens
+  // everything over that, and clearing it puts their choice back. `open` is
+  // controlled so a section they collapsed still opens for a search — React
+  // only writes the attribute when the prop changes.
+  const [userOpen, setUserOpen] = useState(depth === 0);
 
   return (
     <details
-      open={depth === 0 || searching}
+      open={searching || userOpen}
+      onToggle={(e) => {
+        if (!searching) setUserOpen(e.currentTarget.open);
+      }}
       data-class={id}
       data-unlocked={unlocked}
       className={cx(depth > 0 && 'ml-4 border-l border-line pl-3')}

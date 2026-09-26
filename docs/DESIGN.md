@@ -157,6 +157,35 @@ follow the game's own scale. `dmg-thermal` sits close to `danger`, so:
 Added with the Fittings section — see
 `docs/context/decisions/20260924-150509-fittings-section-a-fitter-after-all.md`.
 
+### Ship Tree (ISIS)
+
+| Token           | Value     | Use                                                    |
+| --------------- | --------- | ------------------------------------------------------ |
+| `mastery-elite` | `#e8b84a` | Mastery V, and nothing else: tile, badge, dot, legend. |
+| `omega`         | `#d9a72c` | The Ω "needs an Omega clone" mark, and nothing else.   |
+
+The Ship Tree (Ships › Tree) is a replica of the in-game one (ISIS), drawn
+from in-game screenshots — a game-art surface, and a documented exception to
+this palette and to §3 and §6, for the same reason as damage types: players
+read it as the game draws it. The exception covers
+`src/features/fittings/shipTree/shipTree.css` and the surfaces it styles —
+the map, its tiles, lines and hover card, and the ladder's tiles — and
+nothing else. There it allows:
+
+- The game's own palette, as raw values in that one file, not app tokens.
+- Hard-stop `linear-gradient` corner brackets on tiles and the map's 1px
+  grid — drawings, not fades (see §6).
+- A `radial-gradient` mask that feathers each hull render into its tile.
+- The Mastery V tile's gold glow (`box-shadow`), the class label's
+  `text-shadow`, and the Mastery badge ring's 1.5px border.
+
+The two golds are tokens because the app chrome around the tree (the Ship
+Info window, the legend, search results) carries the same marks. Outside
+`shipTree.css`, only those two tokens come from the game; everything else is
+the app's own. Always pair them with a written label — "Mastery V", "Needs an
+Omega clone" (§7). Scope decision:
+`docs/context/decisions/20260926-135538-fittings-ship-tree-tab-and-ship-info-window.md`.
+
 ## 2. Typography
 
 No bundled fonts, no new deps — system stack approximating EVE's condensed sans
@@ -496,6 +525,8 @@ Rules:
     hard, and it reads as "not available", which no flat fill can say without
     being mistaken for "empty". Reach for this only where a surface must look
     unavailable rather than merely dim.
+  - The Ship Tree's corner brackets, grid and render mask (`shipTree.css`)
+    are hard-stop drawings under its own exception — §1 "Ship Tree (ISIS)".
 - Layering: `bg` → `panel` → `panel-2`. Depth via background steps + hairlines,
   not shadows. Shadows only for popovers/menus (`shadow-lg shadow-black/50`).
 - One `primary` button per view; everything else `ghost`.
@@ -610,6 +641,13 @@ surfaces — `bg` / `panel` / `panel-2`:
 | `kind-contract-expiry`   | 8.05 / 7.56 / 7.05    |
 | `kind-order-expiry`      | 12.54 / 11.78 / 10.99 |
 | `kind-skill-plan`        | 12.67 / 11.90 / 11.10 |
+
+Ship Tree golds (§1), also used as text, on `bg` / `panel` / `panel-2`:
+
+| Token           | Ratios              |
+| --------------- | ------------------- |
+| `mastery-elite` | 10.49 / 9.85 / 9.19 |
+| `omega`         | 8.76 / 8.23 / 7.68  |
 
 - `text-faint` and `accent-dim` fail AA by design — restricted to non-text decoration.
 - Hairlines are decorative (1.5–2:1), except a field's resting border

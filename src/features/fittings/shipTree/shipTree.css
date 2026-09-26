@@ -1,10 +1,12 @@
 /*
  * The Ship Tree's ISIS replica (scope decision 20260926-135538). A game-art
- * surface copied from in-game screenshots, so it keeps its own palette
- * rather than the app's tokens. The linear-gradients below are hard-stop
- * corner brackets and a 1px grid — drawings, not fades (docs/DESIGN.md §6,
- * same reasoning as `.calendar-map-past`); the radial mask only feathers the
- * hull render into its tile, as the game does.
+ * surface copied from in-game screenshots, so it keeps the game's palette
+ * rather than the app's tokens — a documented exception, scoped to this
+ * file: docs/DESIGN.md §1 "Ship Tree (ISIS)" lists what it allows (its own
+ * palette, the hard-stop corner-bracket and grid gradients, the radial
+ * render mask, the Mastery V glow, the label shadow, the badge ring's 1.5px
+ * border). The two golds are app tokens (`--color-mastery-elite`,
+ * `--color-omega`) because the app chrome around the tree uses them too.
  */
 
 .isis-viewport {
@@ -63,7 +65,7 @@
   background: #1a2a34;
 }
 .isis-tile:focus-visible {
-  outline: 2px solid #b7ddef;
+  outline: 2px solid var(--color-accent);
   outline-offset: 1px;
 }
 .isis-tile.selected {
@@ -87,14 +89,22 @@
 .isis-tile.elite::before {
   opacity: 1;
   background:
-    linear-gradient(#e8b84a, #e8b84a) left top/8px 2px no-repeat,
-    linear-gradient(#e8b84a, #e8b84a) left top/2px 8px no-repeat,
-    linear-gradient(#e8b84a, #e8b84a) right top/8px 2px no-repeat,
-    linear-gradient(#e8b84a, #e8b84a) right top/2px 8px no-repeat,
-    linear-gradient(#e8b84a, #e8b84a) left bottom/8px 2px no-repeat,
-    linear-gradient(#e8b84a, #e8b84a) left bottom/2px 8px no-repeat,
-    linear-gradient(#e8b84a, #e8b84a) right bottom/8px 2px no-repeat,
-    linear-gradient(#e8b84a, #e8b84a) right bottom/2px 8px no-repeat;
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) left top/8px 2px
+      no-repeat,
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) left top/2px 8px
+      no-repeat,
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) right top/8px 2px
+      no-repeat,
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) right top/2px 8px
+      no-repeat,
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) left bottom/8px 2px
+      no-repeat,
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) left bottom/2px 8px
+      no-repeat,
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) right bottom/8px 2px
+      no-repeat,
+    linear-gradient(var(--color-mastery-elite), var(--color-mastery-elite)) right bottom/2px 8px
+      no-repeat;
 }
 .isis-tile.elite > img {
   filter: grayscale(1) sepia(1) saturate(2.2) hue-rotate(-8deg) contrast(1.3) brightness(1.05);
@@ -158,11 +168,11 @@
   color: #3f4e57;
 }
 .isis-tile.elite .isis-badge {
-  color: #e8b84a;
+  color: var(--color-mastery-elite);
 }
 .isis-tile.elite .isis-badge .ring {
   background: #2a2110;
-  box-shadow: 0 0 8px #e8b84a66;
+  box-shadow: 0 0 8px color-mix(in srgb, var(--color-mastery-elite) 40%, transparent);
 }
 
 .isis-name {
@@ -364,7 +374,7 @@
   flex-shrink: 0;
   clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
   background: #7a6120;
-  color: #d9a72c;
+  color: var(--color-omega);
   font: 700 12px/1 serif;
   position: relative;
 }
@@ -397,4 +407,66 @@
 .isis-icon.locked::before,
 .isis-icon.locked::after {
   border-color: #556773;
+}
+
+/* The map's SVG connectors: lit pipes over the dim ones, and the Ω hexagon. */
+.isis-pipe-glow,
+.isis-pipe-lit,
+.isis-pipe-core,
+.isis-pipe-dim,
+.isis-pipe-dim-core {
+  fill: none;
+}
+.isis-pipe-glow {
+  stroke: #9fc3d3;
+  stroke-opacity: 0.25;
+  stroke-width: 10px;
+}
+.isis-pipe-lit {
+  stroke: #c6dde6;
+  stroke-width: 6px;
+}
+.isis-pipe-core {
+  stroke: #56707c;
+  stroke-width: 2.4px;
+}
+.isis-pipe-dim {
+  stroke: #3b4b55;
+  stroke-width: 4px;
+}
+.isis-pipe-dim-core {
+  stroke: #070d12;
+  stroke-width: 2px;
+}
+.isis-omega-hex {
+  fill: #15130b;
+  stroke: #7a6120;
+  stroke-width: 1.5px;
+}
+.isis-omega-glyph {
+  fill: var(--color-omega);
+  font: 700 15px serif;
+}
+
+/* The in-game hover card and the bonus list inside it. */
+.isis-hover-card {
+  border-color: #3d525e;
+  background: #05090cf2;
+  color: #c9d6dc;
+}
+.isis-hover-render {
+  border-color: #2a3a44;
+}
+.isis-hover-name,
+.isis-trait-value {
+  color: #fff;
+}
+.isis-hover-class {
+  color: #8aa0ab;
+}
+.isis-hover-hint {
+  color: #6f808b;
+}
+.isis-trait-skill {
+  color: #6fb7d8;
 }

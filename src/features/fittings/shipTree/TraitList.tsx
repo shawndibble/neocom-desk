@@ -23,7 +23,7 @@ export function TraitList({
       {traitGroups(traits).map((group) => (
         <div key={group.skillTypeID ?? 'role'}>
           <div
-            className={cx('font-semibold', tone === 'isis' ? 'text-[#6fb7d8]' : 'text-text-dim')}
+            className={cx('font-semibold', tone === 'isis' ? 'isis-trait-skill' : 'text-text-dim')}
           >
             {group.skillTypeID === null
               ? t('ships.info.bonuses.role')
@@ -34,7 +34,7 @@ export function TraitList({
               <span
                 className={cx(
                   'w-10 shrink-0 text-right font-semibold tabular-nums',
-                  tone === 'isis' ? 'text-white' : 'text-text'
+                  tone === 'isis' ? 'isis-trait-value' : 'text-text'
                 )}
               >
                 {trait.bonus !== null ? `${trait.bonus}${trait.unit}` : '·'}

@@ -5,12 +5,21 @@
  * Hovering a hull shows the in-game hover card; clicking one opens the
  * Ship Info window (the caller's).
  */
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { layoutShipTree, hullCountsFor } from '@/engine/shipTree/layout';
-import type { ShipTreeEdge } from '@/engine/shipTree/types';
+import type { ShipTreeEdge, ShipTreeHullStatus, ShipTreeLayout } from '@/engine/shipTree/types';
 import { cx } from '@/lib/cx';
-import type { ShipTreeShip } from '@/sde/types';
+import type { ShipTreeFaction, ShipTreeShip } from '@/sde/types';
 import { ClassNode } from './ClassNode';
 import { HoverCard } from './HoverCard';
 import { Legend } from './Legend';
@@ -21,6 +30,7 @@ import {
   MIN_ZOOM,
   fitCamera,
   focusCamera,
+  wheelZoomFactor,
   zoomAround,
   type Camera,
   type Size,
@@ -29,7 +39,6 @@ import { factionEmblemUrl } from './shipTreeAssets';
 import type { FactionTree } from './useFactionTree';
 import type { ShipTreeSource } from './useShipTreeData';
 
-const WHEEL_STEP = 1.12;
 const BUTTON_STEP = 1.2;
 const toolButton = 'rounded-xs border border-line px-2 py-1 text-xs hover:border-line-bright';
 
@@ -112,10 +121,11 @@ export function ShipTreeMap({
     if (!vp) return;
     function onWheel(e: WheelEvent) {
       e.preventDefault();
+      const factor = wheelZoomFactor(e.deltaY, e.deltaMode);
+      if (factor === 1) return;
       setHover(null);
       const rect = vp!.getBoundingClientRect();
       const { cam: current, factionID: id } = latest.current;
-      const factor = e.deltaY < 0 ? WHEEL_STEP : 1 / WHEEL_STEP;
       setMoved({
         factionID: id,
         cam: zoomAround(current, factor, e.clientX - rect.left, e.clientY - rect.top),
@@ -129,10 +139,26 @@ export function ShipTreeMap({
   const zoomBy = (factor: number) =>
     moveTo(zoomAround(cam, factor, viewport.width / 2, viewport.height / 2));
 
-  function switchFaction(id: number) {
-    setHover(null);
-    onFaction(id);
-  }
+  // Stable, so a pan or a hover re-renders only the transform, not the world.
+  const switchFaction = useCallback(
+    (id: number) => {
+      setHover(null);
+      onFaction(id);
+    },
+    [onFaction]
+  );
+  const selectShip = useCallback(
+    (ship: ShipTreeShip) => {
+      setHover(null);
+      onOpenShip(ship);
+    },
+    [onOpenShip]
+  );
+  const hoverShip = useCallback(
+    (ship: ShipTreeShip | null, el?: HTMLElement) =>
+      setHover(ship && el ? { ship, rect: el.getBoundingClientRect() } : null),
+    []
+  );
 
   function pickResult(ship: ShipTreeShip) {
     setHover(null);
@@ -146,7 +172,6 @@ export function ShipTreeMap({
     onOpenShip(ship);
   }
 
-  const lit = (e: ShipTreeEdge) => tree.unlocked(e.childId);
   const factionShips = data.ships.filter((s) => s.factionID === factionID);
   const flyable = factionShips.filter((s) => statuses.get(s.typeID)?.canFly).length;
   const factionName = (id: number) => data.factions.find((f) => f.id === id)?.name ?? '';
@@ -248,42 +273,19 @@ export function ShipTreeMap({
             transform: `translate(${cam.x}px, ${cam.y}px) scale(${cam.z})`,
           }}
         >
-          <MapLines layout={layout} lit={lit} />
-          {layout.emblems.map((e, i) => {
-            const emblem = factionEmblemUrl(e.factionID);
-            return (
-              <button
-                key={`eb${i}`}
-                type="button"
-                className="isis-emblem"
-                style={{ left: e.x, top: e.y }}
-                title={factionName(e.factionID)}
-                aria-label={t('ships.tree.switchFaction', { name: factionName(e.factionID) })}
-                onClick={() => switchFaction(e.factionID)}
-              >
-                {emblem && <img src={emblem} alt="" width={22} height={22} draggable={false} />}
-              </button>
-            );
-          })}
-          {layout.nodes.map((n) => (
-            <ClassNode
-              key={n.def.id}
-              node={n}
-              tree={tree}
-              statuses={statuses}
-              trainedLevel={trainedLevel}
-              skillName={skillName}
-              selectedTypeID={selectedTypeID}
-              showNames={showNames}
-              onSelect={(ship) => {
-                setHover(null);
-                onOpenShip(ship);
-              }}
-              onHover={(ship, el) =>
-                setHover(ship && el ? { ship, rect: el.getBoundingClientRect() } : null)
-              }
-            />
-          ))}
+          <MapWorld
+            layout={layout}
+            tree={tree}
+            factions={data.factions}
+            statuses={statuses}
+            trainedLevel={trainedLevel}
+            skillName={skillName}
+            selectedTypeID={selectedTypeID}
+            showNames={showNames}
+            onFaction={switchFaction}
+            onSelect={selectShip}
+            onHover={hoverShip}
+          />
         </div>
       </div>
       {hover && hover.ship.factionID === factionID && (
@@ -297,3 +299,73 @@ export function ShipTreeMap({
     </div>
   );
 }
+
+/**
+ * Everything inside the scaled world: lines, pirate emblems and classes.
+ * Memoised on stable props, so panning and zooming (the transform around
+ * it) and the hover card never re-render the tiles.
+ */
+const MapWorld = memo(function MapWorld({
+  layout,
+  tree,
+  factions,
+  statuses,
+  trainedLevel,
+  skillName,
+  selectedTypeID,
+  showNames,
+  onFaction,
+  onSelect,
+  onHover,
+}: {
+  layout: ShipTreeLayout;
+  tree: FactionTree;
+  factions: readonly ShipTreeFaction[];
+  statuses: ReadonlyMap<number, ShipTreeHullStatus>;
+  trainedLevel: (skillTypeID: number) => number;
+  skillName: (skillTypeID: number) => string;
+  selectedTypeID: number | null;
+  showNames: boolean;
+  onFaction: (factionID: number) => void;
+  onSelect: (ship: ShipTreeShip) => void;
+  onHover: (ship: ShipTreeShip | null, el?: HTMLElement) => void;
+}) {
+  const { t } = useTranslation();
+  const lit = useCallback((e: ShipTreeEdge) => tree.unlocked(e.childId), [tree]);
+  const factionName = (id: number) => factions.find((f) => f.id === id)?.name ?? '';
+  return (
+    <>
+      <MapLines layout={layout} lit={lit} />
+      {layout.emblems.map((e, i) => {
+        const emblem = factionEmblemUrl(e.factionID);
+        return (
+          <button
+            key={`eb${i}`}
+            type="button"
+            className="isis-emblem"
+            style={{ left: e.x, top: e.y }}
+            title={factionName(e.factionID)}
+            aria-label={t('ships.tree.switchFaction', { name: factionName(e.factionID) })}
+            onClick={() => onFaction(e.factionID)}
+          >
+            {emblem && <img src={emblem} alt="" width={22} height={22} draggable={false} />}
+          </button>
+        );
+      })}
+      {layout.nodes.map((n) => (
+        <ClassNode
+          key={n.def.id}
+          node={n}
+          tree={tree}
+          statuses={statuses}
+          trainedLevel={trainedLevel}
+          skillName={skillName}
+          selectedTypeID={selectedTypeID}
+          showNames={showNames}
+          onSelect={onSelect}
+          onHover={onHover}
+        />
+      ))}
+    </>
+  );
+});

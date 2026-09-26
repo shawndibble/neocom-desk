@@ -151,11 +151,11 @@ function ShipInfoHeader({ ship, source }: { ship: ShipTreeShip; source: ShipTree
             aria-hidden="true"
             className={cx(
               'inline-flex items-center gap-px',
-              mastery >= 5 ? 'text-[#e8b84a]' : 'text-text-dim'
+              mastery >= 5 ? 'text-mastery-elite' : 'text-text-dim'
             )}
           >
             <Wing />
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full border-[1.5px] border-current px-1 text-[0.625rem] font-bold">
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full border border-current px-1 text-[0.625rem] font-bold">
               {mastery ? romanLevel(mastery) : ''}
             </span>
             <Wing flip />

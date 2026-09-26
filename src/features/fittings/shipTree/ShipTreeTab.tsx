@@ -6,9 +6,9 @@
  * opens its Ship Info window. The page header and tab bar are the Ships
  * route's.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { SegmentedControl, Spinner } from '@/components/ui';
+import { EmptyState, SegmentedControl, Spinner } from '@/components/ui';
 import { intParam } from '@/lib/urlState';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useUrlParam } from '@/lib/useUrlState';
@@ -36,7 +36,9 @@ export function ShipTreeTab() {
   const source = useShipTreeData(characterId);
   return (
     <div className="space-y-2">
-      {source ? (
+      {source === 'failed' ? (
+        <EmptyState title={t('ships.tree.loadFailed')} hint={t('ships.tree.loadFailedHint')} />
+      ) : source ? (
         <ShipTree source={source} />
       ) : (
         <div className="flex items-center gap-2 py-8 text-sm text-text-dim">
@@ -80,7 +82,7 @@ function ShipTree({ source }: { source: ShipTreeSource }) {
       onChange={(next) => void setView(next)}
     />
   );
-  const onFaction = (id: number) => setFaction(id);
+  const onFaction = useCallback((id: number) => setFaction(id), [setFaction]);
 
   return (
     <>
