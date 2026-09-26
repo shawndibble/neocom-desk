@@ -4,6 +4,7 @@ import {
   jobSlotCategory,
   runningJobCountsByCategory,
   aggregateJobSlotSummary,
+  projectJobFinish,
   type JobSlotSkills,
   type JobSlotCharacterInput,
 } from './jobSlots';
@@ -148,5 +149,46 @@ describe('aggregateJobSlotSummary', () => {
       { skills: skills(1), jobs: undefined },
     ];
     expect(aggregateJobSlotSummary(characters, NOW).manufacturing).toBeUndefined();
+  });
+});
+
+describe('projectJobFinish', () => {
+  const skills = {
+    massProduction: 0,
+    advancedMassProduction: 0,
+    laboratoryOperation: 0,
+    advancedLaboratoryOperation: 0,
+    massReactions: 0,
+    advancedMassReactions: 0,
+  };
+  const NOW = 1_000_000;
+
+  it('starts now with a slot open', () => {
+    const p = projectJobFinish({ skills, jobs: [] }, 'manufacturing', 3600, NOW);
+    expect(p).toEqual({ open: 1, startMs: NOW, finishMs: NOW + 3_600_000 });
+  });
+
+  it('counts only running jobs of the same category', () => {
+    const jobs = [
+      { activityId: 11, endMs: NOW + 5000 },
+      { activityId: 1, endMs: NOW - 5000 },
+    ];
+    expect(projectJobFinish({ skills, jobs }, 'manufacturing', 60, NOW).open).toBe(1);
+  });
+
+  it('waits for the earliest-ending job when every slot is full', () => {
+    const jobs = [{ activityId: 1, endMs: NOW + 10_000 }];
+    const p = projectJobFinish({ skills, jobs }, 'manufacturing', 60, NOW);
+    expect(p).toEqual({ open: 0, startMs: NOW + 10_000, finishMs: NOW + 70_000 });
+  });
+
+  it('waits for the right job when over capacity', () => {
+    const jobs = [
+      { activityId: 1, endMs: NOW + 30_000 },
+      { activityId: 1, endMs: NOW + 10_000 },
+      { activityId: 1, endMs: NOW + 20_000 },
+    ];
+    const p = projectJobFinish({ skills, jobs }, 'manufacturing', 0, NOW);
+    expect(p.startMs).toBe(NOW + 30_000);
   });
 });
