@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -43,6 +43,30 @@ export function SkillPlanEditor() {
     unallocatedSp,
   } = usePlanEditorData(activeCharacterId);
   const isDesktop = useIsDesktop();
+  // Memoised: the list pane's per-plan costing re-runs when this changes.
+  const scheduleInputs = useMemo(
+    () =>
+      catalog
+        ? {
+            catalog,
+            trained: trainedSkills,
+            trainedSkillsKnown,
+            queueEntries,
+            attributes,
+            attributeBaseline,
+            implants,
+          }
+        : undefined,
+    [
+      catalog,
+      trainedSkills,
+      trainedSkillsKnown,
+      queueEntries,
+      attributes,
+      attributeBaseline,
+      implants,
+    ]
+  );
   // The page header's actions slot, as a live DOM node: PlanEditor portals
   // Import/Export into it, so they land in the page's one top-right actions
   // cluster (every other route's pattern) rather than in PlanEditor's own
@@ -122,6 +146,8 @@ export function SkillPlanEditor() {
                 activeCharacterId={activeCharacterId}
                 remapInfo={remapInfo}
                 height="sidebar"
+                activePlanId={plan.id}
+                scheduleInputs={scheduleInputs}
               />
             ) : undefined
           }
@@ -151,6 +177,8 @@ export function SkillPlanEditor() {
               activeCharacterId={activeCharacterId}
               remapInfo={remapInfo}
               height="sidebar"
+              activePlanId={plan.id}
+              scheduleInputs={scheduleInputs}
             />
           }
           headerActionsContainer={headerActionsEl}

@@ -80,3 +80,14 @@ test('plan list: the last plan row is reachable above the fixed tab bar at 390px
   expect(tabBarBox).not.toBeNull();
   expect(rowBox!.y + rowBox!.height).toBeLessThanOrEqual(tabBarBox!.y);
 });
+
+test('plan editor: the open plan name is visible in the header at 390px (#1709)', async ({
+  page,
+}) => {
+  await signInAndGoto(page);
+  await seedManyPlans(page);
+  await page.setViewportSize(PHONE);
+  await page.goto('./skills/plans/plan-7');
+
+  await expect(page.getByRole('textbox', { name: 'Plan name' })).toHaveValue('Plan 7');
+});

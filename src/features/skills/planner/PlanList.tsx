@@ -23,6 +23,8 @@ interface PlanListProps {
   onCopyToCharacter?: (id: string, characterId: number) => void;
   /** Per-plan schedule figures by plan id; rows without an entry show name only. */
   stats?: ReadonlyMap<string, PlanRowStats>;
+  /** The plan open in the editor, marked in the list; omitted on the plain list route. */
+  activePlanId?: string;
 }
 
 function PlanRow({
@@ -33,8 +35,10 @@ function PlanRow({
   onRequestDelete,
   onRename,
   stats,
+  active,
 }: {
   plan: SkillPlanRecord;
+  active: boolean;
   stats: PlanRowStats | undefined;
   onRequestCopy: ((plan: SkillPlanRecord) => void) | null;
   onRequestDelete: (plan: SkillPlanRecord) => void;
@@ -51,7 +55,9 @@ function PlanRow({
   }
 
   return (
-    <li className="flex items-center gap-2 border-b border-line px-2 py-1.5 text-xs last:border-b-0">
+    <li
+      className={`flex items-center gap-2 border-b border-line px-2 py-1.5 text-xs last:border-b-0 ${active ? 'bg-accent/15' : ''}`}
+    >
       {renaming ? (
         <TextInput
           size="sm"
@@ -70,7 +76,12 @@ function PlanRow({
           className="flex-1"
         />
       ) : (
-        <button type="button" onClick={() => onOpen(plan.id)} className="min-w-0 flex-1 text-left">
+        <button
+          type="button"
+          onClick={() => onOpen(plan.id)}
+          aria-current={active ? 'true' : undefined}
+          className="min-w-0 flex-1 text-left"
+        >
           <span className="block truncate">{plan.name}</span>
           {stats && (
             <span className="block truncate text-[0.6875rem] text-text-dim tabular-nums">
@@ -129,6 +140,7 @@ export function PlanList({
   otherCharacters = [],
   onCopyToCharacter,
   stats,
+  activePlanId,
 }: PlanListProps) {
   const { t } = useTranslation();
   const [deletingPlan, setDeletingPlan] = useState<SkillPlanRecord | null>(null);
@@ -151,6 +163,7 @@ export function PlanList({
               onRequestDelete={setDeletingPlan}
               onRename={onRename}
               stats={stats?.get(plan.id)}
+              active={plan.id === activePlanId}
             />
           ))}
         </ul>
