@@ -107,6 +107,43 @@ test('trained-skill row keeps its 28px pointer height at and above md (1280px)',
 });
 
 /**
+ * The inspector renders above the sticky search bar, i.e. above the row that
+ * opened it — with no scroll-into-view, selecting a row scrolled below the
+ * top of the page left the inspector rendered entirely off-screen (#1712).
+ *
+ * Scrolls to the bottom before clicking: clicking a row that's already
+ * on-screen leaves the page scrolled little enough that the inspector can
+ * land in view by coincidence, proving nothing about the fix under test.
+ */
+async function assertInspectorScrollsIntoView(page: Page) {
+  const row = await caldariFrigateRow(page);
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await row.click();
+
+  const inspector = page.locator('section').filter({
+    has: page.getByRole('heading', { name: 'Caldari Frigate' }),
+  });
+  const inspectorClose = inspector.getByRole('button', { name: 'Close' });
+  await expect(inspectorClose).toBeInViewport();
+  // In-viewport alone doesn't rule out the sticky search bar painting over
+  // it — a real click only succeeds if the button actually receives it.
+  await inspectorClose.click();
+  await expect(row).toHaveAttribute('aria-pressed', 'false');
+}
+
+test('selecting a trained skill scrolls its inspector into view at 390px', async ({ page }) => {
+  await gotoTrainedSkills(page);
+  await page.setViewportSize(PHONE);
+  await assertInspectorScrollsIntoView(page);
+});
+
+test('selecting a trained skill scrolls its inspector into view at 1280px', async ({ page }) => {
+  await gotoTrainedSkills(page);
+  await page.setViewportSize(DESKTOP);
+  await assertInspectorScrollsIntoView(page);
+});
+
+/**
  * The skill in the live queue's training slot carries a "Training → IV · 4d 4h"
  * chip on its Trained row (#1724). The queue is seeded by a `page.route`
  * override registered before sign-in — the boot prefetch caches whatever it
