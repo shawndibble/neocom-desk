@@ -584,12 +584,7 @@ describe('CourierResults remembered filter (issue #1719)', () => {
     expect(useCourierFilterPref.getState().value).not.toHaveProperty('pref');
   });
 
-  /**
-   * `FilterBar` commits the whole displayed filter on every single-field
-   * edit (`src/components/ui/FilterBar.tsx`), and the displayed filter blends
-   * URL and remembered values — so without `carryOnlyChanges`, editing one
-   * field would silently push an untouched remembered field into the URL.
-   */
+  /** Guards `changedFields` — see its comment in CourierResults.tsx. */
   it('never writes a remembered value into the URL when an unrelated field changes', async () => {
     useCourierFilterPref.setState({
       value: { ...DEFAULT_COURIER_FILTER, maxCollateral: '50000000' },

@@ -23,7 +23,7 @@
  * URL, and this is written to only from an actual filter change.
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
-import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
+import { SPACE_KINDS, isSpaceKind, type SpaceKind } from '@/engine/space';
 import { OVER_RATE_FILTERS, type OverRateFilter } from './overRateFilter';
 
 export const COURIER_FILTER_SETTING_KEY = 'contractSearchCourierFilter';
@@ -52,10 +52,6 @@ export const DEFAULT_COURIER_FILTER: StoredCourierFilter = {
   maxVolume: '',
   minDays: '',
 };
-
-function isSpaceKind(raw: unknown): raw is SpaceKind {
-  return typeof raw === 'string' && (SPACE_KINDS as readonly string[]).includes(raw);
-}
 
 function isOverRateFilter(raw: unknown): raw is OverRateFilter {
   return typeof raw === 'string' && (OVER_RATE_FILTERS as readonly string[]).includes(raw);

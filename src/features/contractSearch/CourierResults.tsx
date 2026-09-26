@@ -75,10 +75,7 @@ import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, enumParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
-import {
-  useCourierFilterPref,
-  type StoredCourierFilter,
-} from '@/features/contractSearch/courierFilterPref';
+import { useCourierFilterPref } from '@/features/contractSearch/courierFilterPref';
 
 /** Rows shown before "show all" — the same cap the item results use. */
 const ROW_CAP = 50;
@@ -642,8 +639,9 @@ const REMEMBERED_FILTER_URL_KEYS = [
   'courier.minDays',
 ] as const;
 
-/** Every `StoredCourierFilter` field, restated as `CourierUiFilter` keys — `routeQuery` is the one field the UI filter has and storage doesn't. */
-const STORED_FILTER_KEYS: readonly (keyof StoredCourierFilter)[] = [
+/** Every field `uiFilter` carries — `routeQuery` is the one the stored shape doesn't (see `changedFields`). */
+const FILTER_KEYS: readonly (keyof CourierUiFilter)[] = [
+  'routeQuery',
   'originRegionId',
   'destinationRegionId',
   'destinationSpace',
@@ -654,7 +652,21 @@ const STORED_FILTER_KEYS: readonly (keyof StoredCourierFilter)[] = [
   'maxVolume',
   'minDays',
 ];
-const FILTER_KEYS: readonly (keyof CourierUiFilter)[] = ['routeQuery', ...STORED_FILTER_KEYS];
+
+/**
+ * `===` except for two arrays, compared by contents rather than reference —
+ * `destinationSpace` is rebuilt as a fresh array (`[...set]`, `.filter()`,
+ * `[...arr, kind]`) every time it is touched at all, including a render
+ * where its *contents* end up unchanged, so reference equality alone would
+ * read every one of those as "changed" and carry it across regardless of
+ * `changedFields`'s point.
+ */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length === b.length && a.every((value) => b.includes(value));
+  }
+  return a === b;
+}
 
 /**
  * `FilterBar`'s pointer-width surface commits the *whole* filter object on
@@ -668,38 +680,26 @@ const FILTER_KEYS: readonly (keyof CourierUiFilter)[] = ['routeQuery', ...STORED
  * would get mirrored into the URL, and a URL-only value would get written
  * back into storage.
  *
- * This reconstructs "what actually changed" by diffing `next` against the
- * previously *displayed* filter, then replays only that change onto each
- * target's own baseline — the raw URL filter for the URL write, the
- * remembered filter for the storage write — so an untouched field's value
- * always comes from wherever it already lived, never from the blend.
+ * This is the one diff `changeFilter` needs: which field(s) `next` actually
+ * touched, against the previously *displayed* filter. Both write targets
+ * (the raw URL filter, the remembered filter) then spread this same patch
+ * onto their own baseline, so an untouched field's value always comes from
+ * wherever it already lived, never from the blend — one diff pass rather than
+ * one per target.
  */
-/**
- * `===` except for two arrays, compared by contents rather than reference —
- * `destinationSpace` is rebuilt as a fresh array (`[...set]`, `.filter()`,
- * `[...arr, kind]`) every time it is touched at all, including a render
- * where its *contents* end up unchanged, so reference equality alone would
- * read every one of those as "changed" and carry it across regardless of
- * `carryOnlyChanges`'s point.
- */
-function sameValue(a: unknown, b: unknown): boolean {
-  if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length === b.length && a.every((value) => b.includes(value));
+function changedFields(
+  displayed: CourierUiFilter,
+  next: CourierUiFilter
+): Partial<CourierUiFilter> {
+  const patch: Partial<CourierUiFilter> = {};
+  for (const key of FILTER_KEYS) {
+    // A dynamic key across a keyed union — TS can't verify the write side
+    // matches the read side per-key, only that both come from `CourierUiFilter`.
+    if (!sameValue(displayed[key], next[key])) {
+      (patch as Record<string, unknown>)[key] = next[key];
+    }
   }
-  return a === b;
-}
-
-function carryOnlyChanges<Base extends object, Display extends Base>(
-  base: Base,
-  displayed: Display,
-  next: Display,
-  keys: readonly (keyof Base)[]
-): Base {
-  const patched = { ...base };
-  for (const key of keys) {
-    if (!sameValue(displayed[key], next[key])) patched[key] = next[key];
-  }
-  return patched;
+  return patch;
 }
 
 /**
@@ -1189,11 +1189,12 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   }, [selectedRow, rows, filter, narrowToCompletable, narrowToOverRate]);
 
   function changeFilter(next: CourierUiFilter) {
-    // Replayed onto each target's own baseline, not onto `next`/`uiFilter`
-    // directly — see `carryOnlyChanges`'s comment for why: `next` carries
-    // every field's *displayed* value, blended from two sources, and only the
-    // field(s) this particular edit actually touched belong to either write.
-    const urlNext = carryOnlyChanges(rawUrlFilter, uiFilter, next, FILTER_KEYS);
+    // Diffed once, then replayed onto each target's own baseline — not onto
+    // `next`/`uiFilter` directly. See `changedFields`'s comment for why: only
+    // the field(s) this particular edit actually touched belong on either
+    // write.
+    const changed = changedFields(uiFilter, next);
+    const urlNext: CourierUiFilter = { ...rawUrlFilter, ...changed };
     setParams({
       'courier.q': urlNext.routeQuery,
       'courier.origin': urlNext.originRegionId,
@@ -1208,8 +1209,10 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
       'courier.all': false,
     });
 
-    const storedNext = carryOnlyChanges(rememberedFilter, uiFilter, next, STORED_FILTER_KEYS);
-    void setRememberedFilter(storedNext);
+    // `routeQuery` has no field on the stored shape — see `courierFilterPref.ts`.
+    const storedChanged = { ...changed };
+    delete storedChanged.routeQuery;
+    void setRememberedFilter({ ...rememberedFilter, ...storedChanged });
   }
 
   /**

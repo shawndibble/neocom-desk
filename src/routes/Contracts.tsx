@@ -349,11 +349,11 @@ export function Contracts() {
    * history entry (`usePageTab`'s own contract, so an explicit tab switch is
    * a place Back returns to) — a *silent* restore on first paint is not such
    * a place, and pushing one here would leave a phantom Items entry behind
-   * Courier for Back to bounce off of. `state: null` unconditionally, even
-   * when the mode already matches (`rememberedMode` is `'items'`): the marker
-   * would otherwise ride along on every subsequent URL-param write for the
-   * rest of this mount (`useUrlParams`'s writes forward `location.state`
-   * verbatim), long after this effect has stopped reading it.
+   * Courier for Back to bounce off of. Skipped entirely when the remembered
+   * mode already matches (`rememberedMode` is `'items'`, the hardcoded
+   * default) — nothing to change, and the only cost of leaving the marker in
+   * place is that it can ride along on a later URL-param write within this
+   * mount, which nothing here or elsewhere ever reads again.
    */
   const location = useLocation();
   const navigate = useNavigate();
@@ -364,11 +364,10 @@ export function Contracts() {
   useEffect(() => {
     if (appliedRememberedMode.current || !rememberedModeHydrated) return;
     appliedRememberedMode.current = true;
-    if (!landedOnDefault) return;
-    const restoredTabId = rememberedMode === 'courier' ? 'search/courier' : tabId;
+    if (!landedOnDefault || rememberedMode !== 'courier') return;
     navigate(
       {
-        pathname: tabPath(CONTRACTS_TABS, restoredTabId),
+        pathname: tabPath(CONTRACTS_TABS, 'search/courier'),
         search: location.search,
         hash: location.hash,
       },
@@ -378,7 +377,6 @@ export function Contracts() {
     rememberedModeHydrated,
     landedOnDefault,
     rememberedMode,
-    tabId,
     location.search,
     location.hash,
     navigate,
