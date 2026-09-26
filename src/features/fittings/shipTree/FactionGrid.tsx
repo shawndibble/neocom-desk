@@ -1,6 +1,6 @@
 /**
  * The map's faction picker, in the in-game panel's place and shape: an icon
- * grid in the canvas's top-right corner, with the chosen faction's name,
+ * grid in the canvas's top-left corner, with the chosen faction's name,
  * flyable count and blurb under it. Phones and the ladder keep `FactionBar`.
  */
 import { memo, useMemo } from 'react';
@@ -41,7 +41,7 @@ export const FactionGrid = memo(function FactionGrid({
   const currentEmblem = factionEmblemUrl(factionID);
 
   return (
-    <div className="isis-overlay absolute top-3 right-3 z-10 w-[14.5rem] space-y-2 p-2">
+    <div className="isis-overlay absolute top-3 left-3 z-10 w-[14.5rem] space-y-2 p-2">
       <div role="group" aria-label={t('ships.tree.factions')} className="grid grid-cols-5 gap-1">
         {factions.map((f) => {
           const c = counts.get(f.id) ?? { flyable: 0, total: 0 };

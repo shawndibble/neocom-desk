@@ -27,16 +27,16 @@ const FIT_PADDING = 40;
 const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
 /** The whole tree, centred, at most 100%. */
-/** `rightInset`: px an overlay panel covers on the right, left out of the fit. */
-export function fitCamera(world: Size, viewport: Size, rightInset = 0): Camera {
-  const width = viewport.width - rightInset;
+/** `leftInset`: px an overlay panel covers on the left, left out of the fit. */
+export function fitCamera(world: Size, viewport: Size, leftInset = 0): Camera {
+  const width = viewport.width - leftInset;
   const z = Math.max(
     FIT_FLOOR,
     Math.min(1, (width - FIT_PADDING) / world.width, (viewport.height - FIT_PADDING) / world.height)
   );
   return {
     z,
-    x: (width - world.width * z) / 2,
+    x: leftInset + (width - world.width * z) / 2,
     y: (viewport.height - world.height * z) / 2,
   };
 }
