@@ -1,10 +1,10 @@
 /**
  * Edits to a Fitting's fighter squadrons — pure, `(Fitting) => Fitting`, the
- * shape the editor's `edit()` applies. A squadron is added full and launched
- * while the hull has a tube free (the caller knows, from the stats), else to
- * the bay; its size stays between one fighter and a full squadron.
+ * shape the editor's `edit()` applies. A squadron is added full, launched
+ * when `canLaunch` allows (the caller has the hull's limits from the stats),
+ * else to the bay; its size stays between one fighter and a full squadron.
  */
-import { squadronSize } from './fighters';
+import { fighterClass, squadronSize, type FighterClass } from './fighters';
 import type { Fitting, FittingFighter } from './types';
 
 function withFighters(fitting: Fitting, fighters: FittingFighter[]): Fitting {
@@ -14,15 +14,37 @@ function withFighters(fitting: Fitting, fighters: FittingFighter[]): Fitting {
   return rest;
 }
 
+/** The hull's tubes and each class's squadron limit (the stats' `fighters` totals). */
+export type FighterLimits = { tubes: number } & Record<FighterClass, number>;
+
+/**
+ * Whether one more squadron of `typeId` can launch beside the ones already
+ * launched: a tube free and its class under the hull's limit. The engine
+ * itself counts a squadron past either (a live run: five launched on a
+ * four-tube Thanatos all fight), so this is where the limit is kept.
+ */
+export function canLaunch(
+  squadrons: readonly FittingFighter[],
+  typeId: number,
+  limits: FighterLimits
+): boolean {
+  const kind = fighterClass(typeId);
+  if (kind === null) return false;
+  const launched = squadrons.filter((squadron) => squadron.state === 'active');
+  const ofClass = launched.filter((squadron) => fighterClass(squadron.typeId) === kind);
+  return launched.length < limits.tubes && ofClass.length < limits[kind];
+}
+
+/** A full squadron of `typeId`, launched when `launch`, else into the bay. */
 export function addSquadron(
   fitting: Fitting,
   typeId: number,
-  { freeTubes }: { freeTubes: number }
+  { launch }: { launch: boolean }
 ): Fitting {
   const squadron: FittingFighter = {
     typeId,
     quantity: squadronSize(typeId),
-    state: freeTubes > 0 ? 'active' : 'online',
+    state: launch ? 'active' : 'online',
   };
   return withFighters(fitting, [...(fitting.fighters ?? []), squadron]);
 }

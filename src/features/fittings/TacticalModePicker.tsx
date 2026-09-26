@@ -8,6 +8,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { defaultTacticalMode, tacticalModesFor } from '@/engine/fittings/tacticalModes';
 import type { Fitting } from '@/engine/fittings/types';
 
+/**
+ * The Fitting in `mode`. The hull's default leaves no `mode` at all — it's
+ * what a Fitting without one flies in anyway, and a link without it stays in
+ * the format every older build reads.
+ */
+function withMode(fitting: Fitting, mode: number): Fitting {
+  if (mode !== defaultTacticalMode(fitting.shipTypeId)) return { ...fitting, mode };
+  const { mode: _default, ...rest } = fitting;
+  void _default;
+  return rest;
+}
+
 export function TacticalModePicker({
   fitting,
   onChange,
@@ -32,7 +44,7 @@ export function TacticalModePicker({
       <span className="text-text-dim">{label}</span>
       <Select
         value={String(current)}
-        onValueChange={(value) => onChange((f) => ({ ...f, mode: Number(value) }))}
+        onValueChange={(value) => onChange((f) => withMode(f, Number(value)))}
       >
         <SelectTrigger aria-label={label} className="w-56">
           <SelectValue />

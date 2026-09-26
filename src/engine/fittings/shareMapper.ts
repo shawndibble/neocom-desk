@@ -20,8 +20,8 @@
  * the wire's two optional trailing sections; on the domain side the side
  * effects live on the implant set, beside the boosters they belong to.
  *
- * Fighter squadrons ride the wire's fighter section as type and size; the
- * wire has no launched/bay split, so they come back launched.
+ * Fighter squadrons ride the wire's fighter section as type, size and — only
+ * for one in the bay — a bay flag.
  *
  * Implant sets are a real field on the wire shape.
  * `implantSet` is threaded straight through both directions, `undefined` and
@@ -77,10 +77,10 @@ export function fittingToShareInput(fitting: Fitting): FittingShareInput {
       count: drone.quantity,
       active: drone.state === 'active' ? drone.quantity : 0,
     })),
-    // The link carries a squadron's type and size, not whether it's launched.
     fighters: (fitting.fighters ?? []).map((fighter) => ({
       typeId: fighter.typeId,
       count: fighter.quantity,
+      ...(fighter.state === 'online' ? { inBay: true } : {}),
     })),
     cargo: fitting.cargo.map((item) => ({ typeId: item.typeId, quantity: item.quantity })),
     ...(fitting.implantSet === undefined
@@ -119,15 +119,13 @@ export function shareToFitting(decoded: FittingShareInput, name: string): Fittin
       state: drone.active > 0 ? 'active' : 'online',
     })),
     cargo: decoded.cargo.map((item) => ({ typeId: item.typeId, quantity: item.quantity })),
-    // Launched: a carrier's squadrons are its weapons, so that's what a link
-    // shows; the tubes a hull lacks, the engine simply doesn't count.
     ...(decoded.fighters.length === 0
       ? {}
       : {
           fighters: decoded.fighters.map((fighter) => ({
             typeId: fighter.typeId,
             quantity: fighter.count,
-            state: 'active' as const,
+            state: fighter.inBay ? ('online' as const) : ('active' as const),
           })),
         }),
     // Side effects ride with the boosters that carry them; with no set, there are none.

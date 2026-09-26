@@ -11,7 +11,8 @@
  * high/mid/low/rig/subsystem; each category is a `,`-joined list of
  * `slot:typeId:state[:chargeTypeId]` (state one of `0`-`3` — see
  * `STATE_TOKENS`). `drones` is `,`-joined `typeId:count:active`; `fighters`
- * and `cargo` are `,`-joined `typeId:count`/`typeId:quantity`; `implants` is
+ * and `cargo` are `,`-joined `typeId:count`/`typeId:quantity` (a fighter
+ * squadron in the bay adds `:0`); `implants` is
  * `implantIds:boosterIds` (each `,`-joined), or empty when no implant set is
  * carried at all. Two optional trailing sections follow, written only when
  * the Fitting has something to put in them, so a Fitting without either
@@ -71,6 +72,12 @@ export interface FittingDrone {
 export interface FittingFighter {
   typeId: number;
   count: number;
+  /**
+   * In the fighter bay rather than launched — written as a third `:0` field
+   * only when true, so a launched squadron (and every link from before the
+   * flag) reads `typeId:count` as it always did.
+   */
+  inBay?: boolean;
 }
 
 export interface FittingCargoItem {
@@ -275,7 +282,7 @@ export async function encodeFittingShare(
     .join(',');
 
   const fightersSection = input.fighters
-    .map((f) => `${f.typeId.toString(36)}:${f.count.toString(36)}`)
+    .map((f) => `${f.typeId.toString(36)}:${f.count.toString(36)}${f.inBay ? ':0' : ''}`)
     .join(',');
 
   const cargoSection = input.cargo
@@ -355,7 +362,19 @@ function parseTypeIdCountPairs(
 }
 
 function parseFighters(raw: string): FittingFighter[] | null {
-  return parseTypeIdCountPairs(raw, MAX_FIGHTERS);
+  if (raw === '') return [];
+  const entries = raw.split(',');
+  if (entries.length > MAX_FIGHTERS) return null;
+  const fighters: FittingFighter[] = [];
+  for (const entryStr of entries) {
+    const fields = entryStr.split(':');
+    if (fields.length !== 2 && !(fields.length === 3 && fields[2] === '0')) return null;
+    const typeId = parseBase36Positive(fields[0]);
+    const count = parseBase36Positive(fields[1]);
+    if (typeId === null || count === null) return null;
+    fighters.push(fields.length === 3 ? { typeId, count, inBay: true } : { typeId, count });
+  }
+  return fighters;
 }
 
 function parseCargo(raw: string): FittingCargoItem[] | null {

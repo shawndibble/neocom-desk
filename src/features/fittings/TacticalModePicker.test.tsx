@@ -27,6 +27,22 @@ describe('TacticalModePicker', () => {
     expect(change(svipul).mode).toBe(34570);
   });
 
+  it('picking the default mode clears it, so the Share Link stays in the old format', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(
+      <TacticalModePicker
+        fitting={{ ...svipul, mode: 34570 }}
+        onChange={onChange}
+        typeName={typeName}
+      />
+    );
+    await user.click(screen.getByRole('combobox', { name: 'Tactical mode' }));
+    await user.click(await screen.findByRole('option', { name: 'Svipul Defense Mode' }));
+    const change = onChange.mock.calls[0][0] as (f: Fitting) => Fitting;
+    expect(change({ ...svipul, mode: 34570 })).not.toHaveProperty('mode');
+  });
+
   it('is not there for a hull without modes', () => {
     const { container } = render(
       <TacticalModePicker

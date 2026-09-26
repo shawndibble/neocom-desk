@@ -64,6 +64,8 @@ const FLAG_PREFIX: Record<FittingSlotKind, string> = {
 
 const SLOT_FLAG = /^(Hi|Med|Lo|Rig|SubSystem)Slot(\d+)$/;
 const FIGHTER_TUBE_FLAG = /^FighterTube\d$/;
+/** `FighterTube0` to `FighterTube4`: the most tubes any hull has. */
+const ESI_FIGHTER_TUBES = 5;
 
 export function esiFittingToFitting(esiFitting: EsiCharacterFitting): LoadedFitting {
   const modules: FittingModule[] = [];
@@ -142,10 +144,14 @@ export function fittingToEsiFitting(
   for (const drone of fitting.drones) {
     items.push({ flag: 'DroneBay', quantity: drone.quantity, type_id: drone.typeId });
   }
-  // Launched squadrons take the tubes in order, as the engine sees them.
+  // Launched squadrons take the tubes in order, as the engine sees them; ESI
+  // has five tubes, so a squadron past them waits in the bay.
   let tube = 0;
   for (const fighter of fitting.fighters ?? []) {
-    const flag = fighter.state === 'active' ? `FighterTube${tube++}` : 'FighterBay';
+    const flag =
+      fighter.state === 'active' && tube < ESI_FIGHTER_TUBES
+        ? `FighterTube${tube++}`
+        : 'FighterBay';
     items.push({ flag, quantity: fighter.quantity, type_id: fighter.typeId });
   }
   for (const item of fitting.cargo) {

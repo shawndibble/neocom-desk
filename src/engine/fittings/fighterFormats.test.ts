@@ -96,3 +96,25 @@ describe('fighters in the formats', () => {
     expect(back.unresolved).toEqual([]);
   });
 });
+
+describe('fighters past the tubes', () => {
+  it('never writes a tube ESI does not have: a sixth launched squadron goes to the bay', () => {
+    const many: Fitting = {
+      ...carrier,
+      fighters: Array.from({ length: 6 }, () => ({
+        typeId: TEMPLAR_I,
+        quantity: 6,
+        state: 'active' as const,
+      })),
+    };
+    const flags = fittingToEsiFitting(many, 'C', '').items.map((item) => item.flag);
+    expect(flags).toEqual([
+      'FighterTube0',
+      'FighterTube1',
+      'FighterTube2',
+      'FighterTube3',
+      'FighterTube4',
+      'FighterBay',
+    ]);
+  });
+});

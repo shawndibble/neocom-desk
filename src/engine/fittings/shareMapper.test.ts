@@ -157,14 +157,19 @@ describe('fittingToShareInput / shareToFitting — fighters', () => {
     expect(shareToFitting(decoded.value, original.name)).toEqual(original);
   });
 
-  it('brings a squadron back launched: the link has no bay/tube split to keep', () => {
-    const input = fittingToShareInput(
-      fitting({ fighters: [{ typeId: 23055, quantity: 6, state: 'online' }] })
-    );
-    expect(input.fighters).toEqual([{ typeId: 23055, count: 6 }]);
-    expect(shareToFitting(input, 'Thanatos').fighters).toEqual([
-      { typeId: 23055, quantity: 6, state: 'active' },
+  it('keeps a squadron in the bay in the bay', () => {
+    const original = fitting({
+      fighters: [
+        { typeId: 23055, quantity: 6, state: 'active' },
+        { typeId: 23055, quantity: 6, state: 'online' },
+      ],
+    });
+    const input = fittingToShareInput(original);
+    expect(input.fighters).toEqual([
+      { typeId: 23055, count: 6 },
+      { typeId: 23055, count: 6, inBay: true },
     ]);
+    expect(shareToFitting(input, original.name)).toEqual(original);
   });
 
   it('carries no fighters key at all for a Fitting without fighters, as before', () => {

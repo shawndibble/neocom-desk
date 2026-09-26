@@ -9,7 +9,13 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Checkbox, IconButton, SearchInput, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
-import { addSquadron, removeSquadron, setSquadron } from '@/engine/fittings/fighterEdit';
+import {
+  addSquadron,
+  canLaunch,
+  removeSquadron,
+  setSquadron,
+  type FighterLimits,
+} from '@/engine/fittings/fighterEdit';
 import { fighterClass, fighterTypeIds, squadronSize } from '@/engine/fittings/fighters';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 
@@ -33,8 +39,15 @@ export function FittingFightersPanel({
   const tubes = stats?.fighters.tubes ?? null;
   if (squadrons.length === 0 && (tubes === null || tubes.total === 0)) return null;
 
-  const launched = squadrons.filter((squadron) => squadron.state === 'active').length;
-  const freeTubes = tubes === null ? 0 : Math.max(0, tubes.total - launched);
+  // Before the stats land nothing launches: the hull's limits aren't known yet.
+  const limits: FighterLimits = stats
+    ? {
+        tubes: stats.fighters.tubes.total,
+        light: stats.fighters.light.total,
+        support: stats.fighters.support.total,
+        heavy: stats.fighters.heavy.total,
+      }
+    : { tubes: 0, light: 0, support: 0, heavy: 0 };
   const needle = query.trim().toLowerCase();
   const matches =
     needle === ''
@@ -111,6 +124,10 @@ export function FittingFightersPanel({
                 <label className="flex min-h-11 cursor-pointer items-center gap-1.5 md:min-h-8">
                   <Checkbox
                     checked={squadron.state === 'active'}
+                    // Launching takes a tube and class room the others may have used up.
+                    disabled={
+                      squadron.state !== 'active' && !canLaunch(squadrons, squadron.typeId, limits)
+                    }
                     onChange={(event) => {
                       // Read now: the edit applies later, after React resets the box.
                       const state = event.target.checked ? 'active' : 'online';
@@ -147,7 +164,9 @@ export function FittingFightersPanel({
                 align="start"
                 className="min-h-11 w-full md:min-h-8"
                 onClick={() => {
-                  onChange((f) => addSquadron(f, typeId, { freeTubes }));
+                  onChange((f) =>
+                    addSquadron(f, typeId, { launch: canLaunch(squadrons, typeId, limits) })
+                  );
                   setQuery('');
                 }}
               >

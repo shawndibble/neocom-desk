@@ -383,3 +383,29 @@ describe('trailing sections: Tactical Destroyer mode and booster side effects', 
     }
   });
 });
+
+describe('fighters: launched or in the bay', () => {
+  it('marks only a bay squadron, so a launched one is written as it always was', async () => {
+    const input: FittingShareInput = {
+      ...minimalInput(),
+      fighters: [
+        { typeId: 23055, count: 6 },
+        { typeId: 23055, count: 6, inBay: true },
+      ],
+    };
+    const encoded = await encodeFittingShare(input);
+    if (!encoded.ok) throw new Error('encode failed');
+    expect(await decodeFittingShare(encoded.payload)).toEqual({ ok: true, value: { ...input } });
+    const bare = await decodeFittingShare(
+      await packRawBody(['1', ';;;;', '', 'hsv:6', '', ''].join('|'))
+    );
+    expect(bare.ok && bare.value.fighters).toEqual([{ typeId: parseInt('hsv', 36), count: 6 }]);
+  });
+
+  it('rejects a bay flag other than 0', async () => {
+    const decoded = await decodeFittingShare(
+      await packRawBody(['1', ';;;;', '', 'hsv:6:1', '', ''].join('|'))
+    );
+    expect(decoded).toEqual({ ok: false, reason: 'invalid' });
+  });
+});

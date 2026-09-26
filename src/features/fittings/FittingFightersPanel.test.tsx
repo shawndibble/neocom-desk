@@ -86,4 +86,29 @@ describe('FittingFightersPanel', () => {
     );
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('will not launch a squadron past the class limit', () => {
+    const fitting: Fitting = {
+      ...carrier,
+      fighters: [
+        ...Array.from({ length: 3 }, () => ({
+          typeId: 23055,
+          quantity: 6,
+          state: 'active' as const,
+        })),
+        { typeId: 23055, quantity: 6, state: 'online' },
+      ],
+    };
+    render(
+      <FittingFightersPanel
+        fitting={fitting}
+        stats={stats(4, 3)}
+        onChange={vi.fn()}
+        typeName={typeName}
+      />
+    );
+    const boxes = screen.getAllByRole('checkbox', { name: 'Launched' });
+    expect(boxes[3]).toBeDisabled();
+    expect(boxes[0]).toBeEnabled();
+  });
 });
