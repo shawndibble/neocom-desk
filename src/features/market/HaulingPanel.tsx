@@ -10,7 +10,7 @@
  * quantity, and unticking or typing a number re-sizes the rest through the
  * same `planTrip` the suggestion came from.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -50,9 +50,12 @@ import { loadMarketGroups } from '@/sde/loadMarketSde';
 import type { MarketGroupNode } from '@/sde/marketTypes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { HAULING_THRESHOLDS } from '@/engine/market/haulingMarket';
+import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { HaulingCargoControl } from './HaulingCargoControl';
 import { HaulingRowDetail } from './HaulingRowDetail';
 import { useHaulingBudget, useHaulingCargo } from './haulingCargo';
+import { ItemContextMenu } from './ItemContextMenu';
+import { MarketItemLink } from './MarketItemLink';
 import {
   DEFAULT_HAULING_CATEGORY_ID,
   HAULING_CATEGORY_IDS,
@@ -98,7 +101,22 @@ function signed(value: number, fractionDigits: number): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(fractionDigits)}`;
 }
 
-export function HaulingPanel() {
+interface HaulingPanelProps {
+  /** Same per-item context menu as Appraisal: null until requested, then per-typeId lookups. */
+  blueprintCatalog: BlueprintCatalog | null;
+  onRequestBlueprintCatalog: () => void;
+  onAddToQuickbar: (typeId: number, itemName: string) => void;
+  quickbarAvailable: boolean;
+  onShowInfo: (typeId: number, itemName: string) => void;
+}
+
+export function HaulingPanel({
+  blueprintCatalog,
+  onRequestBlueprintCatalog,
+  onAddToQuickbar,
+  quickbarAvailable,
+  onShowInfo,
+}: HaulingPanelProps) {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
 
@@ -226,6 +244,29 @@ export function HaulingPanel() {
     },
   };
 
+  // The same menu Appraisal's rows carry — a hauled item is an item like any other.
+  function rowContextMenu(row: HaulingViewRow, tr: ReactElement) {
+    const blueprintTypeID =
+      blueprintCatalog === null
+        ? undefined
+        : (blueprintCatalog.byProductTypeID.get(row.typeId)?.blueprintTypeID ?? null);
+    return (
+      <ItemContextMenu
+        typeId={row.typeId}
+        itemName={row.name}
+        blueprintTypeID={blueprintTypeID}
+        onAddToQuickbar={onAddToQuickbar}
+        quickbarAvailable={quickbarAvailable}
+        onShowInfo={onShowInfo}
+        onOpenChange={(open) => {
+          if (open) onRequestBlueprintCatalog();
+        }}
+      >
+        {tr}
+      </ItemContextMenu>
+    );
+  }
+
   const columns: DataTableColumn<HaulingViewRow>[] = [
     {
       id: 'select',
@@ -250,8 +291,13 @@ export function HaulingPanel() {
       render: (row) => (
         <span className="flex items-center gap-2">
           <TypeIcon typeId={row.typeId} size={32} className="size-6 shrink-0" />
-          <span className="flex flex-col">
-            <span className="font-medium">{row.name}</span>
+          <span className="flex min-w-0 flex-col">
+            <MarketItemLink
+              typeId={row.typeId}
+              className="font-medium hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              {row.name}
+            </MarketItemLink>
             <span className="text-[0.6875rem] text-text-dim">
               {t('market.hauling.volumeEach', {
                 m3: row.unitVolumeM3.toLocaleString(undefined, { maximumFractionDigits: 3 }),
@@ -661,6 +707,8 @@ export function HaulingPanel() {
                 density="compact"
                 stackLayout="labelled"
                 stackColumns={1}
+                rowContextMenu={rowContextMenu}
+                rowMoreActions
                 expandableRow={{
                   renderDetail: (row) => (
                     <HaulingRowDetail row={row} from={from} to={to} fees={fees} />

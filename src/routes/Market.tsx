@@ -993,7 +993,15 @@ export function Market() {
         />
       )}
 
-      {tab === 'hauling' && <HaulingPanel />}
+      {tab === 'hauling' && (
+        <HaulingPanel
+          blueprintCatalog={blueprintCatalog}
+          onRequestBlueprintCatalog={ensureBlueprintCatalog}
+          onAddToQuickbar={handleAddToQuickbar}
+          quickbarAvailable={activeCharacterId !== null}
+          onShowInfo={handleShowInfo}
+        />
+      )}
 
       {tab === 'browser' && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
