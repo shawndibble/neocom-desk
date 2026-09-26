@@ -90,7 +90,7 @@ export function resolveUnitPrice(
   return { price: undefined, source: 'none' };
 }
 
-export type TaxPriceSource = 'saved' | 'historical' | 'live' | 'none';
+export type TaxPriceSource = 'saved' | 'historical' | 'live' | 'live-sell' | 'none';
 
 export interface TaxUnitPriceInputs {
   /** This app's saved snapshot for the day, if one was taken. */
@@ -112,7 +112,7 @@ export interface ResolvedTaxPrice {
  * Payee would actually get selling into buy orders — in this order:
  *
  *   saved snapshot for that day → Adam4EVE's historical buy split →
- *   today's live buy.
+ *   today's live buy → today's live sell (only when no buy side exists anywhere).
  *
  * Deliberately its own resolver rather than `resolveUnitPrice` with a fixed
  * `'buy'` basis: that function gates its `live` fallback to today/yesterday
@@ -129,6 +129,11 @@ export function resolveTaxUnitPrice(inputs: TaxUnitPriceInputs): ResolvedTaxPric
   if (historical !== undefined) return { price: historical, source: 'historical' };
   const live = sidePrice(inputs.live, 'buy');
   if (live !== undefined) return { price: live, source: 'live' };
+  // Last resort: an ore nobody bids on (thin compressed moon ore at Jita) is
+  // still worth roughly its ask. Better than billing 0 — the caller flags the
+  // type so the pilot knows the figure is a sell-side estimate.
+  const liveSell = sidePrice(inputs.live, 'sell');
+  if (liveSell !== undefined) return { price: liveSell, source: 'live-sell' };
   return { price: undefined, source: 'none' };
 }
 

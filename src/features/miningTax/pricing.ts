@@ -48,6 +48,12 @@ export interface UnitPrices {
    * mode a thin order book would otherwise cause silently.
    */
   unpriced: Set<number>;
+  /**
+   * Raw typeIds that had no buy side anywhere, so were valued at today's live
+   * *sell* instead (`resolveTaxUnitPrice`'s last tier). Priced, so absent from
+   * `unpriced`, but an estimate the pilot should be able to see and override.
+   */
+  sellFallback: Set<number>;
 }
 
 /** The hub a Payee's `hubId` names, or Jita when it names none (or one this build does not know). */
@@ -115,21 +121,26 @@ async function resolvePricesForHubAcrossDates(
 
     const prices = new Map<number, number>();
     const unpriced = new Set<number>();
+    const sellFallback = new Set<number>();
     for (const typeId of unique) {
       const pid = pricedTypeId(typeId);
       const resolved = resolveTaxUnitPrice({
         saved: mergedSaved?.get(pid),
         historical: historicalForDate?.get(pid),
-        live: { buy: liveAggregates.get(pid)?.buyMax ?? null, sell: null },
+        live: {
+          buy: liveAggregates.get(pid)?.buyMax ?? null,
+          sell: liveAggregates.get(pid)?.sellMin ?? null,
+        },
       });
       const price = resolved.price ?? 0;
       prices.set(typeId, price);
+      if (resolved.source === 'live-sell') sellFallback.add(typeId);
       // A quoted zero counts as unpriced: an order book that bids nothing
       // values the ore no better than one with no orders at all, and the
       // pilot needs to know before sending the bill either way.
       if (price <= 0) unpriced.add(typeId);
     }
-    byDate.set(date, { prices, unpriced });
+    byDate.set(date, { prices, unpriced, sellFallback });
   }
   return { byDate };
 }
@@ -147,7 +158,7 @@ export async function loadUnitPricesOnDate(
   date: string
 ): Promise<UnitPrices> {
   const { byDate } = await resolvePricesForHubAcrossDates(characterId, typeIds, hub, [date]);
-  return byDate.get(date) ?? { prices: new Map(), unpriced: new Set() };
+  return byDate.get(date) ?? { prices: new Map(), unpriced: new Set(), sellFallback: new Set() };
 }
 
 /** One ledger's prices, at every hub its Payees actually bill against, on every date the ledger needs. */
@@ -164,9 +175,12 @@ export interface DatedUnitPrices {
   unpricedByHub: ReadonlyMap<TradeHub['id'], ReadonlySet<number>>;
   /** The union of `unpricedByHub` — "is there anything at all to warn about". */
   unpriced: Set<number>;
+  /** Per hub, per date, the raw typeIds valued at today's live sell for want of any buy side — see `UnitPrices.sellFallback`. */
+  sellFallbackByHubAndDate: ReadonlyMap<TradeHub['id'], ReadonlyMap<string, ReadonlySet<number>>>;
 }
 
 const NO_PRICES: ReadonlyMap<number, number> = new Map();
+const NO_TYPES: ReadonlySet<number> = new Set();
 
 /**
  * Prices at the hub `hubId` names on `date`, falling back to the default
@@ -184,6 +198,20 @@ export function pricesAtHubOnDate(
     data.byHubAndDate.get(hub.id)?.get(date) ??
     data.byHubAndDate.get(DEFAULT_TRADE_HUB.id)?.get(date) ??
     NO_PRICES
+  );
+}
+
+/** The types valued at today's sell on `date` at the hub `hubId` names — read the same way `pricesAtHubOnDate` reads prices, so the two always describe one book. */
+export function sellFallbackAtHubOnDate(
+  data: DatedUnitPrices,
+  hubId: string | undefined,
+  date: string
+): ReadonlySet<number> {
+  const hub = hubForPayee(hubId);
+  return (
+    data.sellFallbackByHubAndDate.get(hub.id)?.get(date) ??
+    data.sellFallbackByHubAndDate.get(DEFAULT_TRADE_HUB.id)?.get(date) ??
+    NO_TYPES
   );
 }
 
@@ -221,18 +249,25 @@ export async function loadDatedUnitPricesByHub(
   const byHubAndDate = new Map<TradeHub['id'], ReadonlyMap<string, ReadonlyMap<number, number>>>();
   const unpricedByHub = new Map<TradeHub['id'], ReadonlySet<number>>();
   const unpriced = new Set<number>();
+  const sellFallbackByHubAndDate = new Map<
+    TradeHub['id'],
+    ReadonlyMap<string, ReadonlySet<number>>
+  >();
   for (const [hubId, result] of loaded) {
     const byDate = new Map<string, ReadonlyMap<number, number>>();
+    const sellByDate = new Map<string, ReadonlySet<number>>();
     const hubUnpriced = new Set<number>();
     for (const [date, dayResult] of result.byDate) {
       byDate.set(date, dayResult.prices);
+      sellByDate.set(date, dayResult.sellFallback);
       for (const typeId of dayResult.unpriced) {
         hubUnpriced.add(typeId);
         unpriced.add(typeId);
       }
     }
     byHubAndDate.set(hubId, byDate);
+    sellFallbackByHubAndDate.set(hubId, sellByDate);
     unpricedByHub.set(hubId, hubUnpriced);
   }
-  return { byHubAndDate, unpricedByHub, unpriced };
+  return { byHubAndDate, unpricedByHub, unpriced, sellFallbackByHubAndDate };
 }

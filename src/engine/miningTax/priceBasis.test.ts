@@ -148,13 +148,27 @@ describe('resolveTaxUnitPrice', () => {
     });
   });
 
-  it('is unpriced when nothing has a buy side at all', () => {
+  it("falls back to today's live SELL when no book has a buy side — a thin ore is worth its ask, not 0", () => {
+    expect(
+      resolveTaxUnitPrice({
+        saved: { buy: null, sell: 110 },
+        historical: { buy: null, sell: 120 },
+        live: { buy: null, sell: 115 },
+      })
+    ).toEqual({ price: 115, source: 'live-sell' });
+  });
+
+  it('prefers any buy price, even a live one, over the live sell', () => {
+    expect(resolveTaxUnitPrice({ live })).toEqual({ price: 95, source: 'live' });
+  });
+
+  it('is unpriced only when today has no orders on either side', () => {
     expect(resolveTaxUnitPrice({})).toEqual({ price: undefined, source: 'none' });
     expect(
       resolveTaxUnitPrice({
         saved: { buy: null, sell: 1 },
         historical: { buy: null, sell: 1 },
-        live: { buy: null, sell: 1 },
+        live: { buy: null, sell: null },
       })
     ).toEqual({ price: undefined, source: 'none' });
   });
