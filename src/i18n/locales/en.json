@@ -2043,6 +2043,7 @@
   "characters": {
     "title": "Characters",
     "add": "Add character",
+    "addLabel": "Add",
     "addMenuLabel": "Add character options",
     "addWithPermissions": "Add with specific permissions…",
     "customizePermissionsTitle": "Customize permissions",
