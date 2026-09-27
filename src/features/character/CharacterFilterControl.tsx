@@ -41,6 +41,7 @@
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { ICON_SIZE } from '@/components/ui/icons';
+import { controlHeightClassName } from '@/components/ui/controlStyles';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -60,20 +61,26 @@ export interface CharacterFilterControlProps {
 
 /**
  * The composite class list below is one element rather than `Button`'s or
- * `IconButton`'s own `size`/`variant` props: it needs a *different* box at
- * each breakpoint (a fixed `size-9` square below `md`, an auto-width text
- * pill at `md` and up) rather than either component's single fixed shape.
- * Each pair of conflicting utilities here is written mobile-first / `md:`
- * override, the same pattern `iconButtonClassName`'s own `size-11 md:size-9`
- * uses — never two unprefixed utilities for the same property, which is the
- * one ordering Tailwind does not promise to resolve predictably.
+ * `IconButton`'s own `size`/`variant` props: it needs a *different width* at
+ * each breakpoint (a fixed square below `md`, an auto-width text pill at
+ * `md` and up) that neither component's `size` prop can give — both bake
+ * width and height together into one `size-*` utility (`iconButtonClassName`
+ * itself: `size-11 md:size-9`), so overriding only the `md:` width half back
+ * off would mean two `md:`-prefixed utilities fighting over the same
+ * breakpoint, which is the one ordering Tailwind does not promise to resolve
+ * predictably — the same reason two unprefixed utilities for one property
+ * are avoided elsewhere in this file. Height alone has no such coupling, so
+ * it still reads from the shared `controlHeightClassName.sm` (DESIGN.md §3)
+ * rather than being retyped; width and the default-tone ghost colors
+ * (`iconButtonClassName`'s own cascade, copied rather than composed for the
+ * same width-coupling reason) are the only hand-written parts.
  */
 const triggerClassName =
-  'inline-flex shrink-0 items-center justify-center rounded-xs border border-line font-semibold ' +
-  'tracking-widest uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ' +
-  'focus-visible:outline-accent h-9 w-9 bg-panel-2 p-0 text-text-dim hover:border-line-bright ' +
-  'hover:bg-panel-2 hover:text-text md:h-7 md:w-auto md:gap-1.5 md:bg-transparent md:px-2.5 ' +
-  'md:text-[0.6875rem] md:text-text md:hover:bg-panel-2';
+  `inline-flex shrink-0 items-center justify-center rounded-xs border border-line font-semibold ` +
+  `tracking-widest uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ` +
+  `focus-visible:outline-accent ${controlHeightClassName.sm} w-9 bg-panel-2 p-0 text-text-dim ` +
+  `hover:border-line-bright hover:bg-panel-2 hover:text-text md:w-auto md:gap-1.5 md:bg-transparent ` +
+  `md:px-2.5 md:text-[0.6875rem] md:text-text md:hover:bg-panel-2`;
 
 export function CharacterFilterControl({
   activeCharacterId,

@@ -393,12 +393,17 @@ export function OpenOrdersPanel() {
    * `CharacterFilterControl`'s `value` prop, derived the same way from either
    * `filter.characterIds` (desktop strip) or `draft.characterIds` (phone
    * funnel sheet). `characterIds` narrowed to `'current' | 'all'` alongside
-   * `CharacterFilterControl` itself — a non-empty array only ever holds the
-   * active Character's own id now, never a hand-picked subset, so any id at
-   * all reads as "current."
+   * `CharacterFilterControl` itself, so this picker only ever writes an empty
+   * array or exactly one id — but `filter`/`draft` are URL-persisted
+   * (`useUrlFilter`), so a bookmarked or shared link from before the
+   * narrowing can still hand this a genuine multi-id array. That reads as
+   * `'all'`, the same "never guess at 'current' for a legacy subset" rule
+   * `characterFilterValue.ts`'s `fromStoredCharacterFilterValue` applies —
+   * there's no principled way to know which one id (if any) the pilot who
+   * made that link would have meant.
    */
   function characterFilterValueOf(characterIds: readonly number[]): CharacterFilterValue {
-    return characterIds.length === 0 ? 'all' : 'current';
+    return characterIds.length === 1 ? 'current' : 'all';
   }
 
   /** `CharacterFilterControl`'s `onChange`, resolving its selection back to `characterIds` and handing it to whichever setter owns them — `setFilter` (commits immediately) or `setDraft` (committed on the funnel's Apply). */
