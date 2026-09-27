@@ -4735,6 +4735,7 @@
       "copyMultibuy_one": "Copy multibuy ({{count}} item)",
       "copyMultibuy_other": "Copy multibuy ({{count}} items)",
       "copied": "Multibuy list copied",
+      "copyFailed": "Couldn't copy — copy the list below by hand.",
       "multibuyList": "Multibuy list",
       "multibuyEmpty": "Nothing selected.",
       "feesLine": "Fees: Accounting {{accounting}}, Broker Relations {{broker}}",
@@ -4769,6 +4770,7 @@
         "lowMarginTip": "The margin after fees is small enough that a price move erases it."
       },
       "filters": {
+        "title": "Hauling filters",
         "sellsWithin": "Sells within",
         "marginOver": "Margin over",
         "demand": "Demand",
@@ -4779,8 +4781,8 @@
         "days_other": "{{count}} days"
       },
       "plan": {
-        "profit": "Expected profit",
-        "spend": "To spend in {{hub}}",
+        "profit": "Profit",
+        "spend": "Spend",
         "items": "Items",
         "selected": "Selected",
         "selectedOf": "{{selected}} of {{total}}",

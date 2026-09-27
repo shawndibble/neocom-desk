@@ -312,6 +312,21 @@
       content: none;
     }
 
+    /* `cardCorner: 'start'` (e.g. a row-selection checkbox): the card's own
+       top-left corner instead of top-right — its own control, not a value
+       about the row, so it reads as the card's leading affordance rather
+       than crowding the actions/expand cluster on the right. */
+    .dt-stack td.dt-corner-start {
+      right: auto;
+      left: 0.75rem;
+    }
+
+    /* The title clears a start-pinned corner the same way it clears the
+       actions button below — first line reads to its right, not under it. */
+    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-corner-start) td.dt-primary {
+      padding-left: 1.75rem;
+    }
+
     /* The More actions button (`rowMoreActions`): a control, not a field —
        no label gutter. `width: auto` overrides the cell's own `w-0` (kept
        for desktop's tight actions column, see the JSX): a zero-width flowed
@@ -366,8 +381,10 @@
 
     /* A row with both a corner value and the actions button: one corner
        control per position, not two overlapping. The button keeps the
-       card's actual top-right corner; the value shifts left to clear it. */
-    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-corner {
+       card's actual top-right corner; the value shifts left to clear it.
+       Excludes `dt-corner-start`, which already sits in the opposite
+       corner and needs no shift. */
+    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-corner:not(.dt-corner-start) {
       right: 3.75rem;
     }
 
@@ -380,13 +397,20 @@
     /* All three corner controls at once (a card with `cardCorner`,
        `expandableRow` and `rowMoreActions` together, e.g. HaulingPanel):
        the corner value shifts further left again to clear the chevron,
-       which otherwise shares its offset and sits on top of it. */
-    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions):has(> td.dt-disclosure) td.dt-corner {
+       which otherwise shares its offset and sits on top of it. Excludes
+       `dt-corner-start`, which sits in the opposite corner (top-left) and
+       needs no shift — `right` and `left` set together on the same
+       absolutely-positioned, `width: auto` element would fight each other
+       for the box's width instead of just moving it. */
+    .dt-stack:not(.dt-stack-dense)
+      tr:has(> td.dt-actions):has(> td.dt-disclosure)
+      td.dt-corner:not(.dt-corner-start) {
       right: 5.25rem;
     }
 
     /* The card title truncates before the pinned button rather than
-       running under it. Only when the row actually has one. */
+       running under it. Only when the row actually has one — wider still
+       when the expand chevron is clustered beside it too. */
     .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-primary {
       padding-right: 3rem;
       overflow: hidden;
