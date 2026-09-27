@@ -21,7 +21,8 @@
  * when it fails; each still reports its own row.
  *
  * Resolution itself is `resolveBuildPlan`, the same call `BuildPlanDetail.tsx`
- * makes for the open plan — Blueprint Acquisition (issue #838/#839), the
+ * makes for the open plan, against the same `buildPlanPricingInputs.ts`
+ * inputs — Blueprint Acquisition (issue #838/#839), the
  * per-plan Corp Assets blueprint merge and the Reaction Location (issue #698)
  * are all wired there, once, so this hook's totals (the Industry index's
  * Profit column, Compare, and every Build Group rollup) cannot drift from the
@@ -32,22 +33,19 @@ import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
 import i18n from '@/i18n';
 import type { BuildPlanRecord } from '@/db';
 import type { BuildResult } from '@/engine/industry/types';
-import type { BpcContractRow } from '@/engine/contracts/bpcSearch';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { PiData } from '@/sde/types';
 import { DEFAULT_TRADE_HUB, getTradeHub, type TradeHub } from '@/market/hubs';
-import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
-import {
-  tradeHubStanding,
-  type TradeHubStandingsMap,
-} from '@/features/market/useTradeHubStandings';
 import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { loadPlanSnapshots, type PlanSnapshots } from './planSnapshots';
 import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
-import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
-import { useAssumedMe } from './assumedMe';
-import { useIncludeBlueprintCost } from './includeBlueprintCost';
-import { offersForRegion } from './useBpcAcquisitionOffers';
+import {
+  hydratedPricingInputs,
+  pricingSourcesForHub,
+  type BuildPlanPricingInputs,
+  type HubPricingSources,
+  type PricingSourceInputs,
+} from './buildPlanPricingInputs';
 
 export interface ComparedBuildRow {
   planId: string;
@@ -73,20 +71,14 @@ export interface UseComparedBuildResultsArgs {
   catalog: BlueprintCatalog | null;
   pi: PiData | null;
   ownedBlueprints: readonly CharacterBlueprint[];
-  /**
-   * The active Character's corp blueprints (issue #839), folded into each
-   * plan on its own `includeCorpAssets` — never into every plan at once.
-   * Omitted reads as unavailable.
-   */
-  corpOwnedBlueprints?: CorpOwnedBlueprintsState;
   modifiers: CharacterModifiers;
   /**
-   * The active Character's standing toward each Trade Hub's NPC owner
-   * (issue #1238), keyed by hub id — `useTradeHubStandings`'s result.
-   * Absent/no entry for a plan's hub = standings assumed 0, today's
-   * behaviour, same as `BuildPlanDetail.tsx`'s own page.
+   * `useBuildPlanPricingInputs`'s result. Nothing is fetched until its
+   * settings hydrate (`hydratedPricingInputs`); corp blueprints fold into
+   * each plan on its own `includeCorpAssets` (issue #839), and standings and
+   * BPC Sourcing offers resolve for each plan's own Trade Hub.
    */
-  tradeHubStandings?: TradeHubStandingsMap;
+  pricingInputs: BuildPlanPricingInputs;
   /** @see ComparedBuildRow.groupResult */
   computeGroupResult?: boolean;
 }
@@ -118,10 +110,9 @@ async function computeRow(
   plan: BuildPlanRecord,
   catalog: BlueprintCatalog,
   priced: PlanSnapshots | null,
-  sources: Omit<BuildPlanSources, 'catalog' | 'bpcOffersFor' | 'standing'>,
-  bpcRows: readonly BpcContractRow[],
-  computeGroupResult: boolean,
-  tradeHubStandings: TradeHubStandingsMap
+  sources: Omit<BuildPlanSources, 'catalog' | keyof HubPricingSources>,
+  pricing: PricingSourceInputs,
+  computeGroupResult: boolean
 ): Promise<ComparedBuildRow> {
   const base = {
     planId: plan.id,
@@ -141,12 +132,7 @@ async function computeRow(
     const hub: TradeHub = getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB;
     const { result, error, groupResult, groupError } = resolveBuildPlan(
       plan,
-      {
-        ...sources,
-        catalog,
-        bpcOffersFor: offersForRegion(bpcRows, hub.regionId),
-        standing: tradeHubStanding(tradeHubStandings, hub.id),
-      },
+      { ...sources, ...pricingSourcesForHub(pricing, hub), catalog },
       { snapshot, reactionSystemCostIndex: reactionSnapshot?.systemCostIndex },
       { withGroupResult: computeGroupResult }
     );
@@ -170,9 +156,8 @@ export function useComparedBuildResults({
   catalog,
   pi,
   ownedBlueprints,
-  corpOwnedBlueprints,
   modifiers,
-  tradeHubStandings,
+  pricingInputs,
   computeGroupResult = false,
 }: UseComparedBuildResultsArgs): ComparedBuildRow[] {
   const [rows, setRows] = useState<ComparedBuildRow[]>([]);
@@ -181,7 +166,11 @@ export function useComparedBuildResults({
   // the corp list landing must not restart every row's fetch (and flash every
   // Profit cell back to loading) when no plan here would price differently.
   const anyPlanUsesCorp = plans.some((p) => p.includeCorpAssets ?? false);
-  const corpForPlans = anyPlanUsesCorp ? corpOwnedBlueprints : undefined;
+  const corpForPlans = anyPlanUsesCorp ? pricingInputs.corpBlueprints : undefined;
+  // Read field by field, not as the whole object, for the same reason: only
+  // a change that can move a price restarts the fetch.
+  const ready = hydratedPricingInputs(pricingInputs) !== null;
+  const { assumedMe, includeBlueprintCost, standings, bpcRows } = pricingInputs;
 
   // Latest-ref pattern (useCompareRows.ts): a fresh `plans` array reference
   // lands on nearly every render, so the fetch effect below keys on a
@@ -193,42 +182,6 @@ export function useComparedBuildResults({
   });
   const plansKey = plans.map((p) => `${p.id}:${p.updatedAt}`).join(',');
 
-  // Same setting BuildPlanDetail.tsx uses for the open plan — unowned
-  // sub-builds must quote at the pilot's assumption, not 0, or profit
-  // silently disagrees between views.
-  const assumedMe = useAssumedMe((state) => state.value);
-  const assumedMeHydrated = useAssumedMe((state) => state.hydrated);
-  const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateAssumedMe();
-  }, [hydrateAssumedMe]);
-
-  const includeBlueprintCost = useIncludeBlueprintCost((state) => state.value);
-  const includeBlueprintCostHydrated = useIncludeBlueprintCost((state) => state.hydrated);
-  const hydrateIncludeBlueprintCost = useIncludeBlueprintCost((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateIncludeBlueprintCost();
-  }, [hydrateIncludeBlueprintCost]);
-
-  // BPC Sourcing's public-contract snapshot (issue #838), loaded once per
-  // active character rather than per plan/region — `loadPublicBpcContracts`
-  // is a single shared cache-through read, and `offersForRegion` narrows it
-  // per plan below, the same split `useBpcAcquisitionOffers` makes for one
-  // plan's own page.
-  const characterId = plans[0]?.characterId;
-  const [bpcRows, setBpcRows] = useState<readonly BpcContractRow[]>([]);
-  useEffect(() => {
-    if (characterId === undefined) return;
-    let cancelled = false;
-    void loadPublicBpcContracts(characterId).then((cached) => {
-      if (cancelled || !cached) return;
-      setBpcRows(cached.data.rows);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [characterId]);
-
   useEffect(() => {
     const currentPlans = plansRef.current;
     if (!catalog || currentPlans.length === 0) {
@@ -236,10 +189,10 @@ export function useComparedBuildResults({
       return;
     }
     setRows(currentPlans.map((plan) => placeholderRow(plan, catalog)));
-    // Skip fetching until the real assumedMe/includeBlueprintCost settings
-    // land, rather than fetching once at the default and again once
-    // hydrated — a batched multi-plan fetch is too expensive to double.
-    if (!assumedMeHydrated || !includeBlueprintCostHydrated) return;
+    // Skip fetching until the real pricing settings land, rather than
+    // fetching once at the default and again once hydrated — a batched
+    // multi-plan fetch is too expensive to double.
+    if (!ready) return;
     let cancelled = false;
 
     // Every plan's requests go in one call, so plans sharing a hub share a
@@ -257,17 +210,9 @@ export function useComparedBuildResults({
         plan,
         catalog,
         priced,
-        {
-          pi,
-          ownedBlueprints,
-          corpBlueprints: corpForPlans,
-          assumedMe,
-          modifiers,
-          includeBlueprintCost,
-        },
-        bpcRows,
-        computeGroupResult,
-        tradeHubStandings ?? new Map()
+        { pi, ownedBlueprints, modifiers },
+        { assumedMe, includeBlueprintCost, corpBlueprints: corpForPlans, standings, bpcRows },
+        computeGroupResult
       ).then((row) => {
         if (cancelled) return;
         setRows((prev) => prev.map((r) => (r.planId === plan.id ? row : r)));
@@ -283,13 +228,12 @@ export function useComparedBuildResults({
     pi,
     ownedBlueprints,
     corpForPlans,
+    ready,
     assumedMe,
-    assumedMeHydrated,
     includeBlueprintCost,
-    includeBlueprintCostHydrated,
+    standings,
     bpcRows,
     modifiers,
-    tradeHubStandings,
     computeGroupResult,
   ]);
 

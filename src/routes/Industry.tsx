@@ -14,7 +14,6 @@ import { findOwnedBlueprint } from '@/features/industry/data';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
-import { useTradeHubStandings } from '@/features/market/useTradeHubStandings';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import type { PlanIndexStats, PlanRollupStats } from '@/features/industry/BuildPlanList';
 import { BuildPlanCompare } from '@/features/industry/BuildPlanCompare';
@@ -74,7 +73,7 @@ export function Industry() {
     catalog,
     pi,
     ownedBlueprints,
-    corpOwnedBlueprints,
+    pricingInputs,
     blueprintsNeedsReauth,
     modifiers,
     buildGroups,
@@ -272,15 +271,13 @@ export function Industry() {
       ),
     [plans, knownGroupIds]
   );
-  const tradeHubStandings = useTradeHubStandings(activeCharacterId);
   const groupedRows = useComparedBuildResults({
     plans: groupedPlans,
     catalog,
     pi,
     ownedBlueprints,
-    corpOwnedBlueprints,
     modifiers,
-    tradeHubStandings,
+    pricingInputs,
     computeGroupResult: true,
   });
   const ungroupedRows = useComparedBuildResults({
@@ -288,9 +285,8 @@ export function Industry() {
     catalog,
     pi,
     ownedBlueprints,
-    corpOwnedBlueprints,
     modifiers,
-    tradeHubStandings,
+    pricingInputs,
   });
   const statsByPlanId = useMemo(() => {
     const map = new Map<string, PlanIndexStats>();
@@ -505,6 +501,7 @@ export function Industry() {
                 facilityDefaults={facilityDefaults}
                 activeCharacterId={activeCharacterId}
                 ownedStockSnapshot={workspace.ownedStockSnapshot}
+                assumedMe={pricingInputs.assumedMe}
                 onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
                 onAddToQuickbar={quickbar.add}
                 quickbarAvailable={quickbar.available}
@@ -541,9 +538,8 @@ export function Industry() {
                 catalog={catalog}
                 pi={pi}
                 ownedBlueprints={ownedBlueprints}
-                corpOwnedBlueprints={corpOwnedBlueprints}
                 modifiers={modifiers}
-                tradeHubStandings={tradeHubStandings}
+                pricingInputs={pricingInputs}
                 onDone={exitCompare}
               />
             ) : (
