@@ -277,6 +277,53 @@ test("naming a milestone from an entry row shows it as the header's next milesto
 });
 
 /**
+ * Long Plan Milestone name overflow (issue #2094): a name at the
+ * `MAX_MILESTONE_NAME_LENGTH` (60-char) cap used to grow the header's "Next
+ * milestone" chip wider than the viewport, and squeeze the entry row's own
+ * skill name down to just its level numeral. Both now truncate/reflow
+ * instead — asserted here against Gallente Drone Specialization (29 chars,
+ * the same "long skill name" fixture #1716's test above uses) so the fix
+ * holds for the long-milestone-name + long-skill-name combination the issue
+ * calls out, not just a short skill name.
+ */
+test('a long milestone name does not overflow the header chip or squeeze the entry row at 390px', async ({
+  page,
+}) => {
+  const longName = 'x'.repeat(60);
+
+  await signInAndGoto(page);
+  await seedPlan(page, [{ skillTypeID: SKILL.gallenteDroneSpecialization, targetLevel: 4 }]);
+  await page.setViewportSize(PHONE);
+  await page.goto(`./skills/plans/${PLAN_ID}`);
+
+  await page
+    .getByRole('button', { name: 'Add milestone to Gallente Drone Specialization IV' })
+    .click();
+  const nameDialog = page.getByRole('dialog', { name: 'Name this milestone' });
+  await nameDialog.getByRole('textbox').fill(longName);
+  await nameDialog.getByRole('button', { name: 'Save' }).click();
+  await expect(nameDialog).toBeHidden();
+
+  await expect(page.getByText('Next milestone')).toBeVisible();
+
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+
+  const removeButton = page.getByRole('button', {
+    name: 'Remove Gallente Drone Specialization IV',
+  });
+  await expect(removeButton).toBeVisible();
+  const nameSpan = page
+    .locator('li', { has: removeButton })
+    .getByText('Gallente Drone Specialization');
+  await expect(nameSpan).toBeVisible();
+  const nameWidth = await nameSpan.evaluate((el) => el.getBoundingClientRect().width);
+  expect(nameWidth).toBeGreaterThan(20);
+});
+
+/**
  * Plan row level numeral (issue #1716): the row's level numeral used to sit
  * inside the same truncating span as the skill name, so a long name clipped
  * it away — exactly the piece of information that disambiguates "level III"

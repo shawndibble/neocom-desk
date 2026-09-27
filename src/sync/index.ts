@@ -35,6 +35,15 @@ export async function signOutOfSync(): Promise<void> {
 }
 
 /**
+ * Stop syncing on this page until it reloads, once any sync in flight is done
+ * (planSync.ts). Only call it where sync is configured.
+ */
+export async function haltSync(): Promise<void> {
+  const { haltSync } = await import('./planSync');
+  return haltSync();
+}
+
+/**
  * Debounced sync — call after each edit. Fire-and-forget: a failed driver load
  * (offline before the chunk is precached) is swallowed and no sync happens.
  */
@@ -168,13 +177,10 @@ export async function ensureSignedIn(characterId: number): Promise<string> {
 }
 
 /**
- * Purge a removed Character's remote Firestore docs (plans, buildPlans,
- * quickbars, stationPins, settings) right now. If it can't run (most commonly a dead
- * refresh token — the Character can no longer sign in), records a pending
- * purge that the next successful sync for it retries automatically. Returns
- * whether the purge ran immediately.
+ * Delete every remote doc one Character owns, now ("Delete all data" only —
+ * see remotePurge.ts). Throws on failure (dead refresh token, offline).
  */
-export async function purgeCharacterRemoteDataOrDefer(characterId: number): Promise<boolean> {
-  const { purgeCharacterRemoteDataOrDefer } = await import('./characterPurge');
-  return purgeCharacterRemoteDataOrDefer(characterId);
+export async function purgeCharacterRemoteData(characterId: number): Promise<void> {
+  const { purgeCharacterRemoteData } = await import('./remotePurge');
+  return purgeCharacterRemoteData(characterId);
 }

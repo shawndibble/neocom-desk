@@ -3,6 +3,7 @@ import type { BuildResult } from '@/engine/industry/types';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import type { OpportunityRow } from './opportunities';
 import { unitCount, unitMargin } from './opportunityMetrics';
+import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 
 function row(runs: number, profit: number | null, productQuantity = 1): OpportunityRow {
   const blueprint: CharacterBlueprint = {
@@ -38,6 +39,7 @@ function row(runs: number, profit: number | null, productQuantity = 1): Opportun
     },
     result: { profit } as BuildResult,
     sellDepthIsk: null,
+    hub: DEFAULT_TRADE_HUB,
     materialSourcing: {},
     buildHere: [],
     orderDepth: 'unknown',

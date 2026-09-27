@@ -77,7 +77,7 @@ import {
 import { formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { removeCharacter } from '@/features/character/removeCharacter';
+import { removeCharacterAfterSync } from '@/features/character/removeCharacter';
 import { CharacterRowContextMenu } from '@/features/character/CharacterRowContextMenu';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
 import {
@@ -950,7 +950,6 @@ export function Characters() {
     id: number;
     name: string;
   } | null>(null);
-  const [deferredNoticeName, setDeferredNoticeName] = useState<string | null>(null);
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [customizingPermissions, setCustomizingPermissions] = useState(false);
 
@@ -1166,10 +1165,9 @@ export function Characters() {
 
   async function confirmRemoveCharacter() {
     if (!removingCharacter) return;
-    const { id, name } = removingCharacter;
+    const { id } = removingCharacter;
     setRemovingCharacter(null);
-    const { remotePurged } = await removeCharacter(id, isSyncConfigured());
-    if (!remotePurged) setDeferredNoticeName(name);
+    await removeCharacterAfterSync(id, isSyncConfigured());
   }
 
   async function handleMoveToGroup(characterId: number, groupId: string | null) {
@@ -1666,21 +1664,6 @@ export function Characters() {
             onClick={() => deletingGroupId && void handleRemoveGroup(deletingGroupId)}
           >
             {t('characters.deleteGroup')}
-          </Button>
-        </div>
-      </Modal>
-
-      <Modal
-        open={deferredNoticeName !== null}
-        onClose={() => setDeferredNoticeName(null)}
-        title={t('characters.removeDeferredNoticeTitle')}
-      >
-        <p className="text-xs text-text-dim">
-          {deferredNoticeName && t('characters.removeDeferredNotice', { name: deferredNoticeName })}
-        </p>
-        <div className="mt-3 flex justify-end">
-          <Button size="sm" onClick={() => setDeferredNoticeName(null)}>
-            {t('characters.ok')}
           </Button>
         </div>
       </Modal>

@@ -5,26 +5,41 @@ import { Button, Modal, Panel } from '@/components/ui';
 import { db } from '@/db';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { logoutAllCharacters } from '@/features/character/logoutAll';
+import {
+  deleteAllLocalData,
+  purgeAllRemoteCharacterData,
+} from '@/features/character/deleteAllCharacterData';
+
+type Dialog = 'logout' | 'delete';
 
 /**
- * Settings → This device. One action today: forget every login on this
- * browser. Once no Character is left, `RequireCharacter` sends the app to
- * /login by itself, so nothing here navigates.
+ * Settings → This device. Two actions: forget every login on this browser, or
+ * that plus erasing every Character's synced data and this browser's app data.
+ * Once no Character is left, `RequireCharacter` sends the app to /login by
+ * itself, so logout never navigates and a failed purge is reported before
+ * the local wipe, while this dialog can still be seen. Delete reloads after.
  */
 export function DevicePanel() {
-  const { t } = useTranslation();
-  const count = useLiveQuery(() => db.characters.count());
-  const [confirming, setConfirming] = useState(false);
+  const { t, i18n } = useTranslation();
+  const characters = useLiveQuery(() => db.characters.toArray());
+  const [dialog, setDialog] = useState<Dialog | null>(null);
   const [working, setWorking] = useState(false);
   const [failed, setFailed] = useState(false);
+  // Characters whose remote purge could not run now; set once step one is done.
+  const [unpurged, setUnpurged] = useState<number[] | null>(null);
   const syncConfigured = isSyncConfigured();
 
-  async function confirmLogout() {
+  function openDialog(next: Dialog) {
+    setFailed(false);
+    setUnpurged(null);
+    setDialog(next);
+  }
+
+  async function run(action: () => Promise<void>) {
     setWorking(true);
     setFailed(false);
     try {
-      await logoutAllCharacters(syncConfigured);
-      setConfirming(false);
+      await action();
     } catch {
       // Stay in the dialog so the pilot can see it and try again.
       setFailed(true);
@@ -33,7 +48,34 @@ export function DevicePanel() {
     }
   }
 
-  const loggedIn = count ?? 0;
+  const confirmLogout = () =>
+    run(async () => {
+      await logoutAllCharacters(syncConfigured);
+      setDialog(null);
+    });
+
+  const confirmDelete = () =>
+    run(async () => {
+      if (syncConfigured && unpurged === null) {
+        const notPurged = await purgeAllRemoteCharacterData();
+        if (notPurged.length > 0) {
+          setUnpurged(notPurged);
+          return;
+        }
+      }
+      await deleteAllLocalData(syncConfigured);
+      // A fresh boot: no store, query or timer from before the wipe survives.
+      window.location.replace('/');
+    });
+
+  const loggedIn = characters?.length ?? 0;
+  const unpurgedNames = unpurged
+    ? new Intl.ListFormat(i18n.language, { style: 'long', type: 'conjunction' }).format(
+        unpurged.map(
+          (id) => characters?.find((character) => character.characterId === id)?.name ?? String(id)
+        )
+      )
+    : '';
 
   return (
     <Panel title={t('settings.deviceTitle')}>
@@ -52,16 +94,30 @@ export function DevicePanel() {
             variant="danger"
             size="sm"
             disabled={loggedIn === 0}
-            onClick={() => setConfirming(true)}
+            onClick={() => openDialog('logout')}
           >
             {t('settings.deviceLogoutAction')}
           </Button>
         </div>
+        <div className="space-y-1.5 border-t border-line pt-3">
+          <span className="block text-xs font-semibold">{t('settings.deviceDeleteLabel')}</span>
+          <p className="text-xs text-text-dim">
+            {t(syncConfigured ? 'settings.deviceDeleteHint' : 'settings.deviceDeleteHintLocalOnly')}
+          </p>
+          <Button
+            variant="danger"
+            size="sm"
+            disabled={loggedIn === 0}
+            onClick={() => openDialog('delete')}
+          >
+            {t('settings.deviceDeleteAction')}
+          </Button>
+        </div>
       </div>
       <Modal
-        open={confirming}
+        open={dialog === 'logout'}
         onClose={() => {
-          if (!working) setConfirming(false);
+          if (!working) setDialog(null);
         }}
         title={t('settings.deviceLogoutConfirmTitle')}
       >
@@ -74,7 +130,7 @@ export function DevicePanel() {
           </p>
         )}
         <div className="mt-3 flex justify-end gap-2">
-          <Button size="sm" disabled={working} onClick={() => setConfirming(false)}>
+          <Button size="sm" disabled={working} onClick={() => setDialog(null)}>
             {t('characters.cancel')}
           </Button>
           <Button
@@ -84,6 +140,47 @@ export function DevicePanel() {
             onClick={() => void confirmLogout()}
           >
             {t('settings.deviceLogoutAction')}
+          </Button>
+        </div>
+      </Modal>
+      <Modal
+        open={dialog === 'delete'}
+        onClose={() => {
+          // Past a partial purge there is no going back: the purged Characters'
+          // remote data is gone, and an incremental sync would not re-push rows
+          // older than its cursor. Only finishing is offered.
+          if (!working && !unpurged) setDialog(null);
+        }}
+        title={t('settings.deviceDeleteConfirmTitle')}
+      >
+        <p className="text-xs text-text-dim">
+          {unpurged
+            ? t('settings.deviceDeleteUnpurged', { count: unpurged.length, names: unpurgedNames })
+            : t(
+                syncConfigured
+                  ? 'settings.deviceDeleteConfirm'
+                  : 'settings.deviceDeleteConfirmLocalOnly',
+                { count: loggedIn }
+              )}
+        </p>
+        {failed && (
+          <p role="alert" className="mt-2 text-xs text-danger">
+            {t('settings.deviceDeleteFailed')}
+          </p>
+        )}
+        <div className="mt-3 flex justify-end gap-2">
+          {!unpurged && (
+            <Button size="sm" disabled={working} onClick={() => setDialog(null)}>
+              {t('characters.cancel')}
+            </Button>
+          )}
+          <Button
+            variant="danger"
+            size="sm"
+            disabled={working}
+            onClick={() => void confirmDelete()}
+          >
+            {t(unpurged ? 'settings.deviceDeleteFinish' : 'settings.deviceDeleteAction')}
           </Button>
         </div>
       </Modal>

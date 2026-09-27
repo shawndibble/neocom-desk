@@ -1,17 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { resolveLocationStandings } from './locationStandings';
 import { lookupNpcStation } from '@/sde/npcStations';
-import { loadStationOwner } from '@/features/character/stations';
 import { loadPublicCorporationInfo } from '@/features/character/publicInfoData';
 import type { CharacterStandingEntry } from '@/engine/market/standings';
 import { TRADE_HUBS } from '@/market/hubs';
 
 vi.mock('@/sde/npcStations', () => ({ lookupNpcStation: vi.fn() }));
-vi.mock('@/features/character/stations', () => ({ loadStationOwner: vi.fn() }));
 vi.mock('@/features/character/publicInfoData', () => ({ loadPublicCorporationInfo: vi.fn() }));
 
 const JITA_ID = 60003760;
-/** Any NPC station that is not a Trade Hub, so it takes the ESI path. */
+/** Any NPC station that is not a Trade Hub, so it takes the snapshot path. */
 const PERIMETER_STATION_ID = 60000004;
 const CALDARI_NAVY_ID = 1000035;
 const CALDARI_STATE_FACTION_ID = 500001;
@@ -23,18 +21,16 @@ const STANDINGS: CharacterStandingEntry[] = [
 
 beforeEach(() => {
   vi.mocked(lookupNpcStation).mockReset();
-  vi.mocked(loadStationOwner).mockReset();
   vi.mocked(loadPublicCorporationInfo).mockReset();
 });
 
 describe('resolveLocationStandings', () => {
-  it('returns zero for a known player structure, without resolving an owner', async () => {
+  it('returns zero for a known player structure, without a request', async () => {
     vi.mocked(lookupNpcStation).mockResolvedValue(null);
 
     const result = await resolveLocationStandings(1_000_000_000_001, STANDINGS);
 
     expect(result).toEqual({ factionStanding: 0, corpStanding: 0 });
-    expect(loadStationOwner).not.toHaveBeenCalled();
   });
 
   it('returns zero when the NPC-station snapshot itself could not be read', async () => {
@@ -43,7 +39,6 @@ describe('resolveLocationStandings', () => {
     const result = await resolveLocationStandings(PERIMETER_STATION_ID, STANDINGS);
 
     expect(result).toEqual({ factionStanding: 0, corpStanding: 0 });
-    expect(loadStationOwner).not.toHaveBeenCalled();
   });
 
   it('resolves a Trade Hub from its stored owner, with no request at all', async () => {
@@ -51,7 +46,6 @@ describe('resolveLocationStandings', () => {
 
     expect(result).toEqual({ factionStanding: 10, corpStanding: 5 });
     expect(lookupNpcStation).not.toHaveBeenCalled();
-    expect(loadStationOwner).not.toHaveBeenCalled();
     expect(loadPublicCorporationInfo).not.toHaveBeenCalled();
   });
 
@@ -69,37 +63,27 @@ describe('resolveLocationStandings', () => {
     expect(loadPublicCorporationInfo).not.toHaveBeenCalled();
   });
 
-  it('resolves faction and corp standing for an NPC station via its owner corporation', async () => {
+  it('resolves faction and corp standing for an NPC station from the snapshot, with no request', async () => {
     vi.mocked(lookupNpcStation).mockResolvedValue({
       id: PERIMETER_STATION_ID,
       name: 'Perimeter',
       systemId: 1,
-    });
-    vi.mocked(loadStationOwner).mockResolvedValue(CALDARI_NAVY_ID);
-    vi.mocked(loadPublicCorporationInfo).mockResolvedValue({
-      corporation_id: CALDARI_NAVY_ID,
-      name: 'Caldari Navy',
-      ticker: 'CN',
-      ceo_id: 1,
-      creator_id: 1,
-      member_count: 1,
-      tax_rate: 0,
-      faction_id: CALDARI_STATE_FACTION_ID,
-      ceoName: null,
+      ownerCorporationId: CALDARI_NAVY_ID,
+      ownerFactionId: CALDARI_STATE_FACTION_ID,
     });
 
     const result = await resolveLocationStandings(PERIMETER_STATION_ID, STANDINGS);
 
     expect(result).toEqual({ factionStanding: 10, corpStanding: 5 });
+    expect(loadPublicCorporationInfo).not.toHaveBeenCalled();
   });
 
-  it('returns zero when the station owner cannot be resolved', async () => {
+  it('returns zero when the snapshot predates owner fields', async () => {
     vi.mocked(lookupNpcStation).mockResolvedValue({
       id: PERIMETER_STATION_ID,
       name: 'Perimeter',
       systemId: 1,
     });
-    vi.mocked(loadStationOwner).mockResolvedValue(null);
 
     const result = await resolveLocationStandings(PERIMETER_STATION_ID, STANDINGS);
 
@@ -112,17 +96,7 @@ describe('resolveLocationStandings', () => {
       id: PERIMETER_STATION_ID,
       name: 'Perimeter',
       systemId: 1,
-    });
-    vi.mocked(loadStationOwner).mockResolvedValue(CALDARI_NAVY_ID);
-    vi.mocked(loadPublicCorporationInfo).mockResolvedValue({
-      corporation_id: CALDARI_NAVY_ID,
-      name: 'Caldari Navy',
-      ticker: 'CN',
-      ceo_id: 1,
-      creator_id: 1,
-      member_count: 1,
-      tax_rate: 0,
-      ceoName: null,
+      ownerCorporationId: CALDARI_NAVY_ID,
     });
 
     const result = await resolveLocationStandings(PERIMETER_STATION_ID, STANDINGS);
