@@ -69,26 +69,23 @@ import { sampledProblem } from '@/engine/market/orderProblemHistory';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import {
   buildOpenOrderRows,
-  groupOpenOrders,
   needsAttentionCount,
   openOrderProblemCounts,
-  summariseOrderGroup,
   type OpenOrderGroupSummary,
   type OpenOrderRow,
 } from './openOrdersModel';
 import {
   EMPTY_OPEN_ORDERS_FILTER,
   FILTERABLE_PROBLEMS,
-  filterOpenOrders,
   OPEN_ORDERS_FIELD_TO_PARAM,
   OPEN_ORDERS_FILTER_PARAMS,
   OPEN_ORDERS_SORTS,
-  sortOpenOrders,
   activeFilterChips,
   DEFAULT_OPEN_ORDERS_FILTER_PARAMS,
   type OpenOrdersFilter,
   type OpenOrdersSort,
 } from './openOrdersFilter';
+import { buildOpenOrdersView, isGroupFolded } from './openOrdersView';
 import type { OrderProblem } from '@/engine/market/orderProblems';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
@@ -148,18 +145,6 @@ function itemKey(regionId: number, typeId: number): string {
 function stationShortName(name: string): string {
   const dashIndex = name.indexOf(' - ');
   return dashIndex === -1 ? name : name.slice(0, dashIndex);
-}
-
-/** The highlighted row's own group always wins over either fold mechanism (decision `20260924-...`, step 9). */
-function isGroupFolded(
-  problem: OrderProblem,
-  highlightedRow: OpenOrderRow | null,
-  filter: OpenOrdersFilter,
-  collapsedGroups: ReadonlySet<OrderProblem>
-): boolean {
-  if (problem === highlightedRow?.problem) return false;
-  if (problem === 'healthy') return filter.hideHealthy;
-  return collapsedGroups.has(problem);
 }
 
 interface ActiveChipDisplay {
@@ -458,24 +443,9 @@ export function OpenOrdersPanel({
 
   const problemCounts = useMemo(() => openOrderProblemCounts(allRows), [allRows]);
 
-  const visibleRows = useMemo(
-    () => sortOpenOrders(filterOpenOrders(allRows, filter), filter.sort),
+  const { visibleRows, groupingRows, groups, groupSummaries, matchCountVisible } = useMemo(
+    () => buildOpenOrdersView(allRows, filter),
     [allRows, filter]
-  );
-  // Healthy orders are FOLDED, not filtered out (CONTEXT.md): grouping always
-  // sees every row that matches every filter but `hideHealthy`, so the
-  // healthy group's own heading and count still render — just without its
-  // table — while `hideHealthy` is on. Using `visibleRows` here instead would
-  // make the group vanish outright, which reads as "nothing matched" rather
-  // than "nothing here needs you."
-  const groupingRows = useMemo(
-    () => sortOpenOrders(filterOpenOrders(allRows, { ...filter, hideHealthy: false }), filter.sort),
-    [allRows, filter]
-  );
-  const groups = useMemo(() => groupOpenOrders(groupingRows), [groupingRows]);
-  const groupSummaries = useMemo(
-    () => new Map(groups.map((group) => [group.problem, summariseOrderGroup(group.rows)])),
-    [groups]
   );
 
   const attentionCount = useMemo(() => needsAttentionCount(allRows), [allRows]);
@@ -1132,7 +1102,7 @@ export function OpenOrdersPanel({
             would read as a broken filter, so the count steps aside and the
             folded Healthy group speaks for itself.
           */}
-          {(visibleRows.length > 0 || groupingRows.length === 0) && (
+          {matchCountVisible && (
             <p className="px-3 pt-2 text-xs text-text-dim">
               {t('market.orders.filter.matchCount', {
                 count: visibleRows.length,
