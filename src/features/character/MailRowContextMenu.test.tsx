@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { configureClipboard } from '@/lib/clipboard';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
+import { RowMoreActions } from '@/components/ui';
 import { MailRowContextMenu } from './MailRowContextMenu';
 
 const MAIL_ID = 481123;
@@ -16,10 +17,13 @@ const writeSpy = vi.fn<(text: string) => Promise<void>>(() => Promise.resolve())
 function renderMenu(senderId: number | undefined) {
   const onRowClick = vi.fn();
   const view = render(
-    <MailRowContextMenu mailId={MAIL_ID} senderId={senderId}>
-      <button type="button" onClick={onRowClick}>
-        Re: Fleet tonight
-      </button>
+    <MailRowContextMenu mailId={MAIL_ID} subject="Re: Fleet tonight" senderId={senderId}>
+      <div>
+        <button type="button" onClick={onRowClick}>
+          Re: Fleet tonight
+        </button>
+        <RowMoreActions />
+      </div>
     </MailRowContextMenu>
   );
   return { ...view, onRowClick };
@@ -79,5 +83,18 @@ describe('MailRowContextMenu (#889)', () => {
 
     fireEvent.contextMenu(row);
     expect(await screen.findByRole('menuitem', { name: 'View sender' })).toBeInTheDocument();
+  });
+
+  it('offers the same items from the visible More-actions button, without selecting the row (#2060)', async () => {
+    const user = userEvent.setup();
+    const { onRowClick } = renderMenu(SENDER_ID);
+    await user.click(screen.getByRole('button', { name: 'More actions for Re: Fleet tonight' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'View sender' }));
+
+    expect(usePublicInfoModalStore.getState().request).toEqual({
+      kind: 'character',
+      id: SENDER_ID,
+    });
+    expect(onRowClick).not.toHaveBeenCalled();
   });
 });

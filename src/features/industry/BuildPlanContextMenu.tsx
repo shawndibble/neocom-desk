@@ -35,15 +35,13 @@ import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { industryTabHref } from './industryTabs';
 import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
   IconButton,
+  MenuItem as RowMenuItem,
+  RowActionsMenu,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { writeToClipboard } from '@/lib/clipboard';
@@ -57,7 +55,7 @@ import {
 import { applyPlanSeed, type BuildPlanSeed } from './planSeed';
 
 /** `ContextMenuItem` and `DropdownMenuItem` share this shape — both spread onto a Radix `Item`. */
-type MenuItemComponent = typeof ContextMenuItem;
+type MenuItemComponent = typeof RowMenuItem;
 
 export interface BuildPlanContextMenuProps {
   /** The row's own type — a blueprint on the BPC table, anything at all in a contract. */
@@ -190,13 +188,12 @@ export function BuildPlanContextMenu({
   seed,
 }: BuildPlanContextMenuProps) {
   const { index, onOpenChange } = usePlannableIndexOnOpen();
-  const items = useBuildPlanMenuNodes({ typeId, itemName, seed }, index, ContextMenuItem);
+  const items = useBuildPlanMenuNodes({ typeId, itemName, seed }, index, RowMenuItem);
 
   return (
-    <ContextMenu onOpenChange={onOpenChange}>
-      <ContextMenuTrigger asChild>{trigger}</ContextMenuTrigger>
-      <ContextMenuContent>{items}</ContextMenuContent>
-    </ContextMenu>
+    <RowActionsMenu name={itemName ?? `#${typeId}`} items={items} onOpenChange={onOpenChange}>
+      {trigger}
+    </RowActionsMenu>
   );
 }
 
