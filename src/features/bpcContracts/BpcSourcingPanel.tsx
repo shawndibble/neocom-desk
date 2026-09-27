@@ -31,7 +31,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import {
-  BPC_SOURCING_PARAMS,
+  bpcSourcingParams,
   BPC_SOURCING_SORT_KEY,
   DEFAULT_SOURCE_TOGGLES,
   SOURCE_TOGGLES,
@@ -95,6 +95,10 @@ import {
   useMarketBpoOrders,
 } from '@/features/bpcContracts/useMarketBpoOrders';
 import { useMarketHub } from '@/features/market/hub';
+import {
+  useBpcHideAuctionsDefault,
+  useBpcHidePlexDefault,
+} from '@/features/bpcContracts/sourcingDefaults';
 import { DEFAULT_TRADE_HUB, getTradeHub, TRADE_HUBS } from '@/market/hubs';
 import { DEFAULT_JUMP_RANGE, withinJumpRange, type JumpRange } from '@/engine/route/jumpRange';
 import {
@@ -577,7 +581,19 @@ export function BpcSourcingPanel() {
   // Search, filters, sources and the pinned blueprint all live in
   // the URL (`bpcSourcingUrl.ts`), one group so a handler that changes
   // several at once writes them in one navigation.
-  const [params, setParams] = useUrlParams(BPC_SOURCING_PARAMS);
+  const hideAuctionsDefault = useBpcHideAuctionsDefault((state) => state.value);
+  const hidePlexDefault = useBpcHidePlexDefault((state) => state.value);
+  const hydrateHideAuctionsDefault = useBpcHideAuctionsDefault((state) => state.hydrate);
+  const hydrateHidePlexDefault = useBpcHidePlexDefault((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateHideAuctionsDefault();
+    void hydrateHidePlexDefault();
+  }, [hydrateHideAuctionsDefault, hydrateHidePlexDefault]);
+  const sourcingParams = useMemo(
+    () => bpcSourcingParams({ hideAuctions: hideAuctionsDefault, hidePlex: hidePlexDefault }),
+    [hideAuctionsDefault, hidePlexDefault]
+  );
+  const [params, setParams] = useUrlParams(sourcingParams);
   const uiFilter: UiFilter = useMemo(
     () => ({
       typeQuery: params['sourcing.q'],
@@ -828,8 +844,8 @@ export function BpcSourcingPanel() {
       minTe: '',
       minRuns: '',
       maxPrice: '',
-      hideAuctions: false,
-      hidePlex: false,
+      hideAuctions: hideAuctionsDefault,
+      hidePlex: hidePlexDefault,
     });
     setParams({
       'sourcing.src': new Set(DEFAULT_SOURCE_TOGGLES),

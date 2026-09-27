@@ -167,7 +167,10 @@
 // same reason, never deleted for the same reason — see
 // features/fittings/targetProfiles.ts.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
+  'sync.bpcHideAuctions',
+  'sync.bpcHidePlex',
   'sync.corpDarkAfterDays',
+  'sync.courierHighCollateralRatio',
   'sync.defaultCharacterFilter',
   'sync.fittingDamageProfileId',
   'sync.fittingDamageProfiles',
