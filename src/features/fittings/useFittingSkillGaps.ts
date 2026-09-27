@@ -34,25 +34,21 @@ export function useFittingSkillGaps(
     void (async () => {
       try {
         const typeIds = fittingRequirementTypeIds(fitting);
-        const required = new Array<readonly RequiredSkill[]>(typeIds.length);
+        const byType = new Map<number, readonly RequiredSkill[]>();
         const [profile] = await Promise.all([
           loadActivePilotProfile(characterId),
-          // Bounded, not `Promise.all(typeIds.map(...))`: an uncached Fitting
-          // can carry a dozen distinct types, each its own ESI round trip —
-          // ESI has no batch endpoint for dogma attributes (issue: N+1 API
-          // Call on /fittings/edit), so the fan-out is unavoidable, but it
-          // must not exceed the same per-call-site cap every other ESI
-          // fan-out in the app respects.
-          mapWithConcurrencyLimit(
-            typeIds.map((typeId, index) => ({ typeId, index })),
-            ESI_FANOUT_CONCURRENCY,
-            async ({ typeId, index }) => {
-              required[index] = await loadRequirements(typeId);
-            }
-          ),
+          // Bounded, not `Promise.all(typeIds.map(...))`: each type's
+          // requirements are their own uncached ESI round trip, and an open
+          // Fitting can carry a dozen distinct types — ESI has no batch
+          // endpoint for dogma attributes (Sentry: "N+1 API Call" on
+          // /fittings/edit), so the fan-out is unavoidable, but it must not
+          // exceed the same per-call-site cap every other ESI fan-out in the
+          // app respects.
+          mapWithConcurrencyLimit(typeIds, ESI_FANOUT_CONCURRENCY, async (typeId) => {
+            byType.set(typeId, await loadRequirements(typeId));
+          }),
         ]);
         if (cancelled) return;
-        const byType = new Map(typeIds.map((id, i) => [id, required[i]]));
         setResult({
           fitting,
           characterId,

@@ -26,24 +26,16 @@ export function useFittingHardpoints(fitting: Fitting | null): HardpointCounts |
       try {
         // Bounded, not `Promise.all(missing.map(...))`: a fit's high slots can
         // hold a dozen distinct types, each its own uncached ESI round trip —
-        // ESI has no batch endpoint for dogma effects (issue: N+1 API Call on
-        // /fittings/edit) — so cap the fan-out like every other ESI call site.
-        const loaded = new Array<readonly [number, HardpointKind | null | undefined]>(
-          missing.length
-        );
-        await mapWithConcurrencyLimit(
-          missing.map((typeId, index) => ({ typeId, index })),
-          ESI_FANOUT_CONCURRENCY,
-          async ({ typeId, index }) => {
-            loaded[index] = [typeId, await loadHardpointKind(typeId)];
-          }
-        );
+        // ESI has no batch endpoint for dogma effects (Sentry: "N+1 API Call"
+        // on /fittings/edit) — so cap the fan-out like every other ESI call site.
+        const found = new Map<number, HardpointKind | null>();
+        await mapWithConcurrencyLimit(missing, ESI_FANOUT_CONCURRENCY, async (typeId) => {
+          const kind = await loadHardpointKind(typeId);
+          // A type ESI couldn't supply stays unknown — and missing, so the next Fitting change retries it.
+          if (kind !== undefined) found.set(typeId, kind);
+        });
         if (cancelled) return;
-        // A type ESI couldn't supply stays unknown — and missing, so the next Fitting change retries it.
-        const known = loaded.filter(
-          (entry): entry is readonly [number, HardpointKind | null] => entry[1] !== undefined
-        );
-        if (known.length > 0) setKinds((previous) => new Map([...previous, ...known]));
+        if (found.size > 0) setKinds((previous) => new Map([...previous, ...found]));
       } catch {
         // Leaves them unknown; the pips show nothing taken.
       }
