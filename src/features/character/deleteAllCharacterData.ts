@@ -1,8 +1,8 @@
 // "Delete all data" (Settings → This device): every Character's synced
 // Editable Data (Skill Plans, Build Plans, synced settings...) leaves
 // Firestore now — the only client-side remote delete; otherwise it waits for
-// the 90-day inactivity purge — and then everything this app keeps in the
-// browser goes too: IndexedDB, web storage, runtime caches. The caller
+// the 90-day inactivity purge — and then everything this app keeps on the
+// device goes too: IndexedDB, web storage, runtime caches. The caller
 // reloads afterwards, so no in-memory state outlives the wipe.
 //
 // Two steps, so the caller can show a failed purge before the roster is gone.
@@ -109,7 +109,7 @@ async function clearRuntimeCaches(): Promise<void> {
 }
 
 /**
- * Step two: everything this app stores in the browser. Refresh tokens go
+ * Step two: everything this app stores on the device. Refresh tokens go
  * first; then what needs local state to undo — the push registration (keyed
  * by the device id in localStorage), the Firebase session, the app badge;
  * then every other store, the app's own database last.

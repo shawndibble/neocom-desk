@@ -577,6 +577,9 @@ export function Login() {
         <a href="/privacy.html" className="hover:text-text hover:underline">
           {t('login.footerPrivacy')}
         </a>
+        <a href="/data-credit.html" className="hover:text-text hover:underline">
+          {t('login.footerDataCredit')}
+        </a>
         <a
           href={DISCORD_URL}
           target="_blank"
