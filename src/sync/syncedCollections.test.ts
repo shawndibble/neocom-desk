@@ -89,12 +89,8 @@ describe('synced collection registry — persisted names', () => {
     expect(ownerHashKey(7)).toBe('sync.__ownerHash.7');
   });
 
-  it('keeps the removal purge rule as it was', () => {
-    // The three Production Log tables were never in removeCharacter's local
-    // delete list. Preserved as-is here; changing it is its own decision.
-    expect(
-      EDITABLE_COLLECTIONS.filter((c) => c.onRemoval === 'keep').map((c) => c.remoteName)
-    ).toEqual(['productionRuns', 'productionSaleLinks', 'productionOrderWatches']);
+  it('deletes every collection’s local rows on Character removal, Production Log included', () => {
+    expect(EDITABLE_COLLECTIONS.filter((c) => c.onRemoval === 'keep')).toEqual([]);
   });
 
   it('declares the feed and synced settings alongside the editable collections', () => {

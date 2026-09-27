@@ -167,7 +167,7 @@ describe('removeCharacter', () => {
     expect(await db.miningLedgerHistory.get(1)).toBeUndefined();
   });
 
-  it('applies each synced collection’s declared removal rule to its local rows', async () => {
+  it('deletes every synced collection’s local rows, Production Log included', async () => {
     await seedCharacter(1);
     for (const [table, record] of Object.entries(FULL_RECORDS)) {
       await db.table(table).put(record);
@@ -177,9 +177,7 @@ describe('removeCharacter', () => {
 
     for (const c of EDITABLE_COLLECTIONS) {
       const left = await db.table(c.table).where('characterId').equals(1).count();
-      // `keep` is the Production Log's three tables, which removal never
-      // deleted locally — preserved as-is by the registry (issue #2043).
-      expect({ [c.table]: left > 0 }).toEqual({ [c.table]: c.onRemoval === 'keep' });
+      expect({ [c.table]: left }).toEqual({ [c.table]: 0 });
     }
   });
 

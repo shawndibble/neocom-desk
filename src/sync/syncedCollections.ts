@@ -422,9 +422,7 @@ export const PRODUCTION_RUNS = defineEditableCollection<
   remoteName: 'productionRuns',
   table: 'productionRuns',
   tombstoneSegment: 'productionRunTombstones',
-  // Kept on removal: removeCharacter never deleted this table's local rows
-  // (it predates the registry's purge rule). Preserved as-is — see #2053.
-  onRemoval: 'keep',
+  onRemoval: 'delete',
   faqItem: 'productionRuns',
   toRemoteDoc: (r, ownerHash) => ({
     id: r.id,
@@ -463,9 +461,7 @@ export const PRODUCTION_SALE_LINKS = defineEditableCollection<
   remoteName: 'productionSaleLinks',
   table: 'productionSaleLinks',
   tombstoneSegment: 'productionSaleLinkTombstones',
-  // Kept on removal: removeCharacter never deleted this table's local rows
-  // (it predates the registry's purge rule). Preserved as-is — see #2053.
-  onRemoval: 'keep',
+  onRemoval: 'delete',
   faqItem: 'productionRuns',
   toRemoteDoc: (r, ownerHash) => ({
     id: r.id,
@@ -502,9 +498,7 @@ export const PRODUCTION_ORDER_WATCHES = defineEditableCollection<
   remoteName: 'productionOrderWatches',
   table: 'productionOrderWatches',
   tombstoneSegment: 'productionOrderWatchTombstones',
-  // Kept on removal: removeCharacter never deleted this table's local rows
-  // (it predates the registry's purge rule). Preserved as-is — see #2053.
-  onRemoval: 'keep',
+  onRemoval: 'delete',
   faqItem: 'productionRuns',
   toRemoteDoc: (r, ownerHash) => ({
     id: r.id,
