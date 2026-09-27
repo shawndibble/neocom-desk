@@ -569,6 +569,12 @@ here — they go one per file in `docs/context/decisions/`.
   from ESI. Rows, not a summary — each row is one order with its price,
   quantity, location, range and expiry. Replaces the single best bid/ask that a
   **Price Aggregate** gives.
+- **Order Detail**: The Open Orders modal's full breakdown of one open order,
+  and the module behind it: the page's one set of on-demand caches (region and
+  structure books, routes, price history, the refine comparison, hub bids),
+  the loader adapter that fills them, and the pure view assembly that turns
+  them into what the modal shows (`useOrderDetail.ts`, `orderDetailView.ts`,
+  issue #2046).
 - **Order Floor**: The lowest price a sell order is worth taking, from
   `src/engine/market/orderFloor.ts`. Two numbers: `relist` (sales tax plus a
   broker fee charged again on the edit — the lowest price worth
