@@ -17,10 +17,11 @@
  * setting: a half-restored filter is worse than a fully default one.
  *
  * URL wins whenever present (decision `20260922-221531` / ADR 0015): this
- * setting is consulted only for the fields a fresh page load's URL leaves
- * unset. `CourierResults.tsx` checks each key's raw presence in the query
- * string itself — nothing here ever mirrors a stored value back into the
- * URL, and this is written to only from an actual filter change.
+ * setting is consulted only for the fields the URL leaves unset.
+ * `CourierResults.tsx` hands it to `useRememberedUrlParams`
+ * (`lib/useUrlState.ts`), which owns that per-field presence check — nothing
+ * ever mirrors a stored value back into the URL, and this is written to only
+ * from an actual filter change.
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { SPACE_KINDS, isSpaceKind, type SpaceKind } from '@/engine/space';

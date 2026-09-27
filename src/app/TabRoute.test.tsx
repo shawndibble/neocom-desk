@@ -9,11 +9,11 @@ import {
   useNavigate,
   useNavigationType,
 } from 'react-router-dom';
-import { definePageTabs } from '@/lib/pageTabs';
-import { usePageTab } from '@/lib/usePageTab';
+import { definePageTabs, type TabRouteDefaultState } from '@/lib/pageTabs';
+import { usePageTab, useRememberedPageTab, type RememberedTab } from '@/lib/usePageTab';
 import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
-import { TabRoute, type TabRouteDefaultState } from './TabRoute';
+import { TabRoute } from './TabRoute';
 
 const PAGE = definePageTabs('/page', [
   { id: 'one', labelKey: 'one' },
@@ -169,5 +169,79 @@ describe('TabRoute with an index state', () => {
   it('still redirects to the default tab from the breakpoint up', () => {
     renderIndexed(true);
     expect(probe()).toBe('/idx/one|REPLACE|true');
+  });
+});
+
+describe('useRememberedPageTab', () => {
+  function RememberedPage({ remembered }: { remembered: RememberedTab<'one' | 'two'> }) {
+    const [tab] = useRememberedPageTab(PAGE, remembered);
+    const navigate = useNavigate();
+    return (
+      <div>
+        <span data-testid="tab">{tab}</span>
+        <button type="button" onClick={() => navigate(-1)}>
+          back
+        </button>
+      </div>
+    );
+  }
+
+  function renderRemembered(initial: string, remembered: RememberedTab<'one' | 'two'>) {
+    const tree = (next: RememberedTab<'one' | 'two'>) => (
+      <MemoryRouter initialEntries={['/elsewhere', initial]} initialIndex={1}>
+        <Routes>
+          <Route
+            path="/page/*"
+            element={
+              <TabRoute page={PAGE}>
+                <RememberedPage remembered={next} />
+              </TabRoute>
+            }
+          />
+          <Route path="*" element={<span>elsewhere</span>} />
+        </Routes>
+        <Probe />
+      </MemoryRouter>
+    );
+    const view = render(tree(remembered));
+    return { rerender: (next: RememberedTab<'one' | 'two'>) => view.rerender(tree(next)) };
+  }
+
+  it('swaps a bare visit for the remembered tab by replace, keeping query and hash', async () => {
+    const user = userEvent.setup();
+    renderRemembered('/page?q=abc#x', { value: 'two', hydrated: true });
+    expect(probe()).toBe('/page/two?q=abc#x|REPLACE|false');
+    expect(screen.getByTestId('tab')).toHaveTextContent('two');
+
+    // No phantom default-tab entry behind it for Back to bounce off.
+    await user.click(screen.getByRole('button', { name: 'back' }));
+    expect(screen.getByText('elsewhere')).toBeInTheDocument();
+  });
+
+  it('never overrides a link that names the default tab itself', () => {
+    renderRemembered('/page/one', { value: 'two', hydrated: true });
+    expect(probe()).toBe('/page/one|POP|false');
+  });
+
+  it('stays on the default tab when that is the remembered one', () => {
+    renderRemembered('/page', { value: 'one', hydrated: true });
+    expect(probe()).toBe('/page/one|REPLACE|true');
+  });
+
+  it('waits for the store to hydrate, then decides once', () => {
+    const { rerender } = renderRemembered('/page', { value: 'one', hydrated: false });
+    expect(probe()).toBe('/page/one|REPLACE|true');
+
+    rerender({ value: 'one', hydrated: true });
+    rerender({ value: 'two', hydrated: true });
+
+    // Decided at hydration: a later change to the stored value is an edit, not a landing.
+    expect(probe()).toBe('/page/one|REPLACE|true');
+  });
+
+  it('applies a remembered tab that arrives with hydration', () => {
+    const { rerender } = renderRemembered('/page', { value: 'one', hydrated: false });
+    rerender({ value: 'two', hydrated: true });
+    expect(probe()).toBe('/page/two|REPLACE|false');
   });
 });
