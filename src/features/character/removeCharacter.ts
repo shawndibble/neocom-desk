@@ -22,20 +22,15 @@ import { useActiveCharacter } from '@/stores/activeCharacter';
 
 /**
  * How long the last pushes may take, all together, before removal goes ahead
- * without them. A push that hangs (offline, a stalled chunk load) must not
- * keep a pilot signed in on a machine they are trying to leave.
- *
- * A push that outlives this is abandoned, not cancelled: it may still write
- * rows for a Character that is already gone. That is a stale local copy of
- * data that is also on the server, not a login, and only ever follows a hang.
+ * without them — a hung push (offline, stalled chunk load) must not block it.
+ * One that outlives this is abandoned, not cancelled: it may still write a
+ * stale local copy for a Character already gone, never a login.
  */
 export const SYNC_FLUSH_TIMEOUT_MS = 8_000;
 
 /**
- * Best-effort push of each Character's unsynced edits. Removal deletes the
- * local rows and their tombstones, and the synced copy is what re-adding the
- * Character restores, so an edit still waiting for its debounced sync would
- * otherwise be lost; a failure here only means it is.
+ * Best-effort push of each Character's unsynced edits before its local rows
+ * and tombstones go; a failure here only means those edits are lost.
  */
 export async function flushSync(characterIds: readonly number[]): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined;

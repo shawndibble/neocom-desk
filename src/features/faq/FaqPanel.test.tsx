@@ -145,7 +145,7 @@ describe('FaqPanel — What We Store', () => {
   });
 
   it('says when a removed character’s synced copy actually leaves our servers', () => {
-    // Removal is local-only (issue #2066); the remote docs go with the
+    // Removal is local-only; the remote docs go with the
     // `purgeStaleAccounts` inactivity purge. Saying "removed means deleted"
     // would be the one outright false sentence in the section.
     renderFaq();

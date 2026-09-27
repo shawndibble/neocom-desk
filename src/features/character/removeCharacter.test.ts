@@ -201,8 +201,7 @@ describe('removeCharacter', () => {
 
     await removeCharacter(1);
 
-    // The `@/sync` mock exposes only local bookkeeping — any remote purge
-    // call would throw here.
+    // The `@/sync` mock exposes no remote purge — calling one would throw.
     expect(syncMock.clearCharacterSyncBookkeeping).toHaveBeenCalledWith(1);
     const keys = (await db.settings.toArray()).map((row) => row.key);
     expect(keys.filter((key) => key.startsWith('remotePurgePending.'))).toEqual([]);
@@ -273,8 +272,6 @@ describe('removeCharacter', () => {
 });
 
 describe('removeCharacterAfterSync', () => {
-  // The synced copy is what re-adding the Character restores, so an edit
-  // still waiting on its debounced push must reach it before the local rows go.
   it('pushes the Character once before removing it when sync is configured', async () => {
     await seedCharacter(1);
     syncMock.triggerSync.mockImplementation(async () => {

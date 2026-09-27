@@ -29,8 +29,9 @@ import { backfillAccountWideData, scheduleSync } from '@/sync';
  *   missing pin is worth strictly less than a lost session.
  *
  * Deliberately *not* gated on `isSyncConfigured()`. That gate is for
- * operations that talk to a backend; this one only copies Dexie rows sideways, and an account-wide pin is just as much the
- * new Character's on a device that never syncs. `scheduleSync` is left
+ * operations that talk to a backend; this one only copies Dexie rows
+ * sideways, and an account-wide pin is just as much the new Character's on a
+ * device that never syncs. `scheduleSync` is left
  * unconditional for the same reason it is everywhere else — it is
  * fire-and-forget and already a no-op when there is nothing to sync to.
  */
