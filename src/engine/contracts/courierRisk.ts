@@ -145,13 +145,16 @@ export function completableCourierRoutes(rows: readonly CourierRouteRow[]): Cour
 
 /**
  * Collateral at this many times the reward or more earns the `high-collateral`
- * flag (issue #1720). Set well clear of honest high-value freight — a 1B load
+ * flag (issue #1720) � the default; a pilot can set their own (`features/contractSearch/collateralThreshold.ts`). Set well clear of honest high-value freight — a 1B load
  * paying 25M is 40x — so the flag names an outlier rather than ordinary work.
  */
 export const HIGH_COLLATERAL_RATIO = 50;
 
-export function asksFarMoreCollateralThanReward(ratio: number | null): boolean {
-  return ratio !== null && ratio >= HIGH_COLLATERAL_RATIO;
+export function asksFarMoreCollateralThanReward(
+  ratio: number | null,
+  threshold: number = HIGH_COLLATERAL_RATIO
+): boolean {
+  return ratio !== null && ratio >= threshold;
 }
 
 /**

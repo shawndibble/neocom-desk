@@ -67,20 +67,30 @@ import {
   toViewRows,
   type HaulingViewRow,
 } from './haulingView';
+import { useMarketHub } from './hub';
+import { haulingHubDefaults } from './haulingHubs';
 import { useHaulingFees, useHaulingScan } from './useHaulingScan';
 
 const HUB_IDS = TRADE_HUBS.map((h) => h.id);
 const DAY_CHOICES = [7, 14, 30, 0] as const;
 const MARGIN_CHOICES = [0, 3, 5, 10] as const;
 
-const HAULING_URL = {
-  from: enumParam(HUB_IDS, 'jita'),
-  to: enumParam(HUB_IDS, 'amarr'),
+const HAULING_URL_FILTERS = {
   cat: intParam(DEFAULT_HAULING_CATEGORY_ID),
   days: intParam(14, { min: 0, max: 365 }),
   margin: intParam(3, { min: 0, max: 100 }),
   demand: enumParam(['steady', 'any'] as const, 'steady'),
 };
+
+/** From/To default to the pilot's Trade Hub (`haulingHubs.ts`), so the schema is built per hub. */
+function haulingUrl(hubId: TradeHub['id']) {
+  const defaults = haulingHubDefaults(hubId);
+  return {
+    from: enumParam(HUB_IDS, defaults.from),
+    to: enumParam(HUB_IDS, defaults.to),
+    ...HAULING_URL_FILTERS,
+  };
+}
 
 const useIntroDismissed = createLocalSetting<boolean>({
   key: 'haulingIntroDismissed',
@@ -120,7 +130,13 @@ export function HaulingPanel({
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
 
-  const [params, setParams] = useUrlParams(HAULING_URL);
+  const defaultHubId = useMarketHub((state) => state.value);
+  const hydrateDefaultHub = useMarketHub((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateDefaultHub();
+  }, [hydrateDefaultHub]);
+  const haulingSchema = useMemo(() => haulingUrl(defaultHubId), [defaultHubId]);
+  const [params, setParams] = useUrlParams(haulingSchema);
   const from = hubFor(params.from);
   const to = hubFor(params.to);
   const categoryId = isHaulingCategoryId(params.cat) ? params.cat : DEFAULT_HAULING_CATEGORY_ID;
