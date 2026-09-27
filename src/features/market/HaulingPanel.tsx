@@ -576,17 +576,22 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         a deliberate deviation: putting them in a sibling row alongside
         `FilterBar` (rather than inside it) was tried first and rejected —
         `FilterBar` manages its own two-line box (trigger row, then the
-        opened controls below), so a *shared* flex row either reflows the
-        siblings when the box opens (with `items-end`, cross-axis realigns
-        to the row's new height — the bug this render actually had) or, to
-        avoid that with `items-start`, leaves the icon-only trigger cluster
-        floating at label height instead of lined up with the selects below
-        them. Nesting these controls in `search` keeps everything in one
-        `items-center` row that `FilterBar` itself owns, so neither problem
-        exists — at the cost of the slot's own contract. No table in this
-        codebase has filters with no search box yet; if a second one shows
-        up, that's the signal to give `FilterBar` a real "leading toolbar"
-        slot instead of overloading `search` a second time.
+        opened controls below), so a *shared* flex row reflows the siblings
+        when the box opens: `FilterBar` growing taller pushes a sibling row's
+        own cross-axis alignment around with it. Nesting these controls in
+        `search` avoids that — opening the box only ever adds a second row
+        *below* this one inside `FilterBar` itself, never resizing it — at
+        the cost of the slot's own contract. No table in this codebase has
+        filters with no search box yet; if a second one shows up, that's the
+        signal to give `FilterBar` a real "leading toolbar" slot instead of
+        overloading `search` a second time.
+
+        `rowAlign="end"`/`triggerSize="sm"`: the From/To/Category controls
+        are labelled fields (a caption above each `Select`), taller than the
+        plain icon buttons beside them — `items-center` (this row's default)
+        centers those buttons against the *field's* full height instead of
+        lining their bottom edge up with the select boxes', and left the
+        funnel trigger a size bigger than the `sm` column picker beside it.
       */}
       <FilterBar
         value={filterValue}
@@ -594,6 +599,8 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
         activeCount={activeFilterCount}
         title={t('market.hauling.filters.title')}
         className="border-b border-line px-3 py-3"
+        rowAlign="end"
+        triggerSize="sm"
         search={
           <>
             <HubField
@@ -601,7 +608,12 @@ export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
               value={from.id}
               onChange={(id) => setParams(pickHaulingHub({ from: from.id, to: to.id }, 'from', id))}
             />
-            <span aria-hidden="true" className="text-text-faint">
+            {/* `self-center`: the row's own `items-end` lines the labelled
+                fields and icon buttons up by their bottom edge, but this
+                arrow has no label above it — left to that default it would
+                sink to their baseline instead of sitting at the selects'
+                natural mid-height. */}
+            <span aria-hidden="true" className="self-center text-text-faint">
               →
             </span>
             <HubField
