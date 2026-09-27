@@ -2253,6 +2253,8 @@
     "opportunitiesEmptyHint": "Own a blueprint original or copy, then refresh — reaction blueprints are not ranked here.",
     "opportunitiesProgress": "{{done}} of {{total}} calculated",
     "opportunitiesRefresh": "Refresh",
+    "opportunitiesNeedsRefreshTitle": "Pricing settings changed",
+    "opportunitiesNeedsRefreshHint": "Your Assumed ME, skills, implants, facility or blueprint research changed since these results were calculated. Press Refresh to recalculate.",
     "opportunitiesAddToCompare": "Add {{count}} to Compare",
     "opportunitiesSelectFor": "Select {{name}} to compare plans",
     "opportunitiesLossBreakdownFor": "Why {{name}} is a loss",

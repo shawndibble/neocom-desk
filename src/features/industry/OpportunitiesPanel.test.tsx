@@ -21,7 +21,11 @@ vi.mock('./data', async () => {
 // mock factory below — which vitest hoists above every other statement — and
 // the assertion read the same number.
 const loop = vi.hoisted(() => ({ count: 0, limit: 40 }));
-const stub = vi.hoisted(() => ({ rows: [] as unknown[] }));
+const stub = vi.hoisted(() => ({
+  rows: [] as unknown[],
+  manualRefreshOnly: false,
+  needsRefresh: false,
+}));
 
 vi.mock('@/lib/useIsDesktop', () => ({ useIsDesktop: () => true }));
 
@@ -41,7 +45,8 @@ vi.mock('./useOpportunities', () => ({
       rows: stub.rows,
       loading: false,
       progress: { done: 0, total: 0 },
-      manualRefreshOnly: false,
+      manualRefreshOnly: stub.manualRefreshOnly,
+      needsRefresh: stub.needsRefresh,
       refresh: () => {},
     };
   },
@@ -65,6 +70,8 @@ const SNAPSHOT: OwnedStockSnapshot = {
 beforeEach(async () => {
   loop.count = 0;
   stub.rows = [];
+  stub.manualRefreshOnly = false;
+  stub.needsRefresh = false;
   loadCharacterBlueprints.mockReset();
   loadCharacterBlueprints.mockResolvedValue({ cached: { data: [], fetchedAt: new Date() } });
   await db.characters.clear();
@@ -227,6 +234,52 @@ describe('OpportunitiesPanel', () => {
       fireEvent.click(within(row).getByRole('button', { name: 'Start a plan' }));
       expect(onStartPlan).toHaveBeenCalledWith(entry(1000, 'Widget Alpha'));
     });
+  });
+
+  it('shows a needs-Refresh state instead of rows when pricing inputs changed (issue #2056)', async () => {
+    const catalog = {
+      ...CATALOG,
+      byBlueprintTypeID: new Map([
+        [
+          900,
+          {
+            blueprintTypeID: 900,
+            blueprint: { activity: 'manufacturing', skills: [] },
+            productTypeID: 1000,
+            productName: 'Widget Alpha',
+            productNameLower: 'widget alpha',
+          },
+        ],
+      ]),
+    } as unknown as BlueprintCatalog;
+    loadCharacterBlueprints.mockResolvedValue({
+      cached: {
+        data: [{ item_id: 1, type_id: 900, runs: -1, material_efficiency: 0, time_efficiency: 0 }],
+        fetchedAt: new Date(),
+      },
+    });
+    stub.manualRefreshOnly = true;
+    stub.needsRefresh = true;
+    render(
+      withItemActions(
+        <OpportunitiesPanel
+          catalog={catalog}
+          pi={null}
+          modifiers={NO_CHARACTER_MODIFIERS}
+          facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
+          activeCharacterId={CHARACTER_ID}
+          ownedStockSnapshot={SNAPSHOT}
+          assumedMe={0}
+          onAddToCompare={() => {}}
+          onStartPlan={() => {}}
+        />
+      ),
+      { wrapper: MemoryRouter }
+    );
+
+    expect(await screen.findByText('Pricing settings changed')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toBeInTheDocument();
+    expect(screen.queryByRole('table')).toBeNull();
   });
 
   describe('Compare button (issue #1781)', () => {
