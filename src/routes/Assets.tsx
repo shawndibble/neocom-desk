@@ -20,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
-  StatChip,
   TextInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -1529,17 +1528,6 @@ export function Assets() {
           meta={
             <>
               {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
-              {showTotalValueChip && (
-                <StatChip
-                  label={t('assets.section.totalValueLabel')}
-                  value={
-                    totalValueFiltered
-                      ? t('assets.section.totalValueFiltered', { value: formatIsk(totalValue) })
-                      : formatIsk(totalValue)
-                  }
-                  tone="success"
-                />
-              )}
               {crossCharacterFilterMeta}
               {otherCharacterIds.length > 0 && crossCharacterLoading && (
                 <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
@@ -1784,6 +1772,16 @@ export function Assets() {
                         className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                       >
                         {t('assets.section.locationCount', { count: sortedTree.length })}
+                        {showTotalValueChip && (
+                          <span className="text-isk-pos">
+                            {' · '}
+                            {totalValueFiltered
+                              ? t('assets.section.totalValueFiltered', {
+                                  value: formatIsk(totalValue),
+                                })
+                              : t('assets.section.totalValue', { value: formatIsk(totalValue) })}
+                          </span>
+                        )}
                       </h2>
                       {/* flex-wrap (issue #415): on a narrow phone the two Selects no
                         longer share one row with no priority order — Sort stays put
