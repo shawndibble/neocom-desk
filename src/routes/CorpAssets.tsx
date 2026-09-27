@@ -85,6 +85,7 @@ import {
 } from '@/features/character/assetSelection';
 import {
   ContainerRow,
+  ItemColumnLabels,
   ItemRow,
   LocationRow,
   SearchResultRow,
@@ -401,6 +402,9 @@ function CorpAssetsView() {
     }));
   }, [searchActive, searchMatches, pathGroupId, resolved.children, groups]);
 
+  const showItemColumns =
+    !searchActive && rows.some((r) => r.kind === 'node' && r.node.kind === 'item');
+
   const scrollParentRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line react-hooks/incompatible-library
   const rowVirtualizer = useVirtualizer({
@@ -706,6 +710,7 @@ function CorpAssetsView() {
                 data-virtual-scroll-root
                 className="min-h-0 overflow-y-auto"
               >
+                {showItemColumns && <ItemColumnLabels t={t} />}
                 <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
                   {rowVirtualizer.getVirtualItems().map((virtualRow) => {
                     const row = rows[virtualRow.index];

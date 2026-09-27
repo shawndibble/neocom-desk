@@ -89,6 +89,7 @@ import {
 } from '@/features/character/assetSelection';
 import {
   ContainerRow,
+  ItemColumnLabels,
   ItemRow,
   JumpsAwayText,
   LocationRow,
@@ -1144,6 +1145,14 @@ export function Assets() {
     t,
   ]);
 
+  // The md+ label strip names the item cells, so it only shows on a level that
+  // actually has item rows (not in the location list, and not in flat search
+  // results, whose rows are a different shape).
+  const showItemColumns =
+    !flatModeActive &&
+    pathStationId !== null &&
+    rows.some((r) => r.kind === 'node' && r.node.kind === 'item');
+
   const scrollParentRef = useRef<HTMLDivElement>(null);
   // React Compiler isn't enabled in this build (no babel plugin configured);
   // this is eslint-plugin-react-hooks flagging TanStack Virtual's returned
@@ -1882,6 +1891,7 @@ export function Assets() {
                   aria-label={t('assets.treeLabel')}
                   className="min-h-0 flex-1 overflow-y-auto"
                 >
+                  {showItemColumns && <ItemColumnLabels t={t} />}
                   <div
                     role="presentation"
                     style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
