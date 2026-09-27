@@ -697,7 +697,19 @@ export function Mail() {
                           subject={header.subject || t('mail.noSubject')}
                           senderId={header.from}
                         >
-                          <div className="flex items-center">
+                          {/* Selection used to be `bg-panel-2` alone � the same fill
+                              hover already paints, so the open mail was invisible
+                              the moment the pointer moved. The accent edge carries
+                              it now, with the fill as the second, non-colour signal;
+                              both sit on the wrapper so they span the twin too. */}
+                          <div
+                            className={cx(
+                              'flex items-center border-l-2 transition-colors',
+                              isSelected
+                                ? 'border-l-accent bg-panel-2'
+                                : 'border-l-transparent hover:bg-panel-2/60'
+                            )}
+                          >
                             <button
                               type="button"
                               onClick={(e) => {
@@ -717,16 +729,8 @@ export function Mail() {
                               // spelling out the default.
                               aria-current={isSelected ? 'true' : undefined}
                               className={cx(
-                                'flex min-w-0 flex-1 items-start gap-2 self-stretch border-l-2 py-1.5 pr-3 pl-2.5 text-left transition-colors',
-                                'focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent',
-                                // Selection used to be `bg-panel-2` alone — the same
-                                // fill hover already paints, so the open mail was
-                                // invisible the moment the pointer moved. The accent
-                                // edge carries it now, with the fill still there as
-                                // the second, non-colour signal beside it.
-                                isSelected
-                                  ? 'border-l-accent bg-panel-2'
-                                  : 'border-l-transparent hover:bg-panel-2/60'
+                                'flex min-w-0 flex-1 items-start gap-2 self-stretch py-1.5 pr-3 pl-2.5 text-left',
+                                'focus-visible:-outline-offset-2 focus-visible:outline-2 focus-visible:outline-accent'
                               )}
                             >
                               {/* Unread marker, in a fixed-width gutter so read and
