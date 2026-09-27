@@ -5,6 +5,7 @@
  * bonus lands once in `src/engine/industry/characterModifiers.ts` and reaches
  * all of them.
  */
+import { useEffect, useState } from 'react';
 import { characterModifiers, type CharacterModifiers } from '@/engine/industry/characterModifiers';
 import type { SkillLevels } from '@/engine/industry/types';
 import {
@@ -12,6 +13,7 @@ import {
   type LoadCorrectedSkillsOptions,
 } from '@/features/skills/correctedSkills';
 import { loadCharacterImplants } from '@/features/skills/data';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 
 export interface LoadCharacterModifiersOptions extends LoadCorrectedSkillsOptions {
   /**
@@ -40,4 +42,43 @@ export async function loadCharacterModifiers(
     for (const [skillId, trained] of corrected.trained) skills[skillId] = trained.level;
   }
   return characterModifiers({ skills, implantTypeIds: implants?.data ?? [] });
+}
+
+/**
+ * Every given Character's `CharacterModifiers`, fanned out and cached — for
+ * Build Opportunities (issue #2055), which prices each candidate against its
+ * own owning Character's real skills/implants rather than one active
+ * Character's. A Character absent from the result had no resolved modifiers
+ * yet; callers should read that the same way a not-yet-hydrated Character
+ * reads elsewhere — as `NO_CHARACTER_MODIFIERS` (import from
+ * `@/engine/industry/characterModifiers`).
+ *
+ * Mirrors `useAccountSkillLevels`'s value-stable-key shape: `key` is the id
+ * set's real identity (order-independent), so an upstream caller that rebuilds
+ * its id array on every render does not restart this fan-out.
+ */
+export function useCharacterModifiersByCharacter(
+  characterIds: readonly number[],
+  options?: LoadCharacterModifiersOptions
+): ReadonlyMap<number, CharacterModifiers> {
+  const [modifiersByCharacter, setModifiersByCharacter] = useState<
+    ReadonlyMap<number, CharacterModifiers>
+  >(new Map());
+  const key = [...characterIds].sort((a, b) => a - b).join(',');
+
+  useEffect(() => {
+    let cancelled = false;
+    const byCharacter = new Map<number, CharacterModifiers>();
+    void mapWithConcurrencyLimit(characterIds, ESI_FANOUT_CONCURRENCY, async (characterId) => {
+      byCharacter.set(characterId, await loadCharacterModifiers(characterId, Date.now(), options));
+    }).then(() => {
+      if (!cancelled) setModifiersByCharacter(byCharacter);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `key` is the id set's real identity; `characterIds`/`options` are intentionally not deps (see the comment above `key`).
+  }, [key]);
+
+  return modifiersByCharacter;
 }

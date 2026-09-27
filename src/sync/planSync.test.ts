@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore/lite';
 import {
   db,
@@ -15,19 +15,20 @@ import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { CACHE_PURGE_PENDING_PREFIX } from '@/esi/cachePurge';
 import { FEED_SYNC_WINDOW_MAX_ROWS, FEED_SYNC_WINDOW_MS } from '@/features/notifications/feed';
 import { backfillAccountWideData } from './accountWideBackfill';
-import { remotePurgePendingKey } from './characterPurge';
 import { pullCursorKey } from './localBookkeeping';
 import { TOMBSTONE_TTL_MS } from './merge';
 import {
   clearStationPin,
   deleteSyncedSetting,
   getSyncStatus,
+  haltSync,
   markBuildPlanDeleted,
   markBuildPlansDeleted,
   markPlanDeleted,
   markProductionRunDeleted,
   removeProductionOrderWatch,
   removeProductionSaleLink,
+  resetSyncHalt,
   scheduleSync,
   setAccountStationPin,
   setCharacterStationPin,
@@ -679,30 +680,6 @@ describe('triggerSync: ownerHash-scoped reads', () => {
     seedRemote(PLANS_PATH, [remoteDoc({ id: 'stale', ownerHash: 'previous-owner' })]);
     await triggerSync(1);
     expect(await db.skillPlans.get('stale')).toBeUndefined();
-  });
-});
-
-describe('triggerSync: deferred remote purge retry', () => {
-  it('retries and clears a pending remote-purge marker left by a removed character', async () => {
-    await db.settings.put({ key: remotePurgePendingKey(1), value: true });
-    seedRemote(PLANS_PATH, [remoteDoc({ id: 'stale' })]);
-
-    await triggerSync(1);
-
-    // The retry (ensureSignedIn now succeeds, per the module-level mock)
-    // deletes every doc in the character's remote collections before the
-    // normal push/pull below ever runs — an empty local table pulls nothing
-    // back to replace it.
-    expect(remoteStore.get(PLANS_PATH)?.has('stale')).toBe(false);
-    expect(await db.settings.get(remotePurgePendingKey(1))).toBeUndefined();
-  });
-
-  it('does nothing extra when no purge is pending', async () => {
-    seedRemote(PLANS_PATH, [remoteDoc({ id: 'kept' })]);
-
-    await triggerSync(1);
-
-    expect(remoteStore.get(PLANS_PATH)?.has('kept')).toBe(true);
   });
 });
 
@@ -1887,6 +1864,45 @@ describe('sync orchestration', () => {
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
     expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(13);
     expect(vi.mocked(setDoc)).toHaveBeenCalledTimes(1); // the heartbeat, once
+  });
+});
+
+describe('haltSync', () => {
+  afterEach(() => {
+    resetSyncHalt();
+  });
+
+  it('cancels a scheduled sync and refuses new ones', async () => {
+    scheduleSync(1, 20);
+    await haltSync();
+
+    await triggerSync(1);
+    scheduleSync(1, 20);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    expect(vi.mocked(getDocs)).not.toHaveBeenCalled();
+  });
+
+  it('waits for a sync already running', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(getDocs).mockImplementation((async (target: FakeQuery) => {
+      await gate;
+      return fake.getDocsImpl(target);
+    }) as never);
+    const running = triggerSync(1);
+    let halted = false;
+    const halt = haltSync().then(() => {
+      halted = true;
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(halted).toBe(false);
+    release();
+    await Promise.all([running, halt]);
+    expect(halted).toBe(true);
   });
 });
 
