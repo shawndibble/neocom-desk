@@ -45,7 +45,6 @@ import {
   trimFeed,
 } from '@/features/notifications/feed';
 import { refreshAppBadge } from '@/features/notifications/appBadge';
-import { retryPendingRemotePurge } from './characterPurge';
 import { getSyncFirestore } from './firebaseApp';
 import {
   INTERNAL_PREFIX,
@@ -974,10 +973,6 @@ async function syncCharacter(characterId: number): Promise<void> {
   const character = await db.characters.get(characterId);
   if (!character) throw new Error(`Unknown character ${characterId}`);
   await handleOwnerHashChange(character);
-  // A purge deferred by an earlier removal (features/character/removeCharacter)
-  // because the refresh token was dead at the time — retry now that this
-  // Character has authenticated again. No-op the moment nothing is pending.
-  await retryPendingRemotePurge(characterId);
 
   const uid = await ensureSignedIn(characterId);
   const firestore = getSyncFirestore();
