@@ -26,7 +26,7 @@ export interface DataTableSort {
   direction: 'asc' | 'desc';
 }
 
-const STICKY_START = 'sticky left-0 z-10 bg-panel max-md:border-r max-md:border-line';
+const STICKY_START = 'sticky left-0 z-10 bg-bg max-md:border-r max-md:border-line';
 // `hover:bg-panel-2` lives on the `<tr>`, whose own background a sticky
 // cell's opaque one would otherwise cover.
 const STICKY_START_CELL = 'max-sm:max-w-30 [tr:hover>&]:bg-panel-2';

@@ -5,8 +5,7 @@
 //
 // Every per-collection list the app used to keep by hand derives from here:
 // the sync pass and the ownerHash-change wipe (planSync.ts), the tombstone
-// keys and their cleanup (localBookkeeping.ts), the remote purge
-// (characterPurge.ts), the local delete on Character removal
+// keys and their cleanup (localBookkeeping.ts), the local delete on Character removal
 // (features/character/removeCharacter.ts), the tables an encrypted device
 // backup carries (backup/io.ts), and the "What We Store" commitment
 // (features/faq/whatWeStore.ts).
@@ -674,9 +673,9 @@ export const SYNCED_SETTINGS: FeedOrSettingsCollection = {
 };
 
 /**
- * Every collection a Character owns remotely — the remote purge list, and the
- * authoritative answer to "what leaves this device" (the "What We Store"
- * section is a promise to the pilot about exactly this set).
+ * Every collection a Character owns remotely — the authoritative answer to
+ * "what leaves this device" (the "What We Store" section is a promise to the
+ * pilot about exactly this set).
  */
 export const REMOTE_COLLECTIONS: readonly SyncedCollection[] = [
   ...EDITABLE_COLLECTIONS,
