@@ -5,12 +5,7 @@
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from '@/components/ui';
+import { MenuItem, RowActionsMenu } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
 import { usePublicInfoModal, type PublicInfoKind } from '@/stores/publicInfoModal';
 import type { CharacterContact } from '@/esi/endpoints';
@@ -35,24 +30,28 @@ export function ContactContextMenu({ contact, name, children }: ContactContextMe
   const kind = publicInfoKind(contact);
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem onSelect={() => void writeToClipboard(name)}>
-          {t('contacts.contextMenu.copyName')}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => void writeToClipboard(String(contact.contact_id))}>
-          {t('contacts.contextMenu.copyContactId')}
-        </ContextMenuItem>
-        <ContextMenuItem
-          disabled={kind === null}
-          onSelect={() => {
-            if (kind) open(kind, contact.contact_id);
-          }}
-        >
-          {t('contacts.contextMenu.showInfo')}
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+    <RowActionsMenu
+      name={name}
+      items={
+        <>
+          <MenuItem onSelect={() => void writeToClipboard(name)}>
+            {t('contacts.contextMenu.copyName')}
+          </MenuItem>
+          <MenuItem onSelect={() => void writeToClipboard(String(contact.contact_id))}>
+            {t('contacts.contextMenu.copyContactId')}
+          </MenuItem>
+          <MenuItem
+            disabled={kind === null}
+            onSelect={() => {
+              if (kind) open(kind, contact.contact_id);
+            }}
+          >
+            {t('contacts.contextMenu.showInfo')}
+          </MenuItem>
+        </>
+      }
+    >
+      {children}
+    </RowActionsMenu>
   );
 }

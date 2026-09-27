@@ -655,6 +655,7 @@ export function Contracts() {
               rowKey={(contract) => contract.contract_id}
               highlightRowKey={highlightedContractId}
               rowContextMenu={contractRowContextMenu}
+              rowMoreActions
               {...historySortProps}
             />
           )}
