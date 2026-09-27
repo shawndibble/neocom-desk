@@ -7,6 +7,7 @@
  * buildRows exactly, so bandStarts keeps working unmodified against those).
  */
 import type { PlanEntry, ScheduledStep } from '@/engine/types';
+import type { QueueEndProjection } from '@/features/skills/queueStatus';
 import { entrySlices } from './entrySlices';
 import { buildRows, type PlanRow } from './markers';
 import { entryId } from './reorder';
@@ -80,6 +81,39 @@ export function summarizeEntryQueue(
     });
   });
   return result;
+}
+
+export interface PinnedInProgressEntry {
+  /** Matches a MergedRow['id'] (see `entryId`) — the plan entry this pins. */
+  id: string;
+  /** Real seconds left on the in-game queue's own clock, floored at 0. */
+  seconds: number;
+}
+
+/**
+ * The plan entry that is also the in-game queue's currently-training level, if
+ * any (#1701 follow-up). `projectQueueEnd` always pins that level
+ * (`queuedLevels[0]`) to its real `finish_date` and credits it as already
+ * trained as of the plan's start, so the matching plan entry contributes none
+ * of its own scheduled steps (`entrySlices` reports `ownStart: -1` for it) and
+ * its row would otherwise read a bare, misleading "0m". EntryList uses this
+ * instead to show the level's real remaining time, straight off the ESI
+ * queue's own `finish_date` rather than the plan's (zeroed) schedule.
+ */
+export function pinnedInProgressEntry(
+  entries: readonly PlanEntry[],
+  projection: Pick<QueueEndProjection, 'queuedLevels' | 'paused'>,
+  nowMs: number
+): PinnedInProgressEntry | null {
+  if (projection.paused) return null;
+  const head = projection.queuedLevels[0];
+  if (!head?.finish_date) return null;
+  const finishMs = Date.parse(head.finish_date);
+  if (!Number.isFinite(finishMs)) return null;
+  const match = entries.find(
+    (e) => e.skillTypeID === head.skill_id && e.targetLevel === head.finished_level
+  );
+  return match ? { id: entryId(match), seconds: Math.max(0, (finishMs - nowMs) / 1000) } : null;
 }
 
 export type MergedRow =

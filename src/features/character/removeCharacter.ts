@@ -1,10 +1,9 @@
 // Removing a Character from the app (parity plan §5.7 item 3): local Dexie
 // rows for it are deleted (per each synced collection's `onRemoval` rule in
-// sync/syncedCollections.ts); its remote Editable Data (every collection in
-// that registry — CONTEXT.md) is purged inline when
-// a session can still be established as it, or deferred to the next time it
-// authenticates when the refresh token is already dead — the common case for
-// dropping a sold Character (see sync/characterPurge.ts).
+// sync/syncedCollections.ts). Its remote Editable Data (CONTEXT.md) is left
+// alone: the `purgeStaleAccounts` Cloud Function deletes it once no device
+// has synced the Character for 90 days. Adding the Character back before then
+// pulls it all again — the pull cursors go with the local rows.
 //
 // Unlike a sold Character (detected via a changed ownerHash, handled by
 // sync/planSync.handleOwnerHashChange), this is the user *choosing* to drop
@@ -13,7 +12,7 @@
 
 import { db } from '@/db';
 import { purgeCharacterCacheOrSuppress, purgeSharedStructureCache } from '@/esi/cachePurge';
-import { clearCharacterSyncBookkeeping, purgeCharacterRemoteDataOrDefer } from '@/sync';
+import { clearCharacterSyncBookkeeping, triggerSync } from '@/sync';
 import { EDITABLE_COLLECTIONS } from '@/sync/syncedCollections';
 import { refreshAppBadge } from '@/features/notifications/appBadge';
 import { deleteFeedForCharacter } from '@/features/notifications/feed';
@@ -21,35 +20,49 @@ import { scheduleProjectionRebuild } from '@/features/notifications/projectionRe
 import { unregisterProjectionRegistration } from '@/features/notifications/projectionUpload';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
-export interface RemoveCharacterResult {
-  /**
-   * False when a remote purge was attempted but could not run now, and was
-   * deferred instead (dead refresh token, offline). True both when it
-   * succeeded and when `attemptRemotePurge` was false — sync unconfigured
-   * means there is nothing remote to have deferred.
-   */
-  remotePurged: boolean;
+/**
+ * How long the last pushes may take, all together, before removal goes ahead
+ * without them — a hung push (offline, stalled chunk load) must not block it.
+ * One that outlives this is abandoned, not cancelled: it may still write a
+ * stale local copy for a Character already gone, never a login.
+ */
+export const SYNC_FLUSH_TIMEOUT_MS = 8_000;
+
+/**
+ * Best-effort push of each Character's unsynced edits before its local rows
+ * and tombstones go; a failure here only means those edits are lost.
+ */
+export async function flushSync(characterIds: readonly number[]): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, SYNC_FLUSH_TIMEOUT_MS);
+  });
+  const pushes = Promise.allSettled(characterIds.map((id) => triggerSync(id)));
+  try {
+    await Promise.race([pushes, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
- * @param attemptRemotePurge Whether to try purging remote Firestore docs at
- *   all — gate this on `isSyncConfigured()` at the call site (routes already
- *   do the same for `scheduleSync`/`triggerSync`, see app/syncStatus.ts).
- *   With sync unconfigured there is nothing remote to purge, and attempting
- *   it would just fail and record a marker that can never be retried.
+ * Removing one Character from the Characters page: a last push when sync is
+ * set up (gate on `isSyncConfigured()` at the call site), then local removal.
+ */
+export async function removeCharacterAfterSync(
+  characterId: number,
+  syncConfigured: boolean
+): Promise<void> {
+  if (syncConfigured) await flushSync([characterId]);
+  await removeCharacter(characterId);
+}
+
+/**
  * @param syncPush Whether to bring this device's Scheduled Push registration in
  *   line with the remaining roster. `logoutAllCharacters` turns it off and
  *   unregisters once itself, rather than once per Character.
  */
-export async function removeCharacter(
-  characterId: number,
-  attemptRemotePurge: boolean,
-  syncPush = true
-): Promise<RemoveCharacterResult> {
-  const remotePurged = attemptRemotePurge
-    ? await purgeCharacterRemoteDataOrDefer(characterId)
-    : true;
-
+export async function removeCharacter(characterId: number, syncPush = true): Promise<void> {
   await db.characters.delete(characterId);
   await db.tokens.delete(characterId);
   for (const collection of EDITABLE_COLLECTIONS) {
@@ -92,6 +105,4 @@ export async function removeCharacter(
     if (next) await setActiveCharacter(next.characterId);
     else await clearActiveCharacter();
   }
-
-  return { remotePurged };
 }

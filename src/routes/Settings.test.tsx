@@ -72,6 +72,25 @@ vi.mock('@/features/notifications/projectionRebuild', () => ({
   rebuildProjection: vi.fn(async () => {}),
 }));
 
+/**
+ * `ForegroundNotificationPoller` runs a poll on every `<App/>` mount (its own
+ * doc comment: "on mount, since opening the app is itself the strongest case
+ * of 'becoming visible'"), and a poll that reaches its end unconditionally
+ * calls `rebuildProjection` too (`foregroundPoller.ts`), independent of the
+ * debounced scheduler below. Settings has nothing to do with the poller, so
+ * the real thing here was cross-contaminating `rebuildProjection`'s call
+ * count: it could still be mid-flight (real ESI/Dexie reads, not driven by
+ * this file's fake timers) when a test's own preference write and its
+ * mount's poll happened to both resolve inside the same assertion window,
+ * landing an extra, unrelated call and flaking a call-count assertion
+ * (issue #2065). Kept as a real `vi.fn()` (not a bare no-op) so a future
+ * caller expecting to assert against it still can.
+ */
+vi.mock('@/features/notifications/foregroundPoller', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/features/notifications/foregroundPoller')>();
+  return { ...actual, runForegroundPoll: vi.fn(async () => {}) };
+});
+
 const CHAR_ID = 91;
 
 /**
@@ -1592,7 +1611,7 @@ describe('Settings defaults', () => {
     await screen.findByRole('heading', { level: 1, name: /settings/i });
 
     await user.click(await screen.findByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('button', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
 
     expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
     await waitFor(async () => {

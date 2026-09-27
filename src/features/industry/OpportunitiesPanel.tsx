@@ -11,10 +11,11 @@
  * account-level alt-linking, just this feature's own scoped selector.
  */
 import { useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react';
-import type { CharacterModifiers } from '@/engine/industry/characterModifiers';
+import { useCharacterModifiersByCharacter } from '@/features/character/characterModifiers';
+import { useTradeHubStandingsByCharacter } from '@/features/market/useTradeHubStandings';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/db';
+import { db, type BuildPlanRecord } from '@/db';
 import {
   Button,
   DataAgeBadge,
@@ -38,7 +39,6 @@ import { useIsDesktop } from '@/lib/useIsDesktop';
 import type { CharacterBlueprint } from '@/esi/endpoints';
 import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skillGate';
 import type { PiData } from '@/sde/types';
-import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { PriceHistoryPanel } from '@/features/market/PriceHistoryPanel';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
@@ -52,7 +52,7 @@ import { MobileOpportunityList } from './MobileOpportunityList';
 import { OPPORTUNITIES_DEFAULT_SORT, OPPORTUNITIES_SORT_KEY } from './opportunitiesUrl';
 import { ORDER_DEPTH_RANK, ORDER_DEPTH_TONE, unitMargin } from './opportunityMetrics';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
-import { buildOpportunityCandidates, type OpportunityRow } from './opportunities';
+import { buildOpportunityCandidates, hubForCharacter, type OpportunityRow } from './opportunities';
 import { SkillGateMarker } from './SkillGateMarker';
 import { useOpportunities } from './useOpportunities';
 import { characterFilterParam } from '@/features/character/characterFilterUrlParam';
@@ -61,7 +61,6 @@ import { useUrlParam, useUrlSort } from '@/lib/useUrlState';
 interface OpportunitiesPanelProps {
   catalog: BlueprintCatalog;
   pi: PiData | null;
-  modifiers: CharacterModifiers;
   facilityDefaults: ActivityFacilityDefaults;
   activeCharacterId: number;
   ownedStockSnapshot: OwnedStockSnapshot;
@@ -91,7 +90,6 @@ const OPPORTUNITIES_CHARACTERS_KEY = 'opps.chars';
 export function OpportunitiesPanel({
   catalog,
   pi,
-  modifiers,
   facilityDefaults,
   activeCharacterId,
   ownedStockSnapshot,
@@ -124,12 +122,25 @@ export function OpportunitiesPanel({
   // unmemoized identity into an effect dep array is exactly what caused an
   // infinite render loop here before (issue #675, React error #185).
   const resolvedCharacterIds = useResolvedCharacterFilter(characterFilter, activeCharacterId);
+  const nextCharacterIds =
+    resolvedCharacterIds === 'all'
+      ? characterCandidates.map((c) => c.characterId)
+      : [...resolvedCharacterIds];
+  // Stabilizes the array's *identity* across renders where its *values*
+  // haven't changed — memoizing on the ids themselves (via a joined string,
+  // a plain primitive) rather than on `characterCandidates`'s own identity,
+  // which still allocates a fresh array whenever `allCharacters`'s
+  // `useLiveQuery` result changes, even to an equal roster. The
+  // blueprint-loading effect below keys off this array by reference, so a
+  // churning identity re-fires it every such commit — the "one redundant
+  // load... when useLiveQuery swaps its default [] for the real roster" the
+  // render-loop-settling test above already flags as bounded but
+  // unaddressed; this closes it so the effect only ever re-fires when the
+  // actual selected characters change.
+  const characterIdsKey = nextCharacterIds.join(',');
   const characterIds = useMemo(
-    () =>
-      resolvedCharacterIds === 'all'
-        ? characterCandidates.map((c) => c.characterId)
-        : [...resolvedCharacterIds],
-    [resolvedCharacterIds, characterCandidates]
+    () => (characterIdsKey === '' ? [] : characterIdsKey.split(',').map(Number)),
+    [characterIdsKey]
   );
 
   // One state object rather than two separate `useState` calls: every branch
@@ -176,13 +187,45 @@ export function OpportunitiesPanel({
     [ownedByCharacter, characterNames, catalog]
   );
 
+  // Every candidate's own Build Plan, for `hubForCharacter` below (issue
+  // #2055): the same Trade Hub a fresh plan for that Character would default
+  // to (`mostRecentlyUpdatedPlan`'s rule), not a hard-coded default.
+  const plansQuery = useLiveQuery(
+    () => db.buildPlans.where('characterId').anyOf(characterIds).toArray(),
+    [characterIds],
+    []
+  );
+  const plansByCharacter = useMemo(() => {
+    const map = new Map<number, BuildPlanRecord[]>();
+    for (const plan of plansQuery ?? []) {
+      const list = map.get(plan.characterId);
+      if (list) list.push(plan);
+      else map.set(plan.characterId, [plan]);
+    }
+    return map;
+  }, [plansQuery]);
+  const resolveHubForCharacter = useMemo(
+    () => (characterId: number) => hubForCharacter(characterId, plansByCharacter),
+    [plansByCharacter]
+  );
+
+  // Each owning Character's own standings/skills (issue #2055), not just the
+  // active Character's — a candidate seeded by an alt prices at that alt's
+  // real broker fee, not the pilot currently viewing the panel.
+  const modifiersByCharacter = useCharacterModifiersByCharacter(characterIds, {
+    skipQueueWithoutScope: true,
+    levels: 'effective',
+  });
+  const standingsByCharacter = useTradeHubStandingsByCharacter(characterIds);
+
   const { rows, loading, progress, manualRefreshOnly, needsRefresh, refresh } = useOpportunities({
     candidates,
     catalog,
     pi,
-    hub: DEFAULT_TRADE_HUB,
+    hubForCharacter: resolveHubForCharacter,
     facilityDefaults,
-    modifiers,
+    modifiersByCharacter,
+    standingsByCharacter,
     ownedStockSnapshot,
     ownedByCharacter,
     assumedMe,
@@ -224,7 +267,11 @@ export function OpportunitiesPanel({
   // (`loadPriceHistory`) — kept out of the row tree entirely until a pilot
   // asks for one, so rendering the ranked list never issues a market-history
   // request and opening exactly one row issues exactly one.
-  const [historyItem, setHistoryItem] = useState<{ typeId: number; itemName: string } | null>(null);
+  const [historyItem, setHistoryItem] = useState<{
+    typeId: number;
+    itemName: string;
+    regionId: number;
+  } | null>(null);
 
   const showCharacterFilter = characterCandidates.length > 1;
   const showCharacterColumn = new Set(rows.map((r) => r.candidate.characterId)).size > 1;
@@ -281,6 +328,7 @@ export function OpportunitiesPanel({
                   setHistoryItem({
                     typeId: productTypeID,
                     itemName: row.candidate.catalogEntry.productName,
+                    regionId: row.hub.regionId,
                   })
                 }
               />
@@ -425,7 +473,6 @@ export function OpportunitiesPanel({
     <span className="flex flex-wrap items-center gap-2">
       {showCharacterFilter && (
         <CharacterFilterControl
-          characters={characterCandidates}
           activeCharacterId={activeCharacterId}
           value={characterFilter}
           onChange={setCharacterFilter}
@@ -496,7 +543,9 @@ export function OpportunitiesPanel({
           selectedIds={selectedIds}
           onToggleSelected={toggleSelected}
           onStartPlan={onStartPlan}
-          onViewHistory={(typeId, itemName) => setHistoryItem({ typeId, itemName })}
+          onViewHistory={(typeId, itemName, regionId) =>
+            setHistoryItem({ typeId, itemName, regionId })
+          }
           skillGateFor={(productTypeID) => skillGateByProductTypeID.get(productTypeID)}
           nameForSkill={(typeID) => nameForType(catalog, typeID)}
           nameForCharacter={(id) => characterNames.get(id) ?? unknown}
@@ -510,7 +559,7 @@ export function OpportunitiesPanel({
           placement="wide"
         >
           <PriceHistoryPanel
-            regionId={DEFAULT_TRADE_HUB.regionId}
+            regionId={historyItem.regionId}
             typeId={historyItem.typeId}
             itemName={historyItem.itemName}
           />

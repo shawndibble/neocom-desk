@@ -616,10 +616,10 @@ export function Assets() {
 
   // Cross-character search (issue #746, replacing issue #85's binary toggle):
   // `'current'` by default (today's old off-state, no extra fan-out), or
-  // All/a hand-picked subset once the pilot asks via `CharacterFilterControl`
-  // — same picker Wallet Balance and Industry Active Jobs already use. The
-  // URL wins; absent, the synced Settings default applies. Nothing here is
-  // written back to that setting.
+  // `'all'` once the pilot asks via `CharacterFilterControl` — same picker
+  // Wallet Balance and Industry Active Jobs already use. The URL wins;
+  // absent, the synced Settings default applies. Nothing here is written
+  // back to that setting.
   const defaultCharacterFilter = useDefaultCharacterFilter((s) => s.value);
   const hydrateDefaultCharacterFilter = useDefaultCharacterFilter((s) => s.hydrate);
   useEffect(() => {
@@ -691,10 +691,13 @@ export function Assets() {
   const crossCharacterFilterMeta =
     crossCharacterCandidates.length > 1 ? (
       <CharacterFilterControl
-        characters={crossCharacterCandidates}
         activeCharacterId={activeCharacterId}
         value={crossCharacterFilter}
         onChange={(chars: CharacterFilterValue) => setView({ chars })}
+        // Rides in this route's own `PageHeader` meta (no titled inner
+        // `Panel`), whose `actions` cluster sits at `IconButton`'s default
+        // (larger) touch tier — match it, not the panel-`meta` default.
+        size="md"
       />
     ) : undefined;
 

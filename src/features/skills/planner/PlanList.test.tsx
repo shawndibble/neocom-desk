@@ -127,6 +127,22 @@ describe('PlanList active plan (#1709)', () => {
   });
 });
 
+describe('PlanList long name (#2105)', () => {
+  it('carries the full name as a title attribute so a truncated name is still readable on hover', () => {
+    const longName = 'A very long plan name that will surely truncate in the sidebar list';
+    render(
+      <PlanList
+        plans={[plan('1', longName)]}
+        onOpen={noop}
+        onDuplicate={noop}
+        onDelete={noop}
+        onRename={noop}
+      />
+    );
+    expect(screen.getByText(longName)).toHaveAttribute('title', longName);
+  });
+});
+
 describe('PlanList row menu', () => {
   it('renames from the menu', async () => {
     const user = userEvent.setup();

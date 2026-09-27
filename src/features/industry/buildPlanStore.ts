@@ -10,7 +10,7 @@
  * write that forgets the bump is an edit that never reaches other devices.
  *
  * Deliberately *not* routed through here: writes that apply remote state or
- * purge in bulk (`sync/merge.ts`, `sync/characterPurge.ts`, `backup/io.ts`,
+ * purge in bulk (`sync/merge.ts`, `backup/io.ts`,
  * `character/removeCharacter.ts`). Those must not bump `updatedAt` or schedule
  * a sync — doing so would push the pulled data straight back out.
  *

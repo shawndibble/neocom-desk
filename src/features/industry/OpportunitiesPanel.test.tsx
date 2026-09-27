@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
 import { MemoryRouter } from 'react-router-dom';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -101,7 +100,6 @@ describe('OpportunitiesPanel', () => {
         <OpportunitiesPanel
           catalog={CATALOG}
           pi={null}
-          modifiers={NO_CHARACTER_MODIFIERS}
           facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
           activeCharacterId={CHARACTER_ID}
           ownedStockSnapshot={SNAPSHOT}
@@ -173,7 +171,6 @@ describe('OpportunitiesPanel', () => {
           <OpportunitiesPanel
             catalog={catalog}
             pi={null}
-            modifiers={NO_CHARACTER_MODIFIERS}
             facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
             activeCharacterId={CHARACTER_ID}
             ownedStockSnapshot={SNAPSHOT}
@@ -265,7 +262,6 @@ describe('OpportunitiesPanel', () => {
         <OpportunitiesPanel
           catalog={catalog}
           pi={null}
-          modifiers={NO_CHARACTER_MODIFIERS}
           facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
           activeCharacterId={CHARACTER_ID}
           ownedStockSnapshot={SNAPSHOT}
@@ -332,7 +328,6 @@ describe('OpportunitiesPanel', () => {
           <OpportunitiesPanel
             catalog={catalog}
             pi={null}
-            modifiers={NO_CHARACTER_MODIFIERS}
             facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
             activeCharacterId={CHARACTER_ID}
             ownedStockSnapshot={SNAPSHOT}

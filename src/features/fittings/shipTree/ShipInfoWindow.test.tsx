@@ -287,7 +287,7 @@ describe('Ship Info window', () => {
       'href',
       bpcSourcingHref(MERLIN_BLUEPRINT)
     );
-    expect(within(dialog).getByRole('link', { name: 'View in market' })).toHaveAttribute(
+    expect(within(dialog).getByRole('link', { name: 'View in Market' })).toHaveAttribute(
       'href',
       `/market/browser?type=${MERLIN_BLUEPRINT}`
     );

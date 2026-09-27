@@ -230,7 +230,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
    * today's exact behavior, no extra fan-out, and it keeps following the
    * active Character across a switch with no resync logic of its own
    * (`useResolvedCharacterFilter` re-resolves it whenever the active
-   * Character changes) — or All/a hand-picked subset once the pilot asks.
+   * Character changes) — or `'all'` once the pilot asks.
    *
    * Kept in the URL (`jobs.chars`); absent, it is the synced default
    * (Settings' Defaults panel), which reads as `'current'` until it hydrates.
@@ -817,10 +817,9 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
    * every panel's title), so the wrapper here carries its own.
    */
   const jobsMeta = (
-    <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 max-md:basis-full">
+    <span className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
       {showCharacterFilter && (
         <CharacterFilterControl
-          characters={jobsFilterCandidates}
           activeCharacterId={characterId}
           value={jobsCharacterFilter}
           onChange={(next) => setJobsCharacterValues({ 'jobs.chars': next })}

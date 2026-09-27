@@ -1214,10 +1214,6 @@ export function TaxTab({ tabBar }: TaxTabProps) {
 
           <div className="flex flex-wrap items-center gap-2">
             <CharacterFilterControl
-              characters={characters.map((c) => ({
-                characterId: c.characterId,
-                characterName: c.characterName,
-              }))}
               activeCharacterId={activeCharacterId}
               value={characterFilter}
               onChange={setCharacterFilter}
