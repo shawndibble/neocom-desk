@@ -1211,6 +1211,10 @@ export function Market() {
                                   rowKey={(o) => o.order_id}
                                   label={t('market.sell')}
                                   defaultSort={{ columnId: 'price', direction: 'asc' }}
+                                  // Quantity/Security/Jumps/Expiry are short figures, and Location
+                                  // wraps within its half-width track — pairing two per line at
+                                  // phone widths beats one-per-line without overlap or clipping.
+                                  stackColumns={2}
                                   rowContextMenu={orderRowContextMenu}
                                   rowMoreActions
                                   rowClassName={(o) =>
@@ -1302,6 +1306,9 @@ export function Market() {
                                   rowKey={(o) => o.order_id}
                                   label={t('market.buy')}
                                   defaultSort={{ columnId: 'price', direction: 'desc' }}
+                                  // Same rationale as the sell table above, plus Range/Min. volume —
+                                  // still short figures, so pair two per line rather than stack.
+                                  stackColumns={2}
                                   rowContextMenu={orderRowContextMenu}
                                   rowMoreActions
                                   rowClassName={(o) =>
