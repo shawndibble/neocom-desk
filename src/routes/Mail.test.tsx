@@ -132,6 +132,17 @@ describe('Mail', () => {
     expect(await screen.findByText(/Market Bot/)).toBeInTheDocument();
   });
 
+  it('renders no reading-pane header when nothing is selected (issue #2104)', async () => {
+    render(<App />);
+    await screen.findByText('Fleet up!');
+    expect(screen.queryByRole('button', { name: 'Reply' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Forward' })).not.toBeInTheDocument();
+    // Only the page's own top header should exist — the empty reading pane
+    // must not render a second, actionless header bar above the empty state.
+    expect(document.querySelectorAll('header')).toHaveLength(1);
+    expect(screen.getByText('Select a message to read it.')).toBeInTheDocument();
+  });
+
   it('shows the body, markup stripped, on click', async () => {
     const user = userEvent.setup();
     render(<App />);
