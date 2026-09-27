@@ -29,7 +29,7 @@ export function DevicePanel() {
   const [deferred, setDeferred] = useState<number[] | null>(null);
   const syncConfigured = isSyncConfigured();
 
-  function open(next: Dialog) {
+  function openDialog(next: Dialog) {
     setFailed(false);
     setDeferred(null);
     setDialog(next);
@@ -95,7 +95,7 @@ export function DevicePanel() {
             variant="danger"
             size="sm"
             disabled={loggedIn === 0}
-            onClick={() => open('logout')}
+            onClick={() => openDialog('logout')}
           >
             {t('settings.deviceLogoutAction')}
           </Button>
@@ -109,7 +109,7 @@ export function DevicePanel() {
             variant="danger"
             size="sm"
             disabled={loggedIn === 0}
-            onClick={() => open('delete')}
+            onClick={() => openDialog('delete')}
           >
             {t('settings.deviceDeleteAction')}
           </Button>

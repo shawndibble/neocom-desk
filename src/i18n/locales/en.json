@@ -5424,7 +5424,7 @@
     "deviceDeleteHintLocalOnly": "Erases everything this app stores in this browser: every character, their data, and settings such as your theme and trade hub. The page reloads to the login screen. Sync is not set up here, so nothing is stored anywhere else. This cannot be undone.",
     "deviceDeleteAction": "Delete all",
     "deviceDeleteFinish": "Finish deleting",
-    "deviceDeleteFailed": "Could not delete. Try again, or reload the page.",
+    "deviceDeleteFailed": "Could not finish deleting. Close Neocom Desk in any other tab, reload this page, and try again.",
     "deviceDeleteConfirmTitle": "Delete all data?",
     "deviceDeleteConfirm_one": "This permanently deletes {{count}} character's synced data from the sync server, and erases all of this app's data and settings from this browser. The page reloads to the login screen.",
     "deviceDeleteConfirm_other": "This permanently deletes {{count}} characters' synced data from the sync server, and erases all of this app's data and settings from this browser. The page reloads to the login screen.",

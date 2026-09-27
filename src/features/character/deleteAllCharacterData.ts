@@ -14,6 +14,7 @@
 
 import { db } from '@/db';
 import {
+  haltSync,
   purgeCharacterRemoteDataOrDefer,
   REMOTE_PURGE_PENDING_PREFIX,
   signOutOfSync,
@@ -23,10 +24,10 @@ import { scheduleProjectionRebuild } from '@/features/notifications/projectionRe
 import { unregisterProjectionRegistration } from '@/features/notifications/projectionUpload';
 
 /**
- * How long one database delete may wait on another tab's open connection
- * before the wipe goes on without it. Dexie closes on `versionchange`, so this
- * only bites a tab too stale to answer — the pilot must not be left staring at
- * a spinner over it.
+ * How long one database delete may wait on another tab's open connection.
+ * Other tabs close and reload on the delete (app/databaseWipe.ts), so this only
+ * bites a tab too stale to answer — the pilot must not be left staring at a
+ * spinner over it. Another app's database is left behind; ours is a failure.
  */
 export const DATABASE_DELETE_TIMEOUT_MS = 5_000;
 
@@ -38,9 +39,9 @@ export const DATABASE_DELETE_TIMEOUT_MS = 5_000;
 const PRECACHE_PREFIX = 'workbox-precache';
 
 /**
- * Step one: purge every Character's remote data. Sequential, because
- * `ensureSignedIn` holds one shared Firebase session and signs in as each
- * Character in turn.
+ * Step one: purge every Character's remote data. Syncing halts first, for the
+ * rest of the page's life: a sync could push purged rows back, or switch the
+ * shared Firebase session mid-purge. Sequential for that same session.
  *
  * A purge that can't run now (dead refresh token, offline) is recorded as
  * pending on this device and retried the next time that Character logs in
@@ -49,6 +50,7 @@ const PRECACHE_PREFIX = 'workbox-precache';
  * @returns The Characters whose purge was deferred rather than done.
  */
 export async function purgeAllRemoteCharacterData(): Promise<number[]> {
+  await haltSync();
   const characters = await db.characters.orderBy('characterId').toArray();
   const deferred: number[] = [];
   for (const { characterId } of characters) {
@@ -122,20 +124,25 @@ async function clearRuntimeCaches(): Promise<void> {
  *
  * Deletes rows wholesale, not Character by Character, so the roster never
  * drops to zero mid-wipe and sends the app to /login before it is done. The
- * caller reloads straight after: Dexie stays closed until then.
+ * caller reloads straight after.
  *
  * @param syncConfigured Whether sync is set up here — gate on
  *   `isSyncConfigured()`, as `logoutAllCharacters` does.
+ * @throws When the database delete does not finish in time. The logins are
+ *   gone by then; the rest may not be.
  */
 export async function deleteAllLocalData(syncConfigured: boolean): Promise<void> {
   const pendingPurges = await db.settings
     .where('key')
     .startsWith(REMOTE_PURGE_PENDING_PREFIX)
     .toArray();
+  // First, so no later step failing can leave a login on this device.
+  await db.tokens.clear();
 
   scheduleProjectionRebuild.cancel();
   await unregisterProjectionRegistration();
   if (syncConfigured) {
+    await haltSync();
     await signOutOfSync().catch(() => {
       // Its persisted session is deleted below with the rest of IndexedDB.
     });
@@ -147,11 +154,11 @@ export async function deleteAllLocalData(syncConfigured: boolean): Promise<void>
 
   // Last: once it is gone every mounted live query fails, so the caller's
   // reload should follow at once.
-  const deleted = await withTimeout(db.delete());
-  // A delete still waiting on another tab would hold the reopen behind it.
-  if (deleted && pendingPurges.length > 0) {
+  if (!(await withTimeout(db.delete()))) {
+    throw new Error('The app database delete is blocked by another tab');
+  }
+  if (pendingPurges.length > 0) {
     await db.open();
     await db.settings.bulkPut(pendingPurges);
-    db.close();
   }
 }

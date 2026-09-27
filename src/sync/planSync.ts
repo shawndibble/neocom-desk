@@ -409,9 +409,29 @@ const DEFAULT_DEBOUNCE_MS = 2000;
 // Global serialization chain. Never left rejected: failures surface through the
 // per-run promise and the status stream.
 let syncChain: Promise<void> = Promise.resolve();
+// Set by `haltSync` for the rest of the page's life: a purge-then-wipe must
+// not race a sync that pushes the purged rows back or re-mints a session.
+let halted = false;
+
+/**
+ * Stop syncing on this page until it reloads: pending debounces are dropped,
+ * new syncs are refused, and this resolves once any sync in flight is done.
+ */
+export async function haltSync(): Promise<void> {
+  halted = true;
+  for (const timer of pendingTimers.values()) clearTimeout(timer);
+  pendingTimers.clear();
+  await Promise.allSettled(running.values());
+}
+
+/** Undo `haltSync`. Tests only — the app reloads instead. */
+export function resetSyncHalt(): void {
+  halted = false;
+}
 
 /** Debounced sync — call after each edit. */
 export function scheduleSync(characterId: number, debounceMs = DEFAULT_DEBOUNCE_MS): void {
+  if (halted) return;
   const existing = pendingTimers.get(characterId);
   if (existing !== undefined) clearTimeout(existing);
   pendingTimers.set(
@@ -430,6 +450,7 @@ export function scheduleSync(characterId: number, debounceMs = DEFAULT_DEBOUNCE_
  * awaited instead) and serialized globally.
  */
 export function triggerSync(characterId: number): Promise<void> {
+  if (halted) return Promise.resolve();
   const pending = pendingTimers.get(characterId);
   if (pending !== undefined) {
     clearTimeout(pending);

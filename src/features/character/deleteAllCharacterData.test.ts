@@ -2,7 +2,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { deleteAllLocalData, purgeAllRemoteCharacterData } from './deleteAllCharacterData';
+import {
+  DATABASE_DELETE_TIMEOUT_MS,
+  deleteAllLocalData,
+  purgeAllRemoteCharacterData,
+} from './deleteAllCharacterData';
 
 const syncMock = vi.hoisted(() => ({
   clearCharacterSyncBookkeeping: vi.fn(async () => {}),
@@ -11,6 +15,7 @@ const syncMock = vi.hoisted(() => ({
   ),
   triggerSync: vi.fn(async () => {}),
   signOutOfSync: vi.fn(async () => {}),
+  haltSync: vi.fn(async () => {}),
   REMOTE_PURGE_PENDING_PREFIX: 'remotePurgePending.',
 }));
 vi.mock('@/sync', () => syncMock);
@@ -102,6 +107,18 @@ describe('purgeAllRemoteCharacterData', () => {
 
     expect(syncMock.triggerSync).not.toHaveBeenCalled();
   });
+
+  it('halts syncing before the first purge, so none can push purged rows back', async () => {
+    await seedCharacter(1);
+    syncMock.purgeCharacterRemoteDataOrDefer.mockImplementation(async () => {
+      expect(syncMock.haltSync).toHaveBeenCalled();
+      return true;
+    });
+
+    await purgeAllRemoteCharacterData();
+
+    expect(syncMock.purgeCharacterRemoteDataOrDefer).toHaveBeenCalledOnce();
+  });
 });
 
 describe('deleteAllLocalData', () => {
@@ -176,19 +193,20 @@ describe('deleteAllLocalData', () => {
 
   it('unregisters push and signs out before the stores go', async () => {
     await seedCharacter(1);
-    const tokensAt = async () => (await db.tokens.count()) > 0;
+    const storesStillThere = async () => (await db.characters.count()) > 0;
     pushMock.unregisterProjectionRegistration.mockImplementationOnce(async () => {
-      expect(await tokensAt()).toBe(true);
+      expect(await storesStillThere()).toBe(true);
     });
+    const signedOutWithStores: boolean[] = [];
     syncMock.signOutOfSync.mockImplementationOnce(async () => {
-      expect(await tokensAt()).toBe(true);
+      signedOutWithStores.push(await storesStillThere());
     });
 
     await deleteAllLocalData(true);
 
     expect(pushMock.scheduleProjectionRebuild.cancel).toHaveBeenCalled();
     expect(pushMock.unregisterProjectionRegistration).toHaveBeenCalledOnce();
-    expect(syncMock.signOutOfSync).toHaveBeenCalledOnce();
+    expect(signedOutWithStores).toEqual([true]);
   });
 
   it('never pushes and never purges again; the remote side is purgeAllRemoteCharacterData’s job', async () => {
@@ -200,11 +218,50 @@ describe('deleteAllLocalData', () => {
     expect(syncMock.purgeCharacterRemoteDataOrDefer).not.toHaveBeenCalled();
   });
 
+  it('halts syncing before signing out, so no debounce re-mints a session', async () => {
+    await seedCharacter(1);
+    const order: string[] = [];
+    syncMock.haltSync.mockImplementationOnce(async () => {
+      order.push('halt');
+    });
+    syncMock.signOutOfSync.mockImplementationOnce(async () => {
+      order.push('signOut');
+    });
+
+    await deleteAllLocalData(true);
+
+    expect(order).toEqual(['halt', 'signOut']);
+  });
+
+  it('fails, with every login already gone, when the database delete never finishes', async () => {
+    await seedCharacter(1);
+    const remove = vi.spyOn(db, 'delete').mockReturnValue(new Promise(() => {}) as never);
+    // Only the timeout is faked: fake-indexeddb schedules on the other timers.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      let settled = false;
+      const done = deleteAllLocalData(true).finally(() => {
+        settled = true;
+      });
+      const failed = expect(done).rejects.toThrow(/blocked/);
+      // The steps before the delete are real IndexedDB work; keep advancing
+      // until the delete's own timeout has been armed and has fired.
+      while (!settled) await vi.advanceTimersByTimeAsync(DATABASE_DELETE_TIMEOUT_MS);
+      await failed;
+    } finally {
+      vi.useRealTimers();
+      remove.mockRestore();
+    }
+
+    expect(await db.tokens.count()).toBe(0);
+  });
+
   it('skips the Firebase sign-out when sync is not configured', async () => {
     await seedCharacter(1);
 
     await deleteAllLocalData(false);
 
     expect(syncMock.signOutOfSync).not.toHaveBeenCalled();
+    expect(syncMock.haltSync).not.toHaveBeenCalled();
   });
 });

@@ -35,6 +35,15 @@ export async function signOutOfSync(): Promise<void> {
 }
 
 /**
+ * Stop syncing on this page until it reloads, once any sync in flight is done
+ * (planSync.ts). Only call it where sync is configured.
+ */
+export async function haltSync(): Promise<void> {
+  const { haltSync } = await import('./planSync');
+  return haltSync();
+}
+
+/**
  * Debounced sync — call after each edit. Fire-and-forget: a failed driver load
  * (offline before the chunk is precached) is swallowed and no sync happens.
  */

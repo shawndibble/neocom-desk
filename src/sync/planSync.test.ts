@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { deleteDoc, getDocs, setDoc, where } from 'firebase/firestore/lite';
 import {
   db,
@@ -22,12 +22,14 @@ import {
   clearStationPin,
   deleteSyncedSetting,
   getSyncStatus,
+  haltSync,
   markBuildPlanDeleted,
   markBuildPlansDeleted,
   markPlanDeleted,
   markProductionRunDeleted,
   removeProductionOrderWatch,
   removeProductionSaleLink,
+  resetSyncHalt,
   scheduleSync,
   setAccountStationPin,
   setCharacterStationPin,
@@ -1880,6 +1882,45 @@ describe('sync orchestration', () => {
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
     expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(13);
     expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
+  });
+});
+
+describe('haltSync', () => {
+  afterEach(() => {
+    resetSyncHalt();
+  });
+
+  it('cancels a scheduled sync and refuses new ones', async () => {
+    scheduleSync(1, 20);
+    await haltSync();
+
+    await triggerSync(1);
+    scheduleSync(1, 20);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    expect(vi.mocked(getDocs)).not.toHaveBeenCalled();
+  });
+
+  it('waits for a sync already running', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(getDocs).mockImplementation((async (target: FakeQuery) => {
+      await gate;
+      return fake.getDocsImpl(target);
+    }) as never);
+    const running = triggerSync(1);
+    let halted = false;
+    const halt = haltSync().then(() => {
+      halted = true;
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(halted).toBe(false);
+    release();
+    await Promise.all([running, halt]);
+    expect(halted).toBe(true);
   });
 });
 
