@@ -47,3 +47,21 @@ describe('context-menu label casing', () => {
     }
   });
 });
+
+function collectStrings(node: unknown, path: string, out: string[][]) {
+  if (typeof node === 'string') {
+    out.push([path, node]);
+  } else if (node && typeof node === 'object') {
+    for (const [key, value] of Object.entries(node)) collectStrings(value, `${path}.${key}`, out);
+  }
+}
+
+describe('Market page-name casing', () => {
+  const all: string[][] = [];
+  collectStrings(en, 'en', all);
+
+  it('never spells the Market page as lowercase "in market"', () => {
+    const offenders = all.filter(([, value]) => /\bin market\b/.test(value));
+    expect(offenders).toEqual([]);
+  });
+});

@@ -26,7 +26,7 @@ export interface DataTableSort {
   direction: 'asc' | 'desc';
 }
 
-const STICKY_START = 'sticky left-0 z-10 bg-panel max-md:border-r max-md:border-line';
+const STICKY_START = 'sticky left-0 z-10 bg-bg max-md:border-r max-md:border-line';
 // `hover:bg-panel-2` lives on the `<tr>`, whose own background a sticky
 // cell's opaque one would otherwise cover.
 const STICKY_START_CELL = 'max-sm:max-w-30 [tr:hover>&]:bg-panel-2';
@@ -91,6 +91,18 @@ export interface DataTableColumn<T> {
    * ISK/jump, the number a reader scans the list by.
    */
   cardCorner?: boolean;
+  /**
+   * Pins this cell to the stacked card's top-right corner, same spot as
+   * `cardCorner` — but for a real control (a "More actions" button built
+   * from a custom render rather than the table's own `rowMoreActions` column,
+   * because the row needs per-row props `rowMoreActions` can't take), not a
+   * decorative one. Reuses `rowMoreActions`'s own `dt-actions` CSS rather
+   * than `cardCorner`'s `dt-corner` — the button keeps its 44px touch target
+   * and the title-collision padding that CSS carries, which `dt-corner`
+   * doesn't. Exactly one of `cardCorner`/`cardActions` per table; at most one
+   * `cardActions` column, later ones ignored.
+   */
+  cardActions?: boolean;
   /**
    * Dense stack only: text printed around this cell's value on the card's
    * meta line, e.g. `{ before: 'Qty ' }` or `{ after: ' reward' }`. The dense
@@ -425,11 +437,14 @@ export function DataTable<T>({
     columns.findIndex((column) => column.primary)
   );
   const cardCornerIndex = columns.findIndex((column) => column.cardCorner);
+  const cardActionsIndex = columns.findIndex((column) => column.cardActions);
   // The dense card's second line: every cell that is neither title nor
   // corner. The first gets no leading separator. Only computed (and only
   // marked in the DOM) when dense, so no other table's markup changes.
   const firstMetaIndex = dense
-    ? columns.findIndex((_, i) => i !== primaryIndex && i !== cardCornerIndex)
+    ? columns.findIndex(
+        (_, i) => i !== primaryIndex && i !== cardCornerIndex && i !== cardActionsIndex
+      )
     : -1;
   // A right-aligned sortable header's own sort glyph (`gap-1` + an icon) sits
   // between the label and the header's right inset, pushing the label ~1rem
@@ -595,7 +610,8 @@ export function DataTable<T>({
         }
       >
         {columns.map((column, i) => {
-          const meta = dense && i !== primaryIndex && i !== cardCornerIndex;
+          const meta =
+            dense && i !== primaryIndex && i !== cardCornerIndex && i !== cardActionsIndex;
           return (
             <td
               key={column.id}
@@ -610,6 +626,7 @@ export function DataTable<T>({
                 cellClass[i],
                 i === primaryIndex && 'dt-primary',
                 i === cardCornerIndex && 'dt-corner',
+                i === cardActionsIndex && 'dt-actions',
                 meta && 'dt-meta',
                 meta && i === firstMetaIndex && 'dt-meta-first',
                 // Inert at every width except the dense card, which has no
@@ -626,7 +643,7 @@ export function DataTable<T>({
           (() => {
             const Chevron = expanded ? Icon.Expanded : Icon.Descend;
             return (
-              <td role="cell" aria-hidden="true" className={cx(cellPadding, 'w-0')}>
+              <td role="cell" aria-hidden="true" className={cx(cellPadding, 'w-0 dt-disclosure')}>
                 <Chevron size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-dim" />
               </td>
             );
@@ -843,7 +860,17 @@ export function DataTable<T>({
             <th role="columnheader" scope="col" aria-hidden="true" className="w-0 p-0" />
           )}
           {rowMoreActions && (
-            <th role="columnheader" scope="col" className="w-0 p-0">
+            // `relative`: the `sr-only` label below has no explicit
+            // top/left, so its used position falls back to its own static
+            // position — past this trailing column, at the table's right
+            // edge. With no positioned ancestor, that resolves the label's
+            // containing block above any `overflow-x-auto` wrapper a caller
+            // puts around this table, so a wide table (#2093) keeps
+            // stretching that ancestor's scrollable region even though the
+            // wrapper visually clips everything else. This `<th>` being
+            // positioned gives the label a containing block that's already
+            // inside the clip.
+            <th role="columnheader" scope="col" className="relative w-0 p-0">
               <span className="sr-only">{t('common.dataTable.actionsHeader')}</span>
             </th>
           )}

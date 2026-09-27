@@ -63,6 +63,7 @@ import {
   type FoldedDomain,
 } from '@/features/overview/cards';
 import {
+  loadCalendarEventsBoard,
   loadContractsBoard,
   loadIndustryBoard,
   loadMiningTaxBoard,
@@ -84,7 +85,13 @@ import {
   ordersSummary,
   planetarySummary,
 } from '@/features/overview/boardSummary';
-import { compareSeverity, worstSeverity, type DeadlineSeverity } from '@/engine/severity';
+import {
+  compareSeverity,
+  severityForRemaining,
+  worstSeverity,
+  type DeadlineSeverity,
+} from '@/engine/severity';
+import { soonestCalendarDeadline } from '@/engine/calendarDeadline';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { isJobDone } from '@/features/industry/jobs';
 import type { CharacterSkills, SkillQueueEntry } from '@/esi/endpoints';
@@ -201,6 +208,9 @@ export function Overview() {
   });
   const contractsSnapshot = useRouteSnapshot(loadContractsBoard, undefined, {
     cacheKey: 'overview:contracts',
+  });
+  const calendarSnapshot = useRouteSnapshot(loadCalendarEventsBoard, undefined, {
+    cacheKey: 'overview:calendar',
   });
   const { hydrated, activeCharacterId } = walletSnapshot;
 
@@ -361,6 +371,20 @@ export function Overview() {
       note: contractsNote,
       severity: soonestContract.overdue ? 'critical' : 'warning',
       to: CONTRACTS_IN_PROGRESS_HREF,
+    });
+  }
+  /*
+   * Only events the pilot has actually committed to — `accepted` or
+   * `tentative` — so a fleet op nobody has answered yet cannot lead the board
+   * (`engine/calendarDeadline`).
+   */
+  const calendarEvent = soonestCalendarDeadline(calendarSnapshot.data?.events ?? [], now);
+  if (calendarEvent) {
+    deadlines.push({
+      at: calendarEvent.atMs,
+      note: calendarEvent.title,
+      severity: severityForRemaining(calendarEvent.atMs - now),
+      to: '/calendar',
     });
   }
   const soonest = deadlines.sort((a, b) => a.at - b.at)[0] ?? null;
@@ -534,6 +558,7 @@ export function Overview() {
           industrySnapshot.data?.fetchedAt,
           miningSnapshot.data?.fetchedAt,
           contractsSnapshot.data?.fetchedAt,
+          calendarSnapshot.data?.fetchedAt,
         ])}
         now={now}
         fromCache={Boolean(
@@ -547,6 +572,7 @@ export function Overview() {
           contractsSnapshot.refresh();
           planetarySnapshot.refresh();
           industrySnapshot.refresh();
+          calendarSnapshot.refresh();
         }}
         refreshing={
           walletSnapshot.loading ||
@@ -554,7 +580,8 @@ export function Overview() {
           industrySnapshot.loading ||
           ordersSnapshot.loading ||
           miningSnapshot.loading ||
-          contractsSnapshot.loading
+          contractsSnapshot.loading ||
+          calendarSnapshot.loading
         }
       />
 

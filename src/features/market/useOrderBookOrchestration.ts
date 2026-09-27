@@ -13,7 +13,7 @@
  * here regardless of which tab is showing.
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useUrlParam, useUrlParams } from '@/lib/useUrlState';
+import { useRememberedUrlParams, useUrlParam, type RememberedDefaults } from '@/lib/useUrlState';
 import { boolParam, enumParam, enumSetParam, intParam, type UrlParamCodec } from '@/lib/urlState';
 import { JUMP_RANGES, DEFAULT_JUMP_RANGE, type JumpRange } from '@/engine/route/jumpRange';
 import { SPACE_KINDS, type SpaceKind } from '@/engine/space';
@@ -24,6 +24,7 @@ import {
   type CurrentSystemState,
   type JumpRangeFilter,
 } from '@/features/route/currentSystem';
+import { useBrowserFilterSetting } from '@/features/market/browserFilterSetting';
 import { ORDER_BOOK_FANOUT_CONCURRENCY } from '@/features/market/orderBook';
 import {
   buildOrderBookView,
@@ -79,7 +80,11 @@ const STATION_FILTER_PARAM: UrlParamCodec<number | null> = {
  * The order book's filter bar — Jump Range, Security, Min quantity, NPC
  * stations only — as one `useUrlParams` group, so the narrow sheet's Apply
  * lands every changed field in one write rather than four writers racing in
- * one tick (see `navigateTo` in `useMarketBrowser.ts`).
+ * one tick (see `navigateTo` in `useMarketBrowser.ts`). Each field's stored
+ * default (`browserFilterSetting.ts`) sits behind the URL via
+ * `useRememberedUrlParams`, so a filter set once survives a reload or a
+ * fresh visit with no matching query string — same pattern as Location
+ * Mode/Trade Hub in `useMarketBrowser.ts`.
  */
 const BROWSER_FILTER_PARAMS = {
   'browser.jumps': enumParam(JUMP_RANGES, DEFAULT_JUMP_RANGE),
@@ -214,7 +219,37 @@ export function useOrderBookOrchestration({
   // neither shown nor applied there, whatever the URL says; Min quantity
   // applies in both. All narrow the book next to the station filter, see
   // `orderBookView.ts`'s `allowedSystems`/`minQuantity`/`npcStationIds`.
-  const [browserFilters, setBrowserFilters] = useUrlParams(BROWSER_FILTER_PARAMS);
+  const browserFilterSettingValue = useBrowserFilterSetting((state) => state.value);
+  const browserFilterSettingHydrated = useBrowserFilterSetting((state) => state.hydrated);
+  const hydrateBrowserFilterSetting = useBrowserFilterSetting((state) => state.hydrate);
+  const setBrowserFilterSettingValue = useBrowserFilterSetting((state) => state.setValue);
+  useEffect(() => {
+    void hydrateBrowserFilterSetting();
+  }, [hydrateBrowserFilterSetting]);
+  const rememberedBrowserFilters: RememberedDefaults<typeof BROWSER_FILTER_PARAMS> = useMemo(
+    () => ({
+      values: {
+        'browser.jumps': browserFilterSettingValue.jumps,
+        'browser.sec': browserFilterSettingValue.sec,
+        'browser.minQty': browserFilterSettingValue.minQty,
+        'browser.npcOnly': browserFilterSettingValue.npcOnly,
+      },
+      hydrated: browserFilterSettingHydrated,
+      remember: (patch) => {
+        void setBrowserFilterSettingValue({
+          jumps: patch['browser.jumps'] ?? browserFilterSettingValue.jumps,
+          sec: patch['browser.sec'] ?? browserFilterSettingValue.sec,
+          minQty: patch['browser.minQty'] ?? browserFilterSettingValue.minQty,
+          npcOnly: patch['browser.npcOnly'] ?? browserFilterSettingValue.npcOnly,
+        });
+      },
+    }),
+    [browserFilterSettingValue, browserFilterSettingHydrated, setBrowserFilterSettingValue]
+  );
+  const [browserFilters, setBrowserFilters] = useRememberedUrlParams(
+    BROWSER_FILTER_PARAMS,
+    rememberedBrowserFilters
+  );
   const regionMode = effectiveLocation.mode === 'region';
   const jumpRange = browserFilters['browser.jumps'];
   const spaceKinds = browserFilters['browser.sec'];
@@ -317,16 +352,26 @@ export function useOrderBookOrchestration({
     [allRegionsFetchKey]
   );
 
-  // Refetches on selection, location, or a manual Refresh click. Gated on both
-  // *Hydrated flags so this doesn't fire once for the defaults and again once
-  // the persisted settings resolve. `fetchOrderBook` never rejects: a 420 or
-  // an Error Budget refusal settles as `'failed'`, which renders its own
-  // state rather than an empty book or a spinner that never clears.
+  // Refetches on selection, location, or a manual Refresh click. Gated on all
+  // three *Hydrated flags so this doesn't fire once for the defaults and
+  // again once the persisted settings resolve — for All Regions with a
+  // persisted Jump Range especially, firing once against every region (the
+  // pre-hydration default) and then again against the narrowed in-range set
+  // would cost a slow, wasted full fan-out on every visit. `fetchOrderBook`
+  // never rejects: a 420 or an Error Budget refusal settles as `'failed'`,
+  // which renders its own state rather than an empty book or a spinner that
+  // never clears.
   useEffect(() => {
     // Also waits for globalMarkets.json to settle (success or failure):
     // before it does, a Global Market Region item (a PLEX deep link) would be
     // read from the wrong region.
-    if (selectedTypeId === null || !hubHydrated || !locationModeHydrated || globalMarkets === null)
+    if (
+      selectedTypeId === null ||
+      !hubHydrated ||
+      !locationModeHydrated ||
+      !browserFilterSettingHydrated ||
+      globalMarkets === null
+    )
       return;
     // Waits for the region list and the range (see `allRegionsFetchKey`).
     if (allRegions && allRegionsFetchIds === null) return;
@@ -356,6 +401,7 @@ export function useOrderBookOrchestration({
     allRegionsFetchIds,
     hubHydrated,
     locationModeHydrated,
+    browserFilterSettingHydrated,
     globalMarkets,
     refreshTick,
   ]);

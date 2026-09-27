@@ -812,6 +812,7 @@ export function MaterialsTable({
               id: 'actions',
               header: '',
               align: 'right',
+              cardActions: true,
               render: (material: MaterialTableRow) => rowActions(material),
             } satisfies DataTableColumn<MaterialTableRow>,
           ]

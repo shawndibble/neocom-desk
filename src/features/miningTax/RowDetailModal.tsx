@@ -43,6 +43,8 @@ interface RowDetailModalProps {
   onSplit?: () => void;
   /** Opens the Payee manager over this modal when the pilot has no Payees yet. */
   onAddPayee?: () => void;
+  /** Reopens a Paid Assignment for editing ("unlock to edit") — offered only when `assignment.status === 'paid'`. */
+  onUnlock?: () => void | Promise<void>;
 }
 
 /**
@@ -73,6 +75,7 @@ export function RowDetailModal({
   onJoin,
   onSplit,
   onAddPayee,
+  onUnlock,
 }: RowDetailModalProps) {
   const { t } = useTranslation();
   const oreLines = assignment ? assignment.oreLines : row.unassignedOreLines;
@@ -196,6 +199,7 @@ export function RowDetailModal({
             onAssigned={onAssigned}
             onCancel={onClose}
             onAddPayee={onAddPayee}
+            onUnlock={onUnlock}
             extraActions={
               <>
                 {status === 'unassigned' && (

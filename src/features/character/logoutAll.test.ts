@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { logoutAllCharacters, SYNC_FLUSH_TIMEOUT_MS } from './logoutAll';
+import { logoutAllCharacters } from './logoutAll';
+import { SYNC_FLUSH_TIMEOUT_MS } from './removeCharacter';
 
 const syncMock = vi.hoisted(() => ({
   clearCharacterSyncBookkeeping: vi.fn(async () => {}),
-  purgeCharacterRemoteDataOrDefer: vi.fn(async () => true),
   triggerSync: vi.fn<(characterId: number) => Promise<void>>(async () => {}),
   signOutOfSync: vi.fn(async () => {}),
 }));
@@ -97,7 +97,6 @@ describe('logoutAllCharacters', () => {
 
     await logoutAllCharacters(true);
 
-    expect(syncMock.purgeCharacterRemoteDataOrDefer).not.toHaveBeenCalled();
     expect((await db.settings.get('marketHub'))?.value).toBe('amarr');
     expect((await db.settings.get('sync.assumedMe'))?.value).toBe(10);
   });

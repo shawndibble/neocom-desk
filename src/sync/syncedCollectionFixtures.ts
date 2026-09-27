@@ -190,6 +190,7 @@ export const FULL_MINING_TAX_ASSIGNMENT: Required<MiningTaxAssignmentRecord> = {
     journalRefId: 123,
     contractId: 456,
   },
+  oreLineValues: { 45490: 4_800_000 },
   updatedAt: UPDATED_AT,
 };
 

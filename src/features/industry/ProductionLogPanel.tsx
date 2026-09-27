@@ -24,7 +24,7 @@ import { soldUnitsMargin } from '@/engine/industry/realizedProfit';
 import type { SkillLevels } from '@/engine/industry/types';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { getTradeHub, DEFAULT_TRADE_HUB } from '@/market/hubs';
-import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import {
@@ -418,21 +418,6 @@ export function ProductionLogPanel({
     );
   };
 
-  // Visible keyboard-reachable equivalent of `itemMenuFor` above (WCAG 2.1.1,
-  // issue #1498) — same conditional: a product the catalog doesn't know gets
-  // no button at all, matching the bare row the context menu already leaves it.
-  const moreActionsFor = (typeId: number, itemName: string): ReactElement | null => {
-    const entry = catalog.byProductTypeID.get(typeId);
-    if (!entry) return null;
-    return (
-      <ItemMoreActions
-        typeId={typeId}
-        itemName={itemName}
-        blueprintTypeID={entry.blueprintTypeID}
-      />
-    );
-  };
-
   const columns: DataTableColumn<ItemRow>[] = [
     {
       id: 'item',
@@ -499,12 +484,6 @@ export function ProductionLogPanel({
       sortValue: (r) => r.unsoldCost,
       render: (r) => formatIsk(r.unsoldCost),
     },
-    {
-      id: 'moreActions',
-      header: '',
-      align: 'right',
-      render: (r) => moreActionsFor(r.productTypeID, r.itemName),
-    },
   ];
 
   const runColumns: DataTableColumn<RunRow>[] = [
@@ -521,12 +500,6 @@ export function ProductionLogPanel({
     realizedProfitColumn(t, skills, (r) => standingByPlanId.get(r.run.buildPlanId)),
     statusColumn(t),
     soldActionsColumn(sale),
-    {
-      id: 'moreActions',
-      header: '',
-      align: 'right',
-      render: (r) => moreActionsFor(r.run.productTypeID, r.itemName),
-    },
   ];
 
   return (
@@ -617,6 +590,7 @@ export function ProductionLogPanel({
                 rows={itemRows}
                 rowKey={(r) => r.productTypeID}
                 rowContextMenu={(r, tr) => itemMenuFor(r.productTypeID, r.itemName, tr)}
+                rowMoreActions
                 label={t('industry.byItem')}
                 sort={knownSort(itemSort, columns)}
                 onSortChange={setItemSort}
@@ -642,6 +616,7 @@ export function ProductionLogPanel({
                   rows={runRows}
                   rowKey={(r) => r.run.id}
                   rowContextMenu={(r, tr) => itemMenuFor(r.run.productTypeID, r.itemName, tr)}
+                  rowMoreActions
                   label={t('industry.allProductionRuns')}
                   sort={knownSort(runSort, runColumns)}
                   onSortChange={setRunSort}
