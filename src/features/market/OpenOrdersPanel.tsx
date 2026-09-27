@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -33,17 +33,12 @@ import { CharacterBadge } from '@/features/character/assetBrowserRows';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
 import { resolveCharacterFilter } from '@/features/character/characterFilterValue';
-import { loadReprocessing } from '@/sde/loadSde';
-import type { ReprocessingType } from '@/sde/types';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useIsPhone } from '@/lib/useIsPhone';
 import { useUrlFilter } from '@/lib/useUrlState';
-import { useLazyRowCache } from '@/lib/useLazyRowCache';
-import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { cx } from '@/lib/cx';
 import { formatIskAuto, formatIskCompact } from '@/lib/isk';
-import { TRADE_HUBS } from '@/market/hubs';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { ordersCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrder } from '@/esi/endpoints';
@@ -54,18 +49,8 @@ import { OpenOrdersList } from './OpenOrdersList';
 import { isOffHubStation } from './hubStation';
 import { formatOrderFloorPrice, formatOrderRemaining } from './orderRowFormat';
 import { loadOpenOrdersSnapshot } from './openOrdersPageSnapshot';
-import {
-  loadStationBestPrices,
-  loadRegionCompetition,
-  loadStructureCompetition,
-  loadJumpsBetween,
-  type RegionCompetition,
-  type StructureCompetition,
-} from './orderCompetition';
-import { loadPriceHistory, type PriceHistoryResult } from './priceHistory';
 import { recordOrderProblemSamples, sampleableCharacterIds } from './orderProblemSamples';
 import { sampledProblem } from '@/engine/market/orderProblemHistory';
-import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import {
   buildOpenOrderRows,
   groupOpenOrders,
@@ -91,15 +76,14 @@ import {
 import type { OrderProblem } from '@/engine/market/orderProblems';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
-import { stationPriceKey } from './stationPriceKey';
-import type { HubBuyPrice } from './orderExits';
 import { OrderBadgeLegend } from './OrderBadgeLegend';
 import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { orderRowSummary } from './orderRowSummary';
 import { priceClipboardText } from './priceClipboardText';
 import { writeToClipboard } from '@/lib/clipboard';
 import { OrderDetailModal } from './OrderDetailModal';
-import type { ReprocessingInput } from './orderExits';
+import { useOrderDetail } from './useOrderDetail';
+import { itemKey } from './orderDetailView';
 import {
   OPEN_ORDER_COLUMN_IDS,
   useVisibleOpenOrderColumns,
@@ -138,10 +122,6 @@ const GROUP_ACCENT: Record<OrderProblem, string> = {
 
 const EXPIRING_WITHIN_DAY_OPTIONS = [3, 7, 14, 30] as const;
 const MIN_ISK_TIED_UP_OPTIONS = [10_000_000, 100_000_000, 1_000_000_000] as const;
-
-function itemKey(regionId: number, typeId: number): string {
-  return `${regionId}:${typeId}`;
-}
 
 /** "Jita 4 - Moon 4 - Caldari Navy Assembly Plant" -> "Jita 4"; the full name still shows on hover. */
 function stationShortName(name: string): string {
@@ -205,41 +185,11 @@ export function OpenOrdersPanel() {
     () => new Set()
   );
   /**
-   * Six per-row-expand caches, same `useLazyRowCache` shape — only what
-   * differs per one (key, retry policy) is noted below.
+   * The Order Detail modal's loading, page-level: its caches outlive any one
+   * modal, and its region and structure books also reclassify the rows below
+   * (`useOrderDetail`'s own doc).
    */
-  const deepCache = useLazyRowCache<string, RegionCompetition>();
-  /**
-   * One player structure's market book, keyed by locationId — every order
-   * parked at that structure, of any type or character, shares one fetch.
-   * Absent means "never attempted or still failing"; `buildOpenOrderRows`
-   * and the detail modal both read that absence as "unavailable", same as
-   * an ungranted scope or an ACL denial. Loaded `sticky` (below): an
-   * ACL-denied (403) structure must not retry on every unrelated snapshot
-   * revalidation while the modal stays open — only the modal's "Check
-   * deeper" button forces another attempt, via `structureCache.reset`.
-   */
-  const structureCache = useLazyRowCache<number, StructureCompetition>();
-  /** Jump distance between two solar systems, keyed by `"system:system"` — shared by the region-rival lookup and the trade-hub sweep below. */
-  const jumpsCache = useLazyRowCache<string, JumpsAwayResult>();
-  /**
-   * The refine comparison, per opened order: the baked yield for its item
-   * plus a price for each material AT THAT STATION. Keyed the same way as
-   * the other on-demand caches, and loaded only when a detail modal opens —
-   * `reprocessing.json` is 1.4 MB and no row on the worklist needs it.
-   */
-  const reprocessingCache = useLazyRowCache<
-    string,
-    { entry: ReprocessingType; materialPrices: Record<number, number> }
-  >();
-  /**
-   * What each trade hub bids for one item, keyed by type id alone: a hub's
-   * own buy orders do not change with where the player's stock happens to
-   * sit, unlike the refine prices above.
-   */
-  const hubPricesCache = useLazyRowCache<number, Record<string, number | null>>();
-  /** Price history for the modal's "sells out in" chip, keyed by region+item. */
-  const historyCache = useLazyRowCache<string, PriceHistoryResult>();
+  const orderDetail = useOrderDetail();
 
   /** One column-visibility setting shared by every per-problem-group table below. */
   const {
@@ -251,128 +201,17 @@ export function OpenOrdersPanel() {
 
   const snapshot = data;
 
-  /**
-   * The shared body behind both `ensureDeepChecked` (one row's "Details") and
-   * `checkGroupDeeper` (a whole group at once) — returning the underlying
-   * promise, rather than firing-and-forgetting like the old single-item
-   * helper did, is what lets `checkGroupDeeper` route every item in a group
-   * through `mapWithConcurrencyLimit`: a worker there only picks up its next
-   * item once the promise for the current one settles, which is exactly what
-   * caps the fan-out. In-flight de-duplication and per-item failure isolation
-   * (`deepCache`'s own job now) both still apply.
-   */
-  function loadDeepIfNeeded(regionId: number, typeId: number): Promise<void> {
-    return deepCache.load(itemKey(regionId, typeId), () => loadRegionCompetition(regionId, typeId));
-  }
-
-  function ensureDeepChecked(regionId: number, typeId: number) {
-    void loadDeepIfNeeded(regionId, typeId);
-  }
-
-  /**
-   * One player structure's market book, keyed by locationId — every order
-   * parked there shares this one fetch. `loadStructureCompetition` never
-   * throws (a 403/network failure resolves to `null`), so a `null` result is
-   * turned into a rejection here — `structureCache`'s `sticky` option is what
-   * actually stops a repeat attempt, but a rejection is what marks it failed
-   * and lets a `null` share the same "unavailable" shape as a genuine fetch
-   * error.
-   *
-   * Wrapped in `useCallback` because it is called from the effect below, and
-   * only a REFERENTIALLY STABLE function can sit in that effect's dependency
-   * array without eslint's exhaustive-deps rule (rightly) demanding the
-   * effect re-run on every render. `[structureCache.load]` costs nothing:
-   * `load` is itself stable for the life of the `useLazyRowCache` call.
-   */
-  const ensureStructureChecked = useCallback(
-    (characterId: number, locationId: number): void => {
-      void structureCache.load(
-        locationId,
-        async () => {
-          const result = await loadStructureCompetition(characterId, locationId);
-          if (!result) throw new Error('Structure market unavailable');
-          return result;
-        },
-        { sticky: true }
-      );
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `structureCache.load` is the only part of `structureCache` read here, and it alone is stable for the life of the `useLazyRowCache` call; listing the whole object would recreate this callback every render, since its `byKey`/`loadingKeys`/`failedKeys` change on every fetch.
-    [structureCache.load]
-  );
-
-  /**
-   * Price history for the modal's "sells out in" chip — fetched on demand,
-   * the same on-open pattern as `ensureDeepChecked`, and left uncached on
-   * failure so the next open retries. Single-item, so no fan-out cap is
-   * needed here (unlike the deep check, this never runs for a whole group).
-   */
-  function ensureHistoryLoaded(regionId: number, typeId: number) {
-    void historyCache.load(itemKey(regionId, typeId), () => loadPriceHistory(regionId, typeId));
-  }
-
-  /**
-   * The refine comparison for one order, on the same on-open pattern as
-   * `ensureHistoryLoaded`.
-   *
-   * Keyed by station AND item, not by item alone: the material prices are the
-   * ones at THIS station, and the same item held at two stations refines into
-   * materials worth different amounts. Left uncached on failure so the next
-   * open retries. An item with no reprocessing entry caches an empty
-   * materials list rather than retrying forever — "this refines into nothing"
-   * is an answer.
-   */
-  function ensureReprocessingLoaded(locationId: number, typeId: number) {
-    void reprocessingCache.load(stationPriceKey(locationId, typeId), async () => {
-      const map = await loadReprocessing();
-      const entry = map[String(typeId)] ?? { portionSize: 1, materials: [] };
-      const materialTypeIds = entry.materials.map((m) => m.typeID);
-      const materialPrices: Record<number, number> = {};
-      if (materialTypeIds.length > 0) {
-        const prices = await loadStationBestPrices([
-          { stationId: locationId, typeIds: materialTypeIds },
-        ]);
-        for (const materialTypeId of materialTypeIds) {
-          // The best BUY order: this exit sells the materials into orders
-          // that already exist, rather than listing them and waiting.
-          const buyMax = prices.get(stationPriceKey(locationId, materialTypeId))?.buyMax;
-          if (buyMax !== null && buyMax !== undefined) materialPrices[materialTypeId] = buyMax;
-        }
-      }
-      return { entry, materialPrices };
-    });
-  }
-
-  /**
-   * What every trade hub bids for the opened order's item, on the same
-   * on-open pattern as the refine comparison. Queried per hub STATION, not
-   * per region: a buy order elsewhere in the hub's region carries a range
-   * this app does not read and may not reach the hub at all, the same
-   * restriction `orderExits` applies to the player's own station.
-   */
-  function ensureHubPricesLoaded(typeId: number) {
-    void hubPricesCache.load(typeId, async () => {
-      const prices = await loadStationBestPrices(
-        TRADE_HUBS.map((hub) => ({ stationId: hub.stationId, typeIds: [typeId] }))
-      );
-      const byHub: Record<string, number | null> = {};
-      for (const hub of TRADE_HUBS) {
-        byHub[hub.id] = prices.get(stationPriceKey(hub.stationId, typeId))?.buyMax ?? null;
-      }
-      return byHub;
-    });
-  }
-
   const deepCompetitionByOrderId = useMemo(() => {
     const m = new Map<number, { competitors: readonly CompetingOrder[]; truncated: boolean }>();
     if (!snapshot) return m;
     for (const entry of snapshot.openOrders.entries) {
       for (const order of entry.orders) {
-        const rc = deepCache.byKey.get(itemKey(order.region_id, order.type_id));
+        const rc = orderDetail.caches.regionBooks.get(itemKey(order.region_id, order.type_id));
         if (rc) m.set(order.order_id, { competitors: rc.competitors, truncated: rc.truncated });
       }
     }
     return m;
-  }, [snapshot, deepCache.byKey]);
+  }, [snapshot, orderDetail.caches.regionBooks]);
 
   const stationNames = useMemo(() => {
     const m = new Map<number, string>();
@@ -390,14 +229,14 @@ export function OpenOrdersPanel() {
       costBases: snapshot.costBases,
       walletBasisGaps: snapshot.walletBasisGaps,
       deepCompetition: deepCompetitionByOrderId,
-      structureCompetition: structureCache.byKey,
+      structureCompetition: orderDetail.caches.structureBooks,
       stationNames,
       problemSamples: snapshot.problemSamples,
       skillsByCharacter: snapshot.skillsByCharacter,
       standingsByOrder: snapshot.standingsByOrder,
       now: snapshot.now,
     });
-  }, [snapshot, deepCompetitionByOrderId, structureCache.byKey, stationNames]);
+  }, [snapshot, deepCompetitionByOrderId, orderDetail.caches.structureBooks, stationNames]);
 
   /**
    * The highlighted row, found across every group before any fold/filter
@@ -508,63 +347,6 @@ export function OpenOrdersPanel() {
   const detailRow =
     detailOrderId !== null ? (allRows.find((r) => r.orderId === detailOrderId) ?? null) : null;
 
-  // Region jumps for the currently open row's region rival, once one exists.
-  // No dedup check needed here beyond `jumpsCache.load`'s own — see its doc
-  // comment for why that's synchronous and burst-safe on its own.
-  useEffect(() => {
-    if (!detailRow || !snapshot) return;
-    const rival = detailRow.deepUndercut?.byScope.region;
-    if (!rival) return;
-    const mySystemId = snapshot.npcStations.get(detailRow.locationId)?.systemId;
-    if (mySystemId === undefined) return;
-    const pairKey = `${mySystemId}:${rival.systemId}`;
-    void jumpsCache.load(pairKey, () => loadJumpsBetween(mySystemId, rival.systemId));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `jumpsCache.load` is stable for the life of the `useLazyRowCache` call; `jumpsCache` itself is a fresh object every render (its `byKey` changes on every fetch), so depending on it would run this effect on every render instead of only when `detailRow`/`snapshot` change.
-  }, [detailRow, snapshot, jumpsCache.load]);
-
-  // Distance from the opened order to every trade hub. Routes only: a hub's
-  // price stands on its own where the origin system is unknown (a player
-  // structure), so the rows render with the distance blank rather than not
-  // at all. Five pairs, fired in one pass — `jumpsCache.load`'s own
-  // synchronous dedup is what keeps that from re-asking for a route already
-  // requested this pass, once an earlier one resolves and re-triggers this
-  // effect (see its doc comment).
-  useEffect(() => {
-    if (!detailRow || !snapshot) return;
-    const mySystemId = snapshot.npcStations.get(detailRow.locationId)?.systemId;
-    if (mySystemId === undefined) return;
-    for (const hub of TRADE_HUBS) {
-      const pairKey = `${mySystemId}:${hub.systemId}`;
-      void jumpsCache.load(pairKey, () => loadJumpsBetween(mySystemId, hub.systemId));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- see the disable above: `jumpsCache.load` alone is the stable part.
-  }, [detailRow, snapshot, jumpsCache.load]);
-
-  /**
-   * The currently open row's structure market book (issue #538), once its
-   * location is confirmed a player structure. An EFFECT, not a one-shot call
-   * from `openDetails`: the NPC-station lookup can still be loading (or have
-   * failed) the moment a row is clicked — `stationsLoaded` false at that
-   * instant — and only resolve afterward, on a later snapshot. Keying off
-   * `detailRow`/`snapshot` means this re-evaluates whenever either changes,
-   * including a background refresh landing while the modal stays open,
-   * rather than being stuck with nothing left to retry it (the region
-   * "Check deeper" button may already be hidden by then, since `deep` can
-   * have resolved independently in the meantime).
-   *
-   * `snapshot` changes on ANY unrelated ESI cache revalidating elsewhere in
-   * the app, not just this page's own poll (`useRouteSnapshot`'s app-wide
-   * listener) — so this effect fires far more often than "this row's data
-   * changed." That's fine: `ensureStructureChecked`'s `sticky` load makes
-   * every re-fire after the first a no-op, which is what stops a permanently
-   * ACL-denied structure from being retried forever.
-   */
-  useEffect(() => {
-    if (!detailRow || !snapshot?.stationsLoaded) return;
-    if (detailRow.stationName !== null) return;
-    ensureStructureChecked(detailRow.characterId, detailRow.locationId);
-  }, [detailRow, snapshot, ensureStructureChecked]);
-
   if (!hydrated) {
     return (
       <div className="flex justify-center py-16">
@@ -599,36 +381,9 @@ export function OpenOrdersPanel() {
     .map((r) => ordersByOrderId.get(r.orderId))
     .filter((o): o is MarketOrder => o !== undefined);
 
+  // The modal loads what the order needs as it opens (`useOpenOrderDetail`).
   function openDetails(row: OpenOrderRow) {
     setDetailOrderId(row.orderId);
-    ensureDeepChecked(row.regionId, row.typeId);
-    ensureHistoryLoaded(row.regionId, row.typeId);
-    ensureReprocessingLoaded(row.locationId, row.typeId);
-    ensureHubPricesLoaded(row.typeId);
-    // The structure market fetch (issue #538) is NOT triggered here — see
-    // the effect below keyed off `detailRow`/`snapshot`, which also covers
-    // `stationsLoaded` resolving after this click.
-  }
-
-  /**
-   * Fans out over the group's DISTINCT items (not rows — several characters
-   * can each hold an order on the same item) at most `ESI_FANOUT_CONCURRENCY`
-   * at a time, rather than firing every region-book fetch in the group at
-   * once: a large "expiring or stale" group can easily hold dozens of
-   * distinct items.
-   */
-  function checkGroupDeeper(rows: readonly OpenOrderRow[]) {
-    const seen = new Set<string>();
-    const uniqueRows: OpenOrderRow[] = [];
-    for (const row of rows) {
-      const key = itemKey(row.regionId, row.typeId);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      uniqueRows.push(row);
-    }
-    void mapWithConcurrencyLimit(uniqueRows, ESI_FANOUT_CONCURRENCY, (row) =>
-      loadDeepIfNeeded(row.regionId, row.typeId)
-    );
   }
 
   /** `CharacterFilterControl`'s `value` prop, derived the same way from either `filter.characterIds` (desktop strip) or `draft.characterIds` (phone funnel sheet). */
@@ -1180,7 +935,7 @@ export function OpenOrdersPanel() {
                             variant="plain"
                             icon={<Icon.Refresh />}
                             label={t('market.orders.checkDeeper')}
-                            onClick={() => checkGroupDeeper(group.rows)}
+                            onClick={() => orderDetail.checkDeeper(group.rows)}
                           />
                         )}
                       </span>
@@ -1243,61 +998,9 @@ export function OpenOrdersPanel() {
           // state resets) between orders, rather than reusing one instance
           // across every row (issue #1428).
           key={detailRow.orderId}
-          open={detailOrderId !== null}
           row={detailRow}
-          skills={snapshot.skillsByCharacter.get(detailRow.characterId)}
-          deep={deepCache.byKey.get(itemKey(detailRow.regionId, detailRow.typeId)) ?? null}
-          loadingDeep={deepCache.loadingKeys.has(itemKey(detailRow.regionId, detailRow.typeId))}
-          history={historyCache.byKey.get(itemKey(detailRow.regionId, detailRow.typeId)) ?? null}
-          stationChecked={snapshot.stationPrices.has(
-            stationPriceKey(detailRow.locationId, detailRow.typeId)
-          )}
-          stationsLoaded={snapshot.stationsLoaded}
-          regionJumps={(() => {
-            const rival = detailRow.deepUndercut?.byScope.region;
-            const mySystemId = snapshot.npcStations.get(detailRow.locationId)?.systemId;
-            if (!rival || mySystemId === undefined) return undefined;
-            return jumpsCache.byKey.get(`${mySystemId}:${rival.systemId}`);
-          })()}
-          stationNameFor={(locationId) => snapshot.npcStations.get(locationId)?.name ?? null}
-          structureMarket={structureCache.byKey.get(detailRow.locationId) ?? null}
-          reprocessing={((): ReprocessingInput | undefined => {
-            const loaded = reprocessingCache.byKey.get(
-              stationPriceKey(detailRow.locationId, detailRow.typeId)
-            );
-            const skills = snapshot.skillsByCharacter.get(detailRow.characterId);
-            if (!loaded || !skills) return undefined;
-            return {
-              entry: loaded.entry,
-              materialPrices: loaded.materialPrices,
-              modifiers: skills.modifiers,
-            };
-          })()}
-          hubs={((): readonly HubBuyPrice[] | undefined => {
-            const byHub = hubPricesCache.byKey.get(detailRow.typeId);
-            if (!byHub) return undefined;
-            const mySystemId = snapshot.npcStations.get(detailRow.locationId)?.systemId;
-            return TRADE_HUBS.map((hub) => ({
-              hubId: hub.id,
-              systemName: hub.systemName,
-              stationId: hub.stationId,
-              buyMax: byHub[hub.id] ?? null,
-              jumps:
-                mySystemId === undefined
-                  ? undefined
-                  : jumpsCache.byKey.get(`${mySystemId}:${hub.systemId}`),
-            }));
-          })()}
-          hubsFailed={hubPricesCache.failedKeys.has(detailRow.typeId)}
-          onCheckDeeper={() => {
-            ensureDeepChecked(detailRow.regionId, detailRow.typeId);
-            if (detailRow.stationName === null && snapshot.stationsLoaded) {
-              // Manual retry forces a new attempt past the sticky gate,
-              // unlike the automatic effect above.
-              structureCache.reset(detailRow.locationId);
-              ensureStructureChecked(detailRow.characterId, detailRow.locationId);
-            }
-          }}
+          snapshot={snapshot}
+          detail={orderDetail}
           onClose={() => setDetailOrderId(null)}
         />
       )}
