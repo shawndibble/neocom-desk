@@ -459,7 +459,10 @@ const EntryRow = memo(function EntryRow({
         {boosted && <BoosterMark />}
         {alphaCapped && <AlphaCapMark />}
       </span>
-      {milestoneStatus && <MilestoneMark status={milestoneStatus} />}
+      {/* Desktop keeps the mark on line one (#114's fixed columns leave it
+          room); below `md` it moves to the meta line instead, so a long
+          milestone name can't squeeze the skill name off this row. */}
+      {isDesktop && milestoneStatus && <MilestoneMark status={milestoneStatus} />}
     </span>
   );
 
@@ -507,7 +510,11 @@ const EntryRow = memo(function EntryRow({
    * back to a single line when the user turns every optional column off.
    */
   const metaLine =
-    attributeBadge || priorityControl || columns.perLevelTime || columns.cumulativeTime ? (
+    attributeBadge ||
+    priorityControl ||
+    columns.perLevelTime ||
+    columns.cumulativeTime ||
+    milestoneStatus ? (
       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-6 text-[0.6875rem] text-text-dim">
         {attributeBadge}
         {priorityControl}
@@ -520,6 +527,7 @@ const EntryRow = memo(function EntryRow({
             value={doneByText(row.cumulativeSeconds, startDate)}
           />
         )}
+        {milestoneStatus && <MilestoneMark status={milestoneStatus} />}
       </div>
     ) : null;
 
