@@ -35,7 +35,7 @@ import { toggleFilterMember } from '@/lib/multiSelectFilter';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, type UrlParamCodec } from '@/lib/urlState';
 import type { TradeHub } from '@/market/hubs';
-import type { PayeeRecord } from '@/db';
+import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import {
@@ -126,6 +126,48 @@ function labelForLinkedRef(
     mp.amount === null ? t('miningTax.linkPaymentInKind') : `${formatIsk(mp.amount)} ISK`;
   const label = mp.label || t('miningTax.linkPaymentUntitledContract');
   return `${amount} · ${mp.date.slice(0, 10)} — ${label}`;
+}
+
+/** The dedup'd `LinkedTransaction[]` across `assignments`' payments — the same shape whether it's one row's shared-payment group or a joined group's members. */
+function linkedTransactionsFor(
+  assignments: readonly MiningTaxAssignmentRecord[],
+  madePayments: readonly MadePayment[],
+  t: TFunction
+): LinkedTransaction[] {
+  const seen = new Set<string>();
+  const out: LinkedTransaction[] = [];
+  for (const a of assignments) {
+    if (!a.payment) continue;
+    for (const kind of ['journal', 'contract'] as const) {
+      for (const l of (kind === 'journal' ? a.payment.journalLinks : a.payment.contractLinks) ??
+        []) {
+        const key = `${kind}:${l.refId}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({
+          kind,
+          refId: l.refId,
+          source: l.source,
+          label: labelForLinkedRef(madePayments, t, kind, l.refId),
+        });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Every Assignment a "Link transaction" action on `dr` should apply to:
+ * every member of a joined group at once (issue #540 follow-up — a joined
+ * group is billed as one obligation, so a linked transaction covers all of
+ * it), or the single row's own shared-`paymentId` group otherwise.
+ */
+function assignmentsForLinkTarget(
+  dr: DisplayRow,
+  everyAssignment: readonly MiningTaxAssignmentRecord[]
+): MiningTaxAssignmentRecord[] {
+  if (dr.groupMembers) return allMembers(dr).map((m) => m.assignment);
+  return dr.assignment ? assignmentsSharingPayment(dr.assignment, everyAssignment) : [];
 }
 
 const ALL_STATUSES: readonly MiningTaxRowStatus[] = [
@@ -736,30 +778,25 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   }
 
   const detailLinkedTransactions: LinkedTransaction[] | undefined = useMemo(() => {
-    const payment = detailTarget?.assignment?.payment;
-    if (!payment) return undefined;
-    return [
-      ...(payment.journalLinks ?? []).map((l): LinkedTransaction => ({
-        kind: 'journal',
-        refId: l.refId,
-        source: l.source,
-        label: labelForLinkedRef(madePayments, t, 'journal', l.refId),
-      })),
-      ...(payment.contractLinks ?? []).map((l): LinkedTransaction => ({
-        kind: 'contract',
-        refId: l.refId,
-        source: l.source,
-        label: labelForLinkedRef(madePayments, t, 'contract', l.refId),
-      })),
-    ];
+    if (!detailTarget?.assignment?.payment) return undefined;
+    return linkedTransactionsFor([detailTarget.assignment], madePayments, t);
+  }, [detailTarget, madePayments, t]);
+
+  const groupLinkedTransactions: LinkedTransaction[] | undefined = useMemo(() => {
+    if (!detailTarget?.groupMembers) return undefined;
+    return linkedTransactionsFor(
+      allMembers(detailTarget).map((m) => m.assignment),
+      madePayments,
+      t
+    );
   }, [detailTarget, madePayments, t]);
 
   async function handleUnlinkTransactionFromDetail(transaction: LinkedTransaction) {
-    if (!detailTarget?.assignment) return;
+    if (!detailTarget) return;
     setBusy(true);
     try {
       await unlinkPaymentTransaction(
-        assignmentsSharingPayment(detailTarget.assignment, everyAssignment),
+        assignmentsForLinkTarget(detailTarget, everyAssignment),
         transaction.kind === 'journal'
           ? { journalRefId: transaction.refId }
           : { contractId: transaction.refId }
@@ -779,12 +816,21 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     );
   }, [linkTransactionTarget, madePayments, everyAssignment]);
 
+  const linkTransactionTargetAmount = useMemo(() => {
+    if (!linkTransactionTarget) return 0;
+    const targets = assignmentsForLinkTarget(linkTransactionTarget, everyAssignment);
+    const existing = targets.map((a) => a.payment?.amount).find((amount) => amount !== undefined);
+    return existing ?? targets.reduce((sum, a) => sum + a.taxOwed, 0);
+  }, [linkTransactionTarget, everyAssignment]);
+
   async function handleConfirmLinkTransaction(payment: MadePayment, source: 'auto' | 'manual') {
-    if (!linkTransactionTarget?.assignment) return;
+    if (!linkTransactionTarget) return;
+    const targets = assignmentsForLinkTarget(linkTransactionTarget, everyAssignment);
+    if (targets.length === 0) return;
     setBusy(true);
     try {
       await linkPaymentTransaction(
-        assignmentsSharingPayment(linkTransactionTarget.assignment, everyAssignment),
+        targets,
         payment.kind === 'journal'
           ? { journalRefId: payment.refId }
           : { contractId: payment.refId },
@@ -1492,6 +1538,13 @@ export function TaxTab({ tabBar }: TaxTabProps) {
             })
           }
           onMarkAllPaid={() => void handleMarkGroupPaidFromDetail()}
+          linkedTransactions={groupLinkedTransactions}
+          onLinkTransaction={
+            allMembers(detailTarget).every((m) => m.assignment.status === 'paid')
+              ? () => setLinkTransactionTarget(detailTarget)
+              : undefined
+          }
+          onUnlinkTransaction={(tx) => void handleUnlinkTransactionFromDetail(tx)}
         />
       )}
 
@@ -1544,19 +1597,17 @@ export function TaxTab({ tabBar }: TaxTabProps) {
         />
       )}
 
-      {linkTransactionTarget && linkTransactionTarget.assignment && (
-        <LinkTransactionDialog
-          open
-          onClose={() => setLinkTransactionTarget(null)}
-          candidates={linkTransactionCandidates}
-          targetAmount={
-            linkTransactionTarget.assignment.payment?.amount ??
-            linkTransactionTarget.assignment.taxOwed
-          }
-          busy={busy}
-          onConfirm={(payment, source) => void handleConfirmLinkTransaction(payment, source)}
-        />
-      )}
+      {linkTransactionTarget &&
+        assignmentsForLinkTarget(linkTransactionTarget, everyAssignment).length > 0 && (
+          <LinkTransactionDialog
+            open
+            onClose={() => setLinkTransactionTarget(null)}
+            candidates={linkTransactionCandidates}
+            targetAmount={linkTransactionTargetAmount}
+            busy={busy}
+            onConfirm={(payment, source) => void handleConfirmLinkTransaction(payment, source)}
+          />
+        )}
 
       {splitTarget && splitTarget.assignment && data && (
         <SplitDialog
