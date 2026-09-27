@@ -150,7 +150,12 @@ export function PlanHeader({
             label={t('plans.milestone.next')}
             value={
               <>
-                {nextMilestone.name}{' '}
+                <span
+                  title={nextMilestone.name}
+                  className="inline-block max-w-[8rem] overflow-hidden text-ellipsis whitespace-nowrap align-bottom md:max-w-none md:overflow-visible"
+                >
+                  {nextMilestone.name}
+                </span>{' '}
                 <span className="text-text-dim">{formatLocalDate(nextMilestone.finish)}</span>
               </>
             }

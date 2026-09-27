@@ -4,6 +4,7 @@ import {
   activeFilterCount,
   EMPTY_OPEN_ORDERS_FILTER,
   filterOpenOrders,
+  locationFilterOptions,
   openOrdersHref,
   OPEN_ORDERS_FILTER_PARAMS,
   sortOpenOrders,
@@ -91,6 +92,19 @@ describe('filterOpenOrders', () => {
       )
     ).toEqual([2]);
     expect(filterOpenOrders(rows, { ...EMPTY_OPEN_ORDERS_FILTER, characterIds: [] })).toEqual(rows);
+  });
+
+  it('filters by locationIds, empty meaning every location', () => {
+    const rows = [
+      makeRow({ orderId: 1, locationId: 60003760 }),
+      makeRow({ orderId: 2, locationId: 60008494 }),
+    ];
+    expect(
+      filterOpenOrders(rows, { ...EMPTY_OPEN_ORDERS_FILTER, locationIds: [60008494] }).map(
+        (r) => r.orderId
+      )
+    ).toEqual([2]);
+    expect(filterOpenOrders(rows, { ...EMPTY_OPEN_ORDERS_FILTER, locationIds: [] })).toEqual(rows);
   });
 
   it("filters by problems against the row's problems array (overlap-honest)", () => {
@@ -190,6 +204,33 @@ describe('filterOpenOrders', () => {
   });
 });
 
+describe('locationFilterOptions', () => {
+  const unknownLabel = (id: number) => `Unknown structure #${id}`;
+
+  it('produces one option per distinct locationId, alphabetised by name', () => {
+    const rows = [
+      makeRow({ orderId: 1, locationId: 2, stationName: 'Rens VI' }),
+      makeRow({ orderId: 2, locationId: 1, stationName: 'Amarr VIII' }),
+      makeRow({ orderId: 3, locationId: 1, stationName: 'Amarr VIII' }),
+    ];
+    expect(locationFilterOptions(rows, unknownLabel)).toEqual([
+      { locationId: 1, label: 'Amarr VIII' },
+      { locationId: 2, label: 'Rens VI' },
+    ]);
+  });
+
+  it('names an unresolved structure (null stationName) with the fallback', () => {
+    const rows = [makeRow({ orderId: 1, locationId: 1000000123456, stationName: null })];
+    expect(locationFilterOptions(rows, unknownLabel)).toEqual([
+      { locationId: 1000000123456, label: 'Unknown structure #1000000123456' },
+    ]);
+  });
+
+  it('is empty for no rows', () => {
+    expect(locationFilterOptions([], unknownLabel)).toEqual([]);
+  });
+});
+
 describe('sortOpenOrders', () => {
   it('never mutates its input', () => {
     const rows = [makeRow({ orderId: 2 }), makeRow({ orderId: 1 })];
@@ -265,19 +306,30 @@ describe('activeFilterChips / activeFilterCount', () => {
     const filter: OpenOrdersFilter = {
       ...EMPTY_OPEN_ORDERS_FILTER,
       characterIds: [1, 2],
+      locationIds: [60003760],
       problems: ['belowFloor', 'outbid'],
     };
     const chips = activeFilterChips(filter);
     const ids = chips.map((c) => c.id);
     expect(ids).toEqual(
-      expect.arrayContaining(['character:1', 'character:2', 'problem:belowFloor', 'problem:outbid'])
+      expect.arrayContaining([
+        'character:1',
+        'character:2',
+        'location:60003760',
+        'problem:belowFloor',
+        'problem:outbid',
+      ])
     );
     expect(new Set(ids).size).toBe(ids.length);
 
     const characterChip = chips.find((c) => c.id === 'character:1')!;
     const cleared = characterChip.clear(filter);
     expect(cleared.characterIds).toEqual([2]);
+    expect(cleared.locationIds).toEqual([60003760]);
     expect(cleared.problems).toEqual(['belowFloor', 'outbid']);
+
+    const locationChip = chips.find((c) => c.id === 'location:60003760')!;
+    expect(locationChip.clear(filter).locationIds).toEqual([]);
   });
 
   it('clear on each scalar chip removes only that constraint', () => {
@@ -285,6 +337,7 @@ describe('activeFilterChips / activeFilterCount', () => {
       text: 'trit',
       side: 'buy',
       characterIds: [1],
+      locationIds: [60003760],
       problems: ['outbid'],
       expiringWithinDays: 7,
       costBasis: 'linked',
@@ -294,7 +347,7 @@ describe('activeFilterChips / activeFilterCount', () => {
     };
     const chips = activeFilterChips(filter);
     // Every constraint present should have produced a chip.
-    expect(chips.length).toBe(8);
+    expect(chips.length).toBe(9);
 
     for (const chip of chips) {
       const cleared = chip.clear(filter);
@@ -312,6 +365,10 @@ describe('activeFilterChips / activeFilterCount', () => {
         case 'character:1':
           expect(cleared.characterIds).toEqual([]);
           delete untouched.characterIds;
+          break;
+        case 'location:60003760':
+          expect(cleared.locationIds).toEqual([]);
+          delete untouched.locationIds;
           break;
         case 'problem:outbid':
           expect(cleared.problems).toEqual([]);
@@ -386,6 +443,13 @@ describe('the deep-link vocabulary', () => {
 
   it('reads a comma-separated characters param, sorted', () => {
     expect(charactersCodec.parse('91,42')).toEqual([42, 91]);
+  });
+
+  it('reads a comma-separated locations param, sorted', () => {
+    const locationsCodec = OPEN_ORDERS_FILTER_PARAMS['orders.locations'] as UrlParamCodec<
+      readonly number[]
+    >;
+    expect(locationsCodec.parse('60008494,60003760')).toEqual([60003760, 60008494]);
   });
 
   /*

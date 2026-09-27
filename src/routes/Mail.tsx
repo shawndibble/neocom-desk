@@ -835,31 +835,33 @@ export function Mail() {
                 ) : undefined
               }
               actions={
-                <div className="flex items-center gap-2">
-                  {selectedHeader !== null && composeKind === null && (
-                    <>
-                      <IconButton
-                        ref={replyButtonRef}
-                        icon={<Icon.MailReply size={Icon.ICON_SIZE.sm} />}
-                        label={t('mail.reply')}
-                        size="sm"
-                        onClick={() => openCompose('reply', selectedHeader.mail_id)}
-                      />
-                      <IconButton
-                        ref={forwardButtonRef}
-                        icon={<Icon.MailForward size={Icon.ICON_SIZE.sm} />}
-                        label={t('mail.forward')}
-                        size="sm"
-                        onClick={() => openCompose('forward', selectedHeader.mail_id)}
-                      />
-                    </>
-                  )}
-                  {showBackControl && (
-                    <Button size="sm" onClick={handleBackToList}>
-                      {t('mail.backToList')}
-                    </Button>
-                  )}
-                </div>
+                (selectedHeader !== null && composeKind === null) || showBackControl ? (
+                  <div className="flex items-center gap-2">
+                    {selectedHeader !== null && composeKind === null && (
+                      <>
+                        <IconButton
+                          ref={replyButtonRef}
+                          icon={<Icon.MailReply size={Icon.ICON_SIZE.sm} />}
+                          label={t('mail.reply')}
+                          size="row"
+                          onClick={() => openCompose('reply', selectedHeader.mail_id)}
+                        />
+                        <IconButton
+                          ref={forwardButtonRef}
+                          icon={<Icon.MailForward size={Icon.ICON_SIZE.sm} />}
+                          label={t('mail.forward')}
+                          size="row"
+                          onClick={() => openCompose('forward', selectedHeader.mail_id)}
+                        />
+                      </>
+                    )}
+                    {showBackControl && (
+                      <Button size="sm" onClick={handleBackToList}>
+                        {t('mail.backToList')}
+                      </Button>
+                    )}
+                  </div>
+                ) : undefined
               }
             >
               {selectedId === null ? (

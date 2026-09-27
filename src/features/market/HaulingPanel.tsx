@@ -15,9 +15,12 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   Checkbox,
+  ColumnPickerMenu,
   DataTable,
   DataAgeBadge,
   EmptyState,
+  FilterBar,
+  FilterField,
   IconButton,
   Panel,
   Select,
@@ -42,9 +45,14 @@ import {
 import type { HaulingFlag } from '@/engine/market/haulingMarket';
 import { formatIsk, formatIskCompact } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
+import { createColumnVisibilitySetting, useColumnVisibility } from '@/lib/columnVisibility';
 import { createLocalSetting } from '@/lib/useLocalSetting';
 import { enumParam, intParam } from '@/lib/urlState';
-import { useUrlParams } from '@/lib/useUrlState';
+import {
+  useRememberedUrlParams,
+  type RememberedDefaults,
+  type UrlParamValues,
+} from '@/lib/useUrlState';
 import { TRADE_HUBS, type TradeHub } from '@/market/hubs';
 import { loadMarketGroups } from '@/sde/loadMarketSde';
 import type { MarketGroupNode } from '@/sde/marketTypes';
@@ -53,6 +61,12 @@ import { HAULING_THRESHOLDS } from '@/engine/market/haulingMarket';
 import { HaulingCargoControl } from './HaulingCargoControl';
 import { HaulingRowDetail } from './HaulingRowDetail';
 import { useHaulingBudget, useHaulingCargo } from './haulingCargo';
+import {
+  DEFAULT_HAULING_FILTER,
+  useHaulingFilterPref,
+  type HaulingDemandFilter,
+  type StoredHaulingFilter,
+} from './haulingFilterPref';
 import { ItemContextMenu } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
 import {
@@ -76,9 +90,9 @@ const MARGIN_CHOICES = [0, 3, 5, 10] as const;
 
 const HAULING_URL_FILTERS = {
   cat: intParam(DEFAULT_HAULING_CATEGORY_ID),
-  days: intParam(14, { min: 0, max: 365 }),
-  margin: intParam(3, { min: 0, max: 100 }),
-  demand: enumParam(['steady', 'any'] as const, 'steady'),
+  days: intParam(DEFAULT_HAULING_FILTER.days, { min: 0, max: 365 }),
+  margin: intParam(DEFAULT_HAULING_FILTER.margin, { min: 0, max: 100 }),
+  demand: enumParam(['steady', 'any'] as const, DEFAULT_HAULING_FILTER.demand),
 };
 
 /** From/To default to the pilot's Trade Hub (`haulingHubs.ts`), so the schema is built per hub. */
@@ -91,9 +105,48 @@ function haulingUrl(hubId: TradeHub['id']) {
   };
 }
 
+type HaulingUrlValues = UrlParamValues<ReturnType<typeof haulingUrl>>;
+
+/**
+ * Lifts `days`/`margin`/`demand` off any wider object that carries them
+ * (`params`, the remembered-filter store's value) — the three travel
+ * together everywhere this filter is read, so this is the one place that
+ * reassembles them rather than each call site picking fields by hand.
+ */
+function pickHaulingFilter<T extends { days: number; margin: number; demand: HaulingDemandFilter }>(
+  source: T
+): StoredHaulingFilter {
+  return { days: source.days, margin: source.margin, demand: source.demand };
+}
+
 const useIntroDismissed = createLocalSetting<boolean>({
   key: 'haulingIntroDismissed',
   defaultValue: false,
+});
+
+/**
+ * The list's optional (non-identity) columns, for `ColumnPickerMenu`
+ * (issue: hauling toolbar redesign). `select`/`item` stay out of `ids` —
+ * hiding either loses the row's own identity or the multibuy checkbox.
+ */
+const HAULING_COLUMN_IDS = [
+  'buy',
+  'expected',
+  'margin',
+  'days',
+  'demand',
+  'flags',
+  'bring',
+] as const;
+type HaulingColumnId = (typeof HAULING_COLUMN_IDS)[number];
+
+function isHaulingColumnId(id: string): id is HaulingColumnId {
+  return (HAULING_COLUMN_IDS as readonly string[]).includes(id);
+}
+
+const useHaulingColumns = createColumnVisibilitySetting<HaulingColumnId>({
+  key: 'haulingColumns',
+  ids: HAULING_COLUMN_IDS,
 });
 
 const DEMAND_DOT: Record<HaulingViewRow['demand']['demand'], string> = {
@@ -121,10 +174,36 @@ export function HaulingPanel() {
     void hydrateDefaultHub();
   }, [hydrateDefaultHub]);
   const haulingSchema = useMemo(() => haulingUrl(defaultHubId), [defaultHubId]);
-  const [params, setParams] = useUrlParams(haulingSchema);
+
+  // The filter fields (days/margin/demand) are remembered across sessions
+  // (issue: hauling toolbar redesign) — a link's own value always wins, and
+  // an edit is written to both the URL and this store in the same call. See
+  // `haulingFilterPref.ts`.
+  const haulingFilterPref = useHaulingFilterPref((s) => s.value);
+  const hydrateHaulingFilterPref = useHaulingFilterPref((s) => s.hydrate);
+  useEffect(() => {
+    void hydrateHaulingFilterPref();
+  }, [hydrateHaulingFilterPref]);
+  const rememberedFilter: RememberedDefaults<ReturnType<typeof haulingUrl>> = useMemo(
+    () => ({
+      values: pickHaulingFilter(haulingFilterPref),
+      remember: (patch: Partial<HaulingUrlValues>) => {
+        const { value, setValue } = useHaulingFilterPref.getState();
+        void setValue({
+          days: patch.days ?? value.days,
+          margin: patch.margin ?? value.margin,
+          demand: patch.demand ?? value.demand,
+        });
+      },
+    }),
+    [haulingFilterPref]
+  );
+  const [params, setParams] = useRememberedUrlParams(haulingSchema, rememberedFilter);
   const from = hubFor(params.from);
   const to = hubFor(params.to);
   const categoryId = isHaulingCategoryId(params.cat) ? params.cat : DEFAULT_HAULING_CATEGORY_ID;
+
+  const columnVisibility = useColumnVisibility(useHaulingColumns, HAULING_COLUMN_IDS);
 
   const [groups, setGroups] = useState<MarketGroupNode[] | null>(null);
   useEffect(() => {
@@ -218,19 +297,21 @@ export function HaulingPanel() {
     shown.length > 0 && shown.every((r) => overrides.get(r.typeId)?.selected !== false);
   const selectedCount = shown.filter((r) => overrides.get(r.typeId)?.selected !== false).length;
 
-  const [copied, setCopied] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle');
   useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 2000);
+    if (copyStatus === 'idle') return;
+    const timer = setTimeout(() => setCopyStatus('idle'), 2000);
     return () => clearTimeout(timer);
-  }, [copied]);
+  }, [copyStatus]);
   const listText = multibuyText(plan.lines);
   async function copyMultibuy() {
     try {
       await writeToClipboard(listText);
-      setCopied(true);
+      setCopyStatus('copied');
     } catch {
-      // Clipboard refused: the list is on screen to copy by hand.
+      // Clipboard refused: the list is still on screen to copy by hand, but
+      // say so rather than leaving the button looking like it did nothing.
+      setCopyStatus('failed');
     }
   }
 
@@ -267,7 +348,7 @@ export function HaulingPanel() {
       header: '',
       headerClassName: 'w-8',
       className: 'w-8',
-      cardCorner: true,
+      cardCorner: 'start',
       render: (row) => (
         <Checkbox
           aria-label={t('market.hauling.selectRow', { item: row.name })}
@@ -417,6 +498,19 @@ export function HaulingPanel() {
     },
   ];
 
+  // Hideable columns only — `select` and `item` (the row's own identity)
+  // are always shown, so they're left out of the picker's catalog entirely.
+  const hideableColumnsById = Object.fromEntries(
+    columns
+      .filter((column): column is DataTableColumn<HaulingViewRow> & { id: HaulingColumnId } =>
+        isHaulingColumnId(column.id)
+      )
+      .map((column) => [column.id, column])
+  ) as Record<HaulingColumnId, DataTableColumn<HaulingViewRow>>;
+  const visibleColumns = columns.filter(
+    (column) => !isHaulingColumnId(column.id) || columnVisibility.isVisible(column.id)
+  );
+
   const heldPct =
     cargo !== null && cargo.m3 > 0 ? Math.min(100, (plan.totals.volumeM3 / cargo.m3) * 100) : null;
 
@@ -429,11 +523,18 @@ export function HaulingPanel() {
           ? t('market.hauling.plan.limitedSales')
           : null;
 
+  const activeFilterCount =
+    (params.days !== DEFAULT_HAULING_FILTER.days ? 1 : 0) +
+    (params.margin !== DEFAULT_HAULING_FILTER.margin ? 1 : 0) +
+    (params.demand !== DEFAULT_HAULING_FILTER.demand ? 1 : 0);
+  const filterValue = pickHaulingFilter(params);
+
   return (
     <Panel
       title={t('market.hauling.title')}
+      actionsFill
       actions={
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
           <HaulingCargoControl
             characterId={activeCharacterId}
             cargo={cargo}
@@ -444,55 +545,166 @@ export function HaulingPanel() {
           <Button size="sm" disabled={plan.totals.items === 0} onClick={() => void copyMultibuy()}>
             {t('market.hauling.copyMultibuy', { count: plan.totals.items })}
           </Button>
-        </div>
-      }
-      padded={false}
-    >
-      <div className="flex flex-wrap items-end gap-3 border-b border-line px-3 py-3">
-        <HubField
-          label={t('market.hauling.from')}
-          value={from.id}
-          onChange={(id) => setParams(pickHaulingHub({ from: from.id, to: to.id }, 'from', id))}
-        />
-        <span aria-hidden="true" className="pb-2 text-text-faint">
-          →
-        </span>
-        <HubField
-          label={t('market.hauling.to')}
-          value={to.id}
-          onChange={(id) => setParams(pickHaulingHub({ from: from.id, to: to.id }, 'to', id))}
-        />
-        <label className="flex flex-col gap-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
-          {t('market.hauling.category')}
-          <Select
-            value={String(categoryId)}
-            onValueChange={(value) => setParams({ cat: Number(value) })}
-          >
-            <SelectTrigger size="sm" aria-label={t('market.hauling.category')} className="w-52">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {HAULING_CATEGORY_IDS.map((id) => (
-                <SelectItem key={id} value={String(id)}>
-                  {categoryName(id)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-        <div className="flex-1" />
-        {state.status === 'ready' && (
           <span className="flex items-center gap-2">
-            <DataAgeBadge date={new Date(state.scan.fetchedAt)} />
+            {state.status === 'ready' && <DataAgeBadge date={new Date(state.scan.fetchedAt)} />}
             <IconButton
               size="sm"
               icon={<Icon.Refresh />}
               label={t('market.refresh')}
               onClick={refresh}
+              disabled={state.status !== 'ready'}
             />
           </span>
+        </div>
+      }
+      padded={false}
+    >
+      {/*
+        `search` is documented as the route's search box (DESIGN.md §4b) —
+        Hauling has none. It carries the From/To/Category controls instead,
+        a deliberate deviation: putting them in a sibling row alongside
+        `FilterBar` (rather than inside it) was tried first and rejected —
+        `FilterBar` manages its own two-line box (trigger row, then the
+        opened controls below), so a *shared* flex row either reflows the
+        siblings when the box opens (with `items-end`, cross-axis realigns
+        to the row's new height — the bug this render actually had) or, to
+        avoid that with `items-start`, leaves the icon-only trigger cluster
+        floating at label height instead of lined up with the selects below
+        them. Nesting these controls in `search` keeps everything in one
+        `items-center` row that `FilterBar` itself owns, so neither problem
+        exists — at the cost of the slot's own contract. No table in this
+        codebase has filters with no search box yet; if a second one shows
+        up, that's the signal to give `FilterBar` a real "leading toolbar"
+        slot instead of overloading `search` a second time.
+      */}
+      <FilterBar
+        value={filterValue}
+        onChange={(next) => setParams(next)}
+        activeCount={activeFilterCount}
+        title={t('market.hauling.filters.title')}
+        className="border-b border-line px-3 py-3"
+        search={
+          <>
+            <HubField
+              label={t('market.hauling.from')}
+              value={from.id}
+              onChange={(id) => setParams(pickHaulingHub({ from: from.id, to: to.id }, 'from', id))}
+            />
+            <span aria-hidden="true" className="text-text-faint">
+              →
+            </span>
+            <HubField
+              label={t('market.hauling.to')}
+              value={to.id}
+              onChange={(id) => setParams(pickHaulingHub({ from: from.id, to: to.id }, 'to', id))}
+            />
+            <label className="flex flex-col gap-1 text-[0.625rem] font-semibold tracking-widest text-text-dim uppercase">
+              {t('market.hauling.category')}
+              <Select
+                value={String(categoryId)}
+                onValueChange={(value) => setParams({ cat: Number(value) })}
+              >
+                <SelectTrigger size="sm" aria-label={t('market.hauling.category')} className="w-52">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {HAULING_CATEGORY_IDS.map((id) => (
+                    <SelectItem key={id} value={String(id)}>
+                      {categoryName(id)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+          </>
+        }
+        actions={
+          <ColumnPickerMenu
+            available={HAULING_COLUMN_IDS}
+            visible={columnVisibility.visible}
+            columnsById={hideableColumnsById}
+            onToggle={columnVisibility.toggle}
+            onReset={columnVisibility.reset}
+            resetLabel={t('common.resetColumns')}
+            buttonLabel={t('common.columnsButton')}
+            menuTitle={t('common.columnsMenuTitle')}
+            size="sm"
+          />
+        }
+      >
+        {(draft, setDraft) => (
+          <>
+            <FilterField label={t('market.hauling.filters.sellsWithin')}>
+              <Select
+                value={String(draft.days)}
+                onValueChange={(v) => setDraft({ ...draft, days: Number(v) })}
+              >
+                <SelectTrigger
+                  size="sm"
+                  aria-label={t('market.hauling.filters.sellsWithin')}
+                  className="w-28"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DAY_CHOICES.map((d) => (
+                    <SelectItem key={d} value={String(d)}>
+                      {d === 0
+                        ? t('market.hauling.filters.anyTime')
+                        : t('market.hauling.filters.days', { count: d })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label={t('market.hauling.filters.marginOver')}>
+              <Select
+                value={String(draft.margin)}
+                onValueChange={(v) => setDraft({ ...draft, margin: Number(v) })}
+              >
+                <SelectTrigger
+                  size="sm"
+                  aria-label={t('market.hauling.filters.marginOver')}
+                  className="w-24"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MARGIN_CHOICES.map((m) => (
+                    <SelectItem key={m} value={String(m)}>
+                      {m}%
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <FilterField label={t('market.hauling.filters.demand')}>
+              <Select
+                value={draft.demand}
+                onValueChange={(v) => setDraft({ ...draft, demand: v as HaulingDemandFilter })}
+              >
+                <SelectTrigger
+                  size="sm"
+                  aria-label={t('market.hauling.filters.demand')}
+                  className="w-32"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="steady">{t('market.hauling.filters.steady')}</SelectItem>
+                  <SelectItem value="any">{t('market.hauling.filters.anyDemand')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </FilterField>
+            <p className="text-[0.6875rem] text-text-dim">
+              {t('market.hauling.feesLine', {
+                accounting: fees.accountingLevel,
+                broker: fees.brokerRelationsLevel,
+              })}
+            </p>
+          </>
         )}
-      </div>
+      </FilterBar>
 
       {!introDismissed && (
         <div className="flex items-start justify-between gap-3 border-b border-accent-dim bg-accent/10 px-3 py-2 text-sm">
@@ -530,81 +742,6 @@ export function HaulingPanel() {
         />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
-            <label className="flex items-center gap-2 text-xs text-text-dim">
-              {t('market.hauling.filters.sellsWithin')}
-              <Select
-                value={String(params.days)}
-                onValueChange={(v) => setParams({ days: Number(v) })}
-              >
-                <SelectTrigger
-                  size="sm"
-                  aria-label={t('market.hauling.filters.sellsWithin')}
-                  className="w-28"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DAY_CHOICES.map((d) => (
-                    <SelectItem key={d} value={String(d)}>
-                      {d === 0
-                        ? t('market.hauling.filters.anyTime')
-                        : t('market.hauling.filters.days', { count: d })}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-            <label className="flex items-center gap-2 text-xs text-text-dim">
-              {t('market.hauling.filters.marginOver')}
-              <Select
-                value={String(params.margin)}
-                onValueChange={(v) => setParams({ margin: Number(v) })}
-              >
-                <SelectTrigger
-                  size="sm"
-                  aria-label={t('market.hauling.filters.marginOver')}
-                  className="w-24"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MARGIN_CHOICES.map((m) => (
-                    <SelectItem key={m} value={String(m)}>
-                      {m}%
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </label>
-            <label className="flex items-center gap-2 text-xs text-text-dim">
-              {t('market.hauling.filters.demand')}
-              <Select
-                value={params.demand}
-                onValueChange={(v) => setParams({ demand: v as 'steady' | 'any' })}
-              >
-                <SelectTrigger
-                  size="sm"
-                  aria-label={t('market.hauling.filters.demand')}
-                  className="w-32"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="steady">{t('market.hauling.filters.steady')}</SelectItem>
-                  <SelectItem value="any">{t('market.hauling.filters.anyDemand')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </label>
-            <div className="flex-1" />
-            <span className="text-[0.6875rem] text-text-dim">
-              {t('market.hauling.feesLine', {
-                accounting: fees.accountingLevel,
-                broker: fees.brokerRelationsLevel,
-              })}
-            </span>
-          </div>
-
           {shown.length === 0 ? (
             <EmptyState
               title={t('market.hauling.emptyTitle')}
@@ -619,10 +756,7 @@ export function HaulingPanel() {
                   : t('market.hauling.emptyHint', { scanned: state.scan.scanned })
               }
               action={
-                <Button
-                  size="sm"
-                  onClick={() => setParams({ days: 14, margin: 3, demand: 'steady' })}
-                >
+                <Button size="sm" onClick={() => setParams(DEFAULT_HAULING_FILTER)}>
                   {t('common.resetFilters')}
                 </Button>
               }
@@ -636,7 +770,7 @@ export function HaulingPanel() {
                   tone={plan.totals.profit > 0 ? 'success' : 'default'}
                 />
                 <StatChip
-                  label={t('market.hauling.plan.spend', { hub: from.systemName })}
+                  label={t('market.hauling.plan.spend')}
                   value={formatIskCompact(plan.totals.cost)}
                 />
                 <StatChip label={t('market.hauling.plan.items')} value={plan.totals.items} />
@@ -695,7 +829,7 @@ export function HaulingPanel() {
 
               <DataTable
                 label={t('market.hauling.title')}
-                columns={columns}
+                columns={visibleColumns}
                 rows={shown}
                 rowKey={(row) => row.typeId}
                 density="compact"
@@ -757,7 +891,8 @@ export function HaulingPanel() {
           )}
         </>
       )}
-      {copied && <Toast message={t('market.hauling.copied')} />}
+      {copyStatus === 'copied' && <Toast message={t('market.hauling.copied')} />}
+      {copyStatus === 'failed' && <Toast message={t('market.hauling.copyFailed')} />}
     </Panel>
   );
 }
