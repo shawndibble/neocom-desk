@@ -168,9 +168,10 @@ retry.
 
 - `gh auth status` must succeed. If not, stop and report.
 - `git fetch origin main:main` — updates the local `main` ref to match
-  `origin/main` (fast-forward only). This does **not** touch whatever branch
-  is currently checked out here, so it's safe to run from any worktree,
-  including one already mid-ticket.
+  `origin/main` (fast-forward only) without touching the checked-out branch.
+  Git refuses this when `main` is checked out in the main repo directory (the
+  normal setup); then fall back to a plain `git fetch origin main` — step 6's
+  `sync-main.mjs` merges `origin/main` anyway.
 - `git worktree prune` — clears references to worktrees whose directories were
   already deleted (e.g. by a crashed prior run).
 
