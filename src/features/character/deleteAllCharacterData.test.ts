@@ -10,13 +10,10 @@ import {
 
 const syncMock = vi.hoisted(() => ({
   clearCharacterSyncBookkeeping: vi.fn(async () => {}),
-  purgeCharacterRemoteDataOrDefer: vi.fn<(characterId: number) => Promise<boolean>>(
-    async () => true
-  ),
+  purgeCharacterRemoteData: vi.fn<(characterId: number) => Promise<void>>(async () => {}),
   triggerSync: vi.fn(async () => {}),
   signOutOfSync: vi.fn(async () => {}),
   haltSync: vi.fn(async () => {}),
-  REMOTE_PURGE_PENDING_PREFIX: 'remotePurgePending.',
 }));
 vi.mock('@/sync', () => syncMock);
 const pushMock = vi.hoisted(() => ({
@@ -58,7 +55,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   // `deleteAllLocalData` deletes the database and leaves it closed.
   if (!db.isOpen()) await db.open();
-  syncMock.purgeCharacterRemoteDataOrDefer.mockImplementation(async () => true);
+  syncMock.purgeCharacterRemoteData.mockImplementation(async () => {});
   await Promise.all([
     db.characters.clear(),
     db.tokens.clear(),
@@ -73,31 +70,34 @@ describe('purgeAllRemoteCharacterData', () => {
     await seedCharacter(1);
     await seedCharacter(2);
     let inFlight = 0;
-    syncMock.purgeCharacterRemoteDataOrDefer.mockImplementation(async (id) => {
+    syncMock.purgeCharacterRemoteData.mockImplementation(async (id) => {
       // One Firebase session is shared, so the purges must not overlap.
       expect(++inFlight).toBe(1);
       expect(await db.tokens.get(id)).toBeDefined();
       await Promise.resolve();
       inFlight--;
-      return true;
     });
 
-    const deferred = await purgeAllRemoteCharacterData();
+    const unpurged = await purgeAllRemoteCharacterData();
 
-    expect(syncMock.purgeCharacterRemoteDataOrDefer.mock.calls.map(([id]) => id)).toEqual([1, 2]);
-    expect(deferred).toEqual([]);
+    expect(syncMock.purgeCharacterRemoteData.mock.calls.map(([id]) => id)).toEqual([1, 2]);
+    expect(unpurged).toEqual([]);
   });
 
-  it('returns the characters whose purge could not run now, and deletes nothing locally', async () => {
+  it('returns the characters whose purge failed, keeps going, and deletes nothing locally', async () => {
     await seedCharacter(1);
     await seedCharacter(2);
-    syncMock.purgeCharacterRemoteDataOrDefer.mockImplementation(async (id) => id !== 2);
+    await seedCharacter(3);
+    syncMock.purgeCharacterRemoteData.mockImplementation(async (id) => {
+      if (id === 2) throw new Error('refresh failed');
+    });
 
-    const deferred = await purgeAllRemoteCharacterData();
+    const unpurged = await purgeAllRemoteCharacterData();
 
-    expect(deferred).toEqual([2]);
-    expect(await db.characters.count()).toBe(2);
-    expect(await db.tokens.count()).toBe(2);
+    expect(unpurged).toEqual([2]);
+    expect(syncMock.purgeCharacterRemoteData).toHaveBeenCalledTimes(3);
+    expect(await db.characters.count()).toBe(3);
+    expect(await db.tokens.count()).toBe(3);
   });
 
   it('never pushes local edits, which would put the purged data back', async () => {
@@ -110,14 +110,13 @@ describe('purgeAllRemoteCharacterData', () => {
 
   it('halts syncing before the first purge, so none can push purged rows back', async () => {
     await seedCharacter(1);
-    syncMock.purgeCharacterRemoteDataOrDefer.mockImplementation(async () => {
+    syncMock.purgeCharacterRemoteData.mockImplementation(async () => {
       expect(syncMock.haltSync).toHaveBeenCalled();
-      return true;
     });
 
     await purgeAllRemoteCharacterData();
 
-    expect(syncMock.purgeCharacterRemoteDataOrDefer).toHaveBeenCalledOnce();
+    expect(syncMock.purgeCharacterRemoteData).toHaveBeenCalledOnce();
   });
 });
 
@@ -135,16 +134,6 @@ describe('deleteAllLocalData', () => {
     expect(await db.tokens.count()).toBe(0);
     expect(await db.skillPlans.count()).toBe(0);
     expect(await db.settings.count()).toBe(0);
-  });
-
-  it('keeps pending remote-purge markers, so a deferred purge still retries', async () => {
-    await seedCharacter(1);
-    await db.settings.put({ key: 'remotePurgePending.1', value: true });
-
-    await deleteAllLocalData(true);
-    await db.open();
-
-    expect(await db.settings.toArray()).toEqual([{ key: 'remotePurgePending.1', value: true }]);
   });
 
   it('deletes the app’s other IndexedDB databases', async () => {
@@ -215,7 +204,7 @@ describe('deleteAllLocalData', () => {
     await deleteAllLocalData(true);
 
     expect(syncMock.triggerSync).not.toHaveBeenCalled();
-    expect(syncMock.purgeCharacterRemoteDataOrDefer).not.toHaveBeenCalled();
+    expect(syncMock.purgeCharacterRemoteData).not.toHaveBeenCalled();
   });
 
   it('halts syncing before signing out, so no debounce re-mints a session', async () => {

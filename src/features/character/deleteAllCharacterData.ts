@@ -1,21 +1,16 @@
-// "Delete all character data" (Settings → This device): every Character's
-// synced Editable Data (Skill Plans, Build Plans, synced settings...) leaves
-// Firestore, the way removing one Character does (removeCharacter.ts), and
-// then everything this app keeps in the browser goes too — IndexedDB, web
-// storage, runtime caches. The caller reloads afterwards, so no in-memory
-// state outlives the wipe.
+// "Delete all data" (Settings → This device): every Character's synced
+// Editable Data (Skill Plans, Build Plans, synced settings...) leaves
+// Firestore now — the only client-side remote delete; otherwise it waits for
+// the 90-day inactivity purge — and then everything this app keeps in the
+// browser goes too: IndexedDB, web storage, runtime caches. The caller
+// reloads afterwards, so no in-memory state outlives the wipe.
 //
-// Two steps, so the caller can show a deferred purge before it is gone.
+// Two steps, so the caller can show a failed purge before the roster is gone.
 // Neither pushes. A last push before a purge is wasted, and one after it
 // would put the purged data straight back.
 
 import { db } from '@/db';
-import {
-  haltSync,
-  purgeCharacterRemoteDataOrDefer,
-  REMOTE_PURGE_PENDING_PREFIX,
-  signOutOfSync,
-} from '@/sync';
+import { haltSync, purgeCharacterRemoteData, signOutOfSync } from '@/sync';
 import { setAppBadgeCount } from '@/features/notifications/badge';
 import { scheduleProjectionRebuild } from '@/features/notifications/projectionRebuildScheduler';
 import { unregisterProjectionRegistration } from '@/features/notifications/projectionUpload';
@@ -30,8 +25,8 @@ export const DATABASE_DELETE_TIMEOUT_MS = 5_000;
 
 /**
  * The app shell Workbox precaches. Kept: a wipe run offline (the likely case
- * when a purge was deferred) would otherwise reload into a blank page. It is
- * code, not data.
+ * when a purge failed) would otherwise reload into a blank page. It is code,
+ * not data.
  */
 const PRECACHE_PREFIX = 'workbox-precache';
 
@@ -40,20 +35,23 @@ const PRECACHE_PREFIX = 'workbox-precache';
  * rest of the page's life: a sync could push purged rows back, or switch the
  * shared Firebase session mid-purge. Sequential for that same session.
  *
- * A purge that can't run now (dead refresh token, offline) is recorded as
- * pending on this device and retried the next time that Character logs in
- * here — see sync/characterPurge.ts. Step two carries those markers across.
+ * A purge that can't run now (dead refresh token, offline) is not retried:
+ * that Character's synced copy waits for the 90-day inactivity purge.
  *
- * @returns The Characters whose purge was deferred rather than done.
+ * @returns The Characters whose purge failed.
  */
 export async function purgeAllRemoteCharacterData(): Promise<number[]> {
   await haltSync();
   const characters = await db.characters.orderBy('characterId').toArray();
-  const deferred: number[] = [];
+  const unpurged: number[] = [];
   for (const { characterId } of characters) {
-    if (!(await purgeCharacterRemoteDataOrDefer(characterId))) deferred.push(characterId);
+    try {
+      await purgeCharacterRemoteData(characterId);
+    } catch {
+      unpurged.push(characterId);
+    }
   }
-  return deferred;
+  return unpurged;
 }
 
 /** True when `work` settled in time; false when the timeout won. */
@@ -116,9 +114,6 @@ async function clearRuntimeCaches(): Promise<void> {
  * by the device id in localStorage), the Firebase session, the app badge;
  * then every other store, the app's own database last.
  *
- * Pending-purge markers from step one are written back into a fresh database,
- * so a deferred purge still retries when that Character logs in here again.
- *
  * Deletes rows wholesale, not Character by Character, so the roster never
  * drops to zero mid-wipe and sends the app to /login before it is done. The
  * caller reloads straight after.
@@ -129,10 +124,6 @@ async function clearRuntimeCaches(): Promise<void> {
  *   gone by then; the rest may not be.
  */
 export async function deleteAllLocalData(syncConfigured: boolean): Promise<void> {
-  const pendingPurges = await db.settings
-    .where('key')
-    .startsWith(REMOTE_PURGE_PENDING_PREFIX)
-    .toArray();
   // First, so no later step failing can leave a login on this device.
   await db.tokens.clear();
 
@@ -147,13 +138,10 @@ export async function deleteAllLocalData(syncConfigured: boolean): Promise<void>
   await Promise.all([setAppBadgeCount(0), deleteOtherDatabases(), clearRuntimeCaches()]);
   clearWebStorage();
 
-  // Last: once it is gone every mounted live query fails, so the caller's
-  // reload should follow at once.
   if (!(await withTimeout(db.delete()))) {
     throw new Error('The app database delete is blocked by another tab');
   }
-  if (pendingPurges.length > 0) {
-    await db.open();
-    await db.settings.bulkPut(pendingPurges);
-  }
+  // Empty and fresh: mounted live queries read nothing rather than throw on a
+  // closed database until the caller's reload.
+  await db.open();
 }

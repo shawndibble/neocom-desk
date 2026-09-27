@@ -13,17 +13,6 @@ import { EDITABLE_COLLECTIONS, type EditableCollection } from './syncedCollectio
 
 export const INTERNAL_PREFIX = 'sync.__';
 
-/**
- * Pending remote-purge marker prefix in `db.settings` (see characterPurge.ts).
- * Device-local; mirrors `esi/cachePurge.ts`. Here rather than there so a
- * Firebase-free caller (deleteAllCharacterData) can carry markers across a
- * full local wipe.
- */
-export const REMOTE_PURGE_PENDING_PREFIX = 'remotePurgePending.';
-
-export const remotePurgePendingKey = (characterId: number): string =>
-  `${REMOTE_PURGE_PENDING_PREFIX}${characterId}`;
-
 export const ownerHashKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}ownerHash.${characterId}`;
 /**

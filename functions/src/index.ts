@@ -34,6 +34,13 @@ import {
   NOTIFICATION_FEED_COLLECTION,
   feedPurgeCutoff,
 } from './purgeFeed.js';
+import {
+  LAST_SYNCED_FIELD,
+  STALE_ACCOUNT_BATCH_SIZE,
+  STALE_ACCOUNT_MAX_PASSES,
+  decideAccountAction,
+  lastSyncedAtOf,
+} from './purgeStaleAccounts.js';
 import { streamPublicContractsCsvs } from './publicContractsArchive.js';
 import {
   ADAM4EVE_MIN_REQUEST_GAP_MS,
@@ -328,6 +335,54 @@ export const purgeNotificationFeed = onSchedule('every 24 hours', async () => {
     cutoff,
     deleted,
   });
+});
+
+/**
+ * purgeStaleAccounts: deletes the synced data of accounts with no successful
+ * sync in 90 days (issue #2065). Retention is by inactivity, not by Character
+ * removal, so it reaches accounts whose devices are all gone.
+ *
+ * Enumerates `characters/{uid}` with `listDocuments()` (which includes uids
+ * that only have subcollections and no parent doc), then per uid: seeds the
+ * heartbeat if absent, or, when stale, empties every subcollection in bounded
+ * batches and finally deletes the parent doc. The run-wide pass cap leaves a
+ * large backlog for the next tick; the parent doc survives until its
+ * subcollections are empty, so a half-purged account stays stale.
+ */
+export const purgeStaleAccounts = onSchedule('every 24 hours', async () => {
+  const db = getFirestore();
+  const now = Date.now();
+  let passes = 0;
+  let purged = 0;
+
+  for (const ref of await db.collection('characters').listDocuments()) {
+    const snap = await ref.get();
+    const action = decideAccountAction(lastSyncedAtOf(snap.data()), now);
+    if (action === 'keep') continue;
+    if (action === 'seed') {
+      await ref.set({ [LAST_SYNCED_FIELD]: now }, { merge: true });
+      continue;
+    }
+
+    for (const sub of await ref.listCollections()) {
+      for (;;) {
+        if (passes >= STALE_ACCOUNT_MAX_PASSES) {
+          logWarn('Stale account purge: pass limit reached, backlog continues next run', {
+            purged,
+          });
+          return;
+        }
+        const page = await sub.limit(STALE_ACCOUNT_BATCH_SIZE).get();
+        if (page.empty) break;
+        passes += 1;
+        const batch = db.batch();
+        for (const doc of page.docs) batch.delete(doc.ref);
+        await batch.commit();
+      }
+    }
+    await ref.delete();
+    purged += 1;
+  }
 });
 
 /** Firestore's hard cap on writes in a single `WriteBatch`, with headroom for a shorter final page. */

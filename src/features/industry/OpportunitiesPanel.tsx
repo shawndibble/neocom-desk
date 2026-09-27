@@ -176,7 +176,7 @@ export function OpportunitiesPanel({
     [ownedByCharacter, characterNames, catalog]
   );
 
-  const { rows, loading, progress, manualRefreshOnly, refresh } = useOpportunities({
+  const { rows, loading, progress, manualRefreshOnly, needsRefresh, refresh } = useOpportunities({
     candidates,
     catalog,
     pi,
@@ -488,6 +488,12 @@ export function OpportunitiesPanel({
         <EmptyState
           title={t('industry.opportunitiesEmptyTitle')}
           hint={t('industry.opportunitiesEmptyHint')}
+          className="py-8"
+        />
+      ) : needsRefresh ? (
+        <EmptyState
+          title={t('industry.opportunitiesNeedsRefreshTitle')}
+          hint={t('industry.opportunitiesNeedsRefreshHint')}
           className="py-8"
         />
       ) : isDesktop ? (

@@ -8,14 +8,15 @@
  * the one frame they land in.
  *
  * Mirrors `useComparedBuildResults.ts`'s latest-ref + value-stable-key shape:
- * `candidatesRef` lets the effect depend on `key` (built from candidate ids,
+ * `candidatesRef` lets the effect depend on `batchKey` (built from candidate ids,
  * not array identity) so a re-render that hands in a freshly-computed but
  * content-identical `candidates` array does not restart the fetch.
  *
  * Above `AUTO_RECALCULATE_MAX` owned blueprints, a remount (switching tabs
  * away and back) must not silently recompute — the ticket calls that out as
- * a manual-refresh action. `rowsCache` is module-level (outside React state)
- * so it survives the panel unmounting when the tab changes, the same way
+ * a manual-refresh action. Nor may it serve rows priced at since-changed
+ * inputs (issue #2056); see `decideOpportunitiesCache`. `rowsCache` is
+ * module-level (outside React state) so it survives the panel unmounting when the tab changes, the same way
  * `marketData.ts`'s cost-index cache survives a remount. `rows`/`progress`/
  * `loading` live in one state object (rather than three separate `useState`
  * calls) so every branch below is exactly one `setState` call, matching this
@@ -34,8 +35,11 @@ import type { OwnedStockSnapshot } from './ownedStockDetection';
 import {
   autoRecalculates,
   computeOpportunityRow,
+  decideOpportunitiesCache,
+  deleteOpportunitiesCache,
   detectOpportunityStock,
-  opportunitiesCacheKey,
+  opportunitiesBatchKey,
+  opportunitiesInputsKey,
   opportunitySnapshotRequest,
   rankOpportunityRows,
   readOpportunitiesCache,
@@ -67,6 +71,8 @@ export interface UseOpportunitiesResult {
   progress: { done: number; total: number };
   /** True once the batch exceeds the auto-recalculate threshold — the panel shows a manual Refresh action instead of silently recomputing on every visit. */
   manualRefreshOnly: boolean;
+  /** True when the cached large batch was priced at since-changed inputs: no rows are shown until the pilot hits Refresh. */
+  needsRefresh: boolean;
   refresh: () => void;
 }
 
@@ -74,12 +80,14 @@ interface OpportunitiesState {
   rows: OpportunityRow[];
   progress: { done: number; total: number };
   loading: boolean;
+  needsRefresh: boolean;
 }
 
 const EMPTY_STATE: OpportunitiesState = {
   rows: [],
   progress: { done: 0, total: 0 },
   loading: false,
+  needsRefresh: false,
 };
 
 export function useOpportunities({
@@ -102,7 +110,11 @@ export function useOpportunities({
   });
 
   const manualRefreshOnly = !autoRecalculates(candidates.length);
-  const key = useMemo(() => opportunitiesCacheKey(candidates, hub), [candidates, hub]);
+  const batchKey = useMemo(() => opportunitiesBatchKey(candidates, hub), [candidates, hub]);
+  const inputsKey = useMemo(
+    () => opportunitiesInputsKey({ assumedMe, modifiers, facilityDefaults, ownedByCharacter }),
+    [assumedMe, modifiers, facilityDefaults, ownedByCharacter]
+  );
 
   useEffect(() => {
     const currentCandidates = candidatesRef.current;
@@ -111,27 +123,35 @@ export function useOpportunities({
       return;
     }
 
-    // A cached batch is only reused above the auto-recalculate threshold,
-    // and only until the pilot explicitly hits Refresh (refreshToken > 0)
-    // — below the threshold this always recomputes, matching "recalculates
-    // automatically" for a small owned-blueprint count.
-    const cached = readOpportunitiesCache(key);
-    if (cached && manualRefreshOnly && refreshToken === 0) {
+    const decision = decideOpportunitiesCache(
+      readOpportunitiesCache(batchKey),
+      inputsKey,
+      manualRefreshOnly
+    );
+    if (decision.kind === 'serve') {
       // Serves the module-level cache verbatim — a remount (tab switch away
       // and back) must land here without ever entering the loading/fetch
       // path below, which is exactly what "does not auto-recalculate above
       // the threshold" means.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setState({
-        rows: cached,
-        progress: { done: cached.length, total: cached.length },
-        loading: false,
+        ...EMPTY_STATE,
+        rows: decision.rows,
+        progress: { done: decision.rows.length, total: decision.rows.length },
       });
+      return;
+    }
+    if (decision.kind === 'needs-refresh') {
+      setState({ ...EMPTY_STATE, needsRefresh: true });
       return;
     }
 
     let cancelled = false;
-    setState({ rows: [], progress: { done: 0, total: currentCandidates.length }, loading: true });
+    setState({
+      ...EMPTY_STATE,
+      progress: { done: 0, total: currentCandidates.length },
+      loading: true,
+    });
 
     void (async () => {
       const request = opportunitySnapshotRequest(currentCandidates, hub, catalog, pi);
@@ -169,6 +189,7 @@ export function useOpportunities({
         }
         const done = Math.min(i + CHUNK_SIZE, currentCandidates.length);
         setState({
+          ...EMPTY_STATE,
           rows: rankOpportunityRows(unranked),
           progress: { done, total: currentCandidates.length },
           loading: true,
@@ -179,11 +200,11 @@ export function useOpportunities({
       }
       if (cancelled) return;
       const ranked = rankOpportunityRows(unranked);
-      writeOpportunitiesCache(key, ranked);
+      writeOpportunitiesCache(batchKey, { inputsKey, rows: ranked });
       setState({
+        ...EMPTY_STATE,
         rows: ranked,
         progress: { done: ranked.length, total: currentCandidates.length },
-        loading: false,
       });
     })();
 
@@ -191,7 +212,8 @@ export function useOpportunities({
       cancelled = true;
     };
   }, [
-    key,
+    batchKey,
+    inputsKey,
     catalog,
     pi,
     hub,
@@ -204,7 +226,12 @@ export function useOpportunities({
     manualRefreshOnly,
   ]);
 
-  const refresh = useCallback(() => setRefreshToken((t) => t + 1), []);
+  // Dropping the entry is what makes the next run compute; the token only
+  // re-runs the effect.
+  const refresh = useCallback(() => {
+    deleteOpportunitiesCache(batchKey);
+    setRefreshToken((t) => t + 1);
+  }, [batchKey]);
 
   return { ...state, manualRefreshOnly, refresh };
 }

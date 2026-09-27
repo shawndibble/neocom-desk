@@ -1174,6 +1174,22 @@ describe('ContractSearchPanel — Build Plan from an item row', () => {
     runs: 5,
   });
 
+  it('offers the same Build Plan from the visible More-actions button (#2060)', async () => {
+    loadPublicContractOffers.mockResolvedValue(cachedSnapshot([BPC_ROW]));
+    renderWithProbe();
+
+    await bodyRows();
+    const twin = await screen.findByRole('button', { name: /^More actions for/ });
+    fireEvent.pointerDown(twin, { button: 0, ctrlKey: false });
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Build Plan' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('location')).toHaveTextContent(
+        '/industry/plans?product=587&me=10&te=20&runs=5'
+      );
+    });
+  });
+
   it("plans the copy a blueprint row names, at that copy's own ME/TE/runs", async () => {
     loadPublicContractOffers.mockResolvedValue(cachedSnapshot([BPC_ROW]));
     renderWithProbe();

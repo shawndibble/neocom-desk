@@ -15,7 +15,6 @@ import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { CACHE_PURGE_PENDING_PREFIX } from '@/esi/cachePurge';
 import { FEED_SYNC_WINDOW_MAX_ROWS, FEED_SYNC_WINDOW_MS } from '@/features/notifications/feed';
 import { backfillAccountWideData } from './accountWideBackfill';
-import { remotePurgePendingKey } from './characterPurge';
 import { pullCursorKey } from './localBookkeeping';
 import { TOMBSTONE_TTL_MS } from './merge';
 import {
@@ -138,6 +137,13 @@ const PRODUCTION_SALE_LINKS_PATH = 'characters/char:1/productionSaleLinks';
 const PRODUCTION_ORDER_WATCHES_PATH = 'characters/char:1/productionOrderWatches';
 const SETTINGS_PATH = 'characters/char:1/settings';
 const NOTIFICATION_FEED_PATH = 'characters/char:1/notificationFeed';
+
+/** setDoc calls that wrote a Notification Feed row (the heartbeat write is not one). */
+function feedWrites() {
+  return vi
+    .mocked(setDoc)
+    .mock.calls.filter(([ref]) => (ref as unknown as FakeRef).col.path === NOTIFICATION_FEED_PATH);
+}
 const HASH = 'hash-a';
 
 function plan(overrides: Partial<SkillPlanRecord> = {}): SkillPlanRecord {
@@ -674,30 +680,6 @@ describe('triggerSync: ownerHash-scoped reads', () => {
     seedRemote(PLANS_PATH, [remoteDoc({ id: 'stale', ownerHash: 'previous-owner' })]);
     await triggerSync(1);
     expect(await db.skillPlans.get('stale')).toBeUndefined();
-  });
-});
-
-describe('triggerSync: deferred remote purge retry', () => {
-  it('retries and clears a pending remote-purge marker left by a removed character', async () => {
-    await db.settings.put({ key: remotePurgePendingKey(1), value: true });
-    seedRemote(PLANS_PATH, [remoteDoc({ id: 'stale' })]);
-
-    await triggerSync(1);
-
-    // The retry (ensureSignedIn now succeeds, per the module-level mock)
-    // deletes every doc in the character's remote collections before the
-    // normal push/pull below ever runs — an empty local table pulls nothing
-    // back to replace it.
-    expect(remoteStore.get(PLANS_PATH)?.has('stale')).toBe(false);
-    expect(await db.settings.get(remotePurgePendingKey(1))).toBeUndefined();
-  });
-
-  it('does nothing extra when no purge is pending', async () => {
-    seedRemote(PLANS_PATH, [remoteDoc({ id: 'kept' })]);
-
-    await triggerSync(1);
-
-    expect(remoteStore.get(PLANS_PATH)?.has('kept')).toBe(true);
   });
 });
 
@@ -1472,7 +1454,7 @@ describe('triggerSync: notification feed', () => {
 
     vi.mocked(setDoc).mockClear();
     await triggerSync(1);
-    expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
+    expect(feedWrites()).toHaveLength(0);
   });
 
   it('pushes a back-dated row on an incremental pass (#1207)', async () => {
@@ -1530,7 +1512,7 @@ describe('triggerSync: notification feed', () => {
 
     vi.mocked(setDoc).mockClear();
     await triggerSync(1);
-    expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
+    expect(feedWrites()).toHaveLength(0);
   });
 
   it('clears syncedAt for the Character’s rows when the ownerHash changes', async () => {
@@ -1881,7 +1863,7 @@ describe('sync orchestration', () => {
     await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(13));
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
     expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(13);
-    expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
+    expect(vi.mocked(setDoc)).toHaveBeenCalledTimes(1); // the heartbeat, once
   });
 });
 
@@ -2189,5 +2171,31 @@ describe('triggerSync: incremental pull', () => {
     // the allow-list bounds the doc count anyway.
     expect(filtersFor(SETTINGS_PATH, readsSoFar() - 13)).toEqual([OWNER_FILTER]);
     expect(await readCursor('sync.__pullCursor.1.settings')).toBeUndefined();
+  });
+});
+
+describe('triggerSync: last-synced heartbeat (#2065)', () => {
+  const heartbeat = () => remoteStore.get('characters')?.get('char:1');
+
+  it('stamps lastSyncedAt on the characters/{uid} parent doc after a sync', async () => {
+    const before = Date.now();
+    await triggerSync(1);
+    expect(heartbeat()).toEqual({ lastSyncedAt: expect.any(Number) });
+    expect((heartbeat() as { lastSyncedAt: number }).lastSyncedAt).toBeGreaterThanOrEqual(before);
+  });
+
+  it('bumps the heartbeat on every sync even when no document changed', async () => {
+    await triggerSync(1);
+    vi.mocked(setDoc).mockClear();
+    await triggerSync(1);
+    const writes = vi
+      .mocked(setDoc)
+      .mock.calls.map(([ref]) => (ref as unknown as FakeRef).col.path);
+    expect(writes).toEqual(['characters']);
+  });
+
+  it('writes only the lastSyncedAt field, so the rules can allow just that', async () => {
+    await triggerSync(1);
+    expect(Object.keys(heartbeat() as object)).toEqual(['lastSyncedAt']);
   });
 });

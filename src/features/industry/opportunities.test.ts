@@ -7,10 +7,13 @@ import {
   autoRecalculates,
   buildOpportunityCandidates,
   computeOpportunityRow,
-  opportunitiesCacheKey,
+  decideOpportunitiesCache,
+  opportunitiesBatchKey,
+  opportunitiesInputsKey,
   planForOpportunityCandidate,
   rankOpportunityRows,
   type OpportunityCandidate,
+  type OpportunityPricingInputs,
   type UnrankedOpportunityRow,
 } from './opportunities';
 import { recipeForLookup } from './recipes';
@@ -203,7 +206,7 @@ describe('computeOpportunityRow — auto make-or-buy depth (issue #652)', () => 
   });
 });
 
-describe('opportunitiesCacheKey', () => {
+describe('opportunitiesBatchKey', () => {
   function candidate(id: string): OpportunityCandidate {
     return {
       id,
@@ -215,15 +218,95 @@ describe('opportunitiesCacheKey', () => {
   }
 
   it('is independent of array order', () => {
-    const a = opportunitiesCacheKey([candidate('b'), candidate('a')], DEFAULT_TRADE_HUB);
-    const b = opportunitiesCacheKey([candidate('a'), candidate('b')], DEFAULT_TRADE_HUB);
+    const a = opportunitiesBatchKey([candidate('b'), candidate('a')], DEFAULT_TRADE_HUB);
+    const b = opportunitiesBatchKey([candidate('a'), candidate('b')], DEFAULT_TRADE_HUB);
     expect(a).toBe(b);
   });
 
   it('changes when the hub changes', () => {
-    const jita = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB);
-    const amarr = opportunitiesCacheKey([candidate('a')], { ...DEFAULT_TRADE_HUB, id: 'amarr' });
+    const jita = opportunitiesBatchKey([candidate('a')], DEFAULT_TRADE_HUB);
+    const amarr = opportunitiesBatchKey([candidate('a')], { ...DEFAULT_TRADE_HUB, id: 'amarr' });
     expect(jita).not.toBe(amarr);
+  });
+});
+
+describe('opportunitiesInputsKey', () => {
+  const INPUTS: OpportunityPricingInputs = {
+    assumedMe: 10,
+    modifiers: NO_CHARACTER_MODIFIERS,
+    facilityDefaults: DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+    ownedByCharacter: new Map([[1, [owned(1), owned(2)]]]),
+  };
+
+  it('changes when Assumed ME changes', () => {
+    expect(opportunitiesInputsKey(INPUTS)).not.toBe(
+      opportunitiesInputsKey({ ...INPUTS, assumedMe: 0 })
+    );
+  });
+
+  it('changes when modifiers change', () => {
+    expect(opportunitiesInputsKey(INPUTS)).not.toBe(
+      opportunitiesInputsKey({
+        ...INPUTS,
+        modifiers: { ...NO_CHARACTER_MODIFIERS, manufacturingTimeImplantPct: 4 },
+      })
+    );
+  });
+
+  it('changes when facility defaults change', () => {
+    expect(opportunitiesInputsKey(INPUTS)).not.toBe(
+      opportunitiesInputsKey({
+        ...INPUTS,
+        facilityDefaults: {
+          ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+          manufacturing: { ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.manufacturing, facilityTaxPct: 5 },
+        },
+      })
+    );
+  });
+
+  it('changes when an owned blueprint is researched', () => {
+    expect(opportunitiesInputsKey(INPUTS)).not.toBe(
+      opportunitiesInputsKey({
+        ...INPUTS,
+        ownedByCharacter: new Map([[1, [owned(1, { material_efficiency: 0 }), owned(2)]]]),
+      })
+    );
+  });
+
+  it('is the same for equal inputs built as fresh objects in a different order', () => {
+    expect(opportunitiesInputsKey(INPUTS)).toBe(
+      opportunitiesInputsKey({
+        ownedByCharacter: new Map([[1, [owned(2), owned(1)]]]),
+        facilityDefaults: {
+          reaction: { ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.reaction },
+          manufacturing: { ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.manufacturing },
+        },
+        modifiers: { ...NO_CHARACTER_MODIFIERS },
+        assumedMe: 10,
+      })
+    );
+  });
+});
+
+describe('decideOpportunitiesCache', () => {
+  const rows = [] as never[];
+  const entry = { inputsKey: 'me10', rows };
+
+  it('serves a large batch computed at the same inputs', () => {
+    expect(decideOpportunitiesCache(entry, 'me10', true)).toEqual({ kind: 'serve', rows });
+  });
+
+  it('asks for Refresh, not a silent recompute, when a large batch was priced at other inputs', () => {
+    expect(decideOpportunitiesCache(entry, 'me0', true)).toEqual({ kind: 'needs-refresh' });
+  });
+
+  it('computes a large batch with no cached entry (first visit, or after Refresh)', () => {
+    expect(decideOpportunitiesCache(undefined, 'me10', true)).toEqual({ kind: 'compute' });
+  });
+
+  it('always computes a small batch', () => {
+    expect(decideOpportunitiesCache(entry, 'me10', false)).toEqual({ kind: 'compute' });
   });
 });
 

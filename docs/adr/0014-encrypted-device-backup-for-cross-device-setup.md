@@ -26,7 +26,7 @@ from Settings' Data tab:
   derives an AES-256-GCM key via PBKDF2-SHA256 (600,000 iterations,
   WebCrypto). The encrypted JSON bundle contains each character's record, its
   refresh/access tokens, its Editable Data
-  (`sync/characterPurge.ts`'s `REMOTE_COLLECTIONS`), and its synced settings
+  (`sync/syncedCollections.ts`'s `REMOTE_COLLECTIONS`), and its synced settings
   (`sync/syncedSettings.ts`'s `SYNCED_SETTING_KEYS` allow-list). `esiCache`
   and `notificationFeed` are excluded — both are already excluded from
   `REMOTE_COLLECTIONS` for the same reasons (API-derived, device-local).

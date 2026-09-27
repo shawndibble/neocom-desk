@@ -381,8 +381,8 @@ describe('Mail', () => {
     render(<App />);
     await screen.findByText('Fleet up!');
     // 'Fleet up!' is corp + unread; 'Market report' is inbox + read.
-    expect(screen.getByRole('button', { name: /Fleet up!.*Corp.*Unread/s })).toBeInTheDocument();
-    const read = screen.getByRole('button', { name: /Market report/s });
+    expect(screen.getByRole('button', { name: /^Fleet up!.*Corp.*Unread/s })).toBeInTheDocument();
+    const read = screen.getByRole('button', { name: /^Market report/s });
     expect(read).toHaveAccessibleName(expect.stringContaining('Inbox'));
     expect(read.textContent).not.toMatch(/Unread/);
   });
@@ -416,13 +416,13 @@ describe('Mail', () => {
       )
     );
     render(<App />);
-    const row = await screen.findByRole('button', { name: /Contract terms/s });
+    const row = await screen.findByRole('button', { name: /^Contract terms/s });
     expect(row).toHaveTextContent('Corp Recruiter');
     expect(row).not.toHaveTextContent('Fleet Commander');
 
     // More than one recipient collapses to the first plus a count — a row has
     // one line for them.
-    expect(screen.getByRole('button', { name: /Fleet doctrine/s })).toHaveTextContent(
+    expect(screen.getByRole('button', { name: /^Fleet doctrine/s })).toHaveTextContent(
       'Corp Recruiter +1 more'
     );
   });

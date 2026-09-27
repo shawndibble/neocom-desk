@@ -2253,6 +2253,8 @@
     "opportunitiesEmptyHint": "Own a blueprint original or copy, then refresh — reaction blueprints are not ranked here.",
     "opportunitiesProgress": "{{done}} of {{total}} calculated",
     "opportunitiesRefresh": "Refresh",
+    "opportunitiesNeedsRefreshTitle": "Pricing settings changed",
+    "opportunitiesNeedsRefreshHint": "Your Assumed ME, skills, implants, facility or blueprint research changed since these results were calculated. Press Refresh to recalculate.",
     "opportunitiesAddToCompare": "Add {{count}} to Compare",
     "opportunitiesSelectFor": "Select {{name}} to compare plans",
     "opportunitiesLossBreakdownFor": "Why {{name}} is a loss",
@@ -2544,11 +2546,8 @@
     "densitySpacious": "Spacious",
     "remove": "Remove",
     "removeButtonLabel": "Remove {{name}}",
-    "removeConfirm": "Remove {{name}}? This deletes their skill plans, build plans, quickbar and cached game data from this device, and — if a session can still be started as them — their synced plans, build plans, quickbar and settings too. If not, that remote data stays until you log in as {{name}} again. This cannot be undone here.",
-    "removeDeferredNoticeTitle": "Sync deferred",
-    "removeDeferredNotice": "{{name}}'s synced data couldn't be cleared right now — their session couldn't be re-established. It will be cleared automatically the next time you log in as {{name}}.",
+    "removeConfirm": "Remove {{name}}? This deletes their skill plans, build plans, quickbar and cached game data from this device. If sync is on, their synced copy stays on our servers, so adding {{name}} back restores it. It is deleted automatically once no device has synced {{name}} for 90 days. This cannot be undone here.",
     "cancel": "Cancel",
-    "ok": "OK",
     "searchPlaceholder": "Search by name or corporation…",
     "noSearchMatches": "No characters match this search or filter.",
     "noSearchMatchesHint": "Clear the search and filters to see every character.",
@@ -5430,8 +5429,8 @@
     "deviceDeleteConfirm_other": "This permanently deletes {{count}} characters' synced data from the sync server, and erases all of this app's data and settings from this browser. The page reloads to the login screen.",
     "deviceDeleteConfirmLocalOnly_one": "This permanently erases {{count}} character and all of this app's data and settings from this browser. The page reloads to the login screen.",
     "deviceDeleteConfirmLocalOnly_other": "This permanently erases {{count}} characters and all of this app's data and settings from this browser. The page reloads to the login screen.",
-    "deviceDeleteDeferred_one": "The synced data for {{names}} could not be deleted right now (offline, or the login has expired). It will be deleted the next time that character logs in on this browser. Any other character's synced data is already deleted. Finish deleting to erase this browser's data.",
-    "deviceDeleteDeferred_other": "The synced data for {{names}} could not be deleted right now (offline, or the logins have expired). It will be deleted the next time each of those characters logs in on this browser. Any other character's synced data is already deleted. Finish deleting to erase this browser's data.",
+    "deviceDeleteUnpurged_one": "The synced data for {{names}} could not be deleted from the sync server (offline, or the login has expired). The server deletes it automatically after 90 days without a sync. Every other character's synced data is already deleted. Finish deleting to erase this browser's data.",
+    "deviceDeleteUnpurged_other": "The synced data for {{names}} could not be deleted from the sync server (offline, or the logins have expired). The server deletes it automatically after 90 days without a sync. Every other character's synced data is already deleted. Finish deleting to erase this browser's data.",
     "faq": {
       "storeTitle": "What we store",
       "storeIntro": "Neocom Desk keeps as little as possible on a server. The short version: we store the things you make in the app, and none of what we read from EVE on your behalf.",
@@ -5468,7 +5467,7 @@
         "notes": {
           "push": "Push notifications, if you turn them on: we store a token for this device, the character IDs it covers, and the alerts due in the next 72 hours — including their text, so they can be delivered while the app is closed. Each character is verified with EVE at that moment, and the token used for that check is discarded straight after.",
           "crashes": "Crash reports: when something goes wrong we receive the error and which page it happened on, so it can be fixed. IP addresses are switched off, request and response bodies are never captured, and your EVE tokens are stripped before anything is sent.",
-          "removal": "Removing a character deletes everything above from our servers. If its EVE login has already expired we cannot log in to do that, so the deletion runs the next time you add that character back.",
+          "removal": "Removing a character only clears it from this device. Its synced copy stays on our servers, so adding the character back restores it. We delete it automatically once no device has synced that character for 90 days. To delete it right away, use Delete all data in Settings → Data & storage.",
           "export": "Exporting a backup (Data tab) writes a password-encrypted file — including your login tokens — to your device. This only happens when you press the button, and the file goes wherever you choose to put it; we never see it."
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."

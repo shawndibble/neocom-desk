@@ -48,13 +48,15 @@ describe('DevicePanel delete all character data', () => {
     expect(replace).toHaveBeenCalledWith('/');
   });
 
-  it('names the characters whose purge was deferred, and waits before deleting locally', async () => {
+  it('names the characters whose purge failed, and waits before deleting locally', async () => {
     deleteMock.purgeAllRemoteCharacterData.mockImplementation(async () => [2]);
     const { user, dialog } = await openDeleteDialog();
 
     await user.click(within(dialog).getByRole('button', { name: 'Delete all' }));
 
-    expect(await within(dialog).findByText(/Bravo could not be deleted/)).toBeInTheDocument();
+    expect(
+      await within(dialog).findByText(/Bravo could not be deleted from the sync server/)
+    ).toBeInTheDocument();
     expect(deleteMock.deleteAllLocalData).not.toHaveBeenCalled();
     // The other Characters' remote data is already gone; backing out is not offered.
     expect(within(dialog).queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();

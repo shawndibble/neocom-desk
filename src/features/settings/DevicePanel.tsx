@@ -16,7 +16,7 @@ type Dialog = 'logout' | 'delete';
  * Settings → This device. Two actions: forget every login on this browser, or
  * that plus erasing every Character's synced data and this browser's app data.
  * Once no Character is left, `RequireCharacter` sends the app to /login by
- * itself, so logout never navigates and a deferred purge is reported before
+ * itself, so logout never navigates and a failed purge is reported before
  * the local wipe, while this dialog can still be seen. Delete reloads after.
  */
 export function DevicePanel() {
@@ -26,12 +26,12 @@ export function DevicePanel() {
   const [working, setWorking] = useState(false);
   const [failed, setFailed] = useState(false);
   // Characters whose remote purge could not run now; set once step one is done.
-  const [deferred, setDeferred] = useState<number[] | null>(null);
+  const [unpurged, setUnpurged] = useState<number[] | null>(null);
   const syncConfigured = isSyncConfigured();
 
   function openDialog(next: Dialog) {
     setFailed(false);
-    setDeferred(null);
+    setUnpurged(null);
     setDialog(next);
   }
 
@@ -56,10 +56,10 @@ export function DevicePanel() {
 
   const confirmDelete = () =>
     run(async () => {
-      if (syncConfigured && deferred === null) {
+      if (syncConfigured && unpurged === null) {
         const notPurged = await purgeAllRemoteCharacterData();
         if (notPurged.length > 0) {
-          setDeferred(notPurged);
+          setUnpurged(notPurged);
           return;
         }
       }
@@ -69,9 +69,9 @@ export function DevicePanel() {
     });
 
   const loggedIn = characters?.length ?? 0;
-  const deferredNames = deferred
+  const unpurgedNames = unpurged
     ? new Intl.ListFormat(i18n.language, { style: 'long', type: 'conjunction' }).format(
-        deferred.map(
+        unpurged.map(
           (id) => characters?.find((character) => character.characterId === id)?.name ?? String(id)
         )
       )
@@ -149,13 +149,13 @@ export function DevicePanel() {
           // Past a partial purge there is no going back: the purged Characters'
           // remote data is gone, and an incremental sync would not re-push rows
           // older than its cursor. Only finishing is offered.
-          if (!working && !deferred) setDialog(null);
+          if (!working && !unpurged) setDialog(null);
         }}
         title={t('settings.deviceDeleteConfirmTitle')}
       >
         <p className="text-xs text-text-dim">
-          {deferred
-            ? t('settings.deviceDeleteDeferred', { count: deferred.length, names: deferredNames })
+          {unpurged
+            ? t('settings.deviceDeleteUnpurged', { count: unpurged.length, names: unpurgedNames })
             : t(
                 syncConfigured
                   ? 'settings.deviceDeleteConfirm'
@@ -169,7 +169,7 @@ export function DevicePanel() {
           </p>
         )}
         <div className="mt-3 flex justify-end gap-2">
-          {!deferred && (
+          {!unpurged && (
             <Button size="sm" disabled={working} onClick={() => setDialog(null)}>
               {t('characters.cancel')}
             </Button>
@@ -180,7 +180,7 @@ export function DevicePanel() {
             disabled={working}
             onClick={() => void confirmDelete()}
           >
-            {t(deferred ? 'settings.deviceDeleteFinish' : 'settings.deviceDeleteAction')}
+            {t(unpurged ? 'settings.deviceDeleteFinish' : 'settings.deviceDeleteAction')}
           </Button>
         </div>
       </Modal>

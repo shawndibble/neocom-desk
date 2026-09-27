@@ -200,7 +200,7 @@ describe('backfillAccountWideData', () => {
     await backfillAccountWideData(2);
     expect(await db.stationPins.get('2:60003760')).toBeDefined();
 
-    await removeCharacter(2, false);
+    await removeCharacter(2);
 
     expect(await db.stationPins.get('2:60003760')).toBeUndefined();
     expect(await db.stationPins.get('1:60003760')).toBeDefined();

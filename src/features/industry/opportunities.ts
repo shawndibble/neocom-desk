@@ -278,7 +278,8 @@ export function detectOpportunityStock(
 
 /**
  * A batch's identity for the "don't auto-recalculate above 10 blueprints"
- * cache (issue #642): which owned-blueprint entities, at which hub.
+ * cache (issue #642): which owned-blueprint entities, at which hub. What the
+ * rows were priced at is `opportunitiesInputsKey`'s job.
  * Content-keyed rather than array-identity-keyed so a re-render with a fresh
  * `candidates` array reference (the panel recomputes it from Dexie/ESI data
  * on every render) does not read as "a different batch."
@@ -288,7 +289,7 @@ export function detectOpportunityStock(
  * now computes rows at a fixed depth, so a depth component would only ever
  * hold one value.
  */
-export function opportunitiesCacheKey(
+export function opportunitiesBatchKey(
   candidates: readonly OpportunityCandidate[],
   hub: TradeHub
 ): string {
@@ -298,20 +299,85 @@ export function opportunitiesCacheKey(
     .join(',')}`;
 }
 
+/** What every row in a batch is priced at (issue #2056). */
+export interface OpportunityPricingInputs {
+  assumedMe: number;
+  modifiers: CharacterModifiers;
+  facilityDefaults: ActivityFacilityDefaults;
+  /**
+   * Owned blueprints' ME/TE price both the candidates and any sub-build the
+   * pilot owns a copy of. Owned stock is left out on purpose: assets churn
+   * on every ESI refresh, which would ask for Refresh on nearly every visit.
+   */
+  ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>;
+}
+
+/** JSON with object keys sorted, so equal values built in a different key order serialize the same. */
+function stableSerialize(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b)))
+      : v
+  );
+}
+
+export function opportunitiesInputsKey(inputs: OpportunityPricingInputs): string {
+  // Only research levels, not whole ESI records: a moved blueprint shouldn't read as repriced.
+  const research = [...inputs.ownedByCharacter.values()]
+    .flat()
+    .map((bp) => `${bp.item_id}:${bp.material_efficiency}:${bp.time_efficiency}`)
+    .sort();
+  return stableSerialize({
+    assumedMe: inputs.assumedMe,
+    modifiers: inputs.modifiers,
+    facilityDefaults: inputs.facilityDefaults,
+    research,
+  });
+}
+
 const AUTO_RECALCULATE_MAX = 10;
 
 export function autoRecalculates(candidateCount: number): boolean {
   return candidateCount <= AUTO_RECALCULATE_MAX;
 }
 
-const rowsCache = new Map<string, OpportunityRow[]>();
-
-export function readOpportunitiesCache(key: string): OpportunityRow[] | undefined {
-  return rowsCache.get(key);
+export interface OpportunitiesCacheEntry {
+  inputsKey: string;
+  rows: OpportunityRow[];
 }
 
-export function writeOpportunitiesCache(key: string, rows: OpportunityRow[]): void {
-  rowsCache.set(key, rows);
+export type OpportunitiesCacheDecision =
+  { kind: 'serve'; rows: OpportunityRow[] } | { kind: 'needs-refresh' } | { kind: 'compute' };
+
+/**
+ * A large batch cached at other pricing inputs is neither served (stale
+ * prices) nor silently recomputed (manual-refresh only, #642); it waits on
+ * Refresh (#2056), which drops the entry so this sees none.
+ */
+export function decideOpportunitiesCache(
+  entry: OpportunitiesCacheEntry | undefined,
+  inputsKey: string,
+  manualRefreshOnly: boolean
+): OpportunitiesCacheDecision {
+  if (!manualRefreshOnly || !entry) return { kind: 'compute' };
+  return entry.inputsKey === inputsKey
+    ? { kind: 'serve', rows: entry.rows }
+    : { kind: 'needs-refresh' };
+}
+
+/** Keyed by `opportunitiesBatchKey`: one entry per batch, remembering the inputs it was priced at. */
+const rowsCache = new Map<string, OpportunitiesCacheEntry>();
+
+export function readOpportunitiesCache(batchKey: string): OpportunitiesCacheEntry | undefined {
+  return rowsCache.get(batchKey);
+}
+
+export function writeOpportunitiesCache(batchKey: string, entry: OpportunitiesCacheEntry): void {
+  rowsCache.set(batchKey, entry);
+}
+
+export function deleteOpportunitiesCache(batchKey: string): void {
+  rowsCache.delete(batchKey);
 }
 
 /** Test-only: production callers rely on the manual Refresh action instead of clearing. */
