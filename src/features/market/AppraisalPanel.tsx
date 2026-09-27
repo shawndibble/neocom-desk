@@ -488,6 +488,7 @@ export function AppraisalPanel({
                 onToggle={toggleColumn}
                 buttonLabel={t('market.appraisal.columnsButton')}
                 menuTitle={t('market.appraisal.columnsMenuTitle')}
+                size="sm"
               />
               <IconButton
                 size="sm"
