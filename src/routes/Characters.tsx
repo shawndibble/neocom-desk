@@ -63,6 +63,8 @@ import { maxJobSlots, type JobSlotCategory, type JobSlotSkills } from '@/engine/
 import { jobSlotSkillsFromCharacterSkills } from '@/features/character/jobSlotSkills';
 import {
   availableCharacterColumns,
+  migrateVisibleColumns,
+  useCharacterColumnsMigrated,
   useCharacterViewMode,
   useVisibleCharacterColumns,
   visibleAvailableColumns,
@@ -167,12 +169,14 @@ const DENSITY_LABEL_KEYS = {
   1.25: 'characters.densitySpacious',
 } as const satisfies Record<FontScale, string>;
 
-const SORT_KEYS: readonly CharacterSortKey[] = ['name', 'skillPoints', 'wallet'];
+const SORT_KEYS: readonly CharacterSortKey[] = ['name', 'skillPoints', 'wallet', 'group', 'alerts'];
 const SORT_DIRECTIONS: readonly SortDirection[] = ['asc', 'desc'];
 /** `unknown` left out: it means "no cached queue yet", not a state anyone filters for. */
 const QUEUE_FILTER_STATES: readonly QueueState[] = ['training', 'endingSoon', 'paused', 'idle'];
 /** Radix `SelectItem` can't take `''`, so "any corporation" needs a sentinel. */
 const ALL_CORPS_VALUE = '__all__';
+/** Same reasoning as `ALL_CORPS_VALUE` — "any Group" needs a non-empty sentinel. `UNGROUPED_VALUE` (above) doubles as this filter's "no Group" option, same as the group column's Select. */
+const ALL_GROUPS_VALUE = '__all_groups__';
 
 /**
  * The filter bar, in the URL (ADR 0015) as one group: the bar hands back sort
@@ -185,6 +189,7 @@ const FILTER_PARAMS = {
   dir: enumParam(SORT_DIRECTIONS, 'asc'),
   queue: optionalEnumParam(QUEUE_FILTER_STATES),
   corp: nullableTextParam(),
+  group: nullableTextParam(),
   starred: boolParam(),
   alerts: boolParam(),
 };
@@ -195,6 +200,8 @@ interface RosterFilter {
   sortDirection: SortDirection;
   queue: QueueState | null;
   corp: string | null;
+  /** A group id, `UNGROUPED_VALUE` for "no group", or null for "any group". */
+  group: string | null;
   starredOnly: boolean;
   alertsOnly: boolean;
 }
@@ -204,15 +211,16 @@ function activeRosterFilterCount(filter: RosterFilter): number {
   return [
     filter.queue !== null,
     filter.corp !== null,
+    filter.group !== null,
     filter.starredOnly,
     filter.alertsOnly,
   ].filter(Boolean).length;
 }
 
 /**
- * Table view's header-click sort — one key for every group section's table,
- * so a column sort reads the same across the whole roster. Unsorted (the
- * filter bar's order) by default.
+ * Table view's header-click sort, over the whole roster in one flat table
+ * (decision 20260927-071415 dropped the old one-`DataTable`-per-group-section
+ * layout). Unsorted (the filter bar's order) by default.
  */
 const TABLE_SORT = optionalSortParam();
 
@@ -547,6 +555,8 @@ interface CharacterRow {
   /** Raw `total_sp` (not `correctedTotalSp`) — see `totalSpMap`'s doc comment. */
   totalSp: number | undefined;
   starred: boolean;
+  /** Null when ungrouped — same as the card's `groupId` prop. */
+  groupId: string | null;
 }
 
 /** `queueById`'s shape, built once from a roster snapshot — shared by the initial cache-only load and the "Refresh all" live reload so the two never compute it differently. */
@@ -673,7 +683,10 @@ function buildColumns(
   t: (key: string, options?: Record<string, unknown>) => string,
   spExtractionThresholdSp: number,
   onToggleStarred: (characterId: number) => void,
-  timeZone: 'UTC' | undefined
+  timeZone: 'UTC' | undefined,
+  groups: readonly CharacterGroup[],
+  onMoveToGroup: (characterId: number, groupId: string | null) => void,
+  onRemove: (characterId: number, name: string) => void
 ): Record<CharacterColumnId, DataTableColumn<CharacterRow>> {
   return {
     name: {
@@ -700,6 +713,42 @@ function buildColumns(
       className: 'text-text-dim',
       sortValue: (row) => row.info?.corporationName ?? '',
       render: (row) => row.info?.corporationName ?? t('common.unknown'),
+    },
+    // Same Select the card view's group control renders (issue #2077) — a
+    // visible, Tab-reachable move-to-group in table view, no context-menu
+    // twin needed. Only offered when `groups.length > 0` (gated in
+    // `availableCharacterColumns`), so `groups` here is never empty in
+    // practice, but the map still runs off the live list rather than a
+    // snapshot so a group renamed mid-session updates every row's dropdown.
+    group: {
+      id: 'group',
+      header: t('characters.column.group'),
+      sortValue: (row) =>
+        row.groupId ? (groups.find((group) => group.id === row.groupId)?.name ?? '') : undefined,
+      render: (row) => (
+        <Select
+          value={row.groupId ?? UNGROUPED_VALUE}
+          onValueChange={(value) =>
+            onMoveToGroup(row.character.characterId, value === UNGROUPED_VALUE ? null : value)
+          }
+        >
+          <SelectTrigger
+            size="sm"
+            aria-label={t('characters.groupFor', { name: row.character.name })}
+            className="w-32"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={UNGROUPED_VALUE}>{t('characters.ungrouped')}</SelectItem>
+            {groups.map((group) => (
+              <SelectItem key={group.id} value={group.id}>
+                {group.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ),
     },
     spTotal: {
       id: 'spTotal',
@@ -860,6 +909,23 @@ function buildColumns(
         />
       ),
     },
+    // Trailing danger `IconButton`, matching the card's separate red X
+    // (issue #2077) — same confirm dialog, not folded into the row's nav-only
+    // context menu (decision 20260927-071415).
+    remove: {
+      id: 'remove',
+      header: t('characters.column.remove'),
+      align: 'right',
+      render: (row) => (
+        <IconButton
+          size="sm"
+          icon={<Icon.Close />}
+          tone="danger"
+          label={t('characters.removeButtonLabel', { name: row.character.name })}
+          onClick={() => onRemove(row.character.characterId, row.character.name)}
+        />
+      ),
+    },
   };
 }
 
@@ -895,6 +961,12 @@ export function Characters() {
   const visibleColumns = useVisibleCharacterColumns((state) => state.value);
   const setVisibleColumns = useVisibleCharacterColumns((state) => state.setValue);
   const hydrateVisibleColumns = useVisibleCharacterColumns((state) => state.hydrate);
+  const visibleColumnsHydrated = useVisibleCharacterColumns((state) => state.hydrated);
+
+  const columnsMigrated = useCharacterColumnsMigrated((state) => state.value);
+  const columnsMigratedHydrated = useCharacterColumnsMigrated((state) => state.hydrated);
+  const hydrateColumnsMigrated = useCharacterColumnsMigrated((state) => state.hydrate);
+  const setColumnsMigrated = useCharacterColumnsMigrated((state) => state.setValue);
 
   const spExtractionEnabled = useSpExtractionMonitoringEnabled((state) => state.value);
   const hydrateSpExtractionEnabled = useSpExtractionMonitoringEnabled((state) => state.hydrate);
@@ -914,6 +986,7 @@ export function Characters() {
     sortDirection,
     queue: filterParams.queue,
     corp: filterParams.corp,
+    group: filterParams.group,
     starredOnly: filterParams.starred,
     alertsOnly: filterParams.alerts,
   };
@@ -966,9 +1039,15 @@ export function Characters() {
     t,
     spExtractionThreshold,
     (id) => void handleToggleStar(id),
-    timeZone
+    timeZone,
+    groupsValue.groups,
+    (id, groupId) => void handleMoveToGroup(id, groupId),
+    (id, name) => requestRemoveCharacter(id, name)
   );
-  const availableColumnIds = availableCharacterColumns(spExtractionEnabled);
+  const availableColumnIds = availableCharacterColumns(
+    spExtractionEnabled,
+    groupsValue.groups.length > 0
+  );
   // `id` is already known available here, so this is just "is it checked" —
   // `visibleAvailableColumns` (below, `handleToggleColumn`'s own zero-columns
   // guard) is for narrowing the *raw stored* list, which can hold ids that
@@ -998,6 +1077,14 @@ export function Characters() {
       return false;
     }
     if (rosterFilter.corp !== null && corpName !== rosterFilter.corp) return false;
+    if (rosterFilter.group !== null) {
+      const characterGroupId = groupIdByCharacterId.get(characterId) ?? null;
+      if (rosterFilter.group === UNGROUPED_VALUE) {
+        if (characterGroupId !== null) return false;
+      } else if (characterGroupId !== rosterFilter.group) {
+        return false;
+      }
+    }
     if (rosterFilter.starredOnly && !isCharacterStarred(starred, characterId)) return false;
     if (rosterFilter.alertsOnly && (alertCounts.get(characterId) ?? 0) === 0) return false;
     return true;
@@ -1018,6 +1105,32 @@ export function Characters() {
   useEffect(() => {
     void hydrateVisibleColumns();
   }, [hydrateVisibleColumns]);
+
+  useEffect(() => {
+    void hydrateColumnsMigrated();
+  }, [hydrateColumnsMigrated]);
+
+  // One-shot migration (issue #2077, decision 20260927-071415): a stored
+  // column list from before `group`/`remove` existed is missing both, not
+  // because a pilot hid them. Gated on `columnsMigrated` rather than run on
+  // every hydrate, so a pilot who deliberately hides one afterward keeps it
+  // hidden. `setColumnsMigrated(true)` fires even when nothing was actually
+  // missing, so this never runs a second time on this device.
+  useEffect(() => {
+    if (!visibleColumnsHydrated || !columnsMigratedHydrated || columnsMigrated) return;
+    const migrated = migrateVisibleColumns(visibleColumns);
+    void (async () => {
+      if (migrated !== visibleColumns) await setVisibleColumns(migrated);
+      await setColumnsMigrated(true);
+    })();
+  }, [
+    visibleColumnsHydrated,
+    columnsMigratedHydrated,
+    columnsMigrated,
+    visibleColumns,
+    setVisibleColumns,
+    setColumnsMigrated,
+  ]);
 
   useEffect(() => {
     void hydrateSpExtractionEnabled();
@@ -1100,13 +1213,39 @@ export function Characters() {
     }
   }, [characters, starred, starredHydrated, setStarred]);
 
-  const groupIdByCharacterId = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const group of groupsValue.groups) {
-      for (const characterId of group.characterIds) map.set(characterId, group.id);
-    }
-    return map;
-  }, [groupsValue.groups]);
+  const groupIdByCharacterId = new Map<number, string>();
+  for (const group of groupsValue.groups) {
+    for (const characterId of group.characterIds) groupIdByCharacterId.set(characterId, group.id);
+  }
+
+  /**
+   * `stats` (`rosterSortStats`) plus the two fields it can't carry itself —
+   * group name and alert count both live in stores outside `groups.ts`'s
+   * Dexie-free scope (`groups.ts`'s `CharacterSortStats` doc comment). Built
+   * here, not in `stats` state, so `applyRoster`/`mergeRosterEntry` stay a
+   * pure roster-snapshot mirror; this just layers the two extra keys on top
+   * for `sortCharacterIds` to read when `sortKey` is `'group'`/`'alerts'`.
+   *
+   * Not `useMemo`: its only stable-looking input, `groupIdByCharacterId`, is
+   * a `Map` — the React Compiler lint (`react-hooks/preserve-manual-
+   * memoization`) can't prove a `Map` dependency is never mutated in place,
+   * so it refuses to trust this memo (and, transitively, the one that builds
+   * `groupIdByCharacterId`). `renderTable`/`renderCardList` already rebuild
+   * their `CharacterRow[]` unmemoized every render for the same roster-sized
+   * data, so recomputing this map alongside them costs nothing extra.
+   */
+  const sortStatsById = new Map<number, CharacterSortStats>();
+  for (const [characterId, base] of stats) {
+    const groupId = groupIdByCharacterId.get(characterId);
+    const groupName = groupId
+      ? groupsValue.groups.find((group) => group.id === groupId)?.name
+      : undefined;
+    sortStatsById.set(characterId, {
+      ...base,
+      groupName,
+      alertCount: alertCounts.get(characterId) ?? 0,
+    });
+  }
 
   async function select(characterId: number) {
     await setActiveCharacter(characterId);
@@ -1151,7 +1290,10 @@ export function Characters() {
     // currently excludes (e.g. `spReady` while monitoring is off), so a raw
     // `next.length` check can stay non-zero while every id left actually
     // renders nothing.
-    if (visibleAvailableColumns(next, spExtractionEnabled).length === 0) return;
+    if (
+      visibleAvailableColumns(next, spExtractionEnabled, groupsValue.groups.length > 0).length === 0
+    )
+      return;
     void setVisibleColumns(next);
   }
 
@@ -1175,6 +1317,7 @@ export function Characters() {
       updateGroups(
         groupsValue,
         (groups) => moveCharacterToGroup(groups, characterId, groupId),
+        // eslint-disable-next-line react-hooks/purity -- fires from a click (the group Select's onValueChange, reached through buildColumns' column-object indirection, same handler CharacterCard's own group Select already calls directly), never during render itself.
         Date.now()
       )
     );
@@ -1214,7 +1357,8 @@ export function Characters() {
     );
   }
 
-  function renderCharacterList(characterIds: readonly number[]) {
+  /** Card view only — called once per group section plus once for Ungrouped, same as before (decision 20260927-071415 keeps group sectioning card-view-only). */
+  function renderCardList(characterIds: readonly number[]) {
     // A group (or the ungrouped section) that the filter emptied just shows
     // nothing here — repeating a "no matches" line under every such section
     // would be noise once any other section still has results. The one case
@@ -1227,50 +1371,9 @@ export function Characters() {
     // not a replacement for it, so a star raises one card and leaves the order
     // of everything around it exactly as the user asked for.
     const sortedIds = partitionStarredFirst(
-      sortCharacterIds(filteredIds, stats, sortKey, sortDirection),
+      sortCharacterIds(filteredIds, sortStatsById, sortKey, sortDirection),
       starred
     );
-
-    if (viewMode === 'table') {
-      const rows: CharacterRow[] = sortedIds
-        .map((characterId) => charactersById.get(characterId))
-        .filter((character): character is CharacterRecord => character !== undefined)
-        .map((character) => ({
-          character,
-          info: publicInfo[character.characterId],
-          stats: stats.get(character.characterId),
-          queue: queueById.get(character.characterId),
-          notTrainingAlertEnabled: notTrainingAlertEnabledFor(character.characterId),
-          attention: attentionById.get(character.characterId),
-          alertCount: alertCounts.get(character.characterId) ?? 0,
-          jobSlotSkills: jobSlotSkillsById.get(character.characterId),
-          totalSp: totalSpById.get(character.characterId),
-          starred: isCharacterStarred(starred, character.characterId),
-        }));
-      return (
-        // Deliberate deviation from DataTable's usual `.dt-stack` collapse on
-        // mobile (docs/context/decisions/20260909-130638-characters-table-
-        // view-mobile-scroll-roster-overview-split.md): a real, comparable
-        // table stays a table, and scrolls sideways instead, at every width.
-        <div className="overflow-x-auto">
-          <DataTable
-            columns={activeColumnIds.map((id) => columnsById[id])}
-            rows={rows}
-            rowKey={(row) => row.character.characterId}
-            label={t('characters.title')}
-            responsive="table"
-            sort={tableSort}
-            onSortChange={setTableSort}
-            onRowClick={(row) => void select(row.character.characterId)}
-            rowContextMenu={(row, tr) => (
-              <CharacterRowContextMenu characterId={row.character.characterId}>
-                {tr}
-              </CharacterRowContextMenu>
-            )}
-          />
-        </div>
-      );
-    }
 
     return (
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -1303,6 +1406,59 @@ export function Characters() {
     );
   }
 
+  /**
+   * Table view — one flat `DataTable` over the whole (filtered) roster, not
+   * one per group section (decision 20260927-071415): the new `group` column
+   * carries membership per row instead, and `GroupSectionHeader`'s
+   * rename/reorder/delete stay card-view only.
+   */
+  function renderTable(characterIds: readonly number[]) {
+    const filteredIds = characterIds.filter((characterId) => matchesFilters(characterId));
+    const sortedIds = partitionStarredFirst(
+      sortCharacterIds(filteredIds, sortStatsById, sortKey, sortDirection),
+      starred
+    );
+    const rows: CharacterRow[] = sortedIds
+      .map((characterId) => charactersById.get(characterId))
+      .filter((character): character is CharacterRecord => character !== undefined)
+      .map((character) => ({
+        character,
+        info: publicInfo[character.characterId],
+        stats: stats.get(character.characterId),
+        queue: queueById.get(character.characterId),
+        notTrainingAlertEnabled: notTrainingAlertEnabledFor(character.characterId),
+        attention: attentionById.get(character.characterId),
+        alertCount: alertCounts.get(character.characterId) ?? 0,
+        jobSlotSkills: jobSlotSkillsById.get(character.characterId),
+        totalSp: totalSpById.get(character.characterId),
+        starred: isCharacterStarred(starred, character.characterId),
+        groupId: groupIdByCharacterId.get(character.characterId) ?? null,
+      }));
+    return (
+      // Deliberate deviation from DataTable's usual `.dt-stack` collapse on
+      // mobile (docs/context/decisions/20260909-130638-characters-table-
+      // view-mobile-scroll-roster-overview-split.md): a real, comparable
+      // table stays a table, and scrolls sideways instead, at every width.
+      <div className="overflow-x-auto">
+        <DataTable
+          columns={activeColumnIds.map((id) => columnsById[id])}
+          rows={rows}
+          rowKey={(row) => row.character.characterId}
+          label={t('characters.title')}
+          responsive="table"
+          sort={tableSort}
+          onSortChange={setTableSort}
+          onRowClick={(row) => void select(row.character.characterId)}
+          rowContextMenu={(row, tr) => (
+            <CharacterRowContextMenu characterId={row.character.characterId}>
+              {tr}
+            </CharacterRowContextMenu>
+          )}
+        />
+      </div>
+    );
+  }
+
   if (!characters) {
     return (
       <div className="flex justify-center py-16">
@@ -1325,6 +1481,18 @@ export function Characters() {
       ].filter((name): name is string => !!name)
     ),
   ].sort((a, b) => a.localeCompare(b));
+  // Same "keep a stale selection visible so it can be cleared" reasoning as
+  // `corpOptions` — a group filtered on, then deleted, would otherwise blank
+  // the Select's trigger while the filter chip count still counts it.
+  const groupFilterOptions =
+    rosterFilter.group !== null &&
+    rosterFilter.group !== UNGROUPED_VALUE &&
+    !groupsValue.groups.some((group) => group.id === rosterFilter.group)
+      ? [
+          ...groupsValue.groups,
+          { id: rosterFilter.group, name: rosterFilter.group, characterIds: [] },
+        ]
+      : groupsValue.groups;
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -1407,6 +1575,7 @@ export function Characters() {
                 dir: next.sortDirection,
                 queue: next.queue,
                 corp: next.corp,
+                group: next.group,
                 starred: next.starredOnly,
                 alerts: next.alertsOnly,
               })
@@ -1476,6 +1645,36 @@ export function Characters() {
                         {corpOptions.map((name) => (
                           <SelectItem key={name} value={name}>
                             {name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FilterField>
+                )}
+                {/* No Groups yet has nothing to narrow to — same gate as the corp filter above. */}
+                {groupsValue.groups.length > 0 && (
+                  <FilterField label={t('characters.filterGroupLabel')}>
+                    <Select
+                      value={draft.group ?? ALL_GROUPS_VALUE}
+                      onValueChange={(value) =>
+                        setDraft({ ...draft, group: value === ALL_GROUPS_VALUE ? null : value })
+                      }
+                    >
+                      <SelectTrigger
+                        size="md"
+                        aria-label={t('characters.filterGroupLabel')}
+                        className="w-48"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={ALL_GROUPS_VALUE}>
+                          {t('characters.allGroups')}
+                        </SelectItem>
+                        <SelectItem value={UNGROUPED_VALUE}>{t('characters.ungrouped')}</SelectItem>
+                        {groupFilterOptions.map((group) => (
+                          <SelectItem key={group.id} value={group.id}>
+                            {group.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1595,6 +1794,11 @@ export function Characters() {
               title={t('characters.noSearchMatches')}
               hint={t('characters.noSearchMatchesHint')}
             />
+          ) : viewMode === 'table' ? (
+            // One flat table over the whole roster, not one per group section
+            // (decision 20260927-071415) — the `group` column carries
+            // membership per row, and group management stays in card view.
+            renderTable(allIds)
           ) : (
             <div className="space-y-4">
               {groupsValue.groups.map((group, index) => (
@@ -1610,7 +1814,7 @@ export function Characters() {
                   {group.characterIds.length === 0 ? (
                     <p className="text-xs text-text-dim">{t('characters.emptyGroup')}</p>
                   ) : (
-                    renderCharacterList(group.characterIds)
+                    renderCardList(group.characterIds)
                   )}
                 </section>
               ))}
@@ -1622,7 +1826,7 @@ export function Characters() {
                       {t('characters.ungrouped')}
                     </h2>
                   )}
-                  {renderCharacterList(ungroupedIds)}
+                  {renderCardList(ungroupedIds)}
                 </section>
               )}
             </div>

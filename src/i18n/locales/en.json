@@ -2516,7 +2516,9 @@
     "sortKeys": {
       "name": "Name",
       "skillPoints": "Skill points",
-      "wallet": "Wallet"
+      "wallet": "Wallet",
+      "group": "Group",
+      "alerts": "Alerts"
     },
     "activeLabel": "Active",
     "spLabel": "SP",
@@ -2554,6 +2556,8 @@
     "filterQueueLabel": "Queue state",
     "filterCorpLabel": "Corporation",
     "allCorporations": "All corporations",
+    "filterGroupLabel": "Group",
+    "allGroups": "All groups",
     "filterStarredOnly": "Starred only",
     "filterHasAlerts": "Has alerts",
     "viewModeLabel": "View",
@@ -2567,6 +2571,7 @@
     "column": {
       "name": "Name",
       "corp": "Corp",
+      "group": "Group",
       "spTotal": "SP",
       "wallet": "Wallet",
       "lastSynced": "Last synced",
@@ -2574,7 +2579,8 @@
       "pi": "PI",
       "spReady": "SP ready",
       "alerts": "Alerts",
-      "starred": "Starred"
+      "starred": "Starred",
+      "remove": "Remove"
     },
     "jobSlotCategory": {
       "manufacturing": "Mfg",

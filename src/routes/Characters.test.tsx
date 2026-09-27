@@ -22,6 +22,7 @@ import {
 import { FONT_SCALE_KEY, useFontScale } from '@/lib/fontScale';
 import {
   DEFAULT_VISIBLE_CHARACTER_COLUMNS,
+  useCharacterColumnsMigrated,
   useCharacterViewMode,
   useVisibleCharacterColumns,
 } from '@/features/character/characterColumns';
@@ -91,6 +92,8 @@ beforeEach(async () => {
     value: DEFAULT_VISIBLE_CHARACTER_COLUMNS,
     hydrated: false,
   });
+  // Defaults already include `group`/`remove` — no migration needed in tests.
+  useCharacterColumnsMigrated.setState({ value: true, hydrated: false });
   useSpExtractionMonitoringEnabled.setState({ value: false, hydrated: false });
   useSpExtractionThresholdSp.setState({
     value: DEFAULT_SP_EXTRACTION_THRESHOLD_SP,
@@ -1067,6 +1070,7 @@ describe('Characters table view', () => {
       'Rxn',
       'Training',
       'Starred',
+      'Remove',
     ]) {
       await user.click(await screen.findByRole('button', { name: 'Columns' }));
       await user.click(await screen.findByRole('menuitemcheckbox', { name: label }));
@@ -1434,6 +1438,101 @@ describe('Characters table view', () => {
       snapshotSpy.mockRestore();
       attentionSpy.mockRestore();
     }
+  });
+
+  it('is one flat table with no group section headings, and moves a character between groups via the Group column', async () => {
+    await useOverviewGroups.getState().setValue({
+      groups: [
+        { id: 'a', name: 'Alts', characterIds: [92] },
+        { id: 'b', name: 'Mains', characterIds: [] },
+      ],
+      updatedAt: 1,
+    });
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+
+    const table = await screen.findByRole('table');
+    // No card-view section headings in table view (decision 20260927-071415).
+    expect(screen.queryByRole('heading', { name: 'Alts' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Ungrouped' })).not.toBeInTheDocument();
+    expect(within(table).getByText('Pilot One')).toBeInTheDocument();
+    expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
+
+    const pilotOneRow = within(table).getByText('Pilot One').closest('tr') as HTMLElement;
+    const groupSelect = within(pilotOneRow).getByRole('combobox', {
+      name: 'Group for Pilot One',
+    });
+    expect(groupSelect).toHaveTextContent('Ungrouped');
+
+    await user.click(groupSelect);
+    await user.click(await screen.findByRole('option', { name: 'Mains' }));
+
+    await waitForSettingsValue(OVERVIEW_GROUPS_SETTING_KEY, (value) => {
+      const groups = (value as { groups: { id: string; characterIds: number[] }[] }).groups;
+      return groups.find((group) => group.id === 'b')?.characterIds.includes(91) ?? false;
+    });
+  });
+
+  it('hides the Group column and filter entirely when no Groups exist', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+    const table = await screen.findByRole('table');
+
+    expect(within(table).queryByRole('columnheader', { name: /group/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    expect(screen.queryByRole('combobox', { name: 'Group' })).not.toBeInTheDocument();
+  });
+
+  it('removes a character from the table via its Remove column, same confirm dialog as the card', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
+    expect(dialog).toHaveTextContent('Pilot One');
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+
+    await waitFor(() => expect(screen.queryByText('Pilot One')).not.toBeInTheDocument());
+  });
+
+  it('filters the roster by Group, including an Ungrouped-only option', async () => {
+    await useOverviewGroups.getState().setValue({
+      groups: [{ id: 'a', name: 'Alts', characterIds: [92] }],
+      updatedAt: 1,
+    });
+    const user = userEvent.setup();
+    renderCharacters();
+    await user.click(await screen.findByRole('button', { name: 'Table' }));
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    await user.click(screen.getByRole('combobox', { name: 'Group' }));
+    await user.click(await screen.findByRole('option', { name: 'Alts' }));
+
+    await waitFor(() => expect(screen.queryByText('Pilot One')).not.toBeInTheDocument());
+    expect(screen.getByText('Pilot Two')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('combobox', { name: 'Group' }));
+    await user.click(await screen.findByRole('option', { name: 'Ungrouped' }));
+
+    await waitFor(() => expect(screen.getByText('Pilot One')).toBeInTheDocument());
+    expect(screen.queryByText('Pilot Two')).not.toBeInTheDocument();
+  });
+
+  it('offers Group and Alerts as Sort-by options', async () => {
+    const user = userEvent.setup();
+    renderCharacters();
+    await screen.findByText('Pilot One');
+
+    await user.click(screen.getByRole('button', { name: /^Filters/ }));
+    await user.click(screen.getByRole('combobox', { name: 'Sort by' }));
+    expect(await screen.findByRole('option', { name: 'Group' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Alerts' })).toBeInTheDocument();
   });
 
   describe('row context menu', () => {
