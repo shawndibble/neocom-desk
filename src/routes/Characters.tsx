@@ -1117,12 +1117,6 @@ export function Characters() {
   // every hydrate, so a pilot who deliberately hides one afterward keeps it
   // hidden. `setColumnsMigrated(true)` fires even when nothing was actually
   // missing, so this never runs a second time on this device.
-  // One-shot migration (issue #2077, decision 20260927-071415): a stored
-  // column list from before `group`/`remove` existed is missing both, not
-  // because a pilot hid them. Gated on `columnsMigrated` rather than run on
-  // every hydrate, so a pilot who deliberately hides one afterward keeps it
-  // hidden. `setColumnsMigrated(true)` fires even when nothing was actually
-  // missing, so this never runs a second time on this device.
   useEffect(() => {
     if (!visibleColumnsHydrated || !columnsMigratedHydrated || columnsMigrated) return;
     const migrated = migrateVisibleColumns(visibleColumns);
