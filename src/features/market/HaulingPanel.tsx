@@ -21,7 +21,6 @@ import {
   EmptyState,
   FilterBar,
   FilterField,
-  IconButton,
   Panel,
   Select,
   SelectContent,
@@ -35,7 +34,6 @@ import {
   TypeIcon,
   type DataTableColumn,
 } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
 import {
   multibuyText,
   planTrip,
@@ -163,7 +161,23 @@ function signed(value: number, fractionDigits: number): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(fractionDigits)}`;
 }
 
-export function HaulingPanel() {
+/** What the page header needs to render Hauling's own reload button beside the page title. */
+export interface HaulingRefreshInfo {
+  refresh: () => void;
+  disabled: boolean;
+}
+
+interface HaulingPanelProps {
+  /**
+   * Reload lives in the page title bar next to "Market", not in this Panel's
+   * own header — so the scan state (and the function that re-triggers it)
+   * is handed up to whoever renders that title bar. Called on every change,
+   * and with `null` on unmount so a stale button never lingers.
+   */
+  onRefreshInfoChange?: (info: HaulingRefreshInfo | null) => void;
+}
+
+export function HaulingPanel({ onRefreshInfoChange }: HaulingPanelProps) {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
 
@@ -247,6 +261,12 @@ export function HaulingPanel() {
     defaultHubHydrated && from.id !== to.id
   );
   const fees = useHaulingFees(activeCharacterId, to);
+
+  const refreshDisabled = state.status !== 'ready';
+  useEffect(() => {
+    onRefreshInfoChange?.({ refresh, disabled: refreshDisabled });
+    return () => onRefreshInfoChange?.(null);
+  }, [onRefreshInfoChange, refresh, refreshDisabled]);
 
   const viewRows = useMemo(
     () => (state.status === 'ready' ? toViewRows(state.scan.rows, fees) : []),
@@ -543,18 +563,9 @@ export function HaulingPanel() {
             onBudgetChange={(next) => void setBudget(next)}
           />
           <Button size="sm" disabled={plan.totals.items === 0} onClick={() => void copyMultibuy()}>
-            {t('market.hauling.copyMultibuy', { count: plan.totals.items })}
+            {t('market.hauling.copyMultibuy')}
           </Button>
-          <span className="flex items-center gap-2">
-            {state.status === 'ready' && <DataAgeBadge date={new Date(state.scan.fetchedAt)} />}
-            <IconButton
-              size="sm"
-              icon={<Icon.Refresh />}
-              label={t('market.refresh')}
-              onClick={refresh}
-              disabled={state.status !== 'ready'}
-            />
-          </span>
+          {state.status === 'ready' && <DataAgeBadge date={new Date(state.scan.fetchedAt)} />}
         </div>
       }
       padded={false}
@@ -841,6 +852,7 @@ export function HaulingPanel() {
                   renderDetail: (row) => (
                     <HaulingRowDetail row={row} from={from} to={to} fees={fees} />
                   ),
+                  hideIcon: true,
                 }}
                 rowClassName={(row) =>
                   overrides.get(row.typeId)?.selected === false ? 'opacity-60' : undefined
@@ -874,7 +886,7 @@ export function HaulingPanel() {
                   </pre>
                 </div>
                 <Button disabled={plan.totals.items === 0} onClick={() => void copyMultibuy()}>
-                  {t('market.hauling.copyMultibuy', { count: plan.totals.items })}
+                  {t('market.hauling.copyMultibuy')}
                 </Button>
               </div>
 
