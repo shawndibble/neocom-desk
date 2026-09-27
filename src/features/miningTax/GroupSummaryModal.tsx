@@ -1,15 +1,11 @@
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
-import { Button, IconButton, InfoTooltip, Modal, StatChip } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
+import { Button, InfoTooltip, Modal, StatChip } from '@/components/ui';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import type { MiningTaxAssignmentRecord } from '@/db';
 import { STATUS_LABEL_KEY } from '@/engine/miningTax/rowStatus';
-import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { formatIsk } from '@/lib/isk';
+import { PaymentLinksCard, type LinkedTransaction } from './PaymentLinksCard';
 import { STATUS_TONE } from './statusTone';
-import type { LinkedTransaction } from './RowDetailModal';
 import type { MoonMiningTaxRow } from './snapshot';
 
 export interface GroupMember {
@@ -98,62 +94,12 @@ export function GroupSummaryModal({
 
         {!anyOutstanding &&
           (onLinkTransaction || (linkedTransactions && linkedTransactions.length > 0)) && (
-            <div className="space-y-1.5 rounded-xs border border-line bg-panel-2 p-2">
-              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                {t('miningTax.paymentCardTitle')}
-              </p>
-              {linkedTransactions && linkedTransactions.length > 0 ? (
-                <ul className="divide-y divide-line text-xs">
-                  {linkedTransactions.map((tx) => (
-                    <li
-                      key={`${tx.kind}:${tx.refId}`}
-                      className="flex items-center justify-between gap-2 py-1 first:pt-0 last:pb-0"
-                    >
-                      <span className="min-w-0 flex-1 truncate">
-                        {tx.label === null ? (
-                          <span className="text-text-dim">
-                            {t('miningTax.transactionNoLongerCached', { id: tx.refId })}
-                          </span>
-                        ) : (
-                          <Link
-                            to={
-                              tx.kind === 'journal'
-                                ? `/wallet/journal?${HIGHLIGHT_PARAM}=${tx.refId}`
-                                : `/contracts?${HIGHLIGHT_PARAM}=${tx.refId}`
-                            }
-                            className={inlineLinkClassName}
-                          >
-                            {tx.label}
-                          </Link>
-                        )}
-                        {tx.source === 'auto' && (
-                          <span className="ml-1.5 text-[0.6875rem] text-text-dim">
-                            {t('miningTax.transactionAutoMatchedBadge')}
-                          </span>
-                        )}
-                      </span>
-                      {onUnlinkTransaction && (
-                        <IconButton
-                          icon={<Icon.Close />}
-                          label={t('miningTax.unlinkTransactionAction')}
-                          size="sm"
-                          tone="danger"
-                          disabled={busy}
-                          onClick={() => onUnlinkTransaction(tx)}
-                        />
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-xs text-text-dim">{t('miningTax.noLinkedTransactions')}</p>
-              )}
-              {onLinkTransaction && (
-                <Button size="sm" disabled={busy} onClick={onLinkTransaction}>
-                  {t('miningTax.linkTransactionAction')}
-                </Button>
-              )}
-            </div>
+            <PaymentLinksCard
+              linkedTransactions={linkedTransactions}
+              onLinkTransaction={onLinkTransaction}
+              onUnlinkTransaction={onUnlinkTransaction}
+              busy={busy}
+            />
           )}
 
         <ul className="space-y-2">
