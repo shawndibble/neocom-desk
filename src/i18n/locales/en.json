@@ -4097,6 +4097,7 @@
     "startingBid": "Starting bid: {{price}}",
     "buyout": "Buyout: {{price}}",
     "plexPrice": "{{plex}} PLEX",
+    "iskPlusPlexPrice": "{{isk}} + {{plex}} PLEX",
     "wholeContractMarker": "Whole contract",
     "emptyTitle": "No public BPC listings synced yet",
     "emptyHint": "The public contract index refreshes on its own schedule — check back shortly.",
