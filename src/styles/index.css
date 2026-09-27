@@ -353,6 +353,11 @@
       top: 0.5rem;
       right: 0.75rem;
       padding: 0;
+      /* Overrides the cell's own `w-0` (kept for desktop's tight trailing
+         column, see the JSX) — left at `w-0` the icon rendered from this
+         corner anchor with no box to fill and overlapped the actions
+         button beside it, the same #1708 mistake `dt-actions` above notes. */
+      width: auto;
     }
 
     .dt-stack:not(.dt-stack-dense) td.dt-disclosure::before {
@@ -370,6 +375,14 @@
        chevron sits immediately left of the button rather than under it. */
     .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-disclosure {
       right: 3.75rem;
+    }
+
+    /* All three corner controls at once (a card with `cardCorner`,
+       `expandableRow` and `rowMoreActions` together, e.g. HaulingPanel):
+       the corner value shifts further left again to clear the chevron,
+       which otherwise shares its offset and sits on top of it. */
+    .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions):has(> td.dt-disclosure) td.dt-corner {
+      right: 5.25rem;
     }
 
     /* The card title truncates before the pinned button rather than

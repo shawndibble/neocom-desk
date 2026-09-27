@@ -281,6 +281,14 @@ md:h-9`** — pointer users never get the 44px box, touch users never get the
   replaced, and they are why a `Select` used to sit taller than the
   `Button size="sm"` beside it. `StatChip` and `DataAgeBadge` are the
   deliberate exception at a flat `h-7`: readouts, not targets.
+- A control that would otherwise get `md` for its own sake (a primary
+  action, a pin/target toggle) but sits paired beside an `sm` control in the
+  same small toolbar — Market's `ItemPriceAlertBell` next to its Info
+  `IconButton` — takes `sm` too. Two adjacent icon buttons at different
+  heights reads as a layout bug before it reads as an intentional touch-target
+  choice, and the mismatch is more visible than the few extra millimeters of
+  target size. Prefer this only where the controls sit in the same visual
+  row and the sibling's own size wasn't itself an oversight.
 - Radius: **minimal**. `rounded-xs` (2px) for panels, buttons, chips, inputs.
   `rounded-full` only for avatars, dots, spinners. Never `rounded-md`+ on rectangles.
 - Borders: always 1px (`border`), never 2px. The one exception is a **state
