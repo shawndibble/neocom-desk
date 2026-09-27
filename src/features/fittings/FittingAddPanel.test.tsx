@@ -14,7 +14,6 @@ import { clearHullFitMemory } from './hullFitService';
 const checkCandidates = vi.fn();
 const checkCharges = vi.fn();
 vi.mock('./dogmaFittingEngine', () => ({
-  DOGMA_ASSET_VERSION: 1,
   checkCandidates: (...args: unknown[]) => checkCandidates(...args),
   checkCharges: (...args: unknown[]) => checkCharges(...args),
 }));

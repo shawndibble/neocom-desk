@@ -12,14 +12,14 @@
 import type { CandidateRack } from '@/engine/fittings/candidates';
 import { skillsKey, unpackCheck } from '@/engine/fittings/hullFitKey';
 import type { PilotProfile } from '@/engine/fittings/types';
-import { DOGMA_ASSET_VERSION, checkCandidates, type CandidateCheck } from './dogmaFittingEngine';
+import { checkCandidates, type CandidateCheck } from './dogmaFittingEngine';
 import { loadSavedHullFit, saveHullFit } from './hullFitCache';
 import type { HullFitReply, HullFitRequest } from './hullFit.worker';
 import type { FittingCatalogue } from './useFittingCatalogue';
 
 export type HullFitChecks = ReadonlyMap<number, CandidateCheck>;
 
-/** Bump when what a saved check means changes (`HULL_RULES`, the pre-filter, the packing). */
+/** Bump when what a saved check means changes without the engine pins doing so (`HULL_RULES`, the pre-filter, the packing). */
 const RESULT_VERSION = 1;
 /** Ids per engine call on the page; small enough that one slice stays well under a frame. */
 const BATCH = 50;
@@ -28,12 +28,37 @@ const SLICE_MS = 12;
 /** Hulls kept in memory. */
 const MEMORY_HULLS = 8;
 
+const RACK_CODE: Record<CandidateRack, number> = {
+  high: 1,
+  medium: 2,
+  low: 3,
+  rig: 4,
+  subsystem: 5,
+  drone: 6,
+};
+const fingerprints = new WeakMap<FittingCatalogue, string>();
+
+/** The items and racks the check runs over, as a short text: a data rebuild changes it. */
+function catalogueFingerprint(catalogue: FittingCatalogue): string {
+  let known = fingerprints.get(catalogue);
+  if (known === undefined) {
+    let hash = 0;
+    for (const entry of catalogue.marketTypes) {
+      const rack = catalogue.rackOf[String(entry.typeId)];
+      hash = (Math.imul(hash, 31) + entry.typeId * 8 + (rack ? RACK_CODE[rack] : 0)) | 0;
+    }
+    known = `${catalogue.marketTypes.length}.${(hash >>> 0).toString(36)}`;
+    fingerprints.set(catalogue, known);
+  }
+  return known;
+}
+
 /** Everything a saved answer is valid for. */
 function hullFitKey(catalogue: FittingCatalogue, shipTypeId: number, profile: PilotProfile) {
   return [
     RESULT_VERSION,
-    DOGMA_ASSET_VERSION,
-    catalogue.marketTypes.length,
+    __DOGMA_PINS__,
+    catalogueFingerprint(catalogue),
     shipTypeId,
     skillsKey(profile.skillLevels),
   ].join('|');
@@ -115,7 +140,7 @@ function computeInWorker(
   });
 }
 
-/** The page's own path: every item through the memoizing engine call, in slices that yield. */
+/** The page's own path: every item through the memoizing engine call, in slices that yield; keeps what fits the hull, as the worker does. */
 function computeOnPage(
   shipTypeId: number,
   jobs: [CandidateRack, number[]][],
@@ -133,7 +158,7 @@ function computeOnPage(
       while (next < slices.length && performance.now() < until) {
         const [rack, ids] = slices[next++];
         for (const [id, check] of checkCandidates(shipTypeId, rack, ids, profile)) {
-          checks.set(id, check);
+          if (check.fitsHull) checks.set(id, check);
         }
       }
       if (next < slices.length) setTimeout(slice, 0);
@@ -173,7 +198,12 @@ export function getHullFit(
 ): Promise<HullFitChecks> {
   const key = hullFitKey(catalogue, shipTypeId, profile);
   const known = memory.get(key);
-  if (known) return Promise.resolve(known);
+  if (known) {
+    // Most recently used last, so the oldest goes first.
+    memory.delete(key);
+    memory.set(key, known);
+    return Promise.resolve(known);
+  }
   const existing = running.get(key);
   if (existing) return existing;
 

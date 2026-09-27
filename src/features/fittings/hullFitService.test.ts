@@ -5,7 +5,6 @@ import type { FittingCatalogue } from './useFittingCatalogue';
 
 const checkCandidates = vi.fn();
 vi.mock('./dogmaFittingEngine', () => ({
-  DOGMA_ASSET_VERSION: 1,
   checkCandidates: (...args: unknown[]) => checkCandidates(...args),
 }));
 
@@ -45,7 +44,8 @@ describe('getHullFit', () => {
     expect(a).toBe(b);
     expect(checkCandidates).toHaveBeenCalledTimes(1);
     expect(a.get(1)?.fitsHull).toBe(true);
-    expect(a.get(2)?.fitsHull).toBe(false);
+    // What doesn't go on the hull isn't listed.
+    expect(a.has(2)).toBe(false);
   });
 
   it('answers a repeat from memory', async () => {
@@ -65,7 +65,7 @@ describe('getHullFit', () => {
 
     expect(checkCandidates).not.toHaveBeenCalled();
     expect(checks.get(1)).toEqual({ fitsHull: true, canFly: true, fitsResources: true });
-    expect(checks.get(2)).toEqual({ fitsHull: false, canFly: true, fitsResources: true });
+    expect(checks.has(2)).toBe(false);
   });
 
   it('checks again for other skills, or another hull', async () => {

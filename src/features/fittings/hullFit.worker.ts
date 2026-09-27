@@ -26,11 +26,16 @@ export type HullFitReply =
 /** Items per turn of the worker's own event loop, so a newer request is heard. */
 const BATCH = 100;
 
-let latest = 0;
-
 const yieldToQueue = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
-async function run({ id, shipTypeId, jobs, skillLevels }: HullFitRequest): Promise<HullFitReply> {
+/**
+ * Answers one request. `isLatest` says whether it is still the newest one
+ * asked; checked between batches, so a newer request ends this one early.
+ */
+export async function runHullFit(
+  { id, shipTypeId, jobs, skillLevels }: HullFitRequest,
+  isLatest: (id: number) => boolean
+): Promise<HullFitReply> {
   await loadDogmaEngine();
   const skills = new Map(skillLevels);
   const racks = hullRacks(shipTypeId, skills);
@@ -38,7 +43,7 @@ async function run({ id, shipTypeId, jobs, skillLevels }: HullFitRequest): Promi
   for (const [rack, typeIds] of jobs) {
     if (!racks.has(rack)) continue;
     for (let i = 0; i < typeIds.length; i += BATCH) {
-      if (latest !== id) return { id, aborted: true };
+      if (!isLatest(id)) return { id, aborted: true };
       for (const typeId of typeIds.slice(i, i + BATCH)) {
         const check = checkHullCandidate(shipTypeId, rack, typeId, skills);
         if (check) entries.push([typeId, packCheck(check)]);
@@ -46,15 +51,19 @@ async function run({ id, shipTypeId, jobs, skillLevels }: HullFitRequest): Promi
       await yieldToQueue();
     }
   }
-  return latest === id ? { id, entries } : { id, aborted: true };
+  return isLatest(id) ? { id, entries } : { id, aborted: true };
 }
 
-self.onmessage = (event: MessageEvent<HullFitRequest>) => {
-  latest = event.data.id;
-  run(event.data)
-    .catch((error: unknown): HullFitReply => ({
-      id: event.data.id,
-      error: error instanceof Error ? error.message : String(error),
-    }))
-    .then((reply) => self.postMessage(reply));
-};
+// Only in a worker: the module is also imported by tests, where there is no `self` to listen on.
+if (typeof WorkerGlobalScope !== 'undefined') {
+  let latest = 0;
+  self.onmessage = (event: MessageEvent<HullFitRequest>) => {
+    latest = event.data.id;
+    runHullFit(event.data, (id) => id === latest)
+      .catch((error: unknown): HullFitReply => ({
+        id: event.data.id,
+        error: error instanceof Error ? error.message : String(error),
+      }))
+      .then((reply) => self.postMessage(reply));
+  };
+}

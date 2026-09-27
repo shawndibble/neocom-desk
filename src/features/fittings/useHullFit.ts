@@ -32,22 +32,31 @@ export function useHullFit(
   useEffect(() => {
     if (catalogue === null || profile === null || shipTypeId === null || !engineReady) return;
     let cancelled = false;
-    const start = () => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const start = (attempt = 0) => {
       getHullFit(catalogue, shipTypeId, profile)
         .then((checks) => {
           if (!cancelled) setResult({ catalogue, shipTypeId, profile, checks });
         })
-        .catch(() => {
-          // Superseded by a newer hull, or the check failed: the browser
-          // stays on "checking" and the next change of hull asks again.
+        .catch((error: unknown) => {
+          // A newer hull took the worker while this one was still on screen
+          // (back-and-forth switching): ask again. Any other failure leaves
+          // the browser on "checking" until the hull or pilot changes.
+          if (
+            !cancelled &&
+            attempt < 3 &&
+            error instanceof Error &&
+            error.message === 'superseded'
+          ) {
+            timer = setTimeout(() => start(attempt + 1), 0);
+          }
         });
     };
-    let timer: ReturnType<typeof setTimeout> | undefined;
     let idle: number | undefined;
     if (whenIdle && typeof requestIdleCallback === 'function') {
-      idle = requestIdleCallback(start, { timeout: 2000 });
+      idle = requestIdleCallback(() => start(), { timeout: 2000 });
     } else {
-      timer = setTimeout(start, 0);
+      timer = setTimeout(() => start(), 0);
     }
     return () => {
       cancelled = true;

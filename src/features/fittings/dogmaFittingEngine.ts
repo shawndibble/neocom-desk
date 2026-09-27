@@ -57,8 +57,6 @@ const SDE_URL = '/vendor/dogma/sde.dat';
  * fetch, on the next bump.
  */
 const CACHE_VERSION = 1;
-/** The engine assets' version — part of what a saved hull check is valid for. */
-export const DOGMA_ASSET_VERSION = CACHE_VERSION;
 const CACHE_NAME = `dogma-engine-assets-v${CACHE_VERSION}`;
 
 export interface DogmaAssetProgress {
