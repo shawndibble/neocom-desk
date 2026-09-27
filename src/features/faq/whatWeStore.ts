@@ -7,11 +7,13 @@
  * wording lives in `en.json`.
  *
  * This list is a **user-facing commitment**, not documentation. It is written
- * from what actually reaches a server — the `CollectionSpec`s in
- * `sync/planSync.ts`, the `SYNCED_SETTING_KEYS` allow-list in
- * `sync/syncedSettings.ts`, and `instrument.ts`'s Sentry configuration.
- * Anything added to any of those makes this list wrong until it is added here
- * too. See the scope decision recorded alongside this feature.
+ * from what actually reaches a server — the synced collection registry
+ * (`sync/syncedCollections.ts`), whose every declaration names the line here
+ * that tells the pilot about it (`faqItem`), the `SYNCED_SETTING_KEYS`
+ * allow-list in `sync/syncedSettings.ts`, and `instrument.ts`'s Sentry
+ * configuration. Anything added to any of those makes this list wrong until
+ * it is added here too. See the scope decision recorded alongside this
+ * feature.
  *
  * Deliberately honest about the four places where something EVE-derived, or
  * anything at all, does leave the device, because a section that overclaimed
@@ -25,11 +27,22 @@
  * stated in {@link WHAT_WE_STORE_NOTES} rather than buried.
  */
 
+import type { SyncedFaqItemId } from '@/sync/syncedCollections';
+
 /** One line in a group: a short label, plus a note when the label alone would leave a real question. */
 export interface WhatWeStoreItem {
   id: string;
   labelKey: string;
   noteKey?: string;
+}
+
+/**
+ * A line in the synced group. Its id is the `faqItem` that one or more
+ * registry declarations point at, so a typo'd or renamed line fails to
+ * compile rather than silently orphaning a collection.
+ */
+interface SyncedWhatWeStoreItem extends WhatWeStoreItem {
+  id: SyncedFaqItemId;
 }
 
 export interface WhatWeStoreGroup {
@@ -77,7 +90,7 @@ export const WHAT_WE_STORE_GROUPS: readonly WhatWeStoreGroup[] = [
         labelKey: 'settings.faq.store.synced.settings',
         noteKey: 'settings.faq.store.synced.settingsNote',
       },
-    ],
+    ] satisfies readonly SyncedWhatWeStoreItem[],
   },
   {
     id: 'local',
