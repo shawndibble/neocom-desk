@@ -7,13 +7,13 @@
  * Player-structure orders never carry standings — `lookupNpcStation`
  * returning `null` (a known player structure) or `undefined` (the snapshot
  * itself could not be read, so this location's kind is unknown) both fall
- * back to zero without spending a request. A Trade Hub skips all of it and
- * reads its stored owner and faction (`src/market/hubs.ts`), so the pages that
- * resolve every hub up front (`useTradeHubStandings`) never fan out to ESI.
+ * back to zero without spending a request. A Trade Hub reads its stored owner
+ * and faction (`src/market/hubs.ts`); every other NPC station reads them from
+ * the station snapshot (issue #1675). Neither spends a request, so the pages
+ * that resolve every order or hub (`openOrdersPageSnapshot`,
+ * `useTradeHubStandings`) never fan out to ESI.
  */
 import { lookupNpcStation } from '@/sde/npcStations';
-import { loadStationOwner } from '@/features/character/stations';
-import { loadPublicCorporationInfo } from '@/features/character/publicInfoData';
 import { TRADE_HUBS } from '@/market/hubs';
 import {
   resolveOwnerStandings,
@@ -32,9 +32,11 @@ export async function resolveLocationStandings(
   const snapshot = await lookupNpcStation(locationId);
   if (snapshot === null || snapshot === undefined) return ZERO_STANDINGS;
 
-  const ownerCorporationId = await loadStationOwner(locationId);
-  if (ownerCorporationId === null) return ZERO_STANDINGS;
-
-  const corp = await loadPublicCorporationInfo(ownerCorporationId);
-  return resolveOwnerStandings(ownerCorporationId, corp?.faction_id ?? null, standings);
+  // A snapshot built before owner columns existed has no owner to resolve.
+  if (snapshot.ownerCorporationId === undefined) return ZERO_STANDINGS;
+  return resolveOwnerStandings(
+    snapshot.ownerCorporationId,
+    snapshot.ownerFactionId ?? null,
+    standings
+  );
 }
