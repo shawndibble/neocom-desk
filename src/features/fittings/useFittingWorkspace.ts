@@ -18,8 +18,8 @@
  */
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { db } from '@/db';
-import { renameFitting, saveFitting } from './myFittings';
+import { renameFittingById, resolveSaveTarget, saveFitting } from './myFittings';
+import { resolveCoalesce, resolveShareCodeChange } from './fittingShareSession';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useUrlParam } from '@/lib/useUrlState';
 import { FITTING_EDIT_PATH, fittingEditLocation } from './fittingRoutes';
@@ -236,20 +236,23 @@ export function useFittingWorkspace(): FittingWorkspace {
     ownWriteRef.current = null;
     const pending = pendingOpenRef.current;
     pendingOpenRef.current = null;
-    if (own?.code !== shareCode) {
+    const { isDifferentFitting, resetSavedId, adopted } = resolveShareCodeChange({
+      ownWrite: own,
+      pendingOpen: pending,
+      shareCode,
+    });
+    if (isDifferentFitting) {
       launchPendingRef.current = null;
-      // Anything but an edit or a saved-Fitting open is a different Fitting.
-      if (pending?.code !== shareCode) setSavedId(null);
+      if (resetSavedId) setSavedId(null);
       setLastLoad(null);
       setTooLargeToShare(false);
       // Back/Forward or a pasted link ends any coalescing run: the next edit
       // pushes rather than overwriting the entry just navigated to.
       lastWriteRef.current = null;
     }
-    // `own.fitting` is only set by `edit()` (a paste's own write carries
-    // `fitting: null`) — an edit keeps the toggle's override, everything else
-    // (a paste, Back/Forward) is a genuinely different Fitting.
-    if (!(own?.code === shareCode && own.fitting)) {
+    // An edit keeps the toggle's override; everything else (a paste,
+    // Back/Forward) is a genuinely different Fitting.
+    if (adopted === null) {
       setBasisOverride(null);
     }
     if (shareCode === null) {
@@ -262,10 +265,10 @@ export function useFittingWorkspace(): FittingWorkspace {
       setShareError(null);
       return;
     }
-    if (own?.code === shareCode && own.fitting) {
-      latestFittingRef.current = own.fitting;
+    if (adopted !== null) {
+      latestFittingRef.current = adopted;
       setShareError(null);
-      setFitting(own.fitting);
+      setFitting(adopted);
       return;
     }
     void (async () => {
@@ -402,14 +405,13 @@ export function useFittingWorkspace(): FittingWorkspace {
         // wrote, not the last one asked for: a superseded first edit of a run
         // never wrote, so the one that does must still push, or the pre-edit
         // entry would be overwritten and Back would skip past it.
-        const now = Date.now();
-        const last = lastWriteRef.current;
-        const coalesce =
-          coalesceKey !== undefined &&
-          last !== null &&
-          last.key === coalesceKey &&
-          now - last.at < COALESCE_MS;
-        lastWriteRef.current = coalesceKey === undefined ? null : { key: coalesceKey, at: now };
+        const { coalesce, next: nextRun } = resolveCoalesce(
+          lastWriteRef.current,
+          coalesceKey,
+          Date.now(),
+          COALESCE_MS
+        );
+        lastWriteRef.current = nextRun;
         ownWriteRef.current = { code: encoded.payload, fitting: next };
         setShareCode(encoded.payload, { push: !coalesce && history === 'push' });
       })();
@@ -439,13 +441,8 @@ export function useFittingWorkspace(): FittingWorkspace {
       // The record may have been deleted from the list since it was opened;
       // then this is a new save. A live one keeps its name, which the list
       // may have renamed since the Fitting was opened.
-      const existing = savedId === null ? undefined : await db.fittings.get(savedId);
-      const updating = existing?.characterId === activeCharacterId ? existing : undefined;
-      const record = await saveFitting(activeCharacterId, {
-        ...(updating ? { id: updating.id } : {}),
-        name: updating?.name ?? current.name,
-        code: encoded.payload,
-      });
+      const target = await resolveSaveTarget(savedId, activeCharacterId, current.name);
+      const record = await saveFitting(activeCharacterId, { ...target, code: encoded.payload });
       setSavedId(record.id);
     } finally {
       savingRef.current = false;
@@ -478,9 +475,7 @@ export function useFittingWorkspace(): FittingWorkspace {
     (name: string) => {
       applyEdit((f) => ({ ...f, name }), { history: 'none' });
       if (savedId === null) return;
-      void db.fittings.get(savedId).then((record) => {
-        if (record) void renameFitting(record, name);
-      });
+      void renameFittingById(savedId, name);
     },
     [applyEdit, savedId]
   );
