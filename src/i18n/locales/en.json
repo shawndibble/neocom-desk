@@ -1362,6 +1362,7 @@
     "columnCumulative": "Finish date",
     "columnTakes": "Takes",
     "columnDoneBy": "Done by",
+    "inGameQueueDone": "In game queue · done {{date}}",
     "columns": "Columns",
     "columnAttributePair": "Attribute pair",
     "columnPriority": "Priority",
