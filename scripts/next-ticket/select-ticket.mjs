@@ -35,7 +35,8 @@ function sleep(ms) {
 }
 
 function acquireLock() {
-  for (let attempt = 1; attempt <= 12; attempt++) {
+  let attempt = 1;
+  while (attempt <= 12) {
     try {
       fs.mkdirSync(lockDir);
       fs.writeFileSync(path.join(lockDir, 'owner'), String(Math.floor(Date.now() / 1000)));
@@ -50,10 +51,11 @@ function acquireLock() {
       if (ageSec > 90) {
         log(`stale lock (${ageSec}s old), reclaiming`);
         fs.rmSync(lockDir, { recursive: true, force: true });
-        continue;
+        continue; // retry right away — reclaiming does not use up an attempt
       }
       log(`lock held, waiting (attempt ${attempt}/12)`);
       sleep(10_000);
+      attempt++;
     }
   }
   return false;
@@ -61,7 +63,7 @@ function acquireLock() {
 
 function releaseLock() {
   try {
-    fs.rmdirSync(lockDir);
+    fs.rmSync(lockDir, { recursive: true, force: true }); // holds an owner file, so rmdir would throw
   } catch {}
 }
 

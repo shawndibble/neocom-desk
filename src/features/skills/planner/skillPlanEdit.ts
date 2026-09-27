@@ -1,21 +1,20 @@
 /**
- * Every Skill Plan edit the Plan Editor makes (issue #2044), each a pure
- * `(plan, ...args) => patch` so the editor only dispatches — the same shape
- * as the Fitting editor's `engine/fittings/fittingEdit.ts`. Never mutates
- * its input.
+ * Every Skill Plan edit, each a pure `(plan, ...args) => patch`: the Plan
+ * Editor (issue #2044) only dispatches — the same shape as the Fitting
+ * editor's `engine/fittings/fittingEdit.ts` — and the writes from outside it
+ * (`useTargetPlan`'s Add/Undo, `SkillRowContextMenu`'s Add) come through here
+ * too. Never mutates its input.
  *
  * A Skill Plan holds three index-aligned lists: `entries`, `markers` (Remap
  * Marker positions into `entries`) and `markerAttributes` (each marker's
  * manual override, by marker ordinal — see `normalizeMarkerAttributes`).
- * Keeping those three consistent is this module's job for every edit the
- * Plan Editor makes: each operation returns a patch in which whatever it
- * touches still lines up, so no caller has to remember which marker helper
- * pairs with which.
+ * Keeping those three consistent is this module's job for every edit: each
+ * operation returns a patch in which whatever it touches still lines up, so
+ * no caller has to remember which marker helper pairs with which.
  *
- * A patch carries only the fields the edit changes, exactly as the editor
- * wrote them before this module existed — the record the route persists and
- * syncs is `{ ...plan, ...patch }`, so an extra field here would be an extra
- * synced write.
+ * A patch carries only the fields the edit changes — every caller persists
+ * and syncs `{ ...plan, ...patch }`, so an extra field here would be an
+ * extra synced write.
  */
 import type { SkillPlanRecord } from '@/db';
 import type { RemapSegment } from '@/engine/optimizer';
