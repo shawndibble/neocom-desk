@@ -1,8 +1,8 @@
 /**
  * One `Map<key, value>` of resolved results plus the in-flight/failed
- * tracking around it — the shape `OpenOrdersPanel` hand-rolled six times
- * (region competition, structure book, jump distance, refine comparison, hub
- * prices, price history), each keyed differently but doing the same thing:
+ * tracking around it — the shape Order Detail (`useOrderDetail`) holds six
+ * of (region competition, structure book, jump distance, refine comparison,
+ * hub prices, price history), each keyed differently but doing the same thing:
  * fetch a key once, on demand (a row expanding), skip a key already resolved
  * or already in flight, and leave a failure uncached so the next demand
  * retries it.

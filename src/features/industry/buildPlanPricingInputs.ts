@@ -18,7 +18,8 @@
  * The two settings hydrate asynchronously. `isPricingReady` is the "don't
  * price until hydrated" gate: batch pricing waits on it rather than pricing
  * once at the default and again once hydrated. The plan page and Build
- * Opportunities read without waiting, as they always have (#2054).
+ * Opportunities wait on it too (#2054), just by not mounting until it clears
+ * rather than by reading `isPricingReady` themselves — see their own callers.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';

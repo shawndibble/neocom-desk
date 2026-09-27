@@ -490,17 +490,29 @@ export function Industry() {
               <BpcSourcingPanel />
             ) : tab === 'opportunities' ? (
               <div className="flex flex-col gap-4">
-                <OpportunitiesPanel
-                  catalog={catalog}
-                  pi={pi}
-                  modifiers={modifiers}
-                  facilityDefaults={facilityDefaults}
-                  activeCharacterId={activeCharacterId}
-                  ownedStockSnapshot={workspace.ownedStockSnapshot}
-                  assumedMe={assumedMe}
-                  onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
-                  onStartPlan={handleStartPlan}
-                />
+                {/* Waits on the pricing-settings hydration gate (issue #2054):
+                    not mounting the panel until `assumedMe` has hydrated is
+                    enough to stop its first pass from pricing every candidate
+                    at the default, without threading a readiness flag into
+                    `useOpportunities` itself. Market-Wide Build Opportunities
+                    reads no pricing input, so it renders regardless. */}
+                {!pricingInputs.hydrated ? (
+                  <div className="flex justify-center py-16">
+                    <Spinner label={t('common.loading')} />
+                  </div>
+                ) : (
+                  <OpportunitiesPanel
+                    catalog={catalog}
+                    pi={pi}
+                    modifiers={modifiers}
+                    facilityDefaults={facilityDefaults}
+                    activeCharacterId={activeCharacterId}
+                    ownedStockSnapshot={workspace.ownedStockSnapshot}
+                    assumedMe={assumedMe}
+                    onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
+                    onStartPlan={handleStartPlan}
+                  />
+                )}
                 <MarketWideOpportunitiesPanel
                   hub={DEFAULT_TRADE_HUB}
                   trees={marketWideTrees}
