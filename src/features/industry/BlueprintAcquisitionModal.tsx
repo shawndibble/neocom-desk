@@ -619,22 +619,28 @@ export function BlueprintAcquisitionModal({
 
         <section className={SECTION_CLASS}>
           <h3 className={HEADING_CLASS}>{t('industry.blueprintAcquisitionLpHeading')}</h3>
-          <label className="flex flex-wrap items-center gap-2">
-            {t('industry.bpAcqLpValueLabel')}
-            <TextInput
-              size="sm"
-              className="w-28"
-              inputMode="decimal"
-              disabled={!lpValueHydrated}
-              value={lpValueDraft ?? String(lpValue)}
-              onChange={(e) => setLpValueDraft(e.target.value)}
-              onBlur={commitLpValue}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitLpValue();
-              }}
-            />
-          </label>
-          <p className="text-text-dim">{t('industry.bpAcqLpValueHint')}</p>
+          {lp.status !== 'loading' &&
+          lp.status !== 'unavailable' &&
+          lpSection.total === 0 ? null : (
+            <>
+              <label className="flex flex-wrap items-center gap-2">
+                {t('industry.bpAcqLpValueLabel')}
+                <TextInput
+                  size="sm"
+                  className="w-28"
+                  inputMode="decimal"
+                  disabled={!lpValueHydrated}
+                  value={lpValueDraft ?? String(lpValue)}
+                  onChange={(e) => setLpValueDraft(e.target.value)}
+                  onBlur={commitLpValue}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') commitLpValue();
+                  }}
+                />
+              </label>
+              <p className="text-text-dim">{t('industry.bpAcqLpValueHint')}</p>
+            </>
+          )}
           {lp.status === 'loading' ? (
             <p className="flex items-center gap-2 text-text-dim">
               <Spinner
