@@ -122,12 +122,25 @@ export function OpportunitiesPanel({
   // unmemoized identity into an effect dep array is exactly what caused an
   // infinite render loop here before (issue #675, React error #185).
   const resolvedCharacterIds = useResolvedCharacterFilter(characterFilter, activeCharacterId);
+  const nextCharacterIds =
+    resolvedCharacterIds === 'all'
+      ? characterCandidates.map((c) => c.characterId)
+      : [...resolvedCharacterIds];
+  // Stabilizes the array's *identity* across renders where its *values*
+  // haven't changed — memoizing on the ids themselves (via a joined string,
+  // a plain primitive) rather than on `characterCandidates`'s own identity,
+  // which still allocates a fresh array whenever `allCharacters`'s
+  // `useLiveQuery` result changes, even to an equal roster. The
+  // blueprint-loading effect below keys off this array by reference, so a
+  // churning identity re-fires it every such commit — the "one redundant
+  // load... when useLiveQuery swaps its default [] for the real roster" the
+  // render-loop-settling test above already flags as bounded but
+  // unaddressed; this closes it so the effect only ever re-fires when the
+  // actual selected characters change.
+  const characterIdsKey = nextCharacterIds.join(',');
   const characterIds = useMemo(
-    () =>
-      resolvedCharacterIds === 'all'
-        ? characterCandidates.map((c) => c.characterId)
-        : [...resolvedCharacterIds],
-    [resolvedCharacterIds, characterCandidates]
+    () => (characterIdsKey === '' ? [] : characterIdsKey.split(',').map(Number)),
+    [characterIdsKey]
   );
 
   // One state object rather than two separate `useState` calls: every branch
