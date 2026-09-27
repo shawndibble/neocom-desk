@@ -59,7 +59,6 @@ import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 import { hydrateActivityFacilityDefaults } from './facilityDefaults';
 import { retargetPatch } from './retargetPatch';
 import { DEFAULT_TRADE_HUB, TRADE_HUBS, getTradeHub } from '@/market/hubs';
-import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import type { BuildPlanRecord } from '@/db';
 import type { JobProductionSeed } from './logProductionFromJob';
@@ -80,7 +79,6 @@ import {
 } from './blueprintCatalog';
 import { planOwnedBlueprints, resolveBuildPlan } from './resolveBuildPlan';
 import { buildPlanTypeIds, recipeForLookup } from './recipes';
-import { useBpcAcquisitionOffers } from './useBpcAcquisitionOffers';
 import { materialPriceBasisOf } from './priceBasis';
 import { useMarketSnapshot } from './useMarketSnapshot';
 import { formatDuration } from '@/lib/duration';
@@ -113,9 +111,7 @@ import {
 } from './planMaterialsView';
 import { useDetectedOwnedStock } from './useDetectedOwnedStock';
 import type { CorpOwnedStockState } from './corpOwnedStock';
-import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
-import { useAssumedMe } from './assumedMe';
-import { useIncludeBlueprintCost } from './includeBlueprintCost';
+import { pricingSourcesForHub, type BuildPlanPricingInputs } from './buildPlanPricingInputs';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
 import { BuildPlanAutoBuildControl } from './BuildPlanAutoBuildControl';
 import { ResultsSummary } from './ResultsSummary';
@@ -203,13 +199,14 @@ interface BuildPlanDetailProps {
    */
   corpOwnedStock: CorpOwnedStockState;
   /**
-   * The active Character's corporation's blueprints as a second ownership
-   * source (issue #839), loaded once by `useCorpOwnedBlueprints` above the
-   * same remount boundary as `corpOwnedStock`. Folded into `ownedBlueprints`
-   * below exactly when `plan.includeCorpAssets` is on — the same toggle
-   * `corpOwnedStock` already answers to, not a second one.
+   * Everything else this plan is priced against (`buildPlanPricingInputs.ts`):
+   * the assumed-ME and include-blueprint-cost settings, standings, the corp's
+   * blueprints (folded into `ownedBlueprints` exactly when
+   * `plan.includeCorpAssets` is on, issue #839) and BPC Sourcing offers.
+   * Loaded once by `useIndustryWorkspace`, above this component's
+   * `key={plan.id}` remount boundary, so switching plans never reloads it.
    */
-  corpOwnedBlueprints: CorpOwnedBlueprintsState;
+  pricingInputs: BuildPlanPricingInputs;
   /**
    * Every write this panel makes to its plan, as one `BuildPlanChange` — a
    * pilot edit, a derived fix, or sourcing edits. The caller hands it to
@@ -273,7 +270,7 @@ export function BuildPlanDetail({
   modifiers,
   ownedStockSnapshot,
   corpOwnedStock,
-  corpOwnedBlueprints,
+  pricingInputs,
   onChange,
   onAddToQuickbar,
   quickbarAvailable,
@@ -289,10 +286,17 @@ export function BuildPlanDetail({
   const blueprint = useMemo(() => (entry ? toIndustryBlueprint(entry.blueprint) : null), [entry]);
   const activity = blueprint ? industryActivityOf(blueprint) : 'manufacturing';
   const hub = useMemo(() => getTradeHub(plan.hubId) ?? DEFAULT_TRADE_HUB, [plan.hubId]);
-  // The plan owner's standing toward this hub's NPC owner (issue #1238), for
-  // the broker fee/break-even price every result below prices with.
-  const tradeHubStandings = useTradeHubStandings(plan.characterId);
-  const standing = tradeHubStanding(tradeHubStandings, hub.id);
+  // This plan's share of the pricing inputs, for its own Trade Hub: the
+  // assumed ME every unowned sub-build is quoted at, whether Blueprint
+  // Acquisition's cost counts toward profit, the corp's blueprints, the
+  // standing toward this hub's NPC owner (issue #1238, for the broker
+  // fee/break-even price) and BPC Sourcing offers in this hub's region (issue
+  // #838; none when BPC Sourcing isn't synced, so the price cascade falls
+  // through to the BPO's own hub sell price). Read without waiting on the
+  // settings' hydration gate — this page has always priced at the settings'
+  // defaults until they load (#2054).
+  const { assumedMe, includeBlueprintCost, corpBlueprints, standing, bpcOffersFor } =
+    pricingSourcesForHub(pricingInputs, hub);
   const facilityPreset = FACILITY_PRESETS[plan.facility];
   // Include Reactions (issue #698): meaningless for a reaction-activity plan,
   // which is always eligible via its own top-level facility regardless of
@@ -316,26 +320,9 @@ export function BuildPlanDetail({
     return buildPlanTypeIds(blueprint, { catalog, pi });
   }, [blueprint, catalog, pi]);
 
-  // The ME every sub-build with no owned blueprint is quoted at. Hydrated
-  // here rather than read raw, so a pilot who set it sees their own figure
-  // instead of one frame of the default.
-  const assumedMe = useAssumedMe((state) => state.value);
-  const hydrateAssumedMe = useAssumedMe((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateAssumedMe();
-  }, [hydrateAssumedMe]);
-
-  // Whether Blueprint Acquisition's resolved cost counts toward this plan's
-  // totalCost/profit at all — see includeBlueprintCost.ts.
-  const includeBlueprintCost = useIncludeBlueprintCost((state) => state.value);
-  const hydrateIncludeBlueprintCost = useIncludeBlueprintCost((state) => state.hydrate);
-  useEffect(() => {
-    void hydrateIncludeBlueprintCost();
-  }, [hydrateIncludeBlueprintCost]);
-
   // Pre-fills a fresh plan's Reaction Location the first time Include
-  // Reactions is turned on for it (issue #698) — read here, alongside
-  // `assumedMe`, so it's in hand the moment `toggleIncludeReactions` needs it
+  // Reactions is turned on for it (issue #698) — read here, ahead of
+  // `toggleIncludeReactions`, so it's in hand the moment that needs it
   // rather than one render behind.
   const reactionFacilityDefaults = useReactionFacilityDefaults((state) => state.value);
   const hydrateReactionFacilityDefaults = hydrateActivityFacilityDefaults;
@@ -480,9 +467,9 @@ export function BuildPlanDetail({
       planOwnedBlueprints(
         { includeCorpAssets: plan.includeCorpAssets },
         ownedBlueprints,
-        corpOwnedBlueprints
+        corpBlueprints
       ),
-    [ownedBlueprints, plan.includeCorpAssets, corpOwnedBlueprints]
+    [ownedBlueprints, plan.includeCorpAssets, corpBlueprints]
   );
 
   /**
@@ -504,13 +491,6 @@ export function BuildPlanDetail({
       }),
     [catalog, pi, effectiveOwnedBlueprints, assumedMe]
   );
-
-  // Blueprint Acquisition (issue #838): BPC Sourcing offers for this plan's
-  // own Trade Hub region, grouped by blueprint typeID. Degrades to "no
-  // offers" when BPC Sourcing sync isn't configured or hasn't landed yet —
-  // the price cascade then falls straight through to the BPO's own hub sell
-  // price, same as if no contract offer were listed.
-  const bpcOffersFor = useBpcAcquisitionOffers(plan.characterId, hub.regionId);
 
   // The one place "can this be built here" is decided — `craftScopeList`
   // (issue #698) is the same answer Auto Build's own Craft Scope and the
@@ -583,7 +563,7 @@ export function BuildPlanDetail({
           catalog,
           pi,
           ownedBlueprints,
-          corpBlueprints: corpOwnedBlueprints,
+          corpBlueprints,
           assumedMe,
           modifiers,
           standing,
@@ -597,7 +577,7 @@ export function BuildPlanDetail({
       catalog,
       pi,
       ownedBlueprints,
-      corpOwnedBlueprints,
+      corpBlueprints,
       assumedMe,
       modifiers,
       standing,

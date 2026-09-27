@@ -14,6 +14,7 @@ import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { BuildResult, MaterialCostLine } from '@/engine/industry/types';
 import { configureClipboard } from '@/lib/clipboard';
 import { BuildGroupPanel } from './BuildGroupPanel';
+import { PRICING_INPUTS_FIXTURE } from './pricingInputsFixtures';
 import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
 import type { BuildGroup } from './buildGroups';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
@@ -193,6 +194,7 @@ function renderPanel(
       pi={null}
       ownedBlueprints={[]}
       modifiers={NO_CHARACTER_MODIFIERS}
+      pricingInputs={PRICING_INPUTS_FIXTURE}
       ownedStockSnapshot={SNAPSHOT}
       onAutoBuild={overrides.onAutoBuild ?? (() => Promise.resolve())}
       onOpenPlan={() => {}}

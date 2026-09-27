@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { BuildPlanCompare } from './BuildPlanCompare';
+import { PRICING_INPUTS_FIXTURE } from './pricingInputsFixtures';
 import { useComparedBuildResults, type ComparedBuildRow } from './useComparedBuildResults';
 import type { BuildPlanRecord } from '@/db';
 import type { BlueprintCatalog } from './blueprintCatalog';
@@ -89,6 +90,7 @@ function renderCompare(rows: ComparedBuildRow[], onDone = vi.fn()) {
         pi={null}
         ownedBlueprints={[]}
         modifiers={NO_CHARACTER_MODIFIERS}
+        pricingInputs={PRICING_INPUTS_FIXTURE}
         onDone={onDone}
       />
     ),

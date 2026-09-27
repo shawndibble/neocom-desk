@@ -51,6 +51,7 @@ const DOM_TS_TESTS = [
   'src/features/corp/useCorpRouteGate.test.ts',
   'src/features/corp/useCorpSnapshot.test.ts',
   'src/features/contractSearch/offerLocations.test.ts',
+  'src/features/industry/buildPlanPricingInputs.test.ts',
   'src/features/industry/corpOwnedBlueprints.test.ts',
   'src/features/industry/corpOwnedStock.test.ts',
   'src/features/industry/useComparedBuildResults.test.ts',

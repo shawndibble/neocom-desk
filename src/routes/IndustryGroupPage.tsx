@@ -17,11 +17,10 @@ import { retargetBuildGroup } from '@/features/industry/buildGroupActions';
 import { patchBuildPlans } from '@/features/industry/buildPlanStore';
 import { BuildGroupPanel } from '@/features/industry/BuildGroupPanel';
 import { applyGroupAutoBuild } from '@/features/industry/autoBuildGroup';
-import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
+import { loadBpcContractRows } from '@/features/industry/buildPlanPricingInputs';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { OwnedStockScope } from '@/engine/industry/types';
 import { useQuickbar } from '@/features/market/useQuickbar';
-import { useTradeHubStandings } from '@/features/market/useTradeHubStandings';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 
 const NO_PLANS: BuildPlanRecord[] = [];
@@ -42,14 +41,13 @@ export function IndustryGroupPage() {
     catalog,
     pi,
     ownedBlueprints,
-    corpOwnedBlueprints,
+    pricingInputs,
     modifiers,
     ownedStockSnapshot,
     blueprintsNeedsReauth,
   } = workspace;
 
   const quickbar = useQuickbar(activeCharacterId);
-  const tradeHubStandings = useTradeHubStandings(activeCharacterId);
   const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
     null
   );
@@ -85,21 +83,20 @@ export function IndustryGroupPage() {
       })
     );
     // Same BPC Sourcing snapshot each member's own page resolves its
-    // top-level tier against; no offers (not synced / fetch failed) degrades
-    // to owned, forced and BPO tiers, exactly as on the plan page.
-    const bpcRows = await loadPublicBpcContracts(activeCharacterId).then(
-      (cached) => cached?.data.rows ?? [],
-      () => []
-    );
+    // top-level tier against, read fresh at click time rather than off
+    // `pricingInputs.bpcRows`, which may not have landed yet; no offers (not
+    // synced / fetch failed) degrades to owned, forced and BPO tiers,
+    // exactly as on the plan page.
+    const bpcRows = (await loadBpcContractRows(activeCharacterId)) ?? [];
     const picks = await applyGroupAutoBuild(
       plans,
       catalog,
       pi,
       ownedBlueprints,
       modifiers,
-      workspace.assumedMe,
+      pricingInputs.assumedMe,
       options,
-      corpOwnedBlueprints,
+      pricingInputs.corpBlueprints,
       bpcRows
     );
     if (picks.size === 0) return;
@@ -167,9 +164,8 @@ export function IndustryGroupPage() {
           catalog={catalog}
           pi={pi}
           ownedBlueprints={ownedBlueprints}
-          corpOwnedBlueprints={corpOwnedBlueprints}
           modifiers={modifiers}
-          tradeHubStandings={tradeHubStandings}
+          pricingInputs={pricingInputs}
           ownedStockSnapshot={ownedStockSnapshot}
           onOpenPlan={(planId) => navigate(`/industry/plans/${planId}`)}
           onRetarget={(target, planIds) => void handleRetargetGroup(target, planIds)}

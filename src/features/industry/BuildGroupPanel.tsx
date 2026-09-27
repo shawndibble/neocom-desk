@@ -41,12 +41,10 @@ import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { unmaskNumber } from '@/lib/numberMask';
 import { getTradeHub } from '@/market/hubs';
-import type { TradeHubStandingsMap } from '@/features/market/useTradeHubStandings';
 import type { PiData } from '@/sde/types';
-import { useAssumedMe } from './assumedMe';
 import { nameForType, volumeForType, type BlueprintCatalog } from './blueprintCatalog';
 import type { BuildGroup } from './buildGroups';
-import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
+import type { BuildPlanPricingInputs } from './buildPlanPricingInputs';
 import { AutoBuildControl } from './AutoBuildControl';
 import { groupCraftScope, groupAutoBuildMaxDepth } from './autoBuildGroup';
 import { formatPercent, formatVolume } from './format';
@@ -99,11 +97,9 @@ interface BuildGroupPanelProps {
   catalog: BlueprintCatalog;
   pi: PiData | null;
   ownedBlueprints: readonly CharacterBlueprint[];
-  /** Folded into each member on its own `includeCorpAssets` — see `resolveBuildPlan`. */
-  corpOwnedBlueprints?: CorpOwnedBlueprintsState;
   modifiers: CharacterModifiers;
-  /** The active Character's per-Trade-Hub standings (issue #1238) — see `useComparedBuildResults`. */
-  tradeHubStandings?: TradeHubStandingsMap;
+  /** `useIndustryWorkspace`'s pricing inputs — see `useComparedBuildResults`. */
+  pricingInputs: BuildPlanPricingInputs;
   ownedStockSnapshot: OwnedStockSnapshot;
   /** Opens one member on its own, the way clicking it in the list would. */
   onOpenPlan: (planId: string) => void;
@@ -133,9 +129,8 @@ export function BuildGroupPanel({
   catalog,
   pi,
   ownedBlueprints,
-  corpOwnedBlueprints,
   modifiers,
-  tradeHubStandings,
+  pricingInputs,
   ownedStockSnapshot,
   onOpenPlan,
   onRetarget,
@@ -159,16 +154,15 @@ export function BuildGroupPanel({
     catalog,
     pi,
     ownedBlueprints,
-    corpOwnedBlueprints,
     modifiers,
-    tradeHubStandings,
+    pricingInputs,
     computeGroupResult: true,
   });
 
-  // Same setting `useComparedBuildResults` reads for these members' own
-  // pricing — sub-builds unowned anywhere in the group must assume the same
-  // ME that hook already quotes them at.
-  const assumedMe = useAssumedMe((state) => state.value);
+  // The same inputs `useComparedBuildResults` prices these members against —
+  // sub-builds unowned anywhere in the group must assume the same ME that
+  // hook already quotes them at.
+  const { assumedMe, corpBlueprints } = pricingInputs;
 
   // Depth is structural — which typeIDs have a recipe — and never
   // moves with a member's runs/ME/hub/sourcing edit, so this keys on the
@@ -182,7 +176,7 @@ export function BuildGroupPanel({
     () =>
       groupAutoBuildMaxDepth(
         plans,
-        { catalog, pi, ownedBlueprints, corpOwnedBlueprints, assumedMe },
+        { catalog, pi, ownedBlueprints, corpOwnedBlueprints: corpBlueprints, assumedMe },
         modifiers
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- autoBuildBlueprintSignature is the stable proxy for `plans`' structural identity; see comment above.
@@ -191,7 +185,7 @@ export function BuildGroupPanel({
       catalog,
       pi,
       ownedBlueprints,
-      corpOwnedBlueprints,
+      corpBlueprints,
       assumedMe,
       modifiers,
     ]
