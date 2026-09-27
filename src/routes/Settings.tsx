@@ -90,6 +90,7 @@ import { useCorpAccess } from '@/features/corp/useCorpAccess';
 import { NotificationsPanel } from '@/features/notifications/NotificationsPanel';
 import { PermissionsPanel } from '@/features/permissions/PermissionsPanel';
 import { FaqPanel } from '@/features/faq/FaqPanel';
+import { HelpPanel } from '@/features/help/HelpPanel';
 import { db } from '@/db';
 import { useSingleKeyShortcuts } from '@/lib/singleKeyShortcuts';
 import { exportBackupToFile, importBackup, type ImportSummary } from '@/backup/io';
@@ -1351,6 +1352,8 @@ export function Settings() {
           {section === 'activity' && <ActivityLogPanel />}
           {/* `/settings/faq` is the link to hand someone who asks what the app stores. */}
           {section === 'faq' && <FaqPanel />}
+          {/* `/settings/help` is the link to hand someone who needs support or wants to give feedback. */}
+          {section === 'help' && <HelpPanel />}
         </div>
       </div>
     </div>

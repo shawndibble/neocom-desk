@@ -2474,7 +2474,8 @@
     "bottomCtaBody": "One EVE SSO login to start. Add as many characters as you fly — they all sit side by side.",
     "footerOffline": "Offline-capable PWA",
     "footerOpenSource": "Free & open source",
-    "footerPrivacy": "Privacy policy"
+    "footerPrivacy": "Privacy policy",
+    "footerDiscord": "Discord"
   },
   "callback": {
     "completing": "Completing login…",
@@ -5274,7 +5275,8 @@
   "notFound": {
     "title": "Page not found",
     "hint": "That address does not match anything in Neocom Desk. The link may be wrong, or it may have pointed at something that has since moved.",
-    "home": "Go to Neocom Desk"
+    "home": "Go to Neocom Desk",
+    "discordHint": "Think this is a bug? Ask on Discord"
   },
   "permissions": {
     "wallet": {
@@ -5368,7 +5370,8 @@
       "notifications": "Notifications",
       "data": "Data & storage",
       "activity": "Activity Log",
-      "faq": "FAQ"
+      "faq": "FAQ",
+      "help": "Help & Support"
     },
     "groups": {
       "app": "App",
@@ -5453,9 +5456,15 @@
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."
       },
-      "feedbackTitle": "Where do I report a bug or ask for a feature?",
-      "feedbackBody": "On GitHub: <issues>github.com/shawndibble/neocom-desk/issues</issues>.",
-      "feedbackHint": "For bugs, please include steps to reproduce and what the expected outcome should be.",
+      "helpPointer": "Looking to report a bug, ask for help, or join the community? See <help>Help & Support</help>."
+    },
+    "help": {
+      "reportTitle": "Where do I report a bug or ask for a feature?",
+      "reportBody": "On GitHub: <issues>github.com/shawndibble/neocom-desk/issues</issues>.",
+      "reportHint": "For bugs, please include steps to reproduce and what the expected outcome should be.",
+      "communityTitle": "Join the community",
+      "communityBody": "Chat with other pilots, ask questions, and get help fast on <discord>Discord</discord>.",
+      "communityHint": "For bugs and feature requests, GitHub is still the one place they get tracked — Discord is for everything else.",
       "thanksTitle": "Is there someone I can thank?",
       "thanksBody": "In Game Name: <pilot>Mero Otichoda</pilot>.",
       "thanksHint": "Donations are welcome and never expected — the app is free, open source, and stays that way."

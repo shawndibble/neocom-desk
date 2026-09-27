@@ -47,6 +47,7 @@ export const SETTINGS_TABS = definePageTabs(
     { id: 'dataAge', labelKey: 'settings.tabs.data' },
     { id: 'activity', labelKey: 'settings.tabs.activity' },
     { id: 'faq', labelKey: 'settings.tabs.faq' },
+    { id: 'help', labelKey: 'settings.tabs.help' },
   ],
   undefined,
   // A phone lists the sections at `/settings`; `md` up has the rail and lands on Display.

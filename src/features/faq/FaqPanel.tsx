@@ -1,7 +1,9 @@
 import { Trans, useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Panel } from '@/components/ui';
-import { ISSUES_URL } from '@/lib/links';
+import { tabPath } from '@/lib/pageTabs';
+import { SETTINGS_TABS } from '@/app/pageTabs';
 import { WHAT_WE_STORE_GROUPS, WHAT_WE_STORE_NOTES } from './whatWeStore';
 
 /**
@@ -76,39 +78,14 @@ export function FaqPanel() {
         </div>
       </Panel>
 
-      <Panel title={t('settings.faq.feedbackTitle')}>
-        <div className={PROSE}>
-          {/*
-            `Trans` rather than an interpolated string: the link sits mid-
-            sentence, and splitting the sentence into "before"/"after" halves
-            around a bare <a> is exactly the shape that becomes untranslatable
-            the moment a language wants the clause in a different order.
-          */}
-          <p>
-            <Trans
-              i18nKey="settings.faq.feedbackBody"
-              components={{
-                issues: (
-                  <a href={ISSUES_URL} target="_blank" rel="noopener noreferrer" className={LINK} />
-                ),
-              }}
-            />
-          </p>
-          <p className="text-xs text-text-dim">{t('settings.faq.feedbackHint')}</p>
-        </div>
-      </Panel>
-
-      <Panel title={t('settings.faq.thanksTitle')}>
-        <div className={PROSE}>
-          <p>
-            <Trans
-              i18nKey="settings.faq.thanksBody"
-              components={{ pilot: <span className="font-semibold text-text" /> }}
-            />
-          </p>
-          <p className="text-xs text-text-dim">{t('settings.faq.thanksHint')}</p>
-        </div>
-      </Panel>
+      <p className="text-sm text-text-dim">
+        <Trans
+          i18nKey="settings.faq.helpPointer"
+          components={{
+            help: <Link to={tabPath(SETTINGS_TABS, 'help')} className={LINK} />,
+          }}
+        />
+      </p>
     </div>
   );
 }
