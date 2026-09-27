@@ -251,7 +251,7 @@ export function Login() {
     void beginAddCharacterLogin().catch(() => setPending(false));
   }
 
-  if (characterCount === undefined) return <BootScreen />;
+  if (characterCount === undefined) return <BootScreen gate="login" />;
   if (characterCount > 0) return <Navigate to="/characters" replace />;
 
   if (inApp) {

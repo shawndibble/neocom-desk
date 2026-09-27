@@ -179,7 +179,7 @@ function Root() {
   const characterCount = useLiveQuery(() => db.characters.count());
   const hydrated = useActiveCharacter((state) => state.hydrated);
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  if (characterCount === undefined || !hydrated) return <BootScreen />;
+  if (characterCount === undefined || !hydrated) return <BootScreen gate="root" />;
   if (characterCount === 0) return <Navigate to="/login" replace />;
   return <Navigate to={activeCharacterId === null ? '/characters' : '/overview'} replace />;
 }
