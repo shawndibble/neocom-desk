@@ -23,10 +23,11 @@ export interface ItemContextMenuProps {
   /**
    * The blueprint behind Build Plan, when the row already knows it (an
    * industry job, a Loyalty Store offer); null when nothing produces the item.
+   * Undefined while the row's own catalog hasn't loaded ("checking…").
    * Omitted, the page's Item Actions look it up — "checking…" until the lazy
    * catalog loads, which the menu requests as it opens.
    */
-  blueprintTypeID?: number | null;
+  blueprintTypeID?: number | null | undefined;
   /** The product the Build Plan action opens when it isn't `typeId` itself � a blueprint row (Assets) plans what it builds. */
   planProductTypeID?: number;
   /** Variations-table rows only (issue #147): adds the row's variation group to the Compare Set and opens the Compare drawer on Attributes. Omitted elsewhere. */
@@ -109,27 +110,24 @@ export function ViewInMarketMenuItem({ typeId }: { typeId: number }) {
  * have expected otherwise. Nothing renders while the answer is unknown, so
  * the row never appears under a cursor already in the menu.
  */
-function useItemMenuItems(
-  {
+function useItemMenuItems(props: ItemMenuProps, onAlertRequest: () => void): ReactNode {
+  const {
     typeId,
     itemName,
-    blueprintTypeID: knownBlueprintTypeID,
     planProductTypeID,
     onCompareVariations,
     onViewInIndustryAsMaterial,
     onToggleBuildHere,
     buildingHere,
     extraItems,
-  }: ItemMenuProps,
-  onAlertRequest: () => void
-): ReactNode {
+  } = props;
   const { t } = useTranslation();
   const navigate = useNavigate();
   const addToCompare = useCompareSet((state) => state.add);
   const piPlannable = usePiPlannable(typeId);
   const { canAddToQuickbar, addToQuickbar, blueprintFor } = useItemActions();
-  const blueprintTypeID =
-    knownBlueprintTypeID === undefined ? blueprintFor(typeId) : knownBlueprintTypeID;
+  // Present-but-undefined is the row's own "checking…"; only an omitted prop defers to the page.
+  const blueprintTypeID = 'blueprintTypeID' in props ? props.blueprintTypeID : blueprintFor(typeId);
 
   // `industry.*`, not `market.*`: `BuildPlanContextMenu` offers this same
   // action on the pages this richer menu doesn't reach (the BPC search table,

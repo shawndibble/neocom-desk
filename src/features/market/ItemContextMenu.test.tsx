@@ -227,7 +227,11 @@ describe('ItemContextMenu — Item Actions', () => {
     return render(
       <MemoryRouter>
         <FakeItemActions actions={actions}>
-          <ItemContextMenu typeId={RIFTER} itemName="Rifter" blueprintTypeID={blueprintTypeID}>
+          <ItemContextMenu
+            typeId={RIFTER}
+            itemName="Rifter"
+            {...(blueprintTypeID === undefined ? {} : { blueprintTypeID })}
+          >
             <button type="button">Rifter</button>
           </ItemContextMenu>
         </FakeItemActions>
@@ -259,6 +263,22 @@ describe('ItemContextMenu — Item Actions', () => {
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Rifter' }));
     expect(
       await screen.findByRole('menuitem', { name: 'No blueprint options' })
+    ).toBeInTheDocument();
+  });
+
+  it("keeps a row's own still-loading catalog on checking, whatever the page knows", async () => {
+    render(
+      <MemoryRouter>
+        <FakeItemActions actions={fakeItemActions({ blueprints: catalog })}>
+          <ItemContextMenu typeId={RIFTER} itemName="Rifter" blueprintTypeID={undefined}>
+            <button type="button">Rifter</button>
+          </ItemContextMenu>
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Rifter' }));
+    expect(
+      await screen.findByRole('menuitem', { name: 'Build Plan (checking…)' })
     ).toBeInTheDocument();
   });
 

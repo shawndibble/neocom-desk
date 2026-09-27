@@ -494,7 +494,7 @@ export function Market() {
 
   // The Quickbar (CONTEXT.md): Editable Data, one record per character. Reads
   // as [] rather than requiring an active character — Market Browser itself
-  // needs none — so Add to Quickbar silently no-ops with nobody active.
+  // needs none — so Add to Quickbar is disabled with nobody active.
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
   // Item Actions (issue #2041): every item menu's Quickbar add, Show info (the
   // one Item Detail modal, priced at `orderBookLocation`) and the lazy

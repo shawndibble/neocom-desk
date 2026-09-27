@@ -35,5 +35,5 @@ export function FakeItemActions({
 
 /** `ui` under `actions` (a fresh `fakeItemActions()` by default) — for `render(withItemActions(<Panel />))`. */
 export function withItemActions(ui: ReactNode, actions: ItemActions = fakeItemActions()) {
-  return createElement(ItemActionsContext.Provider, { value: actions }, ui);
+  return createElement(FakeItemActions, { actions, children: ui });
 }

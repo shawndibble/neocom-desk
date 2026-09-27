@@ -169,9 +169,7 @@ export function CorpTransactionsPanel({
 }: CorpTransactionsPanelProps) {
   const { t } = useTranslation();
 
-  /** Same menu every other item table carries (issue #817). No blueprint ever
-   * produces a wallet transaction's item from this table, so Build Plan is
-   * hardcoded "No blueprint options" rather than looked up. */
+  /** Same menu every other item table carries (issue #817). */
   function rowContextMenu(txn: CorporationWalletTransaction, tr: ReactElement) {
     const itemName = nameFor(txn.type_id);
     return (

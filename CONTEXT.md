@@ -393,8 +393,8 @@ here — they go one per file in `docs/context/decisions/`.
   snapshot, so it is the one Market Browser panel that needs the network.
 - **Item Actions**: What an item menu can do on the page it's on — add to the
   Quickbar, find the blueprint behind Build Plan, and open the page's one
-  Item Detail (Show info). Provided once per page and read by every item
-  menu, so a panel never threads them itself (issue #2041).
+  Item Detail (Show info). One set per page, shared by every item menu on it
+  (issue #2041).
 - **ISK/jump**: What a public courier haul pays per stargate jump of the trip
   it asks for — reward divided by the jump count, and the figure the Courier
   board ranks on (issue #943). A hauler's cost is the trip, and the trip is

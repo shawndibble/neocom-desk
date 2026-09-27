@@ -187,9 +187,9 @@ function FittingsPage() {
     savedRecord.id === workspace.savedId &&
     currentShareCode !== null &&
     savedRecord.code !== currentShareCode;
-  // The page's Item Actions — Show info's only entry (the Fitting editor's
-  // own menu has no Add to Quickbar or Build Plan): opens the Market's item
-  // detail modal a List name click, or a menu's "Show info", asks for.
+  // The page's Item Actions — here only Show info (the Fitting editor's menu
+  // has no Add to Quickbar or Build Plan): a List name click or a menu's
+  // "Show info" opens the page's Item Detail modal.
   const pageItemActions = usePageItemActions({ activeCharacterId });
   // Bumped on a successful Save to EVE so In-game Fittings remounts and
   // refetches, picking up the fitting that just landed (or the overwrite).
