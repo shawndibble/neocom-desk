@@ -105,27 +105,27 @@ import { queueCsvColumns } from './queueCsv';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { formatDuration } from '@/lib/duration';
 import { formatLocalDate } from '@/lib/localDate';
+import { dedupeEntries } from './reorder';
+import { buildRows } from './markers';
 import {
-  dedupeEntries,
+  addEntry,
+  addRemapMarker,
+  appendImport,
+  applyOptimizeForMe,
+  applyRemapSegments,
+  applyReorder,
+  moveRow,
+  promotePrereqRow,
+  remapMarkerAttributes,
   removeEntry,
-  upsertEntry,
-  appendImportedEntries,
-  applyReorderSuggestion,
-  setEntryPriority,
-} from './reorder';
-import { splitEntriesByLevel } from './splitEntries';
-import {
-  addMarker,
-  addMarkerAttributes,
-  buildRows,
-  markerAttributesAfterEntryRemoval,
-  markersAfterEntryRemoval,
-  normalizeMarkerAttributes,
-  removeMarker,
-  removeMarkerAttributes,
-  segmentsToMarkers,
-} from './markers';
-import { planDrop, promotePrereq } from './planDrop';
+  removeRemapMarker,
+  replaceWithImport,
+  setPriority,
+  setRemapMarkerAttributes,
+  splitByLevel,
+  type SkillPlanEditable,
+  type SkillPlanPatch,
+} from './skillPlanEdit';
 import { RemapMarkerModal } from './RemapMarkerModal';
 import { bandStarts, meaningfulBandStarts } from './bands';
 import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueRows';
@@ -303,9 +303,7 @@ export function PlanEditor({
   // A snapshot taken just before a Replace, for the Undo beside its
   // confirmation — scoped to plan.id so switching plans can't apply an undo
   // meant for a different one (#1402).
-  const [undoImport, setUndoImport] = useScopedState<
-    Pick<SkillPlanRecord, 'entries' | 'markers' | 'markerAttributes'>
-  >([plan.id]);
+  const [undoImport, setUndoImport] = useScopedState<SkillPlanPatch>([plan.id]);
   // Inline, beside-the-button confirmations (#222) — same pattern as
   // copyConfirm/importConfirm above: small text next to the triggering
   // button, cleared after a couple of seconds. Additive to the full
@@ -505,14 +503,20 @@ export function PlanEditor({
     [catalog]
   );
 
-  // Manual overrides (RemapMarkerModal), aligned to the current markers —
-  // recomputed here rather than trusted as-is, since `plan.markerAttributes`
-  // can be stale relative to `plan.markers` (a drag or removal touches one
-  // without necessarily touching the other in the same write).
-  const normalizedMarkerAttributes = useMemo(
-    () => normalizeMarkerAttributes(plan.markers, plan.markerAttributes, plan.entries.length),
-    [plan.markers, plan.markerAttributes, plan.entries.length]
+  // What every Skill Plan edit (skillPlanEdit.ts) reads: the three aligned
+  // lists alone, so a handler built on it keeps its identity across edits
+  // to the plan's other fields (name, boosters, milestones).
+  const editable = useMemo<SkillPlanEditable>(
+    () => ({
+      entries: plan.entries,
+      markers: plan.markers,
+      markerAttributes: plan.markerAttributes,
+    }),
+    [plan.entries, plan.markers, plan.markerAttributes]
   );
+
+  // Manual overrides (RemapMarkerModal), aligned to the current markers.
+  const normalizedMarkerAttributes = useMemo(() => remapMarkerAttributes(editable), [editable]);
 
   // The queue's lead (the levels ahead of the first one this plan lists)
   // trains first, so the plan starts when it ends. One instant feeds the schedule,
@@ -673,22 +677,9 @@ export function PlanEditor({
   // anything.
   useEffect(() => {
     if (!trainedSkillsKnown) return;
-    const split = splitEntriesByLevel(
-      plan.entries,
-      plan.markers,
-      catalog.engineSkills,
-      trainedSkills
-    );
-    if (!split.changed) return;
-    onUpdate({ entries: split.entries, ...(split.markers ? { markers: split.markers } : {}) });
-  }, [
-    plan.entries,
-    plan.markers,
-    catalog.engineSkills,
-    trainedSkills,
-    trainedSkillsKnown,
-    onUpdate,
-  ]);
+    const patch = splitByLevel(editable, catalog.engineSkills, trainedSkills);
+    if (patch) onUpdate(patch);
+  }, [editable, catalog.engineSkills, trainedSkills, trainedSkillsKnown, onUpdate]);
 
   const userSkillTypeIDs = useMemo(
     () => new Set(plan.entries.map((e) => e.skillTypeID)),
@@ -830,8 +821,6 @@ export function PlanEditor({
     timedRemap,
   ]);
 
-  const update = useCallback((entries: PlanEntry[]) => onUpdate({ entries }), [onUpdate]);
-
   /** Beside-the-button import confirmation, superseding whichever one is already showing rather than racing its timer (#1402). */
   function showImportConfirm(message: string, durationMs: number) {
     if (importConfirmTimeout.current) clearTimeout(importConfirmTimeout.current);
@@ -873,7 +862,7 @@ export function PlanEditor({
       // An empty plan has nothing to lose, so it goes in with no prompt —
       // the choice Modal below exists only to protect entries already there.
       if (plan.entries.length === 0) {
-        update(parsed);
+        onUpdate({ entries: parsed });
         return;
       }
       setPendingQueueImport(parsed);
@@ -897,7 +886,7 @@ export function PlanEditor({
     // showing it beside an unrelated Append confirmation would let it revert
     // this (and anything since) instead of just the Replace it was for.
     setUndoImport(null);
-    update(appendImportedEntries(plan.entries, parsed));
+    onUpdate(appendImport(editable, parsed));
     showImportConfirm(appendedCountMessage(parsed), 4000);
     setPendingQueueImport(null);
   }
@@ -905,15 +894,9 @@ export function PlanEditor({
   /** Replace choice on the queue-import Modal (#1402): swaps entries, clears Remap Markers, leaves an Undo. */
   function confirmQueueImportReplace() {
     if (!pendingQueueImport) return;
-    setUndoImport({
-      entries: plan.entries,
-      // `?? []`, not the possibly-undefined field itself: Firestore rejects
-      // an explicit `undefined` value, and an absent list already reads as
-      // empty everywhere else this plan uses it.
-      markers: plan.markers ?? [],
-      markerAttributes: plan.markerAttributes ?? [],
-    });
-    onUpdate({ entries: pendingQueueImport, markers: [], markerAttributes: [] });
+    const { patch, undo } = replaceWithImport(editable, pendingQueueImport);
+    setUndoImport(undo);
+    onUpdate(patch);
     // Longer than Append/clipboard's 4s — this one carries an Undo action, so
     // it has to stay up long enough to use it.
     showImportConfirm(t('plans.importQueueReplaced'), 10000);
@@ -1014,30 +997,15 @@ export function PlanEditor({
    * Turn a set of RemapSegments into actual Remap Markers, so the user
    * doesn't have to drag/add them by hand to match what a search (Optimize
    * Remaps) or a live read of the plan's existing markers (Optimize at my
-   * markers) found. Replaces `plan.markers` wholesale rather than diffing —
-   * that's "move the existing one, add the missing one" in a single write.
-   * Shared by all three flows' Accept button: for Optimize at my markers
-   * this round-trips the plan's own markers back through the same
-   * conversion, so it is normally a no-op, but two markers that now delimit
-   * the same optimizer step (see markerAttributesByStepIndex below) collapse
-   * to one. `entries` is only passed for "Optimize for me", whose segments
-   * are indexed against its own reordered entries, not the plan's current
-   * ones — the other two flows omit it and patch markers alone.
+   * markers) found. For Optimize at my markers this round-trips the plan's
+   * own markers back through the same conversion, so it is normally a
+   * no-op, but two markers that now delimit the same optimizer step (see
+   * markerAttributesByStepIndex below) collapse to one. "Optimize for me"
+   * goes through `applyOptimizeForMe` instead: its segments index its own
+   * reordered entries, not the plan's current ones.
    */
-  function applySegmentsAsMarkers(segments: readonly RemapSegment[], entries?: PlanEntry[]) {
-    onUpdate({
-      markers: segmentsToMarkers(
-        entries ?? plan.entries,
-        segments,
-        catalog.engineSkills,
-        trainedSkills
-      ),
-      // Wholesale replacement, not a diff against the old markers — any
-      // manual override the old markers carried is for a segmentation this
-      // search just discarded, so it has nothing left to attach to.
-      markerAttributes: [],
-      ...(entries !== undefined ? { entries } : {}),
-    });
+  function applySegmentsAsMarkers(segments: readonly RemapSegment[]) {
+    onUpdate(applyRemapSegments(editable, segments, catalog.engineSkills, trainedSkills));
   }
 
   /** Accept on the Optimize Remaps preview Modal. */
@@ -1064,8 +1032,15 @@ export function PlanEditor({
   /** Accept on the "Optimize for me" preview Modal: one write, new order and remap markers together. */
   function acceptOptimizeForMe() {
     if (!optimizeForMePreview) return;
-    const newEntries = applyReorderSuggestion(plan.entries, optimizeForMePreview.order);
-    applySegmentsAsMarkers(optimizeForMePreview.remaps.segments, newEntries);
+    onUpdate(
+      applyOptimizeForMe(
+        editable,
+        optimizeForMePreview.order,
+        optimizeForMePreview.remaps.segments,
+        catalog.engineSkills,
+        trainedSkills
+      )
+    );
     setOptimizeForMePreview(null);
   }
 
@@ -1123,9 +1098,7 @@ export function PlanEditor({
 
   /** RemapMarkerModal's Save/Clear: set (or clear, via `null`) marker `markerIndex`'s manual override. */
   function handleSaveMarkerAttributes(markerIndex: number, attributes: Attributes | null) {
-    const next = [...normalizedMarkerAttributes];
-    next[markerIndex] = attributes;
-    onUpdate({ markerAttributes: next });
+    onUpdate(setRemapMarkerAttributes(editable, markerIndex, attributes));
   }
 
   /** "{Skill} III" — how a promoted prereq is named back to the user. */
@@ -1142,13 +1115,6 @@ export function PlanEditor({
     [t, levelLabel]
   );
 
-  /** `markerOrder` names, per new marker, which old ordinal it was — see `RowsToState`. */
-  const reorderedMarkerAttributes = useCallback(
-    (markerOrder: readonly number[]): (Attributes | null)[] =>
-      markerOrder.map((oldOrdinal) => normalizedMarkerAttributes[oldOrdinal] ?? null),
-    [normalizedMarkerAttributes]
-  );
-
   /**
    * One drag on the merged list — or the equivalent non-drag move (#408's
    * row-actions menu resolves its own target id and calls this the same way
@@ -1163,9 +1129,7 @@ export function PlanEditor({
    */
   const handleDrop = useCallback(
     (activeId: string, overId: string) => {
-      const result = planDrop({
-        entries: plan.entries,
-        markers: plan.markers,
+      const result = moveRow(editable, {
         rows: mergedRows,
         activeId,
         overId,
@@ -1192,22 +1156,16 @@ export function PlanEditor({
         return;
       }
       setDropError(null);
-      onUpdate({
-        entries: result.entries,
-        markers: result.markers,
-        markerAttributes: reorderedMarkerAttributes(result.markerOrder),
-      });
+      onUpdate(result.patch);
       if (result.promoted) confirmPromotion(result.promoted.skillTypeID, result.promoted.level);
     },
     [
-      plan.entries,
-      plan.markers,
+      editable,
       mergedRows,
       catalog.engineSkills,
       trainedSkills,
       t,
       nameFor,
-      reorderedMarkerAttributes,
       confirmPromotion,
       onUpdate,
       setDropError,
@@ -1217,31 +1175,14 @@ export function PlanEditor({
   /** The "+" on a prereq row: the same promotion, without needing a drag. */
   const handlePromotePrereq = useCallback(
     (rowId: string) => {
-      const result = promotePrereq({
-        entries: plan.entries,
-        markers: plan.markers,
-        rows: mergedRows,
-        rowId,
-      });
-      if (!result) return;
+      const patch = promotePrereqRow(editable, mergedRows, rowId);
+      if (!patch) return;
       setDropError(null);
-      onUpdate({
-        entries: result.entries,
-        markers: result.markers,
-        markerAttributes: reorderedMarkerAttributes(result.markerOrder),
-      });
+      onUpdate(patch);
       const row = mergedRows.find((r) => r.id === rowId);
       if (row?.kind === 'prereq') confirmPromotion(row.step.skillTypeID, row.step.level);
     },
-    [
-      plan.entries,
-      plan.markers,
-      mergedRows,
-      onUpdate,
-      reorderedMarkerAttributes,
-      confirmPromotion,
-      setDropError,
-    ]
+    [editable, mergedRows, onUpdate, confirmPromotion, setDropError]
   );
 
   /** EntryList's `onRemove`: opens the confirm Modal rather than removing immediately (#408). */
@@ -1253,45 +1194,19 @@ export function PlanEditor({
   const confirmRemoveEntry = useCallback(() => {
     if (removingEntry === null) return;
     const { skillTypeID, targetLevel } = removingEntry;
-    const entryIndex = plan.entries.findIndex(
-      (e) => e.skillTypeID === skillTypeID && e.targetLevel === targetLevel
-    );
-    onUpdate({
-      entries: removeEntry(plan.entries, skillTypeID, targetLevel),
-      ...(plan.markers
-        ? {
-            markers: markersAfterEntryRemoval(plan.markers, entryIndex, plan.entries.length),
-            markerAttributes: markerAttributesAfterEntryRemoval(
-              plan.markers,
-              plan.markerAttributes,
-              entryIndex,
-              plan.entries.length
-            ),
-          }
-        : {}),
-    });
+    onUpdate(removeEntry(editable, skillTypeID, targetLevel));
     setRemovingEntry(null);
-  }, [removingEntry, plan.entries, plan.markers, plan.markerAttributes, onUpdate]);
+  }, [removingEntry, editable, onUpdate]);
 
   const handleRemoveMarker = useCallback(
-    (markerIndex: number) => {
-      onUpdate({
-        markers: removeMarker(plan.markers, markerIndex, plan.entries.length),
-        markerAttributes: removeMarkerAttributes(
-          plan.markers,
-          plan.markerAttributes,
-          markerIndex,
-          plan.entries.length
-        ),
-      });
-    },
-    [plan.markers, plan.markerAttributes, plan.entries.length, onUpdate]
+    (markerIndex: number) => onUpdate(removeRemapMarker(editable, markerIndex)),
+    [editable, onUpdate]
   );
 
   const handleSetPriority = useCallback(
     (skillTypeID: number, priority: PlanPriority) =>
-      update(setEntryPriority(plan.entries, skillTypeID, priority)),
-    [plan.entries, update]
+      onUpdate(setPriority(editable, skillTypeID, priority)),
+    [editable, onUpdate]
   );
 
   /** EntryList's row menu "Add milestone…": opens the naming modal anchored to that row. */
@@ -1333,14 +1248,7 @@ export function PlanEditor({
   }
 
   function handleAddMarker() {
-    onUpdate({
-      markers: addMarker(plan.markers, plan.entries.length),
-      markerAttributes: addMarkerAttributes(
-        plan.markers,
-        plan.markerAttributes,
-        plan.entries.length
-      ),
-    });
+    onUpdate(addRemapMarker(editable));
     setMarkerConfirm(true);
     setTimeout(() => setMarkerConfirm(false), 2000);
   }
@@ -1494,7 +1402,7 @@ export function PlanEditor({
 
   function acceptReorder() {
     if (!reorderPreview) return;
-    update(applyReorderSuggestion(plan.entries, reorderPreview.steps));
+    onUpdate(applyReorder(editable, reorderPreview.steps));
     setReorderPreview(null);
   }
 
@@ -1988,7 +1896,7 @@ export function PlanEditor({
               catalog={catalog}
               trainedSkills={trainedSkills}
               planEntries={plan.entries}
-              onAdd={(entry) => update(upsertEntry(plan.entries, entry))}
+              onAdd={(entry) => onUpdate(addEntry(editable, entry))}
               controls={
                 // Group-by and Columns are this list's own view controls —
                 // riding the search bar's row keeps them off the page
@@ -2172,7 +2080,7 @@ export function PlanEditor({
       {importOpen && (
         <ImportClipboardDialog
           onApply={(entries) => {
-            update(appendImportedEntries(plan.entries, entries));
+            onUpdate(appendImport(editable, entries));
             // A pending Undo describes a Replace this doesn't touch — see
             // confirmQueueImportAppend's comment above.
             setUndoImport(null);
