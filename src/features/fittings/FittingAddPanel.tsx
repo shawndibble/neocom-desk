@@ -68,6 +68,41 @@ const RACK_LABEL_KEY: Record<CandidateRack, string> = {
   drone: 'fittings.add.rack.drone',
 };
 
+/** The in-game Fitting window's three icon toggles, in their on-screen order. */
+type FitFilterKind = 'hull' | 'resources' | 'skills';
+const FIT_FILTER_KINDS: readonly FitFilterKind[] = ['hull', 'resources', 'skills'];
+
+/**
+ * The icon and i18n keys for each toggle — CCP's own in-game art (scope
+ * decision `20260927-104252`), copied from the EVE University wiki into
+ * `public/images/fitting/` rather than linked.
+ */
+const FIT_FILTERS: readonly {
+  kind: FitFilterKind;
+  icon: string;
+  labelKey: string;
+  tooltipKey: string;
+}[] = [
+  {
+    kind: 'hull',
+    icon: '/images/fitting/hull.png',
+    labelKey: 'fittings.add.filterHull',
+    tooltipKey: 'fittings.add.filterHullTooltip',
+  },
+  {
+    kind: 'resources',
+    icon: '/images/fitting/resource.png',
+    labelKey: 'fittings.add.filterResources',
+    tooltipKey: 'fittings.add.filterResourcesTooltip',
+  },
+  {
+    kind: 'skills',
+    icon: '/images/fitting/skill.png',
+    labelKey: 'fittings.add.filterSkills',
+    tooltipKey: 'fittings.add.filterSkillsTooltip',
+  },
+];
+
 interface BrowseFilterOptions {
   tab: BrowserTab;
   /** Only this rack — the chosen slot's, with "fits this slot" on. */
@@ -75,13 +110,14 @@ interface BrowseFilterOptions {
   metaGroupId: number | null;
   /** Null until the hull check is done; then only what fits it. */
   hullFit: ReadonlyMap<number, CandidateCheck> | null;
-  canFlyOnly: boolean;
+  /** Which of the three icon filters are currently on. */
+  fitFilters: ReadonlySet<FitFilterKind>;
 }
 
 /** Whether a market item belongs in the browser under the current tab, slot and filters. */
 function browseFilter(
   catalogue: FittingCatalogue,
-  { tab, slotRack, metaGroupId, hullFit, canFlyOnly }: BrowseFilterOptions
+  { tab, slotRack, metaGroupId, hullFit, fitFilters }: BrowseFilterOptions
 ): (entry: CandidateEntry) => boolean {
   return (entry) => {
     const rack = catalogue.rackOf[String(entry.typeId)];
@@ -95,9 +131,11 @@ function browseFilter(
       return false;
     if (hullFit !== null) {
       const check = hullFit.get(entry.typeId);
-      // Modules the ship can't take — by the hull's rules, or too big for its
-      // CPU / powergrid / calibration even with nothing else fitted — never show.
-      if (!check?.fitsHull || !check.fitsResources || (canFlyOnly && !check.canFly)) return false;
+      // Each icon toggle hides on its own rule: the hull's rack rules, its
+      // bare CPU/powergrid/calibration, or the pilot's skills.
+      if (fitFilters.has('hull') && !check?.fitsHull) return false;
+      if (fitFilters.has('resources') && !check?.fitsResources) return false;
+      if (fitFilters.has('skills') && !check?.canFly) return false;
     }
     return true;
   };
@@ -134,10 +172,17 @@ function ItemRow({ entry, rack, check, placeable, draggable, onAdd }: ItemRowPro
       >
         <TypeIcon typeId={entry.typeId} size={32} width={24} height={24} />
         <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-        {check !== null && !check.canFly && (
+        {check?.fitsHull === false ? (
           <span className="shrink-0 text-[0.6875rem] text-warning">
-            {t('fittings.add.missingSkills')}
+            {t('fittings.add.doesntFitHull')}
           </span>
+        ) : (
+          check !== null &&
+          !check.canFly && (
+            <span className="shrink-0 text-[0.6875rem] text-warning">
+              {t('fittings.add.missingSkills')}
+            </span>
+          )
         )}
       </button>
       {actions && <RowMoreActions />}
@@ -182,7 +227,18 @@ export function FittingAddPanel({
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [fitsSlot, setFitsSlot] = useState(true);
-  const [canFlyOnly, setCanFlyOnly] = useState(true);
+  // The three in-game icon toggles (hull, resources, skills) — all on by
+  // default, so the result list starts exactly as restrictive as before they existed.
+  const [fitFilters, setFitFilters] = useState<ReadonlySet<FitFilterKind>>(
+    () => new Set(FIT_FILTER_KINDS)
+  );
+  const toggleFitFilter = (kind: FitFilterKind) =>
+    setFitFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(kind)) next.delete(kind);
+      else next.add(kind);
+      return next;
+    });
   const [metaGroupId, setMetaGroupId] = useState<number | null>(null);
   const [toggled, setToggled] = useState<ReadonlySet<number>>(new Set());
 
@@ -205,38 +261,47 @@ export function FittingAddPanel({
     // Once the ship data is in, a search waits for the hull check as browsing
     // does, rather than briefly offering structure modules and the like.
     if (catalogue === null || trimmed === '' || (engineReady && hullFit === null)) return [];
-    const include = browseFilter(catalogue, { tab, slotRack, metaGroupId, hullFit, canFlyOnly });
+    const include = browseFilter(catalogue, { tab, slotRack, metaGroupId, hullFit, fitFilters });
     return catalogue.marketTypes
       .filter((entry) => include(entry) && entry.name.toLowerCase().includes(trimmed))
       .sort((a, b) => a.name.localeCompare(b.name))
       .slice(0, CANDIDATE_LIMIT);
-  }, [catalogue, trimmed, engineReady, tab, slotRack, metaGroupId, hullFit, canFlyOnly]);
+  }, [catalogue, trimmed, engineReady, tab, slotRack, metaGroupId, hullFit, fitFilters]);
   // Browsing needs the hull check: without it the tree would be every
   // fittable item in the game, structure modules and all.
   const tree = useMemo(() => {
     if (catalogue === null || hullFit === null || trimmed !== '') return [];
-    const include = browseFilter(catalogue, { tab, slotRack, metaGroupId, hullFit, canFlyOnly });
+    const include = browseFilter(catalogue, { tab, slotRack, metaGroupId, hullFit, fitFilters });
     return browserTree(catalogue.marketTypes, include, catalogue.groupsById);
-  }, [catalogue, trimmed, tab, slotRack, metaGroupId, hullFit, canFlyOnly]);
-  // What "Can fly" is hiding for this search/browse: the items that pass every
-  // other filter but not the skills one. Nothing to count once it's off.
-  const hiddenByCanFly = useMemo(() => {
-    if (catalogue === null || hullFit === null || !canFlyOnly) return 0;
+  }, [catalogue, trimmed, tab, slotRack, metaGroupId, hullFit, fitFilters]);
+  // What Resources and Skills are hiding for this search/browse: the items
+  // that pass Hull (as it currently stands) and every other filter but not
+  // one of those two. Hull stays fixed here — the market is mostly things
+  // that don't fit this hull at all, so counting past it would name numbers
+  // in the thousands and the note would stop being useful.
+  const relaxed = useMemo(() => {
+    const next = new Set(fitFilters);
+    next.delete('resources');
+    next.delete('skills');
+    return next;
+  }, [fitFilters]);
+  const hiddenByFilters = useMemo(() => {
+    if (catalogue === null || hullFit === null || relaxed.size === fitFilters.size) return 0;
     const base = { tab, slotRack, metaGroupId, hullFit };
-    const shown = browseFilter(catalogue, { ...base, canFlyOnly: true });
-    const all = browseFilter(catalogue, { ...base, canFlyOnly: false });
+    const shown = browseFilter(catalogue, { ...base, fitFilters });
+    const all = browseFilter(catalogue, { ...base, fitFilters: relaxed });
     return catalogue.marketTypes.filter(
       (entry) => all(entry) && !shown(entry) && entry.name.toLowerCase().includes(trimmed)
     ).length;
-  }, [catalogue, trimmed, tab, slotRack, metaGroupId, hullFit, canFlyOnly]);
+  }, [catalogue, trimmed, tab, slotRack, metaGroupId, hullFit, fitFilters, relaxed]);
   const hiddenNote =
-    hiddenByCanFly > 0 ? (
+    hiddenByFilters > 0 ? (
       <button
         type="button"
         className="min-h-11 text-left text-xs text-accent underline-offset-2 hover:underline md:min-h-9"
-        onClick={() => setCanFlyOnly(false)}
+        onClick={() => setFitFilters(relaxed)}
       >
-        {t('fittings.add.hiddenByCanFly', { count: hiddenByCanFly })}
+        {t('fittings.add.hiddenByFilters', { count: hiddenByFilters })}
       </button>
     ) : null;
   // The market roots ("Ship Equipment", …) are a click nobody needs: the
@@ -294,14 +359,18 @@ export function FittingAddPanel({
 
   function row(entry: CandidateEntry) {
     const rack = catalogue!.rackOf[String(entry.typeId)];
+    const check = hullFit?.get(entry.typeId) ?? null;
+    // The Hull filter can be off, so a row the hull refuses outright can be
+    // on screen — it stays visible (asked for, in that case) but never addable.
+    const fitsHull = check?.fitsHull !== false;
     return (
       <ItemRow
         key={entry.typeId}
         entry={entry}
         rack={rack}
-        check={hullFit?.get(entry.typeId) ?? null}
-        placeable={engineReady && canPlace(rack, entry.typeId)}
-        draggable={dragToRing && engineReady}
+        check={check}
+        placeable={fitsHull && engineReady && canPlace(rack, entry.typeId)}
+        draggable={fitsHull && dragToRing && engineReady}
         onAdd={onAdd}
       />
     );
@@ -369,13 +438,20 @@ export function FittingAddPanel({
                 onToggle={() => setFitsSlot((on) => !on)}
               />
             )}
-            <FilterChip
-              label={t('fittings.add.canFly')}
-              selected={canFlyOnly && hullFit !== null}
-              disabled={hullFit === null}
-              tooltip={t('fittings.add.canFlyTooltip')}
-              onToggle={() => setCanFlyOnly((on) => !on)}
-            />
+            <div className="flex items-center gap-1">
+              {FIT_FILTERS.map(({ kind, icon, labelKey, tooltipKey }) => (
+                <IconButton
+                  key={kind}
+                  icon={<img src={icon} alt="" width={16} height={16} />}
+                  label={t(labelKey)}
+                  tooltip={t(tooltipKey)}
+                  size="sm"
+                  pressed={fitFilters.has(kind) && hullFit !== null}
+                  disabled={hullFit === null}
+                  onClick={() => toggleFitFilter(kind)}
+                />
+              ))}
+            </div>
             <NativeSelect
               size="sm"
               aria-label={t('fittings.add.metaLabel')}
