@@ -432,6 +432,34 @@ describe('Alerts', () => {
       expect(screen.queryByText('Kaelen Vor')).not.toBeInTheDocument();
     });
 
+    /*
+     * The name still has to come out of the body copy even with the pill
+     * gone: dropping the pill because a one-Character device already knows
+     * whose alert this is only pays for itself if the body stops saying the
+     * name too (issue: mobile with one Character kept "Kaelen Vor's wallet
+     * balance changed…" while a multi-Character device deduped it away).
+     */
+    it('strips the name from the body too on a one-character device', async () => {
+      await db.characters.where('characterId').equals(SERA).delete();
+      await db.notificationFeed.put({
+        id: 'wallet',
+        characterId: KAELEN,
+        eventId: 'walletBalanceChanged',
+        title: 'Wallet balance changed',
+        body: "Kaelen Vor's wallet balance changed by -13,494,555.00 ISK.",
+        firedAt: Date.now(),
+      });
+      renderPage();
+      await userEvent.click(
+        await screen.findByRole('button', { name: /wallet balance changed/i, expanded: false })
+      );
+
+      expect(
+        await screen.findByText('Wallet balance changed by -13,494,555.00 ISK.')
+      ).toBeInTheDocument();
+      expect(screen.queryByText('Kaelen Vor')).not.toBeInTheDocument();
+    });
+
     it('names the character once, visibly, rather than only to a screen reader', async () => {
       await db.notificationFeed.bulkPut([
         entry({ id: 'a', characterId: KAELEN }),
