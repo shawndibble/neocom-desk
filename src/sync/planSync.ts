@@ -1060,4 +1060,13 @@ async function syncCharacter(characterId: number): Promise<void> {
     const cleared = new Set(settings.clearLocalTombstones);
     await writeSettingsTombstones(settingsTombstones.filter((t) => !cleared.has(t.key)));
   }
+
+  // Heartbeat (issue #2065): stamped only once every collection above synced,
+  // so the scheduled purge of accounts idle for 90 days sees an account that
+  // syncs daily without edits as active. The rules allow this one field only.
+  await setDoc(
+    doc(collection(firestore, 'characters'), uid),
+    { lastSyncedAt: now },
+    { merge: true }
+  );
 }
