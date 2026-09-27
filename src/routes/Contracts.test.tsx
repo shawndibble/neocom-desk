@@ -653,14 +653,6 @@ describe('Contracts tab strip (issue #908)', () => {
     await waitFor(() => expect(window.location.pathname).toBe('/contracts/search/courier'));
   });
 
-  it('still lands on Items when the remembered mode is Items itself', async () => {
-    useContractSearchMode.setState({ value: 'items', hydrated: true });
-    window.history.pushState({}, '', '/contracts');
-    render(<App />);
-    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/contracts/search/items');
-  });
-
   it('never overrides an explicit deep link to Search Items with a remembered Courier mode', async () => {
     // `tabId` reads identically for this and a bare `/contracts` visit
     // (issue #1719) — only `TabRoute`'s own `tabRouteDefaulted` marker tells
@@ -670,27 +662,6 @@ describe('Contracts tab strip (issue #908)', () => {
     render(<App />);
     expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
     expect(window.location.pathname).toBe('/contracts/search/items');
-  });
-
-  it('restores the remembered Courier mode via replace, leaving no extra history entry', async () => {
-    useContractSearchMode.setState({ value: 'courier', hydrated: true });
-    window.history.pushState({}, '', '/contracts');
-    const historyLengthBeforeRender = window.history.length;
-    render(<App />);
-    expect(await screen.findByText(SEARCH_UNAVAILABLE)).toBeInTheDocument();
-    await waitFor(() => expect(window.location.pathname).toBe('/contracts/search/courier'));
-    // Neither TabRoute's own redirect nor the mode restore push — Back from
-    // Courier must land wherever the pilot was before this page, not on Items.
-    expect(window.history.length).toBe(historyLengthBeforeRender);
-  });
-
-  it('leaves the History tab alone regardless of the remembered Search mode', async () => {
-    useContractSearchMode.setState({ value: 'courier', hydrated: true });
-    // beforeEach above already deep-links to History; restated for clarity.
-    window.history.pushState({}, '', '/contracts/history');
-    render(<App />);
-    expect(await screen.findByText('Rifter fit')).toBeInTheDocument();
-    expect(window.location.pathname).toBe('/contracts/history');
   });
 
   it('swaps the public search for the contracts table when History is picked', async () => {

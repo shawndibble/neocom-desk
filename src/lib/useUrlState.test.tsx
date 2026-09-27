@@ -1,9 +1,16 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { useMemo, useState } from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation, useNavigationType } from 'react-router-dom';
 import { boolParam, enumSetParam, textParam } from './urlState';
-import { useUrlFilter, useUrlParam, useUrlParams, useUrlSort } from './useUrlState';
+import {
+  useRememberedUrlParams,
+  useUrlFilter,
+  useUrlParam,
+  useUrlParams,
+  useUrlSort,
+} from './useUrlState';
 
 const TYPES = ['a', 'b', 'c'] as const;
 const SCHEMA = { q: textParam(), types: enumSetParam(TYPES), only: boolParam() };
@@ -242,5 +249,173 @@ describe('useUrlFilter', () => {
       </MemoryRouter>
     );
     await waitFor(() => expect(screen.getByLabelText('text')).toHaveValue(''));
+  });
+});
+
+describe('useRememberedUrlParams', () => {
+  /** `q` is URL-only; `max` and `only` have a remembered default behind them. */
+  const GROUP = { q: textParam(), max: textParam(), only: boolParam() };
+  type Stored = { max: string; only: boolean };
+  type GroupValues = { q: string; max: string; only: boolean };
+
+  interface HarnessProps {
+    initial: Stored;
+    hydrated?: boolean;
+    adoptLinked?: boolean;
+    accepts?: (key: keyof typeof GROUP, value: unknown) => boolean;
+    onRemember?: (patch: Partial<GroupValues>) => void;
+  }
+
+  function Remembered({
+    initial,
+    hydrated = true,
+    adoptLinked,
+    accepts,
+    onRemember,
+  }: HarnessProps) {
+    const [stored, setStored] = useState<Stored>(initial);
+    const remembered = useMemo(
+      () => ({
+        values: { max: stored.max, only: stored.only },
+        hydrated,
+        adoptLinked,
+        accepts,
+        remember: (patch: Partial<GroupValues>) => {
+          onRemember?.(patch);
+          setStored((current) => ({ ...current, ...patch }));
+        },
+      }),
+      [stored, hydrated, adoptLinked, accepts, onRemember]
+    );
+    const [values, setValues, linked] = useRememberedUrlParams(GROUP, remembered);
+    return (
+      <div>
+        <input
+          aria-label="max"
+          value={values.max}
+          onChange={(event) => setValues({ ...values, max: event.target.value })}
+        />
+        {/* The whole object, as a filter bar commits it. */}
+        <button type="button" onClick={() => setValues({ ...values, only: !values.only })}>
+          toggle only
+        </button>
+        <span data-testid="only">{String(values.only)}</span>
+        <span data-testid="stored">{`${stored.max}|${String(stored.only)}`}</span>
+        <span data-testid="linked">{String(linked('max'))}</span>
+      </div>
+    );
+  }
+
+  function renderRemembered(initial: string, props: HarnessProps) {
+    const tree = (next: HarnessProps) => (
+      <MemoryRouter initialEntries={[initial]}>
+        <Routes>
+          <Route
+            path="*"
+            element={
+              <>
+                <Remembered {...next} />
+                <Probe />
+              </>
+            }
+          />
+        </Routes>
+      </MemoryRouter>
+    );
+    const view = render(tree(props));
+    return { rerender: (next: HarnessProps) => view.rerender(tree(next)) };
+  }
+
+  const stored = () => screen.getByTestId('stored').textContent;
+
+  it('reads a field the URL states over its stored default', () => {
+    renderRemembered('/p?max=10', { initial: { max: '50', only: false } });
+    expect(screen.getByLabelText('max')).toHaveValue('10');
+    expect(screen.getByTestId('linked')).toHaveTextContent('true');
+  });
+
+  it('reads the stored default for a field the URL leaves out, without writing it into the URL', () => {
+    renderRemembered('/p', { initial: { max: '50', only: true } });
+    expect(screen.getByLabelText('max')).toHaveValue('50');
+    expect(screen.getByTestId('only')).toHaveTextContent('true');
+    expect(screen.getByTestId('linked')).toHaveTextContent('false');
+    expect(probe()).toBe('/p|POP');
+  });
+
+  it('writes an edited field to both the URL and the stored default', async () => {
+    const user = userEvent.setup();
+    renderRemembered('/p', { initial: { max: '', only: false } });
+
+    await user.type(screen.getByLabelText('max'), '7');
+
+    expect(stored()).toBe('7|false');
+    await waitFor(() => expect(probe()).toBe('/p?max=7|REPLACE'));
+  });
+
+  it("never copies an untouched field's URL value into storage", async () => {
+    const onRemember = vi.fn();
+    const user = userEvent.setup();
+    renderRemembered('/p?only=1', { initial: { max: '', only: false }, onRemember });
+
+    await user.type(screen.getByLabelText('max'), '7');
+
+    expect(onRemember).toHaveBeenCalledWith({ max: '7' });
+    expect(onRemember.mock.calls.every(([patch]) => !('only' in patch))).toBe(true);
+    expect(stored()).toBe('7|false');
+  });
+
+  it('never adds a URL param for an untouched field read from the stored default', async () => {
+    const user = userEvent.setup();
+    renderRemembered('/p', { initial: { max: '50', only: false } });
+
+    await user.click(screen.getByRole('button', { name: 'toggle only' }));
+
+    await waitFor(() => expect(probe()).toBe('/p?only=1|REPLACE'));
+    expect(stored()).toBe('50|true');
+  });
+
+  it('keeps a deep link over the stored default on first render and after hydration', () => {
+    const onRemember = vi.fn();
+    const { rerender } = renderRemembered('/p?max=10', {
+      initial: { max: '50', only: false },
+      hydrated: false,
+      onRemember,
+    });
+    expect(screen.getByLabelText('max')).toHaveValue('10');
+
+    rerender({ initial: { max: '50', only: false }, hydrated: true, onRemember });
+
+    expect(screen.getByLabelText('max')).toHaveValue('10');
+    expect(probe()).toBe('/p?max=10|POP');
+    expect(onRemember).not.toHaveBeenCalled();
+  });
+
+  it('adopts a linked value into storage once hydrated, only when opted in', () => {
+    const onRemember = vi.fn();
+    const props = { initial: { max: '50', only: false }, adoptLinked: true, onRemember };
+    const { rerender } = renderRemembered('/p?max=10&q=jita', { ...props, hydrated: false });
+    expect(onRemember).not.toHaveBeenCalled();
+
+    rerender({ ...props, hydrated: true });
+
+    // `q` has no stored default, so there is nothing to adopt it into.
+    expect(onRemember).toHaveBeenCalledTimes(1);
+    expect(onRemember).toHaveBeenCalledWith({ max: '10' });
+    expect(stored()).toBe('10|false');
+    expect(probe()).toBe('/p?max=10&q=jita|POP');
+  });
+
+  it('reads a linked value the caller rejects as absent, and never adopts it', () => {
+    const onRemember = vi.fn();
+    renderRemembered('/p?max=bad', {
+      initial: { max: '50', only: false },
+      adoptLinked: true,
+      accepts: (_key, value) => value !== 'bad',
+      onRemember,
+    });
+
+    expect(screen.getByLabelText('max')).toHaveValue('50');
+    expect(screen.getByTestId('linked')).toHaveTextContent('false');
+    expect(onRemember).not.toHaveBeenCalled();
   });
 });

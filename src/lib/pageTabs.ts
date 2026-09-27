@@ -96,3 +96,20 @@ export function tabFromPathname<Id extends string>(
   const segment = pathname.slice(page.base.length + 1).replace(/\/$/, '');
   return page.tabs.find((tab) => tab.id === segment)?.id ?? null;
 }
+
+/**
+ * Marker `TabRoute`'s default-tab redirect carries in its navigation `state`,
+ * so a page whose default tab hides a remembered sub-choice (Contracts'
+ * Items/Courier mode) can tell "the generic default landing" apart from an
+ * explicit link that happens to name that same tab path —
+ * `tabFromPathname` resolves both identically, and only `TabRoute` itself,
+ * at the moment it redirects, knows which one this was.
+ */
+export interface TabRouteDefaultState {
+  tabRouteDefaulted?: boolean;
+}
+
+/** Whether a location's `state` is `TabRoute`'s default-tab landing. */
+export function isTabRouteDefaulted(state: unknown): boolean {
+  return Boolean((state as TabRouteDefaultState | null)?.tabRouteDefaulted);
+}
