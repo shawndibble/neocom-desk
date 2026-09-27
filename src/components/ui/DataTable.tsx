@@ -843,7 +843,17 @@ export function DataTable<T>({
             <th role="columnheader" scope="col" aria-hidden="true" className="w-0 p-0" />
           )}
           {rowMoreActions && (
-            <th role="columnheader" scope="col" className="w-0 p-0">
+            // `relative`: the `sr-only` label below has no explicit
+            // top/left, so its used position falls back to its own static
+            // position — past this trailing column, at the table's right
+            // edge. With no positioned ancestor, that resolves the label's
+            // containing block above any `overflow-x-auto` wrapper a caller
+            // puts around this table, so a wide table (#2093) keeps
+            // stretching that ancestor's scrollable region even though the
+            // wrapper visually clips everything else. This `<th>` being
+            // positioned gives the label a containing block that's already
+            // inside the clip.
+            <th role="columnheader" scope="col" className="relative w-0 p-0">
               <span className="sr-only">{t('common.dataTable.actionsHeader')}</span>
             </th>
           )}
