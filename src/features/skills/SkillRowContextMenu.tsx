@@ -16,7 +16,7 @@ import {
 import { db, type SkillPlanRecord } from '@/db';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { scheduleSync } from '@/sync';
-import { upsertEntry } from './planner/reorder';
+import { addEntry } from './planner/skillPlanEdit';
 
 export interface SkillRowContextMenuProps {
   activeCharacterId: number;
@@ -53,7 +53,7 @@ async function addSkillToPlan(
   characterId: number
 ): Promise<void> {
   await db.skillPlans.update(plan.id, {
-    entries: upsertEntry(plan.entries, { skillTypeID, targetLevel }),
+    ...addEntry(plan, { skillTypeID, targetLevel }),
     updatedAt: Date.now(),
   });
   if (isSyncConfigured()) scheduleSync(characterId);

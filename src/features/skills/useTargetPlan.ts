@@ -10,7 +10,7 @@ import { isSyncConfigured } from '@/app/syncStatus';
 import { scheduleSync } from '@/sync';
 import type { PlanEntry } from '@/engine/types';
 import { newPlan } from './planner/newPlan';
-import { removeEntry, upsertEntry } from './planner/reorder';
+import { addEntry, removeEntry, type SkillPlanEditable } from './planner/skillPlanEdit';
 import {
   selectTargetPlanId,
   targetPlanIdFor,
@@ -25,7 +25,7 @@ export interface AddEntriesResult {
   planName: string;
   /**
    * The subset of `entries` not already covered by an existing row at that
-   * level (`upsertEntry`'s rule, applied cumulatively) — what a caller's
+   * level (`addEntry`'s rule, applied cumulatively) — what a caller's
    * Undo should pass back to `removeEntries`.
    */
   added: readonly PlanEntry[];
@@ -92,12 +92,12 @@ export function useTargetPlan(characterId: number | null): TargetPlan {
         // in-batch duplicate must also be excluded from `added`, or Undo
         // would remove a row that was never its own.
         const added: PlanEntry[] = [];
-        const merged = entries.reduce((acc, entry) => {
-          const next = upsertEntry(acc, entry);
-          if (next.length > acc.length) added.push(entry);
+        const merged = entries.reduce<SkillPlanEditable>((acc, entry) => {
+          const next = { ...acc, ...addEntry(acc, entry) };
+          if (next.entries.length > acc.entries.length) added.push(entry);
           return next;
-        }, current.entries);
-        const updated = { ...current, entries: merged, updatedAt: Date.now() };
+        }, current);
+        const updated = { ...current, ...merged, updatedAt: Date.now() };
         await db.skillPlans.put(updated);
         return { planId: updated.id, planName: updated.name, added };
       });
@@ -115,14 +115,13 @@ export function useTargetPlan(characterId: number | null): TargetPlan {
       await db.transaction('rw', db.skillPlans, async () => {
         const plan = await db.skillPlans.get(planId);
         if (!plan) return;
-        const updated = {
-          ...plan,
-          entries: entries.reduce(
-            (acc, e) => removeEntry(acc, e.skillTypeID, e.targetLevel),
-            plan.entries
-          ),
-          updatedAt: Date.now(),
-        };
+        // Through `removeEntry`, not a bare entries filter: Remap Markers
+        // after a removed entry shift back with it, overrides and all.
+        const edited = entries.reduce<SkillPlanEditable>(
+          (acc, e) => ({ ...acc, ...removeEntry(acc, e.skillTypeID, e.targetLevel) }),
+          plan
+        );
+        const updated = { ...plan, ...edited, updatedAt: Date.now() };
         await db.skillPlans.put(updated);
       });
       if (characterId !== null && isSyncConfigured()) scheduleSync(characterId);
