@@ -73,9 +73,9 @@ describe('addCharacter', () => {
   });
 
   it('backfills even with sync unconfigured — the copy is a local Dexie write', async () => {
-    // `removeCharacter` gates its remote purge on `isSyncConfigured()` because
-    // that operation talks to a backend. This one does not: an account-wide
-    // pin is just as much the new Character's on a device that never syncs.
+    // `isSyncConfigured()` gates operations that talk to a backend. This one
+    // does not: an account-wide pin is just as much the new Character's on a
+    // device that never syncs.
     await db.characters.put(characterRecord(1));
     mocks.completeLogin.mockResolvedValue(characterRecord(2));
 
