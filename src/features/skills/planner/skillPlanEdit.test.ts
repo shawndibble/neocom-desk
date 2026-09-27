@@ -21,7 +21,7 @@ import {
   applyReorder,
   moveRow,
   promotePrereqRow,
-  remapMarkerAttributes,
+  alignedMarkerAttributes,
   removeEntry,
   removeRemapMarker,
   replaceWithImport,
@@ -177,13 +177,13 @@ describe('removeRemapMarker', () => {
   });
 });
 
-describe('setRemapMarkerAttributes / remapMarkerAttributes', () => {
+describe('setRemapMarkerAttributes / alignedMarkerAttributes', () => {
   it("reads each marker's override aligned to normalized marker order, null for none", () => {
-    expect(remapMarkerAttributes(plan({ markers: [3, 1], markerAttributes: [A] }))).toEqual([
+    expect(alignedMarkerAttributes(plan({ markers: [3, 1], markerAttributes: [A] }))).toEqual([
       null,
       A,
     ]);
-    expect(remapMarkerAttributes(plan())).toEqual([]);
+    expect(alignedMarkerAttributes(plan())).toEqual([]);
   });
 
   it("sets one marker's override, writing a dense list aligned to the markers", () => {

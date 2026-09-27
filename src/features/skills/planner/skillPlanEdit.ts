@@ -7,9 +7,10 @@
  * A Skill Plan holds three index-aligned lists: `entries`, `markers` (Remap
  * Marker positions into `entries`) and `markerAttributes` (each marker's
  * manual override, by marker ordinal — see `normalizeMarkerAttributes`).
- * Keeping those three consistent is this module's job alone: every
- * operation returns a patch in which whatever it touches still lines up, so
- * no caller has to remember which marker helper pairs with which.
+ * Keeping those three consistent is this module's job for every edit the
+ * Plan Editor makes: each operation returns a patch in which whatever it
+ * touches still lines up, so no caller has to remember which marker helper
+ * pairs with which.
  *
  * A patch carries only the fields the edit changes, exactly as the editor
  * wrote them before this module existed — the record the route persists and
@@ -49,7 +50,7 @@ export type SkillPlanPatch = Partial<SkillPlanEditable>;
  * `plan.markerAttributes` itself can be stale relative to `plan.markers`, so
  * this is the only way to read it by marker ordinal.
  */
-export function remapMarkerAttributes(plan: SkillPlanEditable): (Attributes | null)[] {
+export function alignedMarkerAttributes(plan: SkillPlanEditable): (Attributes | null)[] {
   return normalizeMarkerAttributes(plan.markers, plan.markerAttributes, plan.entries.length);
 }
 
@@ -100,7 +101,7 @@ export function addRemapMarker(plan: SkillPlanEditable): SkillPlanPatch {
 /** Remove the marker at ordinal `markerIndex` (normalized order), and its override with it. */
 export function removeRemapMarker(plan: SkillPlanEditable, markerIndex: number): SkillPlanPatch {
   const markers = normalizeMarkers(plan.markers, plan.entries.length);
-  const markerAttributes = remapMarkerAttributes(plan);
+  const markerAttributes = alignedMarkerAttributes(plan);
   markers.splice(markerIndex, 1);
   markerAttributes.splice(markerIndex, 1);
   return { markers, markerAttributes };
@@ -112,7 +113,7 @@ export function setRemapMarkerAttributes(
   markerIndex: number,
   attributes: Attributes | null
 ): SkillPlanPatch {
-  const markerAttributes = remapMarkerAttributes(plan);
+  const markerAttributes = alignedMarkerAttributes(plan);
   markerAttributes[markerIndex] = attributes;
   return { markerAttributes };
 }
@@ -123,7 +124,7 @@ export function setRemapMarkerAttributes(
  * ordinal it was (see `RowsToState`).
  */
 function dropPatch(plan: SkillPlanEditable, state: PlanDropState): SkillPlanPatch {
-  const before = remapMarkerAttributes(plan);
+  const before = alignedMarkerAttributes(plan);
   return {
     entries: state.entries,
     markers: state.markers,
@@ -183,7 +184,7 @@ export function promotePrereqRow(
 export function replaceWithImport(
   plan: SkillPlanEditable,
   imported: readonly PlanEntry[]
-): { patch: SkillPlanPatch; undo: SkillPlanPatch } {
+): { patch: SkillPlanPatch; undo: Required<SkillPlanEditable> } {
   return {
     patch: { entries: [...imported], markers: [], markerAttributes: [] },
     undo: {
@@ -267,11 +268,7 @@ export function removeEntry(
     return {
       entries,
       markers: normalizeMarkers(plan.markers, plan.entries.length),
-      markerAttributes: normalizeMarkerAttributes(
-        plan.markers,
-        plan.markerAttributes,
-        plan.entries.length
-      ),
+      markerAttributes: alignedMarkerAttributes(plan),
     };
   }
   const shifted = plan.markers.map((m) => (m > entryIndex ? m - 1 : m));

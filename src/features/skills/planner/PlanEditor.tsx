@@ -116,7 +116,7 @@ import {
   applyReorder,
   moveRow,
   promotePrereqRow,
-  remapMarkerAttributes,
+  alignedMarkerAttributes,
   removeEntry,
   removeRemapMarker,
   replaceWithImport,
@@ -124,7 +124,6 @@ import {
   setRemapMarkerAttributes,
   splitByLevel,
   type SkillPlanEditable,
-  type SkillPlanPatch,
 } from './skillPlanEdit';
 import { RemapMarkerModal } from './RemapMarkerModal';
 import { bandStarts, meaningfulBandStarts } from './bands';
@@ -303,7 +302,7 @@ export function PlanEditor({
   // A snapshot taken just before a Replace, for the Undo beside its
   // confirmation — scoped to plan.id so switching plans can't apply an undo
   // meant for a different one (#1402).
-  const [undoImport, setUndoImport] = useScopedState<SkillPlanPatch>([plan.id]);
+  const [undoImport, setUndoImport] = useScopedState<Required<SkillPlanEditable>>([plan.id]);
   // Inline, beside-the-button confirmations (#222) — same pattern as
   // copyConfirm/importConfirm above: small text next to the triggering
   // button, cleared after a couple of seconds. Additive to the full
@@ -516,7 +515,7 @@ export function PlanEditor({
   );
 
   // Manual overrides (RemapMarkerModal), aligned to the current markers.
-  const normalizedMarkerAttributes = useMemo(() => remapMarkerAttributes(editable), [editable]);
+  const normalizedMarkerAttributes = useMemo(() => alignedMarkerAttributes(editable), [editable]);
 
   // The queue's lead (the levels ahead of the first one this plan lists)
   // trains first, so the plan starts when it ends. One instant feeds the schedule,
