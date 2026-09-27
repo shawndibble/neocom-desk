@@ -38,8 +38,9 @@ const DESKTOP = { width: 1280, height: 800 };
 
 const REGION = 10000002; // The Forge
 const TRITANIUM = 34;
-/** Jita IV - Moon 4 - Caldari Navy Assembly Plant — real NPC station, ~48 characters. */
+/** Real NPC station, bundled in `public/data/market/stations.json` — its ~46-character name is the long station name the acceptance criteria asks for. */
 const STATION_A = 60003760;
+const STATION_A_NAME = 'Jita 4 - Moon 4 - Caldari Navy Assembly Plant';
 const JITA_SYSTEM = 30000142;
 
 function order(
@@ -109,6 +110,8 @@ interface CellBox {
   top: number;
   left: number;
   width: number;
+  /** A wrapped-but-clipped cell would still pass every geometry check above — its box never grows past its track, it just hides content inside it. This is what actually catches that. */
+  clipped: boolean;
 }
 
 interface RowGeometry {
@@ -138,6 +141,7 @@ async function readRow(page: Page, tableLabel: string, orderId: number): Promise
           top: cellBox.top,
           left: cellBox.left,
           width: cellBox.width,
+          clipped: td.scrollWidth > td.clientWidth + 1,
         };
       });
       return {
@@ -161,6 +165,10 @@ function lines(cells: CellBox[]): CellBox[][] {
   return grouped;
 }
 
+function labelLines(cells: CellBox[]): string[][] {
+  return lines(cells).map((line) => line.map((cell) => cell.label));
+}
+
 test.describe('Market Browser — order book stacked cards', () => {
   test.beforeEach(async ({ page }) => {
     await seedOrderBook(page);
@@ -174,34 +182,55 @@ test.describe('Market Browser — order book stacked cards', () => {
 
     const sell = await readRow(page, 'Sell Orders', SELL_ORDER.order_id);
     expect(sell.display).toBe('grid');
-    // Price (primary, full width) + Quantity/Location/Security/Jumps/Expires
-    // paired two per line, with the fifth (odd) column trailing alone.
-    const sellLines = lines(sell.cells);
-    expect(sellLines).toHaveLength(4);
-    expect(sellLines[0]).toHaveLength(1);
-    expect(sellLines[1]).toHaveLength(2);
-    expect(sellLines[2]).toHaveLength(2);
-    expect(sellLines[3]).toHaveLength(1);
+    // Price (primary, full width) + Quantity/Location paired, Security/Jumps
+    // paired, Expires trailing alone (5 secondary columns, odd) — exact
+    // labels, not just line lengths, so a dropped or reordered column fails
+    // here rather than passing on a coincidentally-matching count.
+    expect(labelLines(sell.cells)).toEqual([
+      ['Price'],
+      ['Quantity', 'Location'],
+      ['Security', 'Jumps'],
+      ['Expires'],
+    ]);
 
     const buy = await readRow(page, 'Buy Orders', BUY_ORDER.order_id);
     expect(buy.display).toBe('grid');
-    // Price + Quantity/Location/Security/Jumps/Expires/Range/Min. Volume: 3
-    // paired lines plus a trailing odd one.
-    const buyLines = lines(buy.cells);
-    expect(buyLines).toHaveLength(5);
-    expect(buyLines[0]).toHaveLength(1);
-    expect(buyLines[1]).toHaveLength(2);
-    expect(buyLines[2]).toHaveLength(2);
-    expect(buyLines[3]).toHaveLength(2);
-    expect(buyLines[4]).toHaveLength(1);
+    // Same as Sell, plus Range/Min. Volume paired before the trailing Expires.
+    expect(labelLines(buy.cells)).toEqual([
+      ['Price'],
+      ['Quantity', 'Location'],
+      ['Security', 'Jumps'],
+      ['Expires', 'Range'],
+      ['Min. Volume'],
+    ]);
 
-    // The long station name and the 8-figure quantity both fit their half of
-    // the card without pushing past it or overlapping their line partner.
-    for (const rowLines of [sellLines, buyLines]) {
-      for (const line of rowLines.slice(1)) {
-        if (line.length !== 2) continue;
-        const [first, second] = line;
-        expect(second.left).toBeGreaterThanOrEqual(first.left + first.width);
+    for (const { cells, contentWidth } of [sell, buy]) {
+      const [[price], ...valueLines] = lines(cells);
+      // The long station name renders in full rather than as the "Unknown
+      // Structure" fallback (which would satisfy every geometry check below
+      // while showing the pilot nothing useful) — the whole point of seeding
+      // it, not just its byte length.
+      const location = cells.find((c) => c.label === 'Location')!;
+      expect(location.text).toBe(STATION_A_NAME);
+
+      // The primary cell still titles the card, full width.
+      expect(price.width).toBeCloseTo(contentWidth, -1);
+
+      for (const line of valueLines) {
+        for (const cell of line) {
+          // A wrapped-but-clipped cell (e.g. the long station name hitting
+          // `useMarketOrderColumns.tsx`'s `truncate` class, which only
+          // applies `sm:`-scoped, but a regression here would silently
+          // clip it inside its half-width track without changing its box)
+          // would pass every check above while hiding its own text.
+          expect(cell.clipped).toBe(false);
+        }
+        if (line.length === 2) {
+          const [first, second] = line;
+          // Side by side, not overlapping: the second starts at or past the
+          // end of the first (the grid's own column gap).
+          expect(second.left).toBeGreaterThanOrEqual(first.left + first.width);
+        }
       }
     }
 

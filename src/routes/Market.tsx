@@ -1210,8 +1210,9 @@ export function Market() {
                                 rowKey={(o) => o.order_id}
                                 label={t('market.sell')}
                                 defaultSort={{ columnId: 'price', direction: 'asc' }}
-                                // Quantity/Location/Security/Jumps/Expiry are all short figures —
-                                // pair them two per line at phone widths instead of one per line.
+                                // Quantity/Security/Jumps/Expiry are short figures, and Location
+                                // wraps within its half-width track — pairing two per line at
+                                // phone widths beats one-per-line without overlap or clipping.
                                 stackColumns={2}
                                 rowContextMenu={orderRowContextMenu}
                                 rowMoreActions
