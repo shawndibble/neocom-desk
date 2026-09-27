@@ -18,6 +18,7 @@ import { configureClipboard } from '@/lib/clipboard';
 import { fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import type { Fitting } from '@/engine/fittings/types';
+import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 import { FittingItemActionsProvider } from './fittingItemActions';
 import { fakeItemActions } from './__fixtures__/itemActions';
 
@@ -217,18 +218,20 @@ describe('FittingStatsSections offense weapon menu', () => {
     );
     render(
       <MemoryRouter>
-        <FittingItemActionsProvider value={actions}>
-          <FittingStatsSections
-            stats={heatedStats()}
-            statsProgress={null}
-            statsError={false}
-            price={null}
-            damageProfiles={damageProfiles()}
-            targetProfiles={targetProfiles()}
-            typeName={typeName}
-            fitting={blasters}
-          />
-        </FittingItemActionsProvider>
+        <FakeItemActions>
+          <FittingItemActionsProvider value={actions}>
+            <FittingStatsSections
+              stats={heatedStats()}
+              statsProgress={null}
+              statsError={false}
+              price={null}
+              damageProfiles={damageProfiles()}
+              targetProfiles={targetProfiles()}
+              typeName={typeName}
+              fitting={blasters}
+            />
+          </FittingItemActionsProvider>
+        </FakeItemActions>
       </MemoryRouter>
     );
     return actions;

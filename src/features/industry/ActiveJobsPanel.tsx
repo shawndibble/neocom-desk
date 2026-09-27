@@ -149,10 +149,6 @@ function JobFilterMenu<T extends string | number>({
 
 interface ActiveJobsPanelProps {
   characterId: number;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  /** False with no active character — the Quickbar has nobody to save the item under. */
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 interface Snapshot {
@@ -203,12 +199,7 @@ async function loadActiveJobsSnapshot(characterId: number): Promise<Snapshot> {
  * corporation's industry jobs belong to the Corporation page, which loads
  * them itself.
  */
-export function ActiveJobsPanel({
-  characterId,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
-}: ActiveJobsPanelProps) {
+export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
   const { t } = useTranslation();
   const [now, setNow] = useState(() => Date.now());
   // URL-backed filters (ADR 0015), empty meaning "every activity"/"every
@@ -740,9 +731,6 @@ export function ActiveJobsPanel({
               typeId={menuTypeId}
               itemName={nameForBlueprint(menuTypeId)}
               blueprintTypeID={job.product_type_id !== undefined ? job.blueprint_type_id : null}
-              onAddToQuickbar={onAddToQuickbar}
-              quickbarAvailable={quickbarAvailable}
-              onShowInfo={onShowInfo}
               extraItems={
                 canLog(job) ? (
                   <MenuItem onSelect={() => void handleLogProduction(job)}>
@@ -763,9 +751,6 @@ export function ActiveJobsPanel({
       jobTone,
       nameForBlueprint,
       showCharacterColumn,
-      onAddToQuickbar,
-      quickbarAvailable,
-      onShowInfo,
       canLog,
       handleLogProduction,
     ]
@@ -784,9 +769,6 @@ export function ActiveJobsPanel({
         typeId={menuTypeId}
         itemName={nameForBlueprint(menuTypeId)}
         blueprintTypeID={job.product_type_id !== undefined ? job.blueprint_type_id : null}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable={quickbarAvailable}
-        onShowInfo={onShowInfo}
         extraItems={
           canLog(job) ? (
             <MenuItem onSelect={() => void handleLogProduction(job)}>

@@ -8,6 +8,7 @@ import type { TradeHub } from '@/market/hubs';
 import type { BlueprintCatalog } from './blueprintCatalog';
 import type { MarketWideResultRow } from './marketWideOpportunities';
 import { MarketWideOpportunitiesPanel } from './MarketWideOpportunitiesPanel';
+import { fakeItemActions, withItemActions } from '@/features/market/__fixtures__/itemActions';
 
 const row = (productTypeID: number, productName: string): MarketWideResultRow =>
   ({
@@ -43,33 +44,33 @@ const catalog = {
   byProductTypeID: new Map([[200, { blueprintTypeID: 1200, productTypeID: 200 }]]),
 } as unknown as BlueprintCatalog;
 
-function renderPanel(props: { onAddToQuickbar?: () => void; quickbarAvailable?: boolean } = {}) {
+function renderPanel(actions = fakeItemActions()) {
   return render(
     <MemoryRouter>
-      <MarketWideOpportunitiesPanel
-        hub={{ id: 'jita' } as unknown as TradeHub}
-        trees={{}}
-        catalog={catalog}
-        modifiers={{} as CharacterModifiers}
-        activeCharacterId={null}
-        onStartPlan={() => {}}
-        onAddToQuickbar={props.onAddToQuickbar ?? (() => {})}
-        quickbarAvailable={props.quickbarAvailable ?? true}
-        onShowInfo={() => {}}
-      />
+      {withItemActions(
+        <MarketWideOpportunitiesPanel
+          hub={{ id: 'jita' } as unknown as TradeHub}
+          trees={{}}
+          catalog={catalog}
+          modifiers={{} as CharacterModifiers}
+          activeCharacterId={null}
+          onStartPlan={() => {}}
+        />,
+        actions
+      )}
     </MemoryRouter>
   );
 }
 
 describe('MarketWideOpportunitiesPanel row context menu', () => {
   it('opens the item menu for the row product', async () => {
-    const onAddToQuickbar = vi.fn();
-    renderPanel({ onAddToQuickbar });
+    const actions = fakeItemActions();
+    renderPanel(actions);
 
     fireEvent.contextMenu(screen.getByText('Widget Beta').closest('tr')!);
     fireEvent.click(await screen.findByText('Add to Quickbar'));
 
-    expect(onAddToQuickbar).toHaveBeenCalledWith(200, 'Widget Beta');
+    expect(actions.addToQuickbar).toHaveBeenCalledWith(200, 'Widget Beta');
     expect(screen.getAllByRole('button', { name: 'Start a plan' })[0]).toBeInTheDocument();
   });
 
@@ -82,8 +83,8 @@ describe('MarketWideOpportunitiesPanel row context menu', () => {
   });
 
   it('gives the row a visible "More actions" button with the same items as its right-click menu (issue #1498)', async () => {
-    const onAddToQuickbar = vi.fn();
-    renderPanel({ onAddToQuickbar });
+    const actions = fakeItemActions();
+    renderPanel(actions);
     const user = userEvent.setup();
     const row = screen.getByText('Widget Beta').closest('tr')!;
 

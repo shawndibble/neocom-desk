@@ -61,8 +61,7 @@ interface EditorItemActionsInput {
   dronesShown: boolean;
   /** Drag is pointer-only: without one, every drop is off. */
   dragEnabled: boolean;
-  /** Stable (a `useCallback` over state setters), as the next two are. */
-  showInfo: (typeId: number, name: string) => void;
+  /** Stable (a `useCallback` over a state setter), as the next one is. */
   selectTarget: (target: AddTarget) => void;
   /** Opens the quantity dialog for a cargo item. */
   openCargoQuantity: (typeId: number) => void;
@@ -98,7 +97,6 @@ export function useEditorItemActions({
   target,
   dronesShown,
   dragEnabled,
-  showInfo,
   selectTarget,
   openCargoQuantity,
 }: EditorItemActionsInput): EditorItemActions {
@@ -260,7 +258,6 @@ export function useEditorItemActions({
         ? null
         : {
             typeName: (typeId) => catalogueTypeName(catalogue, typeId),
-            showInfo,
             charges,
             setState: (rack, index, state) => edit((f) => setModuleState(f, rack, index, state)),
             unloadCharge: (rack, index) => edit((f) => setModuleCharge(f, rack, index, null)),
@@ -330,7 +327,6 @@ export function useEditorItemActions({
       open,
       shipTypeId,
       catalogue,
-      showInfo,
       charges,
       edit,
       variationIndex,

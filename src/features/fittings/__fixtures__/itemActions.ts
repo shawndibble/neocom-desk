@@ -31,7 +31,6 @@ export function fakeItemActions(
   };
   return {
     typeName: (typeId) => names[typeId] ?? `#${typeId}`,
-    showInfo: vi.fn(),
     charges,
     setState: vi.fn(),
     unloadCharge: vi.fn(),

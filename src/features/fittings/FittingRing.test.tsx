@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
 import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
+import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 import { FittingRing } from './FittingRing';
 import { FITTING_DRAG_TYPE, useFittingDrag, type FittingDragPayload } from './fittingDrag';
 import { FittingItemActionsProvider, type FittingItemActions } from './fittingItemActions';
@@ -280,15 +281,17 @@ describe('FittingRing with the editor’s item actions', () => {
   ) {
     return render(
       <MemoryRouter>
-        <FittingItemActionsProvider value={actions}>
-          <FittingRing
-            fitting={fitting}
-            stats={statsWith(10)}
-            typeName={(typeId) => names[typeId as keyof typeof names] ?? '?'}
-            moduleResults={results}
-            {...props}
-          />
-        </FittingItemActionsProvider>
+        <FakeItemActions>
+          <FittingItemActionsProvider value={actions}>
+            <FittingRing
+              fitting={fitting}
+              stats={statsWith(10)}
+              typeName={(typeId) => names[typeId as keyof typeof names] ?? '?'}
+              moduleResults={results}
+              {...props}
+            />
+          </FittingItemActionsProvider>
+        </FakeItemActions>
       </MemoryRouter>
     );
   }

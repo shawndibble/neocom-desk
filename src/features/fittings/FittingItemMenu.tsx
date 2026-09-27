@@ -216,7 +216,7 @@ export function ModuleMenuItems({
         </>
       )}
       <MenuSeparator />
-      <ShowInfoMenuItem typeId={typeId} itemName={name} onShowInfo={actions.showInfo} />
+      <ShowInfoMenuItem typeId={typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={typeId} />
       <MenuSeparator />
       <MenuItem onSelect={() => actions.removeAllOfType(typeId)}>
@@ -324,7 +324,7 @@ export function WeaponMenuItems({
         </MenuSub>
       )}
       <MenuSeparator />
-      <ShowInfoMenuItem typeId={first.typeId} itemName={name} onShowInfo={actions.showInfo} />
+      <ShowInfoMenuItem typeId={first.typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={first.typeId} />
     </>
   );
@@ -398,7 +398,7 @@ export function DroneMenuItems({
       </MenuItem>
       <MenuItem onSelect={() => actions.recallAllDrones()}>{t('fittings.item.recallAll')}</MenuItem>
       <MenuSeparator />
-      <ShowInfoMenuItem typeId={typeId} itemName={name} onShowInfo={actions.showInfo} />
+      <ShowInfoMenuItem typeId={typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={typeId} />
       <MenuSeparator />
       <MenuItem className="text-danger" onSelect={() => actions.removeDrones(typeId)}>
@@ -471,7 +471,7 @@ export function CargoMenuItems({ typeId }: { typeId: number }) {
         {t('fittings.item.changeQuantity')}
       </MenuItem>
       <MenuSeparator />
-      <ShowInfoMenuItem typeId={typeId} itemName={name} onShowInfo={actions.showInfo} />
+      <ShowInfoMenuItem typeId={typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={typeId} />
       <MenuSeparator />
       <MenuItem className="text-danger" onSelect={() => actions.removeCargo(typeId)}>
@@ -537,7 +537,7 @@ export function AddItemMenuItems({
         <ChargeLoadItems actions={actions} typeId={typeId} fromCargo={false} />
       )}
       <MenuSeparator />
-      <ShowInfoMenuItem typeId={typeId} itemName={name} onShowInfo={actions.showInfo} />
+      <ShowInfoMenuItem typeId={typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={typeId} />
     </>
   );

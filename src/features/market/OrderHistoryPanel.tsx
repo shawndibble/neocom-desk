@@ -26,7 +26,6 @@ import { useIsPhone } from '@/lib/useIsPhone';
 import { MarketItemLink } from './MarketItemLink';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
-import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { useUrlFilter, useUrlSort } from '@/lib/useUrlState';
 import { useColumnVisibility } from '@/lib/columnVisibility';
@@ -140,23 +139,10 @@ function HistoryFilterBar({ filter, onChange, actions }: HistoryFilterBarProps) 
 interface OrderHistoryPanelProps {
   /** Switches the History tab to its other view; the picker lives in this panel's header. */
   onViewChange: (view: HistoryView) => void;
-  /** Same per-item context menu as Appraisal: null until requested, then per-typeId lookups. */
-  blueprintCatalog: BlueprintCatalog | null;
-  onRequestBlueprintCatalog: () => void;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 /** Market's History tab, Orders view: a character's completed/expired/cancelled market orders. */
-export function OrderHistoryPanel({
-  onViewChange,
-  blueprintCatalog,
-  onRequestBlueprintCatalog,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
-}: OrderHistoryPanelProps) {
+export function OrderHistoryPanel({ onViewChange }: OrderHistoryPanelProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
@@ -275,22 +261,8 @@ export function OrderHistoryPanel({
   /** Same menu the Appraisal ledger carries — an order-history row names an item like any other. */
   function rowContextMenu(order: MarketOrderHistory, tr: ReactElement) {
     const itemName = nameFor(order.type_id);
-    const blueprintTypeID =
-      blueprintCatalog === null
-        ? undefined
-        : (blueprintCatalog.byProductTypeID.get(order.type_id)?.blueprintTypeID ?? null);
     return (
-      <ItemContextMenu
-        typeId={order.type_id}
-        itemName={itemName}
-        blueprintTypeID={blueprintTypeID}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable={quickbarAvailable}
-        onShowInfo={onShowInfo}
-        onOpenChange={(open) => {
-          if (open) onRequestBlueprintCatalog();
-        }}
-      >
+      <ItemContextMenu typeId={order.type_id} itemName={itemName}>
         {tr}
       </ItemContextMenu>
     );

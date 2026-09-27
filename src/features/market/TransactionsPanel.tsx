@@ -31,7 +31,6 @@ import { MarketItemLink } from './MarketItemLink';
 import type { CachedResult } from '@/esi/cache';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { iskToneClass } from '@/features/character/format';
-import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { formatIsk } from '@/lib/isk';
 import { formatTimestamp } from '@/lib/timestamp';
@@ -96,22 +95,9 @@ async function loadTransactionsSnapshot(
 interface TransactionsPanelProps {
   /** Switches the History tab to its other view; the picker lives in this panel's header. */
   onViewChange: (view: HistoryView) => void;
-  /** Same per-item context menu as Appraisal: null until requested, then per-typeId lookups. */
-  blueprintCatalog: BlueprintCatalog | null;
-  onRequestBlueprintCatalog: () => void;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
-export function TransactionsPanel({
-  onViewChange,
-  blueprintCatalog,
-  onRequestBlueprintCatalog,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
-}: TransactionsPanelProps) {
+export function TransactionsPanel({ onViewChange }: TransactionsPanelProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   const timeZone = useTimeZone();
@@ -249,22 +235,8 @@ export function TransactionsPanel({
   /** Same menu the Appraisal ledger carries — a transaction row names an item like any other. */
   function rowContextMenu(txn: WalletTransaction, tr: ReactElement) {
     const itemName = typeNames.get(txn.type_id) ?? `Type #${txn.type_id}`;
-    const blueprintTypeID =
-      blueprintCatalog === null
-        ? undefined
-        : (blueprintCatalog.byProductTypeID.get(txn.type_id)?.blueprintTypeID ?? null);
     return (
-      <ItemContextMenu
-        typeId={txn.type_id}
-        itemName={itemName}
-        blueprintTypeID={blueprintTypeID}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable={quickbarAvailable}
-        onShowInfo={onShowInfo}
-        onOpenChange={(open) => {
-          if (open) onRequestBlueprintCatalog();
-        }}
-      >
+      <ItemContextMenu typeId={txn.type_id} itemName={itemName}>
         {tr}
       </ItemContextMenu>
     );

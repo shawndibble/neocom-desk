@@ -69,10 +69,6 @@ interface ProductionLogPanelProps {
   plans: BuildPlanRecord[];
   /** Row click on the runs table: hands back the run's own Build Plan so the caller can jump to it. */
   onOpenRun?: (buildPlanId: string) => void;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  /** False with no active character — the Quickbar has nobody to save the item under. */
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 interface ItemRow {
@@ -305,9 +301,6 @@ export function ProductionLogPanel({
   skills,
   plans,
   onOpenRun,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
 }: ProductionLogPanelProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
@@ -417,14 +410,7 @@ export function ProductionLogPanel({
   const itemMenuFor = (typeId: number, itemName: string, tr: ReactElement): ReactElement => {
     const entry = catalog.byProductTypeID.get(typeId);
     return entry ? (
-      <ItemContextMenu
-        typeId={typeId}
-        itemName={itemName}
-        blueprintTypeID={entry.blueprintTypeID}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable={quickbarAvailable}
-        onShowInfo={onShowInfo}
-      >
+      <ItemContextMenu typeId={typeId} itemName={itemName} blueprintTypeID={entry.blueprintTypeID}>
         {tr}
       </ItemContextMenu>
     ) : (
@@ -443,9 +429,6 @@ export function ProductionLogPanel({
         typeId={typeId}
         itemName={itemName}
         blueprintTypeID={entry.blueprintTypeID}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable={quickbarAvailable}
-        onShowInfo={onShowInfo}
       />
     );
   };

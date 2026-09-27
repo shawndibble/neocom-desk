@@ -18,6 +18,7 @@ import type { RegionOrder } from '@/esi/endpoints';
 import { formatIsk } from '@/lib/isk';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatOrderLocationText } from './format';
+import { ShowInfoMenuItem } from './ItemContextMenu';
 
 export interface OrderRowContextMenuProps {
   order: RegionOrder;
@@ -27,7 +28,6 @@ export interface OrderRowContextMenuProps {
   onFilterToStation: (locationId: number) => void;
   typeId: number;
   itemName: string;
-  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 export function OrderRowContextMenu({
@@ -38,7 +38,6 @@ export function OrderRowContextMenu({
   onFilterToStation,
   typeId,
   itemName,
-  onShowInfo,
 }: OrderRowContextMenuProps) {
   const { t } = useTranslation();
   const location = resolveOrderLocation(order, npcStations, solarSystems);
@@ -58,9 +57,7 @@ export function OrderRowContextMenu({
           <MenuItem onSelect={() => void writeToClipboard(priceText)}>
             {t('market.contextMenu.copyPrice')}
           </MenuItem>
-          <MenuItem onSelect={() => onShowInfo(typeId, itemName)}>
-            {t('market.contextMenu.showInfo')}
-          </MenuItem>
+          <ShowInfoMenuItem typeId={typeId} itemName={itemName} />
           <MenuItem onSelect={() => onFilterToStation(order.location_id)}>
             {t('market.contextMenu.filterToStation')}
           </MenuItem>

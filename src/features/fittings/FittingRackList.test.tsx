@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
+import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 import { DroneSection, FittingRackList as EditableRackList } from './FittingRackList';
 import { FITTING_DRAG_TYPE, useFittingDrag, type FittingDragPayload } from './fittingDrag';
 import { FittingItemActionsProvider, type FittingItemActions } from './fittingItemActions';
@@ -238,9 +239,11 @@ describe('FittingRackList with the editor’s item actions', () => {
   function renderList(actions: FittingItemActions, fit: Fitting = fitting) {
     return render(
       <MemoryRouter>
-        <FittingItemActionsProvider value={actions}>
-          <FittingRackList fitting={fit} stats={withSlots} />
-        </FittingItemActionsProvider>
+        <FakeItemActions>
+          <FittingItemActionsProvider value={actions}>
+            <FittingRackList fitting={fit} stats={withSlots} />
+          </FittingItemActionsProvider>
+        </FakeItemActions>
       </MemoryRouter>
     );
   }
@@ -249,16 +252,18 @@ describe('FittingRackList with the editor’s item actions', () => {
     const actions = fakeItemActions({ names });
     render(
       <MemoryRouter>
-        <FittingItemActionsProvider value={actions}>
-          <FittingRackList
-            fitting={fitting}
-            stats={withSlots}
-            moduleResults={[
-              { state: 'active', maxState: 'overload', chargeGroupIds: [83] },
-              { state: 'online', maxState: 'online', chargeGroupIds: [] },
-            ]}
-          />
-        </FittingItemActionsProvider>
+        <FakeItemActions>
+          <FittingItemActionsProvider value={actions}>
+            <FittingRackList
+              fitting={fitting}
+              stats={withSlots}
+              moduleResults={[
+                { state: 'active', maxState: 'overload', chargeGroupIds: [83] },
+                { state: 'online', maxState: 'online', chargeGroupIds: [] },
+              ]}
+            />
+          </FittingItemActionsProvider>
+        </FakeItemActions>
       </MemoryRouter>
     );
     // The Damage Control takes no charge: no "No charge in cargo fits this".

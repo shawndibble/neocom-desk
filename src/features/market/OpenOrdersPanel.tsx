@@ -48,7 +48,6 @@ import { downloadCsv } from '@/lib/downloadCsv';
 import { ordersCsvColumns } from '@/features/character/ordersCsv';
 import type { MarketOrder } from '@/esi/endpoints';
 import type { CompetingOrder } from '@/engine/market/undercut';
-import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { ItemContextMenu } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
 import { OpenOrdersList } from './OpenOrdersList';
@@ -168,23 +167,8 @@ interface ActiveChipDisplay {
   clear: () => void;
 }
 
-interface OpenOrdersPanelProps {
-  /** Same per-item context menu as Transactions: null until requested, then per-typeId lookups. */
-  blueprintCatalog: BlueprintCatalog | null;
-  onRequestBlueprintCatalog: () => void;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
-}
-
 /** Market's Open Orders tab: every selling character's open market orders, worklisted by problem. */
-export function OpenOrdersPanel({
-  blueprintCatalog,
-  onRequestBlueprintCatalog,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
-}: OpenOrdersPanelProps) {
+export function OpenOrdersPanel() {
   const { t } = useTranslation();
   const { data, error, loading, hydrated, activeCharacterId, refresh } = useRouteSnapshot(
     loadOpenOrdersSnapshot,
@@ -662,10 +646,6 @@ export function OpenOrdersPanel({
 
   /** Same menu Transactions carries — an order row names an item like any other. */
   function rowContextMenu(row: OpenOrderRow, tr: ReactElement) {
-    const blueprintTypeID =
-      blueprintCatalog === null
-        ? undefined
-        : (blueprintCatalog.byProductTypeID.get(row.typeId)?.blueprintTypeID ?? null);
     const summary = orderRowSummary(row);
     const relistPrice =
       summary?.kind === 'undercut' || summary?.kind === 'outbid' ? summary.suggestedPrice : null;
@@ -680,13 +660,6 @@ export function OpenOrdersPanel({
           )
         }
         itemName={row.typeName}
-        blueprintTypeID={blueprintTypeID}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable={quickbarAvailable}
-        onShowInfo={onShowInfo}
-        onOpenChange={(open) => {
-          if (open) onRequestBlueprintCatalog();
-        }}
       >
         {tr}
       </ItemContextMenu>

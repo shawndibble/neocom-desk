@@ -6,6 +6,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import '@/i18n';
 import type { PiData } from '@/sde/types';
+import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
+import { FakeItemActions, fakeItemActions } from './__fixtures__/itemActions';
 
 const pi = JSON.parse(
   readFileSync(resolve(process.cwd(), 'public/data/pi.json'), 'utf8')
@@ -28,17 +30,12 @@ function CurrentLocation() {
 function renderMenu(typeId: number, itemName: string) {
   return render(
     <MemoryRouter initialEntries={['/market']}>
-      <CurrentLocation />
-      <ItemContextMenu
-        typeId={typeId}
-        itemName={itemName}
-        blueprintTypeID={null}
-        onAddToQuickbar={vi.fn()}
-        quickbarAvailable
-        onShowInfo={vi.fn()}
-      >
-        <button type="button">{itemName}</button>
-      </ItemContextMenu>
+      <FakeItemActions>
+        <CurrentLocation />
+        <ItemContextMenu typeId={typeId} itemName={itemName} blueprintTypeID={null}>
+          <button type="button">{itemName}</button>
+        </ItemContextMenu>
+      </FakeItemActions>
     </MemoryRouter>
   );
 }
@@ -61,18 +58,17 @@ describe('ItemContextMenu — build-here toggle', () => {
     const onToggleBuildHere = vi.fn();
     render(
       <MemoryRouter initialEntries={['/industry']}>
-        <ItemContextMenu
-          typeId={TRITANIUM}
-          itemName="Tritanium"
-          blueprintTypeID={null}
-          onAddToQuickbar={vi.fn()}
-          quickbarAvailable
-          onShowInfo={vi.fn()}
-          onToggleBuildHere={onToggleBuildHere}
-          buildingHere={buildingHere}
-        >
-          <button type="button">Tritanium</button>
-        </ItemContextMenu>
+        <FakeItemActions>
+          <ItemContextMenu
+            typeId={TRITANIUM}
+            itemName="Tritanium"
+            blueprintTypeID={null}
+            onToggleBuildHere={onToggleBuildHere}
+            buildingHere={buildingHere}
+          >
+            <button type="button">Tritanium</button>
+          </ItemContextMenu>
+        </FakeItemActions>
       </MemoryRouter>
     );
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
@@ -90,17 +86,16 @@ describe('ItemContextMenu — View in Industry as material (issue #414)', () => 
     const onViewInIndustryAsMaterial = vi.fn();
     render(
       <MemoryRouter initialEntries={['/assets']}>
-        <ItemContextMenu
-          typeId={TRITANIUM}
-          itemName="Tritanium"
-          blueprintTypeID={null}
-          onAddToQuickbar={vi.fn()}
-          quickbarAvailable
-          onShowInfo={vi.fn()}
-          onViewInIndustryAsMaterial={onViewInIndustryAsMaterial}
-        >
-          <button type="button">Tritanium</button>
-        </ItemContextMenu>
+        <FakeItemActions>
+          <ItemContextMenu
+            typeId={TRITANIUM}
+            itemName="Tritanium"
+            blueprintTypeID={null}
+            onViewInIndustryAsMaterial={onViewInIndustryAsMaterial}
+          >
+            <button type="button">Tritanium</button>
+          </ItemContextMenu>
+        </FakeItemActions>
       </MemoryRouter>
     );
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
@@ -161,16 +156,11 @@ describe('ItemContextMenu — price alert availability', () => {
   it('disables the item with no active character', async () => {
     render(
       <MemoryRouter>
-        <ItemContextMenu
-          typeId={TRITANIUM}
-          itemName="Tritanium"
-          blueprintTypeID={null}
-          onAddToQuickbar={vi.fn()}
-          quickbarAvailable={false}
-          onShowInfo={vi.fn()}
-        >
-          <button type="button">Tritanium</button>
-        </ItemContextMenu>
+        <FakeItemActions actions={fakeItemActions({ canAddToQuickbar: false })}>
+          <ItemContextMenu typeId={TRITANIUM} itemName="Tritanium" blueprintTypeID={null}>
+            <button type="button">Tritanium</button>
+          </ItemContextMenu>
+        </FakeItemActions>
       </MemoryRouter>
     );
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
@@ -186,14 +176,9 @@ describe('ItemMoreActions', () => {
   function renderMoreActions() {
     return render(
       <MemoryRouter initialEntries={['/market']}>
-        <ItemMoreActions
-          typeId={TRITANIUM}
-          itemName="Tritanium"
-          blueprintTypeID={null}
-          onAddToQuickbar={vi.fn()}
-          quickbarAvailable
-          onShowInfo={vi.fn()}
-        />
+        <FakeItemActions>
+          <ItemMoreActions typeId={TRITANIUM} itemName="Tritanium" blueprintTypeID={null} />
+        </FakeItemActions>
       </MemoryRouter>
     );
   }
@@ -213,16 +198,11 @@ describe('ItemMoreActions', () => {
 
     render(
       <MemoryRouter initialEntries={['/market']}>
-        <ItemContextMenu
-          typeId={TRITANIUM}
-          itemName="Tritanium"
-          blueprintTypeID={null}
-          onAddToQuickbar={vi.fn()}
-          quickbarAvailable
-          onShowInfo={vi.fn()}
-        >
-          <button type="button">Tritanium context trigger</button>
-        </ItemContextMenu>
+        <FakeItemActions>
+          <ItemContextMenu typeId={TRITANIUM} itemName="Tritanium" blueprintTypeID={null}>
+            <button type="button">Tritanium context trigger</button>
+          </ItemContextMenu>
+        </FakeItemActions>
       </MemoryRouter>
     );
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium context trigger' }));
@@ -231,5 +211,66 @@ describe('ItemMoreActions', () => {
       .then((els) => els.map((el) => el.textContent));
 
     expect(buttonItems).toEqual(contextItems);
+  });
+});
+
+describe('ItemContextMenu — Item Actions', () => {
+  const RIFTER = 587;
+  const catalog = {
+    byProductTypeID: new Map([[RIFTER, { blueprintTypeID: 691 }]]),
+  } as unknown as BlueprintCatalog;
+
+  function renderWith(
+    actions: ReturnType<typeof fakeItemActions>,
+    blueprintTypeID?: number | null
+  ) {
+    return render(
+      <MemoryRouter>
+        <FakeItemActions actions={actions}>
+          <ItemContextMenu typeId={RIFTER} itemName="Rifter" blueprintTypeID={blueprintTypeID}>
+            <button type="button">Rifter</button>
+          </ItemContextMenu>
+        </FakeItemActions>
+      </MemoryRouter>
+    );
+  }
+
+  it("asks the page's Item Actions for the blueprint catalog as it opens, and says checking until it loads", async () => {
+    const actions = fakeItemActions();
+    renderWith(actions);
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Rifter' }));
+    expect(await screen.findByRole('menuitem', { name: 'Build Plan (checking…)' })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    expect(actions.requestBlueprints).toHaveBeenCalled();
+  });
+
+  it("offers Build Plan from the page's catalog once it has loaded", async () => {
+    renderWith(fakeItemActions({ blueprints: catalog }));
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Rifter' }));
+    expect(await screen.findByRole('menuitem', { name: 'Build Plan' })).not.toHaveAttribute(
+      'aria-disabled'
+    );
+  });
+
+  it('prefers a blueprint the row already knows over the page catalog', async () => {
+    renderWith(fakeItemActions({ blueprints: catalog }), null);
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Rifter' }));
+    expect(
+      await screen.findByRole('menuitem', { name: 'No blueprint options' })
+    ).toBeInTheDocument();
+  });
+
+  it('adds to the Quickbar and shows info through the page', async () => {
+    const actions = fakeItemActions();
+    renderWith(actions);
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Rifter' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Add to Quickbar' }));
+    expect(actions.addToQuickbar).toHaveBeenCalledWith(RIFTER, 'Rifter');
+
+    fireEvent.contextMenu(screen.getByRole('button', { name: 'Rifter' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Show info' }));
+    expect(actions.showInfo).toHaveBeenCalledWith(RIFTER, 'Rifter');
   });
 });

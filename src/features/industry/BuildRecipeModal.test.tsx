@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
+import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 import { BuildRecipeModal } from './BuildRecipeModal';
 import type { BuildRecipe } from './subBuildPlan';
 
@@ -53,29 +54,19 @@ const RECIPE: BuildRecipe = {
 
 function itemMenuFor(typeId: number, trigger: React.ReactElement) {
   return (
-    <ItemContextMenu
-      typeId={typeId}
-      itemName={nameFor(typeId)}
-      blueprintTypeID={null}
-      onAddToQuickbar={vi.fn()}
-      quickbarAvailable
-      onShowInfo={vi.fn()}
-    >
-      {trigger}
-    </ItemContextMenu>
+    <FakeItemActions>
+      <ItemContextMenu typeId={typeId} itemName={nameFor(typeId)} blueprintTypeID={null}>
+        {trigger}
+      </ItemContextMenu>
+    </FakeItemActions>
   );
 }
 
 function itemActionsFor(typeId: number) {
   return (
-    <ItemMoreActions
-      typeId={typeId}
-      itemName={nameFor(typeId)}
-      blueprintTypeID={null}
-      onAddToQuickbar={vi.fn()}
-      quickbarAvailable
-      onShowInfo={vi.fn()}
-    />
+    <FakeItemActions>
+      <ItemMoreActions typeId={typeId} itemName={nameFor(typeId)} blueprintTypeID={null} />
+    </FakeItemActions>
   );
 }
 

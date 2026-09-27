@@ -52,7 +52,6 @@ import { useFocusHeading } from '@/lib/useFocusHeading';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemPriceAlertBell } from '@/features/market/ItemPriceAlertBell';
 import { OrderRowContextMenu } from '@/features/market/OrderRowContextMenu';
-import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { RequiredSkillsSection } from '@/features/market/RequiredSkillsSection';
 import type { RequiredSkill } from '@/features/skills/dogma';
 import type { TargetPlan } from '@/features/skills/useTargetPlan';
@@ -67,7 +66,8 @@ import {
   removeQuickbarItem,
   reorderQuickbarItems,
 } from '@/features/market/quickbar';
-import { useQuickbar } from '@/features/market/useQuickbar';
+import { usePageItemActions } from '@/features/market/usePageItemActions';
+import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import {
   resolveOrderLocation,
   type NpcStationLookup,
@@ -76,7 +76,6 @@ import {
 import { ALL_REGIONS } from '@/engine/market/locationMode';
 import type { RegionOrder } from '@/esi/endpoints';
 import type { MarketAppraiseState, MarketFocusSearchState } from '@/lib/shortcuts';
-import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { downloadCsv } from '@/lib/downloadCsv';
 import { orderBookCsvColumns } from '@/features/market/orderBookCsv';
@@ -89,7 +88,6 @@ import { useAppraisal } from '@/features/market/useAppraisal';
 import { tradeHubStanding, useTradeHubStandings } from '@/features/market/useTradeHubStandings';
 import { useMarketPricePercent } from '@/features/market/pricePercent';
 import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
-import { blueprintTypeIdFor, useBlueprintCatalog } from '@/features/market/useBlueprintCatalog';
 import { useMarketCatalogue } from '@/features/market/useMarketCatalogue';
 import { useMarketBrowser } from '@/features/market/useMarketBrowser';
 import {
@@ -346,11 +344,6 @@ interface MarketGroupTreeProps {
   onToggle: (id: number) => void;
   onSelect: (typeId: number) => void;
   selectedTypeId: number | null;
-  blueprintCatalog: BlueprintCatalog | null;
-  onRequestBlueprintCatalog: () => void;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 function MarketGroupTree({
@@ -362,30 +355,14 @@ function MarketGroupTree({
   onToggle,
   onSelect,
   selectedTypeId,
-  blueprintCatalog,
-  onRequestBlueprintCatalog,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
 }: MarketGroupTreeProps) {
   const { t } = useTranslation();
   const filtering = filterResult !== null;
 
   function renderItem(item: MarketTypeEntry, itemDepth: number) {
-    const blueprintTypeID = blueprintTypeIdFor(blueprintCatalog, item.typeId);
     return (
       <li key={item.typeId}>
-        <ItemContextMenu
-          typeId={item.typeId}
-          itemName={item.name}
-          blueprintTypeID={blueprintTypeID}
-          onAddToQuickbar={onAddToQuickbar}
-          quickbarAvailable={quickbarAvailable}
-          onShowInfo={onShowInfo}
-          onOpenChange={(open) => {
-            if (open) onRequestBlueprintCatalog();
-          }}
-        >
+        <ItemContextMenu typeId={item.typeId} itemName={item.name}>
           {/* The trigger holds the More actions button beside the
                   item button (buttons don't nest), so both sit inside
                   the menu. */}
@@ -519,13 +496,16 @@ export function Market() {
   // as [] rather than requiring an active character — Market Browser itself
   // needs none — so Add to Quickbar silently no-ops with nobody active.
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
+  // Item Actions (issue #2041): every item menu's Quickbar add, Show info (the
+  // one Item Detail modal, priced at `orderBookLocation`) and the lazy
+  // blueprint catalog behind Build Plan.
+  const itemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
   const {
     items: quickbarItems,
     write: writeQuickbar,
-    add: handleAddToQuickbar,
     setTarget: handleSetQuickbarTarget,
     pinWithTarget: handlePinWithTarget,
-  } = useQuickbar(activeCharacterId);
+  } = itemActions.quickbar;
 
   function handleRemoveFromQuickbar(typeId: number) {
     void writeQuickbar(removeQuickbarItem(quickbarItems, typeId));
@@ -539,16 +519,6 @@ export function Market() {
   function handleViewQuickbarInAppraisal() {
     appraisal.appraiseText(quickbarToPasteText(quickbarItems));
     changeTab('appraisal', true);
-  }
-
-  // Item Detail (CONTEXT.md round 6): opened from the item context menu
-  // (tree/search/Quickbar) or an order row's context menu, both of which
-  // only know the target item, not the whole selection state.
-  const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
-    null
-  );
-  function handleShowInfo(typeId: number, itemName: string) {
-    setInfoModalItem({ typeId, itemName });
   }
 
   // Variations "Compare" (issue #146, folded into the Compare drawer's
@@ -586,8 +556,6 @@ export function Market() {
     removeManyFromCompare(compareUndo.typeIds);
     setCompareUndo(null);
   }
-
-  const { blueprintCatalog, ensureBlueprintCatalog } = useBlueprintCatalog();
 
   // Narrow screens show one column at a time (CONTEXT.md round 8); matches
   // the grid's own `lg:` breakpoint so the JS-driven visibility and the CSS
@@ -736,7 +704,7 @@ export function Market() {
     hubHydrated,
     locationModeHydrated,
     catalogueError,
-    ensureBlueprintCatalog,
+    ensureBlueprintCatalog: itemActions.actions.requestBlueprints,
     npcStations,
     solarSystems,
     marketRegions,
@@ -758,7 +726,8 @@ export function Market() {
    * is unavailable.
    */
   const selectedIsBlueprint =
-    selectedTypeId !== null && (blueprintCatalog?.byBlueprintTypeID.has(selectedTypeId) ?? false);
+    selectedTypeId !== null &&
+    (itemActions.actions.blueprints?.byBlueprintTypeID.has(selectedTypeId) ?? false);
 
   const sellRows = sellShowAll ? sortedSell : sortedSell.slice(0, ROW_CAP);
   const buyRows = buyShowAll ? sortedBuy : sortedBuy.slice(0, ROW_CAP);
@@ -805,7 +774,6 @@ export function Market() {
         onFilterToStation={setStationFilter}
         typeId={selectedTypeId ?? 0}
         itemName={selectedItem?.name ?? ''}
-        onShowInfo={handleShowInfo}
       />
     );
   }
@@ -839,13 +807,14 @@ export function Market() {
   );
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader
-        title={t('market.title')}
-        actions={
-          usesHubPicker(tab) ? (
-            <>
-              {/* The mode chip and the picker next to it printed the same words
+    <ItemActionsProvider page={itemActions} detailLocation={orderBookLocation}>
+      <div className="mx-auto max-w-6xl space-y-4">
+        <PageHeader
+          title={t('market.title')}
+          actions={
+            usesHubPicker(tab) ? (
+              <>
+                {/* The mode chip and the picker next to it printed the same words
                   twice — "TRADE HUB · REGION · TRADE HUB [Jita]". The selected chip
                   *is* the picker's label, so the picker keeps the string as its
                   `aria-label` only: still announced, no longer duplicated on
@@ -853,358 +822,319 @@ export function Market() {
 
                   Browser only: see `usesHubPicker`. Appraisal prices at a
                   station, so it has no Region mode to toggle into. */}
-              {tab === 'browser' && (
-                <div role="group" aria-label={t('market.locationMode')} className="flex gap-2">
-                  <FilterChip
-                    label={t('market.modeHub')}
-                    selected={effectiveLocation.mode === 'hub'}
-                    onToggle={() => handleModeChange('hub')}
+                {tab === 'browser' && (
+                  <div role="group" aria-label={t('market.locationMode')} className="flex gap-2">
+                    <FilterChip
+                      label={t('market.modeHub')}
+                      selected={effectiveLocation.mode === 'hub'}
+                      onToggle={() => handleModeChange('hub')}
+                    />
+                    <FilterChip
+                      label={t('market.modeRegion')}
+                      selected={effectiveLocation.mode === 'region'}
+                      onToggle={() => handleModeChange('region')}
+                    />
+                  </div>
+                )}
+                {effectiveLocation.mode === 'hub' || tab === 'appraisal' ? (
+                  <Select
+                    value={effectiveHub.id}
+                    onValueChange={(value) => handleHubChange(value as TradeHub['id'])}
+                  >
+                    <SelectTrigger
+                      size="sm"
+                      aria-label={t('market.tradeHub')}
+                      className="w-32 sm:w-44"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TRADE_HUBS.map((h) => (
+                        <SelectItem key={h.id} value={h.id}>
+                          {h.systemName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  // "All regions" (`null` to the picker) fans the selected item's
+                  // book out over every region; see `allRegionsFetchKey`.
+                  <RegionSelect
+                    size="sm"
+                    options={marketRegions ?? []}
+                    value={allRegions ? null : chosenRegionId}
+                    onChange={(regionId) => handleRegionChange(regionId ?? ALL_REGIONS)}
+                    allLabel={t('market.allRegions')}
+                    searchPlaceholder={t('common.searchRegions')}
+                    noResultsLabel={t('common.noRegionMatches')}
+                    aria-label={t('market.region')}
+                    className="w-32 sm:w-44"
                   />
-                  <FilterChip
-                    label={t('market.modeRegion')}
-                    selected={effectiveLocation.mode === 'region'}
-                    onToggle={() => handleModeChange('region')}
+                )}
+                <IconButton
+                  size="sm"
+                  icon={<Icon.Refresh />}
+                  label={t('market.refresh')}
+                  onClick={handleRefresh}
+                  // Section-aware: on the Browser this re-reads the selected
+                  // item's order book, on Appraisal it re-prices the pasted
+                  // list. Both are "refresh what is on screen", and neither has
+                  // anything to do until there *is* something on screen.
+                  disabled={
+                    tab === 'appraisal'
+                      ? appraisal.result === null || appraisal.loading
+                      : !catalogueError && (selectedTypeId === null || orderBookLoading)
+                  }
+                />
+              </>
+            ) : undefined
+          }
+        />
+
+        <Tabs
+          label={t('market.title')}
+          value={isHistoryView(tab) ? 'history' : tab}
+          // Clicking History while already inside it would otherwise throw away
+          // the chosen view and snap back to the orders one.
+          onChange={(id) => {
+            if (id === 'history' && isHistoryView(tab)) return;
+            changeTab(id as MarketTab);
+          }}
+          tabs={[
+            { id: 'browser', label: t('market.sections.browser') },
+            { id: 'orders', label: t('market.sections.openOrders') },
+            { id: 'history', label: t('market.sections.history') },
+            { id: 'appraisal', label: t('market.sections.appraisal') },
+            { id: 'hauling', label: t('market.sections.hauling') },
+          ]}
+        />
+
+        {tab === 'orders' && <OpenOrdersPanel />}
+
+        {tab === 'history' && (
+          <OrderHistoryPanel
+            onViewChange={(view) =>
+              changeTab(view === 'transactions' ? 'history/transactions' : 'history')
+            }
+          />
+        )}
+        {tab === 'history/transactions' && (
+          <TransactionsPanel
+            onViewChange={(view) =>
+              changeTab(view === 'transactions' ? 'history/transactions' : 'history')
+            }
+          />
+        )}
+
+        {/* The list itself lives in `useAppraisal` at route level, so switching
+          to the Browser and back does not throw away a forty-line paste. */}
+        {tab === 'appraisal' && (
+          <AppraisalPanel
+            controller={appraisal}
+            pricePercent={pricePercent}
+            onPricePercentChange={(value) => void setPricePercent(value)}
+            hub={effectiveHub}
+            standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
+            defaultCompareExpanded={expandCompareOnAppraisal}
+          />
+        )}
+
+        {tab === 'hauling' && <HaulingPanel />}
+
+        {tab === 'browser' && (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
+            <Panel
+              ref={finderPanelRef}
+              className={isDesktop || selectedTypeId === null ? '' : 'hidden'}
+            >
+              <SearchInput
+                ref={searchInputRef}
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={t('market.searchPlaceholder')}
+                aria-label={t('market.searchLabel')}
+              />
+
+              {query.trim().length > 0 && query.trim().length < MARKET_TREE_MIN_QUERY_LENGTH && (
+                <p className="pt-2 text-[0.6875rem] text-text-dim uppercase">
+                  {t('market.searchTooShort', { min: MARKET_TREE_MIN_QUERY_LENGTH })}
+                </p>
+              )}
+
+              {filterResult?.capped && (
+                <p className="pt-2 text-[0.6875rem] text-warning uppercase">
+                  {t('market.searchCapped', {
+                    limit: MARKET_TREE_MATCH_LIMIT,
+                    total: filterResult.totalMatches,
+                  })}
+                </p>
+              )}
+
+              {catalogueError ? (
+                <EmptyState
+                  title={t('market.loadFailedTitle')}
+                  hint={t('market.loadFailedHint')}
+                  className="py-8"
+                />
+              ) : catalogueLoading ? (
+                <div className="flex justify-center py-8">
+                  <Spinner label={t('common.loading')} />
+                </div>
+              ) : filterResult &&
+                filterResult.visibleGroupIds.size === 0 &&
+                !filterResult.bestMatch ? (
+                <EmptyState title={t('market.noResults')} className="py-8" />
+              ) : (
+                <div className="mt-3 border-t border-line pt-2">
+                  <MarketGroupTree
+                    groups={groups ?? []}
+                    childrenByParent={childrenByParent}
+                    typesByGroup={typesByGroup}
+                    filterResult={filterResult}
+                    expandedIds={expandedIds}
+                    searchCollapsedIds={searchCollapsedIds}
+                    onToggle={handleToggle}
+                    onSelect={handleSelectItem}
+                    selectedTypeId={selectedTypeId}
                   />
                 </div>
               )}
-              {effectiveLocation.mode === 'hub' || tab === 'appraisal' ? (
-                <Select
-                  value={effectiveHub.id}
-                  onValueChange={(value) => handleHubChange(value as TradeHub['id'])}
-                >
-                  <SelectTrigger
-                    size="sm"
-                    aria-label={t('market.tradeHub')}
-                    className="w-32 sm:w-44"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TRADE_HUBS.map((h) => (
-                      <SelectItem key={h.id} value={h.id}>
-                        {h.systemName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              ) : (
-                // "All regions" (`null` to the picker) fans the selected item's
-                // book out over every region; see `allRegionsFetchKey`.
-                <RegionSelect
-                  size="sm"
-                  options={marketRegions ?? []}
-                  value={allRegions ? null : chosenRegionId}
-                  onChange={(regionId) => handleRegionChange(regionId ?? ALL_REGIONS)}
-                  allLabel={t('market.allRegions')}
-                  searchPlaceholder={t('common.searchRegions')}
-                  noResultsLabel={t('common.noRegionMatches')}
-                  aria-label={t('market.region')}
-                  className="w-32 sm:w-44"
-                />
-              )}
-              <IconButton
-                size="sm"
-                icon={<Icon.Refresh />}
-                label={t('market.refresh')}
-                onClick={handleRefresh}
-                // Section-aware: on the Browser this re-reads the selected
-                // item's order book, on Appraisal it re-prices the pasted
-                // list. Both are "refresh what is on screen", and neither has
-                // anything to do until there *is* something on screen.
-                disabled={
-                  tab === 'appraisal'
-                    ? appraisal.result === null || appraisal.loading
-                    : !catalogueError && (selectedTypeId === null || orderBookLoading)
-                }
+
+              <QuickbarList
+                items={quickbarItems}
+                selectedTypeId={selectedTypeId}
+                onSelect={handleSelectItem}
+                onRemove={handleRemoveFromQuickbar}
+                onReorder={handleReorderQuickbar}
+                onSetTarget={handleSetQuickbarTarget}
+                onViewInAppraisal={handleViewQuickbarInAppraisal}
               />
-            </>
-          ) : undefined
-        }
-      />
+            </Panel>
 
-      <Tabs
-        label={t('market.title')}
-        value={isHistoryView(tab) ? 'history' : tab}
-        // Clicking History while already inside it would otherwise throw away
-        // the chosen view and snap back to the orders one.
-        onChange={(id) => {
-          if (id === 'history' && isHistoryView(tab)) return;
-          changeTab(id as MarketTab);
-        }}
-        tabs={[
-          { id: 'browser', label: t('market.sections.browser') },
-          { id: 'orders', label: t('market.sections.openOrders') },
-          { id: 'history', label: t('market.sections.history') },
-          { id: 'appraisal', label: t('market.sections.appraisal') },
-          { id: 'hauling', label: t('market.sections.hauling') },
-        ]}
-      />
-
-      {tab === 'orders' && (
-        <OpenOrdersPanel
-          blueprintCatalog={blueprintCatalog}
-          onRequestBlueprintCatalog={ensureBlueprintCatalog}
-          onAddToQuickbar={handleAddToQuickbar}
-          quickbarAvailable={activeCharacterId !== null}
-          onShowInfo={handleShowInfo}
-        />
-      )}
-
-      {tab === 'history' && (
-        <OrderHistoryPanel
-          onViewChange={(view) =>
-            changeTab(view === 'transactions' ? 'history/transactions' : 'history')
-          }
-          blueprintCatalog={blueprintCatalog}
-          onRequestBlueprintCatalog={ensureBlueprintCatalog}
-          onAddToQuickbar={handleAddToQuickbar}
-          quickbarAvailable={activeCharacterId !== null}
-          onShowInfo={handleShowInfo}
-        />
-      )}
-      {tab === 'history/transactions' && (
-        <TransactionsPanel
-          onViewChange={(view) =>
-            changeTab(view === 'transactions' ? 'history/transactions' : 'history')
-          }
-          blueprintCatalog={blueprintCatalog}
-          onRequestBlueprintCatalog={ensureBlueprintCatalog}
-          onAddToQuickbar={handleAddToQuickbar}
-          quickbarAvailable={activeCharacterId !== null}
-          onShowInfo={handleShowInfo}
-        />
-      )}
-
-      {/* The list itself lives in `useAppraisal` at route level, so switching
-          to the Browser and back does not throw away a forty-line paste. */}
-      {tab === 'appraisal' && (
-        <AppraisalPanel
-          controller={appraisal}
-          pricePercent={pricePercent}
-          onPricePercentChange={(value) => void setPricePercent(value)}
-          hub={effectiveHub}
-          standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
-          blueprintCatalog={blueprintCatalog}
-          onRequestBlueprintCatalog={ensureBlueprintCatalog}
-          onAddToQuickbar={handleAddToQuickbar}
-          quickbarAvailable={activeCharacterId !== null}
-          onShowInfo={handleShowInfo}
-          defaultCompareExpanded={expandCompareOnAppraisal}
-        />
-      )}
-
-      {tab === 'hauling' && (
-        <HaulingPanel
-          blueprintCatalog={blueprintCatalog}
-          onRequestBlueprintCatalog={ensureBlueprintCatalog}
-          onAddToQuickbar={handleAddToQuickbar}
-          quickbarAvailable={activeCharacterId !== null}
-          onShowInfo={handleShowInfo}
-        />
-      )}
-
-      {tab === 'browser' && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[22rem_1fr] lg:items-start">
-          <Panel
-            ref={finderPanelRef}
-            className={isDesktop || selectedTypeId === null ? '' : 'hidden'}
-          >
-            <SearchInput
-              ref={searchInputRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('market.searchPlaceholder')}
-              aria-label={t('market.searchLabel')}
-            />
-
-            {query.trim().length > 0 && query.trim().length < MARKET_TREE_MIN_QUERY_LENGTH && (
-              <p className="pt-2 text-[0.6875rem] text-text-dim uppercase">
-                {t('market.searchTooShort', { min: MARKET_TREE_MIN_QUERY_LENGTH })}
-              </p>
-            )}
-
-            {filterResult?.capped && (
-              <p className="pt-2 text-[0.6875rem] text-warning uppercase">
-                {t('market.searchCapped', {
-                  limit: MARKET_TREE_MATCH_LIMIT,
-                  total: filterResult.totalMatches,
-                })}
-              </p>
-            )}
-
-            {catalogueError ? (
-              <EmptyState
-                title={t('market.loadFailedTitle')}
-                hint={t('market.loadFailedHint')}
-                className="py-8"
-              />
-            ) : catalogueLoading ? (
-              <div className="flex justify-center py-8">
-                <Spinner label={t('common.loading')} />
-              </div>
-            ) : filterResult &&
-              filterResult.visibleGroupIds.size === 0 &&
-              !filterResult.bestMatch ? (
-              <EmptyState title={t('market.noResults')} className="py-8" />
-            ) : (
-              <div className="mt-3 border-t border-line pt-2">
-                <MarketGroupTree
-                  groups={groups ?? []}
-                  childrenByParent={childrenByParent}
-                  typesByGroup={typesByGroup}
-                  filterResult={filterResult}
-                  expandedIds={expandedIds}
-                  searchCollapsedIds={searchCollapsedIds}
-                  onToggle={handleToggle}
-                  onSelect={handleSelectItem}
-                  selectedTypeId={selectedTypeId}
-                  blueprintCatalog={blueprintCatalog}
-                  onRequestBlueprintCatalog={ensureBlueprintCatalog}
-                  onAddToQuickbar={handleAddToQuickbar}
-                  quickbarAvailable={activeCharacterId !== null}
-                  onShowInfo={handleShowInfo}
-                />
-              </div>
-            )}
-
-            <QuickbarList
-              items={quickbarItems}
-              selectedTypeId={selectedTypeId}
-              onSelect={handleSelectItem}
-              onRemove={handleRemoveFromQuickbar}
-              onReorder={handleReorderQuickbar}
-              onSetTarget={handleSetQuickbarTarget}
-              onViewInAppraisal={handleViewQuickbarInAppraisal}
-              onAddToQuickbar={handleAddToQuickbar}
-              quickbarAvailable={activeCharacterId !== null}
-              onShowInfo={handleShowInfo}
-              blueprintTypeIdFor={(typeId) => blueprintTypeIdFor(blueprintCatalog, typeId)}
-              onRequestBlueprintCatalog={ensureBlueprintCatalog}
-            />
-          </Panel>
-
-          <Panel
-            // `min-w-0`: a grid track doesn't shrink a child below its own
-            // intrinsic content width by default — a wide table row here
-            // was forcing the whole page to scroll sideways.
-            className={`min-w-0 ${isDesktop || selectedTypeId !== null ? '' : 'hidden'}`}
-            title={selectedItem?.name}
-            headingRef={itemHeadingRef}
-            meta={
-              selectedItem &&
-              selectedTypeId !== null && (
-                <span className="flex flex-wrap items-center gap-1 max-md:shrink-0 max-md:flex-nowrap">
-                  <ItemPriceAlertBell
-                    typeId={selectedTypeId}
-                    name={selectedItem.name}
-                    item={quickbarItems.find((i) => i.typeId === selectedTypeId)}
-                    disabled={activeCharacterId === null}
-                    onPin={handlePinWithTarget}
-                  />
-                  <IconButton
-                    size="sm"
-                    icon={<Icon.Info />}
-                    label={t('market.contextMenu.showInfo')}
-                    onClick={() => handleShowInfo(selectedTypeId, selectedItem.name)}
-                  />
-                </span>
-              )
-            }
-            padded={selectedTypeId === null}
-            leading={itemPanelLeading}
-          >
-            {selectedTypeId === null ? (
-              <EmptyState
-                title={t('market.selectPromptTitle')}
-                hint={t('market.selectPromptHint')}
-                className="py-8"
-              />
-            ) : (
-              <>
-                {itemTab === 'orders' ? (
-                  <BrowserFilterBar
-                    value={browserFilterValue}
-                    onChange={handleBrowserFiltersChange}
-                    activeCount={activeFilterCount}
-                    regionMode={regionMode}
-                    currentSystem={currentSystem}
-                    leading={itemTabs}
-                    className="px-3 pt-2"
-                  />
-                ) : (
-                  <div className="px-3 pt-2">{itemTabs}</div>
-                )}
-                {/* Above both tabs: Price History is one of the readers it names. */}
-                {allRegions && (
-                  <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-                    {t('market.allRegionsSecondaryNote', { regionName: hubRegionName })}
-                  </p>
-                )}
-                {itemTab === 'history' ? (
-                  resolvedRegion && (
-                    <PriceHistoryPanel
-                      regionId={resolvedRegion.regionId}
+            <Panel
+              // `min-w-0`: a grid track doesn't shrink a child below its own
+              // intrinsic content width by default — a wide table row here
+              // was forcing the whole page to scroll sideways.
+              className={`min-w-0 ${isDesktop || selectedTypeId !== null ? '' : 'hidden'}`}
+              title={selectedItem?.name}
+              headingRef={itemHeadingRef}
+              meta={
+                selectedItem &&
+                selectedTypeId !== null && (
+                  <span className="flex flex-wrap items-center gap-1 max-md:shrink-0 max-md:flex-nowrap">
+                    <ItemPriceAlertBell
                       typeId={selectedTypeId}
-                      itemName={selectedItem?.name ?? ''}
+                      name={selectedItem.name}
+                      item={quickbarItems.find((i) => i.typeId === selectedTypeId)}
+                      disabled={activeCharacterId === null}
+                      onPin={handlePinWithTarget}
                     />
-                  )
-                ) : orderBookLoading &&
-                  !regionsUnavailable &&
-                  (!orderBookView || orderBookFailed) ? (
-                  <div className="flex justify-center py-8">
-                    <Spinner label={t('common.loading')} />
-                  </div>
-                ) : orderBookFailed ? (
-                  // Not the empty book: ESI didn't answer (a 420, or the Error
-                  // Budget declining to send), which says nothing about who
-                  // trades the item — so no "nobody is selling" copy and no
-                  // blueprint BPC hint, just the failure and a way to retry.
-                  <EmptyState
-                    title={t('market.orderBookFailedTitle')}
-                    hint={t('market.orderBookFailedHint')}
-                    className="py-8"
-                    action={
-                      <Button size="sm" onClick={handleRefresh}>
-                        {t('market.orderBookFailedRetry')}
-                      </Button>
-                    }
-                  />
-                ) : (
-                  <>
-                    {resolvedRegion?.override && (
-                      <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
-                        {t('market.globalMarketNote', {
-                          regionName: resolvedRegion.override.regionName,
-                        })}
-                      </p>
-                    )}
-                    <div className="divide-y divide-line">
-                      {/* Outside the funnel, so a collapsed bar can't hide why a range isn't applying. */}
-                      {(jumpNoteShown || failedRegionCount > 0) && (
-                        <div className="flex flex-col items-end gap-1 px-3 py-2 text-xs text-text-dim">
-                          {jumpNoteShown && <JumpRangeNote status={jumpRangeFilter.status} />}
-                          {failedRegionCount > 0 && (
-                            <p role="status" className="text-warning">
-                              {t('market.regionsFailed', { count: failedRegionCount })}
-                            </p>
-                          )}
-                        </div>
+                    <IconButton
+                      size="sm"
+                      icon={<Icon.Info />}
+                      label={t('market.contextMenu.showInfo')}
+                      onClick={() =>
+                        itemActions.actions.showInfo(selectedTypeId, selectedItem.name)
+                      }
+                    />
+                  </span>
+                )
+              }
+              padded={selectedTypeId === null}
+              leading={itemPanelLeading}
+            >
+              {selectedTypeId === null ? (
+                <EmptyState
+                  title={t('market.selectPromptTitle')}
+                  hint={t('market.selectPromptHint')}
+                  className="py-8"
+                />
+              ) : (
+                <>
+                  {itemTab === 'orders' ? (
+                    <BrowserFilterBar
+                      value={browserFilterValue}
+                      onChange={handleBrowserFiltersChange}
+                      activeCount={activeFilterCount}
+                      regionMode={regionMode}
+                      currentSystem={currentSystem}
+                      leading={itemTabs}
+                      className="px-3 pt-2"
+                    />
+                  ) : (
+                    <div className="px-3 pt-2">{itemTabs}</div>
+                  )}
+                  {/* Above both tabs: Price History is one of the readers it names. */}
+                  {allRegions && (
+                    <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                      {t('market.allRegionsSecondaryNote', { regionName: hubRegionName })}
+                    </p>
+                  )}
+                  {itemTab === 'history' ? (
+                    resolvedRegion && (
+                      <PriceHistoryPanel
+                        regionId={resolvedRegion.regionId}
+                        typeId={selectedTypeId}
+                        itemName={selectedItem?.name ?? ''}
+                      />
+                    )
+                  ) : orderBookLoading &&
+                    !regionsUnavailable &&
+                    (!orderBookView || orderBookFailed) ? (
+                    <div className="flex justify-center py-8">
+                      <Spinner label={t('common.loading')} />
+                    </div>
+                  ) : orderBookFailed ? (
+                    // Not the empty book: ESI didn't answer (a 420, or the Error
+                    // Budget declining to send), which says nothing about who
+                    // trades the item — so no "nobody is selling" copy and no
+                    // blueprint BPC hint, just the failure and a way to retry.
+                    <EmptyState
+                      title={t('market.orderBookFailedTitle')}
+                      hint={t('market.orderBookFailedHint')}
+                      className="py-8"
+                      action={
+                        <Button size="sm" onClick={handleRefresh}>
+                          {t('market.orderBookFailedRetry')}
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    <>
+                      {resolvedRegion?.override && (
+                        <p className="border-b border-line px-3 py-2 text-[0.6875rem] text-text-dim">
+                          {t('market.globalMarketNote', {
+                            regionName: resolvedRegion.override.regionName,
+                          })}
+                        </p>
                       )}
-                      {stationFilter !== null && (
-                        <div className="flex items-center justify-between px-3 py-2 text-xs text-text-dim">
-                          <span>
-                            {t('market.stationFilterActive', {
-                              station: stationFilterLabel ?? t('market.unknownStructure'),
-                            })}
-                          </span>
-                          <Button size="sm" onClick={() => setStationFilter(null)}>
-                            {t('market.clearStationFilter')}
-                          </Button>
-                        </div>
-                      )}
+                      <div className="divide-y divide-line">
+                        {/* Outside the funnel, so a collapsed bar can't hide why a range isn't applying. */}
+                        {(jumpNoteShown || failedRegionCount > 0) && (
+                          <div className="flex flex-col items-end gap-1 px-3 py-2 text-xs text-text-dim">
+                            {jumpNoteShown && <JumpRangeNote status={jumpRangeFilter.status} />}
+                            {failedRegionCount > 0 && (
+                              <p role="status" className="text-warning">
+                                {t('market.regionsFailed', { count: failedRegionCount })}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {stationFilter !== null && (
+                          <div className="flex items-center justify-between px-3 py-2 text-xs text-text-dim">
+                            <span>
+                              {t('market.stationFilterActive', {
+                                station: stationFilterLabel ?? t('market.unknownStructure'),
+                              })}
+                            </span>
+                            <Button size="sm" onClick={() => setStationFilter(null)}>
+                              {t('market.clearStationFilter')}
+                            </Button>
+                          </div>
+                        )}
 
-                      <div className="pb-3">
-                        {/*
+                        <div className="pb-3">
+                          {/*
                         Each export sits with the table it exports. Both were
                         in the panel header, where — once they became icons —
                         they were two identical download glyphs telling a
@@ -1212,265 +1142,247 @@ export function Market() {
                         differed, and a touch user never sees those. Beside
                         "Sell orders" the same glyph is unambiguous.
                       */}
-                        <div className="flex items-center justify-between px-3 pt-3 pb-1">
-                          <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                            {t('market.sell')}
-                          </h2>
-                          <span className="flex items-center gap-1">
-                            <ColumnPickerMenu
-                              available={SELL_ORDER_COLUMN_IDS}
-                              visible={visibleOrderColumns}
-                              columnsById={orderColumnsById}
-                              onToggle={toggleOrderColumn}
-                              buttonLabel={t('market.columnsButton')}
-                              menuTitle={t('market.columnsMenuTitle')}
-                            />
-                            <IconButton
-                              size="sm"
-                              icon={<Icon.Download />}
-                              label={t('market.exportCsvSell')}
-                              disabled={sortedSell.length === 0}
-                              onClick={() =>
-                                downloadCsv(
-                                  'market-sell',
-                                  sortedSell,
-                                  orderBookCsvColumns(t, {
-                                    npcStations: npcStationMap,
-                                    solarSystems: solarSystemMap,
-                                    isBuy: false,
-                                  }),
-                                  new Date(),
-                                  loadedView?.truncated ?? false
-                                )
+                          <div className="flex items-center justify-between px-3 pt-3 pb-1">
+                            <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                              {t('market.sell')}
+                            </h2>
+                            <span className="flex items-center gap-1">
+                              <ColumnPickerMenu
+                                available={SELL_ORDER_COLUMN_IDS}
+                                visible={visibleOrderColumns}
+                                columnsById={orderColumnsById}
+                                onToggle={toggleOrderColumn}
+                                buttonLabel={t('market.columnsButton')}
+                                menuTitle={t('market.columnsMenuTitle')}
+                              />
+                              <IconButton
+                                size="sm"
+                                icon={<Icon.Download />}
+                                label={t('market.exportCsvSell')}
+                                disabled={sortedSell.length === 0}
+                                onClick={() =>
+                                  downloadCsv(
+                                    'market-sell',
+                                    sortedSell,
+                                    orderBookCsvColumns(t, {
+                                      npcStations: npcStationMap,
+                                      solarSystems: solarSystemMap,
+                                      isBuy: false,
+                                    }),
+                                    new Date(),
+                                    loadedView?.truncated ?? false
+                                  )
+                                }
+                              />
+                            </span>
+                          </div>
+                          {sortedSell.length === 0 ? (
+                            <EmptyState
+                              title={t('market.emptySellTitle')}
+                              hint={
+                                stationFilter !== null
+                                  ? t('market.emptyFilteredHint')
+                                  : filtersNarrowBook
+                                    ? t('market.emptyFiltersHint')
+                                    : selectedIsBlueprint
+                                      ? t('market.emptySellBlueprintHint')
+                                      : t('market.emptySellHint')
+                              }
+                              className="py-6"
+                              action={
+                                selectedIsBlueprint &&
+                                !filtersNarrowBook &&
+                                selectedTypeId !== null ? (
+                                  <Link
+                                    to={bpcSourcingHref(selectedTypeId)}
+                                    className={buttonClassName({ size: 'sm' })}
+                                  >
+                                    {t('market.searchBpcContracts')}
+                                  </Link>
+                                ) : undefined
                               }
                             />
-                          </span>
+                          ) : (
+                            <>
+                              <DataTable
+                                columns={baseColumns}
+                                rows={sellRows}
+                                rowKey={(o) => o.order_id}
+                                label={t('market.sell')}
+                                defaultSort={{ columnId: 'price', direction: 'asc' }}
+                                rowContextMenu={orderRowContextMenu}
+                                rowMoreActions
+                                rowClassName={(o) =>
+                                  myOrderIds.has(o.order_id) ? 'row-mine' : undefined
+                                }
+                                expandableRow={{
+                                  renderDetail: (o) => (
+                                    <OrderDetailPanel
+                                      order={o}
+                                      npcStations={npcStationMap}
+                                      solarSystems={solarSystemMap}
+                                      hiddenColumns={sellHiddenColumns}
+                                      orderColumnsById={orderColumnsById}
+                                      itemSkills={itemSkills}
+                                      trainedSkills={trainedSkills}
+                                      targetPlan={targetPlan}
+                                      activeCharacterId={activeCharacterId}
+                                      itemName={selectedItem?.name ?? ''}
+                                      t={t}
+                                    />
+                                  ),
+                                }}
+                              />
+                              {!sellShowAll && sortedSell.length > ROW_CAP && (
+                                <div className="px-3 py-2">
+                                  <Button size="sm" onClick={() => setSellShowAll(true)}>
+                                    {t('market.showAll', { count: sortedSell.length })}
+                                  </Button>
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
-                        {sortedSell.length === 0 ? (
-                          <EmptyState
-                            title={t('market.emptySellTitle')}
-                            hint={
-                              stationFilter !== null
-                                ? t('market.emptyFilteredHint')
-                                : filtersNarrowBook
-                                  ? t('market.emptyFiltersHint')
-                                  : selectedIsBlueprint
-                                    ? t('market.emptySellBlueprintHint')
-                                    : t('market.emptySellHint')
-                            }
-                            className="py-6"
-                            action={
-                              selectedIsBlueprint &&
-                              !filtersNarrowBook &&
-                              selectedTypeId !== null ? (
-                                <Link
-                                  to={bpcSourcingHref(selectedTypeId)}
-                                  className={buttonClassName({ size: 'sm' })}
-                                >
-                                  {t('market.searchBpcContracts')}
-                                </Link>
-                              ) : undefined
-                            }
-                          />
-                        ) : (
-                          <>
-                            <DataTable
-                              columns={baseColumns}
-                              rows={sellRows}
-                              rowKey={(o) => o.order_id}
-                              label={t('market.sell')}
-                              defaultSort={{ columnId: 'price', direction: 'asc' }}
-                              rowContextMenu={orderRowContextMenu}
-                              rowMoreActions
-                              rowClassName={(o) =>
-                                myOrderIds.has(o.order_id) ? 'row-mine' : undefined
+
+                        <div className="pb-3">
+                          <div className="flex items-center justify-between px-3 pt-3 pb-1">
+                            <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                              {t('market.buy')}
+                            </h2>
+                            <span className="flex items-center gap-1">
+                              <ColumnPickerMenu
+                                available={BUY_ORDER_COLUMN_IDS}
+                                visible={visibleOrderColumns}
+                                columnsById={orderColumnsById}
+                                onToggle={toggleOrderColumn}
+                                buttonLabel={t('market.columnsButton')}
+                                menuTitle={t('market.columnsMenuTitle')}
+                              />
+                              <IconButton
+                                size="sm"
+                                icon={<Icon.Download />}
+                                label={t('market.exportCsvBuy')}
+                                disabled={sortedBuy.length === 0}
+                                onClick={() =>
+                                  downloadCsv(
+                                    'market-buy',
+                                    sortedBuy,
+                                    orderBookCsvColumns(t, {
+                                      npcStations: npcStationMap,
+                                      solarSystems: solarSystemMap,
+                                      isBuy: true,
+                                    }),
+                                    new Date(),
+                                    loadedView?.truncated ?? false
+                                  )
+                                }
+                              />
+                            </span>
+                          </div>
+                          {sortedBuy.length === 0 ? (
+                            <EmptyState
+                              title={t('market.emptyBuyTitle')}
+                              hint={
+                                stationFilter !== null
+                                  ? t('market.emptyFilteredHint')
+                                  : filtersNarrowBook
+                                    ? t('market.emptyFiltersHint')
+                                    : t('market.emptyBuyHint')
                               }
-                              expandableRow={{
-                                renderDetail: (o) => (
-                                  <OrderDetailPanel
-                                    order={o}
-                                    npcStations={npcStationMap}
-                                    solarSystems={solarSystemMap}
-                                    hiddenColumns={sellHiddenColumns}
-                                    orderColumnsById={orderColumnsById}
-                                    itemSkills={itemSkills}
-                                    trainedSkills={trainedSkills}
-                                    targetPlan={targetPlan}
-                                    activeCharacterId={activeCharacterId}
-                                    itemName={selectedItem?.name ?? ''}
-                                    t={t}
-                                  />
-                                ),
-                              }}
+                              className="py-6"
                             />
-                            {!sellShowAll && sortedSell.length > ROW_CAP && (
-                              <div className="px-3 py-2">
-                                <Button size="sm" onClick={() => setSellShowAll(true)}>
-                                  {t('market.showAll', { count: sortedSell.length })}
-                                </Button>
-                              </div>
-                            )}
-                          </>
-                        )}
+                          ) : (
+                            <>
+                              <DataTable
+                                columns={buyColumns}
+                                rows={buyRows}
+                                rowKey={(o) => o.order_id}
+                                label={t('market.buy')}
+                                defaultSort={{ columnId: 'price', direction: 'desc' }}
+                                rowContextMenu={orderRowContextMenu}
+                                rowMoreActions
+                                rowClassName={(o) =>
+                                  myOrderIds.has(o.order_id) ? 'row-mine' : undefined
+                                }
+                                expandableRow={{
+                                  renderDetail: (o) => (
+                                    <OrderDetailPanel
+                                      order={o}
+                                      npcStations={npcStationMap}
+                                      solarSystems={solarSystemMap}
+                                      hiddenColumns={buyHiddenColumns}
+                                      orderColumnsById={orderColumnsById}
+                                      itemSkills={itemSkills}
+                                      trainedSkills={trainedSkills}
+                                      targetPlan={targetPlan}
+                                      activeCharacterId={activeCharacterId}
+                                      itemName={selectedItem?.name ?? ''}
+                                      t={t}
+                                    />
+                                  ),
+                                }}
+                              />
+                              {!buyShowAll && sortedBuy.length > ROW_CAP && (
+                                <div className="px-3 py-2">
+                                  <Button size="sm" onClick={() => setBuyShowAll(true)}>
+                                    {t('market.showAll', { count: sortedBuy.length })}
+                                  </Button>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="pb-3">
-                        <div className="flex items-center justify-between px-3 pt-3 pb-1">
-                          <h2 className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                            {t('market.buy')}
-                          </h2>
-                          <span className="flex items-center gap-1">
-                            <ColumnPickerMenu
-                              available={BUY_ORDER_COLUMN_IDS}
-                              visible={visibleOrderColumns}
-                              columnsById={orderColumnsById}
-                              onToggle={toggleOrderColumn}
-                              buttonLabel={t('market.columnsButton')}
-                              menuTitle={t('market.columnsMenuTitle')}
-                            />
-                            <IconButton
-                              size="sm"
-                              icon={<Icon.Download />}
-                              label={t('market.exportCsvBuy')}
-                              disabled={sortedBuy.length === 0}
-                              onClick={() =>
-                                downloadCsv(
-                                  'market-buy',
-                                  sortedBuy,
-                                  orderBookCsvColumns(t, {
-                                    npcStations: npcStationMap,
-                                    solarSystems: solarSystemMap,
-                                    isBuy: true,
-                                  }),
-                                  new Date(),
-                                  loadedView?.truncated ?? false
-                                )
-                              }
-                            />
-                          </span>
-                        </div>
-                        {sortedBuy.length === 0 ? (
-                          <EmptyState
-                            title={t('market.emptyBuyTitle')}
-                            hint={
-                              stationFilter !== null
-                                ? t('market.emptyFilteredHint')
-                                : filtersNarrowBook
-                                  ? t('market.emptyFiltersHint')
-                                  : t('market.emptyBuyHint')
-                            }
-                            className="py-6"
-                          />
-                        ) : (
-                          <>
-                            <DataTable
-                              columns={buyColumns}
-                              rows={buyRows}
-                              rowKey={(o) => o.order_id}
-                              label={t('market.buy')}
-                              defaultSort={{ columnId: 'price', direction: 'desc' }}
-                              rowContextMenu={orderRowContextMenu}
-                              rowMoreActions
-                              rowClassName={(o) =>
-                                myOrderIds.has(o.order_id) ? 'row-mine' : undefined
-                              }
-                              expandableRow={{
-                                renderDetail: (o) => (
-                                  <OrderDetailPanel
-                                    order={o}
-                                    npcStations={npcStationMap}
-                                    solarSystems={solarSystemMap}
-                                    hiddenColumns={buyHiddenColumns}
-                                    orderColumnsById={orderColumnsById}
-                                    itemSkills={itemSkills}
-                                    trainedSkills={trainedSkills}
-                                    targetPlan={targetPlan}
-                                    activeCharacterId={activeCharacterId}
-                                    itemName={selectedItem?.name ?? ''}
-                                    t={t}
-                                  />
-                                ),
-                              }}
-                            />
-                            {!buyShowAll && sortedBuy.length > ROW_CAP && (
-                              <div className="px-3 py-2">
-                                <Button size="sm" onClick={() => setBuyShowAll(true)}>
-                                  {t('market.showAll', { count: sortedBuy.length })}
-                                </Button>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-
-                    {/*
+                      {/*
                       A gap, so the buy table stops butting straight into the
                       Variations hairline — it reads as one more row block
                       otherwise, not as a separate section.
                     */}
-                    {variationsResult && (
-                      <div className="mt-3">
-                        <VariationsTable
-                          rows={variationsResult.rows}
-                          prices={variationPrices}
-                          onSelect={handleSelectItem}
-                          onCompare={handleCompareVariations}
-                          blueprintCatalog={blueprintCatalog}
-                          onRequestBlueprintCatalog={ensureBlueprintCatalog}
-                          onAddToQuickbar={handleAddToQuickbar}
-                          quickbarAvailable={activeCharacterId !== null}
-                          onShowInfo={handleShowInfo}
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-          </Panel>
-        </div>
-      )}
+                      {variationsResult && (
+                        <div className="mt-3">
+                          <VariationsTable
+                            rows={variationsResult.rows}
+                            prices={variationPrices}
+                            onSelect={handleSelectItem}
+                            onCompare={handleCompareVariations}
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+            </Panel>
+          </div>
+        )}
 
-      {compareCount > 0 && (
-        <CompareDrawer
-          location={orderBookLocation}
-          refreshTick={refreshTick}
-          blueprintCatalog={blueprintCatalog}
-          onRequestBlueprintCatalog={ensureBlueprintCatalog}
-          onAddToQuickbar={handleAddToQuickbar}
-          quickbarAvailable={activeCharacterId !== null}
-          onShowInfo={handleShowInfo}
-          characterId={activeCharacterId}
-          hub={effectiveHub}
-          standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
-          sourceLabel={
-            effectiveLocation.mode === 'hub'
-              ? effectiveHub.systemName
-              : (marketRegions?.find((region) => region.id === orderBookLocation.regionId)?.name ??
-                hubRegionName)
-          }
-        />
-      )}
+        {compareCount > 0 && (
+          <CompareDrawer
+            location={orderBookLocation}
+            refreshTick={refreshTick}
+            characterId={activeCharacterId}
+            hub={effectiveHub}
+            standing={tradeHubStanding(tradeHubStandings, effectiveHub.id)}
+            sourceLabel={
+              effectiveLocation.mode === 'hub'
+                ? effectiveHub.systemName
+                : (marketRegions?.find((region) => region.id === orderBookLocation.regionId)
+                    ?.name ?? hubRegionName)
+            }
+          />
+        )}
 
-      {compareUndo && (
-        <Toast
-          message={t('market.compareUndo.added', {
-            count: compareUndo.count,
-            name: compareUndo.itemName,
-          })}
-          undo={{ label: t('market.compareUndo.undo'), onUndo: handleUndoCompareVariations }}
-        />
-      )}
-
-      {infoModalItem && (
-        <ItemDetailModal
-          typeId={infoModalItem.typeId}
-          itemName={infoModalItem.itemName}
-          location={orderBookLocation}
-          onClose={() => setInfoModalItem(null)}
-        />
-      )}
-    </div>
+        {compareUndo && (
+          <Toast
+            message={t('market.compareUndo.added', {
+              count: compareUndo.count,
+              name: compareUndo.itemName,
+            })}
+            undo={{ label: t('market.compareUndo.undo'), onUndo: handleUndoCompareVariations }}
+          />
+        )}
+      </div>
+    </ItemActionsProvider>
   );
 }

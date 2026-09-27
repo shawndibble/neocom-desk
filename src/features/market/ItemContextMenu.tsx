@@ -14,19 +14,21 @@ import { writeToClipboard } from '@/lib/clipboard';
 import { marketLinkParams } from '@/engine/market/urlState';
 import { usePiPlannable } from '@/features/pi/usePiPlannable';
 import { useCompareSet } from './compareSet';
+import { useItemActions } from './itemActions';
 import { PriceAlertDialog, PriceAlertMenuItem } from './PriceAlertDialog';
 
 export interface ItemContextMenuProps {
   typeId: number;
   itemName: string;
-  /** Undefined while the blueprint catalog hasn't been checked yet; null once checked and no blueprint produces this item. */
-  blueprintTypeID: number | null | undefined;
+  /**
+   * The blueprint behind Build Plan, when the row already knows it (an
+   * industry job, a Loyalty Store offer); null when nothing produces the item.
+   * Omitted, the page's Item Actions look it up — "checking…" until the lazy
+   * catalog loads, which the menu requests as it opens.
+   */
+  blueprintTypeID?: number | null;
   /** The product the Build Plan action opens when it isn't `typeId` itself � a blueprint row (Assets) plans what it builds. */
   planProductTypeID?: number;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  /** False with no active character — the Quickbar has nobody to save the item under. */
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
   /** Variations-table rows only (issue #147): adds the row's variation group to the Compare Set and opens the Compare drawer on Attributes. Omitted elsewhere. */
   onCompareVariations?: () => void;
   /** Present only when at least one of the character's own Build Plans consumes this item as a material (issue #414); omitted when unknown or when no plan does. */
@@ -45,34 +47,26 @@ export interface ItemContextMenuProps {
   buildingHere?: boolean;
   /** Caller-specific entries appended after the shared ones (Open Orders' "Copy new price"). */
   extraItems?: ReactNode;
-  onOpenChange?: (open: boolean) => void;
   children: ReactElement;
 }
 
 /**
  * Wraps `trigger` in this menu for `typeId`, the caller having already bound
- * the rest of the props. How a page that owns the Quickbar/show-info wiring
+ * the rest of the props. How a page that knows item names and blueprints
  * hands the menu down to children that only know a type ID — same shape as
  * `DataTable`'s `rowContextMenu`.
  */
 export type ItemMenuFor = (typeId: number, trigger: ReactElement) => ReactElement;
 
 /** Everything the menu's entries need — the props minus the trigger wiring. */
-type ItemMenuProps = Omit<ItemContextMenuProps, 'children' | 'onOpenChange'>;
+type ItemMenuProps = Omit<ItemContextMenuProps, 'children'>;
 
 /** The item menu's "Show info" — also reused as-is by menus that aren't item menus (the Fittings editor's). */
-export function ShowInfoMenuItem({
-  typeId,
-  itemName,
-  onShowInfo,
-}: {
-  typeId: number;
-  itemName: string;
-  onShowInfo: (typeId: number, itemName: string) => void;
-}) {
+export function ShowInfoMenuItem({ typeId, itemName }: { typeId: number; itemName: string }) {
   const { t } = useTranslation();
+  const { showInfo } = useItemActions();
   return (
-    <MenuItem onSelect={() => onShowInfo(typeId, itemName)}>
+    <MenuItem onSelect={() => showInfo(typeId, itemName)}>
       {t('market.contextMenu.showInfo')}
     </MenuItem>
   );
@@ -106,10 +100,10 @@ export function ViewInMarketMenuItem({ typeId }: { typeId: number }) {
  * Add to Quickbar, show info, add to Compare, view in
  * Market, copy name, jump to a Build Plan, jump to a PI Plan.
  *
- * The PI action asks for itself rather than taking a prop the way
- * `blueprintTypeID` does: `pi.json` is 15KB against `blueprints.json`'s
- * 1.4MB, so there is nothing to defend by making five call sites load it and
- * thread it down. It is also rendered only when the answer is yes — a
+ * The PI action asks for itself rather than going through the page's Item
+ * Actions the way `blueprintTypeID` does: `pi.json` is 15KB against
+ * `blueprints.json`'s 1.4MB, so there is nothing to defend by loading it
+ * once per page. It is also rendered only when the answer is yes — a
  * permanently-disabled row on every item in the game buys nothing, where the
  * Build Plan row's disabled state is telling the user something they might
  * have expected otherwise. Nothing renders while the answer is unknown, so
@@ -119,11 +113,8 @@ function useItemMenuItems(
   {
     typeId,
     itemName,
-    blueprintTypeID,
+    blueprintTypeID: knownBlueprintTypeID,
     planProductTypeID,
-    onAddToQuickbar,
-    quickbarAvailable,
-    onShowInfo,
     onCompareVariations,
     onViewInIndustryAsMaterial,
     onToggleBuildHere,
@@ -136,6 +127,9 @@ function useItemMenuItems(
   const navigate = useNavigate();
   const addToCompare = useCompareSet((state) => state.add);
   const piPlannable = usePiPlannable(typeId);
+  const { canAddToQuickbar, addToQuickbar, blueprintFor } = useItemActions();
+  const blueprintTypeID =
+    knownBlueprintTypeID === undefined ? blueprintFor(typeId) : knownBlueprintTypeID;
 
   // `industry.*`, not `market.*`: `BuildPlanContextMenu` offers this same
   // action on the pages this richer menu doesn't reach (the BPC search table,
@@ -150,14 +144,14 @@ function useItemMenuItems(
   return (
     <>
       <MenuItem
-        disabled={!quickbarAvailable}
-        title={quickbarAvailable ? undefined : t('market.contextMenu.quickbarNoCharacter')}
-        onSelect={() => onAddToQuickbar(typeId, itemName)}
+        disabled={!canAddToQuickbar}
+        title={canAddToQuickbar ? undefined : t('market.contextMenu.quickbarNoCharacter')}
+        onSelect={() => addToQuickbar(typeId, itemName)}
       >
         {t('market.contextMenu.addToQuickbar')}
       </MenuItem>
-      <PriceAlertMenuItem typeId={typeId} available={quickbarAvailable} onSelect={onAlertRequest} />
-      <ShowInfoMenuItem typeId={typeId} itemName={itemName} onShowInfo={onShowInfo} />
+      <PriceAlertMenuItem typeId={typeId} available={canAddToQuickbar} onSelect={onAlertRequest} />
+      <ShowInfoMenuItem typeId={typeId} itemName={itemName} />
       <MenuItem onSelect={() => addToCompare({ typeId, itemName })}>
         {t('market.contextMenu.addToCompare')}
       </MenuItem>
@@ -209,13 +203,20 @@ function useItemMenuItems(
  * 2.1.1, issue #1497).
  */
 export function ItemContextMenu(props: ItemContextMenuProps) {
-  const { typeId, itemName, onOpenChange, children } = props;
+  const { typeId, itemName, children } = props;
   const [alertOpen, setAlertOpen] = useState(false);
   const items = useItemMenuItems(props, () => setAlertOpen(true));
+  const { requestBlueprints } = useItemActions();
 
   return (
     <>
-      <RowActionsMenu name={itemName} items={items} onOpenChange={onOpenChange}>
+      <RowActionsMenu
+        name={itemName}
+        items={items}
+        onOpenChange={(open) => {
+          if (open) requestBlueprints();
+        }}
+      >
         {children}
       </RowActionsMenu>
       {alertOpen && (

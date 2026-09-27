@@ -42,19 +42,9 @@ interface QuickbarRowProps {
   onSelect: (typeId: number) => void;
   onRemove: (typeId: number) => void;
   onSetTarget: (typeId: number, target: QuickbarTarget) => void;
-  menu: QuickbarMenuProps;
 }
 
-/** What the shared item context menu needs, wired by the route like the tree's. */
-interface QuickbarMenuProps {
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
-  blueprintTypeIdFor: (typeId: number) => number | null | undefined;
-  onRequestBlueprintCatalog: () => void;
-}
-
-function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget, menu }: QuickbarRowProps) {
+function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget }: QuickbarRowProps) {
   const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.typeId,
@@ -80,17 +70,7 @@ function QuickbarRow({ item, selected, onSelect, onRemove, onSetTarget, menu }: 
       >
         <Icon.DragHandle />
       </button>
-      <ItemContextMenu
-        typeId={item.typeId}
-        itemName={item.name}
-        blueprintTypeID={menu.blueprintTypeIdFor(item.typeId)}
-        onAddToQuickbar={menu.onAddToQuickbar}
-        quickbarAvailable={menu.quickbarAvailable}
-        onShowInfo={menu.onShowInfo}
-        onOpenChange={(open) => {
-          if (open) menu.onRequestBlueprintCatalog();
-        }}
-      >
+      <ItemContextMenu typeId={item.typeId} itemName={item.name}>
         {/* The trigger holds the More actions button beside the item
             button (buttons don't nest), so both sit inside the menu. */}
         <div className="flex min-w-0 flex-1 items-center">
@@ -153,11 +133,6 @@ export interface QuickbarListProps {
   onReorder: (activeTypeId: number, overTypeId: number) => void;
   onSetTarget: (typeId: number, target: QuickbarTarget) => void;
   onViewInAppraisal: () => void;
-  onAddToQuickbar: QuickbarMenuProps['onAddToQuickbar'];
-  quickbarAvailable: boolean;
-  onShowInfo: QuickbarMenuProps['onShowInfo'];
-  blueprintTypeIdFor: QuickbarMenuProps['blueprintTypeIdFor'];
-  onRequestBlueprintCatalog: () => void;
 }
 
 export function QuickbarList({
@@ -168,19 +143,7 @@ export function QuickbarList({
   onReorder,
   onSetTarget,
   onViewInAppraisal,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
-  blueprintTypeIdFor,
-  onRequestBlueprintCatalog,
 }: QuickbarListProps) {
-  const menu: QuickbarMenuProps = {
-    onAddToQuickbar,
-    quickbarAvailable,
-    onShowInfo,
-    blueprintTypeIdFor,
-    onRequestBlueprintCatalog,
-  };
   const { t } = useTranslation();
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -223,7 +186,6 @@ export function QuickbarList({
                   onSelect={onSelect}
                   onRemove={onRemove}
                   onSetTarget={onSetTarget}
-                  menu={menu}
                 />
               ))}
             </ul>

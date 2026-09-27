@@ -44,7 +44,6 @@ import {
 import { countPasteLines } from '@/engine/market/appraisalPaste';
 import type { ResolvedStandings } from '@/engine/market/standings';
 import { iskToneClass } from '@/features/character/format';
-import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { LpStoreLink } from '@/features/loyalty/LpStoreLink';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatIskAuto } from '@/lib/isk';
@@ -73,12 +72,6 @@ interface AppraisalPanelProps {
   hub: TradeHub;
   /** The active Character's standing toward this hub's NPC station owner, for the net-of-fees chips' broker fee. */
   standing: ResolvedStandings;
-  /** Same per-item context menu as the tree and the Variations table: null until requested, then per-typeId lookups. */
-  blueprintCatalog: BlueprintCatalog | null;
-  onRequestBlueprintCatalog: () => void;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
   /** Opens the Compare Hubs panel already expanded — the Quickbar's "View in Appraisal" action (#726) lands directly on the multi-hub view rather than a collapsed one. */
   defaultCompareExpanded?: boolean;
 }
@@ -116,11 +109,6 @@ export function AppraisalPanel({
   onPricePercentChange,
   hub,
   standing,
-  blueprintCatalog,
-  onRequestBlueprintCatalog,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
   defaultCompareExpanded = false,
 }: AppraisalPanelProps) {
   const { t } = useTranslation();
@@ -356,26 +344,12 @@ export function AppraisalPanel({
 
   // The same menu the tree, the Quickbar and the Variations table carry — an
   // appraised row is an item like any other, and every action on it applies.
-  // `ItemDetailModal` and `CompareDrawer` are rendered by `Market.tsx` outside
-  // its section guards, so Show Info and Add to Compare work from this tab
-  // without a second copy of either.
+  // The Item Detail modal (Market's `ItemActionsProvider`) and `CompareDrawer`
+  // sit outside Market's section guards, so Show Info and Add to Compare work
+  // from this tab without a second copy of either.
   function rowContextMenu(row: AppraisalRow, tr: ReactElement) {
-    const blueprintTypeID =
-      blueprintCatalog === null
-        ? undefined
-        : (blueprintCatalog.byProductTypeID.get(row.typeId)?.blueprintTypeID ?? null);
     return (
-      <ItemContextMenu
-        typeId={row.typeId}
-        itemName={row.name}
-        blueprintTypeID={blueprintTypeID}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable={quickbarAvailable}
-        onShowInfo={onShowInfo}
-        onOpenChange={(open) => {
-          if (open) onRequestBlueprintCatalog();
-        }}
-      >
+      <ItemContextMenu typeId={row.typeId} itemName={row.name}>
         {tr}
       </ItemContextMenu>
     );

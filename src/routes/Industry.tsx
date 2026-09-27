@@ -12,8 +12,8 @@ import {
 } from '@/features/industry/blueprintCatalog';
 import { findOwnedBlueprint } from '@/features/industry/data';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
-import { ItemDetailModal } from '@/features/market/ItemDetailModal';
-import { useQuickbar } from '@/features/market/useQuickbar';
+import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
+import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useTradeHubStandings } from '@/features/market/useTradeHubStandings';
 import { BuildPlanList } from '@/features/industry/BuildPlanList';
 import type { PlanIndexStats, PlanRollupStats } from '@/features/industry/BuildPlanList';
@@ -110,10 +110,7 @@ export function Industry() {
   }, [activeCharacterId]);
   const plans = plansQuery?.characterId === activeCharacterId ? plansQuery.rows : undefined;
 
-  const quickbar = useQuickbar(activeCharacterId);
-  const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
-    null
-  );
+  const itemActions = usePageItemActions({ activeCharacterId });
 
   const expandedGroups = useExpandedGroups((state) => state.value);
   const expandedGroupsHydrated = useExpandedGroups((state) => state.hydrated);
@@ -477,164 +474,146 @@ export function Industry() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
-      <IndustryHeader
-        activeCharacterId={activeCharacterId}
-        activeTab={tab}
-        onTabChange={setTab}
-        blueprintsNeedsReauth={blueprintsNeedsReauth}
-        onAddToQuickbar={quickbar.add}
-        quickbarAvailable={quickbar.available}
-        onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
-      />
+    <ItemActionsProvider page={itemActions}>
+      <div className="mx-auto max-w-7xl space-y-4">
+        <IndustryHeader
+          activeCharacterId={activeCharacterId}
+          activeTab={tab}
+          onTabChange={setTab}
+          blueprintsNeedsReauth={blueprintsNeedsReauth}
+        />
 
-      {!plans || !catalog || !buildGroupsHydrated || !expandedGroupsHydrated ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : (
-        <>
-          {tab === 'sourcing' ? (
-            <BpcSourcingPanel />
-          ) : tab === 'opportunities' ? (
-            <div className="flex flex-col gap-4">
-              <OpportunitiesPanel
+        {!plans || !catalog || !buildGroupsHydrated || !expandedGroupsHydrated ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : (
+          <>
+            {tab === 'sourcing' ? (
+              <BpcSourcingPanel />
+            ) : tab === 'opportunities' ? (
+              <div className="flex flex-col gap-4">
+                <OpportunitiesPanel
+                  catalog={catalog}
+                  pi={pi}
+                  modifiers={modifiers}
+                  facilityDefaults={facilityDefaults}
+                  activeCharacterId={activeCharacterId}
+                  ownedStockSnapshot={workspace.ownedStockSnapshot}
+                  onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
+                  onStartPlan={handleStartPlan}
+                />
+                <MarketWideOpportunitiesPanel
+                  hub={DEFAULT_TRADE_HUB}
+                  trees={marketWideTrees}
+                  catalog={catalog}
+                  modifiers={modifiers}
+                  activeCharacterId={activeCharacterId}
+                  onStartPlan={handleStartPlan}
+                />
+              </div>
+            ) : tab === 'records' ? (
+              <ProductionLogPanel
+                characterId={activeCharacterId}
                 catalog={catalog}
-                pi={pi}
-                modifiers={modifiers}
-                facilityDefaults={facilityDefaults}
-                activeCharacterId={activeCharacterId}
-                ownedStockSnapshot={workspace.ownedStockSnapshot}
-                onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
-                onAddToQuickbar={quickbar.add}
-                quickbarAvailable={quickbar.available}
-                onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
-                onStartPlan={handleStartPlan}
+                skills={modifiers.skills}
+                plans={plans}
+                onOpenRun={openRunFromRecords}
               />
-              <MarketWideOpportunitiesPanel
-                hub={DEFAULT_TRADE_HUB}
-                trees={marketWideTrees}
-                catalog={catalog}
-                modifiers={modifiers}
-                activeCharacterId={activeCharacterId}
-                onAddToQuickbar={quickbar.add}
-                quickbarAvailable={quickbar.available}
-                onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
-                onStartPlan={handleStartPlan}
-              />
-            </div>
-          ) : tab === 'records' ? (
-            <ProductionLogPanel
-              characterId={activeCharacterId}
-              catalog={catalog}
-              skills={modifiers.skills}
-              plans={plans}
-              onOpenRun={openRunFromRecords}
-              onAddToQuickbar={quickbar.add}
-              quickbarAvailable={quickbar.available}
-              onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
-            />
-          ) : comparing ? (
-            comparePlans.length >= 2 ? (
-              <BuildPlanCompare
-                plans={comparePlans}
-                catalog={catalog}
-                pi={pi}
-                ownedBlueprints={ownedBlueprints}
-                corpOwnedBlueprints={corpOwnedBlueprints}
-                modifiers={modifiers}
-                tradeHubStandings={tradeHubStandings}
-                onDone={exitCompare}
-              />
+            ) : comparing ? (
+              comparePlans.length >= 2 ? (
+                <BuildPlanCompare
+                  plans={comparePlans}
+                  catalog={catalog}
+                  pi={pi}
+                  ownedBlueprints={ownedBlueprints}
+                  corpOwnedBlueprints={corpOwnedBlueprints}
+                  modifiers={modifiers}
+                  tradeHubStandings={tradeHubStandings}
+                  onDone={exitCompare}
+                />
+              ) : (
+                <EmptyState
+                  title={t('industry.compareNeedMore')}
+                  hint={t('industry.compareNeedMoreHint')}
+                  action={
+                    <Button size="sm" onClick={exitCompare}>
+                      {t('industry.compareDone')}
+                    </Button>
+                  }
+                />
+              )
             ) : (
-              <EmptyState
-                title={t('industry.compareNeedMore')}
-                hint={t('industry.compareNeedMoreHint')}
-                action={
-                  <Button size="sm" onClick={exitCompare}>
-                    {t('industry.compareDone')}
-                  </Button>
+              <BuildPlanList
+                note={
+                  (plans?.length ?? 0) > 0 && (
+                    <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
+                  )
                 }
+                plans={plans}
+                catalog={catalog}
+                selectedId={null}
+                onSelect={(id) => navigate(`/industry/plans/${id}`)}
+                // Stays on the index, same as duplicate — the search box adds
+                // a row to manage, it doesn't presume the pilot wants to edit
+                // it immediately. `void`: `onCreate` only takes the entry.
+                onCreate={(entry) => void createPlan(entry)}
+                onDuplicate={(id) => void handleDuplicate(id)}
+                onDelete={(id) => void handleDelete(id)}
+                onRename={(id, name) => void handleRename(id, name)}
+                compareMode={compareMode}
+                compareSelectedIds={compareSelectedIds}
+                onToggleCompareMode={toggleCompareMode}
+                onToggleCompareSelected={toggleCompareSelected}
+                onOpenCompare={() => setComparing(true)}
+                groups={groups}
+                expandedGroupIds={expandedGroupIds}
+                selectedGroupId={null}
+                onToggleGroup={(groupId) =>
+                  void setGroupExpanded(groupId, !expandedGroupIds.has(groupId))
+                }
+                onSelectGroup={(groupId) => navigate(`/industry/groups/${groupId}`)}
+                onCreateGroup={() => void handleCreateGroup()}
+                onRenameGroup={(groupId, name) => void handleRenameGroup(groupId, name)}
+                onDeleteGroup={requestDeleteGroup}
+                onMovePlan={(planId, groupId) => void handleMovePlan(planId, groupId)}
+                onOpenFitImport={() => setFitImportOpen(true)}
+                statsByPlanId={statsByPlanId}
+                ownedBlueprints={ownedBlueprints}
+                statsByGroupId={statsByGroupId}
               />
-            )
-          ) : (
-            <BuildPlanList
-              note={
-                (plans?.length ?? 0) > 0 && (
-                  <AssumesBaseStandingsNote hint={t('industry.assumesBaseStandingsHint')} />
-                )
-              }
-              plans={plans}
-              catalog={catalog}
-              selectedId={null}
-              onSelect={(id) => navigate(`/industry/plans/${id}`)}
-              // Stays on the index, same as duplicate — the search box adds
-              // a row to manage, it doesn't presume the pilot wants to edit
-              // it immediately. `void`: `onCreate` only takes the entry.
-              onCreate={(entry) => void createPlan(entry)}
-              onDuplicate={(id) => void handleDuplicate(id)}
-              onDelete={(id) => void handleDelete(id)}
-              onRename={(id, name) => void handleRename(id, name)}
-              compareMode={compareMode}
-              compareSelectedIds={compareSelectedIds}
-              onToggleCompareMode={toggleCompareMode}
-              onToggleCompareSelected={toggleCompareSelected}
-              onOpenCompare={() => setComparing(true)}
-              groups={groups}
-              expandedGroupIds={expandedGroupIds}
-              selectedGroupId={null}
-              onToggleGroup={(groupId) =>
-                void setGroupExpanded(groupId, !expandedGroupIds.has(groupId))
-              }
-              onSelectGroup={(groupId) => navigate(`/industry/groups/${groupId}`)}
-              onCreateGroup={() => void handleCreateGroup()}
-              onRenameGroup={(groupId, name) => void handleRenameGroup(groupId, name)}
-              onDeleteGroup={requestDeleteGroup}
-              onMovePlan={(planId, groupId) => void handleMovePlan(planId, groupId)}
-              onOpenFitImport={() => setFitImportOpen(true)}
-              statsByPlanId={statsByPlanId}
-              ownedBlueprints={ownedBlueprints}
-              statsByGroupId={statsByGroupId}
-            />
-          )}
-        </>
-      )}
+            )}
+          </>
+        )}
 
-      <Modal
-        open={deletingGroupId !== null}
-        onClose={() => setDeletingGroupId(null)}
-        title={t('industry.deleteGroup')}
-      >
-        <p className="text-xs text-text-dim">{t('industry.deleteGroupConfirm')}</p>
-        <div className="mt-3 flex justify-end gap-2">
-          <Button size="sm" onClick={() => setDeletingGroupId(null)}>
-            {t('industry.cancel')}
-          </Button>
-          <Button
-            size="sm"
-            variant="danger"
-            onClick={() => deletingGroupId && void handleDeleteGroup(deletingGroupId)}
-          >
-            {t('industry.deleteGroup')}
-          </Button>
-        </div>
-      </Modal>
+        <Modal
+          open={deletingGroupId !== null}
+          onClose={() => setDeletingGroupId(null)}
+          title={t('industry.deleteGroup')}
+        >
+          <p className="text-xs text-text-dim">{t('industry.deleteGroupConfirm')}</p>
+          <div className="mt-3 flex justify-end gap-2">
+            <Button size="sm" onClick={() => setDeletingGroupId(null)}>
+              {t('industry.cancel')}
+            </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => deletingGroupId && void handleDeleteGroup(deletingGroupId)}
+            >
+              {t('industry.deleteGroup')}
+            </Button>
+          </div>
+        </Modal>
 
-      {fitImportOpen && catalog && (
-        <FitImportDialog
-          catalog={catalog}
-          onApply={(preview) => void handleFitImport(preview)}
-          onClose={() => setFitImportOpen(false)}
-        />
-      )}
-
-      {infoModalItem && (
-        <ItemDetailModal
-          typeId={infoModalItem.typeId}
-          itemName={infoModalItem.itemName}
-          onClose={() => setInfoModalItem(null)}
-        />
-      )}
-    </div>
+        {fitImportOpen && catalog && (
+          <FitImportDialog
+            catalog={catalog}
+            onApply={(preview) => void handleFitImport(preview)}
+            onClose={() => setFitImportOpen(false)}
+          />
+        )}
+      </div>
+    </ItemActionsProvider>
   );
 }

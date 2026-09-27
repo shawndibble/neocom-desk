@@ -37,6 +37,7 @@ import {
 } from '@/engine/fittings/types';
 import { moduleKey } from '@/engine/fittings/skillGaps';
 import { showsDrones } from '@/engine/fittings/stats';
+import { useOptionalItemActions } from '@/features/market/itemActions';
 import { useOverBudgetFlash } from './useOverBudgetFlash';
 import { checkCharges } from './dogmaFittingEngine';
 import { endFittingDrag, startFittingDrag, type FittingDragPayload } from './fittingDrag';
@@ -123,8 +124,6 @@ export interface ModuleRowProps extends EditContext {
   cantUse: boolean;
   /** List view only — Ring opens the same panel via its own slot click; absent inside that panel's own Modal, which needs no further affordance. */
   onOpenVariations?: (slot: FittingSlotKind, slotIndex: number) => void;
-  /** The name opens the item's info (the Market's item detail). */
-  onShowInfo?: ShowInfo;
   /**
    * A row of the List (or a rack sheet): a drop target, dragged by its grip
    * on a pointer, with Move up / down / to slot in its menu. Off in the
@@ -133,25 +132,18 @@ export interface ModuleRowProps extends EditContext {
   inRack?: boolean;
 }
 
-/** Opens an item's info — the Market's item detail — by type and name. */
-export type ShowInfo = (typeId: number, name: string) => void;
-
-/** A fitted item's name: the way into its info, when there is one. */
-function SlotName({
-  typeId,
-  name,
-  onShowInfo,
-}: {
-  typeId: number;
-  name: string;
-  onShowInfo?: ShowInfo;
-}) {
-  if (!onShowInfo) return <span className={SLOT_NAME_CLASS}>{name}</span>;
+/**
+ * A fitted item's name: the way into its info, when the page has Item
+ * Actions (a shared-fitting preview renders no provider, and stays a span).
+ */
+function SlotName({ typeId, name }: { typeId: number; name: string }) {
+  const actions = useOptionalItemActions();
+  if (!actions) return <span className={SLOT_NAME_CLASS}>{name}</span>;
   return (
     <button
       type="button"
       className={`${SLOT_NAME_CLASS} ${tappableRowClassName} cursor-pointer text-accent underline-offset-2 hover:underline`}
-      onClick={() => onShowInfo(typeId, name)}
+      onClick={() => actions.showInfo(typeId, name)}
     >
       {name}
     </button>
@@ -168,7 +160,6 @@ export function ModuleRow({
   profile,
   edit,
   onOpenVariations,
-  onShowInfo,
   inRack = false,
 }: ModuleRowProps) {
   const { t } = useTranslation();
@@ -234,7 +225,7 @@ export function ModuleRow({
       identity={
         <>
           <TypeIcon typeId={typeId} size={32} width={24} height={24} />
-          <SlotName typeId={typeId} name={name} onShowInfo={onShowInfo} />
+          <SlotName typeId={typeId} name={name} />
           {cantUse && (
             <span className="shrink-0 rounded-xs border border-danger px-1 text-[0.6875rem] font-semibold text-danger">
               {t('fittings.list.cantUse')}
@@ -528,7 +519,6 @@ interface RackSlotsProps extends EditContext {
   onSelectTarget: (target: AddTarget) => void;
   unusableModuleKeys?: ReadonlySet<string>;
   onOpenVariations?: (slot: FittingSlotKind, slotIndex: number) => void;
-  onShowInfo?: ShowInfo;
   /** Hides the rack's own heading — a rack sheet titles it already. */
   hideLabel?: boolean;
 }
@@ -545,7 +535,6 @@ export function RackSlots({
   onSelectTarget,
   unusableModuleKeys,
   onOpenVariations,
-  onShowInfo,
   hideLabel = false,
   ...context
 }: RackSlotsProps) {
@@ -576,7 +565,6 @@ export function RackSlots({
                 result={moduleResults?.[entry.index] ?? null}
                 cantUse={unusableModuleKeys?.has(moduleKey(entry.module)) ?? false}
                 onOpenVariations={onOpenVariations}
-                onShowInfo={onShowInfo}
                 inRack
               />
             );
@@ -608,7 +596,6 @@ interface DroneSectionProps {
   edit: EditContext['edit'];
   target: AddTarget | null;
   onSelectTarget: (target: AddTarget) => void;
-  onShowInfo?: ShowInfo;
   /**
    * `list`: a section of the List, headed "Drones" under the List's own
    * resource bars. `panel`: the Ring's drone panel or the phone's sheet —
@@ -630,7 +617,6 @@ export function DroneSection({
   edit,
   target,
   onSelectTarget,
-  onShowInfo,
   variant = 'list',
 }: DroneSectionProps) {
   const { t } = useTranslation();
@@ -695,7 +681,7 @@ export function DroneSection({
               identity={
                 <>
                   <TypeIcon typeId={group.typeId} size={32} width={24} height={24} />
-                  <SlotName typeId={group.typeId} name={name} onShowInfo={onShowInfo} />
+                  <SlotName typeId={group.typeId} name={name} />
                 </>
               }
               removeLabel={t('fittings.edit.remove', { name })}
@@ -747,7 +733,6 @@ interface FittingRackListProps extends EditContext {
   /** `moduleKey`s the active Character lacks the skills for. */
   unusableModuleKeys?: ReadonlySet<string>;
   onOpenVariations?: (slot: FittingSlotKind, slotIndex: number) => void;
-  onShowInfo?: ShowInfo;
   /** The panel header's controls — the page's "+ Add module". */
   actions?: ReactNode;
 }
@@ -771,7 +756,6 @@ export function FittingRackList({
   onSelectTarget,
   unusableModuleKeys,
   onOpenVariations,
-  onShowInfo,
   actions,
 }: FittingRackListProps) {
   const { t } = useTranslation();
@@ -830,7 +814,6 @@ export function FittingRackList({
             onSelectTarget={onSelectTarget}
             unusableModuleKeys={unusableModuleKeys}
             onOpenVariations={onOpenVariations}
-            onShowInfo={onShowInfo}
           />
         ))}
 
@@ -841,11 +824,10 @@ export function FittingRackList({
           edit={edit}
           target={target}
           onSelectTarget={onSelectTarget}
-          onShowInfo={onShowInfo}
         />
 
         {/* What a fit carries besides its slots and drones: ammo, paste, filaments, a depot. */}
-        <CargoSection fitting={fitting} catalogue={catalogue} edit={edit} onShowInfo={onShowInfo} />
+        <CargoSection fitting={fitting} catalogue={catalogue} edit={edit} />
       </div>
     </Panel>
   );
@@ -860,8 +842,7 @@ export function CargoSection({
   fitting,
   catalogue,
   edit,
-  onShowInfo,
-}: Pick<EditContext, 'fitting' | 'catalogue' | 'edit'> & { onShowInfo?: ShowInfo }) {
+}: Pick<EditContext, 'fitting' | 'catalogue' | 'edit'>) {
   const { t } = useTranslation();
   const actions = useFittingItemActions();
   const cargo = cargoGroups(fitting);
@@ -899,7 +880,7 @@ export function CargoSection({
             identity={
               <>
                 <TypeIcon typeId={item.typeId} size={32} width={24} height={24} />
-                <SlotName typeId={item.typeId} name={name} onShowInfo={onShowInfo} />
+                <SlotName typeId={item.typeId} name={name} />
               </>
             }
             removeLabel={t('fittings.edit.remove', { name })}

@@ -11,6 +11,7 @@ import type { BlueprintMap, TypeMap } from '@/sde/types';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ActiveJobsPanel } from './ActiveJobsPanel';
+import { FakeItemActions, fakeItemActions } from '@/features/market/__fixtures__/itemActions';
 
 vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn().mockResolvedValue(undefined) }));
 
@@ -135,12 +136,9 @@ describe('ActiveJobsPanel: rendering', () => {
     const user = userEvent.setup();
     const { container } = render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -252,12 +250,9 @@ describe('ActiveJobsPanel: rendering', () => {
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -281,12 +276,9 @@ describe('ActiveJobsPanel: rendering', () => {
     server.use(http.get(jobsUrl(), () => HttpResponse.json([])));
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
     // The whole point: an idle panel is its own header line, not a card that
@@ -302,12 +294,9 @@ describe('ActiveJobsPanel: rendering', () => {
     server.use(http.get(jobsUrl(), () => HttpResponse.error()));
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
     expect(await screen.findByText('No active jobs cached')).toBeInTheDocument();
@@ -324,12 +313,9 @@ describe('ActiveJobsPanel: 403 (missing scope) surfaces a distinct re-login stat
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -352,12 +338,9 @@ describe('ActiveJobsPanel: 403 (missing scope) surfaces a distinct re-login stat
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -378,12 +361,9 @@ describe('ActiveJobsPanel: 403 (missing scope) surfaces a distinct re-login stat
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -424,12 +404,9 @@ describe('ActiveJobsPanel: offline cache fallback', () => {
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -463,12 +440,9 @@ describe('ActiveJobsPanel: offline cache fallback', () => {
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -503,16 +477,13 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
 
   it('offers Add to Quickbar, View in Market, and Build Plan on a job row, keyed off its product', async () => {
     server.use(http.get(jobsUrl(), () => HttpResponse.json([manufacturingJob()])));
-    const onAddToQuickbar = vi.fn();
+    const actions = fakeItemActions();
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={onAddToQuickbar}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions actions={actions}>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -528,7 +499,7 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
 
     fireEvent.click(quickbarItem);
     // The job's product (200 -> Widget Beta), not its blueprint (100 -> Widget Alpha).
-    expect(onAddToQuickbar).toHaveBeenCalledWith(200, 'Widget Beta');
+    expect(actions.addToQuickbar).toHaveBeenCalledWith(200, 'Widget Beta');
   });
 
   it('gives a job row a visible "More actions" button with the same items as the right-click menu (issue #1498)', async () => {
@@ -537,12 +508,9 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -573,12 +541,9 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -607,12 +572,9 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -655,12 +617,9 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -705,12 +664,9 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
 
     render(
       <MemoryRouter initialEntries={['/industry/plans?jobs.status=completingSoon']}>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
         <SearchProbe />
       </MemoryRouter>
     );
@@ -743,12 +699,9 @@ describe('ActiveJobsPanel: row context menu and filters (#409)', () => {
       }
       render(
         <MemoryRouter initialEntries={[url]}>
-          <ActiveJobsPanel
-            characterId={CHAR_ID}
-            onAddToQuickbar={() => {}}
-            quickbarAvailable={true}
-            onShowInfo={() => {}}
-          />
+          <FakeItemActions>
+            <ActiveJobsPanel characterId={CHAR_ID} />
+          </FakeItemActions>
           <SearchProbe />
         </MemoryRouter>
       );
@@ -923,12 +876,9 @@ describe('ActiveJobsPanel: Log production from job (#1787)', () => {
   function renderPanel(onLocation: (loc: ReturnType<typeof useLocation>) => void) {
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
         <LocationProbe onLocation={onLocation} />
       </MemoryRouter>
     );
@@ -1143,12 +1093,9 @@ describe('ActiveJobsPanel: table columns', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const { container } = render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -1191,12 +1138,9 @@ describe('ActiveJobsPanel: table columns', () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const { container } = render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -1274,12 +1218,9 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -1296,12 +1237,9 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -1321,12 +1259,9 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -1342,12 +1277,9 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -1364,12 +1296,9 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -1398,12 +1327,9 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -1447,12 +1373,9 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -1476,12 +1399,9 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
 
     render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -1533,12 +1453,9 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
 
     const { container } = render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -1601,12 +1518,9 @@ describe('ActiveJobsPanel: open job-slot header (issue #679)', () => {
 
     const { container } = render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 
@@ -1636,12 +1550,9 @@ describe('ActiveJobsPanel: open job-slot header (issue #679)', () => {
 
     const { container } = render(
       <MemoryRouter>
-        <ActiveJobsPanel
-          characterId={CHAR_ID}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable={true}
-          onShowInfo={() => {}}
-        />
+        <FakeItemActions>
+          <ActiveJobsPanel characterId={CHAR_ID} />
+        </FakeItemActions>
       </MemoryRouter>
     );
 

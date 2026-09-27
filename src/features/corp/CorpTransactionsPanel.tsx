@@ -83,9 +83,6 @@ interface CorpTransactionsPanelProps {
   /** Names the CSV file's division, when the division list has loaded. */
   divisionQualifier: string | undefined;
   offlineTitleKey: string;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 /** Radix needs a value here, and `''` reads to it as "nothing selected". */
@@ -169,24 +166,16 @@ export function CorpTransactionsPanel({
   nameFor,
   divisionQualifier,
   offlineTitleKey,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
 }: CorpTransactionsPanelProps) {
   const { t } = useTranslation();
 
-  /** Same menu every other item table carries (issue #817). */
+  /** Same menu every other item table carries (issue #817). No blueprint ever
+   * produces a wallet transaction's item from this table, so Build Plan is
+   * hardcoded "No blueprint options" rather than looked up. */
   function rowContextMenu(txn: CorporationWalletTransaction, tr: ReactElement) {
     const itemName = nameFor(txn.type_id);
     return (
-      <ItemContextMenu
-        typeId={txn.type_id}
-        itemName={itemName}
-        blueprintTypeID={null}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable={quickbarAvailable}
-        onShowInfo={onShowInfo}
-      >
+      <ItemContextMenu typeId={txn.type_id} itemName={itemName} blueprintTypeID={null}>
         {tr}
       </ItemContextMenu>
     );

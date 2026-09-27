@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -12,8 +12,8 @@ import { bpcSourcingHref } from '@/features/bpcContracts/bpcSourcingUrl';
 import { BuildPlanDetail } from '@/features/industry/BuildPlanDetail';
 import { applyBuildPlanChange } from '@/features/industry/buildPlanStore';
 import type { JobProductionSeed } from '@/features/industry/logProductionFromJob';
-import { useQuickbar } from '@/features/market/useQuickbar';
-import { ItemDetailModal } from '@/features/market/ItemDetailModal';
+import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
+import { usePageItemActions } from '@/features/market/usePageItemActions';
 
 /**
  * `/industry/plans/:planId` — a single Build Plan's own full-width page.
@@ -65,10 +65,7 @@ export function IndustryPlanPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reapplication is gated on `location.key` via the ref above, not a dependency list; `pendingLogProduction` is derived from `location.state` each render and would otherwise report false churn
   }, [location.key, catalog]);
 
-  const quickbar = useQuickbar(activeCharacterId);
-  const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
-    null
-  );
+  const itemActions = usePageItemActions({ activeCharacterId });
 
   // Wrapped, not the bare record: Dexie's `get` also resolves to `undefined`
   // for a missing row, and without the wrapper that's indistinguishable from
@@ -103,55 +100,43 @@ export function IndustryPlanPage() {
       : (groups.find((g) => g.id === plan.buildGroupId)?.snapshot ?? null);
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
-      {/* Same chrome the index shows above its own tab strip — a plan is
-          still conceptually inside Build Plans, so moving here should read
-          as "the content under the tabs changed," not a jump to a different
-          page. Picking another tab navigates back to `/industry` itself. */}
-      <IndustryHeader
-        activeCharacterId={activeCharacterId}
-        activeTab="plans"
-        onTabChange={(id) => navigate(industryTabHref(id as IndustryTab))}
-        tabsActivation="manual"
-        blueprintsNeedsReauth={blueprintsNeedsReauth}
-        onAddToQuickbar={quickbar.add}
-        quickbarAvailable={quickbar.available}
-        onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
-      />
-
-      {!catalog ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : (
-        <BuildPlanDetail
-          key={plan.id}
-          plan={plan}
-          catalog={catalog}
-          pi={pi}
-          ownedBlueprints={ownedBlueprints}
-          modifiers={modifiers}
-          ownedStockSnapshot={ownedStockSnapshot}
-          corpOwnedStock={corpOwnedStock}
-          corpOwnedBlueprints={corpOwnedBlueprints}
-          onChange={(change) => void applyBuildPlanChange(plan.id, change)}
-          onAddToQuickbar={quickbar.add}
-          quickbarAvailable={quickbar.available}
-          onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
-          groupSnapshot={groupSnapshot}
-          onSearchBpcSourcing={(typeId) => navigate(bpcSourcingHref(typeId))}
-          pendingLogProduction={pendingLogProduction}
-          pendingLogProductionKey={location.key}
+    <ItemActionsProvider page={itemActions}>
+      <div className="mx-auto max-w-7xl space-y-4">
+        {/* Same chrome the index shows above its own tab strip — a plan is
+            still conceptually inside Build Plans, so moving here should read
+            as "the content under the tabs changed," not a jump to a different
+            page. Picking another tab navigates back to `/industry` itself. */}
+        <IndustryHeader
+          activeCharacterId={activeCharacterId}
+          activeTab="plans"
+          onTabChange={(id) => navigate(industryTabHref(id as IndustryTab))}
+          tabsActivation="manual"
+          blueprintsNeedsReauth={blueprintsNeedsReauth}
         />
-      )}
 
-      {infoModalItem && (
-        <ItemDetailModal
-          typeId={infoModalItem.typeId}
-          itemName={infoModalItem.itemName}
-          onClose={() => setInfoModalItem(null)}
-        />
-      )}
-    </div>
+        {!catalog ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : (
+          <BuildPlanDetail
+            key={plan.id}
+            plan={plan}
+            catalog={catalog}
+            pi={pi}
+            ownedBlueprints={ownedBlueprints}
+            modifiers={modifiers}
+            ownedStockSnapshot={ownedStockSnapshot}
+            corpOwnedStock={corpOwnedStock}
+            corpOwnedBlueprints={corpOwnedBlueprints}
+            onChange={(change) => void applyBuildPlanChange(plan.id, change)}
+            groupSnapshot={groupSnapshot}
+            onSearchBpcSourcing={(typeId) => navigate(bpcSourcingHref(typeId))}
+            pendingLogProduction={pendingLogProduction}
+            pendingLogProductionKey={location.key}
+          />
+        )}
+      </div>
+    </ItemActionsProvider>
   );
 }

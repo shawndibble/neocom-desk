@@ -59,8 +59,8 @@ import type { LoyaltyOfferRow } from '@/features/loyalty/offerRows';
 import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import type { ResolvedMaterial } from '@/engine/industry/materialResolution';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
-import { ItemDetailModal } from '@/features/market/ItemDetailModal';
-import { useQuickbar } from '@/features/market/useQuickbar';
+import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
+import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 
 function iskPerLpTone(value: number | null): string {
@@ -365,13 +365,7 @@ export function LoyaltyStore() {
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const activeCharacterId = useActiveCharacter((s) => s.activeCharacterId);
-  const { add: handleAddToQuickbar, available: quickbarAvailable } = useQuickbar(activeCharacterId);
-  const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
-    null
-  );
-  function handleShowInfo(typeId: number, itemName: string) {
-    setInfoModalItem({ typeId, itemName });
-  }
+  const itemActions = usePageItemActions({ activeCharacterId });
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -418,14 +412,7 @@ export function LoyaltyStore() {
     // use; `?? null` collapsing "not loaded" into "no blueprint" is safe here.
     const blueprintTypeID = catalog?.byProductTypeID.get(typeId)?.blueprintTypeID ?? null;
     return (
-      <ItemContextMenu
-        typeId={typeId}
-        itemName={itemName}
-        blueprintTypeID={blueprintTypeID}
-        onAddToQuickbar={handleAddToQuickbar}
-        quickbarAvailable={quickbarAvailable}
-        onShowInfo={handleShowInfo}
-      >
+      <ItemContextMenu typeId={typeId} itemName={itemName} blueprintTypeID={blueprintTypeID}>
         {tr}
       </ItemContextMenu>
     );
@@ -572,181 +559,176 @@ export function LoyaltyStore() {
   );
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* `self-start`, unlike `SkillPlanEditor`'s otherwise identical link:
+    <ItemActionsProvider page={itemActions}>
+      <div className="flex flex-col gap-3">
+        {/* `self-start`, unlike `SkillPlanEditor`'s otherwise identical link:
           this one's parent is a `flex flex-col`, whose default
           `align-items: stretch` would blow the control's intrinsic width out
           to the full page — a full-width bordered bar above the header. */}
-      <Link to="/wallet" className={buttonClassName({ size: 'sm', className: 'self-start' })}>
-        {t('loyaltyStore.back')}
-      </Link>
+        <Link to="/wallet" className={buttonClassName({ size: 'sm', className: 'self-start' })}>
+          {t('loyaltyStore.back')}
+        </Link>
 
-      <PageHeader
-        title={corpName ?? t('loyaltyStore.title')}
-        meta={
-          <div className="flex flex-wrap items-center gap-2">
-            {offersFetchedAt && <DataAgeBadge date={offersFetchedAt} />}
-            <StatChip
-              label={t('loyaltyStore.yourLp')}
-              value={playerLp.toLocaleString()}
-              tone="accent"
-            />
-            <StatChip
-              label={t('loyaltyStore.offersShown')}
-              value={`${filteredRows.length} / ${rows.length}`}
-            />
-          </div>
-        }
-      />
+        <PageHeader
+          title={corpName ?? t('loyaltyStore.title')}
+          meta={
+            <div className="flex flex-wrap items-center gap-2">
+              {offersFetchedAt && <DataAgeBadge date={offersFetchedAt} />}
+              <StatChip
+                label={t('loyaltyStore.yourLp')}
+                value={playerLp.toLocaleString()}
+                tone="accent"
+              />
+              <StatChip
+                label={t('loyaltyStore.offersShown')}
+                value={`${filteredRows.length} / ${rows.length}`}
+              />
+            </div>
+          }
+        />
 
-      <FilterBar
-        value={{ hubId, priceBasis, affordableOnly, blueprintsOnly }}
-        onChange={(next) => {
-          // Persisted preferences (hub, price basis) are written here and only
-          // here, so a Cancel in the mobile sheet never has a store write to
-          // roll back — the draft was local until this point.
-          if (next.hubId !== hubId) void setHubId(next.hubId);
-          if (next.priceBasis !== priceBasis) void setPriceBasis(next.priceBasis);
-          setFilterParams({
-            affordableOnly: next.affordableOnly,
-            blueprintsOnly: next.blueprintsOnly,
-          });
-        }}
-        activeCount={(affordableOnly ? 1 : 0) + (blueprintsOnly ? 1 : 0)}
-        search={
-          <SearchInput
-            placeholder={t('loyaltyStore.searchPlaceholder')}
-            value={search}
-            onChange={(e) => setFilterParams({ search: e.target.value })}
-            className="min-w-40 flex-1"
-          />
-        }
-        actions={
-          <ColumnPickerMenu
-            available={LOYALTY_STORE_OFFERS_COLUMN_IDS}
-            visible={offersColumnVisibility.visible}
-            columnsById={optionalOfferColumns}
-            onToggle={offersColumnVisibility.toggle}
-            buttonLabel={t('common.columnsButton')}
-            menuTitle={t('common.columnsMenuTitle')}
-            onReset={offersColumnVisibility.reset}
-            resetLabel={t('common.resetColumns')}
-          />
-        }
-      >
-        {(draft, setDraft) => (
-          <>
-            {/* Radix, to match the revenue-basis select beside it: side by side,
+        <FilterBar
+          value={{ hubId, priceBasis, affordableOnly, blueprintsOnly }}
+          onChange={(next) => {
+            // Persisted preferences (hub, price basis) are written here and only
+            // here, so a Cancel in the mobile sheet never has a store write to
+            // roll back — the draft was local until this point.
+            if (next.hubId !== hubId) void setHubId(next.hubId);
+            if (next.priceBasis !== priceBasis) void setPriceBasis(next.priceBasis);
+            setFilterParams({
+              affordableOnly: next.affordableOnly,
+              blueprintsOnly: next.blueprintsOnly,
+            });
+          }}
+          activeCount={(affordableOnly ? 1 : 0) + (blueprintsOnly ? 1 : 0)}
+          search={
+            <SearchInput
+              placeholder={t('loyaltyStore.searchPlaceholder')}
+              value={search}
+              onChange={(e) => setFilterParams({ search: e.target.value })}
+              className="min-w-40 flex-1"
+            />
+          }
+          actions={
+            <ColumnPickerMenu
+              available={LOYALTY_STORE_OFFERS_COLUMN_IDS}
+              visible={offersColumnVisibility.visible}
+              columnsById={optionalOfferColumns}
+              onToggle={offersColumnVisibility.toggle}
+              buttonLabel={t('common.columnsButton')}
+              menuTitle={t('common.columnsMenuTitle')}
+              onReset={offersColumnVisibility.reset}
+              resetLabel={t('common.resetColumns')}
+            />
+          }
+        >
+          {(draft, setDraft) => (
+            <>
+              {/* Radix, to match the revenue-basis select beside it: side by side,
                 two selects that open into different-looking lists read as a seam. */}
-            <FilterField label={t('loyaltyStore.hubLabel')}>
-              <Select
-                value={draft.hubId}
-                onValueChange={(value) => setDraft({ ...draft, hubId: value as typeof hubId })}
-              >
-                <SelectTrigger aria-label={t('loyaltyStore.hubLabel')}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {TRADE_HUBS.map((h) => (
-                    <SelectItem key={h.id} value={h.id}>
-                      {h.systemName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FilterField>
-            {/*
+              <FilterField label={t('loyaltyStore.hubLabel')}>
+                <Select
+                  value={draft.hubId}
+                  onValueChange={(value) => setDraft({ ...draft, hubId: value as typeof hubId })}
+                >
+                  <SelectTrigger aria-label={t('loyaltyStore.hubLabel')}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TRADE_HUBS.map((h) => (
+                      <SelectItem key={h.id} value={h.id}>
+                        {h.systemName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              {/*
               Radix rather than `NativeSelect`, the one thing a real `<select>`
               can't do: the trigger shows just "Sell"/"Buy" while the open list
               spells out what each basis means. A native option's text is the same
               in both places, so the closed box had to carry "(list order)" —
               twelve characters of explanation sitting permanently in a filter row.
             */}
-            <FilterField label={t('loyaltyStore.priceBasisLabel')}>
-              <Select
-                value={draft.priceBasis}
-                onValueChange={(value) => setDraft({ ...draft, priceBasis: value as PriceBasis })}
-              >
-                {/*
+              <FilterField label={t('loyaltyStore.priceBasisLabel')}>
+                <Select
+                  value={draft.priceBasis}
+                  onValueChange={(value) => setDraft({ ...draft, priceBasis: value as PriceBasis })}
+                >
+                  {/*
                   An `aria-label` on the trigger ends name computation, so nothing
                   inside it is ever announced — including the selection. The visible
                   text is deliberately short here, so the label carries the long form
                   and the current basis itself.
                 */}
-                <SelectTrigger
-                  aria-label={`${t('loyaltyStore.priceBasisLabel')}: ${t(
-                    draft.priceBasis === 'buy'
-                      ? 'loyaltyStore.priceBasisBuy'
-                      : 'loyaltyStore.priceBasisSell'
-                  )}`}
-                >
-                  <SelectValue>
-                    {t(
+                  <SelectTrigger
+                    aria-label={`${t('loyaltyStore.priceBasisLabel')}: ${t(
                       draft.priceBasis === 'buy'
-                        ? 'loyaltyStore.priceBasisBuyShort'
-                        : 'loyaltyStore.priceBasisSellShort'
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sell">{t('loyaltyStore.priceBasisSell')}</SelectItem>
-                  <SelectItem value="buy">{t('loyaltyStore.priceBasisBuy')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </FilterField>
-            <FilterChip
-              label={t('loyaltyStore.affordableFilter')}
-              selected={draft.affordableOnly}
-              onToggle={() => setDraft({ ...draft, affordableOnly: !draft.affordableOnly })}
-              count={affordableCount}
-              size="md"
-            />
-            <FilterChip
-              label={t('loyaltyStore.blueprintsFilter')}
-              selected={draft.blueprintsOnly}
-              onToggle={() => setDraft({ ...draft, blueprintsOnly: !draft.blueprintsOnly })}
-              size="md"
-            />
-          </>
+                        ? 'loyaltyStore.priceBasisBuy'
+                        : 'loyaltyStore.priceBasisSell'
+                    )}`}
+                  >
+                    <SelectValue>
+                      {t(
+                        draft.priceBasis === 'buy'
+                          ? 'loyaltyStore.priceBasisBuyShort'
+                          : 'loyaltyStore.priceBasisSellShort'
+                      )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sell">{t('loyaltyStore.priceBasisSell')}</SelectItem>
+                    <SelectItem value="buy">{t('loyaltyStore.priceBasisBuy')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterField>
+              <FilterChip
+                label={t('loyaltyStore.affordableFilter')}
+                selected={draft.affordableOnly}
+                onToggle={() => setDraft({ ...draft, affordableOnly: !draft.affordableOnly })}
+                count={affordableCount}
+                size="md"
+              />
+              <FilterChip
+                label={t('loyaltyStore.blueprintsFilter')}
+                selected={draft.blueprintsOnly}
+                onToggle={() => setDraft({ ...draft, blueprintsOnly: !draft.blueprintsOnly })}
+                size="md"
+              />
+            </>
+          )}
+        </FilterBar>
+
+        {offersFromCache && (
+          <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
         )}
-      </FilterBar>
 
-      {offersFromCache && (
-        <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
-      )}
-
-      {isDesktop ? (
-        <div className="flex items-start gap-3">
-          {list}
-          {/* The mobile branch below opens the same content in a `Modal`,
+        {isDesktop ? (
+          <div className="flex items-start gap-3">
+            {list}
+            {/* The mobile branch below opens the same content in a `Modal`,
               which announces itself on open — this split-panel layout just
               repaints in place, so it needs its own announcement (#1490). */}
-          <p aria-live="polite" className="sr-only">
-            {selectedRow && t('loyaltyStore.selectedAnnouncement', { name: selectedRow.itemName })}
-          </p>
-          <Panel className="min-w-0 flex-1">{detail}</Panel>
-        </div>
-      ) : (
-        <>
-          {list}
-          <Modal
-            open={sheetOpen && selectedRow !== undefined}
-            onClose={() => setSheetOpen(false)}
-            title={selectedRow?.itemName ?? t('loyaltyStore.title')}
-            placement="sheet"
-          >
-            {detail}
-          </Modal>
-        </>
-      )}
-
-      {infoModalItem && (
-        <ItemDetailModal
-          typeId={infoModalItem.typeId}
-          itemName={infoModalItem.itemName}
-          onClose={() => setInfoModalItem(null)}
-        />
-      )}
-    </div>
+            <p aria-live="polite" className="sr-only">
+              {selectedRow &&
+                t('loyaltyStore.selectedAnnouncement', { name: selectedRow.itemName })}
+            </p>
+            <Panel className="min-w-0 flex-1">{detail}</Panel>
+          </div>
+        ) : (
+          <>
+            {list}
+            <Modal
+              open={sheetOpen && selectedRow !== undefined}
+              onClose={() => setSheetOpen(false)}
+              title={selectedRow?.itemName ?? t('loyaltyStore.title')}
+              placement="sheet"
+            >
+              {detail}
+            </Modal>
+          </>
+        )}
+      </div>
+    </ItemActionsProvider>
   );
 }
