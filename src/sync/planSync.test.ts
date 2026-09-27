@@ -136,6 +136,13 @@ const PRODUCTION_SALE_LINKS_PATH = 'characters/char:1/productionSaleLinks';
 const PRODUCTION_ORDER_WATCHES_PATH = 'characters/char:1/productionOrderWatches';
 const SETTINGS_PATH = 'characters/char:1/settings';
 const NOTIFICATION_FEED_PATH = 'characters/char:1/notificationFeed';
+
+/** setDoc calls that wrote a Notification Feed row (the heartbeat write is not one). */
+function feedWrites() {
+  return vi
+    .mocked(setDoc)
+    .mock.calls.filter(([ref]) => (ref as unknown as FakeRef).col.path === NOTIFICATION_FEED_PATH);
+}
 const HASH = 'hash-a';
 
 function plan(overrides: Partial<SkillPlanRecord> = {}): SkillPlanRecord {
@@ -1470,7 +1477,7 @@ describe('triggerSync: notification feed', () => {
 
     vi.mocked(setDoc).mockClear();
     await triggerSync(1);
-    expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
+    expect(feedWrites()).toHaveLength(0);
   });
 
   it('pushes a back-dated row on an incremental pass (#1207)', async () => {
@@ -1528,7 +1535,7 @@ describe('triggerSync: notification feed', () => {
 
     vi.mocked(setDoc).mockClear();
     await triggerSync(1);
-    expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
+    expect(feedWrites()).toHaveLength(0);
   });
 
   it('clears syncedAt for the Character’s rows when the ownerHash changes', async () => {
@@ -1879,7 +1886,7 @@ describe('sync orchestration', () => {
     await vi.waitFor(() => expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(13));
     await new Promise((resolve) => setTimeout(resolve, 100)); // no extra runs
     expect(vi.mocked(getDocs)).toHaveBeenCalledTimes(13);
-    expect(vi.mocked(setDoc)).not.toHaveBeenCalled();
+    expect(vi.mocked(setDoc)).toHaveBeenCalledTimes(1); // the heartbeat, once
   });
 });
 
@@ -2148,5 +2155,31 @@ describe('triggerSync: incremental pull', () => {
     // the allow-list bounds the doc count anyway.
     expect(filtersFor(SETTINGS_PATH, readsSoFar() - 13)).toEqual([OWNER_FILTER]);
     expect(await readCursor('sync.__pullCursor.1.settings')).toBeUndefined();
+  });
+});
+
+describe('triggerSync: last-synced heartbeat (#2065)', () => {
+  const heartbeat = () => remoteStore.get('characters')?.get('char:1');
+
+  it('stamps lastSyncedAt on the characters/{uid} parent doc after a sync', async () => {
+    const before = Date.now();
+    await triggerSync(1);
+    expect(heartbeat()).toEqual({ lastSyncedAt: expect.any(Number) });
+    expect((heartbeat() as { lastSyncedAt: number }).lastSyncedAt).toBeGreaterThanOrEqual(before);
+  });
+
+  it('bumps the heartbeat on every sync even when no document changed', async () => {
+    await triggerSync(1);
+    vi.mocked(setDoc).mockClear();
+    await triggerSync(1);
+    const writes = vi
+      .mocked(setDoc)
+      .mock.calls.map(([ref]) => (ref as unknown as FakeRef).col.path);
+    expect(writes).toEqual(['characters']);
+  });
+
+  it('writes only the lastSyncedAt field, so the rules can allow just that', async () => {
+    await triggerSync(1);
+    expect(Object.keys(heartbeat() as object)).toEqual(['lastSyncedAt']);
   });
 });

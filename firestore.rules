@@ -30,6 +30,14 @@ service cloud.firestore {
         return request.resource.data.ownerHash == request.auth.token.ownerHash;
       }
 
+      // Last-synced heartbeat (issue #2065): the parent doc holds one field,
+      // stamped after each successful sync, which the scheduled
+      // purgeStaleAccounts function reads. Owner-only, that one field only —
+      // no ownerHash guard, it carries no user data.
+      allow create, update: if isOwner()
+        && request.resource.data.keys().hasOnly(['lastSyncedAt'])
+        && request.resource.data.lastSyncedAt is number;
+
       match /plans/{planId} {
         allow get: if isOwner() && hashMatches();
         allow list: if isOwner();
