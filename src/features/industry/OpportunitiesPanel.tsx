@@ -21,7 +21,6 @@ import {
   DataAgeBadge,
   DataTable,
   EmptyState,
-  IconButton,
   InfoTooltip,
   IskAmount,
   Modal,
@@ -31,7 +30,6 @@ import {
   type DataTableColumn,
   Checkbox,
 } from '@/components/ui';
-import * as Icon from '@/components/ui/icons';
 import { formatDuration } from '@/lib/duration';
 import { formatIsk } from '@/lib/isk';
 import { iskToneClass } from '@/features/character/format';
@@ -316,22 +314,6 @@ export function OpportunitiesPanel({
             )}
             {showCharacterColumn && (
               <span className="text-[0.6875rem] text-text-dim">{row.candidate.characterName}</span>
-            )}
-            {productTypeID !== null && (
-              <IconButton
-                size="sm"
-                icon={<Icon.Market />}
-                label={t('industry.opportunitiesViewHistory', {
-                  name: row.candidate.catalogEntry.productName,
-                })}
-                onClick={() =>
-                  setHistoryItem({
-                    typeId: productTypeID,
-                    itemName: row.candidate.catalogEntry.productName,
-                    regionId: row.hub.regionId,
-                  })
-                }
-              />
             )}
           </span>
         );
