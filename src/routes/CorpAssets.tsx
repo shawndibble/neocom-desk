@@ -90,6 +90,7 @@ import {
   LocationRow,
   SearchResultRow,
 } from '@/features/character/assetBrowserRows';
+import { hasItemRows } from '@/features/character/assetBrowserFormat';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
 import { useQuickbar } from '@/features/market/useQuickbar';
@@ -402,8 +403,7 @@ function CorpAssetsView() {
     }));
   }, [searchActive, searchMatches, pathGroupId, resolved.children, groups]);
 
-  const showItemColumns =
-    !searchActive && rows.some((r) => r.kind === 'node' && r.node.kind === 'item');
+  const showItemColumns = !searchActive && hasItemRows(rows);
 
   const scrollParentRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line react-hooks/incompatible-library

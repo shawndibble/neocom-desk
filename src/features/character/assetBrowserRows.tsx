@@ -2,13 +2,14 @@
  * Row components for the Assets drill-down (issue #148 follow-up).
  *
  * Every row here obeys one layout rule, which is the whole point of the
- * rework: nothing is laid out in fixed-width columns that a 390px screen
- * cannot honour. A row is a name that truncates and one wrapping metadata
+ * rework: below `md`, nothing is laid out in fixed-width columns that a 390px
+ * screen cannot honour (the one md+ exception is an item row's figure cells,
+ * see `ItemRow`). A row is a name that truncates and one wrapping metadata
  * line beneath it — item count, ISK value, security, jumps — rendered once
  * (no `sm:hidden`/`hidden sm:flex` duplicate pair), so the page never
  * scrolls sideways and never puts the same text in the DOM twice at any
- * width. Numbers that used to be fixed-width columns (`w-14`/`w-16`/`w-20`)
- * are gone; they wrap with everything else.
+ * width. Below `md` the numbers that used to be fixed-width columns
+ * (`w-14`/`w-16`/`w-20`) wrap with everything else.
  */
 
 import type { ReactElement, ReactNode } from 'react';
@@ -279,6 +280,7 @@ const ITEM_VOLUME_CELL = cx(ITEM_CELL, 'md:w-28');
 const ITEM_VALUE_CELL = cx(ITEM_CELL, 'md:w-24');
 /** The row menu button's md+ box (`IconButton` size `row`, `md:size-7`), reserved even when the row has no menu. */
 const ITEM_MENU_SLOT = 'md:flex md:w-7 md:shrink-0 md:justify-end';
+const ITEM_MENU_SPACER = 'md:w-7 md:shrink-0';
 
 interface ItemColumnLabelsProps {
   t: Translate;
@@ -300,7 +302,7 @@ export function ItemColumnLabels({ t }: ItemColumnLabelsProps) {
       <span className={ITEM_QUANTITY_CELL}>{t('assets.columns.quantity')}</span>
       <span className={ITEM_VOLUME_CELL}>{t('assets.columns.volume')}</span>
       <span className={ITEM_VALUE_CELL}>{t('assets.sort.value')}</span>
-      <span className="md:w-7 md:shrink-0" />
+      <span className={ITEM_MENU_SPACER} />
     </div>
   );
 }

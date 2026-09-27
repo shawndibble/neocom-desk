@@ -97,6 +97,7 @@ import {
   SectionHeading,
   SecurityValue,
 } from '@/features/character/assetBrowserRows';
+import { hasItemRows } from '@/features/character/assetBrowserFormat';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { assetShipEditLocation } from '@/features/fittings/assetShipLocation';
 import { ItemDetailModal } from '@/features/market/ItemDetailModal';
@@ -1148,10 +1149,7 @@ export function Assets() {
   // The md+ label strip names the item cells, so it only shows on a level that
   // actually has item rows (not in the location list, and not in flat search
   // results, whose rows are a different shape).
-  const showItemColumns =
-    !flatModeActive &&
-    pathStationId !== null &&
-    rows.some((r) => r.kind === 'node' && r.node.kind === 'item');
+  const showItemColumns = !flatModeActive && pathStationId !== null && hasItemRows(rows);
 
   const scrollParentRef = useRef<HTMLDivElement>(null);
   // React Compiler isn't enabled in this build (no babel plugin configured);
