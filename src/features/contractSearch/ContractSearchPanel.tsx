@@ -20,7 +20,7 @@
  * Mounts under a Router: every item row is a Build Plan context-menu
  * trigger (#931), and so is each line of the detail modal's contents.
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import {
@@ -575,20 +575,30 @@ export function ContractSearchPanel({
   const statsByType = useMemo(() => contractOfferStats(nonTypeRows), [nonTypeRows]);
 
   /**
+   * Deferred rather than the raw keystroke value: `typeIds` feeding
+   * `displayRows` below re-filters and re-sorts up to ~370k rows, and running
+   * that synchronously on every keystroke is what made a click elsewhere in
+   * the app stall while this panel was open (issue #2024). `uiFilter.typeQuery`
+   * itself stays undeferred — the search box and the (cheap, small-set)
+   * suggestion list must still track every keystroke immediately.
+   */
+  const deferredTypeQuery = useDeferredValue(uiFilter.typeQuery);
+
+  /**
    * A pinned type wins outright. Otherwise a non-blank query widens to the
    * types it ranks against; `null` means "no type restriction", which is not
    * the same as the empty set a query matching nothing produces.
    */
   const typeIds = useMemo<ReadonlySet<number> | null>(() => {
     if (selectedTypeId !== null) return new Set([selectedTypeId]);
-    if (uiFilter.typeQuery.trim() === '') return null;
+    if (deferredTypeQuery.trim() === '') return null;
     return new Set(
-      rankedSearch(typeOptions, uiFilter.typeQuery, {
+      rankedSearch(typeOptions, deferredTypeQuery, {
         primary: (option) => option.name,
         limit: TYPE_SEARCH_LIMIT,
       }).map((option) => option.typeId)
     );
-  }, [selectedTypeId, uiFilter.typeQuery, typeOptions]);
+  }, [selectedTypeId, deferredTypeQuery, typeOptions]);
 
   /**
    * Cheapest first, so the rows arrive in the order the table's default
