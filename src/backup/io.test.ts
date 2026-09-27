@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeEach } from 'vitest';
-import { db } from '@/db';
+import { db, type MiningTaxAssignmentRecord } from '@/db';
 import { FULL_RECORDS } from '@/sync/syncedCollectionFixtures';
 import { EDITABLE_COLLECTIONS } from '@/sync/syncedCollections';
 import { exportBackup, importBackup } from './io';
@@ -156,10 +156,34 @@ describe('restoring an existing-format backup file', () => {
     // oreLineValues (grilling session, 2026-09-27) postdates this fixture.
     miningTaxAssignments: ['oreLineValues'],
   };
+  /**
+   * Like `LEGACY_OMISSIONS`, but for a field that was *reshaped* rather than
+   * merely added, so dropping it to `undefined` isn't enough — the frozen
+   * fixture's raw row still carries the old shape verbatim. `payment`'s
+   * single `journalRefId`/`contractId` became `journalLinks`/`contractLinks`
+   * arrays (manual/retroactive wallet-transaction linking, 2026-09-27),
+   * postdating this fixture the same way `oreLineValues` does.
+   */
+  const LEGACY_RESHAPES: Partial<Record<keyof typeof FULL_RECORDS, (record: unknown) => unknown>> =
+    {
+      miningTaxAssignments: (record) => {
+        const { payment, ...rest } = record as MiningTaxAssignmentRecord;
+        if (!payment) return record;
+        const { journalLinks, contractLinks, ...paymentRest } = payment;
+        return {
+          ...rest,
+          payment: {
+            ...paymentRest,
+            ...(journalLinks?.[0] ? { journalRefId: journalLinks[0].refId } : {}),
+            ...(contractLinks?.[0] ? { contractId: contractLinks[0].refId } : {}),
+          },
+        };
+      },
+    };
   const LEGACY_EXPECTED_RECORDS = Object.fromEntries(
     Object.entries(FULL_RECORDS).map(([table, record]) => [
       table,
-      {
+      (LEGACY_RESHAPES[table as keyof typeof FULL_RECORDS] ?? ((r: unknown) => r))({
         ...record,
         ...Object.fromEntries(
           (LEGACY_OMISSIONS[table as keyof typeof FULL_RECORDS] ?? []).map((key) => [
@@ -167,7 +191,7 @@ describe('restoring an existing-format backup file', () => {
             undefined,
           ])
         ),
-      },
+      }),
     ])
   );
 
