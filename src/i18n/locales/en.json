@@ -3290,6 +3290,10 @@
       "value": "Value",
       "quantity": "Quantity"
     },
+    "columns": {
+      "quantity": "Qty",
+      "volume": "m³"
+    },
     "breadcrumb": {
       "back": "Back one level"
     },
