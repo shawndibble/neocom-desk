@@ -508,6 +508,19 @@ Rules:
 - Never emoji or dingbat characters as icons — SVG only, matching the rest of
   this system's illustration style (DESIGN.md's brand assets, §2b).
 
+**Exception — the Fitting Add panel's three filter icons.** The module
+browser's Hull/Resources/Skills toggles (`FittingAddPanel.tsx`) use CCP's own
+in-game Fitting-window icons as raster PNGs (`public/images/fitting/{hull,
+resource,skill}.png`), not Phosphor SVGs, composed through `IconButton` as
+`<img>` children — the same "read as the game draws it" reasoning as the Ship
+Tree (§1): these three are copied from screenshots of a specific in-game
+control, not drawn to this system's own illustration style, so a Phosphor
+glyph would say something else at a glance than what the pilot already knows
+from the client. The exception is scoped to exactly those three `<img>`
+elements and nothing else in the panel — its search icon, close button and
+every other glyph stay Phosphor as normal. Scope decision:
+`docs/context/decisions/20260927-104252-fitting-add-panel-hull-resource-skill-filter-icons.md`.
+
 ## 6. Usage rules
 
 - **Ellipsis is one glyph.** A `*Placeholder` string starting "Search" ends in a
