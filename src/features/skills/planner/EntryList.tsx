@@ -34,7 +34,7 @@ import { formatLocalDate } from '@/lib/localDate';
 import { doneByText } from './doneBy';
 import type { AttributePair } from './attributePairBands';
 import type { ColumnVisibility } from './columnPreference';
-import type { MergedRow } from './queueRows';
+import type { MergedRow, PinnedInProgressEntry } from './queueRows';
 import { remapInstruction } from './remapInstruction';
 import { buildRowAnnouncer, formatLevelLabel } from './rowAnnouncer';
 
@@ -394,6 +394,13 @@ interface EntryRowProps {
   isDesktop: boolean;
   onRemove: (skillTypeID: number, targetLevel: number) => void;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
+  /**
+   * Set when this row IS the in-game queue's currently-training level (#1701
+   * follow-up) — it contributes zero of its own scheduled steps (already
+   * credited as trained by `startDate`), so its "Takes" cell reads that
+   * level's real remaining time instead of a bare, misleading "0m".
+   */
+  pinnedInProgress: PinnedInProgressEntry | null | undefined;
   /** This row's Plan Milestone (CONTEXT.md), if one is anchored to its skill/level. */
   milestoneStatus: MilestoneStatus | undefined;
   onAddMilestone: (skillTypeID: number, targetLevel: number) => void;
@@ -421,6 +428,7 @@ const EntryRow = memo(function EntryRow({
   isDesktop,
   onRemove,
   onSetPriority,
+  pinnedInProgress,
   milestoneStatus,
   onAddMilestone,
   onRenameMilestone,
@@ -429,6 +437,12 @@ const EntryRow = memo(function EntryRow({
   const { t } = useTranslation();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
   const { entry, stepIndices } = row;
+  // A row credited as already-trained by the plan's start (`row.seconds: 0`)
+  // because it IS the in-game queue's currently-training level (#1701
+  // follow-up) reads that level's real remaining time instead of a bare,
+  // misleading "0m" — straight off the ESI queue's own `finish_date`, not
+  // the plan's (zeroed) schedule.
+  const takesSeconds = pinnedInProgress?.id === row.id ? pinnedInProgress.seconds : row.seconds;
   const boosted = stepIndices.some((i) => boostedSteps?.has(i) ?? false);
   const alphaCapped = stepIndices.some((i) => alphaCappedSteps?.has(i) ?? false);
   // Names the level, not just the skill: a plan holds one row per level, so
@@ -459,7 +473,10 @@ const EntryRow = memo(function EntryRow({
         {boosted && <BoosterMark />}
         {alphaCapped && <AlphaCapMark />}
       </span>
-      {milestoneStatus && <MilestoneMark status={milestoneStatus} />}
+      {/* Desktop keeps the mark on line one (#114's fixed columns leave it
+          room); below `md` it moves to the meta line instead, so a long
+          milestone name can't squeeze the skill name off this row. */}
+      {isDesktop && milestoneStatus && <MilestoneMark status={milestoneStatus} />}
     </span>
   );
 
@@ -507,12 +524,16 @@ const EntryRow = memo(function EntryRow({
    * back to a single line when the user turns every optional column off.
    */
   const metaLine =
-    attributeBadge || priorityControl || columns.perLevelTime || columns.cumulativeTime ? (
+    attributeBadge ||
+    priorityControl ||
+    columns.perLevelTime ||
+    columns.cumulativeTime ||
+    milestoneStatus ? (
       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-6 text-[0.6875rem] text-text-dim">
         {attributeBadge}
         {priorityControl}
         {columns.perLevelTime && (
-          <MetaValue label={t('plans.columnTakes')} value={formatDuration(row.seconds)} />
+          <MetaValue label={t('plans.columnTakes')} value={formatDuration(takesSeconds)} />
         )}
         {columns.cumulativeTime && (
           <MetaValue
@@ -520,6 +541,7 @@ const EntryRow = memo(function EntryRow({
             value={doneByText(row.cumulativeSeconds, startDate)}
           />
         )}
+        {milestoneStatus && <MilestoneMark status={milestoneStatus} />}
       </div>
     ) : null;
 
@@ -539,7 +561,7 @@ const EntryRow = memo(function EntryRow({
           {attributeBadge}
           {priorityControl}
           {columns.perLevelTime && (
-            <TimeCell value={formatDuration(row.seconds)} dim label={t('plans.columnTakes')} />
+            <TimeCell value={formatDuration(takesSeconds)} dim label={t('plans.columnTakes')} />
           )}
           {columns.cumulativeTime && (
             <TimeCell
@@ -814,6 +836,11 @@ interface EntryListProps {
   /** Opens the manual attribute editor (RemapMarkerModal) for a marker. */
   onEditMarker: (markerIndex: number) => void;
   onSetPriority: (skillTypeID: number, priority: PlanPriority) => void;
+  /**
+   * The plan entry that is also the in-game queue's currently-training level,
+   * if any (#1701 follow-up) — see `queueRows.ts`'s `pinnedInProgressEntry`.
+   */
+  pinnedInProgress?: PinnedInProgressEntry | null;
   /** Turn a derived prereq row into a real entry where it already sits (CONTEXT.md "Prereq Promotion"). */
   onPromotePrereq: (rowId: string) => void;
   /** An entry row's Plan Milestone (CONTEXT.md), keyed by (skillTypeID, level) — see `skillPlanSchedule.ts`'s `stepKey`. Derived prereq rows never carry one (out of scope). */
@@ -853,6 +880,7 @@ export function EntryList({
   markerImplants = EMPTY_IMPLANTS,
   onEditMarker,
   onSetPriority,
+  pinnedInProgress,
   onPromotePrereq,
   milestoneStatusFor,
   onAddMilestone,
@@ -929,6 +957,7 @@ export function EntryList({
                       isDesktop={isDesktop}
                       onRemove={onRemove}
                       onSetPriority={onSetPriority}
+                      pinnedInProgress={pinnedInProgress}
                       milestoneStatus={milestoneStatusFor(
                         row.entry.skillTypeID,
                         row.entry.targetLevel

@@ -47,6 +47,18 @@ export interface NpcStationEntry {
    * field — a caller must fall back rather than read `undefined` as a type id.
    */
   typeId?: number;
+  /**
+   * `staStations.corporationID` — the NPC corporation that owns the station
+   * (issue #1675). Optional because a snapshot built before that change has no
+   * such field; a caller must treat its absence as "owner unknown".
+   */
+  ownerCorporationId?: number;
+  /**
+   * The owner's faction, from `crpNPCCorporations.factionID`. Absent for a
+   * factionless owner as well as for an older snapshot — ESI's corporation
+   * endpoint cannot supply it for NPC corps, so there is nothing to fall back to.
+   */
+  ownerFactionId?: number;
 }
 
 /** One entry in public/data/market/regions.json — a region probed to actually carry orders. */
