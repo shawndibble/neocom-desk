@@ -401,10 +401,8 @@ export function useFittingWorkspace(): FittingWorkspace {
         // until an edit brings it back under the limit.
         setTooLargeToShare(!encoded.ok);
         if (!encoded.ok) return;
-        // Push or replace is decided against the last edit that actually
-        // wrote, not the last one asked for: a superseded first edit of a run
-        // never wrote, so the one that does must still push, or the pre-edit
-        // entry would be overwritten and Back would skip past it.
+        // See resolveCoalesce's own doc for why this is judged against the
+        // last edit that actually wrote, not the last one asked for.
         const { coalesce, next: nextRun } = resolveCoalesce(
           lastWriteRef.current,
           coalesceKey,
