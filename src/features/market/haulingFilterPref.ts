@@ -7,16 +7,20 @@
  * `HaulingPanel.tsx` hands it to `useRememberedUrlParams`
  * (`lib/useUrlState.ts`), which owns that per-field presence check — nothing
  * ever mirrors a stored value back into the URL, and this is written to only
- * from an actual filter change (`FilterBar`'s `onChange`).
+ * when a covered field actually changes: a `FilterBar` edit, or the
+ * empty-state Reset action (both flow through the same `setParams`).
  */
 import { createLocalSetting } from '@/lib/useLocalSetting';
 
 export const HAULING_FILTER_SETTING_KEY = 'haulingFilter';
 
+/** How rarely-selling items are treated — its own alias so the four places this travels (the URL codec, the stored shape, the `<Select>` cast, the parser) can't drift apart. */
+export type HaulingDemandFilter = 'steady' | 'any';
+
 export interface StoredHaulingFilter {
   days: number;
   margin: number;
-  demand: 'steady' | 'any';
+  demand: HaulingDemandFilter;
 }
 
 /** The filter a hauler who has never touched it sees — matches the URL codecs' own defaults. */

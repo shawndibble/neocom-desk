@@ -61,7 +61,12 @@ import { HAULING_THRESHOLDS } from '@/engine/market/haulingMarket';
 import { HaulingCargoControl } from './HaulingCargoControl';
 import { HaulingRowDetail } from './HaulingRowDetail';
 import { useHaulingBudget, useHaulingCargo } from './haulingCargo';
-import { DEFAULT_HAULING_FILTER, useHaulingFilterPref } from './haulingFilterPref';
+import {
+  DEFAULT_HAULING_FILTER,
+  useHaulingFilterPref,
+  type HaulingDemandFilter,
+  type StoredHaulingFilter,
+} from './haulingFilterPref';
 import { ItemContextMenu } from './ItemContextMenu';
 import { MarketItemLink } from './MarketItemLink';
 import {
@@ -102,6 +107,18 @@ function haulingUrl(hubId: TradeHub['id']) {
 
 type HaulingUrlValues = UrlParamValues<ReturnType<typeof haulingUrl>>;
 
+/**
+ * Lifts `days`/`margin`/`demand` off any wider object that carries them
+ * (`params`, the remembered-filter store's value) — the three travel
+ * together everywhere this filter is read, so this is the one place that
+ * reassembles them rather than each call site picking fields by hand.
+ */
+function pickHaulingFilter<T extends { days: number; margin: number; demand: HaulingDemandFilter }>(
+  source: T
+): StoredHaulingFilter {
+  return { days: source.days, margin: source.margin, demand: source.demand };
+}
+
 const useIntroDismissed = createLocalSetting<boolean>({
   key: 'haulingIntroDismissed',
   defaultValue: false,
@@ -122,6 +139,10 @@ const HAULING_COLUMN_IDS = [
   'bring',
 ] as const;
 type HaulingColumnId = (typeof HAULING_COLUMN_IDS)[number];
+
+function isHaulingColumnId(id: string): id is HaulingColumnId {
+  return (HAULING_COLUMN_IDS as readonly string[]).includes(id);
+}
 
 const useHaulingColumns = createColumnVisibilitySetting<HaulingColumnId>({
   key: 'haulingColumns',
@@ -165,11 +186,7 @@ export function HaulingPanel() {
   }, [hydrateHaulingFilterPref]);
   const rememberedFilter: RememberedDefaults<ReturnType<typeof haulingUrl>> = useMemo(
     () => ({
-      values: {
-        days: haulingFilterPref.days,
-        margin: haulingFilterPref.margin,
-        demand: haulingFilterPref.demand,
-      },
+      values: pickHaulingFilter(haulingFilterPref),
       remember: (patch: Partial<HaulingUrlValues>) => {
         const { value, setValue } = useHaulingFilterPref.getState();
         void setValue({
@@ -486,14 +503,12 @@ export function HaulingPanel() {
   const hideableColumnsById = Object.fromEntries(
     columns
       .filter((column): column is DataTableColumn<HaulingViewRow> & { id: HaulingColumnId } =>
-        (HAULING_COLUMN_IDS as readonly string[]).includes(column.id)
+        isHaulingColumnId(column.id)
       )
       .map((column) => [column.id, column])
   ) as Record<HaulingColumnId, DataTableColumn<HaulingViewRow>>;
   const visibleColumns = columns.filter(
-    (column) =>
-      !(HAULING_COLUMN_IDS as readonly string[]).includes(column.id) ||
-      columnVisibility.isVisible(column.id as HaulingColumnId)
+    (column) => !isHaulingColumnId(column.id) || columnVisibility.isVisible(column.id)
   );
 
   const heldPct =
@@ -512,7 +527,7 @@ export function HaulingPanel() {
     (params.days !== DEFAULT_HAULING_FILTER.days ? 1 : 0) +
     (params.margin !== DEFAULT_HAULING_FILTER.margin ? 1 : 0) +
     (params.demand !== DEFAULT_HAULING_FILTER.demand ? 1 : 0);
-  const filterValue = { days: params.days, margin: params.margin, demand: params.demand };
+  const filterValue = pickHaulingFilter(params);
 
   return (
     <Panel
@@ -544,6 +559,24 @@ export function HaulingPanel() {
       }
       padded={false}
     >
+      {/*
+        `search` is documented as the route's search box (DESIGN.md §4b) —
+        Hauling has none. It carries the From/To/Category controls instead,
+        a deliberate deviation: putting them in a sibling row alongside
+        `FilterBar` (rather than inside it) was tried first and rejected —
+        `FilterBar` manages its own two-line box (trigger row, then the
+        opened controls below), so a *shared* flex row either reflows the
+        siblings when the box opens (with `items-end`, cross-axis realigns
+        to the row's new height — the bug this render actually had) or, to
+        avoid that with `items-start`, leaves the icon-only trigger cluster
+        floating at label height instead of lined up with the selects below
+        them. Nesting these controls in `search` keeps everything in one
+        `items-center` row that `FilterBar` itself owns, so neither problem
+        exists — at the cost of the slot's own contract. No table in this
+        codebase has filters with no search box yet; if a second one shows
+        up, that's the signal to give `FilterBar` a real "leading toolbar"
+        slot instead of overloading `search` a second time.
+      */}
       <FilterBar
         value={filterValue}
         onChange={(next) => setParams(next)}
@@ -648,7 +681,7 @@ export function HaulingPanel() {
             <FilterField label={t('market.hauling.filters.demand')}>
               <Select
                 value={draft.demand}
-                onValueChange={(v) => setDraft({ ...draft, demand: v as 'steady' | 'any' })}
+                onValueChange={(v) => setDraft({ ...draft, demand: v as HaulingDemandFilter })}
               >
                 <SelectTrigger
                   size="sm"

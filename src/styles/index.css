@@ -409,8 +409,7 @@
     }
 
     /* The card title truncates before the pinned button rather than
-       running under it. Only when the row actually has one — wider still
-       when the expand chevron is clustered beside it too. */
+       running under it. Only when the row actually has one. */
     .dt-stack:not(.dt-stack-dense) tr:has(> td.dt-actions) td.dt-primary {
       padding-right: 3rem;
       overflow: hidden;
