@@ -29,7 +29,7 @@ import { evaluateSkillGate, type SkillGateVerdict } from '@/engine/industry/skil
 import type { OrderDepthLevel } from '@/engine/industry/opportunities';
 import type { MarketWideTreeMap } from '@/sde/types';
 import type { TradeHub } from '@/market/hubs';
-import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
+import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { useAccountSkillLevels } from '@/features/skills/useAccountSkillLevels';
 import { useTradeHubStandings, tradeHubStanding } from '@/features/market/useTradeHubStandings';
 import { nameForType, type BlueprintCatalog, type BlueprintCatalogEntry } from './blueprintCatalog';
@@ -182,26 +182,6 @@ export function MarketWideOpportunitiesPanel({
         </Button>
       ),
     },
-    {
-      // Visible keyboard-reachable equivalent of `rowContextMenu` below (WCAG
-      // 2.1.1, issue #1498) — same item list, through the shared
-      // `useItemMenuNodes` hook, so the two can't drift.
-      id: 'moreActions',
-      header: '',
-      align: 'right',
-      cardCorner: true,
-      render: (row) => (
-        <ItemMoreActions
-          typeId={row.productTypeID}
-          itemName={row.productName}
-          blueprintTypeID={
-            catalog
-              ? (catalog.byProductTypeID.get(row.productTypeID)?.blueprintTypeID ?? null)
-              : undefined
-          }
-        />
-      ),
-    },
   ];
   const rowContextMenu = (row: MarketWideResultRow, tr: ReactElement): ReactElement => (
     <ItemContextMenu
@@ -275,6 +255,7 @@ export function MarketWideOpportunitiesPanel({
               rows={visibleRows}
               rowKey={(row) => row.productTypeID}
               rowContextMenu={rowContextMenu}
+              rowMoreActions
               label={t('industry.marketOpportunitiesTitle')}
               mobileSort
               {...sortProps}

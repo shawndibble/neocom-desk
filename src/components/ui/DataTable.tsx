@@ -92,6 +92,18 @@ export interface DataTableColumn<T> {
    */
   cardCorner?: boolean;
   /**
+   * Pins this cell to the stacked card's top-right corner, same spot as
+   * `cardCorner` — but for a real control (a "More actions" button built
+   * from a custom render rather than the table's own `rowMoreActions` column,
+   * because the row needs per-row props `rowMoreActions` can't take), not a
+   * decorative one. Reuses `rowMoreActions`'s own `dt-actions` CSS rather
+   * than `cardCorner`'s `dt-corner` — the button keeps its 44px touch target
+   * and the title-collision padding that CSS carries, which `dt-corner`
+   * doesn't. Exactly one of `cardCorner`/`cardActions` per table; at most one
+   * `cardActions` column, later ones ignored.
+   */
+  cardActions?: boolean;
+  /**
    * Dense stack only: text printed around this cell's value on the card's
    * meta line, e.g. `{ before: 'Qty ' }` or `{ after: ' reward' }`. The dense
    * card drops column headers, so a bare "12" or "4.2M" needs a word to say
@@ -425,11 +437,14 @@ export function DataTable<T>({
     columns.findIndex((column) => column.primary)
   );
   const cardCornerIndex = columns.findIndex((column) => column.cardCorner);
+  const cardActionsIndex = columns.findIndex((column) => column.cardActions);
   // The dense card's second line: every cell that is neither title nor
   // corner. The first gets no leading separator. Only computed (and only
   // marked in the DOM) when dense, so no other table's markup changes.
   const firstMetaIndex = dense
-    ? columns.findIndex((_, i) => i !== primaryIndex && i !== cardCornerIndex)
+    ? columns.findIndex(
+        (_, i) => i !== primaryIndex && i !== cardCornerIndex && i !== cardActionsIndex
+      )
     : -1;
   // A right-aligned sortable header's own sort glyph (`gap-1` + an icon) sits
   // between the label and the header's right inset, pushing the label ~1rem
@@ -595,7 +610,8 @@ export function DataTable<T>({
         }
       >
         {columns.map((column, i) => {
-          const meta = dense && i !== primaryIndex && i !== cardCornerIndex;
+          const meta =
+            dense && i !== primaryIndex && i !== cardCornerIndex && i !== cardActionsIndex;
           return (
             <td
               key={column.id}
@@ -610,6 +626,7 @@ export function DataTable<T>({
                 cellClass[i],
                 i === primaryIndex && 'dt-primary',
                 i === cardCornerIndex && 'dt-corner',
+                i === cardActionsIndex && 'dt-actions',
                 meta && 'dt-meta',
                 meta && i === firstMetaIndex && 'dt-meta-first',
                 // Inert at every width except the dense card, which has no
