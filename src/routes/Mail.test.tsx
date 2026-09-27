@@ -10,7 +10,34 @@ import { ACTIVE_CHARACTER_KEY, useActiveCharacter } from '@/stores/activeCharact
 import { usePublicInfo } from '@/stores/publicInfo';
 import { usePublicInfoModalStore } from '@/stores/publicInfoModal';
 import { DEFAULT_MAIL_FOLDERS, useMailFolders } from '@/features/character/mailFolderPref';
+import { DESKTOP_QUERY } from '@/lib/useIsDesktop';
 import { App } from '@/app/App';
+
+/**
+ * jsdom's `matchMedia` stub (`vitest.setup.dom.ts`) never matches, which
+ * `useIsDesktop` reads as narrow/phone. The reading-pane header's empty-state
+ * acceptance criteria (issue #2104) are asserted at desktop widths (1024px
+ * and 1440px both satisfy `min-width: 64rem`), so force that here.
+ */
+let restoreMatchMedia: (() => void) | undefined;
+
+function useDesktopViewport(): void {
+  const real = window.matchMedia;
+  window.matchMedia = (media: string) =>
+    ({
+      media,
+      matches: media === DESKTOP_QUERY,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList;
+  restoreMatchMedia = () => {
+    window.matchMedia = real;
+  };
+}
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: () => ({
@@ -99,7 +126,11 @@ const server = setupServer(
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }));
 afterAll(() => server.close());
-afterEach(() => server.resetHandlers());
+afterEach(() => {
+  server.resetHandlers();
+  restoreMatchMedia?.();
+  restoreMatchMedia = undefined;
+});
 beforeEach(async () => {
   await db.characters.clear();
   await db.tokens.clear();
@@ -132,7 +163,11 @@ describe('Mail', () => {
     expect(await screen.findByText(/Market Bot/)).toBeInTheDocument();
   });
 
-  it('renders no reading-pane header when nothing is selected (issue #2104)', async () => {
+  it('renders no reading-pane header until a mail is selected, at desktop widths (issue #2104)', async () => {
+    // 1024px and 1440px both satisfy the desktop breakpoint (min-width: 64rem)
+    // the acceptance criteria are asserted at.
+    useDesktopViewport();
+    const user = userEvent.setup();
     render(<App />);
     await screen.findByText('Fleet up!');
     expect(screen.queryByRole('button', { name: 'Reply' })).not.toBeInTheDocument();
@@ -141,6 +176,11 @@ describe('Mail', () => {
     // must not render a second, actionless header bar above the empty state.
     expect(document.querySelectorAll('header')).toHaveLength(1);
     expect(screen.getByText('Select a message to read it.')).toBeInTheDocument();
+
+    await user.click(await screen.findByText('Fleet up!'));
+    expect(await screen.findByRole('button', { name: 'Reply' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Forward' })).toBeInTheDocument();
+    expect(document.querySelectorAll('header')).toHaveLength(2);
   });
 
   it('shows the body, markup stripped, on click', async () => {
