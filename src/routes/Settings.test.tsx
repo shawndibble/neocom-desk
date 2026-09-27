@@ -901,10 +901,12 @@ describe('Settings — Notifications (issue #170)', () => {
     await openTab(user, /^help & support$/i);
 
     expect(
-      await screen.findByRole('heading', { name: /report a bug or ask for a feature/i })
+      await screen.findByRole('heading', { name: /report a bug, ask for a feature, or just chat/i })
     ).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: /join the community/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /discord/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /see the code, or add something yourself/i })
+    ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /someone i can thank/i })).toBeInTheDocument();
   });
 
