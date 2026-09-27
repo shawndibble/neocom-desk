@@ -23,6 +23,7 @@ import {
   fitCamera,
   focusCamera,
   initialCamera,
+  wheelZoomFactor,
   zoomAround,
   type Camera,
   type Size,
@@ -127,9 +128,13 @@ export function ShipTreeMap({
         setHover(null);
         const rect = viewportRef.current!.getBoundingClientRect();
         const wheelEvent = event as WheelEvent;
-        const factor = Math.exp(-dy * 0.002);
         moveTo(
-          zoomAround(cam, factor, wheelEvent.clientX - rect.left, wheelEvent.clientY - rect.top)
+          zoomAround(
+            cam,
+            wheelZoomFactor(dy),
+            wheelEvent.clientX - rect.left,
+            wheelEvent.clientY - rect.top
+          )
         );
       },
       onPinchStart: () => setHover(null),

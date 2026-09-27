@@ -26,19 +26,24 @@ const FIT_PADDING = 40;
 
 const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
+/** The tree centred at zoom `z`. `leftInset`: px an overlay panel covers on the left. */
+function centreAt(world: Size, viewport: Size, z: number, leftInset: number): Camera {
+  const width = viewport.width - leftInset;
+  return {
+    z,
+    x: leftInset + (width - world.width * z) / 2,
+    y: (viewport.height - world.height * z) / 2,
+  };
+}
+
 /** The whole tree, centred, at most 100%. */
-/** `leftInset`: px an overlay panel covers on the left, left out of the fit. */
 export function fitCamera(world: Size, viewport: Size, leftInset = 0): Camera {
   const width = viewport.width - leftInset;
   const z = Math.max(
     FIT_FLOOR,
     Math.min(1, (width - FIT_PADDING) / world.width, (viewport.height - FIT_PADDING) / world.height)
   );
-  return {
-    z,
-    x: leftInset + (width - world.width * z) / 2,
-    y: (viewport.height - world.height * z) / 2,
-  };
+  return centreAt(world, viewport, z, leftInset);
 }
 
 /**
@@ -47,12 +52,7 @@ export function fitCamera(world: Size, viewport: Size, leftInset = 0): Camera {
  * a large tree to make it fit; the reader pans to see the rest.
  */
 export function initialCamera(world: Size, viewport: Size, leftInset = 0): Camera {
-  const width = viewport.width - leftInset;
-  return {
-    z: 1,
-    x: leftInset + (width - world.width) / 2,
-    y: (viewport.height - world.height) / 2,
-  };
+  return centreAt(world, viewport, 1, leftInset);
 }
 
 /** One class centred in the viewport. */
@@ -69,4 +69,18 @@ export function focusCamera(node: ShipTreeNode, viewport: Size, currentZoom: num
 export function zoomAround(cam: Camera, factor: number, px: number, py: number): Camera {
   const z = clampZoom(cam.z * factor);
   return { z, x: px - ((px - cam.x) * z) / cam.z, y: py - ((py - cam.y) * z) / cam.z };
+}
+
+/** A wheel event's vertical delta zooms by this much per pixel. */
+const WHEEL_SENSITIVITY = 0.002;
+
+/**
+ * The zoom factor for one wheel event's vertical delta: scrolling up (a
+ * negative `deltaY`) zooms in. Deliberately simpler than the old
+ * device-aware `wheelZoomFactor` this replaced (no `deltaMode`/notch
+ * handling or per-event cap) — @use-gesture reports raw pixel deltas, and
+ * the pan/pinch gestures already accept its plain, untuned feel.
+ */
+export function wheelZoomFactor(deltaY: number): number {
+  return Math.exp(-deltaY * WHEEL_SENSITIVITY);
 }

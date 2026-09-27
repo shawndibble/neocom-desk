@@ -5,6 +5,7 @@ import {
   fitCamera,
   focusCamera,
   initialCamera,
+  wheelZoomFactor,
   zoomAround,
 } from './mapCamera';
 
@@ -67,6 +68,19 @@ describe('zoomAround', () => {
     const cam = zoomAround({ x: 0, y: 0, z: 1 }, 2, 100, 50);
     expect(cam).toEqual({ z: 2, x: -100, y: -50 });
     expect(zoomAround({ x: 0, y: 0, z: 2 }, 10, 0, 0).z).toBe(MAX_ZOOM);
+  });
+});
+
+describe('wheelZoomFactor', () => {
+  it('zooms in on a negative delta (scroll up) and out on a positive one', () => {
+    expect(wheelZoomFactor(-100)).toBeGreaterThan(1);
+    expect(wheelZoomFactor(100)).toBeLessThan(1);
+  });
+  it('is a no-op with no vertical delta', () => {
+    expect(wheelZoomFactor(0)).toBe(1);
+  });
+  it('zooming in then out by the same delta round-trips to 1', () => {
+    expect(wheelZoomFactor(-50) * wheelZoomFactor(50)).toBeCloseTo(1, 10);
   });
 });
 

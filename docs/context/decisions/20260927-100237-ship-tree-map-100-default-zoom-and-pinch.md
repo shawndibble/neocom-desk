@@ -23,13 +23,16 @@ _Recorded 2026-09-27._
   pinch on next to two different one-off implementations — see
   `ShipTreeMap.tsx`'s gesture-binding comment.
   - Wheel-zoom and drag-pan intentionally **stopped preserving their old
-    tuned feel** (the previous `wheelZoomFactor` unit/notch/cap math, and the
-    previous no-momentum direct-follow pan). Both now use the gesture
-    library's own deltas/defaults. This was an explicit trade for less
-    one-off code, not an oversight; a return to custom tuning (e.g. adding
-    momentum-free panning back, or a bespoke wheel curve) is a separate,
-    later decision if the library's feel doesn't hold up.
+    tuned feel** (the previous device-aware `wheelZoomFactor` — separate
+    `deltaMode` line/page handling and a per-event pixel cap — and the
+    previous no-momentum direct-follow pan). Drag-pan now uses the gesture
+    library's own deltas/defaults untouched. Wheel-zoom still goes through a
+    small named, tested `wheelZoomFactor` in `mapCamera.ts` (kept, not
+    removed — only simplified: a single `Math.exp` curve on the raw pixel
+    delta `@use-gesture` reports, no more device-mode branching or cap) so
+    the zoom-factor math stays a tested pure function rather than moving
+    inline and untested. This was an explicit trade for less one-off code,
+    not an oversight; a return to the old, fuller tuning is a separate,
+    later decision if the simpler feel doesn't hold up.
   - `MIN_ZOOM`/`MAX_ZOOM` bounds are unchanged and still enforced (via the
     pinch gesture's `scaleBounds` and `zoomAround`'s existing clamp).
-  - `wheelZoomFactor` was removed from `mapCamera.ts` along with its tests,
-    since nothing calls it anymore.
