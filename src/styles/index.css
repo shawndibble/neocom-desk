@@ -575,6 +575,23 @@
       padding: 0;
     }
 
+    /*
+     * `.dt-stack.dt-stack-2col tr` (above) sets every `tr` under it —
+     * including this one — to a two-track `display: grid`, at equal
+     * specificity to the plain rule above. Left alone, the detail `<td>` then
+     * lands in a single grid track (half the card) instead of the full-width
+     * flex cell the rule below expects: `flex: 1 1 100%` is a no-op once its
+     * parent isn't a flex container (Market's order-row expand, #2138 — the
+     * required-skills section rendered at half width). Restoring `flex` here
+     * — at higher specificity than the 2-col rule, so order doesn't matter —
+     * makes `dt-stack tr.dt-row-detail > td`'s existing rule apply again
+     * regardless of `stackColumns`.
+     */
+    .dt-stack.dt-stack-2col tr.dt-row-detail {
+      display: flex;
+      flex-direction: column;
+    }
+
     .dt-stack tr.dt-row-detail > td {
       flex: 1 1 100%;
       padding: 0.75rem;
