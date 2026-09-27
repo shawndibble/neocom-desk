@@ -1079,11 +1079,6 @@ function CharacterDefaultsPanel() {
   // a device with none active right now (`CharacterFilterControl` already
   // omits that quick-select when this is null).
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
-  const characterFilterCandidates = useMemo(
-    () => (allCharacters ?? []).map((c) => ({ characterId: c.characterId, characterName: c.name })),
-    [allCharacters]
-  );
 
   if (!ready) {
     return (
@@ -1103,7 +1098,6 @@ function CharacterDefaultsPanel() {
           </span>
           <p className="text-xs text-text-dim">{t('settings.defaultCharacterFilterHint')}</p>
           <CharacterFilterControl
-            characters={characterFilterCandidates}
             activeCharacterId={activeCharacterId}
             value={fromStoredCharacterFilterValue(defaultCharacterFilter)}
             onChange={(next) => void setDefaultCharacterFilter(toStoredCharacterFilterValue(next))}

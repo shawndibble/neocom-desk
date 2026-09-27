@@ -34,7 +34,6 @@
     "settings": "Settings",
     "soon": "Soon",
     "switchCharacter": "Switch character",
-    "switchCharacterNamed": "{{name}}, switch character",
     "more": "More",
     "mobileLabel": "Mobile navigation",
     "alerts": "Alerts",
@@ -2491,11 +2490,7 @@
   "character": {
     "filter": {
       "thisCharacter": "This character",
-      "allCharacters": "All characters",
-      "selectedCount_one": "{{count}} character",
-      "selectedCount_other": "{{count}} characters",
-      "searchPlaceholder": "Search characters…",
-      "noResults": "No characters match your search."
+      "allCharacters": "All characters"
     }
   },
   "characters": {

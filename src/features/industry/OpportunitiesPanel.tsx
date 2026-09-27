@@ -492,7 +492,6 @@ export function OpportunitiesPanel({
     <span className="flex flex-wrap items-center gap-2">
       {showCharacterFilter && (
         <CharacterFilterControl
-          characters={characterCandidates}
           activeCharacterId={activeCharacterId}
           value={characterFilter}
           onChange={setCharacterFilter}

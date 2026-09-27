@@ -1,11 +1,5 @@
 import type { ReactNode } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { useTranslation } from 'react-i18next';
-import { Link, useInRouterContext, useLocation } from 'react-router-dom';
-import { db } from '@/db';
 import { cx } from '@/lib/cx';
-import { useActiveCharacter } from '@/stores/activeCharacter';
-import { CharacterAvatar } from './CharacterAvatar';
 
 interface PageHeaderProps {
   /** Already-translated page title. Rendered as the route's one `<h1>`. */
@@ -38,42 +32,6 @@ interface PageHeaderProps {
 }
 
 /**
- * Phone-only "whose data is this" cue: only Overview carries a portrait below
- * `md`, so an alt's Mail looked identical to the main's. Links to Characters
- * with this page as the return target (#1764). Absent on `/characters` itself
- * (it would link to where you already are) and with no active Character.
- */
-function PhoneIdentityAvatar() {
-  const { t } = useTranslation();
-  const { pathname } = useLocation();
-  const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const character = useLiveQuery(
-    () => (activeCharacterId === null ? undefined : db.characters.get(activeCharacterId)),
-    [activeCharacterId]
-  );
-  if (!character || pathname === '/characters') return null;
-  // `h-11 self-start` centres it on the title's first line even when the
-  // actions beside it wrap to a second.
-  return (
-    <div className="flex h-11 shrink-0 items-center self-start md:hidden">
-      <Link
-        to="/characters"
-        state={{ from: pathname }}
-        aria-label={t('nav.switchCharacterNamed', { name: character.name })}
-        className="shrink-0 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent md:hidden"
-      >
-        <CharacterAvatar
-          characterId={character.characterId}
-          size="sm"
-          loading="lazy"
-          className="rounded-full"
-        />
-      </Link>
-    </div>
-  );
-}
-
-/**
  * Every route's top line: title, then its data age, then its controls.
  *
  * Before this, fourteen routes hand-rolled the same header and had drifted —
@@ -90,15 +48,14 @@ function PhoneIdentityAvatar() {
  * visibly) would sit at a different height route to route, jumping as you
  * switch between them on the bottom tab bar.
  *
- * Below `md` the phone identity avatar is always the top-right corner, beside
- * the title. Title, meta and actions share one wrapping row to its left, so
- * actions stay inline when they fit and drop to a second line when they
- * don't — without taking the avatar (or the title) with them. At `md` that
- * row is `contents`, so every child is back in the header's own flex row.
+ * No phone-only "whose data is this" avatar lives here any more (#1764 added
+ * one, since removed): a route that filters by Character already carries
+ * that cue in its `CharacterFilterControl`, whose trigger shows the active
+ * Character's own portrait below `md`. A route with one Character to offer,
+ * and so no filter control, has nothing to name here either — the bottom
+ * tab bar's More sheet is still a phone's route to Characters either way.
  */
 export function PageHeader({ title, meta, actions, subNav, className = '' }: PageHeaderProps) {
-  // Some unit tests render a route's header without a router.
-  const inRouter = useInRouterContext();
   return (
     <header
       className={cx(
@@ -131,7 +88,6 @@ export function PageHeader({ title, meta, actions, subNav, className = '' }: Pag
           </div>
         )}
       </div>
-      {inRouter && <PhoneIdentityAvatar />}
       {subNav && (
         <div className="order-last w-full min-w-0 md:order-none md:w-auto md:flex-1">{subNav}</div>
       )}

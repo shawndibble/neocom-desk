@@ -59,12 +59,14 @@
 //
 // sync.defaultCharacterFilter (issue #607): a sixth Defaults-panel preference,
 // added later than the five above and with no device-local life to seed from
-// (no `legacyKey`). Which Character(s) a cross-character view (Wallet
-// Balance, Industry Active Jobs) opens on by default — `'current'`, `'all'`,
-// or a hand-picked subset, stored as `StoredCharacterFilterValue`
-// (`features/character/characterFilterValue.ts`) since a `Set` is not
-// Firestore-safe. Same "set to another value, never unset" shape as the five
-// above, so the tombstone-expiry edge does not bite this one either.
+// (no `legacyKey`). Which Character a cross-character view (Wallet Balance,
+// Industry Active Jobs) opens on by default — `'current'` or `'all'`, stored
+// as `StoredCharacterFilterValue` (`features/character/characterFilterValue.ts`).
+// That stored shape still accepts a legacy `number[]` on read — an older
+// client could still be writing one for a while after this value narrowed
+// away from a hand-picked-subset picker — but nothing writes one any more.
+// Same "set to another value, never unset" shape as the five above, so the
+// tombstone-expiry edge does not bite this one either.
 //
 // sync.marketPricePercent: the percentage of market the Market page's
 // Appraisal tab prices a pasted list at. It sits in the same control cluster

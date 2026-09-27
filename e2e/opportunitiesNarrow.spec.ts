@@ -218,9 +218,11 @@ test.describe('Opportunities — ranked phone list', () => {
       await expect(page.getByRole('button', { name: /Sort by/ })).toBeVisible();
 
       // The Character filter defaults to "This character" — switch to "All
-      // characters" so the alt's row joins the list.
-      await page.getByText('This character').last().click();
-      await page.getByRole('button', { name: 'All characters' }).click();
+      // characters" so the alt's row joins the list. Below `md` the trigger
+      // is icon-only, so it's found by its `aria-label`, not its (absent)
+      // visible text.
+      await page.getByRole('button', { name: 'This character' }).last().click();
+      await page.getByRole('menuitemradio', { name: 'All characters' }).click();
 
       const altRow = page.locator('li', { hasText: SECOND_CHARACTER_NAME });
       await expect(altRow).toBeVisible();

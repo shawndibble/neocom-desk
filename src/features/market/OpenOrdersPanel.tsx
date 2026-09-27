@@ -32,7 +32,10 @@ import { GrantBanner } from '@/app/GrantNote';
 import { CharacterBadge } from '@/features/character/assetBrowserRows';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import { resolveCharacterFilter } from '@/features/character/characterFilterValue';
+import {
+  resolveCharacterFilter,
+  type CharacterFilterValue,
+} from '@/features/character/characterFilterValue';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -356,14 +359,35 @@ export function OpenOrdersPanel() {
     setDetailOrderId(row.orderId);
   }
 
-  /** `CharacterFilterControl`'s `value` prop, derived the same way from either `filter.characterIds` (desktop strip) or `draft.characterIds` (phone funnel sheet). */
-  function characterFilterValueOf(characterIds: readonly number[]) {
-    return characterIds.length === 0 ? 'all' : new Set(characterIds);
+  /**
+   * `CharacterFilterControl`'s `value` prop, derived the same way from either
+   * `filter.characterIds` (desktop strip) or `draft.characterIds` (phone
+   * funnel sheet). Reads `'current'` only for the exact single-id array
+   * `characterFilterOnChange` itself would write for that literal value
+   * (`[activeCharacterId]`) — everything else reads `'all'`, the closest this
+   * narrowed picker can still say honestly. That covers two different single-
+   * id cases the same way: a legacy hand-picked-subset link (from before the
+   * current/all narrowing) naming some other Character — there's no
+   * principled way to know which one id, if any, the pilot who made it would
+   * have meant, so this never guesses `'current'` for it (mirrors
+   * `characterFilterValue.ts`'s `fromStoredCharacterFilterValue`) — and the
+   * Overview board's own per-Character Orders tile (`overview/cards.tsx`),
+   * which deep-links here with exactly one *other* alt's id on purpose, live
+   * traffic rather than anything stale. Either way the label falls back to
+   * "All characters" rather than lying that it's "This character," but the
+   * table itself keeps filtering to whatever `characterIds` actually holds —
+   * this function only ever feeds the picker's display, never the row filter
+   * (`matchesCharacterIds` reads `filter.characterIds` directly), so an
+   * Overview tile's narrowed view still opens narrowed; only its label can no
+   * longer name the one alt it's showing.
+   */
+  function characterFilterValueOf(characterIds: readonly number[]): CharacterFilterValue {
+    return characterIds.length === 1 && characterIds[0] === activeCharacterId ? 'current' : 'all';
   }
 
   /** `CharacterFilterControl`'s `onChange`, resolving its selection back to `characterIds` and handing it to whichever setter owns them — `setFilter` (commits immediately) or `setDraft` (committed on the funnel's Apply). */
   function characterFilterOnChange(setCharacterIds: (ids: readonly number[]) => void) {
-    return (next: Parameters<typeof resolveCharacterFilter>[0]) => {
+    return (next: CharacterFilterValue) => {
       const resolved = resolveCharacterFilter(next, activeCharacterId);
       setCharacterIds(resolved === 'all' ? [] : [...resolved]);
     };
@@ -782,7 +806,6 @@ export function OpenOrdersPanel() {
                   {isPhone && showCharacterStrip && (
                     <div className="w-full border-t border-line pt-2">
                       <CharacterFilterControl
-                        characters={entriesWithOrders}
                         activeCharacterId={activeCharacterId}
                         value={characterFilterValueOf(draft.characterIds)}
                         onChange={characterFilterOnChange((characterIds) =>
@@ -814,7 +837,6 @@ export function OpenOrdersPanel() {
           {showCharacterStrip && !isPhone && (
             <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
               <CharacterFilterControl
-                characters={entriesWithOrders}
                 activeCharacterId={activeCharacterId}
                 value={characterFilterValueOf(filter.characterIds)}
                 onChange={characterFilterOnChange((characterIds) =>
