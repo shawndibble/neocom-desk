@@ -15,10 +15,10 @@
  * Above `AUTO_RECALCULATE_MAX` owned blueprints, a remount (switching tabs
  * away and back) must not silently recompute — the ticket calls that out as
  * a manual-refresh action. Nor may it serve rows priced at inputs that have
- * since changed (Assumed ME, modifiers, facility defaults — issue #2056):
- * that batch reports `needsRefresh` instead, see `decideOpportunitiesCache`.
- * `rowsCache` is module-level (outside React state)
- * so it survives the panel unmounting when the tab changes, the same way
+ * since changed (Assumed ME, modifiers, facility defaults, blueprint
+ * research — issue #2056): that batch reports `needsRefresh` instead, see
+ * `decideOpportunitiesCache`. `rowsCache` is module-level (outside React
+ * state) so it survives the panel unmounting when the tab changes, the same way
  * `marketData.ts`'s cost-index cache survives a remount. `rows`/`progress`/
  * `loading` live in one state object (rather than three separate `useState`
  * calls) so every branch below is exactly one `setState` call, matching this
@@ -117,8 +117,8 @@ export function useOpportunities({
   const manualRefreshOnly = !autoRecalculates(candidates.length);
   const batchKey = useMemo(() => opportunitiesBatchKey(candidates, hub), [candidates, hub]);
   const inputsKey = useMemo(
-    () => opportunitiesInputsKey({ assumedMe, modifiers, facilityDefaults }),
-    [assumedMe, modifiers, facilityDefaults]
+    () => opportunitiesInputsKey({ assumedMe, modifiers, facilityDefaults, ownedByCharacter }),
+    [assumedMe, modifiers, facilityDefaults, ownedByCharacter]
   );
 
   useEffect(() => {

@@ -2254,7 +2254,7 @@
     "opportunitiesProgress": "{{done}} of {{total}} calculated",
     "opportunitiesRefresh": "Refresh",
     "opportunitiesNeedsRefreshTitle": "Pricing settings changed",
-    "opportunitiesNeedsRefreshHint": "These rows were priced at your old Assumed ME, skills or facility. Press Refresh to price them again.",
+    "opportunitiesNeedsRefreshHint": "Your Assumed ME, skills, implants, facility or blueprint research changed since these results were calculated. Press Refresh to recalculate.",
     "opportunitiesAddToCompare": "Add {{count}} to Compare",
     "opportunitiesSelectFor": "Select {{name}} to compare plans",
     "opportunitiesLossBreakdownFor": "Why {{name}} is a loss",

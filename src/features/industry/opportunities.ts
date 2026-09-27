@@ -278,7 +278,8 @@ export function detectOpportunityStock(
 
 /**
  * A batch's identity for the "don't auto-recalculate above 10 blueprints"
- * cache (issue #642): which owned-blueprint entities, at which hub.
+ * cache (issue #642): which owned-blueprint entities, at which hub. What the
+ * rows were priced at is `opportunitiesInputsKey`'s job.
  * Content-keyed rather than array-identity-keyed so a re-render with a fresh
  * `candidates` array reference (the panel recomputes it from Dexie/ESI data
  * on every render) does not read as "a different batch."
@@ -298,11 +299,13 @@ export function opportunitiesBatchKey(
     .join(',')}`;
 }
 
-/** The settings every row in a batch is priced at (issue #2056). */
+/** What every row in a batch is priced at (issue #2056). */
 export interface OpportunityPricingInputs {
   assumedMe: number;
   modifiers: CharacterModifiers;
   facilityDefaults: ActivityFacilityDefaults;
+  /** Owned blueprints' ME/TE price both the candidates and any sub-build the pilot owns a copy of. */
+  ownedByCharacter: ReadonlyMap<number, readonly CharacterBlueprint[]>;
 }
 
 /** JSON with object keys sorted, so equal values built in a different key order serialize the same. */
@@ -315,24 +318,17 @@ function stableSerialize(value: unknown): string {
 }
 
 export function opportunitiesInputsKey(inputs: OpportunityPricingInputs): string {
+  // Only research levels, not whole ESI records: a moved blueprint shouldn't read as repriced.
+  const research = [...inputs.ownedByCharacter.values()]
+    .flat()
+    .map((bp) => `${bp.item_id}:${bp.material_efficiency}:${bp.time_efficiency}`)
+    .sort();
   return stableSerialize({
     assumedMe: inputs.assumedMe,
     modifiers: inputs.modifiers,
     facilityDefaults: inputs.facilityDefaults,
+    research,
   });
-}
-
-/**
- * The full cache identity: the batch plus the pricing inputs its rows were
- * computed at (issue #2056), so a changed Assumed ME, modifier or facility
- * default never reads as the same cached batch.
- */
-export function opportunitiesCacheKey(
-  candidates: readonly OpportunityCandidate[],
-  hub: TradeHub,
-  inputs: OpportunityPricingInputs
-): string {
-  return `${opportunitiesBatchKey(candidates, hub)}|${opportunitiesInputsKey(inputs)}`;
 }
 
 const AUTO_RECALCULATE_MAX = 10;
