@@ -32,9 +32,10 @@ const payees: PayeeRecord[] = [
 ];
 
 function renderModal(
-  status: 'unassigned' | 'needs-review',
+  status: 'unassigned' | 'needs-review' | 'paid',
   assignment: MiningTaxAssignmentRecord | null,
-  onSplit?: () => void
+  onSplit?: () => void,
+  onUnlock?: () => void
 ) {
   const noop = vi.fn();
   render(
@@ -57,6 +58,7 @@ function renderModal(
         onResolve={noop}
         onUndo={noop}
         onSplit={onSplit}
+        onUnlock={onUnlock}
       />
     </MemoryRouter>
   );
@@ -112,5 +114,33 @@ describe('RowDetailModal split', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Split' }));
     expect(onSplit).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('RowDetailModal paid lock', () => {
+  it('passes onUnlock through to the Assign form, which fires it from its unlock button', () => {
+    const onUnlock = vi.fn();
+    renderModal(
+      'paid',
+      {
+        id: 'a1',
+        characterId: 1,
+        date: '2026-09-08',
+        solarSystemId: 30000142,
+        payeeId: 'p1',
+        oreLines: [{ typeId: VELDSPAR, quantity: 250 }],
+        taxPct: 10,
+        estimatedValue: 1_000,
+        taxOwed: 100,
+        status: 'paid',
+        paidAt: 1,
+        updatedAt: 1,
+      } as MiningTaxAssignmentRecord,
+      undefined,
+      onUnlock
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock to edit' }));
+    expect(onUnlock).toHaveBeenCalledTimes(1);
   });
 });

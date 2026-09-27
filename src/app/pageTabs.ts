@@ -41,6 +41,7 @@ export const SETTINGS_TABS = definePageTabs(
     { id: 'permissions', labelKey: 'settings.tabs.permissions' },
     { id: 'industry', labelKey: 'settings.tabs.industry' },
     { id: 'market', labelKey: 'settings.tabs.market' },
+    { id: 'miningTax', labelKey: 'settings.tabs.miningTax' },
     { id: 'characters', labelKey: 'settings.tabs.characters' },
     { id: 'corporation', labelKey: 'settings.tabs.corporation' },
     { id: 'notifications', labelKey: 'settings.tabs.notifications' },

@@ -1800,6 +1800,7 @@ describe('Settings — sections rail', () => {
       'Permissions',
       'Industry',
       'Market',
+      'Moon Mining Tax',
       'Characters',
       // Corporation is absent: this character has no corp access.
       'Notifications',
@@ -1876,7 +1877,7 @@ describe('Settings — phone list', () => {
     }
     // Corporation is absent: this character has no corp access.
     expect(within(nav).queryByRole('link', { name: /corporation/i })).not.toBeInTheDocument();
-    expect(within(nav).getAllByRole('link')).toHaveLength(11);
+    expect(within(nav).getAllByRole('link')).toHaveLength(12);
     expect(within(nav).getByRole('link', { name: /^display/i })).toHaveTextContent(
       /default text, my local time/i
     );
