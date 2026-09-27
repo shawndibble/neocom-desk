@@ -463,6 +463,10 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
                 activeCharacterId={activeCharacterId}
                 value={characterFilter}
                 onChange={setCharacterFilter}
+                // Rides in this route's own `PageHeader` meta (no titled
+                // inner `Panel`); its `actions` cluster (the Refresh button
+                // below) sits at `IconButton`'s default touch tier.
+                size="md"
               />
             )}
           </>

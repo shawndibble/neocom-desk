@@ -30,18 +30,21 @@
  * `docs/context/decisions/20260908-192806-the-character-filter-rides-in-the-panel-header.md`.
  *
  * Below `md` the trigger is icon-only, fixed to the same box a sibling
- * `IconButton size="sm"` uses, rather than a full-width text pill — the
- * active Character's own portrait for "current," the generic `AllCharacters`
- * glyph for "all." That box also absorbed the phone-only "whose data is
- * this" avatar `PageHeader` used to float in its own corner (#1764): with
- * this trigger already carrying that cue whenever a route offers the
- * filter, a second, separate avatar had nothing left to say. At `md` the
- * trigger is the usual text button; there is room for the words there.
+ * `IconButton` uses in whichever row it rides in — `size="sm"` (the panel
+ * `meta` hosts: Active Jobs, Open Orders, Mining Tax) by default, `size="md"`
+ * where a `PageHeader`'s own `actions` cluster sits at its default (larger)
+ * touch tier instead (Assets, Mining Tax Overview) — rather than a
+ * full-width text pill. The active Character's own portrait for "current,"
+ * the generic `AllCharacters` glyph for "all." That box also absorbed the
+ * phone-only "whose data is this" avatar `PageHeader` used to float in its
+ * own corner (#1764): with this trigger already carrying that cue whenever a
+ * route offers the filter, a second, separate avatar had nothing left to
+ * say. At `md` the trigger is the usual text button regardless of `size`;
+ * there is room for the words there.
  */
 import { useTranslation } from 'react-i18next';
 import * as Icon from '@/components/ui/icons';
 import { ICON_SIZE } from '@/components/ui/icons';
-import { controlHeightClassName } from '@/components/ui/controlStyles';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,35 +60,56 @@ export interface CharacterFilterControlProps {
   activeCharacterId: number | null;
   value: CharacterFilterValue;
   onChange: (next: CharacterFilterValue) => void;
+  /**
+   * The sibling touch tier this trigger's icon-only phone box must match,
+   * mirroring `IconButtonSize`'s two below-`md` values (`size-9`/`size-11`) —
+   * not the full `IconButtonSize` (there is no `'row'` tier here). `'sm'`
+   * (default) for a panel's own `meta` row, where the `IconButton`s beside it
+   * (Active Jobs, Open Orders, Mining Tax) are themselves `size="sm"`.
+   * `'md'` for a `PageHeader`'s `meta`, where that header's own `actions`
+   * cluster sits at `IconButton`'s default (larger) tier instead (Assets,
+   * Mining Tax Overview) — see `PageHeader`'s own doc comment.
+   */
+  size?: 'sm' | 'md';
 }
 
 /**
- * The composite class list below is one element rather than `Button`'s or
- * `IconButton`'s own `size`/`variant` props: it needs a *different width* at
- * each breakpoint (a fixed square below `md`, an auto-width text pill at
- * `md` and up) that neither component's `size` prop can give — both bake
- * width and height together into one `size-*` utility (`iconButtonClassName`
- * itself: `size-11 md:size-9`), so overriding only the `md:` width half back
- * off would mean two `md:`-prefixed utilities fighting over the same
- * breakpoint, which is the one ordering Tailwind does not promise to resolve
- * predictably — the same reason two unprefixed utilities for one property
- * are avoided elsewhere in this file. Height alone has no such coupling, so
- * it still reads from the shared `controlHeightClassName.sm` (DESIGN.md §3)
- * rather than being retyped; width and the default-tone ghost colors
- * (`iconButtonClassName`'s own cascade, copied rather than composed for the
- * same width-coupling reason) are the only hand-written parts.
+ * The two below-`md` box sizes this trigger can be fixed to, keyed the same
+ * way `CharacterFilterControlProps.size` is. Plain `h-*`/`w-*` rather than
+ * `IconButton`'s own `size-*` (which bakes width and height into one
+ * utility): this trigger also needs an auto-width text pill at `md` and up,
+ * and overriding just the `md:` width half of a `size-*` utility would mean
+ * two `md:`-prefixed utilities fighting over the same breakpoint — the one
+ * ordering Tailwind does not promise to resolve predictably, the same reason
+ * two unprefixed utilities for one property are avoided elsewhere in this
+ * file. At `md` the trigger is always the same compact text pill regardless
+ * of this tier (`md:h-7`, in `triggerBaseClassName` below, unconditionally)
+ * — so only the phone-width half varies here.
  */
-const triggerClassName =
+const TRIGGER_BOX: Record<'sm' | 'md', string> = {
+  sm: 'h-9 w-9',
+  md: 'h-11 w-11',
+};
+
+/**
+ * The rest of the composite class list is one element rather than `Button`'s
+ * or `IconButton`'s own `size`/`variant` props for the same width-coupling
+ * reason `TRIGGER_BOX` is: the default-tone ghost colors below are
+ * `iconButtonClassName`'s own cascade, copied rather than composed because
+ * composing it would pull in its coupled `size-*` too.
+ */
+const triggerBaseClassName =
   `inline-flex shrink-0 items-center justify-center rounded-xs border border-line font-semibold ` +
   `tracking-widest uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ` +
-  `focus-visible:outline-accent ${controlHeightClassName.sm} w-9 bg-panel-2 p-0 text-text-dim ` +
-  `hover:border-line-bright hover:bg-panel-2 hover:text-text md:w-auto md:gap-1.5 md:bg-transparent ` +
-  `md:px-2.5 md:text-[0.6875rem] md:text-text md:hover:bg-panel-2`;
+  `focus-visible:outline-accent md:h-7 bg-panel-2 p-0 text-text-dim hover:border-line-bright ` +
+  `hover:bg-panel-2 hover:text-text md:w-auto md:gap-1.5 md:bg-transparent md:px-2.5 ` +
+  `md:text-[0.6875rem] md:text-text md:hover:bg-panel-2`;
 
 export function CharacterFilterControl({
   activeCharacterId,
   value,
   onChange,
+  size = 'sm',
 }: CharacterFilterControlProps) {
   const { t } = useTranslation();
   const resolved = useResolvedCharacterFilter(value, activeCharacterId);
@@ -95,14 +119,18 @@ export function CharacterFilterControl({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" aria-label={label} className={triggerClassName}>
+        <button
+          type="button"
+          aria-label={label}
+          className={`${TRIGGER_BOX[size]} ${triggerBaseClassName}`}
+        >
           <span aria-hidden="true" className="flex items-center justify-center md:hidden">
             {isAll || activeCharacterId === null ? (
               <Icon.AllCharacters size={ICON_SIZE.md} />
             ) : (
               <CharacterAvatar
                 characterId={activeCharacterId}
-                size="sm"
+                size={size === 'md' ? 'md' : 'sm'}
                 loading="lazy"
                 className="rounded-full"
               />

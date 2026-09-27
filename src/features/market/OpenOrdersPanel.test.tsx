@@ -913,6 +913,41 @@ describe('OpenOrdersPanel', () => {
       expect(await screen.findByText('2 of 3 orders match')).toBeInTheDocument();
     });
 
+    it('self-heals a legacy characterIds link naming an alt other than the active Character to "All characters"', async () => {
+      mockedLoadAll.mockResolvedValue(
+        snapshot([
+          {
+            characterId: 1,
+            characterName: 'Alpha',
+            orders: [BELOW_FLOOR_ORDER, EXPIRING_ORDER],
+            fetchedAt: Date.now(),
+            fromCache: false,
+            needsReauth: false,
+          },
+          {
+            characterId: 2,
+            characterName: 'Beta',
+            orders: [order({ order_id: 301, type_id: 36, price: 300, duration: 5 })],
+            fetchedAt: Date.now(),
+            fromCache: false,
+            needsReauth: false,
+          },
+        ])
+      );
+      mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
+      // The active Character (from `useActiveCharacter`) is Alpha (id 1); this
+      // link names Beta (id 2) instead — a bookmark or shared link from
+      // before the current/all narrowing, which used to mean "just Beta."
+      // `CharacterFilterControl` can no longer express that, and must not
+      // silently relabel it as "This character" (Alpha) either — the picker
+      // and the table it filters must end up agreeing on "All characters."
+      renderPanel('/market/orders?orders.characters=2');
+
+      expect(await screen.findByRole('button', { name: 'All characters' })).toBeInTheDocument();
+      // The stale param is corrected away, not just papered over for this render.
+      await waitFor(() => expect(window.location.search).not.toContain('orders.characters'));
+    });
+
     it('keeps the filter it applied removable, rather than silently narrowing', async () => {
       const user = userEvent.setup();
       renderMixedFixture('/market/orders?orders.problems=expiringOrStale');

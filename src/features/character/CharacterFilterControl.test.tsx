@@ -62,4 +62,44 @@ describe('CharacterFilterControl', () => {
     expect(screen.queryByRole('menuitemradio', { name: 'This character' })).not.toBeInTheDocument();
     expect(screen.getByRole('menuitemradio', { name: 'All characters' })).toBeInTheDocument();
   });
+
+  describe('the icon-only phone trigger', () => {
+    it('renders both an icon (hidden at md) and the text label (hidden below md)', () => {
+      render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
+      const trigger = screen.getByRole('button', { name: 'This character' });
+      const [iconSlot, textSlot] = trigger.children;
+      expect(iconSlot).toHaveClass('md:hidden');
+      expect(textSlot).toHaveClass('hidden', 'md:inline');
+    });
+
+    it("shows the AllCharacters glyph for 'all' and the active Character's own portrait for 'current'", () => {
+      const { rerender } = render(
+        <CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />
+      );
+      const trigger = () => screen.getByRole('button');
+      expect(trigger().querySelector('img')).toBeInTheDocument();
+      expect(trigger().querySelector('svg')).not.toBeInTheDocument();
+
+      rerender(<CharacterFilterControl activeCharacterId={1} value="all" onChange={() => {}} />);
+      expect(trigger().querySelector('svg')).toBeInTheDocument();
+      expect(trigger().querySelector('img')).not.toBeInTheDocument();
+    });
+
+    it("defaults to the sm touch tier (a panel meta row's own IconButton size)", () => {
+      render(<CharacterFilterControl activeCharacterId={1} value="current" onChange={() => {}} />);
+      expect(screen.getByRole('button')).toHaveClass('h-9', 'w-9');
+    });
+
+    it("matches the larger md tier when a PageHeader's own actions cluster needs it", () => {
+      render(
+        <CharacterFilterControl
+          activeCharacterId={1}
+          value="current"
+          onChange={() => {}}
+          size="md"
+        />
+      );
+      expect(screen.getByRole('button')).toHaveClass('h-11', 'w-11');
+    });
+  });
 });

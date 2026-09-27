@@ -694,6 +694,10 @@ export function Assets() {
         activeCharacterId={activeCharacterId}
         value={crossCharacterFilter}
         onChange={(chars: CharacterFilterValue) => setView({ chars })}
+        // Rides in this route's own `PageHeader` meta (no titled inner
+        // `Panel`), whose `actions` cluster sits at `IconButton`'s default
+        // (larger) touch tier — match it, not the panel-`meta` default.
+        size="md"
       />
     ) : undefined;
 

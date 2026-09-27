@@ -175,6 +175,28 @@ export function OpenOrdersPanel() {
     DEFAULT_OPEN_ORDERS_FILTER_PARAMS
   );
   /**
+   * Self-heals a legacy hand-picked-subset `characterIds` (from before the
+   * current/all narrowing) the moment one is seen — a bookmarked or shared
+   * `orders.characters` link naming a Character other than the one now
+   * active, say — back into this filter's own canonical shape: empty, or
+   * exactly the active Character's own id. Without this, `filter.characterIds`
+   * itself never changes just because `CharacterFilterControl` displays it
+   * differently now, so the table would go on filtering to that stale id
+   * while the picker's label and portrait silently claimed something else
+   * entirely, until the pilot happened to touch the picker again.
+   */
+  useEffect(() => {
+    if (activeCharacterId === null) return;
+    const canonical =
+      filter.characterIds.length === 1 && filter.characterIds[0] === activeCharacterId
+        ? filter.characterIds
+        : [];
+    const alreadyCanonical =
+      canonical.length === filter.characterIds.length &&
+      canonical.every((id, i) => id === filter.characterIds[i]);
+    if (!alreadyCanonical) setFilter({ ...filter, characterIds: canonical });
+  }, [filter, activeCharacterId, setFilter]);
+  /**
    * The order a Notification Event (an undercut, or a fill) sent the reader
    * to, spent once on arrival (`useHighlightParam`'s own doc). Landing on the
    * row that prompted the click, decision `20260908-123516`.
