@@ -643,7 +643,7 @@ export function DataTable<T>({
           (() => {
             const Chevron = expanded ? Icon.Expanded : Icon.Descend;
             return (
-              <td role="cell" aria-hidden="true" className={cx(cellPadding, 'w-0')}>
+              <td role="cell" aria-hidden="true" className={cx(cellPadding, 'w-0 dt-disclosure')}>
                 <Chevron size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-dim" />
               </td>
             );
