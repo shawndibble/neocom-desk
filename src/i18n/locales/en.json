@@ -2546,11 +2546,8 @@
     "densitySpacious": "Spacious",
     "remove": "Remove",
     "removeButtonLabel": "Remove {{name}}",
-    "removeConfirm": "Remove {{name}}? This deletes their skill plans, build plans, quickbar and cached game data from this device, and — if a session can still be started as them — their synced plans, build plans, quickbar and settings too. If not, that remote data stays until you log in as {{name}} again. This cannot be undone here.",
-    "removeDeferredNoticeTitle": "Sync deferred",
-    "removeDeferredNotice": "{{name}}'s synced data couldn't be cleared right now — their session couldn't be re-established. It will be cleared automatically the next time you log in as {{name}}.",
+    "removeConfirm": "Remove {{name}}? This deletes their skill plans, build plans, quickbar and cached game data from this device. If sync is on, their synced copy stays on our servers, so adding {{name}} back restores it. It is deleted automatically once no device has synced {{name}} for 90 days. This cannot be undone here.",
     "cancel": "Cancel",
-    "ok": "OK",
     "searchPlaceholder": "Search by name or corporation…",
     "noSearchMatches": "No characters match this search or filter.",
     "noSearchMatchesHint": "Clear the search and filters to see every character.",
@@ -5457,7 +5454,7 @@
         "notes": {
           "push": "Push notifications, if you turn them on: we store a token for this device, the character IDs it covers, and the alerts due in the next 72 hours — including their text, so they can be delivered while the app is closed. Each character is verified with EVE at that moment, and the token used for that check is discarded straight after.",
           "crashes": "Crash reports: when something goes wrong we receive the error and which page it happened on, so it can be fixed. IP addresses are switched off, request and response bodies are never captured, and your EVE tokens are stripped before anything is sent.",
-          "removal": "Removing a character deletes everything above from our servers. If its EVE login has already expired we cannot log in to do that, so the deletion runs the next time you add that character back.",
+          "removal": "Removing a character only clears it from this device. Its synced copy stays on our servers, so adding the character back restores it. We delete it automatically once no device has synced that character for 90 days.",
           "export": "Exporting a backup (Data tab) writes a password-encrypted file — including your login tokens — to your device. This only happens when you press the button, and the file goes wherever you choose to put it; we never see it."
         },
         "privacyLink": "Full details are in the <privacy>Privacy Policy</privacy>."

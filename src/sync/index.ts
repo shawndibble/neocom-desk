@@ -166,15 +166,3 @@ export async function ensureSignedIn(characterId: number): Promise<string> {
   const { ensureSignedIn } = await import('./syncAuth');
   return ensureSignedIn(characterId);
 }
-
-/**
- * Purge a removed Character's remote Firestore docs (plans, buildPlans,
- * quickbars, stationPins, settings) right now. If it can't run (most commonly a dead
- * refresh token — the Character can no longer sign in), records a pending
- * purge that the next successful sync for it retries automatically. Returns
- * whether the purge ran immediately.
- */
-export async function purgeCharacterRemoteDataOrDefer(characterId: number): Promise<boolean> {
-  const { purgeCharacterRemoteDataOrDefer } = await import('./characterPurge');
-  return purgeCharacterRemoteDataOrDefer(characterId);
-}
