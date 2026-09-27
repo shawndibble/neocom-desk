@@ -127,7 +127,12 @@ import {
 } from './skillPlanEdit';
 import { RemapMarkerModal } from './RemapMarkerModal';
 import { bandStarts, meaningfulBandStarts } from './bands';
-import { summarizeEntryQueue, buildMergedRows, placeBandHeaders } from './queueRows';
+import {
+  summarizeEntryQueue,
+  buildMergedRows,
+  placeBandHeaders,
+  pinnedInProgressEntry,
+} from './queueRows';
 import { remapBudget, type RemapAvailability } from './remapAvailability';
 import {
   whatIfImplants,
@@ -524,6 +529,13 @@ export function PlanEditor({
   const queueProjection = useMemo(
     () => projectQueueEnd(trainedSkills, queueEntries, loadedAtMs, plan.entries),
     [trainedSkills, queueEntries, loadedAtMs, plan.entries]
+  );
+  // The plan entry that IS the in-game queue's currently-training level, if
+  // any (#1701 follow-up) — EntryList labels its row instead of showing a
+  // bare, misleading "0m" for the zero own-steps that entry contributes.
+  const pinnedInProgress = useMemo(
+    () => pinnedInProgressEntry(plan.entries, queueProjection),
+    [plan.entries, queueProjection]
   );
   // Costed by `schedulePlan`, the same call the Calendar makes, so the two
   // can never quote different dates for one plan.
@@ -1971,6 +1983,7 @@ export function PlanEditor({
                 onReorder={handleDrop}
                 onPromotePrereq={handlePromotePrereq}
                 onRemove={requestRemoveEntry}
+                pinnedInProgress={pinnedInProgress}
                 onRemoveMarker={handleRemoveMarker}
                 markerAttributesFor={markerAttributesFor}
                 markerImplants={effectiveImplants}
