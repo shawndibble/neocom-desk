@@ -626,7 +626,12 @@ export function DataTable<T>({
           (() => {
             const Chevron = expanded ? Icon.Expanded : Icon.Descend;
             return (
-              <td role="cell" aria-hidden="true" className={cx(cellPadding, 'w-0')}>
+              // Hidden on the stacked card (`dt-disclosure`, index.css): the
+              // whole card is already tappable and `aria-expanded` above
+              // carries the state to AT, so on a phone this rendered as a
+              // stray icon on its own labelless line rather than trailing a
+              // column.
+              <td role="cell" aria-hidden="true" className={cx(cellPadding, 'dt-disclosure w-0')}>
                 <Chevron size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-dim" />
               </td>
             );

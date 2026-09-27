@@ -329,6 +329,15 @@
       content: none;
     }
 
+    /* The disclosure chevron (`DataTable`'s `expandableRow`): a decorative
+       trailing-column icon on desktop, but with no column to trail here it
+       rendered as a stray glyph on its own labelless line. The card itself
+       is already tappable and carries `aria-expanded`, so the icon is
+       dropped rather than pinned like `dt-corner`. */
+    .dt-stack td.dt-disclosure {
+      display: none;
+    }
+
     /* Labelled cards (`stackColumns={1}`/`{2}`): pinned to the card's own
        top-right corner instead of flowing as a bottom row, which used to
        leave a dead ~40px strip under a title-height's worth of nothing. The
