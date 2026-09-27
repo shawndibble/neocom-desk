@@ -1446,6 +1446,7 @@ export function BpcSourcingPanel() {
         <IconButton
           icon={<Icon.Refresh />}
           label={t('bpcContracts.refresh')}
+          size="sm"
           onClick={() => {
             refresh();
             setMarketRefreshTick((tick) => tick + 1);
