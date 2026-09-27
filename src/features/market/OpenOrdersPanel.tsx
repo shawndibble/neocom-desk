@@ -14,6 +14,7 @@ import {
   IconButton,
   InfoTooltip,
   MenuItem,
+  MultiSelect,
   Panel,
   SearchInput,
   Select,
@@ -36,7 +37,12 @@ import { resolveCharacterFilter } from '@/features/character/characterFilterValu
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useIsPhone } from '@/lib/useIsPhone';
-import { useUrlFilter } from '@/lib/useUrlState';
+import {
+  filterFromParamValues,
+  paramsPatchFromFilter,
+  useRememberedUrlParams,
+  type UrlParamValues,
+} from '@/lib/useUrlState';
 import { cx } from '@/lib/cx';
 import { formatIskAuto, formatIskCompact } from '@/lib/isk';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -64,15 +70,16 @@ import {
   EMPTY_OPEN_ORDERS_FILTER,
   FILTERABLE_PROBLEMS,
   filterOpenOrders,
+  locationFilterOptions,
   OPEN_ORDERS_FIELD_TO_PARAM,
   OPEN_ORDERS_FILTER_PARAMS,
   OPEN_ORDERS_SORTS,
   sortOpenOrders,
   activeFilterChips,
-  DEFAULT_OPEN_ORDERS_FILTER_PARAMS,
   type OpenOrdersFilter,
   type OpenOrdersSort,
 } from './openOrdersFilter';
+import { useOpenOrdersLocationFilterPref } from './openOrdersLocationFilterPref';
 import type { OrderProblem } from '@/engine/market/orderProblems';
 import { OrderProblemBadge } from './OrderProblemBadge';
 import { orderBadgeFor } from './orderBadgeKind';
@@ -161,16 +168,41 @@ export function OpenOrdersPanel() {
    * field — a deep link (the Overview board's count tiles, `openOrdersHref`)
    * narrows it on arrival, and every chip, select and search keystroke from
    * here on writes straight back to it, so a reload or a shared link always
-   * reopens exactly what was on screen. This page has only the one filter
-   * bar, so it never needs `useUrlFilter`'s scope-reset — the scope key
-   * never changes.
+   * reopens exactly what was on screen.
+   *
+   * `orders.locations` is the one exception: a bare `/market/orders` visit
+   * (no query string at all — every app relaunch) falls back to the
+   * device-local pick remembered in `openOrdersLocationFilterPref.ts`
+   * (decision `20260922-221531` / ADR 0015), via `useRememberedUrlParams`
+   * rather than the plain `useUrlFilter` every other field still reads
+   * through. The URL always wins when it states the field; the stored value
+   * is never mirrored back into it.
    */
-  const [filter, setFilter] = useUrlFilter<OpenOrdersFilter>(
-    'orders',
-    OPEN_ORDERS_FILTER_PARAMS,
-    OPEN_ORDERS_FIELD_TO_PARAM,
-    DEFAULT_OPEN_ORDERS_FILTER_PARAMS
+  const rememberedLocationIds = useOpenOrdersLocationFilterPref((state) => state.value);
+  const hydrateRememberedLocationIds = useOpenOrdersLocationFilterPref((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateRememberedLocationIds();
+  }, [hydrateRememberedLocationIds]);
+  const remembered = useMemo(
+    () => ({
+      values: { 'orders.locations': rememberedLocationIds },
+      remember: (patch: Partial<UrlParamValues<typeof OPEN_ORDERS_FILTER_PARAMS>>) => {
+        if (!('orders.locations' in patch)) return;
+        void useOpenOrdersLocationFilterPref
+          .getState()
+          .setValue(patch['orders.locations'] as readonly number[]);
+      },
+    }),
+    [rememberedLocationIds]
   );
+  const [params, setParams] = useRememberedUrlParams(OPEN_ORDERS_FILTER_PARAMS, remembered);
+  const filter = useMemo(
+    () => filterFromParamValues<OpenOrdersFilter>(params, OPEN_ORDERS_FIELD_TO_PARAM),
+    [params]
+  );
+  function setFilter(next: OpenOrdersFilter) {
+    setParams(paramsPatchFromFilter(next, OPEN_ORDERS_FIELD_TO_PARAM));
+  }
   /**
    * The order a Notification Event (an undercut, or a fill) sent the reader
    * to, spent once on arrival (`useHighlightParam`'s own doc). Landing on the
@@ -315,6 +347,25 @@ export function OpenOrdersPanel() {
     return m;
   }, [entriesWithOrders]);
 
+  /**
+   * Every location currently holding an open order — the location filter's
+   * option catalog, so a saved pick from a station that has since sold out
+   * can still be seen and untoggled rather than just quietly narrowing to
+   * nothing (see `filter.locationIds` below).
+   */
+  const locationOptions = useMemo(
+    () =>
+      locationFilterOptions(allRows, (locationId) =>
+        t('market.orders.filter.unknownLocation', { id: locationId })
+      ),
+    [allRows, t]
+  );
+  const locationNamesById = useMemo(
+    () => new Map(locationOptions.map((option) => [option.locationId, option.label])),
+    [locationOptions]
+  );
+  const showLocationFilter = locationOptions.length > 1;
+
   const ordersByOrderId = useMemo(() => {
     const m = new Map<number, MarketOrder>();
     if (!snapshot) return m;
@@ -371,7 +422,7 @@ export function OpenOrdersPanel() {
     .filter((chip) => chip.id !== 'hideHealthy')
     .map((chip) => ({
       id: chip.id,
-      label: chipLabel(chip, characterNamesById, t),
+      label: chipLabel(chip, characterNamesById, locationNamesById, t),
       clear: () => setFilter(chip.clear(filter)),
     }));
 
@@ -783,6 +834,50 @@ export function OpenOrdersPanel() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {showLocationFilter && (
+                    <MultiSelect
+                      trigger={
+                        <Button size="sm">
+                          {draft.locationIds.length === 0
+                            ? t('market.orders.filter.allLocations')
+                            : t('market.orders.filter.selectedLocationsCount', {
+                                count: draft.locationIds.length,
+                              })}
+                        </Button>
+                      }
+                      options={locationOptions.map((option) => ({
+                        id: option.locationId,
+                        label: option.label,
+                      }))}
+                      selected={new Set(draft.locationIds)}
+                      onToggle={(locationId) =>
+                        setDraft({
+                          ...draft,
+                          locationIds: draft.locationIds.includes(locationId)
+                            ? draft.locationIds.filter((id) => id !== locationId)
+                            : [...draft.locationIds, locationId],
+                        })
+                      }
+                      searchPlaceholder={t('market.orders.filter.locationSearchPlaceholder')}
+                      noResultsLabel={t('market.orders.filter.locationNoResults')}
+                      extraContent={(close) => (
+                        <div className="border-b border-line p-1">
+                          <Button
+                            variant="ghost"
+                            align="start"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => {
+                              setDraft({ ...draft, locationIds: [] });
+                              close();
+                            }}
+                          >
+                            {t('market.orders.filter.allLocations')}
+                          </Button>
+                        </div>
+                      )}
+                    />
+                  )}
                   <Select
                     value={draft.sort}
                     onValueChange={(value) => setDraft({ ...draft, sort: value as OpenOrdersSort })}
@@ -1012,6 +1107,7 @@ export function OpenOrdersPanel() {
 function chipLabel(
   chip: ReturnType<typeof activeFilterChips>[number],
   characterNamesById: ReadonlyMap<number, string>,
+  locationNamesById: ReadonlyMap<number, string>,
   t: (key: string, options?: Record<string, unknown>) => string
 ): string {
   const label = t(chip.labelKey);
@@ -1021,6 +1117,10 @@ function chipLabel(
   if (chip.id.startsWith('character:')) {
     const characterId = Number(chip.value);
     return `${label}: ${characterNamesById.get(characterId) ?? chip.value}`;
+  }
+  if (chip.id.startsWith('location:')) {
+    const locationId = Number(chip.value);
+    return `${label}: ${locationNamesById.get(locationId) ?? chip.value}`;
   }
   if (chip.id.startsWith('problem:')) return `${label}: ${t(`market.orders.group.${chip.value}`)}`;
   if (chip.id === 'costBasis') {
