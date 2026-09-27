@@ -42,7 +42,7 @@ export function markerRowId(index: number): string {
  * Aligned to `normalizeMarkers`' own output: entry i of the result is the
  * override for the marker now at `normalizeMarkers(markers, entryCount)[i]`.
  * When two raw positions collapse onto the same normalized slot (entry
- * removal can do this — see `markerAttributesAfterEntryRemoval`), the first
+ * removal can do this — see `removeEntry` in skillPlanEdit.ts), the first
  * one's override survives, the same "first write wins" a `Set` gives
  * `normalizeMarkers` for the position itself.
  */
@@ -150,80 +150,6 @@ export function reorderRows(
     };
   }
   return rowsToState(arrayMove(rows, oldIndex, newIndex));
-}
-
-/** "Add remap marker": append after the last entry (the user drags it up). */
-export function addMarker(markers: readonly number[] | undefined, entryCount: number): number[] {
-  return normalizeMarkers([...(markers ?? []), entryCount], entryCount);
-}
-
-/** `addMarker`'s companion: the newly appended marker gets no override. */
-export function addMarkerAttributes(
-  markers: readonly number[] | undefined,
-  attributes: readonly (Attributes | null)[] | undefined,
-  entryCount: number
-): (Attributes | null)[] {
-  return normalizeMarkerAttributes(
-    [...(markers ?? []), entryCount],
-    [...(attributes ?? []), null],
-    entryCount
-  );
-}
-
-/** Remove the marker at `markerIndex` (an index into the normalized list). */
-export function removeMarker(
-  markers: readonly number[] | undefined,
-  markerIndex: number,
-  entryCount: number
-): number[] {
-  const normalized = normalizeMarkers(markers, entryCount);
-  normalized.splice(markerIndex, 1);
-  return normalized;
-}
-
-/** `removeMarker`'s companion: drop the override at the same normalized index. */
-export function removeMarkerAttributes(
-  markers: readonly number[] | undefined,
-  attributes: readonly (Attributes | null)[] | undefined,
-  markerIndex: number,
-  entryCount: number
-): (Attributes | null)[] {
-  const normalized = normalizeMarkerAttributes(markers, attributes, entryCount);
-  normalized.splice(markerIndex, 1);
-  return normalized;
-}
-
-/**
- * Keep markers anchored when the entry at `entryIndex` is removed: markers
- * after it shift one position left; markers before it stay put.
- */
-export function markersAfterEntryRemoval(
-  markers: readonly number[] | undefined,
-  entryIndex: number,
-  entryCountBefore: number
-): number[] {
-  if (entryIndex < 0) return normalizeMarkers(markers, entryCountBefore);
-  return normalizeMarkers(
-    (markers ?? []).map((m) => (m > entryIndex ? m - 1 : m)),
-    entryCountBefore - 1
-  );
-}
-
-/**
- * `markersAfterEntryRemoval`'s companion. Removing an entry can make two
- * markers land on the same shifted position — `normalizeMarkerAttributes`
- * then keeps the earlier one's override, exactly like `markersAfterEntryRemoval`
- * itself collapses the two positions into one marker.
- */
-export function markerAttributesAfterEntryRemoval(
-  markers: readonly number[] | undefined,
-  attributes: readonly (Attributes | null)[] | undefined,
-  entryIndex: number,
-  entryCountBefore: number
-): (Attributes | null)[] {
-  if (entryIndex < 0) return normalizeMarkerAttributes(markers, attributes, entryCountBefore);
-  const shifted = (markers ?? []).map((m) => (m > entryIndex ? m - 1 : m));
-  return normalizeMarkerAttributes(shifted, attributes, entryCountBefore - 1);
 }
 
 /**

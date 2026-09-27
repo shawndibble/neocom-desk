@@ -1651,20 +1651,12 @@ describe('an attribute sheet nothing explains', () => {
 describe('splitting a plan into one row per level', () => {
   const MULTI_LEVEL = { ...PLAN, entries: [{ skillTypeID: 10, targetLevel: 3 }], markers: [1] };
 
-  it('splits an entry that trains several levels, carrying its marker along', async () => {
+  it('writes the split on open once the trained levels are known', async () => {
+    // What the split writes (rows, markers carried along) is splitByLevel's,
+    // tested in skillPlanEdit.test.ts; this only checks the editor fires it.
     const { onUpdate } = renderEditor(vi.fn(), { plan: MULTI_LEVEL });
 
-    await waitFor(() =>
-      expect(onUpdate).toHaveBeenCalledWith({
-        entries: [
-          { skillTypeID: 10, targetLevel: 1 },
-          { skillTypeID: 10, targetLevel: 2 },
-          { skillTypeID: 10, targetLevel: 3 },
-        ],
-        // Was "before entry 1"; the same entry now sits at position 3.
-        markers: [3],
-      })
-    );
+    await waitFor(() => expect(onUpdate).toHaveBeenCalledTimes(1));
   });
 
   it("rewrites nothing until the character's trained levels are actually known", async () => {
@@ -1818,7 +1810,7 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     });
   });
 
-  it('Replace swaps the entries and clears Remap Markers', async () => {
+  it('Replace swaps the entries in', async () => {
     loadCharacterSkillQueue.mockResolvedValue(
       queueResult([{ skill_id: 20, finished_level: 3, queue_position: 0 }])
     );
@@ -1829,14 +1821,13 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
     await waitFor(() => screen.getByText(/in-game queue has 1 skill/i));
     await user.click(screen.getByRole('button', { name: 'Replace plan' }));
 
-    expect(onUpdate).toHaveBeenCalledWith({
-      entries: [{ skillTypeID: 20, targetLevel: 3 }],
-      markers: [],
-      markerAttributes: [],
-    });
+    // Clearing the Remap Markers with it is replaceWithImport's (skillPlanEdit.test.ts).
+    expect(onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ entries: [{ skillTypeID: 20, targetLevel: 3 }] })
+    );
   });
 
-  it('Undo restores the prior entries and markers exactly', async () => {
+  it('Undo writes back the snapshot taken before the Replace', async () => {
     loadCharacterSkillQueue.mockResolvedValue(
       queueResult([{ skill_id: 20, finished_level: 3, queue_position: 0 }])
     );
@@ -1850,15 +1841,11 @@ describe('queue import into a non-empty plan asks Append or Replace (#1402)', ()
 
     await user.click(screen.getByRole('button', { name: 'Undo' }));
 
-    expect(onUpdate).toHaveBeenLastCalledWith({
-      entries: originalPlan.entries,
-      markers: originalPlan.markers,
-      // `?? []`, not the fixture's `undefined` field itself — the snapshot
-      // normalizes an absent marker-attributes list the same way a Replace's
-      // own write already does, so a sync write never carries an explicit
-      // `undefined` value (Firestore rejects those).
-      markerAttributes: originalPlan.markerAttributes ?? [],
-    });
+    // That the snapshot restores the plan exactly is replaceWithImport's
+    // (skillPlanEdit.test.ts); this checks Undo dispatches it.
+    expect(onUpdate).toHaveBeenLastCalledWith(
+      expect.objectContaining({ entries: originalPlan.entries })
+    );
   });
 
   it('an empty queue never replaces or empties the plan', async () => {

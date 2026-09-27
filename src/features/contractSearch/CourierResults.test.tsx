@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { CourierResults } from '@/features/contractSearch/CourierResults';
 import type { CourierEndpoint, CourierRouteRow } from '@/engine/contracts/courierSearch';
@@ -98,22 +98,6 @@ function renderBoard(characterId = CHARACTER_ID, initialEntries: string[] = ['/'
       <CourierResults rows={ROWS} regionNames={REGION_NAMES} characterId={characterId} />
     </MemoryRouter>
   );
-}
-
-/** Reads the URL `MemoryRouter` produced; unlike a real router it never touches `window.location`. */
-function LocationProbe() {
-  const { search } = useLocation();
-  return <span data-testid="location-search">{search}</span>;
-}
-
-function renderBoardWithProbe(initialEntries: string[] = ['/']) {
-  render(
-    <MemoryRouter initialEntries={initialEntries}>
-      <CourierResults rows={ROWS} regionNames={REGION_NAMES} characterId={CHARACTER_ID} />
-      <LocationProbe />
-    </MemoryRouter>
-  );
-  return () => screen.getByTestId('location-search').textContent ?? '';
 }
 
 const myRegionButton = () => screen.getByRole('button', { name: 'From my region' });
@@ -584,38 +568,9 @@ describe('CourierResults remembered filter (issue #1719)', () => {
     expect(useCourierFilterPref.getState().value).not.toHaveProperty('pref');
   });
 
-  /** Guards `changedFields` — see its comment in CourierResults.tsx. */
-  it('never writes a remembered value into the URL when an unrelated field changes', async () => {
-    useCourierFilterPref.setState({
-      value: { ...DEFAULT_COURIER_FILTER, maxCollateral: '50000000' },
-      hydrated: true,
-    });
-    const user = userEvent.setup();
-    const currentSearch = renderBoardWithProbe(['/']);
-
-    await openFilters(user);
-    await user.type(screen.getByLabelText('Min reward'), '1');
-
-    await waitFor(() => expect(currentSearch()).toContain('courier.minReward'));
-    expect(currentSearch()).not.toContain('maxCollateral');
-  });
-
-  /**
-   * Symmetric case: a shared link's `originRegionId` must stay scoped to the
-   * URL and never leak into the remembered default just because the hauler
-   * happened to edit some other field while that link was open.
-   */
-  it('never overwrites the remembered default with a URL-only value when an unrelated field changes', async () => {
-    useCourierFilterPref.setState({ value: DEFAULT_COURIER_FILTER, hydrated: true });
-    const user = userEvent.setup();
-    renderBoard(CHARACTER_ID, ['/?courier.origin=10000002']);
-
-    await openFilters(user);
-    await user.type(screen.getByLabelText('Max collateral'), '1');
-
-    await waitFor(() => expect(useCourierFilterPref.getState().value.maxCollateral).toBe('1'));
-    expect(useCourierFilterPref.getState().value.originRegionId).toBeNull();
-  });
+  // Which field an edit reaches, and that an untouched one never crosses
+  // between the URL and the remembered filter, is `useRememberedUrlParams`'
+  // own contract — tested in `lib/useUrlState.test.tsx`.
 });
 
 describe('CourierResults ISK filters', () => {

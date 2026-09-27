@@ -50,6 +50,7 @@ import { routeExposure, type RouteExposure } from '@/features/contractSearch/rou
 import { formatMagnitude } from '@/lib/magnitude';
 import type { RoutePreferenceKind } from '@/engine/route/jumpRoute';
 import { endpointName, endpointSystemName } from '@/features/contractSearch/courierEndpointNames';
+import { useCourierCollateralRatio } from '@/features/contractSearch/collateralThreshold';
 import { RISK_COPY, WARNING_RISKS } from '@/features/contractSearch/courierRiskLabels';
 
 /**
@@ -202,6 +203,11 @@ export function CourierContractDetailModal({
   const collateral = courierCollateral(row);
   const volumeRate = iskPerVolume(row.reward, row.volume);
   const collateralRatio = collateralToRewardRatio(collateral, row.reward);
+  const collateralThreshold = useCourierCollateralRatio((state) => state.value);
+  const hydrateCollateralThreshold = useCourierCollateralRatio((state) => state.hydrate);
+  useEffect(() => {
+    void hydrateCollateralThreshold();
+  }, [hydrateCollateralThreshold]);
   const jumpCount = jumps.kind === 'known' ? jumps.count : null;
   const jumpRate = jumps.kind === 'known' ? iskPerJump(row.reward, jumpCount) : null;
   // Spelled out here, where the decision is actually made — the row only has
@@ -213,7 +219,9 @@ export function CourierContractDetailModal({
   const risks: CourierRiskKind[] = [
     ...endpointRisks,
     ...(paysFarAboveGoingRate(goingRateMultiple) ? (['over-rate'] as const) : []),
-    ...(asksFarMoreCollateralThanReward(collateralRatio) ? (['high-collateral'] as const) : []),
+    ...(asksFarMoreCollateralThanReward(collateralRatio, collateralThreshold)
+      ? (['high-collateral'] as const)
+      : []),
   ];
   const exposure = useRouteExposure(row, preference);
   // Where the return hauls set out from, which is this haul's drop-off region.
