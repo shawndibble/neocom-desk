@@ -11,6 +11,10 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { useMarketHub } from '@/features/market/hub';
 import { useMarketBrowserHub } from '@/features/market/browserHub';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
+import {
+  useBrowserFilterSetting,
+  DEFAULT_BROWSER_FILTER_SETTING,
+} from '@/features/market/browserFilterSetting';
 import { clearOrderBookCache, ORDER_BOOK_FANOUT_CONCURRENCY } from '@/features/market/orderBook';
 import { resetEsiBudget } from '@/esi/budget';
 import {
@@ -345,6 +349,7 @@ beforeEach(async () => {
   useMarketHub.setState({ value: 'jita', hydrated: false });
   useMarketBrowserHub.setState({ value: 'jita', hydrated: false });
   useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
+  useBrowserFilterSetting.setState({ value: DEFAULT_BROWSER_FILTER_SETTING, hydrated: false });
   useCompareSet.setState({ items: [] });
   clearOrderBookCache();
   // Module state, and it latches. One test provoking an ESI error (the 420 in
