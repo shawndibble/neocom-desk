@@ -1154,6 +1154,7 @@ export function Market() {
                                 onToggle={toggleOrderColumn}
                                 buttonLabel={t('market.columnsButton')}
                                 menuTitle={t('market.columnsMenuTitle')}
+                                size="sm"
                               />
                               <IconButton
                                 size="sm"
@@ -1257,6 +1258,7 @@ export function Market() {
                                 onToggle={toggleOrderColumn}
                                 buttonLabel={t('market.columnsButton')}
                                 menuTitle={t('market.columnsMenuTitle')}
+                                size="sm"
                               />
                               <IconButton
                                 size="sm"
