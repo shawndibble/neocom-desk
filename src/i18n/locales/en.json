@@ -5434,7 +5434,7 @@
           "notificationFeed": "Your Alerts.",
           "notificationFeedNote": "Ones you have already been shown, so another device can catch up on what it missed. Kept for 30 days.",
           "settings": "The settings you chose on this page.",
-          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, which skill plan you're adding skills to from Fit Check and Market, the fitting damage profiles you made along with which one fittings are measured against, and the fitting target profiles you made along with which one applied DPS is worked out against. Nothing else on this page leaves your device."
+          "settingsNote": "Your notification preferences, the PI customs rates you overrode, your industry build groups, the defaults every page starts from — trade hub, industry facility, reaction facility, assumed ME and assumed TE, the PI expiring-soon window, the corp dark threshold, and the default characters shown, the courier collateral warning multiple, and whether BPC Sourcing opens set to hide auctions and hide PLEX contracts — the appraisal price percentage you set on the Market page, whether SP Extraction monitoring is on along with the SP threshold you set for it, whether blueprint cost counts toward Industry profit, the ISK-per-LP value you set for LP Store blueprints, whether each character is Alpha or Omega, the ore types you tagged as moon ore or ignored on the Moon Mining Tax ledger's unclassified-ore banner, which skill plan you're adding skills to from Fit Check and Market, the fitting damage profiles you made along with which one fittings are measured against, and the fitting target profiles you made along with which one applied DPS is worked out against. Nothing else on this page leaves your device."
         },
         "local": {
           "title": "Kept on this device only",
@@ -5633,7 +5633,13 @@
       "reset": "Use the default four"
     },
     "tradeHubLabel": "Default trade hub",
-    "tradeHubHint": "Prices shown in the LP store and item lookups. The Market browser remembers its own hub per device. Moon mining tax uses each payee’s own hub.",
+    "courierCollateralLabel": "Flag courier collateral at",
+    "courierCollateralHint": "A courier contract whose collateral reaches this many times its reward gets a High collateral warning in its details.",
+    "courierCollateralOption": "{{count}}× reward",
+    "bpcHideAuctionsLabel": "BPC Sourcing: hide auctions",
+    "bpcHidePlexLabel": "BPC Sourcing: hide PLEX contracts",
+    "bpcHideHint": "Sets where BPC Sourcing starts. You can still switch either back in its filter bar for one search.",
+    "tradeHubHint": "Prices shown in the LP store and item lookups, and where Hauling Opportunities starts from. The Market browser remembers its own hub per device. Moon mining tax uses each payee’s own hub.",
     "facilityLabel": "Default manufacturing facility",
     "facilityHint": "Where a new manufacturing plan starts. Only your first plan uses it — after that, a new plan copies your most recent one.",
     "rigLevelLabel": "Rigs",

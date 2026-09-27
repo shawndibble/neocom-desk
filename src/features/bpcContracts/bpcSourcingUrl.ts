@@ -45,6 +45,20 @@ export const BPC_SOURCING_PARAMS = {
   'sourcing.type': optionalIdParam(),
 };
 
+/**
+ * The schema with the two exclude toggles' defaults swapped for the pilot's
+ * Settings (`sourcingDefaults.ts`). The URL still wins: only a toggle that
+ * differs from *their* default is written to it, so `?sourcing.hideAuctions=0`
+ * is how a view opts out of a default that hides auctions.
+ */
+export function bpcSourcingParams(defaults: { hideAuctions: boolean; hidePlex: boolean }) {
+  return {
+    ...BPC_SOURCING_PARAMS,
+    'sourcing.hideAuctions': boolParam(defaults.hideAuctions),
+    'sourcing.hidePlex': boolParam(defaults.hidePlex),
+  };
+}
+
 /** Key for the offers table's sort. */
 export const BPC_SOURCING_SORT_KEY = 'sourcing.sort';
 

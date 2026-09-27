@@ -78,6 +78,14 @@ import {
   useSpExtractionThresholdSp,
 } from '@/features/character/spExtractionSettings';
 import { SP_EXTRACTION_CHUNK_SP } from '@/engine/spExtraction';
+import {
+  COLLATERAL_RATIO_OPTIONS,
+  useCourierCollateralRatio,
+} from '@/features/contractSearch/collateralThreshold';
+import {
+  useBpcHideAuctionsDefault,
+  useBpcHidePlexDefault,
+} from '@/features/bpcContracts/sourcingDefaults';
 import { useDarkThreshold, DARK_AFTER_DAY_OPTIONS } from '@/features/corp/darkThreshold';
 import { useDefaultCharacterFilter } from '@/features/character/defaultCharacterFilter';
 import {
@@ -980,7 +988,17 @@ function MarketDefaultsPanel() {
   const { t } = useTranslation();
   const hub = useMarketHub((state) => state.value);
   const setHub = useMarketHub((state) => state.setValue);
-  const hydrated = useHydratedStore(useMarketHub);
+  const hubHydrated = useHydratedStore(useMarketHub);
+  const collateralRatio = useCourierCollateralRatio((state) => state.value);
+  const setCollateralRatio = useCourierCollateralRatio((state) => state.setValue);
+  const collateralHydrated = useHydratedStore(useCourierCollateralRatio);
+  const hideAuctions = useBpcHideAuctionsDefault((state) => state.value);
+  const setHideAuctions = useBpcHideAuctionsDefault((state) => state.setValue);
+  const hideAuctionsHydrated = useHydratedStore(useBpcHideAuctionsDefault);
+  const hidePlex = useBpcHidePlexDefault((state) => state.value);
+  const setHidePlex = useBpcHidePlexDefault((state) => state.setValue);
+  const hidePlexHydrated = useHydratedStore(useBpcHidePlexDefault);
+  const hydrated = hubHydrated && collateralHydrated && hideAuctionsHydrated && hidePlexHydrated;
 
   return (
     <Panel title={t('settings.marketDefaultsTitle')}>
@@ -1004,6 +1022,30 @@ function MarketDefaultsPanel() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <ChipRow
+            label={t('settings.courierCollateralLabel')}
+            hint={t('settings.courierCollateralHint')}
+            options={COLLATERAL_RATIO_OPTIONS}
+            selected={collateralRatio}
+            onSelect={(ratio) => void setCollateralRatio(ratio)}
+            labelFor={(ratio) => t('settings.courierCollateralOption', { count: ratio })}
+          />
+
+          <div className="space-y-1.5 border-t border-line pt-3">
+            <label className="flex items-center gap-2 text-xs font-semibold">
+              <Checkbox
+                checked={hideAuctions}
+                onChange={() => void setHideAuctions(!hideAuctions)}
+              />
+              {t('settings.bpcHideAuctionsLabel')}
+            </label>
+            <label className="flex items-center gap-2 text-xs font-semibold">
+              <Checkbox checked={hidePlex} onChange={() => void setHidePlex(!hidePlex)} />
+              {t('settings.bpcHidePlexLabel')}
+            </label>
+            <p className="text-xs text-text-dim">{t('settings.bpcHideHint')}</p>
           </div>
         </div>
       ) : (
