@@ -122,7 +122,7 @@ export function FittingShared() {
     };
   }, [readyFitting, t]);
 
-  if (characterCount === undefined) return <BootScreen />;
+  if (characterCount === undefined) return <BootScreen gate="fitting-shared" />;
   // A visitor with a Character never gets the All-V view — the same link
   // opens in the editor, under their own pilot (CONTEXT.md **Share Link**).
   if (characterCount > 0) {

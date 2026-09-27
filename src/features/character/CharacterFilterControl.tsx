@@ -1,20 +1,20 @@
 /**
- * The "This Character / All Characters / specific characters" picker shared
- * by the cross-character Wallet Balance and Industry Active Jobs views, and
- * by the synced default in Settings (issue #607). Same checkbox-per-character
- * shape `MoonMiningTax.tsx` already ships for its Character filter, plus the
- * "This Character" quick-select that page doesn't offer — every existing
- * caller of that pattern only ever needed "all or a hand-picked subset."
- * Built on the shared `MultiSelect` (issue #797) for its type-to-filter
- * search box; the quick-selects render as plain buttons in `extraContent`
- * above it, not `DropdownMenu` items — a live search input doesn't mix with
- * Radix's menu-family navigation, see
- * `docs/context/decisions/20260905-114550-hand-build-aria-comboboxes-rather-than-buy-radix.md`.
+ * The "This Character / All Characters" toggle shared by the cross-character
+ * Wallet Balance and Industry Active Jobs views, by Open Orders' character
+ * strip, and by the synced default in Settings (issue #607).
+ *
+ * Used to also offer a hand-picked subset of specific characters (a
+ * checkbox-per-character list with a search box, the `MoonMiningTax.tsx`
+ * shape this generalised) — narrowed to just these two states because
+ * nothing in the product actually named a partial subset as a feature: every
+ * caller's own comments described only "current" or "all," a pilot never had
+ * a reason documented for picking exactly 2 of 4 alts, and no test ever
+ * exercised one. See the scope decision recording the narrowing.
  *
  * "This Character" emits the literal `'current'` (`CharacterFilterValue`),
  * not a `Set` frozen to whichever Character happens to be active at click
  * time — so a Settings default of "This Character" keeps meaning "whichever
- * one I'm on," not "always character #91," and a page-level picker keeps
+ * one I'm on," not "always character #91," and a page-level toggle keeps
  * following a Character switch without any resync logic of its own
  * (`useResolvedCharacterFilter` re-resolves it whenever the active Character
  * changes instead).
@@ -28,105 +28,132 @@
  * panel's title, and not at all for a caller with one Character to offer —
  * see
  * `docs/context/decisions/20260908-192806-the-character-filter-rides-in-the-panel-header.md`.
- * Two callers sit outside that rule for reasons of their own. Settings' copy
- * is an account-level synced default rather than a filter over anything on
- * screen, so it renders with one Character too. `OpenOrdersPanel` keeps its
- * copy in a bordered body strip alongside the rest of that panel's filter
- * chips, in a `Panel` whose header carries no title for it to sit beside.
+ *
+ * Below `md` the trigger is icon-only, fixed to the same box a sibling
+ * `IconButton` uses in whichever row it rides in — `size="sm"` (the panel
+ * `meta` hosts: Active Jobs, Open Orders, Mining Tax) by default, `size="md"`
+ * where a `PageHeader`'s own `actions` cluster sits at its default (larger)
+ * touch tier instead (Assets, Mining Tax Overview) — rather than a
+ * full-width text pill. The active Character's own portrait for "current,"
+ * the generic `AllCharacters` glyph for "all." That box also absorbed the
+ * phone-only "whose data is this" avatar `PageHeader` used to float in its
+ * own corner (#1764): with this trigger already carrying that cue whenever a
+ * route offers the filter, a second, separate avatar had nothing left to
+ * say. At `md` the trigger is the usual text button regardless of `size`;
+ * there is room for the words there.
  */
 import { useTranslation } from 'react-i18next';
-import { Button, MultiSelect } from '@/components/ui';
-import { toggleFilterMember } from '@/lib/multiSelectFilter';
+import * as Icon from '@/components/ui/icons';
+import { ICON_SIZE } from '@/components/ui/icons';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/DropdownMenu';
+import { CharacterAvatar } from '@/components/ui/CharacterAvatar';
 import { useResolvedCharacterFilter, type CharacterFilterValue } from './characterFilterValue';
 
-export interface CharacterFilterCandidate {
-  characterId: number;
-  characterName: string;
-}
-
 export interface CharacterFilterControlProps {
-  characters: readonly CharacterFilterCandidate[];
-  /** Null with no active Character — the "This Character" quick-select has nothing to name and is omitted. */
+  /** Null with no active Character — `resolveCharacterFilter` then reads `'current'` as `'all'`, so the trigger and its "This character" option both fall away on their own. */
   activeCharacterId: number | null;
   value: CharacterFilterValue;
   onChange: (next: CharacterFilterValue) => void;
+  /**
+   * The sibling touch tier this trigger's icon-only phone box must match,
+   * mirroring `IconButtonSize`'s two below-`md` values (`size-9`/`size-11`) —
+   * not the full `IconButtonSize` (there is no `'row'` tier here). `'sm'`
+   * (default) for a panel's own `meta` row, where the `IconButton`s beside it
+   * (Active Jobs, Open Orders, Mining Tax) are themselves `size="sm"`.
+   * `'md'` for a `PageHeader`'s `meta`, where that header's own `actions`
+   * cluster sits at `IconButton`'s default (larger) tier instead (Assets,
+   * Mining Tax Overview) — see `PageHeader`'s own doc comment.
+   */
+  size?: 'sm' | 'md';
 }
 
+/**
+ * The two below-`md` box sizes this trigger can be fixed to, keyed the same
+ * way `CharacterFilterControlProps.size` is. Plain `h-*`/`w-*` rather than
+ * `IconButton`'s own `size-*` (which bakes width and height into one
+ * utility): this trigger also needs an auto-width text pill at `md` and up,
+ * and overriding just the `md:` width half of a `size-*` utility would mean
+ * two `md:`-prefixed utilities fighting over the same breakpoint — the one
+ * ordering Tailwind does not promise to resolve predictably, the same reason
+ * two unprefixed utilities for one property are avoided elsewhere in this
+ * file. At `md` the trigger is always the same compact text pill regardless
+ * of this tier (`md:h-7`, in `triggerBaseClassName` below, unconditionally)
+ * — so only the phone-width half varies here.
+ */
+const TRIGGER_BOX: Record<'sm' | 'md', string> = {
+  sm: 'h-9 w-9',
+  md: 'h-11 w-11',
+};
+
+/**
+ * The rest of the composite class list is one element rather than `Button`'s
+ * or `IconButton`'s own `size`/`variant` props for the same width-coupling
+ * reason `TRIGGER_BOX` is: the default-tone ghost colors below are
+ * `iconButtonClassName`'s own cascade, copied rather than composed because
+ * composing it would pull in its coupled `size-*` too.
+ */
+const triggerBaseClassName =
+  `inline-flex shrink-0 items-center justify-center rounded-xs border border-line font-semibold ` +
+  `tracking-widest uppercase transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 ` +
+  `focus-visible:outline-accent md:h-7 bg-panel-2 p-0 text-text-dim hover:border-line-bright ` +
+  `hover:bg-panel-2 hover:text-text md:w-auto md:gap-1.5 md:bg-transparent md:px-2.5 ` +
+  `md:text-[0.6875rem] md:text-text md:hover:bg-panel-2`;
+
 export function CharacterFilterControl({
-  characters,
   activeCharacterId,
   value,
   onChange,
+  size = 'sm',
 }: CharacterFilterControlProps) {
   const { t } = useTranslation();
   const resolved = useResolvedCharacterFilter(value, activeCharacterId);
-  // Reads "This character" for the literal `'current'` and for a hand-picked
-  // subset that happens to resolve to just the active Character too — how it
-  // got there doesn't change what the trigger should say.
-  const isCurrentOnly =
-    value === 'current' ||
-    (activeCharacterId !== null &&
-      resolved !== 'all' &&
-      resolved.size === 1 &&
-      resolved.has(activeCharacterId));
-
-  const label =
-    resolved === 'all'
-      ? t('character.filter.allCharacters')
-      : isCurrentOnly
-        ? t('character.filter.thisCharacter')
-        : t('character.filter.selectedCount', { count: resolved.size });
-
-  function toggleCharacter(characterId: number) {
-    onChange(
-      toggleFilterMember(
-        resolved,
-        characterId,
-        characters.map((c) => c.characterId)
-      )
-    );
-  }
-
-  const selected = resolved === 'all' ? new Set(characters.map((c) => c.characterId)) : resolved;
+  const isAll = resolved === 'all';
+  const label = isAll ? t('character.filter.allCharacters') : t('character.filter.thisCharacter');
 
   return (
-    <MultiSelect
-      trigger={<Button size="sm">{label}</Button>}
-      options={characters.map((c) => ({ id: c.characterId, label: c.characterName }))}
-      selected={selected}
-      onToggle={toggleCharacter}
-      searchPlaceholder={t('character.filter.searchPlaceholder')}
-      noResultsLabel={t('character.filter.noResults')}
-      extraContent={(close) => {
-        function quickSelect(next: CharacterFilterValue) {
-          onChange(next);
-          close();
-        }
-        return (
-          <div className="border-b border-line p-1">
-            {activeCharacterId !== null && (
-              <Button
-                variant="ghost"
-                align="start"
-                size="sm"
-                className="w-full"
-                onClick={() => quickSelect('current')}
-              >
-                {t('character.filter.thisCharacter')}
-              </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={label}
+          className={`${TRIGGER_BOX[size]} ${triggerBaseClassName}`}
+        >
+          <span aria-hidden="true" className="flex items-center justify-center md:hidden">
+            {isAll || activeCharacterId === null ? (
+              <Icon.AllCharacters size={ICON_SIZE.md} />
+            ) : (
+              <CharacterAvatar
+                characterId={activeCharacterId}
+                size={size === 'md' ? 'md' : 'sm'}
+                loading="lazy"
+                className="rounded-full"
+              />
             )}
-            <Button
-              variant="ghost"
-              align="start"
-              size="sm"
-              className="w-full"
-              onClick={() => quickSelect('all')}
-            >
-              {t('character.filter.allCharacters')}
-            </Button>
-          </div>
-        );
-      }}
-    />
+          </span>
+          <span className="hidden md:inline">{label}</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-40">
+        <DropdownMenuRadioGroup
+          value={isAll ? 'all' : 'current'}
+          onValueChange={(next) => onChange(next as CharacterFilterValue)}
+        >
+          {activeCharacterId !== null && (
+            <DropdownMenuRadioItem value="current">
+              {t('character.filter.thisCharacter')}
+            </DropdownMenuRadioItem>
+          )}
+          <DropdownMenuRadioItem value="all">
+            {t('character.filter.allCharacters')}
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

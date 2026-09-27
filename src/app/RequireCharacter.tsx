@@ -17,7 +17,7 @@ export function RequireCharacter() {
   const location = useLocation();
   const characterCount = useLiveQuery(() => db.characters.count());
 
-  if (characterCount === undefined) return <BootScreen />;
+  if (characterCount === undefined) return <BootScreen gate="require-character" />;
   if (characterCount > 0) return <Outlet />;
 
   // `state.from` is recorded, not yet consumed: throwing the destination away

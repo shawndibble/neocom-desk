@@ -207,7 +207,7 @@ export function EventDetailModal({
                 return (
                   <Button
                     key={response}
-                    size="sm"
+                    size="md"
                     variant={active ? RSVP_ACTIVE_VARIANT[response] : 'ghost'}
                     aria-pressed={active}
                     disabled={saving}

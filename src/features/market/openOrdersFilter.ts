@@ -41,6 +41,8 @@ export interface OpenOrdersFilter {
   side: 'buy' | 'sell' | null;
   /** Empty means every character. */
   characterIds: readonly number[];
+  /** Empty means every location. Matches against a row's `locationId`. */
+  locationIds: readonly number[];
   /** Empty means every problem. Matches against a row's `problems`, so filters overlap honestly. */
   problems: readonly OrderProblem[];
   /** Null means any. */
@@ -57,6 +59,7 @@ export const EMPTY_OPEN_ORDERS_FILTER: OpenOrdersFilter = {
   text: '',
   side: null,
   characterIds: [],
+  locationIds: [],
   problems: [],
   expiringWithinDays: null,
   costBasis: null,
@@ -82,6 +85,11 @@ function matchesSide(row: OpenOrderRow, side: OpenOrdersFilter['side']): boolean
 function matchesCharacterIds(row: OpenOrderRow, characterIds: readonly number[]): boolean {
   if (characterIds.length === 0) return true;
   return characterIds.includes(row.characterId);
+}
+
+function matchesLocationIds(row: OpenOrderRow, locationIds: readonly number[]): boolean {
+  if (locationIds.length === 0) return true;
+  return locationIds.includes(row.locationId);
 }
 
 function matchesProblems(row: OpenOrderRow, problems: readonly OrderProblem[]): boolean {
@@ -126,6 +134,37 @@ export const FILTERABLE_PROBLEMS: readonly OrderProblem[] = ORDER_PROBLEMS.filte
   (problem) => problem !== 'healthy'
 );
 
+/** One filter option per distinct `locationId` across `rows`, alphabetised by name. */
+export interface LocationFilterOption {
+  locationId: number;
+  /** The full station/structure name, or a fallback naming an unresolved structure by id. */
+  label: string;
+}
+
+/**
+ * The location filter's option catalog: every location any of `rows` sits
+ * in, deduplicated and named for the search box. Uses the full station name
+ * rather than the table's truncated `stationShortName` — the same trade hub's
+ * several stations ("Jita 4 - Moon 4 - ...", "Jita 4 - Moon 11 - ...") would
+ * otherwise collide, and it is what the search box should match against.
+ * A row whose `stationName` is null (an unresolved player structure, per
+ * `openOrdersModel.ts`) still gets its own option, named by its id so several
+ * unresolved structures do not all collapse into one indistinguishable entry.
+ */
+export function locationFilterOptions(
+  rows: readonly OpenOrderRow[],
+  unknownLabel: (locationId: number) => string
+): LocationFilterOption[] {
+  const byId = new Map<number, string>();
+  for (const row of rows) {
+    if (byId.has(row.locationId)) continue;
+    byId.set(row.locationId, row.stationName ?? unknownLabel(row.locationId));
+  }
+  return [...byId.entries()]
+    .map(([locationId, label]) => ({ locationId, label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
 export function filterOpenOrders(
   rows: readonly OpenOrderRow[],
   filter: OpenOrdersFilter
@@ -135,6 +174,7 @@ export function filterOpenOrders(
       matchesText(row, filter.text) &&
       matchesSide(row, filter.side) &&
       matchesCharacterIds(row, filter.characterIds) &&
+      matchesLocationIds(row, filter.locationIds) &&
       matchesProblems(row, filter.problems) &&
       matchesExpiringWithinDays(row, filter.expiringWithinDays) &&
       matchesCostBasis(row, filter.costBasis) &&
@@ -229,6 +269,15 @@ export function activeFilterChips(filter: OpenOrdersFilter): ActiveFilterChip[] 
     });
   }
 
+  for (const locationId of filter.locationIds) {
+    chips.push({
+      id: `location:${locationId}`,
+      labelKey: 'market.orders.filter.location',
+      value: String(locationId),
+      clear: (f) => ({ ...f, locationIds: withoutArrayValue(f.locationIds, locationId) }),
+    });
+  }
+
   for (const problem of filter.problems) {
     chips.push({
       id: `problem:${problem}`,
@@ -311,6 +360,7 @@ export const {
   text: { key: 'orders.q', codec: textParam() },
   side: { key: 'orders.side', codec: optionalEnumParam<'buy' | 'sell'>(['buy', 'sell']) },
   characterIds: { key: 'orders.characters', codec: idListParam() },
+  locationIds: { key: 'orders.locations', codec: idListParam() },
   problems: { key: 'orders.problems', codec: enumListParam(FILTERABLE_PROBLEMS) },
   expiringWithinDays: { key: 'orders.expiring', codec: optionalIdParam() },
   costBasis: {

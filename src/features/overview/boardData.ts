@@ -23,6 +23,8 @@ import { loadTypeNames } from '@/features/character/typeNames';
 import { loadContracts } from '@/features/character/contracts';
 import { loadContractLocationName } from '@/features/character/contractLocationName';
 import { summarizeContractsBoard, type ContractsBoardSummary } from '@/engine/contractsBoard';
+import { loadCalendarEvents } from '@/features/character/calendar';
+import type { CalendarEventSummary } from '@/esi/endpoints';
 
 /*
  * `Overview` is the landing route and stays in the entry chunk (every other
@@ -239,4 +241,24 @@ export async function loadContractsBoard(characterId: number): Promise<Contracts
     }
   }
   return { summary, route, needsReauth, fetchedAt: cached ? cached.fetchedAt : null };
+}
+
+// --- Calendar ---------------------------------------------------------------
+
+export interface CalendarEventsBoardData {
+  events: CalendarEventSummary[];
+  needsReauth: boolean;
+  fetchedAt: Date | null;
+}
+
+/**
+ * The pilot's calendar, for the "Next deadline" strip's calendar candidate
+ * (`engine/calendarDeadline`) — not a card of its own, so this is the whole
+ * event list rather than anything already summarised.
+ */
+export async function loadCalendarEventsBoard(
+  characterId: number
+): Promise<CalendarEventsBoardData> {
+  const { cached, needsReauth } = await loadCalendarEvents(characterId);
+  return { events: cached?.data ?? [], needsReauth, fetchedAt: cached ? cached.fetchedAt : null };
 }

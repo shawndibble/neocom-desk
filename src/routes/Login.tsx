@@ -251,7 +251,7 @@ export function Login() {
     void beginAddCharacterLogin().catch(() => setPending(false));
   }
 
-  if (characterCount === undefined) return <BootScreen />;
+  if (characterCount === undefined) return <BootScreen gate="login" />;
   if (characterCount > 0) return <Navigate to="/characters" replace />;
 
   if (inApp) {
@@ -576,6 +576,9 @@ export function Login() {
         </a>
         <a href="/privacy.html" className="hover:text-text hover:underline">
           {t('login.footerPrivacy')}
+        </a>
+        <a href="/data-credit.html" className="hover:text-text hover:underline">
+          {t('login.footerDataCredit')}
         </a>
         <a
           href={DISCORD_URL}

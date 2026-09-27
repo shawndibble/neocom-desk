@@ -32,7 +32,7 @@ export function fallbackFacility(activity: IndustryActivity): FacilityKind {
 
 /** The character's own plan with the highest `updatedAt`, or null if they have none yet. */
 export function mostRecentlyUpdatedPlan(
-  plans: BuildPlanRecord[] | undefined
+  plans: readonly BuildPlanRecord[] | undefined
 ): BuildPlanRecord | null {
   if (!plans || plans.length === 0) return null;
   return plans.reduce((latest, p) => (p.updatedAt > latest.updatedAt ? p : latest));

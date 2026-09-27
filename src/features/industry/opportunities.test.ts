@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { NO_CHARACTER_MODIFIERS } from '@/engine/industry/characterModifiers';
+import { ZERO_STANDINGS, type ResolvedStandings } from '@/engine/market/standings';
 import type { CharacterBlueprint } from '@/esi/endpoints';
-import type { BlueprintCatalog, BlueprintCatalogEntry } from './blueprintCatalog';
+import {
+  toIndustryBlueprint,
+  type BlueprintCatalog,
+  type BlueprintCatalogEntry,
+} from './blueprintCatalog';
 import type { BuildResult } from '@/engine/industry/types';
 import {
   autoRecalculates,
@@ -17,6 +22,7 @@ import {
   type UnrankedOpportunityRow,
 } from './opportunities';
 import { recipeForLookup } from './recipes';
+import { computeBuildPlan } from './computeBuildPlan';
 import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './facilityDefaults';
 import type { MarketSnapshot } from './marketData';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
@@ -119,9 +125,31 @@ describe('planForOpportunityCandidate — plan ownership (issue #1061)', () => {
       DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
       {},
       undefined,
-      candidate.characterId
+      candidate.characterId,
+      DEFAULT_TRADE_HUB
     );
     expect(plan.characterId).toBe(200);
+  });
+
+  it('stamps the row hub onto the seeded plan, so re-pricing it matches (issue #2055)', () => {
+    const cat = catalog([catalogEntry(1)]);
+    const candidate: OpportunityCandidate = {
+      id: '200:10',
+      characterId: 200,
+      characterName: 'Alt',
+      blueprint: owned(1),
+      catalogEntry: cat.byBlueprintTypeID.get(1)!,
+    };
+    const amarr = { ...DEFAULT_TRADE_HUB, id: 'amarr' as const };
+    const plan = planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      {},
+      undefined,
+      candidate.characterId,
+      amarr
+    );
+    expect(plan.hubId).toBe('amarr');
   });
 
   it('stamps an explicit owner onto the plan, for Add to Compare seeding the active character', () => {
@@ -138,7 +166,8 @@ describe('planForOpportunityCandidate — plan ownership (issue #1061)', () => {
       DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
       {},
       undefined,
-      100
+      100,
+      DEFAULT_TRADE_HUB
     );
     expect(plan.characterId).toBe(100);
   });
@@ -190,7 +219,8 @@ describe('computeOpportunityRow — auto make-or-buy depth (issue #652)', () => 
       {
         recipeFor,
         depth,
-      }
+      },
+      DEFAULT_TRADE_HUB
     );
   }
 
@@ -206,6 +236,86 @@ describe('computeOpportunityRow — auto make-or-buy depth (issue #652)', () => 
   });
 });
 
+describe('computeOpportunityRow — priced like a Build Plan (issue #2055)', () => {
+  const entry = catalogEntry(1);
+  const cat = catalog([entry]);
+  const candidate: OpportunityCandidate = {
+    id: '100:1',
+    characterId: 100,
+    characterName: 'Pilot',
+    blueprint: owned(1),
+    catalogEntry: entry,
+  };
+  const snapshot: MarketSnapshot = {
+    hubPrices: { 2: 100_000, 34: 5 },
+    hubBuyPrices: {},
+    hubSellVolumes: { 2: 10 },
+    adjustedPrices: { 34: 1 },
+    systemCostIndex: 0.05,
+  };
+  const recipeFor = recipeForLookup({ catalog: cat, pi: null, ownedBlueprints: [] });
+  const goodStanding: ResolvedStandings = { factionStanding: 10, corpStanding: 10 };
+
+  function row(standing?: ResolvedStandings) {
+    return computeOpportunityRow(
+      candidate,
+      snapshot,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      NO_CHARACTER_MODIFIERS,
+      new Map(),
+      { recipeFor, depth: 0 },
+      DEFAULT_TRADE_HUB,
+      standing
+    );
+  }
+
+  it('equals a Build Plan seeded from the same candidate, hub and standing (AC1)', () => {
+    const opportunityRow = row(goodStanding)!;
+
+    const plan = planForOpportunityCandidate(
+      candidate,
+      DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+      opportunityRow.materialSourcing,
+      undefined,
+      candidate.characterId,
+      DEFAULT_TRADE_HUB
+    );
+    const blueprint = toIndustryBlueprint(candidate.catalogEntry.blueprint);
+    const { result: planResult } = computeBuildPlan({
+      plan,
+      blueprint,
+      systemCostIndex: snapshot.systemCostIndex ?? 0,
+      adjustedPrices: snapshot.adjustedPrices ?? {},
+      hubPrices: snapshot.hubPrices,
+      modifiers: NO_CHARACTER_MODIFIERS,
+      standing: goodStanding,
+      blueprintAcquisition: { blueprintTypeID: candidate.blueprint.type_id, line: null },
+    });
+
+    expect(opportunityRow.result.iskPerHour).toBe(planResult!.iskPerHour);
+  });
+
+  it('gives a Character with real standings a higher ISK/hour than zero standings (AC2)', () => {
+    const zero = row(ZERO_STANDINGS)!;
+    const good = row(goodStanding)!;
+    expect(good.result.iskPerHour!).toBeGreaterThan(zero.result.iskPerHour!);
+  });
+
+  it('treats an absent standing the same as explicit zero standings', () => {
+    expect(row(undefined)!.result.iskPerHour).toBe(row(ZERO_STANDINGS)!.result.iskPerHour);
+  });
+
+  it('owned-blueprint rows include no acquisition cost regardless of Include Blueprint Cost (AC3)', () => {
+    // computeOpportunityRow never reads an Include Blueprint Cost setting —
+    // it always resolves the top-level product as owned/free, so there is no
+    // toggle capable of adding a cost line here in the first place.
+    const opportunityRow = row()!;
+    expect(
+      opportunityRow.result.materials.some((m) => m.typeID === candidate.blueprint.type_id)
+    ).toBe(false);
+  });
+});
+
 describe('opportunitiesBatchKey', () => {
   function candidate(id: string): OpportunityCandidate {
     return {
@@ -217,23 +327,36 @@ describe('opportunitiesBatchKey', () => {
     };
   }
 
+  const hubFor = () => DEFAULT_TRADE_HUB;
+
   it('is independent of array order', () => {
-    const a = opportunitiesBatchKey([candidate('b'), candidate('a')], DEFAULT_TRADE_HUB);
-    const b = opportunitiesBatchKey([candidate('a'), candidate('b')], DEFAULT_TRADE_HUB);
+    const a = opportunitiesBatchKey([candidate('b'), candidate('a')], hubFor);
+    const b = opportunitiesBatchKey([candidate('a'), candidate('b')], hubFor);
     expect(a).toBe(b);
   });
 
   it('changes when the hub changes', () => {
-    const jita = opportunitiesBatchKey([candidate('a')], DEFAULT_TRADE_HUB);
-    const amarr = opportunitiesBatchKey([candidate('a')], { ...DEFAULT_TRADE_HUB, id: 'amarr' });
+    const jita = opportunitiesBatchKey([candidate('a')], hubFor);
+    const amarr = opportunitiesBatchKey([candidate('a')], () => ({
+      ...DEFAULT_TRADE_HUB,
+      id: 'amarr',
+    }));
     expect(jita).not.toBe(amarr);
+  });
+
+  it('changes when the same candidate now resolves to a different hub', () => {
+    const perCharacter = opportunitiesBatchKey([candidate('a')], (characterId) =>
+      characterId === 1 ? { ...DEFAULT_TRADE_HUB, id: 'amarr' } : DEFAULT_TRADE_HUB
+    );
+    expect(perCharacter).not.toBe(opportunitiesBatchKey([candidate('a')], hubFor));
   });
 });
 
 describe('opportunitiesInputsKey', () => {
   const INPUTS: OpportunityPricingInputs = {
     assumedMe: 10,
-    modifiers: NO_CHARACTER_MODIFIERS,
+    modifiersByCharacter: new Map([[1, NO_CHARACTER_MODIFIERS]]),
+    standingsByCharacter: new Map([[1, new Map([['jita', ZERO_STANDINGS]])]]),
     facilityDefaults: DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
     ownedByCharacter: new Map([[1, [owned(1), owned(2)]]]),
   };
@@ -244,11 +367,24 @@ describe('opportunitiesInputsKey', () => {
     );
   });
 
-  it('changes when modifiers change', () => {
+  it('changes when a Character’s modifiers change', () => {
     expect(opportunitiesInputsKey(INPUTS)).not.toBe(
       opportunitiesInputsKey({
         ...INPUTS,
-        modifiers: { ...NO_CHARACTER_MODIFIERS, manufacturingTimeImplantPct: 4 },
+        modifiersByCharacter: new Map([
+          [1, { ...NO_CHARACTER_MODIFIERS, manufacturingTimeImplantPct: 4 }],
+        ]),
+      })
+    );
+  });
+
+  it('changes when a Character’s standing changes (issue #2055)', () => {
+    expect(opportunitiesInputsKey(INPUTS)).not.toBe(
+      opportunitiesInputsKey({
+        ...INPUTS,
+        standingsByCharacter: new Map([
+          [1, new Map([['jita', { ...ZERO_STANDINGS, corpStanding: 5 }]])],
+        ]),
       })
     );
   });
@@ -282,7 +418,8 @@ describe('opportunitiesInputsKey', () => {
           reaction: { ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.reaction },
           manufacturing: { ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.manufacturing },
         },
-        modifiers: { ...NO_CHARACTER_MODIFIERS },
+        standingsByCharacter: new Map([[1, new Map([['jita', { ...ZERO_STANDINGS }]])]]),
+        modifiersByCharacter: new Map([[1, { ...NO_CHARACTER_MODIFIERS }]]),
         assumedMe: 10,
       })
     );
@@ -355,6 +492,7 @@ describe('rankOpportunityRows', () => {
       },
       result: buildResult({ iskPerHour, totalCost: 1_000_000 }),
       sellDepthIsk: 3_000_000,
+      hub: DEFAULT_TRADE_HUB,
       materialSourcing: {},
       buildHere: [],
     };

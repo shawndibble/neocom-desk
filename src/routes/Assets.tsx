@@ -20,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
   Spinner,
-  StatChip,
   TextInput,
 } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -616,10 +615,10 @@ export function Assets() {
 
   // Cross-character search (issue #746, replacing issue #85's binary toggle):
   // `'current'` by default (today's old off-state, no extra fan-out), or
-  // All/a hand-picked subset once the pilot asks via `CharacterFilterControl`
-  // — same picker Wallet Balance and Industry Active Jobs already use. The
-  // URL wins; absent, the synced Settings default applies. Nothing here is
-  // written back to that setting.
+  // `'all'` once the pilot asks via `CharacterFilterControl` — same picker
+  // Wallet Balance and Industry Active Jobs already use. The URL wins;
+  // absent, the synced Settings default applies. Nothing here is written
+  // back to that setting.
   const defaultCharacterFilter = useDefaultCharacterFilter((s) => s.value);
   const hydrateDefaultCharacterFilter = useDefaultCharacterFilter((s) => s.hydrate);
   useEffect(() => {
@@ -691,10 +690,13 @@ export function Assets() {
   const crossCharacterFilterMeta =
     crossCharacterCandidates.length > 1 ? (
       <CharacterFilterControl
-        characters={crossCharacterCandidates}
         activeCharacterId={activeCharacterId}
         value={crossCharacterFilter}
         onChange={(chars: CharacterFilterValue) => setView({ chars })}
+        // Rides in this route's own `PageHeader` meta (no titled inner
+        // `Panel`), whose `actions` cluster sits at `IconButton`'s default
+        // (larger) touch tier — match it, not the panel-`meta` default.
+        size="md"
       />
     ) : undefined;
 
@@ -1526,17 +1528,6 @@ export function Assets() {
           meta={
             <>
               {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
-              {showTotalValueChip && (
-                <StatChip
-                  label={t('assets.section.totalValueLabel')}
-                  value={
-                    totalValueFiltered
-                      ? t('assets.section.totalValueFiltered', { value: formatIsk(totalValue) })
-                      : formatIsk(totalValue)
-                  }
-                  tone="success"
-                />
-              )}
               {crossCharacterFilterMeta}
               {otherCharacterIds.length > 0 && crossCharacterLoading && (
                 <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
@@ -1781,6 +1772,16 @@ export function Assets() {
                         className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                       >
                         {t('assets.section.locationCount', { count: sortedTree.length })}
+                        {showTotalValueChip && (
+                          <span className="text-isk-pos">
+                            {' · '}
+                            {totalValueFiltered
+                              ? t('assets.section.totalValueFiltered', {
+                                  value: formatIsk(totalValue),
+                                })
+                              : t('assets.section.totalValue', { value: formatIsk(totalValue) })}
+                          </span>
+                        )}
                       </h2>
                       {/* flex-wrap (issue #415): on a narrow phone the two Selects no
                         longer share one row with no priority order — Sort stays put

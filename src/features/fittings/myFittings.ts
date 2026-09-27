@@ -45,6 +45,27 @@ export function renameFitting(fitting: FittingRecord, name: string): Promise<Fit
   return saveFitting(fitting.characterId, { id: fitting.id, name, code: fitting.code });
 }
 
+/** Renames a saved record by id; a no-op if it's since been deleted. */
+export async function renameFittingById(id: string, name: string): Promise<void> {
+  const record = await db.fittings.get(id);
+  if (record) await renameFitting(record, name);
+}
+
+/**
+ * What a Save writes: continues `savedId` when it still belongs to this
+ * Character, otherwise a fresh save under `fallbackName` — the record may
+ * have been deleted from My Fittings, or reassigned, since it was opened.
+ */
+export async function resolveSaveTarget(
+  savedId: string | null,
+  characterId: number,
+  fallbackName: string
+): Promise<{ id?: string; name: string }> {
+  const existing = savedId === null ? undefined : await db.fittings.get(savedId);
+  const updating = existing?.characterId === characterId ? existing : undefined;
+  return { ...(updating ? { id: updating.id } : {}), name: updating?.name ?? fallbackName };
+}
+
 /** Sets a saved Fitting's notes (kept to what EVE will take as a description). */
 export function setFittingNotes(fitting: FittingRecord, notes: string): Promise<FittingRecord> {
   return saveFitting(fitting.characterId, {

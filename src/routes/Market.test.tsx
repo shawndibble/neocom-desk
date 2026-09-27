@@ -11,6 +11,10 @@ import { usePublicInfo } from '@/stores/publicInfo';
 import { useMarketHub } from '@/features/market/hub';
 import { useMarketBrowserHub } from '@/features/market/browserHub';
 import { useLocationMode, DEFAULT_LOCATION_MODE } from '@/features/market/locationMode';
+import {
+  useBrowserFilterSetting,
+  DEFAULT_BROWSER_FILTER_SETTING,
+} from '@/features/market/browserFilterSetting';
 import { clearOrderBookCache, ORDER_BOOK_FANOUT_CONCURRENCY } from '@/features/market/orderBook';
 import { resetEsiBudget } from '@/esi/budget';
 import {
@@ -345,6 +349,7 @@ beforeEach(async () => {
   useMarketHub.setState({ value: 'jita', hydrated: false });
   useMarketBrowserHub.setState({ value: 'jita', hydrated: false });
   useLocationMode.setState({ value: DEFAULT_LOCATION_MODE, hydrated: false });
+  useBrowserFilterSetting.setState({ value: DEFAULT_BROWSER_FILTER_SETTING, hydrated: false });
   useCompareSet.setState({ items: [] });
   clearOrderBookCache();
   // Module state, and it latches. One test provoking an ESI error (the 420 in
@@ -1099,8 +1104,13 @@ describe('Variations table (issue #145, formerly the Related Items strip of issu
     await user.type(await screen.findByRole('searchbox'), 'Selected Widget');
     await user.click(await screen.findByText('Selected Widget'));
 
-    // The selected item's own book plus all 20 capped variation rows.
-    await waitFor(() => expect(fetchedTypeIds.size).toBe(21), { timeout: 3000 });
+    // The selected item's own book plus every one of its 25 siblings' —
+    // fetching is uncapped, same as rendering (#1217's cap was on
+    // concurrency, never on row count; the render-side row cap this number
+    // used to match was removed separately, and this count went stale
+    // instead of following it — see "renders every sibling of a large
+    // Market Group, uncapped" above).
+    await waitFor(() => expect(fetchedTypeIds.size).toBe(26), { timeout: 3000 });
     // The main order book runs alongside the variation workers.
     expect(maxInFlight).toBeLessThanOrEqual(ORDER_BOOK_FANOUT_CONCURRENCY + 1);
   });

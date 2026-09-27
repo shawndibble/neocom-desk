@@ -5,6 +5,8 @@ import type { GroupMember } from './groupRows';
 import type { MoonMiningTaxRow } from './snapshot';
 import {
   autoMatchRecordedPayments,
+  exactAmountMatches,
+  normalizePaymentInfo,
   suggestLink,
   unlinkedPayments,
   unlinkedRecordedPayments,
@@ -113,7 +115,7 @@ describe('unlinkedPayments', () => {
         paidOn: '2026-09-06',
         method: 'donation',
         amount: 100,
-        journalRefId: 11,
+        journalLinks: [{ refId: 11, source: 'auto' }],
       },
     });
 
@@ -133,7 +135,7 @@ describe('unlinkedPayments', () => {
         paidOn: '2026-09-06',
         method: 'contract',
         amount: 100,
-        contractId: 11,
+        contractLinks: [{ refId: 11, source: 'auto' }],
       },
     });
 
@@ -293,7 +295,16 @@ describe('unlinkedRecordedPayments', () => {
   });
 
   it('excludes an Assignment already linked to a journal entry or contract', () => {
-    const linked = recorded({ payment: { ...recorded().payment!, journalRefId: 11 } });
+    const linked = recorded({
+      payment: { ...recorded().payment!, journalLinks: [{ refId: 11, source: 'auto' }] },
+    });
+    expect(unlinkedRecordedPayments([linked])).toEqual([]);
+  });
+
+  it('excludes an Assignment linked via the legacy single-ref shape (pre-migration data)', () => {
+    const linked = recorded({
+      payment: { ...recorded().payment!, journalRefId: 11 } as never,
+    });
     expect(unlinkedRecordedPayments([linked])).toEqual([]);
   });
 
@@ -431,5 +442,43 @@ describe('suggestLink — paying back taxes', () => {
     );
 
     expect(result).toBeNull();
+  });
+});
+
+describe('normalizePaymentInfo', () => {
+  it('leaves a payment with the current shape untouched', () => {
+    const p = recorded().payment!;
+    expect(normalizePaymentInfo(p)).toEqual(p);
+  });
+
+  it('reads a legacy single journalRefId as one auto-sourced link', () => {
+    const legacy = { ...recorded().payment!, journalRefId: 11 };
+    expect(normalizePaymentInfo(legacy)).toEqual({
+      paymentId: 'p1',
+      paidOn: '2026-09-06',
+      method: 'donation',
+      amount: 100,
+      journalLinks: [{ refId: 11, source: 'auto' }],
+      contractLinks: undefined,
+    });
+  });
+
+  it('reads a legacy single contractId as one auto-sourced link', () => {
+    const legacy = { ...recorded().payment!, contractId: 7 };
+    expect(normalizePaymentInfo(legacy).contractLinks).toEqual([{ refId: 7, source: 'auto' }]);
+  });
+});
+
+describe('exactAmountMatches', () => {
+  it('keeps only payments whose ISK figure equals the target exactly', () => {
+    const exact = payment({ key: 'journal:1', refId: 1, amount: 100 });
+    const close = payment({ key: 'journal:2', refId: 2, amount: 101 });
+
+    expect(exactAmountMatches([exact, close], 100)).toEqual([exact]);
+  });
+
+  it('never matches a payment in kind, which carries no ISK figure', () => {
+    const inKind = payment({ kind: 'contract', key: 'contract:1', amount: null });
+    expect(exactAmountMatches([inKind], 0)).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type ComponentProps, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cx } from '@/lib/cx';
 import { useIsNarrow } from '@/lib/useIsNarrow';
@@ -89,6 +89,23 @@ interface FilterBarProps<T> {
   actions?: ReactNode;
   /** Wrapper class for the row. */
   className?: string;
+  /**
+   * Cross-axis alignment of the row's own items (search, `actions`, the
+   * funnel trigger). `center` (default) is right for a plain `SearchInput`,
+   * which is the same height as the icon buttons beside it. A `search` built
+   * from labelled fields (a caption above each control, Hauling's From/To/
+   * Category) is taller than those buttons, so `end` lines every control's
+   * own bottom edge up instead of centering the icons against the taller
+   * block's full height.
+   */
+  rowAlign?: 'center' | 'end';
+  /**
+   * Size of the funnel trigger's `IconButton`. Defaults to `IconButton`'s
+   * own default (`md`) so existing callers are unchanged; pass `sm` to match
+   * a `size="sm"` `actions` control (Hauling's `ColumnPickerMenu`) so the two
+   * read as one pair rather than two different-sized buttons.
+   */
+  triggerSize?: ComponentProps<typeof IconButton>['size'];
 }
 
 /**
@@ -124,6 +141,8 @@ export function FilterBar<T>({
   children,
   actions,
   className = '',
+  rowAlign = 'center',
+  triggerSize,
 }: FilterBarProps<T>) {
   const isNarrow = useIsNarrow();
 
@@ -135,6 +154,8 @@ export function FilterBar<T>({
         title={title}
         actions={actions}
         className={className}
+        rowAlign={rowAlign}
+        triggerSize={triggerSize}
       >
         {children(value, onChange)}
       </CollapsibleFilterRow>
@@ -150,6 +171,8 @@ export function FilterBar<T>({
       title={title}
       actions={actions}
       className={className}
+      rowAlign={rowAlign}
+      triggerSize={triggerSize}
     >
       {children}
     </FilterSheet>
@@ -169,11 +192,13 @@ function FilterTrigger({
   expanded,
   haspopup,
   onClick,
+  size,
 }: {
   activeCount: number;
   expanded: boolean;
   haspopup: 'dialog' | 'true';
   onClick: () => void;
+  size?: ComponentProps<typeof IconButton>['size'];
 }) {
   const { t } = useTranslation();
   return (
@@ -186,6 +211,7 @@ function FilterTrigger({
         aria-haspopup={haspopup}
         aria-expanded={expanded}
         onClick={onClick}
+        size={size}
       />
       {activeCount > 0 && (
         <span
@@ -216,6 +242,8 @@ function CollapsibleFilterRow({
   actions,
   children,
   className = '',
+  rowAlign = 'center',
+  triggerSize,
 }: {
   search?: ReactNode;
   activeCount: number;
@@ -223,12 +251,16 @@ function CollapsibleFilterRow({
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
+  rowAlign?: 'center' | 'end';
+  triggerSize?: ComponentProps<typeof IconButton>['size'];
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   return (
     <div className={cx('flex flex-col gap-2', className)}>
-      <div className="flex flex-wrap items-center gap-2">
+      <div
+        className={cx('flex flex-wrap gap-2', rowAlign === 'end' ? 'items-end' : 'items-center')}
+      >
         {search}
         {/* Before the trigger, so Tab runs straight from the funnel into the
             group it just revealed. */}
@@ -237,6 +269,7 @@ function CollapsibleFilterRow({
           activeCount={activeCount}
           expanded={open}
           haspopup="true"
+          size={triggerSize}
           onClick={() => setOpen((was) => !was)}
         />
       </div>
@@ -269,6 +302,8 @@ function FilterSheet<T>({
   actions,
   children,
   className = '',
+  rowAlign = 'center',
+  triggerSize,
 }: FilterBarProps<T>) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -276,7 +311,13 @@ function FilterSheet<T>({
 
   return (
     <>
-      <div className={cx('flex flex-wrap items-center gap-2', className)}>
+      <div
+        className={cx(
+          'flex flex-wrap gap-2',
+          rowAlign === 'end' ? 'items-end' : 'items-center',
+          className
+        )}
+      >
         {search}
         {actions}
         {/*
@@ -289,6 +330,7 @@ function FilterSheet<T>({
           activeCount={activeCount}
           expanded={open}
           haspopup="dialog"
+          size={triggerSize}
           onClick={() => {
             // Seeded here rather than in an effect on `value`: a filter whose
             // options arrive from a fetch would otherwise re-seed mid-edit and

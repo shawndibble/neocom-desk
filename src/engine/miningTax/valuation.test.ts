@@ -42,4 +42,32 @@ describe('computeAssignmentValue', () => {
       computeAssignmentValue(lines, prices, 15)
     );
   });
+
+  it('uses a per-line value override in place of quantity * unit price, for the lines it covers', () => {
+    const lines: OreLine[] = [
+      { typeId: A, quantity: 100 },
+      { typeId: B, quantity: 50 },
+    ];
+    const prices = new Map([
+      [A, 10],
+      [B, 4],
+    ]);
+    // A overridden to 900 (corp tool's own total); B left to the computed 50*4=200.
+    const overrides = new Map([[A, 900]]);
+
+    const result = computeAssignmentValue(lines, prices, 10);
+    const overridden = computeAssignmentValue(lines, prices, 10, overrides);
+
+    expect(result).toEqual({ estimatedValue: 1200, taxOwed: 120 });
+    // 900 + 200 = 1100; 10% of 1100 = 110
+    expect(overridden).toEqual({ estimatedValue: 1100, taxOwed: 110 });
+  });
+
+  it('an override map with no entries behaves exactly like no override at all', () => {
+    const lines: OreLine[] = [{ typeId: A, quantity: 100 }];
+    const prices = new Map([[A, 10]]);
+    expect(computeAssignmentValue(lines, prices, 10, new Map())).toEqual(
+      computeAssignmentValue(lines, prices, 10)
+    );
+  });
 });

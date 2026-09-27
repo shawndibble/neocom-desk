@@ -595,7 +595,7 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
       await screen.findByRole('heading', { name: 'Build Opportunities' })
     ).closest('section')!;
     await user.click(await within(oppSection).findByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('button', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
     // The filter lives in the URL, so a reload keeps it.
     expect(new URLSearchParams(window.location.search).get('opps.chars')).toBe('all');
 

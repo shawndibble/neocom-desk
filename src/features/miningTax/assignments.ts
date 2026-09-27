@@ -11,12 +11,16 @@ import {
   type MiningTaxAssignmentRecord,
   type MiningTaxOreLine,
   type MiningTaxPaymentInfo,
+  type MiningTaxPaymentLink,
+  type MiningTaxPaymentLinkSource,
+  type MiningTaxPaymentMethod,
 } from '@/db';
 import { markMiningTaxAssignmentDeleted, scheduleSync } from '@/sync';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { linesOwnedBy } from '@/engine/miningTax/ownership';
 import { planSplit } from '@/engine/miningTax/split';
 import type { MiningLedgerEntry } from '@/engine/miningTax/types';
+import { normalizePaymentInfo } from './paymentLinks';
 import { loadPayees } from './payees';
 import { hubForPayee, loadUnitPricesOnDate } from './pricing';
 
@@ -68,8 +72,10 @@ async function assertUnclaimed(
   if (clash) throw new AlreadyAssignedError();
 }
 
-export function loadAssignments(characterId: number): Promise<MiningTaxAssignmentRecord[]> {
-  return db.miningTaxAssignments.where('characterId').equals(characterId).toArray();
+/** Normalizes each record's `payment` on the way out — see `normalizePaymentInfo`. */
+export async function loadAssignments(characterId: number): Promise<MiningTaxAssignmentRecord[]> {
+  const records = await db.miningTaxAssignments.where('characterId').equals(characterId).toArray();
+  return records.map((r) => (r.payment ? { ...r, payment: normalizePaymentInfo(r.payment) } : r));
 }
 
 export interface AssignInput {
@@ -182,6 +188,15 @@ export interface UpdateAssignmentInput {
   taxPct: number;
   estimatedValue: number;
   taxOwed: number;
+  /**
+   * The pilot's per-ore-type corrections, when the "edit ore values
+   * individually" setting is on — omit (not an empty object) to leave
+   * whatever was previously stored untouched only when the setting is off
+   * *and* the record never had any; otherwise this always replaces the
+   * stored map outright, so a line the pilot cleared back to tracking the
+   * computed default is actually gone, not silently kept from a prior edit.
+   */
+  oreLineValues?: Record<number, number>;
 }
 
 /**
@@ -190,11 +205,17 @@ export interface UpdateAssignmentInput {
  * correctable after the fact (a Jita price or a Payee's rate can turn out
  * wrong after the invoice moment `createAssignment` snapshotted).
  *
- * Deliberately leaves two things alone: `oreLines`, since line membership is
+ * Deliberately leaves one thing alone: `oreLines`, since line membership is
  * what the sole-vs-split ownership rule (`rowStatus.ts`) keys off — resplitting
- * a record happens through Undo + a fresh Assign, not this edit — and
- * `status`/`paidAt`, so correcting a Paid record's ISK doesn't silently
- * un-pay it.
+ * a record happens through Undo + a fresh Assign, not this edit. `status`/
+ * `paidAt` are also left alone here — correcting a Paid record's ISK doesn't
+ * silently un-pay it; `unlockPaidAssignment` is the only thing that reopens a
+ * Paid record, and only the pilot calling it explicitly does that.
+ *
+ * `oreLineValues` replaces whatever was stored outright (or is removed
+ * entirely when omitted) rather than merging — the Assign form always
+ * recomputes the whole map from what's currently in each per-ore box, so a
+ * partial merge here would resurrect a correction the pilot just cleared.
  *
  * Moving a *joined* member onto a different Payee or rate does drop its
  * `groupId`, though. A group is one obligation billed to one Payee at one
@@ -215,8 +236,36 @@ export async function updateAssignment(
     taxOwed: input.taxOwed,
     updatedAt: Date.now(),
   };
+  if (input.oreLineValues !== undefined) updated.oreLineValues = input.oreLineValues;
+  else delete updated.oreLineValues;
   const termsChanged = input.payeeId !== assignment.payeeId || input.taxPct !== assignment.taxPct;
   if (termsChanged) delete updated.groupId;
+  await db.miningTaxAssignments.put(updated);
+  scheduleSync(assignment.characterId);
+  return updated;
+}
+
+/**
+ * Reopens a Paid Assignment for editing ("unlock to edit", grilling session
+ * 2026-09-27) — reverts `status` to `outstanding` and clears `paidAt` so the
+ * row detail view's fields stop rendering read-only, but deliberately leaves
+ * `payment` (the recorded amount/method/date and any matched wallet-journal
+ * or contract reference) exactly as it was: the pilot is correcting a
+ * data-entry mistake, not reversing a real payment, and losing an
+ * already-matched reconciliation over a routine ore-value fix would be a
+ * real chore. Re-marking the corrected record paid afterward
+ * (`markAssignmentsPaid`, with no `payment` argument) reuses that same
+ * retained record rather than asking for it again.
+ */
+export async function unlockPaidAssignment(
+  assignment: MiningTaxAssignmentRecord
+): Promise<MiningTaxAssignmentRecord> {
+  const updated: MiningTaxAssignmentRecord = {
+    ...assignment,
+    status: 'outstanding',
+    updatedAt: Date.now(),
+  };
+  delete updated.paidAt;
   await db.miningTaxAssignments.put(updated);
   scheduleSync(assignment.characterId);
   return updated;
@@ -336,27 +385,131 @@ export async function markAssignmentsPaid(
     scheduleSync(characterId);
 }
 
+/** Which linked-transaction array a call targets — a wallet-journal entry id or a contract id, never both. */
+export type PaymentTransactionRef = { journalRefId: number } | { contractId: number };
+
+/** Every Assignment settled by the same lump sum as `assignment` — linking or unlinking a transaction applies to the whole group, not just one row. Falls back to the row alone when there is no `payment` yet. */
+export function assignmentsSharingPayment(
+  assignment: MiningTaxAssignmentRecord,
+  all: readonly MiningTaxAssignmentRecord[]
+): MiningTaxAssignmentRecord[] {
+  const paymentId = assignment.payment?.paymentId;
+  if (paymentId === undefined) return [assignment];
+  return all.filter((a) => a.payment?.paymentId === paymentId);
+}
+
+/** Appends one link onto whichever array `ref` names, normalizing the payment's legacy shape first. */
+function withLink(
+  payment: MiningTaxPaymentInfo,
+  ref: PaymentTransactionRef,
+  source: MiningTaxPaymentLinkSource
+): MiningTaxPaymentInfo {
+  const normalized = normalizePaymentInfo(payment);
+  const link: MiningTaxPaymentLink = {
+    refId: 'journalRefId' in ref ? ref.journalRefId : ref.contractId,
+    source,
+  };
+  return 'journalRefId' in ref
+    ? { ...normalized, journalLinks: [...(normalized.journalLinks ?? []), link] }
+    : { ...normalized, contractLinks: [...(normalized.contractLinks ?? []), link] };
+}
+
 /**
  * Attaches a real wallet-journal or contract id to an already-recorded
  * Settle-up payment (`paymentLinks.ts`'s `autoMatchRecordedPayments`) — every
- * other field of `payment` is left exactly as the pilot recorded it. Never
- * called for a manual link through the dialog; that path goes through
- * `markAssignmentsPaid` instead, since it may also change which Assignments a
- * payment covers.
+ * other field of `payment` is left exactly as the pilot recorded it, and this
+ * always *adds* a link rather than replacing one, since a lump sum can be
+ * paid in installments. Never called for the itemized settle-up link; that
+ * path goes through `markAssignmentsPaid` instead, since it may also change
+ * which Assignments a payment covers.
  */
 export async function linkRecordedPayment(
   assignments: readonly MiningTaxAssignmentRecord[],
-  ref: { journalRefId: number } | { contractId: number }
+  ref: PaymentTransactionRef
 ): Promise<void> {
   if (assignments.length === 0) return;
   const now = Date.now();
   const updated = assignments.map((a): MiningTaxAssignmentRecord => {
     if (!a.payment) return a;
-    return { ...a, payment: { ...a.payment, ...ref }, updatedAt: now };
+    return { ...a, payment: withLink(a.payment, ref, 'auto'), updatedAt: now };
   });
   await db.miningTaxAssignments.bulkPut(updated);
   for (const characterId of new Set(assignments.map((a) => a.characterId)))
     scheduleSync(characterId);
+}
+
+/** A minimal payment to create from the transaction's own data, when the target Assignment(s) have no `payment` yet — see `linkPaymentTransaction`. */
+export interface FallbackPaymentInput {
+  paidOn: string;
+  amount: number;
+  method: MiningTaxPaymentMethod;
+}
+
+/**
+ * The manual "Link transaction" action (issue #540 follow-up): attaches a
+ * wallet-journal or contract id to every Assignment in `assignments` — every
+ * member of one payment's `paymentId` group, so linking from one row settles
+ * the whole lump sum it belongs to. Purely informational: it never touches
+ * `status`, `taxOwed`, or any other field, and — unlike `linkRecordedPayment`
+ * — it is reachable from an already-Paid row that was settled before ESI had
+ * posted the transaction, which is the gap this fills.
+ *
+ * When an Assignment has no `payment` at all yet (a bare "mark paid" with no
+ * Settle-up record), `fallbackPayment` seeds a minimal one from the
+ * transaction's own date/amount/method, rather than forcing a separate
+ * "record payment" step first — the transaction already carries what a
+ * payment record needs.
+ */
+export async function linkPaymentTransaction(
+  assignments: readonly MiningTaxAssignmentRecord[],
+  ref: PaymentTransactionRef,
+  source: MiningTaxPaymentLinkSource,
+  fallbackPayment: FallbackPaymentInput
+): Promise<void> {
+  if (assignments.length === 0) return;
+  const now = Date.now();
+  const updated = assignments.map((a): MiningTaxAssignmentRecord => {
+    const base: MiningTaxPaymentInfo = a.payment ?? {
+      paymentId: crypto.randomUUID(),
+      ...fallbackPayment,
+    };
+    return { ...a, payment: withLink(base, ref, source), updatedAt: now };
+  });
+  await db.miningTaxAssignments.bulkPut(updated);
+  for (const characterId of new Set(assignments.map((a) => a.characterId)))
+    scheduleSync(characterId);
+}
+
+/** Removes one linked transaction from every Assignment in `assignments` (a mistaken pick) — the mirror of `linkPaymentTransaction`. A no-op for an Assignment with no `payment` or without that link. */
+export async function unlinkPaymentTransaction(
+  assignments: readonly MiningTaxAssignmentRecord[],
+  ref: PaymentTransactionRef
+): Promise<void> {
+  if (assignments.length === 0) return;
+  const now = Date.now();
+  const updated = assignments
+    .filter((a): a is MiningTaxAssignmentRecord & { payment: MiningTaxPaymentInfo } => !!a.payment)
+    .map((a): MiningTaxAssignmentRecord => {
+      const normalized = normalizePaymentInfo(a.payment);
+      const payment =
+        'journalRefId' in ref
+          ? {
+              ...normalized,
+              journalLinks: (normalized.journalLinks ?? []).filter(
+                (l) => l.refId !== ref.journalRefId
+              ),
+            }
+          : {
+              ...normalized,
+              contractLinks: (normalized.contractLinks ?? []).filter(
+                (l) => l.refId !== ref.contractId
+              ),
+            };
+      return { ...a, payment, updatedAt: now };
+    });
+  if (updated.length === 0) return;
+  await db.miningTaxAssignments.bulkPut(updated);
+  for (const characterId of new Set(updated.map((a) => a.characterId))) scheduleSync(characterId);
 }
 
 export interface SplitInput {
@@ -420,6 +573,14 @@ export async function splitAssignment(
     taxOwed: keptValue.taxOwed,
     updatedAt: now,
   };
+  // A per-ore-type override (`oreLineValues`) names typeIds against the
+  // *original*'s line set — splitting changes which lines this record
+  // covers, so a carried-over override would either dangle (a moved type no
+  // longer here) or silently misprice a kept line the pilot never corrected
+  // for this half of the split. Both sides re-price independently
+  // (`SplitPrices`'s own doc comment); a hand-edited correction does not
+  // survive that same way.
+  delete kept.oreLineValues;
   delete kept.collectsGrowth;
   if (input.collector === 'original') kept.collectsGrowth = true;
   if (original.status === 'needs-review') {
@@ -515,6 +676,10 @@ export async function resolveNeedsReview(
   };
   delete updated.reviewDiff;
   delete updated.paidAt;
+  // Same reason `splitAssignment` drops it: `oreLineValues` names typeIds
+  // against the pre-review line set, and growth can add or resize lines —
+  // a carried-over override would misprice this fresh re-snapshot.
+  delete updated.oreLineValues;
   await db.miningTaxAssignments.put(updated);
   scheduleSync(assignment.characterId);
 }
