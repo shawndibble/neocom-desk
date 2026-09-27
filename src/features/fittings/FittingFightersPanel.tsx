@@ -39,7 +39,6 @@ function FighterMenuItems({
   launchable,
   onState,
   onRemove,
-  showInfo,
   name,
 }: {
   squadron: FittingFighter;
@@ -47,7 +46,6 @@ function FighterMenuItems({
   launchable: boolean;
   onState: (state: FittingFighter['state']) => void;
   onRemove: () => void;
-  showInfo: (typeId: number, name: string) => void;
   name: string;
 }) {
   const { t } = useTranslation();
@@ -61,7 +59,7 @@ function FighterMenuItems({
         </MenuItem>
       )}
       <MenuSeparator />
-      <ShowInfoMenuItem typeId={squadron.typeId} itemName={name} onShowInfo={showInfo} />
+      <ShowInfoMenuItem typeId={squadron.typeId} itemName={name} />
       <ViewInMarketMenuItem typeId={squadron.typeId} />
       <MenuSeparator />
       <MenuItem className="text-danger" onSelect={onRemove}>
@@ -208,7 +206,6 @@ export function FittingFightersPanel({
                     squadron={squadron}
                     launchable={launchable}
                     name={name}
-                    showInfo={actions.showInfo}
                     onState={(state) => onChange((f) => setSquadron(f, index, { state }))}
                     onRemove={() => onChange((f) => removeSquadron(f, index))}
                   />

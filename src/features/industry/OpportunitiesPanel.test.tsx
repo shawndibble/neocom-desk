@@ -9,6 +9,7 @@ import type { BlueprintCatalog } from './blueprintCatalog';
 import type { OwnedStockSnapshot } from './ownedStockDetection';
 import { DEFAULT_ACTIVITY_FACILITY_DEFAULTS } from './facilityDefaults';
 import { OpportunitiesPanel } from './OpportunitiesPanel';
+import { fakeItemActions, withItemActions } from '@/features/market/__fixtures__/itemActions';
 
 const loadCharacterBlueprints = vi.hoisted(() => vi.fn());
 vi.mock('./data', async () => {
@@ -89,20 +90,19 @@ describe('OpportunitiesPanel', () => {
    */
   it('settles instead of re-rendering unboundedly', async () => {
     render(
-      <OpportunitiesPanel
-        catalog={CATALOG}
-        pi={null}
-        modifiers={NO_CHARACTER_MODIFIERS}
-        facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
-        activeCharacterId={CHARACTER_ID}
-        ownedStockSnapshot={SNAPSHOT}
-        assumedMe={0}
-        onAddToCompare={() => {}}
-        onStartPlan={() => {}}
-        onAddToQuickbar={() => {}}
-        quickbarAvailable
-        onShowInfo={() => {}}
-      />,
+      withItemActions(
+        <OpportunitiesPanel
+          catalog={CATALOG}
+          pi={null}
+          modifiers={NO_CHARACTER_MODIFIERS}
+          facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
+          activeCharacterId={CHARACTER_ID}
+          ownedStockSnapshot={SNAPSHOT}
+          assumedMe={0}
+          onAddToCompare={() => {}}
+          onStartPlan={() => {}}
+        />
+      ),
       { wrapper: MemoryRouter }
     );
 
@@ -160,39 +160,38 @@ describe('OpportunitiesPanel', () => {
           orderDepth: 'deep',
         },
       ];
-      const onAddToQuickbar = vi.fn();
-      const onShowInfo = vi.fn();
+      const actions = fakeItemActions();
       render(
-        <OpportunitiesPanel
-          catalog={catalog}
-          pi={null}
-          modifiers={NO_CHARACTER_MODIFIERS}
-          facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
-          activeCharacterId={CHARACTER_ID}
-          ownedStockSnapshot={SNAPSHOT}
-          assumedMe={0}
-          onAddToCompare={() => {}}
-          onStartPlan={() => {}}
-          onAddToQuickbar={onAddToQuickbar}
-          quickbarAvailable
-          onShowInfo={onShowInfo}
-          {...handlers}
-        />,
+        withItemActions(
+          <OpportunitiesPanel
+            catalog={catalog}
+            pi={null}
+            modifiers={NO_CHARACTER_MODIFIERS}
+            facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
+            activeCharacterId={CHARACTER_ID}
+            ownedStockSnapshot={SNAPSHOT}
+            assumedMe={0}
+            onAddToCompare={() => {}}
+            onStartPlan={() => {}}
+            {...handlers}
+          />,
+          actions
+        ),
         { wrapper: MemoryRouter }
       );
       const name = await screen.findByText('Widget Alpha');
-      return { row: name.closest('tr')!, onAddToQuickbar, onShowInfo };
+      return { row: name.closest('tr')!, actions };
     }
 
     it('opens the shared item menu from a row and wires its actions', async () => {
-      const { row, onAddToQuickbar, onShowInfo } = await renderWithRow(1000);
+      const { row, actions } = await renderWithRow(1000);
       fireEvent.contextMenu(row);
       fireEvent.click(await screen.findByText('Add to Quickbar'));
-      expect(onAddToQuickbar).toHaveBeenCalledWith(1000, 'Widget Alpha');
+      expect(actions.addToQuickbar).toHaveBeenCalledWith(1000, 'Widget Alpha');
 
       fireEvent.contextMenu(row);
       fireEvent.click(await screen.findByText('Show info'));
-      expect(onShowInfo).toHaveBeenCalledWith(1000, 'Widget Alpha');
+      expect(actions.showInfo).toHaveBeenCalledWith(1000, 'Widget Alpha');
     });
 
     it('renders a row with an unknown product type without a menu', async () => {
@@ -276,20 +275,19 @@ describe('OpportunitiesPanel', () => {
         },
       });
       render(
-        <OpportunitiesPanel
-          catalog={catalog}
-          pi={null}
-          modifiers={NO_CHARACTER_MODIFIERS}
-          facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
-          activeCharacterId={CHARACTER_ID}
-          ownedStockSnapshot={SNAPSHOT}
-          assumedMe={0}
-          onAddToCompare={() => {}}
-          onStartPlan={() => {}}
-          onAddToQuickbar={() => {}}
-          quickbarAvailable
-          onShowInfo={() => {}}
-        />,
+        withItemActions(
+          <OpportunitiesPanel
+            catalog={catalog}
+            pi={null}
+            modifiers={NO_CHARACTER_MODIFIERS}
+            facilityDefaults={DEFAULT_ACTIVITY_FACILITY_DEFAULTS}
+            activeCharacterId={CHARACTER_ID}
+            ownedStockSnapshot={SNAPSHOT}
+            assumedMe={0}
+            onAddToCompare={() => {}}
+            onStartPlan={() => {}}
+          />
+        ),
         { wrapper: MemoryRouter }
       );
 

@@ -20,6 +20,7 @@ import { SEVERITY_ICON, SEVERITY_LABEL, SEVERITY_TEXT } from '@/components/ui/se
 import { marketItemUrl } from '@/engine/market/urlState';
 import { writeToClipboard } from '@/lib/clipboard';
 import { formatDuration } from '@/lib/duration';
+import { useItemActions } from '@/features/market/itemActions';
 import { structureStateLabel } from './boardSources';
 import type { CorpBoardItem } from '@/engine/corp/board';
 
@@ -148,13 +149,11 @@ interface BoardRowAction {
  * can't drift. Job rows add market-item (typeId) actions; other kinds only
  * get copy name.
  */
-function useBoardRowActions(
-  item: CorpBoardItem,
-  onShowInfo: (typeId: number, itemName: string) => void
-): BoardRowAction[] {
+function useBoardRowActions(item: CorpBoardItem): BoardRowAction[] {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  const { showInfo } = useItemActions();
   const typeId = item.typeId;
 
   const actions: BoardRowAction[] = [
@@ -169,7 +168,7 @@ function useBoardRowActions(
       {
         key: 'showInfo',
         label: t('corp.board.contextMenu.showInfo'),
-        onSelect: () => onShowInfo(typeId, item.subject),
+        onSelect: () => showInfo(typeId, item.subject),
       },
       {
         key: 'viewInMarket',
@@ -190,15 +189,9 @@ function useBoardRowActions(
  * cards is precisely how one surface ends up quietly printing a figure the
  * other refuses to.
  */
-export function CorpBoardRow({
-  item,
-  onShowInfo,
-}: {
-  item: CorpBoardItem;
-  onShowInfo: (typeId: number, itemName: string) => void;
-}) {
+export function CorpBoardRow({ item }: { item: CorpBoardItem }) {
   const { t } = useTranslation();
-  const actions = useBoardRowActions(item, onShowInfo);
+  const actions = useBoardRowActions(item);
   const detail = detailText(item, t);
   return (
     // `ContextMenuTrigger asChild` clones the `<li>` itself rather than

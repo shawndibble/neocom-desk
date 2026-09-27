@@ -92,8 +92,8 @@ import {
 } from '@/features/character/assetBrowserRows';
 import { hasItemRows } from '@/features/character/assetBrowserFormat';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
-import { ItemDetailModal } from '@/features/market/ItemDetailModal';
-import { useQuickbar } from '@/features/market/useQuickbar';
+import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
+import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useCompareSet } from '@/features/market/compareSet';
 import { writeToClipboard } from '@/lib/clipboard';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -439,13 +439,7 @@ function CorpAssetsView() {
     [data?.inputs]
   );
 
-  const quickbar = useQuickbar(snapshot.activeCharacterId);
-  const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
-    null
-  );
-  const onShowInfo = useCallback((typeId: number, itemName: string) => {
-    setInfoModalItem({ typeId, itemName });
-  }, []);
+  const itemActions = usePageItemActions({ activeCharacterId: snapshot.activeCharacterId });
 
   function collectRowItemIds(): number[] {
     return rows.flatMap((row) => {
@@ -469,7 +463,7 @@ function CorpAssetsView() {
     for (const id of selectedIds) {
       const asset = assetsByItemId.get(id);
       if (!asset) continue;
-      quickbar.add(asset.type_id, typeDisplayName(asset.type_id, typeNames));
+      itemActions.quickbar.add(asset.type_id, typeDisplayName(asset.type_id, typeNames));
     }
   }
   function handleBulkAddToCompare() {
@@ -541,226 +535,217 @@ function CorpAssetsView() {
       : (resolved.group?.itemCount ?? null);
 
   return (
-    <div className="space-y-4">
-      <PageHeader
-        title={t('corp.assets.title')}
-        subNav={<CorpSubNav flush />}
-        meta={
-          data?.fetchedAt ? (
-            <DataAgeBadge date={data.fetchedAt} note={t('corp.dataAgeNote')} />
-          ) : undefined
-        }
-        actions={
-          <div className="ml-auto flex items-center gap-1.5">
-            <IconButton
-              icon={<Icon.Select />}
-              label={t('assets.select.toggle')}
-              pressed={selectMode}
-              onClick={toggleSelectMode}
-            />
-            <IconButton
-              icon={<Icon.Download />}
-              label={t('assets.exportCsv')}
-              disabled={!groups || !hasAnyAssets}
-              onClick={handleExportCsv}
-            />
-            <IconButton
-              icon={<Icon.Refresh />}
-              label={t('corp.assets.refresh')}
-              onClick={snapshot.refresh}
-              disabled={snapshot.loading}
-            />
-          </div>
-        }
-      />
-
-      {snapshot.loading && data === null ? (
-        <Spinner />
-      ) : data === null || data.groups === null ? (
-        <EmptyState
-          title={t('corp.assets.loadFailedTitle')}
-          hint={t('corp.assets.loadFailedHint')}
-        />
-      ) : !hasAnyAssets ? (
-        <EmptyState title={t('corp.assets.empty')} hint={t('corp.assets.emptyHint')} />
-      ) : (
-        <div className="space-y-2">
-          {data.truncated && (
-            <p className="text-[0.6875rem] text-warning uppercase">
-              {t('common.incompleteTitle')} —{' '}
-              {t('corp.assets.fetchTruncatedNotice', { shown: data.assetsShown })}
-            </p>
-          )}
-          <SearchInput
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={t('corp.assets.searchPlaceholder')}
-          />
-
-          {selectMode && (
-            <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
-              {selectedIds.size > 0 && (
-                <span className="text-[0.6875rem] text-text-dim tabular-nums">
-                  {t('assets.select.selectedCount', { count: selectedIds.size })}
-                </span>
-              )}
-              <Button size="sm" onClick={handleSelectAllInView}>
-                {t('assets.select.selectAllInView')}
-              </Button>
-              <Button size="sm" disabled={selectedIds.size === 0} onClick={handleDeselectAll}>
-                {t('assets.select.deselectAll')}
-              </Button>
-              {selectedIds.size > 0 && (
-                <>
-                  <Button
-                    size="sm"
-                    disabled={!quickbar.available}
-                    onClick={handleBulkAddToQuickbar}
-                  >
-                    {t('assets.select.addToQuickbar')}
-                  </Button>
-                  <Button size="sm" onClick={handleBulkAddToCompare}>
-                    {t('assets.select.addToCompare')}
-                  </Button>
-                  <Button size="sm" onClick={handleBulkCopyNames}>
-                    {t('assets.select.copyNames')}
-                  </Button>
-                </>
-              )}
+    <ItemActionsProvider page={itemActions}>
+      <div className="space-y-4">
+        <PageHeader
+          title={t('corp.assets.title')}
+          subNav={<CorpSubNav flush />}
+          meta={
+            data?.fetchedAt ? (
+              <DataAgeBadge date={data.fetchedAt} note={t('corp.dataAgeNote')} />
+            ) : undefined
+          }
+          actions={
+            <div className="ml-auto flex items-center gap-1.5">
+              <IconButton
+                icon={<Icon.Select />}
+                label={t('assets.select.toggle')}
+                pressed={selectMode}
+                onClick={toggleSelectMode}
+              />
+              <IconButton
+                icon={<Icon.Download />}
+                label={t('assets.exportCsv')}
+                disabled={!groups || !hasAnyAssets}
+                onClick={handleExportCsv}
+              />
+              <IconButton
+                icon={<Icon.Refresh />}
+                label={t('corp.assets.refresh')}
+                onClick={snapshot.refresh}
+                disabled={snapshot.loading}
+              />
             </div>
-          )}
+          }
+        />
 
-          <Panel padded={false} className="flex min-h-0 flex-col">
-            {!searchActive && pathGroupId !== null && (
-              <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel-2 py-1.5 pr-3 pl-1">
-                <IconButton
-                  icon={<Icon.Back size={Icon.ICON_SIZE.lg} />}
-                  label={t('assets.breadcrumb.back')}
-                  variant="plain"
-                  onClick={() => void navigate(parentHref)}
-                />
-                <h2
-                  ref={levelHeadingRef}
-                  tabIndex={-1}
-                  className="min-w-0 flex-1 truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  {currentLabel}
-                  {currentItemCount !== null && (
-                    <span className="sr-only">
-                      {t('corp.assets.levelHeading.itemsSuffix', {
-                        items: t('corp.assets.itemCount', { count: currentItemCount }),
-                      })}
-                    </span>
-                  )}
-                </h2>
+        {snapshot.loading && data === null ? (
+          <Spinner />
+        ) : data === null || data.groups === null ? (
+          <EmptyState
+            title={t('corp.assets.loadFailedTitle')}
+            hint={t('corp.assets.loadFailedHint')}
+          />
+        ) : !hasAnyAssets ? (
+          <EmptyState title={t('corp.assets.empty')} hint={t('corp.assets.emptyHint')} />
+        ) : (
+          <div className="space-y-2">
+            {data.truncated && (
+              <p className="text-[0.6875rem] text-warning uppercase">
+                {t('common.incompleteTitle')} —{' '}
+                {t('corp.assets.fetchTruncatedNotice', { shown: data.assetsShown })}
+              </p>
+            )}
+            <SearchInput
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={t('corp.assets.searchPlaceholder')}
+            />
+
+            {selectMode && (
+              <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
+                {selectedIds.size > 0 && (
+                  <span className="text-[0.6875rem] text-text-dim tabular-nums">
+                    {t('assets.select.selectedCount', { count: selectedIds.size })}
+                  </span>
+                )}
+                <Button size="sm" onClick={handleSelectAllInView}>
+                  {t('assets.select.selectAllInView')}
+                </Button>
+                <Button size="sm" disabled={selectedIds.size === 0} onClick={handleDeselectAll}>
+                  {t('assets.select.deselectAll')}
+                </Button>
+                {selectedIds.size > 0 && (
+                  <>
+                    <Button
+                      size="sm"
+                      disabled={!itemActions.quickbar.available}
+                      onClick={handleBulkAddToQuickbar}
+                    >
+                      {t('assets.select.addToQuickbar')}
+                    </Button>
+                    <Button size="sm" onClick={handleBulkAddToCompare}>
+                      {t('assets.select.addToCompare')}
+                    </Button>
+                    <Button size="sm" onClick={handleBulkCopyNames}>
+                      {t('assets.select.copyNames')}
+                    </Button>
+                  </>
+                )}
               </div>
             )}
-            {!searchActive && pathGroupId === null && (
-              <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5">
-                <h2
-                  ref={levelHeadingRef}
-                  tabIndex={-1}
-                  className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  {/* "Groups" on purpose, not "divisions": `groups` here is
+
+            <Panel padded={false} className="flex min-h-0 flex-col">
+              {!searchActive && pathGroupId !== null && (
+                <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel-2 py-1.5 pr-3 pl-1">
+                  <IconButton
+                    icon={<Icon.Back size={Icon.ICON_SIZE.lg} />}
+                    label={t('assets.breadcrumb.back')}
+                    variant="plain"
+                    onClick={() => void navigate(parentHref)}
+                  />
+                  <h2
+                    ref={levelHeadingRef}
+                    tabIndex={-1}
+                    className="min-w-0 flex-1 truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    {currentLabel}
+                    {currentItemCount !== null && (
+                      <span className="sr-only">
+                        {t('corp.assets.levelHeading.itemsSuffix', {
+                          items: t('corp.assets.itemCount', { count: currentItemCount }),
+                        })}
+                      </span>
+                    )}
+                  </h2>
+                </div>
+              )}
+              {!searchActive && pathGroupId === null && (
+                <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5">
+                  <h2
+                    ref={levelHeadingRef}
+                    tabIndex={-1}
+                    className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  >
+                    {/* "Groups" on purpose, not "divisions": `groups` here is
                       the seven hangar divisions plus any non-empty flag
                       groups (Office, Deliveries, Impounded, Asset Safety,
                       Other) — a corp with an office folder would otherwise
                       read a division count that undercounts what's actually
                       listed below. */}
-                  {t('corp.assets.groupCount', { count: (groups ?? []).length })}
-                </h2>
-              </div>
-            )}
-            {searchActive && (
-              <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
-                <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                  {t('assets.search.resultCount', { count: searchMatches.length })}
-                </span>
-                <IconButton
-                  icon={<Icon.Close />}
-                  label={t('assets.search.clear')}
-                  variant="plain"
-                  size="sm"
-                  className="ml-auto"
-                  onClick={() => setSearch('')}
-                />
-              </div>
-            )}
-
-            {resolved.unresolved.length > 0 ? (
-              <EmptyState
-                title={t('assets.staleLink.title')}
-                hint={t('assets.staleLink.hint')}
-                className="py-8"
-                action={
-                  <Button size="sm" onClick={() => void navigate(corpAssetHref(null, [], query))}>
-                    {t('assets.staleLink.action')}
-                  </Button>
-                }
-              />
-            ) : rows.length === 0 ? (
-              <EmptyState
-                title={searchActive ? t('assets.noResults') : t('corp.assets.divisionEmpty')}
-                className="py-8"
-              />
-            ) : (
-              <div
-                ref={scrollParentRef}
-                data-virtual-scroll-root
-                className="min-h-0 overflow-y-auto"
-              >
-                {showItemColumns && <ItemColumnLabels t={t} />}
-                <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
-                  {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                    const row = rows[virtualRow.index];
-                    return (
-                      <div
-                        key={virtualRow.key}
-                        data-index={virtualRow.index}
-                        style={{
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          width: '100%',
-                          transform: `translateY(${virtualRow.start}px)`,
-                        }}
-                      >
-                        <BrowseRowView
-                          row={row}
-                          t={t}
-                          typeNames={typeNames}
-                          locationNames={locationNames}
-                          divisionNames={divisionNames}
-                          selectMode={selectMode}
-                          selectedIds={selectedIds}
-                          onToggleSelection={toggleNodeSelection}
-                          onAddToQuickbar={quickbar.add}
-                          quickbarAvailable={quickbar.available}
-                          onShowInfo={onShowInfo}
-                          pathGroupId={pathGroupId}
-                          pathSegments={pathSegments}
-                          query={query}
-                          priceByTypeId={data?.priceByTypeId ?? EMPTY_PRICES}
-                        />
-                      </div>
-                    );
-                  })}
+                    {t('corp.assets.groupCount', { count: (groups ?? []).length })}
+                  </h2>
                 </div>
-              </div>
-            )}
-          </Panel>
-        </div>
-      )}
+              )}
+              {searchActive && (
+                <div className="flex h-11 shrink-0 items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
+                  <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                    {t('assets.search.resultCount', { count: searchMatches.length })}
+                  </span>
+                  <IconButton
+                    icon={<Icon.Close />}
+                    label={t('assets.search.clear')}
+                    variant="plain"
+                    size="sm"
+                    className="ml-auto"
+                    onClick={() => setSearch('')}
+                  />
+                </div>
+              )}
 
-      {infoModalItem && (
-        <ItemDetailModal
-          typeId={infoModalItem.typeId}
-          itemName={infoModalItem.itemName}
-          onClose={() => setInfoModalItem(null)}
-        />
-      )}
-    </div>
+              {resolved.unresolved.length > 0 ? (
+                <EmptyState
+                  title={t('assets.staleLink.title')}
+                  hint={t('assets.staleLink.hint')}
+                  className="py-8"
+                  action={
+                    <Button size="sm" onClick={() => void navigate(corpAssetHref(null, [], query))}>
+                      {t('assets.staleLink.action')}
+                    </Button>
+                  }
+                />
+              ) : rows.length === 0 ? (
+                <EmptyState
+                  title={searchActive ? t('assets.noResults') : t('corp.assets.divisionEmpty')}
+                  className="py-8"
+                />
+              ) : (
+                <div
+                  ref={scrollParentRef}
+                  data-virtual-scroll-root
+                  className="min-h-0 overflow-y-auto"
+                >
+                  {showItemColumns && <ItemColumnLabels t={t} />}
+                  <div style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}>
+                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                      const row = rows[virtualRow.index];
+                      return (
+                        <div
+                          key={virtualRow.key}
+                          data-index={virtualRow.index}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            transform: `translateY(${virtualRow.start}px)`,
+                          }}
+                        >
+                          <BrowseRowView
+                            row={row}
+                            t={t}
+                            typeNames={typeNames}
+                            locationNames={locationNames}
+                            divisionNames={divisionNames}
+                            selectMode={selectMode}
+                            selectedIds={selectedIds}
+                            onToggleSelection={toggleNodeSelection}
+                            pathGroupId={pathGroupId}
+                            pathSegments={pathSegments}
+                            query={query}
+                            priceByTypeId={data?.priceByTypeId ?? EMPTY_PRICES}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </Panel>
+          </div>
+        )}
+      </div>
+    </ItemActionsProvider>
   );
 }
 
@@ -773,9 +758,6 @@ interface BrowseRowViewProps {
   selectMode: boolean;
   selectedIds: ReadonlySet<number>;
   onToggleSelection: (ids: readonly number[]) => void;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
   pathGroupId: CorpAssetGroupId | null;
   pathSegments: readonly string[];
   /** Current query string (`?q=…` or empty), kept on drill-down links. */
@@ -835,9 +817,6 @@ function NodeRowView({
   selectMode,
   selectedIds,
   onToggleSelection,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
   pathGroupId,
   pathSegments,
   query,
@@ -875,14 +854,7 @@ function NodeRowView({
       onToggleSelection={() => onToggleSelection([asset.item_id])}
       t={t}
       wrap={(children) => (
-        <ItemContextMenu
-          typeId={asset.type_id}
-          itemName={label}
-          blueprintTypeID={null}
-          onAddToQuickbar={onAddToQuickbar}
-          quickbarAvailable={quickbarAvailable}
-          onShowInfo={onShowInfo}
-        >
+        <ItemContextMenu typeId={asset.type_id} itemName={label} blueprintTypeID={null}>
           {children}
         </ItemContextMenu>
       )}

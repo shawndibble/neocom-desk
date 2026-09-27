@@ -67,9 +67,9 @@ import {
   loadCorporationWallets,
 } from '@/features/corp/wallet';
 import { CorpTransactionsPanel } from '@/features/corp/CorpTransactionsPanel';
-import { ItemDetailModal } from '@/features/market/ItemDetailModal';
+import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
 import { signedIsk } from '@/features/market/signedIsk';
-import { useQuickbar } from '@/features/market/useQuickbar';
+import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { loadTypeNames } from '@/features/character/typeNames';
 import {
@@ -640,13 +640,7 @@ export function Wallet() {
   // Detail plumbing as every other item table, added here rather than to
   // `CorpTransactionsPanel` since the Quickbar is per-character state, not
   // this panel's own.
-  const { add: handleAddToQuickbar, available: quickbarAvailable } = useQuickbar(activeCharacterId);
-  const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
-    null
-  );
-  function handleShowInfo(typeId: number, itemName: string) {
-    setInfoModalItem({ typeId, itemName });
-  }
+  const itemActions = usePageItemActions({ activeCharacterId });
 
   // A notification's `walletBalanceChanged` deep link (`notificationOptions.ts`)
   // names the tab as a path segment (`/wallet/journal`) — the `Tabs`
@@ -1198,136 +1192,138 @@ export function Wallet() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
-      <PageHeader
-        title={t('wallet.title')}
-        actions={
-          <>
-            <IconButton
-              icon={<Icon.Refresh />}
-              label={t('wallet.refresh')}
-              onClick={showingCorp ? handleCorpRefresh : handlePersonalRefresh}
-              disabled={
-                showingCorp
-                  ? corpBalances.loading || corpJournal.loading || corpTransactions.loading
-                  : loading || personalFills.loading
-              }
-            />
-          </>
-        }
-      />
+    <ItemActionsProvider page={itemActions}>
+      <div className="mx-auto max-w-6xl space-y-4">
+        <PageHeader
+          title={t('wallet.title')}
+          actions={
+            <>
+              <IconButton
+                icon={<Icon.Refresh />}
+                label={t('wallet.refresh')}
+                onClick={showingCorp ? handleCorpRefresh : handlePersonalRefresh}
+                disabled={
+                  showingCorp
+                    ? corpBalances.loading || corpJournal.loading || corpTransactions.loading
+                    : loading || personalFills.loading
+                }
+              />
+            </>
+          }
+        />
 
-      {/*
+        {/*
         The switch and, beside it, the division selector — one wrapping row, so
         a phone stacks them rather than scrolling the page sideways. Rendered
         only for a Character that actually holds the capability; for everyone
         else this is not on the page at all.
       */}
-      {corpAvailable && (
-        <div className="flex flex-wrap items-center gap-2">
-          <OwnerSwitch
-            value={owner}
-            onChange={setOwner}
-            label={t('wallet.ownerLabel')}
-            personalLabel={t('wallet.ownerPersonal')}
-            corporationLabel={t('wallet.ownerCorporation')}
-          />
-          {showingCorp && divisions.length > 0 && (
-            <Select
-              value={String(effectiveDivision)}
-              onValueChange={(value) => setDivision(Number(value))}
-            >
-              <SelectTrigger size="sm" aria-label={t('wallet.corpDivisionLabel')} className="w-56">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {divisions.map((entry) => (
-                  <SelectItem key={entry.division} value={String(entry.division)}>
-                    {divisionLabel(entry)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-        </div>
-      )}
+        {corpAvailable && (
+          <div className="flex flex-wrap items-center gap-2">
+            <OwnerSwitch
+              value={owner}
+              onChange={setOwner}
+              label={t('wallet.ownerLabel')}
+              personalLabel={t('wallet.ownerPersonal')}
+              corporationLabel={t('wallet.ownerCorporation')}
+            />
+            {showingCorp && divisions.length > 0 && (
+              <Select
+                value={String(effectiveDivision)}
+                onValueChange={(value) => setDivision(Number(value))}
+              >
+                <SelectTrigger
+                  size="sm"
+                  aria-label={t('wallet.corpDivisionLabel')}
+                  className="w-56"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {divisions.map((entry) => (
+                    <SelectItem key={entry.division} value={String(entry.division)}>
+                      {divisionLabel(entry)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        )}
 
-      {/*
+        {/*
         Transactions is listed only for a corporation wallet: the character's
         fills are Market's tab, and an entry that switched pages would not be a
         tab. Personal keeps exactly the two it had.
       */}
-      <Tabs
-        label={t('wallet.title')}
-        value={walletTab}
-        onChange={(id) => setTab(id as WalletTab)}
-        tabs={
-          showingCorp
-            ? [
-                { id: 'balance', label: t('wallet.balanceTab') },
-                { id: 'journal', label: t('wallet.journalTab') },
-                { id: 'transactions', label: t('wallet.corpTransactionsTab') },
-              ]
-            : [
-                { id: 'balance', label: t('wallet.balanceTab') },
-                { id: 'journal', label: t('wallet.journalTab') },
-              ]
-        }
-      />
+        <Tabs
+          label={t('wallet.title')}
+          value={walletTab}
+          onChange={(id) => setTab(id as WalletTab)}
+          tabs={
+            showingCorp
+              ? [
+                  { id: 'balance', label: t('wallet.balanceTab') },
+                  { id: 'journal', label: t('wallet.journalTab') },
+                  { id: 'transactions', label: t('wallet.corpTransactionsTab') },
+                ]
+              : [
+                  { id: 'balance', label: t('wallet.balanceTab') },
+                  { id: 'journal', label: t('wallet.journalTab') },
+                ]
+          }
+        />
 
-      {showingCorp ? (
-        walletTab === 'transactions' ? (
-          <CorpTransactionsPanel
-            transactionsResult={corpTransactionsResult}
-            transactions={corpTransactionRows}
-            filteredTransactions={filteredTransactions}
-            loading={corpTransactions.loading && corpTransactions.data === null}
-            filter={transactionFilter}
-            onFilterChange={setTransactionFilter}
-            sort={transactionsSortProps.sort}
-            onSortChange={transactionsSortProps.onSortChange}
-            nameFor={nameForType}
-            divisionQualifier={selectedDivision ? divisionLabel(selectedDivision) : undefined}
-            offlineTitleKey={
-              corpTransactions.refreshCount > 0
-                ? 'common.refreshFailedTitle'
-                : 'common.offlineTitle'
-            }
-            onAddToQuickbar={handleAddToQuickbar}
-            quickbarAvailable={quickbarAvailable}
-            onShowInfo={handleShowInfo}
-          />
-        ) : (
-          <CorpWalletView
-            tab={walletTab}
-            balances={corpBalances.data}
-            balancesLoading={corpBalances.loading && corpBalances.data === null}
-            journalResult={corpJournalResult}
-            journal={corpJournalEntries}
-            journalLoading={corpJournal.loading && corpJournal.data === null}
-            journalColumns={corpJournalColumns}
-            journalFilter={journalFilter}
-            onJournalFilterChange={setJournalFilter}
-            journalSort={journalSortProps.sort}
-            onJournalSortChange={journalSortProps.onSortChange}
-            division={selectedDivision}
-            divisionLabel={divisionLabel}
-            offlineTitleKey={
-              corpBalances.refreshCount > 0 || corpJournal.refreshCount > 0
-                ? 'common.refreshFailedTitle'
-                : 'common.offlineTitle'
-            }
-          />
-        )
-      ) : loading && !data ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : error ? (
-        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-      ) : walletTab === 'balance' ? (
-        <div className="space-y-4">
-          {/*
+        {showingCorp ? (
+          walletTab === 'transactions' ? (
+            <CorpTransactionsPanel
+              transactionsResult={corpTransactionsResult}
+              transactions={corpTransactionRows}
+              filteredTransactions={filteredTransactions}
+              loading={corpTransactions.loading && corpTransactions.data === null}
+              filter={transactionFilter}
+              onFilterChange={setTransactionFilter}
+              sort={transactionsSortProps.sort}
+              onSortChange={transactionsSortProps.onSortChange}
+              nameFor={nameForType}
+              divisionQualifier={selectedDivision ? divisionLabel(selectedDivision) : undefined}
+              offlineTitleKey={
+                corpTransactions.refreshCount > 0
+                  ? 'common.refreshFailedTitle'
+                  : 'common.offlineTitle'
+              }
+            />
+          ) : (
+            <CorpWalletView
+              tab={walletTab}
+              balances={corpBalances.data}
+              balancesLoading={corpBalances.loading && corpBalances.data === null}
+              journalResult={corpJournalResult}
+              journal={corpJournalEntries}
+              journalLoading={corpJournal.loading && corpJournal.data === null}
+              journalColumns={corpJournalColumns}
+              journalFilter={journalFilter}
+              onJournalFilterChange={setJournalFilter}
+              journalSort={journalSortProps.sort}
+              onJournalSortChange={journalSortProps.onSortChange}
+              division={selectedDivision}
+              divisionLabel={divisionLabel}
+              offlineTitleKey={
+                corpBalances.refreshCount > 0 || corpJournal.refreshCount > 0
+                  ? 'common.refreshFailedTitle'
+                  : 'common.offlineTitle'
+              }
+            />
+          )
+        ) : loading && !data ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : error ? (
+          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        ) : walletTab === 'balance' ? (
+          <div className="space-y-4">
+            {/*
             The picker stays visible in both branches, even while pinned to
             "This character" — otherwise there is no way to discover the
             cross-character view at all (issue #607) — but it rides in each
@@ -1335,265 +1331,264 @@ export function Wallet() {
             swaps beneath it: unchanged for "This character", a per-character
             table + total for anything wider.
           */}
-          {showingAllWalletBalances ? (
+            {showingAllWalletBalances ? (
+              <Panel
+                padded={false}
+                title={t('wallet.balanceByCharacter')}
+                meta={walletCharacterFilterMeta}
+                actions={
+                  <IconButton
+                    size="sm"
+                    icon={<Icon.Refresh />}
+                    label={t('wallet.refresh')}
+                    onClick={refreshWalletBalances}
+                    disabled={walletBalancesLoading}
+                  />
+                }
+              >
+                {walletBalancesLoading ? (
+                  <div className="flex justify-center py-8">
+                    <Spinner label={t('common.loading')} />
+                  </div>
+                ) : (
+                  <>
+                    <p className="px-3 pt-2 text-xl font-medium tabular-nums">
+                      {t('wallet.totalBalance')}:{' '}
+                      <span className={iskToneClass(walletBalancesTotal)}>
+                        {formatIsk(walletBalancesTotal, 2)}
+                      </span>
+                    </p>
+                    {walletBalancesSkipped.length > 0 && (
+                      <div className="space-y-1 px-3 pt-2">
+                        {walletBalancesSkipped.map((s) => (
+                          <p key={s.characterId} className="text-xs text-text-dim">
+                            {s.name} — {t('wallet.balanceCharacterNotShared')}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                    {visibleWalletBalances.length === 0 ? (
+                      <EmptyState title={t('wallet.balanceEmpty')} className="py-8" />
+                    ) : (
+                      <DataTable
+                        label={t('wallet.balanceByCharacter')}
+                        columns={walletBalanceColumns}
+                        rows={visibleWalletBalances}
+                        rowKey={(row) => row.characterId}
+                        sort={balanceSortProps.sort}
+                        onSortChange={balanceSortProps.onSortChange}
+                      />
+                    )}
+                  </>
+                )}
+              </Panel>
+            ) : (
+              <Panel
+                title={t('wallet.balanceTab')}
+                meta={walletCharacterFilterMeta}
+                actions={
+                  balanceResult ? <DataAgeBadge date={balanceResult.fetchedAt} /> : undefined
+                }
+              >
+                <div className="flex flex-wrap gap-x-8 gap-y-4">
+                  <div>
+                    <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {t('wallet.isk')}
+                    </p>
+                    {balanceNeedsReauth ? (
+                      <GrantBanner
+                        characterId={activeCharacterId}
+                        endpoints={['getCharacterWallet']}
+                        title={t('wallet.reauthTitle')}
+                        hint={t('wallet.reauthHint')}
+                        actionLabel={t('wallet.reauthAction')}
+                      />
+                    ) : balanceResult ? (
+                      <p
+                        className={`text-xl font-medium tabular-nums ${iskToneClass(balanceResult.data)}`}
+                      >
+                        {formatIsk(balanceResult.data, 2)}
+                      </p>
+                    ) : (
+                      <EmptyState title={t('wallet.balanceEmpty')} className="py-4" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {t('wallet.everMarks')}
+                      <InfoTooltip
+                        label={t('wallet.everMarksTooltipLabel')}
+                        content={t('wallet.everMarksTooltip')}
+                      />
+                    </p>
+                    <p className="text-xl font-medium tabular-nums">
+                      {loyaltyResult && !loyaltyNeedsReauth
+                        ? everMarks.toLocaleString()
+                        : t('common.unknown')}
+                    </p>
+                  </div>
+                </div>
+                {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
+                  <p className="mt-3 text-[0.6875rem] text-warning uppercase">
+                    {t(offlineTitleKey)}
+                  </p>
+                )}
+                {journal.length === 0 ? (
+                  <CachedEmptyState
+                    result={journalResult}
+                    title={t('wallet.journalEmptyTitle')}
+                    hint={t('wallet.journalEmptyHint')}
+                    fetchedTitle={t('wallet.journalEmptyFetchedTitle')}
+                    className="py-8"
+                  />
+                ) : (
+                  <div className="mt-4">
+                    {journalTruncated && (
+                      <p className="px-1 pb-2 text-[0.6875rem] text-warning uppercase">
+                        {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
+                      </p>
+                    )}
+                    {walletBalancePoints.length > 0 && (
+                      <Suspense
+                        fallback={
+                          <div className="flex justify-center py-8">
+                            <Spinner label={t('common.loading')} />
+                          </div>
+                        }
+                      >
+                        <LazyWalletBalanceChart
+                          points={walletBalancePoints}
+                          trend={walletBalanceTrendDirection}
+                          timeZone={timeZone}
+                        />
+                      </Suspense>
+                    )}
+                  </div>
+                )}
+              </Panel>
+            )}
+
             <Panel
               padded={false}
-              title={t('wallet.balanceByCharacter')}
-              meta={walletCharacterFilterMeta}
-              actions={
-                <IconButton
-                  size="sm"
-                  icon={<Icon.Refresh />}
-                  label={t('wallet.refresh')}
-                  onClick={refreshWalletBalances}
-                  disabled={walletBalancesLoading}
-                />
-              }
+              title={t('loyalty.title')}
+              actions={loyaltyResult ? <DataAgeBadge date={loyaltyResult.fetchedAt} /> : undefined}
             >
-              {walletBalancesLoading ? (
-                <div className="flex justify-center py-8">
-                  <Spinner label={t('common.loading')} />
+              {loyaltyNeedsReauth ? (
+                <div className="p-3">
+                  <GrantBanner
+                    characterId={activeCharacterId}
+                    endpoints={['getCharacterLoyaltyPoints']}
+                    title={t('loyalty.reauthTitle')}
+                    hint={t('loyalty.reauthHint')}
+                    actionLabel={t('loyalty.reauthAction')}
+                  />
                 </div>
-              ) : (
-                <>
-                  <p className="px-3 pt-2 text-xl font-medium tabular-nums">
-                    {t('wallet.totalBalance')}:{' '}
-                    <span className={iskToneClass(walletBalancesTotal)}>
-                      {formatIsk(walletBalancesTotal, 2)}
-                    </span>
-                  </p>
-                  {walletBalancesSkipped.length > 0 && (
-                    <div className="space-y-1 px-3 pt-2">
-                      {walletBalancesSkipped.map((s) => (
-                        <p key={s.characterId} className="text-xs text-text-dim">
-                          {s.name} — {t('wallet.balanceCharacterNotShared')}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                  {visibleWalletBalances.length === 0 ? (
-                    <EmptyState title={t('wallet.balanceEmpty')} className="py-8" />
-                  ) : (
-                    <DataTable
-                      label={t('wallet.balanceByCharacter')}
-                      columns={walletBalanceColumns}
-                      rows={visibleWalletBalances}
-                      rowKey={(row) => row.characterId}
-                      sort={balanceSortProps.sort}
-                      onSortChange={balanceSortProps.onSortChange}
-                    />
-                  )}
-                </>
-              )}
-            </Panel>
-          ) : (
-            <Panel
-              title={t('wallet.balanceTab')}
-              meta={walletCharacterFilterMeta}
-              actions={balanceResult ? <DataAgeBadge date={balanceResult.fetchedAt} /> : undefined}
-            >
-              <div className="flex flex-wrap gap-x-8 gap-y-4">
-                <div>
-                  <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('wallet.isk')}
-                  </p>
-                  {balanceNeedsReauth ? (
-                    <GrantBanner
-                      characterId={activeCharacterId}
-                      endpoints={['getCharacterWallet']}
-                      title={t('wallet.reauthTitle')}
-                      hint={t('wallet.reauthHint')}
-                      actionLabel={t('wallet.reauthAction')}
-                    />
-                  ) : balanceResult ? (
-                    <p
-                      className={`text-xl font-medium tabular-nums ${iskToneClass(balanceResult.data)}`}
-                    >
-                      {formatIsk(balanceResult.data, 2)}
-                    </p>
-                  ) : (
-                    <EmptyState title={t('wallet.balanceEmpty')} className="py-4" />
-                  )}
-                </div>
-                <div>
-                  <p className="flex items-center gap-1 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('wallet.everMarks')}
-                    <InfoTooltip
-                      label={t('wallet.everMarksTooltipLabel')}
-                      content={t('wallet.everMarksTooltip')}
-                    />
-                  </p>
-                  <p className="text-xl font-medium tabular-nums">
-                    {loyaltyResult && !loyaltyNeedsReauth
-                      ? everMarks.toLocaleString()
-                      : t('common.unknown')}
-                  </p>
-                </div>
-              </div>
-              {(balanceResult?.fromCache || loyaltyResult?.fromCache) && (
-                <p className="mt-3 text-[0.6875rem] text-warning uppercase">{t(offlineTitleKey)}</p>
-              )}
-              {journal.length === 0 ? (
+              ) : !loyaltyResult || otherLoyalty.length === 0 ? (
                 <CachedEmptyState
-                  result={journalResult}
-                  title={t('wallet.journalEmptyTitle')}
-                  hint={t('wallet.journalEmptyHint')}
-                  fetchedTitle={t('wallet.journalEmptyFetchedTitle')}
+                  result={loyaltyResult}
+                  title={t('loyalty.emptyTitle')}
+                  hint={t('loyalty.emptyHint')}
+                  fetchedTitle={t('loyalty.emptyFetchedTitle')}
                   className="py-8"
                 />
               ) : (
-                <div className="mt-4">
-                  {journalTruncated && (
-                    <p className="px-1 pb-2 text-[0.6875rem] text-warning uppercase">
-                      {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
-                    </p>
-                  )}
-                  {walletBalancePoints.length > 0 && (
-                    <Suspense
-                      fallback={
-                        <div className="flex justify-center py-8">
-                          <Spinner label={t('common.loading')} />
-                        </div>
+                <DataTable
+                  label={t('loyalty.title')}
+                  columns={loyaltyColumns}
+                  rows={otherLoyalty}
+                  rowKey={(entry) => entry.corporation_id}
+                  sort={loyaltySortProps.sort}
+                  onSortChange={loyaltySortProps.onSortChange}
+                  responsive="table"
+                  onRowClick={(entry) => navigate(`/wallet/loyalty/${entry.corporation_id}`)}
+                  rowMoreActions
+                  rowContextMenu={(entry, tr) => (
+                    <CorpHistoryContextMenu
+                      corporationId={entry.corporation_id}
+                      name={
+                        corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`
                       }
                     >
-                      <LazyWalletBalanceChart
-                        points={walletBalancePoints}
-                        trend={walletBalanceTrendDirection}
-                        timeZone={timeZone}
-                      />
-                    </Suspense>
+                      {tr}
+                    </CorpHistoryContextMenu>
                   )}
-                </div>
+                />
               )}
             </Panel>
-          )}
-
+          </div>
+        ) : (
           <Panel
             padded={false}
-            title={t('loyalty.title')}
-            actions={loyaltyResult ? <DataAgeBadge date={loyaltyResult.fetchedAt} /> : undefined}
+            title={t('wallet.journalTab')}
+            actions={
+              <span className="flex items-center gap-2">
+                {!showingCorp && (
+                  <Link
+                    to="/market/history/transactions"
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs text-accent hover:underline md:min-h-0 md:min-w-0"
+                  >
+                    {t('wallet.transactionsLink')}
+                  </Link>
+                )}
+                {journalResult && (
+                  <>
+                    <IconButton
+                      size="sm"
+                      icon={<Icon.Download />}
+                      label={t('wallet.exportCsvJournal')}
+                      disabled={filteredJournal.length === 0}
+                      onClick={() =>
+                        downloadCsv(
+                          'wallet-journal',
+                          [...filteredJournal].sort(byDateDesc),
+                          walletJournalCsvColumns(t),
+                          new Date(),
+                          journalTruncated
+                        )
+                      }
+                    />
+                    <DataAgeBadge date={journalResult.fetchedAt} />
+                  </>
+                )}
+              </span>
+            }
           >
-            {loyaltyNeedsReauth ? (
-              <div className="p-3">
-                <GrantBanner
-                  characterId={activeCharacterId}
-                  endpoints={['getCharacterLoyaltyPoints']}
-                  title={t('loyalty.reauthTitle')}
-                  hint={t('loyalty.reauthHint')}
-                  actionLabel={t('loyalty.reauthAction')}
-                />
-              </div>
-            ) : !loyaltyResult || otherLoyalty.length === 0 ? (
+            {!journalResult || journal.length === 0 ? (
               <CachedEmptyState
-                result={loyaltyResult}
-                title={t('loyalty.emptyTitle')}
-                hint={t('loyalty.emptyHint')}
-                fetchedTitle={t('loyalty.emptyFetchedTitle')}
+                result={journalResult}
+                title={t('wallet.journalEmptyTitle')}
+                hint={t('wallet.journalEmptyHint')}
+                fetchedTitle={t('wallet.journalEmptyFetchedTitle')}
                 className="py-8"
               />
             ) : (
-              <DataTable
-                label={t('loyalty.title')}
-                columns={loyaltyColumns}
-                rows={otherLoyalty}
-                rowKey={(entry) => entry.corporation_id}
-                sort={loyaltySortProps.sort}
-                onSortChange={loyaltySortProps.onSortChange}
-                responsive="table"
-                onRowClick={(entry) => navigate(`/wallet/loyalty/${entry.corporation_id}`)}
-                rowMoreActions
-                rowContextMenu={(entry, tr) => (
-                  <CorpHistoryContextMenu
-                    corporationId={entry.corporation_id}
-                    name={corporationNames.get(entry.corporation_id) ?? `#${entry.corporation_id}`}
-                  >
-                    {tr}
-                  </CorpHistoryContextMenu>
+              <>
+                {journalResult.fromCache && (
+                  <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                    {t(offlineTitleKey)}
+                  </p>
                 )}
-              />
+                {journalTruncated && (
+                  <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
+                    {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
+                  </p>
+                )}
+                <JournalTable
+                  filter={journalFilter}
+                  onFilterChange={setJournalFilter}
+                  refTypeOptions={refTypeOptions}
+                  filteredJournal={filteredJournal}
+                  journalColumns={journalColumns}
+                  label={t('wallet.journalTab')}
+                  sort={journalSortProps.sort}
+                  onSortChange={journalSortProps.onSortChange}
+                  highlightRowKey={highlightedEntryId}
+                />
+              </>
             )}
           </Panel>
-        </div>
-      ) : (
-        <Panel
-          padded={false}
-          title={t('wallet.journalTab')}
-          actions={
-            <span className="flex items-center gap-2">
-              {!showingCorp && (
-                <Link
-                  to="/market/history/transactions"
-                  className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs text-accent hover:underline md:min-h-0 md:min-w-0"
-                >
-                  {t('wallet.transactionsLink')}
-                </Link>
-              )}
-              {journalResult && (
-                <>
-                  <IconButton
-                    size="sm"
-                    icon={<Icon.Download />}
-                    label={t('wallet.exportCsvJournal')}
-                    disabled={filteredJournal.length === 0}
-                    onClick={() =>
-                      downloadCsv(
-                        'wallet-journal',
-                        [...filteredJournal].sort(byDateDesc),
-                        walletJournalCsvColumns(t),
-                        new Date(),
-                        journalTruncated
-                      )
-                    }
-                  />
-                  <DataAgeBadge date={journalResult.fetchedAt} />
-                </>
-              )}
-            </span>
-          }
-        >
-          {!journalResult || journal.length === 0 ? (
-            <CachedEmptyState
-              result={journalResult}
-              title={t('wallet.journalEmptyTitle')}
-              hint={t('wallet.journalEmptyHint')}
-              fetchedTitle={t('wallet.journalEmptyFetchedTitle')}
-              className="py-8"
-            />
-          ) : (
-            <>
-              {journalResult.fromCache && (
-                <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                  {t(offlineTitleKey)}
-                </p>
-              )}
-              {journalTruncated && (
-                <p className="px-3 pt-2 text-[0.6875rem] text-warning uppercase">
-                  {t('common.incompleteTitle')} — {t('wallet.journalTruncatedHint')}
-                </p>
-              )}
-              <JournalTable
-                filter={journalFilter}
-                onFilterChange={setJournalFilter}
-                refTypeOptions={refTypeOptions}
-                filteredJournal={filteredJournal}
-                journalColumns={journalColumns}
-                label={t('wallet.journalTab')}
-                sort={journalSortProps.sort}
-                onSortChange={journalSortProps.onSortChange}
-                highlightRowKey={highlightedEntryId}
-              />
-            </>
-          )}
-        </Panel>
-      )}
-
-      {infoModalItem && (
-        <ItemDetailModal
-          typeId={infoModalItem.typeId}
-          itemName={infoModalItem.itemName}
-          onClose={() => setInfoModalItem(null)}
-        />
-      )}
-    </div>
+        )}
+      </div>
+    </ItemActionsProvider>
   );
 }

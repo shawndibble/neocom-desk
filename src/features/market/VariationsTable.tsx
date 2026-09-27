@@ -13,7 +13,6 @@ import { IconButton, IskAmount, TypeIcon } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
 import { downloadCsv } from '@/lib/downloadCsv';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
-import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { ItemContextMenu } from './ItemContextMenu';
 import type { VariationRow } from './variations';
 import { variationsCsvColumns } from './variationsCsv';
@@ -38,12 +37,6 @@ export interface VariationsTableProps {
   onSelect: (typeId: number) => void;
   /** Adds every row currently shown here to the Compare Set and opens the Compare drawer on Attributes — both the header button and each row's "Compare Variations" menu action. */
   onCompare: () => void;
-  /** Same per-item context menu as the tree (issue #147): null until requested, then per-typeId lookups. */
-  blueprintCatalog: BlueprintCatalog | null;
-  onRequestBlueprintCatalog: () => void;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 /**
@@ -65,39 +58,14 @@ function priceCell(
   return t('market.variations.noOrders');
 }
 
-export function VariationsTable({
-  rows,
-  prices,
-  onSelect,
-  onCompare,
-  blueprintCatalog,
-  onRequestBlueprintCatalog,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
-}: VariationsTableProps) {
+export function VariationsTable({ rows, prices, onSelect, onCompare }: VariationsTableProps) {
   const { t } = useTranslation();
 
   if (rows.length === 0) return null;
 
   function rowContextMenu(row: VariationRow, tr: ReactElement) {
-    const blueprintTypeID =
-      blueprintCatalog === null
-        ? undefined
-        : (blueprintCatalog.byProductTypeID.get(row.typeId)?.blueprintTypeID ?? null);
     return (
-      <ItemContextMenu
-        typeId={row.typeId}
-        itemName={row.name}
-        blueprintTypeID={blueprintTypeID}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable={quickbarAvailable}
-        onShowInfo={onShowInfo}
-        onCompareVariations={onCompare}
-        onOpenChange={(open) => {
-          if (open) onRequestBlueprintCatalog();
-        }}
-      >
+      <ItemContextMenu typeId={row.typeId} itemName={row.name} onCompareVariations={onCompare}>
         {tr}
       </ItemContextMenu>
     );

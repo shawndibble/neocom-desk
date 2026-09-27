@@ -8,35 +8,26 @@ import { ResultsSummary } from './ResultsSummary';
 import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type { MaterialCostLine } from '@/engine/industry/types';
 import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
+import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 
 const NAMES: Record<number, string> = { 587: 'Rifter', 34: 'Tritanium' };
 const itemNameFor = (typeId: number) => NAMES[typeId] ?? `Type ${typeId}`;
 
 function itemMenuFor(typeId: number, trigger: React.ReactElement) {
   return (
-    <ItemContextMenu
-      typeId={typeId}
-      itemName={itemNameFor(typeId)}
-      blueprintTypeID={null}
-      onAddToQuickbar={vi.fn()}
-      quickbarAvailable
-      onShowInfo={vi.fn()}
-    >
-      {trigger}
-    </ItemContextMenu>
+    <FakeItemActions>
+      <ItemContextMenu typeId={typeId} itemName={itemNameFor(typeId)} blueprintTypeID={null}>
+        {trigger}
+      </ItemContextMenu>
+    </FakeItemActions>
   );
 }
 
 function itemActionsFor(typeId: number) {
   return (
-    <ItemMoreActions
-      typeId={typeId}
-      itemName={itemNameFor(typeId)}
-      blueprintTypeID={null}
-      onAddToQuickbar={vi.fn()}
-      quickbarAvailable
-      onShowInfo={vi.fn()}
-    />
+    <FakeItemActions>
+      <ItemMoreActions typeId={typeId} itemName={itemNameFor(typeId)} blueprintTypeID={null} />
+    </FakeItemActions>
   );
 }
 

@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { CorpTransactionsPanel } from './CorpTransactionsPanel';
 import { EMPTY_WALLET_TRANSACTION_FILTER } from '@/features/character/walletTransactionFilter';
+import { fakeItemActions, withItemActions } from '@/features/market/__fixtures__/itemActions';
 import type { CorporationWalletTransaction } from '@/esi/endpoints';
 
 vi.mock('@/lib/downloadCsv', () => ({ downloadCsv: vi.fn() }));
@@ -27,53 +28,52 @@ function transaction(
 }
 
 function renderPanel(overrides: Partial<Parameters<typeof CorpTransactionsPanel>[0]> = {}) {
-  const onAddToQuickbar = vi.fn();
-  const onShowInfo = vi.fn();
+  const actions = fakeItemActions();
   const txns = [transaction()];
   render(
-    <MemoryRouter>
-      <CorpTransactionsPanel
-        transactionsResult={{
-          data: txns,
-          fetchedAt: new Date(),
-          fromCache: false,
-          truncated: false,
-        }}
-        transactions={txns}
-        filteredTransactions={txns}
-        loading={false}
-        filter={EMPTY_WALLET_TRANSACTION_FILTER}
-        onFilterChange={vi.fn()}
-        sort={{ columnId: 'date', direction: 'desc' }}
-        onSortChange={vi.fn()}
-        nameFor={() => 'Damage Control II'}
-        divisionQualifier={undefined}
-        offlineTitleKey="common.offlineTitle"
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable
-        onShowInfo={onShowInfo}
-        {...overrides}
-      />
-    </MemoryRouter>
+    withItemActions(
+      <MemoryRouter>
+        <CorpTransactionsPanel
+          transactionsResult={{
+            data: txns,
+            fetchedAt: new Date(),
+            fromCache: false,
+            truncated: false,
+          }}
+          transactions={txns}
+          filteredTransactions={txns}
+          loading={false}
+          filter={EMPTY_WALLET_TRANSACTION_FILTER}
+          onFilterChange={vi.fn()}
+          sort={{ columnId: 'date', direction: 'desc' }}
+          onSortChange={vi.fn()}
+          nameFor={() => 'Damage Control II'}
+          divisionQualifier={undefined}
+          offlineTitleKey="common.offlineTitle"
+          {...overrides}
+        />
+      </MemoryRouter>,
+      actions
+    )
   );
-  return { onAddToQuickbar, onShowInfo };
+  return { actions };
 }
 
 describe('CorpTransactionsPanel — the row as an item', () => {
   it('opens the same menu from a visible More actions button on the row (#1497)', async () => {
     const user = userEvent.setup();
-    const { onShowInfo } = renderPanel();
+    const { actions } = renderPanel();
 
     await user.click(
       await screen.findByRole('button', { name: 'More actions for Damage Control II' })
     );
     await user.click(await screen.findByRole('menuitem', { name: 'Show info' }));
 
-    expect(onShowInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
+    expect(actions.showInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
   });
 
   it('carries the item context menu on every row', async () => {
-    const { onShowInfo } = renderPanel();
+    const { actions } = renderPanel();
 
     fireEvent.contextMenu(await screen.findByRole('row', { name: /Damage Control II/ }));
 
@@ -81,7 +81,7 @@ describe('CorpTransactionsPanel — the row as an item', () => {
     expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Show info' }));
-    expect(onShowInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
+    expect(actions.showInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
   });
 });
 

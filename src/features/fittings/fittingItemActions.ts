@@ -23,7 +23,6 @@ import type { ChargeLoading } from './useChargeLoading';
 /** Everything the menus (and the drops they stand in for) do — the page's own edits. */
 export interface FittingItemActions {
   typeName: (typeId: number) => string;
-  showInfo: (typeId: number, name: string) => void;
   charges: ChargeLoading;
 
   setState: (rack: FittingSlotKind, index: number, state: FittingItemState) => void;

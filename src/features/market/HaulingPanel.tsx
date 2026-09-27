@@ -50,7 +50,6 @@ import { loadMarketGroups } from '@/sde/loadMarketSde';
 import type { MarketGroupNode } from '@/sde/marketTypes';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { HAULING_THRESHOLDS } from '@/engine/market/haulingMarket';
-import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { HaulingCargoControl } from './HaulingCargoControl';
 import { HaulingRowDetail } from './HaulingRowDetail';
 import { useHaulingBudget, useHaulingCargo } from './haulingCargo';
@@ -111,22 +110,7 @@ function signed(value: number, fractionDigits: number): string {
   return `${value >= 0 ? '+' : ''}${value.toFixed(fractionDigits)}`;
 }
 
-interface HaulingPanelProps {
-  /** Same per-item context menu as Appraisal: null until requested, then per-typeId lookups. */
-  blueprintCatalog: BlueprintCatalog | null;
-  onRequestBlueprintCatalog: () => void;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
-}
-
-export function HaulingPanel({
-  blueprintCatalog,
-  onRequestBlueprintCatalog,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
-}: HaulingPanelProps) {
+export function HaulingPanel() {
   const { t } = useTranslation();
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
 
@@ -270,22 +254,8 @@ export function HaulingPanel({
 
   // The same menu Appraisal's rows carry — a hauled item is an item like any other.
   function rowContextMenu(row: HaulingViewRow, tr: ReactElement) {
-    const blueprintTypeID =
-      blueprintCatalog === null
-        ? undefined
-        : (blueprintCatalog.byProductTypeID.get(row.typeId)?.blueprintTypeID ?? null);
     return (
-      <ItemContextMenu
-        typeId={row.typeId}
-        itemName={row.name}
-        blueprintTypeID={blueprintTypeID}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable={quickbarAvailable}
-        onShowInfo={onShowInfo}
-        onOpenChange={(open) => {
-          if (open) onRequestBlueprintCatalog();
-        }}
-      >
+      <ItemContextMenu typeId={row.typeId} itemName={row.name}>
         {tr}
       </ItemContextMenu>
     );

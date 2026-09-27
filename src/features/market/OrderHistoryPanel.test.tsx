@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { OrderHistoryPanel } from './OrderHistoryPanel';
+import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import { loadOrderHistory } from '@/features/character/orders';
 import { loadTypeNames } from '@/features/character/typeNames';
 import type { MarketOrderHistory } from '@/esi/endpoints';
@@ -39,23 +40,16 @@ function historyOrder(overrides: Partial<MarketOrderHistory> = {}): MarketOrderH
 }
 
 function renderPanel() {
-  const onAddToQuickbar = vi.fn();
-  const onShowInfo = vi.fn();
-  const onRequestBlueprintCatalog = vi.fn();
+  const actions = fakeItemActions();
   const onViewChange = vi.fn();
   render(
     <MemoryRouter initialEntries={['/market/history']}>
-      <OrderHistoryPanel
-        onViewChange={onViewChange}
-        blueprintCatalog={null}
-        onRequestBlueprintCatalog={onRequestBlueprintCatalog}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable
-        onShowInfo={onShowInfo}
-      />
+      <FakeItemActions actions={actions}>
+        <OrderHistoryPanel onViewChange={onViewChange} />
+      </FakeItemActions>
     </MemoryRouter>
   );
-  return { onAddToQuickbar, onShowInfo, onRequestBlueprintCatalog, onViewChange };
+  return { actions, onViewChange };
 }
 
 beforeEach(() => {
@@ -75,7 +69,7 @@ describe('OrderHistoryPanel — the row as an item', () => {
       },
       needsReauth: false,
     });
-    const { onShowInfo } = renderPanel();
+    const { actions } = renderPanel();
 
     fireEvent.contextMenu(await screen.findByRole('row', { name: /Damage Control II/ }));
 
@@ -83,7 +77,7 @@ describe('OrderHistoryPanel — the row as an item', () => {
     expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Show info' }));
-    expect(onShowInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
+    expect(actions.showInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
   });
 
   it('asks for the blueprint catalog the first time a row menu opens', async () => {
@@ -96,10 +90,10 @@ describe('OrderHistoryPanel — the row as an item', () => {
       },
       needsReauth: false,
     });
-    const { onRequestBlueprintCatalog } = renderPanel();
+    const { actions } = renderPanel();
 
     fireEvent.contextMenu(await screen.findByRole('row', { name: /Damage Control II/ }));
-    expect(onRequestBlueprintCatalog).toHaveBeenCalled();
+    expect(actions.requestBlueprints).toHaveBeenCalled();
   });
 });
 

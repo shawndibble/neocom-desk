@@ -73,10 +73,6 @@ interface OpportunitiesPanelProps {
   assumedMe: number;
   onAddToCompare: (rows: readonly OpportunityRow[]) => void;
   onStartPlan: (entry: BlueprintCatalogEntry) => void;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  /** False with no active character — the Quickbar has nobody to save the item under. */
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 function numericCell(
@@ -101,9 +97,6 @@ export function OpportunitiesPanel({
   assumedMe,
   onAddToCompare,
   onStartPlan,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
 }: OpportunitiesPanelProps) {
   const { t } = useTranslation();
   const unknown = t('common.unknown');
@@ -420,9 +413,6 @@ export function OpportunitiesPanel({
             typeId={productTypeID}
             itemName={productName}
             blueprintTypeID={blueprintTypeID}
-            onAddToQuickbar={onAddToQuickbar}
-            quickbarAvailable={quickbarAvailable}
-            onShowInfo={onShowInfo}
           />
         );
       },
@@ -438,9 +428,6 @@ export function OpportunitiesPanel({
         typeId={productTypeID}
         itemName={productName}
         blueprintTypeID={blueprintTypeID}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable={quickbarAvailable}
-        onShowInfo={onShowInfo}
       >
         {tr}
       </ItemContextMenu>

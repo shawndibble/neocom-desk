@@ -6,6 +6,7 @@ import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { beginEveLogin } from '@/app/loginFlow';
 import { OpenOrdersPanel } from './OpenOrdersPanel';
+import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import { loadAllCharactersOpenOrders, type OpenOrdersSnapshot } from './openOrdersData';
 import { loadOrderCostBases, type ProductionRunBasis } from './orderCostBasis';
 import { loadStationBestPrices, loadRegionCompetition, loadJumpsBetween } from './orderCompetition';
@@ -127,19 +128,14 @@ function snapshot(
   return { entries, skipped };
 }
 
-const onRequestBlueprintCatalog = vi.fn();
-const onShowInfo = vi.fn();
+const actions = fakeItemActions();
 
 function renderPanel(initialEntry = '/market/orders') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
-      <OpenOrdersPanel
-        blueprintCatalog={null}
-        onRequestBlueprintCatalog={onRequestBlueprintCatalog}
-        onAddToQuickbar={vi.fn()}
-        quickbarAvailable
-        onShowInfo={onShowInfo}
-      />
+      <FakeItemActions actions={actions}>
+        <OpenOrdersPanel />
+      </FakeItemActions>
     </MemoryRouter>
   );
 }
@@ -154,13 +150,9 @@ function renderPanelWithLocation(initialEntry: string) {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <CurrentSearch />
-      <OpenOrdersPanel
-        blueprintCatalog={null}
-        onRequestBlueprintCatalog={onRequestBlueprintCatalog}
-        onAddToQuickbar={vi.fn()}
-        quickbarAvailable
-        onShowInfo={onShowInfo}
-      />
+      <FakeItemActions actions={actions}>
+        <OpenOrdersPanel />
+      </FakeItemActions>
     </MemoryRouter>
   );
 }
@@ -234,12 +226,12 @@ describe('OpenOrdersPanel', () => {
     renderPanel();
 
     const group = await screen.findByTestId('order-group-expiringOrStale');
-    expect(onRequestBlueprintCatalog).not.toHaveBeenCalled();
+    expect(actions.requestBlueprints).not.toHaveBeenCalled();
     fireEvent.contextMenu(within(group).getAllByRole('row')[1]);
 
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Show info' }));
-    expect(onShowInfo).toHaveBeenCalledWith(36, 'Mexallon');
-    expect(onRequestBlueprintCatalog).toHaveBeenCalled();
+    expect(actions.showInfo).toHaveBeenCalledWith(36, 'Mexallon');
+    expect(actions.requestBlueprints).toHaveBeenCalled();
   });
 
   it('renders groups worst-first, each with its row count', async () => {

@@ -423,7 +423,7 @@ export function useOrderBookOrchestration({
     // `ensureBlueprintCatalog` is ref-guarded, so re-running this costs nothing.
     // A failed book says nothing about who sells the item, so it asks nothing.
     if (selectedTypeId !== null && loadedView && sortedSell.length === 0) ensureBlueprintCatalog();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `ensureBlueprintCatalog` is a stable, ref-guarded no-op past its first call; listing it would fire this on every render even though its identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `ensureBlueprintCatalog` is a ref-guarded no-op past its first call; its identity changing (once, as the catalog lands) is no reason to re-run this.
   }, [selectedTypeId, loadedView, sortedSell.length]);
 
   const stationFilterLabel = useMemo(() => {

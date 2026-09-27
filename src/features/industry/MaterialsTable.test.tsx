@@ -8,6 +8,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
+import { FakeItemActions, fakeItemActions } from '@/features/market/__fixtures__/itemActions';
 import { materialCostLines } from '@/engine/industry/sourcing';
 import type {
   EffectiveMaterial,
@@ -530,37 +531,33 @@ function renderTable(props: Partial<React.ComponentProps<typeof MaterialsTable>>
 }
 
 /** Mirrors BuildPlanDetail's wiring: the catalog is already in hand, so `blueprintTypeID` is never the "checking…" undefined. */
-function menuFor(blueprintByProduct: Record<number, number>, handlers = {}) {
+function menuFor(blueprintByProduct: Record<number, number>, actions = fakeItemActions()) {
   return function rowContextMenu(material: MaterialCostLine, tr: React.ReactElement) {
     return (
-      <ItemContextMenu
-        typeId={material.typeID}
-        itemName={nameFor(material.typeID)}
-        blueprintTypeID={blueprintByProduct[material.typeID] ?? null}
-        onAddToQuickbar={vi.fn()}
-        quickbarAvailable
-        onShowInfo={vi.fn()}
-        {...handlers}
-      >
-        {tr}
-      </ItemContextMenu>
+      <FakeItemActions actions={actions}>
+        <ItemContextMenu
+          typeId={material.typeID}
+          itemName={nameFor(material.typeID)}
+          blueprintTypeID={blueprintByProduct[material.typeID] ?? null}
+        >
+          {tr}
+        </ItemContextMenu>
+      </FakeItemActions>
     );
   };
 }
 
 /** `rowActions` mirror of `menuFor` — same props, the visible button instead of the right-click wrapper. */
-function actionsFor(blueprintByProduct: Record<number, number>, handlers = {}) {
+function actionsFor(blueprintByProduct: Record<number, number>, actions = fakeItemActions()) {
   return function rowActions(material: MaterialCostLine) {
     return (
-      <ItemMoreActions
-        typeId={material.typeID}
-        itemName={nameFor(material.typeID)}
-        blueprintTypeID={blueprintByProduct[material.typeID] ?? null}
-        onAddToQuickbar={vi.fn()}
-        quickbarAvailable
-        onShowInfo={vi.fn()}
-        {...handlers}
-      />
+      <FakeItemActions actions={actions}>
+        <ItemMoreActions
+          typeId={material.typeID}
+          itemName={nameFor(material.typeID)}
+          blueprintTypeID={blueprintByProduct[material.typeID] ?? null}
+        />
+      </FakeItemActions>
     );
   };
 }
@@ -658,12 +655,12 @@ describe('MaterialsTable', () => {
 
     it('targets the right-clicked material, not the first row', async () => {
       const user = userEvent.setup();
-      const onShowInfo = vi.fn();
-      renderTable({ rowContextMenu: menuFor({ 9840: 9841 }, { onShowInfo }) });
+      const actions = fakeItemActions();
+      renderTable({ rowContextMenu: menuFor({ 9840: 9841 }, actions) });
       const row = screen.getByText('Mechanical Parts').closest('tr');
       fireEvent.contextMenu(row!);
       await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
-      expect(onShowInfo).toHaveBeenCalledWith(9840, 'Mechanical Parts');
+      expect(actions.showInfo).toHaveBeenCalledWith(9840, 'Mechanical Parts');
     });
   });
 

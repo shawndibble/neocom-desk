@@ -12,6 +12,7 @@ import { loadGlobalMarkets } from '@/sde/loadMarketSde';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
 import { DEFAULT_LP_VALUE, useLpValue } from '@/features/loyalty/lpValue';
 import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
+import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 import { BlueprintAcquisitionModal, type AcquisitionOwnedCopy } from './BlueprintAcquisitionModal';
 
 vi.mock('@/features/market/appraisalLpAcquisition', () => ({ findLpOfferMatches: vi.fn() }));
@@ -161,29 +162,19 @@ function section(heading: string): HTMLElement {
 
 function itemMenuFor(typeId: number, trigger: React.ReactElement) {
   return (
-    <ItemContextMenu
-      typeId={typeId}
-      itemName="Astero Blueprint"
-      blueprintTypeID={null}
-      onAddToQuickbar={vi.fn()}
-      quickbarAvailable
-      onShowInfo={vi.fn()}
-    >
-      {trigger}
-    </ItemContextMenu>
+    <FakeItemActions>
+      <ItemContextMenu typeId={typeId} itemName="Astero Blueprint" blueprintTypeID={null}>
+        {trigger}
+      </ItemContextMenu>
+    </FakeItemActions>
   );
 }
 
 function itemActionsFor(typeId: number) {
   return (
-    <ItemMoreActions
-      typeId={typeId}
-      itemName="Astero Blueprint"
-      blueprintTypeID={null}
-      onAddToQuickbar={vi.fn()}
-      quickbarAvailable
-      onShowInfo={vi.fn()}
-    />
+    <FakeItemActions>
+      <ItemMoreActions typeId={typeId} itemName="Astero Blueprint" blueprintTypeID={null} />
+    </FakeItemActions>
   );
 }
 

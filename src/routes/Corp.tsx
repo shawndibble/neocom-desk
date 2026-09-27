@@ -21,7 +21,7 @@
  *   The `DataAgeBadge` note says so, and the board refuses to print a countdown
  *   shorter than the window.
  */
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DataAgeBadge, IconButton, PageHeader, Spinner } from '@/components/ui';
 import * as Icon from '@/components/ui/icons';
@@ -39,8 +39,10 @@ import { LOOSEST_DARK_AFTER_DAYS } from '@/features/corp/darkThreshold';
 // modal Market/Industry/Assets already use for "Show info" — item info never
 // existed as a real in-game protocol link in a browser (`showinfo:` is dead
 // here, see `engine/market/itemDescription.ts`), so this modal already *is*
-// the established substitute, not a fifth pattern.
-import { ItemDetailModal } from '@/features/market/ItemDetailModal';
+// the established substitute, not a fifth pattern. Rendered by
+// `ItemActionsProvider` now, not this route directly.
+import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
+import { usePageItemActions } from '@/features/market/usePageItemActions';
 import {
   MASTER_WALLET_DIVISION,
   loadCorporationId,
@@ -332,12 +334,6 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
     capabilities.canReadMoonExtractions ||
     capabilities.canReadIndustry;
 
-  // The board row's "Show info" action (issue #419) — same `infoModalItem`
-  // shape Industry/Assets/Market already use.
-  const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
-    null
-  );
-
   const snapshot = useRouteSnapshot<CorpSnapshot>(
     (characterId, signal) => loadCorpSnapshot(characterId, capabilities, signal),
     undefined,
@@ -348,6 +344,10 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
     { staleWhileRevalidate: true, cacheKey: 'corp' }
   );
   const data = snapshot.data;
+
+  // The board row's "Show info" action (issue #419) — same Item Actions
+  // Industry/Assets/Market already provide.
+  const itemActions = usePageItemActions({ activeCharacterId: snapshot.activeCharacterId });
 
   const items = useMemo(() => {
     if (data === null) return [];
@@ -413,45 +413,46 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
       : null;
 
   return (
-    <div className="space-y-4">
-      {/*
+    <ItemActionsProvider page={itemActions}>
+      <div className="space-y-4">
+        {/*
         Title, tabs, data age and the refresh action on one 36px line (#566).
         The three stacked bands this replaces — `PageHeader`, then `CorpSubNav`,
         then the board panel's own header — were about 110px of chrome before
         any data, on the one route in the app whose whole job is triage.
       */}
-      <PageHeader
-        title={t('corp.title')}
-        meta={
-          data?.oldestFetchedAt ? (
-            <DataAgeBadge date={data.oldestFetchedAt} note={t('corp.dataAgeNote')} />
-          ) : undefined
-        }
-        subNav={<CorpSubNav flush />}
-        actions={
-          <IconButton
-            icon={<Icon.Refresh />}
-            label={t('corp.refresh')}
-            onClick={snapshot.refresh}
-            disabled={snapshot.loading}
-          />
-        }
-      />
+        <PageHeader
+          title={t('corp.title')}
+          meta={
+            data?.oldestFetchedAt ? (
+              <DataAgeBadge date={data.oldestFetchedAt} note={t('corp.dataAgeNote')} />
+            ) : undefined
+          }
+          subNav={<CorpSubNav flush />}
+          actions={
+            <IconButton
+              icon={<Icon.Refresh />}
+              label={t('corp.refresh')}
+              onClick={snapshot.refresh}
+              disabled={snapshot.loading}
+            />
+          }
+        />
 
-      {snapshot.loading && data === null ? (
-        <Spinner />
-      ) : (
-        <div className="space-y-3">
-          {/*
+        {snapshot.loading && data === null ? (
+          <Spinner />
+        ) : (
+          <div className="space-y-3">
+            {/*
             Answer first. Standing carries the figures a manager acts on and the
             Deadline Strip that says when — and each figure is gated on its own
             source, so a Station Manager who is not an Accountant gets the
             clocks with no money figures beside them rather than two holes
             (AC3). With neither readable the panel renders nothing at all.
           */}
-          <CorpStanding clocks={clocks} money={money} />
+            <CorpStanding clocks={clocks} money={money} />
 
-          {/*
+            {/*
             AC3's harder half, unchanged in substance from the flat board it
             replaces. "Cannot read" and "read fine, nothing due" are different
             answers and must look different: a card exists only for a kind whose
@@ -459,21 +460,17 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
             due". Collapsing them would put "No moon chunks" in front of someone
             who was never allowed to ask.
           */}
-          <CorpKindCards
-            grouped={grouped}
-            capabilities={capabilities}
-            onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
-          />
+            <CorpKindCards grouped={grouped} capabilities={capabilities} />
 
-          {/*
+            {/*
             The board's one untimed kind, on the one surface that suits it. Absent
             entirely when every service is online — see `CorpOfflineServices`.
           */}
-          {capabilities.canReadStructures && (
-            <CorpOfflineServices items={grouped.get('serviceOffline') ?? []} />
-          )}
+            {capabilities.canReadStructures && (
+              <CorpOfflineServices items={grouped.get('serviceOffline') ?? []} />
+            )}
 
-          {/*
+            {/*
             Money and People along the bottom, each simply absent without its
             capability — no placeholder and no "you cannot see this". Their own
             reads were never fired either (see the loader). Two half-width
@@ -481,42 +478,36 @@ function CorpBoardView({ capabilities }: { capabilities: CorpCapabilities }) {
             out of content two-thirds down the page, which was most of the empty
             space #566 exists to remove.
           */}
-          {(showVitals || showPeople) && data !== null && (
-            <div
-              className={cx(
-                'grid min-w-0 gap-3',
-                showVitals && showPeople && 'lg:grid-cols-2 lg:items-start'
-              )}
-            >
-              {showVitals && (
-                <CorpVitalsRail
-                  divisions={data.wallets ?? []}
-                  journal={data.journal}
-                  journalDivision={MASTER_WALLET_DIVISION}
-                  nowMs={data.loadedAt}
-                />
-              )}
-              {showPeople && (
-                <CorpPeopleRail
-                  members={data.members ?? []}
-                  highlights={data.peopleHighlights}
-                  names={data.memberNames}
-                  diff={data.rosterDiff}
-                  nowMs={data.loadedAt}
-                />
-              )}
-            </div>
-          )}
-        </div>
-      )}
-      {infoModalItem && (
-        <ItemDetailModal
-          typeId={infoModalItem.typeId}
-          itemName={infoModalItem.itemName}
-          onClose={() => setInfoModalItem(null)}
-        />
-      )}
-    </div>
+            {(showVitals || showPeople) && data !== null && (
+              <div
+                className={cx(
+                  'grid min-w-0 gap-3',
+                  showVitals && showPeople && 'lg:grid-cols-2 lg:items-start'
+                )}
+              >
+                {showVitals && (
+                  <CorpVitalsRail
+                    divisions={data.wallets ?? []}
+                    journal={data.journal}
+                    journalDivision={MASTER_WALLET_DIVISION}
+                    nowMs={data.loadedAt}
+                  />
+                )}
+                {showPeople && (
+                  <CorpPeopleRail
+                    members={data.members ?? []}
+                    highlights={data.peopleHighlights}
+                    names={data.memberNames}
+                    diff={data.rosterDiff}
+                    nowMs={data.loadedAt}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </ItemActionsProvider>
   );
 }
 

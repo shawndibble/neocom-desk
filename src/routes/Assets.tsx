@@ -100,16 +100,15 @@ import {
 import { hasItemRows } from '@/features/character/assetBrowserFormat';
 import { ItemContextMenu } from '@/features/market/ItemContextMenu';
 import { assetShipEditLocation } from '@/features/fittings/assetShipLocation';
-import { ItemDetailModal } from '@/features/market/ItemDetailModal';
+import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
+import { useItemActions } from '@/features/market/itemActions';
+import { usePageItemActions } from '@/features/market/usePageItemActions';
 import { addQuickbarItem } from '@/features/market/quickbar';
-import { useQuickbar } from '@/features/market/useQuickbar';
 import { useCompareSet } from '@/features/market/compareSet';
 import { writeToClipboard } from '@/lib/clipboard';
 import {
   buildPlansByMaterialTypeID,
-  loadBlueprintCatalog,
   planTargetForItem,
-  type BlueprintCatalog,
 } from '@/features/industry/blueprintCatalog';
 
 // Matches Market.tsx's/SkillPicker.tsx's own search debounce — the input stays
@@ -525,23 +524,21 @@ function characterBadgeFor(itemId: number, ctx: CharacterBadgeContext): string |
 }
 
 /**
- * The item context menu's actions and their supporting data (Quickbar,
- * blueprint catalog, pricing/volume) — everything an item row needs but a
- * prop-threaded context cannot carry cheaply. Reaching these through
- * `useContext` rather than props matters beyond style: the React Compiler's
- * purity/refs checks can verify a value read via Context is deferred to event
- * time, but lose that guarantee for a closure passed through ordinary props.
+ * Assets-only supporting data an item row needs but a prop-threaded context
+ * cannot carry cheaply — pricing/volume and the "View in Industry as
+ * material" wiring. Quickbar, blueprint lookup and Show info are the page's
+ * shared Item Actions (`itemActions.ts`) now, read by `ItemContextMenu`
+ * itself; this context stays for what's Assets-specific. Reaching these
+ * through `useContext` rather than props matters beyond style: the React
+ * Compiler's purity/refs checks can verify a value read via Context is
+ * deferred to event time, but lose that guarantee for a closure passed
+ * through ordinary props.
  */
 interface AssetItemActions {
   priceByTypeId: ReadonlyMap<number, number>;
   volumeByTypeId: ReadonlyMap<number, number>;
-  blueprintCatalog: BlueprintCatalog | null;
   /** Material typeID -> the character's own Build Plan consuming it; null until the blueprint catalog has loaded. */
   materialPlanMap: ReadonlyMap<number, BuildPlanRecord> | null;
-  quickbarAvailable: boolean;
-  onRequestBlueprintCatalog: () => void;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  onShowInfo: (typeId: number, itemName: string) => void;
   onViewInIndustryAsMaterial: (typeId: number) => void;
 }
 
@@ -751,13 +748,11 @@ export function Assets() {
   const activeCrossCharacterData =
     otherCharacterIds.length > 0 && searchActive ? crossCharacterData : null;
 
-  // Quickbar (CONTEXT.md): the same Editable Data record the Market Browser's
-  // and Industry's item context menus write to, keyed by the active character.
-  const {
-    items: quickbarItems,
-    write: writeQuickbar,
-    add: handleAddToQuickbar,
-  } = useQuickbar(activeCharacterId);
+  // Quickbar (CONTEXT.md), the blueprint catalog for Build Plan, and Show
+  // info's modal — the page's shared Item Actions (issue #2041), loaded
+  // lazily on the first menu open (same trade-off as the Market Browser: it
+  // pulls the full SDE types.json and most page visits never open a menu).
+  const itemActions = usePageItemActions({ activeCharacterId, lazyBlueprints: true });
 
   // Station Pins (issue #84): also Editable Data, synced the same way as the
   // Quickbar. Loaded whole (every Character's pin rows, not just the active
@@ -780,25 +775,10 @@ export function Assets() {
     else await clearStationPin(locationId);
   }
 
-  // Blueprint catalog for the context menu's Build Plan action, loaded
-  // lazily on the first menu open — same trade-off as the Market Browser:
-  // it pulls the full SDE types.json and most page visits never open a menu.
-  const [blueprintCatalog, setBlueprintCatalog] = useState<BlueprintCatalog | null>(null);
-  const blueprintCatalogRequested = useRef(false);
-  function ensureBlueprintCatalog() {
-    if (blueprintCatalogRequested.current) return;
-    blueprintCatalogRequested.current = true;
-    void loadBlueprintCatalog()
-      .then(setBlueprintCatalog)
-      .catch(() => {
-        // Build Plan action degrades to "No blueprint options" on failure — not core functionality.
-      });
-  }
-
   // "View in Industry as material" (issue #414): the character's own plans,
   // reverse-indexed by the materials their blueprints consume, once the
   // (lazily loaded) blueprint catalog is in hand. Null while unknown, same
-  // as `blueprintCatalog` itself, so the menu action stays absent rather than
+  // as the catalog itself, so the menu action stays absent rather than
   // flashing in once the catalog lands.
   const buildPlansQuery = useLiveQuery(async () => {
     if (activeCharacterId === null) return undefined;
@@ -806,18 +786,14 @@ export function Assets() {
   }, [activeCharacterId]);
   const buildPlans = buildPlansQuery ?? NO_BUILD_PLANS;
   const materialPlanMap = useMemo<ReadonlyMap<number, BuildPlanRecord> | null>(
-    () => (blueprintCatalog ? buildPlansByMaterialTypeID(buildPlans, blueprintCatalog) : null),
-    [blueprintCatalog, buildPlans]
+    () =>
+      itemActions.actions.blueprints
+        ? buildPlansByMaterialTypeID(buildPlans, itemActions.actions.blueprints)
+        : null,
+    [itemActions.actions.blueprints, buildPlans]
   );
   function handleViewInIndustryAsMaterial(typeId: number) {
     navigate(`${industryTabHref('plans')}?material=${typeId}`);
-  }
-
-  const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
-    null
-  );
-  function handleShowInfo(typeId: number, itemName: string) {
-    setInfoModalItem({ typeId, itemName });
   }
 
   const assetsResult = data?.assetsResult ?? null;
@@ -1417,18 +1393,18 @@ export function Assets() {
   // Bulk actions (issue #90): the three actions the item context menu already
   // offers per row, applied to every selected item_id at once. Quickbar and
   // Compare have different lifetimes (CONTEXT.md) — bulk-adding to Quickbar
-  // schedules a sync, like `handleAddToQuickbar`; bulk-adding to Compare does
-  // not, matching `ItemContextMenu`'s own single-item path.
+  // schedules a sync, like a single row's Add to Quickbar; bulk-adding to
+  // Compare does not, matching `ItemContextMenu`'s own single-item path.
   function handleBulkAddToQuickbar() {
     if (activeCharacterId === null) return;
-    let items = quickbarItems;
+    let items = itemActions.quickbar.items;
     for (const id of selectedIds) {
       const asset = assetsByItemId.get(id);
       if (!asset) continue;
       const name = mergedTypeNames.get(asset.type_id) ?? `Type #${asset.type_id}`;
       items = addQuickbarItem(items, { typeId: asset.type_id, name });
     }
-    void writeQuickbar(items);
+    void itemActions.quickbar.write(items);
   }
   function handleBulkAddToCompare() {
     const addToCompare = useCompareSet.getState().add;
@@ -1484,15 +1460,10 @@ export function Assets() {
     );
   }
 
-  const itemActions: AssetItemActions = {
+  const assetItemActions: AssetItemActions = {
     priceByTypeId,
     volumeByTypeId,
-    blueprintCatalog,
     materialPlanMap,
-    quickbarAvailable: activeCharacterId !== null,
-    onRequestBlueprintCatalog: ensureBlueprintCatalog,
-    onAddToQuickbar: handleAddToQuickbar,
-    onShowInfo: handleShowInfo,
     onViewInIndustryAsMaterial: handleViewInIndustryAsMaterial,
   };
 
@@ -1530,426 +1501,429 @@ export function Assets() {
     deepest && (!('kind' in deepest) || deepest.kind !== 'item') ? deepest : null;
 
   return (
-    <div
-      className={cx(
-        'mx-auto flex w-full max-w-6xl flex-col gap-3',
-        // Fills the remaining viewport height (issue #148) rather than
-        // growing with content: bounds the height against `<main>`'s own
-        // chrome (Layout.tsx's `p-4`, plus the mobile bottom nav's
-        // `calc(5rem+safe-area)` reservation below `md`, mirrored here since
-        // that reservation isn't itself exposed as a token) so the list
-        // Panel below — the only `flex-1` child — has real remaining space
-        // to fill instead of a `flex-1` that's inert with no bounded
-        // ancestor.
-        'h-[calc(100dvh-6rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-2rem)]'
-      )}
-    >
-      <PageHeader
-        title={t('assets.title')}
-        // `CharacterFilterControl` rides here rather than in `actions` per
-        // `docs/context/decisions/20260908-192806-the-character-filter-rides-in-the-panel-header.md`
-        // — Assets has no titled inner `Panel` to attach it to, so it takes
-        // the page-level title band instead, the same "names whose data this
-        // is" role the decision describes for a panel's own `meta`.
-        meta={
-          <>
-            {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
-            {showTotalValueChip && (
-              <StatChip
-                label={t('assets.section.totalValueLabel')}
-                value={
-                  totalValueFiltered
-                    ? t('assets.section.totalValueFiltered', { value: formatIsk(totalValue) })
-                    : formatIsk(totalValue)
-                }
-                tone="success"
-              />
-            )}
-            {crossCharacterFilterMeta}
-            {otherCharacterIds.length > 0 && crossCharacterLoading && (
-              <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
-            )}
-          </>
-        }
-        actions={
-          <>
-            <div className="ml-auto flex items-center gap-1.5">
-              <IconButton
-                icon={<Icon.FlatList />}
-                label={t('assets.allItemsToggle')}
-                pressed={allItemsView}
-                onClick={() => setView({ all: !allItemsView })}
-              />
-              <IconButton
-                icon={<Icon.Select />}
-                label={t('assets.select.toggle')}
-                pressed={selectMode}
-                onClick={toggleSelectMode}
-              />
-              <IconButton
-                icon={<Icon.Download />}
-                label={t('assets.exportCsv')}
-                disabled={csvGroups.length === 0}
-                onClick={handleExportCsv}
-              />
-              <IconButton
-                icon={<Icon.Refresh />}
-                label={t('assets.refresh')}
-                disabled={loading}
-                onClick={refresh}
-              />
-            </div>
-          </>
-        }
-      />
-
-      {assetsResult && !assetsNeedsReauth && (
-        <SearchInput
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t('assets.searchPlaceholder')}
-        />
-      )}
-
-      {selectMode && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
-          {selectedIds.size > 0 && (
-            <span className="text-[0.6875rem] text-text-dim tabular-nums">
-              {t('assets.select.selectedCount', { count: selectedIds.size })}
-            </span>
-          )}
-          <Button size="sm" onClick={handleSelectAllInView}>
-            {t('assets.select.selectAllInView')}
-          </Button>
-          <Button size="sm" disabled={selectedIds.size === 0} onClick={handleDeselectAll}>
-            {t('assets.select.deselectAll')}
-          </Button>
-          {selectedIds.size > 0 && (
+    <ItemActionsProvider page={itemActions}>
+      <div
+        className={cx(
+          'mx-auto flex w-full max-w-6xl flex-col gap-3',
+          // Fills the remaining viewport height (issue #148) rather than
+          // growing with content: bounds the height against `<main>`'s own
+          // chrome (Layout.tsx's `p-4`, plus the mobile bottom nav's
+          // `calc(5rem+safe-area)` reservation below `md`, mirrored here since
+          // that reservation isn't itself exposed as a token) so the list
+          // Panel below — the only `flex-1` child — has real remaining space
+          // to fill instead of a `flex-1` that's inert with no bounded
+          // ancestor.
+          'h-[calc(100dvh-6rem-env(safe-area-inset-bottom))] md:h-[calc(100dvh-2rem)]'
+        )}
+      >
+        <PageHeader
+          title={t('assets.title')}
+          // `CharacterFilterControl` rides here rather than in `actions` per
+          // `docs/context/decisions/20260908-192806-the-character-filter-rides-in-the-panel-header.md`
+          // — Assets has no titled inner `Panel` to attach it to, so it takes
+          // the page-level title band instead, the same "names whose data this
+          // is" role the decision describes for a panel's own `meta`.
+          meta={
             <>
-              <Button
-                size="sm"
-                disabled={activeCharacterId === null}
-                onClick={handleBulkAddToQuickbar}
-              >
-                {t('assets.select.addToQuickbar')}
-              </Button>
-              <Button size="sm" onClick={handleBulkAddToCompare}>
-                {t('assets.select.addToCompare')}
-              </Button>
-              <Button size="sm" onClick={handleBulkCopyNames}>
-                {t('assets.select.copyNames')}
-              </Button>
+              {assetsResult && <DataAgeBadge date={assetsResult.fetchedAt} />}
+              {showTotalValueChip && (
+                <StatChip
+                  label={t('assets.section.totalValueLabel')}
+                  value={
+                    totalValueFiltered
+                      ? t('assets.section.totalValueFiltered', { value: formatIsk(totalValue) })
+                      : formatIsk(totalValue)
+                  }
+                  tone="success"
+                />
+              )}
+              {crossCharacterFilterMeta}
+              {otherCharacterIds.length > 0 && crossCharacterLoading && (
+                <Spinner size="sm" label={t('assets.crossCharacterLoading')} />
+              )}
             </>
-          )}
-        </div>
-      )}
-
-      {loading && !data ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : assetsNeedsReauth ? (
-        <GrantBanner
-          characterId={activeCharacterId}
-          endpoints={['getCharacterAssets']}
-          title={t('assets.reauthTitle')}
-          hint={t('assets.reauthHint')}
-          actionLabel={t('assets.reauthAction')}
+          }
+          actions={
+            <>
+              <div className="ml-auto flex items-center gap-1.5">
+                <IconButton
+                  icon={<Icon.FlatList />}
+                  label={t('assets.allItemsToggle')}
+                  pressed={allItemsView}
+                  onClick={() => setView({ all: !allItemsView })}
+                />
+                <IconButton
+                  icon={<Icon.Select />}
+                  label={t('assets.select.toggle')}
+                  pressed={selectMode}
+                  onClick={toggleSelectMode}
+                />
+                <IconButton
+                  icon={<Icon.Download />}
+                  label={t('assets.exportCsv')}
+                  disabled={csvGroups.length === 0}
+                  onClick={handleExportCsv}
+                />
+                <IconButton
+                  icon={<Icon.Refresh />}
+                  label={t('assets.refresh')}
+                  disabled={loading}
+                  onClick={refresh}
+                />
+              </div>
+            </>
+          }
         />
-      ) : error ? (
-        <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
-      ) : !assetsResult ? (
-        <EmptyState title={t('assets.emptyTitle')} hint={t('assets.emptyHint')} />
-      ) : (
-        <div className="flex min-h-0 flex-1 flex-col gap-3">
-          {assetsResult.fromCache && (
-            <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
-          )}
-          {assetsTruncated && (
-            <p className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-warning uppercase">
-              <span>
-                {t('common.incompleteTitle')} —{' '}
-                {t('assets.fetchTruncatedNotice', { shown: assetsResult.data.length })}
-              </span>
-              <Button size="sm" disabled={loading} onClick={refresh}>
-                {t('assets.fetchTruncatedRetry')}
-              </Button>
-            </p>
-          )}
 
-          <AssetItemActionsContext.Provider value={itemActions}>
-            <Panel padded={false} fill className="flex min-h-0 flex-1 flex-col">
-              {/* --- level header: breadcrumb when drilled in, sort controls at the root --- */}
-              {flatModeActive ? (
-                <div className="flex h-11 shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
-                  <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
-                    {t('assets.search.resultCount', { count: flatMatches.length })}
-                  </span>
-                  {/* CSV export always stays scoped to the active Character's own
+        {assetsResult && !assetsNeedsReauth && (
+          <SearchInput
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t('assets.searchPlaceholder')}
+          />
+        )}
+
+        {selectMode && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xs border border-line bg-panel-2 px-3 py-2">
+            {selectedIds.size > 0 && (
+              <span className="text-[0.6875rem] text-text-dim tabular-nums">
+                {t('assets.select.selectedCount', { count: selectedIds.size })}
+              </span>
+            )}
+            <Button size="sm" onClick={handleSelectAllInView}>
+              {t('assets.select.selectAllInView')}
+            </Button>
+            <Button size="sm" disabled={selectedIds.size === 0} onClick={handleDeselectAll}>
+              {t('assets.select.deselectAll')}
+            </Button>
+            {selectedIds.size > 0 && (
+              <>
+                <Button
+                  size="sm"
+                  disabled={activeCharacterId === null}
+                  onClick={handleBulkAddToQuickbar}
+                >
+                  {t('assets.select.addToQuickbar')}
+                </Button>
+                <Button size="sm" onClick={handleBulkAddToCompare}>
+                  {t('assets.select.addToCompare')}
+                </Button>
+                <Button size="sm" onClick={handleBulkCopyNames}>
+                  {t('assets.select.copyNames')}
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
+        {loading && !data ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : assetsNeedsReauth ? (
+          <GrantBanner
+            characterId={activeCharacterId}
+            endpoints={['getCharacterAssets']}
+            title={t('assets.reauthTitle')}
+            hint={t('assets.reauthHint')}
+            actionLabel={t('assets.reauthAction')}
+          />
+        ) : error ? (
+          <EmptyState title={t('common.loadFailedTitle')} hint={t('common.loadFailedHint')} />
+        ) : !assetsResult ? (
+          <EmptyState title={t('assets.emptyTitle')} hint={t('assets.emptyHint')} />
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col gap-3">
+            {assetsResult.fromCache && (
+              <p className="text-[0.6875rem] text-warning uppercase">{t('common.offlineTitle')}</p>
+            )}
+            {assetsTruncated && (
+              <p className="flex flex-wrap items-center gap-2 text-[0.6875rem] text-warning uppercase">
+                <span>
+                  {t('common.incompleteTitle')} —{' '}
+                  {t('assets.fetchTruncatedNotice', { shown: assetsResult.data.length })}
+                </span>
+                <Button size="sm" disabled={loading} onClick={refresh}>
+                  {t('assets.fetchTruncatedRetry')}
+                </Button>
+              </p>
+            )}
+
+            <AssetItemActionsContext.Provider value={assetItemActions}>
+              <Panel padded={false} fill className="flex min-h-0 flex-1 flex-col">
+                {/* --- level header: breadcrumb when drilled in, sort controls at the root --- */}
+                {flatModeActive ? (
+                  <div className="flex h-11 shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 md:h-9">
+                    <span className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                      {t('assets.search.resultCount', { count: flatMatches.length })}
+                    </span>
+                    {/* CSV export always stays scoped to the active Character's own
                       assets (see csvGroups above) — this is the only UI surface
                       that explains why (issue #415), shown exactly when cross-
                       character results are actually on screen to be confused by. */}
-                  {activeCrossCharacterData && (
-                    <span className="text-[0.6875rem] text-text-dim">
-                      {t('assets.crossCharacterCsvNote')}
-                    </span>
-                  )}
-                  <div className="ml-auto flex items-center gap-2">
-                    <TextInput
-                      type="number"
-                      size="sm"
-                      min={0}
-                      inputMode="decimal"
-                      value={minValueInput}
-                      onChange={(e) => setView({ min: e.target.value })}
-                      placeholder={t('assets.minValue.placeholder')}
-                      aria-label={t('assets.minValue.label')}
-                      className="w-24 tabular-nums"
-                    />
-                    <Select
-                      value={sortField}
-                      onValueChange={(value) => void setSortField(value as AssetSortField)}
-                    >
-                      <SelectTrigger size="sm" aria-label={t('assets.sort.label')} className="w-28">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="name">{t('assets.sort.name')}</SelectItem>
-                        <SelectItem value="value">{t('assets.sort.value')}</SelectItem>
-                        <SelectItem value="quantity">{t('assets.sort.quantity')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {searchActive && (
-                      <IconButton
-                        icon={<Icon.Close />}
-                        label={t('assets.search.clear')}
-                        variant="plain"
+                    {activeCrossCharacterData && (
+                      <span className="text-[0.6875rem] text-text-dim">
+                        {t('assets.crossCharacterCsvNote')}
+                      </span>
+                    )}
+                    <div className="ml-auto flex items-center gap-2">
+                      <TextInput
+                        type="number"
                         size="sm"
-                        onClick={() => setSearch('')}
+                        min={0}
+                        inputMode="decimal"
+                        value={minValueInput}
+                        onChange={(e) => setView({ min: e.target.value })}
+                        placeholder={t('assets.minValue.placeholder')}
+                        aria-label={t('assets.minValue.label')}
+                        className="w-24 tabular-nums"
                       />
-                    )}
-                  </div>
-                </div>
-              ) : pathStationId !== null ? (
-                <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel-2 py-1.5 pr-3 pl-1">
-                  <IconButton
-                    icon={<Icon.Back size={Icon.ICON_SIZE.lg} />}
-                    label={t('assets.breadcrumb.back')}
-                    variant="plain"
-                    onClick={() => void navigate(parentHref)}
-                  />
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <h2
-                      ref={levelHeadingRef}
-                      tabIndex={-1}
-                      className="truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                    >
-                      {crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''}
-                      {currentTotals && (
-                        <span className="sr-only">
-                          {t('assets.levelHeading.itemsSuffix', {
-                            items: t('assets.itemCount', { count: currentTotals.itemCount }),
-                          })}
-                        </span>
-                      )}
-                    </h2>
-                    {crumbs.length > 1 && (
-                      <span className="flex min-w-0 items-center gap-1 truncate text-[0.6875rem] text-text-dim">
-                        {crumbs.slice(0, -1).map((crumb, index) => (
-                          <span key={crumb.href} className="flex min-w-0 items-center gap-1">
-                            {index > 0 && <span aria-hidden="true">›</span>}
-                            <Link to={crumb.href} className="truncate hover:text-accent">
-                              {crumb.label}
-                            </Link>
-                          </span>
-                        ))}
-                      </span>
-                    )}
-                  </div>
-                  {resolved.station &&
-                    !isUnresolvedParent(resolved.station, mergedLocationNames) && (
-                      <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-dim sm:flex">
-                        <SecurityValue
-                          security={securityForStation(resolved.station.locationId)}
-                          t={t}
-                        />
-                        <JumpsAwayText
-                          result={jumpsAwayByKey.get(
-                            `${resolved.station.locationId}:${routePreference}`
-                          )}
-                          t={t}
-                        />
-                      </span>
-                    )}
-                  {currentTotals && (
-                    <span className="shrink-0 text-[0.6875rem] text-text-dim tabular-nums">
-                      <span className="hidden sm:inline">
-                        {t('assets.itemCount', { count: currentTotals.itemCount })} ·{' '}
-                      </span>
-                      <span className="text-isk-pos">
-                        <IskAmount
-                          value={currentTotals.estimatedValue}
-                          revealOn="tap"
-                          decimals={0}
-                        />
-                      </span>
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5">
-                    <h2
-                      ref={levelHeadingRef}
-                      tabIndex={-1}
-                      className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                    >
-                      {t('assets.section.locationCount', { count: sortedTree.length })}
-                    </h2>
-                    {/* flex-wrap (issue #415): on a narrow phone the two Selects no
-                        longer share one row with no priority order — Sort stays put
-                        (it comes first in DOM order) and Route is the one that drops
-                        to its own line when both can't fit beside the label. */}
-                    <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
                       <Select
-                        value={stationSortField}
-                        onValueChange={(value) =>
-                          void setStationSortField(value as StationSortField)
-                        }
-                      >
-                        <SelectTrigger aria-label={t('assets.stationSort.label')} className="w-36">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="name">{t('assets.stationSort.name')}</SelectItem>
-                          <SelectItem value="value">{t('assets.stationSort.value')}</SelectItem>
-                          <SelectItem value="itemCount">
-                            {t('assets.stationSort.itemCount')}
-                          </SelectItem>
-                          <SelectItem value="jumpsAway">
-                            {t('assets.stationSort.jumpsAway')}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={routePreference}
-                        onValueChange={(value) => void setRoutePreference(value as RoutePreference)}
+                        value={sortField}
+                        onValueChange={(value) => void setSortField(value as AssetSortField)}
                       >
                         <SelectTrigger
-                          aria-label={t('assets.jumpsAway.routePreference.label')}
+                          size="sm"
+                          aria-label={t('assets.sort.label')}
                           className="w-28"
                         >
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="shortest">
-                            {t('assets.jumpsAway.routePreference.shortest')}
-                          </SelectItem>
-                          <SelectItem value="safest">
-                            {t('assets.jumpsAway.routePreference.safest')}
-                          </SelectItem>
+                          <SelectItem value="name">{t('assets.sort.name')}</SelectItem>
+                          <SelectItem value="value">{t('assets.sort.value')}</SelectItem>
+                          <SelectItem value="quantity">{t('assets.sort.quantity')}</SelectItem>
                         </SelectContent>
                       </Select>
+                      {searchActive && (
+                        <IconButton
+                          icon={<Icon.Close />}
+                          label={t('assets.search.clear')}
+                          variant="plain"
+                          size="sm"
+                          onClick={() => setSearch('')}
+                        />
+                      )}
                     </div>
                   </div>
-                  {/* Without the grant every row degrades to "-"; the note
-                      says why (issue #1590). */}
-                  <GrantNote
-                    className="shrink-0 border-b border-line px-3"
-                    characterId={activeCharacterId}
-                    endpoints={LOCATION_ENDPOINTS}
-                    title={t('assets.jumpsAway.locationNotGrantedTitle')}
-                    hint={t('assets.jumpsAway.locationNotGrantedHint')}
-                    actionLabel={t('assets.jumpsAway.locationNotGrantedAction')}
-                  />
-                </>
-              )}
-
-              {/* --- the list --- */}
-              {resolved.unresolved.length > 0 ? (
-                <EmptyState
-                  title={t('assets.staleLink.title')}
-                  hint={t('assets.staleLink.hint')}
-                  className="py-8"
-                  action={
-                    <Button size="sm" onClick={() => void navigate(assetHref(null, [], query))}>
-                      {t('assets.staleLink.action')}
-                    </Button>
-                  }
-                />
-              ) : rows.length === 0 ? (
-                <EmptyState
-                  title={flatModeActive ? t('assets.noResults') : t('assets.emptyLocation')}
-                  className="py-8"
-                />
-              ) : (
-                <div
-                  ref={scrollParentRef}
-                  data-virtual-scroll-root
-                  aria-label={t('assets.treeLabel')}
-                  className="min-h-0 flex-1 overflow-y-auto"
-                >
-                  {showItemColumns && <ItemColumnLabels t={t} />}
-                  <div
-                    role="presentation"
-                    style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
-                  >
-                    {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                      const row = rows[virtualRow.index];
-                      return (
-                        <div
-                          key={virtualRow.key}
-                          data-index={virtualRow.index}
-                          style={{
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            width: '100%',
-                            transform: `translateY(${virtualRow.start}px)`,
-                          }}
-                        >
-                          <BrowseRowView
-                            row={row}
+                ) : pathStationId !== null ? (
+                  <div className="flex shrink-0 items-center gap-2 border-b border-line bg-panel-2 py-1.5 pr-3 pl-1">
+                    <IconButton
+                      icon={<Icon.Back size={Icon.ICON_SIZE.lg} />}
+                      label={t('assets.breadcrumb.back')}
+                      variant="plain"
+                      onClick={() => void navigate(parentHref)}
+                    />
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <h2
+                        ref={levelHeadingRef}
+                        tabIndex={-1}
+                        className="truncate text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      >
+                        {crumbs.length > 0 ? crumbs[crumbs.length - 1].label : ''}
+                        {currentTotals && (
+                          <span className="sr-only">
+                            {t('assets.levelHeading.itemsSuffix', {
+                              items: t('assets.itemCount', { count: currentTotals.itemCount }),
+                            })}
+                          </span>
+                        )}
+                      </h2>
+                      {crumbs.length > 1 && (
+                        <span className="flex min-w-0 items-center gap-1 truncate text-[0.6875rem] text-text-dim">
+                          {crumbs.slice(0, -1).map((crumb, index) => (
+                            <span key={crumb.href} className="flex min-w-0 items-center gap-1">
+                              {index > 0 && <span aria-hidden="true">›</span>}
+                              <Link to={crumb.href} className="truncate hover:text-accent">
+                                {crumb.label}
+                              </Link>
+                            </span>
+                          ))}
+                        </span>
+                      )}
+                    </div>
+                    {resolved.station &&
+                      !isUnresolvedParent(resolved.station, mergedLocationNames) && (
+                        <span className="hidden shrink-0 items-center gap-2 text-[0.6875rem] text-text-dim sm:flex">
+                          <SecurityValue
+                            security={securityForStation(resolved.station.locationId)}
                             t={t}
-                            typeNames={mergedTypeNames}
-                            characterBadges={characterBadges}
-                            selectMode={selectMode}
-                            selectedIds={selectedIds}
-                            onToggleSelection={toggleNodeSelection}
-                            stationLabelFor={stationLabelFor}
-                            nodeLabel={nodeLabel}
-                            locationNames={mergedLocationNames}
-                            securityForStation={securityForStation}
-                            jumpsAwayFor={(locationId) =>
-                              jumpsAwayByKey.get(`${locationId}:${routePreference}`)
-                            }
-                            pinStateFor={pinStateFor}
-                            onTogglePin={(locationId) => void handleTogglePin(locationId)}
-                            pathStationId={pathStationId}
-                            pathSegments={pathSegments}
-                            trailFor={trailFor}
-                            rootStationIdFor={rootStationIdFor}
-                            query={query}
                           />
-                        </div>
-                      );
-                    })}
+                          <JumpsAwayText
+                            result={jumpsAwayByKey.get(
+                              `${resolved.station.locationId}:${routePreference}`
+                            )}
+                            t={t}
+                          />
+                        </span>
+                      )}
+                    {currentTotals && (
+                      <span className="shrink-0 text-[0.6875rem] text-text-dim tabular-nums">
+                        <span className="hidden sm:inline">
+                          {t('assets.itemCount', { count: currentTotals.itemCount })} ·{' '}
+                        </span>
+                        <span className="text-isk-pos">
+                          <IskAmount
+                            value={currentTotals.estimatedValue}
+                            revealOn="tap"
+                            decimals={0}
+                          />
+                        </span>
+                      </span>
+                    )}
                   </div>
-                </div>
-              )}
-            </Panel>
-          </AssetItemActionsContext.Provider>
-        </div>
-      )}
+                ) : (
+                  <>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line bg-panel-2 px-3 py-1.5">
+                      <h2
+                        ref={levelHeadingRef}
+                        tabIndex={-1}
+                        className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                      >
+                        {t('assets.section.locationCount', { count: sortedTree.length })}
+                      </h2>
+                      {/* flex-wrap (issue #415): on a narrow phone the two Selects no
+                        longer share one row with no priority order — Sort stays put
+                        (it comes first in DOM order) and Route is the one that drops
+                        to its own line when both can't fit beside the label. */}
+                      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+                        <Select
+                          value={stationSortField}
+                          onValueChange={(value) =>
+                            void setStationSortField(value as StationSortField)
+                          }
+                        >
+                          <SelectTrigger
+                            aria-label={t('assets.stationSort.label')}
+                            className="w-36"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="name">{t('assets.stationSort.name')}</SelectItem>
+                            <SelectItem value="value">{t('assets.stationSort.value')}</SelectItem>
+                            <SelectItem value="itemCount">
+                              {t('assets.stationSort.itemCount')}
+                            </SelectItem>
+                            <SelectItem value="jumpsAway">
+                              {t('assets.stationSort.jumpsAway')}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={routePreference}
+                          onValueChange={(value) =>
+                            void setRoutePreference(value as RoutePreference)
+                          }
+                        >
+                          <SelectTrigger
+                            aria-label={t('assets.jumpsAway.routePreference.label')}
+                            className="w-28"
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="shortest">
+                              {t('assets.jumpsAway.routePreference.shortest')}
+                            </SelectItem>
+                            <SelectItem value="safest">
+                              {t('assets.jumpsAway.routePreference.safest')}
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {/* Without the grant every row degrades to "-"; the note
+                      says why (issue #1590). */}
+                    <GrantNote
+                      className="shrink-0 border-b border-line px-3"
+                      characterId={activeCharacterId}
+                      endpoints={LOCATION_ENDPOINTS}
+                      title={t('assets.jumpsAway.locationNotGrantedTitle')}
+                      hint={t('assets.jumpsAway.locationNotGrantedHint')}
+                      actionLabel={t('assets.jumpsAway.locationNotGrantedAction')}
+                    />
+                  </>
+                )}
 
-      {infoModalItem && (
-        <ItemDetailModal
-          typeId={infoModalItem.typeId}
-          itemName={infoModalItem.itemName}
-          onClose={() => setInfoModalItem(null)}
-        />
-      )}
-    </div>
+                {/* --- the list --- */}
+                {resolved.unresolved.length > 0 ? (
+                  <EmptyState
+                    title={t('assets.staleLink.title')}
+                    hint={t('assets.staleLink.hint')}
+                    className="py-8"
+                    action={
+                      <Button size="sm" onClick={() => void navigate(assetHref(null, [], query))}>
+                        {t('assets.staleLink.action')}
+                      </Button>
+                    }
+                  />
+                ) : rows.length === 0 ? (
+                  <EmptyState
+                    title={flatModeActive ? t('assets.noResults') : t('assets.emptyLocation')}
+                    className="py-8"
+                  />
+                ) : (
+                  <div
+                    ref={scrollParentRef}
+                    data-virtual-scroll-root
+                    aria-label={t('assets.treeLabel')}
+                    className="min-h-0 flex-1 overflow-y-auto"
+                  >
+                    {showItemColumns && <ItemColumnLabels t={t} />}
+                    <div
+                      role="presentation"
+                      style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
+                    >
+                      {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+                        const row = rows[virtualRow.index];
+                        return (
+                          <div
+                            key={virtualRow.key}
+                            data-index={virtualRow.index}
+                            style={{
+                              position: 'absolute',
+                              top: 0,
+                              left: 0,
+                              width: '100%',
+                              transform: `translateY(${virtualRow.start}px)`,
+                            }}
+                          >
+                            <BrowseRowView
+                              row={row}
+                              t={t}
+                              typeNames={mergedTypeNames}
+                              characterBadges={characterBadges}
+                              selectMode={selectMode}
+                              selectedIds={selectedIds}
+                              onToggleSelection={toggleNodeSelection}
+                              stationLabelFor={stationLabelFor}
+                              nodeLabel={nodeLabel}
+                              locationNames={mergedLocationNames}
+                              securityForStation={securityForStation}
+                              jumpsAwayFor={(locationId) =>
+                                jumpsAwayByKey.get(`${locationId}:${routePreference}`)
+                              }
+                              pinStateFor={pinStateFor}
+                              onTogglePin={(locationId) => void handleTogglePin(locationId)}
+                              pathStationId={pathStationId}
+                              pathSegments={pathSegments}
+                              trailFor={trailFor}
+                              rootStationIdFor={rootStationIdFor}
+                              query={query}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </Panel>
+            </AssetItemActionsContext.Provider>
+          </div>
+        )}
+      </div>
+    </ItemActionsProvider>
   );
 }
 
@@ -2054,6 +2028,7 @@ function NodeRowView({
   query,
 }: BrowseRowViewProps & { node: AssetTreeNode }) {
   const actions = useAssetItemActions();
+  const pageActions = useItemActions();
   const navigate = useNavigate();
   const label = nodeLabel(node);
   const badge = node.kind === 'bay' ? null : characterBadgeFor(node.asset.item_id, characterBadges);
@@ -2096,9 +2071,9 @@ function NodeRowView({
   const { asset } = node;
   const estimatedValue = estimatedValueFor(asset, actions.priceByTypeId);
   const planTarget =
-    actions.blueprintCatalog === null
+    pageActions.blueprints === null
       ? undefined
-      : planTargetForItem(actions.blueprintCatalog, asset.type_id);
+      : planTargetForItem(pageActions.blueprints, asset.type_id);
   const blueprintTypeID =
     planTarget === undefined ? undefined : (planTarget?.blueprintTypeID ?? null);
   const onViewInIndustryAsMaterial = actions.materialPlanMap?.has(asset.type_id)
@@ -2122,13 +2097,7 @@ function NodeRowView({
           itemName={label}
           blueprintTypeID={blueprintTypeID}
           planProductTypeID={planTarget?.productTypeID}
-          onAddToQuickbar={actions.onAddToQuickbar}
-          quickbarAvailable={actions.quickbarAvailable}
-          onShowInfo={actions.onShowInfo}
           onViewInIndustryAsMaterial={onViewInIndustryAsMaterial}
-          onOpenChange={(open) => {
-            if (open) actions.onRequestBlueprintCatalog();
-          }}
         >
           {children}
         </ItemContextMenu>

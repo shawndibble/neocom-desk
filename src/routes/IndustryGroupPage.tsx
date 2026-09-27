@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -20,8 +19,8 @@ import { applyGroupAutoBuild } from '@/features/industry/autoBuildGroup';
 import { loadBpcContractRows } from '@/features/industry/buildPlanPricingInputs';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
 import type { OwnedStockScope } from '@/engine/industry/types';
-import { useQuickbar } from '@/features/market/useQuickbar';
-import { ItemDetailModal } from '@/features/market/ItemDetailModal';
+import { ItemActionsProvider } from '@/features/market/ItemActionsProvider';
+import { usePageItemActions } from '@/features/market/usePageItemActions';
 
 const NO_PLANS: BuildPlanRecord[] = [];
 
@@ -47,10 +46,7 @@ export function IndustryGroupPage() {
     blueprintsNeedsReauth,
   } = workspace;
 
-  const quickbar = useQuickbar(activeCharacterId);
-  const [infoModalItem, setInfoModalItem] = useState<{ typeId: number; itemName: string } | null>(
-    null
-  );
+  const itemActions = usePageItemActions({ activeCharacterId });
 
   const plansQuery = useLiveQuery(async () => {
     if (activeCharacterId === null || groupId === undefined) return undefined;
@@ -138,50 +134,41 @@ export function IndustryGroupPage() {
   if (!group) return <Navigate to={industryTabHref('plans')} replace />;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
-      {/* Same chrome the index shows above its own tab strip — see
-          `IndustryPlanPage`'s identical use of it. */}
-      <IndustryHeader
-        activeCharacterId={activeCharacterId}
-        activeTab="plans"
-        onTabChange={(id) => navigate(industryTabHref(id as IndustryTab))}
-        tabsActivation="manual"
-        blueprintsNeedsReauth={blueprintsNeedsReauth}
-        onAddToQuickbar={quickbar.add}
-        quickbarAvailable={quickbar.available}
-        onShowInfo={(typeId, itemName) => setInfoModalItem({ typeId, itemName })}
-      />
-
-      {!catalog ? (
-        <div className="flex justify-center py-16">
-          <Spinner label={t('common.loading')} />
-        </div>
-      ) : (
-        <BuildGroupPanel
-          key={group.id}
-          group={group}
-          plans={plans}
-          catalog={catalog}
-          pi={pi}
-          ownedBlueprints={ownedBlueprints}
-          modifiers={modifiers}
-          pricingInputs={pricingInputs}
-          ownedStockSnapshot={ownedStockSnapshot}
-          onOpenPlan={(planId) => navigate(`/industry/plans/${planId}`)}
-          onRetarget={(target, planIds) => void handleRetargetGroup(target, planIds)}
-          onAutoBuild={(options) => handleAutoBuildGroup(options)}
-          onOwnedStockChange={(ownedStock) => void handleGroupOwnedStockChange(ownedStock)}
-          onOwnedStockScopeChange={(scope) => void handleGroupOwnedStockScopeChange(scope)}
+    <ItemActionsProvider page={itemActions}>
+      <div className="mx-auto max-w-7xl space-y-4">
+        {/* Same chrome the index shows above its own tab strip — see
+            `IndustryPlanPage`'s identical use of it. */}
+        <IndustryHeader
+          activeCharacterId={activeCharacterId}
+          activeTab="plans"
+          onTabChange={(id) => navigate(industryTabHref(id as IndustryTab))}
+          tabsActivation="manual"
+          blueprintsNeedsReauth={blueprintsNeedsReauth}
         />
-      )}
 
-      {infoModalItem && (
-        <ItemDetailModal
-          typeId={infoModalItem.typeId}
-          itemName={infoModalItem.itemName}
-          onClose={() => setInfoModalItem(null)}
-        />
-      )}
-    </div>
+        {!catalog ? (
+          <div className="flex justify-center py-16">
+            <Spinner label={t('common.loading')} />
+          </div>
+        ) : (
+          <BuildGroupPanel
+            key={group.id}
+            group={group}
+            plans={plans}
+            catalog={catalog}
+            pi={pi}
+            ownedBlueprints={ownedBlueprints}
+            modifiers={modifiers}
+            pricingInputs={pricingInputs}
+            ownedStockSnapshot={ownedStockSnapshot}
+            onOpenPlan={(planId) => navigate(`/industry/plans/${planId}`)}
+            onRetarget={(target, planIds) => void handleRetargetGroup(target, planIds)}
+            onAutoBuild={(options) => handleAutoBuildGroup(options)}
+            onOwnedStockChange={(ownedStock) => void handleGroupOwnedStockChange(ownedStock)}
+            onOwnedStockScopeChange={(scope) => void handleGroupOwnedStockScopeChange(scope)}
+          />
+        )}
+      </div>
+    </ItemActionsProvider>
   );
 }

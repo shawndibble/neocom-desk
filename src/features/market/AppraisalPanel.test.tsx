@@ -11,6 +11,7 @@ import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { ESI_REGISTRY } from '@/esi/registry';
 import { AppraisalPanel } from './AppraisalPanel';
+import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import type { AppraisalController } from './useAppraisal';
 import type { AppraisalOutcome, HubComparisonRow } from './appraisalData';
 
@@ -89,27 +90,22 @@ function renderPanel(
   { route = '/market/appraisal?hub=jita' }: { route?: string } = {}
 ) {
   const onPricePercentChange = vi.fn();
-  const onAddToQuickbar = vi.fn();
-  const onShowInfo = vi.fn();
-  const onRequestBlueprintCatalog = vi.fn();
+  const actions = fakeItemActions();
   render(
     <MemoryRouter initialEntries={[route]}>
-      <AppraisalPanel
-        controller={controller()}
-        pricePercent={90}
-        onPricePercentChange={onPricePercentChange}
-        hub={TRADE_HUBS[0]}
-        standing={ZERO_STANDINGS}
-        blueprintCatalog={null}
-        onRequestBlueprintCatalog={onRequestBlueprintCatalog}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable
-        onShowInfo={onShowInfo}
-        {...props}
-      />
+      <FakeItemActions actions={actions}>
+        <AppraisalPanel
+          controller={controller()}
+          pricePercent={90}
+          onPricePercentChange={onPricePercentChange}
+          hub={TRADE_HUBS[0]}
+          standing={ZERO_STANDINGS}
+          {...props}
+        />
+      </FakeItemActions>
     </MemoryRouter>
   );
-  return { onPricePercentChange, onAddToQuickbar, onShowInfo, onRequestBlueprintCatalog };
+  return { onPricePercentChange, actions };
 }
 
 describe('AppraisalPanel', () => {
@@ -806,7 +802,7 @@ describe('AppraisalPanel — the row as an item', () => {
   });
 
   it('carries the item context menu on every priced row', async () => {
-    const { onShowInfo } = renderPanel({ controller: controller({ result: outcome() }) });
+    const { actions } = renderPanel({ controller: controller({ result: outcome() }) });
     fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
 
     expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
@@ -814,15 +810,15 @@ describe('AppraisalPanel — the row as an item', () => {
     expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Show info' }));
-    expect(onShowInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
+    expect(actions.showInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
   });
 
   /** Without this the Build Plan action sits on "Checking…" forever. */
   it('asks for the blueprint catalog the first time a row menu opens', () => {
-    const { onRequestBlueprintCatalog } = renderPanel({
+    const { actions } = renderPanel({
       controller: controller({ result: outcome() }),
     });
     fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
-    expect(onRequestBlueprintCatalog).toHaveBeenCalled();
+    expect(actions.requestBlueprints).toHaveBeenCalled();
   });
 });

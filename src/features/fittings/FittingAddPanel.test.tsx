@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import type { Fitting, PilotProfile } from '@/engine/fittings/types';
+import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 import { FittingAddPanel } from './FittingAddPanel';
 import { FittingItemActionsProvider } from './fittingItemActions';
 import { fakeItemActions } from './__fixtures__/itemActions';
@@ -220,18 +221,20 @@ describe('FittingAddPanel', () => {
     const holding: Fitting = { ...fitting, cargo: [{ typeId: 4, quantity: 2 }] };
     render(
       <MemoryRouter>
-        <FittingItemActionsProvider value={actions}>
-          <FittingAddPanel
-            fitting={holding}
-            catalogue={catalogue}
-            target={{ kind: 'cargo' }}
-            engineReady
-            profile={profile}
-            canPlace={() => true}
-            onAdd={vi.fn()}
-            onAddCargo={onAddCargo}
-          />
-        </FittingItemActionsProvider>
+        <FakeItemActions>
+          <FittingItemActionsProvider value={actions}>
+            <FittingAddPanel
+              fitting={holding}
+              catalogue={catalogue}
+              target={{ kind: 'cargo' }}
+              engineReady
+              profile={profile}
+              canPlace={() => true}
+              onAdd={vi.fn()}
+              onAddCargo={onAddCargo}
+            />
+          </FittingItemActionsProvider>
+        </FakeItemActions>
       </MemoryRouter>
     );
     await user.type(screen.getByLabelText('Search items to put in the cargo hold'), 'Anchoring');
@@ -270,18 +273,20 @@ describe('FittingAddPanel', () => {
     const actions = fakeItemActions({ names: { 3: '1MN Afterburner II' } });
     render(
       <MemoryRouter>
-        <FittingItemActionsProvider value={actions}>
-          <FittingAddPanel
-            fitting={fitting}
-            catalogue={catalogue}
-            target={{ kind: 'cargo' }}
-            engineReady
-            profile={profile}
-            canPlace={() => true}
-            onAdd={vi.fn()}
-            onAddCargo={vi.fn()}
-          />
-        </FittingItemActionsProvider>
+        <FakeItemActions>
+          <FittingItemActionsProvider value={actions}>
+            <FittingAddPanel
+              fitting={fitting}
+              catalogue={catalogue}
+              target={{ kind: 'cargo' }}
+              engineReady
+              profile={profile}
+              canPlace={() => true}
+              onAdd={vi.fn()}
+              onAddCargo={vi.fn()}
+            />
+          </FittingItemActionsProvider>
+        </FakeItemActions>
       </MemoryRouter>
     );
     await user.type(screen.getByLabelText('Search items to put in the cargo hold'), 'Afterburner');

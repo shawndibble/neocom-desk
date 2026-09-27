@@ -9,9 +9,6 @@ export interface IndustryHeaderProps {
   activeTab: IndustryTab;
   onTabChange: (tab: IndustryTab) => void;
   blueprintsNeedsReauth: boolean;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
   /**
    * `'manual'` for `IndustryPlanPage`/`IndustryGroupPage`, whose `onTabChange`
    * navigates away rather than swapping content in place — see `Tabs`'
@@ -35,21 +32,13 @@ export function IndustryHeader({
   activeTab,
   onTabChange,
   blueprintsNeedsReauth,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
   tabsActivation = 'automatic',
 }: IndustryHeaderProps) {
   const { t } = useTranslation();
   return (
     <>
       <PageHeader title={t('nav.industry')} />
-      <ActiveJobsPanel
-        characterId={activeCharacterId}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable={quickbarAvailable}
-        onShowInfo={onShowInfo}
-      />
+      <ActiveJobsPanel characterId={activeCharacterId} />
 
       {blueprintsNeedsReauth && (
         <Panel title={t('industry.blueprintsTitle')}>

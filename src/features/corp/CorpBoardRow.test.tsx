@@ -3,12 +3,13 @@
  * keyboard-unreachable row actions) and that it lists the same items as the
  * right-click menu.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { CorpBoardRow } from './CorpBoardRow';
+import { fakeItemActions, withItemActions } from '@/features/market/__fixtures__/itemActions';
 import type { CorpBoardItem } from '@/engine/corp/board';
 
 const jobItem: CorpBoardItem = {
@@ -37,13 +38,16 @@ const structureItem: CorpBoardItem = {
   withinStaleWindow: false,
 };
 
-function renderRow(item: CorpBoardItem, onShowInfo = vi.fn()) {
+function renderRow(item: CorpBoardItem, actions = fakeItemActions()) {
   return render(
-    <MemoryRouter>
-      <ul>
-        <CorpBoardRow item={item} onShowInfo={onShowInfo} />
-      </ul>
-    </MemoryRouter>
+    withItemActions(
+      <MemoryRouter>
+        <ul>
+          <CorpBoardRow item={item} />
+        </ul>
+      </MemoryRouter>,
+      actions
+    )
   );
 }
 
@@ -78,15 +82,15 @@ describe('CorpBoardRow', () => {
     expect(screen.getAllByRole('menuitem').map((el) => el.textContent)).toEqual(['Copy name']);
   });
 
-  it("calls onShowInfo with the item's typeId from the button menu", async () => {
+  it("calls the page's showInfo with the item's typeId from the button menu", async () => {
     const user = userEvent.setup();
-    const onShowInfo = vi.fn();
-    renderRow(jobItem, onShowInfo);
+    const actions = fakeItemActions();
+    renderRow(jobItem, actions);
 
     await user.click(screen.getByRole('button', { name: 'More actions for Rifter Blueprint' }));
     await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
 
-    expect(onShowInfo).toHaveBeenCalledWith(587, 'Rifter Blueprint');
+    expect(actions.showInfo).toHaveBeenCalledWith(587, 'Rifter Blueprint');
   });
 
   it('titles the truncated subject and detail lines with their full text', () => {

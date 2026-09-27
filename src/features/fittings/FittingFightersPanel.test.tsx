@@ -5,6 +5,10 @@ import userEvent from '@testing-library/user-event';
 import '@/i18n';
 import { neutralExtendedStats } from '@/engine/fittings/__fixtures__/fittingStats';
 import type { Fitting, FittingStats } from '@/engine/fittings/types';
+import {
+  fakeItemActions as fakeMarketItemActions,
+  FakeItemActions,
+} from '@/features/market/__fixtures__/itemActions';
 import { FittingFightersPanel } from './FittingFightersPanel';
 import { FittingItemActionsProvider } from './fittingItemActions';
 import { fakeItemActions } from './__fixtures__/itemActions';
@@ -120,19 +124,22 @@ describe('FittingFightersPanel item menu', () => {
   function renderWithMenu(fitting: Fitting, fighterStats: FittingStats) {
     const onChange = vi.fn();
     const actions = fakeItemActions({ names: NAMES });
+    const marketActions = fakeMarketItemActions();
     render(
       <MemoryRouter>
-        <FittingItemActionsProvider value={actions}>
-          <FittingFightersPanel
-            fitting={fitting}
-            stats={fighterStats}
-            onChange={onChange}
-            typeName={typeName}
-          />
-        </FittingItemActionsProvider>
+        <FakeItemActions actions={marketActions}>
+          <FittingItemActionsProvider value={actions}>
+            <FittingFightersPanel
+              fitting={fitting}
+              stats={fighterStats}
+              onChange={onChange}
+              typeName={typeName}
+            />
+          </FittingItemActionsProvider>
+        </FakeItemActions>
       </MemoryRouter>
     );
-    return { onChange, actions };
+    return { onChange, actions, marketActions };
   }
 
   async function openMenu() {
@@ -147,7 +154,7 @@ describe('FittingFightersPanel item menu', () => {
       ...carrier,
       fighters: [{ typeId: 23055, quantity: 6, state: 'active' }],
     };
-    const { onChange, actions } = renderWithMenu(fitting, stats(4, 1));
+    const { onChange, marketActions } = renderWithMenu(fitting, stats(4, 1));
     await openMenu();
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Move to bay' }));
     expect(applied(onChange, fitting).fighters).toEqual([
@@ -155,7 +162,7 @@ describe('FittingFightersPanel item menu', () => {
     ]);
     await openMenu();
     fireEvent.click(await screen.findByRole('menuitem', { name: /Show info/ }));
-    expect(actions.showInfo).toHaveBeenCalledWith(23055, 'Templar I');
+    expect(marketActions.showInfo).toHaveBeenCalledWith(23055, 'Templar I');
   });
 
   it('launches a bay squadron only while a tube is free, and removes one', async () => {

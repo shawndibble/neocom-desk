@@ -11,6 +11,7 @@ import { loadAttributeDictionary } from '@/sde/loadMarketSde';
 import { loadSkills } from '@/sde/loadSde';
 import { useCompareSet } from './compareSet';
 import { CompareDrawer } from './CompareDrawer';
+import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import { ZERO_STANDINGS } from '@/engine/market/standings';
@@ -105,32 +106,26 @@ beforeEach(() => {
   mockedLoadSkills.mockResolvedValue([]);
 });
 
-const drawerHandlers = {
-  onRequestBlueprintCatalog: vi.fn(),
-  onShowInfo: vi.fn(),
-};
+const actions = fakeItemActions();
 
 function renderDrawer(characterId: number | null = null) {
   return render(
     <MemoryRouter>
-      <CompareDrawer
-        location={{
-          mode: 'region',
-          regionId: REGION_ID,
-          hubStationId: 60003760,
-          globalMarkets: new Map(),
-        }}
-        refreshTick={0}
-        blueprintCatalog={null}
-        onRequestBlueprintCatalog={drawerHandlers.onRequestBlueprintCatalog}
-        onAddToQuickbar={vi.fn()}
-        quickbarAvailable
-        onShowInfo={drawerHandlers.onShowInfo}
-        characterId={characterId}
-        hub={DEFAULT_TRADE_HUB}
-        standing={ZERO_STANDINGS}
-        sourceLabel="Jita"
-      />
+      <FakeItemActions actions={actions}>
+        <CompareDrawer
+          location={{
+            mode: 'region',
+            regionId: REGION_ID,
+            hubStationId: 60003760,
+            globalMarkets: new Map(),
+          }}
+          refreshTick={0}
+          characterId={characterId}
+          hub={DEFAULT_TRADE_HUB}
+          standing={ZERO_STANDINGS}
+          sourceLabel="Jita"
+        />
+      </FakeItemActions>
     </MemoryRouter>
   );
 }
@@ -241,13 +236,13 @@ describe('CompareDrawer', () => {
 
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Remove Tritanium' }));
     expect(screen.queryByRole('menuitem', { name: 'Show info' })).not.toBeInTheDocument();
-    expect(drawerHandlers.onRequestBlueprintCatalog).not.toHaveBeenCalled();
+    expect(actions.requestBlueprints).not.toHaveBeenCalled();
 
     fireEvent.contextMenu(within(region).getByText('Tritanium'));
     await user.click(await screen.findByRole('menuitem', { name: 'Show info' }));
 
-    expect(drawerHandlers.onRequestBlueprintCatalog).toHaveBeenCalled();
-    expect(drawerHandlers.onShowInfo).toHaveBeenCalledWith(ITEM_A.typeId, ITEM_A.itemName);
+    expect(actions.requestBlueprints).toHaveBeenCalled();
+    expect(actions.showInfo).toHaveBeenCalledWith(ITEM_A.typeId, ITEM_A.itemName);
   });
 
   it('clears the whole set from the drawer header', async () => {

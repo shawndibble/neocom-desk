@@ -11,6 +11,7 @@ import type { BreakdownContext } from './CalculationBreakdown';
 import { ownedStockSale } from '@/engine/industry/ownedStockSale';
 import type { MaterialCostLine } from '@/engine/industry/types';
 import { ItemContextMenu, ItemMoreActions } from '@/features/market/ItemContextMenu';
+import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 
 /** One material the plan needs 100 of and the player already holds all 100 of. */
 const OWNED_MATERIALS: MaterialCostLine[] = [
@@ -114,29 +115,19 @@ function renderHeroWithRouter(overrides: HeroOverrides & { openBreakdown?: boole
 
 function itemMenuFor(typeId: number, trigger: React.ReactElement) {
   return (
-    <ItemContextMenu
-      typeId={typeId}
-      itemName="Rifter"
-      blueprintTypeID={null}
-      onAddToQuickbar={vi.fn()}
-      quickbarAvailable
-      onShowInfo={vi.fn()}
-    >
-      {trigger}
-    </ItemContextMenu>
+    <FakeItemActions>
+      <ItemContextMenu typeId={typeId} itemName="Rifter" blueprintTypeID={null}>
+        {trigger}
+      </ItemContextMenu>
+    </FakeItemActions>
   );
 }
 
 function itemActionsFor(typeId: number) {
   return (
-    <ItemMoreActions
-      typeId={typeId}
-      itemName="Rifter"
-      blueprintTypeID={null}
-      onAddToQuickbar={vi.fn()}
-      quickbarAvailable
-      onShowInfo={vi.fn()}
-    />
+    <FakeItemActions>
+      <ItemMoreActions typeId={typeId} itemName="Rifter" blueprintTypeID={null} />
+    </FakeItemActions>
   );
 }
 

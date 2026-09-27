@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { QuickbarList, type QuickbarListProps } from './QuickbarList';
+import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 
 const items = [{ typeId: 34, name: 'Tritanium', characterId: 1, position: 0 }];
 
@@ -16,19 +17,17 @@ function renderList(overrides: Partial<QuickbarListProps> = {}) {
     onReorder: vi.fn(),
     onSetTarget: vi.fn(),
     onViewInAppraisal: vi.fn(),
-    onAddToQuickbar: vi.fn(),
-    quickbarAvailable: true,
-    onShowInfo: vi.fn(),
-    blueprintTypeIdFor: () => null,
-    onRequestBlueprintCatalog: vi.fn(),
     ...overrides,
   };
+  const actions = fakeItemActions();
   render(
     <MemoryRouter>
-      <QuickbarList {...props} />
+      <FakeItemActions actions={actions}>
+        <QuickbarList {...props} />
+      </FakeItemActions>
     </MemoryRouter>
   );
-  return props;
+  return { ...props, actions };
 }
 
 describe('QuickbarList item context menu', () => {
@@ -37,7 +36,7 @@ describe('QuickbarList item context menu', () => {
     fireEvent.contextMenu(screen.getByRole('button', { name: 'Tritanium' }));
 
     expect(await screen.findByRole('menuitem', { name: /Show info/i })).toBeInTheDocument();
-    expect(props.onRequestBlueprintCatalog).toHaveBeenCalled();
+    expect(props.actions.requestBlueprints).toHaveBeenCalled();
     expect(props.onSelect).not.toHaveBeenCalled();
   });
 
@@ -47,7 +46,7 @@ describe('QuickbarList item context menu', () => {
     await user.click(screen.getByRole('button', { name: 'More actions for Tritanium' }));
 
     expect(await screen.findByRole('menuitem', { name: /Show info/i })).toBeInTheDocument();
-    expect(props.onRequestBlueprintCatalog).toHaveBeenCalled();
+    expect(props.actions.requestBlueprints).toHaveBeenCalled();
     expect(props.onSelect).not.toHaveBeenCalled();
   });
 

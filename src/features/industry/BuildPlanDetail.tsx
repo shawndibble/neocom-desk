@@ -214,11 +214,6 @@ interface BuildPlanDetailProps {
    * and sync rules for each kind.
    */
   onChange: (change: BuildPlanChange) => void;
-  /** Materials-row context menu (CONTEXT.md round 26) — the same actions the Market and Assets rows offer. */
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  /** False with no active character — the Quickbar has nobody to save the material under. */
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
   /** This plan's group's last Retarget (issue #632), or null when ungrouped or not yet Retargeted. */
   groupSnapshot: BuildGroupSnapshot | null;
   /**
@@ -272,9 +267,6 @@ export function BuildPlanDetail({
   corpOwnedStock,
   pricingInputs,
   onChange,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
   groupSnapshot,
   onSearchBpcSourcing,
   pendingLogProduction,
@@ -1001,8 +993,8 @@ export function BuildPlanDetail({
   /**
    * Unlike Market/Assets, this page already holds the whole blueprint catalog
    * (it needs it to render the plan at all), so the "Build Plan" action
-   * resolves synchronously — never the `undefined` "checking…" state those
-   * lazily-loading callers pass. For a material something else manufactures
+   * resolves synchronously — never the "checking…" state those
+   * lazily-loading pages show. For a material something else manufactures
    * the action lands back here with `?product=`, creating or selecting that
    * material's own plan so its build-vs-buy read can be compared with this one.
    */
@@ -1016,9 +1008,6 @@ export function BuildPlanDetail({
         typeId={typeId}
         itemName={nameForType(catalog, typeId)}
         blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable={quickbarAvailable}
-        onShowInfo={onShowInfo}
         onToggleBuildHere={buildHere?.onToggle}
         buildingHere={buildHere?.building}
       >
@@ -1058,9 +1047,6 @@ export function BuildPlanDetail({
         typeId={typeId}
         itemName={nameForType(catalog, typeId)}
         blueprintTypeID={catalog.byProductTypeID.get(typeId)?.blueprintTypeID ?? null}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable={quickbarAvailable}
-        onShowInfo={onShowInfo}
         onToggleBuildHere={buildHere?.onToggle}
         buildingHere={buildHere?.building}
       />

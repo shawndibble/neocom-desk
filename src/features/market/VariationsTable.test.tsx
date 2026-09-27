@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { VariationsTable, type VariationsTableProps } from './VariationsTable';
+import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import type { VariationRow } from './variations';
 import type { OrderBookSummary } from '@/engine/market/orderBook';
 
@@ -23,22 +24,21 @@ function defaultProps(overrides: Partial<VariationsTableProps> = {}): Variations
     prices: new Map(),
     onSelect: vi.fn(),
     onCompare: vi.fn(),
-    blueprintCatalog: null,
-    onRequestBlueprintCatalog: vi.fn(),
-    onAddToQuickbar: vi.fn(),
-    quickbarAvailable: true,
-    onShowInfo: vi.fn(),
     ...overrides,
   };
 }
 
 /** ItemContextMenu (wired to every row) calls useNavigate/useLocation unconditionally, so any non-empty render needs a Router ancestor. */
 function renderTable(overrides: Partial<VariationsTableProps> = {}) {
-  return render(
+  const actions = fakeItemActions();
+  const result = render(
     <MemoryRouter>
-      <VariationsTable {...defaultProps(overrides)} />
+      <FakeItemActions actions={actions}>
+        <VariationsTable {...defaultProps(overrides)} />
+      </FakeItemActions>
     </MemoryRouter>
   );
+  return { ...result, actions };
 }
 
 describe('VariationsTable', () => {
@@ -171,34 +171,31 @@ describe('VariationsTable', () => {
     });
 
     it('requests the blueprint catalog when the menu opens, same as the tree', () => {
-      const onRequestBlueprintCatalog = vi.fn();
-      renderTable({ onRequestBlueprintCatalog });
+      const { actions } = renderTable();
       const row = screen.getByText('Rifter').closest('tr');
       if (!row) throw new Error('expected a Rifter row');
       fireEvent.contextMenu(row);
-      expect(onRequestBlueprintCatalog).toHaveBeenCalledTimes(1);
+      expect(actions.requestBlueprints).toHaveBeenCalledTimes(1);
     });
 
     it('adds the right-clicked row to the Quickbar via Add to Quickbar', async () => {
       const user = userEvent.setup();
-      const onAddToQuickbar = vi.fn();
-      renderTable({ onAddToQuickbar });
+      const { actions } = renderTable();
       const row = screen.getByText('Rifter').closest('tr');
       if (!row) throw new Error('expected a Rifter row');
       fireEvent.contextMenu(row);
       await user.click(screen.getByRole('menuitem', { name: 'Add to Quickbar' }));
-      expect(onAddToQuickbar).toHaveBeenCalledWith(587, 'Rifter');
+      expect(actions.addToQuickbar).toHaveBeenCalledWith(587, 'Rifter');
     });
 
     it('shows info for the right-clicked row via Show info', async () => {
       const user = userEvent.setup();
-      const onShowInfo = vi.fn();
-      renderTable({ onShowInfo });
+      const { actions } = renderTable();
       const row = screen.getByText('Rifter').closest('tr');
       if (!row) throw new Error('expected a Rifter row');
       fireEvent.contextMenu(row);
       await user.click(screen.getByRole('menuitem', { name: 'Show info' }));
-      expect(onShowInfo).toHaveBeenCalledWith(587, 'Rifter');
+      expect(actions.showInfo).toHaveBeenCalledWith(587, 'Rifter');
     });
 
     it('triggers onCompare for the whole table via the row-level Compare Variations action', async () => {

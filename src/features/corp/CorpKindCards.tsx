@@ -82,18 +82,9 @@ const EMPTY_FOR_KIND: Readonly<Record<CorpCardKind, string>> = {
 interface CorpKindCardsProps {
   grouped: ReadonlyMap<CorpBoardItemKind, CorpBoardItem[]>;
   capabilities: CorpCapabilities;
-  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
-function KindCard({
-  kind,
-  items,
-  onShowInfo,
-}: {
-  kind: CorpCardKind;
-  items: readonly CorpBoardItem[];
-  onShowInfo: (typeId: number, itemName: string) => void;
-}) {
+function KindCard({ kind, items }: { kind: CorpCardKind; items: readonly CorpBoardItem[] }) {
   const { t } = useTranslation();
   const shown = items.slice(0, ROWS_PER_CARD);
   const hidden = items.length - shown.length;
@@ -121,7 +112,7 @@ function KindCard({
         <>
           <ul className="divide-y divide-line">
             {shown.map((item) => (
-              <CorpBoardRow key={item.id} item={item} onShowInfo={onShowInfo} />
+              <CorpBoardRow key={item.id} item={item} />
             ))}
           </ul>
           {/*
@@ -141,7 +132,7 @@ function KindCard({
   );
 }
 
-export function CorpKindCards({ grouped, capabilities, onShowInfo }: CorpKindCardsProps) {
+export function CorpKindCards({ grouped, capabilities }: CorpKindCardsProps) {
   const readable = CARD_KINDS.filter((kind) => capabilities[CAPABILITY_FOR_KIND[kind]]);
   if (readable.length === 0) return null;
 
@@ -157,7 +148,7 @@ export function CorpKindCards({ grouped, capabilities, onShowInfo }: CorpKindCar
     // whitespace).
     <div className="grid min-w-0 items-start gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {readable.map((kind) => (
-        <KindCard key={kind} kind={kind} items={grouped.get(kind) ?? []} onShowInfo={onShowInfo} />
+        <KindCard key={kind} kind={kind} items={grouped.get(kind) ?? []} />
       ))}
     </div>
   );

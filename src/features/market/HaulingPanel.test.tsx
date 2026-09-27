@@ -5,6 +5,7 @@ import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import type { HaulingScanRow } from './haulingData';
 import type { HaulingScanState } from './useHaulingScan';
+import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 
 const FEES = {
   accountingLevel: 5,
@@ -45,19 +46,15 @@ vi.mock('@/sde/loadMarketSde', () => ({ loadMarketGroups: vi.fn(async () => []) 
 const { HaulingPanel } = await import('./HaulingPanel');
 
 function renderPanel() {
-  const props = {
-    blueprintCatalog: null,
-    onRequestBlueprintCatalog: vi.fn(),
-    onAddToQuickbar: vi.fn(),
-    quickbarAvailable: true,
-    onShowInfo: vi.fn(),
-  };
+  const actions = fakeItemActions();
   render(
     <MemoryRouter initialEntries={['/market/hauling?from=jita&to=amarr']}>
-      <HaulingPanel {...props} />
+      <FakeItemActions actions={actions}>
+        <HaulingPanel />
+      </FakeItemActions>
     </MemoryRouter>
   );
-  return props;
+  return { actions };
 }
 
 describe('HaulingPanel item rows', () => {
@@ -72,18 +69,18 @@ describe('HaulingPanel item rows', () => {
   });
 
   it('carries the item context menu on every row', async () => {
-    const { onShowInfo } = renderPanel();
+    const { actions } = renderPanel();
     fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
 
     expect(await screen.findByRole('menuitem', { name: 'Show info' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Show info' }));
-    expect(onShowInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
+    expect(actions.showInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
   });
 
   it('asks for the blueprint catalog the first time a row menu opens', () => {
-    const { onRequestBlueprintCatalog } = renderPanel();
+    const { actions } = renderPanel();
     fireEvent.contextMenu(screen.getByRole('row', { name: /Damage Control II/ }));
-    expect(onRequestBlueprintCatalog).toHaveBeenCalled();
+    expect(actions.requestBlueprints).toHaveBeenCalled();
   });
 
   it('offers a visible More actions button on each row', () => {

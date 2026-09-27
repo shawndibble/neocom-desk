@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { TransactionsPanel } from './TransactionsPanel';
+import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import { loadWalletJournal, loadWalletTransactions } from '@/features/character/wallet';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { downloadCsv } from '@/lib/downloadCsv';
@@ -43,23 +44,16 @@ function transaction(overrides: Partial<WalletTransaction> = {}): WalletTransact
 }
 
 function renderPanel(url = '/market/history/transactions') {
-  const onAddToQuickbar = vi.fn();
-  const onShowInfo = vi.fn();
-  const onRequestBlueprintCatalog = vi.fn();
+  const actions = fakeItemActions();
   const onViewChange = vi.fn();
   render(
     <MemoryRouter initialEntries={[url]}>
-      <TransactionsPanel
-        onViewChange={onViewChange}
-        blueprintCatalog={null}
-        onRequestBlueprintCatalog={onRequestBlueprintCatalog}
-        onAddToQuickbar={onAddToQuickbar}
-        quickbarAvailable
-        onShowInfo={onShowInfo}
-      />
+      <FakeItemActions actions={actions}>
+        <TransactionsPanel onViewChange={onViewChange} />
+      </FakeItemActions>
     </MemoryRouter>
   );
-  return { onAddToQuickbar, onShowInfo, onRequestBlueprintCatalog, onViewChange };
+  return { actions, onViewChange };
 }
 
 beforeEach(() => {
@@ -77,7 +71,7 @@ describe('TransactionsPanel — the row as an item', () => {
       fromCache: false,
       truncated: false,
     });
-    const { onShowInfo } = renderPanel();
+    const { actions } = renderPanel();
 
     fireEvent.contextMenu(await screen.findByRole('row', { name: /Damage Control II/ }));
 
@@ -85,7 +79,7 @@ describe('TransactionsPanel — the row as an item', () => {
     expect(screen.getByRole('menuitem', { name: 'View in Market' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Show info' }));
-    expect(onShowInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
+    expect(actions.showInfo).toHaveBeenCalledWith(2048, 'Damage Control II');
   });
 
   it('asks for the blueprint catalog the first time a row menu opens', async () => {
@@ -95,10 +89,10 @@ describe('TransactionsPanel — the row as an item', () => {
       fromCache: false,
       truncated: false,
     });
-    const { onRequestBlueprintCatalog } = renderPanel();
+    const { actions } = renderPanel();
 
     fireEvent.contextMenu(await screen.findByRole('row', { name: /Damage Control II/ }));
-    expect(onRequestBlueprintCatalog).toHaveBeenCalled();
+    expect(actions.requestBlueprints).toHaveBeenCalled();
   });
 });
 
@@ -300,14 +294,9 @@ describe('TransactionsPanel — phone', () => {
     load([transaction({ transaction_id: 7 })]);
     render(
       <MemoryRouter initialEntries={['/market/history/transactions?highlight=2048']}>
-        <TransactionsPanel
-          onViewChange={vi.fn()}
-          blueprintCatalog={null}
-          onRequestBlueprintCatalog={vi.fn()}
-          onAddToQuickbar={vi.fn()}
-          quickbarAvailable
-          onShowInfo={vi.fn()}
-        />
+        <FakeItemActions>
+          <TransactionsPanel onViewChange={vi.fn()} />
+        </FakeItemActions>
       </MemoryRouter>
     );
     const link = await screen.findByRole('link', { name: 'Damage Control II' });

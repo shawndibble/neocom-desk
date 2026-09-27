@@ -15,6 +15,7 @@ import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { PRICING_INPUTS_FIXTURE } from './pricingInputsFixtures';
 import { EMPTY_OWNED_STOCK_SNAPSHOT } from './ownedStockDetection';
 import { BuildPlanDetail, type PlanPatch } from './BuildPlanDetail';
+import { FakeItemActions } from '@/features/market/__fixtures__/itemActions';
 
 // BuildPlanDetail fetches a market snapshot in an effect on mount; a real
 // fetch would hit ESI/Fuzzwork and never resolve under MSW's default
@@ -227,36 +228,35 @@ function Harness({
   const [plan, setPlan] = useState<BuildPlanRecord>(makePlan(planOverrides));
   return (
     <MemoryRouter>
-      <BuildPlanDetail
-        plan={plan}
-        catalog={catalog}
-        pi={null}
-        ownedBlueprints={[]}
-        modifiers={NO_CHARACTER_MODIFIERS}
-        ownedStockSnapshot={EMPTY_OWNED_STOCK_SNAPSHOT}
-        corpOwnedStock={{ ...CORP_OWNED_STOCK_UNAVAILABLE, ...corpOwnedStock }}
-        pricingInputs={
-          corpOwnedBlueprints
-            ? {
-                ...PRICING_INPUTS_FIXTURE,
-                corpBlueprints: {
-                  ...PRICING_INPUTS_FIXTURE.corpBlueprints,
-                  ...corpOwnedBlueprints,
-                },
-              }
-            : PRICING_INPUTS_FIXTURE
-        }
-        onChange={(change) => {
-          if (change.kind === 'sourcing') return;
-          (change.kind === 'edit' ? onUpdate : onDerivedFix)?.(change.patch);
-          setPlan((p) => ({ ...p, ...change.patch }));
-        }}
-        onAddToQuickbar={vi.fn()}
-        quickbarAvailable
-        onShowInfo={vi.fn()}
-        groupSnapshot={null}
-        onSearchBpcSourcing={vi.fn()}
-      />
+      <FakeItemActions>
+        <BuildPlanDetail
+          plan={plan}
+          catalog={catalog}
+          pi={null}
+          ownedBlueprints={[]}
+          modifiers={NO_CHARACTER_MODIFIERS}
+          ownedStockSnapshot={EMPTY_OWNED_STOCK_SNAPSHOT}
+          corpOwnedStock={{ ...CORP_OWNED_STOCK_UNAVAILABLE, ...corpOwnedStock }}
+          pricingInputs={
+            corpOwnedBlueprints
+              ? {
+                  ...PRICING_INPUTS_FIXTURE,
+                  corpBlueprints: {
+                    ...PRICING_INPUTS_FIXTURE.corpBlueprints,
+                    ...corpOwnedBlueprints,
+                  },
+                }
+              : PRICING_INPUTS_FIXTURE
+          }
+          onChange={(change) => {
+            if (change.kind === 'sourcing') return;
+            (change.kind === 'edit' ? onUpdate : onDerivedFix)?.(change.patch);
+            setPlan((p) => ({ ...p, ...change.patch }));
+          }}
+          groupSnapshot={null}
+          onSearchBpcSourcing={vi.fn()}
+        />
+      </FakeItemActions>
     </MemoryRouter>
   );
 }

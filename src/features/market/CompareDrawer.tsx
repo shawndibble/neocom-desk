@@ -44,7 +44,6 @@ import type { OrderBookLocation } from './orderBookView';
 import { compareCsvColumns } from './compareCsv';
 import { formatVolume } from './format';
 import { downloadCsv } from '@/lib/downloadCsv';
-import type { BlueprintCatalog } from '@/features/industry/blueprintCatalog';
 import { ItemContextMenu } from './ItemContextMenu';
 import { compareMargin, type AppraisalNetFees } from '@/engine/market/appraisal';
 import { ZERO_STANDINGS, type ResolvedStandings } from '@/engine/market/standings';
@@ -52,7 +51,6 @@ import type { TradeHub } from '@/market/hubs';
 import { SKILL_IDS } from '@/engine/industry/types';
 import { loadCharacterModifiers } from '@/features/character/characterModifiers';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
-import { blueprintTypeIdFor } from './useBlueprintCatalog';
 
 const DRAWER_ID = 'compare-drawer';
 const MIN_HEIGHT = 160;
@@ -81,11 +79,6 @@ const VIEW_LABEL_KEYS = { prices: 'viewPrices', attributes: 'viewAttributes' } a
 export interface CompareDrawerProps {
   location: OrderBookLocation;
   refreshTick: number;
-  blueprintCatalog: BlueprintCatalog | null;
-  onRequestBlueprintCatalog: () => void;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
   /** The active Character, whose skills and `standing` price the after-fees column; null shows no after-fees figure. */
   characterId: number | null;
   /** The Trade Hub the fees are quoted at. */
@@ -107,11 +100,6 @@ const NO_SKILL_FEES: AppraisalNetFees = {
 export function CompareDrawer({
   location,
   refreshTick,
-  blueprintCatalog,
-  onRequestBlueprintCatalog,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
   characterId,
   standing,
   sourceLabel,
@@ -241,17 +229,7 @@ export function CompareDrawer({
         // The menu wraps only this cell, not the row (unlike sibling surfaces):
         // the row also holds a Remove button, which must not open it.
         render: (row) => (
-          <ItemContextMenu
-            typeId={row.typeId}
-            itemName={row.itemName}
-            blueprintTypeID={blueprintTypeIdFor(blueprintCatalog, row.typeId)}
-            onAddToQuickbar={onAddToQuickbar}
-            quickbarAvailable={quickbarAvailable}
-            onShowInfo={onShowInfo}
-            onOpenChange={(open) => {
-              if (open) onRequestBlueprintCatalog();
-            }}
-          >
+          <ItemContextMenu typeId={row.typeId} itemName={row.itemName}>
             <span className="flex items-center gap-1.5">
               <TypeIcon typeId={row.typeId} size={32} className="h-4 w-4 shrink-0" />
               <span>{row.itemName}</span>
@@ -349,16 +327,7 @@ export function CompareDrawer({
         ),
       },
     ],
-    [
-      t,
-      marginFor,
-      removeItem,
-      blueprintCatalog,
-      onRequestBlueprintCatalog,
-      onAddToQuickbar,
-      quickbarAvailable,
-      onShowInfo,
-    ]
+    [t, marginFor, removeItem]
   );
 
   return (

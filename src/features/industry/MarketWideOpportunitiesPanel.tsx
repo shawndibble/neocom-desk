@@ -55,10 +55,6 @@ interface MarketWideOpportunitiesPanelProps {
   /** For the standing toward `hub`'s NPC owner (issue #1238). Null while no character is active. */
   activeCharacterId: number | null;
   onStartPlan: (entry: BlueprintCatalogEntry) => void;
-  onAddToQuickbar: (typeId: number, itemName: string) => void;
-  /** False with no active character — the Quickbar has nobody to save the item under. */
-  quickbarAvailable: boolean;
-  onShowInfo: (typeId: number, itemName: string) => void;
 }
 
 const HIDE_SKILL_GATED = boolParam();
@@ -71,9 +67,6 @@ export function MarketWideOpportunitiesPanel({
   modifiers,
   activeCharacterId,
   onStartPlan,
-  onAddToQuickbar,
-  quickbarAvailable,
-  onShowInfo,
 }: MarketWideOpportunitiesPanelProps) {
   const { t } = useTranslation();
   const tradeHubStandings = useTradeHubStandings(activeCharacterId);
@@ -205,9 +198,6 @@ export function MarketWideOpportunitiesPanel({
               ? (catalog.byProductTypeID.get(row.productTypeID)?.blueprintTypeID ?? null)
               : undefined
           }
-          onAddToQuickbar={onAddToQuickbar}
-          quickbarAvailable={quickbarAvailable}
-          onShowInfo={onShowInfo}
         />
       ),
     },
@@ -221,9 +211,6 @@ export function MarketWideOpportunitiesPanel({
           ? (catalog.byProductTypeID.get(row.productTypeID)?.blueprintTypeID ?? null)
           : undefined
       }
-      onAddToQuickbar={onAddToQuickbar}
-      quickbarAvailable={quickbarAvailable}
-      onShowInfo={onShowInfo}
     >
       {tr}
     </ItemContextMenu>
