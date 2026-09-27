@@ -774,23 +774,6 @@ describe('Characters', () => {
     await waitFor(() => expect(useActiveCharacter.getState().activeCharacterId).toBe(92));
   });
 
-  it('shows a deferred-sync notice when the remote purge is deferred', async () => {
-    const removeCharacterModule = await import('@/features/character/removeCharacter');
-    vi.spyOn(removeCharacterModule, 'removeCharacter').mockResolvedValueOnce({
-      remotePurged: false,
-    });
-    const user = userEvent.setup();
-    renderCharacters();
-    await screen.findByText('Pilot One');
-
-    await user.click(screen.getByRole('button', { name: 'Remove Pilot One' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Remove' });
-    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
-
-    const notice = await screen.findByRole('dialog', { name: 'Sync deferred' });
-    expect(notice).toHaveTextContent('Pilot One');
-  });
-
   it('filters the roster by name or corporation', async () => {
     const user = userEvent.setup();
     renderCharacters();

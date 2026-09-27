@@ -1204,35 +1204,41 @@ export function Market() {
                             />
                           ) : (
                             <>
-                              <DataTable
-                                columns={baseColumns}
-                                rows={sellRows}
-                                rowKey={(o) => o.order_id}
-                                label={t('market.sell')}
-                                defaultSort={{ columnId: 'price', direction: 'asc' }}
-                                rowContextMenu={orderRowContextMenu}
-                                rowMoreActions
-                                rowClassName={(o) =>
-                                  myOrderIds.has(o.order_id) ? 'row-mine' : undefined
-                                }
-                                expandableRow={{
-                                  renderDetail: (o) => (
-                                    <OrderDetailPanel
-                                      order={o}
-                                      npcStations={npcStationMap}
-                                      solarSystems={solarSystemMap}
-                                      hiddenColumns={sellHiddenColumns}
-                                      orderColumnsById={orderColumnsById}
-                                      itemSkills={itemSkills}
-                                      trainedSkills={trainedSkills}
-                                      targetPlan={targetPlan}
-                                      activeCharacterId={activeCharacterId}
-                                      itemName={selectedItem?.name ?? ''}
-                                      t={t}
-                                    />
-                                  ),
-                                }}
-                              />
+                              <div className="overflow-x-auto">
+                                <DataTable
+                                  columns={baseColumns}
+                                  rows={sellRows}
+                                  rowKey={(o) => o.order_id}
+                                  label={t('market.sell')}
+                                  defaultSort={{ columnId: 'price', direction: 'asc' }}
+                                  // Quantity/Security/Jumps/Expiry are short figures, and Location
+                                  // wraps within its half-width track — pairing two per line at
+                                  // phone widths beats one-per-line without overlap or clipping.
+                                  stackColumns={2}
+                                  rowContextMenu={orderRowContextMenu}
+                                  rowMoreActions
+                                  rowClassName={(o) =>
+                                    myOrderIds.has(o.order_id) ? 'row-mine' : undefined
+                                  }
+                                  expandableRow={{
+                                    renderDetail: (o) => (
+                                      <OrderDetailPanel
+                                        order={o}
+                                        npcStations={npcStationMap}
+                                        solarSystems={solarSystemMap}
+                                        hiddenColumns={sellHiddenColumns}
+                                        orderColumnsById={orderColumnsById}
+                                        itemSkills={itemSkills}
+                                        trainedSkills={trainedSkills}
+                                        targetPlan={targetPlan}
+                                        activeCharacterId={activeCharacterId}
+                                        itemName={selectedItem?.name ?? ''}
+                                        t={t}
+                                      />
+                                    ),
+                                  }}
+                                />
+                              </div>
                               {!sellShowAll && sortedSell.length > ROW_CAP && (
                                 <div className="px-3 py-2">
                                   <Button size="sm" onClick={() => setSellShowAll(true)}>
@@ -1293,35 +1299,40 @@ export function Market() {
                             />
                           ) : (
                             <>
-                              <DataTable
-                                columns={buyColumns}
-                                rows={buyRows}
-                                rowKey={(o) => o.order_id}
-                                label={t('market.buy')}
-                                defaultSort={{ columnId: 'price', direction: 'desc' }}
-                                rowContextMenu={orderRowContextMenu}
-                                rowMoreActions
-                                rowClassName={(o) =>
-                                  myOrderIds.has(o.order_id) ? 'row-mine' : undefined
-                                }
-                                expandableRow={{
-                                  renderDetail: (o) => (
-                                    <OrderDetailPanel
-                                      order={o}
-                                      npcStations={npcStationMap}
-                                      solarSystems={solarSystemMap}
-                                      hiddenColumns={buyHiddenColumns}
-                                      orderColumnsById={orderColumnsById}
-                                      itemSkills={itemSkills}
-                                      trainedSkills={trainedSkills}
-                                      targetPlan={targetPlan}
-                                      activeCharacterId={activeCharacterId}
-                                      itemName={selectedItem?.name ?? ''}
-                                      t={t}
-                                    />
-                                  ),
-                                }}
-                              />
+                              <div className="overflow-x-auto">
+                                <DataTable
+                                  columns={buyColumns}
+                                  rows={buyRows}
+                                  rowKey={(o) => o.order_id}
+                                  label={t('market.buy')}
+                                  defaultSort={{ columnId: 'price', direction: 'desc' }}
+                                  // Same rationale as the sell table above, plus Range/Min. volume —
+                                  // still short figures, so pair two per line rather than stack.
+                                  stackColumns={2}
+                                  rowContextMenu={orderRowContextMenu}
+                                  rowMoreActions
+                                  rowClassName={(o) =>
+                                    myOrderIds.has(o.order_id) ? 'row-mine' : undefined
+                                  }
+                                  expandableRow={{
+                                    renderDetail: (o) => (
+                                      <OrderDetailPanel
+                                        order={o}
+                                        npcStations={npcStationMap}
+                                        solarSystems={solarSystemMap}
+                                        hiddenColumns={buyHiddenColumns}
+                                        orderColumnsById={orderColumnsById}
+                                        itemSkills={itemSkills}
+                                        trainedSkills={trainedSkills}
+                                        targetPlan={targetPlan}
+                                        activeCharacterId={activeCharacterId}
+                                        itemName={selectedItem?.name ?? ''}
+                                        t={t}
+                                      />
+                                    ),
+                                  }}
+                                />
+                              </div>
                               {!buyShowAll && sortedBuy.length > ROW_CAP && (
                                 <div className="px-3 py-2">
                                   <Button size="sm" onClick={() => setBuyShowAll(true)}>

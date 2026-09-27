@@ -439,7 +439,8 @@ export function Industry() {
         facilityDefaults,
         row.materialSourcing,
         row.buildHere,
-        activeCharacterId
+        activeCharacterId,
+        row.hub
       )
     );
     await createBuildPlans(newPlans);
@@ -504,7 +505,6 @@ export function Industry() {
                   <OpportunitiesPanel
                     catalog={catalog}
                     pi={pi}
-                    modifiers={modifiers}
                     facilityDefaults={facilityDefaults}
                     activeCharacterId={activeCharacterId}
                     ownedStockSnapshot={workspace.ownedStockSnapshot}
