@@ -4,8 +4,11 @@ import {
   CHARACTER_COLUMN_IDS,
   DEFAULT_VISIBLE_CHARACTER_COLUMNS,
   VISIBLE_CHARACTER_COLUMNS_KEY,
+  CHARACTER_COLUMNS_MIGRATED_KEY,
   availableCharacterColumns,
+  migrateVisibleColumns,
   useVisibleCharacterColumns,
+  useCharacterColumnsMigrated,
   visibleAvailableColumns,
   CHARACTER_VIEW_MODE_KEY,
   useCharacterViewMode,
@@ -18,30 +21,77 @@ beforeEach(async () => {
     hydrated: false,
   });
   useCharacterViewMode.setState({ value: 'card', hydrated: false });
+  useCharacterColumnsMigrated.setState({ value: false, hydrated: false });
 });
 
 describe('availableCharacterColumns', () => {
   it('includes spReady when monitoring is on', () => {
-    expect(availableCharacterColumns(true)).toContain('spReady');
+    expect(availableCharacterColumns(true, true)).toContain('spReady');
   });
 
   it('excludes spReady when monitoring is off', () => {
-    expect(availableCharacterColumns(false)).not.toContain('spReady');
-    expect(availableCharacterColumns(false)).toHaveLength(CHARACTER_COLUMN_IDS.length - 1);
+    expect(availableCharacterColumns(false, true)).not.toContain('spReady');
+    expect(availableCharacterColumns(false, true)).toHaveLength(CHARACTER_COLUMN_IDS.length - 1);
+  });
+
+  it('includes group when at least one Group exists', () => {
+    expect(availableCharacterColumns(true, true)).toContain('group');
+  });
+
+  it('excludes group when no Groups exist', () => {
+    expect(availableCharacterColumns(true, false)).not.toContain('group');
+    expect(availableCharacterColumns(true, false)).toHaveLength(CHARACTER_COLUMN_IDS.length - 1);
   });
 });
 
 describe('visibleAvailableColumns', () => {
   it('drops spReady from a stored preference while monitoring is off, without mutating the preference itself', () => {
     const stored = ['name', 'spReady', 'alerts'] as const;
-    expect(visibleAvailableColumns(stored, false)).toEqual(['name', 'alerts']);
+    expect(visibleAvailableColumns(stored, false, true)).toEqual(['name', 'alerts']);
     // The stored array itself is untouched — only the render-time view is narrowed.
     expect(stored).toEqual(['name', 'spReady', 'alerts']);
   });
 
   it('keeps spReady once monitoring is back on', () => {
     const stored = ['name', 'spReady', 'alerts'] as const;
-    expect(visibleAvailableColumns(stored, true)).toEqual(['name', 'spReady', 'alerts']);
+    expect(visibleAvailableColumns(stored, true, true)).toEqual(['name', 'spReady', 'alerts']);
+  });
+
+  it('drops group from a stored preference once the last Group is deleted', () => {
+    const stored = ['name', 'group', 'alerts'] as const;
+    expect(visibleAvailableColumns(stored, true, false)).toEqual(['name', 'alerts']);
+  });
+});
+
+describe('migrateVisibleColumns', () => {
+  it('appends group and remove when neither is present', () => {
+    expect(migrateVisibleColumns(['name', 'alerts'])).toEqual([
+      'name',
+      'alerts',
+      'group',
+      'remove',
+    ]);
+  });
+
+  it('appends only the missing one', () => {
+    expect(migrateVisibleColumns(['name', 'group'])).toEqual(['name', 'group', 'remove']);
+  });
+
+  it('is a no-op once both are already present', () => {
+    expect(migrateVisibleColumns(['name', 'group', 'remove'])).toEqual(['name', 'group', 'remove']);
+  });
+});
+
+describe('useCharacterColumnsMigrated', () => {
+  it('defaults to not migrated', async () => {
+    await useCharacterColumnsMigrated.getState().hydrate();
+    expect(useCharacterColumnsMigrated.getState().value).toBe(false);
+  });
+
+  it('persists once set', async () => {
+    await useCharacterColumnsMigrated.getState().setValue(true);
+    const row = await db.settings.get(CHARACTER_COLUMNS_MIGRATED_KEY);
+    expect(row?.value).toBe(true);
   });
 });
 

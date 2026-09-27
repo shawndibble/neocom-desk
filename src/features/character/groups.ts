@@ -12,7 +12,7 @@ export interface CharacterGroup {
   characterIds: number[];
 }
 
-export type CharacterSortKey = 'name' | 'skillPoints' | 'wallet';
+export type CharacterSortKey = 'name' | 'skillPoints' | 'wallet' | 'group' | 'alerts';
 export type SortDirection = 'asc' | 'desc';
 
 /**
@@ -20,6 +20,13 @@ export type SortDirection = 'asc' | 'desc';
  * `stats[key]` directly, and a flat shape keeps that untouched. `*FetchedAt`
  * is undefined exactly when its value is — never show a badge for a value
  * that isn't there (#483).
+ *
+ * `groupName`/`alertCount` are never set by `rosterSortStats` — group
+ * membership lives in `overviewGroups.ts` and alert counts in
+ * `alertCountsByCharacter.ts`, both outside this module's Dexie-free, no-fetch
+ * scope. The caller (`Characters.tsx`) merges them in before sorting by
+ * `'group'`/`'alerts'`. Left unset, both keys sink every id to the end, same
+ * as any other missing value.
  */
 export interface CharacterSortStats {
   name: string;
@@ -27,6 +34,8 @@ export interface CharacterSortStats {
   skillPointsFetchedAt?: Date;
   wallet?: number;
   walletFetchedAt?: Date;
+  groupName?: string;
+  alertCount?: number;
 }
 
 /**
@@ -148,7 +157,10 @@ export function sortCharacterIds(
   function valueOf(id: number): string | number | undefined {
     const stats = statsById.get(id);
     if (!stats) return undefined;
-    return key === 'name' ? stats.name : stats[key];
+    if (key === 'name') return stats.name;
+    if (key === 'group') return stats.groupName;
+    if (key === 'alerts') return stats.alertCount;
+    return stats[key];
   }
 
   return ids
