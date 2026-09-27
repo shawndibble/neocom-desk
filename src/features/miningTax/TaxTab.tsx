@@ -29,11 +29,12 @@ import { beginGrant } from '@/app/grantAction';
 import { useRouteSnapshot, type RouteSnapshotSignal } from '@/lib/useRouteSnapshot';
 import { cx } from '@/lib/cx';
 import { formatIsk } from '@/lib/isk';
+import { formatLocalDate } from '@/lib/localDate';
 import { toggleFilterMember } from '@/lib/multiSelectFilter';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, type UrlParamCodec } from '@/lib/urlState';
 import type { TradeHub } from '@/market/hubs';
-import type { PayeeRecord } from '@/db';
+import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import {
@@ -61,9 +62,11 @@ import { SecurityValue } from '@/features/character/assetBrowserRows';
 import {
   deleteAssignment,
   dismissEntry,
+  linkPaymentTransaction,
   linkRecordedPayment,
   markAssignmentsPaid,
   resolveNeedsReview,
+  unlinkPaymentTransaction,
 } from '@/features/miningTax/assignments';
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { TypeOverridesDialog } from '@/features/miningTax/TypeOverridesDialog';
@@ -90,10 +93,22 @@ import { GroupSummaryModal } from '@/features/miningTax/GroupSummaryModal';
 import { SettleUpDialog, type SettleUpRow } from '@/features/miningTax/SettleUpDialog';
 import { JoinAssignDialog } from '@/features/miningTax/JoinAssignDialog';
 import { PayeeManagerDialog } from '@/features/miningTax/PayeeManagerDialog';
-import { RowDetailModal } from '@/features/miningTax/RowDetailModal';
+import { RowDetailModal, type LinkedTransaction } from '@/features/miningTax/RowDetailModal';
+import { LinkTransactionDialog } from '@/features/miningTax/LinkTransactionDialog';
 import { SplitDialog } from '@/features/miningTax/SplitDialog';
 import { findPricingGaps, type PricingGap } from '@/features/miningTax/pricingGaps';
 import { linesOwnedBy } from '@/engine/miningTax/ownership';
+
+/**
+ * A `MadePayment`'s own timestamp as a local calendar date, falling back to
+ * today — the same rule `LinkPaymentDialog`'s `paidOnFor` uses, so a
+ * fallback payment created from a manually-linked transaction reads a
+ * `paidOn` the same way a Settle-up-recorded one does.
+ */
+function paidOnFromMadePaymentDate(isoDate: string): string {
+  const parsed = new Date(isoDate);
+  return formatLocalDate(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
+}
 
 const ALL_STATUSES: readonly MiningTaxRowStatus[] = [
   'unassigned',
@@ -270,6 +285,11 @@ export function TaxTab({ tabBar }: TaxTabProps) {
   // the table's checkbox selection. `null` keeps it closed.
   const [settleUpRows, setSettleUpRows] = useState<SettleUpRow[] | null>(null);
   const [detailTarget, setDetailTarget] = useState<DisplayRow | null>(null);
+  // Which row's "Link transaction" picker is open — kept separate from
+  // `detailTarget` so the manual picker can sit on top of the row detail
+  // rather than replacing it (issue #540 follow-up: linking a transaction to
+  // an already-Paid row).
+  const [linkTransactionTarget, setLinkTransactionTarget] = useState<DisplayRow | null>(null);
   const [joinTarget, setJoinTarget] = useState<DisplayRow | null>(null);
   const [splitTarget, setSplitTarget] = useState<DisplayRow | null>(null);
   // Set only by the selection toolbar's Combine — pins `JoinAssignDialog`'s
@@ -692,6 +712,92 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     try {
       await handleDismiss(detailTarget.row);
       setDetailTarget(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Every Assignment settled by the same lump sum as `assignment` — linking or unlinking a transaction applies to the whole group, not just this row. Falls back to the row alone when there is no `payment` yet. */
+  function paymentGroupFor(assignment: MiningTaxAssignmentRecord): MiningTaxAssignmentRecord[] {
+    const paymentId = assignment.payment?.paymentId;
+    if (paymentId === undefined) return [assignment];
+    return everyAssignment.filter((a) => a.payment?.paymentId === paymentId);
+  }
+
+  /** A short display line for a linked ref, from the same `MadePayment[]` the Payments-to-link card already loaded — `null` when it's no longer in the cached wallet journal/contracts. */
+  function labelForLinkedRef(kind: 'journal' | 'contract', refId: number): string | null {
+    const mp = madePayments.find((p) => p.key === `${kind}:${refId}`);
+    if (!mp) return null;
+    const amount =
+      mp.amount === null ? t('miningTax.linkPaymentInKind') : `${formatIsk(mp.amount)} ISK`;
+    const label = mp.label || t('miningTax.linkPaymentUntitledContract');
+    return `${amount} · ${mp.date.slice(0, 10)} — ${label}`;
+  }
+
+  const detailLinkedTransactions: LinkedTransaction[] | undefined = useMemo(() => {
+    const payment = detailTarget?.assignment?.payment;
+    if (!payment) return undefined;
+    return [
+      ...(payment.journalLinks ?? []).map((l): LinkedTransaction => ({
+        kind: 'journal',
+        refId: l.refId,
+        source: l.source,
+        label: labelForLinkedRef('journal', l.refId),
+      })),
+      ...(payment.contractLinks ?? []).map((l): LinkedTransaction => ({
+        kind: 'contract',
+        refId: l.refId,
+        source: l.source,
+        label: labelForLinkedRef('contract', l.refId),
+      })),
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailTarget, madePayments]);
+
+  async function handleUnlinkTransactionFromDetail(transaction: LinkedTransaction) {
+    if (!detailTarget?.assignment) return;
+    setBusy(true);
+    try {
+      await unlinkPaymentTransaction(
+        paymentGroupFor(detailTarget.assignment),
+        transaction.kind === 'journal'
+          ? { journalRefId: transaction.refId }
+          : { contractId: transaction.refId }
+      );
+      setDetailTarget(null);
+      refresh();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const linkTransactionCandidates = useMemo(() => {
+    if (!linkTransactionTarget) return [];
+    return unlinkedPayments(
+      madePayments.filter((p) => p.characterId === linkTransactionTarget.row.characterId),
+      everyAssignment
+    );
+  }, [linkTransactionTarget, madePayments, everyAssignment]);
+
+  async function handleConfirmLinkTransaction(payment: MadePayment, source: 'auto' | 'manual') {
+    if (!linkTransactionTarget?.assignment) return;
+    setBusy(true);
+    try {
+      await linkPaymentTransaction(
+        paymentGroupFor(linkTransactionTarget.assignment),
+        payment.kind === 'journal'
+          ? { journalRefId: payment.refId }
+          : { contractId: payment.refId },
+        source,
+        {
+          paidOn: paidOnFromMadePaymentDate(payment.date),
+          method: payment.method,
+          amount: payment.amount === null ? 0 : Math.round(payment.amount),
+        }
+      );
+      setLinkTransactionTarget(null);
+      setDetailTarget(null);
+      refresh();
     } finally {
       setBusy(false);
     }
@@ -1412,6 +1518,27 @@ export function TaxTab({ tabBar }: TaxTabProps) {
                 }
               : undefined
           }
+          linkedTransactions={detailLinkedTransactions}
+          onLinkTransaction={
+            detailTarget.status === 'paid'
+              ? () => setLinkTransactionTarget(detailTarget)
+              : undefined
+          }
+          onUnlinkTransaction={(tx) => void handleUnlinkTransactionFromDetail(tx)}
+        />
+      )}
+
+      {linkTransactionTarget && linkTransactionTarget.assignment && (
+        <LinkTransactionDialog
+          open
+          onClose={() => setLinkTransactionTarget(null)}
+          candidates={linkTransactionCandidates}
+          targetAmount={
+            linkTransactionTarget.assignment.payment?.amount ??
+            linkTransactionTarget.assignment.taxOwed
+          }
+          busy={busy}
+          onConfirm={(payment, source) => void handleConfirmLinkTransaction(payment, source)}
         />
       )}
 
