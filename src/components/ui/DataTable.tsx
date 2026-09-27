@@ -85,12 +85,18 @@ export interface DataTableColumn<T> {
    * icon) that reads as a stray unlabelled line when stacked normally. At
    * most one column per table; later ones are ignored.
    *
+   * `'start'` pins it to the top-*left* corner instead — for a row-selection
+   * checkbox, which reads as the card's own leading control rather than a
+   * value about it. Only meaningful in the labelled stack (`stackLayout`
+   * `"labelled"`, the default): the dense stack always renders the corner in
+   * flow, right of the title, regardless of this value.
+   *
    * In the dense stack (`stackLayout="dense"`) the corner is not decorative
    * but the card's headline figure: it sits *in flow* on the title line,
    * right of the primary cell, bold and unwrapped — a courier offer's
    * ISK/jump, the number a reader scans the list by.
    */
-  cardCorner?: boolean;
+  cardCorner?: boolean | 'start';
   /**
    * Pins this cell to the stacked card's top-right corner, same spot as
    * `cardCorner` — but for a real control (a "More actions" button built
@@ -437,6 +443,7 @@ export function DataTable<T>({
     columns.findIndex((column) => column.primary)
   );
   const cardCornerIndex = columns.findIndex((column) => column.cardCorner);
+  const cardCornerStart = columns[cardCornerIndex]?.cardCorner === 'start';
   const cardActionsIndex = columns.findIndex((column) => column.cardActions);
   // The dense card's second line: every cell that is neither title nor
   // corner. The first gets no leading separator. Only computed (and only
@@ -626,6 +633,7 @@ export function DataTable<T>({
                 cellClass[i],
                 i === primaryIndex && 'dt-primary',
                 i === cardCornerIndex && 'dt-corner',
+                i === cardCornerIndex && cardCornerStart && 'dt-corner-start',
                 i === cardActionsIndex && 'dt-actions',
                 meta && 'dt-meta',
                 meta && i === firstMetaIndex && 'dt-meta-first',
