@@ -23,6 +23,8 @@ One row per surface, with what the audit concluded.
 | Characters (`/characters`, card + table view, multi-character roster)                             | Cards clean at 1440 and 1024. Table view: pinned Name column fill mismatches the page (filed) and rows lack Group/Remove (filed, human). The Compact/Cozy select is the global text-size control, deliberate per its header comment. Populated data needs extra characters seeded straight into the `characters` store. |
 | Calendar (`/calendar`, populated with 10 events at 1440 and 1024)                                 | Clean: map and Coming Up header bars align, long titles ellipsize at 1024 with the modal one click away, hatched past days are deliberate. Rail runs taller than the map, which is just a list.                                                                                                                         |
 | Ships (`/ships` Fittings empty state, `/ships/tree` Map + Ladder)                                 | Clean. Tree map opens at 25-29% zoom, so hull labels are tiny, but it is the documented game-art exception with an `Aa` control. Ships page is uncapped by the same decision as Fittings.                                                                                                                               |
+| Skill Plans list + editor (`/skills/plans`, populated with 3 plans and a 12-skill plan)           | Clean. Plan Tools panel (attributes, remaps, injectors) is dense but each section earns its place; the "Added X" confirmation text is a deliberate visible-then-`sr-only` pattern, not a stray toast. Mining Overview (`/mining/overview`) only reproduces its empty state — a mocked personal-mining-ledger route nobody has built yet, so it was not fully audited.                                              |
+| Market › Browser (`/market`, item detail pane, populated order book)                              | One real bug: Sell/Buy order tables have no `overflow-x-auto` wrapper (every sibling `DataTable` caller has one), so the default all-columns-visible state overflows the page at 1024–1440 (filed). Region tree, Quickbar and Variations panels are clean.                                                            |
 
 ## Contract already enforced
 
@@ -53,6 +55,7 @@ Issue number, size (tweak/rework), verdict, one line.
 - #2087 tweak, SHIP (narrowed): Clones table renders a jump clone's given name in the Location cell; no new column, no `#N` fallback.
 - #2076 tweak, NARROW: Characters table's pinned Name fill (`panel`) should match the bare page surface; the Panel-wrap fix was rejected.
 - #2077 rework (ready-for-human), ESCALATE: Characters table has no Group assign or Remove; menu vs column, and #2059's bare-menu allowlist, are open.
+- #2093 tweak (bug), SHIP: Market Browser's Sell/Buy order tables lack the `overflow-x-auto` wrapper every sibling `DataTable` caller has, so the default column set overflows the page horizontally at 1024–1440.
 
 ## Killed findings
 
@@ -79,3 +82,5 @@ What was killed, and why. This is what stops a re-pitch.
 - Populated preview needs the mocked `/universe/types/{id}` route from `e2e/fittingsLoadNarrow.spec.ts`.
 - Seeding Dexie rows (a build plan, a production run) works as in `e2e/industryRecordsNarrow.spec.ts`; call `signInAndGoto` once per test, a second seed hits a `VersionError`. Routes are lazy: wait for `main h1` before screenshotting or the page is blank.
 - `npm ci` from Git Bash can leave `node_modules/.bin` missing; rerun it from PowerShell.
+- Market's order book needs both `esi.evetech.net/markets/*/orders*` and `.../history*` routed (empty `[]` is enough for History); seed the `#/market?section=browser` search box and click the best-match result to open an item's detail pane.
+- Seeding extra skill plans/entries through the UI (New plan, skill search, level buttons) is simpler than raw IndexedDB when the entries need to render through the live plan-editor queue math (training time, projected finish).
