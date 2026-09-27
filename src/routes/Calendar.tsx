@@ -23,6 +23,7 @@ import {
 } from '@/features/character/calendarSkillPlan';
 import { KIND_LABEL } from '@/features/character/calendarKindLabels';
 import { useCalendarDensity } from '@/features/character/calendarViewPref';
+import { useCalendarWeekStart } from '@/features/character/calendarWeekStart';
 import {
   useCalendarHiddenKinds,
   shownKinds,
@@ -131,12 +132,15 @@ export function Calendar() {
   const skillPlanChoices = useCalendarSkillPlans((state) => state.value);
   const setSkillPlanChoices = useCalendarSkillPlans((state) => state.setValue);
   const hydrateSkillPlanChoices = useCalendarSkillPlans((state) => state.hydrate);
+  const weekStart = useCalendarWeekStart((state) => state.value);
+  const hydrateWeekStart = useCalendarWeekStart((state) => state.hydrate);
 
   useEffect(() => {
     void hydrateDensity();
     void hydrateHiddenKinds();
     void hydrateSkillPlanChoices();
-  }, [hydrateDensity, hydrateHiddenKinds, hydrateSkillPlanChoices]);
+    void hydrateWeekStart();
+  }, [hydrateDensity, hydrateHiddenKinds, hydrateSkillPlanChoices, hydrateWeekStart]);
 
   // The loader reads the choice from Dexie itself, so the write must land
   // before the reload that reads it.
@@ -279,8 +283,10 @@ export function Calendar() {
     // render straddling midnight can ring one day and hatch it at once.
     const today = new Date(nowMs);
     if (isNarrow) return buildDaysFrom(anchor, TICKER_DAYS, today);
-    return density === 'month' ? buildMonthGrid(anchor, today) : buildFortnightDays(anchor, today);
-  }, [anchor, density, isNarrow, nowMs]);
+    return density === 'month'
+      ? buildMonthGrid(anchor, today, weekStart)
+      : buildFortnightDays(anchor, today, weekStart);
+  }, [anchor, density, isNarrow, nowMs, weekStart]);
 
   const events = eventsWithOverrides ?? [];
   const selectedEvent = events.find((event) => event.event_id === selectedEventId) ?? null;
@@ -308,7 +314,8 @@ export function Calendar() {
   }
   if (activeCharacterId === null) return <Navigate to="/characters" replace />;
 
-  const periodLabel = density === 'month' ? formatMonthLabel(anchor) : formatFortnightLabel(anchor);
+  const periodLabel =
+    density === 'month' ? formatMonthLabel(anchor) : formatFortnightLabel(anchor, weekStart);
 
   const periodControls = (
     <div className="flex items-center gap-1.5">
@@ -435,6 +442,7 @@ export function Calendar() {
                   days={days}
                   loads={loads}
                   nowMs={nowMs}
+                  weekStart={weekStart}
                   selectedDayMs={selectedDayMs}
                   onSelectDay={setSelectedDayMs}
                 />

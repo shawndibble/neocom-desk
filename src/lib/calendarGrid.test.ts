@@ -57,6 +57,25 @@ describe('startOfWeek', () => {
   it('rewinds a Sunday to the Monday six days earlier', () => {
     expect(dayKey(startOfWeek(new Date(2026, 8, 6)))).toBe('2026-08-31');
   });
+
+  it('defaults to Monday when weekStart is omitted', () => {
+    expect(dayKey(startOfWeek(new Date(2026, 8, 3)))).toBe(
+      dayKey(startOfWeek(new Date(2026, 8, 3), 'monday'))
+    );
+  });
+
+  it('rewinds to Sunday for a mid-week date when weekStart is sunday', () => {
+    // 2026-09-03 is a Thursday; the Sunday of that week is 2026-08-30.
+    expect(dayKey(startOfWeek(new Date(2026, 8, 3), 'sunday'))).toBe('2026-08-30');
+  });
+
+  it('is a no-op for a date that is already Sunday, weekStart sunday', () => {
+    expect(dayKey(startOfWeek(new Date(2026, 7, 30), 'sunday'))).toBe('2026-08-30');
+  });
+
+  it('rewinds a Saturday to the Sunday six days earlier, weekStart sunday', () => {
+    expect(dayKey(startOfWeek(new Date(2026, 8, 5), 'sunday'))).toBe('2026-08-30');
+  });
 });
 
 describe('buildMonthGrid', () => {
@@ -87,6 +106,13 @@ describe('buildMonthGrid', () => {
     const grid = buildMonthGrid(new Date(2026, 8, 1), new Date(2020, 0, 1));
     expect(grid.some((day) => day.isToday)).toBe(false);
   });
+
+  it('uses Sunday-first weeks when weekStart is sunday', () => {
+    const grid = buildMonthGrid(new Date(2026, 8, 1), new Date(), 'sunday');
+    expect(grid).toHaveLength(42);
+    expect(grid[0].date.getDay()).toBe(0); // Sunday
+    expect(grid[0].key).toBe('2026-08-30');
+  });
 });
 
 describe('weekdayLabels', () => {
@@ -94,6 +120,17 @@ describe('weekdayLabels', () => {
     const labels = weekdayLabels();
     expect(labels).toHaveLength(7);
     expect(new Set(labels).size).toBe(7);
+  });
+
+  it('rotates to Sunday first when weekStart is sunday', () => {
+    const monday = weekdayLabels('monday');
+    const sunday = weekdayLabels('sunday');
+    expect(sunday).toHaveLength(7);
+    // Sunday sits last in the Monday-first ordering and first in the
+    // Sunday-first one; every other day just shifts forward by one slot.
+    expect(sunday[0]).toBe(monday[6]);
+    expect(sunday[1]).toBe(monday[0]);
+    expect(sunday[7 - 1]).toBe(monday[5]);
   });
 });
 
@@ -117,5 +154,11 @@ describe('formatMonthLabel / formatFortnightLabel', () => {
   it('names the year on both sides when the span crosses one', () => {
     expect(formatFortnightLabel(new Date(2025, 11, 31))).toMatch(/2025/);
     expect(formatFortnightLabel(new Date(2025, 11, 31))).toMatch(/2026/);
+  });
+
+  it("spans fourteen days from the anchor week's Sunday when weekStart is sunday", () => {
+    const label = formatFortnightLabel(new Date(2026, 8, 3), 'sunday');
+    expect(label).toMatch(/Aug 30/);
+    expect(label).toMatch(/Sep 12/);
   });
 });

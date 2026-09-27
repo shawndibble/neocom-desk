@@ -43,6 +43,10 @@ import {
   type MobileTabPath,
 } from '@/lib/mobileTabs';
 import { useTimeFormat, useTimeZone, TIME_FORMATS } from '@/lib/timeFormat';
+import {
+  useCalendarWeekStart,
+  CALENDAR_WEEK_START_DAYS,
+} from '@/features/character/calendarWeekStart';
 import { VIEW_PREFERENCE_KEYS } from '@/lib/viewPreferenceKeys';
 import { useIsNarrow } from '@/lib/useIsNarrow';
 import { formatAge } from '@/lib/age';
@@ -1252,6 +1256,14 @@ export function Settings() {
   const timeFormat = useTimeFormat((state) => state.value);
   const isNarrow = useIsNarrow();
   const setTimeFormat = useTimeFormat((state) => state.setValue);
+  const weekStart = useCalendarWeekStart((state) => state.value);
+  const setWeekStart = useCalendarWeekStart((state) => state.setValue);
+  // Unlike `fontScale`/`timeFormat`, `App.tsx` does not hydrate this store for
+  // the whole shell — it is otherwise only read from within `Calendar.tsx`
+  // after that page's own `hydrate()` — so a cold load straight to `/settings`
+  // needs its own hydrate here too, or the chip would paint the default until
+  // Calendar happened to be visited (see `useHydratedStore`'s doc comment).
+  const weekStartHydrated = useHydratedStore(useCalendarWeekStart);
   const singleKeyShortcuts = useSingleKeyShortcuts((state) => state.value);
   const setSingleKeyShortcuts = useSingleKeyShortcuts((state) => state.setValue);
   const { hash } = useLocation();
@@ -1324,6 +1336,18 @@ export function Settings() {
                       labelFor={(format) => t(`settings.timeFormat.${format}`)}
                     />
                   </div>
+                  {weekStartHydrated && (
+                    <div className="border-t border-line pt-3">
+                      <ChipRow
+                        label={t('settings.weekStartLabel')}
+                        hint={t('settings.weekStartHint')}
+                        options={CALENDAR_WEEK_START_DAYS}
+                        selected={weekStart}
+                        onSelect={(day) => void setWeekStart(day)}
+                        labelFor={(day) => t(`settings.weekStart.${day}`)}
+                      />
+                    </div>
+                  )}
                 </div>
               </Panel>
               {isNarrow && <MobileTabsPanel />}

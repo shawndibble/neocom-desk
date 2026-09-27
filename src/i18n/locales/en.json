@@ -5624,6 +5624,12 @@
       "local": "My local time",
       "eve": "EVE time (UTC)"
     },
+    "weekStartLabel": "Week starts on",
+    "weekStartHint": "Changes the first day of the week in the Calendar's Month and Fortnight grids. EVE's own in-game calendar starts the week on Monday.",
+    "weekStart": {
+      "monday": "Monday",
+      "sunday": "Sunday"
+    },
     "mobileTabs": {
       "title": "Phone tab bar",
       "hint": "Pick the four links the bottom bar shows on a phone. Everything else moves into the More menu. Stays on this device.",

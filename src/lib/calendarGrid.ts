@@ -4,6 +4,9 @@
  * timestamps — no fetch/DOM/Dexie imports.
  */
 
+/** Which day a week grid starts on. Default is Monday, EVE's own in-game calendar value. */
+export type WeekStart = 'monday' | 'sunday';
+
 export interface GridDay {
   /** Local midnight for this day. */
   date: Date;
@@ -43,11 +46,12 @@ export function addMonths(date: Date, delta: number): Date {
   return new Date(date.getFullYear(), date.getMonth() + delta, date.getDate());
 }
 
-/** Rewinds to the Monday of the anchor's week. */
-export function startOfWeek(date: Date): Date {
+/** Rewinds to the first day of the anchor's week, per `weekStart` (default Monday). */
+export function startOfWeek(date: Date, weekStart: WeekStart = 'monday'): Date {
   const day = date.getDay(); // 0 = Sunday .. 6 = Saturday
-  const mondayOffset = day === 0 ? -6 : 1 - day;
-  return addDays(date, mondayOffset);
+  const startDay = weekStart === 'sunday' ? 0 : 1;
+  const offset = (day - startDay + 7) % 7;
+  return addDays(date, -offset);
 }
 
 function toGridDay(date: Date, monthAnchor: Date, today: Date): GridDay {
@@ -61,24 +65,32 @@ function toGridDay(date: Date, monthAnchor: Date, today: Date): GridDay {
   };
 }
 
-/** 42 cells (6 Monday-first weeks) covering the anchor's month, plus lead/trail days. */
-export function buildMonthGrid(monthAnchor: Date, today: Date = new Date()): GridDay[] {
+/** 42 cells (6 weeks, aligned per `weekStart`) covering the anchor's month, plus lead/trail days. */
+export function buildMonthGrid(
+  monthAnchor: Date,
+  today: Date = new Date(),
+  weekStart: WeekStart = 'monday'
+): GridDay[] {
   const firstOfMonth = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1);
-  const gridStart = startOfWeek(firstOfMonth);
+  const gridStart = startOfWeek(firstOfMonth, weekStart);
   return Array.from({ length: 42 }, (_, i) => toGridDay(addDays(gridStart, i), monthAnchor, today));
 }
 
 /**
- * 14 Monday-first days containing the anchor — the Calendar Map's Fortnight
- * density.
+ * 14 days, aligned per `weekStart`, containing the anchor — the Calendar
+ * Map's Fortnight density.
  *
  * Its own builder rather than a span argument on `buildMonthGrid`: that one is
  * a fixed 42 cells aligned to a month, and a caller asking for 14 wants two
  * whole weeks around a date instead, which is a different question about a
  * different anchor.
  */
-export function buildFortnightDays(anchor: Date, today: Date = new Date()): GridDay[] {
-  const gridStart = startOfWeek(anchor);
+export function buildFortnightDays(
+  anchor: Date,
+  today: Date = new Date(),
+  weekStart: WeekStart = 'monday'
+): GridDay[] {
+  const gridStart = startOfWeek(anchor, weekStart);
   return Array.from({ length: 14 }, (_, i) => toGridDay(addDays(gridStart, i), anchor, today));
 }
 
@@ -93,12 +105,12 @@ export function buildDaysFrom(start: Date, count: number, today: Date = new Date
   return Array.from({ length: count }, (_, i) => toGridDay(addDays(start, i), start, today));
 }
 
-/** Monday..Sunday short weekday names, in the viewer's locale. */
-export function weekdayLabels(): string[] {
+/** Short weekday names in the viewer's locale, ordered per `weekStart` (default Monday first). */
+export function weekdayLabels(weekStart: WeekStart = 'monday'): string[] {
   const formatter = new Intl.DateTimeFormat(undefined, { weekday: 'short' });
   // 2024-01-01 is a Monday — an arbitrary fixed anchor, not tied to "today".
-  const monday = new Date(2024, 0, 1);
-  return Array.from({ length: 7 }, (_, i) => formatter.format(addDays(monday, i)));
+  const start = startOfWeek(new Date(2024, 0, 1), weekStart);
+  return Array.from({ length: 7 }, (_, i) => formatter.format(addDays(start, i)));
 }
 
 export function formatMonthLabel(monthAnchor: Date): string {
@@ -112,8 +124,8 @@ export function formatMonthLabel(monthAnchor: Date): string {
  * and would print a seven-day range over a fourteen-day grid — a caption
  * quietly disagreeing with the thing it captions.
  */
-export function formatFortnightLabel(anchor: Date): string {
-  return formatSpanLabel(startOfWeek(anchor), 13);
+export function formatFortnightLabel(anchor: Date, weekStart: WeekStart = 'monday'): string {
+  return formatSpanLabel(startOfWeek(anchor, weekStart), 13);
 }
 
 /** Shared by the week and fortnight labels: a start date, and how many days after it. */
