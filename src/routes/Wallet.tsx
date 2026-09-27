@@ -1501,6 +1501,7 @@ export function Wallet() {
                 onSortChange={loyaltySortProps.onSortChange}
                 responsive="table"
                 onRowClick={(entry) => navigate(`/wallet/loyalty/${entry.corporation_id}`)}
+                rowMoreActions
                 rowContextMenu={(entry, tr) => (
                   <CorpHistoryContextMenu
                     corporationId={entry.corporation_id}

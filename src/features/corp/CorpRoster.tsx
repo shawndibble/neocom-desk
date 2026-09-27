@@ -286,6 +286,7 @@ export function CorpRosterTable({
       columns={shownColumns}
       rows={rows}
       rowContextMenu={rowContextMenu}
+      rowMoreActions={rowContextMenu !== undefined}
       rowKey={(row) => row.characterId}
       highlightRowKey={highlightedMemberId}
       label={t('corp.members.tableLabel')}

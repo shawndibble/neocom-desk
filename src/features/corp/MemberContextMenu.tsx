@@ -7,12 +7,7 @@
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from '@/components/ui';
+import { MenuItem, RowActionsMenu } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
 import { usePublicInfoModal } from '@/stores/publicInfoModal';
 
@@ -27,16 +22,20 @@ export function MemberContextMenu({ characterId, name, children }: MemberContext
   const { open } = usePublicInfoModal();
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem onSelect={() => void writeToClipboard(name)}>
-          {t('corp.members.contextMenu.copyName')}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => open('character', characterId)}>
-          {t('corp.members.contextMenu.showInfo')}
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+    <RowActionsMenu
+      name={name}
+      items={
+        <>
+          <MenuItem onSelect={() => void writeToClipboard(name)}>
+            {t('corp.members.contextMenu.copyName')}
+          </MenuItem>
+          <MenuItem onSelect={() => open('character', characterId)}>
+            {t('corp.members.contextMenu.showInfo')}
+          </MenuItem>
+        </>
+      }
+    >
+      {children}
+    </RowActionsMenu>
   );
 }

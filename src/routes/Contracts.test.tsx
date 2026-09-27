@@ -204,18 +204,29 @@ describe('Contracts', () => {
     await screen.findByText('Rifter fit');
     const table = screen.getByRole('table', { name: 'Contracts' });
 
+    // The row's More-actions button draws an icon too; the cue is any other svg.
+    const cue = (row: Element | null | undefined) =>
+      row?.querySelector('svg:not(button svg)') ?? null;
+
     const freshRow = within(table).getByText('Rifter fit').closest('tr');
-    expect(freshRow?.querySelector('svg')).not.toBeInTheDocument();
+    expect(cue(freshRow)).not.toBeInTheDocument();
 
     // Lapsed rows carry a non-color cue (icon + tooltip) rather than dimming
     // the row's own text below AA (issue #1491).
     const staleRow = within(table).getByText('Lapsed offer').closest('tr');
-    expect(staleRow?.querySelector('svg')).toBeInTheDocument();
+    expect(cue(staleRow)).toBeInTheDocument();
 
     // Finished, with a deadline in the past — not flagged (issue: was
     // status-blind, so almost every completed contract dimmed).
     const finishedRow = within(table).getByText('Courier').closest('tr');
-    expect(finishedRow?.querySelector('svg')).not.toBeInTheDocument();
+    expect(cue(finishedRow)).not.toBeInTheDocument();
+  });
+
+  it('offers the row menu through a visible More-actions button', async () => {
+    render(<App />);
+    await screen.findByText('Rifter fit');
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Rifter fit' }));
+    expect(await screen.findByRole('menuitem', { name: 'Copy contract ID' })).toBeInTheDocument();
   });
 
   it('opens the contract detail modal on click', async () => {

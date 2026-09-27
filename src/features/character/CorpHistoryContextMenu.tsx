@@ -6,12 +6,7 @@
  */
 import type { ReactElement } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from '@/components/ui';
+import { MenuItem, RowActionsMenu } from '@/components/ui';
 import { writeToClipboard } from '@/lib/clipboard';
 import { usePublicInfoModal } from '@/stores/publicInfoModal';
 
@@ -30,16 +25,20 @@ export function CorpHistoryContextMenu({
   const { open } = usePublicInfoModal();
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem onSelect={() => void writeToClipboard(name)}>
-          {t('employmentHistory.contextMenu.copyName')}
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => open('corporation', corporationId)}>
-          {t('employmentHistory.contextMenu.showInfo')}
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+    <RowActionsMenu
+      name={name}
+      items={
+        <>
+          <MenuItem onSelect={() => void writeToClipboard(name)}>
+            {t('employmentHistory.contextMenu.copyName')}
+          </MenuItem>
+          <MenuItem onSelect={() => open('corporation', corporationId)}>
+            {t('employmentHistory.contextMenu.showInfo')}
+          </MenuItem>
+        </>
+      }
+    >
+      {children}
+    </RowActionsMenu>
   );
 }

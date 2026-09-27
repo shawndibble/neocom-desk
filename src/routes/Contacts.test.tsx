@@ -216,7 +216,9 @@ describe('Contacts', () => {
     await screen.findByText('Good Friend');
     openFilters();
 
-    const badChip = screen.getByRole('button', { name: /Bad/ });
+    const badChip = within(screen.getByRole('group', { name: 'Standing' })).getByRole('button', {
+      name: /Bad/,
+    });
     fireEvent.click(badChip);
 
     expect(await screen.findByText('Good Friend')).toBeInTheDocument();
@@ -580,7 +582,9 @@ describe('Contacts standing filter chips (issue #403)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
 
     expect(await screen.findByRole('group', { name: 'Standing' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Bad/ })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole('group', { name: 'Standing' })).getByRole('button', { name: /Bad/ })
+    ).toBeInTheDocument();
 
     resolveRefresh();
     await waitFor(() => expect(screen.getByText('Good Friend')).toBeInTheDocument());
