@@ -181,15 +181,17 @@ Run these as one chained Bash call.
 `node scripts/next-ticket/select-ticket.mjs [issue-number]` does the whole
 of this step in one call: acquires a local lock shared by every worktree
 (they share one `.git`, so concurrent runs can't select the same ticket),
-lists `ready-for-agent` issues, drops any with an assignee or an
-`in-progress` label, resolves each remaining issue's `## Blocked by` section
-(unblocked only if every referenced issue is `CLOSED`), picks the
-lowest-numbered unblocked one (or checks the given issue number against the
-same rules, if `$ARGUMENTS` has one), claims it
-(`--add-assignee @me --add-label in-progress`), and releases the lock. It
-retries lock acquisition internally (12 attempts over ~2 minutes, reclaiming
-a lock older than 90s as crashed) — that whole wait, if it happens, is inside
-this one call.
+lists `ready-for-agent` issues, drops any not authored by the authenticated
+`gh` user (Shawn) — a repo collaborator opening and self-labelling an issue
+under their own account must never be picked up and auto-merged by this
+loop — and any with an assignee or an `in-progress` label, resolves each
+remaining issue's `## Blocked by` section (unblocked only if every
+referenced issue is `CLOSED`), picks the lowest-numbered unblocked one (or
+checks the given issue number against the same rules, if `$ARGUMENTS` has
+one), claims it (`--add-assignee @me --add-label in-progress`), and releases
+the lock. It retries lock acquisition internally (12 attempts over ~2
+minutes, reclaiming a lock older than 90s as crashed) — that whole wait, if
+it happens, is inside this one call.
 
 It prints one line of JSON on stdout:
 
@@ -198,7 +200,7 @@ It prints one line of JSON on stdout:
   and **STOP**.
 - `{"status":"lock-timeout"}` → report the lock could not be acquired and
   **STOP** with `RESULT ticket=none pr=none status=blocked`.
-- `{"status":"override-unavailable","reason":"not-found|assigned-or-in-progress|blocked"}`
+- `{"status":"override-unavailable","reason":"not-found|assigned-or-in-progress|blocked|not-own-ticket"}`
   (only when `$ARGUMENTS` gave an issue number) → report the reason and
   **STOP**.
 
