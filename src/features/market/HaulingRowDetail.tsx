@@ -233,9 +233,12 @@ export function HaulingRowDetail({ row, from, to, fees }: HaulingRowDetailProps)
                 table sideways rather than the whole card losing its columns —
                 unlike `DataTable`, this is a plain `<table>` with no card
                 layout to fall back to, so it must keep row/column shape at
-                every width. */}
+                every width. `dt-embedded-table` is the hook `index.css` uses
+                to undo the outer `DataTable`'s phone card-layout CSS, which
+                otherwise leaks into this nested table too — see the comment
+                there. */}
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[20rem] text-sm tabular-nums">
+              <table className="dt-embedded-table w-full min-w-[20rem] text-sm tabular-nums">
                 <thead>
                   <tr className="text-left text-[0.6875rem] tracking-wider text-text-dim uppercase">
                     <th className="py-1 font-semibold">{t('market.hauling.detail.colPrice')}</th>

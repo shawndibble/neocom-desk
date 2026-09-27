@@ -602,6 +602,62 @@
       content: none;
     }
 
+    /*
+     * A plain `<table>` nested inside a row's expand detail (Hauling's own
+     * "Sell orders" mini table, round: hauling mobile table detail) — the
+     * rules above key off bare `tbody`/`tr`/`td`/`thead` descendant
+     * selectors with no notion of "table nested in another table," so
+     * without this they flatten the inner table into a second, broken card
+     * layout too. It has no card fallback of its own to fall into, unlike
+     * `DataTable`'s own rows, so every leaky property is undone here,
+     * restated explicitly rather than `revert`ed — Tailwind's own utility
+     * classes on this inner table (`py-1`, `text-right`) sit in a lower-
+     * priority cascade layer than this whole stylesheet, so they can never
+     * win a property this file also declares; `text-align` for the two
+     * right-aligned columns is keyed off that same `text-right` class name
+     * instead, rather than relying on the utility itself to apply.
+     */
+    .dt-stack .dt-embedded-table,
+    .dt-stack .dt-embedded-table tbody,
+    .dt-stack .dt-embedded-table tr,
+    .dt-stack .dt-embedded-table td,
+    .dt-stack .dt-embedded-table th {
+      display: revert;
+    }
+
+    .dt-stack .dt-embedded-table thead {
+      position: revert;
+      width: revert;
+      height: revert;
+      overflow: revert;
+      clip-path: revert;
+      white-space: revert;
+    }
+
+    .dt-stack .dt-embedded-table tr {
+      padding: 0;
+    }
+
+    .dt-stack .dt-embedded-table td,
+    .dt-stack .dt-embedded-table th {
+      position: static;
+      /* Matches the `py-1` Tailwind utility already on these cells. */
+      padding: 0.25rem 0;
+      min-height: 0;
+      text-align: left;
+      white-space: normal;
+      overflow-wrap: normal;
+    }
+
+    .dt-stack .dt-embedded-table td.text-right,
+    .dt-stack .dt-embedded-table th.text-right {
+      text-align: right;
+    }
+
+    .dt-stack .dt-embedded-table td::before {
+      content: none;
+    }
+
     .dt-stack.dt-stack-dense tr.dt-group-header::before {
       content: none;
     }
