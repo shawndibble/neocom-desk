@@ -11,12 +11,9 @@ const ALLOWED = new Set([
   'src/features/character/EventContextMenu.tsx',
   // Table-only shortcuts to pages the nav already reaches.
   'src/features/character/CharacterRowContextMenu.tsx',
-  // Mail rows: tracked by a sibling ticket.
-  'src/features/character/MailRowContextMenu.tsx',
   // No mounted call site (dead code, separate cleanup).
   'src/features/notifications/NotificationContextMenu.tsx',
   // Build Plan menus carry their own visible twins.
-  'src/features/industry/BuildPlanContextMenu.tsx',
   'src/features/industry/BuildPlanList.tsx',
   'src/features/industry/BuildPlanRowContextMenu.tsx',
   // Hand-rolled wrapper that provides RowActionsContext itself.

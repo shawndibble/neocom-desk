@@ -1126,6 +1126,7 @@ export function ContractSearchPanel({
                         count: displayRows.length,
                       })}
                       onRowClick={setSelectedRow}
+                      rowMoreActions
                       // The shortcut past the detail modal, which offers the
                       // same action per line since #933 — hence the shared
                       // `planSeed` rule, so neither path quotes the copy
