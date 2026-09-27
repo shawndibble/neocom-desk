@@ -260,7 +260,7 @@ export function BuildGroupPanel({
   );
 
   // The group's own Acquisition Verdict, from the same `computeGroupRollup`
-  // the index row reads � unknown while any member is still loading or failed.
+  // the index row reads, unknown while any member is still loading or failed.
   const groupProfit = view.savings;
   const groupVerdict = view.verdict;
   // Which way the numbers point, independent of whether they can be trusted:
@@ -399,7 +399,7 @@ export function BuildGroupPanel({
   // Unlike `bulkDetectedEntries`, this scans every merged material, not just
   // `buyRows`: a material can carry an owned-stock ledger entry from before
   // it became fully crafted (see `craftedTypeIds` above), and that entry is
-  // still live in `ownedStockMap` — still read by `rollUpBuildGroup` above —
+  // still live in `ownedStockMap` — still read by `computeGroupRollup` above —
   // even though the Crafted section renders no input for it. "Use none" has
   // to be able to reach it, or a stray entry becomes permanently stuck.
   const bulkClearTypeIds = useMemo(
