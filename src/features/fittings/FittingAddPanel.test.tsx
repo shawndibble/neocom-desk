@@ -88,11 +88,12 @@ describe('FittingAddPanel', () => {
     });
     const { onAdd } = renderPanel();
 
-    // The hull check runs in the background; browsing waits for it. "Can fly"
-    // starts on, hiding Damage Control II (no skills for it) until it's off.
-    const canFly = await screen.findByRole('button', { name: 'Can fly' });
+    // The hull check runs in the background; browsing waits for it. The
+    // skill filter starts on, hiding Damage Control II (no skills for it)
+    // until it's off.
+    const skillFilter = await screen.findByRole('button', { name: 'Skills' });
     expect(screen.queryByRole('button', { name: /Damage Control II/ })).not.toBeInTheDocument();
-    await user.click(canFly);
+    await user.click(skillFilter);
     const dc2 = await screen.findByRole('button', { name: /Damage Control II/ });
     expect(screen.queryByRole('button', { name: /Afterburner/ })).not.toBeInTheDocument();
     // Damage Control I doesn't fit the hull.
@@ -103,7 +104,7 @@ describe('FittingAddPanel', () => {
     expect(onAdd).toHaveBeenCalledWith(2, 'low');
   });
 
-  it('says when Can fly hid the search matches, and one tap shows them', async () => {
+  it('says when a filter hid the search matches, and one tap shows them', async () => {
     const user = userEvent.setup();
     checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
       return new Map(
@@ -112,14 +113,14 @@ describe('FittingAddPanel', () => {
     });
     renderPanel({ target: null });
 
-    await screen.findByRole('button', { name: 'Can fly' });
+    await screen.findByRole('button', { name: 'Skills' });
     await user.type(screen.getByLabelText('Search items to add'), 'Damage Control II');
     expect(screen.queryByText('No matching items.')).toBeInTheDocument();
     await user.click(
-      await screen.findByRole('button', { name: '1 more hidden by Can fly — show it' })
+      await screen.findByRole('button', { name: '1 more hidden by filters — show it' })
     );
     expect(await screen.findByRole('button', { name: /Damage Control II/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /hidden by Can fly/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /hidden by filters/ })).not.toBeInTheDocument();
   });
 
   it('keeps the plain no-results wording when nothing matches at all', async () => {
@@ -131,10 +132,10 @@ describe('FittingAddPanel', () => {
     });
     renderPanel({ target: null });
 
-    await screen.findByRole('button', { name: 'Can fly' });
+    await screen.findByRole('button', { name: 'Skills' });
     await user.type(screen.getByLabelText('Search items to add'), 'zzzz');
     expect(screen.getByText('No matching items.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /hidden by Can fly/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /hidden by filters/ })).not.toBeInTheDocument();
   });
 
   it('browses only the groups holding something that fits the hull', async () => {
@@ -151,7 +152,8 @@ describe('FittingAddPanel', () => {
     expect(screen.queryByText('Structure Equipment')).toBeNull();
   });
 
-  it('hides modules too big for the bare hull’s CPU, powergrid or calibration', async () => {
+  it('hides modules too big for the bare hull’s CPU, powergrid or calibration, until the resource filter is off', async () => {
+    const user = userEvent.setup();
     checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
       return new Map(
         ids.map((id) => [id, { fitsHull: true, canFly: true, fitsResources: id !== 4 }])
@@ -161,6 +163,29 @@ describe('FittingAddPanel', () => {
 
     expect(await screen.findByRole('button', { name: /Afterburners/ })).toBeInTheDocument();
     expect(screen.queryByText('Structure Equipment')).toBeNull();
+
+    await user.click(await screen.findByRole('button', { name: 'Resources' }));
+    expect(await screen.findByText('Structure Equipment')).toBeInTheDocument();
+  });
+
+  it('hides modules the hull cannot rack at all, until the hull filter is off', async () => {
+    const user = userEvent.setup();
+    checkCandidates.mockImplementation((_ship: number, _rack: string, ids: number[]) => {
+      return new Map(
+        ids.map((id) => [id, { fitsHull: id !== 4, canFly: true, fitsResources: true }])
+      );
+    });
+    renderPanel({ target: null });
+
+    expect(await screen.findByRole('button', { name: /Afterburners/ })).toBeInTheDocument();
+    expect(screen.queryByText('Structure Equipment')).toBeNull();
+
+    await user.click(await screen.findByRole('button', { name: 'Hull' }));
+    expect(await screen.findByText('Structure Equipment')).toBeInTheDocument();
+    // Shown with the Hull filter off, but never addable — the hull refuses it outright.
+    const anchoringArray = screen.getByRole('button', { name: /Anchoring Array/ });
+    expect(anchoringArray).toBeDisabled();
+    expect(anchoringArray).toHaveTextContent("Doesn't fit this hull");
   });
 
   it('loads a charge into every fitted module that takes it, from the Charges tab', async () => {
