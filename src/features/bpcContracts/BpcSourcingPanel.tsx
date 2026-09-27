@@ -1393,6 +1393,7 @@ export function BpcSourcingPanel() {
       id: 'moreActions',
       header: '',
       align: 'right',
+      cardCorner: true,
       render: (row) => (
         <BpcOfferMoreActions
           typeId={row.typeId}

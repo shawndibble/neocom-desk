@@ -406,6 +406,7 @@ export function OpportunitiesPanel({
       id: 'moreActions',
       header: '',
       align: 'right',
+      cardCorner: true,
       render: (row) => {
         const { productTypeID, productName, blueprintTypeID } = row.candidate.catalogEntry;
         if (productTypeID === null) return null;

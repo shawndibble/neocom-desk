@@ -189,6 +189,7 @@ export function MarketWideOpportunitiesPanel({
       id: 'moreActions',
       header: '',
       align: 'right',
+      cardCorner: true,
       render: (row) => (
         <ItemMoreActions
           typeId={row.productTypeID}

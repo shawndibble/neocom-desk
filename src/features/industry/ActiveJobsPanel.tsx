@@ -724,6 +724,7 @@ export function ActiveJobsPanel({ characterId }: ActiveJobsPanelProps) {
         id: 'moreActions',
         header: '',
         align: 'right',
+        cardCorner: true,
         render: (job) => {
           const menuTypeId = contextMenuTypeId(job);
           return (

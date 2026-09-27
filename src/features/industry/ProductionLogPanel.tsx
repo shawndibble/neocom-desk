@@ -503,6 +503,7 @@ export function ProductionLogPanel({
       id: 'moreActions',
       header: '',
       align: 'right',
+      cardCorner: true,
       render: (r) => moreActionsFor(r.productTypeID, r.itemName),
     },
   ];
@@ -525,6 +526,7 @@ export function ProductionLogPanel({
       id: 'moreActions',
       header: '',
       align: 'right',
+      cardCorner: true,
       render: (r) => moreActionsFor(r.run.productTypeID, r.itemName),
     },
   ];
