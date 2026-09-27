@@ -34,10 +34,13 @@ export interface BpcContractRow {
   /**
    * PLEX quantity the contract's issuer wants in return, when any (issue
    * #1080's PLEX-for-item barter, #1105's Sourcing filter/price display).
-   * `price` on such a contract is `0` — it is a barter, not a giveaway — so a
-   * consumer that wants to show or filter on what the contract actually asks
-   * for reads this field instead of treating `0` as free. Absent, not zero,
-   * when the contract asks for nothing PLEX.
+   * `price` on such a contract is usually `0` — it is a barter, not a
+   * giveaway — but some issuers ask for an ISK amount *and* PLEX in the same
+   * contract, in which case `price` is that real, non-zero ISK ask. Either
+   * way, a consumer that wants to show or filter on what the contract
+   * actually asks for reads this field rather than treating `0` as free or a
+   * non-zero `price` as the whole ask. Absent, not zero, when the contract
+   * asks for nothing PLEX.
    */
   requestedPlex?: number;
 }

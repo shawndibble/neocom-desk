@@ -1231,12 +1231,22 @@ export function BpcSourcingPanel() {
           // reads `effectivePrice`. Long press, not tap: a row tap opens the
           // contract.
           //
-          // A contract asking for PLEX (issue #1105) has an ISK `price` of
-          // `0` — the ask is the PLEX, not a real zero — so its requested
-          // quantity is shown here instead of the ISK figure `sortValue`
-          // would otherwise reflect as "free".
+          // A contract asking for PLEX (issue #1105) usually has an ISK
+          // `price` of `0` — the ask is the PLEX, not a real zero — so its
+          // requested quantity is shown here instead of the ISK figure
+          // `sortValue` would otherwise reflect as "free". Some issuers ask
+          // for both an ISK amount and PLEX in the same contract, so a real
+          // (non-zero) price alongside `requestedPlex` is shown as both
+          // figures rather than the PLEX one alone hiding the ISK ask.
           const amount = contract.requestedPlex ? (
-            t('bpcContracts.plexPrice', { plex: contract.requestedPlex.toLocaleString() })
+            contract.price > 0 ? (
+              t('bpcContracts.iskPlusPlexPrice', {
+                isk: formatIskAuto(contract.price, CONTRACT_ISK_CENTS_BELOW),
+                plex: contract.requestedPlex.toLocaleString(),
+              })
+            ) : (
+              t('bpcContracts.plexPrice', { plex: contract.requestedPlex.toLocaleString() })
+            )
           ) : contract.isAuction ? (
             contract.buyout !== undefined ? (
               t('bpcContracts.buyout', {
