@@ -914,8 +914,8 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   `sync/syncedCollections.ts` (issue #2043): its remote name, Dexie table,
   tombstone key, what removing a Character does to its local rows, its remote
   mapping, and its **What We Store** line. Sync, tombstones, the owner-change
-  wipe, the remote purge, Character removal and the encrypted backup all derive
-  from that one declaration. `firestore.rules` and `firestore.indexes.json` do
+  wipe, Character removal and the encrypted backup all derive from that one
+  declaration. `firestore.rules` and `firestore.indexes.json` do
   not — they stay hand-written, with a test that fails until they cover it.
 - **System Label**: One of ESI's four built-in mail labels — Inbox, Sent,
   Corp, Alliance — returned by `/characters/{id}/mail/labels/` alongside

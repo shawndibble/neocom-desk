@@ -930,6 +930,9 @@ export const db = new Dexie('neocom') as Dexie & {
  * reporting after the close would lose the diagnosis. It is a signal rather
  * than a Sentry call because `src/db` ships inside the service-worker bundle,
  * which must not carry the React SDK.
+ *
+ * Another tab *deleting* the database is the other disruption: the app shell
+ * reloads on it (`app/databaseWipe.ts`), which a worker has no page to do.
  */
 db.on('blocked', (event) => {
   emitUpgradeBlocked({ oldVersion: event.oldVersion, newVersion: event.newVersion });
