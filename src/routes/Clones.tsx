@@ -199,12 +199,13 @@ export function Clones() {
       {
         id: 'location',
         header: t('clones.location'),
+        // Name first, then location, so same-station clones order deterministically.
         sortValue: (clone) => `${cloneName(clone) ?? ''}\u0000${locationLabel(clone)}`,
         render: (clone) => {
           const name = cloneName(clone);
           if (name === undefined) return locationLabel(clone);
           return (
-            <span className="break-words [overflow-wrap:anywhere]">
+            <span className="[overflow-wrap:anywhere]">
               <span className="text-text">{name}</span>
               <span className="text-text-dim"> · {locationLabel(clone)}</span>
             </span>
