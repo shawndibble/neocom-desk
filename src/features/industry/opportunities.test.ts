@@ -7,10 +7,14 @@ import {
   autoRecalculates,
   buildOpportunityCandidates,
   computeOpportunityRow,
+  decideOpportunitiesCache,
+  opportunitiesBatchKey,
   opportunitiesCacheKey,
+  opportunitiesInputsKey,
   planForOpportunityCandidate,
   rankOpportunityRows,
   type OpportunityCandidate,
+  type OpportunityPricingInputs,
   type UnrankedOpportunityRow,
 } from './opportunities';
 import { recipeForLookup } from './recipes';
@@ -214,16 +218,119 @@ describe('opportunitiesCacheKey', () => {
     };
   }
 
+  const INPUTS: OpportunityPricingInputs = {
+    assumedMe: 10,
+    modifiers: NO_CHARACTER_MODIFIERS,
+    facilityDefaults: DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+  };
+
   it('is independent of array order', () => {
-    const a = opportunitiesCacheKey([candidate('b'), candidate('a')], DEFAULT_TRADE_HUB);
-    const b = opportunitiesCacheKey([candidate('a'), candidate('b')], DEFAULT_TRADE_HUB);
+    const a = opportunitiesCacheKey([candidate('b'), candidate('a')], DEFAULT_TRADE_HUB, INPUTS);
+    const b = opportunitiesCacheKey([candidate('a'), candidate('b')], DEFAULT_TRADE_HUB, INPUTS);
     expect(a).toBe(b);
   });
 
   it('changes when the hub changes', () => {
-    const jita = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB);
-    const amarr = opportunitiesCacheKey([candidate('a')], { ...DEFAULT_TRADE_HUB, id: 'amarr' });
+    const jita = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB, INPUTS);
+    const amarr = opportunitiesCacheKey(
+      [candidate('a')],
+      { ...DEFAULT_TRADE_HUB, id: 'amarr' },
+      INPUTS
+    );
     expect(jita).not.toBe(amarr);
+  });
+
+  it('changes when Assumed ME changes', () => {
+    const me10 = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB, INPUTS);
+    const me0 = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB, {
+      ...INPUTS,
+      assumedMe: 0,
+    });
+    expect(me10).not.toBe(me0);
+  });
+
+  it('changes when modifiers change', () => {
+    const base = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB, INPUTS);
+    const implant = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB, {
+      ...INPUTS,
+      modifiers: { ...NO_CHARACTER_MODIFIERS, manufacturingTimeImplantPct: 4 },
+    });
+    expect(base).not.toBe(implant);
+  });
+
+  it('changes when facility defaults change', () => {
+    const base = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB, INPUTS);
+    const taxed = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB, {
+      ...INPUTS,
+      facilityDefaults: {
+        ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS,
+        manufacturing: {
+          ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.manufacturing,
+          facilityTaxPct: 5,
+        },
+      },
+    });
+    expect(base).not.toBe(taxed);
+  });
+
+  it('is the same for equal inputs built as fresh objects in a different key order', () => {
+    const a = opportunitiesInputsKey(INPUTS);
+    const b = opportunitiesInputsKey({
+      facilityDefaults: {
+        reaction: { ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.reaction },
+        manufacturing: { ...DEFAULT_ACTIVITY_FACILITY_DEFAULTS.manufacturing },
+      },
+      modifiers: { ...NO_CHARACTER_MODIFIERS },
+      assumedMe: 10,
+    });
+    expect(a).toBe(b);
+  });
+
+  it('combines the batch identity and the pricing inputs', () => {
+    const key = opportunitiesCacheKey([candidate('a')], DEFAULT_TRADE_HUB, INPUTS);
+    expect(key).toContain(opportunitiesBatchKey([candidate('a')], DEFAULT_TRADE_HUB));
+    expect(key).toContain(opportunitiesInputsKey(INPUTS));
+  });
+});
+
+describe('decideOpportunitiesCache', () => {
+  const rows = [] as never[];
+  const entry = { inputsKey: 'me10', rows };
+
+  it('serves a large batch computed at the same inputs', () => {
+    expect(
+      decideOpportunitiesCache(entry, 'me10', { manualRefreshOnly: true, refreshRequested: false })
+    ).toEqual({ kind: 'serve', rows });
+  });
+
+  it('asks for Refresh, not a silent recompute, when a large batch was priced at other inputs', () => {
+    expect(
+      decideOpportunitiesCache(entry, 'me0', { manualRefreshOnly: true, refreshRequested: false })
+    ).toEqual({ kind: 'needs-refresh' });
+  });
+
+  it('computes a large batch that was never computed', () => {
+    expect(
+      decideOpportunitiesCache(undefined, 'me10', {
+        manualRefreshOnly: true,
+        refreshRequested: false,
+      })
+    ).toEqual({ kind: 'compute' });
+  });
+
+  it('computes when the pilot asks for Refresh', () => {
+    expect(
+      decideOpportunitiesCache(entry, 'me0', { manualRefreshOnly: true, refreshRequested: true })
+    ).toEqual({ kind: 'compute' });
+    expect(
+      decideOpportunitiesCache(entry, 'me10', { manualRefreshOnly: true, refreshRequested: true })
+    ).toEqual({ kind: 'compute' });
+  });
+
+  it('always computes a small batch', () => {
+    expect(
+      decideOpportunitiesCache(entry, 'me10', { manualRefreshOnly: false, refreshRequested: false })
+    ).toEqual({ kind: 'compute' });
   });
 });
 

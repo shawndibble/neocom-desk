@@ -288,7 +288,7 @@ export function detectOpportunityStock(
  * now computes rows at a fixed depth, so a depth component would only ever
  * hold one value.
  */
-export function opportunitiesCacheKey(
+export function opportunitiesBatchKey(
   candidates: readonly OpportunityCandidate[],
   hub: TradeHub
 ): string {
@@ -298,20 +298,84 @@ export function opportunitiesCacheKey(
     .join(',')}`;
 }
 
+/** The settings every row in a batch is priced at (issue #2056). */
+export interface OpportunityPricingInputs {
+  assumedMe: number;
+  modifiers: CharacterModifiers;
+  facilityDefaults: ActivityFacilityDefaults;
+}
+
+/** JSON with object keys sorted, so equal values built in a different key order serialize the same. */
+function stableSerialize(value: unknown): string {
+  return JSON.stringify(value, (_key, v: unknown) =>
+    v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => a.localeCompare(b)))
+      : v
+  );
+}
+
+export function opportunitiesInputsKey(inputs: OpportunityPricingInputs): string {
+  return stableSerialize({
+    assumedMe: inputs.assumedMe,
+    modifiers: inputs.modifiers,
+    facilityDefaults: inputs.facilityDefaults,
+  });
+}
+
+/**
+ * The full cache identity: the batch plus the pricing inputs its rows were
+ * computed at (issue #2056), so a changed Assumed ME, modifier or facility
+ * default never reads as the same cached batch.
+ */
+export function opportunitiesCacheKey(
+  candidates: readonly OpportunityCandidate[],
+  hub: TradeHub,
+  inputs: OpportunityPricingInputs
+): string {
+  return `${opportunitiesBatchKey(candidates, hub)}|${opportunitiesInputsKey(inputs)}`;
+}
+
 const AUTO_RECALCULATE_MAX = 10;
 
 export function autoRecalculates(candidateCount: number): boolean {
   return candidateCount <= AUTO_RECALCULATE_MAX;
 }
 
-const rowsCache = new Map<string, OpportunityRow[]>();
-
-export function readOpportunitiesCache(key: string): OpportunityRow[] | undefined {
-  return rowsCache.get(key);
+export interface OpportunitiesCacheEntry {
+  inputsKey: string;
+  rows: OpportunityRow[];
 }
 
-export function writeOpportunitiesCache(key: string, rows: OpportunityRow[]): void {
-  rowsCache.set(key, rows);
+export type OpportunitiesCacheDecision =
+  { kind: 'serve'; rows: OpportunityRow[] } | { kind: 'needs-refresh' } | { kind: 'compute' };
+
+/**
+ * What to do with a batch's cached rows. A small batch, or a Refresh, always
+ * computes; a large batch never computed computes once (issue #642's first
+ * visit). A large batch cached at other pricing inputs is neither served
+ * (its rows would be priced at the old inputs) nor silently recomputed
+ * (large batches are manual-refresh only) — it waits on Refresh (#2056).
+ */
+export function decideOpportunitiesCache(
+  entry: OpportunitiesCacheEntry | undefined,
+  inputsKey: string,
+  { manualRefreshOnly, refreshRequested }: { manualRefreshOnly: boolean; refreshRequested: boolean }
+): OpportunitiesCacheDecision {
+  if (!manualRefreshOnly || refreshRequested || !entry) return { kind: 'compute' };
+  return entry.inputsKey === inputsKey
+    ? { kind: 'serve', rows: entry.rows }
+    : { kind: 'needs-refresh' };
+}
+
+/** Keyed by `opportunitiesBatchKey`: one entry per batch, remembering the inputs it was priced at. */
+const rowsCache = new Map<string, OpportunitiesCacheEntry>();
+
+export function readOpportunitiesCache(batchKey: string): OpportunitiesCacheEntry | undefined {
+  return rowsCache.get(batchKey);
+}
+
+export function writeOpportunitiesCache(batchKey: string, entry: OpportunitiesCacheEntry): void {
+  rowsCache.set(batchKey, entry);
 }
 
 /** Test-only: production callers rely on the manual Refresh action instead of clearing. */
