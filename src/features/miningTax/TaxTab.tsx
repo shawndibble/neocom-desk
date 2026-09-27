@@ -64,6 +64,7 @@ import {
   linkRecordedPayment,
   markAssignmentsPaid,
   resolveNeedsReview,
+  unlockPaidAssignment,
 } from '@/features/miningTax/assignments';
 import { tagAsIgnored, tagAsMoonOre } from '@/features/miningTax/typeOverrides';
 import { TypeOverridesDialog } from '@/features/miningTax/TypeOverridesDialog';
@@ -737,6 +738,25 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     }
   }
 
+  /**
+   * "Unlock to edit" (AssignDialog's paid-lock banner). Deliberately does not
+   * close the modal or call `refresh()` the way every other row action does
+   * — the whole point is to reopen the *same* record for editing right away,
+   * so it swaps `detailTarget`'s assignment in place (the same pattern
+   * `GroupSummaryModal`'s `onEditMember` already uses) rather than round-
+   * tripping through the full snapshot reload.
+   */
+  async function handleUnlockFromDetail() {
+    if (!detailTarget?.assignment) return;
+    setBusy(true);
+    try {
+      const unlocked = await unlockPaidAssignment(detailTarget.assignment);
+      setDetailTarget({ ...detailTarget, assignment: unlocked, status: unlocked.status });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // Every bulk action reads the selection narrowed to what is *on screen*:
   // selection state survives a filter change, so acting on the full set would
   // let Dismiss reach entries the pilot cannot see.
@@ -1391,6 +1411,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
           onMarkPaid={() => void handleMarkPaidFromDetail()}
           onResolve={() => void handleResolveFromDetail()}
           onUndo={() => void handleUndoFromDetail()}
+          onUnlock={handleUnlockFromDetail}
           onAddPayee={
             payeeManagerDefaultCharacterId !== null
               ? () => setPayeeManagerCharacterId(payeeManagerDefaultCharacterId)

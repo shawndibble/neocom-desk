@@ -168,6 +168,16 @@
 // the Fittings applied-DPS graphs are worked out against. Two keys for the
 // same reason, never deleted for the same reason — see
 // features/fittings/targetProfiles.ts.
+//
+// sync.miningTaxOreValueMode (grilling session, 2026-09-27): whether the
+// Moon Mining Tax Assign/edit form shows one editable total-value box per
+// ore type instead of a single whole-row total — a pilot reconciling this
+// app's numbers against a corp's own moon-tax tool wants that per-ore
+// workflow available wherever they're doing the reconciling, not re-enabled
+// per device. See features/miningTax/oreValueMode.ts. Same "set to another
+// value, never unset" shape as the Defaults-panel preferences above (off is
+// a value, not an absence), so the tombstone-expiry edge does not bite it.
+// No `legacyKey`: new, with no device-local life to seed from.
 export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.bpcHideAuctions',
   'sync.bpcHidePlex',
@@ -189,6 +199,7 @@ export const SYNCED_SETTING_KEYS: readonly string[] = [
   'sync.marketPricePercent',
   'sync.miningTaxManualIgnoredTypeIds',
   'sync.miningTaxManualMoonOreTypeIds',
+  'sync.miningTaxOreValueMode',
   'sync.notificationFeedPrefs',
   'sync.piCustomsRates',
   'sync.piExpiringSoonHours',

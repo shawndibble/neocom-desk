@@ -62,6 +62,7 @@ import {
 } from '@/engine/industry/types';
 import { rigKindLabelKey } from '@/features/industry/rigFitLabels';
 import { useMarketHub } from '@/features/market/hub';
+import { useMiningTaxOreValueMode } from '@/features/miningTax/oreValueMode';
 import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
 import { useAssumedTe, MIN_ASSUMED_TE, MAX_ASSUMED_TE } from '@/features/industry/assumedTe';
 import { useIncludeBlueprintCost } from '@/features/industry/includeBlueprintCost';
@@ -1059,6 +1060,30 @@ function MarketDefaultsPanel() {
   );
 }
 
+function MiningTaxDefaultsPanel() {
+  const { t } = useTranslation();
+  const oreValueMode = useMiningTaxOreValueMode((state) => state.value);
+  const setOreValueMode = useMiningTaxOreValueMode((state) => state.setValue);
+  const hydrated = useHydratedStore(useMiningTaxOreValueMode);
+
+  return (
+    <Panel title={t('settings.miningTaxDefaultsTitle')}>
+      {hydrated ? (
+        <div className="max-w-md space-y-4">
+          <p className="text-xs text-text-dim">{t('settings.defaultsSyncHint')}</p>
+          <label className="flex items-center gap-2 text-xs font-semibold">
+            <Checkbox checked={oreValueMode} onChange={() => void setOreValueMode(!oreValueMode)} />
+            {t('settings.miningTaxOreValueModeLabel')}
+          </label>
+          <p className="text-xs text-text-dim">{t('settings.miningTaxOreValueModeHint')}</p>
+        </div>
+      ) : (
+        <Spinner />
+      )}
+    </Panel>
+  );
+}
+
 function CharacterDefaultsPanel() {
   const { t } = useTranslation();
   const defaultCharacterFilter = useDefaultCharacterFilter((state) => state.value);
@@ -1394,6 +1419,7 @@ export function Settings() {
             </>
           )}
           {section === 'market' && <MarketDefaultsPanel />}
+          {section === 'miningTax' && <MiningTaxDefaultsPanel />}
           {section === 'characters' && <CharacterDefaultsPanel />}
           {section === 'corporation' && <CorpDefaultsPanel />}
           {/* The Overview feed's "Settings" link targets `/settings/notifications` directly. */}

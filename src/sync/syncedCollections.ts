@@ -615,6 +615,7 @@ export const MINING_TAX_ASSIGNMENTS = defineEditableCollection<
     ...(a.groupId !== undefined ? { groupId: a.groupId } : {}),
     ...(a.collectsGrowth !== undefined ? { collectsGrowth: a.collectsGrowth } : {}),
     ...(a.payment !== undefined ? { payment: a.payment } : {}),
+    ...(a.oreLineValues !== undefined ? { oreLineValues: a.oreLineValues } : {}),
     updatedAt: a.updatedAt,
     ownerHash,
     deleted: false,
@@ -635,6 +636,7 @@ export const MINING_TAX_ASSIGNMENTS = defineEditableCollection<
     ...(r.groupId !== undefined ? { groupId: r.groupId } : {}),
     ...(r.collectsGrowth !== undefined ? { collectsGrowth: r.collectsGrowth } : {}),
     ...(r.payment !== undefined ? { payment: r.payment } : {}),
+    ...(r.oreLineValues !== undefined ? { oreLineValues: r.oreLineValues } : {}),
     updatedAt: r.updatedAt,
   }),
 });
