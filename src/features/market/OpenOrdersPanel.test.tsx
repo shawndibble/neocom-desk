@@ -474,6 +474,27 @@ describe('OpenOrdersPanel', () => {
     ).toBeInTheDocument();
   });
 
+  it('all-healthy: no "0 of N orders match" line, and the healthy sentence shows once', async () => {
+    mockedLoadAll.mockResolvedValue(
+      snapshot([
+        {
+          characterId: 1,
+          characterName: 'Alpha',
+          orders: [NO_COST_BASIS_ORDER],
+          fetchedAt: Date.now(),
+          fromCache: false,
+          needsReauth: false,
+        },
+      ])
+    );
+
+    renderPanel();
+
+    await screen.findByTestId('order-group-healthy');
+    expect(screen.queryByText(/orders match/)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/Nothing wrong here/)).toHaveLength(1);
+  });
+
   // issue #1423: a marketOrderUndercut (or marketOrderFilled) notification
   // deep-links here with `?highlight=<orderId>`, per decision
   // `20260908-123516` — the row must land expanded and pulsed even when its
