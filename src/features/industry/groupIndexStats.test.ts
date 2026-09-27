@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { BuildPlanRecord } from '@/db';
 import type { BuildResult } from '@/engine/industry/types';
 import type { BuildGroup } from './buildGroups';
-import { computeGroupIndexStats, profitOf, verdictOf } from './groupIndexStats';
+import { computeGroupIndexStats } from './groupIndexStats';
+import { profitOf, verdictOf } from './groupRollupView';
 import type { ComparedBuildRow } from './useComparedBuildResults';
 
 const GROUP: BuildGroup = { id: 'g1', name: 'Fit', order: 0 };

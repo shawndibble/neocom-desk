@@ -6,29 +6,10 @@
  * and `rollUpBuildGroup` far more than it reaches into the route's own state.
  */
 import type { BuildPlanRecord } from '@/db';
-import { rollUpBuildGroup, type BuildGroupMember } from '@/engine/industry/groupRollup';
-import type { PlanRollupStats, PlanVerdictTag } from './BuildPlanList';
+import type { PlanRollupStats } from './BuildPlanList';
 import type { BuildGroup } from './buildGroups';
-import { flattenBuildResult } from './resultFlattenCache';
+import { computeGroupRollup } from './groupRollupView';
 import type { ComparedBuildRow } from './useComparedBuildResults';
-
-/** Buy price minus build cost — positive is money saved building it. Null with no buy price to compare against. */
-export function profitOf(totalCost: number, buyCost: number | null): number | null {
-  return buyCost === null ? null : buyCost - totalCost;
-}
-
-/**
- * No buy price to compare against reads as "unknown" rather than silently
- * missing — and so does `unpriceable`: `totalCost` counts an unpriced
- * material's own line as 0 (see `materialResolution.ts`), so a `savings`
- * value can stay non-null and understated even when the group can't really
- * be priced. Without this gate the verdict tag would read "confident" next
- * to a profit figure the row itself shows as "—".
- */
-export function verdictOf(profit: number | null, unpriceable = false): PlanVerdictTag {
-  if (profit === null || unpriceable) return 'unknown';
-  return profit >= 0 ? 'build' : 'buy';
-}
 
 const UNKNOWN_STATS: PlanRollupStats = { profit: null, verdict: 'unknown' };
 
@@ -44,38 +25,12 @@ export function computeGroupIndexStats(
   memberPlans: readonly BuildPlanRecord[],
   rowByPlanId: ReadonlyMap<string, ComparedBuildRow>
 ): PlanRollupStats {
-  const members: BuildGroupMember[] = [];
-  for (const plan of memberPlans) {
-    const row = rowByPlanId.get(plan.id);
-    if (!row?.groupResult) continue;
-    const flattened = flattenBuildResult(row.groupResult);
-    members.push({
-      planId: row.planId,
-      planName: row.planName,
-      hubId: plan.hubId,
-      result: row.groupResult,
-      shoppingMaterials: flattened.shopping,
-      tableMaterials: flattened.table,
-    });
-  }
-  if (members.length === 0 || members.length !== memberPlans.length) return UNKNOWN_STATS;
-
-  const ownedStock = new Map(
-    Object.entries(group.ownedStock ?? {}).map(([typeID, qty]) => [Number(typeID), qty])
-  );
-  const rollup = rollUpBuildGroup(members, { ownedStock });
-  const savings = profitOf(rollup.totalCost, rollup.buyCost);
-  // `rollup.unpriceable` alone misses one case: a member whose own material
-  // (not product) is unpriced, but the group's owned-stock ledger happens to
-  // fully cover it — `rollup.unpriceable` clears, yet that member's own
-  // `profit` was computed on the owned-disabled tree, where it's still
-  // unpriced, so `rollup.profit` stays null. Gate on both, or the tag reads
-  // confident next to a "—" profit.
-  const unpriceable = rollup.unpriceable || rollup.profit === null;
+  const view = computeGroupRollup(group, memberPlans, rowByPlanId);
+  if (!view.complete) return UNKNOWN_STATS;
   return {
-    profit: rollup.profit,
-    verdict: verdictOf(savings, unpriceable),
-    buildCost: unpriceable ? null : rollup.totalCost,
-    buyCost: unpriceable ? null : rollup.buyCost,
+    profit: view.profit,
+    verdict: view.verdict,
+    buildCost: view.buildCost,
+    buyCost: view.buyCost,
   };
 }

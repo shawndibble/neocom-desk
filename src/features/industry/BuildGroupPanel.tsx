@@ -30,7 +30,6 @@ import { tappableRowClassName } from '@/components/ui/controlStyles';
 import * as Icon from '@/components/ui/icons';
 import type { BuildPlanRecord } from '@/db';
 import type { BuildStrategy } from '@/engine/industry/autoMakeOrBuy';
-import { rollUpBuildGroup, type BuildGroupMember } from '@/engine/industry/groupRollup';
 import { rowVolume, totalVolume } from '@/engine/industry/materialVolume';
 import { suggestedOwnedQuantity, type OwnedStockScope } from '@/engine/industry/ownedStock';
 import type { MaterialCostLine } from '@/engine/industry/types';
@@ -51,7 +50,7 @@ import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import { AutoBuildControl } from './AutoBuildControl';
 import { groupCraftScope, groupAutoBuildMaxDepth } from './autoBuildGroup';
 import { formatPercent, formatVolume } from './format';
-import { profitOf, verdictOf } from './groupIndexStats';
+import { computeGroupRollup } from './groupRollupView';
 import { SourcingInput } from './MaterialsTable';
 import { OwnedStockHint } from './OwnedStockHint';
 import { OwnedStockScopeControl } from './OwnedStockScopeControl';
@@ -63,7 +62,6 @@ import {
   ownedStockView,
   typeIdsFromKey,
 } from './planMaterialsView';
-import { flattenBuildResult } from './resultFlattenCache';
 import { GroupSlotLine } from './PlanSlotLine';
 import { countJobsByCategory } from './planJobSlots';
 import { hasShoppingList, shoppingListText } from './shoppingList';
@@ -218,46 +216,12 @@ export function BuildGroupPanel({
     catalog.byBlueprintTypeID.has(p.blueprintTypeID)
   ).length;
 
-  // `tableMaterials` widens to `MaterialCostLine[]` at the `BuildGroupMember`
-  // boundary (`groupRollup.ts` stays free of feature types), which loses
-  // `subBuilds` for anyone reading it back off `members` — so this is
-  // computed here, off `flattened.table` while it is still a
-  // `MaterialTableRow[]`, rather than downstream. Summed by typeID across
-  // members the same way `mergeMaterials` sums quantity, since a material one
-  // member builds is still built no matter how many members contribute it.
-  const { members, builtQuantityByType } = useMemo(() => {
-    const byId = new Map(plans.map((p) => [p.id, p]));
-    const builtQuantityByType = new Map<number, number>();
-    const members: BuildGroupMember[] = [];
-    for (const row of rows) {
-      const plan = byId.get(row.planId);
-      // A member still loading, or one that could not be priced, contributes
-      // nothing rather than contributing zeroes — a total that silently counts
-      // a failed member as free is worse than one that says it is incomplete.
-      // `groupResult`, never `result`: the group total re-resolves each
-      // member with owned-stock deduction disabled (issue #697) — `result`
-      // is what that member's own page shows, still netted against its own
-      // `materialSourcing`, and stays untouched in the member list below.
-      if (!plan || !row.groupResult) continue;
-      const flattened = flattenBuildResult(row.groupResult);
-      for (const material of flattened.table) {
-        if (material.subBuilds.length === 0) continue;
-        builtQuantityByType.set(
-          material.typeID,
-          (builtQuantityByType.get(material.typeID) ?? 0) + material.quantity
-        );
-      }
-      members.push({
-        planId: row.planId,
-        planName: row.planName,
-        hubId: plan.hubId,
-        result: row.groupResult,
-        shoppingMaterials: flattened.shopping,
-        tableMaterials: flattened.table,
-      });
-    }
-    return { members, builtQuantityByType };
-  }, [rows, plans]);
+  const rowByPlanId = useMemo(() => new Map(rows.map((r) => [r.planId, r])), [rows]);
+  const view = useMemo(
+    () => computeGroupRollup(group, plans, rowByPlanId),
+    [group, plans, rowByPlanId]
+  );
+  const { members, builtQuantityByType, rollup } = view;
 
   // Every type any member's whole tree can show, not only each blueprint's
   // own materials: the buy table below lists sub-build leaves
@@ -295,20 +259,10 @@ export function BuildGroupPanel({
     [group.ownedStock]
   );
 
-  const rollup = useMemo(
-    () => rollUpBuildGroup(members, { ownedStock: ownedStockMap }),
-    [members, ownedStockMap]
-  );
-
-  // The group's own Acquisition Verdict — buyCost null means at least one
-  // member is unpriced, same "unknown" rule `computeGroupIndexStats` already
-  // applies to the index row for this group. `rollup.unpriceable` alone
-  // misses a member whose own material is unpriced but the group's owned
-  // ledger fully covers it (see `computeGroupIndexStats`'s matching gate) —
-  // `rollup.profit === null` catches that case too, keeping this panel's
-  // verdict from disagreeing with the index row for the same group.
-  const groupProfit = profitOf(rollup.totalCost, rollup.buyCost);
-  const groupVerdict = verdictOf(groupProfit, rollup.unpriceable || rollup.profit === null);
+  // The group's own Acquisition Verdict, from the same `computeGroupRollup`
+  // the index row reads � unknown while any member is still loading or failed.
+  const groupProfit = view.savings;
+  const groupVerdict = view.verdict;
   // Which way the numbers point, independent of whether they can be trusted:
   // an unknown verdict (a material has no price) still carries a signed
   // saving, and wording it as "BUY is cheaper by -X" was the bug. Headline and
@@ -556,7 +510,6 @@ export function BuildGroupPanel({
     return () => clearTimeout(timer);
   }, [copyState]);
 
-  const rowByPlanId = useMemo(() => new Map(rows.map((row) => [row.planId, row])), [rows]);
   const loading = rows.some((row) => row.loading);
   const failed = rows.filter((row) => row.error !== null);
 
