@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react';
 import * as Icon from './icons';
 import { IconButton } from './IconButton';
 import {
@@ -25,6 +26,8 @@ interface ColumnPickerMenuProps<Id extends string, Row> {
    */
   onReset?: () => void;
   resetLabel?: string;
+  /** Trigger size; defaults to `IconButton`'s own default so existing callers are unchanged. */
+  size?: ComponentProps<typeof IconButton>['size'];
 }
 
 /**
@@ -46,13 +49,14 @@ export function ColumnPickerMenu<Id extends string, Row>({
   menuTitle,
   onReset,
   resetLabel,
+  size,
 }: ColumnPickerMenuProps<Id, Row>) {
   const visibleSet = new Set(visible);
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <IconButton icon={<Icon.ColumnsPicker />} label={buttonLabel} />
+        <IconButton icon={<Icon.ColumnsPicker />} label={buttonLabel} size={size} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
         <p className="px-2 py-1.5 text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
