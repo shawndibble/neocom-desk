@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { countHardpoints, type HardpointKind } from '@/engine/fittings/hardpoints';
 import type { Fitting, HardpointCounts } from '@/engine/fittings/types';
+import { ESI_FANOUT_CONCURRENCY, mapWithConcurrencyLimit } from '@/lib/concurrency';
 import { loadHardpointKind } from './hardpointKinds';
 
 export function useFittingHardpoints(fitting: Fitting | null): HardpointCounts | null {
@@ -23,8 +24,19 @@ export function useFittingHardpoints(fitting: Fitting | null): HardpointCounts |
     let cancelled = false;
     void (async () => {
       try {
-        const loaded = await Promise.all(
-          missing.map(async (typeId) => [typeId, await loadHardpointKind(typeId)] as const)
+        // Bounded, not `Promise.all(missing.map(...))`: a fit's high slots can
+        // hold a dozen distinct types, each its own uncached ESI round trip —
+        // ESI has no batch endpoint for dogma effects (issue: N+1 API Call on
+        // /fittings/edit) — so cap the fan-out like every other ESI call site.
+        const loaded = new Array<readonly [number, HardpointKind | null | undefined]>(
+          missing.length
+        );
+        await mapWithConcurrencyLimit(
+          missing.map((typeId, index) => ({ typeId, index })),
+          ESI_FANOUT_CONCURRENCY,
+          async ({ typeId, index }) => {
+            loaded[index] = [typeId, await loadHardpointKind(typeId)];
+          }
         );
         if (cancelled) return;
         // A type ESI couldn't supply stays unknown — and missing, so the next Fitting change retries it.
