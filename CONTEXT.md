@@ -974,8 +974,8 @@ default tax %, optional moon/system tag, optional Trade Hub}`. The
   their own words, what leaves their device. Not documentation — a
   **commitment**: the **Synced Collection** registry's `REMOTE_COLLECTIONS` is
   the authoritative set, and every declaration names the line that mentions
-  it, so a newly synced collection cannot be declared until the copy accounts
-  for it. Names its own exceptions (Notification Feed rows,
+  it, so a newly synced collection fails the suite until the copy accounts for
+  it. Names its own exceptions (Notification Feed rows,
   Scheduled Push occurrences, crash reports) rather than rounding them off; a
   section a reader can catch overclaiming is worth less than none. Deep-linkable
   at `/settings#faq`.

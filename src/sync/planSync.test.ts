@@ -701,11 +701,11 @@ describe('triggerSync: deferred remote purge retry', () => {
 
 /**
  * The class of bug this pins: a field the UI writes onto a record, that the
- * collection spec then forgets to map, so the value is saved locally and
+ * collection's remote mapping then forgets, so the value is saved locally and
  * quietly never leaves the device (What-If Implants and the Booster were
  * exactly that, one layer up).
  *
- * A `CollectionSpec` lists its fields explicitly — never a spread, because
+ * A mapping (`sync/syncedCollections.ts`) lists its fields explicitly — never a spread, because
  * Firestore rejects `undefined` and a record carries local-only shapes — so
  * nothing but a test can notice the omission. The pinned key lists make
  * adding a field to a record fail here until its round trip is decided.

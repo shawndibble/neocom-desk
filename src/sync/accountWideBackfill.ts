@@ -68,8 +68,8 @@ import { PLANET_RICHNESS, STATION_PINS } from './syncedCollections';
 /**
  * One account-wide collection, for `ACCOUNT_WIDE_COLLECTIONS` below.
  *
- * Deliberately two functions rather than a `CollectionSpec`-shaped record:
- * that type is ten fields because it describes remote document
+ * Deliberately its own small shape rather than a registry declaration
+ * (`syncedCollections.ts`): that type describes remote document
  * round-tripping, and none of that is needed to copy a local row sideways.
  * All this needs to know is which rows are account-wide, and how to re-key one
  * onto another Character.

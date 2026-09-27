@@ -127,7 +127,7 @@ export interface EditableCollection<
 }
 
 /** A remote collection that does not sync through the editable-record merge. */
-export interface OtherRemoteCollection extends RemoteCollectionBase {
+export interface FeedOrSettingsCollection extends RemoteCollectionBase {
   /**
    * `feed`: the Notification Feed — no tombstones, merged on dismissal
    * (planSync's syncFeed). `settings`: the synced settings allow-list, one
@@ -136,9 +136,9 @@ export interface OtherRemoteCollection extends RemoteCollectionBase {
   kind: 'feed' | 'settings';
 }
 
-export type RemoteCollection = EditableCollection | OtherRemoteCollection;
+export type SyncedCollection = EditableCollection | FeedOrSettingsCollection;
 
-/** Identity helper: infers nothing, checks the declaration against its record type. */
+/** Identity helper: exists only to check a declaration against its record type. */
 function defineEditableCollection<L extends EditableRecord, R extends RemoteDoc>(
   collection: EditableCollection<L, R>
 ): EditableCollection<L, R> {
@@ -423,7 +423,7 @@ export const PRODUCTION_RUNS = defineEditableCollection<
   table: 'productionRuns',
   tombstoneSegment: 'productionRunTombstones',
   // Kept on removal: removeCharacter never deleted this table's local rows
-  // (it predates the registry's purge rule). Preserved as-is — see #2043's PR.
+  // (it predates the registry's purge rule). Preserved as-is — see #2053.
   onRemoval: 'keep',
   faqItem: 'productionRuns',
   toRemoteDoc: (r, ownerHash) => ({
@@ -464,7 +464,7 @@ export const PRODUCTION_SALE_LINKS = defineEditableCollection<
   table: 'productionSaleLinks',
   tombstoneSegment: 'productionSaleLinkTombstones',
   // Kept on removal: removeCharacter never deleted this table's local rows
-  // (it predates the registry's purge rule). Preserved as-is — see #2043's PR.
+  // (it predates the registry's purge rule). Preserved as-is — see #2053.
   onRemoval: 'keep',
   faqItem: 'productionRuns',
   toRemoteDoc: (r, ownerHash) => ({
@@ -503,7 +503,7 @@ export const PRODUCTION_ORDER_WATCHES = defineEditableCollection<
   table: 'productionOrderWatches',
   tombstoneSegment: 'productionOrderWatchTombstones',
   // Kept on removal: removeCharacter never deleted this table's local rows
-  // (it predates the registry's purge rule). Preserved as-is — see #2043's PR.
+  // (it predates the registry's purge rule). Preserved as-is — see #2053.
   onRemoval: 'keep',
   faqItem: 'productionRuns',
   toRemoteDoc: (r, ownerHash) => ({
@@ -666,14 +666,14 @@ export const EDITABLE_COLLECTIONS: readonly EditableCollection[] = [
 ];
 
 /** The Notification Feed's remote copy (issue #362). Device-local archive, synced window only. */
-export const NOTIFICATION_FEED: OtherRemoteCollection = {
+export const NOTIFICATION_FEED: FeedOrSettingsCollection = {
   kind: 'feed',
   remoteName: 'notificationFeed',
   faqItem: 'notificationFeed',
 };
 
 /** Synced settings: the `sync.`-prefixed keys on `syncedSettings.ts`'s allow-list. */
-export const SYNCED_SETTINGS: OtherRemoteCollection = {
+export const SYNCED_SETTINGS: FeedOrSettingsCollection = {
   kind: 'settings',
   remoteName: 'settings',
   faqItem: 'settings',
@@ -684,7 +684,7 @@ export const SYNCED_SETTINGS: OtherRemoteCollection = {
  * authoritative answer to "what leaves this device" (the "What We Store"
  * section is a promise to the pilot about exactly this set).
  */
-export const REMOTE_COLLECTIONS: readonly RemoteCollection[] = [
+export const REMOTE_COLLECTIONS: readonly SyncedCollection[] = [
   ...EDITABLE_COLLECTIONS,
   NOTIFICATION_FEED,
   SYNCED_SETTINGS,

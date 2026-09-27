@@ -3,7 +3,8 @@
  * Imported by test files only — nothing in the app references this module
  * (`statusFixtures.ts`'s shape, same reasoning).
  *
- * Each value is typed `Required<...Record>`, so a field added to a record
+ * Each value is typed `Required<...Record>` (Build Plans less the legacy
+ * `rigLevel`, explained below), so a field added to a record
  * fails typecheck here until the fixture sets it. The round-trip test
  * (`syncedCollections.test.ts`) then pushes and pulls each one field by field,
  * so a field the collection's remote mapping forgets fails there instead of
