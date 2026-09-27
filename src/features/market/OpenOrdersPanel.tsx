@@ -32,7 +32,10 @@ import { GrantBanner } from '@/app/GrantNote';
 import { CharacterBadge } from '@/features/character/assetBrowserRows';
 import { AssumesBaseStandingsNote } from '@/features/character/AssumesBaseStandingsNote';
 import { CharacterFilterControl } from '@/features/character/CharacterFilterControl';
-import { resolveCharacterFilter } from '@/features/character/characterFilterValue';
+import {
+  resolveCharacterFilter,
+  type CharacterFilterValue,
+} from '@/features/character/characterFilterValue';
 import { useRouteSnapshot } from '@/lib/useRouteSnapshot';
 import { useHighlightParam } from '@/lib/useHighlightParam';
 import { useIsPhone } from '@/lib/useIsPhone';
@@ -386,14 +389,21 @@ export function OpenOrdersPanel() {
     setDetailOrderId(row.orderId);
   }
 
-  /** `CharacterFilterControl`'s `value` prop, derived the same way from either `filter.characterIds` (desktop strip) or `draft.characterIds` (phone funnel sheet). */
-  function characterFilterValueOf(characterIds: readonly number[]) {
-    return characterIds.length === 0 ? 'all' : new Set(characterIds);
+  /**
+   * `CharacterFilterControl`'s `value` prop, derived the same way from either
+   * `filter.characterIds` (desktop strip) or `draft.characterIds` (phone
+   * funnel sheet). `characterIds` narrowed to `'current' | 'all'` alongside
+   * `CharacterFilterControl` itself — a non-empty array only ever holds the
+   * active Character's own id now, never a hand-picked subset, so any id at
+   * all reads as "current."
+   */
+  function characterFilterValueOf(characterIds: readonly number[]): CharacterFilterValue {
+    return characterIds.length === 0 ? 'all' : 'current';
   }
 
   /** `CharacterFilterControl`'s `onChange`, resolving its selection back to `characterIds` and handing it to whichever setter owns them — `setFilter` (commits immediately) or `setDraft` (committed on the funnel's Apply). */
   function characterFilterOnChange(setCharacterIds: (ids: readonly number[]) => void) {
-    return (next: Parameters<typeof resolveCharacterFilter>[0]) => {
+    return (next: CharacterFilterValue) => {
       const resolved = resolveCharacterFilter(next, activeCharacterId);
       setCharacterIds(resolved === 'all' ? [] : [...resolved]);
     };
@@ -812,7 +822,6 @@ export function OpenOrdersPanel() {
                   {isPhone && showCharacterStrip && (
                     <div className="w-full border-t border-line pt-2">
                       <CharacterFilterControl
-                        characters={entriesWithOrders}
                         activeCharacterId={activeCharacterId}
                         value={characterFilterValueOf(draft.characterIds)}
                         onChange={characterFilterOnChange((characterIds) =>
@@ -844,7 +853,6 @@ export function OpenOrdersPanel() {
           {showCharacterStrip && !isPhone && (
             <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-2">
               <CharacterFilterControl
-                characters={entriesWithOrders}
                 activeCharacterId={activeCharacterId}
                 value={characterFilterValueOf(filter.characterIds)}
                 onChange={characterFilterOnChange((characterIds) =>

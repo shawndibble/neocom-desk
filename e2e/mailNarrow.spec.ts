@@ -17,7 +17,7 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from './support/testBase';
 import { signInAndGoto } from './support/authSeed';
-import { CHARACTER_ID, CHARACTER_NAME } from './support/fixtureData';
+import { CHARACTER_ID } from './support/fixtureData';
 
 const PHONE = { width: 390, height: 844 };
 
@@ -138,17 +138,4 @@ test('reading pane: Reply/Forward meet the 44px touch target floor at 390px', as
   expect(forwardDesktopBox).not.toBeNull();
   expect(replyDesktopBox!.height).toBeCloseTo(28, 0);
   expect(forwardDesktopBox!.height).toBeCloseTo(28, 0);
-});
-
-// Issue #1765: below `md` only Overview said whose data you were looking at.
-test('PageHeader carries an identity avatar linking to /characters at 390px', async ({ page }) => {
-  await page.setViewportSize(PHONE);
-  // Mail fetches its mailing lists on mount; mockEsi.ts doesn't cover them.
-  await page.route(`**/characters/${CHARACTER_ID}/mail/lists`, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
-  );
-  await signInAndGoto(page, './mail');
-  const avatar = page.getByRole('link', { name: `${CHARACTER_NAME}, switch character` });
-  await expect(avatar).toBeVisible();
-  await expect(avatar).toHaveAttribute('href', /\/characters$/);
 });

@@ -460,10 +460,6 @@ export function OverviewTab({ tabBar }: OverviewTabProps) {
             {data?.fetchedAt ? <DataAgeBadge date={data.fetchedAt} /> : undefined}
             {characters.length > 0 && (
               <CharacterFilterControl
-                characters={characters.map((c) => ({
-                  characterId: c.characterId,
-                  characterName: c.characterName,
-                }))}
                 activeCharacterId={activeCharacterId}
                 value={characterFilter}
                 onChange={setCharacterFilter}
