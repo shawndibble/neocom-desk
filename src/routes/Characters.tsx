@@ -38,7 +38,6 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
-import { isSyncConfigured } from '@/app/syncStatus';
 import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
@@ -950,7 +949,6 @@ export function Characters() {
     id: number;
     name: string;
   } | null>(null);
-  const [deferredNoticeName, setDeferredNoticeName] = useState<string | null>(null);
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [customizingPermissions, setCustomizingPermissions] = useState(false);
 
@@ -1166,10 +1164,9 @@ export function Characters() {
 
   async function confirmRemoveCharacter() {
     if (!removingCharacter) return;
-    const { id, name } = removingCharacter;
+    const { id } = removingCharacter;
     setRemovingCharacter(null);
-    const { remotePurged } = await removeCharacter(id, isSyncConfigured());
-    if (!remotePurged) setDeferredNoticeName(name);
+    await removeCharacter(id);
   }
 
   async function handleMoveToGroup(characterId: number, groupId: string | null) {
@@ -1666,21 +1663,6 @@ export function Characters() {
             onClick={() => deletingGroupId && void handleRemoveGroup(deletingGroupId)}
           >
             {t('characters.deleteGroup')}
-          </Button>
-        </div>
-      </Modal>
-
-      <Modal
-        open={deferredNoticeName !== null}
-        onClose={() => setDeferredNoticeName(null)}
-        title={t('characters.removeDeferredNoticeTitle')}
-      >
-        <p className="text-xs text-text-dim">
-          {deferredNoticeName && t('characters.removeDeferredNotice', { name: deferredNoticeName })}
-        </p>
-        <div className="mt-3 flex justify-end">
-          <Button size="sm" onClick={() => setDeferredNoticeName(null)}>
-            {t('characters.ok')}
           </Button>
         </div>
       </Modal>

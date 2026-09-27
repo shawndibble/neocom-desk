@@ -141,16 +141,17 @@ describe('FaqPanel — What We Store', () => {
 
     expect(screen.getByText(/push notifications, if you turn them on/i)).toBeInTheDocument();
     expect(screen.getByText(/crash reports/i)).toBeInTheDocument();
-    expect(screen.getByText(/removing a character deletes/i)).toBeInTheDocument();
+    expect(screen.getByText(/removing a character only clears it/i)).toBeInTheDocument();
   });
 
-  it('is honest about a deletion it cannot always carry out', () => {
-    // `characterPurge.ts` records the caveat by design: a Character whose
-    // refresh token is already dead cannot be signed in as, so its remote docs
-    // survive until it authenticates again. Saying "removed means deleted"
-    // flatly would be the one outright false sentence in the section.
+  it('says when a removed character’s synced copy actually leaves our servers', () => {
+    // Removal is local-only (issue #2066); the remote docs go with the
+    // `purgeStaleAccounts` inactivity purge. Saying "removed means deleted"
+    // would be the one outright false sentence in the section.
     renderFaq();
-    expect(screen.getByText(/next time you add that character back/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/no device has synced that character for 90 days/i)
+    ).toBeInTheDocument();
   });
 
   it('does not claim EVE data is uploaded', () => {
