@@ -38,6 +38,7 @@ import {
 import * as Icon from '@/components/ui/icons';
 import { beginAddCharacterLogin } from '@/app/loginFlow';
 import { CustomizePermissionsDialog } from '@/features/permissions/CustomizePermissionsDialog';
+import { isSyncConfigured } from '@/app/syncStatus';
 import { usePublicInfo, type PublicInfoEntry } from '@/stores/publicInfo';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { useFontScale, FONT_SCALE_STEPS, type FontScale } from '@/lib/fontScale';
@@ -76,7 +77,7 @@ import {
 import { formatDuration } from '@/lib/duration';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { removeCharacter } from '@/features/character/removeCharacter';
+import { removeCharacterAfterSync } from '@/features/character/removeCharacter';
 import { CharacterRowContextMenu } from '@/features/character/CharacterRowContextMenu';
 import { updateGroups, useOverviewGroups } from '@/features/character/overviewGroups';
 import {
@@ -1166,7 +1167,7 @@ export function Characters() {
     if (!removingCharacter) return;
     const { id } = removingCharacter;
     setRemovingCharacter(null);
-    await removeCharacter(id);
+    await removeCharacterAfterSync(id, isSyncConfigured());
   }
 
   async function handleMoveToGroup(characterId: number, groupId: string | null) {

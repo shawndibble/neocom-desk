@@ -1,53 +1,23 @@
 // "Log out of this device" (Settings → This device): every Character's login
 // and local data leave this browser, and nothing remote is touched.
 //
-// It is `removeCharacter` run over the whole roster, which leaves every
-// Character's synced Editable Data (Skill Plans, Build Plans...) on the server
-// and only forgets it locally — the inactivity purge deletes it after 90 days
-// without a sync (issue #2066). Logging a Character back in pulls it all again (the pull cursors go with the local
-// rows, so nothing is skipped as "already seen"), and device-wide settings —
-// the synced defaults, sync configuration — are rows in `db.settings` that
-// `removeCharacter` never deletes.
+// It is `removeCharacter` run over the whole roster, after one last push each.
+// Synced Editable Data (Skill Plans, Build Plans...) stays on the server until
+// the inactivity purge, so logging a Character back in pulls it all again, and
+// device-wide settings — the synced defaults, sync configuration — are rows in
+// `db.settings` that `removeCharacter` never deletes.
 
 import { db } from '@/db';
-import { signOutOfSync, triggerSync } from '@/sync';
+import { signOutOfSync } from '@/sync';
 import { scheduleProjectionRebuild } from '@/features/notifications/projectionRebuildScheduler';
 import { unregisterProjectionRegistration } from '@/features/notifications/projectionUpload';
-import { removeCharacter } from './removeCharacter';
-
-/**
- * How long the last pushes may take, all together, before logout goes ahead
- * without them. A push that hangs (offline, a stalled chunk load) must not
- * keep a pilot signed in on a machine they are trying to leave.
- *
- * A push that outlives this is abandoned, not cancelled: it may still write
- * rows for a Character that is already gone. That is a stale local copy of
- * data that is also on the server, not a login, and only ever follows a hang.
- */
-export const SYNC_FLUSH_TIMEOUT_MS = 8_000;
-
-/**
- * Best-effort push of every Character's unsynced edits. Logout deletes the
- * local rows and their tombstones, so an edit still waiting for its debounced
- * sync would otherwise be lost; a failure here only means it is.
- */
-async function flushSync(characterIds: readonly number[]): Promise<void> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<void>((resolve) => {
-    timer = setTimeout(resolve, SYNC_FLUSH_TIMEOUT_MS);
-  });
-  const pushes = Promise.allSettled(characterIds.map((id) => triggerSync(id)));
-  try {
-    await Promise.race([pushes, timeout]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
+import { flushSync, removeCharacter } from './removeCharacter';
 
 /**
  * @param syncConfigured Whether sync is set up here — gate on
- *   `isSyncConfigured()` at the call site. When true, each Character gets a last push first,
- *   and the Firebase session (which persists on disk) is signed out at the end.
+ *   `isSyncConfigured()` at the call site. When true, each Character gets a
+ *   last push first, and the Firebase session (which persists on disk) is
+ *   signed out at the end.
  * @returns How many Characters were logged out.
  */
 export async function logoutAllCharacters(syncConfigured: boolean): Promise<number> {

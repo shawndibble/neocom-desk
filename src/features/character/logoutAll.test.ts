@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/db';
 import { useActiveCharacter } from '@/stores/activeCharacter';
-import { logoutAllCharacters, SYNC_FLUSH_TIMEOUT_MS } from './logoutAll';
+import { logoutAllCharacters } from './logoutAll';
+import { SYNC_FLUSH_TIMEOUT_MS } from './removeCharacter';
 
 const syncMock = vi.hoisted(() => ({
   clearCharacterSyncBookkeeping: vi.fn(async () => {}),

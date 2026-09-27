@@ -2,9 +2,8 @@
 // rows for it are deleted (per each synced collection's `onRemoval` rule in
 // sync/syncedCollections.ts). Its remote Editable Data (CONTEXT.md) is left
 // alone: the `purgeStaleAccounts` Cloud Function deletes it once no device
-// has synced the Character for 90 days (issue #2066). Adding the Character
-// back before then pulls it all again — the pull cursors go with the local
-// rows.
+// has synced the Character for 90 days. Adding the Character back before then
+// pulls it all again — the pull cursors go with the local rows.
 //
 // Unlike a sold Character (detected via a changed ownerHash, handled by
 // sync/planSync.handleOwnerHashChange), this is the user *choosing* to drop
@@ -13,13 +12,55 @@
 
 import { db } from '@/db';
 import { purgeCharacterCacheOrSuppress, purgeSharedStructureCache } from '@/esi/cachePurge';
-import { clearCharacterSyncBookkeeping } from '@/sync';
+import { clearCharacterSyncBookkeeping, triggerSync } from '@/sync';
 import { EDITABLE_COLLECTIONS } from '@/sync/syncedCollections';
 import { refreshAppBadge } from '@/features/notifications/appBadge';
 import { deleteFeedForCharacter } from '@/features/notifications/feed';
 import { scheduleProjectionRebuild } from '@/features/notifications/projectionRebuildScheduler';
 import { unregisterProjectionRegistration } from '@/features/notifications/projectionUpload';
 import { useActiveCharacter } from '@/stores/activeCharacter';
+
+/**
+ * How long the last pushes may take, all together, before removal goes ahead
+ * without them. A push that hangs (offline, a stalled chunk load) must not
+ * keep a pilot signed in on a machine they are trying to leave.
+ *
+ * A push that outlives this is abandoned, not cancelled: it may still write
+ * rows for a Character that is already gone. That is a stale local copy of
+ * data that is also on the server, not a login, and only ever follows a hang.
+ */
+export const SYNC_FLUSH_TIMEOUT_MS = 8_000;
+
+/**
+ * Best-effort push of each Character's unsynced edits. Removal deletes the
+ * local rows and their tombstones, and the synced copy is what re-adding the
+ * Character restores, so an edit still waiting for its debounced sync would
+ * otherwise be lost; a failure here only means it is.
+ */
+export async function flushSync(characterIds: readonly number[]): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, SYNC_FLUSH_TIMEOUT_MS);
+  });
+  const pushes = Promise.allSettled(characterIds.map((id) => triggerSync(id)));
+  try {
+    await Promise.race([pushes, timeout]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Removing one Character from the Characters page: a last push when sync is
+ * set up (gate on `isSyncConfigured()` at the call site), then local removal.
+ */
+export async function removeCharacterAfterSync(
+  characterId: number,
+  syncConfigured: boolean
+): Promise<void> {
+  if (syncConfigured) await flushSync([characterId]);
+  await removeCharacter(characterId);
+}
 
 /**
  * @param syncPush Whether to bring this device's Scheduled Push registration in

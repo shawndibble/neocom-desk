@@ -517,8 +517,7 @@ describe('mergeFeed', () => {
   });
 });
 
-// Issue #582: the remote collection had no upper bound and no expiry — only
-// Character removal ever deleted a row. These pin the retention rule that bounds
+// Issue #582: the remote collection had no upper bound and no expiry. These pin the retention rule that bounds
 // it on the window the push side already used.
 describe('mergeFeed: remote retention purge', () => {
   const CUTOFF = NOW - FEED_SYNC_WINDOW_MS;

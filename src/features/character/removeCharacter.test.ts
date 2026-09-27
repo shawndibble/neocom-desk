@@ -4,10 +4,11 @@ import { GLOBAL_CACHE_CHARACTER_ID } from '@/esi/cache';
 import { useActiveCharacter } from '@/stores/activeCharacter';
 import { FULL_RECORDS } from '@/sync/syncedCollectionFixtures';
 import { EDITABLE_COLLECTIONS } from '@/sync/syncedCollections';
-import { removeCharacter } from './removeCharacter';
+import { removeCharacter, removeCharacterAfterSync } from './removeCharacter';
 
 const syncMock = vi.hoisted(() => ({
   clearCharacterSyncBookkeeping: vi.fn(async () => {}),
+  triggerSync: vi.fn<(characterId: number) => Promise<void>>(async () => {}),
 }));
 vi.mock('@/sync', () => syncMock);
 const pushMock = vi.hoisted(() => ({
@@ -111,6 +112,7 @@ async function seedCharacter(characterId: number): Promise<void> {
 beforeEach(async () => {
   vi.clearAllMocks();
   syncMock.clearCharacterSyncBookkeeping.mockImplementation(async () => {});
+  syncMock.triggerSync.mockImplementation(async () => {});
   await Promise.all([
     db.characters.clear(),
     db.tokens.clear(),
@@ -267,5 +269,39 @@ describe('removeCharacter', () => {
     expect(
       (await db.esiCache.get([GLOBAL_CACHE_CHARACTER_ID, 'structure:1000000000001']))?.value
     ).toEqual({ name: 'Shared By The Roster' });
+  });
+});
+
+describe('removeCharacterAfterSync', () => {
+  // The synced copy is what re-adding the Character restores, so an edit
+  // still waiting on its debounced push must reach it before the local rows go.
+  it('pushes the Character once before removing it when sync is configured', async () => {
+    await seedCharacter(1);
+    syncMock.triggerSync.mockImplementation(async () => {
+      expect(await db.characters.get(1)).toBeDefined();
+    });
+
+    await removeCharacterAfterSync(1, true);
+
+    expect(syncMock.triggerSync).toHaveBeenCalledExactlyOnceWith(1);
+    expect(await db.characters.get(1)).toBeUndefined();
+  });
+
+  it('removes locally even when that push fails', async () => {
+    await seedCharacter(1);
+    syncMock.triggerSync.mockRejectedValueOnce(new Error('offline'));
+
+    await removeCharacterAfterSync(1, true);
+
+    expect(await db.characters.get(1)).toBeUndefined();
+  });
+
+  it('does not push when sync is not configured', async () => {
+    await seedCharacter(1);
+
+    await removeCharacterAfterSync(1, false);
+
+    expect(syncMock.triggerSync).not.toHaveBeenCalled();
+    expect(await db.characters.get(1)).toBeUndefined();
   });
 });
