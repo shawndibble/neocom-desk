@@ -1,20 +1,12 @@
 /**
  * The Ship Tree as the game draws it (desktop default): one faction's tree
- * in a pan/zoom world — drag to pan, wheel to zoom around the pointer, Fit
- * for the whole tree. Geometry is `layoutShipTree`'s; this only draws it.
- * Hovering a hull shows the in-game hover card; clicking one opens the
- * Ship Info window (the caller's).
+ * in a pan/zoom world — drag to pan, wheel or pinch to zoom around the
+ * pointer/fingers, Fit for the whole tree. Geometry is `layoutShipTree`'s;
+ * this only draws it. Hovering a hull shows the in-game hover card; clicking
+ * one opens the Ship Info window (the caller's).
  */
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useGesture } from '@use-gesture/react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ShipTreeEdge, ShipTreeHullStatus, ShipTreeLayout } from '@/engine/shipTree/types';
 import { cx } from '@/lib/cx';
@@ -30,7 +22,7 @@ import {
   MIN_ZOOM,
   fitCamera,
   focusCamera,
-  wheelZoomFactor,
+  initialCamera,
   zoomAround,
   type Camera,
   type Size,
@@ -77,11 +69,10 @@ export function ShipTreeMap({
       ? FACTION_PANEL_SPACE
       : 0;
   // A camera the reader moved, for the faction they moved it on; any other
-  // faction starts from Fit (or centred on the hull search picked there).
+  // faction starts at 100% (or centred on the hull search picked there).
   const [moved, setMoved] = useState<{ factionID: number; cam: Camera } | null>(null);
   const [focus, setFocus] = useState<{ factionID: number; typeID: number } | null>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ x: number; y: number; cam: Camera } | null>(null);
 
   const layout = tree.layout;
   const nodeById = useMemo(() => new Map(layout.nodes.map((n) => [n.def.id, n])), [layout]);
@@ -94,19 +85,13 @@ export function ShipTreeMap({
     return ship ? (nodeById.get(ship.treeGroupID) ?? null) : null;
   }, [focusShip, data, nodeById]);
 
-  const fitted = fitCamera(world, viewport, fitInset);
+  const initial = initialCamera(world, viewport, fitInset);
   const cam =
     moved?.factionID === factionID
       ? moved.cam
       : focusNode
-        ? focusCamera(focusNode, viewport, fitted.z)
-        : fitted;
-
-  // The wheel listener is bound once; it reads the camera as last drawn.
-  const latest = useRef({ cam, factionID });
-  useLayoutEffect(() => {
-    latest.current = { cam, factionID };
-  });
+        ? focusCamera(focusNode, viewport, initial.z)
+        : initial;
 
   useEffect(() => {
     const vp = viewportRef.current;
@@ -118,29 +103,49 @@ export function ShipTreeMap({
     return () => observer.disconnect();
   }, []);
 
-  // React's onWheel is passive, so preventDefault needs a raw listener.
-  useEffect(() => {
-    const vp = viewportRef.current;
-    if (!vp) return;
-    function onWheel(e: WheelEvent) {
-      e.preventDefault();
-      const factor = wheelZoomFactor(e.deltaY, e.deltaMode);
-      if (factor === 1) return;
-      setHover(null);
-      const rect = vp!.getBoundingClientRect();
-      const { cam: current, factionID: id } = latest.current;
-      setMoved({
-        factionID: id,
-        cam: zoomAround(current, factor, e.clientX - rect.left, e.clientY - rect.top),
-      });
-    }
-    vp.addEventListener('wheel', onWheel, { passive: false });
-    return () => vp.removeEventListener('wheel', onWheel);
-  }, []);
-
   const moveTo = (next: Camera) => setMoved({ factionID, cam: next });
   const zoomBy = (factor: number) =>
     moveTo(zoomAround(cam, factor, viewport.width / 2, viewport.height / 2));
+
+  // Drag pans, wheel and pinch zoom around the pointer/fingers — one gesture
+  // layer for mouse, trackpad and touch (incl. two-finger pinch on a
+  // touchscreen). Bound straight to the viewport node so wheel/touch can
+  // preventDefault (React's synthetic handlers are passive).
+  useGesture(
+    {
+      onDragStart: ({ event, cancel }) => {
+        if ((event.target as HTMLElement).closest('button')) return cancel();
+        setHover(null);
+      },
+      onDrag: ({ pinching, cancel, delta: [dx, dy] }) => {
+        if (pinching) return cancel();
+        moveTo({ ...cam, x: cam.x + dx, y: cam.y + dy });
+      },
+      onWheel: ({ delta: [, dy], event }) => {
+        event.preventDefault();
+        if (dy === 0) return;
+        setHover(null);
+        const rect = viewportRef.current!.getBoundingClientRect();
+        const wheelEvent = event as WheelEvent;
+        const factor = Math.exp(-dy * 0.002);
+        moveTo(
+          zoomAround(cam, factor, wheelEvent.clientX - rect.left, wheelEvent.clientY - rect.top)
+        );
+      },
+      onPinchStart: () => setHover(null),
+      onPinch: ({ origin: [ox, oy], offset: [z], event }) => {
+        event.preventDefault();
+        const rect = viewportRef.current!.getBoundingClientRect();
+        const factor = z / cam.z;
+        if (factor !== 1) moveTo(zoomAround(cam, factor, ox - rect.left, oy - rect.top));
+      },
+    },
+    {
+      target: viewportRef,
+      eventOptions: { passive: false },
+      pinch: { scaleBounds: { min: MIN_ZOOM, max: MAX_ZOOM }, from: () => [cam.z, 0] },
+    }
+  );
 
   // Stable, so a pan or a hover re-renders only the transform, not the world.
   const switchFaction = useCallback(
@@ -253,23 +258,6 @@ export function ShipTreeMap({
         style={{
           backgroundSize: `${40 * cam.z}px ${40 * cam.z}px`,
           backgroundPosition: `${cam.x}px ${cam.y}px`,
-        }}
-        onPointerDown={(e) => {
-          setHover(null);
-          if ((e.target as HTMLElement).closest('button')) return;
-          drag.current = { x: e.clientX, y: e.clientY, cam };
-          e.currentTarget.setPointerCapture?.(e.pointerId);
-        }}
-        onPointerMove={(e) => {
-          const d = drag.current;
-          if (!d) return;
-          moveTo({ ...d.cam, x: d.cam.x + e.clientX - d.x, y: d.cam.y + e.clientY - d.y });
-        }}
-        onPointerUp={() => {
-          drag.current = null;
-        }}
-        onPointerCancel={() => {
-          drag.current = null;
         }}
       >
         <div

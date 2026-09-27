@@ -101,6 +101,8 @@ describe('ShipTreeTab — map', () => {
     renderTab();
     const map = await screen.findByRole('region', { name: 'Caldari State ship tree' });
     expect(map).toBeVisible();
+    // 100% on open, not shrunk to fit the viewport.
+    expect(screen.getByTestId('ship-tree-map')).toHaveAttribute('data-zoom', '1.00');
     // The faction panel and the legend sit inside the canvas, as in game.
     const bar = within(map).getByRole('group', { name: 'Factions' });
     expect(
@@ -145,6 +147,17 @@ describe('ShipTreeTab — map', () => {
     expect(within(card).getByText('Caldari Frigate bonuses (per skill level):')).toBeVisible();
     expect(within(card).getByText('Role bonus:')).toBeVisible();
     expect(within(card).getByText('5%')).toBeVisible();
+  });
+
+  it('resets to 100% on a faction switch, even after the reader zoomed', async () => {
+    const user = userEvent.setup();
+    renderTab();
+    const map = await screen.findByTestId('ship-tree-map');
+    fireEvent.wheel(map, { deltaY: -300 });
+    expect(map).not.toHaveAttribute('data-zoom', '1.00');
+    await user.click(await screen.findByRole('button', { name: /Guristas Pirates/ }));
+    expect(await screen.findByRole('region', { name: 'Guristas Pirates ship tree' })).toBeVisible();
+    expect(screen.getByTestId('ship-tree-map')).toHaveAttribute('data-zoom', '1.00');
   });
 
   it('switches faction from the bar and keeps it in the URL', async () => {
