@@ -843,14 +843,14 @@ export function Mail() {
                           ref={replyButtonRef}
                           icon={<Icon.MailReply size={Icon.ICON_SIZE.sm} />}
                           label={t('mail.reply')}
-                          size="sm"
+                          size="row"
                           onClick={() => openCompose('reply', selectedHeader.mail_id)}
                         />
                         <IconButton
                           ref={forwardButtonRef}
                           icon={<Icon.MailForward size={Icon.ICON_SIZE.sm} />}
                           label={t('mail.forward')}
-                          size="sm"
+                          size="row"
                           onClick={() => openCompose('forward', selectedHeader.mail_id)}
                         />
                       </>
