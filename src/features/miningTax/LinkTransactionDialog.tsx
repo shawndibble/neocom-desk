@@ -74,7 +74,7 @@ export function LinkTransactionDialog({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={t('miningTax.linkTransactionSearchPlaceholder')}
-          aria-label={t('miningTax.linkTransactionSearchPlaceholder')}
+          aria-label={t('miningTax.linkTransactionSearchLabel')}
           className="w-full"
         />
 

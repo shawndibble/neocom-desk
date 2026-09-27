@@ -342,10 +342,23 @@ export async function markAssignmentsPaid(
     scheduleSync(characterId);
 }
 
+/** Which linked-transaction array a call targets — a wallet-journal entry id or a contract id, never both. */
+export type PaymentTransactionRef = { journalRefId: number } | { contractId: number };
+
+/** Every Assignment settled by the same lump sum as `assignment` — linking or unlinking a transaction applies to the whole group, not just one row. Falls back to the row alone when there is no `payment` yet. */
+export function assignmentsSharingPayment(
+  assignment: MiningTaxAssignmentRecord,
+  all: readonly MiningTaxAssignmentRecord[]
+): MiningTaxAssignmentRecord[] {
+  const paymentId = assignment.payment?.paymentId;
+  if (paymentId === undefined) return [assignment];
+  return all.filter((a) => a.payment?.paymentId === paymentId);
+}
+
 /** Appends one link onto whichever array `ref` names, normalizing the payment's legacy shape first. */
 function withLink(
   payment: MiningTaxPaymentInfo,
-  ref: { journalRefId: number } | { contractId: number },
+  ref: PaymentTransactionRef,
   source: MiningTaxPaymentLinkSource
 ): MiningTaxPaymentInfo {
   const normalized = normalizePaymentInfo(payment);
@@ -369,7 +382,7 @@ function withLink(
  */
 export async function linkRecordedPayment(
   assignments: readonly MiningTaxAssignmentRecord[],
-  ref: { journalRefId: number } | { contractId: number }
+  ref: PaymentTransactionRef
 ): Promise<void> {
   if (assignments.length === 0) return;
   const now = Date.now();
@@ -406,7 +419,7 @@ export interface FallbackPaymentInput {
  */
 export async function linkPaymentTransaction(
   assignments: readonly MiningTaxAssignmentRecord[],
-  ref: { journalRefId: number } | { contractId: number },
+  ref: PaymentTransactionRef,
   source: MiningTaxPaymentLinkSource,
   fallbackPayment: FallbackPaymentInput
 ): Promise<void> {
@@ -427,7 +440,7 @@ export async function linkPaymentTransaction(
 /** Removes one linked transaction from every Assignment in `assignments` (a mistaken pick) — the mirror of `linkPaymentTransaction`. A no-op for an Assignment with no `payment` or without that link. */
 export async function unlinkPaymentTransaction(
   assignments: readonly MiningTaxAssignmentRecord[],
-  ref: { journalRefId: number } | { contractId: number }
+  ref: PaymentTransactionRef
 ): Promise<void> {
   if (assignments.length === 0) return;
   const now = Date.now();

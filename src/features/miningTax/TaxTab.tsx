@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -34,7 +35,7 @@ import { toggleFilterMember } from '@/lib/multiSelectFilter';
 import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
 import { boolParam, type UrlParamCodec } from '@/lib/urlState';
 import type { TradeHub } from '@/market/hubs';
-import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
+import type { PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import {
@@ -60,6 +61,7 @@ import {
 import { loadTypeNames } from '@/features/character/typeNames';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
 import {
+  assignmentsSharingPayment,
   deleteAssignment,
   dismissEntry,
   linkPaymentTransaction,
@@ -108,6 +110,21 @@ import { linesOwnedBy } from '@/engine/miningTax/ownership';
 function paidOnFromMadePaymentDate(isoDate: string): string {
   const parsed = new Date(isoDate);
   return formatLocalDate(Number.isNaN(parsed.getTime()) ? new Date() : parsed);
+}
+
+/** A short display line for a linked ref, from the same `MadePayment[]` the Payments-to-link card already loaded — `null` when it's no longer in the cached wallet journal/contracts. */
+function labelForLinkedRef(
+  madePayments: readonly MadePayment[],
+  t: TFunction,
+  kind: 'journal' | 'contract',
+  refId: number
+): string | null {
+  const mp = madePayments.find((p) => p.key === `${kind}:${refId}`);
+  if (!mp) return null;
+  const amount =
+    mp.amount === null ? t('miningTax.linkPaymentInKind') : `${formatIsk(mp.amount)} ISK`;
+  const label = mp.label || t('miningTax.linkPaymentUntitledContract');
+  return `${amount} · ${mp.date.slice(0, 10)} — ${label}`;
 }
 
 const ALL_STATUSES: readonly MiningTaxRowStatus[] = [
@@ -717,23 +734,6 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     }
   }
 
-  /** Every Assignment settled by the same lump sum as `assignment` — linking or unlinking a transaction applies to the whole group, not just this row. Falls back to the row alone when there is no `payment` yet. */
-  function paymentGroupFor(assignment: MiningTaxAssignmentRecord): MiningTaxAssignmentRecord[] {
-    const paymentId = assignment.payment?.paymentId;
-    if (paymentId === undefined) return [assignment];
-    return everyAssignment.filter((a) => a.payment?.paymentId === paymentId);
-  }
-
-  /** A short display line for a linked ref, from the same `MadePayment[]` the Payments-to-link card already loaded — `null` when it's no longer in the cached wallet journal/contracts. */
-  function labelForLinkedRef(kind: 'journal' | 'contract', refId: number): string | null {
-    const mp = madePayments.find((p) => p.key === `${kind}:${refId}`);
-    if (!mp) return null;
-    const amount =
-      mp.amount === null ? t('miningTax.linkPaymentInKind') : `${formatIsk(mp.amount)} ISK`;
-    const label = mp.label || t('miningTax.linkPaymentUntitledContract');
-    return `${amount} · ${mp.date.slice(0, 10)} — ${label}`;
-  }
-
   const detailLinkedTransactions: LinkedTransaction[] | undefined = useMemo(() => {
     const payment = detailTarget?.assignment?.payment;
     if (!payment) return undefined;
@@ -742,24 +742,23 @@ export function TaxTab({ tabBar }: TaxTabProps) {
         kind: 'journal',
         refId: l.refId,
         source: l.source,
-        label: labelForLinkedRef('journal', l.refId),
+        label: labelForLinkedRef(madePayments, t, 'journal', l.refId),
       })),
       ...(payment.contractLinks ?? []).map((l): LinkedTransaction => ({
         kind: 'contract',
         refId: l.refId,
         source: l.source,
-        label: labelForLinkedRef('contract', l.refId),
+        label: labelForLinkedRef(madePayments, t, 'contract', l.refId),
       })),
     ];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detailTarget, madePayments]);
+  }, [detailTarget, madePayments, t]);
 
   async function handleUnlinkTransactionFromDetail(transaction: LinkedTransaction) {
     if (!detailTarget?.assignment) return;
     setBusy(true);
     try {
       await unlinkPaymentTransaction(
-        paymentGroupFor(detailTarget.assignment),
+        assignmentsSharingPayment(detailTarget.assignment, everyAssignment),
         transaction.kind === 'journal'
           ? { journalRefId: transaction.refId }
           : { contractId: transaction.refId }
@@ -784,7 +783,7 @@ export function TaxTab({ tabBar }: TaxTabProps) {
     setBusy(true);
     try {
       await linkPaymentTransaction(
-        paymentGroupFor(linkTransactionTarget.assignment),
+        assignmentsSharingPayment(linkTransactionTarget.assignment, everyAssignment),
         payment.kind === 'journal'
           ? { journalRefId: payment.refId }
           : { contractId: payment.refId },
