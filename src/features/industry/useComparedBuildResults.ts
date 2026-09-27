@@ -40,11 +40,11 @@ import { toIndustryBlueprint, type BlueprintCatalog } from './blueprintCatalog';
 import { loadPlanSnapshots, type PlanSnapshots } from './planSnapshots';
 import { resolveBuildPlan, type BuildPlanSources } from './resolveBuildPlan';
 import {
-  hydratedPricingInputs,
+  isPricingReady,
   pricingSourcesForHub,
   type BuildPlanPricingInputs,
   type HubPricingSources,
-  type PricingSourceInputs,
+  type HubPricingSourceArgs,
 } from './buildPlanPricingInputs';
 
 export interface ComparedBuildRow {
@@ -74,7 +74,7 @@ export interface UseComparedBuildResultsArgs {
   modifiers: CharacterModifiers;
   /**
    * `useBuildPlanPricingInputs`'s result. Nothing is fetched until its
-   * settings hydrate (`hydratedPricingInputs`); corp blueprints fold into
+   * settings hydrate (`isPricingReady`); corp blueprints fold into
    * each plan on its own `includeCorpAssets` (issue #839), and standings and
    * BPC Sourcing offers resolve for each plan's own Trade Hub.
    */
@@ -111,7 +111,7 @@ async function computeRow(
   catalog: BlueprintCatalog,
   priced: PlanSnapshots | null,
   sources: Omit<BuildPlanSources, 'catalog' | keyof HubPricingSources>,
-  pricing: PricingSourceInputs,
+  pricing: HubPricingSourceArgs,
   computeGroupResult: boolean
 ): Promise<ComparedBuildRow> {
   const base = {
@@ -169,7 +169,7 @@ export function useComparedBuildResults({
   const corpForPlans = anyPlanUsesCorp ? pricingInputs.corpBlueprints : undefined;
   // Read field by field, not as the whole object, for the same reason: only
   // a change that can move a price restarts the fetch.
-  const ready = hydratedPricingInputs(pricingInputs) !== null;
+  const ready = isPricingReady(pricingInputs);
   const { assumedMe, includeBlueprintCost, standings, bpcRows } = pricingInputs;
 
   // Latest-ref pattern (useCompareRows.ts): a fresh `plans` array reference

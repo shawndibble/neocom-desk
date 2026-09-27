@@ -6,17 +6,19 @@
  * BPC Sourcing's public-contract rows (issue #838).
  *
  * One module owns all of them so every pricing surface — a plan's own page,
- * Compare, the Industry index and every Group Rollup, and Build Opportunities
- * — reads the same values from the same place. Adding a pricing input means
- * changing this module and `resolveBuildPlan`, not every surface.
+ * Build Plan Compare, the Industry index and every Group Rollup — reads the
+ * same values from the same place (Build Opportunities reads only
+ * `assumedMe`, #2055). Adding a pricing input means changing this module and
+ * `resolveBuildPlan`, not every surface.
  *
  * Call `useBuildPlanPricingInputs` once per page, above whatever remount
  * boundary switches the open Build Plan (the same rule `useCorpOwnedBlueprints`
  * states), and hand the result down; `useIndustryWorkspace` does this.
  *
- * The two settings hydrate asynchronously. `hydratedPricingInputs` is the
- * "don't price until hydrated" gate: batch pricing waits on it rather than
- * pricing once at the default and again once hydrated.
+ * The two settings hydrate asynchronously. `isPricingReady` is the "don't
+ * price until hydrated" gate: batch pricing waits on it rather than pricing
+ * once at the default and again once hydrated. The plan page and Build
+ * Opportunities read without waiting, as they always have (#2054).
  */
 import { useEffect, useMemo, useState } from 'react';
 import { loadPublicBpcContracts } from '@/features/bpcContracts/syncedContracts';
@@ -55,7 +57,7 @@ export type HubPricingSources = Pick<
 >;
 
 /** What `pricingSourcesForHub` reads. Corp blueprints may be withheld, which reads as unavailable. */
-export type PricingSourceInputs = Pick<
+export type HubPricingSourceArgs = Pick<
   BuildPlanPricingInputs,
   'assumedMe' | 'includeBlueprintCost' | 'standings' | 'bpcRows'
 > & { corpBlueprints?: CorpBlueprintSource };
@@ -148,11 +150,9 @@ export function useBuildPlanPricingInputs(characterId: number | null): BuildPlan
   );
 }
 
-/** The hydration gate: the inputs once both settings have hydrated, else null. */
-export function hydratedPricingInputs(
-  inputs: BuildPlanPricingInputs
-): BuildPlanPricingInputs | null {
-  return inputs.hydrated ? inputs : null;
+/** The hydration gate: true once both settings have hydrated. */
+export function isPricingReady(inputs: Pick<BuildPlanPricingInputs, 'hydrated'>): boolean {
+  return inputs.hydrated;
 }
 
 // Per rows array, per region: the same lookup back for the same inputs, so a
@@ -181,7 +181,7 @@ function offersFor(
 
 /** One plan's share of the pricing inputs, for the plan's own Trade Hub. */
 export function pricingSourcesForHub(
-  inputs: PricingSourceInputs,
+  inputs: HubPricingSourceArgs,
   hub: TradeHub
 ): HubPricingSources {
   return {

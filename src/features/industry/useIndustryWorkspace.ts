@@ -49,8 +49,6 @@ export interface IndustryWorkspace {
    * the open plan's remount boundary, so switching plans never reloads it.
    */
   pricingInputs: BuildPlanPricingInputs;
-  /** `pricingInputs.assumedMe`, for seeding a new plan's ME. */
-  assumedMe: number;
   assumedTe: number;
   buildGroups: ReturnType<typeof useBuildGroups.getState>['value'];
   buildGroupsHydrated: boolean;
@@ -133,7 +131,6 @@ export function useIndustryWorkspace(): IndustryWorkspace {
     ownedStockSnapshot,
     corpOwnedStock,
     pricingInputs,
-    assumedMe: pricingInputs.assumedMe,
     assumedTe,
     buildGroups,
     buildGroupsHydrated,

@@ -14,7 +14,7 @@ import { useAssumedMe } from './assumedMe';
 import { useIncludeBlueprintCost } from './includeBlueprintCost';
 import type { CorpOwnedBlueprintsState } from './corpOwnedBlueprints';
 import {
-  hydratedPricingInputs,
+  isPricingReady,
   loadBpcContractRows,
   pricingSourcesForHub,
   useBuildPlanPricingInputs,
@@ -110,19 +110,16 @@ describe('useBuildPlanPricingInputs', () => {
     expect(hydrateCost).toHaveBeenCalled();
   });
 
-  it('gives no inputs through the hydration gate until both settings hydrate', () => {
+  it('is not ready to price until both settings hydrate, then carries their values', () => {
     const { result } = renderHook(() => useBuildPlanPricingInputs(1));
-    expect(hydratedPricingInputs(result.current)).toBeNull();
+    expect(isPricingReady(result.current)).toBe(false);
 
     act(() => mockedAssumedMe.setState({ value: 4, hydrated: true }));
-    expect(hydratedPricingInputs(result.current)).toBeNull();
+    expect(isPricingReady(result.current)).toBe(false);
 
     act(() => mockedIncludeBlueprintCost.setState({ value: false, hydrated: true }));
-    expect(hydratedPricingInputs(result.current)).toMatchObject({
-      hydrated: true,
-      assumedMe: 4,
-      includeBlueprintCost: false,
-    });
+    expect(isPricingReady(result.current)).toBe(true);
+    expect(result.current).toMatchObject({ assumedMe: 4, includeBlueprintCost: false });
   });
 
   it('still reports the current (default) values before hydration, for readers that do not wait', () => {

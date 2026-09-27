@@ -294,15 +294,16 @@ plans for it are wiped first (`handleOwnerHashChange`).
 `useIndustryWorkspace` loads blueprint catalog + owned blueprints +
 character skills, plus `features/industry/buildPlanPricingInputs` — the one
 module that hydrates the assumed-ME / include-blueprint-cost settings (and
-owns the "don't price until hydrated" gate, `hydratedPricingInputs`) and loads
+owns the "don't price until hydrated" gate, `isPricingReady`) and loads
 corp blueprints, per-Trade-Hub standings and BPC Sourcing rows;
 `pricingSourcesForHub` narrows them to one plan's hub. A new pricing input
 goes there and in `resolveBuildPlan`, nowhere else. Every view that prices a
 plan — `BuildPlanDetail` for the open plan, `useComparedBuildResults` for
-Compare / the index / every Group Rollup — takes those inputs, fetches its
-market snapshot (plus a second, reaction-activity one for a configured
-Reaction Location) and calls `features/industry/resolveBuildPlan`. Build
-Opportunities reads only `assumedMe` from the same module. That one pure call does all the wiring:
+Build Plan Compare / the index / every Group Rollup — takes those inputs,
+fetches its market snapshot (plus a second, reaction-activity one for a
+configured Reaction Location) and calls `features/industry/resolveBuildPlan`
+(Build Opportunities reads only `assumedMe` from the module and prices on its
+own). That one pure call does all the wiring:
 per-plan corp-blueprint merge (`includeCorpAssets`), Reaction Location, price
 basis, make-or-buy context, a fresh Blueprint Acquisition tier pool, the
 top-level acquisition (resolved ME/TE), and then `computeBuildPlan`, which

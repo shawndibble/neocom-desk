@@ -162,7 +162,7 @@ export function BuildGroupPanel({
   // The same inputs `useComparedBuildResults` prices these members against —
   // sub-builds unowned anywhere in the group must assume the same ME that
   // hook already quotes them at.
-  const { assumedMe, corpBlueprints: corpOwnedBlueprints } = pricingInputs;
+  const { assumedMe, corpBlueprints } = pricingInputs;
 
   // Depth is structural — which typeIDs have a recipe — and never
   // moves with a member's runs/ME/hub/sourcing edit, so this keys on the
@@ -176,7 +176,7 @@ export function BuildGroupPanel({
     () =>
       groupAutoBuildMaxDepth(
         plans,
-        { catalog, pi, ownedBlueprints, corpOwnedBlueprints, assumedMe },
+        { catalog, pi, ownedBlueprints, corpOwnedBlueprints: corpBlueprints, assumedMe },
         modifiers
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- autoBuildBlueprintSignature is the stable proxy for `plans`' structural identity; see comment above.
@@ -185,7 +185,7 @@ export function BuildGroupPanel({
       catalog,
       pi,
       ownedBlueprints,
-      corpOwnedBlueprints,
+      corpBlueprints,
       assumedMe,
       modifiers,
     ]

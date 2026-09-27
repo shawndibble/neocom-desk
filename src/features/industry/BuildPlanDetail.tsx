@@ -321,8 +321,8 @@ export function BuildPlanDetail({
   }, [blueprint, catalog, pi]);
 
   // Pre-fills a fresh plan's Reaction Location the first time Include
-  // Reactions is turned on for it (issue #698) — read here, at the top of
-  // the component, so it's in hand the moment `toggleIncludeReactions` needs it
+  // Reactions is turned on for it (issue #698) — read here, ahead of
+  // `toggleIncludeReactions`, so it's in hand the moment that needs it
   // rather than one render behind.
   const reactionFacilityDefaults = useReactionFacilityDefaults((state) => state.value);
   const hydrateReactionFacilityDefaults = hydrateActivityFacilityDefaults;

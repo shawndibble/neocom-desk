@@ -79,10 +79,11 @@ export function Industry() {
     buildGroups,
     buildGroupsHydrated,
     setBuildGroups,
-    assumedMe,
     assumedTe,
     facilityDefaults,
   } = workspace;
+  // Seeds a new plan's ME, the same assumption its sub-builds price at.
+  const { assumedMe } = pricingInputs;
   // Character-independent, loaded once — the market-wide scan's precomputed
   // input (issue #819). Not part of `useIndustryWorkspace`: only this index's
   // Opportunities tab needs it, never the plan/group detail pages.
@@ -501,7 +502,7 @@ export function Industry() {
                 facilityDefaults={facilityDefaults}
                 activeCharacterId={activeCharacterId}
                 ownedStockSnapshot={workspace.ownedStockSnapshot}
-                assumedMe={pricingInputs.assumedMe}
+                assumedMe={assumedMe}
                 onAddToCompare={(rows) => void handleAddOpportunitiesToCompare(rows)}
                 onAddToQuickbar={quickbar.add}
                 quickbarAvailable={quickbar.available}
