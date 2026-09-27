@@ -1,24 +1,26 @@
 import { Trans, useTranslation } from 'react-i18next';
 import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { Panel } from '@/components/ui';
-import { DISCORD_URL, ISSUES_URL } from '@/lib/links';
+import { DISCORD_URL, REPO_URL } from '@/lib/links';
 
 const PROSE = 'max-w-2xl space-y-3 text-sm';
 
 const LINK = inlineLinkClassName;
 
 /**
- * Settings' Help & Support tab: report a bug, join the Discord, thank the
- * translator/artist. Split out from the FAQ tab (which now answers only "what
- * does this app store") so a pilot looking for help finds one clearly-named
- * destination instead of scrolling past a data-storage explainer first.
+ * Settings' Help & Support tab: Discord is the one destination for bug
+ * reports, feature requests, and discussion — GitHub is for reading the
+ * source or contributing a pull request, not for filing anything. Split out
+ * from the FAQ tab (which now answers only "what does this app store") so a
+ * pilot looking for help finds one clearly-named destination instead of
+ * scrolling past a data-storage explainer first.
  */
 export function HelpPanel() {
   const { t } = useTranslation();
 
   return (
     <div className="space-y-4">
-      <Panel title={t('settings.help.reportTitle')}>
+      <Panel title={t('settings.help.communityTitle')}>
         <div className={PROSE}>
           {/*
             `Trans` rather than an interpolated string: the link sits mid-
@@ -26,22 +28,6 @@ export function HelpPanel() {
             around a bare <a> is exactly the shape that becomes untranslatable
             the moment a language wants the clause in a different order.
           */}
-          <p>
-            <Trans
-              i18nKey="settings.help.reportBody"
-              components={{
-                issues: (
-                  <a href={ISSUES_URL} target="_blank" rel="noopener noreferrer" className={LINK} />
-                ),
-              }}
-            />
-          </p>
-          <p className="text-xs text-text-dim">{t('settings.help.reportHint')}</p>
-        </div>
-      </Panel>
-
-      <Panel title={t('settings.help.communityTitle')}>
-        <div className={PROSE}>
           <p>
             <Trans
               i18nKey="settings.help.communityBody"
@@ -58,6 +44,22 @@ export function HelpPanel() {
             />
           </p>
           <p className="text-xs text-text-dim">{t('settings.help.communityHint')}</p>
+        </div>
+      </Panel>
+
+      <Panel title={t('settings.help.sourceTitle')}>
+        <div className={PROSE}>
+          <p>
+            <Trans
+              i18nKey="settings.help.sourceBody"
+              components={{
+                repo: (
+                  <a href={REPO_URL} target="_blank" rel="noopener noreferrer" className={LINK} />
+                ),
+              }}
+            />
+          </p>
+          <p className="text-xs text-text-dim">{t('settings.help.sourceHint')}</p>
         </div>
       </Panel>
 

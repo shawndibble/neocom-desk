@@ -5459,12 +5459,12 @@
       "helpPointer": "Looking to report a bug, ask for help, or join the community? See <help>Help & Support</help>."
     },
     "help": {
-      "reportTitle": "Where do I report a bug or ask for a feature?",
-      "reportBody": "On GitHub: <issues>github.com/shawndibble/neocom-desk/issues</issues>.",
-      "reportHint": "For bugs, please include steps to reproduce and what the expected outcome should be.",
-      "communityTitle": "Join the community",
-      "communityBody": "Chat with other pilots, ask questions, and get help fast on <discord>Discord</discord>.",
-      "communityHint": "For bugs and feature requests, GitHub is still the one place they get tracked — Discord is for everything else.",
+      "communityTitle": "Report a bug, ask for a feature, or just chat",
+      "communityBody": "All of it goes through <discord>Discord</discord> — bug reports, feature requests, questions, and general discussion with other pilots and the developer.",
+      "communityHint": "For bugs, please include steps to reproduce and what the expected outcome should be.",
+      "sourceTitle": "Want to see the code, or add something yourself?",
+      "sourceBody": "Neocom Desk is open source: <repo>github.com/shawndibble/neocom-desk</repo>. Read the code, or open a pull request.",
+      "sourceHint": "Not for bug reports or feature requests — see Discord above for those.",
       "thanksTitle": "Is there someone I can thank?",
       "thanksBody": "In Game Name: <pilot>Mero Otichoda</pilot>.",
       "thanksHint": "Donations are welcome and never expected — the app is free, open source, and stays that way."
