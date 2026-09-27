@@ -182,9 +182,9 @@ export async function loadOpenOrdersSnapshot(
 
   // Issue #1238: each order's own standing toward its station's NPC owner.
   // Resolved per order (not deduped per locationId) — `resolveLocationStandings`
-  // is itself cache-backed (NPC-station/owner-corp lookups), so a station
-  // shared by several orders costs nothing extra here, and this stays a
-  // plain fan-out rather than a second bookkeeping structure.
+  // is a pure snapshot lookup (issue #1675), so a station shared by several
+  // orders costs nothing extra here, and this stays a plain fan-out rather
+  // than a second bookkeeping structure.
   const standingsByOrder = new Map<number, ResolvedStandings>();
   const allOrders = openOrders.entries.flatMap((entry) =>
     entry.orders.map((order) => ({ characterId: entry.characterId, order }))
