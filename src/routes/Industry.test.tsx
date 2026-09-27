@@ -12,6 +12,7 @@ import { App } from '@/app/App';
 import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import { useBuildGroups } from '@/features/industry/buildGroups';
+import { useAssumedMe } from '@/features/industry/assumedMe';
 import { DEFAULT_TRADE_HUB } from '@/market/hubs';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 
@@ -612,5 +613,27 @@ describe('Industry: Opportunities "Add to Compare" for an alt-owned row (issue #
     const seeded = await db.buildPlans.toArray();
     expect(seeded).toHaveLength(2);
     for (const plan of seeded) expect(plan.characterId).toBe(CHAR_ID);
+  });
+});
+
+describe('Industry: Build Opportunities waits for the pricing-settings hydration gate (#2054)', () => {
+  it('shows a spinner in place of the panel, and never mounts it, until Assumed ME hydrates', async () => {
+    // Same reset shape `Settings.test.tsx`/`IndustryPlanPage.test.tsx` use to
+    // force a store back to its pre-hydration state — the workspace's own
+    // mount effect (`buildPlanPricingInputs.ts`) re-hydrates it once this
+    // page renders.
+    useAssumedMe.setState({ value: 0, hydrated: false });
+    window.history.pushState({}, '', '/industry/opportunities');
+    render(<App />);
+
+    expect(await screen.findByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Build Opportunities' })).not.toBeInTheDocument();
+
+    // Resolves on its own once the (real, Dexie-backed) hydrate() call
+    // settles — nothing in the test drives it forward by hand. Market-Wide
+    // Build Opportunities reads no pricing input, so it's unaffected and
+    // renders alongside the now-mounted panel.
+    expect(await screen.findByRole('heading', { name: 'Build Opportunities' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: "What's profitable to build" })).toBeInTheDocument();
   });
 });

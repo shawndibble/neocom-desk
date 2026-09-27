@@ -3,7 +3,8 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import '@/i18n';
-import { OrderDetailModal } from './OrderDetailModal';
+import { OrderDetailContent } from './OrderDetailModal';
+import { relistFees } from './orderDetailView';
 import type { OpenOrderRow, CharacterSkills } from './openOrdersModel';
 import type { RegionCompetition } from './orderCompetition';
 import type { PriceHistoryResult } from './priceHistory';
@@ -61,15 +62,22 @@ const BASE_ROW: OpenOrderRow = {
   frequentlyUndercut: false,
 };
 
-function renderModal(overrides: Partial<Parameters<typeof OrderDetailModal>[0]> = {}) {
+/**
+ * The content with a finished view. `skills` stands in for the order
+ * owner's skills in the snapshot: the ledger's fee lines are derived from
+ * them the way Order Detail's view assembly does.
+ */
+function renderModal({
+  skills,
+  ...overrides
+}: Partial<Parameters<typeof OrderDetailContent>[0]> & { skills?: CharacterSkills } = {}) {
   const onClose = vi.fn();
   const onCheckDeeper = vi.fn();
+  const row = overrides.row ?? BASE_ROW;
   render(
     <MemoryRouter>
-      <OrderDetailModal
-        open
-        row={BASE_ROW}
-        skills={undefined}
+      <OrderDetailContent
+        row={row}
         deep={null}
         loadingDeep={false}
         history={null}
@@ -79,6 +87,11 @@ function renderModal(overrides: Partial<Parameters<typeof OrderDetailModal>[0]> 
         stationNameFor={(locationId) =>
           locationId === 60003760 ? 'Jita IV - Moon 4' : `Station ${locationId}`
         }
+        structureMarket={null}
+        reprocessing={undefined}
+        hubs={undefined}
+        hubsFailed={false}
+        relistFees={relistFees(row, skills)}
         onCheckDeeper={onCheckDeeper}
         onClose={onClose}
         {...overrides}
@@ -139,10 +152,8 @@ describe('OrderDetailModal', () => {
   it('offers "Refresh system & region prices" when the deep check has not run, and hides it once loading', () => {
     const { rerender } = render(
       <MemoryRouter>
-        <OrderDetailModal
-          open
+        <OrderDetailContent
           row={BASE_ROW}
-          skills={undefined}
           deep={null}
           loadingDeep={false}
           history={null}
@@ -150,6 +161,11 @@ describe('OrderDetailModal', () => {
           stationsLoaded
           regionJumps={undefined}
           stationNameFor={() => 'Jita IV - Moon 4'}
+          structureMarket={null}
+          reprocessing={undefined}
+          hubs={undefined}
+          hubsFailed={false}
+          relistFees={null}
           onCheckDeeper={vi.fn()}
           onClose={vi.fn()}
         />
@@ -162,10 +178,8 @@ describe('OrderDetailModal', () => {
 
     rerender(
       <MemoryRouter>
-        <OrderDetailModal
-          open
+        <OrderDetailContent
           row={BASE_ROW}
-          skills={undefined}
           deep={null}
           loadingDeep
           history={null}
@@ -173,6 +187,11 @@ describe('OrderDetailModal', () => {
           stationsLoaded
           regionJumps={undefined}
           stationNameFor={() => 'Jita IV - Moon 4'}
+          structureMarket={null}
+          reprocessing={undefined}
+          hubs={undefined}
+          hubsFailed={false}
+          relistFees={null}
           onCheckDeeper={vi.fn()}
           onClose={vi.fn()}
         />
@@ -472,53 +491,6 @@ describe('OrderDetailModal', () => {
     // The displayed figure is that same break-even, rounded UP to a legal price.
     const relistShown = rowValue('Never sell below');
     expect(relistShown).toBe(roundPriceUp(floor.relist));
-  });
-
-  it('spreads the broker fee minimum across a large remaining quantity, not re-applied per unit', () => {
-    // Regression pin for #1224: the ledger used to re-derive broker fee via
-    // brokerFee(relist, ...), which re-clamped the per-unit relist price to
-    // its own 100 ISK minimum — silently reintroducing the per-unit bug in
-    // the fee ledger even after orderFloor() itself was fixed.
-    const skills: CharacterSkills = { ...SKILLS, accountingLevel: 5, brokerRelationsLevel: 5 };
-    const unitCost = 10;
-    const floor = orderFloor({
-      unitCost,
-      remainingQuantity: 10_000,
-      accountingLevel: skills.accountingLevel,
-      brokerRelationsLevel: skills.brokerRelationsLevel,
-      advancedBrokerRelationsLevel: skills.advancedBrokerRelationsLevel,
-    });
-    if (!floor) throw new Error('expected a floor for this fixture');
-
-    const row: OpenOrderRow = {
-      ...BASE_ROW,
-      floor,
-      volumeRemain: 10_000,
-      costBasis: {
-        unitCost,
-        runId: 'run-3',
-        runQuantity: 10_000,
-        materialCost: 90_000,
-        jobFee: 10_000,
-      },
-    };
-    renderModal({ row, skills });
-    expandAll();
-
-    const ledger = screen.getByText('Where that price comes from').closest('section')!;
-    const rowValue = (label: string) => {
-      const text = within(ledger).getByText(label).nextElementSibling?.textContent ?? '';
-      return Number(text.replace(/[^0-9.-]/g, ''));
-    };
-
-    const costPerUnit = rowValue('Cost per unit');
-    const salesTax = rowValue('Sales tax');
-    const brokerFeeValue = rowValue('Broker fee (relist discount applied)');
-
-    // The whole point of the fix: the fee ledger must not show ~100 ISK.
-    expect(brokerFeeValue).toBeLessThan(5);
-    expect(costPerUnit + salesTax + brokerFeeValue).toBeCloseTo(floor.relist, 1);
-    expect(rowValue('Never sell below')).toBe(roundPriceUp(floor.relist));
   });
 
   it('closes via the modal header close button', async () => {

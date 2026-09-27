@@ -67,8 +67,9 @@ interface OpportunitiesPanelProps {
   ownedStockSnapshot: OwnedStockSnapshot;
   /**
    * ME to quote an unowned sub-build at — `buildPlanPricingInputs.ts`'s
-   * `assumedMe`, the one pricing input this panel reads (#2055), read without
-   * waiting on the settings' hydration gate (#2054).
+   * `assumedMe`, the one pricing input this panel reads (#2055).
+   * `Industry.tsx` doesn't mount this panel until `pricingInputs.hydrated`,
+   * so this is always the pilot's own setting, never the default (#2054).
    */
   assumedMe: number;
   onAddToCompare: (rows: readonly OpportunityRow[]) => void;

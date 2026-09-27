@@ -9,9 +9,13 @@ import { OpenOrdersPanel } from './OpenOrdersPanel';
 import { fakeItemActions, FakeItemActions } from './__fixtures__/itemActions';
 import { loadAllCharactersOpenOrders, type OpenOrdersSnapshot } from './openOrdersData';
 import { loadOrderCostBases, type ProductionRunBasis } from './orderCostBasis';
-import { loadStationBestPrices, loadRegionCompetition, loadJumpsBetween } from './orderCompetition';
+import { loadStationBestPrices } from './orderCompetition';
 import { stationPriceKey } from './stationPriceKey';
-import { loadPriceHistory } from './priceHistory';
+import {
+  fakeOrderDetailLoaders,
+  withOrderDetailLoaders,
+  type FakeOrderDetailLoaders,
+} from './__fixtures__/orderDetailLoaders';
 import { loadTypeNames } from '@/features/character/typeNames';
 import { loadNpcStations } from '@/sde/loadMarketSde';
 import { loadCorrectedSkills, type CorrectedSkills } from '@/features/skills/correctedSkills';
@@ -27,12 +31,12 @@ vi.mock('./orderCostBasis', () => ({
   loadOrderCostBases: vi.fn(),
   loadWalletOrderCostBases: vi.fn(async () => ({ bases: new Map(), gaps: new Map() })),
 }));
-vi.mock('./orderCompetition', () => ({
+// The snapshot's own station-price tier. Order Detail's fetches go through
+// its fake loaders instead (`loaders` below).
+vi.mock('./orderCompetition', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./orderCompetition')>()),
   loadStationBestPrices: vi.fn(),
-  loadRegionCompetition: vi.fn(),
-  loadJumpsBetween: vi.fn(),
 }));
-vi.mock('./priceHistory', () => ({ loadPriceHistory: vi.fn() }));
 vi.mock('@/features/character/typeNames', () => ({ loadTypeNames: vi.fn() }));
 vi.mock('@/sde/loadMarketSde', () => ({ loadNpcStations: vi.fn() }));
 vi.mock('@/features/skills/correctedSkills', () => ({ loadCorrectedSkills: vi.fn() }));
@@ -42,9 +46,6 @@ vi.mock('@/app/loginFlow', () => ({ beginEveLogin: vi.fn() }));
 const mockedLoadAll = vi.mocked(loadAllCharactersOpenOrders);
 const mockedCostBases = vi.mocked(loadOrderCostBases);
 const mockedStationPrices = vi.mocked(loadStationBestPrices);
-const mockedRegionCompetition = vi.mocked(loadRegionCompetition);
-const mockedJumps = vi.mocked(loadJumpsBetween);
-const mockedPriceHistory = vi.mocked(loadPriceHistory);
 const mockedTypeNames = vi.mocked(loadTypeNames);
 const mockedNpcStations = vi.mocked(loadNpcStations);
 const mockedSkills = vi.mocked(loadCorrectedSkills);
@@ -129,12 +130,14 @@ function snapshot(
 }
 
 const actions = fakeItemActions();
+/** Order Detail's fetches, fresh per test: region books and price history never resolve unless a test says so. */
+let loaders: FakeOrderDetailLoaders;
 
 function renderPanel(initialEntry = '/market/orders') {
   return render(
     <MemoryRouter initialEntries={[initialEntry]}>
       <FakeItemActions actions={actions}>
-        <OpenOrdersPanel />
+        {withOrderDetailLoaders(<OpenOrdersPanel />, loaders)}
       </FakeItemActions>
     </MemoryRouter>
   );
@@ -151,7 +154,7 @@ function renderPanelWithLocation(initialEntry: string) {
     <MemoryRouter initialEntries={[initialEntry]}>
       <CurrentSearch />
       <FakeItemActions actions={actions}>
-        <OpenOrdersPanel />
+        {withOrderDetailLoaders(<OpenOrdersPanel />, loaders)}
       </FakeItemActions>
     </MemoryRouter>
   );
@@ -173,11 +176,9 @@ beforeEach(() => {
     ])
   );
   // Deep checks (and price history, for the "sells out in" chip) are
-  // on-demand only — default to "never resolves" so a test that doesn't
-  // care about either tier never has to wait on them.
-  mockedRegionCompetition.mockImplementation(() => new Promise(() => {}));
-  mockedPriceHistory.mockImplementation(() => new Promise(() => {}));
-  mockedJumps.mockResolvedValue({ kind: 'unknown', reason: 'noRoute' });
+  // on-demand only — the fake never resolves either, so a test that doesn't
+  // care about them never has to wait on them.
+  loaders = fakeOrderDetailLoaders();
 });
 
 describe('OpenOrdersPanel', () => {
@@ -738,7 +739,7 @@ describe('OpenOrdersPanel', () => {
       ])
     );
     mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
-    mockedPriceHistory.mockResolvedValue({
+    loaders.priceHistory.mockResolvedValue({
       points: Array.from({ length: 3 }, (_, i) =>
         historyPoint({
           date: new Date(Date.now() - (i + 1) * 86_400_000).toISOString().slice(0, 10),
@@ -754,7 +755,7 @@ describe('OpenOrdersPanel', () => {
     await user.click(within(row).getByRole('button', { name: 'Details' }));
 
     const dialog = await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
-    expect(mockedPriceHistory).toHaveBeenCalledWith(REGION, 34);
+    expect(loaders.priceHistory).toHaveBeenCalledWith(REGION, 34);
     // 300 units / 30 days = 10/day; BELOW_FLOOR_ORDER's volumeRemain is 10 ->
     // 1 day, with no deep book fetched yet so myShare defaults to 1.
     await waitFor(() => expect(within(dialog).getByText('1d')).toBeInTheDocument());
@@ -778,7 +779,7 @@ describe('OpenOrdersPanel', () => {
     // The region book comes back with no orders at all — my own order can't
     // be found in it, so `system` cannot be resolved (must read as "not
     // checked"), while `region` was genuinely checked and found clean.
-    mockedRegionCompetition.mockResolvedValue({
+    loaders.regionCompetition.mockResolvedValue({
       competitors: [],
       fetchedAt: Date.now(),
       truncated: false,
@@ -1011,7 +1012,7 @@ describe('OpenOrdersPanel', () => {
       );
       mockedCostBases.mockResolvedValue(new Map());
       // Never resolves, so the in-flight call count is directly observable.
-      mockedRegionCompetition.mockImplementation(() => new Promise(() => {}));
+      loaders.regionCompetition.mockImplementation(() => new Promise(() => {}));
 
       renderPanel();
       const group = await screen.findByTestId('order-group-expiringOrStale');
@@ -1021,7 +1022,7 @@ describe('OpenOrdersPanel', () => {
         within(group).getByRole('button', { name: 'Refresh system & region prices' })
       );
 
-      expect(mockedRegionCompetition).toHaveBeenCalledTimes(ESI_FANOUT_CONCURRENCY);
+      expect(loaders.regionCompetition).toHaveBeenCalledTimes(ESI_FANOUT_CONCURRENCY);
     });
 
     it('does not double-fetch an item already checked from its own row', async () => {
@@ -1039,14 +1040,14 @@ describe('OpenOrdersPanel', () => {
         ])
       );
       mockedCostBases.mockResolvedValue(new Map([[101, costBasis(600)]]));
-      mockedRegionCompetition.mockImplementation(() => new Promise(() => {}));
+      loaders.regionCompetition.mockImplementation(() => new Promise(() => {}));
 
       renderPanel();
       const row = await screen.findByRole('row', { name: /Tritanium/ });
       await user.click(within(row).getByRole('button', { name: 'Details' }));
       await screen.findByRole('dialog', { name: 'Alpha · Tritanium' });
       await user.click(screen.getByRole('button', { name: 'Close' }));
-      expect(mockedRegionCompetition).toHaveBeenCalledTimes(1);
+      expect(loaders.regionCompetition).toHaveBeenCalledTimes(1);
 
       const group = screen.getByTestId('order-group-belowFloor');
       await user.click(
@@ -1054,7 +1055,7 @@ describe('OpenOrdersPanel', () => {
       );
       // Still in flight from opening the row's own detail view — the group
       // check must not fire a second request for the same item.
-      expect(mockedRegionCompetition).toHaveBeenCalledTimes(1);
+      expect(loaders.regionCompetition).toHaveBeenCalledTimes(1);
     });
   });
 });

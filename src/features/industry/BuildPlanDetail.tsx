@@ -284,9 +284,9 @@ export function BuildPlanDetail({
   // standing toward this hub's NPC owner (issue #1238, for the broker
   // fee/break-even price) and BPC Sourcing offers in this hub's region (issue
   // #838; none when BPC Sourcing isn't synced, so the price cascade falls
-  // through to the BPO's own hub sell price). Read without waiting on the
-  // settings' hydration gate — this page has always priced at the settings'
-  // defaults until they load (#2054).
+  // through to the BPO's own hub sell price). `IndustryPlanPage` doesn't
+  // mount this component until `pricingInputs.hydrated`, so these are always
+  // the pilot's own settings, never the defaults (#2054).
   const { assumedMe, includeBlueprintCost, corpBlueprints, standing, bpcOffersFor } =
     pricingSourcesForHub(pricingInputs, hub);
   const facilityPreset = FACILITY_PRESETS[plan.facility];

@@ -4,10 +4,11 @@
  * cheaper and where, and — for a sell order — the cost-basis ledger the
  * floor came from.
  *
- * Kept dumb on purpose: every prop is already-loaded data plus loading flags.
- * `OpenOrdersPanel` owns every fetch (`ensureDeepChecked`, jump lookups,
- * price history for the "sells out in" chip) — this component only renders
- * what it is handed and asks for more via `onCheckDeeper`.
+ * `OrderDetailModal` takes the order, the page snapshot and the page's one
+ * Order Detail (`useOrderDetail`), which owns every fetch behind it;
+ * `useOpenOrderDetail` asks for what this order needs and assembles the
+ * view (`orderDetailView.ts`). `OrderDetailContent` below only renders that
+ * finished view and asks for more via `onCheckDeeper`.
  *
  * The station/system/region three-way state a caller must not collapse:
  * - Station is always eager (`stationChecked` false only means the Fuzzwork
@@ -26,14 +27,13 @@ import { cx } from '@/lib/cx';
 import { buttonClassName } from '@/components/ui/buttonClassName';
 import { Link } from 'react-router-dom';
 import { formatIsk } from '@/lib/isk';
-import { salesTax } from '@/engine/industry/fees';
 import type { JumpsAwayResult } from '@/engine/jumpsAway';
 import { JumpsAwayText } from '@/features/character/assetBrowserRows';
 import type { UndercutRival, UndercutScope } from '@/engine/market/undercut';
 import { sellThrough, type SellThrough } from '@/engine/market/orderHealth';
 import { filterPriceHistoryRange } from '@/engine/market/priceHistory';
 import { useIsPhone } from '@/lib/useIsPhone';
-import type { CharacterSkills, OpenOrderRow } from './openOrdersModel';
+import type { OpenOrderRow } from './openOrdersModel';
 import type { RegionCompetition, StructureCompetition } from './orderCompetition';
 import type { PriceHistoryResult } from './priceHistory';
 import { OrderProblemBadge } from './OrderProblemBadge';
@@ -42,13 +42,9 @@ import { OrderRowSummaryText } from './OrderRowSummaryText';
 import { orderVerdict, type OrderVerdictKind } from './orderVerdict';
 import { orderRowSummary } from './orderRowSummary';
 import { orderNextAction } from './orderNextAction';
-import {
-  orderExits,
-  hubHaulGaps,
-  type HubBuyPrice,
-  type OrderExitKind,
-  type ReprocessingInput,
-} from './orderExits';
+import { orderExits, hubHaulGaps, type OrderExitKind } from './orderExits';
+import { useOpenOrderDetail, type OrderDetail } from './useOrderDetail';
+import type { OrderDetailSnapshot, OrderDetailView } from './orderDetailView';
 import { BASE_STATION_REPROCESSING_RATE } from '@/engine/industry/reprocessing';
 import {
   appliedRefiningImplantPct,
@@ -60,53 +56,29 @@ import { MarketItemLink } from './MarketItemLink';
 import { ImplantsAssumedNote } from '@/features/character/ImplantsAssumedNote';
 
 export interface OrderDetailModalProps {
-  open: boolean;
   row: OpenOrderRow;
-  /** Undefined only if the character's own skills failed to load — the ledger still renders, just without tax/broker lines. */
-  skills: CharacterSkills | undefined;
-  /** Null: not fetched yet (or the fetch failed and hasn't been retried). */
-  deep: RegionCompetition | null;
-  loadingDeep: boolean;
+  snapshot: OrderDetailSnapshot;
   /**
-   * Null: not fetched yet (or the fetch failed and hasn't been retried) —
-   * renders the same honest "can't tell yet" as no history at all, since
-   * neither case can support a number.
+   * The page's one Order Detail. Page-level rather than the modal's own:
+   * its caches outlive this modal (which remounts per order and unmounts on
+   * close, and reopening an order must not refetch), and its region and
+   * structure books also reclassify the worklist's rows.
    */
-  history: PriceHistoryResult | null;
-  /** Whether the cheap station-price tier actually returned an aggregate for this row's station+item. */
-  stationChecked: boolean;
-  /**
-   * Whether the NPC-station lookup itself loaded. False (e.g. a first
-   * offline visit — that file is deliberately outside the install precache)
-   * must read as "not checked" for station/system, never as the false claim
-   * that this order sits at a player structure.
-   */
-  stationsLoaded: boolean;
-  /** Undefined while not yet requested/resolved. */
-  regionJumps: JumpsAwayResult | undefined;
-  /** The refine comparison, once its yield and material prices have loaded. Undefined keeps the row greyed as "not built for this item yet". */
-  reprocessing?: ReprocessingInput;
-  /**
-   * What each trade hub pays for this item, once the aggregates land.
-   * Undefined until then — distinct from an empty list, which is the real
-   * answer that no hub bids at all.
-   */
-  hubs?: readonly HubBuyPrice[];
-  /** The hub lookup failed. Says so, rather than leaving "checking…" standing forever. */
-  hubsFailed?: boolean;
-  /** Resolves a rival's location to a name, so the three scopes can be told apart when they quote the same seller. Returns null for a player structure. */
-  stationNameFor: (locationId: number) => string | null;
-  /**
-   * This order's own structure's market book (issue #538), when this is a
-   * player structure and that book has been fetched. Null for every reason
-   * the station scope can't answer here: not a structure, no fetch attempted
-   * yet, the `structureMarkets` scope isn't granted, or this character isn't
-   * on the structure's ACL — all render as the same "unavailable" row.
-   */
-  structureMarket?: StructureCompetition | null;
-  onCheckDeeper: () => void;
+  detail: OrderDetail;
   onClose: () => void;
 }
+
+/** The full breakdown of one open order. */
+export function OrderDetailModal({ row, snapshot, detail, onClose }: OrderDetailModalProps) {
+  const { view, checkDeeper } = useOpenOrderDetail(detail, row, snapshot);
+  return <OrderDetailContent row={row} {...view} onCheckDeeper={checkDeeper} onClose={onClose} />;
+}
+
+export type OrderDetailContentProps = OrderDetailView & {
+  row: OpenOrderRow;
+  onCheckDeeper: () => void;
+  onClose: () => void;
+};
 
 type ScopeState =
   | { kind: 'unavailable' }
@@ -428,10 +400,9 @@ function outbidSuggestion(row: OpenOrderRow): number | null {
   return summary?.kind === 'outbid' ? summary.suggestedPrice : null;
 }
 
-export function OrderDetailModal({
-  open,
+/** The modal itself, rendering a finished view — `OrderDetailModal` is what a page mounts. */
+export function OrderDetailContent({
   row,
-  skills,
   deep,
   loadingDeep,
   history,
@@ -440,12 +411,13 @@ export function OrderDetailModal({
   regionJumps,
   reprocessing,
   hubs,
-  hubsFailed = false,
+  hubsFailed,
   stationNameFor,
-  structureMarket = null,
+  structureMarket,
+  relistFees,
   onCheckDeeper,
   onClose,
-}: OrderDetailModalProps) {
+}: OrderDetailContentProps) {
   const { t } = useTranslation();
   const isPhone = useIsPhone();
   // Everything folds by default; the modal remounts per row (`OpenOrdersPanel`
@@ -622,12 +594,7 @@ export function OrderDetailModal({
   );
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={`${row.characterName} · ${row.typeName}`}
-      placement="wide"
-    >
+    <Modal open onClose={onClose} title={`${row.characterName} · ${row.typeName}`} placement="wide">
       <div className="space-y-3">
         {/*
           The call and the numbers behind it, side by side on a wide screen
@@ -1013,38 +980,19 @@ export function OrderDetailModal({
                         </div>
                       )}
                       {/*
-                      Rendered as ISK off `floor.relist`, not as a bare
-                      percentage: `unitCost + salesTax(relist) +
-                      brokerFeePerUnit === relist` by construction
-                      (`relistBreakEvenPrice` solves for exactly that
-                      revenue), including its 100 ISK minimum-broker-fee
-                      floor — which a percentage-of-unitCost readout would
-                      silently miss. This is what makes the ledger's lines
-                      actually sum to the floor shown below, so gated on
-                      `row.floor` (not `skills` alone): there is no relist
-                      price to read the fee off without it.
-
-                      Broker fee is read as the ledger's remainder
-                      (`relist - unitCost - salesTax`), not a re-derived
-                      `relistFee(relist, relist, 1, ...)`: `relist` is
-                      already a PER-UNIT price, and re-solving the fee at
-                      quantity 1 would re-apply its own 100 ISK minimum to
-                      that single unit, silently reintroducing the per-unit
-                      minimum this floor removes for large remaining-quantity
-                      stacks. The remainder already carries whatever discount
-                      `relistBreakEvenPrice` applied when it solved `relist`
-                      (Advanced Broker Relations' Relist Discount), so this
-                      readout is correct with no separate fee call needed.
-                    */}
-                      {skills && row.floor && (
+                        The two fee lines sum with cost per unit to exactly
+                        the relist floor below — `relistFees` in
+                        `orderDetailView.ts` says why they are read that way.
+                      */}
+                      {relistFees && (
                         <>
                           <LedgerRow
                             label={t('industry.salesTax')}
-                            value={`${formatIsk(salesTax(row.floor.relist, skills.accountingLevel), 2)} ISK`}
+                            value={`${formatIsk(relistFees.salesTax, 2)} ISK`}
                           />
                           <LedgerRow
                             label={t('market.orders.relistBrokerFee')}
-                            value={`${formatIsk(row.floor.relist - row.costBasis.unitCost - salesTax(row.floor.relist, skills.accountingLevel), 2)} ISK`}
+                            value={`${formatIsk(relistFees.brokerFee, 2)} ISK`}
                           />
                         </>
                       )}
