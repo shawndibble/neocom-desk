@@ -38,21 +38,28 @@ export function reportBootStallOnce(afterMs: number, gate: BootGate): void {
 /**
  * Report how long a *reported* stall took to clear, once the gate that
  * stalled it finally resolves (or `BootScreen` unmounts for any other
- * reason). Distinguishes a boot that was merely slow — resolves shortly
- * after the stall report — from one still stuck when the user gives up and
- * taps reload, which never calls this at all.
+ * reason). Distinguishes a boot that was merely slow — resolves on its own
+ * shortly after the stall report, `recoveryTapped: false` — from one that
+ * was still stuck when the user gave up and tapped reload first.
+ *
+ * That second case still reaches here rather than never firing at all:
+ * `recoverFromStalledBoot` awaits up to two bounded steps before it actually
+ * reloads the page, and the gate can resolve on its own during that window
+ * (its Dexie read finally landing) — the mount stays alive long enough for
+ * this cleanup to run before the reload cuts it off. `recoveryTapped: true`
+ * marks that race.
  *
  * A no-op when no stall was ever reported: most unmounts are the ordinary
  * "gate resolved before ten seconds" case, and reporting on all of them
  * would swamp the one signal this exists for.
  */
-export function reportBootStallResolved(): void {
+export function reportBootStallResolved(recoveryTapped: boolean): void {
   if (reportedAt === undefined) return;
   const resolvedAfterMs = Date.now() - reportedAt;
   reportedAt = undefined;
   captureMessage('Boot stall resolved', {
     level: 'info',
     tags: { subsystem: 'boot' },
-    extra: { resolvedAfterMs },
+    extra: { resolvedAfterMs, recoveryTapped },
   });
 }

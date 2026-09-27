@@ -32,7 +32,7 @@ describe('reportBootStallOnce', () => {
 describe('reportBootStallResolved', () => {
   it('does nothing when no stall was ever reported', async () => {
     const { reportBootStallResolved } = await import('./bootStallReport');
-    reportBootStallResolved();
+    reportBootStallResolved(false);
     expect(captureMessage).not.toHaveBeenCalled();
   });
 
@@ -42,21 +42,32 @@ describe('reportBootStallResolved', () => {
     reportBootStallOnce(10_000, 'require-character');
     captureMessage.mockClear();
     vi.advanceTimersByTime(1_500);
-    reportBootStallResolved();
+    reportBootStallResolved(false);
     expect(captureMessage).toHaveBeenCalledWith('Boot stall resolved', {
       level: 'info',
       tags: { subsystem: 'boot' },
-      extra: { resolvedAfterMs: 1_500 },
+      extra: { resolvedAfterMs: 1_500, recoveryTapped: false },
     });
     vi.useRealTimers();
+  });
+
+  it('records whether the reload button had already been tapped when the gate cleared', async () => {
+    const { reportBootStallOnce, reportBootStallResolved } = await import('./bootStallReport');
+    reportBootStallOnce(10_000, 'require-character');
+    captureMessage.mockClear();
+    reportBootStallResolved(true);
+    expect(captureMessage).toHaveBeenCalledWith(
+      'Boot stall resolved',
+      expect.objectContaining({ extra: expect.objectContaining({ recoveryTapped: true }) })
+    );
   });
 
   it('reports the resolution only once, even called repeatedly', async () => {
     const { reportBootStallOnce, reportBootStallResolved } = await import('./bootStallReport');
     reportBootStallOnce(10_000, 'root');
     captureMessage.mockClear();
-    reportBootStallResolved();
-    reportBootStallResolved();
+    reportBootStallResolved(false);
+    reportBootStallResolved(false);
     expect(captureMessage).toHaveBeenCalledOnce();
   });
 });

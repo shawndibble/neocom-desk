@@ -91,7 +91,21 @@ describe('BootScreen', () => {
       vi.advanceTimersByTime(BOOT_STALL_MS);
     });
     unmount();
-    expect(reportBootStallResolved).toHaveBeenCalledOnce();
+    expect(reportBootStallResolved).toHaveBeenCalledWith(false);
+  });
+
+  it('reports the reload button as already tapped if the gate clears while recovery is in flight', () => {
+    const { unmount } = render(<BootScreen gate="require-character" />);
+    act(() => {
+      vi.advanceTimersByTime(BOOT_STALL_MS);
+    });
+    act(() => {
+      screen.getByRole('button', { name: 'Reload' }).click();
+    });
+    // The gate resolving on its own mid-recovery — recoverFromStalledBoot is
+    // mocked, so nothing here actually reloads the page.
+    unmount();
+    expect(reportBootStallResolved).toHaveBeenCalledWith(true);
   });
 });
 

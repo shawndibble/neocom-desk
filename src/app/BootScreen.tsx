@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, LogoMark, Spinner } from '@/components/ui';
 import { recoverFromStalledBoot } from './bootRecovery';
@@ -25,6 +25,10 @@ export function BootScreen({ gate }: { gate: BootGate }) {
   const { t } = useTranslation();
   const [stalled, setStalled] = useState(false);
   const [recovering, setRecovering] = useState(false);
+  // Mirrors `recovering` for the effect cleanup below, which closes over
+  // state from the render that created it (mount, `recovering` still
+  // `false`) — a ref reads the current value instead of that stale one.
+  const recoveringRef = useRef(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -35,7 +39,7 @@ export function BootScreen({ gate }: { gate: BootGate }) {
       clearTimeout(timer);
       // No-ops unless the timer above already reported a stall — most
       // unmounts are the ordinary "resolved before ten seconds" case.
-      reportBootStallResolved();
+      reportBootStallResolved(recoveringRef.current);
     };
   }, [gate]);
 
@@ -66,6 +70,7 @@ export function BootScreen({ gate }: { gate: BootGate }) {
             size="sm"
             disabled={recovering}
             onClick={() => {
+              recoveringRef.current = true;
               setRecovering(true);
               void recoverFromStalledBoot();
             }}
