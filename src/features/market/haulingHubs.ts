@@ -13,3 +13,23 @@ export function haulingHubDefaults(hubId: TradeHub['id']): {
 } {
   return { from: hubId, to: hubId === 'jita' ? 'amarr' : 'jita' };
 }
+
+export interface HaulingLane {
+  from: TradeHub['id'];
+  to: TradeHub['id'];
+}
+
+/**
+ * The URL patch for picking `id` at one end of the lane. Picking the hub the
+ * other end already holds swaps the two: To's default follows the pilot's
+ * Trade Hub, so a From pick can otherwise land on it and leave a same-hub
+ * dead end the pilot never chose.
+ */
+export function pickHaulingHub(
+  lane: HaulingLane,
+  end: 'from' | 'to',
+  id: TradeHub['id']
+): Partial<HaulingLane> {
+  const other = end === 'from' ? 'to' : 'from';
+  return lane[other] === id ? { [end]: id, [other]: lane[end] } : { [end]: id };
+}

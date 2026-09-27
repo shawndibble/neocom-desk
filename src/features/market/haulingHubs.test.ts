@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { haulingHubDefaults } from './haulingHubs';
+import { haulingHubDefaults, pickHaulingHub } from './haulingHubs';
 
 describe('haulingHubDefaults', () => {
   it('keeps the original Jita to Amarr lane for a Jita pilot', () => {
@@ -12,5 +12,22 @@ describe('haulingHubDefaults', () => {
 
   it('never picks the same hub at both ends', () => {
     expect(haulingHubDefaults('amarr')).toEqual({ from: 'amarr', to: 'jita' });
+  });
+});
+
+describe('pickHaulingHub', () => {
+  it('changes just the end that was picked', () => {
+    expect(pickHaulingHub({ from: 'jita', to: 'amarr' }, 'to', 'rens')).toEqual({ to: 'rens' });
+  });
+
+  it('swaps the lane when the pick is the hub the other end holds', () => {
+    expect(pickHaulingHub({ from: 'amarr', to: 'jita' }, 'from', 'jita')).toEqual({
+      from: 'jita',
+      to: 'amarr',
+    });
+    expect(pickHaulingHub({ from: 'jita', to: 'amarr' }, 'to', 'jita')).toEqual({
+      to: 'jita',
+      from: 'amarr',
+    });
   });
 });
