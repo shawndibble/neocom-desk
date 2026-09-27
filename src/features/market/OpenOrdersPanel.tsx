@@ -1126,12 +1126,20 @@ export function OpenOrdersPanel({
             </div>
           )}
 
-          <p className="px-3 pt-2 text-xs text-text-dim">
-            {t('market.orders.filter.matchCount', {
-              count: visibleRows.length,
-              total: allRows.length,
-            })}
-          </p>
+          {/*
+            Rows hidden only by the Healthy fold are not a failed match: when
+            everything that matches is folded away, "0 of N orders match"
+            would read as a broken filter, so the count steps aside and the
+            folded Healthy group speaks for itself.
+          */}
+          {(visibleRows.length > 0 || groupingRows.length === 0) && (
+            <p className="px-3 pt-2 text-xs text-text-dim">
+              {t('market.orders.filter.matchCount', {
+                count: visibleRows.length,
+                total: allRows.length,
+              })}
+            </p>
+          )}
 
           {groups.length === 0 ? (
             <EmptyState title={t('orders.noResults')} className="py-8" />
@@ -1218,13 +1226,7 @@ export function OpenOrdersPanel({
                       })}
                     </p>
                   </div>
-                  {folded ? (
-                    group.problem === 'healthy' && (
-                      <p className="px-3 py-2 text-xs text-text-dim">
-                        {t('market.orders.group.healthyHint')}
-                      </p>
-                    )
-                  ) : isPhone ? (
+                  {folded ? null : isPhone ? (
                     <OpenOrdersList
                       rows={group.rows}
                       label={`${groupTitle} · ${group.rows.length}`}
