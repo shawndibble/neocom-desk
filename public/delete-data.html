@@ -48,12 +48,12 @@
   <body>
     <main>
       <h1>Delete Your Data — Neocom Desk</h1>
-      <p class="updated">Last updated: September 22, 2026</p>
+      <p class="updated">Last updated: September 26, 2026</p>
 
       <p>
         Neocom Desk has no separate account or password — you sign in with your EVE Online character
-        through CCP's own login. Removing a character from the app is how you delete its data, both
-        an account deletion and a data deletion at once.
+        through CCP's own login. Removing a character from the app deletes its data from your
+        device; its synced copy on the server is deleted automatically after 90 days without a sync.
       </p>
 
       <h2>How to delete a character's data</h2>
@@ -74,29 +74,23 @@
           quickbar, and cached game data are deleted from local storage right away.
         </li>
         <li>
-          <strong>On the sync server, immediately if possible:</strong> if a session can still be
-          started as that character, its synced plans, build plans, quickbar, and settings are
-          deleted from Firebase in the same action.
-        </li>
-        <li>
-          <strong>On the sync server, deferred:</strong> if a session can't be re-established (for
-          example, the character's login is already expired), the synced data is deleted
-          automatically the next time you sign in as that character. There is no other retention
-          period beyond that.
+          <strong>On the sync server, after 90 days:</strong> if you use sync, that character's
+          synced plans, build plans, quickbar, and settings stay on Firebase so that adding the
+          character back restores them. They are deleted automatically once no device has synced
+          that character for 90 days. There is no other retention period beyond that.
         </li>
       </ul>
 
       <h2>Removing everything without opening the app</h2>
       <p>
         Uninstalling the app, or clearing its site data in your browser, immediately deletes all
-        locally cached data for every character. It does not delete synced data left on the server —
-        use the in-app removal above for that, or contact us below.
+        locally cached data for every character. Synced data left on the server is deleted after 90
+        days without a sync — or contact us below to have it removed sooner.
       </p>
 
       <h2>Need it done for you</h2>
       <p>
-        If a character's login can no longer be used to sign in and you want its synced data removed
-        manually, open an issue at
+        If you want a character's synced data removed before the 90 days are up, open an issue at
         <a href="https://github.com/shawndibble/neocom-desk/issues" target="_blank" rel="noopener"
           >github.com/shawndibble/neocom-desk/issues</a
         >
