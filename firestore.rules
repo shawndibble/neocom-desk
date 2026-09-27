@@ -119,8 +119,7 @@ service cloud.firestore {
       // #362), but the sync path does delete here: a row past the synced
       // window is purged outright rather than tombstoned (issue #582), which
       // is what keeps the collection bounded. `delete` is granted uid-only,
-      // like every sibling collection above — covering both that retention
-      // purge and characterPurge.ts clearing a dropped Character's rows.
+      // like every sibling collection above — covering that retention purge.
       match /notificationFeed/{occurrenceKey} {
         allow get: if isOwner() && hashMatches();
         allow list: if isOwner();

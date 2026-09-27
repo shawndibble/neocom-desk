@@ -187,12 +187,9 @@ export async function installEsiMock(page: Page): Promise<void> {
     if (path === `/characters/${CHARACTER_ID}/loyalty/points`) return json([]);
     if (/^\/loyalty\/stores\/\d+\/offers\/$/.test(path)) return json([]);
 
-    // Broker-fee standings resolution (issue #1238): `loadStationOwner`
-    // always reaches this endpoint — the SDE snapshot has no owning-
-    // corporation column — for any NPC station a fee calculation prices at.
-    // Owner is the fixture's own corp, so the follow-on `/corporations/{id}`
-    // lookup this triggers reuses the `CORPORATION_INFO` mock above rather
-    // than needing a dedicated NPC-corp fixture.
+    // Station lookup for a location the SDE snapshot cannot name. Broker-fee
+    // standings no longer come through here (issue #1675 — they read the
+    // snapshot's owner columns), so this only answers name/system lookups.
     const stationMatch = /^\/universe\/stations\/(\d+)$/.exec(path);
     if (stationMatch) {
       return json({
