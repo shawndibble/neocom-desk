@@ -2,17 +2,11 @@ import { describe, it, expect } from 'vitest';
 import type { AttributeName, Attributes, EngineSkill, PlanEntry } from '@/engine/types';
 import type { RemapSegment } from '@/engine/optimizer';
 import {
-  addMarker,
-  addMarkerAttributes,
   buildRows,
-  markerAttributesAfterEntryRemoval,
   markerRowId,
-  markersAfterEntryRemoval,
   markerStepIndices,
   normalizeMarkerAttributes,
   normalizeMarkers,
-  removeMarker,
-  removeMarkerAttributes,
   reorderRows,
   segmentsToMarkers,
 } from './markers';
@@ -127,35 +121,6 @@ describe('reorderRows', () => {
   });
 });
 
-describe('addMarker / removeMarker', () => {
-  it('adds a marker after the last entry, deduped', () => {
-    expect(addMarker([], 3)).toEqual([3]);
-    expect(addMarker([1], 3)).toEqual([1, 3]);
-    expect(addMarker([3], 3)).toEqual([3]);
-  });
-
-  it('removes the marker at the given normalized index', () => {
-    expect(removeMarker([3, 1], 0, 3)).toEqual([3]);
-    expect(removeMarker([3, 1], 1, 3)).toEqual([1]);
-  });
-});
-
-describe('markersAfterEntryRemoval', () => {
-  it('shifts markers after the removed entry left by one', () => {
-    // 3 entries, markers before entries[1] and after the last entry.
-    expect(markersAfterEntryRemoval([1, 3], 0, 3)).toEqual([0, 2]);
-    expect(markersAfterEntryRemoval([1, 3], 2, 3)).toEqual([1, 2]);
-  });
-
-  it('keeps markers at or before the removed index in place', () => {
-    expect(markersAfterEntryRemoval([1], 1, 3)).toEqual([1]);
-  });
-
-  it('is a clamped no-op when the entry was not found', () => {
-    expect(markersAfterEntryRemoval([1, 9], -1, 3)).toEqual([1, 3]);
-  });
-});
-
 describe('normalizeMarkerAttributes', () => {
   const A: Attributes = ATTRS;
   const B: Attributes = { ...ATTRS, perception: 20, willpower: 24 };
@@ -171,49 +136,6 @@ describe('normalizeMarkerAttributes', () => {
 
   it('keeps the first override when two positions collapse onto the same normalized slot', () => {
     expect(normalizeMarkerAttributes([3, 3], [A, B], 3)).toEqual([A]);
-  });
-});
-
-describe('addMarkerAttributes', () => {
-  const A: Attributes = ATTRS;
-
-  it('gives the newly appended marker no override', () => {
-    expect(addMarkerAttributes([], undefined, 3)).toEqual([null]);
-    expect(addMarkerAttributes([1], [A], 3)).toEqual([A, null]);
-  });
-
-  it('keeps the existing override when the append collides with a marker already at the last position', () => {
-    expect(addMarkerAttributes([3], [A], 3)).toEqual([A]);
-  });
-});
-
-describe('removeMarkerAttributes', () => {
-  const A: Attributes = ATTRS;
-  const B: Attributes = { ...ATTRS, perception: 20, willpower: 24 };
-
-  it('splices the override at the given normalized index, matching removeMarker', () => {
-    // normalizeMarkers([3, 1], 3) -> [1, 3], so attributes align to [B, A].
-    expect(removeMarkerAttributes([3, 1], [A, B], 0, 3)).toEqual([A]);
-    expect(removeMarkerAttributes([3, 1], [A, B], 1, 3)).toEqual([B]);
-  });
-});
-
-describe('markerAttributesAfterEntryRemoval', () => {
-  const A: Attributes = ATTRS;
-  const B: Attributes = { ...ATTRS, perception: 20, willpower: 24 };
-
-  it('shifts alongside markersAfterEntryRemoval', () => {
-    // Same fixture as markersAfterEntryRemoval's own test: markers before
-    // entries[1] and after the last entry, removing entry 0 shifts both left.
-    expect(markersAfterEntryRemoval([1, 3], 0, 3)).toEqual([0, 2]);
-    expect(markerAttributesAfterEntryRemoval([1, 3], [A, B], 0, 3)).toEqual([A, B]);
-  });
-
-  it('drops the later override when removing an entry collapses two markers into one', () => {
-    // Same repro as normalizeMarkers itself: markers [3, 4] both shift to 3
-    // once the entry at index 3 is removed, so they collapse into one row —
-    // the first marker's override has to be the one that survives.
-    expect(markerAttributesAfterEntryRemoval([3, 4], [A, B], 3, 5)).toEqual([A]);
   });
 });
 
