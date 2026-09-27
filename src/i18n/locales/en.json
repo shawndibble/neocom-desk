@@ -4710,7 +4710,7 @@
       "hauling": "Hauling"
     },
     "hauling": {
-      "title": "Hauling opportunities",
+      "title": "Hauling",
       "from": "From",
       "to": "To",
       "category": "Category",
@@ -4734,8 +4734,7 @@
       "bringRow": "Quantity of {{item}} to bring",
       "fillHold": "Fill my hold",
       "clearAll": "Clear all",
-      "copyMultibuy_one": "Copy multibuy ({{count}} item)",
-      "copyMultibuy_other": "Copy multibuy ({{count}} items)",
+      "copyMultibuy": "Copy Multibuy",
       "copied": "Multibuy list copied",
       "copyFailed": "Couldn't copy — copy the list below by hand.",
       "multibuyList": "Multibuy list",
@@ -4810,7 +4809,7 @@
       },
       "cargo": {
         "label": "Cargo space",
-        "choose": "Choose your ship",
+        "choose": "Your Ship",
         "chosen": "{{label}} · {{m3}}",
         "tip": "Choose your ship to size the load to your hold.",
         "tabShip": "Ship",

@@ -184,6 +184,13 @@ export function DataTableDenseCell({ children }: { children: ReactNode }) {
 export interface DataTableExpandableRow<T> {
   /** Content of the full-width row shown beneath an expanded row. */
   renderDetail: (row: T) => ReactNode;
+  /**
+   * Hides the chevron that otherwise marks a row as expandable — the row
+   * still opens on click, this only drops the visual affordance for a table
+   * whose caller has another cue for it (Hauling: the whole row reads as a
+   * disclosure already).
+   */
+  hideIcon?: boolean;
 }
 
 /**
@@ -652,7 +659,9 @@ export function DataTable<T>({
             const Chevron = expanded ? Icon.Expanded : Icon.Descend;
             return (
               <td role="cell" aria-hidden="true" className={cx(cellPadding, 'w-0 dt-disclosure')}>
-                <Chevron size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-dim" />
+                {!expandableRow.hideIcon && (
+                  <Chevron size={Icon.ICON_SIZE.sm} className="shrink-0 text-text-dim" />
+                )}
               </td>
             );
           })()}
