@@ -874,6 +874,19 @@ export interface JitaPriceSnapshotRecord {
   prices: SnapshotDay;
 }
 
+/**
+ * A saved answer of the Fitting editor's whole-catalogue hull check
+ * (`hullFitCache.ts`): which items go on one hull for one set of skills, as
+ * `[typeId, packed check]` pairs. Device-local and rebuildable — the key
+ * names everything it is valid for, so a stale row is simply never asked for.
+ */
+export interface HullFitCacheRecord {
+  key: string;
+  /** Epoch ms of the save; the oldest rows are pruned first. */
+  savedAt: number;
+  entries: [number, number][];
+}
+
 export const db = new Dexie('neocom') as Dexie & {
   characters: EntityTable<CharacterRecord, 'characterId'>;
   tokens: EntityTable<TokenRecord, 'characterId'>;
@@ -895,6 +908,7 @@ export const db = new Dexie('neocom') as Dexie & {
   mailDrafts: EntityTable<MailDraftRecord, 'id'>;
   miningLedgerHistory: EntityTable<MiningLedgerHistoryRecord, 'characterId'>;
   jitaPriceSnapshots: EntityTable<JitaPriceSnapshotRecord, 'date'>;
+  hullFitCache: EntityTable<HullFitCacheRecord, 'key'>;
 };
 
 /**
@@ -1230,4 +1244,31 @@ db.version(17).stores({
   miningLedgerHistory: 'characterId',
   jitaPriceSnapshots: 'date',
   fittings: 'id, characterId',
+});
+
+// Adds the saved hull check for the Fitting editor's module browser: additive,
+// device-local, and rebuildable from the engine.
+db.version(18).stores({
+  characters: 'characterId, corporationId',
+  tokens: 'characterId',
+  settings: 'key',
+  skillPlans: 'id, characterId',
+  esiCache: '[characterId+key]',
+  buildPlans: 'id, characterId',
+  quickbars: 'id, characterId',
+  stationPins: 'id, characterId, locationId',
+  planetRichness: 'id, characterId, planetId',
+  notificationFeed: 'id, characterId, firedAt',
+  productionRuns: 'id, characterId, buildPlanId',
+  productionSaleLinks: 'id, characterId, runId',
+  productionOrderWatches: 'id, characterId, runId',
+  payees: 'id, characterId',
+  miningTaxAssignments: 'id, characterId, [characterId+date+solarSystemId]',
+  bpcSearchWatches: null,
+  orderProblemSamples: 'orderId, characterId',
+  mailDrafts: 'id, characterId',
+  miningLedgerHistory: 'characterId',
+  jitaPriceSnapshots: 'date',
+  fittings: 'id, characterId',
+  hullFitCache: 'key, savedAt',
 });

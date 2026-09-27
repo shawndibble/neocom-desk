@@ -10,9 +10,13 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 
-const { version } = JSON.parse(
+const { version, dependencies } = JSON.parse(
   readFileSync(new URL('./package.json', import.meta.url), 'utf-8')
-) as { version: string };
+) as { version: string; dependencies: Record<string, string> };
+
+// The dogma engine and its SDE snapshot are pinned exactly and bumped together
+// (ADR 0016); anything saved from their answers is keyed on this.
+const dogmaPins = `${dependencies['@eveshipfit/dogma-engine']}+${dependencies['@eveshipfit/sde']}`;
 
 /**
  * The manifest description is the login hero's own subheading — one sentence,
@@ -196,7 +200,13 @@ export default defineConfig({
   server: { port: 5173, strictPort: true },
   // Read once at build/dev/test start, not hand-maintained in source — it is
   // the release tag Sentry reports, so it must match the shipped build.
-  define: { __APP_VERSION__: JSON.stringify(version) },
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+    __DOGMA_PINS__: JSON.stringify(dogmaPins),
+  },
+  // The hull-check worker imports the dogma engine (wasm-bindgen glue): ES
+  // modules, not the IIFE default, which cannot code-split its imports.
+  worker: { format: 'es' },
   plugins: [
     react(),
     tailwindcss(),

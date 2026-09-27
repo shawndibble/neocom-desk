@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
@@ -8,6 +8,8 @@ import { FittingAddPanel } from './FittingAddPanel';
 import { FittingItemActionsProvider } from './fittingItemActions';
 import { fakeItemActions } from './__fixtures__/itemActions';
 import type { FittingCatalogue } from './useFittingCatalogue';
+import { db } from '@/db';
+import { clearHullFitMemory } from './hullFitService';
 
 const checkCandidates = vi.fn();
 const checkCharges = vi.fn();
@@ -57,6 +59,12 @@ function renderPanel(overrides: Partial<Parameters<typeof FittingAddPanel>[0]> =
 }
 
 describe('FittingAddPanel', () => {
+  // The hull check is shared and saved per hull and skills; each test answers it afresh.
+  beforeEach(async () => {
+    clearHullFitMemory();
+    await db.hullFitCache.clear();
+  });
+
   it('before ship data: search still works, but Add is disabled and the note says why', async () => {
     const user = userEvent.setup();
     renderPanel({ engineReady: false });
