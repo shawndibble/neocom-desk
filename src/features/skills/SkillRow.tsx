@@ -42,9 +42,19 @@ export function SkillRow({
     );
 
   return (
-    <div className="flex items-center gap-3 text-xs">
-      <SkillStatusIcon status={status} />
-      <span className="flex-1 text-text">{name}</span>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      {/*
+       * The name gets the full row width to itself below `sm`: at phone
+       * widths there isn't room left over once the level bar and (often
+       * wide, e.g. "Add to Skill Plan") trailing control claim their own
+       * space, and a name squeezed into what's left wraps one character per
+       * line instead of at word boundaries. `sm:flex-1` restores the single
+       * inline row once there's width to share.
+       */}
+      <div className="flex min-w-0 basis-full items-center gap-3 sm:flex-1">
+        <SkillStatusIcon status={status} />
+        <span className="min-w-0 flex-1 text-text">{name}</span>
+      </div>
       {tags !== undefined && <span className="flex shrink-0 gap-1">{tags}</span>}
       <SkillBar level={currentLevel} />
       {timeLabel !== undefined && (
