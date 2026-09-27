@@ -16,7 +16,7 @@
 //   {"status":"claimed","number":83,"title":"...","slug":"item-tooltip-context-menu"}
 //   {"status":"no-ticket"}
 //   {"status":"lock-timeout"}
-//   {"status":"override-unavailable","reason":"assigned|in-progress|blocked|not-found|not-own-ticket"}
+//   {"status":"override-unavailable","reason":"not-found|not-own-ticket|assigned-or-in-progress|blocked"}
 // All progress chatter goes to stderr.
 
 import fs from 'node:fs';
@@ -102,10 +102,9 @@ if (!acquireLock()) {
   process.exit(0);
 }
 
-const currentUser = ghJson(['api', 'user']).login;
-
 let picked = null;
 try {
+  const currentUser = ghJson(['api', 'user']).login;
   const issues = ghJson([
     'issue',
     'list',
