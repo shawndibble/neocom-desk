@@ -27,13 +27,19 @@ export interface OrderDetailLoaders {
   stationBestPrices: typeof loadStationBestPrices;
 }
 
+/**
+ * Each entry looks its loader up only when called, never at import: a test
+ * elsewhere that mocks one of these modules without the export this reads
+ * must not fail merely for importing a page that mounts Order Detail.
+ */
 export const esiOrderDetailLoaders: OrderDetailLoaders = {
-  regionCompetition: loadRegionCompetition,
-  structureCompetition: loadStructureCompetition,
-  jumpsBetween: loadJumpsBetween,
-  priceHistory: loadPriceHistory,
-  reprocessing: loadReprocessing,
-  stationBestPrices: loadStationBestPrices,
+  regionCompetition: (regionId, typeId) => loadRegionCompetition(regionId, typeId),
+  structureCompetition: (characterId, structureId) =>
+    loadStructureCompetition(characterId, structureId),
+  jumpsBetween: (origin, destination) => loadJumpsBetween(origin, destination),
+  priceHistory: (regionId, typeId) => loadPriceHistory(regionId, typeId),
+  reprocessing: () => loadReprocessing(),
+  stationBestPrices: (requests) => loadStationBestPrices(requests),
 };
 
 export const OrderDetailLoadersContext = createContext<OrderDetailLoaders>(esiOrderDetailLoaders);
