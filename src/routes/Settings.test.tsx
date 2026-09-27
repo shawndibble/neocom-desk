@@ -1950,7 +1950,7 @@ describe('Settings — This device', () => {
     render(<App />);
 
     expect(
-      await screen.findByText(/2 characters are logged in on this browser/i)
+      await screen.findByText(/2 characters are logged in on this device/i)
     ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^log out$/i }));
     const dialog = await screen.findByRole('dialog', { name: /log out of all characters/i });
@@ -2009,11 +2009,13 @@ describe('Settings — review follow-ups', () => {
     expect(window.location.pathname).toBe('/settings/market');
   });
 
-  it('puts the CCP data credit at the foot of Data & storage', async () => {
+  it('does not show the CCP data credit on Data & storage', async () => {
     window.history.pushState({}, '', '/settings/dataAge');
     render(<App />);
 
-    expect(await screen.findByRole('heading', { name: /data credit/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /clear cached esi data/i })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: /clear cached esi data/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /data credit/i })).not.toBeInTheDocument();
   });
 });

@@ -13,8 +13,8 @@ import {
 type Dialog = 'logout' | 'delete';
 
 /**
- * Settings → This device. Two actions: forget every login on this browser, or
- * that plus erasing every Character's synced data and this browser's app data.
+ * Settings → This device. Two actions: forget every login on this device, or
+ * that plus erasing every Character's synced data and this device's app data.
  * Once no Character is left, `RequireCharacter` sends the app to /login by
  * itself, so logout never navigates and a failed purge is reported before
  * the local wipe, while this dialog can still be seen. Delete reloads after.

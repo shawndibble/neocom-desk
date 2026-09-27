@@ -1,5 +1,5 @@
 // "Log out of this device" (Settings → This device): every Character's login
-// and local data leave this browser, and nothing remote is touched.
+// and local data leave this device, and nothing remote is touched.
 //
 // It is `removeCharacter` run over the whole roster, after one last push each.
 // Synced Editable Data (Skill Plans, Build Plans...) stays on the server until
