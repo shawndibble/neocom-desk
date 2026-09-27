@@ -16,7 +16,7 @@ import {
 import { db, type SkillPlanRecord } from '@/db';
 import { isSyncConfigured } from '@/app/syncStatus';
 import { scheduleSync } from '@/sync';
-import { upsertEntry } from './planner/reorder';
+import { addEntry } from './planner/skillPlanEdit';
 
 export interface SkillRowContextMenuProps {
   activeCharacterId: number;
@@ -52,9 +52,15 @@ async function addSkillToPlan(
   targetLevel: number,
   characterId: number
 ): Promise<void> {
-  await db.skillPlans.update(plan.id, {
-    entries: upsertEntry(plan.entries, { skillTypeID, targetLevel }),
-    updatedAt: Date.now(),
+  // Re-read inside the transaction: `plan` is the menu's live-query snapshot,
+  // and writing its stale entries over a fresher record would misalign markers.
+  await db.transaction('rw', db.skillPlans, async () => {
+    const current = await db.skillPlans.get(plan.id);
+    if (!current) return;
+    await db.skillPlans.update(plan.id, {
+      ...addEntry(current, { skillTypeID, targetLevel }),
+      updatedAt: Date.now(),
+    });
   });
   if (isSyncConfigured()) scheduleSync(characterId);
 }
