@@ -3,8 +3,6 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { tabFromPathname, tabPath, type PageTabs, type TabRouteDefaultState } from '@/lib/pageTabs';
 import { useIsPageIndex } from '@/lib/usePageTab';
 
-export type { TabRouteDefaultState } from '@/lib/pageTabs';
-
 function stateRecord(state: unknown): Record<string, unknown> {
   return typeof state === 'object' && state !== null && !Array.isArray(state)
     ? (state as Record<string, unknown>)

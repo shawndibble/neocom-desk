@@ -15,8 +15,11 @@
  *   so keys that change together (a filter bar's text, types and standings)
  *   belong in one group.
  * - **Read-only defaults.** The URL wins over a default; absent means the
- *   default. Nothing here writes back to a stored setting (scope decision
- *   "persisted view preferences stay out of the URL").
+ *   default. Nothing read from the URL is written back to a stored setting
+ *   (scope decision "persisted view preferences stay out of the URL").
+ *   `useRememberedUrlParams` below stores a reader's own *edit* of a field
+ *   with a stored default, and its opt-in `adoptLinked` is the one recorded
+ *   exception.
  *
  * Pass a schema that is stable across renders — module scope, or a `useMemo`.
  */
@@ -248,7 +251,11 @@ export interface RememberedDefaults<S extends UrlParamSchema> {
    * stored default: it is URL-only, and the codec's own default applies.
    */
   values: Partial<UrlParamValues<S>>;
-  /** False until the store has read its value. Only `adoptLinked` waits on it. */
+  /**
+   * False until the store has read its value. Only `adoptLinked` waits on
+   * it, and absent reads as false, so an adopting caller that forgets it
+   * never adopts against a not-yet-read default.
+   */
   hydrated?: boolean;
   /** Persists an edit — called with only the covered fields the edit touched. */
   remember(patch: Partial<UrlParamValues<S>>): void;
@@ -260,8 +267,7 @@ export interface RememberedDefaults<S extends UrlParamSchema> {
   /**
    * Opt-in exception to scope decision `20260922-221531`: once hydrated,
    * copy each covered field the URL states into storage whenever the two
-   * differ. Market Browser only — see decision
-   * `20260926-201312`. Everyone
+   * differ. Market Browser only — see decision `20260926-201312`. Everyone
    * else leaves it off, and nothing read from the URL is ever stored.
    */
   adoptLinked?: boolean;
@@ -296,7 +302,7 @@ export function useRememberedUrlParams<S extends UrlParamSchema>(
   const [urlValues, setUrlValues] = useUrlParams(schema);
   const { search } = useLocation();
   const codecs = schema as unknown as Record<string, AnyCodec>;
-  const { values: stored, accepts, hydrated = true, adoptLinked = false, remember } = remembered;
+  const { values: stored, accepts, hydrated = false, adoptLinked = false, remember } = remembered;
   const storedValues = stored as Record<string, unknown>;
 
   // What the URL itself states, parsed from the query string rather than read

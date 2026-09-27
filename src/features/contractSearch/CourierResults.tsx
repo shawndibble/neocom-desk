@@ -703,6 +703,8 @@ function rememberedParams(stored: StoredCourierFilter): Partial<CourierFilterPar
 /** The inverse of `rememberedParams`, for only the fields an edit touched. */
 function storedPatch(patch: Partial<CourierFilterParams>): Partial<StoredCourierFilter> {
   const result: Partial<StoredCourierFilter> = {};
+  // `in` for the two region fields: `null` ("any region") is a real edit
+  // there, where for every other field `undefined` just means "not touched".
   if ('courier.origin' in patch) result.originRegionId = patch['courier.origin'];
   if ('courier.dest' in patch) result.destinationRegionId = patch['courier.dest'];
   if (patch['courier.space'] !== undefined) result.destinationSpace = [...patch['courier.space']];
@@ -906,7 +908,6 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   // leaves out, never mirrored back into the URL (decision
   // `20260922-221531` / ADR 0015) — see `courierFilterPref.ts`.
   const rememberedFilter = useCourierFilterPref((state) => state.value);
-  const rememberedFilterHydrated = useCourierFilterPref((state) => state.hydrated);
   const hydrateRememberedFilter = useCourierFilterPref((state) => state.hydrate);
   useEffect(() => {
     void hydrateRememberedFilter();
@@ -914,13 +915,12 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
   const remembered = useMemo(
     () => ({
       values: rememberedParams(rememberedFilter),
-      hydrated: rememberedFilterHydrated,
       remember: (patch: Partial<CourierFilterParams>) => {
         const { value, setValue } = useCourierFilterPref.getState();
         void setValue({ ...value, ...storedPatch(patch) });
       },
     }),
-    [rememberedFilter, rememberedFilterHydrated]
+    [rememberedFilter]
   );
   const [params, setParams] = useRememberedUrlParams(COURIER_FILTER_PARAMS, remembered);
 

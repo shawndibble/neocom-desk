@@ -9,11 +9,11 @@ import {
   useNavigate,
   useNavigationType,
 } from 'react-router-dom';
-import { definePageTabs } from '@/lib/pageTabs';
+import { definePageTabs, type TabRouteDefaultState } from '@/lib/pageTabs';
 import { usePageTab, useRememberedPageTab, type RememberedTab } from '@/lib/usePageTab';
 import { useUrlParam } from '@/lib/useUrlState';
 import { textParam } from '@/lib/urlState';
-import { TabRoute, type TabRouteDefaultState } from './TabRoute';
+import { TabRoute } from './TabRoute';
 
 const PAGE = definePageTabs('/page', [
   { id: 'one', labelKey: 'one' },
