@@ -531,11 +531,11 @@ export function PlanEditor({
     [trainedSkills, queueEntries, loadedAtMs, plan.entries]
   );
   // The plan entry that IS the in-game queue's currently-training level, if
-  // any (#1701 follow-up) — EntryList labels its row instead of showing a
-  // bare, misleading "0m" for the zero own-steps that entry contributes.
+  // any (#1701 follow-up) — EntryList shows its real remaining time instead
+  // of a bare, misleading "0m" for the zero own-steps that entry contributes.
   const pinnedInProgress = useMemo(
-    () => pinnedInProgressEntry(plan.entries, queueProjection),
-    [plan.entries, queueProjection]
+    () => pinnedInProgressEntry(plan.entries, queueProjection, loadedAtMs),
+    [plan.entries, queueProjection, loadedAtMs]
   );
   // Costed by `schedulePlan`, the same call the Calendar makes, so the two
   // can never quote different dates for one plan.

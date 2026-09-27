@@ -397,8 +397,8 @@ interface EntryRowProps {
   /**
    * Set when this row IS the in-game queue's currently-training level (#1701
    * follow-up) — it contributes zero of its own scheduled steps (already
-   * credited as trained by `startDate`), so its "Takes" cell reads
-   * "In game queue · done {date}" instead of a bare, misleading "0m".
+   * credited as trained by `startDate`), so its "Takes" cell reads that
+   * level's real remaining time instead of a bare, misleading "0m".
    */
   pinnedInProgress: PinnedInProgressEntry | null | undefined;
   /** This row's Plan Milestone (CONTEXT.md), if one is anchored to its skill/level. */
@@ -437,10 +437,12 @@ const EntryRow = memo(function EntryRow({
   const { t } = useTranslation();
   const { setNodeRef, style, handleProps, isDragging } = useRowSortable(row.id);
   const { entry, stepIndices } = row;
-  const takesValue =
-    pinnedInProgress?.id === row.id
-      ? t('plans.inGameQueueDone', { date: formatLocalDate(new Date(pinnedInProgress.finishMs)) })
-      : formatDuration(row.seconds);
+  // A row credited as already-trained by the plan's start (`row.seconds: 0`)
+  // because it IS the in-game queue's currently-training level (#1701
+  // follow-up) reads that level's real remaining time instead of a bare,
+  // misleading "0m" — straight off the ESI queue's own `finish_date`, not
+  // the plan's (zeroed) schedule.
+  const takesSeconds = pinnedInProgress?.id === row.id ? pinnedInProgress.seconds : row.seconds;
   const boosted = stepIndices.some((i) => boostedSteps?.has(i) ?? false);
   const alphaCapped = stepIndices.some((i) => alphaCappedSteps?.has(i) ?? false);
   // Names the level, not just the skill: a plan holds one row per level, so
@@ -530,7 +532,9 @@ const EntryRow = memo(function EntryRow({
       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-6 text-[0.6875rem] text-text-dim">
         {attributeBadge}
         {priorityControl}
-        {columns.perLevelTime && <MetaValue label={t('plans.columnTakes')} value={takesValue} />}
+        {columns.perLevelTime && (
+          <MetaValue label={t('plans.columnTakes')} value={formatDuration(takesSeconds)} />
+        )}
         {columns.cumulativeTime && (
           <MetaValue
             label={t('plans.columnDoneBy')}
@@ -557,12 +561,7 @@ const EntryRow = memo(function EntryRow({
           {attributeBadge}
           {priorityControl}
           {columns.perLevelTime && (
-            <TimeCell
-              value={takesValue}
-              dim
-              label={t('plans.columnTakes')}
-              fixedWidth={pinnedInProgress?.id !== row.id}
-            />
+            <TimeCell value={formatDuration(takesSeconds)} dim label={t('plans.columnTakes')} />
           )}
           {columns.cumulativeTime && (
             <TimeCell

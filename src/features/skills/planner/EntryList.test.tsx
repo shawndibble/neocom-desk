@@ -790,17 +790,13 @@ describe('EntryList Plan Milestones (CONTEXT.md)', () => {
   });
 });
 
-describe("pinnedInProgress (#1701 follow-up): labels the row that IS the in-game queue's currently-training level", () => {
-  const finish = new Date('2026-10-01T12:00:00Z');
-  const label = `In game queue · done ${formatLocalDate(finish)}`;
+describe("pinnedInProgress (#1701 follow-up): the row that IS the in-game queue's currently-training level shows its real remaining time", () => {
   // Isolates the "Takes" cell this feature changes: "Done by" also reads a
-  // bare duration here (not the real finish date) only because these tests
-  // pass no `startDate` — PlanEditor always does, and once it does "Done by"
-  // already shows the pinned skill's real finish date (that half of #1701
-  // was already correct; only "Takes" needed this label).
+  // plain duration here only because these tests pass no `startDate` —
+  // PlanEditor always does, and that half of #1701 was already correct.
   const takesOnly = { ...DEFAULT_COLUMN_VISIBILITY, cumulativeTime: false };
 
-  it('shows the label instead of a bare "0m" for the row it pins, on the narrow layout', () => {
+  it('shows the level\'s real remaining time instead of a bare "0m" for the row it pins, on the narrow layout', () => {
     const rows = [entryRow(1, [])]; // zero own steps, entry targets skill 1 level 1
     render(
       <EntryList
@@ -808,14 +804,14 @@ describe("pinnedInProgress (#1701 follow-up): labels the row that IS the in-game
         bandsAt={new Map()}
         {...defaultProps}
         columns={takesOnly}
-        pinnedInProgress={{ id: entryId(entry(1, 1)), finishMs: finish.getTime() }}
+        pinnedInProgress={{ id: entryId(entry(1, 1)), seconds: 600 }}
       />
     );
-    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(screen.getByText('10m')).toBeInTheDocument();
     expect(screen.queryByText('0m')).not.toBeInTheDocument();
   });
 
-  it('shows the label on the desktop layout too', () => {
+  it('shows it on the desktop layout too', () => {
     const restore = mockDesktop(true);
     try {
       const rows = [entryRow(1, [])];
@@ -825,16 +821,16 @@ describe("pinnedInProgress (#1701 follow-up): labels the row that IS the in-game
           bandsAt={new Map()}
           {...defaultProps}
           columns={takesOnly}
-          pinnedInProgress={{ id: entryId(entry(1, 1)), finishMs: finish.getTime() }}
+          pinnedInProgress={{ id: entryId(entry(1, 1)), seconds: 600 }}
         />
       );
-      expect(screen.getByText(label)).toBeInTheDocument();
+      expect(screen.getByText('10m')).toBeInTheDocument();
     } finally {
       restore();
     }
   });
 
-  it('leaves every other row reading a plain duration, pinned or not', () => {
+  it('leaves every other row reading its own duration, pinned or not', () => {
     const rows = [entryRow(1, []), entryRow(2, [0])];
     render(
       <EntryList
@@ -842,10 +838,10 @@ describe("pinnedInProgress (#1701 follow-up): labels the row that IS the in-game
         bandsAt={new Map()}
         {...defaultProps}
         columns={takesOnly}
-        pinnedInProgress={{ id: entryId(entry(1, 1)), finishMs: finish.getTime() }}
+        pinnedInProgress={{ id: entryId(entry(1, 1)), seconds: 600 }}
       />
     );
-    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(screen.getByText('10m')).toBeInTheDocument();
     expect(screen.getByText('1m')).toBeInTheDocument();
   });
 
@@ -861,6 +857,5 @@ describe("pinnedInProgress (#1701 follow-up): labels the row that IS the in-game
       />
     );
     expect(screen.getByText('0m')).toBeInTheDocument();
-    expect(screen.queryByText(label)).not.toBeInTheDocument();
   });
 });
