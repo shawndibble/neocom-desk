@@ -11,7 +11,7 @@
 export { getSyncStatus, subscribeSyncStatus, type SyncState, type SyncStatus } from './status';
 export { uidForCharacter } from './uid';
 export { TOMBSTONE_TTL_MS } from './merge';
-export { clearCharacterSyncBookkeeping } from './localBookkeeping';
+export { clearCharacterSyncBookkeeping, REMOTE_PURGE_PENDING_PREFIX } from './localBookkeeping';
 // Touches Dexie only — no Firebase — so it needs no lazy-import wrapper.
 export { backfillAccountWideData } from './accountWideBackfill';
 

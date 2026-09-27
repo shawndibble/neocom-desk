@@ -26,12 +26,9 @@ import { db } from '@/db';
 import { getSyncFirestore } from './firebaseApp';
 import { REMOTE_COLLECTION_NAMES } from './syncedCollections';
 import { ensureSignedIn } from './syncAuth';
+import { REMOTE_PURGE_PENDING_PREFIX, remotePurgePendingKey } from './localBookkeeping';
 
-/** Marker prefix in `db.settings`. Device-local; mirrors `esi/cachePurge.ts`. */
-export const REMOTE_PURGE_PENDING_PREFIX = 'remotePurgePending.';
-
-export const remotePurgePendingKey = (characterId: number): string =>
-  `${REMOTE_PURGE_PENDING_PREFIX}${characterId}`;
+export { REMOTE_PURGE_PENDING_PREFIX, remotePurgePendingKey };
 
 async function markPending(characterId: number): Promise<void> {
   await db.settings.put({ key: remotePurgePendingKey(characterId), value: true });
