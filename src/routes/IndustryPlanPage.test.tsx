@@ -12,6 +12,7 @@ import { App } from '@/app/App';
 import { clearMarketPriceCache } from '@/market/prices';
 import { clearCostIndexCache } from '@/features/industry/marketData';
 import { useBuildGroups } from '@/features/industry/buildGroups';
+import { useAssumedMe } from '@/features/industry/assumedMe';
 import type { BlueprintMap, TypeMap } from '@/sde/types';
 
 vi.mock('virtual:pwa-register/react', () => ({
@@ -736,5 +737,23 @@ describe('IndustryPlanPage: not-found handling', () => {
     await db.buildPlans.add(seedPlan({ characterId: 92 }));
     render(<App />);
     await waitFor(() => expect(window.location.pathname).toBe('/industry/plans'));
+  });
+});
+
+describe('IndustryPlanPage: waits for the pricing-settings hydration gate (#2054)', () => {
+  it('shows a spinner instead of the plan, and never mounts it, until Assumed ME hydrates', async () => {
+    // Same reset shape `Settings.test.tsx` uses to force a store back to its
+    // pre-hydration state — `useBuildPlanPricingInputs`'s own mount effect
+    // (`buildPlanPricingInputs.ts`) re-hydrates it once the page renders.
+    useAssumedMe.setState({ value: 0, hydrated: false });
+    await db.buildPlans.add(seedPlan());
+    render(<App />);
+
+    expect(await screen.findByRole('status', { name: 'Loading' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Rifter' })).not.toBeInTheDocument();
+
+    // Resolves on its own once the (real, Dexie-backed) hydrate() call
+    // settles — nothing in the test drives it forward by hand.
+    await screen.findByRole('heading', { name: 'Rifter' });
   });
 });

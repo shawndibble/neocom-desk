@@ -114,7 +114,15 @@ export function IndustryPlanPage() {
           blueprintsNeedsReauth={blueprintsNeedsReauth}
         />
 
-        {!catalog ? (
+        {/* Waits on the pricing-settings hydration gate too (issue #2054), not
+            just the catalog — otherwise this page would price the plan once
+            at the default Assumed ME/Include Blueprint Cost and again once
+            the pilot's own settings land, the same double-price
+            `useComparedBuildResults` avoids for Compare/the index/Group
+            Rollups. `pricingInputs.hydrated` resolves quickly and can never
+            hang (`buildPlanPricingInputs.ts`'s own doc comment), so this
+            never becomes a real wait. */}
+        {!catalog || !pricingInputs.hydrated ? (
           <div className="flex justify-center py-16">
             <Spinner label={t('common.loading')} />
           </div>
