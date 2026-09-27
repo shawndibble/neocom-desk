@@ -481,10 +481,13 @@ describe('linkRecordedPayment', () => {
 });
 
 describe('linkPaymentTransaction', () => {
-  async function paidAssignment(payment?: Parameters<typeof markAssignmentsPaid>[1]) {
+  async function paidAssignment(
+    payment?: Parameters<typeof markAssignmentsPaid>[1],
+    date = '2026-09-04'
+  ) {
     const a = await createAssignment({
       characterId: CHAR_A,
-      date: '2026-09-04',
+      date,
       solarSystemId: 1,
       payeeId: 'p',
       oreLines: [{ typeId: TYPE_A, quantity: 10 }],
@@ -525,6 +528,48 @@ describe('linkPaymentTransaction', () => {
     expect(updated?.payment?.paidOn).toBe('2026-09-07');
     expect(updated?.payment?.amount).toBe(500);
     expect(updated?.payment?.journalLinks).toEqual([{ refId: 99, source: 'auto' }]);
+  });
+
+  it('shares one freshly-minted paymentId across several bare-paid assignments (a joined group), not one each', async () => {
+    const first = await paidAssignment(undefined, '2026-09-04');
+    const second = await paidAssignment(undefined, '2026-09-05');
+    expect(first.payment).toBeUndefined();
+    expect(second.payment).toBeUndefined();
+
+    await linkPaymentTransaction([first, second], { journalRefId: 7 }, 'manual', {
+      paidOn: '2026-09-08',
+      method: 'donation',
+      amount: 20,
+    });
+
+    const [updatedFirst, updatedSecond] = await Promise.all([
+      db.miningTaxAssignments.get(first.id),
+      db.miningTaxAssignments.get(second.id),
+    ]);
+    expect(updatedFirst?.payment?.paymentId).toBeDefined();
+    expect(updatedFirst?.payment?.paymentId).toBe(updatedSecond?.payment?.paymentId);
+    expect(updatedSecond?.payment?.journalLinks).toEqual([{ refId: 7, source: 'manual' }]);
+  });
+
+  it('leaves an assignment that already had its own payment on its own paymentId, not the newly-minted shared one', async () => {
+    const alreadyPaid = await paidAssignment(
+      { paidOn: '2026-09-05', method: 'donation', amount: 5 },
+      '2026-09-04'
+    );
+    const bare = await paidAssignment(undefined, '2026-09-05');
+
+    await linkPaymentTransaction([alreadyPaid, bare], { journalRefId: 8 }, 'manual', {
+      paidOn: '2026-09-08',
+      method: 'donation',
+      amount: 20,
+    });
+
+    const [updatedFirst, updatedSecond] = await Promise.all([
+      db.miningTaxAssignments.get(alreadyPaid.id),
+      db.miningTaxAssignments.get(bare.id),
+    ]);
+    expect(updatedFirst?.payment?.paymentId).toBe(alreadyPaid.payment?.paymentId);
+    expect(updatedSecond?.payment?.paymentId).not.toBe(alreadyPaid.payment?.paymentId);
   });
 
   it('never recomputes amount/paidOn when a payment already exists', async () => {

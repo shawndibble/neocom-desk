@@ -468,9 +468,15 @@ export async function linkPaymentTransaction(
 ): Promise<void> {
   if (assignments.length === 0) return;
   const now = Date.now();
+  // Minted once, not per assignment: several bare-paid Assignments (a joined
+  // group's "mark all paid", which records no payment at all) must land on
+  // one shared payment, the same as if they'd gone through Settle-up
+  // together — never one independent payment per member. An Assignment that
+  // already has its own `payment` keeps its own paymentId regardless.
+  const sharedPaymentId = crypto.randomUUID();
   const updated = assignments.map((a): MiningTaxAssignmentRecord => {
     const base: MiningTaxPaymentInfo = a.payment ?? {
-      paymentId: crypto.randomUUID(),
+      paymentId: sharedPaymentId,
       ...fallbackPayment,
     };
     return { ...a, payment: withLink(base, ref, source), updatedAt: now };
