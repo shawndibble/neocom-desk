@@ -1,12 +1,7 @@
 /**
- * What the Open Orders panel renders, derived once from `allRows` + the
- * filter: the visible/grouping row splits, the groups, their summaries, and
- * whether the match-count line shows at all. The panel used to re-derive
- * this inline from `filterOpenOrders`/`groupOpenOrders` calls scattered
- * across several `useMemo`s — the healthy-fold edge case (issue #2032, "0 of
- * N" reading as a broken filter when everything that matched was folded, not
- * absent) was fixed as an ad hoc boolean at the render site because nothing
- * here was a single, testable shape. This module is that shape.
+ * What the Open Orders panel renders: the visible/grouping row splits, the
+ * groups, their summaries, whether the match-count line shows, and whether
+ * a given group is folded. One testable shape for the panel to render.
  */
 import { groupOpenOrders, summariseOrderGroup } from './openOrdersModel';
 import type { OpenOrderGroupSummary, OpenOrderRow, OrderGroup } from './openOrdersModel';
@@ -26,24 +21,20 @@ export interface OpenOrdersView {
   groupingRows: OpenOrderRow[];
   groups: OrderGroup[];
   groupSummaries: Map<OrderProblem, OpenOrderGroupSummary>;
-  /**
-   * Rows hidden only by the healthy fold are not a failed match — when
-   * everything that matches is folded away, "0 of N orders match" would read
-   * as a broken filter, so the count steps aside and the folded healthy
-   * group speaks for itself instead.
-   */
+  /** False only when rows are hidden by the healthy fold alone — that's not a failed match (issue #2032). */
   matchCountVisible: boolean;
+}
+
+function sortedFilter(rows: readonly OpenOrderRow[], filter: OpenOrdersFilter): OpenOrderRow[] {
+  return sortOpenOrders(filterOpenOrders(rows, filter), filter.sort);
 }
 
 export function buildOpenOrdersView(
   rows: readonly OpenOrderRow[],
   filter: OpenOrdersFilter
 ): OpenOrdersView {
-  const visibleRows = sortOpenOrders(filterOpenOrders(rows, filter), filter.sort);
-  const groupingRows = sortOpenOrders(
-    filterOpenOrders(rows, { ...filter, hideHealthy: false }),
-    filter.sort
-  );
+  const visibleRows = sortedFilter(rows, filter);
+  const groupingRows = sortedFilter(rows, { ...filter, hideHealthy: false });
   const groups = groupOpenOrders(groupingRows);
   const groupSummaries = new Map(
     groups.map((group) => [group.problem, summariseOrderGroup(group.rows)])

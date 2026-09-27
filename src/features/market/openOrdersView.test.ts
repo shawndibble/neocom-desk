@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildOpenOrdersView, isGroupFolded } from './openOrdersView';
 import { EMPTY_OPEN_ORDERS_FILTER, type OpenOrdersFilter } from './openOrdersFilter';
 import type { OpenOrderRow } from './openOrdersModel';
+import type { OrderProblem } from '@/engine/market/orderProblems';
 
 function makeRow(overrides: Partial<OpenOrderRow> = {}): OpenOrderRow {
   return {
@@ -94,7 +95,7 @@ describe('isGroupFolded', () => {
         'healthy',
         null,
         { ...filter, hideHealthy: false },
-        new Set(['healthy' as never])
+        new Set<OrderProblem>(['healthy'])
       )
     ).toBe(false);
   });
