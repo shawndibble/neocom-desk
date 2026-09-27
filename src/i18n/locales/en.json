@@ -567,6 +567,7 @@
       "chatLink": "Copy in-game link",
       "multibuy": "Copy multibuy list",
       "eveXml": "Download EVE XML",
+      "manufacturePlan": "Manufacture Plan",
       "appraise": "Appraise in Market",
       "tooLarge": "Too large to share as a link.",
       "copyFailed": "Couldn't copy to the clipboard.",

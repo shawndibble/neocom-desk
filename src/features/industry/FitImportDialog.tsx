@@ -21,13 +21,25 @@ interface FitImportDialogProps {
   /** Creates the group and its plans. Receives the preview the pilot approved. */
   onApply: (preview: FitToBuildPlansResult) => void;
   onClose: () => void;
+  /**
+   * EFT text arriving already in hand — a Fitting's Export menu, "Manufacture
+   * Plan" — pre-filled and parsed as if the pilot had pasted and pressed
+   * Parse themselves. Absent for the ordinary paste-your-own-fit open. Read
+   * only at mount (via `useState`'s lazy initialiser): the dialog mounts
+   * fresh each time it opens (see the `open` comment below), so there is no
+   * later value to react to, and re-parsing on some later render would blow
+   * away a pilot's in-progress edit to the pre-filled text.
+   */
+  initialText?: string;
 }
 
-export function FitImportDialog({ catalog, onApply, onClose }: FitImportDialogProps) {
+export function FitImportDialog({ catalog, onApply, onClose, initialText }: FitImportDialogProps) {
   const { t } = useTranslation();
-  const [text, setText] = useState('');
+  const [text, setText] = useState(() => initialText ?? '');
   const [includeCharges, setIncludeCharges] = useState(false);
-  const [preview, setPreview] = useState<FitToBuildPlansResult | null>(null);
+  const [preview, setPreview] = useState<FitToBuildPlansResult | null>(() =>
+    initialText ? previewFitImport(initialText, catalog, { includeCharges: false }) : null
+  );
   const [pasteError, setPasteError] = useState(false);
 
   async function handlePasteFromClipboard() {
