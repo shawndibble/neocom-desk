@@ -5,11 +5,18 @@
 //
 // Usage: node scripts/next-ticket/select-ticket.mjs [issue-number-override]
 //
+// Only picks up issues whose GitHub author is the authenticated `gh` user
+// (Shawn). This guards against a repo collaborator opening an issue under
+// their own account, labelling it `ready-for-agent`, and this loop
+// autonomously implementing and auto-merging it — every ticket it acts on
+// must actually be one Shawn (or his own automation, which authenticates as
+// him) filed.
+//
 // Prints one line of JSON to stdout:
 //   {"status":"claimed","number":83,"title":"...","slug":"item-tooltip-context-menu"}
 //   {"status":"no-ticket"}
 //   {"status":"lock-timeout"}
-//   {"status":"override-unavailable","reason":"assigned|in-progress|blocked|not-found"}
+//   {"status":"override-unavailable","reason":"not-found|not-own-ticket|assigned-or-in-progress|blocked"}
 // All progress chatter goes to stderr.
 
 import fs from 'node:fs';
@@ -97,6 +104,7 @@ if (!acquireLock()) {
 
 let picked = null;
 try {
+  const currentUser = ghJson(['api', 'user']).login;
   const issues = ghJson([
     'issue',
     'list',
@@ -105,13 +113,19 @@ try {
     '--state',
     'open',
     '--json',
-    'number,title,body,assignees,labels',
+    'number,title,body,assignees,labels,author',
   ]).sort((a, b) => a.number - b.number);
+
+  const isOwnTicket = (issue) => issue.author?.login === currentUser;
 
   if (override) {
     const issue = issues.find((i) => i.number === override);
     if (!issue) {
       printResult({ status: 'override-unavailable', reason: 'not-found' });
+      process.exit(0);
+    }
+    if (!isOwnTicket(issue)) {
+      printResult({ status: 'override-unavailable', reason: 'not-own-ticket' });
       process.exit(0);
     }
     if (issue.assignees?.length > 0 || issue.labels.some((l) => l.name === 'in-progress')) {
@@ -125,7 +139,7 @@ try {
     picked = issue;
   } else {
     for (const issue of issues) {
-      if (isUnblocked(issue)) {
+      if (isOwnTicket(issue) && isUnblocked(issue)) {
         picked = issue;
         break;
       }
