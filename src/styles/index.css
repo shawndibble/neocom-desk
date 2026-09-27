@@ -610,12 +610,16 @@
      * without this they flatten the inner table into a second, broken card
      * layout too. It has no card fallback of its own to fall into, unlike
      * `DataTable`'s own rows, so every leaky property is undone here,
-     * restated explicitly rather than `revert`ed — Tailwind's own utility
-     * classes on this inner table (`py-1`, `text-right`) sit in a lower-
-     * priority cascade layer than this whole stylesheet, so they can never
-     * win a property this file also declares; `text-align` for the two
-     * right-aligned columns is keyed off that same `text-right` class name
-     * instead, rather than relying on the utility itself to apply.
+     * restated explicitly rather than `revert`ed. This block sits in the
+     * same `utilities` layer as the rules above (see this file's own note
+     * at the top of that layer) and beats the inner table's Tailwind
+     * classes (`py-1`, `text-right`) on ordinary specificity the same way
+     * those rules beat them — `revert` would not: it rolls a property back
+     * past every author style, Tailwind's utilities included, straight to
+     * the UA default, undoing `py-1`/`text-right` right along with the leak
+     * it's meant to fix. `text-align` for the two right-aligned columns is
+     * keyed off that same `text-right` class name instead, rather than
+     * relying on the utility itself to apply.
      */
     .dt-stack .dt-embedded-table,
     .dt-stack .dt-embedded-table tbody,
@@ -635,13 +639,20 @@
     }
 
     .dt-stack .dt-embedded-table tr {
+      position: static;
       padding: 0;
     }
 
+    /*
+     * `padding`/`text-align` here restate the Tailwind classes this table's
+     * `<td>`/`<th>` already carry (`py-1`, and `text-right` on the two
+     * right-aligned columns — see `HaulingRowDetail.tsx`) rather than
+     * relying on the utilities themselves to apply. Keep these two in sync
+     * with that component if its classes ever change.
+     */
     .dt-stack .dt-embedded-table td,
     .dt-stack .dt-embedded-table th {
       position: static;
-      /* Matches the `py-1` Tailwind utility already on these cells. */
       padding: 0.25rem 0;
       min-height: 0;
       text-align: left;
