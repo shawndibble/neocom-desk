@@ -9,8 +9,9 @@
 // dropped Character's docs be purged by any session that can still sign in
 // as it, hash or no hash.
 //
-// Signing in needs a live refresh token. `features/character/removeCharacter`
-// (the caller) deletes that token locally right after this runs, so if it was
+// Signing in needs a live refresh token. The callers (`features/character/
+// removeCharacter`, `deleteAllCharacterData`) delete that token locally once
+// this has run, so if it was
 // already dead — the common case: the Character is being dropped precisely
 // because it's gone — the purge can't run inline. This records a pending
 // purge instead (device-local `db.settings` marker, mirroring

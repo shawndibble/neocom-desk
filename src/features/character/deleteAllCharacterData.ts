@@ -5,11 +5,8 @@
 // storage, runtime caches. The caller reloads afterwards, so no in-memory
 // state outlives the wipe.
 //
-// Two steps, so the caller can show the outcome before it is gone. Step one
-// purges while every token is still here — purging needs a live Firebase
-// session per Character. Step two is the local wipe.
-//
-// Neither step pushes. A last push before a purge is wasted, and one after it
+// Two steps, so the caller can show a deferred purge before it is gone.
+// Neither pushes. A last push before a purge is wasted, and one after it
 // would put the purged data straight back.
 
 import { db } from '@/db';
@@ -114,10 +111,10 @@ async function clearRuntimeCaches(): Promise<void> {
 }
 
 /**
- * Step two: everything this app stores in the browser. What needs local state
- * to undo runs first — the push registration (keyed by the device id in
- * localStorage), the Firebase session, the app badge — then the stores go,
- * the app's own database last.
+ * Step two: everything this app stores in the browser. Refresh tokens go
+ * first; then what needs local state to undo — the push registration (keyed
+ * by the device id in localStorage), the Firebase session, the app badge;
+ * then every other store, the app's own database last.
  *
  * Pending-purge markers from step one are written back into a fresh database,
  * so a deferred purge still retries when that Character logs in here again.
@@ -147,9 +144,7 @@ export async function deleteAllLocalData(syncConfigured: boolean): Promise<void>
       // Its persisted session is deleted below with the rest of IndexedDB.
     });
   }
-  await setAppBadgeCount(0);
-  await deleteOtherDatabases();
-  await clearRuntimeCaches();
+  await Promise.all([setAppBadgeCount(0), deleteOtherDatabases(), clearRuntimeCaches()]);
   clearWebStorage();
 
   // Last: once it is gone every mounted live query fails, so the caller's

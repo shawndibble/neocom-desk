@@ -14,10 +14,10 @@ type Dialog = 'logout' | 'delete';
 
 /**
  * Settings → This device. Two actions: forget every login on this browser, or
- * that plus deleting every Character's synced data. Once no Character is left,
- * `RequireCharacter` sends the app to /login by itself, so nothing here
- * navigates — which is also why a deferred purge is reported before the local
- * wipe, while this dialog can still be seen.
+ * that plus erasing every Character's synced data and this browser's app data.
+ * Once no Character is left, `RequireCharacter` sends the app to /login by
+ * itself, so logout never navigates and a deferred purge is reported before
+ * the local wipe, while this dialog can still be seen. Delete reloads after.
  */
 export function DevicePanel() {
   const { t, i18n } = useTranslation();
@@ -69,14 +69,13 @@ export function DevicePanel() {
     });
 
   const loggedIn = characters?.length ?? 0;
-  const deferredNames = new Intl.ListFormat(i18n.language, {
-    style: 'long',
-    type: 'conjunction',
-  }).format(
-    (deferred ?? []).map(
-      (id) => characters?.find((character) => character.characterId === id)?.name ?? String(id)
-    )
-  );
+  const deferredNames = deferred
+    ? new Intl.ListFormat(i18n.language, { style: 'long', type: 'conjunction' }).format(
+        deferred.map(
+          (id) => characters?.find((character) => character.characterId === id)?.name ?? String(id)
+        )
+      )
+    : '';
 
   return (
     <Panel title={t('settings.deviceTitle')}>
