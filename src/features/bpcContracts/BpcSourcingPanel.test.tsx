@@ -1007,6 +1007,16 @@ describe('BpcSourcingPanel Auctions/PLEX filters (issue #1105)', () => {
     expect(within(table).getByText('1,000 PLEX')).toBeInTheDocument();
   });
 
+  it('shows both the ISK ask and the requested PLEX when a contract asks for both', async () => {
+    loadPublicBpcContracts.mockResolvedValue(
+      cachedSnapshot([row({ contractId: 1, typeId: 638, price: 100, requestedPlex: 100 })])
+    );
+    render(<App />);
+    const table = await screen.findByRole('table', { name: 'BPC Sourcing' });
+
+    expect(within(table).getByText('100.00 + 100 PLEX')).toBeInTheDocument();
+  });
+
   it('Reset filters clears both exclude chips', async () => {
     loadPublicBpcContracts.mockResolvedValue(
       cachedSnapshot([

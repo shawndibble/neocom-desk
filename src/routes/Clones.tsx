@@ -188,21 +188,29 @@ export function Clones() {
           { id: homeLocation.location_id }
         ));
 
-  const columns = useMemo<DataTableColumn<JumpClone>[]>(
-    () => [
+  const columns = useMemo<DataTableColumn<JumpClone>[]>(() => {
+    const locationLabel = (clone: JumpClone) =>
+      locationNames.get(clone.location_id) ??
+      t(clone.location_type === 'station' ? 'clones.stationLabel' : 'clones.structureLabel', {
+        id: clone.location_id,
+      });
+    const cloneName = (clone: JumpClone) => clone.name?.trim() || undefined;
+    return [
       {
         id: 'location',
         header: t('clones.location'),
-        sortValue: (clone) =>
-          locationNames.get(clone.location_id) ??
-          t(clone.location_type === 'station' ? 'clones.stationLabel' : 'clones.structureLabel', {
-            id: clone.location_id,
-          }),
-        render: (clone) =>
-          locationNames.get(clone.location_id) ??
-          t(clone.location_type === 'station' ? 'clones.stationLabel' : 'clones.structureLabel', {
-            id: clone.location_id,
-          }),
+        // Name first, then location, so same-station clones order deterministically.
+        sortValue: (clone) => `${cloneName(clone) ?? ''}\u0000${locationLabel(clone)}`,
+        render: (clone) => {
+          const name = cloneName(clone);
+          if (name === undefined) return locationLabel(clone);
+          return (
+            <span className="[overflow-wrap:anywhere]">
+              <span className="text-text">{name}</span>
+              <span className="text-text-dim"> · {locationLabel(clone)}</span>
+            </span>
+          );
+        },
       },
       {
         id: 'implants',
@@ -222,9 +230,8 @@ export function Clones() {
                 </Fragment>
               )),
       },
-    ],
-    [t, locationNames, implantNames, implantDescriptions]
-  );
+    ];
+  }, [t, locationNames, implantNames, implantDescriptions]);
 
   if (!hydrated) {
     return (

@@ -5,6 +5,8 @@ import {
   deleteFitting,
   loadFittings,
   renameFitting,
+  renameFittingById,
+  resolveSaveTarget,
   saveFitting,
   setFittingNotes,
 } from './myFittings';
@@ -89,5 +91,46 @@ describe('My Fittings store', () => {
     const saved = await saveFitting(7, { name: 'Kite', code: 'abc' });
     await deleteFitting(saved);
     expect(markFittingDeleted).toHaveBeenCalledWith(7, saved.id);
+  });
+
+  describe('resolveSaveTarget', () => {
+    it('continues the existing record when it still belongs to this Character', async () => {
+      const saved = await saveFitting(7, { name: 'Kite', code: 'abc' });
+      const target = await resolveSaveTarget(saved.id, 7, 'Fallback');
+      expect(target).toEqual({ id: saved.id, name: 'Kite' });
+    });
+
+    it('falls back to a fresh save when savedId is null', async () => {
+      expect(await resolveSaveTarget(null, 7, 'New Fitting')).toEqual({ name: 'New Fitting' });
+    });
+
+    it('falls back to a fresh save when the record has since been deleted', async () => {
+      const saved = await saveFitting(7, { name: 'Kite', code: 'abc' });
+      await db.fittings.delete(saved.id);
+      expect(await resolveSaveTarget(saved.id, 7, 'Fallback Name')).toEqual({
+        name: 'Fallback Name',
+      });
+    });
+
+    it('falls back to a fresh save when the record now belongs to another Character', async () => {
+      const saved = await saveFitting(7, { name: 'Kite', code: 'abc' });
+      expect(await resolveSaveTarget(saved.id, 8, 'Fallback Name')).toEqual({
+        name: 'Fallback Name',
+      });
+    });
+  });
+
+  describe('renameFittingById', () => {
+    it('renames the record by id, keeping its code', async () => {
+      const saved = await saveFitting(7, { name: 'Old', code: 'abc' });
+      await renameFittingById(saved.id, 'New');
+      expect((await loadFittings(7))[0]).toMatchObject({ name: 'New', code: 'abc' });
+    });
+
+    it('is a no-op when the record has since been deleted', async () => {
+      const saved = await saveFitting(7, { name: 'Kite', code: 'abc' });
+      await db.fittings.delete(saved.id);
+      await expect(renameFittingById(saved.id, 'New')).resolves.toBeUndefined();
+    });
   });
 });

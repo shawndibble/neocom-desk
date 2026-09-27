@@ -20,6 +20,17 @@ export interface MarketAppraiseState {
 }
 
 /**
+ * Router `location.state` shape a Fitting's Export menu navigates `/industry`
+ * with: the fit's EFT text, pre-filled and parsed into the Fit Import dialog
+ * on arrival ("Manufacture Plan"). Shared so the producer
+ * (`features/fittings`) and the consumer (`routes/Industry.tsx`) can't
+ * silently drift apart.
+ */
+export interface IndustryFitImportState {
+  readonly fitImportText: string;
+}
+
+/**
  * Marks an element that owns the keyboard while it is on screen but is not a
  * native `<dialog>` and carries no menu/listbox/dialog role the guard in
  * `app/useKeyboardShortcuts.ts` already recognises — today that means the

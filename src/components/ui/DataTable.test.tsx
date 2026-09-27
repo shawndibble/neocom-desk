@@ -818,6 +818,63 @@ describe('DataTable opt-in phone features', () => {
     });
   });
 
+  describe('cardCorner start', () => {
+    const cornerColumns: DataTableColumn<Row>[] = [
+      { id: 'select', header: '', cardCorner: 'start', render: () => <input type="checkbox" /> },
+      ...columns,
+    ];
+
+    it('tags a start corner separately from the default (top-right) one', () => {
+      renderTable({ columns: cornerColumns });
+      const corner = document.querySelector('td.dt-corner');
+      expect(corner).toHaveClass('dt-corner-start');
+    });
+
+    it('is untagged by default — a plain cardCorner: true column keeps its old class only', () => {
+      const rightCornerColumns: DataTableColumn<Row>[] = [
+        { id: 'corner', header: '', cardCorner: true, render: () => 'x' },
+        ...columns,
+      ];
+      renderTable({ columns: rightCornerColumns });
+      const corner = document.querySelector('td.dt-corner');
+      expect(corner).not.toHaveClass('dt-corner-start');
+    });
+
+    // The disclosure chevron (`expandableRow`) always clusters beside the
+    // actions button now — see the `disclosure` describe block below. This
+    // block only covers the corner's own `'start'` side and its interaction
+    // with that cluster (a table with all three: cardCorner, expandableRow,
+    // rowMoreActions — Hauling's own case).
+    it('a start corner is not shifted by the actions+disclosure triple-collision rule (that rule targets the default right corner)', () => {
+      renderTable({
+        columns: cornerColumns,
+        rowMoreActions: true,
+        expandableRow: { renderDetail: () => <div>detail</div> },
+      });
+      const corner = document.querySelector('td.dt-corner-start')!;
+      // jsdom doesn't compute the `@media (width < 40rem)` cascade, so this
+      // asserts the selector scope rather than a resolved `right` value:
+      // `:not(.dt-corner-start)` on the triple-collision rule means it can
+      // never match this cell regardless of viewport.
+      expect(corner.matches('.dt-corner:not(.dt-corner-start)')).toBe(false);
+    });
+  });
+
+  describe('disclosure chevron (expandableRow)', () => {
+    it('tags the chevron cell so it clusters beside the actions button in the stacked card', () => {
+      renderTable({
+        rowMoreActions: true,
+        expandableRow: { renderDetail: () => <div>detail</div> },
+      });
+      expect(document.querySelector('td.dt-disclosure')).not.toBeNull();
+    });
+
+    it('is present even without a More-actions button (it just flows on its own instead)', () => {
+      renderTable({ expandableRow: { renderDetail: () => <div>detail</div> } });
+      expect(document.querySelector('td.dt-disclosure')).not.toBeNull();
+    });
+  });
+
   describe('groupBy', () => {
     interface Offer {
       id: number;

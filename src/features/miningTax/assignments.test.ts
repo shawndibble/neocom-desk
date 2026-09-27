@@ -14,6 +14,7 @@ import {
   resolveNeedsReview,
   splitAssignment,
   unlinkPaymentTransaction,
+  unlockPaidAssignment,
   updateAssignment,
 } from './assignments';
 
@@ -197,6 +198,100 @@ describe('updateAssignment', () => {
     expect(updated.status).toBe('paid');
     expect(updated.paidAt).toBe(assignment.paidAt);
     expect(await db.miningTaxAssignments.get(assignment.id)).toEqual(updated);
+    expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+  });
+
+  it('persists per-ore-type value overrides when given', async () => {
+    const assignment = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 30000142,
+      payeeId: 'payee-1',
+      oreLines: [
+        { typeId: TYPE_A, quantity: 100 },
+        { typeId: TYPE_B, quantity: 50 },
+      ],
+      taxPct: 10,
+      estimatedValue: 1200,
+      taxOwed: 120,
+      markPaid: false,
+    });
+
+    const updated = await updateAssignment(assignment, {
+      payeeId: 'payee-1',
+      taxPct: 10,
+      estimatedValue: 1100,
+      taxOwed: 110,
+      oreLineValues: { [TYPE_A]: 900 },
+    });
+
+    expect(updated.oreLineValues).toEqual({ [TYPE_A]: 900 });
+    expect((await db.miningTaxAssignments.get(assignment.id))?.oreLineValues).toEqual({
+      [TYPE_A]: 900,
+    });
+  });
+
+  it('clears any stored per-ore-type overrides when the input omits them', async () => {
+    const assignment = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 30000142,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+      markPaid: false,
+    });
+    await updateAssignment(assignment, {
+      payeeId: 'payee-1',
+      taxPct: 10,
+      estimatedValue: 900,
+      taxOwed: 90,
+      oreLineValues: { [TYPE_A]: 900 },
+    });
+
+    // Back to the "edit ore values individually" setting being off: the
+    // Assign form's whole-row edit doesn't send oreLineValues at all.
+    const reverted = await updateAssignment(assignment, {
+      payeeId: 'payee-1',
+      taxPct: 10,
+      estimatedValue: 1100,
+      taxOwed: 110,
+    });
+
+    expect(reverted.oreLineValues).toBeUndefined();
+    expect((await db.miningTaxAssignments.get(assignment.id))?.oreLineValues).toBeUndefined();
+  });
+});
+
+describe('unlockPaidAssignment', () => {
+  it('reverts status to outstanding and clears paidAt, but keeps the recorded payment', async () => {
+    const assignment = await createAssignment({
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 30000142,
+      payeeId: 'payee-1',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 1000,
+      taxOwed: 100,
+      markPaid: false,
+    });
+    await markAssignmentsPaid([assignment], {
+      method: 'donation',
+      amount: 1000,
+      paidOn: '2026-09-05',
+    });
+    const paid = await db.miningTaxAssignments.get(assignment.id);
+    vi.clearAllMocks();
+
+    const unlocked = await unlockPaidAssignment(paid!);
+
+    expect(unlocked.status).toBe('outstanding');
+    expect(unlocked.paidAt).toBeUndefined();
+    expect(unlocked.payment).toEqual(paid!.payment);
+    expect(await db.miningTaxAssignments.get(assignment.id)).toEqual(unlocked);
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
   });
 });
@@ -777,6 +872,30 @@ describe('resolveNeedsReview', () => {
     expect(updated?.reviewDiff).toBeUndefined();
   });
 
+  it('drops a stale per-ore-type override — it named typeIds against the pre-review line set', async () => {
+    const assignment: MiningTaxAssignmentRecord = {
+      id: 'a1',
+      characterId: CHAR_A,
+      date: '2026-09-04',
+      solarSystemId: 1,
+      payeeId: 'p',
+      oreLines: [{ typeId: TYPE_A, quantity: 100 }],
+      taxPct: 10,
+      estimatedValue: 900,
+      taxOwed: 90,
+      status: 'needs-review',
+      reviewDiff: [{ typeId: TYPE_A, before: 100, after: 150 }],
+      oreLineValues: { [TYPE_A]: 900 },
+      updatedAt: 1,
+    };
+    await db.miningTaxAssignments.put(assignment);
+
+    await resolveNeedsReview(assignment, freshEntry, [assignment]);
+
+    const updated = await db.miningTaxAssignments.get('a1');
+    expect(updated?.oreLineValues).toBeUndefined();
+  });
+
   it('as one of a split entry’s Assignments, re-snapshots only to the types it already claimed', async () => {
     const assignment: MiningTaxAssignmentRecord = {
       id: 'a1',
@@ -1039,6 +1158,18 @@ describe('splitAssignment', () => {
     expect(await db.miningTaxAssignments.get('orig')).toEqual(kept);
     expect(await db.miningTaxAssignments.get(created.id)).toEqual(created);
     expect(syncMock.scheduleSync).toHaveBeenCalledWith(CHAR_A);
+  });
+
+  it('drops a stale per-ore-type override on the kept side — it named typeIds against the pre-split line set', async () => {
+    const original = await seedOriginal({ oreLineValues: { [TYPE_A]: 900 } });
+
+    const { kept } = await splitAssignment(
+      original,
+      { moves: [{ typeId: TYPE_B, quantity: 50 }], payeeId: 'payee-2', taxPct: 8 },
+      atOneHub
+    );
+
+    expect(kept.oreLineValues).toBeUndefined();
   });
 
   it('flags the new side as the collector when asked, and clears the flag on the original', async () => {

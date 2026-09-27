@@ -110,7 +110,9 @@ function PlanRow({
           aria-current={active ? 'true' : undefined}
           className="min-w-0 flex-1 text-left"
         >
-          <span className="block truncate">{plan.name}</span>
+          <span className="block truncate" title={plan.name}>
+            {plan.name}
+          </span>
           {stats && (
             <span className="block truncate text-[0.6875rem] text-text-dim tabular-nums">
               {stats.finish === null

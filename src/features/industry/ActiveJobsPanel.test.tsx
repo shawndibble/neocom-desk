@@ -1303,7 +1303,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     );
 
     await user.click(await screen.findByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('button', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
 
     await expandJobs(user);
     expect(await screen.findByText('Pilot One')).toBeInTheDocument();
@@ -1334,7 +1334,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     );
 
     await user.click(await screen.findByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('button', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
     await expandJobs(user);
 
     // All three selected: Pilot Three's skipped notice shows.
@@ -1342,20 +1342,16 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
       await screen.findByText(/Pilot Three.*hasn't granted industry-jobs access/)
     ).toBeInTheDocument();
 
-    // Narrow the filter to exclude Pilot Three — its notice must go with it,
-    // even though it's still a real skipped Character overall (issue #607
-    // CodeRabbit review: the notice list must follow the same filter the
-    // job rows do).
+    // Narrow the filter back to "This character" — the notice list must
+    // follow the same filter the job rows do (issue #607 CodeRabbit review),
+    // not just keep listing every skipped Character regardless.
     await user.click(screen.getByRole('button', { name: 'All characters' }));
-    await user.click(screen.getByRole('option', { name: 'Pilot Three' }));
-    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('menuitemradio', { name: 'This character' }));
 
     expect(
       screen.queryByText(/Pilot Three.*hasn't granted industry-jobs access/)
     ).not.toBeInTheDocument();
-    const table = screen.getByRole('table', { name: 'Active jobs' });
-    expect(within(table).getByText('Pilot One')).toBeInTheDocument();
-    expect(within(table).getByText('Pilot Two')).toBeInTheDocument();
+    expect(screen.queryByText('Pilot Two')).not.toBeInTheDocument();
   });
 
   it("grants a lapsed alt's own grant, not the active Character's, and names them", async () => {
@@ -1380,7 +1376,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     );
 
     await user.click(await screen.findByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('button', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
 
     expect(await screen.findByText('Pilot Two — Log in again to see jobs')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Log in again with EVE Online' }));
@@ -1406,7 +1402,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     );
 
     await user.click(await screen.findByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('button', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
 
     // "No data cached", not "None" — a failed read must not read as an answer
     // of zero running jobs.
@@ -1466,7 +1462,7 @@ describe('ActiveJobsPanel: cross-character view (issue #607)', () => {
     });
 
     await user.click(screen.getByRole('button', { name: 'This character' }));
-    await user.click(await screen.findByRole('button', { name: 'All characters' }));
+    await user.click(await screen.findByRole('menuitemradio', { name: 'All characters' }));
 
     // Both: 4+2=6 max, 2 running -> 4 open. Science/reaction stay at the
     // untrained 1/1 for both characters (base slot only), summed to 2/2.

@@ -113,10 +113,7 @@ import {
   JumpRangeSelect,
 } from '@/features/route/JumpRangeControls';
 import { renderJumpsCell } from '@/features/route/jumpsCell';
-import {
-  BuildPlanContextMenu,
-  BpcOfferMoreActions,
-} from '@/features/industry/BuildPlanContextMenu';
+import { BuildPlanContextMenu } from '@/features/industry/BuildPlanContextMenu';
 import { loadCharacterBlueprints } from '@/features/industry/data';
 import { loadBlueprints } from '@/sde/loadSde';
 import { isSyncConfigured } from '@/app/syncStatus';
@@ -1234,12 +1231,22 @@ export function BpcSourcingPanel() {
           // reads `effectivePrice`. Long press, not tap: a row tap opens the
           // contract.
           //
-          // A contract asking for PLEX (issue #1105) has an ISK `price` of
-          // `0` — the ask is the PLEX, not a real zero — so its requested
-          // quantity is shown here instead of the ISK figure `sortValue`
-          // would otherwise reflect as "free".
+          // A contract asking for PLEX (issue #1105) usually has an ISK
+          // `price` of `0` — the ask is the PLEX, not a real zero — so its
+          // requested quantity is shown here instead of the ISK figure
+          // `sortValue` would otherwise reflect as "free". Some issuers ask
+          // for both an ISK amount and PLEX in the same contract, so a real
+          // (non-zero) price alongside `requestedPlex` is shown as both
+          // figures rather than the PLEX one alone hiding the ISK ask.
           const amount = contract.requestedPlex ? (
-            t('bpcContracts.plexPrice', { plex: contract.requestedPlex.toLocaleString() })
+            contract.price > 0 ? (
+              t('bpcContracts.iskPlusPlexPrice', {
+                isk: formatIskAuto(contract.price, CONTRACT_ISK_CENTS_BELOW),
+                plex: contract.requestedPlex.toLocaleString(),
+              })
+            ) : (
+              t('bpcContracts.plexPrice', { plex: contract.requestedPlex.toLocaleString() })
+            )
           ) : contract.isAuction ? (
             contract.buyout !== undefined ? (
               t('bpcContracts.buyout', {
@@ -1385,22 +1392,6 @@ export function BpcSourcingPanel() {
     for (const id of BPC_SEARCH_COLUMN_IDS) {
       if (visibleColumns.includes(id)) cols.push(bpcColumnsById[id]);
     }
-    cols.push({
-      // Visible keyboard-reachable equivalent of the row's own
-      // `rowContextMenu` below (WCAG 2.1.1, issue #1498) — same item list,
-      // same seed, through `BuildPlanContextMenu`'s shared
-      // `useBuildPlanMenuNodes`, so the two can't drift.
-      id: 'moreActions',
-      header: '',
-      align: 'right',
-      render: (row) => (
-        <BpcOfferMoreActions
-          typeId={row.typeId}
-          itemName={blueprintNames.get(row.typeId)}
-          seed={row.runs === -1 ? null : { me: row.me, te: row.te, runs: row.runs }}
-        />
-      ),
-    });
     return cols;
   }, [
     t,
@@ -1446,6 +1437,7 @@ export function BpcSourcingPanel() {
         <IconButton
           icon={<Icon.Refresh />}
           label={t('bpcContracts.refresh')}
+          size="sm"
           onClick={() => {
             refresh();
             setMarketRefreshTick((tick) => tick + 1);
@@ -1741,6 +1733,7 @@ export function BpcSourcingPanel() {
                 {...sortProps}
                 // No contract exists for an owned row — nothing to open.
                 onRowClick={(row) => setOpenRow(asContract(row))}
+                rowMoreActions
                 rowContextMenu={(row, tr) => (
                   // The Offer's own ME/TE/runs, not the defaults, so a pilot
                   // shopping a specific copy sees what *that* copy builds. A

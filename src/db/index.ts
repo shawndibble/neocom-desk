@@ -646,6 +646,16 @@ export interface MiningTaxAssignmentRecord {
   taxPct: number;
   /** ISK value of `oreLines` at Jita price, snapshotted at assignment time — pilot-editable at assignment. */
   estimatedValue: number;
+  /**
+   * Per-ore-type total ISK value overrides, keyed by `typeId` (grilling
+   * session, 2026-09-27) — only present for lines the pilot has corrected
+   * against their own (e.g. a corp's moon-tax tool's) figures; a line this
+   * map omits still prices from `estimatedValue`'s own basis. Only ever
+   * written when the pilot has the "edit ore values individually" setting on
+   * (`features/miningTax/oreValueMode.ts`); with it off, `estimatedValue` is
+   * the pilot-editable total directly, same as before this existed.
+   */
+  oreLineValues?: Record<number, number>;
   /** Snapshotted at assignment time — defaults to `estimatedValue * taxPct / 100` but is pilot-editable. Always 0 for `dismissed`. */
   taxOwed: number;
   status: MiningTaxAssignmentStatus;
@@ -959,6 +969,9 @@ export const db = new Dexie('neocom') as Dexie & {
  * reporting after the close would lose the diagnosis. It is a signal rather
  * than a Sentry call because `src/db` ships inside the service-worker bundle,
  * which must not carry the React SDK.
+ *
+ * Another tab *deleting* the database is the other disruption: the app shell
+ * reloads on it (`app/databaseWipe.ts`), which a worker has no page to do.
  */
 db.on('blocked', (event) => {
   emitUpgradeBlocked({ oldVersion: event.oldVersion, newVersion: event.newVersion });

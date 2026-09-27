@@ -190,6 +190,7 @@ export const FULL_MINING_TAX_ASSIGNMENT: Required<MiningTaxAssignmentRecord> = {
     journalLinks: [{ refId: 123, source: 'auto' }],
     contractLinks: [{ refId: 456, source: 'manual' }],
   },
+  oreLineValues: { 45490: 4_800_000 },
   updatedAt: UPDATED_AT,
 };
 

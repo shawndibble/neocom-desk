@@ -136,18 +136,20 @@ export function VariationsTable({ rows, prices, onSelect, onCompare }: Variation
           </Button>
         </span>
       </div>
-      <DataTable
-        columns={columns}
-        rows={rows}
-        rowKey={(row) => row.typeId}
-        label={t('market.variations.title')}
-        defaultSort={{ columnId: 'sell', direction: 'asc' }}
-        density="compact"
-        onRowClick={(row) => onSelect(row.typeId)}
-        rowContextMenu={rowContextMenu}
-        rowMoreActions
-        mobileSort
-      />
+      <div className="overflow-x-auto">
+        <DataTable
+          columns={columns}
+          rows={rows}
+          rowKey={(row) => row.typeId}
+          label={t('market.variations.title')}
+          defaultSort={{ columnId: 'sell', direction: 'asc' }}
+          density="compact"
+          onRowClick={(row) => onSelect(row.typeId)}
+          rowContextMenu={rowContextMenu}
+          rowMoreActions
+          mobileSort
+        />
+      </div>
     </div>
   );
 }

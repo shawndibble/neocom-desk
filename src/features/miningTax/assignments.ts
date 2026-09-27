@@ -188,6 +188,15 @@ export interface UpdateAssignmentInput {
   taxPct: number;
   estimatedValue: number;
   taxOwed: number;
+  /**
+   * The pilot's per-ore-type corrections, when the "edit ore values
+   * individually" setting is on — omit (not an empty object) to leave
+   * whatever was previously stored untouched only when the setting is off
+   * *and* the record never had any; otherwise this always replaces the
+   * stored map outright, so a line the pilot cleared back to tracking the
+   * computed default is actually gone, not silently kept from a prior edit.
+   */
+  oreLineValues?: Record<number, number>;
 }
 
 /**
@@ -196,11 +205,17 @@ export interface UpdateAssignmentInput {
  * correctable after the fact (a Jita price or a Payee's rate can turn out
  * wrong after the invoice moment `createAssignment` snapshotted).
  *
- * Deliberately leaves two things alone: `oreLines`, since line membership is
+ * Deliberately leaves one thing alone: `oreLines`, since line membership is
  * what the sole-vs-split ownership rule (`rowStatus.ts`) keys off — resplitting
- * a record happens through Undo + a fresh Assign, not this edit — and
- * `status`/`paidAt`, so correcting a Paid record's ISK doesn't silently
- * un-pay it.
+ * a record happens through Undo + a fresh Assign, not this edit. `status`/
+ * `paidAt` are also left alone here — correcting a Paid record's ISK doesn't
+ * silently un-pay it; `unlockPaidAssignment` is the only thing that reopens a
+ * Paid record, and only the pilot calling it explicitly does that.
+ *
+ * `oreLineValues` replaces whatever was stored outright (or is removed
+ * entirely when omitted) rather than merging — the Assign form always
+ * recomputes the whole map from what's currently in each per-ore box, so a
+ * partial merge here would resurrect a correction the pilot just cleared.
  *
  * Moving a *joined* member onto a different Payee or rate does drop its
  * `groupId`, though. A group is one obligation billed to one Payee at one
@@ -221,8 +236,36 @@ export async function updateAssignment(
     taxOwed: input.taxOwed,
     updatedAt: Date.now(),
   };
+  if (input.oreLineValues !== undefined) updated.oreLineValues = input.oreLineValues;
+  else delete updated.oreLineValues;
   const termsChanged = input.payeeId !== assignment.payeeId || input.taxPct !== assignment.taxPct;
   if (termsChanged) delete updated.groupId;
+  await db.miningTaxAssignments.put(updated);
+  scheduleSync(assignment.characterId);
+  return updated;
+}
+
+/**
+ * Reopens a Paid Assignment for editing ("unlock to edit", grilling session
+ * 2026-09-27) — reverts `status` to `outstanding` and clears `paidAt` so the
+ * row detail view's fields stop rendering read-only, but deliberately leaves
+ * `payment` (the recorded amount/method/date and any matched wallet-journal
+ * or contract reference) exactly as it was: the pilot is correcting a
+ * data-entry mistake, not reversing a real payment, and losing an
+ * already-matched reconciliation over a routine ore-value fix would be a
+ * real chore. Re-marking the corrected record paid afterward
+ * (`markAssignmentsPaid`, with no `payment` argument) reuses that same
+ * retained record rather than asking for it again.
+ */
+export async function unlockPaidAssignment(
+  assignment: MiningTaxAssignmentRecord
+): Promise<MiningTaxAssignmentRecord> {
+  const updated: MiningTaxAssignmentRecord = {
+    ...assignment,
+    status: 'outstanding',
+    updatedAt: Date.now(),
+  };
+  delete updated.paidAt;
   await db.miningTaxAssignments.put(updated);
   scheduleSync(assignment.characterId);
   return updated;
@@ -530,6 +573,14 @@ export async function splitAssignment(
     taxOwed: keptValue.taxOwed,
     updatedAt: now,
   };
+  // A per-ore-type override (`oreLineValues`) names typeIds against the
+  // *original*'s line set — splitting changes which lines this record
+  // covers, so a carried-over override would either dangle (a moved type no
+  // longer here) or silently misprice a kept line the pilot never corrected
+  // for this half of the split. Both sides re-price independently
+  // (`SplitPrices`'s own doc comment); a hand-edited correction does not
+  // survive that same way.
+  delete kept.oreLineValues;
   delete kept.collectsGrowth;
   if (input.collector === 'original') kept.collectsGrowth = true;
   if (original.status === 'needs-review') {
@@ -625,6 +676,10 @@ export async function resolveNeedsReview(
   };
   delete updated.reviewDiff;
   delete updated.paidAt;
+  // Same reason `splitAssignment` drops it: `oreLineValues` names typeIds
+  // against the pre-review line set, and growth can add or resize lines —
+  // a carried-over override would misprice this fresh re-snapshot.
+  delete updated.oreLineValues;
   await db.miningTaxAssignments.put(updated);
   scheduleSync(assignment.characterId);
 }

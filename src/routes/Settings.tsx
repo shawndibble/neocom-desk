@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -62,6 +61,7 @@ import {
 } from '@/engine/industry/types';
 import { rigKindLabelKey } from '@/features/industry/rigFitLabels';
 import { useMarketHub } from '@/features/market/hub';
+import { useMiningTaxOreValueMode } from '@/features/miningTax/oreValueMode';
 import { useAssumedMe, MIN_ASSUMED_ME, MAX_ASSUMED_ME } from '@/features/industry/assumedMe';
 import { useAssumedTe, MIN_ASSUMED_TE, MAX_ASSUMED_TE } from '@/features/industry/assumedTe';
 import { useIncludeBlueprintCost } from '@/features/industry/includeBlueprintCost';
@@ -488,35 +488,6 @@ function DataPanel() {
         {clearedConfirm && <ActionConfirmation message={t('settings.clearCacheConfirm')} />}
         <ResetViewPreferences />
       </div>
-    </Panel>
-  );
-}
-
-/**
- * CCP's Developer License Agreement, which this app's SDE snapshot and ESI
- * access already depend on, requires a credit for CCP-owned data; the
- * Fittings section's ship-fitting math (`@eveshipfit/sde`, ADR 0016) ships
- * its own copy of that agreement as `LICENSE.EVE`, vendored at
- * `/vendor/dogma/LICENSE.EVE` alongside the data itself
- * (`vite.config.ts`'s `copyDogmaEngineAssets`). This had no home anywhere in
- * the app before Fittings — issue #1531.
- */
-function DataAttributionPanel() {
-  const { t } = useTranslation();
-
-  return (
-    <Panel title={t('settings.dataAttributionTitle')}>
-      <p className="text-xs text-text-dim">
-        {t('settings.dataAttributionText')}{' '}
-        <a
-          href="/vendor/dogma/LICENSE.EVE"
-          target="_blank"
-          rel="noreferrer"
-          className={inlineLinkClassName}
-        >
-          {t('settings.dataAttributionLink')}
-        </a>
-      </p>
     </Panel>
   );
 }
@@ -1059,6 +1030,30 @@ function MarketDefaultsPanel() {
   );
 }
 
+function MiningTaxDefaultsPanel() {
+  const { t } = useTranslation();
+  const oreValueMode = useMiningTaxOreValueMode((state) => state.value);
+  const setOreValueMode = useMiningTaxOreValueMode((state) => state.setValue);
+  const hydrated = useHydratedStore(useMiningTaxOreValueMode);
+
+  return (
+    <Panel title={t('settings.miningTaxDefaultsTitle')}>
+      {hydrated ? (
+        <div className="max-w-md space-y-4">
+          <p className="text-xs text-text-dim">{t('settings.defaultsSyncHint')}</p>
+          <label className="flex items-center gap-2 text-xs font-semibold">
+            <Checkbox checked={oreValueMode} onChange={() => void setOreValueMode(!oreValueMode)} />
+            {t('settings.miningTaxOreValueModeLabel')}
+          </label>
+          <p className="text-xs text-text-dim">{t('settings.miningTaxOreValueModeHint')}</p>
+        </div>
+      ) : (
+        <Spinner />
+      )}
+    </Panel>
+  );
+}
+
 function CharacterDefaultsPanel() {
   const { t } = useTranslation();
   const defaultCharacterFilter = useDefaultCharacterFilter((state) => state.value);
@@ -1079,11 +1074,6 @@ function CharacterDefaultsPanel() {
   // a device with none active right now (`CharacterFilterControl` already
   // omits that quick-select when this is null).
   const activeCharacterId = useActiveCharacter((state) => state.activeCharacterId);
-  const allCharacters = useLiveQuery(() => db.characters.toArray(), [], []);
-  const characterFilterCandidates = useMemo(
-    () => (allCharacters ?? []).map((c) => ({ characterId: c.characterId, characterName: c.name })),
-    [allCharacters]
-  );
 
   if (!ready) {
     return (
@@ -1103,7 +1093,6 @@ function CharacterDefaultsPanel() {
           </span>
           <p className="text-xs text-text-dim">{t('settings.defaultCharacterFilterHint')}</p>
           <CharacterFilterControl
-            characters={characterFilterCandidates}
             activeCharacterId={activeCharacterId}
             value={fromStoredCharacterFilterValue(defaultCharacterFilter)}
             onChange={(next) => void setDefaultCharacterFilter(toStoredCharacterFilterValue(next))}
@@ -1400,6 +1389,7 @@ export function Settings() {
             </>
           )}
           {section === 'market' && <MarketDefaultsPanel />}
+          {section === 'miningTax' && <MiningTaxDefaultsPanel />}
           {section === 'characters' && <CharacterDefaultsPanel />}
           {section === 'corporation' && <CorpDefaultsPanel />}
           {/* The Overview feed's "Settings" link targets `/settings/notifications` directly. */}
@@ -1410,7 +1400,6 @@ export function Settings() {
               <DataPanel />
               <ExportPanel />
               <ImportPanel />
-              <DataAttributionPanel />
               <UpdatePanel />
               <DevicePanel />
             </>

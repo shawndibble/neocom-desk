@@ -48,15 +48,30 @@
   <body>
     <main>
       <h1>Delete Your Data — Neocom Desk</h1>
-      <p class="updated">Last updated: September 22, 2026</p>
+      <p class="updated">Last updated: September 26, 2026</p>
 
       <p>
         Neocom Desk has no separate account or password — you sign in with your EVE Online character
-        through CCP's own login. Removing a character from the app is how you delete its data, both
-        an account deletion and a data deletion at once.
+        through CCP's own login. Synced data on the server is deleted in one of two ways: right away
+        with <strong>Delete all data</strong>, or automatically after 90 days without a sync.
       </p>
 
-      <h2>How to delete a character's data</h2>
+      <h2>Delete everything now</h2>
+      <ol>
+        <li>Open Neocom Desk and sign in.</li>
+        <li>Go to <strong>Settings</strong> → <strong>Data &amp; storage</strong>.</li>
+        <li>
+          Under <strong>Delete all data</strong>, click <strong>Delete all</strong> and confirm.
+        </li>
+      </ol>
+      <p>
+        This deletes the synced data of every character logged in on this device from the sync
+        server, then erases everything the app stores on this device. A character whose login has
+        expired, or a deletion made while offline, cannot reach the server; that character's synced
+        data is then deleted automatically after 90 days without a sync.
+      </p>
+
+      <h2>Remove one character from a device</h2>
       <ol>
         <li>Open Neocom Desk and sign in.</li>
         <li>Go to the <strong>Characters</strong> page.</li>
@@ -65,7 +80,6 @@
         </li>
         <li>Confirm the removal.</li>
       </ol>
-      <p>To remove every character (delete everything), repeat this for each one.</p>
 
       <h2>What gets deleted, and when</h2>
       <ul>
@@ -74,33 +88,18 @@
           quickbar, and cached game data are deleted from local storage right away.
         </li>
         <li>
-          <strong>On the sync server, immediately if possible:</strong> if a session can still be
-          started as that character, its synced plans, build plans, quickbar, and settings are
-          deleted from Firebase in the same action.
-        </li>
-        <li>
-          <strong>On the sync server, deferred:</strong> if a session can't be re-established (for
-          example, the character's login is already expired), the synced data is deleted
-          automatically the next time you sign in as that character. There is no other retention
-          period beyond that.
+          <strong>On the sync server, after 90 days:</strong> if you use sync, that character's
+          synced plans, build plans, quickbar, and settings stay on Firebase so that adding the
+          character back restores them. They are deleted automatically once no device has synced
+          that character for 90 days. There is no other retention period beyond that.
         </li>
       </ul>
 
       <h2>Removing everything without opening the app</h2>
       <p>
-        Uninstalling the app, or clearing its site data in your browser, immediately deletes all
-        locally cached data for every character. It does not delete synced data left on the server —
-        use the in-app removal above for that, or contact us below.
-      </p>
-
-      <h2>Need it done for you</h2>
-      <p>
-        If a character's login can no longer be used to sign in and you want its synced data removed
-        manually, open an issue at
-        <a href="https://github.com/shawndibble/neocom-desk/issues" target="_blank" rel="noopener"
-          >github.com/shawndibble/neocom-desk/issues</a
-        >
-        naming the character.
+        Uninstalling the app, or clearing its site data on your device, immediately deletes all
+        locally cached data for every character. Synced data left on the server is deleted after 90
+        days without a sync. To delete it sooner, use <strong>Delete all data</strong> above.
       </p>
 
       <p>See also the <a href="/privacy.html">Privacy Policy</a>.</p>

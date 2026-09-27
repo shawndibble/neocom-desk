@@ -67,6 +67,8 @@ interface RowDetailModalProps {
   /** Opens the manual "Link transaction" picker (issue #540 follow-up) — offered whenever there is a payment to link against, paid or not. */
   onLinkTransaction?: () => void;
   onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
+  /** Reopens a Paid Assignment for editing ("unlock to edit") — offered only when `assignment.status === 'paid'`. */
+  onUnlock?: () => void | Promise<void>;
 }
 
 /**
@@ -100,6 +102,7 @@ export function RowDetailModal({
   linkedTransactions,
   onLinkTransaction,
   onUnlinkTransaction,
+  onUnlock,
 }: RowDetailModalProps) {
   const { t } = useTranslation();
   const oreLines = assignment ? assignment.oreLines : row.unassignedOreLines;
@@ -297,6 +300,7 @@ export function RowDetailModal({
             onAssigned={onAssigned}
             onCancel={onClose}
             onAddPayee={onAddPayee}
+            onUnlock={onUnlock}
             extraActions={
               <>
                 {status === 'unassigned' && (

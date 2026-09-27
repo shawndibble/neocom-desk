@@ -205,6 +205,32 @@ export function useUrlSort(
  * for reasons unrelated to the field it names, that settling looks
  * indistinguishable from a real change and the filter is wiped for it.
  */
+/** A filter object's fields, read off a `useUrlParams`-shaped values record. */
+export function filterFromParamValues<F extends object>(
+  values: Record<string, unknown>,
+  fieldToParam: Record<keyof F & string, string>
+): F {
+  const result = {} as F;
+  for (const field in fieldToParam) {
+    const key = field as keyof F & string;
+    result[key] = values[fieldToParam[key]] as F[typeof key];
+  }
+  return result;
+}
+
+/** The inverse of `filterFromParamValues`: a whole filter object as a params patch. */
+export function paramsPatchFromFilter<F extends object>(
+  next: F,
+  fieldToParam: Record<keyof F & string, string>
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  for (const field in fieldToParam) {
+    const key = field as keyof F & string;
+    patch[fieldToParam[key]] = next[key];
+  }
+  return patch;
+}
+
 export function useUrlFilter<F extends object>(
   scopeKey: string,
   schema: UrlParamSchema,
@@ -212,23 +238,12 @@ export function useUrlFilter<F extends object>(
   emptyParams: Record<string, unknown>
 ): [F, (next: F) => void] {
   const [params, setParams] = useUrlParams(schema);
-  const filter = useMemo(() => {
-    const result = {} as F;
-    for (const field in fieldToParam) {
-      const key = field as keyof F & string;
-      result[key] = params[fieldToParam[key]] as F[typeof key];
-    }
-    return result;
-  }, [params, fieldToParam]);
+  const filter = useMemo(
+    () => filterFromParamValues<F>(params, fieldToParam),
+    [params, fieldToParam]
+  );
   const setFilter = useCallback(
-    (next: F) => {
-      const patch: Record<string, unknown> = {};
-      for (const field in fieldToParam) {
-        const key = field as keyof F & string;
-        patch[fieldToParam[key]] = next[key];
-      }
-      setParams(patch);
-    },
+    (next: F) => setParams(paramsPatchFromFilter(next, fieldToParam)),
     [fieldToParam, setParams]
   );
   const lastScopeKey = useRef(scopeKey);
