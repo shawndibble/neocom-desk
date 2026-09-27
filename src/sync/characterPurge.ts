@@ -1,9 +1,7 @@
 // Remote-data purge for a removed Character (parity plan §5.7 item 3): the
-// delete counterpart to planSync's push/pull, for every piece of Editable
-// Data (CONTEXT.md) a Character owns — plans, buildPlans, quickbars,
-// stationPins, planetRichness, settings, notificationFeed, productionRuns,
-// productionSaleLinks, productionOrderWatches, payees, miningTaxAssignments
-// under /characters/{uid}.
+// delete counterpart to planSync's push/pull, for every collection a
+// Character owns under /characters/{uid} — every declaration in the synced
+// collection registry (syncedCollections.ts's REMOTE_COLLECTIONS).
 //
 // Firestore rules grant `delete` uid-only, unlike `get`/`update`, which also
 // require an ownerHash match (see firestore.rules) — the same rule that lets
@@ -26,33 +24,8 @@
 import { collection, deleteDoc, doc, getDocs, type Firestore } from 'firebase/firestore/lite';
 import { db } from '@/db';
 import { getSyncFirestore } from './firebaseApp';
+import { REMOTE_COLLECTION_NAMES } from './syncedCollections';
 import { ensureSignedIn } from './syncAuth';
-
-/**
- * Every Editable Data collection a Character owns remotely — the purge list,
- * and also the authoritative answer to "what leaves this device".
- *
- * Exported for `features/faq`, whose "What We Store" section is a promise to
- * the user about exactly this set: a test there maps each entry to the line
- * that tells the user about it, so a collection added here without a
- * corresponding line fails that test rather than silently making the section
- * untrue.
- */
-export const REMOTE_COLLECTIONS = [
-  'plans',
-  'buildPlans',
-  'quickbars',
-  'stationPins',
-  'planetRichness',
-  'payees',
-  'fittings',
-  'miningTaxAssignments',
-  'settings',
-  'notificationFeed',
-  'productionRuns',
-  'productionSaleLinks',
-  'productionOrderWatches',
-] as const;
 
 /** Marker prefix in `db.settings`. Device-local; mirrors `esi/cachePurge.ts`. */
 export const REMOTE_PURGE_PENDING_PREFIX = 'remotePurgePending.';
@@ -86,7 +59,7 @@ async function deleteAllDocs(firestore: Firestore, uid: string, name: string): P
 export async function purgeCharacterRemoteData(characterId: number): Promise<void> {
   const uid = await ensureSignedIn(characterId);
   const firestore = getSyncFirestore();
-  for (const name of REMOTE_COLLECTIONS) {
+  for (const name of REMOTE_COLLECTION_NAMES) {
     await deleteAllDocs(firestore, uid, name);
   }
 }

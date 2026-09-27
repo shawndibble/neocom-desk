@@ -4,7 +4,7 @@
 
 import type { CharacterRecord, SettingRecord, TokenRecord } from '@/db';
 
-/** A row from one of the Editable Data tables in `REMOTE_COLLECTIONS` (`sync/characterPurge.ts`) that carries `characterId`. */
+/** A row from one of the Editable Data tables (`sync/syncedCollections.ts`'s `EDITABLE_COLLECTIONS`) that carries `characterId`. */
 export interface EditableRow {
   characterId: number;
   [key: string]: unknown;
@@ -14,7 +14,7 @@ export interface EditableRow {
 export interface BackupPayload {
   characters: CharacterRecord[];
   tokens: TokenRecord[];
-  /** Dexie table name -> rows, for every table in `REMOTE_COLLECTIONS`. */
+  /** Dexie table name -> rows, for every table in `EDITABLE_COLLECTIONS`. */
   editableTables: Record<string, EditableRow[]>;
   /** Only rows whose key passes `isAllowedSyncedSettingKey` (`sync/syncedSettings.ts`). */
   settings: SettingRecord[];

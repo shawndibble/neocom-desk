@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { db } from '@/db';
+import { FULL_RECORDS } from '@/sync/syncedCollectionFixtures';
+import { EDITABLE_COLLECTIONS } from '@/sync/syncedCollections';
 import { exportBackup, importBackup } from './io';
 
 const PASSWORD = 'correct horse battery staple';
@@ -102,5 +105,49 @@ describe('exportBackup / importBackup', () => {
     // reaching the failing table.
     await expect(db.characters.get(3)).resolves.toBeUndefined();
     await expect(db.tokens.get(3)).resolves.toBeUndefined();
+  });
+});
+
+/**
+ * ADR 0014's file format is a promise to every backup already sitting in a
+ * pilot's downloads folder. `__fixtures__/backup-v1.json` was written by the
+ * export code as it stood before the synced-collection registry (issue
+ * #2043), with one full row in every Editable Data table, so this fails if a
+ * refactor stops restoring any table an existing file carries.
+ */
+describe('restoring an existing-format backup file', () => {
+  const FIXTURE = readFileSync(new URL('./__fixtures__/backup-v1.json', import.meta.url), 'utf8');
+  const FIXTURE_PASSWORD = 'fixture password';
+
+  beforeEach(async () => {
+    await Promise.all(EDITABLE_COLLECTIONS.map((c) => db.table(c.table).clear()));
+  });
+
+  it('restores the Character, its token and its synced settings', async () => {
+    const summary = await importBackup(FIXTURE, FIXTURE_PASSWORD);
+
+    expect(summary).toEqual({
+      addedCharacterIds: [1],
+      skippedCharacterIds: [],
+      addedSettingKeys: ['sync.marketHub'],
+      skippedSettingKeys: [],
+    });
+    expect((await db.characters.get(1))?.name).toBe('Fixture Pilot');
+    expect((await db.tokens.get(1))?.refreshToken).toBe('fixture-refresh');
+    expect((await db.settings.get('sync.marketHub'))?.value).toBe('amarr');
+    // Never exported in the first place: only allow-listed `sync.` keys travel.
+    expect(await db.settings.get('activeCharacterId')).toBeUndefined();
+  });
+
+  it.each(Object.entries(FULL_RECORDS))('restores the %s row intact', async (table, record) => {
+    await importBackup(FIXTURE, FIXTURE_PASSWORD);
+    expect(await db.table(table).toArray()).toEqual([record]);
+  });
+
+  it('restores a row into every Editable Data table the registry declares', async () => {
+    await importBackup(FIXTURE, FIXTURE_PASSWORD);
+    for (const c of EDITABLE_COLLECTIONS) {
+      expect({ [c.table]: await db.table(c.table).count() }).toEqual({ [c.table]: 1 });
+    }
   });
 });

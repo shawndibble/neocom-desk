@@ -9,42 +9,30 @@
 
 import { db } from '@/db';
 import type { LocalTombstone } from './merge';
+import { EDITABLE_COLLECTIONS, type EditableCollection } from './syncedCollections';
 
 export const INTERNAL_PREFIX = 'sync.__';
 
 export const ownerHashKey = (characterId: number): string =>
   `${INTERNAL_PREFIX}ownerHash.${characterId}`;
-export const planTombstonesKey = (characterId: number): string =>
-  `${INTERNAL_PREFIX}tombstones.${characterId}`;
-export const buildPlanTombstonesKey = (characterId: number): string =>
-  `${INTERNAL_PREFIX}buildTombstones.${characterId}`;
-export const quickbarTombstonesKey = (characterId: number): string =>
-  `${INTERNAL_PREFIX}quickbarTombstones.${characterId}`;
-export const stationPinTombstonesKey = (characterId: number): string =>
-  `${INTERNAL_PREFIX}stationPinTombstones.${characterId}`;
-export const planetRichnessTombstonesKey = (characterId: number): string =>
-  `${INTERNAL_PREFIX}planetRichnessTombstones.${characterId}`;
-export const productionRunTombstonesKey = (characterId: number): string =>
-  `${INTERNAL_PREFIX}productionRunTombstones.${characterId}`;
-export const productionSaleLinkTombstonesKey = (characterId: number): string =>
-  `${INTERNAL_PREFIX}productionSaleLinkTombstones.${characterId}`;
-export const productionOrderWatchTombstonesKey = (characterId: number): string =>
-  `${INTERNAL_PREFIX}productionOrderWatchTombstones.${characterId}`;
-export const fittingTombstonesKey = (characterId: number): string =>
-  `${INTERNAL_PREFIX}fittingTombstones.${characterId}`;
-export const payeeTombstonesKey = (characterId: number): string =>
-  `${INTERNAL_PREFIX}payeeTombstones.${characterId}`;
-export const miningTaxAssignmentTombstonesKey = (characterId: number): string =>
-  `${INTERNAL_PREFIX}miningTaxAssignmentTombstones.${characterId}`;
+/**
+ * One Character's tombstone list for one editable collection:
+ * `sync.__<tombstoneSegment>.<characterId>`. The segment is pinned per
+ * collection in `syncedCollections.ts`, so keys already on a device keep
+ * resolving.
+ */
+export const tombstoneKey = (
+  collection: Pick<EditableCollection, 'tombstoneSegment'>,
+  characterId: number
+): string => `${INTERNAL_PREFIX}${collection.tombstoneSegment}.${characterId}`;
 
 /**
  * A per-(Character, collection) **pull cursor** (issue #581): where the last
  * incremental read of that remote collection got to.
  *
  * Keyed Character-first so every cursor for one Character shares a prefix and
- * {@link clearPullCursors} can drop them with a single range scan — this
- * module must not carry a copy of the CollectionSpec list, which would rot
- * silently the next time a collection is added to planSync.ts.
+ * {@link clearPullCursors} can drop them with a single range scan — which also
+ * reaches the Notification Feed's cursor, a collection with no tombstones.
  */
 export const PULL_CURSOR_PREFIX = `${INTERNAL_PREFIX}pullCursor.`;
 export const pullCursorKey = (characterId: number, collectionName: string): string =>
@@ -109,17 +97,7 @@ export async function readTombstones(key: string): Promise<LocalTombstone[]> {
 export async function clearCharacterSyncBookkeeping(characterId: number): Promise<void> {
   await db.settings.bulkDelete([
     ownerHashKey(characterId),
-    planTombstonesKey(characterId),
-    buildPlanTombstonesKey(characterId),
-    quickbarTombstonesKey(characterId),
-    stationPinTombstonesKey(characterId),
-    planetRichnessTombstonesKey(characterId),
-    productionRunTombstonesKey(characterId),
-    productionSaleLinkTombstonesKey(characterId),
-    productionOrderWatchTombstonesKey(characterId),
-    payeeTombstonesKey(characterId),
-    fittingTombstonesKey(characterId),
-    miningTaxAssignmentTombstonesKey(characterId),
+    ...EDITABLE_COLLECTIONS.map((collection) => tombstoneKey(collection, characterId)),
   ]);
   await clearPullCursors(characterId);
 }
