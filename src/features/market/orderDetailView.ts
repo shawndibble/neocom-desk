@@ -51,17 +51,6 @@ export interface OrderDetailCacheContents {
   history: ReadonlyMap<string, PriceHistoryResult>;
 }
 
-export const EMPTY_ORDER_DETAIL_CACHES: OrderDetailCacheContents = {
-  regionBooks: new Map(),
-  regionBooksLoading: new Set(),
-  structureBooks: new Map(),
-  jumps: new Map(),
-  refine: new Map(),
-  hubBids: new Map(),
-  hubBidsFailed: new Set(),
-  history: new Map(),
-};
-
 /** The two fees between cost per unit and the relist floor, in ISK per unit. */
 export interface RelistFees {
   salesTax: number;

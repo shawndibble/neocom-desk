@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   assembleOrderDetailView,
-  EMPTY_ORDER_DETAIL_CACHES,
   type OrderDetailCacheContents,
   type OrderDetailSnapshot,
 } from './orderDetailView';
@@ -34,8 +33,20 @@ const SNAPSHOT: OrderDetailSnapshot = {
   skillsByCharacter: new Map(),
 };
 
+/** Every cache empty — nothing fetched yet. */
+const NOTHING_LOADED: OrderDetailCacheContents = {
+  regionBooks: new Map(),
+  regionBooksLoading: new Set(),
+  structureBooks: new Map(),
+  jumps: new Map(),
+  refine: new Map(),
+  hubBids: new Map(),
+  hubBidsFailed: new Set(),
+  history: new Map(),
+};
+
 function caches(overrides: Partial<OrderDetailCacheContents> = {}): OrderDetailCacheContents {
-  return { ...EMPTY_ORDER_DETAIL_CACHES, ...overrides };
+  return { ...NOTHING_LOADED, ...overrides };
 }
 
 describe('assembleOrderDetailView', () => {
