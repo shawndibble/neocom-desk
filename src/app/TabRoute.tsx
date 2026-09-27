@@ -1,19 +1,9 @@
 import type { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { tabFromPathname, tabPath, type PageTabs } from '@/lib/pageTabs';
+import { tabFromPathname, tabPath, type PageTabs, type TabRouteDefaultState } from '@/lib/pageTabs';
 import { useIsPageIndex } from '@/lib/usePageTab';
 
-/**
- * Marker this redirect's own `state` carries, so a page whose default tab
- * hides a sub-choice (Contracts' Items/Courier mode) can tell "this is the
- * generic default landing" apart from an explicit deep link that happens to
- * name that same tab path — `tabFromPathname` resolves both identically, and
- * only `TabRoute` itself, at the moment it decides to redirect, knows which
- * one this was.
- */
-export interface TabRouteDefaultState {
-  tabRouteDefaulted?: boolean;
-}
+export type { TabRouteDefaultState } from '@/lib/pageTabs';
 
 function stateRecord(state: unknown): Record<string, unknown> {
   return typeof state === 'object' && state !== null && !Array.isArray(state)

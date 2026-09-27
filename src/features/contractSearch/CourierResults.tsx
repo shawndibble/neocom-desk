@@ -9,7 +9,6 @@
  * everything that is only true of a haul.
  */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -72,11 +71,12 @@ import { formatIsk, formatIskAuto, formatIskCompact, parseIskAmount } from '@/li
 import { formatMagnitude } from '@/lib/magnitude';
 import { formatTimestamp } from '@/lib/timestamp';
 import { useTimeZone } from '@/lib/timeFormat';
-import { useUrlParams, useUrlSort } from '@/lib/useUrlState';
+import { useRememberedUrlParams, useUrlSort, type UrlParamValues } from '@/lib/useUrlState';
 import { boolParam, enumParam, enumSetParam, optionalIdParam, textParam } from '@/lib/urlState';
 import {
   DEFAULT_COURIER_FILTER,
   useCourierFilterPref,
+  type StoredCourierFilter,
 } from '@/features/contractSearch/courierFilterPref';
 
 /** The filter as the controls hold it: text fields stay strings until they are parsed into the engine's filter. */
@@ -678,87 +678,43 @@ const COURIER_FILTER_PARAMS = {
 };
 const COURIER_SORT = { columnId: 'iskPerJump', direction: 'desc' } as const;
 
-/**
- * The remembered-filter fields' own URL keys (`courierFilterPref.ts`), so
- * "was this given in the URL on this load" can be asked per field — a parsed
- * value equal to its codec default is ambiguous between "not given" and "the
- * reader chose the default", and only the raw query string can tell the two
- * apart (see `courierFilterPref.ts`'s header for why that distinction is the
- * whole point).
- */
-const REMEMBERED_FILTER_URL_KEYS = [
-  'courier.origin',
-  'courier.dest',
-  'courier.space',
-  'courier.hideRisky',
-  'courier.overRate',
-  'courier.minReward',
-  'courier.maxCollateral',
-  'courier.maxVolume',
-  'courier.minDays',
-] as const;
-
-/** Every field `uiFilter` carries — `routeQuery` is the one the stored shape doesn't (see `changedFields`). */
-const FILTER_KEYS: readonly (keyof CourierUiFilter)[] = [
-  'routeQuery',
-  'originRegionId',
-  'destinationRegionId',
-  'destinationSpace',
-  'hideUncompletable',
-  'overRate',
-  'minReward',
-  'maxCollateral',
-  'maxVolume',
-  'minDays',
-];
+type CourierFilterParams = UrlParamValues<typeof COURIER_FILTER_PARAMS>;
 
 /**
- * `===` except for two arrays, compared by contents rather than reference —
- * `destinationSpace` is rebuilt as a fresh array (`[...set]`, `.filter()`,
- * `[...arr, kind]`) every time it is touched at all, including a render
- * where its *contents* end up unchanged, so reference equality alone would
- * read every one of those as "changed" and carry it across regardless of
- * `changedFields`'s point.
+ * The remembered filter (issue #1719, `courierFilterPref.ts`) as the URL
+ * group's own fields — the stored default `useRememberedUrlParams` falls back
+ * to for each field a link leaves out. `courier.q` and `courier.pref` are
+ * absent: neither is remembered.
  */
-function sameValue(a: unknown, b: unknown): boolean {
-  if (Array.isArray(a) && Array.isArray(b)) {
-    return a.length === b.length && a.every((value) => b.includes(value));
-  }
-  return a === b;
+function rememberedParams(stored: StoredCourierFilter): Partial<CourierFilterParams> {
+  return {
+    'courier.origin': stored.originRegionId,
+    'courier.dest': stored.destinationRegionId,
+    'courier.space': new Set(stored.destinationSpace),
+    'courier.hideRisky': stored.hideUncompletable,
+    'courier.overRate': stored.overRate,
+    'courier.minReward': stored.minReward,
+    'courier.maxCollateral': stored.maxCollateral,
+    'courier.maxVolume': stored.maxVolume,
+    'courier.minDays': stored.minDays,
+  };
 }
 
-/**
- * `FilterBar`'s pointer-width surface commits the *whole* filter object on
- * every single-field edit (`src/components/ui/FilterBar.tsx`: "every edit in
- * the pointer-width box lands here immediately"), not a per-field patch. Read
- * naively, that whole object would carry an untouched field's *displayed*
- * value — which, since `uiFilter` blends the URL with the remembered default,
- * is not the same as either source's own value — back into both the URL and
- * storage on an edit to some other field entirely. That is exactly the
- * decision `20260922-221531` forbids in both directions: a remembered default
- * would get mirrored into the URL, and a URL-only value would get written
- * back into storage.
- *
- * This is the one diff `changeFilter` needs: which field(s) `next` actually
- * touched, against the previously *displayed* filter. Both write targets
- * (the raw URL filter, the remembered filter) then spread this same patch
- * onto their own baseline, so an untouched field's value always comes from
- * wherever it already lived, never from the blend — one diff pass rather than
- * one per target.
- */
-function changedFields(
-  displayed: CourierUiFilter,
-  next: CourierUiFilter
-): Partial<CourierUiFilter> {
-  const patch: Partial<CourierUiFilter> = {};
-  for (const key of FILTER_KEYS) {
-    // A dynamic key across a keyed union — TS can't verify the write side
-    // matches the read side per-key, only that both come from `CourierUiFilter`.
-    if (!sameValue(displayed[key], next[key])) {
-      (patch as Record<string, unknown>)[key] = next[key];
-    }
-  }
-  return patch;
+/** The inverse of `rememberedParams`, for only the fields an edit touched. */
+function storedPatch(patch: Partial<CourierFilterParams>): Partial<StoredCourierFilter> {
+  const result: Partial<StoredCourierFilter> = {};
+  if ('courier.origin' in patch) result.originRegionId = patch['courier.origin'];
+  if ('courier.dest' in patch) result.destinationRegionId = patch['courier.dest'];
+  if (patch['courier.space'] !== undefined) result.destinationSpace = [...patch['courier.space']];
+  if (patch['courier.hideRisky'] !== undefined)
+    result.hideUncompletable = patch['courier.hideRisky'];
+  if (patch['courier.overRate'] !== undefined) result.overRate = patch['courier.overRate'];
+  if (patch['courier.minReward'] !== undefined) result.minReward = patch['courier.minReward'];
+  if (patch['courier.maxCollateral'] !== undefined)
+    result.maxCollateral = patch['courier.maxCollateral'];
+  if (patch['courier.maxVolume'] !== undefined) result.maxVolume = patch['courier.maxVolume'];
+  if (patch['courier.minDays'] !== undefined) result.minDays = patch['courier.minDays'];
+  return result;
 }
 
 /**
@@ -946,33 +902,29 @@ interface CourierResultsProps {
 export function CourierResults({ rows, regionNames, characterId }: CourierResultsProps) {
   const { t } = useTranslation();
   const timeZone = useTimeZone();
-  const [params, setParams] = useUrlParams(COURIER_FILTER_PARAMS);
-
-  // The remembered filter (issue #1719): consulted only for a field the URL
-  // itself leaves unset on this load, never mirrored back into it (decision
+  // The remembered filter (issue #1719): a default for each field a link
+  // leaves out, never mirrored back into the URL (decision
   // `20260922-221531` / ADR 0015) — see `courierFilterPref.ts`.
   const rememberedFilter = useCourierFilterPref((state) => state.value);
-  const setRememberedFilter = useCourierFilterPref((state) => state.setValue);
+  const rememberedFilterHydrated = useCourierFilterPref((state) => state.hydrated);
   const hydrateRememberedFilter = useCourierFilterPref((state) => state.hydrate);
   useEffect(() => {
     void hydrateRememberedFilter();
   }, [hydrateRememberedFilter]);
+  const remembered = useMemo(
+    () => ({
+      values: rememberedParams(rememberedFilter),
+      hydrated: rememberedFilterHydrated,
+      remember: (patch: Partial<CourierFilterParams>) => {
+        const { value, setValue } = useCourierFilterPref.getState();
+        void setValue({ ...value, ...storedPatch(patch) });
+      },
+    }),
+    [rememberedFilter, rememberedFilterHydrated]
+  );
+  const [params, setParams] = useRememberedUrlParams(COURIER_FILTER_PARAMS, remembered);
 
-  const location = useLocation();
-  const urlHasField = useMemo(() => {
-    const raw = new URLSearchParams(location.search);
-    const present = new Set(REMEMBERED_FILTER_URL_KEYS.filter((key) => raw.has(key)));
-    return (key: (typeof REMEMBERED_FILTER_URL_KEYS)[number]) => present.has(key);
-  }, [location.search]);
-
-  /**
-   * The filter exactly as the URL states it — no remembered fallback. This is
-   * `uiFilter` below's own write-back baseline: replaying only a real edit
-   * onto *this*, rather than onto the blended `uiFilter`, is what stops an
-   * untouched remembered field from being written into the URL the next time
-   * some other field changes (`carryOnlyChanges`'s own comment).
-   */
-  const rawUrlFilter = useMemo<CourierUiFilter>(
+  const uiFilter = useMemo<CourierUiFilter>(
     () => ({
       routeQuery: params['courier.q'],
       originRegionId: params['courier.origin'],
@@ -986,37 +938,6 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
       minDays: params['courier.minDays'],
     }),
     [params]
-  );
-
-  const uiFilter = useMemo<CourierUiFilter>(
-    () => ({
-      // Free text is never remembered — see `courierFilterPref.ts`'s header.
-      routeQuery: rawUrlFilter.routeQuery,
-      originRegionId: urlHasField('courier.origin')
-        ? rawUrlFilter.originRegionId
-        : rememberedFilter.originRegionId,
-      destinationRegionId: urlHasField('courier.dest')
-        ? rawUrlFilter.destinationRegionId
-        : rememberedFilter.destinationRegionId,
-      destinationSpace: urlHasField('courier.space')
-        ? rawUrlFilter.destinationSpace
-        : rememberedFilter.destinationSpace,
-      hideUncompletable: urlHasField('courier.hideRisky')
-        ? rawUrlFilter.hideUncompletable
-        : rememberedFilter.hideUncompletable,
-      overRate: urlHasField('courier.overRate') ? rawUrlFilter.overRate : rememberedFilter.overRate,
-      minReward: urlHasField('courier.minReward')
-        ? rawUrlFilter.minReward
-        : rememberedFilter.minReward,
-      maxCollateral: urlHasField('courier.maxCollateral')
-        ? rawUrlFilter.maxCollateral
-        : rememberedFilter.maxCollateral,
-      maxVolume: urlHasField('courier.maxVolume')
-        ? rawUrlFilter.maxVolume
-        : rememberedFilter.maxVolume,
-      minDays: urlHasField('courier.minDays') ? rawUrlFilter.minDays : rememberedFilter.minDays,
-    }),
-    [rawUrlFilter, urlHasField, rememberedFilter]
   );
   const preference = params['courier.pref'];
   const [selectedRow, setSelectedRow] = useState<CourierRouteRow | null>(null);
@@ -1237,30 +1158,24 @@ export function CourierResults({ rows, regionNames, characterId }: CourierResult
     };
   }, [selectedRow, rows, filter, narrowToCompletable, narrowToOverRate]);
 
+  /**
+   * `FilterBar` commits the whole filter on every single-field edit;
+   * `useRememberedUrlParams` diffs it against what is shown, so only the
+   * field(s) this edit touched reach the URL and the remembered filter.
+   */
   function changeFilter(next: CourierUiFilter) {
-    // Diffed once, then replayed onto each target's own baseline — not onto
-    // `next`/`uiFilter` directly. See `changedFields`'s comment for why: only
-    // the field(s) this particular edit actually touched belong on either
-    // write.
-    const changed = changedFields(uiFilter, next);
-    const urlNext: CourierUiFilter = { ...rawUrlFilter, ...changed };
     setParams({
-      'courier.q': urlNext.routeQuery,
-      'courier.origin': urlNext.originRegionId,
-      'courier.dest': urlNext.destinationRegionId,
-      'courier.space': new Set(urlNext.destinationSpace),
-      'courier.hideRisky': urlNext.hideUncompletable,
-      'courier.overRate': urlNext.overRate,
-      'courier.minReward': urlNext.minReward,
-      'courier.maxCollateral': urlNext.maxCollateral,
-      'courier.maxVolume': urlNext.maxVolume,
-      'courier.minDays': urlNext.minDays,
+      'courier.q': next.routeQuery,
+      'courier.origin': next.originRegionId,
+      'courier.dest': next.destinationRegionId,
+      'courier.space': new Set(next.destinationSpace),
+      'courier.hideRisky': next.hideUncompletable,
+      'courier.overRate': next.overRate,
+      'courier.minReward': next.minReward,
+      'courier.maxCollateral': next.maxCollateral,
+      'courier.maxVolume': next.maxVolume,
+      'courier.minDays': next.minDays,
     });
-
-    // `routeQuery` has no field on the stored shape — see `courierFilterPref.ts`.
-    const storedChanged = { ...changed };
-    delete storedChanged.routeQuery;
-    void setRememberedFilter({ ...rememberedFilter, ...storedChanged });
   }
 
   /**
