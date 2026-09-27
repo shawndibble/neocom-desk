@@ -1,14 +1,28 @@
 import { useTranslation } from 'react-i18next';
-import { Button, InfoTooltip, Modal, StatChip, TypeIcon } from '@/components/ui';
+import { Link } from 'react-router-dom';
+import { Button, IconButton, InfoTooltip, Modal, StatChip, TypeIcon } from '@/components/ui';
+import * as Icon from '@/components/ui/icons';
+import { inlineLinkClassName } from '@/components/ui/controlStyles';
 import { SecurityValue } from '@/features/character/assetBrowserRows';
-import type { MiningTaxAssignmentRecord, PayeeRecord } from '@/db';
+import type { MiningTaxAssignmentRecord, MiningTaxPaymentLinkSource, PayeeRecord } from '@/db';
 import { STATUS_LABEL_KEY, type MiningTaxRowStatus } from '@/engine/miningTax/rowStatus';
 import { computeAssignmentValue } from '@/engine/miningTax/valuation';
 import { MarketItemLink } from '@/features/market/MarketItemLink';
+import { HIGHLIGHT_PARAM } from '@/lib/highlightParam';
 import { formatIsk } from '@/lib/isk';
+import { formatLocalDate } from '@/lib/localDate';
 import { AssignDialog } from './AssignDialog';
 import { STATUS_TONE } from './statusTone';
 import type { MoonMiningTaxRow } from './snapshot';
+
+/** One linked transaction, resolved for display — `RowDetailModal` itself does no lookups. */
+export interface LinkedTransaction {
+  kind: 'journal' | 'contract';
+  refId: number;
+  source: MiningTaxPaymentLinkSource;
+  /** A short line identifying the transaction (amount/date/label) — `null` when it's fallen out of the cached wallet journal/contracts (the retention gap `paymentLinks.ts` accepts). */
+  label: string | null;
+}
 
 interface RowDetailModalProps {
   open: boolean;
@@ -43,6 +57,16 @@ interface RowDetailModalProps {
   onSplit?: () => void;
   /** Opens the Payee manager over this modal when the pilot has no Payees yet. */
   onAddPayee?: () => void;
+  /**
+   * The Assignment's payment, resolved for display — present only once
+   * `status` is `paid` (or was, before a later needs-review clears it) and a
+   * `payment` record exists. Absent entirely (rather than an empty list)
+   * when there is no payment to show, so the section renders nothing.
+   */
+  linkedTransactions?: readonly LinkedTransaction[];
+  /** Opens the manual "Link transaction" picker (issue #540 follow-up) — offered whenever there is a payment to link against, paid or not. */
+  onLinkTransaction?: () => void;
+  onUnlinkTransaction?: (transaction: LinkedTransaction) => void;
   /** Reopens a Paid Assignment for editing ("unlock to edit") — offered only when `assignment.status === 'paid'`. */
   onUnlock?: () => void | Promise<void>;
 }
@@ -75,6 +99,9 @@ export function RowDetailModal({
   onJoin,
   onSplit,
   onAddPayee,
+  linkedTransactions,
+  onLinkTransaction,
+  onUnlinkTransaction,
   onUnlock,
 }: RowDetailModalProps) {
   const { t } = useTranslation();
@@ -106,12 +133,86 @@ export function RowDetailModal({
       <div className="space-y-3 text-sm">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <span className="text-text-dim">{row.characterName}</span>
-          <StatChip
-            label={t('miningTax.statusColumn')}
-            value={t(`miningTax.status.${STATUS_LABEL_KEY[status]}`)}
-            tone={STATUS_TONE[status]}
-          />
+          <div className="flex flex-wrap items-center gap-1.5">
+            {assignment?.paidAt !== undefined && (
+              <StatChip
+                label={t('miningTax.paidAtLabel')}
+                value={formatLocalDate(new Date(assignment.paidAt))}
+              />
+            )}
+            <StatChip
+              label={t('miningTax.statusColumn')}
+              value={t(`miningTax.status.${STATUS_LABEL_KEY[status]}`)}
+              tone={STATUS_TONE[status]}
+            />
+          </div>
         </div>
+
+        {status === 'paid' && (onLinkTransaction || assignment?.payment) && (
+          <div className="space-y-1.5 rounded-xs border border-line bg-panel-2 p-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[0.6875rem] font-semibold tracking-widest text-text-dim uppercase">
+                {t('miningTax.paymentCardTitle')}
+              </p>
+              {assignment?.payment && (
+                <span className="tabular-nums text-xs text-text-dim">
+                  {formatIsk(assignment.payment.amount)} ISK · {assignment.payment.paidOn}
+                </span>
+              )}
+            </div>
+            {linkedTransactions && linkedTransactions.length > 0 ? (
+              <ul className="divide-y divide-line text-xs">
+                {linkedTransactions.map((tx) => (
+                  <li
+                    key={`${tx.kind}:${tx.refId}`}
+                    className="flex items-center justify-between gap-2 py-1 first:pt-0 last:pb-0"
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {tx.label === null ? (
+                        <span className="text-text-dim">
+                          {t('miningTax.transactionNoLongerCached', { id: tx.refId })}
+                        </span>
+                      ) : (
+                        <Link
+                          to={
+                            tx.kind === 'journal'
+                              ? `/wallet/journal?${HIGHLIGHT_PARAM}=${tx.refId}`
+                              : `/contracts?${HIGHLIGHT_PARAM}=${tx.refId}`
+                          }
+                          className={inlineLinkClassName}
+                        >
+                          {tx.label}
+                        </Link>
+                      )}
+                      {tx.source === 'auto' && (
+                        <span className="ml-1.5 text-[0.6875rem] text-text-dim">
+                          {t('miningTax.transactionAutoMatchedBadge')}
+                        </span>
+                      )}
+                    </span>
+                    {onUnlinkTransaction && (
+                      <IconButton
+                        icon={<Icon.Close />}
+                        label={t('miningTax.unlinkTransactionAction')}
+                        size="sm"
+                        tone="danger"
+                        disabled={busy}
+                        onClick={() => onUnlinkTransaction(tx)}
+                      />
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-text-dim">{t('miningTax.noLinkedTransactions')}</p>
+            )}
+            {onLinkTransaction && (
+              <Button size="sm" disabled={busy} onClick={onLinkTransaction}>
+                {t('miningTax.linkTransactionAction')}
+              </Button>
+            )}
+          </div>
+        )}
 
         {status === 'dismissed' && (
           <div className="flex flex-wrap gap-2">

@@ -697,18 +697,47 @@ export interface MiningTaxAssignmentRecord {
 
 export type MiningTaxPaymentMethod = 'donation' | 'contract' | 'other';
 
+/**
+ * Whether a linked transaction was attached by the silent recorded-payment
+ * matcher (`paymentLinks.ts`'s `autoMatchRecordedPayments`) or picked by the
+ * pilot through the manual "Link transaction" dialog (issue #540 follow-up:
+ * "paying backwards" for an already-Paid row). Both still show a suggestion
+ * before committing — `auto` is never a claim that no one looked, only a
+ * record of which flow it came through, so the row detail can flag it as
+ * "linked automatically" rather than presenting it as pilot-verified.
+ */
+export type MiningTaxPaymentLinkSource = 'auto' | 'manual';
+
+/** One real transaction backing a payment. */
+export interface MiningTaxPaymentLink {
+  /** `WalletJournalEntry.id` or a contract id, depending which array this sits in. */
+  refId: number;
+  source: MiningTaxPaymentLinkSource;
+}
+
 export interface MiningTaxPaymentInfo {
   /** Shared by every Assignment settled in the same lump sum. */
   paymentId: string;
-  /** Local calendar date the pilot says they paid, `YYYY-MM-DD` — a real-world date, not an EVE ledger date. */
+  /**
+   * Local calendar date the pilot says they paid, `YYYY-MM-DD` — a real-world
+   * date, not an EVE ledger date. Never recomputed from `journalLinks`, even
+   * after linking a transaction: this is what Settle-up recorded (or, absent
+   * that, whatever the first linked transaction's own date was), and a pilot
+   * correcting it does so by editing the record, not by linking another
+   * transaction.
+   */
   paidOn: string;
   method: MiningTaxPaymentMethod;
-  /** The whole lump sum, in ISK — the same figure on every Assignment it covered. */
+  /** The whole lump sum, in ISK — the same figure on every Assignment it covered. Never recomputed from linked transactions; see `paidOn`. */
   amount: number;
-  /** Wallet journal entry id (`WalletJournalEntry.id`) the pilot linked this payment to, if any. */
-  journalRefId?: number;
-  /** Contract id the pilot typed or linked, if any. */
-  contractId?: number;
+  /**
+   * Wallet journal entries (`WalletJournalEntry.id`) linked to this payment —
+   * usually one, but a lump sum can be paid in installments, so more than one
+   * is allowed. Absent or empty means nothing has been linked yet.
+   */
+  journalLinks?: MiningTaxPaymentLink[];
+  /** Contracts linked to this payment, same shape as `journalLinks`. */
+  contractLinks?: MiningTaxPaymentLink[];
 }
 
 /**
